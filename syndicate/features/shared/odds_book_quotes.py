@@ -558,38 +558,58 @@ def quote_ref_for_bet(
     line: Any = None,
     player_name: Any = None,
     bookmaker: Any = None,
+    home_team: Any = None,
+    away_team: Any = None,
+    matchup: Any = None,
     now: datetime | None = None,
 ) -> dict[str, Any] | None:
-    """Resolve the quote a bet was struck against, for recording at bet time.
+    """Resolve the quote a bet was struck against.
 
-    Matching is deliberately tolerant. The board's `market`/`selection` wording
-    is not OddsAPI's (`h2h` vs `moneyline`, a team name vs `home`), and a bet
-    logged from a card may carry only some of the fields. So this narrows
-    progressively -- event, then market, then selection, then line -- and returns
-    the best-supported match rather than requiring an exact key.
+    IDENTITY IS A HARD FILTER. An earlier version narrowed progressively with a
+    `narrowed or candidates` fallback at every step, so a bet whose event did
+    not match simply fell through to the whole day's rows and came back with
+    some *other* game's price. That is strictly worse than returning nothing:
+    a missing quote is visibly missing, a wrong one silently misprices the card
+    and, once #213 records it at bet time, poisons CLV. Verified against
+    production 2026-08-06, where MLB candidates carry a StatsAPI gamePk
+    (`824804`) while quotes carry an OddsAPI event hash, so EVERY MLB row hit
+    that fallback.
 
-    Returns None when nothing matches, and that is the honest answer: a bet
-    recorded with no resolvable quote should carry no quote rather than a
-    guessed one, because the whole point is to record the price actually
-    available at that instant.
+    So at least one identity signal must actually match:
+      - `event_id`, when both sides carry the same id space;
+      - `player_name`, which is the reliable cross-sport join for props and
+        the one field board rows and quote rows word identically;
+      - both teams, tolerating tri-code vs full-name (board rows say
+        "LAA @ BAL", quote rows say "Baltimore Orioles").
+    If none matches, return None.
+
+    Market/selection/line stay SOFT after that, because the board's wording is
+    not OddsAPI's ("moneyline" vs "h2h", a team name vs "home") and narrowing
+    to nothing on a vocabulary difference would throw away a correct match.
     """
     rows = read_book_quotes(str(sport or ""), str(date_str or ""))
     if not rows:
         return None
 
     wanted_event = _normalize_token(event_id)
-    wanted_market = _normalize_token(market)
-    wanted_selection = _normalize_token(selection)
     wanted_player = _normalize_token(player_name)
-    line_value = _coerce_line(line)
+    wanted_teams = _team_tokens(home_team, away_team, matchup)
 
-    candidates = list(rows)
-    if wanted_event:
-        narrowed = [row for row in candidates if _normalize_token(row.get("event_id")) == wanted_event]
-        candidates = narrowed or candidates
-    if wanted_player:
-        narrowed = [row for row in candidates if _normalize_token(row.get("player_name")) == wanted_player]
-        candidates = narrowed or candidates
+    identified: list[Mapping[str, Any]] = []
+    for row in rows:
+        if wanted_event and _normalize_token(row.get("event_id")) == wanted_event:
+            identified.append(row)
+            continue
+        if wanted_player and _normalize_token(row.get("player_name")) == wanted_player:
+            identified.append(row)
+            continue
+        if wanted_teams and _row_teams_match(row, wanted_teams):
+            identified.append(row)
+    if not identified:
+        return None
+
+    candidates = list(identified)
+    wanted_market = _normalize_token(market)
     if wanted_market:
         narrowed = [
             row for row in candidates
@@ -597,27 +617,95 @@ def quote_ref_for_bet(
             or _MARKET_ALIASES.get(wanted_market) == _normalize_token(row.get("market"))
         ]
         candidates = narrowed or candidates
+    wanted_selection = _normalize_token(selection)
     if wanted_selection:
-        narrowed = [
-            row for row in candidates
-            if _normalize_token(row.get("selection")) == wanted_selection
-            or _normalize_token(row.get("home_team")) == wanted_selection and row.get("selection") == "home"
-            or _normalize_token(row.get("away_team")) == wanted_selection and row.get("selection") == "away"
-        ]
+        narrowed = [row for row in candidates if _selection_matches(row, wanted_selection)]
         candidates = narrowed or candidates
+    line_value = _coerce_line(line)
     if line_value is not None:
         narrowed = [row for row in candidates if _coerce_line(row.get("line")) == line_value]
         candidates = narrowed or candidates
 
-    if not candidates:
-        return None
     grouped = quotes_by_market(candidates)
     if not grouped:
         return None
-    # Narrowing can still leave more than one market (e.g. no line given and the
-    # book offers several). Prefer the one the most books quote -- the main line.
+    # Narrowing can still leave more than one market (no line given, several
+    # alternates). Prefer the one the most books quote -- the main line.
     best_key = max(grouped, key=lambda key: len(grouped[key]))
     return quote_ref(grouped[best_key], chosen_bookmaker=bookmaker, now=now)
+
+
+def _team_tokens(home_team: Any, away_team: Any, matchup: Any) -> set[str]:
+    """Whatever team identifiers a caller could supply, as comparable tokens.
+
+    Board rows carry `matchup` as "AWAY @ HOME" tri-codes and often no
+    home_team/away_team at all, so the matchup string has to be split.
+    """
+    tokens = {_normalize_token(home_team), _normalize_token(away_team)}
+    text = str(matchup or "").strip()
+    if text:
+        for part in text.replace(" vs ", " @ ").split("@"):
+            token = _normalize_token(part)
+            if token:
+                tokens.add(token)
+    return {token for token in tokens if token}
+
+
+def _team_token_matches(token: str, row_token: str) -> bool:
+    """Does a caller's team token name the same club as a quote row's team?
+
+    Board rows use tri-codes ("NYY", "BAL"), quote rows use full names
+    ("New York Yankees", "Baltimore Orioles"), and there is no single rule that
+    covers both -- which is why this needs two:
+      - word prefix, for codes taken from the first word ("BAL"/"baltimore",
+        "BOS"/"boston");
+      - INITIALS, for codes taken across words ("NYY"/"new york yankees",
+        "LAD"/"los angeles dodgers"), where no single word starts with the code.
+    A prefix-only version passed BOS and failed NYY, which is exactly half the
+    league.
+    """
+    if token == row_token:
+        return True
+    words = row_token.split()
+    if not words:
+        return False
+    if len(token) >= 2 and token == "".join(word[0] for word in words):
+        return True
+    return len(token) >= 3 and any(word.startswith(token) for word in words)
+
+
+def _row_teams_match(row: Mapping[str, Any], wanted: set[str]) -> bool:
+    """True when BOTH of a quote row's teams are named by the caller.
+
+    Both, not either: one shared team is not a game -- two clubs play twice in a
+    series and an either-match would join a Tuesday bet to a Wednesday price.
+    Requiring both also makes the loose token rules above safe, since a false
+    positive would need two independent coincidences in the same matchup.
+    """
+    matched = 0
+    for key in ("home_team", "away_team"):
+        row_token = _normalize_token(row.get(key))
+        if not row_token:
+            continue
+        if any(_team_token_matches(token, row_token) for token in wanted):
+            matched += 1
+    return matched >= 2
+
+
+def _selection_matches(row: Mapping[str, Any], wanted: str) -> bool:
+    row_selection = _normalize_token(row.get("selection"))
+    if not row_selection:
+        return False
+    if row_selection == wanted:
+        return True
+    # Board picks read "Under 0" / "Over 1.5"; quote rows say "under"/"over".
+    if wanted.startswith(row_selection) or row_selection.startswith(wanted.split()[0]):
+        return True
+    if _normalize_token(row.get("home_team")) == wanted and row_selection == "home":
+        return True
+    if _normalize_token(row.get("away_team")) == wanted and row_selection == "away":
+        return True
+    return False
 
 
 # Board wording -> OddsAPI market key. Only the collisions that actually occur;

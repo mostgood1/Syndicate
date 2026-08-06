@@ -130,6 +130,15 @@ def enrich_recommendation_rows(
                 selection=_selection_hint(row),
                 line=row.get("line") if row.get("line") is not None else row.get("market_line"),
                 player_name=row.get("player_name") or row.get("player"),
+                # Identity is a hard filter in quote_ref_for_bet, so these are
+                # what actually let a match happen at all. MLB board rows carry
+                # a StatsAPI gamePk while quotes carry an OddsAPI event hash --
+                # the ids CANNOT match -- so the join is the player for props
+                # and the team pair for game markets, and `matchup` ("LAA @ BAL")
+                # is often the only place the teams appear on a board row.
+                home_team=game.get("home_team") or row.get("home_team"),
+                away_team=game.get("away_team") or row.get("away_team"),
+                matchup=game.get("matchup") or row.get("matchup"),
                 now=now,
             )
             if not quote:

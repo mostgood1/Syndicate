@@ -78,6 +78,30 @@ class EnrichmentTests(unittest.TestCase):
         as_percent = enrich_recommendation_rows(GAME, self._rows(confidence=55.0), sport_slug="mlb", now=NOW)
         self.assertAlmostEqual(as_fraction[0]["ev_pct"], as_percent[0]["ev_pct"], places=4)
 
+    def test_a_bet_on_another_game_gets_no_quote_rather_than_a_wrong_one(self) -> None:
+        """Identity is a HARD filter. An earlier version fell back through
+        every narrowing step, so an unmatched event came back with some other
+        game's price -- strictly worse than nothing, because #213 records the
+        quote at bet time and a wrong one poisons CLV."""
+        rows = enrich_recommendation_rows(
+            {"event_id": "some-other-game", "game_date": DATE,
+             "home_team": "Chicago Cubs", "away_team": "St. Louis Cardinals"},
+            self._rows(ev_pct=1.0), sport_slug="mlb", now=NOW,
+        )
+        self.assertIsNone(rows[0].get("quote"), "attached a quote from an unrelated game")
+        self.assertEqual(rows[0]["ev_pct"], 1.0)
+
+    def test_teams_join_when_the_event_ids_are_from_different_id_spaces(self) -> None:
+        """The real production case: MLB board rows carry a StatsAPI gamePk,
+        quotes carry an OddsAPI hash, so the ids can never match and the team
+        pair is the only usable join."""
+        rows = enrich_recommendation_rows(
+            {"event_id": "824804", "game_date": DATE, "matchup": "BOS @ NYY"},
+            self._rows(), sport_slug="mlb", now=NOW,
+        )
+        self.assertIsNotNone(rows[0].get("quote"), "tri-code matchup failed to join full team names")
+        self.assertEqual(rows[0]["quote"]["best_bookmaker"], "draftkings")
+
     def test_rows_without_a_quote_are_kept_and_left_alone(self) -> None:
         """A missing quote means the odds log has nothing for that market yet --
         not that the pick is invalid. Dropping them would make the board look
