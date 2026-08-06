@@ -762,8 +762,6 @@ def _fetch_live_events_for_date(api_key: str, date_str: str) -> list[dict[str, A
     raw_events = _as_events_list(raw)
     matched_events = [event for event in raw_events if _event_matches_slate_date(event, date_str)]
     _diagnose_live_events_coverage(date_str, raw_events, matched_events)
-    # #207: same-moment provenance of odds_history on THIS service's disk.
-    diagnose_odds_history_provenance(date_str)
     return matched_events
 
 
@@ -1381,6 +1379,14 @@ def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = 
         raise RuntimeError("ODDS_API_KEY not set")
     target_dir = Path(out_dir) if out_dir else (Path(__file__).resolve().parents[1] / "data" / "market" / "oddsapi")
     _ensure_dir(target_dir)
+    # #207: provenance of odds_history on THIS service's disk. Runs BEFORE the
+    # overwrite-skip below and independently of any fetch -- it describes files
+    # already written by earlier cycles, so gating it on a fetch happening is
+    # wrong. It was originally placed inside _fetch_live_events_for_date, which
+    # made a forced re-run silently produce nothing: when today's market files
+    # already exist and overwrite is off, this function returns "skipped" before
+    # that call is ever reached.
+    diagnose_odds_history_provenance(date_str)
     token = str(date_str).replace("-", "_")
     game_lines_path = target_dir / f"oddsapi_game_lines_{token}.json"
     pitcher_props_path = target_dir / f"oddsapi_pitcher_props_{token}.json"
