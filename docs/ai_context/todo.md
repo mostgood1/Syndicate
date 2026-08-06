@@ -1,5 +1,52 @@
 # Syndicate TODO — canonical cross-session list
 
+### FINDING 2026-08-05 (#207) -- odds_history code read: the #206 correction STANDS, there is a worker-only copy web can never see, and path_status contradicts the payload
+
+Code read requested to settle whether the odds defect is capture or publish. It
+does not fully settle it, but it establishes three things.
+
+**1. `load_odds_history_payload_for_sport` reads DISK ONLY.** It iterates
+`odds_history_paths_for_sport`, filters `path.is_file()`, picks freshest mtime,
+returns that file. **No keyvalue fallback.** So the 3,734 markets I inspected
+came from a file on the WEB service's disk -- confirming the #206 correction
+(I was not reading live-odds-worker) and killing my subsequent guess that it
+might have come from shared keyvalue state.
+
+**2. odds_history IS allowlisted, but only two of its three copies can cross
+services.** `HOT_ARTIFACT_PATTERNS` carries
+`*_source/tracking/odds_history/*.json` and
+`*_source/artifacts/*/odds_history/*.json` (added under #112, because oversized
+shards exceed the 8MB keyvalue ceiling and fall back to disk+publish).
+
+**The third copy, `reports/odds_control_plane/odds_history/`, is OUTSIDE
+`data_root()` by construction and cannot be matched by
+`is_hot_artifact_relative_path`.** The module comment states it plainly: "that
+copy only ever reaches the SAME service's own disk... sufficient for the
+refresh-worker's own next-cycle convergence but not for cross-service reads."
+
+So there is, by design, an odds_history copy on the writing service that web can
+never see. Whether it is richer than the published copies (more books, closing
+lines) is **the open question**, and it is exactly where a capture-vs-publish
+answer would live.
+
+**3. NEW BUG -- `path_status` contradicts the payload.** For
+`sport=mlb&date=2026-08-05` the endpoint returned **3,734 markets** while
+`path_status` reported `active_path: null` and `has_payload: false`. Those
+cannot both be right: the loader only returns a payload when it found a real
+file. So `odds_history_path_status_for_sport` and
+`odds_history_paths_for_sport` are resolving paths differently -- likely a
+`data_root()`/env-resolution mismatch. This matters beyond cosmetics: it is a
+diagnostic endpoint whose provenance report is wrong, i.e. exactly the class of
+"cannot tell which copy you are reading" defect that #193 exists to eliminate.
+
+**Still unresolved**: whether live-odds-worker's own
+`reports/odds_control_plane/odds_history/` holds multi-book props and closing
+lines. Workers serve no HTTP, so the only ways to see it are a worker-published
+diagnostic artifact or Render shell. Until then #205/#206's fix ordering stays
+provisional, and the prop verdicts stay withdrawn-pending rather than confirmed
+unrecoverable.
+
+
 ### CORRECTION 2026-08-05 to #205/#206 -- I was reading WEB's disk, not live-odds-worker's. The defect may be in the PUBLISH path, not capture.
 
 User: "are you getting data from odds worker disk?" No. This invalidates the
