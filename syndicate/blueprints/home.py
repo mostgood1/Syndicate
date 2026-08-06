@@ -948,6 +948,7 @@ def _sort_compact_game_items(items: list[dict[str, Any]]) -> list[dict[str, Any]
 
 
 from syndicate.features.shared.market_keys import canonical_market_key
+from syndicate.features.shared.quote_enrichment import _game_date as _quote_game_date
 
 
 def _prop_metric_text(value: Any) -> str | None:
@@ -2847,7 +2848,11 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
 
         opportunity_contract_metrics.record_rows(
             candidates, sport=sport.get("slug"), lane="game_candidate",
-            date_str=game.get("gameDate") or game.get("officialDate") or game.get("game_date"),
+            # Same resolution the enrichment uses. Reading only gameDate left
+            # WNBA in an empty date bucket -- its game dicts carry startTime --
+            # making the counter report a coverage hole in a sport whose
+            # enrichment was working. (Lost once to a revert; re-applied.)
+            date_str=_quote_game_date(game),
         )
     except Exception:
         pass
@@ -4120,6 +4125,19 @@ def _prop_item_from_rank_card(
         # always fell through to the generic "Props"/"Betting Card" heading
         # regardless of what stat the prop was actually on.
         "market": _metric_value(metrics, ["market", "stat"]) or _safe_text(card.get("market"), None),
+        # #226: the CANONICAL key. This builder is shared by every sport's
+        # betting card (_pregame_prop_rows_from_betting_card -> 
+        # _prop_rows_from_rank_cards -> here), which is why it was the whole
+        # remaining keyless population: 18/18 WNBA rows and the last 10 MLB
+        # ones. The card's own "stat" metric is the source's key and was being
+        # read only as a display fallback for "market".
+        "market_key": canonical_market_key(
+            sport_slug,
+            _metric_value(metrics, ["market_key", "stat"]),
+            card.get("market_key"),
+            card.get("prop"),
+            _metric_value(metrics, ["market"]) or _safe_text(card.get("market"), None),
+        ),
         # badge is an EV/confidence percentage (e.g. "20.4% EV") -- it is
         # never a valid "pick" value. It used to be checked first here, and
         # since format_num() always produces a truthy string, it always won,
