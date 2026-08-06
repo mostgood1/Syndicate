@@ -23,6 +23,47 @@ them: **Render auto-deploy is OFF** (pushing to `main` ships nothing on its own)
 **deploying kills an in-flight MLB sim**, and `logger.info` never reaches Render's
 log collector (use `print(..., flush=True)`).
 
+## Render is the source of truth — `data/**` in git is a lossy mirror
+
+**This applies to every task in this repo: analysis, modelling, backtests, and
+debugging alike. Read it before drawing any conclusion from a file under
+`data/`.**
+
+The daily pipeline does **not** run off git. Workers write artifacts to
+Render's mounted disk and the web service reads them from there (see the
+worker-split rule below). The git-tracked `data/<sport>_source/` trees are a
+**cold-start safety net** — periodically refreshed by
+`scripts/refresh_<sport>_source_mirror.ps1` or pulled back over HTTP by the
+backup workflow via `/api/ops/artifacts/export`. They are not a snapshot of
+what production computed.
+
+**The specific trap** (measured 2026-08-05, MLB): each artifact family is
+synced on its own schedule, so their date windows do not line up. Any analysis
+that needs to *join across families* silently collapses to the intersection:
+
+| family | git-tracked dates | window |
+|---|---|---|
+| hitter/pitcher odds snapshots | 46 | broad |
+| `daily_summary_*.json` | 33 | 05-28..07-12, **gaps 06-15..06-20, 06-22..06-28** |
+| `roster_objs/` (v4, carries `batters_faced`) | 26 | 06-15..07-12 |
+| `raw/statsapi/feed_live/` (actual outcomes) | 11 | 06-14..06-25 |
+
+All four together: **one usable date.** A backtest built on these without
+checking coverage will look like it ran on months of data and actually be
+running on whatever the narrowest family happens to cover — or, worse, quietly
+mix git-tracked and untracked on-disk files.
+
+**How to apply:**
+- Before any backtest or model evaluation, print the per-family date coverage
+  and the intersection. Report the number of dates the result actually rests on.
+- `git ls-files` vs. what is on disk is a real distinction here: much of
+  `data/` on a dev machine is untracked mirror output of unknown vintage. Say
+  which you used.
+- Don't diagnose "missing data" from the local checkout — check production
+  first (`/api/ops/...` with `ADMIN_TOKEN`, or the per-sport JSON APIs).
+- Fixing thin coverage means refreshing the mirror from Render or widening
+  `HOT_ARTIFACT_PATTERNS` — not quietly falling back to whatever is on disk.
+
 ## Commands
 
 Run the app locally:
