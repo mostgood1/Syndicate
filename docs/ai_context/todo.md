@@ -37,6 +37,58 @@ Web is live on `67abaa0e` for the allowlist.
 "absent after 10 minutes" poll, which ran against pre-fix code.
 
 
+### IN PROGRESS 2026-08-06 (#210) -- OddsAPI HISTORICAL backfill: what capture threw away is buyable back, and the credit budget is 3x what we thought
+
+User: "can we backfill missing data for at least 30 days for mlb from oddsapi so
+we can do some of the clv work?" Yes -- comfortably.
+
+**Correct the budget first.** Read live off the account 2026-08-06:
+**250,600 used / 14,749,400 remaining -- a 15M ceiling, not 5M.** Several
+earlier entries (and [[project-oddsapi-call-budget]]) reason from 5M. Anything
+that concluded "we can't afford that cadence" against 5M deserves a re-check.
+
+**Historical endpoints, measured not assumed:**
+
+| endpoint | cost |
+|---|---|
+| `/v4/historical/sports/baseball_mlb/events` | 1 credit |
+| `/v4/historical/sports/baseball_mlb/odds` | 10 credits per market-region |
+| `/v4/historical/.../events/{id}/odds` | 10 credits per market-region |
+
+Snapshots are ~5 minutes apart and carry up to **10 books**. A 30-day MLB
+backfill (game markets at 6 pre-game offsets + props at 2) estimates ~140k
+credits -- **0.95% of remaining**.
+
+**Validated on 2026-08-01 before spending on the range**: 15 events, 87 calls,
+4,921 credits, **35,591 quote rows across 8 books over 62 distinct snapshots**.
+
+| measure | live capture (2026-08-05) | backfill (2026-08-01) |
+|---|---|---|
+| prop rows with a bookmaker | 0 of 3,437 | **16,258 of 16,258** |
+| rows with `commence_time` | 0 props | **all 35,591** |
+| derivable closing quotes | 78 (game only) | **13,948 -- 11,164 of them props** |
+
+Cross-book h2h price spread at the same instant: **median 11 American points,
+p90 250**. That is the #205 claim measured directly rather than argued -- the
+single-book capture was not a rounding error.
+
+**A caution that must survive into any write-up**: backfilled closing lines make
+CLV *measurable*; they do not make the prop verdicts in #186-#204 *valid*. Those
+bets were selected on one arbitrary book's price. Re-grading them measures how
+much that selection cost; it does not turn them into bets we would have made.
+Report the two numbers separately or the result will read as a retroactive
+vindication it is not.
+
+Written by `scripts/backfill_mlb_historical_odds.py` straight into the #209
+quote log, so backfilled and live rows are indistinguishable to
+`closing_quotes()` / `best_price_by_market()`. Dry-run by default, hard
+`--max-credits` ceiling, per-date checkpointing so an abort resumes rather than
+re-buys. `publish=False`: local analysis copy, not web's disk.
+
+**Open**: the 2026-07-07..2026-08-05 run, and the game-market best-price
+re-grade that sits on top of it.
+
+
 ### FINDING 2026-08-06 (#209) -- the single-book defect is PLATFORM-WIDE, in three classes. User: "is this the same for all sports. if so we need this fixed everywhere."
 
 Answered by measuring the two sports in season and tracing the code for the six
