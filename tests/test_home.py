@@ -1494,33 +1494,45 @@ class GameBetCandidateTeamAttributionTests(unittest.TestCase):
         self.assertEqual(_first_present_text(None, "", "fallback"), "fallback")
         self.assertIsNone(_first_present_text(None, ""))
 
-    def test_shared_top_play_rows_extracts_player_name_for_hitter_pitcher_markets(self) -> None:
-        # Real gap found 2026-07-23: game["shared_top_play_rows"] (a generic
-        # display-panel highlights list, game_board_contract.py's
-        # _build_top_play_rows) has no dedicated player field at all -- the
-        # panel title becomes "market" and each item's free text becomes
-        # "pick". For MLB hitter/pitcher stat panels that text is
-        # consistently "OVER/UNDER <Player Name>", confirmed live against
-        # production: every "hitter hits"/"hitter rbi"/etc. candidate on the
-        # board showed a blank entity and a blank Projected value because
-        # the player name was never extracted out of the pick text.
+    def test_shared_top_play_rows_no_longer_produce_candidates(self) -> None:
+        """#230 step 7: the prose scraper is DELETED, not merely guarded.
+
+        It regex-scraped wagers out of a display panel's free text, which is how
+        production once published "Simulations: 400" and "Margin: 0.80 (home
+        perspective)" as picks. Two tests here previously pinned its player-name
+        extraction out of "OVER Brooks Lee" -- i.e. they guarded the behaviour of
+        a parser that should not exist. Every row it could legitimately produce
+        now comes from game_market_recommendations or the per-game prop loop,
+        with a canonical market_key and real identity rather than a number parsed
+        back out of a sentence.
+        """
         game = self._sample_game(
             shared_top_play_rows=[
                 {"heading": "Hitter Hits", "name": "OVER Brooks Lee"},
                 {"heading": "Pitcher Strikeouts", "name": "UNDER Gerrit Cole"},
+                {"heading": "Notes", "name": "Simulations: 400"},
             ]
         )
         candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
-        hits = next(c for c in candidates if c["market"] == "Hitter Hits")
-        strikeouts = next(c for c in candidates if c["market"] == "Pitcher Strikeouts")
-        self.assertEqual(hits["entity"], "Brooks Lee")
-        self.assertEqual(hits["player_name"], "Brooks Lee")
-        self.assertEqual(strikeouts["entity"], "Gerrit Cole")
+        scraped = [c for c in candidates if c.get("market") in {"Hitter Hits", "Pitcher Strikeouts", "Notes"}]
+        self.assertEqual(scraped, [], "the shared_top_play_rows prose scraper is producing candidates again")
 
-    def test_shared_top_play_rows_leaves_entity_blank_for_game_level_markets(self) -> None:
-        game = self._sample_game(shared_top_play_rows=[{"heading": "Top Plays", "name": "OVER 8.5"}])
+    def test_game_level_markets_still_come_from_their_real_sources(self) -> None:
+        """Deleting the scraper must not remove genuine game-market candidates.
+
+        Moneyline/Spread/Total are produced by game_market_recommendations and
+        the betting block, not by scraping panel prose, so a game whose only
+        top-play rows are narrative should still yield its real markets.
+        """
+        game = self._sample_game(
+            shared_top_play_rows=[{"heading": "Moneyline", "name": "OVER 8.5"}],
+            betting={"total": 8.5, "over_ev": 0.04, "p_total_over": 0.55},
+        )
         candidates = _game_bet_candidates_from_game({"slug": "mlb"}, game, fallback_epoch=0.0)
-        self.assertIsNone(candidates[0]["entity"])
+        self.assertTrue(
+            any(str(c.get("market")).lower() == "total" for c in candidates),
+            "real game markets disappeared along with the scraper",
+        )
 
     def test_game_market_recommendation_over_line_pick_is_not_mistaken_for_a_player_name(self) -> None:
         # Regression guard: game_market_recommendations rows use the same

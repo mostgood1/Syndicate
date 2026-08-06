@@ -2638,67 +2638,24 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             away_spread_projected = -home_spread_projected if home_spread_projected is not None else None
             _append_game_bet_candidate(candidates, sport=sport, game=game, market="Spread", pick=f"Away { _prop_metric_text(betting.get('away_puck_line')) or '' }".strip(), line=betting.get("away_puck_line"), edge=betting.get("away_spread_ev"), confidence=betting.get("p_away_cover"), projected=away_spread_projected, detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "away"), sim_context=game_sim_context)
             _append_game_bet_candidate(candidates, sport=sport, game=game, market="Spread", pick=f"Home { _prop_metric_text(betting.get('home_puck_line')) or '' }".strip(), line=betting.get("home_puck_line"), edge=betting.get("home_spread_ev"), confidence=betting.get("p_home_cover"), projected=home_spread_projected, detail=game.get("summary"), fallback_epoch=fallback_epoch, live_odds_game_ids=live_odds_game_ids, team=_game_team_label(game, "home"), sim_context=game_sim_context)
-    top_rows = game.get("shared_top_play_rows") if isinstance(game.get("shared_top_play_rows"), list) else []
-    for row in top_rows:
-        if not isinstance(row, dict):
-            continue
-        name = _safe_text(row.get("name"), "-")
-        if name == "-":
-            continue
-        edge_match = re.search(r"([+-]?\d+(?:\.\d+)?)%", name)
-        odds_match = re.search(r"at\s+([+-]?\d+(?:\.\d+)?)", name, re.IGNORECASE)
-        # #77/#68. shared_top_play_rows is a DISPLAY panel, and only some of
-        # its rows are bets. This loop scrapes a price and an edge out of the
-        # row's prose, and when it finds neither it still emitted a candidate
-        # -- so narrative rows became picks. Confirmed against production
-        # 2026-07-26 by running this function over /soccer/mls/api/cards:
-        # every one of the 32 MLS game candidates came from here, with picks
-        # reading "Projected score: New England Revolution 1.4 - CF Montreal
-        # 2.1", "Margin: 0.80 (home perspective)", "Shots: ... 10.1 | ... 14.8"
-        # and, literally, "Simulations: 400".
-        #
-        # Those 32 are currently pruned, but only by accident: they carry
-        # live_projection "0" (the combined score of a scoreless live game),
-        # and classify_candidate's presence test is truthiness-based so 0 reads
-        # as absent. Fixing that test -- which is a real bug, see
-        # _classify_candidate_with_reason -- would publish all of this as live
-        # picks. #77 fixed the placeholder half of exactly this and left the
-        # narrative half live.
-        #
-        # There is nothing structural to test: _build_top_play_rows
-        # ([game_board_contract.py](../features/shared/game_board_contract.py))
-        # builds each row as {heading: panel title, name: panel item text,
-        # detail: panel body} out of a display panel's free-text items -- no
-        # price, no line, no market, unlike _build_prop_rows right below it,
-        # which carries pick/market/line/odds/confidence/projected. So every
-        # candidate from here is scraped, and the only honest test is whether
-        # the text describes a wager at all.
-        #
-        # A wager needs a SIDE. MLB's panels read "OVER Brooks Lee" /
-        # "UNDER Gerrit Cole" / "OVER 8.5" and are real (see the 2026-07-23
-        # tests below); MLS's read "Projected score: ...", "Margin: 0.80 (home
-        # perspective)", "Shots: ... 10.1 | ... 14.8" and "Simulations: 400",
-        # and are not. A scraped price or edge counts too, for moneyline-style
-        # rows that name a price instead of a side.
-        #
-        # Deliberately a side/price/edge test rather than a prose blocklist:
-        # the same "match the copy and it breaks on a reword" trap #77 called
-        # out applies here.
-        if odds_match is None and edge_match is None and not re.search(r"\b(?:over|under)\b", name, re.IGNORECASE):
-            continue
-        _append_game_bet_candidate(
-            candidates,
-            sport=sport,
-            game=game,
-            market=_safe_text(row.get("heading"), _market_label_from_pick_text(name)),
-            pick=name,
-            odds=odds_match.group(1) if odds_match else None,
-            edge=edge_match.group(1) if edge_match else None,
-            detail=row.get("detail"),
-            fallback_epoch=fallback_epoch,
-            live_odds_game_ids=live_odds_game_ids,
-            team=_team_for_side_hint(game, row.get("team_side") or row.get("side") or name),
-        )
+    # #230 step 7: the shared_top_play_rows PROSE SCRAPER is deleted.
+    #
+    # It regex-scraped wagers out of a DISPLAY panel's free text -- reaching for
+    # "([+-]?\d+(?:\.\d+)?)%" and "at ([+-]?\d+)" in prose written for humans --
+    # because _build_top_play_rows emits {heading, name, detail} out of panel
+    # items with no price, no line and no market. Its own comment recorded what
+    # that produced in production: 32 MLS "candidates" reading "Projected score:
+    # New England Revolution 1.4 - CF Montreal 2.1", "Margin: 0.80 (home
+    # perspective)" and, literally, "Simulations: 400", surviving only because a
+    # truthiness bug happened to prune them.
+    #
+    # Every row it could legitimately produce is now produced properly: game
+    # markets come from game_market_recommendations and the betting block, props
+    # from the per-game prop loop, and all of them carry a canonical market_key
+    # and real identity rather than a number parsed back out of a sentence.
+    # Deleting it removes the last place this codebase infers a wager from
+    # display text.
+
     lenses = game.get("gameLens") if isinstance(game.get("gameLens"), list) else []
     for lens in lenses:
         if not isinstance(lens, dict) or bool(lens.get("closed")):
