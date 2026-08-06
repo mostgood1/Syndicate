@@ -1,5 +1,145 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-05/06 -- NFL/NCAAF full-day arc: preseason wiring -> Layer 2 fix -> full gap audit vs MLB -> Tier 1 + Tier 2 build-out (session close-out, archive-ready)
+
+Supersedes the still-open item in the "DONE (mostly) 2026-08-05 -- NFL
+preseason..." entry below (line ~1428 as of this write) -- that entry's
+one open item ("production `/api/intelligence/query` still showed `nfl=0`
+candidates") is now **confirmed resolved**: re-checked live after this
+session's later work, `nfl=1` real card served (`ARI` Moneyline, 52.7%),
+proven via both `/api/ops/intelligence/candidate-trace` and the actual
+served `/api/intelligence/query` response. Working tree clean at close
+(only harmless untracked report/log noise), all commits below pushed to
+`origin/main`, everything user-facing confirmed live on Render.
+
+**Real commits, in order** (hashes as of the final rebase; some were
+rewritten by intervening rebases against a shared, actively-committing
+main -- this is the post-rebase set):
+`4b7bc046` (real preseason schedule/depth-chart/shrinkage model) ->
+`431ae0ef` (fix shrinkage over-flattening, wire real market odds) ->
+`e6288d3e` (wire preseason into odds orchestrator + resim autorun +
+Layer-1 market board) -> `1c458271` (Layer-2 translator + provider wiring,
+NFL) -> `22b11622` (real bug: `preseason_target_week` always returned
+`None` against real 2026 data) -> `a25bd749` (real bug:
+`_build_sport_overview`'s NFL branch never checked preseason) ->
+`7a9c976d` (Tier 1: 7 gap-audit fixes) -> `54500305` (Tier 2: dead
+`nfl_compare` fallback cut + preseason evaluation log with dated odds
+snapshot) -> `d768cf73` (Tier 2: NFL live-lens phase 1) -> `7fcff0fc`
+(Tier 2: NCAAF week-granularity betting-card dashboard -- landed inside a
+concurrent session's commit via a shared-index git incident, content
+verified intact and correct, see "Operational notes" below) -> `37c8fa3c`
+(Tier 2: NCAAF player-stats ingestion, odds-fetch script built but
+deliberately unwired).
+
+**Arc, condensed:**
+
+1. **Preseason build + deploy.** Real ESPN preseason schedule, real
+   shrinkage-adjusted SmartSim2 model (the shrinkage math itself had a
+   real bug -- was flattening real team identity toward league-neutral too
+   aggressively -- found and fixed with a real backtest showing the
+   correction, +4.3pp real accuracy vs. the plain/pre-shrinkage baseline),
+   real depth-chart context, real market odds overlay. Wired into the
+   central odds orchestrator (`_build_nfl_steps`, gated on
+   `preseason_target_week(season) is not None`) and the refresh-worker
+   resim autorun (`_launch_autorun_preseason_projections`, its own env
+   gate `SEASON_PROJECTION_ENABLE_REFRESH_WORKER_PRESEASON_AUTORUN`,
+   confirmed `true` on Render). Layer-1 market board
+   (`build_nfl_preseason_market_board`) built and live at
+   `/nfl/preseason/market-board`.
+
+2. **Layer 2 fix (NFL).** Regular season *and* preseason NFL games never
+   reached the cross-sport opportunity feed (`/`, `/intelligence`) --
+   `_NFLDataProvider.games()` never set `game_market_recommendations`.
+   Fixed via `_nfl_game_market_recommendation_rows`, a read-time
+   translator over the already-built Layer-1 market board's
+   `join_odds_to_sim` output (no new artifact, no new autorun -- same
+   "light transformation for display" class of work MLB's own equivalent
+   translator already does). Two real, previously-undiscovered bugs found
+   and fixed while getting this to actually work in production (both
+   commits above) -- worth remembering as a pattern: a fix can be
+   individually correct, tested, and deployed, and still never fire in
+   production because an upstream signal it depends on was silently wrong
+   the whole time.
+
+3. **Full gap audit vs. MLB.** User asked to evaluate NFL and NCAAF,
+   backend + frontend, against MLB as the reference module, with NFL
+   preseason as the concrete test. 4 parallel code audits (not guesses --
+   every finding cited a real file/function). Full findings + prioritized
+   roadmap published as an artifact
+   (`https://claude.ai/code/artifact/a758939f-7f99-470f-b4f7-00f711efc4b2`).
+   Headline finding: NCAAF had the *exact* pre-fix NFL Layer-2 gap,
+   completely untouched, even though its own Layer-1 market board already
+   existed real and working.
+
+4. **Tier 1 (7 items, all shipped same day):** NFL Layer-2 re-verified
+   live; NFL Box Score/Game tabs fixed (real `sim`/`betting`/
+   `probability_rows` were being computed and then silently dropped, not
+   missing -- a data-plumbing fix, not new modeling); preseason
+   depth-chart `panels` payload (built, never rendered) now has a real
+   "Details" tab; NCAAF ported to Layer 2 (which turned out to need more
+   than a stamp -- `_NCAAFDataProvider.games()` was reading a stale
+   historical snapshot pipeline whose `gamePk`s never matched the market
+   board's real current-slate pipeline, so the port also switched NCAAF's
+   home-dashboard games to the real current slate, a second real fix);
+   new preseason-aware Ask-the-Syndicate fetcher (the existing three NFL
+   fetchers were silently blind to the entire preseason -- wrong filename
+   glob, wrong `season_type` filter); two orphaned nav links closed
+   (confirmed live: `/nfl/cards`'s Props/Market Board links,
+   `/market-board`'s NFL Preseason tile).
+
+5. **Tier 2 (5 items, all shipped same day):** dead `nfl_compare`
+   external-source-app fallback removed (confirmed genuinely dead --
+   unreachable in every real environment, and the one real sibling
+   checkout on disk doesn't even contain the target file); time-sensitive
+   preseason evaluation/ROI log with a **dated snapshot mechanism** for
+   preseason closing lines (`preseason_odds_{season}.csv` is fully
+   overwritten on every refresh with no history -- without a snapshot
+   taken before each game airs, ATS/totals grading for that game becomes
+   permanently impossible; shipped before the real Aug 7 Hall of Fame
+   Game so its line isn't lost); NFL live-lens phase 1 (real ESPN live
+   score/clock/status merged onto the pregame snapshot, no re-sim yet --
+   phase 2 explicitly deferred, needs its own design/calibration cycle
+   per the existing #119 caution against a direct port of MLB/WNBA's
+   continuous-clock model onto football's discrete-play structure; this
+   phase-1 pass also caught the *same* preseason week-resolution
+   ambiguity a third time, in a pre-existing CI test); NCAAF
+   week-granularity betting-card dashboard (real day-of-week game
+   grouping nested inside a week rail -- deliberately NOT a day-rail clone
+   of MLB's, since a CFB week only spans 2-4 real calendar dates); NCAAF
+   player-stats ingestion (real CFBD `/games/players` schema, confirmed
+   live) shipped and wired, odds-fetch script built but **deliberately
+   left unwired** -- a live OddsAPI check for real NCAAF player-prop
+   coverage came back inconclusive (zero markets found, but a control
+   check against NFL's own imminent game also showed zero, meaning
+   OddsAPI likely posts props close to kickoff for both sports, not weeks
+   ahead -- not proof of no coverage, just too early to tell). Revisit
+   closer to Aug 23-30.
+
+**Explicitly deferred, not gaps:** NFL live-lens phase 2 (real in-play
+re-sim); NCAAF props page/market-board join (needs the live-data check
+above, closer to the season); NFL preseason props (no real prop-odds
+source exists at all, correctly never attempted).
+
+**Operational notes:**
+- Two real cross-session git incidents this same day while sharing one
+  working tree with the "MLB HR/K modeling separation" session: (a) this
+  session ran `git checkout --` on a file assuming it was regenerated-
+  artifact churn -- it was that session's uncommitted WIP, discarded with
+  no recovery possible from git alone (no lasting harm -- they re-derived
+  it from a surviving test file and recommitted); (b) the reverse --
+  their `git commit` with no pathspec committed the *entire shared index*,
+  including this session's staged-but-not-yet-committed NCAAF
+  betting-card work, under their own commit message (`7fcff0fc`, content
+  verified complete and correct, just mis-attributed). Fix adopted for
+  the rest of this session and worth keeping going forward: always
+  `git commit -m "..." -- <exact paths>`, never a bare `git commit` when
+  the index might hold another session's staged work.
+- `SEASON_PROJECTION_ENABLE_REFRESH_WORKER_AUTORUN=1` and
+  `SEASON_PROJECTION_ENABLE_REFRESH_WORKER_PRESEASON_AUTORUN=true` both
+  confirmed live on refresh-worker via the Render API (not derivable from
+  any committed config file -- worth a live check, not a repo grep, if
+  this needs re-confirming later).
+
 ### FINDING 2026-08-05 (#207) -- odds_history code read: the #206 correction STANDS, there is a worker-only copy web can never see, and path_status contradicts the payload
 
 Code read requested to settle whether the odds defect is capture or publish. It
