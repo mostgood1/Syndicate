@@ -407,6 +407,45 @@ nothing when the file is already present.
 at 100% said nothing about the board the user actually looks at. Instrument the
 lane the USER reads, or the metric measures the wrong thing confidently.
 
+### NEXT ACTION, precisely located (2026-08-06 close)
+
+**The transport blocker is FIXED and verified.** refresh-worker now holds the
+quote log: `STREAM_PULL_OK path=mlb_source/tracking/book_quotes/2026-08-06.jsonl
+bytes=53,130,595 ... ok=True written=1`. Two real defects were in the way and
+both are shipped:
+- `book_quotes` was absent from `_required_daily_artifact_paths`, so the repair
+  pass built for "missing rather than stale" never asked for it (#232);
+- the repair pass used `/export`, which loads the whole artifact into the web
+  service's memory -- a 52MB shard against a 2GB instance returned
+  PULL_FAILED/written=0 every time. Large families now use the chunked
+  `pull_streamed_artifact` that already existed for exactly this (#233).
+
+**The board is still 0 of 138 priced, and the remaining cause is now exact.**
+The intelligence state recomputed at `21:11:37Z`, AFTER the pull, and still
+attached no quotes. `syndicate/features/intelligence.py` contains **no call to
+any enrichment function at all** -- `enrich_candidate_rows` and
+`enrich_prop_rows` appear zero times in it. Its prop candidates are built by
+`_prop_candidate_from_item` (`:7223`, `:7244`) and its game candidates come via
+`_game_bet_candidates_from_game`, which IS enriched -- but the board's 138 rows
+are overwhelmingly props from the unenriched path.
+
+So every price fix so far has landed on `/api/home`'s lanes only. **This is the
+same mistake as the counter**: work verified on one surface, while the surface
+the user actually reads was never wired.
+
+**Do this next, in order:**
+1. Call `enrich_prop_rows` on the candidates built at
+   `intelligence.py:7223`/`:7244` (they carry `player_name`, `market_key`, `line`
+   and `odds` -- everything `quote_ref_for_bet` needs).
+2. Add an `intelligence_prop` / `intelligence_game` lane to
+   `opportunity_contract_metrics` so this surface is measured too. Without it the
+   next fix here is unverifiable in the same way.
+3. Re-check `/api/intelligence/query`, NOT `/api/home`.
+
+Only then is the UI worth assessing -- the price strip in `intelligence.html`
+still has never rendered, because it has never had a row with a `quote` to
+render.
+
 ## 11. Residual risks
 
 
