@@ -72,7 +72,53 @@ outcome source, with StatsAPI finals kept alongside because the graders read
 worker-local accuracy artifacts and return zero on a cold checkout. Three
 (soccer/ncaab/ncaaf) are still documented `[]`-stubs.
 
+### DEPLOYED + PARTIALLY VERIFIED 2026-08-06 (#217) -- capture works in production; the board join does NOT
+
+All three services deployed and `live` on `c35740a6`. What was actually measured
+on Render, not assumed:
+
+**WORKS -- capture, verified end to end.** `mlb_source/tracking/book_quotes/2026-08-06.jsonl`
+on web: **9,430 rows, 8,133 of them props carrying player names**, 1,297 game
+rows, real team pairs. `book_updated_at 15:47:56Z` distinct from `captured_at
+15:48:13Z` -- a **real book clock**, which is the whole point of the two-clock
+rule. Prop book capture, which was structurally zero, is real.
+
+**DOES NOT WORK -- 0 of 108 board candidates carry a quote.** Two independent
+causes, both diagnosed, neither fixed:
+
+1. **Tri-code team join is incomplete.** `_row_teams_match` accepts a word
+   prefix ("tor" -> "toronto blue jays") or initials ("nyy" -> "new york
+   yankees"). **"chc" matches neither** "chicago cubs" -- not a prefix of
+   "chicago" (chi != chc), not the initials (cc). So `TOR @ CHC` matches one
+   team of two and is rejected. Same class for any code that is neither a first-
+   word prefix nor initials. **The fix is a real per-sport tri-code -> full name
+   map, not another string heuristic** -- `_MLB_TEAM_META_BY_ABBR` already
+   exists in `syndicate/features/mlb/cards.py` and should be threaded through
+   `quote_enrichment`, with each sport supplying its own.
+2. **refresh-worker has no quote log at all.** It builds the board candidates but
+   `pull_hot_artifacts` never fetches `book_quotes` -- and its pulls are
+   currently **502-failing** anyway (`STREAM_PULL_FAILED ... status=502` for
+   odds_history across wnba/nhl/ncaab/soccer at 16:00:08). So even a correct join
+   would find nothing there. Web has the file; the worker does not.
+
+**Do not conclude the board work is wrong** -- the enrichment demonstrably runs
+(candidates carry an explicit `quote: null`, which only this code emits) and the
+identity filter is doing exactly what #217 made it do: refusing to attach a
+price it cannot prove belongs to that game. That refusal is correct behaviour;
+the join is what is incomplete.
+
+**Also unverified: the price strip has still never been seen in a browser.** Its
+render functions were exercised directly under node; `/intelligence` did not load
+in the local driver within 90s. With zero quotes live, there is currently nothing
+for it to render either way.
+
+**Method note**: the `[odds_book_quotes]` print never appeared in Render's logs
+API despite the file being written -- verifying by artifact STATE rather than log
+lines is the only reason capture was confirmed at all.
+
 **STILL OPEN:**
+0. **The two causes above** -- per-sport tri-code map, and getting `book_quotes`
+   onto refresh-worker (or moving enrichment to a service that has it).
 1. **CLV-first portfolio** -- lead with beat-the-close rate, not ROI (#211: ROI
    CI95 was [-7.6%, +3.8%], no power; paired price comparison was
    [+2.48, +3.13]). The data now exists; the page still leads with ROI.
