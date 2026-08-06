@@ -2520,20 +2520,11 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
     candidates: list[dict[str, Any]] = []
     game_sim_context = _game_sim_vs_line_reasoning(game)
     game_recs = game.get("game_market_recommendations") if isinstance(game.get("game_market_recommendations"), list) else []
-    # #215: the single funnel every sport's recommendation rows pass through, so
-    # per-book price context is attached once here rather than in each of the
-    # five builders. This also RE-RANKS: ev_pct is recomputed against the best
-    # available price where a model probability exists, which changes which
-    # candidates surface -- #211 measured 140 bets clearing a 3% threshold under
-    # best price and 0 the other way, since best price is never worse.
-    try:
-        from syndicate.features.shared.quote_enrichment import enrich_recommendation_rows
-
-        enrich_recommendation_rows(game, game_recs, sport_slug=str(sport.get("slug") or "").lower())
-    except Exception:
-        # A board that renders without price context is degraded; a board that
-        # 500s because the odds log was mid-write is an outage.
-        pass
+    # #231 step 7: this used to enrich `game_recs` here, BEFORE the loop, purely
+    # so a best-price ev_pct would be read into the candidate's `edge` below --
+    # enriching the same data twice, at two stages, for one field. That work now
+    # happens once in enrich_candidate_rows over the assembled list (which also
+    # recomputes `edge`), so this pass is gone. Three enrichment sites -> two.
     for row in game_recs:
         if not isinstance(row, dict):
             continue
@@ -2792,6 +2783,35 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
     # a quote, every one of them Moneyline/Total, because the player props come
     # from the other loops. Before the sort, so best-price ev_pct can influence
     # ordering rather than arriving after it.
+    # #231 step 6: every loop in this function funnels through
+    # _append_game_bet_candidate, so the producer already exists structurally --
+    # what it lacked was a contract. Each finished candidate is now run through
+    # UniversalCandidate.validate() and its failures are COUNTED, not dropped.
+    #
+    # Counted rather than dropped on purpose, and this is the whole decision:
+    # rejecting silently would empty lanes that have been serving real picks all
+    # season, with no way to tell a genuine gap from a contract that is too
+    # strict. The counter makes the reject rate visible first; dropping becomes
+    # safe once it is at zero, which is exactly the sequence that took
+    # missing_market_key from 100% to 0%.
+    try:
+        from syndicate.features.shared import opportunity_contract_metrics
+        from syndicate.features.shared.intelligence_contracts import UniversalCandidate
+
+        for candidate in candidates:
+            record = UniversalCandidate.from_raw(candidate)
+            if record is None:
+                continue
+            reasons = record.validate()
+            if reasons:
+                candidate["contract_violations"] = reasons
+        opportunity_contract_metrics.record_rows(
+            [c for c in candidates if c.get("contract_violations")],
+            sport=sport.get("slug"), lane="contract_rejected",
+            date_str=_quote_game_date(game),
+        )
+    except Exception:
+        pass
     try:
         from syndicate.features.shared.quote_enrichment import enrich_candidate_rows
 

@@ -282,6 +282,23 @@ def enrich_candidate_rows(
             shown_implied = _implied_probability(candidate.get("odds"))
             if best_implied is not None and shown_implied is not None:
                 candidate["price_improvement_pct"] = round((shown_implied - best_implied) * 100.0, 2)
+
+            # #231: re-price the EDGE against best available, here rather than in
+            # a second enrichment pass over the raw rows. This is what let the
+            # third call site go away: previously enrich_recommendation_rows had
+            # to run BEFORE _append_game_bet_candidate purely so the recomputed
+            # ev_pct would be read into `edge`, which meant enriching the same
+            # data twice at two different stages.
+            #
+            # `edge` on a finished candidate is DISPLAY TEXT ("3.2%"), not a
+            # number, so it is formatted the same way _pct_text does it. The
+            # numeric model probability is kept alongside on the candidate, which
+            # is what makes recomputing possible at all this late.
+            model_probability = _model_probability(candidate)
+            if model_probability is not None and best_implied is not None:
+                edge_value = (model_probability - best_implied) * 100.0
+                candidate["edge"] = f"{edge_value:.1f}%"
+                candidate["ev_priced_against"] = quote.get("best_bookmaker")
     except Exception:
         return candidates
     return candidates
