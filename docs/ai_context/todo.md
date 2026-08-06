@@ -1,5 +1,70 @@
 # Syndicate TODO — canonical cross-session list
 
+### IN PROGRESS 2026-08-06 (#212/#213/#214) -- the quote layer: all eight sports, two clocks, bet-time price, and settlement unstarved
+
+Plan: `docs/ai_context/plan_quote_layer.md`. Four asks (surfacing, real
+timestamps, book attribution, CLV/settlement) turned out to be one missing
+object: a Layer 2 candidate row is built from
+`display_pick/ev_pct/p_win/market_label/selection` and carries **no price, no
+book, no timestamp**. So the board was never the constraint -- **do not revamp
+Layer 2**, extend the row contract it consumes.
+
+**Done and pushed** (`9c2696c2`, `7006aeee`, `0ba22339`, `ee1a8d8b`):
+
+- **#212 -- all eight sports write one quote shape.** Soccer/NHL/NCAAB were
+  never Class A capture defects but wrote bespoke columns, which IS the routing
+  defect that hid NBA/WNBA's six-book prop CSV. NCAAB needed real work: its rows
+  are WIDE (one per event/book/market carrying both sides) and had to be
+  exploded per selection.
+- **Two clocks, never conflated.** New `book_updated_at` (OddsAPI per-market
+  `last_update`) separate from `captured_at`. **None when unknown, never
+  defaulted to loop time** -- a price whose book last moved 4h ago but which we
+  polled 30s ago is a DEAD MARKET and every surface renders it as fresh today.
+- **`quote_ref()`** -- book, price, line, both clocks, rank vs every other book,
+  plus `consensus_price` (a best price 40 points clear of the field is a stale
+  line, not an edge; rank alone is not evidence). Consensus averages implied
+  PROBABILITY -- the naive mean of -110 and +110 is 0, which is not a price.
+- **#213 -- the price struck is recorded at bet time**, per leg for parlays.
+  This was the irreversible one. Also: **CLV was defined as a LINE difference**,
+  structurally undefined for moneyline, which is why production showed
+  `avg_clv: null`. Added price CLV in implied-probability points.
+- **#214 -- settlement was starved, not broken.** The autorun is enabled and
+  globs for `closing_lines_{date}.csv`; nothing emitted one. Now built from the
+  quote log + free StatsAPI finals. Real output: 2026-08-05 → 4,523 closing rows,
+  356 gradeable; **4,159 of them props, which had no closing price at all.**
+
+**Three non-obvious things the tests forced** (all would have shipped broken):
+1. Reconciliation reads outcome AND closing price off ONE matched row, so they
+   must be merged into one file.
+2. `finals_{date}.json`, not `game_results_{date}.json` -- the latter sorts ahead
+   of `closing_lines` in `RECONCILIATION_PATTERNS` and shadows the merged file.
+3. `data_root()`, not `reports_root()` -- the autorun passes
+   `result_roots=[data_root()]` explicitly.
+
+Also fixed a real #209 defect: `line` was missing from the quote key, so
+alternate lines from one book collapsed (6 considered, 5 appended).
+
+**STILL OPEN, in order:**
+1. **Board/UI** -- book chip, best-of-N badge, two ages on the row. `quote_ref`
+   exists; nothing renders it yet. This is the whole "surface it better" ask.
+2. **Ledger bridge** -- two ledgers still, and `/portfolio` reads only
+   `prediction_ledger.json` (stated in a code comment at
+   `intelligence.py:1919`).
+3. **Rank candidates on best price**, not one arbitrary book -- changes WHICH
+   candidates surface. #211: 140 bets cleared a 3% threshold under best price,
+   0 the other way.
+4. **CLV-first portfolio** -- lead with beat-the-close rate, not ROI (#211: ROI
+   CI95 was [-7.6%, +3.8%], no power; paired price comparison was [+2.48, +3.13]).
+5. **Props cannot settle** -- no actuals source for ANY sport. Closing prices are
+   captured and ready; the bet stays pending and gets no CLV, since CLV is
+   written at settlement. A test pins this so a future actuals source turns it
+   red rather than passing silently.
+
+**Not deployed.** #209-#214 are committed but Render auto-deploy is off, and
+deploying kills in-flight sims. Nothing in the settlement chain produces live
+data until it ships.
+
+
 ### SHIPPED 2026-08-05 (#207) -- odds_history provenance diagnostic, deployed to live-odds-worker
 
 Recorded during end-of-session reconciliation: three code commits shipped with
@@ -15388,6 +15453,44 @@ were resolved and nine already-closed rows removed from the open tables.
 > segment 101,583cr (23.1%), alternate 50,817cr (11.5%), full_game 18,443cr
 > (4.2%) — unchanged shape for the 5th straight reading. `race_detected_count`
 > 5→6 over ~35h — flat, not climbing, no concern.
+>
+> ⚠️ **Latest, 2026-08-06T14:07Z (134.1h post-rollover, same baseline) —
+> convergence broke, cumulative projection jumped:**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 482,766s (117,307 obs) | 375,133 | 2,797.4 | **2.01M** | **40.3%** |
+>
+> Still under 5M on the whole-window average, but the **marginal rate over
+> just the last 82,285s (~22.9h) since the prior reading is 177,239cr, i.e.
+> ~7,756cr/hour — 4x the ~1,800-2,000/hr this had converged to.** Flagged an
+> attribution gap alongside it (only 47,340 of 177,239cr attributed, ~73%
+> unaccounted vs. the usual 10-25%) and a failed multi-league soccer pregame
+> refresh (`returnCode=1`) as candidate explanations, neither confirmed yet.
+>
+> ✅ **RESOLVED same day, via [[project-concurrent-parallel-sessions]] cross-
+> session message, independently verified against `ee1a8d8b`** ("#210:
+> attribute the backfill's OddsAPI calls -- an unattributed call looks like a
+> leak"): #210's one-off 30-day MLB historical backfill
+> (`scripts/backfill_mlb_historical_odds.py`) ran inside this exact interval
+> and spent **115,739 credits over 2,044 calls** through its own `Budget`
+> class, which read `x-requests-last` but never called
+> `record_oddsapi_quota` — every credit hit the vendor counter while
+> contributing zero to `by_sport`/`by_market_family`. 177,239 − 47,340 =
+> 129,899 unattributed; 129,899 − 115,739 = **~14,160 residual**, back in the
+> normal historical gap range. Subtracting the backfill: (177,239 −
+> 115,739) / 22.9h ≈ **2,686 cr/hour — back near the converged baseline**,
+> nothing like the 5.58M/30d the raw marginal rate implied. **Not a leak,
+> not a regression.** Fix shipped same commit: the backfill script now
+> records on both success and HTTPError paths, so a re-run attributes
+> correctly. The failed soccer refresh (`returnCode=1`) remains unexplained
+> and is the better candidate for the ~14k residual gap, per the other
+> session's own caveat — still open, but small and not urgent.
+>
+> **Lesson for next time:** before treating a big attribution gap as a leak,
+> check for a concurrent one-off script (backfills, manual replays) — not
+> every OddsAPI HTTP seam necessarily has record_oddsapi_quota wired in yet;
+> the fix here was making that seam comply, not the monitoring.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,
