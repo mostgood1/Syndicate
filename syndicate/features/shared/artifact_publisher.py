@@ -744,6 +744,28 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
             f"ok={repair_succeeded} written={repair_written}",
             flush=True,
         )
+    # #237: freshness pass for the shards that are APPENDED TO all day. The
+    # repair pass above is presence-based and so, for these, does the wrong
+    # thing exactly when it looks like it worked -- it fetched them once and
+    # then skipped them forever, freezing this worker's prices at that instant.
+    # Same defect the live-lens block below was written to fix, on the files
+    # the board's prices are actually built from. Only re-streams copies that
+    # already exist, so it never double-requests what the repair pass just
+    # asked for, and a current copy costs one 304 with no body.
+    for relative_path in _stale_streamable_artifact_relative_paths(date_str):
+        refresh_succeeded, refresh_written = pull_streamed_artifact(
+            relative_path, timeout_seconds=max(timeout_seconds, 300)
+        )
+        written += refresh_written
+        if refresh_written:
+            # Logged only when a NEWER copy actually landed. The steady state is
+            # a 304 every cycle for every shard, and printing that would bury
+            # the one line that says the board's prices just moved.
+            print(
+                f"[artifact_publisher] PULL_REFRESH_STALE path={relative_path} "
+                f"ok={refresh_succeeded} written={refresh_written}",
+                flush=True,
+            )
     # #124: the live-lens snapshots (data/live/{mlb,nba,wnba}_live_lens.json,
     # now allowlisted above) are continuously rewritten -- every ~60s while
     # games are live -- but carry no date in their filename at all, so
@@ -943,6 +965,53 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
     except Exception:
         pass
     return paths
+
+
+# Families that are APPENDED TO all day rather than written once. The repair
+# pass above is presence-based, so for these it does the wrong thing precisely
+# when it looks like it worked: it fetches the shard the first time it is
+# absent and then skips it forever, freezing this worker on whatever the file
+# contained at that moment.
+_CONTINUOUSLY_APPENDED_MARKERS: tuple[str, ...] = ("/book_quotes/", "/odds_history/")
+
+
+def _stale_streamable_artifact_relative_paths(date_str: str) -> list[str]:
+    """Present-but-possibly-stale shards to re-stream this cycle (#237).
+
+    Measured 2026-08-06. refresh-worker pulled its copies once, at 21:03:22Z,
+    and never again -- `PULL_REPAIR_MISSING` fires only on absence. By 22:19Z
+    web held wnba 1,486,090 bytes and mlb 55,799,948 while refresh-worker was
+    still building the board off the 1,165,695 / 53,130,595 byte snapshots from
+    21:03. WNBA's evening markets were posted after that capture, so its cards
+    could not price at all: 2 of 20 on the served board, against a fix that
+    prices them correctly on a current shard.
+
+    Deliberately complements, rather than duplicates, the repair pass: that one
+    owns MISSING files, this one owns files that exist. So an out-of-season
+    sport is asked for exactly once per cycle, not twice.
+
+    Cheap by construction. `pull_streamed_artifact` sends `since=<local mtime>`
+    and web answers 304 with no body when the copy is current -- its own
+    docstring calls that "the reason this is cheap enough to call every cycle",
+    which is what this finally does.
+    """
+    relative_paths: list[str] = []
+    try:
+        root = _data_root().resolve()
+    except Exception:
+        return relative_paths
+    for path in _required_daily_artifact_paths(date_str):
+        try:
+            if not path.is_file():
+                continue  # the repair pass owns this one
+            relative = path.resolve().relative_to(root).as_posix()
+        except Exception:
+            continue
+        if not any(marker in relative for marker in _CONTINUOUSLY_APPENDED_MARKERS):
+            continue
+        if is_hot_artifact_relative_path(relative):
+            relative_paths.append(relative)
+    return relative_paths
 
 
 def _missing_required_artifact_relative_paths(date_str: str) -> list[str]:
