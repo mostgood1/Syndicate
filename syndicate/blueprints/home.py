@@ -3100,11 +3100,21 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
         home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
         game_items = game_bar.get("items") if isinstance(game_bar.get("items"), list) else []
         dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
+        # #229: read the NAMED source, not the rail. The rail fallbacks stay for
+        # any overview built by a path that predates prop_opportunities -- they
+        # are a compatibility shim, not the contract, and should be deleted once
+        # every producer sets it.
+        opportunities = sport.get("prop_opportunities") if isinstance(sport.get("prop_opportunities"), dict) else {}
         prop_items = []
-        if isinstance((home_rails.get("pregame") or {}).get("items"), list):
-            prop_items.extend((home_rails.get("pregame") or {}).get("items") or [])
-        if isinstance((home_rails.get("live") or {}).get("items"), list):
-            prop_items.extend((home_rails.get("live") or {}).get("items") or [])
+        for lane in ("pregame", "live"):
+            lane_items = opportunities.get(lane)
+            if isinstance(lane_items, list):
+                prop_items.extend(lane_items)
+        if not prop_items:
+            if isinstance((home_rails.get("pregame") or {}).get("items"), list):
+                prop_items.extend((home_rails.get("pregame") or {}).get("items") or [])
+            if isinstance((home_rails.get("live") or {}).get("items"), list):
+                prop_items.extend((home_rails.get("live") or {}).get("items") or [])
         if not prop_items:
             prop_items = props_bar.get("items") if isinstance(props_bar.get("items"), list) else []
         for item in game_items:
@@ -6789,6 +6799,20 @@ def _build_sport_overview(
         "games_count": games_count,
         "active_game_count": active_game_count,
         "hydrated_game_count": hydrated_game_count,
+        # #229 step 4: the opportunity rows under their OWN name, so consumers
+        # stop reading a UI structure as their data source.
+        #
+        # `home_rails` below is a PRESENTATION shape -- titles, links, empty
+        # summaries, a "compact" lane -- and three consumers were reaching into
+        # `home_rails["pregame"]["items"]` for the opportunity feed itself
+        # (_build_home_dashboard here, and intelligence.py at :2585 and :7201).
+        # That is the inversion this plan exists to remove: a rail should RENDER
+        # opportunities, not BE where they live. Same list, named for what it
+        # is; the rails now consume it exactly like everyone else.
+        "prop_opportunities": {
+            "pregame": pregame_prop_items,
+            "live": live_prop_items,
+        },
         "home_rails": {
             "compact": {
                 "title": "Compact game rail",

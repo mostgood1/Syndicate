@@ -2582,9 +2582,19 @@ def build_intelligence_overview(
         # read as evidence about MLB. Scoping diagnostics to one sport makes the
         # other six look like whatever the instrumented one happens to be doing.
         slug = _safe_text(sport_overview.get("slug"), "sport").lower()
+        # #229 step 4: read the NAMED opportunity source rather than the rail.
+        # A rail is a presentation shape; reading it as the data feed is the
+        # inversion the one-opportunity-pipeline plan exists to remove. Rails
+        # remain as a fallback only for overviews built before
+        # prop_opportunities existed.
+        opportunities = sport_overview.get("prop_opportunities") if isinstance(sport_overview.get("prop_opportunities"), dict) else {}
         home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}
-        pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
-        live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
+        pregame_items = opportunities.get("pregame")
+        if not isinstance(pregame_items, list):
+            pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
+        live_items = opportunities.get("live")
+        if not isinstance(live_items, list):
+            live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
         dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
         _intel_trace(
             "overview_counts",
@@ -7199,10 +7209,16 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
         sport_health = _safe_text(sport.get("data_health"), "").lower()
         dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
         home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
+        # #229 step 4: same inversion as above, on the path that actually builds
+        # Layer 2 prop candidates -- this is the one that matters.
+        _opportunities = sport.get("prop_opportunities") if isinstance(sport.get("prop_opportunities"), dict) else {}
         if preferences.get("include_props"):
             pregame_candidates: list[dict[str, Any]] = []
             pregame = home_rails.get("pregame") if isinstance(home_rails.get("pregame"), dict) else {}
-            for item in pregame.get("items") or []:
+            _pregame_source = _opportunities.get("pregame")
+            if not isinstance(_pregame_source, list):
+                _pregame_source = pregame.get("items") or []
+            for item in _pregame_source:
                 if isinstance(item, dict):
                     candidate = _prop_candidate_from_item(
                         sport,
@@ -7218,7 +7234,12 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="pregame_prop_candidate_creation", before=[], after=pregame_candidates)
             live_candidates: list[dict[str, Any]] = []
             live = home_rails.get("live") if isinstance(home_rails.get("live"), dict) else {}
-            for item in live.get("items") or []:
+            # Same inversion as the pregame lane just above. `live` is still
+            # read for its TITLE below, which is genuinely presentation.
+            _live_source = _opportunities.get("live")
+            if not isinstance(_live_source, list):
+                _live_source = live.get("items") or []
+            for item in _live_source:
                 if isinstance(item, dict):
                     candidate = _prop_candidate_from_item(
                         sport,
