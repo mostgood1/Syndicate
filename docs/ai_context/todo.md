@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### RE-RUN 2026-08-05 (#199) -- K on 48 dates: model still beats sim, but NOTHING is profitable. Game markets graded for the first time (#197).
+
+**K (1,294 starts, 48 dates, 560 with two-sided lines).** Now uses REAL
+point-in-time `batters_faced` from #193b option 2, so this is the first K result
+not resting on a reconstructed-feature gap.
+
+| | bias | MAE | RMSE |
+|---|---|---|---|
+| sim | +0.198 | 2.014 | 2.498 |
+| model | -0.803 | 1.913 | 2.434 |
+
+Model-vs-sim delta **-1.001** (sigma 1.048), close to the -1.217 seen on 15
+dates -- #187's finding holds. Served BF mean **280.0** vs the model's 391.7
+training mean; the gap persists even with correct point-in-time reconstruction,
+so it is a genuine train/serve population difference, not the artifact bug I
+first suspected.
+
+| config | min edge | bets | hit | ROI |
+|---|---|---|---|---|
+| sim only | 0% | 560 | 49.29% | -8.0% |
+| sim only | 5% | 457 | 48.36% | -10.8% |
+| model on | 0% | 560 | 49.64% | -7.8% |
+| **model on** | **5%** | **507** | **51.28%** | **-4.6%** |
+| model on | 10% | 442 | 50.90% | -5.3% |
+
+**#187 weakens.** On 15 dates model-on beat sim-only by +2.0-5.7pp everywhere
+and touched 51.75%. On 48 dates the gap is much smaller and the best cell is
+**51.28% / -4.6%** against a 53.00% break-even. **K props are not profitable.**
+Turning the model on is still right -- it beats the sim everywhere -- but it
+does not clear the vig.
+
+**Game markets (#197), graded for the first time. 600 games, 63 dates.**
+
+METHOD WARNING worth remembering: the first pass joined odds to sims by
+substring-matching team abbreviations against full team names. It matched only
+191/873 games and produced **+24.9% to +51.9% moneyline ROI** -- which was
+spurious. A sim with Brier 0.24806 against a 0.24955 base rate cannot yield
++51.9%; the combination of an implausible edge and a low match rate is what
+exposed it. Correct join is odds full-team-names -> cached StatsAPI schedule ->
+`gamePk` -> summary. That lifted 191 -> 600 games and the number collapsed.
+
+Sim home-win Brier **0.24646** vs base-rate **0.25000** -- barely better than
+always predicting the base rate. Calibration is fine mid-range but badly
+overconfident on favourites (0.6-1.0 bucket predicts 64.4%, actual **56.2%**).
+
+| market | min edge | bets | hit | ROI |
+|---|---|---|---|---|
+| moneyline | 0% | 589 | 44.65% | -0.6% |
+| moneyline | 2% | 506 | 45.65% | +3.3% |
+| **moneyline** | **5%** | **358** | **45.53%** | **+8.0%** |
+| totals | 0% | 583 | 51.97% | -1.6% |
+| totals | 0.25 | 473 | 53.07% | -0.0% |
+| totals | 0.50 | 376 | 51.60% | -3.1% |
+
+**Totals: no edge**, flat around break-even in a 4.71%-hold market.
+
+**Moneyline +8.0% is the best signal found all session, and I do NOT trust it
+yet.** Three reasons: (1) n=358 and the sub-50% hit rate means these are
+underdog bets at plus money, where ROI variance is enormous; (2) the sim's
+Brier is barely better than the base rate, which makes a real edge implausible;
+(3) the favourite-overconfidence means the sim systematically takes dogs
+against the market, so the whole result could be one good run of longshots.
+**Next step before believing it**: bucket the moneyline ROI by date and by
+price range, and check whether it survives excluding the biggest winners.
+If it is real, it is a 4.53%-hold market and would be the most valuable finding
+in this thread.
+
 ### RE-RUN 2026-08-05 (#198) -- #188 REVERSED on 3.6x the data: the leak-free Statcast features DO help. Model still beats sim. HR overs still unprofitable.
 
 First re-run on the Render+StatsAPI cache from #193a. Pull completed: 66 dates
