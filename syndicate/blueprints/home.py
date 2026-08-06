@@ -947,6 +947,9 @@ def _sort_compact_game_items(items: list[dict[str, Any]]) -> list[dict[str, Any]
     return [item for _, item in ordered]
 
 
+from syndicate.features.shared.market_keys import canonical_market_key
+
+
 def _prop_metric_text(value: Any) -> str | None:
     text = _score_value(value)
     if text is not None:
@@ -2289,7 +2292,7 @@ def _mlb_prop_player_id(prop_row: dict[str, Any]) -> int | None:
     return None
 
 
-def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, actual: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None, player_id: Any = None, headshot_url: str | None = None, quote: dict[str, Any] | None = None, price_improvement_pct: Any = None) -> None:
+def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, actual: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None, player_id: Any = None, headshot_url: str | None = None, quote: dict[str, Any] | None = None, price_improvement_pct: Any = None, market_key: str | None = None) -> None:
     pick_text = _safe_text(pick, "-")
     if pick_text == "-":
         return
@@ -2471,6 +2474,12 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             # #215 -- the price context the row contract never had. Flattened
             # alongside the full quote because the template renders chips from
             # scalars and the nested object is for the drill-in / API consumers.
+            # #224: an explicit key from the caller wins; otherwise derive from
+            # the market label. That is safe here because canonical_market_key
+            # only maps a known vocabulary ("Moneyline"/"Total"/"ATS"/"Hits")
+            # and returns None for anything else rather than guessing -- an
+            # unmapped label stays unmapped and the counter keeps reporting it.
+            "market_key": market_key or canonical_market_key(sport.get("slug"), market),
             "quote": dict(quote) if isinstance(quote, dict) else None,
             "book": (quote or {}).get("bookmaker"),
             "best_book": (quote or {}).get("best_bookmaker"),
@@ -2579,6 +2588,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             sim_context=game_sim_context,
             quote=row.get("quote"),
             price_improvement_pct=row.get("price_improvement_pct"),
+            market_key=canonical_market_key(sport.get("slug"), row.get("market_key"), row.get("prop"), row_market_text),
         )
     if not candidates:
         game_markets = game.get("gameMarkets") if isinstance(game.get("gameMarkets"), dict) else {}
@@ -2799,6 +2809,10 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                     sport=sport,
                     game=game,
                     market=f"{market_prefix} {market_label}".strip(),
+                    market_key=canonical_market_key(
+                        sport.get("slug"), prop.get("market_key"), prop.get("prop"),
+                        prop.get("prop_market_key"), prop.get("market"),
+                    ),
                     pick=pick,
                     line=prop.get("market_line"),
                     odds=_first_present_text(prop.get("odds"), prop.get("price")),
@@ -5757,6 +5771,12 @@ def _mlb_top_prop_rows_from_group(
             selection = _safe_text(value.get("selectionLabel") or value.get("selection"), "Play")
             target_label = str(value.get("targetLabel") or "").strip()
             market = _safe_text(value.get("statLabel") or value.get("stat"), "Market")
+            # #224: the CANONICAL key, kept separate from the display label
+            # above. Measured 2026-08-06: missing_market_key was 100% of every
+            # row on the board because only `market` (a display string) was ever
+            # carried, while the odds log keys on batter_hits/outs/strikeouts.
+            # `stat` is the source's own key and was sitting right here unused.
+            market_key = canonical_market_key("mlb", value.get("marketKey"), value.get("stat"), value.get("statLabel"))
             pick = f"{selection} {target_label}".strip()
             candidates.append(
                 (
@@ -5772,6 +5792,7 @@ def _mlb_top_prop_rows_from_group(
                         "headshot_url": str(value.get("headshotUrl") or "").strip() or None,
                         "is_live": False,
                         "market": market,
+                        "market_key": market_key,
                         "pick": pick,
                         "detail": f"{pick} {market} | {heading}".strip(),
                         "value": f"{probability * 100:.1f}% win" if probability is not None else heading,
