@@ -481,6 +481,68 @@ def _write_rows(out_path: Path, rows: list[dict]) -> None:
         writer.writerows(rows)
 
 
+def _append_ncaab_book_quotes(rows: list[dict], *, date_iso: str) -> None:
+    """Route NCAAB's already-multi-book rows into the shared quote log.
+
+    NCAAB loops every bookmaker (`iter_current_odds_expanded`) and was never a
+    Class A capture defect. The work here is a SHAPE change and it is not
+    cosmetic: `_normalize_market_rows` emits WIDE rows -- one row per
+    (event, book, market) carrying `moneyline_home`/`moneyline_away`, or
+    `home_spread`/`away_spread` with their prices, or `total`/`over_price`/
+    `under_price`. A cross-sport best-price join needs one row per SELECTION, so
+    this explodes them.
+
+    `last_update` is already captured per market here, so NCAAB gets a real book
+    clock rather than loop time.
+
+    Never raises: a logging side-effect must not fail an odds refresh.
+    """
+    try:
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes
+
+        quotes: list[dict] = []
+        for row in rows or []:
+            base = {
+                "kind": "game",
+                "event_id": row.get("event_id"),
+                "commence_time": str(row.get("commence_time") or "") or None,
+                "home_team": row.get("home_team_name"),
+                "away_team": row.get("away_team_name"),
+                "bookmaker": row.get("book"),
+                "segment": str(row.get("period") or "full") or "full",
+                "player_name": None,
+                "book_updated_at": str(row.get("last_update") or "") or None,
+            }
+            market = str(row.get("market") or "").strip().lower()
+            if market == "h2h":
+                pairs = (("home", row.get("moneyline_home"), None), ("away", row.get("moneyline_away"), None))
+            elif market == "spreads":
+                pairs = (
+                    ("home", row.get("home_spread_price"), row.get("home_spread")),
+                    ("away", row.get("away_spread_price"), row.get("away_spread")),
+                )
+            elif market == "totals":
+                pairs = (
+                    ("over", row.get("over_price"), row.get("total")),
+                    ("under", row.get("under_price"), row.get("total")),
+                )
+            else:
+                continue
+            for selection, price, line in pairs:
+                if price is None:
+                    continue
+                quotes.append({**base, "market": market, "selection": selection, "price": price, "line": line})
+
+        append_book_quotes(
+            sport="ncaab",
+            date_str=str(date_iso),
+            rows=quotes,
+            captured_at=dt.datetime.now(dt.timezone.utc).isoformat(),
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[odds_book_quotes] ncaab append FAILED {type(exc).__name__}: {exc}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Refresh NCAAB odds history through a Syndicate-owned runner.")
     parser.add_argument("--date", required=True)
@@ -522,6 +584,7 @@ def main() -> int:
     if not should_recompute(f"ncaab_odds_{args.mode}:{date_iso}", input_hash) and out_path.exists():
         print(f"Reused {len(rows)} odds rows at {out_path}")
         return 0
+    _append_ncaab_book_quotes(rows, date_iso=date_iso)
     _write_rows(out_path, rows)
     record_refresh_state(
         f"ncaab_odds_{args.mode}:{date_iso}",

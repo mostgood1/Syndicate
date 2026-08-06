@@ -824,6 +824,89 @@ def write_props(df: pd.DataFrame, *, artifact_root: Path, date: str, source: str
     return str(parquet_path if parquet_path.exists() else csv_path)
 
 
+def _append_nhl_book_quotes(frame, *, date: str, kind: str) -> None:
+    """Route NHL's already-multi-book frames into the shared quote log.
+
+    Like soccer and NCAAB, NHL was never a Class A capture defect -- both
+    collectors loop every bookmaker. What it lacked was the SHARED SHAPE, so
+    cross-sport CLV/best-price work had to know NHL's column names
+    (`bookmaker_key`, `outcome_price`, `outcome_name`) to read it at all.
+
+    Team odds carry `book_last_update`, a real book clock. Props do not -- the
+    props flattener never kept `last_update` -- so those rows get
+    `book_updated_at: None`, which is deliberately NOT backfilled with loop time
+    (see QUOTE_FIELDS). Unknown must stay unknown.
+
+    Never raises: a logging side-effect must not fail an odds collection.
+    """
+    try:
+        if frame is None or getattr(frame, "empty", True):
+            return
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes
+
+        rows: List[dict] = []
+        for record in frame.to_dict("records"):
+            if kind == "prop":
+                side = str(record.get("side") or "").strip().lower()
+                rows.append(
+                    {
+                        "kind": "prop",
+                        "event_id": record.get("event_id"),
+                        "commence_time": record.get("commence_time"),
+                        "home_team": record.get("home_team"),
+                        "away_team": record.get("away_team"),
+                        "bookmaker": record.get("book"),
+                        "market": record.get("market"),
+                        "segment": "full",
+                        "selection": side or None,
+                        "player_name": record.get("player"),
+                        "line": record.get("line"),
+                        "price": record.get("odds"),
+                        "book_updated_at": None,
+                    }
+                )
+            else:
+                outcome = str(record.get("outcome_name") or "").strip()
+                home = str(record.get("home_team") or "").strip()
+                away = str(record.get("away_team") or "").strip()
+                lowered = outcome.lower()
+                if lowered.startswith("over"):
+                    selection = "over"
+                elif lowered.startswith("under"):
+                    selection = "under"
+                elif outcome and outcome == home:
+                    selection = "home"
+                elif outcome and outcome == away:
+                    selection = "away"
+                else:
+                    selection = lowered or None
+                rows.append(
+                    {
+                        "kind": "game",
+                        "event_id": record.get("event_id"),
+                        "commence_time": record.get("commence_time"),
+                        "home_team": home,
+                        "away_team": away,
+                        "bookmaker": record.get("bookmaker_key") or record.get("bookmaker"),
+                        "market": record.get("market"),
+                        "segment": "full",
+                        "selection": selection,
+                        "player_name": None,
+                        "line": record.get("outcome_point") if record.get("outcome_point") is not None else record.get("line"),
+                        "price": record.get("outcome_price"),
+                        "book_updated_at": record.get("book_last_update"),
+                    }
+                )
+        append_book_quotes(
+            sport="nhl",
+            date_str=str(date),
+            rows=rows,
+            captured_at=_utc_now_iso(),
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[odds_book_quotes] nhl {kind} append FAILED {type(exc).__name__}: {exc}")
+
+
 def collect_and_write_player_props(*, artifact_root: Path, date: str, source: str = "oddsapi") -> Dict:
     if str(source or "oddsapi").strip().lower() != "oddsapi":
         raise RuntimeError("Syndicate-owned NHL runner currently supports props-source=oddsapi only.")
@@ -831,6 +914,7 @@ def collect_and_write_player_props(*, artifact_root: Path, date: str, source: st
     if roster_df is None or roster_df.empty:
         roster_df = build_all_team_roster_snapshots()
     raw = collect_oddsapi_props(date)
+    _append_nhl_book_quotes(raw, date=date, kind="prop")
     normalized = normalize_player_names(raw, roster_df)
     combined = combine_over_under(normalized)
     output_path = write_props(combined, artifact_root=artifact_root, date=date, source="oddsapi")
@@ -840,4 +924,5 @@ def collect_and_write_player_props(*, artifact_root: Path, date: str, source: st
 def collect_and_write_team_odds(*, artifact_root: Path, date: str, markets: str = "h2h,spreads,totals") -> Dict:
     market_list = [market.strip() for market in str(markets or "h2h,spreads,totals").split(",") if market.strip()]
     frame = collect_oddsapi_team_odds(date, markets=market_list if market_list else None)
+    _append_nhl_book_quotes(frame, date=date, kind="game")
     return write_team_odds(frame, artifact_root=artifact_root, date=date, source="oddsapi")

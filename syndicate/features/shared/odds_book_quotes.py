@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -64,6 +65,21 @@ from syndicate.features.shared.refresh_state_store import data_root
 QUOTE_FIELDS: tuple[str, ...] = (
     "captured_at",
     "snapshot_ts",
+    # TWO CLOCKS, NEVER CONFLATED.
+    #
+    # `captured_at` is when OUR loop looked. `book_updated_at` is when the BOOK
+    # last moved this number, straight from OddsAPI's per-market `last_update`.
+    # They fail independently and the difference is the diagnostic: a price
+    # whose book last moved four hours ago but which we polled 30 seconds ago is
+    # a DEAD MARKET, and every surface in this repo currently renders it as
+    # fresh, because loop time was the only clock available.
+    #
+    # Deliberately None when the source did not give us one -- NOT defaulted to
+    # captured_at. `snapshot_ts` above does fall back to captured_at and is kept
+    # only for the consumers written against it; anything reasoning about
+    # freshness must read this field and treat None as unknown. Falling back
+    # here would silently recreate the exact conflation this exists to remove.
+    "book_updated_at",
     "sport",
     "date",
     "kind",
@@ -138,9 +154,14 @@ def _normalize(row: Mapping[str, Any], *, sport: str, date_str: str, captured_at
     if price is None and line is None:
         return None
     player = str(row.get("player_name") or row.get("player") or "").strip()
+    # See QUOTE_FIELDS: this one stays None when the source has no book clock.
+    book_updated_at = str(
+        row.get("book_updated_at") or row.get("last_update") or row.get("snapshot_ts") or ""
+    ).strip() or None
     out = {
         "captured_at": captured_at,
-        "snapshot_ts": str(row.get("snapshot_ts") or captured_at),
+        "snapshot_ts": str(row.get("snapshot_ts") or row.get("last_update") or captured_at),
+        "book_updated_at": book_updated_at,
         "sport": str(sport or "").strip().lower(),
         "date": str(date_str).strip(),
         "kind": str(row.get("kind") or ("prop" if player else "game")),
@@ -187,10 +208,16 @@ def append_book_quotes(
     rows: Iterable[Mapping[str, Any]],
     captured_at: str,
     publish: bool = True,
+    extra: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Append every quote whose (line, price) differs from that key's last
     observation. Never raises: a quotes-log failure must not fail an odds
-    refresh, exactly as the #207 diagnostic must not."""
+    refresh, exactly as the #207 diagnostic must not.
+
+    `extra` stamps constant fields onto every row -- soccer's `league`, which is
+    the one dimension a single `sport` slug cannot express, since all eight
+    leagues share the `soccer_source` tree.
+    """
     try:
         path = book_quotes_path(sport, date_str)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -207,6 +234,8 @@ def append_book_quotes(
             normalized = _normalize(raw, sport=sport, date_str=date_str, captured_at=captured_at)
             if normalized is None:
                 continue
+            for field, value in (extra or {}).items():
+                normalized.setdefault(str(field), value)
             key = _quote_key(normalized)
             # Two books can legitimately post the same key twice in one payload
             # (alternate lines arrive as separate outcomes); keep the first.
@@ -406,3 +435,118 @@ def best_price_by_market(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[st
         if previous is None or int(price) > int(previous.get("price") or -10**9):
             best[key] = dict(row)
     return best
+
+
+def market_key_for_quote(row: Mapping[str, Any]) -> str:
+    """The cross-book identity of a market: everything except which book quoted
+    it. Same key `best_price_by_market` groups on, exposed so callers can look a
+    market up without reimplementing (and drifting from) the field list."""
+    return "|".join(
+        str(row.get(field) or "")
+        for field in ("sport", "kind", "event_id", "segment", "market", "selection", "player_name", "line")
+    )
+
+
+def _age_seconds(timestamp: Any, *, now: datetime) -> int | None:
+    text = str(timestamp or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0, int((now - parsed).total_seconds()))
+
+
+def _implied_probability(price: int) -> float:
+    return (100.0 / (price + 100.0)) if price > 0 else (abs(price) / (abs(price) + 100.0))
+
+
+def quote_ref(
+    quotes_for_market: Iterable[Mapping[str, Any]],
+    *,
+    chosen_bookmaker: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any] | None:
+    """The board/ledger-facing description of a price: which book, what number,
+    when that book moved it, and how it compares to everyone else quoting it.
+
+    This is the object the read path never had. A Layer 2 candidate row is built
+    from display_pick/ev_pct/p_win/market_label/selection and carries no price,
+    no book and no timestamp -- which is why "which book has the edge" had
+    nowhere to live and CLV had no opening price to record.
+
+    `consensus_price` is here on purpose and matters as much as `price`. A best
+    price 40 points clear of every other book is usually a stale or erroneous
+    line rather than an edge; `price_rank: 1` alone is not evidence, and
+    `price_rank: 1` against a tight consensus of six books is. Surfacing rank
+    without consensus would invite exactly the wrong read.
+
+    Pass `chosen_bookmaker` to describe a price we actually took (a logged bet);
+    omit it to describe the best available.
+    """
+    rows = [row for row in (quotes_for_market or ()) if isinstance(row, Mapping) and row.get("price") is not None]
+    if not rows:
+        return None
+    now = now or datetime.now(timezone.utc)
+
+    ranked = sorted(rows, key=lambda row: int(row["price"]), reverse=True)
+    chosen = None
+    if chosen_bookmaker:
+        wanted = str(chosen_bookmaker).strip().lower()
+        chosen = next((row for row in ranked if str(row.get("bookmaker") or "").lower() == wanted), None)
+    if chosen is None:
+        chosen = ranked[0]
+
+    price = int(chosen["price"])
+    # Mean implied probability across books, converted back to a price-like
+    # number. Averaging American odds directly is meaningless (the scale is
+    # discontinuous at +/-100); averaging implied probability is not.
+    mean_implied = sum(_implied_probability(int(row["price"])) for row in ranked) / len(ranked)
+    consensus_price = (
+        int(round(-100.0 * mean_implied / (1.0 - mean_implied))) if mean_implied >= 0.5
+        else int(round(100.0 * (1.0 - mean_implied) / mean_implied))
+    )
+
+    return {
+        "bookmaker": chosen.get("bookmaker"),
+        "price": price,
+        "line": chosen.get("line"),
+        "book_updated_at": chosen.get("book_updated_at"),
+        "captured_at": chosen.get("captured_at"),
+        "book_age_seconds": _age_seconds(chosen.get("book_updated_at"), now=now),
+        "capture_age_seconds": _age_seconds(chosen.get("captured_at"), now=now),
+        "price_rank": ranked.index(chosen) + 1,
+        "books_quoting": len(ranked),
+        "best_price": int(ranked[0]["price"]),
+        "best_bookmaker": ranked[0].get("bookmaker"),
+        "consensus_price": consensus_price,
+        "edge_vs_consensus_pct": round((_implied_probability(consensus_price) - _implied_probability(price)) * 100, 2),
+        "alternatives": [
+            {"bookmaker": row.get("bookmaker"), "price": int(row["price"]), "line": row.get("line")}
+            for row in ranked
+        ],
+    }
+
+
+def quotes_by_market(rows: Iterable[Mapping[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Group quote rows by cross-book market identity, keeping only the freshest
+    observation per book so `quote_ref` compares one price per book rather than
+    every price each book has posted today."""
+    latest: dict[tuple[str, str], dict[str, Any]] = {}
+    for row in rows or ():
+        if not isinstance(row, Mapping) or row.get("price") is None:
+            continue
+        key = (market_key_for_quote(row), str(row.get("bookmaker") or ""))
+        observed = str(row.get("book_updated_at") or row.get("snapshot_ts") or row.get("captured_at") or "")
+        previous = latest.get(key)
+        if previous is None or observed >= str(
+            previous.get("book_updated_at") or previous.get("snapshot_ts") or previous.get("captured_at") or ""
+        ):
+            latest[key] = dict(row)
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for (market, _book), row in latest.items():
+        grouped.setdefault(market, []).append(row)
+    return grouped

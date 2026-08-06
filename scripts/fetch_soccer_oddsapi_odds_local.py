@@ -15,6 +15,7 @@ Requires ODDS_API_KEY in the environment (or .env).
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import os
 from pathlib import Path
 from typing import Any
@@ -188,6 +189,51 @@ def _stable_odds_df(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
+def _append_soccer_book_quotes(*, league: str, events: list[dict[str, Any]]) -> None:
+    """Route soccer's already-multi-book response into the shared quote log.
+
+    Soccer was never a Class A capture defect -- `_ordered_bookmakers` sweeps
+    every book and the CSV carries a `book` column -- so nothing is being
+    recovered here. What it gains is a SHAPE: CLV, closing lines and best-price
+    comparison read one flat format for all eight sports instead of a bespoke
+    per-sport file list, which is the routing gap that left NBA/WNBA's six-book
+    prop CSV unread for months (#209 Class B).
+
+    It also gains the book clock. The CSV rows built by `parse_event_to_rows`
+    carry no `last_update` at all, so soccer had only loop time; the shared
+    flattener keeps OddsAPI's per-market `last_update`, which is what tells a
+    dead market apart from a fresh one.
+
+    Never raises: a logging side-effect must not be able to fail an odds fetch.
+    """
+    try:
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes
+        from syndicate.features.shared.odds_book_quotes import quote_rows_from_oddsapi_events
+
+        rows = quote_rows_from_oddsapi_events(events)
+        if not rows:
+            return
+        now = dt.datetime.now(dt.timezone.utc)
+        # Shard by the event's own kickoff date rather than "today": a Saturday
+        # 20:00 UTC kickoff and a Sunday 00:30 UTC kickoff belong to different
+        # slates, and bucketing both under the fetch date would put a match's
+        # closing quotes in a shard nothing looks in.
+        by_date: dict[str, list[dict[str, Any]]] = {}
+        for row in rows:
+            commence = str(row.get("commence_time") or "")[:10] or now.date().isoformat()
+            by_date.setdefault(commence, []).append(row)
+        for date_str, date_rows in by_date.items():
+            append_book_quotes(
+                sport="soccer",
+                date_str=date_str,
+                rows=date_rows,
+                captured_at=now.isoformat(),
+                extra={"league": str(league).strip().lower()},
+            )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[odds_book_quotes] soccer append FAILED {type(exc).__name__}: {exc}")
+
+
 def main() -> int:
     _load_env()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -216,6 +262,8 @@ def main() -> int:
     rows: list[dict[str, Any]] = []
     for event in events:
         rows.extend(parse_event_to_rows(event, league=args.league))
+
+    _append_soccer_book_quotes(league=str(args.league), events=events)
 
     df = _stable_odds_df(pd.DataFrame(rows))
     out_path = Path(args.out)
