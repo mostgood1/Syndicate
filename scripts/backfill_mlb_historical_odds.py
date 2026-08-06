@@ -15,10 +15,14 @@ Measured against the live account 2026-08-06 before writing this:
     /v4/historical/sports/baseball_mlb/odds         10 credits per market-region
     .../events/{id}/odds                            10 credits per market-region
 
-    account: 250,600 used / 14,749,400 remaining
+    account headers: 250,600 used / 14,749,400 remaining
 
-Note the account ceiling is 15M, not the 5M assumed in earlier todo entries --
-worth knowing before anyone re-derives a cadence budget from that stale number.
+The headers sum to 15M, but do NOT treat that as the cap: the same discrepancy
+was recorded 2026-07-30 and the user re-confirmed then that 5,000,000 is the real
+billed monthly cap. Budget against 5M. A 30-day backfill at ~140k credits is
+~2.8% of one month against that denominator -- still comfortable, but size it
+against 5M, not against `x-requests-remaining`.
+
 Snapshots are ~5 minutes apart and a slate call returns every book (10 observed:
 fanduel, draftkings, betmgm, williamhill_us, fanatics, betrivers, betonlineag,
 lowvig, bovada, betus).

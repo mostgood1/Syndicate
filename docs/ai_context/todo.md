@@ -94,10 +94,18 @@ said the binding constraint was never model quality. This is that, quantified.
 User: "can we backfill missing data for at least 30 days for mlb from oddsapi so
 we can do some of the clv work?" Yes -- comfortably.
 
-**Correct the budget first.** Read live off the account 2026-08-06:
-**250,600 used / 14,749,400 remaining -- a 15M ceiling, not 5M.** Several
-earlier entries (and [[project-oddsapi-call-budget]]) reason from 5M. Anything
-that concluded "we can't afford that cadence" against 5M deserves a re-check.
+**Budget -- do NOT read the vendor counter as the cap.** Read live off the
+account 2026-08-06: **250,600 used / 14,749,400 remaining**, i.e. the headers sum
+to 15M. That is the SAME unexplained discrepancy already recorded on 2026-07-30
+(headers summed to 15M then too), and the **user re-confirmed on that date that
+5,000,000 is the real billed cap**. So the denominator for any budget decision
+stays **5M**, not 15M, until the account dashboard/invoice settles it.
+
+Against the 5M cap the backfill below is still comfortable -- **115,739 credits =
+2.3% of one month's budget** -- but "0.8% of remaining" would have been the wrong
+frame. The `used` counter reading only 250,600 (against ~2.29M by 2026-07-30 in
+the prior period) is consistent with a recently-reset billing period, which is
+also why remaining looks so generous.
 
 **Historical endpoints, measured not assumed:**
 
