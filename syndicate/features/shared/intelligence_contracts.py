@@ -181,6 +181,32 @@ class UniversalCandidate(MutableMapping[str, Any]):
     type: str | None = None
     selection: str | None = None
     market: str | None = None
+    # #223 -- IDENTITY AND PRICE, promoted out of `raw`/`sport_context`.
+    #
+    # `market` above is display-first by construction (from_raw prefers
+    # payload["market"] over payload["market_key"]), so it holds "Hits" where
+    # the odds log holds "batter_hits". Collapsing the canonical key and the
+    # human label into one field is what made board rows unjoinable to prices;
+    # they are now separate, and `market_key` is never populated from a label.
+    market_key: str | None = None
+    market_label: str | None = None
+    segment: str | None = None
+    line: float | None = None
+    # Who the wager is on. A prop cannot be identified without it, and the
+    # display label ("Rae Burrell UNDER 15.5 PTS") is not a substitute.
+    entity_id: Any = None
+    entity_name: str | None = None
+    # Which game. event_id alone is not enough across sports -- MLB board rows
+    # carry a StatsAPI gamePk while quotes carry an OddsAPI hash -- so the team
+    # pair is carried too and either can satisfy identity.
+    event_id: str | None = None
+    game_date: str | None = None
+    home_team: str | None = None
+    away_team: str | None = None
+    # odds_book_quotes.quote_ref: book, price, both clocks, rank, consensus,
+    # alternatives. Attached at PRODUCTION so CLV has an opening price and the
+    # board has a book to name.
+    quote: dict[str, Any] | None = None
     odds: float | None = None
     projection: float | None = None
     model_probability: float | None = None
@@ -327,6 +353,20 @@ class UniversalCandidate(MutableMapping[str, Any]):
                 implied_probability = abs(odds) / (abs(odds) + 100.0)
         if edge is None and model_probability is not None and implied_probability is not None:
             edge = round(model_probability - implied_probability, 4)
+        # Canonical key ONLY -- never payload["market"], which is the display
+        # string. If a producer has no canonical key this stays None and
+        # validate() says so, rather than silently accepting "Hits".
+        market_key = _first_text(payload.get("market_key"), payload.get("prop"), payload.get("prop_market_key"), payload.get("stat"))
+        market_label = _first_text(payload.get("market_label"), payload.get("market"))
+        segment = _first_text(payload.get("segment"), payload.get("period"))
+        line = _first_number(payload.get("line"), payload.get("market_line"), payload.get("prop_line"))
+        entity_name = _first_text(payload.get("entity_name"), payload.get("player_name"), payload.get("player"), payload.get("entity"))
+        entity_id = payload.get("entity_id") or payload.get("player_id")
+        event_id = _first_text(payload.get("event_id"), payload.get("game_pk"), payload.get("gamePk"), payload.get("game_id"))
+        game_date = _first_text(payload.get("game_date"), payload.get("gameDate"), payload.get("officialDate"), payload.get("selected_date"))
+        home_team = _first_text(payload.get("home_team"), payload.get("home_label"))
+        away_team = _first_text(payload.get("away_team"), payload.get("away_label"))
+        quote_payload = _copy_mapping(payload.get("quote")) or None
         score = _parse_float(payload.get("score"))
         source_strength = _normalize_source_strength(payload.get("source_strength"))
         is_live = _first_bool(payload.get("is_live"), payload.get("live"), payload.get("in_play")) or False
@@ -366,6 +406,17 @@ class UniversalCandidate(MutableMapping[str, Any]):
             type=candidate_type,
             selection=selection,
             market=market,
+            market_key=market_key,
+            market_label=market_label,
+            segment=segment,
+            line=line,
+            entity_id=entity_id,
+            entity_name=entity_name,
+            event_id=event_id,
+            game_date=game_date,
+            home_team=home_team,
+            away_team=away_team,
+            quote=quote_payload,
             odds=odds,
             projection=projection,
             model_probability=model_probability,
@@ -383,6 +434,34 @@ class UniversalCandidate(MutableMapping[str, Any]):
             quality=quality,
             raw=payload,
         )
+
+    def is_prop(self) -> bool:
+        """A wager on a person rather than a team outcome."""
+        if self.entity_name:
+            return True
+        token = " ".join(str(part or "").lower() for part in (self.market_key, self.market_label, self.type))
+        return any(word in token for word in ("player", "batter", "pitcher", "prop"))
+
+    def validate(self) -> list[str]:
+        """Reasons this cannot be emitted as an opportunity. Empty means valid.
+
+        Returns reasons rather than raising: a producer should reject on them, a
+        migration should count them. Silently emitting an unidentifiable row is
+        the one option that is never right -- it is what produced
+        `player_name: null` cards and 0-of-14 price coverage on the live board.
+        """
+        reasons: list[str] = []
+        if not self.market_key:
+            # Deliberately NOT satisfied by `market`/`market_label`: a display
+            # string cannot be joined to an odds feed, which is the whole point.
+            reasons.append("missing_market_key")
+        if not (self.event_id or (self.home_team and self.away_team)):
+            reasons.append("missing_event_identity")
+        if self.is_prop() and not self.entity_name:
+            reasons.append("missing_entity_name")
+        if not self.selection:
+            reasons.append("missing_selection")
+        return reasons
 
     def to_dict(self) -> dict[str, Any]:
         payload = dict(self.raw)
@@ -430,6 +509,13 @@ class UniversalCandidate(MutableMapping[str, Any]):
         payload["is_live"] = self.is_live
         if self.timestamp is not None:
             payload["timestamp"] = self.timestamp
+        for field_name in ("market_key", "market_label", "segment", "line", "entity_id",
+                           "entity_name", "event_id", "game_date", "home_team", "away_team"):
+            value = getattr(self, field_name)
+            if value is not None:
+                payload[field_name] = value
+        if self.quote:
+            payload["quote"] = dict(self.quote)
         if self.sport_context:
             payload["sport_context"] = dict(self.sport_context)
         if self.provenance:

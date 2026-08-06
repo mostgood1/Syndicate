@@ -1336,6 +1336,15 @@ def _home_prop_display_pills(item: dict[str, Any], *, live_total: str | None) ->
 
 
 def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_label: str | None = None, home_games: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    # #222 step 2: measure the identity gap BEFORE this function coerces it away.
+    # Recorded on the way IN, so the numbers describe what producers actually
+    # emit rather than what this function managed to patch up.
+    try:
+        from syndicate.features.shared import opportunity_contract_metrics
+
+        opportunity_contract_metrics.record_rows(rows, sport=slug, lane="prop_source_in", date_str=context_label)
+    except Exception:
+        pass
     finalized: list[dict[str, Any]] = []
     actual_cache: dict[int, dict[str, Any] | None] = {}
     game_index = _home_prop_game_index(home_games)
@@ -2819,6 +2828,15 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
         # A board without price context is degraded; a board that 500s because
         # the odds log was mid-write is an outage.
         pass
+    try:
+        from syndicate.features.shared import opportunity_contract_metrics
+
+        opportunity_contract_metrics.record_rows(
+            candidates, sport=sport.get("slug"), lane="game_candidate",
+            date_str=game.get("gameDate") or game.get("officialDate") or game.get("game_date"),
+        )
+    except Exception:
+        pass
     filtered = [row for row in candidates if row.get("edge") not in {"-", None} or row.get("confidence") not in {"-", None}]
     return sorted(filtered or candidates, key=lambda row: row.get("score", 0.0), reverse=True)
 
@@ -3091,6 +3109,15 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
                 if isinstance(item, dict):
                     prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="HR Top 10"))
         sport_slug = _safe_text(sport.get("slug"), "").lower()
+        try:
+            from syndicate.features.shared import opportunity_contract_metrics
+
+            opportunity_contract_metrics.record_rows(
+                [row for row in prop_rows if row.get("sport_slug") == sport_slug],
+                sport=sport_slug, lane="prop_dashboard_row", date_str=selected_date,
+            )
+        except Exception:
+            pass
         # #220: props are a SEPARATE lane from game bets -- _build_prop_dashboard_row
         # over home_rails/props_bar items, which never passes through
         # _game_bet_candidates_from_game where enrichment lives. Traced live:
@@ -3159,6 +3186,14 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
         {"label": "Props surfaced", "value": str(len(prop_rows)), "meta": f"{len(live_props)} live props in focus"},
         {"label": "Sports tracked", "value": str(len(overview)), "meta": "Cross-sport board"},
     ]
+    # One flush per dashboard build -- the lanes above accumulate in-process, so
+    # a lane that runs per game does not write per game.
+    try:
+        from syndicate.features.shared import opportunity_contract_metrics
+
+        opportunity_contract_metrics.flush()
+    except Exception:
+        pass
     return {
         "summary_cards": summary_cards,
         "top_game_bets": game_bets[:12],

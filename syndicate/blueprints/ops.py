@@ -245,6 +245,35 @@ def api_ops_odds_refresh_status() -> Any:
     return jsonify({"ok": True, "status": normalize_timestamped_payload(load_latest_refresh_status())})
 
 
+@ops_bp.get("/api/ops/opportunity-contract/status")
+def api_ops_opportunity_contract_status() -> Any:
+    """Identity coverage of opportunity rows, per sport and lane (#222).
+
+    Step 2 of the one-opportunity-pipeline plan: measure the gap before closing
+    it. Reports how many rows arrive WITHOUT the fields the price/CLV join
+    actually needs -- a canonical `market_key`, an `entity_name` for props, and
+    an event identity -- so a fix can be shown to have moved something rather
+    than assumed to have.
+
+    Serves the in-process counters when this instance has built a dashboard, and
+    falls back to the persisted report otherwise. Both carry `service_role`,
+    because the instrumented lanes run on web AND refresh-worker and those are
+    separate disks -- a count without it is not interpretable.
+    """
+    from syndicate.features.shared import opportunity_contract_metrics
+
+    live = opportunity_contract_metrics.snapshot()
+    if live.get("by_sport"):
+        return jsonify({"ok": True, "source": "in_process", "metrics": live})
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
+        persisted = read_json_file(reports_root() / "opportunity_contract" / "latest.json")
+    except Exception:
+        persisted = None
+    return jsonify({"ok": True, "source": "persisted", "metrics": persisted or live})
+
+
 @ops_bp.get("/api/ops/version")
 def api_ops_version() -> Any:
     return jsonify({"ok": True, "version": _build_version_payload()})
