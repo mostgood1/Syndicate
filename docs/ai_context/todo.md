@@ -1,5 +1,98 @@
 # Syndicate TODO — canonical cross-session list
 
+### RECONCILIATION 2026-08-06 -- odds provenance -> per-book capture -> the opportunity contract (session close, archive-ready)
+
+One arc, in three acts. Everything below is committed and pushed through
+`66e94c55`, deployed to all three Render services, and verified in production
+except where stated otherwise.
+
+**⚠️ ID COLLISION, unresolved at close.** A concurrent session renumbered its
+soccer-refresh item to **#221** (uncommitted at the time of writing) while this
+session had already shipped **#221** as "stop dropping player identity in the
+prop row builder" (`42902ee6`, deployed). Two different items now claim #221.
+Mine is committed, deployed and referenced across later commit messages, so the
+cheaper move is to renumber theirs -- but that is their call, not mine, and it is
+flagged to them rather than changed unilaterally. **Next session: settle this
+before taking any new ID.**
+
+---
+
+**ACT 1 -- the provenance question (#208).** Answered: **CAPTURE defect**, not
+publish. Three independent lines (one payload dict written to all three
+odds_history paths; exactly two non-test references to the unpublishable copy; a
+same-instant read of the shard the worker published). Prop verdicts in #186-#204
+are unrecoverable, not withdrawn-pending.
+
+**ACT 2 -- per-book capture and what it is worth (#209-#214).**
+- All eight sports now write one flat quote shape (`odds_book_quotes.py`), with
+  **two clocks never conflated**: `book_updated_at` (the book's own) separate
+  from `captured_at` (our loop), None when unknown and never defaulted.
+- **#211, the headline measurement**: holding the model fixed and changing only
+  the price source, best-price grading is worth **+2.79 ROI points on an
+  identical bet set** (n=1,091, CI95 [+2.48, +3.13], 26 dates). Policy-level
+  ROIs (-1.92% vs +2.93%) both have CIs straddling zero -- **the paired number is
+  the defensible one, the absolute ROIs are not.**
+- #210 backfilled 30 days / 766,704 quotes for 115,739 credits (**2.3% of the
+  5M monthly cap** -- not "0.8% of remaining"; the headers' 15M is not the cap).
+- #213 records the price struck at bet time; #214 feeds the settlement autorun
+  that was starved rather than broken.
+
+**ACT 3 -- the opportunity contract (#215-#233).** Plan:
+`docs/ai_context/plan_one_opportunity_pipeline.md`. Steps 1, 2, 3, 4, 6, 7 done;
+step 5 (remaining sports) blocked on seasons -- no live rows to measure, and an
+unmeasured fix is a guess.
+
+Measured arc on `/api/home`, same endpoint throughout:
+
+```
+             missing_market_key    complete
+first read        100% of rows          0%
+after #224         47 of 242           81%
+after #226         53 of 343           85%
+after #231           0 of 256         100%
+```
+
+---
+
+**WHAT IS STILL BROKEN, and it is the thing that matters**
+
+**The Layer 2 board is 0 of 138 priced.** Everything above landed on
+`/api/home`'s lanes. `syndicate/features/intelligence.py` -- which builds the
+board the user actually reads -- contains **no call to any enrichment function**;
+`enrich_candidate_rows` and `enrich_prop_rows` appear zero times in it. Its prop
+candidates come from `_prop_candidate_from_item` (`:7223`, `:7244`).
+
+The transport blocker underneath it IS fixed and verified:
+`STREAM_PULL_OK path=mlb_source/tracking/book_quotes/2026-08-06.jsonl
+bytes=53,130,595 ok=True written=1` -- refresh-worker holds the quote log for the
+first time, after #232 (absent from the repair list) and #233 (`/export` cannot
+deliver 52MB to a 2GB service).
+
+**Next session, in order:**
+1. Call `enrich_prop_rows` at `intelligence.py:7223`/`:7244`.
+2. Add `intelligence_prop`/`intelligence_game` lanes to
+   `opportunity_contract_metrics` -- otherwise the fix is unverifiable.
+3. Verify on `/api/intelligence/query`, **not** `/api/home`.
+4. Only then assess the price strip in `intelligence.html`; it has never
+   rendered because it has never had a row with a `quote`.
+
+**Operational lessons that cost real time today:**
+- **Instrument the surface the USER reads.** A counter at 100% on `/api/home`
+  said nothing about the board. Same error twice: the quote work and the counter
+  both verified the wrong surface.
+- **`/api/home` serves from cache**, so counter readings go stale and look
+  exactly like a failed fix. Check `generated_at`; bust with `?refresh=1&cb=`.
+  Do NOT force repeated rebuilds -- four in a row 502'd the 2GB web service.
+- **Deploy all three services.** refresh-worker sat 5 commits behind for most of
+  the session, and the board reads worker-built candidates.
+- **Render deploys can fire on a stale commit** if the push has not propagated;
+  check the `commit` field and re-trigger.
+- **Allowlisting only PERMITS a transfer** (#208's lesson, re-learned at #232).
+- **Count before deleting.** Removing the rail fallback broke 42 tests: it is a
+  live path for some sports. It is now counted (`rail_fallback_used`) and gets
+  deleted when that reads zero.
+
+
 ### IN PROGRESS 2026-08-06 (#212/#213/#214) -- the quote layer: all eight sports, two clocks, bet-time price, and settlement unstarved
 
 Plan: `docs/ai_context/plan_quote_layer.md`. Four asks (surfacing, real
@@ -4682,7 +4775,7 @@ settlement matcher), or (b) extend `load_latest_refresh_log`/the ops
 endpoint to support a `?head=true` or byte-range read so the START of a
 large captured stdout is readable, not just the tail.
 
-> ✅ **(b)-equivalent SHIPPED 2026-08-06, via #215** (a second, independent
+> ✅ **(b)-equivalent SHIPPED 2026-08-06, via #221** (a second, independent
 > investigation hit this same wall diagnosing a failed soccer refresh):
 > `_truncate_log_text` now keeps head+tail halves at capture time instead of
 > tail-only, same total budget. Not `?head=true` as literally proposed —
@@ -15679,8 +15772,12 @@ were resolved and nine already-closed rows removed from the open tables.
 > every OddsAPI HTTP seam necessarily has record_oddsapi_quota wired in yet;
 > the fix here was making that seam comply, not the monitoring.
 
-**#215** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
-not root-caused; the diagnosability gap that blocked it is fixed.**
+**#221** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
+not root-caused; the diagnosability gap that blocked it is fixed.** (Originally
+filed as #215 — collided with a concurrent session's unrelated #215/#216
+board/ranking work, `ba5d1e58`; renumbered to the actual next-free ID, #221,
+after #220 landed. See top-of-file ID-collision precedent, same class as the
+#131/#132 one.)
 
 - **Reproducible, not a blip.** Two separate `refresh_odds_sources.py --sports
   mlb,wnba,nfl,soccer --phase pregame` runs an hour apart (14:05Z and 15:05Z,
