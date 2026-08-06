@@ -37,22 +37,87 @@ Web is live on `67abaa0e` for the allowlist.
 "absent after 10 minutes" poll, which ran against pre-fix code.
 
 
-### HANDOFF 2026-08-05 -- see `docs/ai_context/handoff_mlb_odds_provenance.md`
+### RESOLVED 2026-08-06 (#208) -- the gating question from the handoff is ANSWERED: **CAPTURE defect**, not publish. Prop verdicts in #186-#204 are unrecoverable; game-market re-grade is still available.
 
-Session ended mid-verification. **Start there, not here** -- it has the
-immediate action, the gating question, and the gotchas in five minutes of
-reading. Everything committed and pushed through `f4fceb9a`.
+Supersedes the handoff's "do this first" and closes the open question in #207 /
+the #205/#206 correction. `docs/ai_context/handoff_mlb_odds_provenance.md`
+sections 1-3 are now history; sections 4-6 still apply.
 
-**In flight**: deploy `dep-d9pvimnlk1mc73e9ec10` on `live-odds-worker`, commit
-`f4fceb9a`. When live, the #207 provenance diagnostic fires on the next
-invocation and answers whether the odds single-book / missing-closing-line
-problem is a CAPTURE defect or a PUBLISH defect -- which decides whether the
-prop verdicts in #186-#204 are recoverable and whether CLV is measurable today.
+Deploy `dep-d9pvimnlk1mc73e9ec10` reached `live` on `f4fceb9a` at
+`2026-08-06T03:06:35Z`. The provenance artifact never appeared -- but the
+question it was built to answer is settled by three independent lines of
+evidence, which is a stronger result than the diagnostic alone would have given.
 
-**Do not resume modelling until that is answered.** #195/#205/#206 established
-that the binding constraint was never model quality: every ROI in this thread
-was graded against one arbitrarily-chosen bookmaker, and CLV -- the only
-instrument with power to detect a 2% edge -- has never been measured.
+**1. Static, by construction.** `odds_refresh_tracking.py:1806-1845` builds ONE
+`payload` dict and writes it to all three paths in the same call:
+`_write_odds_history_artifact(history_path, payload)` /
+`(shared_history_path, payload)` / `(artifact_history_path, payload)`. The
+worker-only third copy therefore CANNOT be richer than the two published ones.
+
+**2. No other writer.** The only non-test writer to
+`reports/odds_control_plane/odds_history/` is that same call site
+(`_shared_odds_history_path` is referenced twice outside tests:
+`odds_refresh_tracking.py:1805` writes, `:1315` reads). Nothing else can be
+depositing a fuller copy there.
+
+**3. Empirical, same-instant, off the owning service's own output.**
+live-odds-worker logs show `[artifact_publisher] PUBLISH_OK
+path=mlb_source/tracking/odds_history/2026-08-05.json` at `03:07:50Z` and the
+shard's own `updated_at` is `2026-08-06T03:08:52+00:00`. Pulling that exact
+published shard (54,135,856 bytes, 3,682 markets):
+
+| measure | value |
+|---|---|
+| entries **with** a `bookmaker=` key part | **245** |
+| entries **without** | **3,437** |
+| bookmaker coverage | **6.65%** |
+| distinct books | 8 (`fanduel`/`betmgm`/`betrivers` 45 each, `draftkings`/`fanatics` 39, `mybookieag` 15, `williamhill_us` 11, `bovada` 6) |
+| markets carrying a book | **`h2h`, `spreads`, `totals` ONLY** -- 8 books each |
+| entries with a closing line | **78 / 3,682 = 2.12%**, all of them `h2h`/`spreads`/`totals` (26 each) |
+
+Every prop market key (`batter_hits` 584, `batter_hits_runs_rbis` 584,
+`batter_rbis` 576, `batter_runs_scored` 576, `batter_total_bases` 548,
+`batter_home_runs` 287, `strikeouts` 58, `outs` 56, `earned_runs` 56) has **no
+bookmaker dimension at all** -- sample keys are
+`player_name=jeremy pena|market=batter_hits|selection=over`. The book is
+collapsed out of the key before persistence, so it is not recoverable by
+re-reading anything.
+
+**Consequences, per the handoff's own decision table (source ~= web -> CAPTURE):**
+- Prop verdicts in #186-#204 are **genuinely unrecoverable**. They stay
+  withdrawn, permanently, not withdrawn-pending.
+- Prop book capture and closing-line capture are both **forward-only fixes**.
+  Every day they are not shipped is another day of unusable prop data.
+- **Game markets are the one retroactive win**, and it is real: 8 US books are
+  already in the key for `h2h`/`spreads`/`totals` historically. #206's
+  "best-price re-grade for GAME markets only" scoping was correct.
+- Closing lines are not entirely absent -- they are captured on ~32% of game
+  market keys (26 of ~82 per market) and 0% of props. So the closing-line
+  mechanism partly works and needs extending, not building from zero.
+
+**Also established: the #207 diagnostic will never fire on the live loop.**
+`diagnose_odds_history_provenance` sits inside
+`fetch_and_write_live_odds_for_date` (`scripts/fetch_mlb_oddsapi_local.py:1389`),
+whose only non-test caller is `scripts/refresh_mlb_oddsapi.py:608` -- the odds
+ORCHESTRATOR path. The odds_history writes visible in the worker's live logs come
+from the live_lens / live_refresh tick via
+`_sync_odds_history_for_refresh`, which never enters that function. That is why
+no `[mlb_odds_history_provenance]` line appears in the worker log and no artifact
+was published. The diagnostic is still correct and still fires under the
+orchestrator; it is simply not on the loop that writes odds_history. Left in
+place (it answers a real question on demand) but it is not a monitor.
+
+**Method note, against the handoff's epistemic warning**: this conclusion is
+cross-checked three ways -- static writer trace, exhaustive writer search, and a
+same-instant read of the owning service's own published output -- rather than
+computed once. Date coverage of the empirical line: **one date (2026-08-05)**,
+which is sufficient here because the claim is about the writer's shape, not about
+a rate estimated over time.
+
+**Next, unblocked**: closing-line capture -> prop book capture -> re-grade game
+markets against best price -> #202 Phase 1 (H1-H3). Modelling stays paused until
+the first three land; #195/#205/#206 all say the binding constraint was never
+model quality.
 
 
 ### RECONCILIATION 2026-08-05/06 -- NFL/NCAAF full-day arc: preseason wiring -> Layer 2 fix -> full gap audit vs MLB -> Tier 1 + Tier 2 build-out (session close-out, archive-ready)
