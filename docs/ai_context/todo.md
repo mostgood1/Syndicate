@@ -5,6 +5,18 @@
 User, correctly: "we can log these but we still aren't any closer to betting
 edges." Two structural reasons, neither of which is model quality.
 
+**VERIFIED ON RENDER 2026-08-05, not inferred from the local mirror** (user:
+"check on render not locally"). Pulled `oddsapi_game_lines_*` for 2026-08-05 and
+08-04 live via `/api/ops/artifacts/stream`: **max 1 row per event**, books
+spread across `betrivers`, `fanduel`, `draftkings`, `mybookieag`, `betmgm`.
+Production behaves exactly as the mirror did, so this is real.
+
+It is also WORSE than "we always use one book": the retained book varies
+essentially at random per game, and includes offshore books such as
+`mybookieag` whose prices are typically worse than the sharp US ones. We are
+not graded against a consistent book -- we are graded against a random one,
+sometimes a bad one. That adds noise to every ROI figure on top of the bias.
+
 **REASON 1 -- we are discarding the prices we already pay for.**
 `oddsapi_game_lines_*.json` requests `regions: "us"`, which returns EVERY US
 book in a single API call, and we persist ONE price per game. Across 20 dates:
