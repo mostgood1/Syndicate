@@ -80,6 +80,22 @@ def _implied_probability(price: Any) -> float | None:
     return (100.0 / (value + 100.0)) if value > 0 else (abs(value) / (abs(value) + 100.0))
 
 
+def _model_edge_pct(model_prob: Any, fair_prob: Any) -> float | None:
+    """The sim's disagreement with the de-vigged market, in points.
+
+    Delegated to `opportunity_signals` so there is one definition; imported
+    lazily because this module is on the request path and that one is not always
+    needed. Never raises -- an enrichment that can break the board is worse than
+    one that omits a field.
+    """
+    try:
+        from syndicate.features.shared.opportunity_signals import model_edge_pct
+
+        return model_edge_pct(model_prob, fair_prob)
+    except Exception:
+        return None
+
+
 def _model_probability(row: Mapping[str, Any]) -> float | None:
     for key in ("p_win", "model_probability", "confidence", "model_prob"):
         raw = row.get(key)
@@ -265,6 +281,14 @@ _FLAT_QUOTE_FIELDS = (
     ("book_age_seconds", "book_age_seconds"),
     ("capture_age_seconds", "capture_age_seconds"),
     ("book_updated_at", "book_updated_at"),
+    # #238: the no-vig fair value. Named `..._vs_fair` on the flattened row so
+    # it can never be confused with the legacy `ev_pct`, which was computed
+    # against a VIGGED price and read systematically low by about half the hold.
+    ("fair_price", "fair_price"),
+    ("fair_probability", "fair_probability"),
+    ("hold_pct", "hold_pct"),
+    ("ev_vs_fair_pct", "ev_pct"),
+    ("best_ev_vs_fair_pct", "best_ev_pct"),
 )
 
 
@@ -341,9 +365,27 @@ def enrich_candidate_rows(
             # numeric model probability is kept alongside on the candidate, which
             # is what makes recomputing possible at all this late.
             model_probability = _model_probability(candidate)
-            if model_probability is not None and best_implied is not None:
+            # #238: measure the model against the NO-VIG fair probability when
+            # the opposing side was available. Against `best_implied` -- which
+            # still carries the book's margin -- the sim was made to look
+            # systematically pessimistic by roughly half the hold (measured
+            # median 6.25%, so ~3.1 points on a typical market). That is not a
+            # cosmetic difference: it is the difference between a row clearing
+            # an edge threshold and being dropped.
+            fair_probability = quote.get("fair_probability")
+            if model_probability is not None and fair_probability is not None:
+                candidate["model_edge_pct"] = _model_edge_pct(model_probability, fair_probability)
+                edge_value = (model_probability - float(fair_probability)) * 100.0
+                candidate["edge"] = f"{edge_value:.1f}%"
+                candidate["edge_priced_against"] = "no_vig_fair"
+                candidate["ev_priced_against"] = quote.get("best_bookmaker")
+            elif model_probability is not None and best_implied is not None:
+                # No opposing side, so no fair price exists. Kept, but labelled,
+                # because a vigged edge silently mixed in with fair ones would be
+                # a number nobody could interpret.
                 edge_value = (model_probability - best_implied) * 100.0
                 candidate["edge"] = f"{edge_value:.1f}%"
+                candidate["edge_priced_against"] = "vigged_best_price"
                 candidate["ev_priced_against"] = quote.get("best_bookmaker")
     except Exception:
         return candidates

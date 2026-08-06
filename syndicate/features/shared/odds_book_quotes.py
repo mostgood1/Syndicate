@@ -477,11 +477,163 @@ def _implied_probability(price: int) -> float:
     return (100.0 / (price + 100.0)) if price > 0 else (abs(price) / (abs(price) + 100.0))
 
 
+# Both sides of a book's own market must be observed within this window to be
+# de-vigged together. Generous enough for a quiet pregame market, far tighter
+# than the hours that separate a stale leg from a live one.
+_FAIR_PAIR_TOLERANCE_S = 600.0
+# Below this the "market" contains a dead leg rather than an opportunity.
+_IMPLAUSIBLE_HOLD_PCT = -5.0
+
+
+def _epoch_seconds(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
+
+
+def _line_value(row: Mapping[str, Any]) -> float | None:
+    try:
+        value = float(row.get("line"))
+    except (TypeError, ValueError):
+        return None
+    return None if value != value else value  # NaN is written for line-less markets
+
+
+def market_sides_for_quote(
+    rows: Iterable[Mapping[str, Any]], chosen: Mapping[str, Any]
+) -> list[dict[str, Any]]:
+    """Every side of the ONE market `chosen` belongs to (#238).
+
+    Needed because a fair (no-vig) probability cannot be derived from one side.
+    `market_key_for_quote` deliberately includes `selection`, so over and under
+    are different keys; this is its counterpart -- same market instance, all
+    sides.
+
+    The line rule is where this gets got wrong, and it is not a detail:
+      - over/under share a line (both sit on 8.5);
+      - spreads are SIGNED per side, so home -1.5 pairs with away **+1.5**.
+        Pairing on an equal line manufactured 716 "arbitrages" out of bets that
+        are not opposite sides of anything (measured 2026-08-06);
+      - h2h has no line at all, and its 3-way form has a draw leg that must be
+        included or the sides sum to less than a market and the "fair" price is
+        wrong in the bettor's favour -- the most dangerous direction.
+    """
+    base = tuple(
+        str(chosen.get(field) or "")
+        for field in ("sport", "kind", "event_id", "segment", "market", "player_name")
+    )
+    chosen_line = _line_value(chosen)
+    sides: list[dict[str, Any]] = []
+    for row in rows or ():
+        if not isinstance(row, Mapping) or row.get("price") is None:
+            continue
+        if tuple(str(row.get(field) or "") for field in
+                 ("sport", "kind", "event_id", "segment", "market", "player_name")) != base:
+            continue
+        line = _line_value(row)
+        if chosen_line is None:
+            if line is not None:
+                continue
+        elif line is None:
+            continue
+        elif abs(line - chosen_line) > 1e-9 and abs(line + chosen_line) > 1e-9:
+            # Neither the same line nor its mirror, so not this market instance.
+            continue
+        sides.append(dict(row))
+    return sides
+
+
+def _fair_value_fields(
+    market_sides: Iterable[Mapping[str, Any]],
+    *,
+    selection: Any,
+    price: int,
+    best_price: int,
+) -> dict[str, Any]:
+    """No-vig fair probability for `selection`, plus what it implies (#238)."""
+    from syndicate.features.shared.opportunity_signals import (
+        american_price,
+        consensus_fair_probability,
+        expected_value_pct,
+        hold_pct,
+    )
+
+    freshest: dict[tuple[str, str], tuple[str, int]] = {}
+    for row in market_sides or ():
+        book = str(row.get("bookmaker") or "")
+        sel = str(row.get("selection") or "")
+        if not book or not sel:
+            continue
+        observed = str(row.get("book_updated_at") or row.get("snapshot_ts") or row.get("captured_at") or "")
+        previous = freshest.get((book, sel))
+        if previous is None or observed >= previous[0]:
+            try:
+                freshest[(book, sel)] = (observed, int(row["price"]))
+            except (TypeError, ValueError, KeyError):
+                continue
+
+    by_book: dict[str, dict[str, int]] = {}
+    for (book, sel), (_observed, book_price) in freshest.items():
+        by_book.setdefault(book, {})[sel] = book_price
+
+    # SIMULTANEITY. The shard is an append-only log over the whole day including
+    # live play, so a book's "latest" over can be hours away from its latest
+    # under. De-vigging those together is not de-vigging a market, it is mixing
+    # two game states -- and it does not fail quietly: on production rows this
+    # produced Myles Straw at -33% hold / +135% EV and Max Clark at -18% / +47%,
+    # numbers that would have gone straight to the top of the board.
+    for book in list(by_book):
+        stamps = [
+            _epoch_seconds(freshest[(book, sel)][0])
+            for sel in by_book[book]
+            if (book, sel) in freshest
+        ]
+        usable = [stamp for stamp in stamps if stamp is not None]
+        if len(usable) != len(by_book[book]) or (usable and max(usable) - min(usable) > _FAIR_PAIR_TOLERANCE_S):
+            del by_book[book]
+
+    wanted = str(selection or "")
+    consensus = consensus_fair_probability(by_book)
+    if not consensus or wanted not in consensus:
+        return {"fair_probability": None, "fair_price": None, "hold_pct": None, "sides_quoted": 0}
+
+    fair = consensus[wanted]
+    # Hold is quoted from the BEST price on each side -- the market a bettor who
+    # shops can actually get, not any single book's margin.
+    best_by_selection: dict[str, int] = {}
+    for (_book, sel), (_observed, book_price) in freshest.items():
+        current = best_by_selection.get(sel)
+        if current is None or _implied_probability(book_price) < _implied_probability(current):
+            best_by_selection[sel] = book_price
+
+    hold = hold_pct(list(best_by_selection.values()))
+    # A genuine arbitrage is SMALL -- the one real arb measured in production was
+    # -0.97%. A double-digit negative hold is not a gift, it is a dead leg on one
+    # side, and publishing the fair price derived from it would put the most
+    # wrong rows at the very top of the board (EV ranks descending).
+    if hold is not None and hold < _IMPLAUSIBLE_HOLD_PCT:
+        return {"fair_probability": None, "fair_price": None, "hold_pct": None, "sides_quoted": 0}
+
+    return {
+        "fair_probability": round(fair, 6),
+        "fair_price": american_price(fair),
+        "hold_pct": hold,
+        "sides_quoted": len(consensus),
+        "ev_pct": expected_value_pct(price, fair),
+        "best_ev_pct": expected_value_pct(best_price, fair),
+    }
+
+
 def quote_ref(
     quotes_for_market: Iterable[Mapping[str, Any]],
     *,
     chosen_bookmaker: str | None = None,
     now: datetime | None = None,
+    market_sides: Iterable[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any] | None:
     """The board/ledger-facing description of a price: which book, what number,
     when that book moved it, and how it compares to everyone else quoting it.
@@ -523,10 +675,25 @@ def quote_ref(
         else int(round(100.0 * (1.0 - mean_implied) / mean_implied))
     )
 
+    # #238: no-vig fair value, when the opposing side(s) were supplied. Absent
+    # rather than guessed when they were not -- a one-sided "fair" price is just
+    # the vigged price with a reassuring name on it.
+    fair_fields = (
+        _fair_value_fields(
+            market_sides,
+            selection=chosen.get("selection"),
+            price=price,
+            best_price=int(ranked[0]["price"]),
+        )
+        if market_sides is not None
+        else {}
+    )
+
     return {
         "bookmaker": chosen.get("bookmaker"),
         "price": price,
         "line": chosen.get("line"),
+        **fair_fields,
         "book_updated_at": chosen.get("book_updated_at"),
         "captured_at": chosen.get("captured_at"),
         "book_age_seconds": _age_seconds(chosen.get("book_updated_at"), now=now),
@@ -632,7 +799,18 @@ def quote_ref_for_bet(
     # Narrowing can still leave more than one market (no line given, several
     # alternates). Prefer the one the most books quote -- the main line.
     best_key = max(grouped, key=lambda key: len(grouped[key]))
-    return quote_ref(grouped[best_key], chosen_bookmaker=bookmaker, now=now)
+    chosen_market = grouped[best_key]
+    # #238: hand the opposing side(s) in so the quote can carry a no-vig fair
+    # price. Sourced from `identified` rather than `candidates`, because the
+    # market/selection/line narrowing above has by then filtered the other side
+    # out by construction -- it narrows TO one selection, which is exactly what
+    # de-vigging needs the complement of.
+    return quote_ref(
+        chosen_market,
+        chosen_bookmaker=bookmaker,
+        now=now,
+        market_sides=market_sides_for_quote(identified, chosen_market[0]),
+    )
 
 
 def _team_tokens(home_team: Any, away_team: Any, matchup: Any) -> set[str]:
