@@ -14,6 +14,7 @@ from typing import Any
 import requests
 
 from syndicate.features.ncaaf.sources import coach_continuity_snapshot_path
+from syndicate.features.ncaaf.sources import player_game_stats_snapshot_path
 from syndicate.features.ncaaf.sources import player_identity_snapshot_path
 from syndicate.features.ncaaf.sources import team_registry_snapshot_path
 
@@ -65,6 +66,29 @@ ROSTER_SNAPSHOT_COLUMNS = (
     "position",
     "season",
     "roster_status",
+    "source_system",
+    "source_snapshot_date",
+)
+
+PLAYER_GAME_STATS_COLUMNS = (
+    "season",
+    "week",
+    "game_id",
+    "player_id",
+    "player_name",
+    "team",
+    "passing_completions",
+    "passing_attempts",
+    "passing_yards",
+    "passing_tds",
+    "interceptions",
+    "rushing_attempts",
+    "rushing_yards",
+    "rushing_tds",
+    "receptions",
+    "receiving_yards",
+    "receiving_tds",
+    "anytime_td",
     "source_system",
     "source_snapshot_date",
 )
@@ -158,6 +182,17 @@ class NcaafRosterSnapshotResult:
     validation_issues: tuple[str, ...]
     source_system: str
     source_snapshot_date: str
+
+
+@dataclass(frozen=True)
+class NcaafPlayerGameStatsSnapshotResult:
+    rows: tuple[dict[str, str], ...]
+    output_path: Path
+    validation_issues: tuple[str, ...]
+    source_system: str
+    source_snapshot_date: str
+    season: int
+    week: int
 
 
 @dataclass(frozen=True)
@@ -305,6 +340,48 @@ class CfbdClient:
 
     def fetch_roster(self, *, season: int) -> list[dict[str, Any]]:
         payload = self._get_json("/roster", params={"year": season})
+        if isinstance(payload, list):
+            return [dict(row) for row in payload if isinstance(row, dict)]
+        if isinstance(payload, dict):
+            data = payload.get("data")
+            if isinstance(data, list):
+                return [dict(row) for row in data if isinstance(row, dict)]
+        return []
+
+    def fetch_player_game_stats(self, *, season: int, week: int | None = None, season_type: str = "regular") -> list[dict[str, Any]]:
+        """Real per-game player stat lines from CFBD's ``/games/players``
+        endpoint -- confirmed live 2026-08-05 against
+        ``https://api.collegefootballdata.com/games/players?year=2025&week=1&seasonType=regular``.
+        Response shape is a flat list of games: each game has ``id`` (no
+        ``week`` field on the game itself -- the request's own ``week``
+        param is the only source of truth for which week these rows belong
+        to) and ``teams``, each team has ``team``/``conference``/``homeAway``/
+        ``points`` and ``categories`` (``passing``, ``rushing``,
+        ``receiving``, ``fumbles``, ``defensive``, ``kicking``, ``punting``,
+        sometimes ``puntReturns``/``kickReturns``), each category has
+        ``types`` (stat columns, e.g. passing's ``C/ATT``, ``YDS``, ``AVG``,
+        ``TD``, ``INT``, ``QBR``), each type has ``athletes``
+        (``{id, name, stat}`` -- ``stat`` is always a STRING, e.g.
+        ``"6/13"`` for completions/attempts, ``"22"`` for yards, ``"--"``
+        for an unavailable QBR). A player can appear in more than one
+        category in the same game (e.g. a dual-threat QB in both
+        ``passing`` and ``rushing``) -- callers must merge by athlete id,
+        not assume one row per player.
+
+        Confirmed live the same day: CFBD returns HTTP 400 for this
+        endpoint when ``week`` is omitted (unlike ``/roster``/``/teams``,
+        there is no whole-season fetch here) -- ``week`` is required in
+        practice even though CFBD's own docs describe it as optional, so
+        this raises a clear error rather than letting a cryptic 400
+        surface from ``requests``.
+        """
+        if week is None:
+            raise ValueError(
+                "CfbdClient.fetch_player_game_stats requires week -- CFBD's real "
+                "/games/players endpoint returns HTTP 400 without one (confirmed live "
+                "2026-08-05), so there is no whole-season fetch to fall back to."
+            )
+        payload = self._get_json("/games/players", params={"year": season, "week": week, "seasonType": season_type})
         if isinstance(payload, list):
             return [dict(row) for row in payload if isinstance(row, dict)]
         if isinstance(payload, dict):
@@ -748,6 +825,288 @@ def build_ncaaf_roster_generation_report(
 def _load_snapshot_rows(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8", newline="") as handle:
         return [dict(row) for row in csv.DictReader(handle)]
+
+
+def _merge_season_week_aware_rows(
+    path: Path,
+    *,
+    new_rows: list[dict[str, Any]],
+    columns: tuple[str, ...],
+) -> list[dict[str, Any]]:
+    """Same discipline as ``_merge_season_aware_rows`` above, but keyed by
+    (season, week) instead of just season -- the player-game-stats snapshot
+    holds every fetched week in one CSV (one CFBD call per week, see
+    CfbdClient.fetch_player_game_stats's week-required docstring), so
+    refreshing one week must never wipe out any other already-fetched
+    week's rows."""
+    keys_to_replace = {(_safe_text(row.get("season")), _safe_text(row.get("week"))) for row in new_rows}
+    other_rows: list[dict[str, Any]] = []
+    if path.exists():
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                key = (_safe_text(row.get("season")), _safe_text(row.get("week")))
+                if key not in keys_to_replace:
+                    other_rows.append({column: row.get(column, "") for column in columns})
+    return other_rows + new_rows
+
+
+def _parse_stat_number(value: Any) -> float:
+    text = _safe_text(value)
+    if not text or text == "--":
+        return 0.0
+    try:
+        return float(text)
+    except Exception:
+        return 0.0
+
+
+def _parse_completions_attempts(value: Any) -> tuple[float, float]:
+    """CFBD's passing ``C/ATT`` type carries a single "6/13" string, not
+    two separate types -- the only stat in the real response shape that
+    needs splitting rather than a direct float parse."""
+    text = _safe_text(value)
+    if "/" not in text:
+        return 0.0, 0.0
+    completions_text, _, attempts_text = text.partition("/")
+    return _parse_stat_number(completions_text), _parse_stat_number(attempts_text)
+
+
+_PLAYER_GAME_STAT_TYPE_FIELDS: dict[str, dict[str, str]] = {
+    "passing": {"YDS": "passing_yards", "TD": "passing_tds", "INT": "interceptions"},
+    "rushing": {"CAR": "rushing_attempts", "YDS": "rushing_yards", "TD": "rushing_tds"},
+    "receiving": {"REC": "receptions", "YDS": "receiving_yards", "TD": "receiving_tds"},
+}
+
+
+def _player_game_stats_row_key(row: dict[str, str]) -> tuple[str, str]:
+    return (_safe_text(row.get("game_id")), _safe_text(row.get("player_id")))
+
+
+def build_ncaaf_player_game_stats_rows(
+    *,
+    season: int,
+    week: int,
+    games_payload: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+    source_system: str = "cfbd",
+    source_snapshot_date: str | None = None,
+) -> tuple[dict[str, str], ...]:
+    """Real CFBD ``/games/players`` payload -> one row per (game, athlete),
+    merged across passing/rushing/receiving categories (a dual-threat
+    player has separate category entries for the same game -- see
+    CfbdClient.fetch_player_game_stats's docstring) -- the NCAAF analog of
+    ``syndicate.features.nfl.player_stats.player_game_log``'s per-play
+    aggregation, except CFBD already hands back per-game totals so there
+    is no play-by-play to sum here. ``anytime_td`` mirrors NFL's own
+    rusher/receiver-only attribution: a passing touchdown never counts as
+    the passer's own anytime-TD."""
+    snapshot_date = source_snapshot_date or date_type.today().isoformat()
+    totals: dict[tuple[str, str], dict[str, Any]] = {}
+
+    for game in games_payload:
+        if not isinstance(game, dict):
+            continue
+        game_id = _safe_text(game.get("id"))
+        if not game_id:
+            continue
+        for team in game.get("teams") or []:
+            if not isinstance(team, dict):
+                continue
+            team_name = _safe_text(team.get("team"))
+            for category in team.get("categories") or []:
+                if not isinstance(category, dict):
+                    continue
+                category_name = _safe_text(category.get("name")).lower()
+                if category_name not in _PLAYER_GAME_STAT_TYPE_FIELDS:
+                    continue
+                type_fields = _PLAYER_GAME_STAT_TYPE_FIELDS[category_name]
+                for stat_type in category.get("types") or []:
+                    if not isinstance(stat_type, dict):
+                        continue
+                    type_name = _safe_text(stat_type.get("name"))
+                    for athlete in stat_type.get("athletes") or []:
+                        if not isinstance(athlete, dict):
+                            continue
+                        player_id = _safe_text(athlete.get("id"))
+                        player_name = _safe_text(athlete.get("name"))
+                        if not player_id:
+                            continue
+                        key = (game_id, player_id)
+                        row = totals.setdefault(
+                            key,
+                            {
+                                "season": str(season),
+                                "week": str(week),
+                                "game_id": game_id,
+                                "player_id": player_id,
+                                "player_name": player_name,
+                                "team": team_name,
+                                "passing_completions": 0.0,
+                                "passing_attempts": 0.0,
+                                "passing_yards": 0.0,
+                                "passing_tds": 0.0,
+                                "interceptions": 0.0,
+                                "rushing_attempts": 0.0,
+                                "rushing_yards": 0.0,
+                                "rushing_tds": 0.0,
+                                "receptions": 0.0,
+                                "receiving_yards": 0.0,
+                                "receiving_tds": 0.0,
+                            },
+                        )
+                        if not row.get("player_name") and player_name:
+                            row["player_name"] = player_name
+                        if category_name == "passing" and type_name == "C/ATT":
+                            completions, attempts = _parse_completions_attempts(athlete.get("stat"))
+                            row["passing_completions"] += completions
+                            row["passing_attempts"] += attempts
+                            continue
+                        field = type_fields.get(type_name)
+                        if field:
+                            row[field] += _parse_stat_number(athlete.get("stat"))
+
+    rows: list[dict[str, str]] = []
+    for row in totals.values():
+        anytime_td = row["rushing_tds"] + row["receiving_tds"]
+        formatted = {
+            "season": row["season"],
+            "week": row["week"],
+            "game_id": row["game_id"],
+            "player_id": row["player_id"],
+            "player_name": row["player_name"],
+            "team": row["team"],
+            "source_system": source_system,
+            "source_snapshot_date": snapshot_date,
+        }
+        for stat_field in (
+            "passing_completions",
+            "passing_attempts",
+            "passing_yards",
+            "passing_tds",
+            "interceptions",
+            "rushing_attempts",
+            "rushing_yards",
+            "rushing_tds",
+            "receptions",
+            "receiving_yards",
+            "receiving_tds",
+        ):
+            formatted[stat_field] = str(row[stat_field])
+        formatted["anytime_td"] = str(anytime_td)
+        if not formatted["player_name"]:
+            continue
+        rows.append(formatted)
+
+    rows.sort(key=lambda row: (row.get("team") or "", row.get("player_name") or "", row.get("player_id") or ""))
+    return tuple(rows)
+
+
+def validate_ncaaf_player_game_stats_rows(
+    rows: list[dict[str, str]] | tuple[dict[str, str], ...],
+    *,
+    expected_season: int,
+    expected_week: int,
+) -> list[str]:
+    issues: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for index, row in enumerate(rows):
+        for field in ("season", "week", "game_id", "player_id", "player_name", "source_system", "source_snapshot_date"):
+            if not _safe_text(row.get(field)):
+                issues.append(f"row {index} missing required field {field}")
+        key = _player_game_stats_row_key(row)
+        if key in seen:
+            issues.append(f"duplicate player game stats row {key[0]}:{key[1]}")
+        seen.add(key)
+        if _safe_text(row.get("season")) != str(expected_season):
+            issues.append(f"row {index} has unexpected season {row.get('season')}")
+        if _safe_text(row.get("week")) != str(expected_week):
+            issues.append(f"row {index} has unexpected week {row.get('week')}")
+        if _safe_text(row.get("source_system")) != "cfbd":
+            issues.append(f"row {index} has unexpected source_system {row.get('source_system')}")
+        if not _safe_date_text(row.get("source_snapshot_date"), ""):
+            issues.append(f"row {index} has invalid source_snapshot_date {row.get('source_snapshot_date')}")
+    return issues
+
+
+def write_ncaaf_player_game_stats_snapshot_csv(
+    *,
+    client: CfbdClient,
+    season: int,
+    week: int,
+    games_payload: list[dict[str, Any]] | tuple[dict[str, Any], ...] | None = None,
+    output_path: Path | None = None,
+    source_system: str = "cfbd",
+    source_snapshot_date: str | None = None,
+) -> NcaafPlayerGameStatsSnapshotResult:
+    payload = list(games_payload) if games_payload is not None else client.fetch_player_game_stats(season=season, week=week)
+    rows = build_ncaaf_player_game_stats_rows(
+        season=season,
+        week=week,
+        games_payload=payload,
+        source_system=source_system,
+        source_snapshot_date=source_snapshot_date,
+    )
+    validation_issues = tuple(validate_ncaaf_player_game_stats_rows(rows, expected_season=season, expected_week=week))
+    path = output_path or player_game_stats_snapshot_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    combined_rows = _merge_season_week_aware_rows(path, new_rows=list(rows), columns=PLAYER_GAME_STATS_COLUMNS)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=PLAYER_GAME_STATS_COLUMNS, extrasaction="ignore")
+        writer.writeheader()
+        for row in combined_rows:
+            writer.writerow({column: row.get(column, "") for column in PLAYER_GAME_STATS_COLUMNS})
+    return NcaafPlayerGameStatsSnapshotResult(
+        rows=rows,
+        output_path=path,
+        validation_issues=validation_issues,
+        source_system=source_system,
+        source_snapshot_date=source_snapshot_date or date_type.today().isoformat(),
+        season=season,
+        week=week,
+    )
+
+
+def build_ncaaf_player_game_stats_generation_report(
+    *,
+    season: int,
+    week: int,
+    output_path: Path,
+    rows: list[dict[str, str]] | tuple[dict[str, str], ...],
+    validation_issues: list[str] | tuple[str, ...],
+    source_system: str,
+    source_snapshot_date: str,
+) -> str:
+    lines = [
+        "# NCAAF Player Game Stats Snapshot Generation Report",
+        "",
+        "## Outcome",
+        "",
+        f"Season: {season}",
+        f"Week: {week}",
+        f"Generated: {'yes' if not validation_issues else 'partial'}",
+        f"Snapshot output: {output_path}",
+        f"Source system: {source_system}",
+        f"Source snapshot date: {source_snapshot_date}",
+        "",
+        "## Counts",
+        "",
+        f"Publishable rows: {len(list(rows))}",
+        f"Validation issues: {len(list(validation_issues))}",
+        "",
+        "## Explicit Answers",
+        "",
+        f"Was the player game stats snapshot generated successfully? {'Yes' if not validation_issues else 'Partially'}.",
+        f"How many publishable rows were produced? {len(list(rows))}.",
+        f"What validation issues remain? {'None' if not validation_issues else '; '.join(validation_issues)}.",
+        "",
+        "## Validation Notes",
+        "",
+    ]
+    if validation_issues:
+        lines.extend(f"- {issue}" for issue in validation_issues)
+    else:
+        lines.append("- No validation issues were detected in the player game stats snapshot build.")
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _portal_row_key(row: dict[str, str]) -> tuple[str, str, str, str, str]:

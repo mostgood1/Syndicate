@@ -54,6 +54,10 @@ def roster_snapshot_path() -> Path:
     return ncaaf_source_artifacts_data_path("processed", "roster", "ncaaf_roster_snapshot.csv")
 
 
+def player_game_stats_snapshot_path() -> Path:
+    return ncaaf_source_artifacts_data_path("processed", "player_game_stats", "ncaaf_player_game_stats_snapshot.csv")
+
+
 def transfer_portal_snapshot_path() -> Path:
     return ncaaf_source_artifacts_data_path("processed", "transfers", "ncaaf_transfer_portal_snapshot.csv")
 
