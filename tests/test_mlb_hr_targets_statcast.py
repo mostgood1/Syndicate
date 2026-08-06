@@ -117,3 +117,94 @@ class TestPitchMixContextDegradation:
         monkeypatch.setattr(hr_targets, "_load_roster_game_payload", lambda *a, **k: {})
 
         assert hr_targets._pitch_mix_context("2026-07-10", {"game_pk": 1, "batter_id": 2}) == {}
+
+
+class TestAnalyticsCallouts:
+    """The advanced metrics behind the HR Top 10 ranking.
+
+    Before this, these numbers were computed per row (_apply_pitch_mix_context
+    merges them into hr_target_metrics) and reached the UI only as prose, or
+    were folded into an opaque "Support" score. The board now names them with
+    their league reference so a reader can size the edge.
+    """
+
+    BASELINES = {
+        "batter_barrel": 0.086,
+        "batter_hardhit": 0.412,
+        "batter_xwoba": 0.320,
+        "batter_la": 12.0,
+        "pitcher_barrel": 0.086,
+        "pitcher_xwoba": 0.320,
+    }
+
+    def _target(self, **metrics):
+        return {
+            "player_name": "Test Hitter",
+            "probability": "18.0%",
+            "pa_mean": 4.3,
+            "lineup_order": 3,
+            "hr_target_metrics": metrics,
+            "source_row": {},
+        }
+
+    def test_elite_batted_ball_reads_as_boost(self):
+        target = self._target(batter_barrel_rate=0.161, batter_hardhit_rate=0.520)
+        callouts = hr_targets._hr_analytics_callouts(target, self.BASELINES)
+        barrel = next(c for c in callouts if c["label"] == "Barrel rate")
+        assert barrel["tone"] == "boost"
+        assert "8.6%" in barrel["detail"]  # league reference is shown
+
+    def test_below_average_reads_as_drag_not_hidden(self):
+        # A top-10 hitter facing a suppressing matchup is still top-10; hiding
+        # the negative would overstate the case.
+        target = self._target(batter_barrel_rate=0.030)
+        callouts = hr_targets._hr_analytics_callouts(target, self.BASELINES)
+        assert next(c for c in callouts if c["label"] == "Barrel rate")["tone"] == "drag"
+
+    def test_strongest_deviation_ranks_first(self):
+        target = self._target(batter_barrel_rate=0.200, batter_launch_angle_mean=12.2)
+        callouts = hr_targets._hr_analytics_callouts(target, self.BASELINES)
+        assert callouts[0]["label"] == "Barrel rate"
+
+    def test_missing_metrics_are_omitted_not_zero_filled(self):
+        callouts = hr_targets._hr_analytics_callouts(self._target(), self.BASELINES)
+        assert all(c["label"] != "Barrel rate" for c in callouts)
+
+    def test_callouts_are_capped(self):
+        target = self._target(
+            batter_barrel_rate=0.20, batter_hardhit_rate=0.55, batter_xwoba=0.44,
+            batter_launch_angle_mean=22.0, pitch_mix_score=1.30, pitcher_barrel_rate=0.14,
+        )
+        assert len(hr_targets._hr_analytics_callouts(target, self.BASELINES)) <= 6
+
+    def test_rationale_names_the_supporting_metrics(self):
+        target = self._target(batter_barrel_rate=0.161, batter_xwoba=0.44)
+        callouts = hr_targets._hr_analytics_callouts(target, self.BASELINES)
+        text = hr_targets._hr_selection_rationale(target, callouts)
+        assert "Test Hitter" in text and "18.0%" in text
+        assert "barrel rate" in text.lower()
+
+    def test_rationale_is_honest_when_nothing_stands_out(self):
+        callouts = hr_targets._hr_analytics_callouts(self._target(), self.BASELINES)
+        text = hr_targets._hr_selection_rationale(self._target(), callouts)
+        assert "without a standout" in text
+
+
+class TestSettlementSurfaceGuard:
+    """HR picks have no market line, so settlement must not send them down the
+    line-comparison path. That branch used to string-match the literal display
+    label, so renaming the surface would have silently mis-graded every HR row.
+    """
+
+    def test_accepts_both_old_and_new_surface_labels(self):
+        from syndicate.blueprints.home import _is_hr_target_surface
+
+        assert _is_hr_target_surface("HR targets")
+        assert _is_hr_target_surface("HR Top 10")
+        assert _is_hr_target_surface("  hr top 10  ")
+
+    def test_rejects_lined_prop_surfaces(self):
+        from syndicate.blueprints.home import _is_hr_target_surface
+
+        for other in ("Hits", "Pitcher ladders", "Total bases", "", None):
+            assert not _is_hr_target_surface(other)

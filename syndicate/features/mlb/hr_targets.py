@@ -578,6 +578,158 @@ def _hr_market_context(player_name: str, selected_date: str, model_prob: float |
     }
 
 
+HR_TOP_N = 10
+
+
+def _league_hr_baselines(season: int | None) -> dict[str, float]:
+    """League-average Statcast rates for the requested season.
+
+    Read from the same feature payload the per-player numbers come from
+    (`league.overall.batter` / `.pitcher`) so the "vs league" comparisons on
+    the board move with the real league instead of drifting against hardcoded
+    constants. Falls back to recent-era values only if the payload lacks them.
+    """
+    payload = _load_statcast_features(season)
+    league = payload.get("league") if isinstance(payload.get("league"), dict) else {}
+    overall = league.get("overall") if isinstance(league.get("overall"), dict) else {}
+    batter = overall.get("batter") if isinstance(overall.get("batter"), dict) else {}
+    pitcher = overall.get("pitcher") if isinstance(overall.get("pitcher"), dict) else {}
+    return {
+        "batter_barrel": _safe_float(batter.get("barrel_rate")) or 0.086,
+        "batter_hardhit": _safe_float(batter.get("hardhit_rate")) or 0.412,
+        "batter_xwoba": _safe_float(batter.get("xwoba")) or 0.320,
+        "batter_la": _safe_float(batter.get("la_mean")) or 12.0,
+        "pitcher_barrel": _safe_float(pitcher.get("barrel_rate")) or 0.086,
+        "pitcher_xwoba": _safe_float(pitcher.get("xwoba")) or 0.320,
+    }
+
+
+def _rel(value: float | None, baseline: float | None) -> float | None:
+    if value is None or not baseline:
+        return None
+    return float(value) / float(baseline)
+
+
+def _hr_analytics_callouts(target: dict[str, Any], baselines: dict[str, float]) -> list[dict[str, Any]]:
+    """The advanced-metric case for this hitter, strongest signal first.
+
+    These are the inputs the HR model actually keys on -- batted-ball quality,
+    the specific pitch mix he'll see, platoon/park/weather run environment, and
+    plate-appearance volume. Every one of them was already computed per row
+    (`_apply_pitch_mix_context` merges them into `hr_target_metrics`) and, before
+    this, reached the UI only as a sentence or was folded into an opaque
+    "Support" number. Each callout carries the number AND its league/neutral
+    reference so a reader can tell a real edge from a rounding artifact.
+
+    `tone` is "boost" / "drag" / "neutral" -- the board renders drags too,
+    deliberately: a top-10 hitter facing a HR-suppressing park is still a
+    top-10 hitter, and hiding the negative would overstate the case.
+    """
+    metrics = target.get("hr_target_metrics") if isinstance(target.get("hr_target_metrics"), dict) else {}
+    row = target.get("source_row") if isinstance(target.get("source_row"), dict) else {}
+    out: list[dict[str, Any]] = []
+
+    def add(label: str, value: str, detail: str, ratio: float | None, *, weight: float, hi: float = 1.06, lo: float = 0.94) -> None:
+        if ratio is None:
+            tone = "neutral"
+        elif ratio >= hi:
+            tone = "boost"
+        elif ratio <= lo:
+            tone = "drag"
+        else:
+            tone = "neutral"
+        out.append(
+            {
+                "label": label,
+                "value": value,
+                "detail": detail,
+                "tone": tone,
+                # rank by how far from neutral it is, scaled by how much the
+                # metric actually moves HR probability
+                "_score": abs((ratio or 1.0) - 1.0) * weight,
+            }
+        )
+
+    barrel = _safe_float(metrics.get("batter_barrel_rate"))
+    if barrel is not None:
+        add("Barrel rate", _format_pct(barrel), f"lg {_format_pct(baselines['batter_barrel'])}",
+            _rel(barrel, baselines["batter_barrel"]), weight=3.0)
+
+    hardhit = _safe_float(metrics.get("batter_hardhit_rate"))
+    if hardhit is not None:
+        add("Hard-hit rate", _format_pct(hardhit), f"lg {_format_pct(baselines['batter_hardhit'])}",
+            _rel(hardhit, baselines["batter_hardhit"]), weight=2.0)
+
+    xwoba = _safe_float(metrics.get("batter_xwoba"))
+    if xwoba is not None:
+        add("xwOBA", _format_num(xwoba), f"lg {_format_num(baselines['batter_xwoba'])}",
+            _rel(xwoba, baselines["batter_xwoba"]), weight=2.0)
+
+    launch = _safe_float(metrics.get("batter_launch_angle_mean"))
+    if launch is not None:
+        add("Launch angle", f"{launch:.1f}°", f"lg {baselines['batter_la']:.1f}°",
+            _rel(launch, baselines["batter_la"]), weight=1.0)
+
+    mix = _safe_float(metrics.get("pitch_mix_score"))
+    if mix is not None:
+        primary = str(metrics.get("opponent_primary_pitch_type") or "").strip()
+        share = _safe_float(metrics.get("opponent_primary_pitch_share"))
+        detail = f"vs {primary}" + (f" {_format_pct(share)} of mix" if share else "") if primary else "full arsenal"
+        add("Pitch-mix fit", f"{_format_num(mix)}x", detail, mix, weight=3.0)
+
+    pitcher_hr = _safe_float(row.get("pitcher_hr_rate"))
+    if pitcher_hr is not None:
+        add("Pitcher HR rate", _format_pct(pitcher_hr), "allowed, season", _rel(pitcher_hr, 0.030), weight=2.5)
+
+    pitcher_barrel = _safe_float(metrics.get("pitcher_barrel_rate"))
+    if pitcher_barrel is not None:
+        add("Barrels allowed", _format_pct(pitcher_barrel), f"lg {_format_pct(baselines['pitcher_barrel'])}",
+            _rel(pitcher_barrel, baselines["pitcher_barrel"]), weight=1.5)
+
+    platoon = _safe_float(row.get("batter_platoon_hr_mult")) or _safe_float(metrics.get("batterPlatoonHr"))
+    if platoon is not None:
+        hand = str(row.get("opponent_pitcher_hand") or "").strip()
+        add("Platoon edge", f"{_format_num(platoon)}x", f"vs {hand}HP" if hand else "handedness split", platoon, weight=2.5)
+
+    park = _safe_float(row.get("park_hr_mult"))
+    if park is not None:
+        venue = str(row.get("venue_name") or "").strip()
+        add("Park factor", f"{_format_num(park)}x", venue or "HR park factor", park, weight=2.0)
+
+    weather = _safe_float(row.get("weather_hr_mult"))
+    if weather is not None and abs(weather - 1.0) > 1e-9:
+        temp = _safe_float(row.get("weather_temp_f"))
+        wind = _safe_float(row.get("weather_wind_speed_mph"))
+        bits = []
+        if temp is not None:
+            bits.append(f"{temp:.0f}°F")
+        if wind:
+            bits.append(f"{wind:.0f} mph")
+        add("Weather", f"{_format_num(weather)}x", " / ".join(bits) or "conditions", weather, weight=2.0)
+
+    pa = _safe_float(target.get("pa_mean"))
+    if pa is not None:
+        slot = _safe_int(target.get("lineup_order"))
+        add("Projected PA", _format_num(pa), (f"bats {slot}" if slot else "volume"), _rel(pa, 4.2), weight=2.0, hi=1.03, lo=0.97)
+
+    out.sort(key=lambda item: item.get("_score") or 0.0, reverse=True)
+    for item in out:
+        item.pop("_score", None)
+    return out[:6]
+
+
+def _hr_selection_rationale(target: dict[str, Any], callouts: list[dict[str, Any]]) -> str:
+    """One line naming why this hitter cleared the top-10 cut."""
+    name = str(target.get("player_name") or "This hitter").strip()
+    prob = str(target.get("probability") or "").strip()
+    boosts = [c for c in callouts if c.get("tone") == "boost"][:3]
+    if not boosts:
+        return f"{name} ranks top-10 at {prob} on projected plate appearances and matchup, without a standout batted-ball edge."
+    parts = [f"{c['label'].lower()} {c['value']}" for c in boosts]
+    joined = parts[0] if len(parts) == 1 else (" and ".join(parts) if len(parts) == 2 else f"{', '.join(parts[:-1])}, and {parts[-1]}")
+    return f"{name} at {prob}: {joined}."
+
+
 def _support_score_display(score: float | None) -> str:
     if score is None:
         return "-"
@@ -885,23 +1037,33 @@ def _cards_from_targets(targets: list[dict[str, Any]], *, selected_date: str) ->
             support_display = f"{support_display} ({support_label})"
         pa_mean = target.get("pa_mean")
         lineup_order = target.get("lineup_order")
-        metrics = [
-            {"label": "HR 1+", "value": target["probability"]},
-            {"label": "Support", "value": support_display},
-        ]
+        rank = _safe_int(target.get("hr_rank"))
+        callouts = target.get("analytics_callouts") or []
+        # Lead with the two advanced metrics that actually earned the ranking,
+        # not the opaque support score -- that was the whole point of surfacing
+        # these. Support stays available but demoted.
+        metrics = [{"label": "HR 1+", "value": target["probability"]}]
+        for callout in callouts[:2]:
+            metrics.append({"label": callout.get("label"), "value": callout.get("value")})
         if pa_mean is not None:
             metrics.append({"label": "PA", "value": _format_num(pa_mean)})
         if lineup_order is not None:
             metrics.append({"label": "Lineup", "value": str(int(lineup_order))})
+        metrics.append({"label": "Support", "value": support_display})
         cards.append(
             {
-                "title": target["player_name"],
+                "title": (f"{rank}. {target['player_name']}" if rank else target["player_name"]),
                 "eyebrow": target["team"],
                 "badge": target["probability"],
                 "meta": target["matchup"],
                 "metrics": metrics,
-                "summary": target["writeup"],
-                "list_items": target["reasons"],
+                "summary": target.get("selection_rationale") or target["writeup"],
+                "list_items": [
+                    f"{c['label']}: {c['value']} ({c['detail']})" if c.get("detail") else f"{c['label']}: {c['value']}"
+                    for c in callouts
+                ] or target["reasons"],
+                "analytics_callouts": callouts,
+                "hr_rank": rank,
                 "summary_stats": _hr_target_summary_stats(target),
                 "table_groups": _hr_target_context_table(target),
                 "headshot_url": target.get("headshot_url"),
@@ -924,39 +1086,63 @@ def build_hr_targets_page_context(selected_date: str) -> dict[str, Any]:
     prev_date = (parsed_date - timedelta(days=1)).isoformat()
     next_date = (parsed_date + timedelta(days=1)).isoformat()
 
-    module_links = build_module_links(selected_date, "HR targets")
+    module_links = build_module_links(selected_date, "HR Top 10")
 
     summary_path = daily_artifact_path(selected_date, suffix="_hr_targets")
     summary = load_json_file(summary_path)
-    summary_targets = _targets_from_summary(summary, selected_date=selected_date, limit=24) if summary else []
-    targets = _backfill_targets_from_daily_summary(summary_targets, selected_date=selected_date, limit=24)
+    # Pull a wider pool than we show, then cut to 10 -- the backfill path can
+    # top up from the richer daily_summary artifact when the dedicated
+    # _hr_targets one is sparse or stale, and it re-sorts by probability, so
+    # truncating before the backfill would lock in a worse top 10.
+    pool_limit = max(HR_TOP_N * 3, 24)
+    summary_targets = _targets_from_summary(summary, selected_date=selected_date, limit=pool_limit) if summary else []
+    pool = _backfill_targets_from_daily_summary(summary_targets, selected_date=selected_date, limit=pool_limit)
+    targets = pool[:HR_TOP_N]
+
+    baselines = _league_hr_baselines(_season_for_date(selected_date))
+    for index, target in enumerate(targets, start=1):
+        callouts = _hr_analytics_callouts(target, baselines)
+        target["hr_rank"] = index
+        target["analytics_callouts"] = callouts
+        target["selection_rationale"] = _hr_selection_rationale(target, callouts)
+
     using_sample_data = False
+    with_metrics = sum(1 for t in targets if t.get("analytics_callouts"))
 
     header_stats = [
-        {"label": "Rows", "value": str(len(targets))},
+        {"label": "Shown", "value": f"{len(targets)} of {len(pool)}"},
+        {"label": "With advanced metrics", "value": f"{with_metrics}/{len(targets)}" if targets else "-"},
         {"label": "Policy", "value": str(((summary or {}).get("policy") or {}).get("label") or "Saved artifact")},
     ]
 
+    cards = _cards_from_targets(targets, selected_date=selected_date)
     return {
         "date": selected_date,
         "prev_date": prev_date,
         "next_date": next_date,
         "module_links": module_links,
         "targets": targets,
-        "cards": _cards_from_targets(targets, selected_date=selected_date),
-        "rank_cards": _cards_from_targets(targets, selected_date=selected_date),
+        "cards": cards,
+        "rank_cards": cards,
         "source_path": str(summary_path),
         "using_sample_data": using_sample_data,
-        "source_title": "MLB HR targets artifact" if targets else "MLB HR targets unavailable",
+        "source_title": "MLB HR Top 10 artifact" if targets else "MLB HR Top 10 unavailable",
         "header_stats": header_stats,
         "route_path": "/mlb/hr-targets",
-        "intro_title": "MLB HR targets",
-        "intro_body": "This is the second real MLB module inside Syndicate, backed by the existing HR targets artifact and reusing shared layout blocks.",
-        "aria_label": "HR target board",
+        "intro_title": "MLB HR Top 10",
+        "intro_body": (
+            "The ten hitters with the highest modeled probability of going deep today, ranked off the sim's "
+            "per-plate-appearance HR distribution. Each card shows the advanced metrics that earned the ranking: "
+            "batted-ball quality (barrel rate, hard-hit rate, xwOBA, launch angle) measured against the current "
+            "season's league average, how the batter's HR profile fits the specific arsenal he'll face, the "
+            "platoon edge, park and weather HR factors, and projected plate appearances. Metrics that work "
+            "against the hitter are shown too, rather than only the supporting case."
+        ),
+        "aria_label": "HR Top 10 board",
         "empty_state": {
-            "eyebrow": "MLB HR targets",
+            "eyebrow": "MLB HR Top 10",
             "title": "No stored MLB HR targets were available for this date",
-            "body": "The HR targets board only renders saved HR-target artifacts, and none were available for the requested date.",
+            "body": "The HR Top 10 board only renders saved HR-target artifacts, and none were available for the requested date.",
             "list_items": ["Choose another stored MLB date from the date control."],
         } if not targets else None,
     }

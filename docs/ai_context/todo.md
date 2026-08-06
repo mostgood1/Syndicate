@@ -1,5 +1,89 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-05 (#193) -- HIGH PRIORITY: make Render the single source of data truth for all sports, all dates
+
+User: "we need ALL required data for ALL dates for ALL sports in one SINGLE
+source of truth - which would appear to be render". Agreed -- and the
+objection raised against it in-session was mostly wrong, so record the
+correction: **the 2GB/2GB/4GB figures are RAM, not disk.** All three services
+have room on their actual disks; Render persistent disks size independently of
+instance RAM. Capacity is NOT the blocker. RAM constrains *processing* (it
+drove the refresh-worker OOM and the 24MB artifact-export budget), never how
+much history can be stored.
+
+**Why this is now the top data item**: #186-#192's conclusions all rest on 14-15
+slates, because the git mirror's artifact families are synced on different
+schedules and their intersection collapses (see CLAUDE.md's new
+"Render is the source of truth" section: odds 46 dates, daily_summary 33 with
+interior gaps, roster_objs 26, feed_live 11 -> **1 date** with all four). No
+profitability question can be settled at that sample size. This blocks the
+real work.
+
+**What actually needs building** (none of it is a wall):
+1. Designate refresh-worker's disk canonical -- it already produces most
+   artifacts.
+2. Ensure everything the pipeline produces lands there for every date and
+   sport, including families currently only mirrored sporadically
+   (`feed_live`, `daily_summary`, `roster_objs`).
+3. Route bulk/historical reads through `/api/ops/artifacts/stream`
+   (`send_file`, answers 304s) rather than `/api/ops/artifacts/export`, which
+   accumulates whole files into a dict and JSON-encodes them in-process --
+   that shape is what caused the OOM, and it's why the 24MB budget exists.
+   Widen `HOT_ARTIFACT_PATTERNS` beyond "hot" for the historical path.
+4. Add a **coverage manifest**: "which dates are complete for sport X", so a
+   backtest can assert coverage instead of globbing and silently landing on
+   one usable date. This is the piece whose absence caused the problem.
+5. Decide a retention policy -- unbounded history on one disk still needs one.
+
+**Verify before designing**: a Render service with an attached persistent disk
+generally cannot run multiple instances. That constrains `web` more than the
+workers and may decide which service can own the canonical disk.
+
+**Cross-check**: outcomes (`feed_live`) are NOT Syndicate output -- they're a
+cache of MLB StatsAPI. Validated 2026-08-05: 30 of 30 sampled games across 15
+dates match `statsapi.mlb.com` exactly, so that family can always be rebuilt
+from upstream rather than needing to be preserved.
+
+### DONE 2026-08-05 (#194) -- MLB HR Targets board + home rail replaced with HR Top 10, advanced metrics surfaced
+
+User: "replace the HR targets and HR targets rail with the HR top 10 calling
+out the advanced analytics behind top 10 selection."
+
+**Board** (`hr_targets.py`): retitled "MLB HR Top 10", cut 24 rows -> 10. Pools
+`max(HR_TOP_N*3, 24)` BEFORE truncating, because
+`_backfill_targets_from_daily_summary` tops up from the richer daily_summary
+artifact and re-sorts by probability -- cutting first would lock in a worse ten.
+Header now reports `Shown 10 of 30` and `With advanced metrics 10/10`.
+
+**New `_hr_analytics_callouts`**: ranks the real model drivers by
+|deviation| x how much each moves HR probability, and renders each with its
+reference value -- barrel rate, hard-hit rate, xwOBA, launch angle (all vs the
+**current season's league average**, read from the Statcast payload's own
+`league.overall` block via `_league_hr_baselines`, not hardcoded constants),
+pitch-mix fit vs the specific arsenal, opposing-pitcher HR rate and barrels
+allowed, platoon edge, park and weather factors, projected PA and lineup slot.
+Every one of these was already computed per row and reached the UI only as
+prose or folded into an opaque "Support" number. `tone` is boost/drag/neutral
+and **drags render too** -- a top-10 hitter facing a suppressing park is still
+top-10, and hiding the negative would overstate the case.
+`_hr_selection_rationale` writes the one-line "why him", and is explicit when
+nothing stands out rather than manufacturing a case.
+
+**Home rail** (`home.py`): carries `hr_rank`/`rank_label` (#1..#10) and the
+callouts. Its single-line `detail` takes the strongest **boost** rather than
+the strongest signal outright -- callouts rank by absolute deviation, so a
+hitter whose biggest mover is negative would otherwise lead with an argument
+against his own pick. The full list, drags included, stays in the expanded row.
+
+**Latent bug fixed while renaming**: `_mlb_prop_result_state`'s `is_hr_target`
+branch was an inline equality test against the literal display label
+`"HR targets"`. HR picks have no market line -- they grade on "did he homer",
+not against a number -- so renaming the surface would have silently rerouted
+every HR row into line-based settlement and mis-graded all of them. Replaced
+with `_is_hr_target_surface()` matching a set of accepted labels.
+
+23 tests in `tests/test_mlb_hr_targets_statcast.py`; `test_home.py` clean.
+
 ### FINDING 2026-08-05 (#192) -- Top-N propensity is the right lens, and HR and K behave in OPPOSITE directions
 
 User's reframing: stop grading accuracy across every row and ask "how do the

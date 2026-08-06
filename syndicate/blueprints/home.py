@@ -1472,7 +1472,7 @@ def _finalize_home_prop_rows(rows: list[dict[str, Any]], *, slug: str, context_l
                 line_value=line_value,
                 selection=selection,
                 final_state=final_state,
-                is_hr_target=str(item.get("heading") or "").strip().lower() == "hr targets",
+                is_hr_target=_is_hr_target_surface(item.get("heading")),
             )
             if state:
                 item["outcome_state"] = state
@@ -3026,7 +3026,7 @@ def _build_home_dashboard(overview: list[dict[str, Any]], *, selected_date: str,
                     prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="Pregame props"))
             for item in mlb_home.get("hr_targets_items") if isinstance(mlb_home.get("hr_targets_items"), list) else []:
                 if isinstance(item, dict):
-                    prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="HR targets"))
+                    prop_rows.append(_build_prop_dashboard_row(sport, item, default_surface="HR Top 10"))
         sport_slug = _safe_text(sport.get("slug"), "").lower()
         mlb_top_prop_counts = _mlb_top_prop_lane_counts(_safe_text(sport.get("context_label"), selected_date)) if sport_slug == "mlb" else None
         availability_reasons = _sport_availability_reason(
@@ -5772,6 +5772,23 @@ def _load_home_prop_items(
     return []
 
 
+_HR_TARGET_SURFACE_LABELS = {"hr targets", "hr target", "hr top 10"}
+
+
+def _is_hr_target_surface(heading: Any) -> bool:
+    """Is this row an HR-propensity pick rather than a lined over/under?
+
+    Settlement branches on this (`_mlb_prop_result_state`): an HR pick has no
+    market line at all -- it grades on "did he homer", not against a number --
+    so it cannot go through the line-comparison path. This used to be an
+    inline equality test against the literal display label "HR targets", which
+    meant renaming that surface would silently reroute HR rows into
+    line-based settlement and mis-grade every one of them. Matching a set of
+    accepted labels keeps the display name free to change.
+    """
+    return str(heading or "").strip().lower() in _HR_TARGET_SURFACE_LABELS
+
+
 def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> list[dict[str, Any]]:
     try:
         from syndicate.features.mlb.hr_targets import build_hr_targets_page_context
@@ -5785,8 +5802,32 @@ def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> li
     for target in targets[:limit]:
         if not isinstance(target, dict):
             continue
-        reasons = [str(item).strip() for item in (target.get("reasons") or []) if str(item).strip()]
-        writeup = str(target.get("writeup") or target.get("summary") or "").strip()
+        # HR Top 10: lead with the advanced metrics that earned the ranking.
+        # `analytics_callouts` is built by hr_targets._hr_analytics_callouts and
+        # already sorted strongest-signal-first, with each metric carrying its
+        # league/neutral reference; fall back to the old free-text reasons when
+        # a row has no Statcast coverage.
+        callouts = [c for c in (target.get("analytics_callouts") or []) if isinstance(c, dict)]
+        callout_lines = [
+            f"{c.get('label')}: {c.get('value')} ({c.get('detail')})" if c.get("detail") else f"{c.get('label')}: {c.get('value')}"
+            for c in callouts
+        ]
+        reasons = callout_lines or [str(item).strip() for item in (target.get("reasons") or []) if str(item).strip()]
+        # The single-line `detail` is the rail's one-glance "why him". Take the
+        # strongest BOOST rather than the strongest signal outright -- callouts
+        # rank by absolute deviation, so a hitter whose biggest mover is a
+        # negative would otherwise lead with an argument against his own pick.
+        # The full list (drags included) still renders in the expanded row.
+        lead = next((c for c in callouts if c.get("tone") == "boost"), None)
+        lead_line = (
+            (f"{lead.get('label')}: {lead.get('value')} ({lead.get('detail')})" if lead.get("detail")
+             else f"{lead.get('label')}: {lead.get('value')}")
+            if lead else None
+        )
+        writeup = str(
+            target.get("selection_rationale") or target.get("writeup") or target.get("summary") or ""
+        ).strip()
+        rank = target.get("hr_rank")
         matchup = _safe_text(target.get("matchup"), "-")
         away_label, home_label = _split_matchup_labels(matchup)
         team_label = _safe_text(target.get("team"), None)
@@ -5807,9 +5848,12 @@ def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> li
                 "game_pk": _int_or_none(target.get("game_pk") or target.get("gamePk")),
                 "heading": _safe_text(target.get("team"), "HR target"),
                 "name": _safe_text(target.get("player_name"), "Unknown hitter"),
+                "hr_rank": _int_or_none(rank),
+                "rank_label": (f"#{int(rank)}" if _int_or_none(rank) else None),
+                "analytics_callouts": callouts,
                 "value": _safe_text(target.get("probability"), "-"),
                 "matchup": matchup,
-                "detail": reasons[0] if reasons else _safe_text(target.get("summary"), "No HR-target summary available."),
+                "detail": lead_line or (reasons[0] if reasons else _safe_text(target.get("summary"), "No HR-target summary available.")),
                 "writeup": writeup or _safe_text(target.get("summary"), "No HR-target summary available."),
                 # Board audit follow-up, found live 2026-07-31: "support" is
                 # hr_targets.py's own model support/confidence score
