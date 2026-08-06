@@ -246,7 +246,52 @@ opportunity, and today there is no one place to hang them.
 
 ---
 
-## 10. Residual risks
+## 10. STEP 2 + STEP 1 SHIPPED — first counter reading (2026-08-06)
+
+`/api/ops/opportunity-contract/status`, web, after one board build:
+
+```
+sport  date        lane                rows  noKey  noEntity  noEvent  quoted  complete
+mlb    2026-08-06  game_candidate       106    106        18        0     106         0
+mlb    2026-08-06  prop_source_in        46     46        10        0       0         0
+mlb    2026-08-06  prop_dashboard_row    45     45         0        0       0         0
+mlb    2026-08-07  game_candidate        12     12         2        0       0         0
+wnba   2026-08-06  prop_source_in        18     18         0        0       0         0
+wnba   2026-08-06  prop_dashboard_row     9      9         0        0       0         0
+wnba   (no date)   game_candidate        12     12        12        0       4         0
+```
+
+**The headline, and it is a single number: `missing_market_key` is 100% of every
+row, in every lane, in both sports — 106/106, 46/46, 45/45, 18/18, 12/12.** Not
+one row anywhere on the board carries a canonical market key. `complete` is 0
+everywhere and that is the *only* reason.
+
+This is exactly what step 2 was for. It converts "props don't join" into a
+single, specific, measurable target, and it says the fix is at the producer, not
+in the matcher — the same conclusion three sessions of matcher-debugging reached
+the slow way.
+
+**Other things the first reading surfaced for free:**
+- **`missing_event_identity` is 0 everywhere.** Event identity is not the
+  problem and needs no work. Worth knowing before spending a day on it.
+- **WNBA game candidates have NO DATE at all** (empty date bucket, and
+  `noEntity` 12/12). Their game dicts carry no field `_game_date` can read,
+  which means quote enrichment returns early for every one — the same
+  camelCase-date defect as #219, in a different sport.
+- **MLB `game_candidate` is `quoted=106/106`** — game markets are fully priced.
+- **`prop_dashboard_row` reads `quoted=0` and that is an instrumentation
+  artifact, not a regression**: the counter is recorded BEFORE
+  `enrich_prop_rows` runs in that function. The served payload for the same
+  build had `top_props` 12/14 priced. Recorded here rather than quietly fixed,
+  because a metric that flatters itself is worse than none — move the call after
+  enrichment, or count both sides.
+
+**Step 3 is now unambiguous**: thread the canonical key from producer to board.
+V2 established it already exists upstream (`prop: "batter_total_bases"`), so this
+is threading, not inventing — and the counter will show it landing, per sport,
+the moment it does.
+
+## 11. Residual risks
 
 
 
@@ -262,7 +307,7 @@ assumed shape:
 3. **Who else reads `home_rails.items`.** If other surfaces consume them as data,
    step 4 needs those migrated too or it breaks them silently.
 
-## 11. The honest counter-argument
+## 12. The honest counter-argument
 
 Per-sport freedom is cheap and shared contracts are expensive — this repo's own
 board-contract convergence has been a multi-phase migration. That trade was
