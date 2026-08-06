@@ -87,7 +87,30 @@ _BASKETBALL: dict[str, str] = {
     "pra": "player_points_rebounds_assists",
     "pr": "player_points_rebounds",
     "pa": "player_points_assists",
+    "ra": "player_rebounds_assists",
     "player_points_rebounds_assists": "player_points_rebounds_assists",
+    # The tail the counter was still reporting: 2 of 18 WNBA rows. Taken from
+    # the markets the WNBA quote log actually carries (measured 2026-08-06:
+    # player_points/rebounds/assists/threes/points_rebounds_assists/
+    # points_rebounds/points_assists/double_double) plus the standard box-score
+    # codes our rails emit, rather than from another production read -- the web
+    # service began returning 502 under repeated dashboard rebuilds and is not
+    # worth destabilising for a two-row lookup.
+    "blk": "player_blocks",
+    "blocks": "player_blocks",
+    "stl": "player_steals",
+    "steals": "player_steals",
+    "to": "player_turnovers",
+    "tov": "player_turnovers",
+    "turnovers": "player_turnovers",
+    "dd": "player_double_double",
+    "double_double": "player_double_double",
+    "double double": "player_double_double",
+    "td": "player_triple_double",
+    "triple_double": "player_triple_double",
+    "triple double": "player_triple_double",
+    "fg3m": "player_threes",
+    "3s": "player_threes",
 }
 
 # Game-level markets are the same three words in every sport, which is why they
