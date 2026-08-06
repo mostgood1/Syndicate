@@ -629,9 +629,15 @@ def _build_odds_coverage_audit(*, requested_date: str) -> dict[str, Any]:
 def _infer_nfl_context(source_root: Path | None, artifact_root: Path, season: int | None, week: int | None) -> tuple[int, int]:
     if season is not None and week is not None:
         return int(season), int(week)
+    # A fallback to source_root / "nfl_compare" / "data" / "current_week.json"
+    # (the external NFL-Betting sibling repo) used to live here. Removed
+    # 2026-08-05, confirmed dead: unreachable in every real environment
+    # this runs in (artifact_root/current_week.json already exists locally
+    # and on Render, so the fallback branch never fired), and even the one
+    # real sibling checkout on disk doesn't contain that file -- it's
+    # frozen at the completed 2025 season with no 2026 activity. NFL
+    # ingestion is fully local/Syndicate-owned going forward.
     current_week_path = artifact_root / "current_week.json"
-    if (not current_week_path.exists()) and source_root is not None:
-        current_week_path = source_root / "nfl_compare" / "data" / "current_week.json"
     payload: dict[str, Any] = {}
     if current_week_path.exists():
         try:

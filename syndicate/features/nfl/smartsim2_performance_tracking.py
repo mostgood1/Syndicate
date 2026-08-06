@@ -38,6 +38,14 @@ from syndicate.features.nfl.sources import default_nfl_source_root
 
 PERFORMANCE_LOG_PATH = default_nfl_source_root() / "data" / "smartsim2_performance_log.jsonl"
 
+# Preseason's own log -- same directory/root convention as
+# PERFORMANCE_LOG_PATH, distinct filename, never mixed with real
+# regular-season records (added 2026-08-05 for the preseason evaluation/ROI
+# task; see scripts/backfill_nfl_performance.py's --season-kind and
+# scripts/fetch_nfl_preseason_odds.py's dated snapshot mechanism, the piece
+# that makes preseason ATS/totals grading possible at all).
+PRESEASON_PERFORMANCE_LOG_PATH = default_nfl_source_root() / "data" / "smartsim2_preseason_performance_log.jsonl"
+
 # A market-margin-based reporting category, same spirit as NCAAF's
 # LARGE_MISMATCH_MARGIN_THRESHOLD -- a review flag only, not a model input.
 LARGE_MISMATCH_MARGIN_THRESHOLD = 14.0
@@ -209,6 +217,7 @@ def summarize_by_week(records: Sequence[dict[str, Any]]) -> dict[int, dict[str, 
 __all__ = [
     "LARGE_MISMATCH_MARGIN_THRESHOLD",
     "PERFORMANCE_LOG_PATH",
+    "PRESEASON_PERFORMANCE_LOG_PATH",
     "GamePerformanceRecord",
     "build_game_performance_record",
     "compute_margin_stats",
