@@ -1,5 +1,74 @@
 # Syndicate TODO — canonical cross-session list
 
+### RESULT 2026-08-05 (#203) -- Phase 1 / H8 NRFI: FAILS all rules. But it exposed the largest, cleanest model defect found all session.
+
+First execution against the #202 pre-registration. Rules applied verbatim, no
+adjustment after seeing numbers.
+
+**Sample**: 525 gradable games / 47 dates (509 at the true NRFI line of 0.5,
+15 at 1.5, 1 at 2.5). Sim `first1` segment vs first-inning runs from StatsAPI
+hydrated schedule linescores (one call per date -- the cached boxscores kept only
+player stats, so innings had to be fetched; cheap).
+
+**Methodology bug caught and fixed mid-run**: the first pass compared
+`P(first1 total == 0)` against the market's under price for lines of 0.5, 1.5
+AND 2.5 -- incompatible quantities for the non-0.5 lines. Corrected to
+`P(total < line)` per game. It barely moved the result (97% of lines are 0.5)
+but the first version was wrong and would have been reported as clean.
+
+**H8 VERDICT: FAIL at every threshold.**
+
+| min edge | bets | hit | ROI |
+|---|---|---|---|
+| 0% | 509 | 46.95% | **-11.1%** |
+| 3% | 392 | 45.66% | -13.0% |
+| 5% | 281 | 45.91% | -11.7% |
+
+- R1 size >=60: PASS (509)
+- **R2 both halves ROI>0: FAIL** (-15.4% / -6.8%)
+- **R3 drop top-5 winners: FAIL** (-12.6%)
+- **R4 bootstrap CI excludes 0: FAIL** -- and note the CI is entirely NEGATIVE:
+  [-19.4%, -2.8%]. This is not "no edge found"; it is a confirmed losing bet.
+- R5/R6: N/A (H8 was a first look with no directional prediction)
+
+**THE FINDING THAT MATTERS -- the sim's first-inning run model is badly biased:**
+
+| | rate |
+|---|---|
+| sim mean P(NRFI) | **55.56%** |
+| **actual NRFI** | **47.24%** |
+| market de-vigged | 50.68% |
+
+**The sim over-predicts NRFI by +8.32pp.** That is why it took the NRFI/under
+side on ~90% of games and lost on all of them. The market (50.68%) is far
+closer to truth than the sim.
+
+This is the most actionable defect found in #186-#203: it is large (8.3pp),
+one-directional, confined to a specific subsystem (first-inning run generation),
+and measured on n=509 -- unlike #201's favourite-overconfidence, which was 16pp
+on n=34 and turned out to be mostly noise.
+
+**But it does NOT convert to money as-is.** Actual YRFI is 52.76% while the
+market implies 49.32%, so a blind YRFI bet would hit 52.76% against a 53.11%
+break-even at the measured 6.23% hold -- marginally losing. Fading our own
+model does not work because the market already prices first innings better than
+we do.
+
+**Next**: root-cause the first-inning bias. Candidate causes -- the sim starting
+every game with the top of the order against a fresh starter, first-inning
+pitcher settings (no fatigue, no TTO), or the same margin/run-scoring
+under-dispersion found in #201 concentrated in inning 1. Worth doing because it
+is a real modelling error regardless of whether it is bettable; the first inning
+feeds every downstream segment (first3/first5) as well.
+
+**Also confirmed**: nothing before 2026-05-28 is reachable. Probed 04-15, 05-01,
+05-15, 05-27 -- daily_summary, sims AND snapshots all return 0 bytes from
+`/api/ops/artifacts/stream`. (`sims-list` reports sims back to 04-10 because it
+resolves roots differently than the streaming endpoint's `data_root()`.) So
+widening 48/66 -> 76 dates genuinely requires the #193 refresh-worker surface;
+it is not available through the current API.
+
+
 ### OPEN 2026-08-05 (#202) -- Conditional-edge scan: PRE-REGISTERED, not yet executed
 
 User: "we need to figure out the overall markets - then we need to find where
