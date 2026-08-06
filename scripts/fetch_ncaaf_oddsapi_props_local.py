@@ -340,6 +340,31 @@ def parse_events_to_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
+def _append_ncaaf_book_quotes(events: list[dict[str, Any]], *, season: int, week: int) -> None:
+    """Every book's price for every tracked market, into the shared quote log.
+
+    Same #209 Class A defect and same fix as NFL: `_choose_bookmaker` keeps one
+    book out of a response that already contains several. Sharded by
+    `{season}_wk{week}` to match how NCAAF props are scoped everywhere else.
+
+    Never raises: a quote-log failure must not fail an odds fetch.
+    """
+    try:
+        if not isinstance(events, list) or not events:
+            return
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes, quote_rows_from_oddsapi_events
+
+        rows = quote_rows_from_oddsapi_events(events, market_map=MARKET_STD_MAP)
+        append_book_quotes(
+            sport="ncaaf",
+            date_str=f"{int(season)}_wk{int(week)}",
+            rows=rows,
+            captured_at=datetime.now(tz=timezone.utc).isoformat(),
+        )
+    except Exception as exc:
+        print(f"[odds_book_quotes] ncaaf append FAILED {type(exc).__name__}: {exc}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Fetch NCAAF player props from The Odds API to CSV")
     parser.add_argument("--season", type=int, required=True)
@@ -405,6 +430,10 @@ def main(argv: list[str] | None = None) -> int:
             print(f"WARNING: Failed writing raw OddsAPI payload sidecar: {exc}")
 
     rows = parse_events_to_rows(events)
+    # #209 Class A: parse_events_to_rows keeps ONE book per event and drops
+    # the rest of an already-paid-for response. The CSV keeps its single-book
+    # shape; the quote log keeps every book.
+    _append_ncaaf_book_quotes(events, season=int(args.season), week=int(args.week))
     if not rows:
         # Confirmed live 2026-08-05: OddsAPI returns zero real player-prop
         # markets for NCAAF games weeks out (and for NFL games days out --

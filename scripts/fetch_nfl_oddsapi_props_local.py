@@ -290,6 +290,31 @@ def parse_events_to_rows(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
+def _append_nfl_book_quotes(events: list[dict[str, Any]], *, season: int, week: int) -> None:
+    """Every book's price for every tracked market, into the shared quote log.
+
+    Sharded by `{season}_wk{week}` rather than a date, matching how NFL's own
+    props CSV and odds_history snapshot paths are scoped -- an NFL week is the
+    unit here, not a slate day.
+
+    Never raises: a quote-log failure must not fail an odds fetch.
+    """
+    try:
+        if not isinstance(events, list) or not events:
+            return
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes, quote_rows_from_oddsapi_events
+
+        rows = quote_rows_from_oddsapi_events(events, market_map=MARKET_STD_MAP)
+        append_book_quotes(
+            sport="nfl",
+            date_str=f"{int(season)}_wk{int(week)}",
+            rows=rows,
+            captured_at=datetime.now(tz=timezone.utc).isoformat(),
+        )
+    except Exception as exc:
+        print(f"[odds_book_quotes] nfl append FAILED {type(exc).__name__}: {exc}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Fetch NFL player props from The Odds API to CSV")
     parser.add_argument("--season", type=int, required=True)
@@ -355,6 +380,13 @@ def main(argv: list[str] | None = None) -> int:
     rows = parse_events_to_rows(events)
     if not rows:
         print("WARNING: No player prop rows parsed from OddsAPI payload.")
+
+    # #209 Class A: parse_events_to_rows keeps ONE book per event
+    # (_choose_bookmaker) and discards the rest of a response we have already
+    # paid for. The CSV keeps its single-book shape -- every downstream consumer
+    # depends on it -- while the quote log keeps all of them, which is what CLV
+    # and best-price grading need.
+    _append_nfl_book_quotes(events, season=int(args.season), week=int(args.week))
 
     df = pd.DataFrame(rows)
     columns = [

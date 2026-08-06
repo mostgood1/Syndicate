@@ -269,12 +269,41 @@ def write_daily_lines(payload: dict[str, Any], *, data_dir: Path) -> Path:
     return output
 
 
+def _append_nfl_team_book_quotes(events: list[dict[str, Any]]) -> None:
+    """Every book's game-market price into the shared quote log.
+
+    Sharded by the UTC date this ran rather than by week: unlike the props
+    fetchers this one has no season/week argument to key on, and team odds are
+    refreshed on a daily cadence. Never raises.
+    """
+    try:
+        if not isinstance(events, list) or not events:
+            return
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes, quote_rows_from_oddsapi_events
+
+        now = datetime.now(tz=timezone.utc)
+        rows = quote_rows_from_oddsapi_events(events)
+        append_book_quotes(
+            sport="nfl",
+            date_str=now.date().isoformat(),
+            rows=rows,
+            captured_at=now.isoformat(),
+        )
+    except Exception as exc:
+        print(f"[odds_book_quotes] nfl team odds append FAILED {type(exc).__name__}: {exc}")
+
+
 def main(*, data_dir: Path | None = None) -> Path:
     api_key = _env("ODDS_API_KEY")
     if not api_key:
         raise RuntimeError("Missing ODDS_API_KEY environment variable")
     region = _env("ODDS_API_REGION", "us") or "us"
     events = fetch_odds(api_key=api_key, region=region)
+    # #209 Class A: build_unified_lines keeps ONE book per event
+    # (choose_bookmaker) out of a response that already carries several. The
+    # unified single-book payload below is unchanged -- the quote log keeps the
+    # rest, which is what CLV and best-price grading need.
+    _append_nfl_team_book_quotes(events)
     payload = build_unified_lines(events)
     return write_daily_lines(payload, data_dir=data_dir or Path(__file__).resolve().parents[1] / "data")
 

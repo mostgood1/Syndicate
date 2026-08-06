@@ -807,6 +807,153 @@ def _best_bookmaker_game_lines(payload: dict[str, Any], *, home_team: str, away_
     return best_lines, best_key
 
 
+def _segment_and_market_from_key(market_key: str) -> tuple[str, str]:
+    """Split OddsAPI's flat market key into (segment, market).
+
+    "totals_1st_5_innings" -> ("first5", "totals"); "h2h" -> ("full", "h2h").
+    Derived from the suffix rather than looked up in _extract_game_lines'
+    segment_market_map so this stays a pure function of the key -- the map there
+    exists to reshape into the board's nested schema, which the quote log
+    deliberately does not use.
+    """
+    key = str(market_key or "").strip().lower()
+    for innings, segment in (("1st_1_innings", "first1"), ("1st_3_innings", "first3"), ("1st_5_innings", "first5")):
+        suffix = f"_{innings}"
+        if key.endswith(suffix):
+            base = key[: -len(suffix)]
+            if base.startswith("alternate_"):
+                base = base[len("alternate_") :] + "_alt"
+            return segment, base
+    return "full", key
+
+
+def _selection_for_outcome(outcome_name: str, *, home_team: str, away_team: str) -> str | None:
+    text = str(outcome_name or "").strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered.startswith("over"):
+        return "over"
+    if lowered.startswith("under"):
+        return "under"
+    if lowered == "draw" or lowered == "tie":
+        return "draw"
+    if home_team and lowered == str(home_team).strip().lower():
+        return "home"
+    if away_team and lowered == str(away_team).strip().lower():
+        return "away"
+    return text
+
+
+def _game_line_book_quotes(payload: dict[str, Any], *, event: dict[str, Any], home_team: str, away_team: str) -> list[dict[str, Any]]:
+    """Every book's price for every game market in one merged event payload.
+
+    #209: the call has already been paid for and the response already contains
+    5-8 US books; _best_bookmaker_game_lines keeps exactly one of them. This
+    keeps the rest, without touching the single-book `games` list four
+    downstream consumers assume (see odds_book_quotes' module docstring).
+    """
+    rows: list[dict[str, Any]] = []
+    commence_time = event.get("commence_time") or payload.get("commence_time")
+    event_id = str(event.get("id") or event.get("event_id") or payload.get("id") or "").strip()
+    for bookmaker in (payload.get("bookmakers") or []):
+        if not isinstance(bookmaker, dict):
+            continue
+        book_key = str(bookmaker.get("key") or bookmaker.get("title") or "").strip()
+        if not book_key:
+            continue
+        for market in _as_market_list(bookmaker.get("markets")):
+            segment, market_name = _segment_and_market_from_key(market.get("key"))
+            outcomes = market.get("outcomes")
+            if not isinstance(outcomes, list):
+                continue
+            for outcome in outcomes:
+                if not isinstance(outcome, dict):
+                    continue
+                selection = _selection_for_outcome(outcome.get("name"), home_team=home_team, away_team=away_team)
+                if not selection:
+                    continue
+                rows.append(
+                    {
+                        "kind": "game",
+                        "event_id": event_id,
+                        "commence_time": commence_time,
+                        "home_team": home_team,
+                        "away_team": away_team,
+                        "bookmaker": book_key,
+                        "market": market_name,
+                        "segment": segment,
+                        "selection": selection,
+                        "line": outcome.get("point"),
+                        "price": outcome.get("price"),
+                        "snapshot_ts": market.get("last_update") or bookmaker.get("last_update"),
+                    }
+                )
+    return rows
+
+
+def _prop_book_quotes(payload: dict[str, Any], *, event: dict[str, Any], key_map: dict[str, str]) -> list[dict[str, Any]]:
+    """Every book's price for every player prop in one event payload.
+
+    The collapse this replaces is at the two `_merge_prop_market_rows` call
+    sites: they iterate every book and fold them into one row per
+    (player, market), so the resulting odds_history keys carry no bookmaker at
+    all -- which is why prop book coverage measured 0/3,437 on 2026-08-05 and
+    why prop closing capture is structurally zero (no event linkage, so the
+    pregame->live stamp can never fire). These rows carry both.
+    """
+    rows: list[dict[str, Any]] = []
+    home_team = str(event.get("home_team") or payload.get("home_team") or "")
+    away_team = str(event.get("away_team") or payload.get("away_team") or "")
+    commence_time = event.get("commence_time") or payload.get("commence_time")
+    event_id = str(event.get("id") or event.get("event_id") or payload.get("id") or "").strip()
+    for bookmaker in (payload.get("bookmakers") or []):
+        if not isinstance(bookmaker, dict):
+            continue
+        book_key = str(bookmaker.get("key") or bookmaker.get("title") or "").strip()
+        if not book_key:
+            continue
+        for market in _as_market_list(bookmaker.get("markets")):
+            raw_key = str(market.get("key") or "").lower().strip()
+            if raw_key not in key_map:
+                continue
+            market_name = str(key_map[raw_key])
+            outcomes = market.get("outcomes")
+            if not isinstance(outcomes, list):
+                continue
+            for outcome in outcomes:
+                if not isinstance(outcome, dict):
+                    continue
+                player = str(outcome.get("description") or outcome.get("participant") or "").strip()
+                if not player:
+                    continue
+                side = str(outcome.get("name") or "").strip().lower()
+                if side.startswith("over"):
+                    selection = "over"
+                elif side.startswith("under"):
+                    selection = "under"
+                else:
+                    continue
+                rows.append(
+                    {
+                        "kind": "prop",
+                        "event_id": event_id,
+                        "commence_time": commence_time,
+                        "home_team": home_team,
+                        "away_team": away_team,
+                        "bookmaker": book_key,
+                        "market": market_name,
+                        "segment": "full",
+                        "selection": selection,
+                        "player_name": player,
+                        "line": outcome.get("point"),
+                        "price": outcome.get("price"),
+                        "snapshot_ts": market.get("last_update") or bookmaker.get("last_update"),
+                    }
+                )
+    return rows
+
+
 def _prop_market_counts(props_by_name: dict[str, dict[str, dict[str, Any]]]) -> dict[str, Any]:
     players = 0
     markets: dict[str, int] = {}
@@ -1118,6 +1265,7 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
     scoping_now = datetime.now(timezone.utc)
 
     games: list[dict[str, Any]] = []
+    book_quotes: list[dict[str, Any]] = []
     events_scoped_full = 0
     events_scoped_reduced = 0
     for event in live_events:
@@ -1155,6 +1303,11 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
             continue
         home_team = str(event.get("home_team") or payload.get("home_team") or "")
         away_team = str(event.get("away_team") or payload.get("away_team") or "")
+        # #209: harvest every book BEFORE the single-book pick below, and from
+        # the same merged payload it scores -- so the quote log and the board's
+        # chosen book are guaranteed to describe the same observation rather
+        # than two fetches a cycle apart.
+        book_quotes.extend(_game_line_book_quotes(payload, event=event, home_team=home_team, away_team=away_team))
         best_lines, bookmaker_key = _best_bookmaker_game_lines(payload, home_team=home_team, away_team=away_team)
         if not isinstance(best_lines, dict):
             continue
@@ -1175,6 +1328,10 @@ def fetch_live_game_lines_for_date(api_key: str, date_str: str, *, regions: str 
         "mode": "live",
         "retrieved_at": datetime.utcnow().isoformat(),
         "games": games,
+        # Drained and removed by fetch_and_write_live_odds_for_date before the
+        # snapshot is written -- the on-disk game-lines artifact shape is
+        # deliberately unchanged (#209).
+        "_book_quotes": book_quotes,
         "meta": {
             "markets": game_market_keys,
             "regions": str(regions or "us"),
@@ -1193,6 +1350,7 @@ def fetch_live_pitcher_props_for_date(api_key: str, date_str: str, *, regions: s
     live_events = list(events or _fetch_live_events_for_date(api_key, date_str))
     desired_markets = list(PITCHER_MARKET_KEY_MAP.keys())
     pitcher_props: dict[str, dict[str, dict[str, Any]]] = {}
+    book_quotes: list[dict[str, Any]] = []
     market_warnings: list[str] = []
 
     # Props cadence (#16 budget lever, cold games only). Props were never
@@ -1258,6 +1416,9 @@ def fetch_live_pitcher_props_for_date(api_key: str, date_str: str, *, regions: s
                 cache[event_id] = {"fetched_at": scoping_now.isoformat(), "payload": payload}
         if not isinstance(payload, dict):
             continue
+        # #209: capture per-book quotes before the merge below folds every book
+        # into one row per (player, market) and discards which book posted it.
+        book_quotes.extend(_prop_book_quotes(payload, event=event, key_map=PITCHER_MARKET_KEY_MAP))
         for bookmaker in (payload.get("bookmakers") or []):
             if not isinstance(bookmaker, dict):
                 continue
@@ -1279,6 +1440,7 @@ def fetch_live_pitcher_props_for_date(api_key: str, date_str: str, *, regions: s
         "mode": "live",
         "retrieved_at": datetime.utcnow().isoformat(),
         "pitcher_props": finalized,
+        "_book_quotes": book_quotes,
         "meta": {
             "markets": desired_markets,
             "regions": str(regions or "us"),
@@ -1296,6 +1458,7 @@ def fetch_live_hitter_props_for_date(api_key: str, date_str: str, *, regions: st
     if not desired_markets:
         desired_markets = [str(market).strip().lower() for market in DEFAULT_HITTER_MARKETS]
     hitter_props: dict[str, dict[str, dict[str, Any]]] = {}
+    book_quotes: list[dict[str, Any]] = []
 
     # Props cadence -- see fetch_live_pitcher_props_for_date's comment for
     # the full rationale; identical mechanism, hitter side.
@@ -1341,6 +1504,8 @@ def fetch_live_hitter_props_for_date(api_key: str, date_str: str, *, regions: st
                 cache[event_id] = {"fetched_at": scoping_now.isoformat(), "payload": payload}
         if not isinstance(payload, dict):
             continue
+        # #209: same as the pitcher path -- per-book quotes before the merge.
+        book_quotes.extend(_prop_book_quotes(payload, event=event, key_map={market_name: market_name for market_name in desired_markets}))
         for bookmaker in (payload.get("bookmakers") or []):
             if not isinstance(bookmaker, dict):
                 continue
@@ -1362,6 +1527,7 @@ def fetch_live_hitter_props_for_date(api_key: str, date_str: str, *, regions: st
         "mode": "live",
         "retrieved_at": datetime.utcnow().isoformat(),
         "hitter_props": finalized,
+        "_book_quotes": book_quotes,
         "meta": {
             "markets": desired_markets,
             "regions": str(regions or "us"),
@@ -1370,6 +1536,29 @@ def fetch_live_hitter_props_for_date(api_key: str, date_str: str, *, regions: st
             "props_cadence": {"enabled": bool(event_scoping_enabled), "fresh_events": int(events_fetched_fresh), "cached_events": int(events_reused_cache)},
         },
     }
+
+
+def _append_mlb_book_quotes(date_str: str, rows: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Hand the harvested per-book quotes to the shared quote log (#209).
+
+    Wrapped so that a quote-log failure cannot fail an odds refresh -- the same
+    rule the #207 diagnostic follows. The log is an analysis surface; the odds
+    themselves are the product.
+    """
+    if not rows:
+        return None
+    try:
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes
+
+        return append_book_quotes(
+            sport="mlb",
+            date_str=str(date_str),
+            rows=rows,
+            captured_at=datetime.now(timezone.utc).isoformat(),
+        )
+    except Exception as exc:
+        print(f"[odds_book_quotes] mlb append FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
 
 
 def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = None, overwrite: bool = True, regions: str = "us", bookmakers: str | None = None, hitter_markets: list[str] | None = None) -> dict[str, Any]:
@@ -1397,6 +1586,18 @@ def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = 
     game_lines_doc = fetch_live_game_lines_for_date(api_key, date_str, regions=regions, bookmakers=bookmakers, events=live_events)
     pitcher_props_doc = fetch_live_pitcher_props_for_date(api_key, date_str, regions=regions, bookmakers=bookmakers, events=live_events)
     hitter_props_doc = fetch_live_hitter_props_for_date(api_key, date_str, regions=regions, bookmakers=bookmakers, markets=hitter_markets, events=live_events)
+    # #209: drain the per-book quotes BEFORE the preserve-existing fallbacks
+    # below, which can replace a doc wholesale with the previous cycle's file --
+    # that file has no quotes on it, and appending the previous cycle's prices
+    # under this cycle's timestamp would be a fabricated observation. Popping
+    # here also keeps the three snapshot artifacts byte-identical in shape to
+    # what every existing consumer reads.
+    _append_mlb_book_quotes(
+        date_str,
+        list(game_lines_doc.pop("_book_quotes", None) or [])
+        + list(pitcher_props_doc.pop("_book_quotes", None) or [])
+        + list(hitter_props_doc.pop("_book_quotes", None) or []),
+    )
     warnings: list[str] = []
     existing_game_lines_doc = _read_json_if_exists(game_lines_path)
     existing_pitcher_props_doc = _read_json_if_exists(pitcher_props_path)

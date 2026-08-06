@@ -277,6 +277,19 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # an oversized shard no matter how many refresh cycles ran.
     "*_source/tracking/odds_history/*.json",
     "*_source/artifacts/*/odds_history/*.json",
+    # #209: per-book quote log (syndicate/features/shared/odds_book_quotes.py).
+    # Deliberately NOT a bookmaker dimension on the odds_history shards above --
+    # that shard is already 54MB at 3,682 MLB keys and restoring ~5 books to its
+    # 3,437 prop keys would push it toward 250MB, published every cycle on 2GB
+    # services, while silently changing which book four existing single-book
+    # consumers pick. This family carries the per-book truth (CLV, best-price
+    # re-grade) and odds_history keeps its display-oriented single-book shape.
+    # Written on live-odds-worker, read on web -- so like odds_history it needs
+    # this entry to cross services at all, and unlike the #207 diagnostic it is
+    # published explicitly by its own writer rather than relying on the
+    # allowlist alone (allowlisting only PERMITS a push; something has to make
+    # it).
+    "*_source/tracking/book_quotes/*.jsonl",
     # #124: the actual root cause of MLB live props reading zero everywhere
     # except web. syndicate/features/shared/live_lens_loop.py runs on
     # live-odds-worker (per its own header comment: "runs independently ...

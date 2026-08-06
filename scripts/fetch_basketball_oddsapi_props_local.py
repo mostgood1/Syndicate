@@ -304,6 +304,69 @@ def _latest_existing_snapshot_path(*, out_path: Path, target_date: str) -> Path 
     return candidates[-1][1]
 
 
+def _append_basketball_book_quotes(*, league: str, date_str: str, df) -> None:
+    """Route this fetcher's already-multi-book rows into the shared quote log.
+
+    #209 Class B: unlike MLB/NFL/NCAAF, nothing is lost at CAPTURE here --
+    _flatten_bookmakers keeps every book and already carries event_id,
+    commence_time and snapshot_ts. What was lost was ROUTING: the odds_history
+    snapshot paths for nba/wnba (odds_refresh_tracking._odds_history_snapshot_paths)
+    list live_lines / live_lens_signals / live_lens_projections / game_cards and
+    never this CSV, so a six-book file sat on disk while the board showed WNBA
+    props with no bookmaker at all (measured 2026-08-05: 128 of 146 shard
+    entries book-less, against 1,813 prop rows across 6 books right here).
+
+    This does not rewrite that routing -- it publishes the same rows in the
+    cross-sport quote shape, so CLV and best-price work reads one format for
+    every sport instead of a bespoke file list per sport.
+    """
+    try:
+        if df is None or getattr(df, "empty", True):
+            return
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes
+
+        rows: list[dict[str, object]] = []
+        for record in df.to_dict("records"):
+            player = str(record.get("player_name") or "").strip()
+            outcome = str(record.get("outcome_name") or "").strip()
+            lowered = outcome.lower()
+            if lowered.startswith("over"):
+                selection = "over"
+            elif lowered.startswith("under"):
+                selection = "under"
+            elif outcome and outcome == str(record.get("home_team") or "").strip():
+                selection = "home"
+            elif outcome and outcome == str(record.get("away_team") or "").strip():
+                selection = "away"
+            else:
+                selection = outcome
+            rows.append(
+                {
+                    "kind": "prop" if player else "game",
+                    "event_id": record.get("event_id"),
+                    "commence_time": record.get("commence_time"),
+                    "home_team": record.get("home_team"),
+                    "away_team": record.get("away_team"),
+                    "bookmaker": record.get("bookmaker"),
+                    "market": record.get("market"),
+                    "segment": "full",
+                    "selection": selection,
+                    "player_name": player or None,
+                    "line": record.get("point"),
+                    "price": record.get("price"),
+                    "snapshot_ts": record.get("last_update") or record.get("snapshot_ts"),
+                }
+            )
+        append_book_quotes(
+            sport=str(league).strip().lower(),
+            date_str=str(date_str),
+            rows=rows,
+            captured_at=pd.Timestamp.utcnow().isoformat(),
+        )
+    except Exception as exc:
+        print(f"[odds_book_quotes] basketball append FAILED {type(exc).__name__}: {exc}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Fetch NBA/WNBA player props from OddsAPI to CSV")
     parser.add_argument("--league", type=str, choices=sorted(SPORT_KEYS.keys()), required=True)
@@ -379,6 +442,7 @@ def main(argv: list[str] | None = None) -> int:
 
     atomic_write_csv(out_path, df)
     print(f"Wrote {out_path} with {len(df)} rows.")
+    _append_basketball_book_quotes(league=str(args.league), date_str=str(args.date), df=df)
     return 0
 
 
