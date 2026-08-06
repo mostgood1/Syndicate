@@ -1,5 +1,23 @@
 # Syndicate TODO — canonical cross-session list
 
+### HANDOFF 2026-08-05 -- see `docs/ai_context/handoff_mlb_odds_provenance.md`
+
+Session ended mid-verification. **Start there, not here** -- it has the
+immediate action, the gating question, and the gotchas in five minutes of
+reading. Everything committed and pushed through `f4fceb9a`.
+
+**In flight**: deploy `dep-d9pvimnlk1mc73e9ec10` on `live-odds-worker`, commit
+`f4fceb9a`. When live, the #207 provenance diagnostic fires on the next
+invocation and answers whether the odds single-book / missing-closing-line
+problem is a CAPTURE defect or a PUBLISH defect -- which decides whether the
+prop verdicts in #186-#204 are recoverable and whether CLV is measurable today.
+
+**Do not resume modelling until that is answered.** #195/#205/#206 established
+that the binding constraint was never model quality: every ROI in this thread
+was graded against one arbitrarily-chosen bookmaker, and CLV -- the only
+instrument with power to detect a 2% edge -- has never been measured.
+
+
 ### RECONCILIATION 2026-08-05/06 -- NFL/NCAAF full-day arc: preseason wiring -> Layer 2 fix -> full gap audit vs MLB -> Tier 1 + Tier 2 build-out (session close-out, archive-ready)
 
 Supersedes the still-open item in the "DONE (mostly) 2026-08-05 -- NFL
