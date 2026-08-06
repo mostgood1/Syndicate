@@ -1,5 +1,60 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-05 (#205) -- HIGHEST-VALUE BETTING ITEM: we fetch 5 books and keep 1. Every ROI in #186-#204 was graded against an arbitrary book, not the best price.
+
+User, correctly: "we can log these but we still aren't any closer to betting
+edges." Two structural reasons, neither of which is model quality.
+
+**REASON 1 -- we are discarding the prices we already pay for.**
+`oddsapi_game_lines_*.json` requests `regions: "us"`, which returns EVERY US
+book in a single API call, and we persist ONE price per game. Across 20 dates:
+draftkings 197, fanduel 20, betmgm 10, williamhill_us 7, fanatics 3 -- one row
+per game, whichever book happened to land.
+
+So every ROI figure in this thread was computed against an arbitrary single
+book. Real bettors take the best of N. Best-of-5 line shopping typically cuts
+effective hold by roughly half and is worth 1-3pp of ROI -- **larger than any
+model improvement made in this entire thread**, and comparable to the entire
+gap we have been chasing:
+
+| market | measured gap | plausibly closed by best-line? |
+|---|---|---|
+| K props | -4.6% | maybe |
+| HR top-10 | -5.3% | maybe |
+| moneyline | not significant | maybe |
+| NRFI | -11.1% | no |
+
+**It costs nothing.** OddsAPI bills per market/region, not per bookmaker -- the
+call already returns all books ([[project-oddsapi-call-budget]] unaffected). We
+pay for five and keep one. Fixing this is a persistence change in
+`fetch_mlb_oddsapi_local.py`, not new spend and not new modelling.
+
+**REASON 2 -- outcome-based ROI on 300-500 bets cannot detect the edge we want.**
+The noise band at those samples is +/-15-20pp (the moneyline bootstrap CI was
+[-5.5%, +22.4%]). A real 2% edge is invisible inside it. Every measurement in
+this thread has been a test with no power to answer the question, which is why
+five findings reversed on more data.
+
+**The fix is CLV**: does our number beat the CLOSING line? It needs no outcomes,
+so it sidesteps the variance entirely, and it converges in weeks rather than
+seasons. It is the standard proof of edge for exactly this reason. If we beat
+closing, we have signal that hit-rate noise has been hiding; if we do not, we
+have no edge and further modelling is wasted.
+
+Data exists: `data/mlb_source/tracking/odds_history.json` plus per-date
+`*_history` / `*_opening` / `*_movement_signals` CSVs. Locally only 3 dates
+(06-10, 07-09, 07-11), but `/api/ops/artifacts/stream` was built specifically
+for odds_history shards (~51MB/slate on Render -- see its docstring), so the
+pull mechanism already exists.
+
+**Order**: (1) capture all books and re-grade #186-#204 against best price --
+cheap, no new spend, and it may move several markets from losing to break-even
+or better; (2) pull odds_history and measure CLV -- the gate that decides
+whether any further modelling is justified at all. Both are data/infrastructure
+work. **Neither is a model change, and model changes are demonstrably not the
+constraint.**
+
+
 ### CORRECTION 2026-08-05 to #204 -- the "34% over-dispersion" figure is WRONG. Real excess is ~2% at inning 1. The shape and top-of-order findings stand.
 
 Caught while starting the sim fix. **#204's headline "first-inning runs are
