@@ -1,5 +1,42 @@
 # Syndicate TODO — canonical cross-session list
 
+### SHIPPED 2026-08-05 (#207) -- odds_history provenance diagnostic, deployed to live-odds-worker
+
+Recorded during end-of-session reconciliation: three code commits shipped with
+no todo entry describing them (`67abaa0e`, `81f8d67a`, `f4fceb9a`) -- only the
+investigation was written up. Closing that gap.
+
+**What shipped**: `diagnose_odds_history_provenance()` in
+`scripts/fetch_mlb_oddsapi_local.py`, allowlisted via
+`reports/mlb_odds_diag/odds_history_provenance_*.json`, 11 tests in
+`tests/test_mlb_odds_history_provenance.py`. It runs on **live-odds-worker** --
+the service that owns odds -- and reports, for that service's OWN disk: every
+odds_history candidate path with existence/market counts, book distribution,
+bookmaker-coverage %, and closing-capture %.
+
+**Two defects were fixed inside it, both real and both generalisable:**
+1. `write_json_file` does NOT cross services. Being in `HOT_ARTIFACT_PATTERNS`
+   only PERMITS a push -- something must call `publish_hot_artifact`. Proven by
+   control: the sibling `live_events_coverage_*.json` is allowlisted yet absent
+   from web for every date back to 2026-07-20, while
+   `reports/intelligence/intelligence_state.json`, which IS explicitly
+   published, serves fine (27MB) through the same endpoint. **That sibling
+   diagnostic is still broken and needs the same one-line fix.**
+2. The call sat inside `_fetch_live_events_for_date`, which is unreachable when
+   `fetch_and_write_live_odds_for_date` returns "skipped" (overwrite off + files
+   exist). A forced re-run therefore produced nothing. Moved ahead of that gate:
+   provenance describes files written by earlier cycles and must not depend on a
+   fetch happening now.
+
+**Deployed**: `dep-d9pvimnlk1mc73e9ec10` on `srv-d91dpertqb8s73co8lt0` at commit
+`f4fceb9a` (was `update_in_progress` at session end -- verify it reached `live`).
+Web is live on `67abaa0e` for the allowlist.
+
+**Not yet read**: the artifact itself. See
+`docs/ai_context/handoff_mlb_odds_provenance.md` -- and disregard the one stale
+"absent after 10 minutes" poll, which ran against pre-fix code.
+
+
 ### HANDOFF 2026-08-05 -- see `docs/ai_context/handoff_mlb_odds_provenance.md`
 
 Session ended mid-verification. **Start there, not here** -- it has the
@@ -599,7 +636,16 @@ components, BvP, zone-fit, damage windows) publishes its own last-7-days record
 as 1W-4L and 0W-4L. A null result is the expected result and is a real finding.
 
 
-### DIAGNOSED, NOT SHIPPED 2026-08-05 (#201) -- the sim's "favourite overconfidence" is mostly NOISE. Real defect is a 4.8% margin under-dispersion, which explains ~1pp of a claimed 16pp gap.
+### PARTLY SHIPPED 2026-08-05 (#201) -- the sim's "favourite overconfidence" is mostly NOISE. The 4.8% margin widening WAS shipped (`c6d54d25`); the affine-logit calibration was NOT.
+
+**Reconciliation note**: this entry was originally headed "DIAGNOSED, NOT
+SHIPPED", which was true when written and became wrong an hour later. The user
+then asked for the margin widening specifically, and it shipped in `c6d54d25`
+(`widen_margin_distribution` + `win_probs_from_margin_distribution` in
+`prob_calibration.py`, wired into `daily_update.py`'s `finalize()` for the FULL
+segment only, 15 tests). The affine-logit calibration described below remains
+deliberately unshipped. Read the "Why nothing was shipped" section as applying
+to the affine-logit ONLY.
 
 #199/#200 flagged the sim as badly overconfident on favourites (0.6-1.0
 home-win bucket predicting 64.4% vs 56.2% actual) and called game-level
