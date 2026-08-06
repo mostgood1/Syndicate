@@ -145,6 +145,23 @@ def _team_names(game: Mapping[str, Any]) -> tuple[Any, Any, Any]:
     return home, away, matchup
 
 
+def _row_slate_date(row: Mapping[str, Any]) -> str | None:
+    """The slate date this PROP ROW belongs to, from the row itself (#235).
+
+    Prop rows carry no game dict, but they do carry their own date -- measured
+    on production 2026-08-06, every unpriced board prop row had
+    `game_date="2026-08-06"` and `context_label="2026-08-06"` while the caller
+    was enriching a 3-day board window with a single date. Only an ISO date is
+    accepted: `context_label` is "2026 Week 1" for NFL, and feeding that to a
+    date-sharded lookup is how a lane reads an empty shard forever.
+    """
+    for key in ("game_date", "slate_date", "date", "commence_time", "start_time_utc", "game_time_utc", "context_label"):
+        value = str(row.get(key) or "").strip()
+        if len(value) >= 10 and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value[:10]):
+            return value[:10]
+    return None
+
+
 def _selection_hint(row: Mapping[str, Any]) -> str | None:
     for key in ("selection", "side", "team_side", "pick", "display_pick"):
         value = str(row.get(key) or "").strip()
@@ -356,6 +373,17 @@ def enrich_prop_rows(
 
     `sport_slug` comes off each row rather than a parameter, because this lane
     mixes sports in a single list.
+
+    So does the DATE, for the same reason and a sharper one (#235). The quote
+    log is sharded by date, and `date_str` is a single value for a list that
+    spans a whole board window -- production served `dates_covered`
+    ["2026-08-06", "2026-08-07", "2026-08-08"] in one payload. One window date
+    applied to every row reads the wrong (often nonexistent) shard and returns
+    nothing, uniformly, which is exactly what "0 of 12 pregame and 0 of 7 live
+    priced" looked like while the same players on the same slate priced fine on
+    the game lane. That lane was immune because `enrich_candidate_rows` takes
+    the date from each GAME dict rather than from a caller-wide parameter.
+    `date_str` stays as the fallback for rows that carry no date of their own.
     """
     if not rows:
         return rows
@@ -379,7 +407,7 @@ def enrich_prop_rows(
                 continue
             quote = quote_ref_for_bet(
                 sport=sport_slug,
-                date_str=date_str,
+                date_str=_row_slate_date(row) or date_str,
                 # Canonical key first: "batter_total_bases" joins, the display
                 # string "Total Bases" does not. Market stays a SOFT narrowing
                 # signal either way, so a sport with no canonical key still
