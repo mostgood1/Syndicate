@@ -37,7 +37,59 @@ Web is live on `67abaa0e` for the allowlist.
 "absent after 10 minutes" poll, which ran against pre-fix code.
 
 
-### IN PROGRESS 2026-08-06 (#210) -- OddsAPI HISTORICAL backfill: what capture threw away is buyable back, and the credit budget is 3x what we thought
+### RESOLVED 2026-08-06 (#211) -- best-price re-grade: **+2.79 ROI points**, measured. #205's central claim is CONFIRMED, and it was never a modelling problem.
+
+The claim in #205 -- that grading against one arbitrary bookmaker cost real money
+-- measured for the first time. It could not be measured before because the books
+were never captured (#208); #210's backfill bought them back.
+`scripts/regrade_mlb_game_markets.py`, report in
+`reports/mlb_regrade/best_price_regrade.json`.
+
+**Apples-to-apples by construction**: the MODEL IS HELD FIXED.
+`daily_summary_*.json` stores the sim's own `home_win_prob` / `total_runs_dist`
+per game -- the real output on the day, not a re-run -- so the only thing that
+differs between arms is which book's price those same probabilities are graded
+against. Outcomes come from free MLB StatsAPI, deliberately NOT our own graded
+rows, which carry the same single-book contamination being measured.
+
+**26 dates, 339 of 371 games joined, edge threshold 3%:**
+
+| | n | ROI | CI95 |
+|---|---|---|---|
+| **re-pricing only** (identical bets) single | 1,091 | **-2.27%** | |
+| **re-pricing only** best | 1,091 | **+0.51%** | |
+| **delta** | 1,091 | **+2.79 pts** | **[+2.48, +3.13]** |
+| whole policy, single | 1,112 | -1.92% | [-7.57, +3.76] |
+| whole policy, best | 1,253 | +2.93% | [-2.53, +8.46] |
+
+**Read this correctly.** The paired +2.79 is the defensible number: outcome
+variance cancels, so the CI is tight and decisively excludes zero. The
+policy-level CIs both straddle zero -- **neither arm's absolute ROI is
+established at this sample size**. Reporting only the combined +4.85 point swing
+would have conflated re-pricing with selection, which is precisely the
+compounded-claim error #208's epistemic warning exists to stop.
+
+The selection effect is real and one-directional: **140 bets cleared the
+threshold only under best price, 0 only under single** -- necessarily, since best
+price is never worse, so measured edge is never lower. That is #205's "drove
+worse selection" term, isolated.
+
+Per market: h2h single -4.11% -> best +1.61%; totals single -1.34% -> best
++3.29%. The single-arm book mix was fanduel 926, draftkings 119, the rest in
+single digits -- i.e. the historical "arbitrary book" was overwhelmingly one
+book, which is why the effect is so consistent.
+
+**Props are excluded and stay excluded.** #210 backfilled their quotes, but the
+historical BETS were selected on one arbitrary book, so a prop re-grade measures
+a counterfactual selection rather than a re-pricing. Game markets are the honest
+scope, exactly as #206 scoped it.
+
+**The strategic conclusion**: a 2.79-point ROI improvement from price shopping
+alone, available on every bet, with no model change whatsoever. #195/#205/#206
+said the binding constraint was never model quality. This is that, quantified.
+
+
+### DONE 2026-08-06 (#210) -- OddsAPI HISTORICAL backfill: what capture threw away is buyable back, and the credit budget is 3x what we thought
 
 User: "can we backfill missing data for at least 30 days for mlb from oddsapi so
 we can do some of the clv work?" Yes -- comfortably.
@@ -85,8 +137,14 @@ quote log, so backfilled and live rows are indistinguishable to
 `--max-credits` ceiling, per-date checkpointing so an abort resumes rather than
 re-buys. `publish=False`: local analysis copy, not web's disk.
 
-**Open**: the 2026-07-07..2026-08-05 run, and the game-market best-price
-re-grade that sits on top of it.
+**The run completed 2026-08-06**: 2026-07-07..2026-08-05, **30 dates, 766,704
+quote rows, 115,739 credits, 2,044 calls**, remaining now **14,628,400**. 28
+files on disk, **323 MB**, 373 events. 2026-07-13 and 2026-07-15 have zero
+events -- that is the **All-Star break**, verified against the slate (07-14
+carries the single ASG event), not missing data. Worth stating because a first
+probe on 2026-07-15 returned one event and looked exactly like a coverage hole.
+
+The re-grade that sits on top of it is #211 above.
 
 
 ### FINDING 2026-08-06 (#209) -- the single-book defect is PLATFORM-WIDE, in three classes. User: "is this the same for all sports. if so we need this fixed everywhere."
