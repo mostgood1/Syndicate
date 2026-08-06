@@ -6012,6 +6012,20 @@ def _load_mlb_home_hr_target_items(context_label: str, *, limit: int = 10) -> li
                 "game_pk": _int_or_none(target.get("game_pk") or target.get("gamePk")),
                 "heading": _safe_text(target.get("team"), "HR target"),
                 "name": _safe_text(target.get("player_name"), "Unknown hitter"),
+                # #227: this row carried NO market field at all and set only
+                # `name`, so it was both keyless and entity-less to the contract
+                # -- part of the last MLB keyless population the counter named.
+                #
+                # An HR target is a probability-of-a-home-run pick, which is
+                # exactly OddsAPI's batter_home_runs (an anytime-HR wager is
+                # that market over 0.5). The key is fixed rather than derived
+                # because this loader only ever produces this one market, so
+                # inferring it from a label would add a guess where a certainty
+                # exists. `line` stays "-" on purpose -- see the note below.
+                "market": "Home Runs",
+                "market_key": "batter_home_runs",
+                "player_name": _safe_text(target.get("player_name"), None),
+                "player_id": _int_or_none(target.get("player_id") or target.get("batter_id")),
                 "hr_rank": _int_or_none(rank),
                 "rank_label": (f"#{int(rank)}" if _int_or_none(rank) else None),
                 "analytics_callouts": callouts,
