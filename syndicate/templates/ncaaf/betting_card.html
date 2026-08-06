@@ -1,0 +1,84 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | {{ intro_title }}{% endblock %}
+{% block page_title %}{{ intro_title }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='shared/rank_board.css') }}" />
+  <style>
+    .ncaaf-week-rail {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 12px 0;
+    }
+    .ncaaf-betting-card-mobile-toolbar {
+      display: none;
+      margin: 12px 0;
+    }
+    @media (max-width: 720px) {
+      .ncaaf-week-rail {
+        display: none;
+      }
+      .ncaaf-betting-card-mobile-toolbar {
+        display: block;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  {% with route_label='/ncaaf/season/' ~ season ~ '/betting-card', title=intro_title, body=intro_body, status=week_summary.source_label %}
+    {% include 'shared/_module_intro.html' %}
+  {% endwith %}
+
+  {% with action=route_path, prev_href=prev_href, next_href=next_href, control_label=control_label, control_type=control_type, control_name=control_name, control_value=control_value, links=module_links, show_home_link=false %}
+    {% include 'shared/_date_controls.html' %}
+  {% endwith %}
+
+  {# Week rail -- the primary nav for this dashboard, analogous to how
+     MLB's season betting-card page treats months: one chip per real
+     available week for this season, not a season-long day rail. #}
+  <nav class="ncaaf-week-rail" aria-label="Select NCAAF week">
+    {% for available_week in available_weeks %}
+      <a
+        class="cards-nav-pill{% if available_week == week %} cards-nav-pill--active{% endif %}"
+        href="{{ route_path }}?week={{ available_week }}"
+      >Week {{ available_week }}</a>
+    {% endfor %}
+  </nav>
+
+  <form class="ncaaf-betting-card-mobile-toolbar" method="get" action="{{ route_path }}" aria-label="Mobile week selector">
+    <label class="cards-form-pill" for="ncaafBettingCardWeekSelect">Week</label>
+    <select id="ncaafBettingCardWeekSelect" name="week" aria-label="Select NCAAF betting-card week" onchange="this.form.submit()">
+      {% for available_week in available_weeks %}
+        <option value="{{ available_week }}"{% if available_week == week %} selected{% endif %}>Week {{ available_week }}</option>
+      {% endfor %}
+    </select>
+    <noscript><button class="cards-submit-button" type="submit">Load</button></noscript>
+  </form>
+
+  {% with eyebrow='Week summary', title=source_date_display, body=source_title, summary_stats=header_stats %}
+    {% include 'shared/_content_panel.html' %}
+  {% endwith %}
+
+  {% if days %}
+    {% for day in days %}
+      <section class="rank-section" aria-label="{{ day.weekday_label }} games">
+        <div class="rank-section__header">
+          <h2>{{ day.weekday_label }}</h2>
+          <div class="rank-section__meta">{{ day.game_count }} game{{ '' if day.game_count == 1 else 's' }}</div>
+        </div>
+        <div class="hr-targets-grid">
+          {% for card in day.games %}
+            {% include 'shared/_rank_card.html' %}
+          {% endfor %}
+        </div>
+      </section>
+    {% endfor %}
+  {% elif empty_state %}
+    {% with eyebrow=empty_state.eyebrow, title=empty_state.title, body=empty_state.body, list_items=empty_state.list_items %}
+      {% include 'shared/_content_panel.html' %}
+    {% endwith %}
+  {% endif %}
+{% endblock %}

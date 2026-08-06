@@ -11,8 +11,8 @@ from syndicate.features.ncaaf.cards import _resolve_ncaaf_active_season_and_week
 from syndicate.features.ncaaf.game_detail import build_game_detail_page_context
 from syndicate.features.ncaaf.live_lens import build_live_lens_page_context
 from syndicate.features.ncaaf.live_lens import build_smartsim_live_lens_page_context
+from syndicate.features.ncaaf.betting_card import build_ncaaf_betting_card_page_context
 from syndicate.features.ncaaf.picks import build_picks_page_context
-from syndicate.features.ncaaf.picks import build_betting_card_page_context
 from syndicate.features.ncaaf.picks import build_smartsim_picks_page_context
 from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import default_week
@@ -148,17 +148,29 @@ def api_live_lens():
 
 @ncaaf_bp.get("/season/<int:season>/betting-card")
 def betting_card(season: int):
-    context = build_betting_card_page_context(season, _selected_week())
-    return render_template("shared/rank_board.html", **context)
+    context = build_ncaaf_betting_card_page_context(season, _selected_week())
+    return render_template("ncaaf/betting_card.html", **context)
 
 @ncaaf_bp.get("/api/season/<int:season>/betting-card")
 def api_betting_card(season: int):
-    context = build_betting_card_page_context(season, _selected_week())
-    payload = build_rank_api_payload(context)
-    payload["season"] = season
-    payload["week"] = context["week"]
-    payload["available_weeks"] = context["available_weeks"]
-    return jsonify(payload)
+    context = build_ncaaf_betting_card_page_context(season, _selected_week())
+    return jsonify(
+        {
+            "season": context["season"],
+            "week": context["week"],
+            "available_weeks": context["available_weeks"],
+            "date": context["date"],
+            "week_summary": context["week_summary"],
+            "days": context["days"],
+            "using_sample_data": context["using_sample_data"],
+            "source_path": context.get("source_path"),
+            "source_title": context.get("source_title"),
+            "route_path": context.get("route_path"),
+            "prev_href": context.get("prev_href"),
+            "next_href": context.get("next_href"),
+            "header_stats": context.get("header_stats"),
+        }
+    )
 
 
 @ncaaf_bp.get("/api/picks")

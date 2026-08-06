@@ -1,5 +1,58 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-05 (#202) -- Conditional-edge scan: PRE-REGISTERED, not yet executed
+
+User: "we need to figure out the overall markets - then we need to find where
+within each market we have data edges for winners." Correct, and it is not what
+#186-#201 did. Those all asked the MARGINAL question (does the model beat the
+market on average, across all rows -- no, everywhere). The CONDITIONAL question
+is whether there are subsets where we are systematically right, and averaging
+over everything is exactly what hides that.
+
+**Rules are pre-registered in `docs/ai_context/mlb_edge_scan_preregistration.md`,
+committed BEFORE any segment numbers were computed.** That is deliberate: this
+session produced two convincing artifacts (a +51.9% moneyline from a bad join,
+a 1.85x HR lift that fell to 1.59x on more data), so my judgement after seeing
+a number is demonstrably unreliable here. Changing a rule later requires its own
+commit, dated after results were seen, and downgrades anything it rescues to
+exploratory.
+
+**Phase 1**: 8 pre-registered hypotheses, each with a mechanism and a
+directional prediction -- K by pitcher K-rate tier (the #187 top-end
+underprojection, the one real mechanistic lead), K by opposing lineup K-rate,
+K by line height, HR by park extremes, HR by platoon magnitude, HR by
+`mix_hr_score` (dead until #198, so never actually tested), game by
+favourite/dog (#201), and NRFI/first1 which is a whole market never graded.
+
+**Six pass/fail rules, all required**: cell >=60 bets; ROI>0 in BOTH
+chronological halves independently; survives dropping the top 5 winners;
+bootstrap 95% CI excludes zero; direction matches prediction; monotone where the
+mechanism implies it. Rules 2 and 3 are the ones that killed the moneyline.
+
+**Phase 2** ("evaluate EVERY stat"): full sweep over all dataset columns,
+profile fields, Statcast families, park/weather, lineup slot, BvP cache. Test
+count explodes to hundreds, so it switches to **Benjamini-Hochberg FDR at
+q=0.10**, mandatory single-touch holdout, and a required causal story before
+anything is promoted.
+
+**Execution order**: NRFI first (whole ungraded market, both sides of the data
+in hand), then K (only mechanistic lead), then HR (H6 especially), then game,
+then Phase 2.
+
+**Data note**: 48 dates / 4 buckets is ~12 dates per cell -- thin, and thin
+cells are exactly where today's reversals came from. Render has sims back to
+2026-04-10 while we only use 05-28+ (web retention, #193a). Widening to ~76
+dates roughly halves per-cell noise and should happen before any result is
+treated as decided.
+
+**Prior, recorded now so it cannot be revised after the fact**: the most likely
+outcome is that NO slice survives all six rules. Every market in #195 needs
+52.3-54.2% just to break even, the model beats the sim but never the price, and
+the most sophisticated competitor sheet observed (Worst Pickz -- six weighted
+components, BvP, zone-fit, damage windows) publishes its own last-7-days record
+as 1W-4L and 0W-4L. A null result is the expected result and is a real finding.
+
+
 ### DIAGNOSED, NOT SHIPPED 2026-08-05 (#201) -- the sim's "favourite overconfidence" is mostly NOISE. Real defect is a 4.8% margin under-dispersion, which explains ~1pp of a claimed 16pp gap.
 
 #199/#200 flagged the sim as badly overconfident on favourites (0.6-1.0

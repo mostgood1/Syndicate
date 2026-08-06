@@ -6545,7 +6545,14 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertEqual(context.get("source_title"), "NCAAF game unavailable")
         self.assertFalse(context.get("using_sample_data"))
 
-    def test_ncaaf_betting_card_api_exposes_rank_board_navigation_metadata(self) -> None:
+    def test_ncaaf_betting_card_api_exposes_week_dashboard_navigation_metadata(self) -> None:
+        # Item 4: the season betting-card API moved off the relabeled
+        # rank-board picks shape (control_name/module_links at the top
+        # level) onto the real week-granularity dashboard shape
+        # (week_summary + days, grouped by real per-game kickoff date),
+        # built by build_ncaaf_betting_card_page_context. See
+        # tests/test_ncaaf_betting_card_local.py for full coverage of the
+        # day-grouping and week-navigation behavior this route now serves.
         response = self.client.get("/ncaaf/api/season/2025/betting-card?week=1")
         payload = response.get_json()
 
@@ -6553,9 +6560,12 @@ class ArchiveRouteTests(unittest.TestCase):
         self.assertIsInstance(payload, dict)
         self.assertEqual(payload.get("season"), 2025)
         self.assertEqual(payload.get("week"), 1)
-        self.assertEqual(payload.get("control_name"), "week")
         self.assertEqual(payload.get("route_path"), "/ncaaf/season/2025/betting-card")
-        self.assertTrue(any(link.get("href") == "/ncaaf/season/2025/betting-card?week=1" for link in (payload.get("module_links") or [])))
+        self.assertIn("week_summary", payload)
+        self.assertIn("days", payload)
+        self.assertIsInstance(payload.get("days"), list)
+        self.assertNotIn("rank_cards", payload)
+        self.assertNotIn("control_name", payload)
 
     def test_nba_picks_api_exposes_rank_board_navigation_metadata(self) -> None:
         response = self.client.get("/nba/api/picks?date=2026-05-16")
