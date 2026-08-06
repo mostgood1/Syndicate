@@ -37,6 +37,72 @@ Web is live on `67abaa0e` for the allowlist.
 "absent after 10 minutes" poll, which ran against pre-fix code.
 
 
+### FINDING 2026-08-06 (#209) -- the single-book defect is PLATFORM-WIDE, in three classes. User: "is this the same for all sports. if so we need this fixed everywhere."
+
+Answered by measuring the two sports in season and tracing the code for the six
+that are not. Only MLB and WNBA have a live odds_history shard right now
+(`nba`/`nhl`/`nfl`/`ncaaf`/`ncaab`/`soccer` shards all return missing for
+2026-08-03..05), so the rest is a code answer and is flagged as such.
+
+**Class A -- capture collapses to one book.** The fetcher receives every book in
+the API response and keeps exactly one. Same defect as MLB, same code shape:
+
+| sport / feed | collapse site | note |
+|---|---|---|
+| MLB game lines | `fetch_mlb_oddsapi_local.py:788` `_best_bookmaker_game_lines` | scores all books, returns one |
+| MLB props | `fetch_mlb_oddsapi_local.py:1268` / `:1353` | loops all books, `_merge_prop_market_rows` drops book identity |
+| NFL team odds | `fetch_nfl_team_odds_local.py:180` `choose_bookmaker` | preferred-book list, else `bookmakers[0]` |
+| NFL props | `fetch_nfl_oddsapi_props_local.py:132` `_choose_bookmaker` | identical |
+| NCAAF props | `fetch_ncaaf_oddsapi_props_local.py:180` `_choose_bookmaker` | identical |
+| NBA/WNBA game lines | `game_cards_{date}.csv` carries a single `bookmaker` column | surfaces in odds_history as the synthetic label `oddsapi_consensus` |
+
+**Class B -- captured correctly, then lost in ROUTING.** This is the cheap one
+and it is basketball. `fetch_basketball_oddsapi_props_local.py:135`
+`_flatten_bookmakers` keeps EVERY book and already carries `event_id`,
+`commence_time`, `snapshot_ts`, `bookmaker`, `player_name`, `point`, `price`. It
+writes `<sport>_source/data/processed/oddsapi_player_props_{date}.csv`, which is
+published and readable from web today. Measured 2026-08-05:
+
+    rows=2,153  markets: player_points 416, player_rebounds 287, player_assists 227, ...
+    PROP rows=1,813 across 6 books
+      draftkings 529, fanduel 495, betonlineag 376, williamhill_us 199, betrivers 192, fanatics 22
+
+But `_odds_history_snapshot_paths` (`odds_refresh_tracking.py:1086`) routes
+nba/wnba to `live_lines_{date}.jsonl`, `live_lens_signals_{date}.jsonl`,
+`live_lens_projections_{date}.jsonl` and `game_cards_{date}.csv` -- **never to
+that file**. So the board and every evaluation see WNBA props with no book at
+all (measured: 128 of 146 shard entries carry no bookmaker), while a six-book
+file sits next to them on the same disk.
+
+Caveat before anyone calls this retroactive: the file holds **one snapshot**
+(`snapshot_ts` is a single value, it is overwritten not appended), and
+2026-07-20 / 2026-06-15 are both absent from web. So it fixes the shape going
+forward; it does not hand back a season of history.
+
+**Class C -- already correct, leave alone.** Soccer odds and props
+(`_ordered_bookmakers`, `fetch_soccer_oddsapi_odds_local.py:87` /
+`_props_local.py:110`, `book` column, dedupe includes `book`), NHL team odds and
+props (`syndicate/local_nhl_odds.py:389` / `:563`, loops every book), NCAAB
+(`refresh_ncaab_odds_history.py:274` / `:323`, loops every book, `key_cols`
+include `book`).
+
+**Closing lines -- one root cause, platform-wide.** The stamp at
+`odds_refresh_tracking.py:1599` fires only on a pregame->live transition, and
+that transition is detected by `_is_live_odds_row` or
+`_row_commence_time_has_passed`. A row with no event linkage can satisfy
+neither, so it can never be stamped. MLB prop keys are literally
+`player_name=...|market=...|selection=...` -- no event, no team, no
+commence_time -- which is why prop closing capture is not merely low but
+**structurally zero**. Measured: MLB 78/3,663 = **2.13%** (game markets only,
+26 each of h2h/spreads/totals); WNBA 10/146 = **6.85%** (game markets only).
+
+**Consequence for the ordered plan**: the capture fix is six sports wide, not
+one, and basketball's is a routing change rather than a fetcher change. The
+`prop_quotes` log decided for MLB should be the shared shape for all of them --
+basketball's existing CSV is already almost exactly that shape, which is good
+evidence it is the right one.
+
+
 ### RESOLVED 2026-08-06 (#208) -- the gating question from the handoff is ANSWERED: **CAPTURE defect**, not publish. Prop verdicts in #186-#204 are unrecoverable; game-market re-grade is still available.
 
 Supersedes the handoff's "do this first" and closes the open question in #207 /
