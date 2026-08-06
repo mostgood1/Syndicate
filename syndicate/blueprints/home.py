@@ -2804,6 +2804,21 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                     player_id=prop_player_id,
                     headshot_url=_mlb_headshot_url(prop_player_id) if prop_player_id else None,
                 )
+    # #219: enrich the ASSEMBLED list, not just the game_market_recommendations
+    # rows. This function builds candidates in several loops (gameLens, the
+    # plain betting dict, shared_top_play_rows, the per-game prop loop) and only
+    # the first was enriched -- measured live: 3-7 of 46 MLB candidates carried
+    # a quote, every one of them Moneyline/Total, because the player props come
+    # from the other loops. Before the sort, so best-price ev_pct can influence
+    # ordering rather than arriving after it.
+    try:
+        from syndicate.features.shared.quote_enrichment import enrich_candidate_rows
+
+        enrich_candidate_rows(game, candidates, sport_slug=str(sport.get("slug") or "").lower())
+    except Exception:
+        # A board without price context is degraded; a board that 500s because
+        # the odds log was mid-write is an outage.
+        pass
     filtered = [row for row in candidates if row.get("edge") not in {"-", None} or row.get("confidence") not in {"-", None}]
     return sorted(filtered or candidates, key=lambda row: row.get("score", 0.0), reverse=True)
 

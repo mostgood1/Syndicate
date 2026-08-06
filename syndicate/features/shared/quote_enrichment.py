@@ -207,3 +207,81 @@ def enrich_recommendation_rows(
     except Exception:
         return rows
     return rows
+
+
+# Flattened fields the board template renders from. Kept here, next to the
+# enrichment that produces them, rather than duplicated at each call site.
+_FLAT_QUOTE_FIELDS = (
+    ("book", "bookmaker"),
+    ("best_book", "best_bookmaker"),
+    ("best_price", "best_price"),
+    ("books_quoting", "books_quoting"),
+    ("price_rank", "price_rank"),
+    ("consensus_price", "consensus_price"),
+    ("book_age_seconds", "book_age_seconds"),
+    ("capture_age_seconds", "capture_age_seconds"),
+    ("book_updated_at", "book_updated_at"),
+)
+
+
+def enrich_candidate_rows(
+    game: Mapping[str, Any],
+    candidates: list[dict[str, Any]],
+    *,
+    sport_slug: str,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Attach price context to FINISHED candidate dicts.
+
+    Enriching `game_market_recommendations` alone was not enough and the live
+    numbers said so: 3-7 of 46 MLB candidates carried a quote, all of them
+    Moneyline/Total. `_game_bet_candidates_from_game` builds candidates in
+    SEVERAL loops -- game_market_recommendations, gameLens, the plain `betting`
+    dict, shared_top_play_rows -- and only the first passed through enrichment.
+    Player props come from the others, and props are most of the volume.
+
+    So this runs over the assembled list instead, which is the one place every
+    loop's output converges. Reads the flattened candidate shape (`entity`/
+    `player_name`, text `line` and `odds`) rather than the raw row shape.
+    """
+    if not candidates:
+        return candidates
+    try:
+        from syndicate.features.shared.odds_book_quotes import quote_ref_for_bet
+
+        date_str = _game_date(game)
+        if not date_str:
+            return candidates
+        now = now or datetime.now(timezone.utc)
+        event_id = game.get("event_id") or game.get("gamePk") or game.get("game_pk")
+        home_team, away_team, matchup = _team_names(game)
+
+        for candidate in candidates:
+            if not isinstance(candidate, dict) or candidate.get("quote"):
+                continue
+            quote = quote_ref_for_bet(
+                sport=sport_slug,
+                date_str=date_str,
+                event_id=event_id,
+                market=candidate.get("market"),
+                selection=candidate.get("pick") or candidate.get("selection"),
+                line=candidate.get("line"),
+                player_name=candidate.get("player_name") or candidate.get("entity"),
+                home_team=home_team,
+                away_team=away_team,
+                matchup=matchup,
+                now=now,
+            )
+            if not quote:
+                continue
+            candidate["quote"] = quote
+            for flat_key, quote_key in _FLAT_QUOTE_FIELDS:
+                candidate[flat_key] = quote.get(quote_key)
+
+            best_implied = _implied_probability(quote.get("best_price"))
+            shown_implied = _implied_probability(candidate.get("odds"))
+            if best_implied is not None and shown_implied is not None:
+                candidate["price_improvement_pct"] = round((shown_implied - best_implied) * 100.0, 2)
+    except Exception:
+        return candidates
+    return candidates
