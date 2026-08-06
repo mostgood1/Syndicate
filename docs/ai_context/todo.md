@@ -1,5 +1,67 @@
 # Syndicate TODO — canonical cross-session list
 
+### ROOT-CAUSED 2026-08-05 (#204) -- the first-inning bias is TWO defects: 34% over-dispersion + a missing top-of-order boost
+
+Diagnosed #203's NRFI bias on **879 games**. It is not a mean problem, which is
+why it was invisible in every runs-based check: sim first-inning mean is 0.987
+vs actual 1.036, a mere -0.049 runs. The damage is in the SHAPE.
+
+**First-inning run distribution, sim vs reality:**
+
+| runs | sim | actual | gap |
+|---|---|---|---|
+| **0** | **54.36%** | **48.92%** | **-5.44** |
+| 1 | 19.40% | 23.21% | +3.81 |
+| 2 | 11.57% | 14.22% | +2.65 |
+| 3 | 6.75% | 6.37% | -0.38 |
+| 4 | 3.73% | 3.53% | -0.21 |
+| 5+ | 4.19% | 3.75% | -0.44 |
+
+Classic all-or-nothing signature: **too many scoreless innings AND too many
+crooked numbers, not enough 1-2 run innings.**
+
+**Defect 1 -- first-inning runs are OVER-dispersed by 34%.**
+Sim variance 2.411 vs actual 1.803, ratio **1.337**. Note this is the OPPOSITE
+sign to #201's full-game margin finding (sim too NARROW there, ratio 1.048).
+Different subsystems, opposite errors -- so there is no single global dispersion
+knob that fixes both, and #201's widening must not be extended here.
+
+**Defect 2 -- the sim does not capture the first-inning boost at all.**
+- Reality: inning 1 scores **1.095x** an average inning (guaranteed top of the
+  order).
+- Sim: inning 1 scores **0.997x** its own average inning -- it treats the first
+  inning as a completely ordinary one.
+
+Both defects push P(0) the same way: a low mean makes more zeros, and excess
+variance makes more zeros for any given mean. Together they produce the +5.44pp
+NRFI over-prediction.
+
+**Per-inning bias profile (bonus finding):**
+
+| innings | bias/inning |
+|---|---|
+| 1 | -0.051 |
+| 2-3 | -0.012 |
+| 4-5 | -0.018 |
+| **6-9** | **-0.045** |
+
+Innings 2-5 are nearly unbiased. The deficit is concentrated at the two ends --
+inning 1 (top-of-order effect missing) and innings 6-9 (**bullpen run
+production**, a separate and previously unrecorded defect worth its own item).
+
+**Deliberately NOT shipping a post-hoc patch**, unlike #201's margin widening.
+Reasons: (1) a 34% variance error is far too large to paper over the way a 4.8%
+one could be; (2) reshaping only `first1` would leave `first3`/`first5`/`full`
+sharing the same broken mechanics; (3) the fix belongs in the inning simulation
+itself. A patch here would hide the defect rather than fix it.
+
+**And it would not pay anyway.** Even a PERFECTLY calibrated first-inning model
+does not beat this market: actual YRFI is 51.08% against a 53.11% break-even at
+the measured 6.23% hold. So #204 is a genuine modelling-quality item, not a
+route to profit -- worth fixing because the first inning feeds every early-game
+segment, not because it unlocks NRFI.
+
+
 ### RESULT 2026-08-05 (#203) -- Phase 1 / H8 NRFI: FAILS all rules. But it exposed the largest, cleanest model defect found all session.
 
 First execution against the #202 pre-registration. Rules applied verbatim, no
