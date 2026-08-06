@@ -643,11 +643,111 @@ def _diagnose_live_events_coverage(date_str: str, raw_events: list[dict[str, Any
         print(f"[mlb_live_events_coverage_diag] FAILED error={type(exc).__name__}: {exc}", flush=True)
 
 
+def diagnose_odds_history_provenance(date_str: str) -> dict[str, Any] | None:
+    """Report what odds_history looks like ON THIS SERVICE'S OWN DISK.
+
+    Why this exists (#207): odds_history is written to three paths, and the
+    third -- reports/odds_control_plane/odds_history/ -- sits OUTSIDE
+    data_root() by construction, so `is_hot_artifact_relative_path` can never
+    match it and it never crosses services. This script runs on
+    live-odds-worker, the service that owns odds, so it is the only place that
+    can see that copy. Web's ops endpoints read web's disk and therefore cannot
+    answer the question this diagnostic answers.
+
+    The open question it settles: are the published copies THINNER than what the
+    odds worker actually captures? Specifically whether props carry a
+    `bookmaker` dimension and whether closing lines are captured -- both looked
+    absent when inspected from web (#205/#206), but that was the synced copy.
+    If they are present here and absent there, the defect is in PUBLISH, the
+    prop verdicts in #186-#204 are recoverable, and CLV is measurable today.
+    If they are absent here too, the defect is in CAPTURE and both are
+    forward-only fixes.
+
+    Written through `write_json_file`, which goes over the shared keyvalue
+    backend on Render -- so unlike the odds_history copy it describes, this
+    payload reaches all three services without needing the artifact push. Same
+    pattern as `_diagnose_live_events_coverage` above. Never raises: a
+    diagnostic must not be able to fail an odds refresh.
+    """
+    try:
+        from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
+        from syndicate.features.shared.refresh_state_store import reports_root
+        from syndicate.features.shared.refresh_state_store import write_json_file
+
+        paths: list[dict[str, Any]] = []
+        best: dict[str, Any] | None = None
+        best_mtime = -1.0
+        for path in odds_history_paths_for_sport("mlb", date_str):
+            info: dict[str, Any] = {"path": str(path), "exists": False}
+            try:
+                if path.is_file():
+                    stat = path.stat()
+                    info.update({"exists": True, "bytes": int(stat.st_size), "mtime": float(stat.st_mtime)})
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                    markets = payload.get("markets") if isinstance(payload, dict) else None
+                    if isinstance(markets, dict):
+                        info["market_count"] = len(markets)
+                        if stat.st_mtime > best_mtime:
+                            best_mtime, best = stat.st_mtime, markets
+            except Exception as exc:
+                info["error"] = f"{type(exc).__name__}: {exc}"
+            paths.append(info)
+
+        summary: dict[str, Any] = {}
+        if best is not None:
+            books: dict[str, int] = {}
+            markets_seen: dict[str, int] = {}
+            with_book = without_book = closing = 0
+            for key, value in best.items():
+                parts = dict(
+                    piece.split("=", 1) for piece in str(key).split("|") if "=" in piece
+                )
+                book = parts.get("bookmaker")
+                market = parts.get("market") or "?"
+                markets_seen[market] = markets_seen.get(market, 0) + 1
+                if book:
+                    books[book] = books.get(book, 0) + 1
+                    with_book += 1
+                else:
+                    without_book += 1
+                if isinstance(value, dict) and (
+                    value.get("closing_price") is not None or value.get("closing_line") is not None
+                ):
+                    closing += 1
+            total = max(1, with_book + without_book)
+            summary = {
+                "entries": with_book + without_book,
+                "with_bookmaker": with_book,
+                "without_bookmaker": without_book,
+                "bookmaker_pct": round(with_book / total * 100.0, 2),
+                "books": dict(sorted(books.items(), key=lambda kv: -kv[1])),
+                "distinct_books": len(books),
+                "markets_top": dict(sorted(markets_seen.items(), key=lambda kv: -kv[1])[:10]),
+                "with_closing": closing,
+                "closing_pct": round(closing / total * 100.0, 2),
+            }
+
+        payload = {
+            "date": date_str,
+            "service_role": os.environ.get("SYNDICATE_SERVICE_ROLE") or os.environ.get("RENDER_SERVICE_NAME") or "unknown",
+            "candidate_paths": paths,
+            "freshest_summary": summary,
+        }
+        print(f"[mlb_odds_history_provenance] {json.dumps(payload, sort_keys=True)[:1200]}", flush=True)
+        write_json_file(reports_root() / "mlb_odds_diag" / f"odds_history_provenance_{date_str}.json", payload)
+        return payload
+    except Exception as exc:
+        print(f"[mlb_odds_history_provenance] FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def _fetch_live_events_for_date(api_key: str, date_str: str) -> list[dict[str, Any]]:
     raw, _ = _http_get(f"{API_BASE}/sports/{SPORT}/events", {"apiKey": api_key})
     raw_events = _as_events_list(raw)
     matched_events = [event for event in raw_events if _event_matches_slate_date(event, date_str)]
     _diagnose_live_events_coverage(date_str, raw_events, matched_events)
+    # #207: same-moment provenance of odds_history on THIS service's disk.
+    diagnose_odds_history_provenance(date_str)
     return matched_events
 
 

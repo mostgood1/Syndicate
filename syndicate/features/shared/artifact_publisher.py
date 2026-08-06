@@ -123,6 +123,16 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # cheap; without this it is only readable on the writing service's own
     # disk, and the writer isn't necessarily the one this is investigated from.
     "reports/mlb_odds_diag/live_events_coverage_*.json",
+    # #207. Same-moment provenance of odds_history as it exists on the ODDS
+    # WORKER's own disk. odds_history is written to three paths and the third
+    # (reports/odds_control_plane/odds_history/) sits outside data_root() by
+    # construction, so it can never be allowlisted and never crosses services --
+    # meaning web literally cannot see the copy the writing service keeps. This
+    # tiny summary (book counts, bookmaker-coverage %, closing-capture %) is the
+    # only way to compare what the odds worker CAPTURES against what web
+    # RECEIVES, which is what decides whether #205/#206's single-book and
+    # missing-closing-line findings are a capture defect or a publish defect.
+    "reports/mlb_odds_diag/odds_history_provenance_*.json",
     # MLB's vendored daily sim (vendor/mlb_bettingv2/tools/daily_update.py,
     # triggered from live_refresh_loop.py's MLB daily-sim gate) writes under
     # data/daily/, data/manager/, data/park/, data/umpire/ -- none of which
