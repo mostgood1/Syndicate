@@ -603,7 +603,7 @@ def quote_ref_for_bet(
         if wanted_player and _normalize_token(row.get("player_name")) == wanted_player:
             identified.append(row)
             continue
-        if wanted_teams and _row_teams_match(row, wanted_teams):
+        if wanted_teams and _row_teams_match(row, wanted_teams, sport):
             identified.append(row)
     if not identified:
         return None
@@ -651,43 +651,25 @@ def _team_tokens(home_team: Any, away_team: Any, matchup: Any) -> set[str]:
     return {token for token in tokens if token}
 
 
-def _team_token_matches(token: str, row_token: str) -> bool:
-    """Does a caller's team token name the same club as a quote row's team?
-
-    Board rows use tri-codes ("NYY", "BAL"), quote rows use full names
-    ("New York Yankees", "Baltimore Orioles"), and there is no single rule that
-    covers both -- which is why this needs two:
-      - word prefix, for codes taken from the first word ("BAL"/"baltimore",
-        "BOS"/"boston");
-      - INITIALS, for codes taken across words ("NYY"/"new york yankees",
-        "LAD"/"los angeles dodgers"), where no single word starts with the code.
-    A prefix-only version passed BOS and failed NYY, which is exactly half the
-    league.
-    """
-    if token == row_token:
-        return True
-    words = row_token.split()
-    if not words:
-        return False
-    if len(token) >= 2 and token == "".join(word[0] for word in words):
-        return True
-    return len(token) >= 3 and any(word.startswith(token) for word in words)
-
-
-def _row_teams_match(row: Mapping[str, Any], wanted: set[str]) -> bool:
+def _row_teams_match(row: Mapping[str, Any], wanted: set[str], sport: Any) -> bool:
     """True when BOTH of a quote row's teams are named by the caller.
 
     Both, not either: one shared team is not a game -- two clubs play twice in a
-    series and an either-match would join a Tuesday bet to a Wednesday price.
-    Requiring both also makes the loose token rules above safe, since a false
-    positive would need two independent coincidences in the same matchup.
+    series, and an either-match would join a Tuesday bet to a Wednesday price.
+
+    Resolution is delegated to team_aliases, which uses the real per-sport maps.
+    A pure string heuristic cannot do this: "chc" is neither a prefix of
+    "chicago" nor the initials of "chicago cubs", and that single gap is why
+    0 of 108 board candidates carried a quote in production on 2026-08-06.
     """
+    from syndicate.features.shared.team_aliases import teams_match
+
     matched = 0
     for key in ("home_team", "away_team"):
-        row_token = _normalize_token(row.get(key))
-        if not row_token:
+        row_team = row.get(key)
+        if not str(row_team or "").strip():
             continue
-        if any(_team_token_matches(token, row_token) for token in wanted):
+        if any(teams_match(sport, token, row_team) for token in wanted):
             matched += 1
     return matched >= 2
 
