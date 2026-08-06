@@ -1,0 +1,107 @@
+{
+ "arms": {
+  "best": {
+   "ci95_pct": [
+    -2.53,
+    8.46
+   ],
+   "n": 1253,
+   "roi_pct": 2.93,
+   "units": 36.69
+  },
+  "single": {
+   "ci95_pct": [
+    -7.57,
+    3.76
+   ],
+   "n": 1112,
+   "roi_pct": -1.92,
+   "units": -21.31
+  }
+ },
+ "coverage": {
+  "dates_with_bets": 26,
+  "games_considered": 371,
+  "games_joined": 339,
+  "skipped_no_model": 0,
+  "skipped_no_outcome": 7,
+  "skipped_no_quotes": 0
+ },
+ "delta_roi_pct_combined": 4.85,
+ "edge_threshold": 0.03,
+ "generated_at": "2026-08-06T04:17:49.258413+00:00",
+ "mean_price": {
+  "best": -1.0,
+  "single": -58.6
+ },
+ "per_market": {
+  "h2h": {
+   "best": {
+    "ci95_pct": [
+     -11.43,
+     14.21
+    ],
+    "n": 268,
+    "roi_pct": 1.61,
+    "units": 4.31
+   },
+   "single": {
+    "ci95_pct": [
+     -17.55,
+     9.32
+    ],
+    "n": 230,
+    "roi_pct": -4.11,
+    "units": -9.46
+   }
+  },
+  "totals": {
+   "best": {
+    "ci95_pct": [
+     -2.77,
+     9.26
+    ],
+    "n": 985,
+    "roi_pct": 3.29,
+    "units": 32.38
+   },
+   "single": {
+    "ci95_pct": [
+     -7.65,
+     5.05
+    ],
+    "n": 882,
+    "roi_pct": -1.34,
+    "units": -11.85
+   }
+  }
+ },
+ "repricing_only": {
+  "best_roi_pct": 0.51,
+  "bets_only_best_took": 140,
+  "bets_only_single_took": 0,
+  "delta_ci95_pct": [
+   2.48,
+   3.13
+  ],
+  "delta_roi_pct": 2.79,
+  "n": 1091,
+  "single_roi_pct": -2.27
+ },
+ "single_arm_book_mix": {
+  "betmgm": 9,
+  "betonlineag": 12,
+  "betrivers": 9,
+  "draftkings": 119,
+  "fanatics": 16,
+  "fanduel": 926,
+  "lowvig": 4,
+  "mybookieag": 14,
+  "williamhill_us": 3
+ },
+ "window": {
+  "dates_requested": 30,
+  "end": "2026-08-05",
+  "start": "2026-07-07"
+ }
+}
