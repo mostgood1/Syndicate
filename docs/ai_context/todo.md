@@ -72,6 +72,60 @@ outcome source, with StatsAPI finals kept alongside because the graders read
 worker-local accuracy artifacts and return zero on a cold checkout. Three
 (soccer/ncaab/ncaaf) are still documented `[]`-stubs.
 
+### TRACED 2026-08-06 (#220) -- the Layer 2 opportunity pipeline has FOUR parallel lanes, and they disagree
+
+The batter-props gap, traced to the boundary. It was never a matching problem.
+
+**Props do not reach the board through `_game_bet_candidates_from_game` at all.**
+They come from `_build_prop_dashboard_row` over each sport's
+`home_rails`/`props_bar` items -- a parallel pipeline. Measured live:
+
+| lane | n | withQuote (before #220) |
+|---|---|---|
+| `command_center/top_game_bets` | 12 | **5** <- the enriched lane |
+| `command_center/top_props` | 14 | 0 |
+| `dashboard/top_edges` | 12 | 0 |
+| `sports[mlb]/home_rails/pregame` | 28 | 0 |
+| `sports[mlb]/home_rails/live` | 5 | 0 |
+| `sports[wnba]/home_rails/pregame` | 9 | 0 |
+
+So the earlier "11 of 46" was measured over a denominator that mixes lanes; 35 of
+those rows came from pipelines the enrichment never ran in. #220 enriches the
+prop lane (player_name is a full identity signal -- a player is unique to one
+game on a slate). After it: `top_edges` 0 -> 1, `top_game_bets` 5 of 12.
+
+**`top_props` is still 0, and NOT because of the join.** Those rows arrive
+already stripped of identity. Real production rows:
+
+```
+{"market": "Hits",   "pick": "Under 0",              "player_name": null, "line": "0.5", "odds": "167"}
+{"market": "Threes", "pick": "Chelsea Gray OVER 1.5","player_name": null, "line": "1.5", "odds": "113"}
+{"market": "Pts",    "pick": "Rae Burrell UNDER 15.5","player_name": "Rae Burrell UNDER 15.5 PTS"}
+```
+
+Three distinct upstream defects, all visible to a human reading the card:
+1. **`player_name` is null** while the player sits in the `pick` text
+   ("Chelsea Gray OVER 1.5"). Enrichment correctly refuses these rather than
+   guessing a player from the market.
+2. **`pick` is truncated to "Under 0"** where the line is 0.5 -- the label is
+   wrong on screen, not just for matching.
+3. **WNBA puts the ENTIRE pick string into `player_name`**
+   ("Rae Burrell UNDER 15.5 PTS") -- a field-shape mismatch in that sport's
+   rail builder.
+
+**Fix upstream, not in the matcher.** `_build_prop_dashboard_row` (or whatever
+feeds its items) should populate `player_name` from the item and stop truncating
+the line into the pick label. Attempting to parse the player back out of the
+pick text would paper over three separate bugs that are also wrong for a reader.
+
+**Also shipped in #220**: the strip could lie. Replaying real data returned a
+NEGATIVE improvement (-12.7 pts) -- the row's own price beating every book we
+hold a quote from, which is impossible for the same wager since best-across-books
+is never worse than any single book. It means the join hit a different line or a
+stale snapshot. The template fell through to "best of N" there, asserting exactly
+what the number disproves; it now renders an explicit unverified chip.
+
+
 ### WORKING IN PRODUCTION 2026-08-06 (#218/#219) -- the board carries per-book prices, verified live
 
 Supersedes the "board join does NOT work" entry below. All services live on
