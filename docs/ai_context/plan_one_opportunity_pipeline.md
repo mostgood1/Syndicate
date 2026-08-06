@@ -161,7 +161,94 @@ Per sport, per day, published so it is visible cross-service:
 - `pct_with_better_price_available` — the #211 lever, in production
 - `rows_scraped_from_prose` — should reach 0 and stay there
 
-## 8. What I would check before writing any of it
+## 8. VERIFICATION RESULTS (done 2026-08-06, before implementing)
+
+All three checks run against production. Two changed the plan; one produced an
+immediate fix.
+
+**V1 — what per-sport sources return.** Identity is PARTLY there and quality
+differs by sport, so the contract's required fields are suppliable:
+- MLB rail items: `player_name: "Ryan Johnson"` ✓, `player_id` ✓, `game_pk` ✓,
+  `market: "Walks Allowed"` (display only).
+- WNBA rail items: `event_id` ✓, but `player_name` holds the whole label
+  `"Rae Burrell UNDER 15.5 PTS"` ✗.
+
+**V2 — does a canonical `market_key` already exist upstream?** **Yes, but it is
+dropped before the board.** Game-dict prop rows carry
+`prop: "batter_total_bases"`; rail items carry only `market: "Total Bases"`.
+So the key exists at the artifact level and dies in the display layer — the
+board's "Total Bases" could never join the quote log's "batter_total_bases".
+This makes the canonical-key step much smaller than assumed: thread it through,
+do not invent it.
+
+**V3 — who else reads `home_rails.items` as data?** **More than home.py.**
+`syndicate/features/intelligence.py` reads the rails directly (`:2585-2587`,
+`:7201`) — the Layer 2 board itself consumes a presentation structure as its
+source. There is also a second prose scraper there (`:4447`, "scrapes narrative
+writeup/reasons text into a home_rails pregame item"). **Migration step 4 must
+cover intelligence.py, not just home.py**, or half the board keeps its old feed.
+
+**The finding that paid immediately (#221).** `_build_prop_dashboard_row`
+reconstructs a new dict rather than passing the item through, and carried no
+`player_name`, no `player_id`, no canonical key. Rail items HAD the player; every
+row it produced had `player_name: null`. The comment directly above that block
+records the identical failure one field-set earlier — it "used to drop
+commence_time entirely", also found only by tracing production. Same function,
+same cause, second occurrence.
+
+Threading identity + `market_key` through it, measured live before and after:
+
+| lane | before | after |
+|---|---|---|
+| `command_center/top_props` | 0 of 14 | **12 of 14** |
+| `dashboard/top_edges` | 0 of 12 | **9 of 12** |
+| `command_center/top_game_bets` | 5 of 12 | **7 of 12** |
+
+Real improvements now surfacing: Dylan Cease strikeouts −113 vs **+105** at
+lowvig (4.27 pts), Ranger Suarez outs −122 vs **−110** at bovada (2.57 pts).
+
+**Still broken, and now clearly a display-layer defect rather than a join one**:
+`pick: "Hits Under 0"` for a 0.5 line. The label is truncated at render. It no
+longer blocks pricing, but it is wrong on screen.
+
+**What this does to the plan:** step 3 shrinks (thread the key, do not invent
+it), step 4 grows (intelligence.py too), and step 2's instrumentation matters
+more than ever — one 3-line change moved 28 rows from unpriced to priced, and
+only a per-lane counter made that visible.
+
+---
+
+## 9. What the OddsJam-class engine needs on top
+
+Stated because the goal is EV + CLV + arb + mispricing, sim-enriched — and the
+verification shows the primitives are already there, unattached.
+
+- **EV** — needs model probability vs BEST price, not one book. Shipped (#215
+  recomputes `ev_pct` against best available).
+- **CLV** — needs the price struck at bet time and the closing price. Both
+  shipped (#213 records `quote` on the bet; #214 derives closes from the log).
+- **Arbitrage** — needs every book's price on BOTH sides of one market. The quote
+  log already holds exactly this: `quotes_by_market` groups by
+  (event, market, segment, selection, line). An arb is
+  `implied(best_over) + implied(best_under) < 1`. **Computable today, nothing
+  written yet.**
+- **Mispriced lines** — needs our price vs the FIELD, not vs one book.
+  `consensus_price` (implied-probability averaged across books) shipped in
+  `quote_ref`.
+- **The sim edge — the differentiator.** OddsJam has the market; it does not have
+  a simulation. Ours is what turns "this book is off consensus" into "this book
+  is off REALITY". That is `model_probability` vs `consensus_price`, which is a
+  different and stronger signal than either arb or steam.
+
+All five hang off the same object. That is the argument for the contract: not
+tidiness, but that EV, CLV, arb, mispricing and sim-edge are five views of one
+opportunity, and today there is no one place to hang them.
+
+---
+
+## 10. Residual risks
+
+
 
 Stated because I have been wrong three times today by designing against an
 assumed shape:
@@ -175,7 +262,7 @@ assumed shape:
 3. **Who else reads `home_rails.items`.** If other surfaces consume them as data,
    step 4 needs those migrated too or it breaks them silently.
 
-## 9. The honest counter-argument
+## 11. The honest counter-argument
 
 Per-sport freedom is cheap and shared contracts are expensive — this repo's own
 board-contract convergence has been a multi-phase migration. That trade was
