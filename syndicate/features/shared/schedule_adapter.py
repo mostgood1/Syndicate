@@ -400,6 +400,106 @@ def _fetch_espn_football_schedule(sport: str, date_str: str, *, timeout: int = 1
     return rows
 
 
+def _fetch_espn_football_live_state(sport: str, date_str: str, *, timeout: int = 12) -> list[dict[str, Any]]:
+    """Sibling to _fetch_espn_football_schedule: hits the exact same ESPN
+    scoreboard endpoint but extracts real live status/score/clock instead of
+    discarding everything except event_id/home/away/start_time_utc.
+
+    Deliberately NOT folded into _fetch_espn_football_schedule itself: that
+    function's rows feed ScheduleEvent via _event_from_row (extra dict keys
+    are silently ignored there, so folding would be harmless) and are cached
+    through fetch_schedule_for_date's TTL cache -- fine for "when does this
+    game start" but wrong for "what's the score right now", which callers
+    need fresh on every live-lens tick. Kept as an uncached, standalone call
+    so a caller can decide its own polling cadence instead of inheriting the
+    schedule cache's 900s default.
+    """
+    league_slug = _ESPN_FOOTBALL_LEAGUE.get(sport)
+    if not league_slug:
+        return []
+    try:
+        compact_date = datetime.strptime(str(date_str).strip(), "%Y-%m-%d").strftime("%Y%m%d")
+    except ValueError:
+        return []
+    url = (
+        f"https://site.api.espn.com/apis/site/v2/sports/football/{league_slug}/scoreboard"
+        f"?dates={urllib.parse.quote(compact_date)}"
+    )
+    # Same bare-Request, no-custom-header pattern as _fetch_espn_football_schedule
+    # above -- confirmed live 2026-08-05 that ESPN 403s this exact endpoint
+    # for Render's outbound IP when any custom User-Agent is sent (see that
+    # function's comment for the full probe results). Do not add headers here.
+    request_obj = urllib.request.Request(url)
+    try:
+        with urllib.request.urlopen(request_obj, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        return []
+
+    rows: list[dict[str, Any]] = []
+    events = payload.get("events") if isinstance(payload, dict) else None
+    for event in events or []:
+        if not isinstance(event, dict):
+            continue
+        competitions = event.get("competitions") or []
+        competition = competitions[0] if competitions else {}
+        competitors = competition.get("competitors") or []
+        home = next((c for c in competitors if c.get("homeAway") == "home"), {})
+        away = next((c for c in competitors if c.get("homeAway") == "away"), {})
+        event_id = str(event.get("id") or "").strip()
+        if not event_id:
+            continue
+
+        status = event.get("status") if isinstance(event.get("status"), dict) else {}
+        status_type = status.get("type") if isinstance(status.get("type"), dict) else {}
+
+        def _score(value: Any) -> float | None:
+            try:
+                if value is None or str(value).strip() == "":
+                    return None
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        # ESPN's standard scoreboard shape puts period/displayClock directly
+        # on `status` (not nested under `status.type`, which only carries
+        # id/name/state/completed/description/detail/shortDetail) -- fall
+        # back to status.type's copy if present, since some ESPN sports feeds
+        # (e.g. wnba/cards.py's own basketball scoreboard reader) have been
+        # observed nesting it there instead.
+        period_raw = status.get("period")
+        if period_raw in (None, ""):
+            period_raw = status_type.get("period")
+        try:
+            period = int(period_raw) if period_raw not in (None, "") else None
+        except (TypeError, ValueError):
+            period = None
+
+        display_clock = str(status.get("displayClock") or status_type.get("displayClock") or "").strip()
+
+        rows.append(
+            {
+                "event_id": event_id,
+                "home": (home.get("team") or {}).get("displayName"),
+                "away": (away.get("team") or {}).get("displayName"),
+                "home_abbr": (home.get("team") or {}).get("abbreviation"),
+                "away_abbr": (away.get("team") or {}).get("abbreviation"),
+                "home_score": _score(home.get("score")),
+                "away_score": _score(away.get("score")),
+                # "pre" | "in" | "post" -- ESPN's own three-value game-state enum.
+                "state": str(status_type.get("state") or "").strip().lower(),
+                "completed": bool(status_type.get("completed")),
+                "period": period,
+                "display_clock": display_clock,
+                "status_detail": str(
+                    status_type.get("shortDetail") or status_type.get("detail") or status_type.get("description") or ""
+                ).strip(),
+                "start_time_utc": event.get("date"),
+            }
+        )
+    return rows
+
+
 _FETCHERS = {
     "mlb": _fetch_mlb_schedule,
     "nba": lambda date_str: _fetch_basketball_schedule("nba", date_str),

@@ -5169,10 +5169,17 @@ class HomeBoardTests(unittest.TestCase):
         self.assertNotEqual(payload.get("latestReport"), {})
 
     def test_nfl_live_lens_empty_week_does_not_inject_fake_rank_card(self) -> None:
+        # preseason_target_week is pinned to None so this regular-season
+        # fixture is deterministic regardless of the real calendar --
+        # otherwise a genuinely-in-preseason test run would silently route
+        # build_live_lens_snapshot to the (unmocked) real preseason cards
+        # builder instead of exercising this test's own empty-week fixture.
         with patch(
             "syndicate.features.nfl.live_lens.build_cards_page_context",
             return_value={"control_value": "1", "date": "2026", "games": [], "source_path": "missing_nfl_cards.csv"},
-        ), patch("syndicate.features.nfl.live_lens.available_weeks", return_value=[]):
+        ), patch("syndicate.features.nfl.live_lens.available_weeks", return_value=[]), patch(
+            "syndicate.features.nfl.live_lens.preseason_target_week", return_value=None
+        ):
             from syndicate.features.nfl.live_lens import build_live_lens_page_context as build_nfl_live_lens_page_context
 
             context = build_nfl_live_lens_page_context(1, season=2026)

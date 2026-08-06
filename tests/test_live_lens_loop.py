@@ -124,10 +124,16 @@ class LiveLensLoopTests(unittest.TestCase):
                 "nba": lambda date_str: {"date": date_str},
                 "wnba": lambda date_str: {"date": date_str},
                 "soccer": lambda date_str: {"date": date_str, "games": []},
+                "nfl": lambda date_str: {"date": date_str, "games": [], "cards": []},
             },
         ), patch.dict(
             live_lens_loop._LIVE_LENS_VALIDATORS,
-            {"nba": lambda payload: True, "wnba": lambda payload: True, "soccer": lambda payload: True},
+            {
+                "nba": lambda payload: True,
+                "wnba": lambda payload: True,
+                "soccer": lambda payload: True,
+                "nfl": lambda payload: True,
+            },
         ), patch.object(live_lens_loop, "write_json_file") as mocked_write:
             meta = live_lens_loop._run_live_lens_tick()
 
@@ -135,9 +141,10 @@ class LiveLensLoopTests(unittest.TestCase):
         self.assertTrue(meta["results"]["nba"]["ok"])
         self.assertTrue(meta["results"]["wnba"]["ok"])
         self.assertTrue(meta["results"]["soccer"]["ok"])
+        self.assertTrue(meta["results"]["nfl"]["ok"])
         self.assertFalse(meta["ok"])
-        # nba, wnba, soccer snapshot writes + the tick-summary write itself.
-        self.assertEqual(mocked_write.call_count, 4)
+        # nba, wnba, soccer, nfl snapshot writes + the tick-summary write itself.
+        self.assertEqual(mocked_write.call_count, 5)
 
     def test_start_live_lens_loop_noop_when_disabled(self) -> None:
         with patch.dict(os.environ, {"SYNDICATE_ENABLE_LIVE_LENS_LOOP": "false"}, clear=False):
@@ -282,6 +289,53 @@ class LiveLensLoopTests(unittest.TestCase):
 
             self.assertTrue(result["ok"])
             mocked_write.assert_called_once()
+
+    def test_nfl_registered_in_dispatch_tables(self) -> None:
+        # Item 3 of todo #119's plan: NFL live-lens phase 1 (real live
+        # status/score/clock, no re-sim) registers into the same generic
+        # per-sport dispatch the other four sports already use. Confirms the
+        # addition didn't drop or duplicate an existing sport's entry.
+        self.assertIn("nfl", live_lens_loop._LIVE_LENS_SPORTS)
+        self.assertIn("nfl", live_lens_loop._LIVE_LENS_BUILDERS)
+        self.assertIn("nfl", live_lens_loop._LIVE_LENS_VALIDATORS)
+        self.assertIn("nfl", live_lens_loop._LIVE_LENS_SNAPSHOT_PATHS)
+        for sport in ("mlb", "nba", "wnba", "soccer"):
+            self.assertIn(sport, live_lens_loop._LIVE_LENS_SPORTS)
+            self.assertIn(sport, live_lens_loop._LIVE_LENS_BUILDERS)
+            self.assertIn(sport, live_lens_loop._LIVE_LENS_VALIDATORS)
+            self.assertIn(sport, live_lens_loop._LIVE_LENS_SNAPSHOT_PATHS)
+        self.assertEqual(len(live_lens_loop._LIVE_LENS_SPORTS), 5)
+        self.assertEqual(set(live_lens_loop._LIVE_LENS_SPORTS), set(live_lens_loop._LIVE_LENS_BUILDERS))
+        self.assertEqual(set(live_lens_loop._LIVE_LENS_SPORTS), set(live_lens_loop._LIVE_LENS_VALIDATORS))
+        self.assertEqual(set(live_lens_loop._LIVE_LENS_SPORTS), set(live_lens_loop._LIVE_LENS_SNAPSHOT_PATHS))
+
+    def test_nfl_build_wrapper_resolves_current_season_and_week(self) -> None:
+        with patch.object(live_lens_loop, "_nfl_latest_season", return_value=2026), patch.object(
+            live_lens_loop, "_nfl_preseason_target_week", return_value=None
+        ), patch.object(live_lens_loop, "_nfl_default_week", return_value=3), patch.object(
+            live_lens_loop, "_nfl_build", return_value={"date": "2026 Week 3"}
+        ) as mocked_build:
+            result = live_lens_loop._nfl_build_wrapper("2026-09-22")
+
+        mocked_build.assert_called_once_with(3, 2026)
+        self.assertEqual(result, {"date": "2026 Week 3"})
+
+    def test_nfl_build_wrapper_prefers_preseason_target_week_over_default_week(self) -> None:
+        # Coordinator-flagged gap: default_week() still says "week 1" during
+        # preseason (no regular-season game has been played either way), so
+        # preseason_target_week() must be checked FIRST and win whenever it
+        # returns a real week -- confirmed live against the real Aug 7 2026
+        # Hall of Fame Game this session was validating against.
+        with patch.object(live_lens_loop, "_nfl_latest_season", return_value=2026), patch.object(
+            live_lens_loop, "_nfl_preseason_target_week", return_value=1
+        ), patch.object(live_lens_loop, "_nfl_default_week") as mocked_default_week, patch.object(
+            live_lens_loop, "_nfl_build", return_value={"date": "2026 Preseason Week 1"}
+        ) as mocked_build:
+            result = live_lens_loop._nfl_build_wrapper("2026-08-07")
+
+        mocked_default_week.assert_not_called()
+        mocked_build.assert_called_once_with(1, 2026)
+        self.assertEqual(result, {"date": "2026 Preseason Week 1"})
 
     def test_soccer_build_wrapper_resolves_source_root_and_reduced_simulations(self) -> None:
         with patch.object(live_lens_loop, "_soccer_source_root", return_value=Path("/tmp/soccer_source")), patch.object(

@@ -16,6 +16,12 @@ from syndicate.features.mlb.live_lens import validate_live_lens_snapshot as _mlb
 from syndicate.features.nba.live_lens import build_live_lens_snapshot as _nba_build
 from syndicate.features.nba.live_lens import live_lens_snapshot_path as _nba_snapshot_path
 from syndicate.features.nba.live_lens import validate_live_lens_snapshot as _nba_validate
+from syndicate.features.nfl.live_lens import build_live_lens_snapshot as _nfl_build
+from syndicate.features.nfl.live_lens import live_lens_snapshot_path as _nfl_snapshot_path
+from syndicate.features.nfl.live_lens import validate_live_lens_snapshot as _nfl_validate
+from syndicate.features.nfl.sources import default_week as _nfl_default_week
+from syndicate.features.nfl.sources import latest_season as _nfl_latest_season
+from syndicate.features.nfl.sources import preseason_target_week as _nfl_preseason_target_week
 from syndicate.features.shared.memory_observability import log_all_process_memory
 from syndicate.features.shared.memory_observability import memory_headroom_snapshot
 from syndicate.features.shared.refresh_state_store import read_json_file
@@ -71,6 +77,32 @@ def _wnba_build_wrapper(date_str: str) -> dict[str, Any]:
 	return _wnba_build(date_str, limit=50)
 
 
+def _nfl_build_wrapper(date_str: str) -> dict[str, Any]:
+	# NFL's live-lens snapshot is week-scoped, not date-scoped like every
+	# other sport this loop drives -- date_str (central_today_iso(), passed
+	# uniformly to every sport's builder by _run_live_lens_tick) isn't
+	# actually usable to pick a week, so resolve the currently tracked
+	# season/week the same way the route's own default resolution does
+	# (nfl/sources.py's latest_season()/default_week()) instead of ignoring
+	# the date_str parameter silently.
+	#
+	# preseason_target_week() is checked FIRST -- the same real "which phase
+	# is actually current" signal _build_sport_overview (home.py) and
+	# _NFLDataProvider.games() already use, both fixed earlier this session.
+	# default_week()/nfl_target_week() both still say "week 1" as soon as the
+	# regular season is next up, even while genuinely still in preseason (no
+	# regular-season game has been played yet either way) -- week number
+	# alone can't tell the two phases apart. Without this, the loop would
+	# resolve week=1/regular-season every single tick during preseason and
+	# build_live_lens_snapshot would never see a real preseason week, even
+	# though it independently re-derives the same signal itself as a second
+	# line of defense.
+	season = _nfl_latest_season()
+	preseason_week = _nfl_preseason_target_week(season)
+	week = preseason_week if preseason_week is not None else _nfl_default_week(season)
+	return _nfl_build(week, season)
+
+
 def _soccer_live_lens_tick_simulations() -> int:
 	# Soccer's live tick (poll_league -> project_live_match + 2x
 	# goal_in_window_probability + project_live_player_props, 4 separate
@@ -101,13 +133,14 @@ def _soccer_build_wrapper(date_str: str) -> dict[str, Any]:
 	)
 
 
-_LIVE_LENS_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "soccer")
+_LIVE_LENS_SPORTS: tuple[str, ...] = ("mlb", "nba", "wnba", "soccer", "nfl")
 
 _LIVE_LENS_BUILDERS: dict[str, Callable[[str], dict[str, Any]]] = {
 	"mlb": _mlb_build_wrapper,
 	"nba": _nba_build_wrapper,
 	"wnba": _wnba_build_wrapper,
 	"soccer": _soccer_build_wrapper,
+	"nfl": _nfl_build_wrapper,
 }
 
 _LIVE_LENS_VALIDATORS: dict[str, Callable[[Any], bool]] = {
@@ -115,6 +148,7 @@ _LIVE_LENS_VALIDATORS: dict[str, Callable[[Any], bool]] = {
 	"nba": _nba_validate,
 	"wnba": _wnba_validate,
 	"soccer": _soccer_validate,
+	"nfl": _nfl_validate,
 }
 
 _LIVE_LENS_SNAPSHOT_PATHS: dict[str, Callable[[], Path]] = {
@@ -122,6 +156,7 @@ _LIVE_LENS_SNAPSHOT_PATHS: dict[str, Callable[[], Path]] = {
 	"nba": _nba_snapshot_path,
 	"wnba": _wnba_snapshot_path,
 	"soccer": _soccer_snapshot_path,
+	"nfl": _nfl_snapshot_path,
 }
 
 
