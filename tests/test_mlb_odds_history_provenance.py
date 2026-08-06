@@ -47,6 +47,13 @@ def wired(tmp_path, monkeypatch):
     monkeypatch.setattr(odds_control_plane, "odds_history_paths_for_sport", lambda s, k: [hist])
     monkeypatch.setattr(refresh_state_store, "reports_root", lambda: tmp_path / "reports")
     monkeypatch.setattr(refresh_state_store, "write_json_file", lambda p, payload: written.update({"path": p, "payload": payload}))
+    # The fixture owns this too: publishing is a real network call otherwise, and
+    # leaving it unpatched made a later test order-dependent.
+    from syndicate.features.shared import artifact_publisher
+
+    published: list = []
+    monkeypatch.setattr(artifact_publisher, "publish_hot_artifact", lambda p, **k: (published.append(p), True)[1])
+    written["published"] = published
     return hist, written
 
 
@@ -132,3 +139,39 @@ class TestProvenanceSummary:
 
         monkeypatch.setattr(odds_control_plane, "odds_history_paths_for_sport", boom)
         assert diagnose_odds_history_provenance("2026-08-05") is None
+
+
+class TestCrossServicePublish:
+    """Allowlisting only PERMITS a push -- something must actually make it.
+
+    Verified live 2026-08-05: the sibling `live_events_coverage_*.json`
+    diagnostic is allowlisted but absent from web for every date back to
+    2026-07-20. It has never been readable off the writing service since it
+    shipped, because `write_json_file` writes locally/keyvalue and nothing
+    published it. Control: `intelligence_state.json`, which IS explicitly
+    published, serves fine through the same endpoint. This artifact exists to be
+    read from web, so it must publish explicitly.
+    """
+
+    def test_publishes_after_writing(self, wired):
+        hist, written = wired
+        hist.write_text(json.dumps(_history({_key("e1", "h2h", "fanduel"): {}})), encoding="utf-8")
+
+        diagnose_odds_history_provenance("2026-08-05")
+
+        published = written["published"]
+        assert len(published) == 1
+        assert published[0].name == "odds_history_provenance_2026-08-05.json"
+
+    def test_publish_failure_does_not_break_the_refresh(self, wired, monkeypatch):
+        hist, _ = wired
+        hist.write_text(json.dumps(_history({_key("e1", "h2h", "fanduel"): {}})), encoding="utf-8")
+        from syndicate.features.shared import artifact_publisher
+
+        def boom(*a, **k):
+            raise RuntimeError("web unreachable")
+
+        monkeypatch.setattr(artifact_publisher, "publish_hot_artifact", boom)
+
+        # Still returns the payload -- a diagnostic must never fail an odds refresh.
+        assert diagnose_odds_history_provenance("2026-08-05") is not None

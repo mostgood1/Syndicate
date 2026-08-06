@@ -734,7 +734,23 @@ def diagnose_odds_history_provenance(date_str: str) -> dict[str, Any] | None:
             "freshest_summary": summary,
         }
         print(f"[mlb_odds_history_provenance] {json.dumps(payload, sort_keys=True)[:1200]}", flush=True)
-        write_json_file(reports_root() / "mlb_odds_diag" / f"odds_history_provenance_{date_str}.json", payload)
+        out_path = reports_root() / "mlb_odds_diag" / f"odds_history_provenance_{date_str}.json"
+        write_json_file(out_path, payload)
+        # write_json_file alone does NOT cross services. Being in
+        # HOT_ARTIFACT_PATTERNS only PERMITS a push; something has to make it.
+        # Verified 2026-08-05: the sibling live_events_coverage_*.json diagnostic
+        # is allowlisted but absent from web for every date back to 2026-07-20 --
+        # it has never been readable off the writing service since it shipped,
+        # because nothing ever published it. (Control: intelligence_state.json,
+        # which IS explicitly published, serves fine through the same endpoint.)
+        # This diagnostic exists precisely to be read from web, so it must push.
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            published = publish_hot_artifact(out_path)
+            print(f"[mlb_odds_history_provenance] published={published} path={out_path}", flush=True)
+        except Exception as exc:
+            print(f"[mlb_odds_history_provenance] publish FAILED {type(exc).__name__}: {exc}", flush=True)
         return payload
     except Exception as exc:
         print(f"[mlb_odds_history_provenance] FAILED error={type(exc).__name__}: {exc}", flush=True)
