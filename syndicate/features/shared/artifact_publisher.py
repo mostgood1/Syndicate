@@ -718,9 +718,26 @@ def pull_hot_artifacts(*, date_str: str | None = None, timeout_seconds: int = 30
     # cycle -- one small request, and the log line says so rather than
     # pretending the board is merely quiet.
     for relative_path in _missing_required_artifact_relative_paths(date_str):
-        repair_succeeded, repair_written = _pull_hot_artifacts_request(
-            _export_url(exact_path=relative_path), token, timeout_seconds=timeout_seconds
-        )
+        # #233: STREAM the big ones. /export loads the whole artifact into the
+        # web service's memory to answer, and book_quotes shards are 52MB
+        # (measured 2026-08-06, MLB) -- every repair request for one came back
+        # PULL_FAILED / written=0 against a 2GB web instance, so the file the
+        # Layer 2 board's prices depend on could be correctly requested and
+        # still never arrive.
+        #
+        # pull_streamed_artifact already exists for exactly this and reads in
+        # 1MB chunks ("a 51MB shard is ~51 reads", per its own note). Routing
+        # the known-large families through it makes the repair pass able to
+        # deliver them at all; everything else keeps /export, which is fine for
+        # the small once-a-day artifacts this list was originally built for.
+        if "/book_quotes/" in relative_path or "/odds_history/" in relative_path:
+            repair_succeeded, repair_written = pull_streamed_artifact(
+                relative_path, timeout_seconds=max(timeout_seconds, 300)
+            )
+        else:
+            repair_succeeded, repair_written = _pull_hot_artifacts_request(
+                _export_url(exact_path=relative_path), token, timeout_seconds=timeout_seconds
+            )
         written += repair_written
         print(
             f"[artifact_publisher] PULL_REPAIR_MISSING path={relative_path} "
