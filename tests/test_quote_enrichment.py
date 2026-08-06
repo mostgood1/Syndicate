@@ -134,5 +134,67 @@ class EnrichmentTests(unittest.TestCase):
         self.assertNotEqual(quote["book_updated_at"], quote["captured_at"])
 
 
+class ProductionGameShapeTests(unittest.TestCase):
+    """The exact game-dict shape /api/home really serves, copied from a live
+    2026-08-06 payload.
+
+    This is the shape that broke it: `gameDate` not `game_date`, and `matchup`
+    as a DICT of team objects rather than the "LAA @ BAL" string the candidate
+    rows carry. Every earlier test built its own tidy game dict and so proved
+    nothing about the real one -- the lookup worked perfectly offline while
+    every production candidate came back with quote: null.
+    """
+
+    def setUp(self) -> None:
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        patcher = patch.object(quotes_module, "data_root", lambda: Path(self.tmp.name))
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        append_book_quotes(
+            sport="mlb", date_str=DATE, publish=False, captured_at="2026-08-06T21:58:00Z",
+            rows=[
+                {**_quote(book, price), "home_team": "Baltimore Orioles",
+                 "away_team": "Los Angeles Angels", "event_id": "oddsapi-hash"}
+                for book, price in (("fanduel", -130), ("draftkings", -110), ("betmgm", -120))
+            ],
+        )
+
+    def _game(self) -> dict:
+        return {
+            "gamePk": 824804,
+            "gameDate": "2026-08-06T16:35:00Z",
+            "officialDate": DATE,
+            "matchup": {
+                "home": {"abbr": "BAL", "id": 110, "name": "Baltimore Orioles"},
+                "away": {"abbr": "LAA", "id": 108, "name": "Los Angeles Angels"},
+                "score": {"away": 0, "home": 0},
+            },
+        }
+
+    def test_camelcase_date_and_dict_matchup_still_resolve(self) -> None:
+        rows = enrich_recommendation_rows(
+            self._game(),
+            [{"market_label": "Moneyline", "display_pick": "Home ML", "selection": "home",
+              "odds": -130, "confidence": 0.55}],
+            sport_slug="mlb", now=NOW,
+        )
+        quote = rows[0].get("quote")
+        self.assertIsNotNone(quote, "the real production game shape produced no quote")
+        self.assertEqual(quote["best_bookmaker"], "draftkings")
+        self.assertEqual(quote["books_quoting"], 3)
+        self.assertGreater(rows[0]["price_improvement_pct"], 0)
+
+    def test_a_dict_matchup_is_never_stringified_into_the_matcher(self) -> None:
+        """str() on that dict is a blob of JSON containing both team names and
+        would match essentially anything."""
+        from syndicate.features.shared.quote_enrichment import _team_names
+
+        home, away, matchup = _team_names(self._game())
+        self.assertEqual(home, "Baltimore Orioles")
+        self.assertEqual(away, "Los Angeles Angels")
+        self.assertIsNone(matchup)
+
+
 if __name__ == "__main__":
     unittest.main()

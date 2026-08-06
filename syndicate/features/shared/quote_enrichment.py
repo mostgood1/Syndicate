@@ -72,11 +72,50 @@ def _model_probability(row: Mapping[str, Any]) -> float | None:
 
 
 def _game_date(game: Mapping[str, Any]) -> str | None:
-    for key in ("game_date", "date", "selected_date", "start_date", "commence_time"):
+    """The slate date, from whichever key this sport's game dict actually uses.
+
+    The snake_case names alone were not enough and that was the whole bug:
+    measured on production 2026-08-06, MLB game dicts carry `gameDate`
+    ("2026-08-06T16:35:00Z") and `officialDate` and NONE of game_date/date/
+    selected_date/start_date/commence_time -- so this returned None, enrichment
+    returned early, and every candidate came back with quote: null while the
+    lookup itself worked perfectly against the same data offline.
+    """
+    for key in (
+        "game_date", "date", "selected_date", "start_date", "commence_time",
+        # camelCase variants -- what the board's own game dicts really use.
+        "gameDate", "officialDate", "startTime", "commenceTime", "start_time",
+    ):
         value = str(game.get(key) or "").strip()
         if len(value) >= 10:
             return value[:10]
     return None
+
+
+def _team_names(game: Mapping[str, Any]) -> tuple[Any, Any, Any]:
+    """(home, away, matchup) in whatever shape the game dict holds them.
+
+    `matchup` is a DICT on MLB game dicts -- {"home": {"abbr": "BAL", "name":
+    "Baltimore Orioles"}, "away": {...}} -- not the "LAA @ BAL" string the
+    board's candidate rows carry. Stringifying it would feed the matcher a blob
+    of JSON, so pull the real names out and pass the string form only when it
+    genuinely is a string.
+    """
+    def side(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return value.get("name") or value.get("abbr") or value.get("team") or None
+        return value
+
+    matchup = game.get("matchup")
+    home = side(game.get("home_team")) or side(game.get("home"))
+    away = side(game.get("away_team")) or side(game.get("away"))
+    if isinstance(matchup, Mapping):
+        home = home or side(matchup.get("home"))
+        away = away or side(matchup.get("away"))
+        matchup = None  # the dict is not a parseable "AWAY @ HOME" string
+    elif not isinstance(matchup, str):
+        matchup = None
+    return home, away, matchup
 
 
 def _selection_hint(row: Mapping[str, Any]) -> str | None:
@@ -118,6 +157,7 @@ def enrich_recommendation_rows(
             return rows
         now = now or datetime.now(timezone.utc)
         event_id = game.get("event_id") or game.get("gamePk") or game.get("game_pk")
+        home_team, away_team, matchup = _team_names(game)
 
         for row in rows:
             if not isinstance(row, dict) or row.get("quote"):
@@ -136,9 +176,9 @@ def enrich_recommendation_rows(
                 # the ids CANNOT match -- so the join is the player for props
                 # and the team pair for game markets, and `matchup` ("LAA @ BAL")
                 # is often the only place the teams appear on a board row.
-                home_team=game.get("home_team") or row.get("home_team"),
-                away_team=game.get("away_team") or row.get("away_team"),
-                matchup=game.get("matchup") or row.get("matchup"),
+                home_team=home_team or row.get("home_team"),
+                away_team=away_team or row.get("away_team"),
+                matchup=matchup or row.get("matchup"),
                 now=now,
             )
             if not quote:
