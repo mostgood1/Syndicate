@@ -24,13 +24,21 @@ class TruncateLogTextTests(unittest.TestCase):
     def test_short_text_is_returned_unchanged(self) -> None:
         self.assertEqual(_truncate_log_text("all good"), "all good")
 
-    def test_oversized_text_keeps_the_tail_not_the_head(self) -> None:
+    def test_oversized_text_keeps_both_head_and_tail(self) -> None:
         text = ("HEAD" * 100) + ("x" * 20000) + "THE-REAL-FAILURE"
         result = _truncate_log_text(text, limit=4096)
-        # The tail is where the failure is -- keeping the head would discard
-        # exactly the part worth reading.
+        # Was tail-only ("the end is where the failure is"), which cost a
+        # real investigation (2026-08-06 soccer refresh) when the failure
+        # was actually near the START of a structured --json document and
+        # the tail-only capture had already discarded it, permanently, at
+        # write time. Now keeps both halves within the same total budget.
         self.assertIn("THE-REAL-FAILURE", result)
-        self.assertNotIn("HEADHEADHEAD", result)
+        self.assertIn("HEADHEADHEAD", result)
+
+    def test_dropped_middle_is_announced(self) -> None:
+        text = ("HEAD" * 100) + ("x" * 20000) + "THE-REAL-FAILURE"
+        result = _truncate_log_text(text, limit=4096)
+        self.assertIn("in the middle", result)
 
     def test_truncation_is_announced(self) -> None:
         result = _truncate_log_text("y" * 20000, limit=4096)

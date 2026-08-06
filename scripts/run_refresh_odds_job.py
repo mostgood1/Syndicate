@@ -148,17 +148,38 @@ def _max_run_artifact_text_bytes() -> int:
 
 
 def _truncate_log_text(text: str, limit: int | None = None) -> str:
-    """Keep the TAIL of a log, not the head -- the end is where the failure
-    is. Prefixed with an explicit notice so a truncated artifact is never
-    mistaken for a complete one."""
+    """Keep HEAD and TAIL halves of a log, not just the tail.
+
+    Was tail-only ("the end is where the failure is"), which is true for a
+    plain crash log but not for this script's `--json` stdout: it's one
+    structured document where per-league/per-step results appear near the
+    START and only a derived summary (odds_control_plane snapshot,
+    publish_parity) trails at the end. A real 2026-08-06 soccer refresh
+    failure (`"ok": false`) was undiagnosable from a tail-only capture --
+    every step visible in the last 65536 bytes showed `ok: true`, because
+    the actual failing step was earlier in a 1.6MB document and had already
+    been discarded at write time, permanently (not a read-time limit --
+    read_text_file just returns what's on disk). This was flagged but not
+    fixed on 2026-08-04 (see todo.md) and cost a second investigation before
+    landing. Same total budget as before (no keyvalue-pressure regression,
+    see `_max_run_artifact_text_bytes`'s docstring) -- just split it, since a
+    dropped middle is far cheaper than a dropped head for this shape of log.
+    """
     resolved_limit = _max_run_artifact_text_bytes() if limit is None else limit
     raw = str(text or "")
     encoded = raw.encode("utf-8", errors="replace")
     if len(encoded) <= resolved_limit:
         return raw
-    tail = encoded[-resolved_limit:].decode("utf-8", errors="replace")
     dropped = len(encoded) - resolved_limit
-    return f"[truncated {dropped} bytes; showing last {resolved_limit}]\n{tail}"
+    head_limit = resolved_limit // 2
+    tail_limit = resolved_limit - head_limit
+    head = encoded[:head_limit].decode("utf-8", errors="replace")
+    tail = encoded[-tail_limit:].decode("utf-8", errors="replace")
+    return (
+        f"[showing first {head_limit} bytes]\n{head}\n"
+        f"[truncated {dropped} bytes in the middle]\n"
+        f"[showing last {tail_limit} bytes]\n{tail}"
+    )
 
 
 def _truncate_payload_strings(payload: dict[str, Any]) -> dict[str, Any]:
