@@ -1,5 +1,54 @@
 # Syndicate TODO — canonical cross-session list
 
+### CLOSED 2026-08-05 (#200) -- The moneyline +8.0% does NOT survive robustness. No MLB market in this thread is profitable.
+
+Ran the checks #199 said were required before believing the +8.0% moneyline
+result (358 bets at >=5% edge, 60 dates). It fails.
+
+**1. Fragility -- the decisive test.** The edge rests on a handful of bets:
+
+| drop top N winners (of 163) | ROI |
+|---|---|
+| 0 | **+8.0%** |
+| 1 | +6.2% |
+| 3 | +2.8% |
+| **5** | **-0.1%** |
+| 10 | -4.4% |
+
+Removing **5 of 358 bets (1.4%)** erases the entire edge. That is variance, not
+signal.
+
+**2. Statistical significance.** Bootstrap (2,000 resamples) 95% CI on ROI is
+**[-5.5%, +22.4%]** -- includes zero. P(ROI>0) = 88.2%, well short of any
+reasonable bar.
+
+**3. Stability over time.** First half of the window +11.4% (n=201), second half
+**+3.6%** (n=157). Decaying, not persistent.
+
+**4. By date.** Only **32 of 60 dates positive (53%)** -- barely a coin flip.
+Median date ROI +5.9%, but the mean is carried by three outlier dates
+(2026-07-23 +175%, 07-27 +134%, 06-22 +132%).
+
+**What held up** (worth keeping, none of it an edge on its own):
+- Home/away is balanced (+7.8% / +8.1%), so this is not a one-sided artifact.
+- The return is NOT coming from longshots: <30% implied returns **-0.2%**
+  (n=51), while pickem 45-55% returns +12.8% (n=143). That is the opposite of
+  the "one good run of longshots" failure mode I predicted -- the concern was
+  right to raise, the specific mechanism was wrong.
+
+**Conclusion for the whole #186-#200 thread: on 48-66 dates of real
+Render+StatsAPI data, the model consistently beats the sim, and NO market
+clears its vig.** HR overs -5.3% at top-10, K props -4.6% at best, totals flat,
+moneyline not significant. The binding constraint was never model quality --
+it is the hold, exactly as the #195 map predicted.
+
+**The one concrete, fixable defect found**: the sim is badly overconfident on
+favourites (0.6-1.0 home-win bucket predicts 64.4%, actual **56.2%**), and its
+Brier (0.24646) is barely better than always predicting the base rate
+(0.25000). Fixing game-level calibration is a real modelling target and is
+upstream of every game-market question. That, not more prop work, is where the
+next effort belongs.
+
 ### RE-RUN 2026-08-05 (#199) -- K on 48 dates: model still beats sim, but NOTHING is profitable. Game markets graded for the first time (#197).
 
 **K (1,294 starts, 48 dates, 560 with two-sided lines).** Now uses REAL
