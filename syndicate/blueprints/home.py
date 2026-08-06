@@ -2280,7 +2280,7 @@ def _mlb_prop_player_id(prop_row: dict[str, Any]) -> int | None:
     return None
 
 
-def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, actual: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None, player_id: Any = None, headshot_url: str | None = None) -> None:
+def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[str, Any], game: dict[str, Any], market: str, pick: str, line: Any = None, odds: Any = None, edge: Any = None, confidence: Any = None, projected: Any = None, live_projection: Any = None, actual: Any = None, detail: str | None = None, fallback_epoch: float, live_odds_game_ids: set[str] | None = None, team: Any = None, sim_context: str | None = None, player_id: Any = None, headshot_url: str | None = None, quote: dict[str, Any] | None = None, price_improvement_pct: Any = None) -> None:
     pick_text = _safe_text(pick, "-")
     if pick_text == "-":
         return
@@ -2459,6 +2459,24 @@ def _append_game_bet_candidate(candidates: list[dict[str, Any]], *, sport: dict[
             "href": href,
             "href_label": _safe_text(game.get("href_label"), "Open game"),
             "score": float((edge_value or 0.0) * 1.8 + (confidence_value or 0.0) + (20.0 if odds_text and odds_text != "-" else 0.0)),
+            # #215 -- the price context the row contract never had. Flattened
+            # alongside the full quote because the template renders chips from
+            # scalars and the nested object is for the drill-in / API consumers.
+            "quote": dict(quote) if isinstance(quote, dict) else None,
+            "book": (quote or {}).get("bookmaker"),
+            "best_book": (quote or {}).get("best_bookmaker"),
+            "best_price": (quote or {}).get("best_price"),
+            "books_quoting": (quote or {}).get("books_quoting"),
+            "price_rank": (quote or {}).get("price_rank"),
+            "consensus_price": (quote or {}).get("consensus_price"),
+            "price_improvement_pct": price_improvement_pct,
+            # TWO CLOCKS. book_age is how long since the BOOK moved this number;
+            # capture_age is how long since we looked. A row with a 4-hour book
+            # age and a 30-second capture age is a dead market, and the single
+            # `updated_at` above -- which is loop time -- renders it as fresh.
+            "book_age_seconds": (quote or {}).get("book_age_seconds"),
+            "capture_age_seconds": (quote or {}).get("capture_age_seconds"),
+            "book_updated_at": (quote or {}).get("book_updated_at"),
         }
     )
 
@@ -2483,6 +2501,20 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
     candidates: list[dict[str, Any]] = []
     game_sim_context = _game_sim_vs_line_reasoning(game)
     game_recs = game.get("game_market_recommendations") if isinstance(game.get("game_market_recommendations"), list) else []
+    # #215: the single funnel every sport's recommendation rows pass through, so
+    # per-book price context is attached once here rather than in each of the
+    # five builders. This also RE-RANKS: ev_pct is recomputed against the best
+    # available price where a model probability exists, which changes which
+    # candidates surface -- #211 measured 140 bets clearing a 3% threshold under
+    # best price and 0 the other way, since best price is never worse.
+    try:
+        from syndicate.features.shared.quote_enrichment import enrich_recommendation_rows
+
+        enrich_recommendation_rows(game, game_recs, sport_slug=str(sport.get("slug") or "").lower())
+    except Exception:
+        # A board that renders without price context is degraded; a board that
+        # 500s because the odds log was mid-write is an outage.
+        pass
     for row in game_recs:
         if not isinstance(row, dict):
             continue
@@ -2536,6 +2568,8 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             live_odds_game_ids=live_odds_game_ids,
             team=_team_for_side_hint(game, row.get("team_side") or row.get("side") or row.get("selection") or row.get("display_pick")),
             sim_context=game_sim_context,
+            quote=row.get("quote"),
+            price_improvement_pct=row.get("price_improvement_pct"),
         )
     if not candidates:
         game_markets = game.get("gameMarkets") if isinstance(game.get("gameMarkets"), dict) else {}

@@ -5332,8 +5332,11 @@ class HomeBoardTests(unittest.TestCase):
 
         self.assertEqual(context.get("rank_cards"), [])
         self.assertFalse(context.get("using_sample_data"))
-        self.assertEqual(context.get("source_title"), "MLB HR targets unavailable")
-        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB HR targets")
+        # Renamed by #194 (2056b74e), which turned "HR Targets" into "HR Top 10"
+        # across the board and home rail but left this assertion on the old
+        # wording -- the only failure in the 383-test archive suite.
+        self.assertEqual(context.get("source_title"), "MLB HR Top 10 unavailable")
+        self.assertEqual((context.get("empty_state") or {}).get("eyebrow"), "MLB HR Top 10")
 
     def test_mlb_rfi_targets_empty_date_does_not_inject_fake_rank_card(self) -> None:
         with patch("syndicate.features.mlb.rfi_targets.load_json_file", return_value=None):

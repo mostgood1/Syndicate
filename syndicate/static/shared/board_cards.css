@@ -331,6 +331,67 @@ body.syndicate-body .cards-shell {
   border: 1px solid rgba(78, 205, 196, 0.2);
 }
 
+/* #215 -- per-book price context. The row contract carried no price, no book
+   and no timestamp, so none of this could be shown at all before. */
+.board-card__prices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.price-chip {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  color: var(--cards-text-muted, #94a3b8);
+  white-space: nowrap;
+}
+
+.price-chip--book {
+  color: var(--cards-text-strong, #e2e8f0);
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+.price-chip--best {
+  color: #4ecdc4;
+  border-color: rgba(78, 205, 196, 0.45);
+  background: rgba(78, 205, 196, 0.1);
+}
+
+/* Deliberately the loudest chip on the card. It means real money is being left
+   on the table on THIS bet -- #211 measured 2.79 ROI points from taking the
+   best price instead of an arbitrary book. */
+.price-chip--better {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.board-card__freshness {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--cards-text-muted, #94a3b8);
+}
+
+/* A price whose book has not moved in over an hour, however recently we
+   polled. Coloured because it reads as fresh otherwise -- which is exactly the
+   failure the separate book clock exists to expose. */
+.board-card__clock--stale {
+  color: #f97316;
+  font-weight: 700;
+}
+
+.board-card__clock--unknown {
+  opacity: 0.65;
+  font-style: italic;
+}
+
 .board-card__facts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));

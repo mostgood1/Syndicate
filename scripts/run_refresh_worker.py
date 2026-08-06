@@ -893,6 +893,31 @@ def _launch_autorun_evaluation_settlement(
     except Exception as exc:
         error_text = f"{type(exc).__name__}: {exc}"
 
+    # #216: carry those outcomes across to the PORTFOLIO ledger. There are two
+    # ledgers and /portfolio reads only data/prediction_ledger.json -- the
+    # evaluation ledger settled just above is, in this repo's own words, "a
+    # separate evaluation ledger the Portfolio page never reads". Both autoruns
+    # were enabled and production still showed settled_count 0 on five tracked
+    # bets, one of them a 4-leg parlay that reconciliation structurally cannot
+    # settle because it has no single market to match on.
+    #
+    # Runs here rather than in the reconciliation autorun so it sees the records
+    # settle_ledger_for_dates just wrote, instead of last cycle's.
+    bridge_summary: dict[str, Any] = {}
+    try:
+        from syndicate.features.shared.evaluation_settlement import _read_ledger_records_for_date
+        from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
+        from syndicate.features.shared.ledger_bridge import bridge_settled_results
+
+        evaluation_records: list[dict[str, Any]] = []
+        for target_date in target_dates:
+            evaluation_records.extend(_read_ledger_records_for_date(DEFAULT_LEDGER_PATH, target_date) or [])
+        bridge_summary = bridge_settled_results(evaluation_records=evaluation_records)
+        print(f"[ledger_bridge] {json.dumps(bridge_summary, default=str)[:400]}", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        bridge_summary = {"error": f"{type(exc).__name__}: {exc}"}
+        print(f"[ledger_bridge] FAILED {bridge_summary['error']}", flush=True)
+
     # Reported live 2026-08-05: total_recommendation_records dropped from a
     # real 194 (19:41Z) to 0 (15:17Z, ~19.5h later) across the SAME date
     # window, with no code change to the counting/reading path in between.
@@ -941,7 +966,18 @@ def _launch_autorun_evaluation_settlement(
 
     _refresh_state_store()["write_json_file"](
         status_path,
-        {"epoch": time.time(), "dates": list(target_dates), "summary": summaries, "error": error_text, "chunk_diagnostics": chunk_diagnostics},
+        {
+            "epoch": time.time(),
+            "dates": list(target_dates),
+            "summary": summaries,
+            "error": error_text,
+            "chunk_diagnostics": chunk_diagnostics,
+            # The only cross-service visibility into whether the portfolio
+            # ledger actually received these outcomes -- refresh-worker serves
+            # no HTTP, so without this "the bridge ran and matched nothing" and
+            # "the bridge never ran" look identical from the web service.
+            "ledger_bridge": bridge_summary,
+        },
     )
 
     if error_text:

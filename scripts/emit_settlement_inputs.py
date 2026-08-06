@@ -44,14 +44,23 @@ Files land in `reports/settlement_inputs/`, inside the roots reconciliation
 already scans. No read-side change is needed: this makes an existing, enabled,
 currently-idle autorun start finding files.
 
-WHAT STILL WILL NOT SETTLE
---------------------------
-Props. Grading one needs the player's actual stat line, and no actuals source is
-wired for any sport yet. Prop rows carry a real closing price, so CLV is ready
-the moment actuals exist -- but `_row_outcome` returns None without them, the
-prediction is skipped, and `record_result` is never called. A prop bet therefore
-stays pending AND has no CLV recorded, because CLV lands at settlement. Say this
-out loud rather than let a zero look like success.
+OUTCOME SOURCES, IN ORDER
+-------------------------
+1. `graded_outcomes.graded_rows_for_date(sport, date)` -- a grader registry that
+   already exists for ALL EIGHT sports and yields `player`/`line`/`actual`/
+   `result`, so it covers PROPS, not just game markets. An earlier version of
+   this file claimed no actuals source was wired anywhere; that was wrong, and
+   the correction matters because props are most of the volume.
+2. MLB StatsAPI finals, for game markets. Kept as well as the graders rather than
+   replaced by them: the graders read per-sport market-accuracy artifacts that
+   are only populated on the worker disks, so on a cold checkout they return
+   zero rows while StatsAPI still resolves. Two independent sources beat one.
+
+Whatever a row cannot be graded by still ships with its closing price, so CLV is
+ready the moment an outcome does exist. But note the ordering constraint: CLV is
+written at SETTLEMENT, so a row that never grades never records CLV either.
+`graded_rows` in the summary is the number to watch -- `closing_rows` alone says
+how much price data exists, not how much of it can settle.
 """
 
 from __future__ import annotations
@@ -110,6 +119,49 @@ def _mlb_finals(date_str: str) -> list[dict[str, Any]]:
                 }
             )
     return out
+
+
+def _graded_outcome_rows(sport: str, date_str: str) -> list[dict[str, Any]]:
+    """Per-sport graded outcomes, including player props.
+
+    Registered for all eight sports in graded_outcomes.GRADED_OUTCOME_GRADERS
+    and yielding sport/market/selection/player/line/actual/result. Returns []
+    rather than raising when a sport's underlying accuracy artifacts are absent,
+    which is the normal state on any machine that is not the worker holding them.
+    """
+    try:
+        from syndicate.features.shared.graded_outcomes import graded_rows_for_date
+
+        return [row for row in (graded_rows_for_date(sport, date_str) or []) if isinstance(row, dict)]
+    except Exception as exc:  # noqa: BLE001
+        print(f"[settlement_inputs] grader failed sport={sport}: {type(exc).__name__}: {exc}", flush=True)
+        return []
+
+
+def _graded_index(rows: list[dict[str, Any]]) -> dict[tuple, dict[str, Any]]:
+    """(player|'', market, selection) -> grading facts, for prop-level matching.
+
+    Keyed on the player rather than the teams, because a prop's identity is the
+    player and the market -- two players in the same game have entirely
+    different outcomes for the same market name.
+    """
+    index: dict[tuple, dict[str, Any]] = {}
+    for row in rows:
+        player = str(row.get("player") or "").strip().lower()
+        market = str(row.get("market") or "").strip().lower()
+        selection = str(row.get("selection") or "").strip().lower()
+        if not market:
+            continue
+        facts = {key: row[key] for key in ("actual", "result", "pnl") if row.get(key) is not None}
+        if not facts:
+            continue
+        index[(player, market, selection)] = facts
+        # Also keyed without the selection, so an Over row can grade an Under
+        # bet off the same `actual` -- _row_outcome compares actual against the
+        # row's own line and derives the side from the bet, not from here.
+        if "actual" in facts:
+            index.setdefault((player, market, ""), {"actual": facts["actual"]})
+    return index
 
 
 def _outcome_index(finals: list[dict[str, Any]]) -> dict[tuple, dict[str, Any]]:
@@ -209,15 +261,30 @@ def emit_for_date(
     finals: list[dict[str, Any]] = _mlb_finals(date_str) if "mlb" in sports else []
     outcomes = _outcome_index(finals)
 
+    graded_by_sport: dict[str, dict[tuple, dict[str, Any]]] = {}
+    for sport in sports:
+        slug = str(sport).strip().lower()
+        graded_by_sport[slug] = _graded_index(_graded_outcome_rows(slug, date_str))
+
     # THE MERGE. Reconciliation reads outcome and closing price off ONE matched
     # row, so they have to travel together -- see the module docstring. A row
     # with no derivable outcome still ships: it carries a real closing price and
-    # grades the moment an actuals source exists.
+    # grades the moment an outcome does exist.
     graded = 0
     for row in closing:
-        facts = outcomes.get(
-            (row.get("home_team"), row.get("away_team"), row.get("market"), row.get("selection"))
-        )
+        facts = None
+        # Graders first: they cover props, which are most of the volume and
+        # which the team-keyed finals index cannot reach at all.
+        by_player = graded_by_sport.get(str(row.get("sport") or "").strip().lower()) or {}
+        if by_player:
+            player = str(row.get("player_name") or "").strip().lower()
+            market = str(row.get("market") or "").strip().lower()
+            selection = str(row.get("selection") or "").strip().lower()
+            facts = by_player.get((player, market, selection)) or by_player.get((player, market, ""))
+        if not facts:
+            facts = outcomes.get(
+                (row.get("home_team"), row.get("away_team"), row.get("market"), row.get("selection"))
+            )
         if not facts:
             continue
         row.update(facts)

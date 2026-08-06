@@ -968,6 +968,82 @@
     return facts;
   }
 
+  // #215 -- the price strip. A board card used to show a bare "Odds" fact with
+  // no indication of WHICH book quoted it, how many others were quoting, or
+  // whether the number was still alive. All three now ride on item.quote.
+  function renderPriceStrip(item) {
+    const quote = item && item.quote;
+    if (!quote || quote.price === null || quote.price === undefined) return "";
+    const chips = [];
+    const book = String(quote.bookmaker || "").trim();
+    const price = formatAmerican(quote.price);
+    if (book) {
+      chips.push(`<span class="price-chip price-chip--book" title="Price shown is ${escapeHtml(book)}'s">${escapeHtml(book.toUpperCase())} ${escapeHtml(price)}</span>`);
+    }
+    const count = Number(quote.books_quoting || 0);
+    // Gate the "better price available" chip on the measured improvement, NOT
+    // on quote.price_rank. Board rows carry no bookmaker of their own, so
+    // quote_ref describes the BEST book by default and its rank is always 1 --
+    // gating on rank showed "★ best" on every card and never once surfaced a
+    // better price, which is the whole point of the strip.
+    const improvement = Number(item.price_improvement_pct);
+    if (Number.isFinite(improvement) && improvement > 0.01) {
+      // Not an error state -- it is the actionable one. #211 measured 2.79 ROI
+      // points on identical bets from taking the best price instead of an
+      // arbitrary book, so "you are not on the best number" is the single most
+      // valuable thing this strip can say.
+      const better = formatAmerican(quote.best_price);
+      const bestBook = String(quote.best_bookmaker || "").toUpperCase();
+      chips.push(`<span class="price-chip price-chip--better" title="A better price is available at ${escapeHtml(bestBook)}">↗ ${escapeHtml(bestBook)} ${escapeHtml(better)} (+${improvement.toFixed(2)} pts)</span>`);
+    } else if (count > 1) {
+      chips.push(`<span class="price-chip price-chip--best" title="Best available of ${count} books quoting this market">★ best of ${count}</span>`);
+    }
+    // Consensus matters as much as rank: a best price far clear of the field is
+    // usually a stale line rather than an edge, so show what everyone else is at.
+    if (quote.consensus_price !== null && quote.consensus_price !== undefined && count > 1) {
+      chips.push(`<span class="price-chip price-chip--consensus" title="Mean implied probability across ${count} books">cons ${escapeHtml(formatAmerican(quote.consensus_price))}</span>`);
+    }
+    return chips.length ? `<div class="board-card__prices">${chips.join("")}</div>` : "";
+  }
+
+  function formatAmerican(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return n > 0 ? `+${n}` : String(n);
+  }
+
+  function formatAge(seconds) {
+    const n = Number(seconds);
+    if (!Number.isFinite(n) || n < 0) return null;
+    if (n < 90) return `${Math.round(n)}s`;
+    if (n < 5400) return `${Math.round(n / 60)}m`;
+    return `${Math.round(n / 3600)}h`;
+  }
+
+  // TWO CLOCKS, NEVER CONFLATED. book age is how long since the BOOK moved this
+  // number; capture age is how long since we looked. They fail independently:
+  // a 4-hour book age with a 30-second capture age is a DEAD MARKET, and the
+  // single loop-time "Updated" stamp renders it as perfectly fresh. Staleness
+  // is judged on the book clock, never on ours.
+  function renderFreshness(item) {
+    const quote = item && item.quote;
+    if (!quote) return "";
+    const bookAge = formatAge(quote.book_age_seconds);
+    const captureAge = formatAge(quote.capture_age_seconds);
+    if (!bookAge && !captureAge) return "";
+    const stale = Number(quote.book_age_seconds) >= 3600;
+    const parts = [];
+    if (bookAge) {
+      parts.push(`<span class="board-card__clock${stale ? " board-card__clock--stale" : ""}" title="When this book last moved the number">Book ${escapeHtml(bookAge)} ago</span>`);
+    } else {
+      // Unknown must read as unknown. Falling back to capture time here would
+      // rebuild exactly the conflation the separate field exists to remove.
+      parts.push('<span class="board-card__clock board-card__clock--unknown" title="This source does not publish a book timestamp">Book age unknown</span>');
+    }
+    if (captureAge) parts.push(`<span class="board-card__clock" title="When we last polled">checked ${escapeHtml(captureAge)} ago</span>`);
+    return `<div class="board-card__freshness">${parts.join(" &middot; ")}</div>`;
+  }
+
   function renderCard(item, index) {
     const edge = edgeValue(item);
     const tier = edgeTier(edge);
@@ -1000,6 +1076,7 @@
           <div class="board-card__edge">${(edge * 100).toFixed(1)}%</div>
         </div>
         <div class="board-card__prop-line">${prop ? escapeHtml(prop) : "No market detail available for this pick."}</div>
+        ${renderPriceStrip(item)}
         <div class="board-card__facts">
           ${facts.map(([label, value]) => `<div><div class="board-card__fact-label">${escapeHtml(label)}</div><div class="board-card__fact-value">${escapeHtml(value)}</div></div>`).join("")}
         </div>
@@ -1022,7 +1099,7 @@
             <button type="button" class="board-action-button board-action-button--watch" data-watch-action="toggle">☆ Watch</button>
             <button type="button" class="board-action-button board-action-button--ask" data-ask-action="ask-pick">☰ Ask</button>
           </div>
-          ${lastResponseTimestamp ? `<div class="board-card__updated">Updated ${escapeHtml(formatTimestamp(lastResponseTimestamp))}</div>` : ""}
+          ${renderFreshness(item) || (lastResponseTimestamp ? `<div class="board-card__updated">Updated ${escapeHtml(formatTimestamp(lastResponseTimestamp))}</div>` : "")}
         </div>
       </article>
     `;
