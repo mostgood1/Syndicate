@@ -72,7 +72,60 @@ outcome source, with StatsAPI finals kept alongside because the graders read
 worker-local accuracy artifacts and return zero on a cold checkout. Three
 (soccer/ncaab/ncaaf) are still documented `[]`-stubs.
 
-### DEPLOYED + PARTIALLY VERIFIED 2026-08-06 (#217) -- capture works in production; the board join does NOT
+### WORKING IN PRODUCTION 2026-08-06 (#218/#219) -- the board carries per-book prices, verified live
+
+Supersedes the "board join does NOT work" entry below. All services live on
+`d5555c50`. Measured on `/api/home`, not asserted:
+
+```
+candidates: 123   MLB: 46   WITH QUOTE: 11
+markets with quotes: {'Pitcher Outs': 6, 'Moneyline': 3, 'Pitcher Strikeouts': 2}
+rows with a BETTER price available: 7
+  Pitcher Strikeouts OVER Dylan Cease | shown -102 -> best +105 lowvig | 1.71 pts | 11 books
+  Pitcher Outs OVER David Peterson    | shown -103 -> best +100 betonlineag | 0.74 pts
+  Moneyline Home ML                   | shown -120 -> best -119 draftkings | 0.21 pts
+  Total Over 9.0                      | shown -106 -> best +103 lowvig | 2.20 pts | 11 books
+```
+
+Book age and capture age track separately on every row, as intended.
+
+**THREE bugs stood between "tests pass" and "works", none of which any test
+caught.** All three found only by querying production and replaying it offline:
+
+1. **#217 -- identity was a soft filter.** Every narrowing step fell back to the
+   full row set, so an unmatched event returned ANOTHER GAME'S PRICE. A test
+   asserted that fallback as desirable. Worse than returning nothing, because
+   #213 records the quote at bet time and it would poison CLV at the source.
+2. **#218 -- "chc" matches nothing.** Not a prefix of "chicago", not the
+   initials of "chicago cubs". Now resolved through the real per-sport maps.
+   Also found: the merged NBA+WNBA alias table lets NBA's "min" shadow the Lynx,
+   so the leagues are looked up separately.
+3. **#219 -- the game dict was never read correctly.** `_game_date` looked for
+   `game_date`; MLB game dicts carry **`gameDate`**. No date meant an early
+   return, so nothing was attempted at all -- while the identical lookup, replayed
+   offline against the same production quote log, returned a perfect quote_ref.
+   `matchup` is also a **dict** there, not the "LAA @ BAL" string the candidate
+   ROWS carry. Every earlier test built its own tidy game dict and so proved
+   nothing about the real one; there is now one pinned to the live shape.
+
+**Method that actually worked**: download the production artifact, replay the
+real lookup against it locally with the real candidate fields. That is what
+separated "the matcher is broken" (it was not) from "the caller never reached
+it" (it did not).
+
+**Still partial: 11 of 46 MLB candidates.** Batter props (`batter_hits`,
+`batter_total_bases` -- the bulk of the 9,430-row quote log) carry no quote yet.
+Pitcher props and game markets do, so the funnel and the join both work; the
+likely cause is that batter-prop candidates reach the board through a different
+lane that does not pass `_game_bet_candidates_from_game`. **Not yet traced --
+trace it, do not guess.**
+
+Also still true: **the price strip has never been seen in a browser.** Its render
+functions were exercised under node and the data now exists, but `/intelligence`
+would not load in the local driver.
+
+
+### SUPERSEDED 2026-08-06 (#217) -- capture works in production; the board join does NOT
 
 All three services deployed and `live` on `c35740a6`. What was actually measured
 on Render, not assumed:
