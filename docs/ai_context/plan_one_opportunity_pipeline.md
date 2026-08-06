@@ -291,6 +291,38 @@ V2 established it already exists upstream (`prop: "batter_total_bases"`), so thi
 is threading, not inventing — and the counter will show it landing, per sport,
 the moment it does.
 
+### Step 3 shipped — second counter reading (#224)
+
+Same endpoint, after threading canonical keys. Before -> after:
+
+```
+lane                        rows   noKey        complete
+mlb  game_candidate         107    106 ->   0     0 -> 107
+mlb  prop_source_in          46     46 ->  28     0 ->  18
+mlb  prop_dashboard_row      44     45 ->  28     0 ->  16
+wnba game_candidate          12     12 ->   0     0 ->  12
+wnba prop_source_in          18     18 ->  18     0 ->   0
+wnba prop_dashboard_row       9      9 ->   9     0 ->   0
+```
+
+**Game markets went 0% -> 100% complete in both sports.** MLB props went 0% ->
+39% (18 of 46). WNBA props are unchanged, which is correct and expected: their
+rail loader is a different function that was not touched.
+
+This is the methodology working. One change, and the counter says precisely what
+is left rather than "props still don't join":
+
+1. **MLB props: 28 of 46 still keyless.** A second MLB prop source feeds
+   `prop_source_in` that #224 did not reach. Find it by the same route -- the
+   counter names the lane, not a guess.
+2. **WNBA props: 18/18 keyless.** Its loader needs the same three-line treatment
+   `_load_mlb_home_top_prop_items` got.
+3. **`quoted=0` on prop lanes remains the instrumentation artifact** recorded
+   above -- the counter runs before `enrich_prop_rows`. Fix the ordering before
+   reading anything into that column.
+4. **WNBA `game_candidate` still has no date bucket**, so its quote enrichment
+   returns early -- the #219 camelCase-date defect in a second sport, still open.
+
 ## 11. Residual risks
 
 
