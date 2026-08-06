@@ -20,6 +20,13 @@ curl -H "X-Admin-Token: $ADMIN_TOKEN" \
 
 (Try `2026-08-05` too — the date used is the slate date passed to the fetcher.)
 
+> **Ignore one stale negative result.** A background poll run during the session
+> reported *"artifact still absent after ~10 minutes."* It began BEFORE
+> `f4fceb9a` deployed, so its whole window checked code where the diagnostic was
+> still behind the overwrite-skip. It says nothing about whether the fix works.
+> The first meaningful check is one made AFTER `dep-d9pvimnlk1mc73e9ec10`
+> reaches `live`.
+
 ## 2. THE QUESTION IT ANSWERS
 
 `odds_history` is written to three paths. The third,
