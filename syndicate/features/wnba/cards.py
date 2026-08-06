@@ -5252,7 +5252,19 @@ def _fallback_live_player_lens_game(game: dict[str, Any], *, event_id: str | Non
         for pick in side_rows:
             if not isinstance(pick, dict):
                 continue
-            player_name = str(pick.get("player") or pick.get("display_pick") or "").strip()
+            # #236: `display_pick` is "Chelsea Gray OVER 1.5 3PM" -- a DISPLAY
+            # string, and using it whole as the player was the root cause of
+            # WNBA serving 0 of 27 prop rows priced on 2026-08-06 against a
+            # quote shard that held 2,615 prop quotes for 28 players. This value
+            # flows into `player` below and from there into every identity field
+            # the price join reads (player_name/entity/name/player), where the
+            # match is exact. It also never matched `player_lookup` just below,
+            # so the sim projection silently fell back to the line itself.
+            player_name = str(pick.get("player") or "").strip()
+            if not player_name:
+                from syndicate.features.shared.quote_enrichment import _player_identity
+
+                player_name = _player_identity(pick.get("display_pick"))
             market = str(pick.get("market") or "").strip().lower()
             line_value = _safe_float(pick.get("line"))
             if not player_name or not market or line_value is None:

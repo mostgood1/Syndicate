@@ -37,10 +37,37 @@ is the opposite of informative. Rows without a quote keep their original
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
 _QUOTE_CACHE_KEY = "_quote_rows_cache"
+
+# "Chelsea Gray OVER 1.5 3PM" -> "Chelsea Gray". Full words only: a bare O/U
+# would risk clipping a real name.
+_PICK_SUFFIX_RE = re.compile(r"\s+(?:OVER|UNDER)\s+[-+]?\d.*$", re.IGNORECASE)
+
+
+def _player_identity(value: Any) -> str:
+    """The PLAYER out of a field that may hold a whole display pick (#236).
+
+    Identity is a hard filter in `quote_ref_for_bet` -- an exact normalized
+    match on the player -- so a producer that writes the display string into
+    the identity field does not merely look untidy, it makes the row
+    unpriceable. Measured on production 2026-08-06: WNBA served 0 of 27 prop
+    rows priced against a shard holding 2,615 prop quotes for 28 players,
+    because every one of `player_name`/`entity`/`name`/`player` read
+    "Chelsea Gray OVER 1.5 3PM" while the shard said "Chelsea Gray".
+
+    This REPAIRS a known-malformed input shape; it does not loosen the match.
+    The stripped name still has to be exactly right. The root cause is fixed at
+    its producer (wnba/cards.py's `display_pick` fallback), but the same shape
+    is cheap to emit from any sport, so the consumer defends itself too.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    return _PICK_SUFFIX_RE.sub("", text).strip() or text
 
 
 def _implied_probability(price: Any) -> float | None:
@@ -266,7 +293,9 @@ def enrich_candidate_rows(
                 market=candidate.get("market"),
                 selection=candidate.get("pick") or candidate.get("selection"),
                 line=candidate.get("line"),
-                player_name=candidate.get("player_name") or candidate.get("entity"),
+                # Same display-string-as-identity repair as enrich_prop_rows:
+                # WNBA's candidates carry the whole pick here too.
+                player_name=_player_identity(candidate.get("player_name") or candidate.get("entity")) or None,
                 home_team=home_team,
                 away_team=away_team,
                 matchup=matchup,
@@ -337,7 +366,9 @@ def enrich_prop_rows(
         for row in rows:
             if not isinstance(row, dict) or row.get("quote"):
                 continue
-            player = row.get("player_name") or row.get("entity") or row.get("player")
+            player = _player_identity(
+                row.get("player_name") or row.get("entity") or row.get("player")
+            )
             if not str(player or "").strip():
                 # Without a player there is no identity signal at all here, and
                 # guessing from the market alone would attach some other
