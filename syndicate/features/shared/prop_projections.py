@@ -576,10 +576,13 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
         player = row.get("player_name")
         sides = list(row.get("sides") or ())
         considered += 1
+        projected_side = None
         if player:
             projection = index.project(
                 player_name=player, market=row.get("market"), line=row.get("line")
             )
+            # Props: `model_prob_over` is the OVER, so it belongs on that row.
+            projected_side = next((s for s in sides if str(s).lower() in {"over", "yes"}), None)
         else:
             # GAME markets -- h2h, spreads, totals -- join on the team pair and
             # the segment rather than a player name. Projected per SIDE, because
@@ -589,6 +592,7 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
             over_side = next(
                 (s for s in sides if str(s).lower() in {"over", "home", "yes", "1"}), None
             )
+            projected_side = over_side
             if over_side is not None:
                 projection = project_game_market(
                     index,
@@ -602,6 +606,11 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
                 )
         if projection is None:
             continue
+        # Which SIDE this projection describes. A prop's `model_prob_over` is
+        # the over; a game market's is home (or the over). Rendering it against
+        # the wrong side would put home's edge on the away row -- a number that
+        # is right and labelled wrong, which reads as a real signal.
+        projection["side"] = projected_side
         model_prob = projection.get("model_prob_over")
         fair = _no_vig_over_probability(row)
         projection["market_fair_prob_over"] = fair

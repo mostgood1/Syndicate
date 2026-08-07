@@ -40,6 +40,11 @@
   .bg-gap { color: #f0b429; font-size: 11px; cursor: help; }
   .bg-meta { color: #7d8ea4; font-size: 11px; }
   .bg-live { color: #34d399; font-size: 11px; font-weight: 600; }
+  /* Modelled, not measured. Distinct colour + a trailing asterisk so it can
+     never be mistaken for a two-sided no-vig consensus. */
+  .bg-modelled { color: #a78bfa; font-style: italic; cursor: help; }
+  th.bg-sortable { cursor: pointer; user-select: none; }
+  th.bg-sortable:hover { color: #e8eef7; }
   .bg-empty { padding: 30px; text-align: center; color: #7d8ea4; }
 </style>
 {% endblock %}
@@ -71,21 +76,32 @@
   // so the grid opens on the markets that actually look like a grid. Props are
   // thinner and are one tab away.
   var GAME_LINES = ["h2h", "spreads", "totals"];
-  var state = { market: "h2h", markets: [], rows: [], summary: {} };
+  var state = { market: "h2h", markets: [], rows: [], summary: {}, sort: { key: null, dir: 1 } };
 
   function el(id) { return document.getElementById(id); }
   function fmtPrice(p) { return p === null || p === undefined ? "" : (p > 0 ? "+" + p : String(p)); }
 
-  function load() {
+  function load(market) {
     var sport = el("bg-sport").value;
     var date = el("bg-date").value;
     el("bg-status").textContent = "loading…";
-    fetch("/api/board/book-grid?sport=" + encodeURIComponent(sport) + "&date=" + encodeURIComponent(date) + "&limit=400")
+    // Fetch PER MARKET, not a global top-N. The grid is ranked by book
+    // coverage, so a global limit returns the widest markets and silently drops
+    // the thin ones -- which are precisely the one-sided rows the margin model
+    // exists to fill. batter_home_runs (100% `over`, 355 rows) was unreachable
+    // in the UI entirely.
+    var q = "/api/board/book-grid?sport=" + encodeURIComponent(sport) +
+            "&date=" + encodeURIComponent(date) + "&limit=600";
+    if (market) { q += "&market=" + encodeURIComponent(market); }
+    fetch(q)
       .then(function (r) { return r.json(); })
       .then(function (d) {
         state.rows = d.rows || [];
         state.summary = d.summary || {};
-        state.markets = d.markets || [];
+        // `markets` is filtered to the requested market when one is passed, so
+        // keep the full list from the unfiltered load rather than collapsing
+        // the tab bar to the tab you just clicked.
+        if (!market || !state.markets.length) { state.markets = d.markets || []; }
         if (state.markets.indexOf(state.market) === -1) {
           // Prefer a game line, then whatever exists.
           var pick = GAME_LINES.filter(function (m) { return state.markets.indexOf(m) !== -1; })[0];
@@ -104,7 +120,11 @@
       return '<span class="bg-tab' + (m === state.market ? " bg-tab--on" : "") + '" data-m="' + m + '">' + m + "</span>";
     }).join("");
     Array.prototype.forEach.call(el("bg-market-tabs").children, function (node) {
-      node.onclick = function () { state.market = node.getAttribute("data-m"); renderTabs(); renderGrid(); };
+      node.onclick = function () {
+        state.market = node.getAttribute("data-m");
+        renderTabs();
+        load(state.market);   // refetch: this market's own top-N, not a slice
+      };
     });
   }
 
@@ -122,8 +142,42 @@
       '<span class="bg-meta">coverage is for the whole slate, not this tab</span>';
   }
 
+  // Sort key per row. Nulls always sort LAST regardless of direction -- a blank
+  // is "we don't know", and letting it rank above a real value in one direction
+  // would put unknowns at the top of a board people read top-down.
+  function sortValue(r, key) {
+    var p = r.projection || {};
+    var g = r.game || {};
+    var side = p.side || (r.sides || [])[0];
+    var best = (r.best || {})[side] || {};
+    switch (key) {
+      case "mkt": return (r.player_name || (r.away_team || "") + " @ " + (r.home_team || "")) + " " + (r.line === null ? "" : r.line);
+      case "date": return g.start_time_utc || "";
+      case "game": return (g.state === "live" ? "0" : g.state === "pregame" ? "1" : "2") + (g.start_time_utc || "");
+      case "proj": return p.projected === undefined || p.projected === null ? null : p.projected;
+      case "edge": return p.edge_vs_market_pct === undefined || p.edge_vs_market_pct === null ? null : p.edge_vs_market_pct;
+      case "best": return best.price === undefined || best.price === null ? null : best.price;
+      case "fair": return ((r.modelled_fair || {})[side] || {}).fair_price || (p.market_fair_prob_over || null);
+      case "cons": return (r.consensus || {})[side];
+      case "age": return r.age_seconds === null || r.age_seconds === undefined ? null : r.age_seconds;
+      default: return null;
+    }
+  }
+
   function renderGrid() {
     var rows = state.rows.filter(function (r) { return r.market === state.market; });
+    if (state.sort.key) {
+      var k = state.sort.key, dir = state.sort.dir;
+      rows = rows.slice().sort(function (a, b) {
+        var av = sortValue(a, k), bv = sortValue(b, k);
+        var an = (av === null || av === undefined), bn = (bv === null || bv === undefined);
+        if (an && bn) return 0;
+        if (an) return 1;      // nulls last, both directions
+        if (bn) return -1;
+        if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+        return String(av).localeCompare(String(bv)) * dir;
+      });
+    }
     if (!rows.length) {
       el("bg-head").innerHTML = "";
       el("bg-body").innerHTML = '<tr><td class="bg-empty">No captured markets for this selection.</td></tr>';
@@ -135,9 +189,32 @@
     rows.forEach(function (r) { (r.books || []).forEach(function (b) { if (books.indexOf(b) === -1) books.push(b); }); });
     books.sort();
 
-    el("bg-head").innerHTML = "<tr><th class='bg-mkt'>Market</th><th>Game</th><th>Side</th>" +
-      "<th>Proj</th><th>Edge</th><th>Best</th><th>Consensus</th>" +
-      books.map(function (b) { return "<th>" + b + "</th>"; }).join("") + "<th>Updated</th></tr>";
+    // Sortable: every column that means something to sort by carries a key.
+    // Book columns are deliberately NOT sortable -- sorting a grid by one
+    // book's price reorders rows by a number most of them do not have, which
+    // looks like a ranking and is not one.
+    var SORTABLE = [
+      ["mkt", "Market"], ["date", "Date"], ["game", "Game"], [null, "Side"],
+      ["proj", "Proj"], ["edge", "Edge"], ["best", "Best"], ["fair", "Fair"], ["cons", "Consensus"],
+    ];
+    el("bg-head").innerHTML = "<tr>" + SORTABLE.map(function (col, i) {
+      var key = col[0], label = col[1];
+      var cls = (i === 0 ? "bg-mkt" : "");
+      if (!key) { return "<th class='" + cls + "'>" + label + "</th>"; }
+      var arrow = state.sort.key === key ? (state.sort.dir > 0 ? " ▲" : " ▼") : "";
+      return "<th class='" + cls + " bg-sortable' data-sort='" + key + "'>" + label + arrow + "</th>";
+    }).join("") +
+      books.map(function (b) { return "<th>" + b + "</th>"; }).join("") +
+      "<th class='bg-sortable' data-sort='age'>Updated" +
+      (state.sort.key === "age" ? (state.sort.dir > 0 ? " ▲" : " ▼") : "") + "</th></tr>";
+    Array.prototype.forEach.call(el("bg-head").querySelectorAll("[data-sort]"), function (th) {
+      th.onclick = function () {
+        var key = th.getAttribute("data-sort");
+        if (state.sort.key === key) { state.sort.dir = -state.sort.dir; }
+        else { state.sort.key = key; state.sort.dir = 1; }
+        renderGrid();
+      };
+    });
 
     var html = [];
     rows.forEach(function (r) {
@@ -161,19 +238,68 @@
         if (idx === 0 && r.gaps && r.gaps.length) {
           gapMark = ' <span class="bg-gap" title="' + r.gaps.join(" · ").replace(/"/g, "&quot;") + '">&#9888;</span>';
         }
+        // Projection first: `bestTxt` below reads it to decide which side the
+        // model favours. (Defining it after was a `var` hoisting trap -- `proj`
+        // existed but was undefined, so every row threw.)
+        var proj = r.projection || {};
+        // Render Proj/Edge against the side the projection actually DESCRIBES,
+        // not the first row. A prop's model_prob is the over; a game market's
+        // is home. Showing home's edge on the away row is a number that is
+        // right and labelled wrong, which reads as a real signal.
+        var projSide = proj.side || (r.sides || [])[0];
+        var onProjSide = (side === projSide);
+
+        // BEST highlights the side the SIM leans on, not merely the best number.
+        // The green cell answers "which side does our model like", which is the
+        // question the board exists for; a bare best price answers "where is the
+        // biggest number", which is true of both sides at once and tells you
+        // nothing. Falls back to plain formatting when there is no projection,
+        // so a row without a model view never implies one.
+        var simSide = null;
+        if (proj.edge_vs_market_pct !== undefined && proj.edge_vs_market_pct !== null) {
+          // A positive edge favours the projected side; a negative one favours
+          // its opposite, which is a real signal rather than the absence of one.
+          var other = (r.sides || []).filter(function (s) { return s !== projSide; })[0];
+          simSide = proj.edge_vs_market_pct > 0 ? projSide : other;
+        }
         var bestTxt = fmtPrice(best.price);
-        if (best.suspect_stale) { bestTxt = '<span class="bg-stale" title="' + String(r.gaps.join(" · ")).replace(/"/g, "&quot;") + '">' + bestTxt + "</span>"; }
-        else if (best.price !== undefined) { bestTxt = '<span class="bg-best">' + bestTxt + "</span>"; }
+        if (best.suspect_stale) {
+          bestTxt = '<span class="bg-stale" title="' + String(r.gaps.join(" · ")).replace(/"/g, "&quot;") + '">' + bestTxt + "</span>";
+        } else if (best.price !== undefined && best.price !== null) {
+          if (simSide !== null && side === simSide) {
+            bestTxt = '<span class="bg-best" title="the model favours this side (edge ' +
+              (proj.edge_vs_market_pct > 0 ? "+" : "") + proj.edge_vs_market_pct.toFixed(1) +
+              ' pts on ' + projSide + ')">' + bestTxt + " ◄</span>";
+          } else if (simSide !== null) {
+            bestTxt = '<span class="bg-meta" title="the model does not favour this side">' + bestTxt + "</span>";
+          } else {
+            bestTxt = '<span class="bg-price">' + bestTxt + "</span>";
+          }
+        }
 
         // Projection + edge: the differentiator, and the reason a blank cell is
         // never a dash without a cause. Edge is signed against the NO-VIG
         // market probability, so the sign means what it looks like it means.
-        var proj = r.projection || {};
-        var projTxt = (idx === 0 && proj.projected !== undefined && proj.projected !== null)
-          ? '<span title="' + String(proj.source || "").replace(/"/g, "&quot;") + " / " + String(proj.basis || "") + '">' + proj.projected + "</span>"
-          : (idx === 0 ? '<span class="bg-missing">·</span>' : "");
+        // For a GAME market the projection is a win/cover probability, not a
+        // projected stat -- "0.495" alone is unreadable. Name the team it
+        // refers to instead, which is the thing a reader is actually asking.
+        var projTxt = "";
+        if (onProjSide) {
+          var isGame = (proj.source === "game_simulation");
+          if (isGame && proj.model_prob_over !== null && proj.model_prob_over !== undefined) {
+            var teamName = (String(projSide).toLowerCase() === "home") ? r.home_team
+                         : (String(projSide).toLowerCase() === "away") ? r.away_team
+                         : String(projSide);
+            projTxt = '<span title="' + String(proj.basis || "") + '">' + String(teamName || projSide) +
+              " " + (proj.model_prob_over * 100).toFixed(1) + "%</span>";
+          } else if (proj.projected !== undefined && proj.projected !== null) {
+            projTxt = '<span title="' + String(proj.source || "").replace(/"/g, "&quot;") + " / " + String(proj.basis || "") + '">' + proj.projected + "</span>";
+          } else {
+            projTxt = '<span class="bg-missing">·</span>';
+          }
+        }
         var edgeTxt = "";
-        if (idx === 0) {
+        if (onProjSide) {
           if (proj.edge_vs_market_pct === undefined || proj.edge_vs_market_pct === null) {
             edgeTxt = '<span class="bg-missing" title="no two-sided market, so no-vig fair value cannot be computed">·</span>';
           } else {
@@ -189,6 +315,19 @@
         // normal; the same age in the 7th is a dead line. Without this the
         // Updated column cannot be read.
         var g = r.game || {};
+        // Date separate from time: a board that spans a slate boundary (and the
+        // forward-looking scope in the plan spans a week) is unreadable when
+        // "7:05" could be tonight or Thursday.
+        var dateTxt = "";
+        if (idx === 0) {
+          if (g.start_time_utc) {
+            var dt = new Date(g.start_time_utc);
+            dateTxt = '<span class="bg-meta">' +
+              dt.toLocaleDateString([], { month: "short", day: "numeric" }) + "</span>";
+          } else {
+            dateTxt = '<span class="bg-missing">·</span>';
+          }
+        }
         var gameTxt = "";
         if (idx === 0) {
           if (g.state === "live") {
@@ -205,15 +344,36 @@
           }
         }
 
+        // Fair value. A MODELLED fair (one-sided market, derived from the
+        // book's own measured margin) is rendered in a different colour with
+        // its assumption in the tooltip -- it must never look like a measured
+        // two-sided consensus. #242: a value wearing a measurement's clothes is
+        // worse than a blank, because it looks authoritative.
+        var fairTxt = '<span class="bg-missing">·</span>';
+        var modelled = (r.modelled_fair || {})[side];
+        if (modelled) {
+          fairTxt = '<span class="bg-modelled" title="' +
+            String(modelled.note || "").replace(/"/g, "&quot;") + '">' +
+            fmtPrice(modelled.fair_price) + "*</span>";
+        } else if (proj.market_fair_prob_over !== undefined && proj.market_fair_prob_over !== null &&
+                   String(side).toLowerCase().match(/^(over|home|yes|1)$/)) {
+          // Measured, two-sided: shown plainly.
+          var fp = proj.market_fair_prob_over;
+          var fairPrice = fp > 0.5 ? Math.round(-100 * fp / (1 - fp)) : Math.round(100 * (1 - fp) / fp);
+          fairTxt = '<span class="bg-meta" title="two-sided no-vig consensus">' + fmtPrice(fairPrice) + "</span>";
+        }
+
         var span = ' rowspan="' + r.sides.length + '"';
         html.push(
           "<tr>" +
           (idx === 0 ? '<td class="bg-mkt"' + span + ">" + label + lineTxt + gapMark + "</td>" : "") +
+          (idx === 0 ? "<td" + span + ">" + dateTxt + "</td>" : "") +
           (idx === 0 ? "<td" + span + ">" + gameTxt + "</td>" : "") +
           '<td class="bg-side">' + side + "</td>" +
-          (idx === 0 ? "<td" + span + ">" + projTxt + "</td>" : "") +
-          (idx === 0 ? "<td" + span + ">" + edgeTxt + "</td>" : "") +
+          "<td>" + projTxt + "</td>" +
+          "<td>" + edgeTxt + "</td>" +
           "<td>" + bestTxt + "</td>" +
+          "<td>" + fairTxt + "</td>" +
           '<td class="bg-meta">' + fmtPrice((r.consensus || {})[side]) + "</td>" +
           cells +
           (idx === 0 ? '<td class="bg-meta"' + span + ">" + (r.age_seconds === null ? "?" : Math.round(r.age_seconds / 60) + "m") + "</td>" : "") +
@@ -224,9 +384,10 @@
     el("bg-body").innerHTML = html.join("");
   }
 
-  el("bg-refresh").onclick = load;
-  el("bg-sport").onchange = load;
-  el("bg-date").onchange = load;
+  function reload() { state.markets = []; load(); }
+  el("bg-refresh").onclick = reload;
+  el("bg-sport").onchange = reload;
+  el("bg-date").onchange = reload;
   load();
 })();
 </script>

@@ -2257,6 +2257,32 @@ def _attach_book_grid_projections(grid: list, *, sport: str, selected_date: str)
         return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
 
 
+def _attach_book_grid_margin_model(grid: list) -> dict:
+    """Fill fair value on one-sided rows from each book's measured margin (S4).
+
+    The profile is built from THIS slate's two-sided markets rather than carried
+    as a constant: holds move with the book, the sport and the day, and a stale
+    constant is the defect class this codebase has paid for most often (a 900MB
+    floor sized for a 2GB container; a 2.3MB payload figure describing a system
+    that had changed underneath it).
+
+    Never displaces a measured two-sided fair value -- it only fills rows that
+    have none, and everything it writes is labelled
+    `fair_method: "book_margin_model"`.
+    """
+    try:
+        from syndicate.features.shared.book_margin_model import (
+            apply_margin_model,
+            build_margin_profile,
+        )
+
+        profile = build_margin_profile(grid)
+        return apply_margin_model(grid, profile)
+    except Exception:
+        _LOGGER.exception("BOOK_GRID_MARGIN_MODEL_FAILURE")
+        return {"rows_modelled": 0, "error": "margin model failed"}
+
+
 @intelligence_bp.get("/api/board/book-grid")
 def board_book_grid_api():
     """L1-A: every book's price for every market on a sport/date (S1).
@@ -2308,6 +2334,13 @@ def board_book_grid_api():
     # build_cards_page_context, which is the call that OOM-killed the worker.
     projection_coverage = _attach_book_grid_projections(grid, sport=sport, selected_date=selected_date)
 
+    # S4: fair value for markets the feed only ever quotes ONE side of, from the
+    # book's own measured margin. De-vig needs both sides, so ~24% of rows had
+    # no fair value at all -- `batter_home_runs` is 100% `over` across all 11
+    # books, so the other side cannot be captured at any cadence. Measured from
+    # this slate's two-sided markets, never a carried constant.
+    margin_coverage = _attach_book_grid_margin_model(grid)
+
     # Summarise BEFORE the market filter and the limit, so the coverage numbers
     # describe the slate rather than the current view. A summary computed after
     # filtering would report "100% of rows have 3+ books" on a filtered view and
@@ -2329,6 +2362,7 @@ def board_book_grid_api():
                 "summary": summary,
                 "game_state": game_state_coverage,
                 "projections": projection_coverage,
+                "margin_model": margin_coverage,
                 "returned": min(len(grid), limit),
                 "total_rows": len(grid),
                 "rows": grid[:limit],
