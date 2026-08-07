@@ -119,10 +119,22 @@
     return state.rows;
   }
 
+  // The server caps `rows` but summarises the WHOLE slate, so the "all" tab must
+  // report the slate count and say when it is showing fewer -- a tab reading
+  // "2000" beside a summary reading "2726" is a silent truncation, which is the
+  // same defect the L1 grid shipped with.
+  //
+  // The arb and low-hold tabs are NOT truncated, and that is structural rather
+  // than lucky: the server sorts by arb descending, i.e. by overround ascending,
+  // and both of those views select the low-overround end. They can only ever be
+  // at the head of the list, never past the cap.
   function countFor(view) {
     if (view === "arb") return state.rows.filter(function (r) { return r.is_arbitrage; }).length;
     if (view === "low_hold") return state.rows.filter(function (r) { return r.is_low_hold; }).length;
-    return state.rows.length;
+    var slate = (state.summary || {}).rows;
+    return (slate !== undefined && slate !== null && slate > state.rows.length)
+      ? state.rows.length + " of " + slate
+      : state.rows.length;
   }
 
   function renderTabs() {
