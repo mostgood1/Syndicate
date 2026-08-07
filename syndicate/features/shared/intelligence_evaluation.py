@@ -14,13 +14,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import uuid
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from statistics import mean
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Iterator, Mapping
 
 from syndicate.features.shared.artifact_manifests import load_artifact_manifests
 from syndicate.features.shared.model_scoring import binary_calibration_metrics
@@ -108,6 +109,40 @@ def _append_jsonl(path: Path, payload: Mapping[str, Any]) -> None:
     with path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, default=str))
         handle.write("\n")
+
+
+def _iter_jsonl_lines(path: Path) -> Iterator[str]:
+    """Lines of a JSONL file, one at a time, never the whole file at once."""
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                yield line
+    except OSError:
+        return
+
+
+def _count_jsonl_records(path: Path) -> int:
+    """Non-blank line count, streamed.
+
+    #254. This was `sum(1 for _ in path.read_text(...).splitlines() if _.strip())`
+    at both manifest-writing call sites, and both run on the APPEND path -- once
+    per record written. So every appended record pulled the entire chunk into a
+    string and then built a list holding every line of it as a separate string,
+    to produce one integer. Production chunks measured 367MB and 480MB on
+    2026-08-07, and the ledger is appended to continuously by settlement.
+
+    Streaming keeps one line live at a time. Same result, and the same defect
+    #75 fixed in odds_lifecycle._load_jsonl_rows.
+    """
+    count = 0
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    count += 1
+    except OSError:
+        return 0
+    return count
 
 
 def _is_chunked_ledger_path(path: Path | str | None) -> bool:
@@ -346,36 +381,73 @@ def _append_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> 
         index[identity] = {"chunk": chunk_name, "path": str(chunk_path), "updated_at": _utc_now()}
         _write_chunk_index(target, index)
     try:
-        record_count = sum(1 for _ in chunk_path.read_text(encoding="utf-8").splitlines() if _.strip())
+        record_count = _count_jsonl_records(chunk_path)
     except Exception:
         record_count = 1
     _write_chunk_manifest(target, chunk_name=chunk_name, record_count=record_count)
 
 
 def _replace_ledger_line(file_path: Path, identity: str, payload: Mapping[str, Any]) -> bool:
-    try:
-        lines = file_path.read_text(encoding="utf-8").splitlines()
-    except Exception:
-        return False
+    """Rewrite one record in place, streaming.
+
+    #254. This was a read-modify-write that held up to FOUR full copies of the
+    chunk live at once: `read_text()` (the whole file as one string),
+    `splitlines()` (a list holding every line as its own string), `new_lines`
+    (a second such list), and `"\\n".join(new_lines)` (a second whole-file
+    string) -- before a single byte was written. Production chunks measured
+    367MB and 480MB on 2026-08-07, so updating one settlement record could cost
+    ~2GB on a worker with ~1.4GB of headroom.
+
+    Now: stream the original into a sibling temp file one line at a time, then
+    atomically replace. Peak is one line plus the OS page cache.
+
+    Semantics are unchanged, deliberately including the awkward part -- when the
+    identity is not found the original file is left byte-for-byte untouched and
+    False is returned. That is why the temp file is discarded rather than
+    promoted on the not-found path.
+    """
+    tmp_path = file_path.with_suffix(file_path.suffix + ".replace.tmp")
     replaced = False
-    new_lines: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if not replaced:
-            try:
-                existing = json.loads(stripped)
-            except Exception:
-                existing = None
-            if isinstance(existing, dict) and _ledger_record_identity(existing) == identity:
-                new_lines.append(_canonical_payload(dict(payload)))
-                replaced = True
-                continue
-        new_lines.append(stripped)
-    if not replaced:
+    try:
+        with file_path.open("r", encoding="utf-8") as source, tmp_path.open(
+            "w", encoding="utf-8"
+        ) as sink:
+            for line in source:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                if not replaced:
+                    try:
+                        existing = json.loads(stripped)
+                    except Exception:
+                        existing = None
+                    if isinstance(existing, dict) and _ledger_record_identity(existing) == identity:
+                        sink.write(_canonical_payload(dict(payload)))
+                        sink.write("\n")
+                        replaced = True
+                        continue
+                sink.write(stripped)
+                sink.write("\n")
+    except Exception:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
         return False
-    file_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
+    if not replaced:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        return False
+    try:
+        os.replace(tmp_path, file_path)
+    except OSError:
+        try:
+            tmp_path.unlink()
+        except OSError:
+            pass
+        return False
     return True
 
 
@@ -415,7 +487,7 @@ def _update_evaluation_ledger_record(path: Path, payload: Mapping[str, Any]) -> 
     index[identity] = {"chunk": chunk_name, "path": str(chunk_path), "updated_at": _utc_now()}
     _write_chunk_index(target, index)
     try:
-        record_count = sum(1 for _ in chunk_path.read_text(encoding="utf-8").splitlines() if _.strip())
+        record_count = _count_jsonl_records(chunk_path)
     except Exception:
         record_count = 1
     _write_chunk_manifest(target, chunk_name=chunk_name, record_count=record_count)
@@ -472,20 +544,31 @@ def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
                 continue
         except OSError:
             continue
+        # #254: stream the chunk. This was read_text() + splitlines(), which is
+        # the exact defect #75 fixed in odds_lifecycle._load_jsonl_rows -- the
+        # ceiling above bounds which files are SKIPPED, never what reading an
+        # accepted one costs. A chunk one byte under the ceiling built a whole
+        # 256MB string, then splitlines() built a list holding every line of it
+        # as a separate string, before a single record was parsed.
+        #
+        # Measured on refresh-worker 2026-08-07 (13:01:32Z): the two skipped
+        # chunks were 367,229,260 and 480,112,146 bytes against ceiling
+        # 256,000,000 -- so real chunks sit in the same order of magnitude as
+        # the ceiling, and "under the limit" is not the same as "small".
         try:
-            content = chunk_path.read_text(encoding="utf-8")
+            with chunk_path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        payload = json.loads(line)
+                    except Exception:
+                        continue
+                    if isinstance(payload, dict):
+                        rows.append(payload)
         except Exception:
             continue
-        for line in content.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                continue
-            if isinstance(payload, dict):
-                rows.append(payload)
     return rows
 
 
@@ -1065,7 +1148,9 @@ def _iter_record_payloads(records: Iterable[Mapping[str, Any]] | None = None, *,
     if not path.exists():
         return []
     rows: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    # #254: streamed -- the unchunked-ledger fallback, which has no ceiling
+    # either. See _count_jsonl_records for the full note.
+    for line in _iter_jsonl_lines(path):
         line = line.strip()
         if not line:
             continue
@@ -1785,20 +1870,22 @@ def _load_chunk_records_for_window(since: str, until: str, ledger_path: Path | s
         chunk_path = _ledger_chunk_path(target_path, date_token)
         if not chunk_path.exists():
             continue
+        # #254: streamed. This window loader has NO size ceiling at all, so it
+        # was the one path that would read a 480MB chunk whole.
         try:
-            content = chunk_path.read_text(encoding="utf-8")
+            with chunk_path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        payload = json.loads(line)
+                    except Exception:
+                        continue
+                    if isinstance(payload, dict):
+                        records.append(payload)
         except Exception:
             continue
-        for line in content.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                continue
-            if isinstance(payload, dict):
-                records.append(payload)
     return records
 
 
@@ -1839,20 +1926,25 @@ def load_recent_evaluation_records(
                 flush=True,
             )
             continue
+        # #254: streamed, same reason as the sibling loop in
+        # _load_chunked_ledger_rows. This is the hotter of the two -- it backs
+        # the board's scoring/ranking pass -- and its ceiling is 64MB rather
+        # than 256MB, so the per-chunk blowup was smaller but paid far more
+        # often.
         try:
-            content = chunk_path.read_text(encoding="utf-8")
+            with chunk_path.open("r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        payload = json.loads(line)
+                    except Exception:
+                        continue
+                    if isinstance(payload, dict):
+                        records.append(payload)
         except Exception:
             continue
-        for line in content.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                payload = json.loads(line)
-            except Exception:
-                continue
-            if isinstance(payload, dict):
-                records.append(payload)
     return records
 
 
