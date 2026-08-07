@@ -2519,10 +2519,36 @@ def _query_preferences(
 #
 # The floor is per-SPORT headroom, not per-pass: the loop holds every sport's
 # hydrated overview simultaneously (peak is the SUM, see the comment inside),
-# so what matters is whether the next sport fits. Replayed against the trace
-# above: before nhl ~1376MB effective -> proceed; before soccer ~943MB ->
-# stop, which is the kill that would not have happened.
-_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 1000 * 1024 * 1024
+# so what matters is whether the NEXT sport fits.
+#
+# It must therefore be the cost of the most expensive sport, not the average.
+# Deployed first at 1000MB, which was sized off soccer/nhl, and it fired exactly
+# as designed (`OVERVIEW_STOPPED_FOR_MEMORY next_sport=soccer sports_done=7`)
+# while the worker kept dying anyway -- because MLB, which runs FIRST, is in a
+# different class entirely. Measured 2026-08-07 with the split checkpoint added
+# in the same change:
+#     05:10:57  post_pull_hot_artifacts    993.8MB container   478MB anon
+#     05:10:57  OVERVIEW_SPORT_BEGIN mlb
+#     05:12:10  mlb board_contract        3922.6MB  95.8%      <- +2.9GB, 73s
+#     05:12:23  post_build_overview       3911.4MB container  3009MB anon
+# MLB alone is 2.9GB, and `anon` does not come back down afterwards (boot is
+# 84MB), so the following cycle starts at 3478MB and is killed during a pass
+# that would otherwise be cheap. A 1000MB floor waves MLB through every time.
+#
+# 3000MB is that measurement. Consequences, stated rather than discovered later:
+# on a fresh boot (container ~994MB) MLB still builds and everything after it is
+# skipped; on a ratcheted cycle (container 3179MB) the whole pass is skipped and
+# the process survives. That is a real reduction in board coverage, and it is
+# the correct trade while the pass is producing candidate_count=0 anyway -- a
+# skipped cycle keeps the sims, the odds capture and every other loop in this
+# process alive, where a SIGKILL takes all of them with it.
+#
+# This is a circuit breaker around MLB's cost, NOT a fix for it. The real work
+# is making build_cards_page_context cheaper or not running it hydrated on the
+# worker at all -- handoff_refresh_worker_oom.md measured the same call at
+# ~3.7GB on 2026-07-26 and its `force_refresh=True` note (the overview cache is
+# defeated on every cycle) is the obvious next lever.
+_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000 * 1024 * 1024
 
 
 def _overview_headroom_exhausted(*, next_sport: str, sports_done: int, sports_total: int) -> bool:

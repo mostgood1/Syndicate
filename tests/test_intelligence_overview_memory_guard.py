@@ -35,6 +35,20 @@ def _snapshot(*, headroom_mb: float, min_required_mb: float) -> dict:
     }
 
 
+def test_per_sport_floor_covers_the_most_expensive_sport():
+    # The floor must be the cost of the WORST sport, not the average, because
+    # MLB runs first and is in a different class. Shipped first at 1000MB,
+    # sized off soccer/nhl; it fired exactly as designed before soccer and the
+    # worker kept dying, because MLB had already spent the budget:
+    #     05:10:57  post_pull_hot_artifacts   993.8MB container
+    #     05:12:10  mlb board_contract       3922.6MB  95.8%   -> +2.9GB
+    # Pinned so the floor cannot drift back under the measured cost of the
+    # sport it is supposed to stop.
+    floor_mb = intelligence_module._OVERVIEW_MIN_SAFE_HEADROOM_BYTES / BYTES_PER_MB
+    measured_mlb_hydrated_cost_mb = 2928.8
+    assert floor_mb >= measured_mlb_hydrated_cost_mb
+
+
 def test_headroom_exhausted_is_false_when_unmeasurable():
     # Local dev has no cgroups. A missing measurement must not silently
     # truncate the board everywhere that is not Render.
