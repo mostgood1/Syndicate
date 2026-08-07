@@ -139,6 +139,42 @@ prop that is tens of rows. It is O(quotes × identified), bounded and small next
 to the per-row full-shard read above. I named it "prime suspect" having never
 measured it; the source says it is not. Deprioritise it.
 
+### 1.1d MEASURED by a third session — #232 is the trigger, and my §1.1c fix was wrong
+
+Session `local_69697977` measured what §1.1c only inferred. Their numbers
+supersede mine:
+
+- **One `read_book_quotes` call on a real 15.1MB MLB shard = +95.8MB RSS
+  (6.3× file size), and 0MB is ever returned to the OS.** Projected to
+  production's 90.2MB shard: **~572MB per sport, per build**, summed across
+  eight sports.
+- **Repeated reads are FREE.** 25 reads cost exactly the same as 1, including
+  when interleaved with retained per-row objects.
+
+⇒ The memory is spent entirely on the **first** read of each sport. The per-row
+loop is a **CPU** problem, not a memory one.
+
+**This invalidates my proposed fix.** §1.1c recommended wiring the dead
+`_QUOTE_CACHE_KEY` cache. That would fix the CPU and **do nothing for the
+memory**, because the cost is the first read and it is never reclaimed. The
+repair belongs **inside `read_book_quotes`** — stream and filter rather than
+materialising the whole shard into a list.
+
+**And the trigger is `#232`, mine — but it was not a wrong fix.** On
+refresh-worker the per-row read had always cost nothing, because the shard was
+never there: `path.is_file()` was False and the read returned instantly. My own
+`#232` commit message says it — *"book_quotes had NEVER reached refresh-worker,
+zero log lines there, ever."* `#232` added book_quotes to
+`_required_daily_artifact_paths` and delivered the 90MB shard, at which point the
+latent per-row read stopped being free. Correct fix, exposed a latent defect.
+
+They also independently exonerated **`#238`** (as §1.1c had) and **`#247`**
+(blamed by proximity — auto-deploy is off, so that deploy was the first to carry
+`#232` to the worker: ~40 commits, not one; `#247` touches no memory path).
+
+**Nothing I shipped needs reverting on this evidence** — including the `#237`/
+`#241` reverts, which on their measurement were unnecessary.
+
 ### 1.2 Things I shipped that made the board *look* fixed while it wasn't
 
 - `#242`: I rendered suppressed values as real ones. `Number(null)` is `0` and

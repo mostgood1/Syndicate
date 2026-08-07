@@ -95,18 +95,25 @@ advisory. This is W2 in the plan. Fix the scheduling, not the interval.
 
 ## The remaining work, in order
 
-**W1 — headroom. START HERE: the per-row full-shard read.** MEASURED
-2026-08-07: `quote_ref_for_bet` calls `read_book_quotes` as its first statement,
-`read_book_quotes` has **no cache**, and `quote_ref_for_bet` is called **per row**
-from three sites in `quote_enrichment.py`. So every enriched row re-reads and
-re-parses the whole 90MB / ~122k-row shard — ~200 full materialisations per board
-build. `_QUOTE_CACHE_KEY` at `quote_enrichment.py:44` is declared and never used;
-the original author saw this coming. Fix: hoist the read out and pass rows in, or
-wire that cache keyed `(sport, date, mtime)`. This is almost certainly the
-dominant per-build allocation and the likely driver behind the anon ratchet.
-(`#238`'s `market_sides_for_quote` is NOT the problem — it receives the
-identity-filtered subset, tens of rows, not 122k. The post-mortem's earlier
-"prime suspect" call was unmeasured and wrong.)
+**W1 — headroom. START HERE: `read_book_quotes` materialises the whole shard.**
+MEASURED by session `local_69697977` on a real 15.1MB MLB shard: **one call =
++95.8MB RSS (6.3× file size), and 0MB is ever returned to the OS.** Projected to
+production's 90.2MB shard: **~572MB per sport, per build**, across eight sports.
+
+Crucially, **repeated reads are free** — 25 reads cost the same as 1. So the
+memory is spent on the **first** read of each sport, and the per-row call
+pattern (`quote_ref_for_bet` → `read_book_quotes`, called per row from three
+loops in `quote_enrichment.py`) is a **CPU** problem, not a memory one.
+
+**Therefore: do NOT "just add a cache."** Wiring the dead `_QUOTE_CACHE_KEY` at
+`quote_enrichment.py:44` fixes the CPU and does nothing for the memory. The fix
+belongs **inside `read_book_quotes`**: stream and filter, rather than building a
+~122k-dict list. (An earlier version of this handoff recommended the cache. That
+was wrong and is corrected here.)
+
+Trigger was `#232`, which delivered the shard to refresh-worker for the first
+time — a correct fix that exposed a latent read. `#238` and `#247` are both
+measured-exonerated; do not spend time on them.
 
 **W1 (cont) — headroom.** `#248` (tail reads for append-only shards, 90 MB → KB) is
 shipped and verified; it makes the *existing* repair path cheaper and adds no
