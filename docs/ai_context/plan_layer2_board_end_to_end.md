@@ -1,0 +1,255 @@
+# The Layer 2 board, end to end: evaluation and one plan
+
+Written 2026-08-07 after ten consecutive point-fixes (#235-#245) that each
+corrected a real defect and none of which made the board trustworthy. The user's
+verdict — "I feel like we are playing whack a mole" — is correct, and this
+document exists to replace that mode with one plan.
+
+Everything below is **measured on production**, not inferred. Where a number
+appears, it came from the live API, the real 74MB quote shard, the Render logs,
+or the served DOM.
+
+---
+
+## 1. What the pipeline is, and where it is actually broken
+
+```
+OddsAPI ──► live-odds-worker ──► web disk ──► refresh-worker ──► board state ──► web ──► UI
+          capture             PUBLISH        PULL             enrich+gate      serve   render
+             │                   │             │                   │             │        │
+            §2.1               §2.2          §2.3                §2.4          §2.5     §2.6
+                                                    │
+                                              settlement/CLV  §2.7  ◄── the loop that is supposed to close
+```
+
+### 2.1 Capture — thin field, no anchor, and 76% of spend on the wrong lane
+
+| measured | value |
+|---|---|
+| books captured | **11** (draftkings, betmgm, betrivers, williamhill_us, fanduel, fanatics, bovada, betonlineag, mybookieag, betus, lowvig) |
+| sharp anchor | **none** — no Pinnacle, no Circa, no exchange |
+| projected 30-day credits | **2,022,867** against a 5M cap |
+| props share of spend | **310,240 / 410,127 = 76%** |
+| game lines share | 21,988 = **5.4%** |
+| MLB median two-sided hold | **6.25%** (p10 3.27, p90 7.36) |
+| `batter_home_runs` | **12,409 rows, 100% one-sided** — no `under` from any of 11 books |
+
+Two consequences. First, fair value is a median of eleven retail books rather
+than an anchor — defensible, but it is the ceiling on every EV number we
+publish. Second, we spend 76% of the budget on props and 5% on the game lines
+where a sharp book would actually be available.
+
+### 2.2 Publish — **currently failing, live**
+
+`live-odds-worker` cannot push artifacts to web. Measured in one hour of logs:
+
+```
+PUBLISH_FAILED × 100 — HTTP 502 Bad Gateway
+  mlb_source/tracking/book_quotes/2026-08-06.jsonl        (74 MB)
+  mlb_source/.../oddsapi_hitter_props_2026_08_06.json
+  wnba_source/data/processed/boxscores_history.csv
+  soccer_source/championship/api/live_state/...
+```
+
+Not size-specific — small CSVs fail too. The pull side was taught to stream in
+1MB chunks (#233); **the push side never was**, and now fails broadly. This is
+upstream of every board symptom: if the push fails, web's copy is stale, and
+refresh-worker faithfully pulls stale data.
+
+### 2.3 Transport — three defects, all fixed this session, all the same shape
+
+- #237 pull fired only when a file was **missing**, never when stale — the
+  worker froze on a 21:03Z snapshot.
+- #239 soccer shards by **fixture date**; the pull only asked for today, got a
+  404 forever, and logged "absent" — which read as "no soccer quotes exist".
+- #241 the pull lived **inside the cache it was supposed to invalidate**.
+  Nothing changed because nothing was fetched; nothing was fetched because
+  nothing had changed.
+
+### 2.4 Enrich — de-vig now exists; identity is still the weak joint
+
+- #238 shipped no-vig fair value. Before it, every EV on the board was
+  `model_probability − vigged implied` — biased low by ~half the hold (~3.1
+  points at our median).
+- Identity is where props die. #236: WNBA carried `"Chelsea Gray OVER 1.5 3PM"`
+  in **all four** identity fields; 0 of 27 rows priced against a shard holding
+  2,615 prop quotes for 28 players.
+- Simultaneity is not optional: requiring both legs fresh and within 180s of
+  each other **dropped 88% of raw pairs** (2,354 → 282). Without it the shard's
+  all-day log pairs a pregame price with an 8th-inning one.
+
+### 2.5 Gate — now one rule, running at serve time (#245)
+
+Current live verdict on 200 rows:
+
+```
+opportunity 14 · dead 20 · watchlist 166
+reasons: no_market_posted 166 · live_market_stale 20 · fair_unavailable 9
+```
+
+### 2.6 Board — honest now, but thin
+
+14 opportunities, zero blank Book/Age cells, **9 of 14 with no fair price**
+(one-sided markets). Blended score exists; its weights are an unvalidated prior.
+
+### 2.7 The feedback loop — **open, and this is the most important finding**
+
+```
+total_recommendation_records  8,276
+settled                           0
+matched                           0
+unmatched                     8,276
+   no_graded_rows             3,716   (outcomes never ingested)
+   no_key_match               4,560   (outcomes exist, the join fails)
+```
+
+**8,276 recommendations, zero settled.** Graded rows that do exist are
+`moneyline` only — no prop outcomes at all. So:
+
+- no CLV, no ROI, no calibration;
+- the blended-score weights **cannot be validated** — they are a prior forever;
+- the sim edge, our entire differentiator, is **unfalsifiable**;
+- and the `no_key_match` half (4,560) is the *same identity-join defect* as
+  #236, just at the settlement end instead of the pricing end.
+
+A system that produces recommendations and cannot learn whether they were any
+good is not an OddsJam-class product. It is a very well-instrumented guess.
+
+---
+
+## 3. The three structural defects behind eleven symptoms
+
+Every fix #235-#245 traces to one of these. Fixing symptoms is why there were
+eleven.
+
+**D1 — Identity has no contract.** The same join (player + market + line +
+event) is re-implemented at the producer, the enricher, the settlement matcher,
+and each sport's cards module. It fails independently in each. #236, #221, and
+settlement's 4,560 `no_key_match` are one defect wearing three hats.
+
+**D2 — Freshness is not a first-class property.** Every stage assumes what it
+reads is current. Nothing carries "as of when", so staleness is invisible until
+it reaches a human — the user saw 7-hour-old odds before any instrument did.
+
+**D3 — There is no closed loop.** Nothing measures whether output was correct,
+so no parameter can ever be tuned by evidence, and every quality question is
+settled by argument instead of data.
+
+---
+
+## 4. The plan
+
+Five phases. Each has an exit criterion that is a **number**, not a judgement.
+Nothing in a later phase starts before its predecessor's number is met.
+
+### Phase 0 — Stop the bleeding (transport)
+Fix the publish path to stream, mirroring #233's pull fix. Nothing downstream
+can be evaluated while 100 pushes an hour fail.
+
+**Exit:** `PUBLISH_FAILED` = 0 over one hour; web's MLB shard mtime never more
+than 5 minutes behind live-odds-worker's.
+
+### Phase 1 — One identity contract (kills D1)
+A single `market_identity()` producing a canonical key from (sport, event,
+market_key, player, line, side), used by **every** producer, the enricher, and
+the settlement matcher. Not a shared helper anyone may bypass — the only
+constructor, with producers emitting it and consumers refusing rows without it.
+
+**Exit:** settlement `unmatched_no_key_match` drops from 4,560 to <100; prop
+rows priced ≥90% wherever a shard covers the slate.
+
+### Phase 2 — Close the loop (kills D3)
+Ingest prop outcomes (only moneyline is graded today), settle the 8,276 pending
+records, and publish CLV per signal bucket.
+
+**Exit:** `settled > 0` and rising daily; CLV computed for ≥500 settled
+recommendations; a per-bucket table (EV / sim-edge / steam / arb) with real
+closing-line numbers.
+
+### Phase 3 — Fair value everywhere (the blanks)
+Two independent tracks:
+- **Sharp anchor** for game lines: add `regions="us,eu"` (Pinnacle, key
+  `pinnacle`) to the *game-line* fetch only — ~+5.4% credits on a 2.02M base.
+  Then teach `consensus_fair_probability` to *prefer* sharp books, or we have
+  paid for an anchor and used it as one vote of twelve.
+- **Margin model** for one-sided props: de-vig a lone price using that book's
+  own measured margin from its two-sided markets. Labelled
+  `fair_method: "book_margin_model"` — never confusable with a true two-sided
+  fair. This is the only thing that fills `batter_home_runs`.
+
+**Exit:** `fair_unavailable` = 0 on the opportunity lane; every fair price
+carries a `fair_method`.
+
+### Phase 4 — The five signals, ranked by evidence (the north star)
+Only now are the remaining signals worth surfacing, because only now can they be
+scored honestly: arbitrage, middles, low-hold, mispricing, sim edge. Re-weight
+the blended score from Phase 2's CLV instead of the current prior.
+
+**Exit:** score weights derived from measured CLV, with the prior retired and
+the derivation written down.
+
+### Phase 5 — Layer 1 odds screen
+Every book × every line per market. The data already ships — `quote.alternatives`
+carries all 11 books on every priced row today.
+
+---
+
+## 5. Pregame vs live — they are different products
+
+The board treats these as one lane with one set of rules. They are not.
+
+| | pregame | live |
+|---|---|---|
+| price half-life | hours | **seconds to minutes** |
+| stale = | normal (books post early and sit) | **dead** (#245: >900s on an in-progress game) |
+| fair value from | full two-sided consensus | often one side only; markets suspend constantly |
+| sim's role | full simulation from a known state | must re-project from *current* game state |
+| capture cadence | a few times a day | must be continuous or the lane is fiction |
+| what a stale row costs | a slightly wrong price | **a bet on a pitcher already pulled** |
+
+The live lane is the harder product and the one where the sim edge is worth
+most (books price live markets fast but shallow). It is also the one that
+punishes every defect above immediately rather than eventually. **Recommendation:
+make the pregame lane genuinely excellent through Phase 4 first, and treat live
+as a Phase 5 product** — not because it matters less, but because a live board
+built on an open feedback loop and a failing publish path will be confidently
+wrong in real time.
+
+---
+
+## 6. Invariants — the actual anti-whack-a-mole measure
+
+Rules that make the failure classes impossible rather than fixed:
+
+1. **One gate.** `opportunity_gate.evaluate` is the only thing that decides
+   eligibility, it is pure, and it runs at serve time. No consumer re-derives a
+   lane — that duplication (a Python rule and a JavaScript copy) was the defect
+   in #244.
+2. **One identity.** Phase 1. A row without a canonical key is rejected at the
+   producer, not repaired downstream by each consumer's own guesswork.
+3. **Every number carries its provenance.** `fair_method`, `edge_priced_against`,
+   `board_score_components`, gate `reasons`. A number a reader cannot take apart
+   is one they must simply trust, and this session produced three that were
+   wrong while looking authoritative (0 hold, +135% EV, 8.5-hour-old "live"
+   prices).
+4. **Absent must never render as a value.** `Number(null)` is `0` and `0` is
+   finite; that alone put a fake "0 at 0.0% hold" on the board (#242).
+5. **Freshness is judged on the BOOK clock**, never our capture clock.
+6. **No measurement, no weight.** Any ranking constant must cite the CLV that
+   set it, or be labelled a prior in the code.
+
+---
+
+## 7. Order of work
+
+```
+Phase 0  publish transport        ← blocks everything, currently failing
+Phase 1  identity contract        ← kills the largest defect class
+Phase 2  close the feedback loop  ← makes every later decision evidence-based
+Phase 3  fair value everywhere    ← sharp anchor + margin model
+Phase 4  five signals, CLV-weighted
+Phase 5  Layer 1 screen, then the live lane as a product
+```
+
+Phases 0-2 are unglamorous and are the whole difference between a board that
+looks like OddsJam and one that is worth betting from.
