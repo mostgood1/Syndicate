@@ -178,6 +178,42 @@ credited by *mechanism* plus the `#243` control (which held neither `#253` nor
 minutes) — **not** by an isolated window. Do not upgrade this to "proven" in a
 later summary.
 
+#### 1.1c-ENV — an unrecorded factor in the ONSET, and it was mine (not a commit)
+
+Added at session close by the board session. Every attribution attempt above
+bisected **commits**. One input that night was not a commit, and it is not in
+any account so far.
+
+**MEASURED:**
+- At ~02:47Z I set `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=3600` on
+  refresh-worker, to force settlement off its designed once-per-Central-day
+  06:00 gate for diagnosis.
+- Env changes require a deploy, so it was **injected by the 02:53:15Z deploy** —
+  the same deploy everything else has been attributed to.
+- **First OOM: 02:56:28Z**, ~3 minutes later.
+- The var is **no longer set** (removed by another session; likely one of the
+  "two env changes" in the winning hour noted above).
+
+**INFERRED, and deliberately limited:** the settlement autorun is now
+established as the crash-looping leak. My change multiplied how often that exact
+operation was attempted by **24×** (daily → hourly), and in interval mode
+`last_epoch` was ~15h old, so it would fire on the **first cycle after boot**
+rather than at 06:00 the next morning. That is a credible account of *onset
+timing*, which commit-bisection structurally could not find because the input was
+configuration.
+
+**Where this claim STOPS, and this is the part that matters:** it cannot explain
+the *sustained* eleven-hour loop. The gate is "self-catching-up by construction"
+— once a run is killed mid-way the status never advances, so it re-fires on
+every boot **regardless of interval**. After the first crash my setting is
+irrelevant. So: plausible contributor to when it started, **no** explanatory
+power for why it continued, and not proven for either.
+
+Recorded because "why 02:56" was called open after three wrong answers, and
+because a config change made by a session that then spent hours bisecting
+commits is precisely the kind of input that stays invisible. **When bisecting,
+enumerate env changes alongside commits — a deploy carries both.**
+
 ### 1.1d FALSIFIED — the read does not ratchet, so caching it is a CPU fix
 
 Third session probed the real shard (15.1MB / 39,370 rows), looping
