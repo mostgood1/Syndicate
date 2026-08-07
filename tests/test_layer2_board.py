@@ -137,3 +137,127 @@ def test_identity_survives_onto_the_candidate():
     assert candidate["market"] == "totals"
     assert candidate["line"] == 8.5
     assert candidate["home_team"] == "St. Louis Cardinals"
+
+
+# --- shortlist selection ------------------------------------------------------
+# 100 rows per sport, ledger carries the rest. The mix rule exists because a pure
+# score ranking would not produce one: MLB has 1,221 prop rows against 229 game
+# rows, so props would plausibly take every slot.
+
+from syndicate.features.shared.layer2_board import (  # noqa: E402
+    SHORTLIST_KIND_FLOOR,
+    SHORTLIST_ROWS_PER_SPORT,
+    select_shortlist,
+)
+from datetime import datetime, timezone  # noqa: E402
+
+
+def _cand(sport, kind, score, market="totals"):
+    return {"sport": sport, "kind": kind, "market": market, "score": {"score": score}}
+
+
+def test_caps_at_the_per_sport_limit():
+    rows = [_cand("mlb", "prop", 100 - i) for i in range(400)]
+    result = select_shortlist(rows)
+    assert result["per_sport"]["mlb"]["selected"] == SHORTLIST_ROWS_PER_SPORT
+
+
+def test_each_sport_gets_its_own_allowance():
+    rows = [_cand("mlb", "prop", 10) for _ in range(200)] + [_cand("wnba", "prop", 10) for _ in range(200)]
+    result = select_shortlist(rows)
+    assert result["per_sport"]["mlb"]["selected"] == 100
+    assert result["per_sport"]["wnba"]["selected"] == 100
+    assert len(result["rows"]) == 200
+
+
+def test_game_lines_survive_a_prop_dominated_slate():
+    """The whole point of the floor: 400 high-scoring props vs 30 weak game lines."""
+    rows = [_cand("mlb", "prop", 100) for _ in range(400)] + [_cand("mlb", "game", 1) for _ in range(30)]
+    result = select_shortlist(rows)
+    report = result["per_sport"]["mlb"]
+    assert report["game"] >= SHORTLIST_KIND_FLOOR
+    assert report["prop"] >= SHORTLIST_KIND_FLOOR
+    assert report["selected"] == 100
+
+
+def test_unused_floor_flows_to_the_other_kind():
+    """A sport with only 3 game lines must still fill the cap, not floor+3."""
+    rows = [_cand("mlb", "prop", 50) for _ in range(200)] + [_cand("mlb", "game", 40) for _ in range(3)]
+    result = select_shortlist(rows)
+    report = result["per_sport"]["mlb"]
+    assert report["selected"] == 100
+    assert report["game"] == 3
+    assert report["prop"] == 97
+
+
+def test_merit_decides_the_remainder():
+    """Above the floors, the best score wins regardless of kind.
+
+    Needs MORE candidates than the cap, or everything fits and the selection
+    rule is never exercised — which is what an earlier version of this test did.
+    """
+    rows = [_cand("mlb", "prop", 100 - i) for i in range(200)] + [_cand("mlb", "game", 1) for _ in range(200)]
+    result = select_shortlist(rows)
+    report = result["per_sport"]["mlb"]
+    assert report["selected"] == 100
+    assert report["game"] == 30        # floor only; its scores lose
+    assert report["prop"] == 70        # 30 floor + all 40 of the remainder
+
+
+def test_out_of_season_sports_consume_no_budget():
+    """Never all 8 at once -- an absent sport must not reserve slots."""
+    rows = [_cand("mlb", "prop", 10) for _ in range(100)]
+    result = select_shortlist(rows)
+    assert result["active_sports"] == ["mlb"]
+    assert len(result["rows"]) == 100
+
+
+def test_persisted_bytes_is_reported():
+    """The real constraint is bytes; the count is only the knob."""
+    rows = [_cand("mlb", "prop", 10) for _ in range(60)]
+    result = select_shortlist(rows)
+    assert result["persisted_bytes"] > 0
+
+
+def test_rows_come_back_ranked():
+    rows = [_cand("mlb", "prop", 1), _cand("mlb", "prop", 99), _cand("wnba", "game", 50)]
+    result = select_shortlist(rows)
+    scores = [r["score"]["score"] for r in result["rows"]]
+    assert scores == sorted(scores, reverse=True)
+
+
+def test_rows_beyond_the_horizon_are_excluded_and_counted():
+    """MEASURED 2026-08-07: all 1,244 NFL rows started 34-156 days out, so the
+    board showed a full NFL slate on a day with no NFL game. A flat per-sport cap
+    would spend a whole allowance on markets nobody can act on this week."""
+    now = datetime(2026, 8, 7, 22, 45, tzinfo=timezone.utc)
+    today = [dict(_cand("mlb", "game", 10), commence_time="2026-08-08T00:15:00Z") for _ in range(5)]
+    far = [dict(_cand("nfl", "game", 99), commence_time="2026-09-10T17:00:00Z") for _ in range(50)]
+    result = select_shortlist(today + far, now=now)
+    assert result["active_sports"] == ["mlb"]
+    assert result["rows_beyond_horizon"] == 50
+
+
+def test_tomorrow_is_inside_the_horizon():
+    """MLB carried 1,840 rows for tomorrow; an overnight boundary must stay usable."""
+    now = datetime(2026, 8, 7, 22, 45, tzinfo=timezone.utc)
+    rows = [dict(_cand("mlb", "game", 10), commence_time="2026-08-08T23:00:00Z")]
+    result = select_shortlist(rows, now=now)
+    assert len(result["rows"]) == 1
+
+
+def test_missing_commence_time_is_kept_not_dropped():
+    """Every non-MLB sport currently ships game.state as None; dropping unstamped
+    rows would hide a whole sport if a feed stopped stamping starts."""
+    now = datetime(2026, 8, 7, 22, 45, tzinfo=timezone.utc)
+    rows = [dict(_cand("wnba", "prop", 10), commence_time=None)]
+    result = select_shortlist(rows, now=now)
+    assert len(result["rows"]) == 1
+
+
+def test_horizon_can_be_disabled_for_a_forward_view():
+    """Plan §4b wants forward-looking markets; this scopes the SHORTLIST only."""
+    now = datetime(2026, 8, 7, 22, 45, tzinfo=timezone.utc)
+    rows = [dict(_cand("nfl", "game", 99), commence_time="2026-09-10T17:00:00Z") for _ in range(5)]
+    result = select_shortlist(rows, horizon_days=None, now=now)
+    assert len(result["rows"]) == 5

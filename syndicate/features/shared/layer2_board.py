@@ -42,6 +42,8 @@ INTEGRATION (not yet wired — deliberately):
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared import opportunity_gate
@@ -66,6 +68,34 @@ _IDENTITY_FIELDS = (
     "away_team",
     "commence_time",
 )
+
+
+# The persisted SHORTLIST, per sport. Not a memory bound -- a readability one.
+#
+# Sized against measurement, and the headroom is deliberate: ~1.0 KB per row
+# (11MB / 10,765 rows measured on production 2026-08-07), so 50 rows is ~50 KB
+# per sport. Every one of the eight sports is never in season at once -- four
+# had a slate on the day this was written -- so the realistic persisted cost is
+# ~400 KB against a 2.4 MB state and a 24 MB export budget. An out-of-season
+# sport contributes no rows and therefore no budget, automatically -- which is
+# what buys the headroom for 100 rather than 50.
+#
+# NAMED FOR THE JOB IT DOES, per post-mortem rule 9: this bounds HOW MANY ROWS A
+# PERSON READS. It is not a memory ceiling, and it must not be reused as one --
+# `_MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES` bounded count while the caller needed
+# bytes, and that was invisible for three weeks. The writer logs the bytes it
+# actually persisted so the real constraint stays observable.
+SHORTLIST_ROWS_PER_SPORT = 100
+
+# Each kind is guaranteed this many slots before merit takes over.
+#
+# A pure score ranking would not mix: MLB carries 1,221 prop rows against 229
+# game rows, so props would plausibly take all 50 and the game board would
+# vanish. A hard 25/25 is the opposite error -- it would drop a clearly better
+# prop to seat a worse game line. Floor-then-merit gets the mix without paying
+# for it in quality, and an unused floor flows to the other kind rather than
+# being wasted on a sport that has only one.
+SHORTLIST_KIND_FLOOR = 30
 
 
 def _as_float(value: Any) -> float | None:
@@ -207,4 +237,126 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "scored": scored,
         "opportunities": opportunities,
         "by_lane": lanes,
+    }
+
+
+def _score_of(row: Mapping[str, Any]) -> float:
+    score = row.get("score")
+    if isinstance(score, Mapping):
+        value = _as_float(score.get("score"))
+        if value is not None:
+            return value
+    return float("-inf")
+
+
+# How far ahead a row may start and still belong on TODAY's shortlist.
+#
+# MEASURED 2026-08-07, and it is the reason this parameter exists at all: the
+# board was serving 1,244 NFL rows for "today" whose games start **34 to 156 days
+# out** -- not one NFL game existed on the date being displayed. Meanwhile MLB
+# had 2,168 rows today and 1,840 tomorrow. Under a flat per-sport cap NFL would
+# spend a full allowance on markets nobody can act on this week.
+#
+# "Quoted today" is not "playing today", and conflating them is what made an
+# empty sport look like a full board. 1 = today and tomorrow, which keeps the
+# overnight boundary usable without importing next month.
+#
+# This does NOT delete forward-looking markets -- plan §4b wants them, and they
+# are the softest lines we see. It scopes the SHORTLIST. A Forward view is a
+# different projection over the same rows.
+SHORTLIST_HORIZON_DAYS = 1
+
+
+def _within_horizon(row: Mapping[str, Any], now: datetime, horizon_days: int | None) -> bool:
+    if horizon_days is None:
+        return True
+    raw = row.get("commence_time")
+    if not raw:
+        # No start time is not evidence of being today. Kept rather than dropped,
+        # because dropping it would silently hide a whole sport if a feed stopped
+        # stamping starts -- and every non-MLB sport currently ships game.state
+        # as None, so this path is not hypothetical.
+        return True
+    try:
+        start = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+    except ValueError:
+        return True
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
+    return (start.astimezone(timezone.utc).date() - now.date()).days <= int(horizon_days)
+
+
+def select_shortlist(
+    opportunities: Iterable[Mapping[str, Any]],
+    *,
+    per_sport: int = SHORTLIST_ROWS_PER_SPORT,
+    kind_floor: int = SHORTLIST_KIND_FLOOR,
+    horizon_days: int | None = SHORTLIST_HORIZON_DAYS,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """The rows that get PERSISTED. Everything else lives in the ledger.
+
+    Two consumers wanted opposite things and sizing one number for both got both
+    wrong: the board wants a shortlist (#243 cut 230 rows to 34 on purpose),
+    while settlement wants breadth because CLV-derived weights converge on
+    volume. They are separated -- this bounds the *display* artifact, and the
+    append-only ledger carries every gated row for S6.
+
+    Selection is FLOOR-THEN-MERIT per sport: guarantee each kind its floor, then
+    fill the remainder purely by score. An unused floor (a sport with no props,
+    or none that survived the gate) flows to the other kind instead of shrinking
+    the shortlist.
+    """
+    reference_now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    by_sport: dict[str, list[Mapping[str, Any]]] = {}
+    beyond_horizon = 0
+    for row in opportunities:
+        if not _within_horizon(row, reference_now, horizon_days):
+            beyond_horizon += 1
+            continue
+        sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
+        by_sport.setdefault(sport, []).append(row)
+
+    selected: list[dict[str, Any]] = []
+    per_sport_report: dict[str, dict[str, Any]] = {}
+
+    for sport, rows in by_sport.items():
+        ranked = sorted(rows, key=_score_of, reverse=True)
+        game = [row for row in ranked if str(row.get("kind") or "") == "game"]
+        prop = [row for row in ranked if str(row.get("kind") or "") == "prop"]
+        other = [row for row in ranked if str(row.get("kind") or "") not in {"game", "prop"}]
+
+        floor = max(0, int(kind_floor))
+        limit = max(0, int(per_sport))
+        picked: list[Mapping[str, Any]] = []
+        picked.extend(game[:floor])
+        picked.extend(prop[:floor])
+
+        chosen_ids = {id(row) for row in picked}
+        remainder = [row for row in ranked + other if id(row) not in chosen_ids]
+        remainder.sort(key=_score_of, reverse=True)
+        picked.extend(remainder[: max(0, limit - len(picked))])
+
+        picked = sorted(picked, key=_score_of, reverse=True)[:limit]
+        selected.extend(dict(row) for row in picked)
+        per_sport_report[sport] = {
+            "available": len(rows),
+            "selected": len(picked),
+            "game": sum(1 for row in picked if str(row.get("kind") or "") == "game"),
+            "prop": sum(1 for row in picked if str(row.get("kind") or "") == "prop"),
+        }
+
+    selected.sort(key=_score_of, reverse=True)
+    return {
+        "rows": selected,
+        "per_sport": per_sport_report,
+        # Only sports with a slate consume budget; the rest contribute nothing.
+        "active_sports": sorted(per_sport_report.keys()),
+        "per_sport_limit": int(per_sport),
+        "kind_floor": int(kind_floor),
+        "horizon_days": horizon_days,
+        # Logged, not silently dropped: a sport vanishing from the shortlist
+        # should be attributable to its schedule rather than look like an outage.
+        "rows_beyond_horizon": beyond_horizon,
+        "persisted_bytes": len(json.dumps(selected, default=str)),
     }
