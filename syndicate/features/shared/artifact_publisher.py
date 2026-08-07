@@ -1123,6 +1123,18 @@ def _stream_url(relative_path: str, *, since_epoch: float | None = None) -> str:
     return url
 
 
+def _is_append_only(relative_path: str) -> bool:
+    """Families that only ever grow, so a tail fetch is safe (#248).
+
+    Deliberately a tiny explicit list rather than "ends with .jsonl". An
+    append-only assumption applied to a file that is rewritten in place would
+    silently concatenate two versions into corruption, and the whole point of
+    this module is that a wrong transfer is worse than a slow one. `book_quotes`
+    is written exclusively by `append_book_quotes`.
+    """
+    return "/book_quotes/" in str(relative_path or "")
+
+
 def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) -> tuple[bool, int]:
     """Stream ONE allowlisted artifact to local disk. Returns (ok, written).
 
@@ -1139,35 +1151,76 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
 
     target_path = _data_root() / Path(normalized)
     local_mtime: float | None = None
+    local_size = 0
     try:
         if target_path.is_file():
-            local_mtime = target_path.stat().st_mtime
+            stat = target_path.stat()
+            local_mtime = stat.st_mtime
+            local_size = int(stat.st_size)
     except Exception:
         local_mtime = None
+        local_size = 0
 
     url = _stream_url(normalized, since_epoch=local_mtime)
     if not url:
         return False, 0
-    request_obj = urllib_request.Request(url, method="GET", headers={"Authorization": f"Bearer {token}"})
+    headers = {"Authorization": f"Bearer {token}"}
+    # #248: APPEND-ONLY families are fetched by their TAIL, not whole.
+    #
+    # `book_quotes/<date>.jsonl` only ever grows -- the capture appends, it never
+    # rewrites -- so re-fetching 74MB to learn about the last few KB is pure
+    # waste, and on this worker it is not merely wasteful: refresh-worker
+    # plateaus at 2.65-2.70GB of 4GB (handoff_refresh_worker_oom.md) leaving
+    # ~1.4GB headroom, and #241's 120s whole-shard re-stream put it into a
+    # ~3-minute restart loop within the hour.
+    #
+    # The server needs no change: /api/ops/artifacts/stream serves via
+    # send_file(conditional=True), which honours HTTP Range already.
+    tail_from = local_size if (local_size > 0 and _is_append_only(normalized)) else 0
+    if tail_from:
+        headers["Range"] = f"bytes={tail_from}-"
+    request_obj = urllib_request.Request(url, method="GET", headers=headers)
 
     temp_path: Path | None = None
     try:
         with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
             remote_mtime_raw = response.headers.get("X-Artifact-Mtime")
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            # uuid4-suffixed for the same concurrency reason the bulk pull's
-            # temp names are (see _pull_hot_artifacts_request).
-            temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.stream.tmp"
-            total = 0
-            with open(temp_path, "wb") as handle:
-                while True:
-                    chunk = response.read(_STREAM_CHUNK_BYTES)
-                    if not chunk:
-                        break
-                    handle.write(chunk)
-                    total += len(chunk)
-        os.replace(temp_path, target_path)
-        temp_path = None
+            # A 206 means the server honoured the Range and this body is only
+            # the new tail -- append it in place. Anything else is a whole file
+            # and replaces the local copy, which is also the correct behaviour
+            # when the shard was rotated or rewritten and our offset is stale.
+            appended = tail_from > 0 and getattr(response, "status", None) == 206
+            if appended:
+                total = 0
+                with open(target_path, "ab") as handle:
+                    while True:
+                        chunk = response.read(_STREAM_CHUNK_BYTES)
+                        if not chunk:
+                            break
+                        handle.write(chunk)
+                        total += len(chunk)
+            else:
+                # uuid4-suffixed for the same concurrency reason the bulk pull's
+                # temp names are (see _pull_hot_artifacts_request).
+                temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.stream.tmp"
+                total = 0
+                with open(temp_path, "wb") as handle:
+                    while True:
+                        chunk = response.read(_STREAM_CHUNK_BYTES)
+                        if not chunk:
+                            break
+                        handle.write(chunk)
+                        total += len(chunk)
+        if temp_path is not None:
+            os.replace(temp_path, target_path)
+            temp_path = None
+        if appended:
+            print(
+                f"[artifact_publisher] STREAM_TAIL_OK path={normalized} appended_bytes={total} from_offset={tail_from}",
+                flush=True,
+            )
+            return True, (1 if total else 0)
         # Stamp the copy with web's mtime, not now(): the next cycle sends
         # this back as since=, and a local mtime later than the source would
         # make an updated shard look already-current forever.
@@ -1180,6 +1233,11 @@ def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) ->
         print(f"[artifact_publisher] STREAM_PULL_OK path={normalized} bytes={total}", flush=True)
         return True, 1
     except urllib_error.HTTPError as exc:
+        if exc.code == 416:
+            # Range Not Satisfiable: our offset is at or past the remote size,
+            # i.e. we already hold everything. A success that writes nothing --
+            # the same steady state a 304 represents.
+            return True, 0
         if exc.code == 304:
             # Already current. The steady state, and the reason this is cheap
             # enough to call every cycle.
