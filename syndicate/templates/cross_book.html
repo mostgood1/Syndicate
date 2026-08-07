@@ -1,0 +1,214 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Market Board — Arbitrage & Low Hold{% endblock %}
+{% block page_title %}Market Board — Arbitrage &amp; Low Hold{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* L2-B / L2-C. Deliberately sparser than the L1 grid: this is a shortlist,
+     and a shortlist that looks like a spreadsheet invites scrolling instead of
+     acting. */
+  .xb-wrap { padding: 0 12px 40px; }
+  .xb-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+  .xb-controls select, .xb-controls input {
+    background: #131a24; color: #e8eef7; border: 1px solid #26313f;
+    border-radius: 6px; padding: 6px 9px; font-size: 13px;
+  }
+  .xb-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 8px; }
+  .xb-tab {
+    padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 12px;
+    background: #141b25; color: #9fb0c6; border: 1px solid #26313f; white-space: nowrap;
+  }
+  .xb-tab--on { background: #1d2836; color: #e8eef7; border-color: #3a4a5f; }
+  .xb-summary { color: #7d8ea4; font-size: 12px; margin: 6px 0 14px; line-height: 1.6; }
+  .xb-scroll { overflow-x: auto; }
+  table.xb { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.xb th, table.xb td {
+    padding: 7px 10px; border-bottom: 1px solid #1c2531; text-align: left; white-space: nowrap;
+  }
+  table.xb th { color: #8fa2b8; font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  table.xb tr:hover td { background: #121a24; }
+  .xb-pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .xb-arb { color: #34d399; }
+  .xb-hold { color: #9cc0e6; }
+  .xb-meta { color: #7d8ea4; font-size: 11px; }
+  .xb-leg { display: block; font-variant-numeric: tabular-nums; }
+  .xb-book { color: #9fb0c6; }
+  /* Skew is the honesty column. A set assembled over 58 seconds is not the
+     same claim as one over 4, and hiding that is how 716 "arbitrages" happen. */
+  .xb-skew { font-variant-numeric: tabular-nums; }
+  .xb-skew--wide { color: #f0b429; }
+  .xb-live { color: #34d399; font-size: 11px; font-weight: 600; }
+  .xb-empty { padding: 30px; text-align: center; color: #7d8ea4; }
+  .xb-note {
+    margin: 10px 0 16px; padding: 10px 12px; border-left: 3px solid #26313f;
+    color: #8fa2b8; font-size: 12px; line-height: 1.6; background: #101720;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="xb-wrap">
+  <div class="xb-controls">
+    <label class="xb-meta">Sport
+      <select id="xb-sport">
+        {% for slug in sports %}<option value="{{ slug }}"{% if slug == sport %} selected{% endif %}>{{ slug|upper }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="xb-meta">Date <input type="date" id="xb-date" value="{{ selected_date }}" /></label>
+    <label class="xb-meta">Max skew (s) <input type="number" id="xb-skew" min="0" max="86400" step="10" value="90" style="width:90px" /></label>
+    <button class="xb-tab" id="xb-refresh">Refresh</button>
+    <a class="xb-tab" href="/market-board/books">Book grid &rarr;</a>
+    <span class="xb-meta" id="xb-status">loading…</span>
+  </div>
+
+  <div class="xb-tabs" id="xb-view-tabs"></div>
+  <div class="xb-summary" id="xb-summary"></div>
+  <div class="xb-note">
+    Every row below is one price per side that <strong>coexisted</strong> inside the skew window.
+    Prices from an all-day log that never overlapped are not an opportunity, and legs on
+    non-mirrored spread lines are not opposite sides of anything &mdash; both are excluded rather
+    than shown with a caveat.
+  </div>
+  <div class="xb-scroll"><table class="xb"><thead id="xb-head"></thead><tbody id="xb-body"></tbody></table></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var VIEWS = [
+    { key: "arb", label: "Arbitrage" },
+    { key: "low_hold", label: "Low hold" },
+    { key: "all", label: "All priced" }
+  ];
+  var state = { view: "arb", rows: [], summary: {}, skew: 90 };
+
+  function el(id) { return document.getElementById(id); }
+  function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"]/g, function (c) {
+    return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c];
+  }); }
+  function fmtPrice(p) { return p === null || p === undefined ? "" : (p > 0 ? "+" + p : String(p)); }
+
+  function load() {
+    var sport = el("xb-sport").value;
+    var date = el("xb-date").value;
+    var skew = Number(el("xb-skew").value || 90);
+    state.skew = skew;
+    el("xb-status").textContent = "loading…";
+    // Fetch the UNFILTERED set once and filter client-side: the three views are
+    // three filters over one search (arb and hold are both monotone in the
+    // overround), so refetching per tab would re-run the same pivot.
+    var q = "/api/board/cross-book?sport=" + encodeURIComponent(sport) +
+            "&date=" + encodeURIComponent(date) +
+            "&max_skew_seconds=" + encodeURIComponent(String(skew)) +
+            "&view=all&limit=2000";
+    fetch(q).then(function (r) { return r.json(); }).then(function (d) {
+      state.rows = d.rows || [];
+      state.summary = d.summary || {};
+      el("xb-status").textContent =
+        (state.summary.rows || 0) + " priced · " +
+        (state.summary.cross_book_rows || 0) + " cross-book";
+      renderTabs(); renderSummary(); renderGrid();
+    }).catch(function (err) { el("xb-status").textContent = "failed: " + err; });
+  }
+
+  function rowsForView() {
+    if (state.view === "arb") return state.rows.filter(function (r) { return r.is_arbitrage; });
+    if (state.view === "low_hold") return state.rows.filter(function (r) { return r.is_low_hold; });
+    return state.rows;
+  }
+
+  function countFor(view) {
+    if (view === "arb") return state.rows.filter(function (r) { return r.is_arbitrage; }).length;
+    if (view === "low_hold") return state.rows.filter(function (r) { return r.is_low_hold; }).length;
+    return state.rows.length;
+  }
+
+  function renderTabs() {
+    el("xb-view-tabs").innerHTML = VIEWS.map(function (v) {
+      return '<span class="xb-tab' + (v.key === state.view ? " xb-tab--on" : "") +
+             '" data-v="' + v.key + '">' + v.label +
+             ' <span class="xb-meta">' + countFor(v.key) + "</span></span>";
+    }).join("");
+    Array.prototype.forEach.call(el("xb-view-tabs").children, function (node) {
+      node.onclick = function () {
+        state.view = node.getAttribute("data-v");
+        renderTabs(); renderGrid();
+      };
+    });
+  }
+
+  function renderSummary() {
+    var s = state.summary || {};
+    // Counts describe the SLATE, not the tab -- "2 of 829" is the honest way to
+    // read an arbitrage board, and a bare "2" is not.
+    el("xb-summary").innerHTML =
+      "Priced <strong>" + (s.rows || 0) + "</strong> market instances · " +
+      "cross-book <strong>" + (s.cross_book_rows || 0) + "</strong> · " +
+      "arbitrage <strong>" + (s.arbitrage_rows || 0) + "</strong> · " +
+      "low hold <strong>" + (s.low_hold_rows || 0) + "</strong>" +
+      (s.best_arb_pct !== null && s.best_arb_pct !== undefined
+        ? " · best arb <strong>" + Number(s.best_arb_pct).toFixed(2) + "%</strong>" : "") +
+      (s.median_skew_seconds !== null && s.median_skew_seconds !== undefined
+        ? " · median skew " + s.median_skew_seconds + "s" : "") +
+      " · window &le; " + state.skew + "s";
+  }
+
+  function renderGrid() {
+    var rows = rowsForView().slice();
+    rows.sort(function (a, b) {
+      if (state.view === "low_hold") return a.hold_pct - b.hold_pct;
+      return b.arb_pct - a.arb_pct;
+    });
+    if (!rows.length) {
+      el("xb-head").innerHTML = "";
+      el("xb-body").innerHTML =
+        '<tr><td class="xb-empty">Nothing qualifies at a ' + state.skew +
+        's window. That is usually the honest answer &mdash; widen the window to see what was rejected.</td></tr>';
+      return;
+    }
+    el("xb-head").innerHTML =
+      "<tr><th>" + (state.view === "low_hold" ? "Hold" : "Profit") +
+      "</th><th>Event</th><th>Market</th><th>Bets</th><th>Books</th>" +
+      "<th>Hold</th><th>Skew</th><th>State</th></tr>";
+
+    el("xb-body").innerHTML = rows.map(function (r) {
+      var g = r.game || {};
+      var event = r.player_name
+        ? esc(r.player_name)
+        : esc((r.away_team || "") + " @ " + (r.home_team || ""));
+      var market = esc(r.market) + (r.segment && r.segment !== "full" ? " · " + esc(r.segment) : "") +
+                   (r.line === null || r.line === undefined ? "" : " " + r.line);
+      var legs = (r.legs || []).map(function (l) {
+        return '<span class="xb-leg">' + esc(l.side) + " " + fmtPrice(l.price) +
+               (l.line === null || l.line === undefined ? "" : " @" + l.line) +
+               ' <span class="xb-book">' + esc(l.book) + "</span></span>";
+      }).join("");
+      var headline = state.view === "low_hold"
+        ? '<span class="xb-pct xb-hold">' + Number(r.hold_pct).toFixed(2) + "%</span>"
+        : '<span class="xb-pct xb-arb">' + (r.arb_pct > 0 ? "+" : "") + Number(r.arb_pct).toFixed(2) + "%</span>";
+      var wide = Number(r.skew_seconds) > 30;
+      var stateTxt = g.state === "live"
+        ? '<span class="xb-live">' + esc(g.status_token || "LIVE") + "</span>"
+        : '<span class="xb-meta">' + esc(g.status_token || g.state || "") + "</span>";
+      return "<tr><td>" + headline + "</td>" +
+        "<td>" + event + "</td>" +
+        '<td class="xb-meta">' + market + "</td>" +
+        "<td>" + legs + "</td>" +
+        '<td class="xb-meta">' + esc((r.books || []).join(" · ")) + "</td>" +
+        '<td class="xb-meta">' + Number(r.hold_pct).toFixed(2) + "%</td>" +
+        '<td class="xb-skew' + (wide ? " xb-skew--wide" : "") + '" title="spread between the earliest and latest observation in this set">' +
+          r.skew_seconds + "s</td>" +
+        "<td>" + stateTxt + "</td></tr>";
+    }).join("");
+  }
+
+  el("xb-sport").onchange = load;
+  el("xb-date").onchange = load;
+  el("xb-skew").onchange = load;
+  el("xb-refresh").onclick = load;
+  load();
+})();
+</script>
+{% endblock %}

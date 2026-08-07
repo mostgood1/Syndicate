@@ -2389,6 +2389,109 @@ def board_book_grid_api():
     )
 
 
+@intelligence_bp.get("/api/board/cross-book")
+def board_cross_book_api():
+    """L2-B (arbitrage) and L2-C (low hold), over prices that COEXISTED (#261).
+
+    A SERVE-TIME pivot on the same `market_row` the book grid serves -- §3's
+    one-row-contract rule. It computes no simulation and adds nothing to any
+    worker.
+
+    Both boards come from ONE search, because arb profit is `1/overround - 1`
+    and hold is `overround - 1`: "best arb" and "lowest hold" are the same
+    question. `view` filters the result; it does not run a second pipeline.
+
+    The two guards live in `board_cross_book` and both are load-bearing:
+    SIMULTANEITY (an all-day append log otherwise pairs an 08:33Z price with an
+    18:43Z one) and COMPLEMENTARITY (books disagree on line sign within a row,
+    which is `#262`). Without the second, this endpoint reported a +250.88%
+    arbitrage on production; with it, two real ones at +3.88% and +1.10%.
+
+    `max_skew_seconds` is exposed because it is a judgement, not a constant: at
+    a ~26-minute capture cadence a window tighter than the cadence returns
+    nothing. Every row reports the skew it actually used.
+    """
+    from syndicate.features.shared.board_cross_book import (
+        DEFAULT_MAX_SKEW_SECONDS,
+        cross_book_opportunities,
+        cross_book_summary,
+    )
+    from syndicate.features.shared.book_grid import build_book_grid
+    from syndicate.features.shared.odds_book_quotes import read_book_quotes
+
+    sport = str(request.args.get("sport") or "mlb").strip().lower()
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    view = str(request.args.get("view") or "all").strip().lower()
+    try:
+        limit = max(1, min(2000, int(str(request.args.get("limit") or "300").strip())))
+    except ValueError:
+        limit = 300
+    try:
+        max_skew = float(str(request.args.get("max_skew_seconds") or DEFAULT_MAX_SKEW_SECONDS).strip())
+    except ValueError:
+        max_skew = DEFAULT_MAX_SKEW_SECONDS
+    max_skew = max(0.0, min(86400.0, max_skew))
+    try:
+        low_hold_threshold = float(str(request.args.get("low_hold_pct") or "2.0").strip())
+    except ValueError:
+        low_hold_threshold = 2.0
+
+    try:
+        rows = read_book_quotes(sport, selected_date)
+    except Exception:
+        _LOGGER.exception("BOARD_CROSS_BOOK_READ_FAILURE sport=%s date=%s", sport, selected_date)
+        rows = []
+
+    try:
+        grid = build_book_grid(rows)
+    except Exception:
+        _LOGGER.exception("BOARD_CROSS_BOOK_BUILD_FAILURE sport=%s date=%s", sport, selected_date)
+        grid = []
+
+    # Game state before the pivot, so each opportunity carries live/pregame with
+    # it. A live arb and a pregame arb are not the same product, and #245 drops
+    # dead markets on exactly this signal.
+    game_state_coverage = _attach_book_grid_game_state(grid, sport=sport, selected_date=selected_date)
+
+    try:
+        opportunities = cross_book_opportunities(
+            grid, max_skew_seconds=max_skew, low_hold_threshold_pct=low_hold_threshold
+        )
+    except Exception:
+        _LOGGER.exception("BOARD_CROSS_BOOK_PIVOT_FAILURE sport=%s date=%s", sport, selected_date)
+        opportunities = []
+
+    # Summarise BEFORE the view filter, same rule as the book grid: the counts
+    # describe the slate, so "2 arbs of 829 priced" stays legible on the arb tab.
+    summary = cross_book_summary(opportunities)
+
+    if view == "arb":
+        selected = [row for row in opportunities if row.get("is_arbitrage")]
+    elif view in {"low_hold", "low-hold"}:
+        selected = [row for row in opportunities if row.get("is_low_hold")]
+    else:
+        selected = list(opportunities)
+
+    return _no_cache_response(
+        jsonify(
+            {
+                "ok": True,
+                "sport": sport,
+                "date": selected_date,
+                "view": view,
+                "max_skew_seconds": max_skew,
+                "low_hold_pct": low_hold_threshold,
+                "summary": summary,
+                "game_state": game_state_coverage,
+                "returned": min(len(selected), limit),
+                "total_rows": len(selected),
+                "rows": selected[:limit],
+                "server_time": _server_timestamp(),
+            }
+        )
+    )
+
+
 @intelligence_bp.get("/market-board/books")
 def market_board_books_page():
     """L1-A, the book grid — the BOOK VIEW of the Layer 1 market board (S1).
@@ -2417,6 +2520,35 @@ def market_board_books_page():
         make_response(
             render_template(
                 "book_grid.html",
+                sport=sport,
+                sports=sports,
+                selected_date=selected_date,
+                nav_path=request.path,
+            )
+        )
+    )
+
+
+@intelligence_bp.get("/market-board/opportunities")
+def market_board_opportunities_page():
+    """L2-B (arbitrage) and L2-C (low hold) — the two cross-book shortlists (S5).
+
+    Sits beside `/market-board/books` rather than inside it: the book grid is
+    Layer 1 and shows everything, while these are Layer 2 and show only what
+    survives a gate. Same `market_row`, opposite jobs.
+
+    Three tabs over ONE fetch, because arb and hold are the same search ordered
+    two ways. Refetching per tab would re-run an identical pivot.
+    """
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    sport = str(request.args.get("sport") or "mlb").strip().lower()
+    sports = ["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"]
+    if sport not in sports:
+        sport = "mlb"
+    return _no_cache_response(
+        make_response(
+            render_template(
+                "cross_book.html",
                 sport=sport,
                 sports=sports,
                 selected_date=selected_date,
