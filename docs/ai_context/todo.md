@@ -1,6 +1,11 @@
 # Syndicate TODO — canonical cross-session list
 
-### OPEN (#255) -- DATA INTEGRITY: a null identity silently overwrites the wrong ledger record
+### OPEN (#258) -- DATA INTEGRITY: a null identity silently overwrites the wrong ledger record
+
+*(Filed briefly as #255, which was already taken by `a39fe3d6` "retention shorter
+than reuse". Renumbered to #258 because that one is committed and referenced from
+three places including the rules section, while this was an OPEN item costing one
+edit to move. IDs are stable and never reused -- CLAUDE.md.)*
 
 Not a memory bug. Found while writing `#254` and deliberately left unfixed there,
 because correcting it changes matching behaviour and does not belong inside a
@@ -23,11 +28,47 @@ and audit callers for whether any legitimately pass one. Needs a decision on
 whether a record with no identity should be replaceable at all, which is why it
 is filed rather than patched.
 
-### WRITTEN, TESTED, NOT DEPLOYED 2026-08-07 (#253, #254) -- the OOM FLOOR, as opposed to the rate
+### RESOLVED 2026-08-07 (#253) -- the OOM FLOOR. 115 kills over 11 hours, stopped.
 
-Held out of production deliberately: `local_ad54d625`'s settlement-cadence env
-revert was mid-rollout, and shipping these on top would have made a fifth
-unattributable result. Deploy them **alone**, refresh-worker only, 30+ minutes.
+```
+build 21efffae live 14:31:49Z   ->  0 kills in 64 min
+last kill            14:18:47Z  ->  77+ minutes clean
+control: n=21 cycles  min 2.4  median 6.0  mean 6.6  MAX 14.6 min
+container memory: 380-870MB   (was 2508-3102MB)
+```
+
+77 minutes is **5.3x** the worst gap that ever occurred without a fix, and the
+floor fell ~2.2GB. Not a lucky quiet stretch.
+
+**ATTRIBUTION -- `#253` by mechanism, NOT by isolated window. Read this before
+citing it.** The winning build bundles `#253`+`#254`+`#256`+`#257`, and the same
+hour also carried **two env changes** by another session: the settlement-cadence
+revert (~13:12Z) and the deletion of
+`EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` (~14:05Z). A later reader
+seeing a rollback plus two env changes plus a four-commit build in one hour is
+right to be suspicious. What separates them:
+
+- `#254`/`#256` are ledger and settlement work, and **settlement was disabled by
+  env throughout the winning window** -- neither could have been acting.
+- `#257` is diagnostics only.
+- **The control is the `#243` rollback**: it contains neither `#253` nor `#254`,
+  it ran *with settlement already off*, and it died **5 times in 18 minutes**.
+  So neither env change was sufficient, and the code delta that matters between
+  `#243` and the winning build is principally `#253`.
+- `#253` removes up to 94 retained MLB cards-page contexts (<=96 -> <=2). A
+  ~2.2GB floor drop is exactly the shape of that.
+
+Strong mechanism plus a real control, but **not** a clean isolated measurement.
+Do not upgrade this to "proven" in a later summary.
+
+**The methodological half of the record, which is the useful half:** `#253` was
+found early in the afternoon and then *demoted by two sessions* as "real but
+bounded, not urgent" -- because we were looking for a rate fix. Six rate fixes
+failed (`#241`, the shard transport, `#238`'s de-vig, `#251`, `#252`, the
+settlement cadence). The one retention fix worked. **Bound retention, not rate.**
+
+Deployed by pinned `commitId` in sequenced windows throughout; the heap census
+built for this never fired, because memory never reached its 1200MB trigger.
 
 **FIVE hypotheses have now failed tonight.** In order: `#241` (reverted, then
 positively exonerated -- it ran 2h20m with zero kills); the book_quotes shard
@@ -141,7 +182,7 @@ stated up front so the result is not credited to the wrong one:
   path, now once-daily. It is a genuine landmine, not this week's explosion.
 
 **Flagged, not fixed:** the `identity=None` wrong-record replacement -- now filed
-as **`#255`** above rather than left in a comment.
+as **`#258`** above rather than left in a comment.
 
 ### SHIPPED 2026-08-07 (#249) -- the refresh-worker OOM loop: the circuit breaker was sized for a 2GB container. #241 is EXONERATED.
 
