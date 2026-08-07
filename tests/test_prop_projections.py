@@ -138,12 +138,44 @@ def test_a_one_sided_market_gets_a_projection_but_no_edge():
     assert coverage["rows_with_edge"] == 0
 
 
-def test_coverage_counts_only_player_rows():
+def test_coverage_counts_every_row_now_that_game_markets_project():
+    """Was player-only. Game markets (h2h/spreads/totals) are projected too, so
+    the denominator is every row -- renaming it would have been the safer half
+    of this change; both keys are emitted so nothing reading the old one breaks,
+    but `rows_considered` is the honest name."""
     index = _index_with_hitter()
     rows = [_grid_row(-110, -110), {"market": "h2h", "player_name": None, "sides": ["home"]}]
     coverage = attach_projections(rows, index)
-    assert coverage["player_rows"] == 1
-    assert coverage["pct_projected"] == 100.0
+    assert coverage["rows_considered"] == 2
+    assert coverage["rows_with_projection"] == 1      # the h2h row has no sim behind it here
+    assert coverage["pct_projected"] == 50.0
+
+
+def test_a_pregame_projection_is_not_priced_against_a_live_market():
+    """The sim's payloads are generated before first pitch. Once a game starts
+    the market re-prices on the actual state and the model does not, so the
+    difference is the SCORE, not an edge.
+
+    Found on 2026-07-12: an event with commence 16:07 carried book quotes at
+    17:35 (away -500) while the sim still said 0.495 -- a +23-point "edge" on a
+    coin-flip game, and game-market edges spreading -55 to +54 on moneylines
+    where books are sharpest.
+    """
+    index = _index_with_hitter()
+    for state in ("live", "final", "in_progress"):
+        rows = [_grid_row(-110, -110, game={"state": state})]
+        attach_projections(rows, index)
+        projection = rows[0]["projection"]
+        assert projection["model_prob_over"] == 0.445        # still projected
+        assert projection["edge_vs_market_pct"] is None      # but not priced
+        assert state in projection["edge_unavailable_reason"]
+
+
+def test_a_pregame_game_still_gets_an_edge():
+    index = _index_with_hitter()
+    rows = [_grid_row(-110, -110, game={"state": "pregame"})]
+    attach_projections(rows, index)
+    assert rows[0]["projection"]["edge_vs_market_pct"] == -5.5
 
 
 def test_roster_snapshot_reader_extracts_both_starters():

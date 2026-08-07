@@ -125,18 +125,54 @@ def _bucket_for_line(prefix: str, line: float) -> str | None:
     return f"{prefix}_{threshold}plus"
 
 
+# Quote `segment` -> the sim payload that covers it. The sim simulates the same
+# game four ways and the board quotes all four, so a projection joined to the
+# wrong segment would be confidently wrong rather than absent.
+_SEGMENT_PAYLOADS: dict[str, str] = {
+    "full_game": "full",
+    "full": "full",
+    "": "full",
+    "1st_5_innings": "first5",
+    "first5": "first5",
+    "1st_3_innings": "first3",
+    "first3": "first3",
+    "1st_1_innings": "first1",
+    "1st_inning": "first1",
+    "first1": "first1",
+}
+
+
 class PropProjectionIndex:
-    """Lookup from (player, market, line) to what the sim projected."""
+    """Lookup from (player, market, line) to what the sim projected.
+
+    Also carries GAME-level projections (h2h / spreads / totals), which come
+    from a different part of the same artifact and join on the team pair rather
+    than a player name.
+    """
 
     def __init__(self) -> None:
         self._pitchers: dict[str, dict[str, Any]] = {}
         self._hitters: dict[tuple[str, str], dict[str, Any]] = {}
         self._hitter_means: dict[str, dict[str, float]] = {}
+        # (away_tri, home_tri) -> {segment_payload_name: payload}
+        self._games: dict[tuple[str, str], dict[str, Any]] = {}
         self.games = 0
 
     # -- build ----------------------------------------------------------
     def ingest_game(self, game: Mapping[str, Any], *, pitcher_names: Mapping[str, str] | None = None) -> None:
         self.games += 1
+
+        # Game-level payloads, one per simulated segment.
+        away = str(game.get("away") or "").strip().upper()
+        home = str(game.get("home") or "").strip().upper()
+        if away and home:
+            segments = {
+                name: game.get(name)
+                for name in ("full", "first5", "first3", "first1")
+                if isinstance(game.get(name), Mapping)
+            }
+            if segments:
+                self._games[(away, home)] = segments
 
         # `starter_names` is keyed by SIDE ({"away": "...", "home": "..."})
         # while `pitcher_props` is keyed by PITCHER ID, and nothing in the
@@ -186,6 +222,29 @@ class PropProjectionIndex:
                 self._hitters[(name, "hr_1plus")] = dict(row)
 
     # -- query ----------------------------------------------------------
+    def game_payloads(self, *, sport: Any, home_team: Any, away_team: Any) -> dict[str, Any] | None:
+        """Segment payloads for a game, matched on the TEAM PAIR.
+
+        The sim keys games by tri-code ("MIL", "PIT"); quote rows carry full
+        club names ("Milwaukee Brewers"). Resolved through `team_aliases`, the
+        same real per-sport maps `#218` established -- a string heuristic cannot
+        bridge that gap, and that single failure is why 0 of 108 board
+        candidates carried a quote on 2026-08-06.
+        """
+        if not self._games:
+            return None
+        try:
+            from syndicate.features.shared.team_aliases import teams_match
+        except Exception:
+            return None
+        for (away_tri, home_tri), payloads in self._games.items():
+            try:
+                if teams_match(sport, home_team, home_tri) and teams_match(sport, away_team, away_tri):
+                    return payloads
+            except Exception:
+                continue
+        return None
+
     def project(self, *, player_name: Any, market: Any, line: Any) -> dict[str, Any] | None:
         """Projection + modelled P(over) for one market line, or None.
 
@@ -328,6 +387,124 @@ def load_prop_projections(
     return index
 
 
+def _dist_prob_below(dist: Mapping[str, Any], line: float) -> float | None:
+    """P(outcome < line), the complement side. Push mass excluded from both."""
+    total = 0.0
+    below = 0.0
+    for raw_value, raw_count in (dist or {}).items():
+        try:
+            value = float(raw_value)
+            count = float(raw_count)
+        except (TypeError, ValueError):
+            continue
+        if count <= 0:
+            continue
+        total += count
+        if value < line:
+            below += count
+    return round(below / total, 4) if total > 0 else None
+
+
+def project_game_market(
+    index: "PropProjectionIndex",
+    *,
+    sport: Any,
+    home_team: Any,
+    away_team: Any,
+    market: Any,
+    selection: Any,
+    line: Any,
+    segment: Any,
+) -> dict[str, Any] | None:
+    """The sim's view of a GAME market -- h2h, spreads, totals -- or None.
+
+    The sign convention is measured, not assumed. `run_margin_dist` is
+    **home minus away**: verified against six games on 2026-07-12 where
+    P(margin > 0) equalled `home_win_prob` to three decimals in every one
+    (0.495/0.495, 0.475/0.475, 0.457/0.457, 0.428/0.428, 0.585/0.585). Getting
+    that backwards would have inverted every spread projection while looking
+    entirely plausible.
+    """
+    payloads = index.game_payloads(sport=sport, home_team=home_team, away_team=away_team)
+    if not payloads:
+        return None
+    segment_key = _SEGMENT_PAYLOADS.get(str(segment or "").strip().lower())
+    if segment_key is None:
+        return None
+    payload = payloads.get(segment_key)
+    if not isinstance(payload, Mapping):
+        return None
+
+    market_key = str(market or "").strip().lower()
+    side = str(selection or "").strip().lower()
+    basis = f"{segment_key}"
+
+    if market_key in {"h2h", "moneyline", "h2h_3_way"}:
+        # Straight from the simulation -- no line, no distribution walk.
+        if side in {"home", "1"}:
+            prob = payload.get("home_win_prob")
+        elif side in {"away", "2"}:
+            prob = payload.get("away_win_prob")
+        elif side in {"draw", "tie", "x"}:
+            prob = payload.get("tie_prob")
+        else:
+            return None
+        if prob is None:
+            return None
+        return {
+            "projected": None,  # a win probability has no "projected value"
+            "model_prob_over": round(float(prob), 4),
+            "source": "game_simulation",
+            "basis": f"{basis}/win_prob",
+        }
+
+    try:
+        line_value = float(line)
+    except (TypeError, ValueError):
+        return None
+
+    if market_key in {"totals", "total", "totals_3_way"}:
+        dist = payload.get("total_runs_dist")
+        if not isinstance(dist, Mapping):
+            return None
+        mean = _dist_mean(dist)
+        if side in {"over", "o"}:
+            prob = _dist_prob_over(dist, line_value)
+        elif side in {"under", "u"}:
+            prob = _dist_prob_below(dist, line_value)
+        else:
+            return None
+        return {
+            "projected": mean,
+            "model_prob_over": prob,
+            "source": "game_simulation",
+            "basis": f"{basis}/total_runs_dist",
+        }
+
+    if market_key in {"spreads", "spreads_3_way", "run_line", "ats"}:
+        dist = payload.get("run_margin_dist")
+        if not isinstance(dist, Mapping):
+            return None
+        # Lines are SIGNED per side. home -1.5 means home must win by 2+, i.e.
+        # margin > 1.5. away +1.5 means away may lose by 1, i.e. margin < 1.5.
+        # The line as quoted is from that side's perspective, so it is converted
+        # to the home-minus-away frame before the distribution is walked.
+        if side in {"home", "1"}:
+            prob = _dist_prob_over(dist, -line_value)
+        elif side in {"away", "2"}:
+            prob = _dist_prob_below(dist, line_value)
+        else:
+            return None
+        return {
+            "projected": _dist_mean(dist),
+            "model_prob_over": prob,
+            "source": "game_simulation",
+            "basis": f"{basis}/run_margin_dist",
+        }
+
+    return None
+
+
 def _implied(price: Any) -> float | None:
     try:
         value = float(price)
@@ -352,15 +529,32 @@ def _no_vig_over_probability(row: Mapping[str, Any]) -> float | None:
     """
     consensus = row.get("consensus") or {}
     sides = [str(side) for side in (row.get("sides") or [])]
-    over_side = next((s for s in sides if s.lower() in {"over", "yes"}), None)
-    under_side = next((s for s in sides if s.lower() in {"under", "no"}), None)
+    # Two vocabularies, one shape: props quote over/under, game markets quote
+    # home/away. Both are two-sided markets whose implied probabilities sum to
+    # more than 1 by exactly the book's margin, so both de-vig identically --
+    # only the labels differ. Handling just over/under is why every game market
+    # came back with a projection and no edge.
+    over_side = next((s for s in sides if s.lower() in {"over", "yes", "home", "1"}), None)
+    under_side = next((s for s in sides if s.lower() in {"under", "no", "away", "2"}), None)
     if not over_side or not under_side:
         return None
+    # A 3-way market (h2h_3_way) has a draw leg that must be included or the
+    # sides sum to less than a market and the "fair" price errs in the bettor's
+    # favour -- the most dangerous direction, and the same rule
+    # `market_sides_for_quote` already enforces.
+    draw_side = next((s for s in sides if s.lower() in {"draw", "tie", "x"}), None)
     over_implied = _implied(consensus.get(over_side))
     under_implied = _implied(consensus.get(under_side))
     if over_implied is None or under_implied is None:
         return None
     total = over_implied + under_implied
+    if draw_side is not None:
+        draw_implied = _implied(consensus.get(draw_side))
+        if draw_implied is None:
+            # A 3-way market missing its draw price cannot be de-vigged; saying
+            # so is better than de-vigging across two of three legs.
+            return None
+        total += draw_implied
     if total <= 0:
         return None
     return round(over_implied / total, 4)
@@ -380,27 +574,74 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
     with_edge = 0
     for row in grid_rows:
         player = row.get("player_name")
-        if not player:
-            continue
+        sides = list(row.get("sides") or ())
         considered += 1
-        projection = index.project(
-            player_name=player, market=row.get("market"), line=row.get("line")
-        )
+        if player:
+            projection = index.project(
+                player_name=player, market=row.get("market"), line=row.get("line")
+            )
+        else:
+            # GAME markets -- h2h, spreads, totals -- join on the team pair and
+            # the segment rather than a player name. Projected per SIDE, because
+            # unlike a prop the two sides are different questions ("does home
+            # win" vs "does away win") rather than over/under one number.
+            projection = None
+            over_side = next(
+                (s for s in sides if str(s).lower() in {"over", "home", "yes", "1"}), None
+            )
+            if over_side is not None:
+                projection = project_game_market(
+                    index,
+                    sport=row.get("sport"),
+                    home_team=row.get("home_team"),
+                    away_team=row.get("away_team"),
+                    market=row.get("market"),
+                    selection=over_side,
+                    line=row.get("line"),
+                    segment=row.get("segment"),
+                )
         if projection is None:
             continue
         model_prob = projection.get("model_prob_over")
         fair = _no_vig_over_probability(row)
         projection["market_fair_prob_over"] = fair
-        projection["edge_vs_market_pct"] = (
-            round((float(model_prob) - float(fair)) * 100.0, 2)
-            if model_prob is not None and fair is not None
-            else None
-        )
+
+        # A PREGAME projection cannot be priced against a LIVE market.
+        #
+        # The sim's payloads are generated before first pitch. Once a game
+        # starts the market re-prices on the actual state and the model does
+        # not, so the difference is not an edge -- it is the score. Found on
+        # 2026-07-12: an event with commence 16:07 carried betmgm quotes at
+        # 17:35 (away -500) while the sim still said 0.495, producing a
+        # +23-point "edge" on a coin-flip game. Game-market edges spread
+        # -55 to +54 as a result, on moneylines, where books are sharpest.
+        #
+        # The projection itself is still shown -- a researcher comparing a
+        # pregame model against a live line is a legitimate thing to want --
+        # but it is not given an edge number, because that number would be
+        # meaningless and would rank.
+        state = str(((row.get("game") or {}).get("state") or "")).strip().lower()
+        live_or_done = state in {"live", "in_progress", "final", "completed"}
+        if live_or_done:
+            projection["edge_vs_market_pct"] = None
+            projection["edge_unavailable_reason"] = (
+                f"game is {state}: a pregame projection cannot be priced against a live market"
+            )
+        else:
+            projection["edge_vs_market_pct"] = (
+                round((float(model_prob) - float(fair)) * 100.0, 2)
+                if model_prob is not None and fair is not None
+                else None
+            )
         row["projection"] = projection
         attached += 1
         if projection["edge_vs_market_pct"] is not None:
             with_edge += 1
     return {
+        # Renamed from `player_rows`: this now counts EVERY row, because game
+        # markets are projected too. Keeping the old name would have made the
+        # denominator silently mean something different.
+        "rows_considered": considered,
         "player_rows": considered,
         "rows_with_projection": attached,
         "rows_with_edge": with_edge,
