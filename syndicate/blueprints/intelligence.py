@@ -2181,6 +2181,82 @@ def board_game_chips_api():
     return _no_cache_response(jsonify({"ok": True, "date": selected_date, "chips": chips}))
 
 
+def _attach_book_grid_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
+    """Stamp start time (pregame) or live status (in-progress) onto grid rows.
+
+    Joined on the TEAM PAIR through `team_aliases`, not on string equality:
+    quote rows carry full club names ("Baltimore Orioles") while the scoreboard
+    carries tri-codes ("BAL"). `#218` established that a pure string heuristic
+    cannot do this -- "chc" is neither a prefix of "chicago" nor the initials of
+    "chicago cubs" -- and that single gap is why 0 of 108 board candidates
+    carried a quote on 2026-08-06.
+    """
+    matched = 0
+    try:
+        from syndicate.features.shared.game_chip_scoreboard import build_game_chips
+        from syndicate.features.shared.team_aliases import teams_match
+
+        chips = build_game_chips(selected_date, [sport]) or []
+    except Exception:
+        _LOGGER.exception("BOOK_GRID_GAME_STATE_FAILURE sport=%s date=%s", sport, selected_date)
+        return {"chips": 0, "rows_matched": 0}
+
+    for row in grid:
+        home = row.get("home_team")
+        away = row.get("away_team")
+        if not home or not away:
+            continue
+        for chip in chips:
+            chip_home = ((chip.get("home") or {}) or {}).get("abbr")
+            chip_away = ((chip.get("away") or {}) or {}).get("abbr")
+            if not chip_home or not chip_away:
+                continue
+            try:
+                if teams_match(sport, home, chip_home) and teams_match(sport, away, chip_away):
+                    row["game"] = {
+                        "state": chip.get("state"),
+                        "start_time_utc": chip.get("start_time_utc"),
+                        "status_token": chip.get("status_token"),
+                        "matchup": chip.get("matchup"),
+                        "home_score": (chip.get("home") or {}).get("score"),
+                        "away_score": (chip.get("away") or {}).get("score"),
+                    }
+                    matched += 1
+                    break
+            except Exception:
+                continue
+    return {"chips": len(chips), "rows_matched": matched}
+
+
+def _attach_book_grid_projections(grid: list, *, sport: str, selected_date: str) -> dict:
+    """Stamp the sim's projection and edge onto player-prop rows (S3).
+
+    MLB only for now, and that is stated rather than silently returning zero:
+    the daily-summary shape this reads is MLB's. Other sports return a coverage
+    payload saying so, so a blank column is attributable instead of mysterious.
+    """
+    if sport != "mlb":
+        return {"supported": False, "reason": f"no projection source wired for {sport}"}
+    try:
+        from syndicate.features.mlb.sources import daily_artifact_path
+        from syndicate.features.shared.prop_projections import (
+            attach_projections,
+            load_prop_projections,
+        )
+
+        summary_path = daily_artifact_path(selected_date)
+        snapshot_dir = Path(summary_path).parent / "snapshots" / selected_date
+        index = load_prop_projections(summary_path, roster_snapshot_dir=snapshot_dir)
+        coverage = attach_projections(grid, index)
+        coverage["supported"] = True
+        coverage["summary_artifact"] = str(summary_path)
+        coverage["games_in_summary"] = index.games
+        return coverage
+    except Exception:
+        _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=%s date=%s", sport, selected_date)
+        return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
+
 @intelligence_bp.get("/api/board/book-grid")
 def board_book_grid_api():
     """L1-A: every book's price for every market on a sport/date (S1).
@@ -2220,6 +2296,18 @@ def board_book_grid_api():
         _LOGGER.exception("BOARD_BOOK_GRID_BUILD_FAILURE sport=%s date=%s", sport, selected_date)
         grid = []
 
+    # Game state: a start time for pregames, a live status for in-progress
+    # games. Not decoration -- it is what makes `age_seconds` readable. A
+    # 40-minute-old price on a game that starts in six hours is normal; the same
+    # age on a game in the 7th is a dead line, and #244/#245 already drop those
+    # from Layer 2 for exactly that reason. Layer 1 shows them and says why.
+    game_state_coverage = _attach_book_grid_game_state(grid, sport=sport, selected_date=selected_date)
+
+    # S3: the sim's projection next to the market's price -- the differentiator.
+    # Reads the daily-summary artifact directly rather than going through
+    # build_cards_page_context, which is the call that OOM-killed the worker.
+    projection_coverage = _attach_book_grid_projections(grid, sport=sport, selected_date=selected_date)
+
     # Summarise BEFORE the market filter and the limit, so the coverage numbers
     # describe the slate rather than the current view. A summary computed after
     # filtering would report "100% of rows have 3+ books" on a filtered view and
@@ -2239,6 +2327,8 @@ def board_book_grid_api():
                 "market": market_filter or None,
                 "markets": markets,
                 "summary": summary,
+                "game_state": game_state_coverage,
+                "projections": projection_coverage,
                 "returned": min(len(grid), limit),
                 "total_rows": len(grid),
                 "rows": grid[:limit],

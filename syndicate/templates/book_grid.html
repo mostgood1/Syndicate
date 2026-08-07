@@ -39,6 +39,7 @@
   .bg-missing { color: #2b3543; }
   .bg-gap { color: #f0b429; font-size: 11px; cursor: help; }
   .bg-meta { color: #7d8ea4; font-size: 11px; }
+  .bg-live { color: #34d399; font-size: 11px; font-weight: 600; }
   .bg-empty { padding: 30px; text-align: center; color: #7d8ea4; }
 </style>
 {% endblock %}
@@ -134,7 +135,8 @@
     rows.forEach(function (r) { (r.books || []).forEach(function (b) { if (books.indexOf(b) === -1) books.push(b); }); });
     books.sort();
 
-    el("bg-head").innerHTML = "<tr><th class='bg-mkt'>Market</th><th>Side</th><th>Best</th><th>Consensus</th>" +
+    el("bg-head").innerHTML = "<tr><th class='bg-mkt'>Market</th><th>Game</th><th>Side</th>" +
+      "<th>Proj</th><th>Edge</th><th>Best</th><th>Consensus</th>" +
       books.map(function (b) { return "<th>" + b + "</th>"; }).join("") + "<th>Updated</th></tr>";
 
     var html = [];
@@ -163,14 +165,58 @@
         if (best.suspect_stale) { bestTxt = '<span class="bg-stale" title="' + String(r.gaps.join(" · ")).replace(/"/g, "&quot;") + '">' + bestTxt + "</span>"; }
         else if (best.price !== undefined) { bestTxt = '<span class="bg-best">' + bestTxt + "</span>"; }
 
+        // Projection + edge: the differentiator, and the reason a blank cell is
+        // never a dash without a cause. Edge is signed against the NO-VIG
+        // market probability, so the sign means what it looks like it means.
+        var proj = r.projection || {};
+        var projTxt = (idx === 0 && proj.projected !== undefined && proj.projected !== null)
+          ? '<span title="' + String(proj.source || "").replace(/"/g, "&quot;") + " / " + String(proj.basis || "") + '">' + proj.projected + "</span>"
+          : (idx === 0 ? '<span class="bg-missing">·</span>' : "");
+        var edgeTxt = "";
+        if (idx === 0) {
+          if (proj.edge_vs_market_pct === undefined || proj.edge_vs_market_pct === null) {
+            edgeTxt = '<span class="bg-missing" title="no two-sided market, so no-vig fair value cannot be computed">·</span>';
+          } else {
+            var e = proj.edge_vs_market_pct;
+            edgeTxt = '<span class="' + (e > 0 ? "bg-best" : "bg-meta") + '" title="model ' +
+              (proj.model_prob_over !== null ? (proj.model_prob_over * 100).toFixed(1) + "%" : "?") +
+              " vs no-vig market " + (proj.market_fair_prob_over !== null ? (proj.market_fair_prob_over * 100).toFixed(1) + "%" : "?") +
+              '">' + (e > 0 ? "+" : "") + e.toFixed(1) + "</span>";
+          }
+        }
+
+        // Game context. A 40-minute-old price six hours before first pitch is
+        // normal; the same age in the 7th is a dead line. Without this the
+        // Updated column cannot be read.
+        var g = r.game || {};
+        var gameTxt = "";
+        if (idx === 0) {
+          if (g.state === "live") {
+            gameTxt = '<span class="bg-live" title="' + String(g.matchup || "") + '">' + (g.status_token || "LIVE") +
+              " " + (g.away_score || 0) + "-" + (g.home_score || 0) + "</span>";
+          } else if (g.state === "final") {
+            gameTxt = '<span class="bg-meta">FINAL</span>';
+          } else if (g.start_time_utc) {
+            var t = new Date(g.start_time_utc);
+            gameTxt = '<span class="bg-meta" title="' + String(g.matchup || "") + '">' +
+              t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + "</span>";
+          } else {
+            gameTxt = '<span class="bg-missing">·</span>';
+          }
+        }
+
+        var span = ' rowspan="' + r.sides.length + '"';
         html.push(
           "<tr>" +
-          (idx === 0 ? '<td class="bg-mkt" rowspan="' + r.sides.length + '">' + label + lineTxt + gapMark + "</td>" : "") +
+          (idx === 0 ? '<td class="bg-mkt"' + span + ">" + label + lineTxt + gapMark + "</td>" : "") +
+          (idx === 0 ? "<td" + span + ">" + gameTxt + "</td>" : "") +
           '<td class="bg-side">' + side + "</td>" +
+          (idx === 0 ? "<td" + span + ">" + projTxt + "</td>" : "") +
+          (idx === 0 ? "<td" + span + ">" + edgeTxt + "</td>" : "") +
           "<td>" + bestTxt + "</td>" +
           '<td class="bg-meta">' + fmtPrice((r.consensus || {})[side]) + "</td>" +
           cells +
-          (idx === 0 ? '<td class="bg-meta" rowspan="' + r.sides.length + '">' + (r.age_seconds === null ? "?" : Math.round(r.age_seconds / 60) + "m") + "</td>" : "") +
+          (idx === 0 ? '<td class="bg-meta"' + span + ">" + (r.age_seconds === null ? "?" : Math.round(r.age_seconds / 60) + "m") + "</td>" : "") +
           "</tr>"
         );
       });
