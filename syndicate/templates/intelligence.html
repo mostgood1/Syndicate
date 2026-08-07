@@ -1015,8 +1015,12 @@
   }
 
   function formatAmerican(value) {
+    // #242: `Number(null)` is 0 and 0 IS finite, so a null price used to render
+    // as the price "0" rather than as missing. A price of zero does not exist
+    // in American odds, so this can only ever have been a null in disguise.
+    if (value === null || value === undefined || value === "") return "—";
     const n = Number(value);
-    if (!Number.isFinite(n)) return "—";
+    if (!Number.isFinite(n) || n === 0) return "—";
     return n > 0 ? `+${n}` : String(n);
   }
 
@@ -1524,29 +1528,48 @@
     return (item && item.quote) || null;
   }
 
+  // #242: Number(null) is 0, and 0 is finite. That one fact rendered every
+  // SUPPRESSED fair value as a real one: a row whose market could not be
+  // de-vigged carries fair_price: null, which came out of the pipeline below as
+  // the price "0" and the hold "0.0%". The board showed a dozen rows quoting a
+  // fair price of zero at zero hold, which is not a market -- it is a missing
+  // value wearing a number's clothes. Never Number() a maybe-null again.
+  function numeric(value) {
+    if (value === null || value === undefined || value === "") return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  // `??` alone is not enough here: item.fair_price is explicitly null (not
+  // absent) on a suppressed row, so `item.fair_price ?? quote.fair_price`
+  // yields null and Number(null) is 0. Coerce each side first, THEN fall back.
+  function firstNumeric(...values) {
+    for (const value of values) {
+      const parsed = numeric(value);
+      if (parsed !== null) return parsed;
+    }
+    return null;
+  }
+
   function priceImprovementValue(item) {
-    const raw = Number(item && item.price_improvement_pct);
-    return Number.isFinite(raw) ? raw : null;
+    return numeric(item && item.price_improvement_pct);
   }
 
   function fairPriceValue(item) {
     const quote = itemQuote(item);
-    const raw = Number(item?.fair_price ?? quote?.fair_price);
-    return Number.isFinite(raw) ? raw : null;
+    return firstNumeric(item?.fair_price, quote?.fair_price);
   }
 
   function evVsFairValue(item) {
     // NOT item.ev_pct -- that is the legacy field computed against a VIGGED
     // price and it reads systematically low by about half the hold (#238).
     const quote = itemQuote(item);
-    const raw = Number(item?.ev_vs_fair_pct ?? quote?.ev_pct);
-    return Number.isFinite(raw) ? raw : null;
+    return firstNumeric(item?.ev_vs_fair_pct, quote?.ev_pct);
   }
 
   function bookAgeValue(item) {
     const quote = itemQuote(item);
-    const raw = Number(item?.book_age_seconds ?? quote?.book_age_seconds);
-    return Number.isFinite(raw) ? raw : null;
+    return firstNumeric(item?.book_age_seconds, quote?.book_age_seconds);
   }
 
   // One entry per sortable blotter column, in table order. getValue returns
@@ -1618,20 +1641,20 @@
   function renderBlotterBook(item) {
     const quote = itemQuote(item);
     const book = String(item?.book ?? quote?.bookmaker ?? "").trim();
-    const price = Number(quote?.price ?? item?.odds);
-    if (!book || !Number.isFinite(price)) return "&mdash;";
+    const price = firstNumeric(quote?.price, item?.odds);
+    if (!book || price === null) return "&mdash;";
     const improvement = priceImprovementValue(item);
     const bestBook = String(item?.best_book ?? quote?.best_bookmaker ?? "").trim();
-    const bestPrice = Number(item?.best_price ?? quote?.best_price);
+    const bestPrice = firstNumeric(item?.best_price, quote?.best_price);
     let better = "";
     // Only when a better price genuinely exists AND is at a different book --
     // "move to the book you are already on" is noise, and the board's own rows
     // carry no bookmaker of their own so quote_ref returns the best by default.
-    if (Number.isFinite(improvement) && improvement > 0.01 && bestBook && bestBook !== book && Number.isFinite(bestPrice)) {
+    if (improvement !== null && improvement > 0.01 && bestBook && bestBook !== book && bestPrice !== null) {
       better = `<span class="board-blotter__better" title="Better price at ${escapeHtml(bestBook.toUpperCase())} (+${improvement.toFixed(2)} pts)">&#8599; ${escapeHtml(bestBook.toUpperCase())} ${escapeHtml(formatAmerican(bestPrice))}</span>`;
     }
-    const books = Number(item?.books_quoting ?? quote?.books_quoting);
-    const field = Number.isFinite(books) && books > 1
+    const books = firstNumeric(item?.books_quoting, quote?.books_quoting);
+    const field = books !== null && books > 1
       ? `<span class="board-blotter__field" title="${books} books quoting this market">${books} bks</span>`
       : "";
     return `<div class="board-blotter__book">${escapeHtml(book.toUpperCase())} ${escapeHtml(formatAmerican(price))}</div>${better}${field}`;
@@ -1646,8 +1669,15 @@
       return '<span class="board-blotter__muted" title="No opposing side quoted, so this market cannot be de-vigged">&mdash;</span>';
     }
     const quote = itemQuote(item);
-    const hold = Number(item?.hold_pct ?? quote?.hold_pct);
-    const holdText = Number.isFinite(hold) ? ` <span class="board-blotter__field">${hold.toFixed(1)}% hold</span>` : "";
+    const hold = firstNumeric(item?.hold_pct, quote?.hold_pct);
+    // Negative hold is real and worth naming rather than printing as a
+    // confusing "-4.8% hold": it means the BEST price on each side sums to
+    // under 100%, i.e. the market can be beaten by shopping.
+    const holdText = hold === null
+      ? ""
+      : (hold < 0
+        ? ` <span class="board-blotter__field board-blotter__field--edge" title="Best prices across books sum to under 100% -- beatable by line shopping">${Math.abs(hold).toFixed(1)}% under juice</span>`
+        : ` <span class="board-blotter__field">${hold.toFixed(1)}% hold</span>`);
     return `<div class="board-blotter__fair" title="No-vig fair price across the books quoting this market">${escapeHtml(formatAmerican(fair))}</div>${holdText}`;
   }
 

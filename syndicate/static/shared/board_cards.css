@@ -1727,3 +1727,10 @@ table.board-blotter tbody tr:last-child td {
 .board-blotter__muted {
   color: var(--cards-text-dim, #64748b);
 }
+
+/* #242: negative hold is not a smaller positive hold -- it means the best
+   prices across books sum to under 100%, which is beatable. Coloured like the
+   better-price chip because it is the same kind of finding. */
+.board-blotter__field--edge {
+  color: #4ecdc4;
+}
