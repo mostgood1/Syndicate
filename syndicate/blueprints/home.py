@@ -71,6 +71,32 @@ _LOGGER = logging.getLogger(__name__)
 
 _HOME_OVERVIEW_TTL_SEC = 10.0
 
+# #251. Minimum age before a HYDRATED sport overview is rebuilt, honoured even
+# when the caller passes force_refresh=True. See the long note at the check in
+# _build_sport_overview for the measurement; in short, MLB's hydrated build is
+# ~2.9GB on refresh-worker and the old code rebuilt it every ~90s while still
+# retaining the previous one.
+#
+# 300s is chosen against the consumer, not the container: the board loop reads
+# dashboard_games/home_rails for candidate generation, and a five-minute-old
+# view of a slate is materially the same slate. It is also strictly fresher
+# than what production actually had while this loop was crashing, which was no
+# rebuilt board at all.
+#
+# Env-tunable so the trade can be moved from Render without a deploy of this
+# file -- 0 disables the limit and restores the previous behaviour exactly.
+_HYDRATED_OVERVIEW_MIN_REBUILD_INTERVAL_SEC = 300.0
+
+
+def _hydrated_overview_min_rebuild_interval_sec() -> float:
+    raw = os.environ.get("SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC")
+    if raw is None or not str(raw).strip():
+        return _HYDRATED_OVERVIEW_MIN_REBUILD_INTERVAL_SEC
+    try:
+        return max(0.0, float(str(raw).strip()))
+    except (TypeError, ValueError):
+        return _HYDRATED_OVERVIEW_MIN_REBUILD_INTERVAL_SEC
+
 # These two were plain dicts that were only ever READ FROM and WRITTEN TO --
 # nothing ever removed an entry. The 10s TTL above reads like a bound but is
 # not one: it only decides whether a cached entry may be *served*. An expired
@@ -6433,6 +6459,41 @@ def _build_sport_overview(
     now = time.monotonic()
     cached = _HOME_OVERVIEW_CACHE.get(cache_key)
     if cached and not force_refresh and (now - cached[0]) < _HOME_OVERVIEW_TTL_SEC:
+        return dict(cached[1])
+    # #251: a rate limit on the HYDRATED rebuild, honoured even under
+    # force_refresh. Not a cache-policy tweak -- it is the fix for the
+    # refresh-worker OOM loop, and the mechanism is the interaction between this
+    # line and the cache below it.
+    #
+    # _HOME_OVERVIEW_TTL_SEC is 10s and the worker's board loop runs every ~90s,
+    # so the TTL could never produce a hit there even without force_refresh --
+    # while the entry is still RETAINED for the whole time. Measured 2026-08-07
+    # on refresh-worker (4GiB):
+    #     05:10:57  OVERVIEW_SPORT_BEGIN mlb    993.8MB container
+    #     05:12:10  mlb board_contract         3922.6MB  95.8%   <- +2.9GB, 73s
+    #     05:12:23  post_build_overview        3009MB anon, and it stays there
+    # So the process holds the previous hydrated MLB context AND builds a new
+    # one on top of it -- ~2x 2.9GB against a 4GiB ceiling. Every cycle. Paying
+    # full price for a cache that structurally cannot hit is the worst of both
+    # arrangements, and it is why the two circuit breakers (#249/#250) could
+    # bound the damage but never stop it.
+    #
+    # Only the expensive path is limited. skip_game_hydration=True substitutes
+    # empty lists for exactly the loaders that cost this much (see the comment
+    # above), runs all eight sports in ~2s, and feeds _source_state_fingerprint
+    # -- rate-limiting THAT would make change-detection blind and is the one
+    # thing this must not do.
+    if (
+        cached
+        and force_refresh
+        and not skip_game_hydration
+        and (now - cached[0]) < _hydrated_overview_min_rebuild_interval_sec()
+    ):
+        print(
+            f"[home] OVERVIEW_REBUILD_RATE_LIMITED sport={slug} "
+            f"age_sec={round(now - cached[0], 1)}",
+            flush=True,
+        )
         return dict(cached[1])
 
     links: list[dict[str, Any]] = []
