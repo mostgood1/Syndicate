@@ -159,6 +159,73 @@ shape but mis-attributed: a lever aimed only at `props` addresses 60%, not 98%.
 
 **Unblocks S0b** (enable `us2` everywhere; `eu`/`us_ex` on game lines only).
 
+### OPEN #262 -- books DISAGREE ON THE SIGN OF THE LINE inside one grid row
+
+Found while building `#261`. **This affects the live board, not just arbitrage.**
+
+One production `spreads_alt` / `first5` row, `line=1.5`:
+
+```
+betmgm     away line=-1.5 (+210)   home line=1.5  (-295)
+betrivers  away line=1.5  (-240)   home line=-1.5 (+180)
+bovada     away line=-1.5 (+240)   home line=1.5  (-340)
+```
+
+betrivers' cells sit on the **opposite** line from betmgm's and bovada's, inside
+the same row. So the row's `best.away` compares a **-1.5 bet against a +1.5
+bet** -- different bets, ranked as if interchangeable. Every cross-book number on
+that row inherits it: best, consensus, width, and the blended score.
+
+`_INSTANCE_FIELDS` in `book_grid.py` is
+`(sport, kind, event_id, segment, market, player_name)` -- **`line` is not in
+it**, so the grouping cannot separate a ladder's rungs by sign; the row's single
+`line` is whichever cell landed first.
+
+**Not yet diagnosed:** whether the sign convention differs per book upstream in
+`book_quotes`, or is lost in the pivot. Answer that before changing the key --
+`_INSTANCE_FIELDS` is documented as needing to mirror `market_sides_for_quote`
+exactly, "if these two ever disagree, sides land in different grid rows and the
+grid silently under-reports book coverage."
+
+Scope: game lines with handicaps (`spreads`, `spreads_alt`). `h2h` has no line
+and `totals` shares one across sides, so both are unaffected.
+
+### SHIPPED 2026-08-07 (#261) -- S5/C3: cross-book numbers over prices that COEXISTED
+
+`syndicate/features/shared/board_cross_book.py` + 14 tests. Not yet wired to an
+endpoint or a board -- the module and its guards are the deliverable.
+
+`arbitrage_profit_pct` and `is_low_hold` have existed in `opportunity_signals`
+with **zero callers**, under a docstring saying the guards "belong at the call
+site". Nobody had written the call site. This is it.
+
+**One optimisation serves both boards.** Arb profit is `1/overround - 1` and hold
+is `overround - 1`, so "best arb" and "lowest hold" are the same search:
+minimise summed implied probability over one price per side. L2-B and L2-C are
+two filters over one result, per §3's one-row-contract rule.
+
+**Two guards, and the second was found only by running it on production:**
+
+1. **Simultaneity.** One MLB h2h row's away quotes spanned **08:33Z..18:43Z**.
+2. **Complementarity (`#262` above).** With simultaneity alone the module
+   reported **40 arbs, best +250.88%** -- because it paired same-sign spread
+   legs. Keyed on side semantics, not market names: `over/under` lines must be
+   EQUAL, `away/home` must SUM TO ZERO, no lines means nothing to reconcile.
+
+**Measured on production, 727 game-line rows:**
+
+| | arbs | best |
+|---|---|---|
+| simultaneity only | 40 | **+250.88%** (fiction) |
+| + complementarity | **2** | **+3.88%** |
+
+25 low-hold rows. The survivors are credible: a 3-way first-inning market
+*including its draw leg*, and a totals pair on a matched 0.5 line. That is the
+plan's predicted "716 -> ~3", arrived at independently.
+
+**Widening the window does not add arbs** (2 at 90s, 300s and 1800s), which says
+the binding constraint is pairing and coexistence, not the capture cadence.
+
 ### SHIPPED 2026-08-07 (#258, `c256cc3e`) -- an unidentified ledger record is now unaddressable. DEPLOYED 19:11Z in `3f8a3f0a`.
 
 Fixed at the function boundary: `_replace_ledger_line` refuses a null/blank
