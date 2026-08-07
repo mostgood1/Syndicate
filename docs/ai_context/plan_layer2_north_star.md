@@ -287,31 +287,39 @@ in a sport nobody has looked at.
   is already in `eu`**. Declined as redundant.
 - **`au`** — negligible value for US sports.
 
-### Value ranking, independent of cost
+### The books each region actually returns
 
-1. **`eu` — Pinnacle.** The sharp reference. It is what makes `no_vig_fair`
-   credible rather than a consensus of soft books. Then
-   `consensus_fair_probability` must *prefer* sharp books, or Pinnacle is one
-   vote of thirteen.
-2. **`us_ex` — Novig, ProphetX.** US exchanges, near-zero vig, so their price is
-   close to true fair. Also where an arb actually gets filled.
-3. **`uk` — Betfair exchange**, Bet365. Betfair's exchange price is arguably the
-   best fair-value anchor that exists.
-4. **`us2`** — widens the L1-A grid and creates more arb/low-hold pairs. Pure
-   product value, no fair-value improvement.
-5. **`au`** — low value for US sports.
+Queried from the API 2026-08-07 (1 credit per region), not recited. 59 distinct
+books exist across all regions; this configuration takes **25 net-new**.
 
-### Two caveats that must be closed first
+**`eu` — 22 books, 20 net-new.** The fair-value region: **`pinnacle`**,
+**`betfair_ex_eu`** (Betfair exchange), **`matchbook`**, plus `marathonbet`,
+`onexbet`, `betsson`, `coolbet`, `nordicbet`, `tipico_de`, `sport888`,
+`williamhill`, `unibet_*`, `winamax_*`, `betclic_fr`, `leovegas_se`, `gtbets`.
 
-- **The 49% / 45% game-line/prop split above is a PROXY** from captured row
-  counts, not credit attribution. Props are fetched per-event, so their true
-  credit share is *higher* than their row share — game-line adds are a **floor**
-  estimate, prop adds a **ceiling**. The real split needs the
-  `by_market_family` telemetry, which is **dead: 2 observations, both from
-  2026-08-01**. Revive it before trusting any of these numbers.
+**`us_ex` — 5 books, all net-new.** Near-zero vig, genuinely independent price
+discovery: `novig`, `prophetx`, `betopenly`, and the two prediction markets
+**`kalshi`** and **`polymarket`**.
+
+**`us2` — 8 books, all net-new.** Soft US retail, for price shopping and grid
+width only: `ballybet`, `betanysports`, `betparx`, `espnbet` (theScore Bet),
+`fliff`, `hardrockbet`, `hardrockbet_oh`, `rebet`.
+
+### Still open
+
 - **Verify whether `bookmakers=` is billed differently from `regions=`.** If it
-  lets us cherry-pick Pinnacle without buying all of `eu`, option 1 gets
-  materially cheaper.
+  lets us cherry-pick `pinnacle` without buying all of `eu`, the anchor gets
+  cheaper still. Low stakes now that `eu` on game lines is only ~30K/month, but
+  it would matter if we ever wanted a sharp anchor on *props*.
+- **Revive `by_market_family` + per-sport attribution** (dead: 2 observations,
+  both 2026-08-01). The cost *structure* above is derived from the request shape
+  and is solid; the **savings-lever percentages are not measured** and the
+  per-sport split is unknown. See the open question above — MLB is only ~16% of
+  spend.
+
+*(A previous caveat here — that the game/prop split was a row-count proxy — is
+now RESOLVED: the split is derived from request structure, not row counts. See
+"The cost structure" above.)*
 
 ---
 
@@ -319,14 +327,24 @@ in a sport nobody has looked at.
 
 Ordered by what unblocks a **column**, not by subsystem.
 
-### S0 — answer the two questions that gate everything else (hours)
-Neither is engineering; both block real decisions.
-- **Confirm the OddsAPI cap (5M vs 15M).** It decides the entire book strategy
-  (§4d) and is one email.
-- **Revive `by_market_family` quota telemetry** (2 observations, both from
-  2026-08-01) so credit attribution is measured rather than proxied.
+### S0 — instrument the spend before changing it (hours)
+- ~~Confirm the OddsAPI cap.~~ **DONE: 5,000,000.**
+- **Revive `by_market_family` + add per-sport attribution** (currently 2
+  observations, both from 2026-08-01). Without it the savings levers in §4d are
+  assumptions and the per-sport split is unknown.
+- **Find the missing 84%.** MLB is ~11,055 of 67,844 credits/day. Measure where
+  the rest goes — probably soccer — **before** optimising MLB's prop cadence.
+  The cheapest lever is likely in a sport nobody has looked at.
 - **Confirm capture is actually running.** The quota counter did not move across
   a 90-second probe on 2026-08-07; at 67,844/day it should have risen ~70.
+
+### S0b — enable the three regions, scoped (config, minutes)
+`us2` everywhere; `eu` and `us_ex` on **game lines only** (~30K/month each).
+Lands at ~4.13M/month = 82.6% of cap before any lever. Then make
+`consensus_fair_probability` **prefer** the sharp books, or Pinnacle, Betfair
+and the exchanges are just three votes among thirty-eight.
+*Exit:* the L1-A grid shows 25 more books and `no_vig_fair` is anchored on
+Pinnacle/Betfair rather than a consensus of retail books.
 
 ### S1 — L1-A, the book grid, PREGAME (days, serve-time only)
 Pivot `book_quotes` into per-book columns. Best-price highlight, `books_quoting`,
