@@ -37,11 +37,28 @@ Untouched since 14:31Z. Four commits are queued behind a deploy hold:
 
 ```
 GATE   full MLB slate, OBSERVATION ONLY
-WIN A  a39fe3d6  (#255)                          ALONE, 30+ min
+WIN A  a39fe3d6  (#255)   -- SEE BELOW, its criterion changed and it may be droppable
 WIN B  c256cc3e (#258+#257 removal)
        c8871b5a (#260)
        + re-enable EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN
 ```
+
+**WIN A's original criterion is WRONG — do not use it.** It read "the hydrated
+MLB rebuild interval must move ~90s → ~300s". Production already sits at ~296s
+**without `#255`**, so that number cannot move and measuring it proves nothing.
+See §6.5: `#251` works in steady state and fails only when a post-boot pass
+exceeds 10s, which is a load condition.
+
+Two options, and the second is preferred:
+- **Drop WIN A**, fold `a39fe3d6` into a later window. Defensible — there is
+  nothing to measure in steady state.
+- **Keep it, measuring the right thing**: that the interval *stays* ~300s across
+  a boot **under slate load**, where today it would decay. That needs the slate,
+  so it belongs *after* the gate, not before.
+
+Either way **`#255` is low priority now and must not hold up WIN B.** The
+settlement autorun is the test that matters; `settled: 0` is the product
+blocker.
 The gate **never ran under load** — every reading was from an idle worker
 (peak drifted 1540 → 1615 → 1789MB over the afternoon, bar was 1500MB, 0 kills
 for 3h). The user accepted "assume we're back to pre-OOM state" and moved on.
@@ -137,11 +154,28 @@ declined — `betfair_ex_eu` is already in `eu`. Book lists are in §4d of the p
    is `canonical_market_key(sport, *values)`; I passed the label as the sport.
 4. **"The betting-card producer bug."** Already fixed — no malformed record
    written since 2026-07-22. The real problem was the denominator (`#260`).
-5. **`#251` may not be the no-op `#255` claims.** Production shows the hydrated
-   MLB rebuild interval already at ~296s (≈ `#251`'s 300s floor) **without
-   `#255` deployed**. Either `#255` is unnecessary, or it fixes a different
-   path, or the detector measures the wrong line. **Resolve before spending
-   WIN A on it.**
+5. **RESOLVED — `#251` is NOT a no-op, and `#255` is not what its commit says.**
+   The loop interval defaults to **30s** (`intelligence_state.py:2018`), so a
+   ~296s hydrated MLB rebuild interval is not natural cadence — `#251`'s 300s
+   floor is rate-limiting, in steady state, today, with `#255` NOT deployed.
+
+   Why the original `_prune_home_cache` analysis missed it: `#251`'s early
+   return happens **before** the write, and the prune only runs **on** a write.
+   When every sport short-circuits there are no writes, therefore no prunes,
+   and the entries survive to 300s. `#251` is self-sustaining once established.
+
+   **It fails only under load.** The first pass after a boot has an empty cache,
+   so all 8 sports build and write, and each write prunes. Sport order is
+   `mlb … soccer`. If that pass exceeds **10s**, MLB's entry is past its TTL
+   before a later sport writes, gets pruned, and the cycle never establishes.
+   During the crash loop MLB alone took **73 seconds** — so `#251` was genuinely
+   defeated then, and the original measurement was right *for those conditions*
+   and over-generalised to steady state.
+
+   `#255` therefore removes an undocumented coupling between a serve-TTL and a
+   rate limiter that fails exactly when the system is slow — i.e. when
+   suppressing a 2.9GB rebuild matters most. **It is a robustness fix, not an
+   activation fix.**
 
 ---
 

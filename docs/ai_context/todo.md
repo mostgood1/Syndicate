@@ -16,11 +16,27 @@ has been watched. A deploy reboots the process, and the whole measurement is
 peak-within-a-boot across a real load — restarting mid-slate destroys the thing
 we are waiting for.
 
-**Why `#255` must be alone (WIN A).** It is the only held item that changes a
-*memory* variable: it makes `#251` execute for the first time, cutting hydrated
-overview rebuilds from ~90s to ~300s. That shifts allocation rate, retention and
-the floor — exactly the quantities being measured. `#251` has already been
-measured once against code that never ran; doing that twice would be a choice.
+**CORRECTED 2026-08-07 — WIN A's premise was wrong and its criterion cannot be
+measured as written.** It said `#255` "makes `#251` execute for the first time",
+cutting rebuilds ~90s → ~300s. Production already sits at **~296s without `#255`
+deployed**, and the loop interval defaults to 30s, so `#251`'s 300s floor IS
+rate-limiting in steady state.
+
+The original `_prune_home_cache` analysis missed that `#251`'s early return
+happens *before* the write while the prune only runs *on* a write — no writes,
+no prunes, so entries survive to 300s. `#251` fails only when the first
+post-boot pass exceeds the 10s TTL, which it did during the crash loop (MLB
+alone took 73s). So the measurement was right for those conditions and was
+over-generalised to steady state.
+
+**`#255` is a robustness fix, not an activation fix**: it removes an
+undocumented coupling between a serve-TTL and a rate limiter that breaks exactly
+when the system is slow — i.e. when suppressing a 2.9GB rebuild matters most.
+
+Consequence: **WIN A is low priority and must not gate WIN B.** Either drop it
+and fold `a39fe3d6` into a later window, or keep it measuring the right thing —
+that the interval *stays* ~300s across a boot **under slate load**, where today
+it would decay. That needs the slate, so it belongs after the gate, not before.
 
 **Why `#255` comes BEFORE the autorun, not after.** If settlement were
 re-enabled first and the floor moved, we could not tell whether it was
