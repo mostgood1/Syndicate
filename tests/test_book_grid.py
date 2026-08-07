@@ -183,6 +183,44 @@ def test_rows_without_a_price_are_ignored_not_crashed_on():
     assert len(grid) == 1
 
 
+def test_a_stale_cell_carries_a_human_reason_not_just_a_flag():
+    """The UI greys cells WITH A REASON. The string is written once, here --
+    a UI that re-derives it will drift from the flag and they will disagree."""
+    grid = build_book_grid(
+        [
+            _quote(selection="home", price=+388, bookmaker="stale_book", snapshot_ts="2026-08-07T12:00:00Z"),
+            _quote(selection="home", price=+110, bookmaker="fresh", snapshot_ts="2026-08-07T19:59:00Z"),
+        ],
+        now=NOW,
+    )
+    row = grid[0]
+    stale_cell = row["cells"]["stale_book"]["home"]
+    fresh_cell = row["cells"]["fresh"]["home"]
+
+    assert stale_cell["stale"] is True
+    assert "behind the freshest quote" in stale_cell["reason"]
+    assert "7h" in stale_cell["reason"]          # human duration, not raw seconds
+    assert fresh_cell["stale"] is False and fresh_cell["reason"] is None
+
+
+def test_row_gaps_explain_why_a_row_is_not_a_full_grid():
+    single = build_book_grid([_quote(selection="home", price=-110, bookmaker="only")], now=NOW)[0]
+    assert single["complete"] is False
+    joined = " | ".join(single["gaps"])
+    assert "only 1 book quoting" in joined
+    assert "one-sided" in joined          # no-vig cannot be computed
+
+
+def test_a_complete_row_has_no_gaps():
+    rows = []
+    for book in ("a", "b", "c"):
+        rows.append(_quote(selection="home", price=-110, bookmaker=book))
+        rows.append(_quote(selection="away", price=-105, bookmaker=book))
+    row = build_book_grid(rows, now=NOW)[0]
+    assert row["complete"] is True
+    assert row["gaps"] == []
+
+
 def test_empty_input_is_an_empty_grid():
     assert build_book_grid([], now=NOW) == []
     assert book_grid_summary([])["rows"] == 0

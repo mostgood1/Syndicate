@@ -2181,6 +2181,73 @@ def board_game_chips_api():
     return _no_cache_response(jsonify({"ok": True, "date": selected_date, "chips": chips}))
 
 
+@intelligence_bp.get("/api/board/book-grid")
+def board_book_grid_api():
+    """L1-A: every book's price for every market on a sport/date (S1).
+
+    A SERVE-TIME PIVOT over `book_quotes`, which already holds every book -- 11
+    captured on MLB while the board rendered one "best" price. It reads one
+    shard and reshapes it; it computes no simulation, generates no artifact and
+    adds nothing to any worker. That is what let S1 ship while refresh-worker
+    was under a memory observation hold.
+
+    Rows are NOT filtered by quality. This is the Layer 1 research surface: a
+    single-book row, or one whose best price is a stale line, still belongs here
+    and arrives carrying `gaps` explaining why it is thin. Layer 2 is the
+    shortlist; filtering here would make the board look complete when the
+    capture is not.
+    """
+    from syndicate.features.shared.book_grid import book_grid_summary, build_book_grid
+    from syndicate.features.shared.odds_book_quotes import read_book_quotes
+
+    sport = str(request.args.get("sport") or "mlb").strip().lower()
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    market_filter = str(request.args.get("market") or "").strip().lower()
+    try:
+        limit = max(1, min(2000, int(str(request.args.get("limit") or "300").strip())))
+    except ValueError:
+        limit = 300
+
+    try:
+        rows = read_book_quotes(sport, selected_date)
+    except Exception:
+        _LOGGER.exception("BOARD_BOOK_GRID_READ_FAILURE sport=%s date=%s", sport, selected_date)
+        rows = []
+
+    try:
+        grid = build_book_grid(rows)
+    except Exception:
+        _LOGGER.exception("BOARD_BOOK_GRID_BUILD_FAILURE sport=%s date=%s", sport, selected_date)
+        grid = []
+
+    # Summarise BEFORE the market filter and the limit, so the coverage numbers
+    # describe the slate rather than the current view. A summary computed after
+    # filtering would report "100% of rows have 3+ books" on a filtered view and
+    # be technically true and completely misleading.
+    summary = book_grid_summary(grid)
+
+    if market_filter:
+        grid = [row for row in grid if str(row.get("market") or "").lower() == market_filter]
+
+    markets = sorted({str(row.get("market") or "") for row in grid if row.get("market")})
+    return _no_cache_response(
+        jsonify(
+            {
+                "ok": True,
+                "sport": sport,
+                "date": selected_date,
+                "market": market_filter or None,
+                "markets": markets,
+                "summary": summary,
+                "returned": min(len(grid), limit),
+                "total_rows": len(grid),
+                "rows": grid[:limit],
+                "server_time": _server_timestamp(),
+            }
+        )
+    )
+
+
 @intelligence_bp.get("/intelligence/status")
 def intelligence_status_page():
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()

@@ -74,6 +74,20 @@ def _age_seconds(stamp: str, *, now: datetime) -> float | None:
     return round(max(0.0, (now - when).total_seconds()), 1)
 
 
+def _duration(seconds: float | None) -> str:
+    """Human duration for a UI reason string. '4h 12m', not '15120.0'."""
+    if seconds is None:
+        return "unknown"
+    total = int(seconds)
+    if total < 60:
+        return f"{total}s"
+    if total < 3600:
+        return f"{total // 60}m"
+    hours, remainder = divmod(total, 3600)
+    minutes = remainder // 60
+    return f"{hours}h {minutes}m" if minutes else f"{hours}h"
+
+
 def _better(price: int, than: int | None) -> bool:
     """True when `price` pays the bettor more.
 
@@ -227,6 +241,56 @@ def build_book_grid(
             stamps = [c[s]["observed_at"] for c in cells.values() for s in c if c[s]["observed_at"]]
             newest = max(stamps) if stamps else None
 
+            # Per-cell staleness, so the UI can grey a cell WITH A REASON rather
+            # than either hiding it or presenting it as current. The reason is
+            # written here, once, because a UI that re-derives it will drift
+            # from the flag and the two will eventually disagree.
+            freshest_row_age = min(
+                (
+                    cells[b][s]["age_seconds"]
+                    for b in cells
+                    for s in cells[b]
+                    if cells[b][s].get("age_seconds") is not None
+                ),
+                default=None,
+            )
+            for book_key, sides_map in cells.items():
+                for side_key, cell in sides_map.items():
+                    age = cell.get("age_seconds")
+                    lag = (
+                        round(age - freshest_row_age, 1)
+                        if age is not None and freshest_row_age is not None
+                        else None
+                    )
+                    cell["lag_behind_freshest_seconds"] = lag
+                    if lag is not None and lag > _STALE_BEST_LAG_SECONDS:
+                        cell["stale"] = True
+                        cell["reason"] = (
+                            f"{_duration(lag)} behind the freshest quote on this market"
+                        )
+                    else:
+                        cell["stale"] = False
+                        cell["reason"] = None
+
+            # Row-level gaps: why this row is not the full grid the reference
+            # surface shows. Rendered greyed with these strings rather than
+            # filtered out -- an honest empty cell says the capture needs work;
+            # a filtered row makes the board look complete when it is not.
+            gaps: list[str] = []
+            if len(books) <= 1:
+                gaps.append(f"only {len(books)} book quoting - no price shopping, no consensus")
+            if len(side_names) < 2:
+                gaps.append("one-sided - no-vig fair value and hold cannot be computed")
+            suspect_sides = [s for s in side_names if (best.get(s) or {}).get("suspect_stale")]
+            if suspect_sides:
+                worst_lag = max(
+                    (best[s].get("lag_behind_freshest_seconds") or 0) for s in suspect_sides
+                )
+                gaps.append(
+                    f"best price on {', '.join(suspect_sides)} lags the market by "
+                    f"{_duration(worst_lag)} - likely a stale line, not an edge"
+                )
+
             first = sides_rows[0]
             grid.append(
                 {
@@ -248,6 +312,8 @@ def build_book_grid(
                     "consensus": consensus,
                     "updated_at": newest,
                     "age_seconds": _age_seconds(newest or "", now=now),
+                    "gaps": gaps,
+                    "complete": not gaps,
                 }
             )
 
