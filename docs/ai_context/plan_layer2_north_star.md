@@ -123,22 +123,180 @@ Three conclusions, each with a direct consequence:
 
 ---
 
+## 4b. The temporal axis — "Today" and "forward looking"
+
+**Not a sixth board.** A scope selector present on *every* board, because the
+same row means different things at different horizons.
+
+| scope | contains | why it exists |
+|---|---|---|
+| **Live** | in-progress games only | the OddsJam live grid; prices move per pitch |
+| **Today** | today's slate, pregame | the default for daily sports (MLB/NBA/NHL/WNBA) |
+| **Forward** | tomorrow → end of week | **the only useful view for weekly sports** (NFL, NCAAF), and where the softest lines live |
+
+Two things make forward-looking load-bearing rather than nice-to-have:
+
+1. **Weekly sports have no "today".** NFL and NCAAF slates are Thursday →
+   Monday. A today-only board is empty six days a week for them. **Known
+   blocker: NFL currently self-pins its week to 1** — that must be fixed before
+   forward scope means anything for NFL.
+2. **The best pregame edges are early.** Books post openers days ahead and move
+   them as money arrives; the largest gaps between our sim and the market appear
+   *before* the market sharpens. A today-only board structurally cannot see
+   them.
+
+Implementation: scope is a filter on `commence_time` over the same
+`market_row`. It must **not** fork the pipeline. The one real pipeline
+consequence is that the capture window must extend far enough forward — a
+7-day lookahead for weekly sports, which is exactly the `#239` soccer
+fixture-date lesson (quotes are sharded by *fixture* date, so a puller that only
+ever asks for today gets a 404 and logs "absent").
+
+---
+
+## 4c. Pregame and live — both, and they are different products
+
+Every board in §2 exists in both modes. They share the row contract and share
+almost nothing else.
+
+| dimension | **pregame** | **live** |
+|---|---|---|
+| capture cadence | 5–15 min is fine | **sub-60s or it is fiction** |
+| price half-life | hours | seconds |
+| "stale" means | normal — books post early and sit | **dead** |
+| market shape | full two-sided consensus | suspends constantly; one-sided is common |
+| fair value | consensus across 11+ books | often single-book; consensus unreliable |
+| sim input | pregame projection | must fold in **live game state** — inning, score, outs, count, pitcher |
+| arb pairing | pairs persist minutes | pairs persist **seconds** |
+| cost of a stale row | a slightly wrong price | **a bet on a pitcher already pulled** |
+| credit cost | low | **high, and non-linear for props** |
+
+### What live actually costs
+
+Game lines are one request per sport per poll. **Props are one request per
+event**, so live prop polling scales with the slate:
+
+```
+MLB, 15 games, props polled every 60s for a ~3.5h window
+  = 15 events x 210 polls = 3,150 requests x markets x regions
+```
+
+That is the single largest discretionary cost in the whole plan, and it is why
+live cannot simply be "the same loop, faster".
+
+**Required design — tiered live capture:**
+- **Tier 1 (60s):** game lines for in-progress games. Cheap, one request per
+  sport, and it is what the live grid's headline columns need.
+- **Tier 2 (2–5 min):** props for in-progress games *only where a market is
+  actually live and unsuspended*. Do not poll a suspended market.
+- **Tier 3 (on state change):** re-poll an event when the game state changes
+  materially (half-inning, pitching change, scoring play) rather than on a
+  fixed clock. The live-lens loop already knows this.
+
+### Non-negotiables for live
+
+1. **Live capture belongs on `live-odds-worker`, not `refresh-worker`.** Two
+   services, one serial process each, different budgets. Do not add a live loop
+   to the worker that just stopped OOM-ing.
+2. **`age_seconds` is a first-class column and must be honest.** A live row over
+   ~900s is dead and `opportunity_gate` already drops it (#244/#245). Keep that
+   rule in one place.
+3. **Live arb requires same-snapshot pairing.** Requiring simultaneity dropped
+   **88%** of raw pairs and took an apparent 716 arbs to **~3**. Without it the
+   arb board is fiction that looks like profit.
+4. **Ship pregame first.** A live board on an open feedback loop is
+   *confidently wrong in real time*, which is strictly worse than being thin.
+
+---
+
+## 4d. Books and regions — measured, 2026-08-07
+
+We request **one region** (`SYNDICATE_LIVE_ODDS_REFRESH_REGIONS = us`, on all
+three services) and get 11–13 books. Every additional region is a config change,
+not an engineering project.
+
+**Measured burn:** 20,322 credits at 2026-08-01 18:01Z → 419,533 at
+2026-08-07 15:15Z = 399,211 over 5.88 days = **67,844/day = 2.04M/month**. This
+confirms the inherited plan's "2.02M/5M base" — that figure was right.
+
+Cost model is `credits = markets x regions`, so adding a region adds ~1x the
+current burn for whatever slice it is applied to.
+
+| option | added/mo | cumulative | % of 5M | % of 15M |
+|---|---|---|---|---|
+| baseline (`us`) | — | 2,035,317 | 40.7% | 13.6% |
+| 1. `eu` (**Pinnacle**) → game lines only | +998,773 | 3,034,090 | 60.7% | 20.2% |
+| 2. `us2` → everything | +2,035,317 | 5,069,406 | **101.4%** | 33.8% |
+| 3. `us_ex` + `uk` → game lines only | +1,997,546 | 7,066,952 | **141.3%** | 47.1% |
+
+**All three = 7.07M/month: impossible on a 5M cap, comfortable (47%) on 15M.**
+
+### The decision reduces to one question
+
+**Is the cap 5M or 15M?** Headers report 14.58M remaining; a standing operational
+note says the headers lie and the real cap is 5M. That note is now worth the
+entire book strategy. **Confirm with OddsAPI before spending anything.**
+
+- **If 5M:** option 1 only. `us2` alone breaks the cap.
+- **If 15M:** take all three and stop worrying.
+
+### Value ranking, independent of cost
+
+1. **`eu` — Pinnacle.** The sharp reference. It is what makes `no_vig_fair`
+   credible rather than a consensus of soft books. Then
+   `consensus_fair_probability` must *prefer* sharp books, or Pinnacle is one
+   vote of thirteen.
+2. **`us_ex` — Novig, ProphetX.** US exchanges, near-zero vig, so their price is
+   close to true fair. Also where an arb actually gets filled.
+3. **`uk` — Betfair exchange**, Bet365. Betfair's exchange price is arguably the
+   best fair-value anchor that exists.
+4. **`us2`** — widens the L1-A grid and creates more arb/low-hold pairs. Pure
+   product value, no fair-value improvement.
+5. **`au`** — low value for US sports.
+
+### Two caveats that must be closed first
+
+- **The 49% / 45% game-line/prop split above is a PROXY** from captured row
+  counts, not credit attribution. Props are fetched per-event, so their true
+  credit share is *higher* than their row share — game-line adds are a **floor**
+  estimate, prop adds a **ceiling**. The real split needs the
+  `by_market_family` telemetry, which is **dead: 2 observations, both from
+  2026-08-01**. Revive it before trusting any of these numbers.
+- **Verify whether `bookmakers=` is billed differently from `regions=`.** If it
+  lets us cherry-pick Pinnacle without buying all of `eu`, option 1 gets
+  materially cheaper.
+
+---
+
 ## 5. Sequence
 
 Ordered by what unblocks a **column**, not by subsystem.
 
-### S1 — L1-A, the book grid (days, serve-time only)
+### S0 — answer the two questions that gate everything else (hours)
+Neither is engineering; both block real decisions.
+- **Confirm the OddsAPI cap (5M vs 15M).** It decides the entire book strategy
+  (§4d) and is one email.
+- **Revive `by_market_family` quota telemetry** (2 observations, both from
+  2026-08-01) so credit attribution is measured rather than proxied.
+- **Confirm capture is actually running.** The quota counter did not move across
+  a 90-second probe on 2026-08-07; at 67,844/day it should have risen ~70.
+
+### S1 — L1-A, the book grid, PREGAME (days, serve-time only)
 Pivot `book_quotes` into per-book columns. Best-price highlight, `books_quoting`,
 width, no-vig where two-sided, honest `updated`. Market-family tabs off
-`canonical_market_key` (#224/#247 already thread it end to end).
-*Exit:* a sport/day grid that matches the OddsJam screenshot, with real books.
+`canonical_market_key` (#224/#247 already thread it end to end). Scope selector
+(Live / Today / Forward) wired from the start — it is a `commence_time` filter,
+not a pipeline fork.
+*Exit:* a sport/day grid that matches the OddsJam screenshot, with real books,
+and a Forward tab that is non-empty for NFL/NCAAF.
 
-### S2 — cadence, split pregame from live
-26 min pregame is acceptable; live needs sub-minute. **Live capture belongs on
-live-odds-worker, not refresh-worker** — the two have different budgets and one
-serial process each. Do not add a live loop to the worker that just stopped
-dying.
-*Exit:* a live row's `age_seconds` is under a minute; pregame under 5.
+### S2 — cadence, and the live tier
+Pregame to 5–15 min; live to sub-60s via the **tiered** design in §4c (game
+lines 60s, props 2–5 min and only when unsuspended, plus state-change triggers).
+**Live capture goes on `live-odds-worker`.** Fix NFL's week self-pinning here —
+forward scope is meaningless for NFL without it.
+*Exit:* live `age_seconds` under 60; pregame under 5 min; live prop credit cost
+measured against the S0 budget, not assumed.
 
 ### S3 — L1-B, the advanced view (the differentiator)
 Join sim projections + advanced analytics onto the same rows: `Projected`,
