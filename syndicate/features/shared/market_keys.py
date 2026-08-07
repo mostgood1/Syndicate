@@ -169,4 +169,21 @@ def canonical_market_key(sport: Any, *values: Any) -> str | None:
         # would lose a key we already have.
         if underscored.startswith(("batter_", "pitcher_", "player_")):
             return underscored
+        # #247: strip a leading ROLE word and retry. Our boards label props by
+        # role ("Hitter Hits", "Pitcher Outs") while graders and the odds feed
+        # use the bare stat ("hits", "outs") -- and the table already holds the
+        # bare form, so the role word was the only thing preventing the join.
+        #
+        # This is not cosmetic. `canonical_market_key("mlb", "Hitter Hits")`
+        # returned None while `("mlb", "batter_hits")` returned batter_hits, so
+        # the two sides of settlement could never agree on what market a bet was
+        # in. Safe by construction: every role-stripped form either hits the
+        # same entry the prefixed alias already pointed at ("batter_home_runs" ->
+        # "home_runs" -> batter_home_runs) or nothing at all.
+        head, _, tail = underscored.partition("_")
+        if tail and head in {"hitter", "batter", "pitcher", "player"}:
+            if tail in _GAME:
+                return _GAME[tail]
+            if tail in sport_map:
+                return sport_map[tail]
     return None

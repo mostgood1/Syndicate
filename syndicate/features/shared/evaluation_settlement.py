@@ -68,6 +68,48 @@ def _market_family(value: Any) -> str | None:
     return market
 
 
+def _markets_compatible(record_market: Any, row_market: Any, sport: Any) -> bool:
+    """Do these two market labels describe the same market? (#247)
+
+    THE reason 4,560 settlement records were `no_key_match`. The two sides speak
+    different vocabularies -- the ledger carries the board's display label
+    ("pitcher outs"), the graded row carries the sport's own stat label
+    ("outs") -- and `_market_family` resolved them by keyword-sniffing free
+    text, which mapped them to `props` and `outs` respectively. Never equal, so
+    the gate meant to prevent WRONG matches blocked every RIGHT one:
+
+        _market_family("pitcher outs")       -> "props"
+        _market_family("outs")               -> "outs"          -> blocked
+        _market_family("batter_total_bases") -> "totals"        -> a player prop
+                                                                   filed as a
+                                                                   game total
+
+    That second case is the dangerous one: it would have permitted a prop to
+    match a game total had their keys overlapped.
+
+    So compare CANONICAL keys when both sides resolve to one -- the same
+    `canonical_market_key` the pricing join already uses, which is what makes
+    settlement and pricing agree by construction rather than by coincidence.
+    Fall back to the coarse family only when canonicalisation cannot answer, and
+    allow the match when neither can: an unknown market must not silently veto a
+    row that every other signal says is right.
+    """
+    try:
+        from syndicate.features.shared.market_keys import canonical_market_key
+
+        record_key = canonical_market_key(sport, record_market)
+        row_key = canonical_market_key(sport, row_market)
+        if record_key and row_key:
+            return record_key == row_key
+    except Exception:
+        pass
+    record_family = _market_family(record_market)
+    row_family = _market_family(row_market)
+    if record_family and row_family:
+        return record_family == row_family
+    return True
+
+
 def _read_chunk_records(chunk_path: Path) -> list[dict[str, Any]]:
     if not chunk_path.exists():
         return []
@@ -163,8 +205,11 @@ def match_graded_row(record: Mapping[str, Any], rows: Iterable[Mapping[str, Any]
         row_keys = _graded_row_keys(row)
         if record_keys and row_keys and record_keys.isdisjoint(row_keys):
             continue
-        row_market_family = _market_family(row.get("market"))
-        if row_market_family and record_market_family and row_market_family != record_market_family:
+        if not _markets_compatible(
+            recommendation.get("market") or recommendation.get("market_family"),
+            row.get("market"),
+            record.get("sport") or recommendation.get("sport") or row.get("sport"),
+        ):
             continue
         if record_line is not None and row.get("line") is not None:
             try:
