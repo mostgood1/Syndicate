@@ -216,6 +216,50 @@ def write_preseason_odds_snapshot(
     return path
 
 
+def _append_nfl_preseason_book_quotes(events: list[dict[str, Any]]) -> None:
+    """Every book's preseason game-market price into the shared quote log.
+
+    THIS WAS MISSING, and it is why NFL preseason never reached the board.
+    Measured on production 2026-08-07: /api/board/book-grid?sport=nfl carried
+    1,246 rows across 272 events whose commence_time ran 2026-09-10..2027-01-10
+    -- entirely regular season -- while the one real preseason game in the
+    window (CAR @ ARI, 2026-08-06) had no row at all. Matched by TEAM NAME, not
+    event id: the board keys on OddsAPI's hex ids and the schedule on ESPN's
+    numerics, so an id comparison reports "absent" for the wrong reason.
+
+    The gap was plumbing, not fetching. `fetch_nfl_team_odds_local.py` is the
+    only other NFL script that appends here and it pulls `americanfootball_nfl`
+    -- regular season only. This script already pays for the real
+    `americanfootball_nfl_preseason` key, then wrote its response to a CSV for
+    the preseason cards page and dropped it. /api/board/book-grid reads
+    book_quotes and nothing else, so those paid-for prices could never appear.
+
+    Sharded under `sport="nfl"`, not a separate "nfl_preseason" slug: the board
+    is keyed by sport slug, so a new slug would need a new board rather than
+    populating the existing one. Preseason and regular-season events never
+    collide -- distinct OddsAPI event ids.
+
+    Mirrors `_append_nfl_team_book_quotes` deliberately, including never
+    raising: a quote-log failure must not fail the odds refresh.
+    """
+    try:
+        if not isinstance(events, list) or not events:
+            return
+        from syndicate.features.shared.odds_book_quotes import append_book_quotes, quote_rows_from_oddsapi_events
+
+        now = datetime.now(tz=timezone.utc)
+        rows = quote_rows_from_oddsapi_events(events)
+        result = append_book_quotes(
+            sport="nfl",
+            date_str=now.date().isoformat(),
+            rows=rows,
+            captured_at=now.isoformat(),
+        )
+        print(f"[odds_book_quotes] nfl preseason quote_rows={len(rows)} appended={result.get('appended')}")
+    except Exception as exc:
+        print(f"[odds_book_quotes] nfl preseason append FAILED {type(exc).__name__}: {exc}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--season", type=int, required=True)
@@ -226,6 +270,11 @@ def main() -> None:
         raise RuntimeError("Missing ODDS_API_KEY environment variable")
 
     events = fetch_odds(api_key=api_key, sport_key=PRESEASON_SPORT_KEY, region="us", odds_format="american")
+    # Before build_odds_rows, deliberately: that function drops any event it
+    # cannot match against schedule_preseason_{season}.csv, and the quote log
+    # should keep every price this response was paid for even when the schedule
+    # mirror is stale -- which, measured 2026-08-07, it is.
+    _append_nfl_preseason_book_quotes(events)
     schedule_lookup = load_schedule_lookup(args.season)
     rows = build_odds_rows(events, schedule_lookup, args.season)
 
