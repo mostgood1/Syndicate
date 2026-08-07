@@ -16289,6 +16289,47 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 
 ## Operational notes worth not rediscovering
 
+- **To measure ONE change when several are already pushed, deploy by pinned
+  `commitId`, not branch head.** (2026-08-07, #254) Render's
+  `POST /v1/services/{id}/deploys` accepts `{"commitId": "<full sha>"}`. That
+  lets you push a stack and still ship only its base, so each fix gets its own
+  attributable window without holding work hostage in a working tree three
+  sessions are writing to. Verify with
+  `git merge-base --is-ancestor <later-commit> <deployed-commit>` — it must say
+  NO. This is the standard way to run a sequenced window here; the alternative
+  (deploy head, hope) is how the 02:53 deploy carried ~40 commits and cost a
+  night of wrong attributions.
+
+- **Memory readings on refresh-worker are confounded by time-since-boot, and
+  every deploy forces a boot.** (2026-08-07, #253/#254) The floor IS the
+  ratchet: sampled 3 minutes after a kill it is low, 8 minutes in it is high.
+  Two consecutive pre-fix cycles read 3994.6MB then 3108.2MB — an 886MB *drop*
+  — purely because a boot happened between them. So **every fix looks good in
+  its first few minutes**, which is how a false "RESOLVED" got written into the
+  handoff. Measure **peak `container_memory_mb` between consecutive `BOOTED`
+  events** and **time-to-next-OOM**, across several complete cycles, against a
+  baseline with a stated spread. A quiet stretch means nothing until it clearly
+  beats the baseline MAX — 14.6m occurred once with nothing fixed at all.
+
+- **A change that never executed is not evidence about the idea it
+  implements.** (2026-08-07, #251 via #255) `#251` was deployed, measured,
+  failed, and written off by three sessions as "a rate fix against a floor
+  problem" — but `_prune_home_cache` had been evicting its cache entries on a
+  10s TTL while `#251` asked for entries up to 300s old, so it never ran. Before
+  concluding an idea is wrong, confirm the code actually took the path. This is
+  the same failure as counting without a denominator: the number was real, it
+  just measured something else.
+
+- **Suspect any constant reused by a caller with a different job.** Four
+  instances in one night: `#249`'s 900MB guard floor sized for a 2GB container
+  guarding an 1873MB stage; a comment reasoning that "the returned payload is
+  only ~2.3MB" so deepcopies could not matter (serialised size vs a live dict
+  graph, and never multiplied by the 96 cache slots); `3ca6c11d`'s count-only
+  cache bound (32/64 entries — web-shaped numbers on a worker where the keys
+  can never hit); and two clocks both named "TTL", one meaning *how long may
+  this be served* and one *how long must this survive*. Each was correct when
+  written. Name the difference in the code or it will be reused wrongly.
+
 - **A "freshest source wins" merge/dedup override that's gated on
   `candidate_type == "steam"` will miss any OTHER live-sourced candidate
   type.** (#174) `_merge_duplicate_prop_candidates`/
