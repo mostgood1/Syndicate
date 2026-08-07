@@ -1659,3 +1659,71 @@ table.board-blotter tbody tr:last-child td {
   border-style: dashed;
   opacity: 0.85;
 }
+
+/* #240: the blotter's price columns. The blotter is the DEFAULT view above
+   900px, and until now it showed no book, no fair price and no book clock --
+   so every price signal built in #215-#239 was rendered only on the card view
+   nobody lands on. Styled tighter than the card's .price-chip family on
+   purpose: this is a dense table, not a card. */
+.board-blotter__book {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--cards-text-strong, #e2e8f0);
+  white-space: nowrap;
+}
+
+/* Same yellow, and the same reason, as .price-chip--better: this is money
+   being left on the table on THIS bet. */
+.board-blotter__better {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fbbf24;
+  white-space: nowrap;
+}
+
+.board-blotter__field {
+  display: inline-block;
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--cards-text-dim, #64748b);
+  white-space: nowrap;
+}
+
+.board-blotter__fair {
+  font-weight: 700;
+  font-size: 12px;
+  color: #7dd3fc;
+  white-space: nowrap;
+}
+
+.board-blotter__ev {
+  font-weight: 800;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* Positive EV against the NO-VIG fair price is the single most valuable thing
+   on the row, so it is the only green here. */
+.board-blotter__ev--pos { color: #2ecc71; }
+.board-blotter__ev--neg { color: var(--cards-text-muted, #94a3b8); }
+.board-blotter__ev--flat { color: var(--cards-text-dim, #64748b); }
+
+.board-blotter__age {
+  font-size: 12px;
+  color: var(--cards-text-muted, #94a3b8);
+  white-space: nowrap;
+}
+
+/* An hour-old book price is dead, and on a live slate that is the difference
+   between a real number and a fossil. Loud on purpose -- the user spotted
+   7-hour-old odds on the board before any instrument did. */
+.board-blotter__age--stale {
+  color: #f97316;
+  font-weight: 700;
+}
+
+.board-blotter__muted {
+  color: var(--cards-text-dim, #64748b);
+}

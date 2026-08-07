@@ -1516,6 +1516,39 @@
     return delta !== null ? Math.abs(delta) : null;
   }
 
+  // #240: blotter price accessors. Each reads the flattened row field first
+  // (quote_enrichment writes those for the prop lane) and falls back to the
+  // nested quote, because the two enrichment paths flatten different subsets
+  // and a column that only worked on one of them would look broken at random.
+  function itemQuote(item) {
+    return (item && item.quote) || null;
+  }
+
+  function priceImprovementValue(item) {
+    const raw = Number(item && item.price_improvement_pct);
+    return Number.isFinite(raw) ? raw : null;
+  }
+
+  function fairPriceValue(item) {
+    const quote = itemQuote(item);
+    const raw = Number(item?.fair_price ?? quote?.fair_price);
+    return Number.isFinite(raw) ? raw : null;
+  }
+
+  function evVsFairValue(item) {
+    // NOT item.ev_pct -- that is the legacy field computed against a VIGGED
+    // price and it reads systematically low by about half the hold (#238).
+    const quote = itemQuote(item);
+    const raw = Number(item?.ev_vs_fair_pct ?? quote?.ev_pct);
+    return Number.isFinite(raw) ? raw : null;
+  }
+
+  function bookAgeValue(item) {
+    const quote = itemQuote(item);
+    const raw = Number(item?.book_age_seconds ?? quote?.book_age_seconds);
+    return Number.isFinite(raw) ? raw : null;
+  }
+
   // One entry per sortable blotter column, in table order. getValue returns
   // a raw comparable primitive (not the display string) so e.g. odds sort
   // numerically (-150 before +200) rather than lexicographically. The
@@ -1528,6 +1561,21 @@
         const raw = Number(item.odds ?? item.odds_current);
         return Number.isFinite(raw) ? raw : null;
       } },
+    // #240: the price columns. Everything #215-#239 built lived ONLY in
+    // renderPriceStrip, which the card view calls and the blotter never did --
+    // and the blotter is the default view on any viewport over 900px. So the
+    // book, the best price, the no-vig fair price and the book clock were all
+    // being computed, shipped, and shown to nobody.
+    //
+    // Sorted by what makes each column actionable: Book sorts on the price
+    // IMPROVEMENT (biggest line-shopping gain first, which is the #211 +2.79
+    // ROI points made clickable), not on the price itself.
+    { key: "book", label: "Book", type: "number", getValue: (item) => priceImprovementValue(item) },
+    { key: "fair", label: "Fair", type: "number", getValue: (item) => fairPriceValue(item) },
+    { key: "ev", label: "EV", type: "number", getValue: (item) => evVsFairValue(item) },
+    // Ascending puts the FRESHEST first, which is why missing-sorts-last
+    // matters here: a row with no book clock must not read as "brand new".
+    { key: "age", label: "Age", type: "number", getValue: (item) => bookAgeValue(item) },
     { key: "projected", label: "Projected", type: "number", getValue: (item) => {
         const raw = Number(item.sim_projection ?? item.projected ?? item.projected_sim);
         return Number.isFinite(raw) ? raw : null;
@@ -1562,6 +1610,65 @@
     if (bMissing) return -1;
     const cmp = column.type === "string" ? String(va).localeCompare(String(vb)) : va - vb;
     return direction === "asc" ? cmp : -cmp;
+  }
+
+  // #240: cell renderers for the price columns. Deliberately terse -- the
+  // blotter is a dense table, so each cell is one number plus at most one
+  // qualifier, with the full story left to the card view's price strip.
+  function renderBlotterBook(item) {
+    const quote = itemQuote(item);
+    const book = String(item?.book ?? quote?.bookmaker ?? "").trim();
+    const price = Number(quote?.price ?? item?.odds);
+    if (!book || !Number.isFinite(price)) return "&mdash;";
+    const improvement = priceImprovementValue(item);
+    const bestBook = String(item?.best_book ?? quote?.best_bookmaker ?? "").trim();
+    const bestPrice = Number(item?.best_price ?? quote?.best_price);
+    let better = "";
+    // Only when a better price genuinely exists AND is at a different book --
+    // "move to the book you are already on" is noise, and the board's own rows
+    // carry no bookmaker of their own so quote_ref returns the best by default.
+    if (Number.isFinite(improvement) && improvement > 0.01 && bestBook && bestBook !== book && Number.isFinite(bestPrice)) {
+      better = `<span class="board-blotter__better" title="Better price at ${escapeHtml(bestBook.toUpperCase())} (+${improvement.toFixed(2)} pts)">&#8599; ${escapeHtml(bestBook.toUpperCase())} ${escapeHtml(formatAmerican(bestPrice))}</span>`;
+    }
+    const books = Number(item?.books_quoting ?? quote?.books_quoting);
+    const field = Number.isFinite(books) && books > 1
+      ? `<span class="board-blotter__field" title="${books} books quoting this market">${books} bks</span>`
+      : "";
+    return `<div class="board-blotter__book">${escapeHtml(book.toUpperCase())} ${escapeHtml(formatAmerican(price))}</div>${better}${field}`;
+  }
+
+  function renderBlotterFair(item) {
+    const fair = fairPriceValue(item);
+    if (!Number.isFinite(fair)) {
+      // Absent is a real answer here and must not read as a failure: a
+      // one-sided market (anytime goal scorer, where only "yes" is quoted)
+      // cannot be de-vigged at all, so there IS no fair price to show.
+      return '<span class="board-blotter__muted" title="No opposing side quoted, so this market cannot be de-vigged">&mdash;</span>';
+    }
+    const quote = itemQuote(item);
+    const hold = Number(item?.hold_pct ?? quote?.hold_pct);
+    const holdText = Number.isFinite(hold) ? ` <span class="board-blotter__field">${hold.toFixed(1)}% hold</span>` : "";
+    return `<div class="board-blotter__fair" title="No-vig fair price across the books quoting this market">${escapeHtml(formatAmerican(fair))}</div>${holdText}`;
+  }
+
+  function renderBlotterEv(item) {
+    const ev = evVsFairValue(item);
+    if (!Number.isFinite(ev)) return '<span class="board-blotter__muted">&mdash;</span>';
+    const tone = ev > 0.01 ? "pos" : (ev < -0.01 ? "neg" : "flat");
+    return `<span class="board-blotter__ev board-blotter__ev--${tone}" title="Expected value against the no-vig fair price">${ev > 0 ? "+" : ""}${ev.toFixed(1)}%</span>`;
+  }
+
+  function renderBlotterAge(item) {
+    const seconds = bookAgeValue(item);
+    if (!Number.isFinite(seconds)) {
+      return '<span class="board-blotter__muted" title="This source publishes no book timestamp">&mdash;</span>';
+    }
+    const text = formatAge(seconds);
+    // One hour is the same staleness line the card view's clock uses. Judged on
+    // the BOOK clock, never on our capture clock -- a number the book last
+    // moved 7 hours ago is dead regardless of how recently we looked at it.
+    const stale = seconds >= 3600;
+    return `<span class="board-blotter__age${stale ? " board-blotter__age--stale" : ""}" title="Since this book last moved the number">${escapeHtml(text || "&mdash;")}</span>`;
   }
 
   function renderBlotter(items) {
@@ -1631,6 +1738,10 @@
                   </td>
                   <td data-label="Line">${escapeHtml(propText || "-")}</td>
                   <td data-label="Odds">${oddsDisplay ? escapeHtml(oddsDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
+                  <td data-label="Book">${renderBlotterBook(item)}</td>
+                  <td data-label="Fair">${renderBlotterFair(item)}</td>
+                  <td data-label="EV">${renderBlotterEv(item)}</td>
+                  <td data-label="Age">${renderBlotterAge(item)}</td>
                   <td data-label="Projected">${projectedDisplay ? escapeHtml(projectedDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
                   <td data-label="Live proj.">${liveDisplay ? escapeHtml(liveDisplay) : "&mdash;"}</td>
                   <td data-label="Actual">${actualDisplay ? escapeHtml(actualDisplay) : "&mdash;"}</td>
