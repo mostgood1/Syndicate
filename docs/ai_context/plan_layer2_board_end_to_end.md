@@ -39,22 +39,43 @@ than an anchor — defensible, but it is the ceiling on every EV number we
 publish. Second, we spend 76% of the budget on props and 5% on the game lines
 where a sharp book would actually be available.
 
-### 2.2 Publish — **currently failing, live**
+### 2.2 Publish — **CORRECTED: it works. The first version of this section was wrong.**
 
-`live-odds-worker` cannot push artifacts to web. Measured in one hour of logs:
+The original finding here read "publishing is failing right now — 100
+PUBLISH_FAILED in an hour, not size-specific, small CSVs fail too". That was
+wrong, and the way it was wrong is worth recording because it is the same error
+class this document exists to eliminate.
 
-```
-PUBLISH_FAILED × 100 — HTTP 502 Bad Gateway
-  mlb_source/tracking/book_quotes/2026-08-06.jsonl        (74 MB)
-  mlb_source/.../oddsapi_hitter_props_2026_08_06.json
-  wnba_source/data/processed/boxscores_history.csv
-  soccer_source/championship/api/live_state/...
-```
+What the fuller measurement shows:
 
-Not size-specific — small CSVs fail too. The pull side was taught to stream in
-1MB chunks (#233); **the push side never was**, and now fails broadly. This is
-upstream of every board symptom: if the push fails, web's copy is stale, and
-refresh-worker faithfully pulls stale data.
+| measured, 01:00–02:10Z | value |
+|---|---|
+| `PUBLISH_OK` | **1000** (hit the query limit) |
+| `PUBLISH_FAILED` | 223 — *all* `HTTP Error 502` |
+| failures by minute | **01:33 ×108, 01:54 ×95, 01:55 ×19**, 02:08 ×1 |
+| web deploys finished | **01:34:06** and **01:55:10** |
+| the 74MB MLB shard specifically | **127 OK / 9 failed (93%)**, publishing every 1–2 min |
+
+The failure bursts are **web restarting for two deploys I triggered myself**.
+The transport is healthy, including for the 74MB shard, and the sweep does not
+advance its watermark on failure (`all_succeeded`), so deploy-window failures
+retry and self-heal by design.
+
+**The error:** a one-hour sample was taken, it happened to contain two of my own
+deploys, and a systemic conclusion was drawn from deploy noise — without ever
+checking the success rate or correlating against the deploy log. Measuring
+failures without measuring successes is not a measurement.
+
+What is genuinely imperfect here, and is *hardening* rather than an outage:
+- `publish_hot_artifact` peaks around 250–300MB for one 74MB file (read_text,
+  then `.encode()` again for the checksum, then `json.dumps`, then `.encode()`).
+  Wasteful; currently survivable.
+- `timeout_seconds=10` for an ~80MB JSON body is fragile — it succeeds today and
+  is the kind of margin that disappears under load.
+- The endpoint parses the whole body into memory on a 2GB instance.
+
+None of these is causing the observed failures. They belong in a later hardening
+pass, not ahead of the feedback loop.
 
 ### 2.3 Transport — three defects, all fixed this session, all the same shape
 
@@ -142,12 +163,22 @@ settled by argument instead of data.
 Five phases. Each has an exit criterion that is a **number**, not a judgement.
 Nothing in a later phase starts before its predecessor's number is met.
 
-### Phase 0 — Stop the bleeding (transport)
-Fix the publish path to stream, mirroring #233's pull fix. Nothing downstream
-can be evaluated while 100 pushes an hour fail.
+### Phase 0 — Make the feedback loop RUN (revised)
+The original Phase 0 was a publish-transport fix built on a wrong premise (see
+§2.2). Transport is healthy; this is the real floor.
 
-**Exit:** `PUBLISH_FAILED` = 0 over one hour; web's MLB shard mtime never more
-than 5 minutes behind live-odds-worker's.
+The settlement autorun last executed **15.3 hours ago**, and when it ran it
+settled 0 of 8,276. Two separate problems, and the cadence one comes first
+because nothing can be measured on a once-a-day grader:
+
+1. **Cadence** — settlement rides inside `run_refresh_worker.py`'s cycle. It
+   must run on a schedule tied to games finishing, not to whenever the worker
+   happens to come round.
+2. **Ingestion** — only `moneyline` graded rows exist. Prop outcomes are never
+   ingested, which is 3,716 of the 8,276 unmatched.
+
+**Exit:** settlement runs at least hourly; `graded_rows_available` non-zero for
+props on a completed slate; `settled` > 0 for the first time.
 
 ### Phase 1 — One identity contract (kills D1)
 A single `market_identity()` producing a canonical key from (sport, event,
@@ -237,13 +268,18 @@ Rules that make the failure classes impossible rather than fixed:
 5. **Freshness is judged on the BOOK clock**, never our capture clock.
 6. **No measurement, no weight.** Any ranking constant must cite the CLV that
    set it, or be labelled a prior in the code.
+7. **Measure failures against successes, and against your own deploys.** §2.2
+   of this document was originally wrong because it counted 100 failures
+   without ever counting the 1000 successes beside them, or noticing that both
+   failure bursts landed on my own web restarts. A rate is a measurement; a
+   count is an anecdote.
 
 ---
 
 ## 7. Order of work
 
 ```
-Phase 0  publish transport        ← blocks everything, currently failing
+Phase 0  make settlement RUN       ← the real floor (publish was a false alarm, §2.2)
 Phase 1  identity contract        ← kills the largest defect class
 Phase 2  close the feedback loop  ← makes every later decision evidence-based
 Phase 3  fair value everywhere    ← sharp anchor + margin model
