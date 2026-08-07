@@ -323,6 +323,65 @@ now RESOLVED: the split is derived from request structure, not row counts. See
 
 ---
 
+## 4e. STALENESS — the biggest single defect on the board
+
+Measured on production, 2026-08-07, MLB: **1,528 of 3,246 rows (47%) have a
+best price that lags the market.** Not a display bug. The board's headline
+number — "best available price" — is wrong on nearly half the rows, and every
+downstream number inherits it: EV, edge, arbitrage, low-hold, and the blended
+score that ranks Layer 2.
+
+### Four distinct causes, which need four different fixes
+
+**C1 — capture cadence.** `snapshot_ts` shows ~78 stamps across 34 hours ≈ **one
+per 26 minutes**. Defensible pregame; fiction live. *Fix: S2's tiered cadence.*
+
+**C2 — books stop updating at different times.** "Freshest per book" across an
+all-day append log still puts a 1pm price beside a 7pm one. This is why a best
+price can sit 272 points clear of consensus (draftkings +388 against a +116
+consensus, observed). *Fix: already labelled per-cell (`stale`,
+`lag_behind_freshest_seconds`) — but labelling is not correcting. The board
+should rank on a **fresh-only** best price and show the stale one as context.*
+
+**C3 — no simultaneity requirement.** Any cross-book claim — best price,
+arbitrage, low hold — is only true if the prices coexisted. Enforcing that
+dropped **88%** of raw arb pairs and took an apparent 716 arbitrages to **~3**.
+*Fix: a same-snapshot constraint on every cross-book derivation, not just arb.*
+
+**C4 — dead markets.** A price on a suspended market or a pulled pitcher is not
+stale, it is void. `opportunity_gate` (#245) already drops these from Layer 2 at
+serve time. *Fix: none needed; keep the rule in one place.*
+
+### The rule this implies
+
+**Freshness is part of a price's identity, not metadata about it.** A price
+without a timestamp is not a price. Every derived figure must state the window
+it was computed over, and any figure combining two books must state that they
+were observed together.
+
+Concretely, and in priority order:
+
+1. **Rank on a fresh-only best price.** Today `best` is the numerically best
+   quote regardless of age, which is why 47% of rows lead with a laggard. Add a
+   freshness bound to the *selection*, keep the stale quote visible as a cell.
+   This is a small change and the largest single accuracy win available.
+2. **Make `age_seconds` legible.** Done — game state (start time / live status)
+   shipped alongside it, because 40 minutes old is normal pregame and fatal in
+   the 7th.
+3. **Same-snapshot pairing for every cross-book number**, not just arbitrage.
+4. **Then** cadence (S2), which reduces how stale things get but cannot fix a
+   selection rule that ignores age.
+
+### Why the order matters
+
+Cadence is the expensive fix and the tempting one. But at any cadence, a
+selection rule that ignores age will still surface the most stale book as "best"
+whenever that book's last price happened to be generous. **Fixing the rule is
+cheap and helps immediately at today's cadence; fixing the cadence without the
+rule buys less than it costs.**
+
+---
+
 ## 5. Sequence
 
 Ordered by what unblocks a **column**, not by subsystem.
@@ -354,6 +413,14 @@ width, no-vig where two-sided, honest `updated`. Market-family tabs off
 not a pipeline fork.
 *Exit:* a sport/day grid that matches the OddsJam screenshot, with real books,
 and a Forward tab that is non-empty for NFL/NCAAF.
+
+### S1b — rank on a FRESH best price (small, and the largest accuracy win)
+47% of production rows currently lead with a stale "best". `best` selects the
+numerically best quote regardless of age; bound that selection by freshness and
+keep the stale quote visible as a cell. See §4e — this is cheap, helps at
+today's cadence, and no amount of S2 fixes it.
+*Exit:* `rows_with_suspect_best` falls sharply without `rows_single_book`
+rising — i.e. we corrected the selection rather than hiding the data.
 
 ### S2 — cadence, and the live tier
 Pregame to 5–15 min; live to sub-60s via the **tiered** design in §4c (game
