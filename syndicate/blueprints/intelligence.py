@@ -2231,10 +2231,54 @@ def _attach_book_grid_game_state(grid: list, *, sport: str, selected_date: str) 
 def _attach_book_grid_projections(grid: list, *, sport: str, selected_date: str) -> dict:
     """Stamp the sim's projection and edge onto player-prop rows (S3).
 
-    MLB only for now, and that is stated rather than silently returning zero:
-    the daily-summary shape this reads is MLB's. Other sports return a coverage
-    payload saying so, so a blank column is attributable instead of mysterious.
+    Per-sport, because each sim ships a different shape. An unwired sport
+    returns a coverage payload saying so, so a blank column is attributable
+    instead of mysterious -- a 2026-08-07 audit found WNBA, NFL and soccer at
+    **0.0% projections on every market** while identity/line/odds were 100%,
+    and only this reason string made that legible rather than a mystery.
+
+    WNBA is wired to a DIFFERENT contract than MLB on purpose: it emits
+    `projected` + `edge_vs_line` and leaves the probability fields null,
+    because its model ships means and not a distribution. See
+    `wnba_projections` -- inventing P(over) from a mean would put a fabricated
+    number into EV and the blended score.
     """
+    if sport == "wnba":
+        try:
+            from syndicate.features.shared.wnba_projections import (
+                attach_wnba_projections,
+                load_wnba_projections,
+            )
+            from syndicate.features.wnba.sources import processed_root
+            from syndicate.features.shared.source_roots import preferred_artifact_roots
+
+            file_name = f"props_recommendations_{selected_date}.csv"
+            # Same resolution the WNBA props board uses: processed_root() prefers
+            # a source_artifacts candidate whether or not anything was written
+            # there, so fall back to whichever candidate root actually holds the
+            # file rather than reporting an empty board.
+            source_path = processed_root() / file_name
+            if not source_path.exists():
+                for root in preferred_artifact_roots(
+                    __file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source"
+                ):
+                    candidate = root / "data" / "processed" / file_name
+                    if candidate.exists():
+                        source_path = candidate
+                        break
+            index = load_wnba_projections(source_path)
+            if not index.players:
+                return {
+                    "supported": True,
+                    "rows_with_projection": 0,
+                    "reason": "no WNBA model rows for this date",
+                    "source_artifact": str(source_path),
+                }
+            return attach_wnba_projections(grid, index)
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=wnba date=%s", selected_date)
+            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
     if sport != "mlb":
         return {"supported": False, "reason": f"no projection source wired for {sport}"}
     try:
