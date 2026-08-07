@@ -216,6 +216,42 @@ sports per cycle, so MLB's hydrated entry was reliably evicted ~10s after being
 stored, while `#251`'s check asks for one up to **300s** old. `#251` has been a
 near no-op since it shipped.
 
+**CORRECTION TO THE CORRECTION (2026-08-07 19:0xZ) -- "near no-op since it
+shipped" is TOO STRONG, and the narrower claim is the interesting one.**
+Production shows the hydrated MLB rebuild interval at **~296s with `a39fe3d6`
+NOT deployed**, against a loop that ticks every **30s**
+(`SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS`, default 30,
+`intelligence_state.py:2018`). So `#251` **is** working in steady state.
+
+What I missed: `#251` returns early **before** the write, and `_prune_home_cache`
+only runs **on** a write. When every sport short-circuits there are no writes,
+so no prunes, and the entries survive to 300s. `#251` is self-sustaining once
+established.
+
+It fails in one specific condition: the first pass after a boot has an empty
+cache, so all eight sports build and write, and each write prunes. Sport order
+is `mlb ... soccer`. **If that pass takes longer than 10s, MLB's entry is past
+TTL before a later sport writes and is evicted**, so the cycle never
+establishes. During the crash loop MLB alone took **73 seconds** -- so `#251`
+was genuinely defeated *then*, and the measurement was right for those
+conditions and wrong as a general claim.
+
+I generalised from a crash-loop measurement to steady state. That is the same
+error shape as rules 9-11, committed inside the fix for it.
+
+**`a39fe3d6` is therefore a ROBUSTNESS fix, not an activation fix**, and should
+be described that way: `#251`'s correctness currently depends on the overview
+pass completing within 10s -- an undocumented coupling between a serve-TTL and a
+rate limiter that fails precisely when the system is slow, i.e. when suppressing
+a 2.9GB rebuild matters most.
+
+**Consequence for WIN A: the criterion recorded for it cannot be measured.**
+"Confirm the interval moves ~90s -> ~300s" will show no change, because it is
+already ~296s. Either drop WIN A and fold `a39fe3d6` into a later window, or
+re-scope it to "the interval *stays* ~300s across a boot under slate load,
+where today it would decay" -- which needs the slate and so belongs after the
+gate. Low priority either way; do not hold the autorun test behind it.
+
 So the control below is **three landed fixes, not four** -- `#249`/`#250`/`#252`
 did nothing, which stands; `#251` was never tested at all. *A change that never
 executed is not evidence about the idea it implements*, and three sessions
