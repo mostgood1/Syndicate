@@ -75,6 +75,64 @@ def test_fingerprint_pass_is_never_rate_limited():
     assert result.get("_marker") != "cached"
 
 
+def test_pruner_does_not_evict_the_entry_the_rate_limiter_needs():
+    # #255. The defect in #251, and the reason it did nothing in production.
+    #
+    # _prune_home_cache runs on EVERY write with ttl=_HOME_OVERVIEW_TTL_SEC
+    # (10s) and pops every entry at or past it. The worker writes all eight
+    # sports each cycle, so the hydrated MLB entry was reliably deleted ~10s
+    # after being stored -- while the rate limiter asks for one up to 300s old.
+    # Retention shorter than reuse means the limiter can never fire.
+    #
+    # Two clocks, two jobs: TTL is how long an entry may be SERVED to a normal
+    # caller; the rebuild interval is how long it must SURVIVE so a forced
+    # caller can be refused. This pins that retention takes the max.
+    _clear()
+    now = home_module.time.monotonic()
+    key = home_module._sport_cache_key("mlb", "2026-08-07")
+    home_module._HOME_OVERVIEW_CACHE[key] = (now - 60.0, {"slug": "mlb", "_marker": "cached"})
+
+    # A write for a DIFFERENT key triggers the prune, exactly as another
+    # sport's overview does on the worker every cycle.
+    other = home_module._sport_cache_key("nba", "2026-08-07")
+    home_module._HOME_OVERVIEW_CACHE[other] = (now, {"slug": "nba"})
+    home_module._prune_home_cache(
+        home_module._HOME_OVERVIEW_CACHE,
+        now=now,
+        ttl=max(
+            home_module._HOME_OVERVIEW_TTL_SEC,
+            home_module._hydrated_overview_min_rebuild_interval_sec(),
+        ),
+    )
+
+    # 60s old: far past the 10s serve TTL, well inside the 300s reuse window.
+    assert key in home_module._HOME_OVERVIEW_CACHE, (
+        "the pruner evicted the entry the rate limiter exists to serve"
+    )
+
+    # And end to end: a forced hydrated rebuild is still refused afterwards.
+    result = home_module._build_sport_overview(
+        {"slug": "mlb"}, "2026-08-07", force_refresh=True, skip_game_hydration=False
+    )
+    assert result["_marker"] == "cached"
+
+
+def test_retention_still_bounded_when_the_limiter_is_disabled():
+    # With the interval at 0 the reuse window vanishes, so retention must fall
+    # back to the plain serve TTL rather than silently keeping entries forever.
+    _clear()
+    now = home_module.time.monotonic()
+    with patch.dict("os.environ", {"SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC": "0"}):
+        ttl = max(
+            home_module._HOME_OVERVIEW_TTL_SEC,
+            home_module._hydrated_overview_min_rebuild_interval_sec(),
+        )
+        assert ttl == home_module._HOME_OVERVIEW_TTL_SEC
+        home_module._HOME_OVERVIEW_CACHE["stale"] = (now - 60.0, {"slug": "mlb"})
+        home_module._prune_home_cache(home_module._HOME_OVERVIEW_CACHE, now=now, ttl=ttl)
+        assert "stale" not in home_module._HOME_OVERVIEW_CACHE
+
+
 def test_interval_is_env_tunable_and_zero_restores_old_behaviour():
     with patch.dict("os.environ", {"SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC": "45"}):
         assert home_module._hydrated_overview_min_rebuild_interval_sec() == 45.0

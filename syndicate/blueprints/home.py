@@ -6930,7 +6930,31 @@ def _build_sport_overview(
     stamped_at = time.monotonic()
     _HOME_OVERVIEW_CACHE[cache_key] = (stamped_at, overview)
     _HOME_OVERVIEW_CACHE.move_to_end(cache_key)
-    _prune_home_cache(_HOME_OVERVIEW_CACHE, now=stamped_at)
+    # #255: the retention window must be at least the REUSE window, or the
+    # pruner deletes exactly the entries the rate limiter exists to serve.
+    #
+    # This is a defect in #251, found by asking what actually evicts. The
+    # pruner runs on EVERY write with ttl=_HOME_OVERVIEW_TTL_SEC (10s) and pops
+    # every entry at or past it. The worker writes all eight sports each cycle,
+    # so MLB's hydrated entry was reliably gone ~10s after it was stored --
+    # while #251's check asks for one up to 300s old. It could therefore only
+    # ever rate-limit inside a 10-second window, against a loop that runs every
+    # ~90s. #251 has been a near no-op in production, which is a better
+    # explanation for its measured lack of effect than the idea being wrong.
+    #
+    # Two different clocks with two different jobs, now named as such:
+    #   _HOME_OVERVIEW_TTL_SEC  - how long an entry may be SERVED to a normal
+    #                             (non-forced) caller. Freshness. Unchanged.
+    #   the rebuild interval    - how long an entry must SURVIVE so a forced
+    #                             caller can be refused. Cost control.
+    # Retention takes the max of the two. Cheap: 8 sports x 2 hydration
+    # variants is 16 live keys against a 32 ceiling, so the count bound still
+    # bites first and nothing becomes unbounded.
+    _prune_home_cache(
+        _HOME_OVERVIEW_CACHE,
+        now=stamped_at,
+        ttl=max(_HOME_OVERVIEW_TTL_SEC, _hydrated_overview_min_rebuild_interval_sec()),
+    )
     return dict(overview)
 
 
