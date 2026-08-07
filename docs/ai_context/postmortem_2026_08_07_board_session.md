@@ -132,6 +132,52 @@ slate starts, and it is falsifiable: log the shard's size against OOM onset over
 two days. **Nobody has done that yet. Until someone does, "why now" is open, and
 three separate confident answers to it have now been wrong.**
 
+#### ANSWERED 2026-08-07 14:31Z — and my retraction above conflated two claims
+
+The shard-growth account in this section is **also wrong**, and so is the part of
+my `#247` retraction that went too far. Both corrected here rather than edited
+away, because the shape of the error is the point.
+
+**What it actually was:** the settlement autorun crash-looped. It reads 21 days
+of ledger into one list, a *diagnostic* then re-reads all 21 chunks whole
+(`read_text().splitlines()` on the same 367MB and 480MB files, to produce a line
+count), and the status file is written **after** all of it. Combined with a gate
+whose own docstring says it is "self-catching-up by construction", a kill
+mid-run means the status never advances and it fires again on the next boot.
+~4 minutes per iteration, for eleven hours. Resolved by `#253` (retention:
+≤96 retained cards contexts → ≤2) plus disabling the autorun; 77 minutes clean,
+container memory 2508–3102MB → 380–870MB.
+
+**Where my retraction was right, and where it overreached.** I withdrew "`#247`
+pushed the pass over" as attribution-by-proximity in a ~40-commit deploy. That
+was correct on the evidence I had: proximity without a mechanism is not a cause.
+But I then wrote that `#247` "touches no memory path whatsoever" and treated it
+as fully exonerated, and **that was a second claim I had not tested.**
+
+`#247` is the **trigger, not the leak.** It unblocked 4,560 of 8,276 records
+from `no_key_match`, so every settlement run afterwards drove thousands of
+`_replace_ledger_line` read-modify-writes over those same chunks. The control is
+clean and is the strongest single piece of evidence anyone produced: **`#243`
+has the identical 21-day reads *without* the matching and ran 73 minutes clean.**
+
+So the honest verdict is neither "it was `#247`" nor "`#247` is irrelevant" —
+it is that a correctness fix fed work into an uncapped, non-idempotent path, and
+the path was the defect. I collapsed those into one claim in both directions on
+the same night.
+
+**Rule this earns, stronger than "don't attribute without a control":**
+*retracting a wrong attribution is not the same as establishing innocence.*
+"Not proven guilty" and "proven not guilty" are different findings, and writing
+the second when you have only the first is how a real trigger gets protected
+from investigation for hours. Say which one you have.
+
+**Attribution caveat on the fix itself, kept deliberately:** the winning hour
+contained a rollback, two env changes and a four-commit build. `#253` is
+credited by *mechanism* plus the `#243` control (which held neither `#253` nor
+`#254`, ran with settlement already disabled, and still died 5 times in 18
+minutes) — **not** by an isolated window. Do not upgrade this to "proven" in a
+later summary.
+
 ### 1.1d FALSIFIED — the read does not ratchet, so caching it is a CPU fix
 
 Third session probed the real shard (15.1MB / 39,370 rows), looping
