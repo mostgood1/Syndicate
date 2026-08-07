@@ -39,6 +39,10 @@
   .bg-missing { color: #2b3543; }
   .bg-gap { color: #f0b429; font-size: 11px; cursor: help; }
   .bg-meta { color: #7d8ea4; font-size: 11px; }
+  /* The three selectors read top-down as the choice narrows: kind, then market,
+     then segment. Spacing carries that hierarchy without extra chrome. */
+  .bg-kinds { margin-bottom: 2px; }
+  .bg-segments { margin-top: 2px; margin-bottom: 2px; }
   /* Segment identity -- a game is quoted once per segment, so several rows share
      one fixture legitimately. Badged, not inferred from row order. */
   .bg-seg {
@@ -77,7 +81,13 @@
     <span class="bg-meta" id="bg-status">loading…</span>
   </div>
 
+  <!-- Kind first, then markets. The market tabs are a function of this
+       selection, so it reads left-to-right in the order the choice is made. -->
+  <div class="bg-tabs bg-kinds" id="bg-kind-tabs"></div>
   <div class="bg-tabs" id="bg-market-tabs"></div>
+  <!-- Segment groups: full game / first 5 / first 3 / first 1 are separate
+       boards, not variants of one row. -->
+  <div class="bg-tabs bg-segments" id="bg-segment-tabs"></div>
   <div class="bg-summary" id="bg-summary"></div>
   <div class="bg-scroll"><table class="bg"><thead id="bg-head"></thead><tbody id="bg-body"></tbody></table></div>
 </div>
@@ -90,7 +100,41 @@
   // so the grid opens on the markets that actually look like a grid. Props are
   // thinner and are one tab away.
   var GAME_LINES = ["h2h", "spreads", "totals"];
-  var state = { market: "h2h", markets: [], rows: [], summary: {}, sort: { key: null, dir: 1 } };
+
+  // Kind is the FIRST filter, mirroring Layer 2: choose game or prop, and the
+  // market tabs become that kind's markets. Which market is which kind is served
+  // by the API as `market_kinds` -- it is derived from the same `kind` the rows
+  // carry, and is deliberately not re-derived here from market names (#244: one
+  // rule, one place).
+  var KINDS = [
+    { key: "game", label: "Game lines" },
+    { key: "prop", label: "Player props" }
+  ];
+  var state = {
+    kind: "game",
+    segment: "full",
+    market: "h2h",
+    markets: [],
+    marketKinds: {},
+    rows: [],
+    summary: {},
+    sort: { key: null, dir: 1 }
+  };
+
+  // Markets belonging to the selected kind. A market whose kind the API did not
+  // report is shown under every kind rather than hidden -- an unclassified
+  // market is a capture question, and silently dropping it from the board is how
+  // it stays invisible.
+  function marketsForKind(kind) {
+    return state.markets.filter(function (m) {
+      var k = state.marketKinds[m];
+      return !k || k === kind;
+    });
+  }
+
+  function kindsPresent() {
+    return KINDS.filter(function (k) { return marketsForKind(k.key).length > 0; });
+  }
 
   function el(id) { return document.getElementById(id); }
   function fmtPrice(p) { return p === null || p === undefined ? "" : (p > 0 ? "+" + p : String(p)); }
@@ -179,13 +223,25 @@
         // keep the full list from the unfiltered load rather than collapsing
         // the tab bar to the tab you just clicked.
         if (!market || !state.markets.length) { state.markets = d.markets || []; }
-        if (state.markets.indexOf(state.market) === -1) {
-          // Prefer a game line, then whatever exists.
-          var pick = GAME_LINES.filter(function (m) { return state.markets.indexOf(m) !== -1; })[0];
-          state.market = pick || state.markets[0] || "";
+        // Same preservation rule: `market_kinds` is computed before the market
+        // filter server-side, but only the unfiltered load is guaranteed to have
+        // been asked about the whole slate.
+        if (!market || !Object.keys(state.marketKinds || {}).length) { state.marketKinds = d.market_kinds || {}; }
+        // Fall back to a kind that actually has markets before choosing one.
+        if (!marketsForKind(state.kind).length) {
+          var firstKind = kindsPresent()[0];
+          if (firstKind) { state.kind = firstKind.key; }
+        }
+        var withinKind = marketsForKind(state.kind);
+        if (withinKind.indexOf(state.market) === -1) {
+          // Prefer a game line, then whatever exists WITHIN THE SELECTED KIND --
+          // otherwise picking "props" would land on h2h and silently flip the
+          // selector back.
+          var pick = GAME_LINES.filter(function (m) { return withinKind.indexOf(m) !== -1; })[0];
+          state.market = pick || withinKind[0] || "";
         }
         el("bg-status").textContent = d.total_rows + " markets · " + (d.summary || {}).distinct_books + " books";
-        renderTabs(); renderSummary();
+        renderKindTabs(); renderTabs(); renderSummary();
         // The UNFILTERED load exists only to discover the market list and the
         // slate summary. It is exactly the global top-N the comment above warns
         // about, so rendering it drops the thin rows of whichever tab we land on:
@@ -194,14 +250,87 @@
         // per-market refetch was wired to tab clicks and never to first paint.
         // Re-entry is safe: this call passes a market, so it cannot recurse.
         if (!market && state.market) { load(state.market); return; }
+        syncSegment();
+        renderSegmentTabs();
         renderGrid();
       })
       .catch(function (err) { el("bg-status").textContent = "failed: " + err; });
   }
 
+  // Segments present in the rows we actually hold, in longest-market-first order.
+  // Derived from the loaded rows rather than assumed, because which segments a
+  // market is quoted on varies: MLB game lines carry full/first5/first3/first1
+  // while a player prop is typically full only.
+  function segmentsInRows() {
+    var seen = {};
+    state.rows.forEach(function (r) {
+      if (r.market !== state.market) { return; }
+      var s = (r.segment === null || r.segment === undefined || r.segment === "") ? "full" : String(r.segment);
+      seen[s] = true;
+    });
+    return Object.keys(seen).sort(function (a, b) {
+      return segmentRank(a).localeCompare(segmentRank(b)) || a.localeCompare(b);
+    });
+  }
+
+  // Keep the selected segment valid across a market change. Falls back to the
+  // longest segment available rather than to none, so switching markets never
+  // lands on an empty board.
+  function syncSegment() {
+    var avail = segmentsInRows();
+    if (avail.indexOf(state.segment) === -1) { state.segment = avail[0] || "full"; }
+  }
+
+  function renderKindTabs() {
+    var present = kindsPresent();
+    // One kind is not a choice. Hiding the row beats showing a control that
+    // cannot do anything.
+    if (present.length < 2) { el("bg-kind-tabs").innerHTML = ""; return; }
+    el("bg-kind-tabs").innerHTML = present.map(function (k) {
+      return '<span class="bg-tab' + (k.key === state.kind ? " bg-tab--on" : "") +
+             '" data-k="' + k.key + '">' + k.label + " <span class=\"bg-meta\">" +
+             marketsForKind(k.key).length + "</span></span>";
+    }).join("");
+    Array.prototype.forEach.call(el("bg-kind-tabs").children, function (node) {
+      node.onclick = function () {
+        state.kind = node.getAttribute("data-k");
+        var within = marketsForKind(state.kind);
+        if (within.indexOf(state.market) === -1) {
+          var pick = GAME_LINES.filter(function (m) { return within.indexOf(m) !== -1; })[0];
+          state.market = pick || within[0] || "";
+        }
+        renderKindTabs(); renderTabs();
+        load(state.market);
+      };
+    });
+  }
+
+  // Segment is a BOARD GROUP, not a row attribute: full game, first 5, first 3
+  // and first 1 are separate markets with separate prices and separate book
+  // coverage (11 / 9 / 5 / 1 books on a sampled MLB game), and mixing them in one
+  // table is what made a game look like it was listed four times.
+  function renderSegmentTabs() {
+    var avail = segmentsInRows();
+    if (avail.length < 2) { el("bg-segment-tabs").innerHTML = ""; return; }
+    el("bg-segment-tabs").innerHTML = avail.map(function (s) {
+      var meta = SEGMENTS[s];
+      var label = meta ? meta.short : s;
+      var title = meta ? meta.title : "segment: " + s;
+      return '<span class="bg-tab' + (s === state.segment ? " bg-tab--on" : "") +
+             '" data-s="' + s + '" title="' + title.replace(/"/g, "&quot;") + '">' + label + "</span>";
+    }).join("");
+    Array.prototype.forEach.call(el("bg-segment-tabs").children, function (node) {
+      node.onclick = function () {
+        state.segment = node.getAttribute("data-s");
+        renderSegmentTabs(); renderGrid();   // same rows, different group -- no refetch
+      };
+    });
+  }
+
   function renderTabs() {
-    var ordered = GAME_LINES.filter(function (m) { return state.markets.indexOf(m) !== -1; })
-      .concat(state.markets.filter(function (m) { return GAME_LINES.indexOf(m) === -1; }));
+    var within = marketsForKind(state.kind);
+    var ordered = GAME_LINES.filter(function (m) { return within.indexOf(m) !== -1; })
+      .concat(within.filter(function (m) { return GAME_LINES.indexOf(m) === -1; }));
     el("bg-market-tabs").innerHTML = ordered.map(function (m) {
       return '<span class="bg-tab' + (m === state.market ? " bg-tab--on" : "") + '" data-m="' + m + '">' + m + "</span>";
     }).join("");
@@ -254,7 +383,13 @@
   }
 
   function renderGrid() {
-    var rows = state.rows.filter(function (r) { return r.market === state.market; });
+    // Market AND segment: a segment is its own board group, so full-game and
+    // first-5 prices never share a table even though they share a market name.
+    var rows = state.rows.filter(function (r) {
+      if (r.market !== state.market) { return false; }
+      var seg = (r.segment === null || r.segment === undefined || r.segment === "") ? "full" : String(r.segment);
+      return seg === state.segment;
+    });
     if (state.sort.key) {
       var k = state.sort.key, dir = state.sort.dir;
       rows = rows.slice().sort(function (a, b) {
@@ -484,7 +619,10 @@
     el("bg-body").innerHTML = html.join("");
   }
 
-  function reload() { state.markets = []; load(); }
+  // A sport or date change invalidates the whole taxonomy, not just the rows:
+  // clear the slate-scoped caches so they are re-derived rather than carried
+  // over from the previous slate.
+  function reload() { state.markets = []; state.marketKinds = {}; state.summary = {}; load(); }
   el("bg-refresh").onclick = reload;
   el("bg-sport").onchange = reload;
   el("bg-date").onchange = reload;

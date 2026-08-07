@@ -2347,6 +2347,22 @@ def board_book_grid_api():
     # be technically true and completely misleading.
     summary = book_grid_summary(grid)
 
+    # Market taxonomy for the board's game/prop selector. Computed HERE, before
+    # the market filter, for the same reason the summary is: it must describe the
+    # slate, not the current view, or selecting one market would empty the
+    # selector that got you there.
+    #
+    # Served rather than re-derived on the client. Every row already carries the
+    # `kind` this pivots on, so a client-side "is this market a game line?" name
+    # test would be the same rule written twice in two languages -- which is #244,
+    # removed in #245 for exactly this reason.
+    market_kinds: dict[str, str] = {}
+    for row in grid:
+        market_name = str(row.get("market") or "")
+        row_kind = str(row.get("kind") or "")
+        if market_name and row_kind:
+            market_kinds.setdefault(market_name, row_kind)
+
     if market_filter:
         grid = [row for row in grid if str(row.get("market") or "").lower() == market_filter]
 
@@ -2359,6 +2375,7 @@ def board_book_grid_api():
                 "date": selected_date,
                 "market": market_filter or None,
                 "markets": markets,
+                "market_kinds": market_kinds,
                 "summary": summary,
                 "game_state": game_state_coverage,
                 "projections": projection_coverage,
