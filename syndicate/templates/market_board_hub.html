@@ -40,6 +40,18 @@
         <p>Every book's price side by side, with best price, consensus and no-vig. Thin or stale
            quotes are shown greyed with the reason rather than hidden.</p>
       </a>
+      {# S5/L2-B + L2-C. The shortlist over the same inventory: where the Book
+         Grid shows everything, this shows only what survives simultaneity and
+         complementarity. Listed next to it because they are two jobs over one
+         row contract, and a user who wants "where is the edge" should not have
+         to know it lives on a different page. #}
+      <a class="market-board-hub__tile market-board-hub__tile--books"
+         href="/market-board/opportunities{% if nav_date %}?date={{ nav_date }}{% endif %}">
+        <h2>Arbitrage &amp; Low Hold</h2>
+        <p>Cross-book opportunities computed only over prices that actually coexisted.
+           Every row states the time spread it was assembled from, because a pairing
+           across an all-day log is not an opportunity.</p>
+      </a>
       {% for sport in sports %}
         <a class="market-board-hub__tile" href="/{{ sport.slug }}/market-board{% if nav_date %}?date={{ nav_date }}{% endif %}">
           <h2>{{ sport.name }}</h2>

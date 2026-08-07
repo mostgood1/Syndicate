@@ -77,6 +77,9 @@
     </label>
     <label class="bg-meta">Date <input type="date" id="bg-date" value="{{ selected_date }}" /></label>
     <button class="bg-tab" id="bg-refresh">Refresh</button>
+    <!-- L1 -> L2. The shortlist over this same inventory; carries the sport and
+         date across so the two boards stay on the same slate. -->
+    <a class="bg-tab" id="bg-opps" href="/market-board/opportunities">Arbitrage &amp; Low Hold &rarr;</a>
     <a class="bg-tab" href="/market-board">&larr; Market Board</a>
     <span class="bg-meta" id="bg-status">loading…</span>
   </div>
@@ -624,8 +627,19 @@
   // over from the previous slate.
   function reload() { state.markets = []; state.marketKinds = {}; state.summary = {}; load(); }
   el("bg-refresh").onclick = reload;
-  el("bg-sport").onchange = reload;
-  el("bg-date").onchange = reload;
+  // Carry the current slate across to the L2 shortlist. Without this the link
+  // silently drops you on today/mlb while you were reading a different one.
+  function syncOppsLink() {
+    var node = el("bg-opps");
+    if (!node) { return; }
+    node.href = "/market-board/opportunities?sport=" +
+      encodeURIComponent(el("bg-sport").value) +
+      "&date=" + encodeURIComponent(el("bg-date").value);
+  }
+
+  el("bg-sport").onchange = function () { syncOppsLink(); reload(); };
+  el("bg-date").onchange = function () { syncOppsLink(); reload(); };
+  syncOppsLink();
   load();
 })();
 </script>

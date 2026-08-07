@@ -58,7 +58,8 @@
     <label class="xb-meta">Date <input type="date" id="xb-date" value="{{ selected_date }}" /></label>
     <label class="xb-meta">Max skew (s) <input type="number" id="xb-skew" min="0" max="86400" step="10" value="90" style="width:90px" /></label>
     <button class="xb-tab" id="xb-refresh">Refresh</button>
-    <a class="xb-tab" href="/market-board/books">Book grid &rarr;</a>
+    <a class="xb-tab" id="xb-books" href="/market-board/books">&larr; Book grid</a>
+    <a class="xb-tab" href="/market-board">&larr; Market Board</a>
     <span class="xb-meta" id="xb-status">loading…</span>
   </div>
 
@@ -216,8 +217,17 @@
     }).join("");
   }
 
-  el("xb-sport").onchange = load;
-  el("xb-date").onchange = load;
+  // Same slate both ways: the L1 grid link carries whatever is selected here.
+  function syncBooksLink() {
+    var node = el("xb-books");
+    if (!node) { return; }
+    node.href = "/market-board/books?sport=" + encodeURIComponent(el("xb-sport").value) +
+                "&date=" + encodeURIComponent(el("xb-date").value);
+  }
+
+  el("xb-sport").onchange = function () { syncBooksLink(); load(); };
+  el("xb-date").onchange = function () { syncBooksLink(); load(); };
+  syncBooksLink();
   el("xb-skew").onchange = load;
   el("xb-refresh").onclick = load;
   load();
