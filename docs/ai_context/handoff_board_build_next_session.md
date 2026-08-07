@@ -15,18 +15,17 @@
 
 ## State of production right now (2026-08-07 ~04:10Z)
 
-- **refresh-worker is STILL RESTARTING every ~3 minutes. This is the first
-  thing to fix and the cause is NOT known.** The last session reverted `#241`,
-  `#241 follow-up` and `#237` (`94600923`, `d5028810`, `0d7c839c`) believing
-  they were the cause; restarts continued after the revert deployed (BOOTED
-  04:12:58, 04:15:39). Restarts began during that session — 0 boots in
-  18:00–20:00Z beforehand — so something in it is implicated, but nothing is
-  proven. **Bisect; do not assume.** There is no traceback and no OOM line, and
-  memory samples sit at 67–68.8%, so the sampler is missing the spike. The
-  consistent last log line before `Instance restarted` is
-  `PERSIST_LOCKED_BEGIN` — the end of a board build. Prime unexamined suspect:
-  `#238`'s de-vig, which runs per quote during every board build on top of a
-  ~122k-row shard load, and was never load-tested on the worker.
+- ~~**refresh-worker is STILL RESTARTING every ~3 minutes...**~~ **RESOLVED
+  2026-08-07 by `#249` (`431fc5a9`).** They were OOM kills at 4GiB — 21 of
+  them, every one labelled `reason.oomKilled.memoryLimit = "4Gi"` in the Render
+  **events** API, which nobody had queried. Cause was **not** `#241` (live
+  2h20m with zero kills — the revert of `94600923`/`d5028810`/`0d7c839c` was
+  unnecessary and could be reconsidered), and not `#238`'s de-vig. It was the
+  circuit breaker: `_MIN_SAFE_MEMORY_HEADROOM_BYTES` was **900MB**, sized for a
+  2GB container, guarding a stage that transiently peaks at **~1873MB** on the
+  4GiB worker. Raised to 1900MB. See `#249` in `todo.md` for the four things
+  this did **not** fix — chiefly that the pass costs ~1.9GB to produce
+  `candidate_count=0`, and that anon ratchets 302MB → 2.8GB within one boot.
 - `SYNDICATE_ARTIFACT_REFRESH_INTERVAL_SECONDS=120` is set on refresh-worker but
   now has **no reader** (its consumer was reverted). Harmless; remove it.
 - `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=3600` **is** live and does
