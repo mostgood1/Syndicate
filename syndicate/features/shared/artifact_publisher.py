@@ -32,6 +32,22 @@ from urllib import request as urllib_request
 logger = logging.getLogger("artifact_publisher")
 
 HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
+    # #246: the settlement inputs. `emit_settlement_inputs.emit_for_date`
+    # writes these on refresh-worker and then tries to publish them, and every
+    # attempt was refused -- measured 2026-08-06 23:07:
+    #   [artifact_publisher] SKIP_NOT_ALLOWLISTED
+    #     path=/opt/render/project/data/settlement_inputs/finals_2026-08-06.json
+    # 15 refusals in a single emit pass. The emitter's own summary that run read
+    # `closing_rows=7316 graded_rows=192`, so this is real settlement evidence
+    # being produced on the worker and then discarded at the service boundary.
+    #
+    # Settlement itself runs on refresh-worker against its LOCAL copies, so this
+    # does not by itself change what settles -- it is what makes the inputs
+    # visible from web, which is the only place they can be inspected. #208's
+    # lesson applies exactly: allowlisting permits a transfer, it does not make
+    # one happen.
+    "settlement_inputs/closing_lines_*.csv",
+    "settlement_inputs/finals_*.json",
     "*_source/source_artifacts/data/live_lens/live_lens_report_*.json",
     "*_source/source_artifacts/data/live_lens/render_sync/*.json",
     # NBA/WNBA's in-game pace-adjusted live projections, written by the
