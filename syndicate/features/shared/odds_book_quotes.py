@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -375,8 +376,62 @@ def quote_rows_from_oddsapi_events(
     return rows
 
 
+# #252. Identity-keyed cache for the parsed shard.
+#
+# This function had NO cache and exactly one caller -- quote_ref_for_bet, as its
+# FIRST statement -- and that caller runs inside a `for row in rows:` loop at
+# three sites in quote_enrichment.py. So every enriched row re-read and
+# re-parsed the whole shard. MLB's is 90,155,656 bytes / ~122k rows, and a board
+# build enriches ~200 candidates: ~200 complete materialisations of a 122k-dict
+# list, per build. `_QUOTE_CACHE_KEY` in quote_enrichment.py has been declared
+# and unused since #215 -- the original author anticipated exactly this.
+#
+# That is the mechanism behind refresh-worker's OOM curve: MLB's hydrated
+# overview measured +2.9GB in 73s (2026-08-07) that never came back down.
+# Nothing was retained -- hundreds of large short-lived allocations fragment
+# pymalloc arenas and glibc does not return them to the OS, so `anon` ratchets
+# and looks exactly like a leak. This is also why tracemalloc could never see
+# it: each parse is freed before the next begins, so PEAK barely moves while
+# RSS climbs (see handoff_refresh_worker_oom.md's methodology note).
+#
+# Keyed on (path, mtime_ns, size), not a TTL, so a rewritten or appended shard
+# invalidates itself and a stale copy can never be served. The mtime-churn trap
+# that defeated _JSONL_ROWS_CACHE for odds_events does NOT apply here: on
+# refresh-worker this file is mutated only by the artifact pull, which runs
+# before the board build, so the shard is stable for the whole build.
+#
+# Bounded to two entries -- one live sport plus one -- because the value is a
+# 122k-dict list and caching every sport's shard would trade a churn problem
+# for a retention one.
+_BOOK_QUOTES_CACHE: "OrderedDict[tuple[str, int, int], list[dict[str, Any]]]" = OrderedDict()
+_BOOK_QUOTES_CACHE_MAX_ENTRIES = 2
+
+
+def _book_quotes_cache_key(path: Path) -> tuple[str, int, int] | None:
+    try:
+        stat = path.stat()
+    except Exception:
+        return None
+    return (str(path), stat.st_mtime_ns, stat.st_size)
+
+
 def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
+    """Every parsed row of a sport/date book-quotes shard.
+
+    Returns the CACHED list itself, not a copy: a defensive copy of 122k dicts
+    per call would reintroduce most of the allocation cost this cache exists to
+    remove. Every caller in the tree treats these rows as read-only (they filter
+    and `dict(...)` the few they keep), which is the contract that makes that
+    safe -- do not mutate the returned rows in place.
+    """
     path = book_quotes_path(sport, date_str)
+    cache_key = _book_quotes_cache_key(path)
+    if cache_key is not None:
+        cached = _BOOK_QUOTES_CACHE.get(cache_key)
+        if cached is not None:
+            _BOOK_QUOTES_CACHE.move_to_end(cache_key)
+            return cached
+
     rows: list[dict[str, Any]] = []
     try:
         if not path.is_file():
@@ -393,7 +448,20 @@ def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
                 if isinstance(parsed, dict):
                     rows.append(parsed)
     except Exception:
+        # Deliberately NOT cached: a partial read from a transient IO error must
+        # not become the answer every subsequent caller gets until the file
+        # changes again.
         return rows
+
+    if cache_key is not None:
+        # Re-stat and only cache when the file has not changed underneath the
+        # read. An append during parsing would otherwise be cached under the
+        # pre-read identity and served as complete until the NEXT change.
+        if _book_quotes_cache_key(path) == cache_key:
+            _BOOK_QUOTES_CACHE[cache_key] = rows
+            _BOOK_QUOTES_CACHE.move_to_end(cache_key)
+            while len(_BOOK_QUOTES_CACHE) > _BOOK_QUOTES_CACHE_MAX_ENTRIES:
+                _BOOK_QUOTES_CACHE.popitem(last=False)
     return rows
 
 
