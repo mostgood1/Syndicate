@@ -56,6 +56,25 @@ was building; the floor was already there. **Retention survives cycles** -- the
 guard stops new work in the current cycle, not what earlier cycles retained --
 so no rate fix can touch it. These two are the first changes aimed at the floor.
 
+**CORRECTION (`#255`, `a39fe3d6`) -- `#251` was never actually in that series.**
+`_prune_home_cache` runs on **every** write to `_HOME_OVERVIEW_CACHE` with a
+**10s** TTL and pops every entry at or past it. The worker writes all eight
+sports per cycle, so MLB's hydrated entry was reliably evicted ~10s after being
+stored, while `#251`'s check asks for one up to **300s** old. `#251` has been a
+near no-op since it shipped.
+
+So the control below is **three landed fixes, not four** -- `#249`/`#250`/`#252`
+did nothing, which stands; `#251` was never tested at all. *A change that never
+executed is not evidence about the idea it implements*, and three sessions
+reasoned forward from that non-result for hours. Two clocks were both called
+"TTL": one meaning *how long may this be served* (freshness), one meaning *how
+long must this survive* (cost control). Both are now named in the code.
+
+This does **not** weaken `#253`: the today-cache 0% hit rate holds at any
+rebuild floor >= 60s, and the loop is ~90s regardless of whether `#251` bites.
+It does mean the rebuild *frequency* changes once `#255` deploys, so a `#253`
+before/after taken now is measured under a cadence that is about to shift.
+
 **#253 -- `mlb/cards.py` held up to 96 full page contexts.** Two module caches
 bounded by ENTRY COUNT only, never age, never bytes, and on the worker both keys
 are *guaranteed* to miss every cycle: the context key embeds
@@ -64,8 +83,10 @@ the today key is `int(time.time() // 60)`. A guaranteed-miss cache evicting on
 count is not a cache, it is a retention buffer. The miss path also held **three**
 live copies (`result` went to the today cache *by reference* while a `deepcopy`
 went to the context cache and a second was returned), two of them retained.
-Worker: today cache is now a no-op (`#251`'s 300s rebuild floor vs a 60s bucket
-key is a mathematically zero hit rate), context limit 32 -> 2, copies 3 -> 2.
+Worker: today cache is now a no-op (a 60s bucket key cannot be re-requested at
+any rebuild floor >= 60s, and the loop is ~90s -- this does not depend on
+`#251`, which per the correction above has not been biting), context limit
+32 -> 2, copies 3 -> 2.
 **Web behaviour is byte-for-byte unchanged** and a test pins why the web path
 must keep its deepcopy: `_today_cache_get` returns its entry *without* copying,
 so aliasing the two web caches would let a caller corrupt the cached one.
