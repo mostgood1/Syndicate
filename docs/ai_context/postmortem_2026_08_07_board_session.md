@@ -371,3 +371,35 @@ Keep these; they are verified and add no worker load.
    wrong.
 8. **Measure before and after on the same instant.** Most of the wrong findings
    came from comparing a live read against a stale artifact.
+9. **A constant is only correct for the job it was written for. Re-derive it
+   when the job changes, and name which job it serves.** This produced *four*
+   separate wrong turns in one incident, which is why it is a rule and not four
+   anecdotes:
+
+   | constant | correct for | reused by | result |
+   |---|---|---|---|
+   | `_MIN_SAFE_MEMORY_HEADROOM_BYTES = 900MB` | a 2GB container, 350-450MB stages | a 4GiB container with a ~1873MB stage | guard fired once in 1200 log lines, always too late (`#249`) |
+   | "the returned payload is only ~2.3MB" | the *serialised* payload | inferring that retained deepcopies are harmless | ≤96 live dict graphs never counted (`#253`) |
+   | `_MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32` | bounding count | bounding *memory* | count-only, no age or byte bound, invisible for three weeks (`3ca6c11d`) |
+   | `_HOME_OVERVIEW_TTL_SEC = 10s` | how long an entry may be **served** | how long an entry must **survive** | pruner deleted the entry the rate limiter needed; `#251` was a no-op (`#255`) |
+
+   The tell is always the same: a comment stating a measurement, with no
+   statement of what it was measured against. `#249`'s own comment still said
+   "the container's hard limit is 2GB" while running on 4GiB.
+
+   Two clocks called "TTL" is the general case. If a name does not say *which*
+   question the number answers, the next reader will answer a different one.
+10. **A change that never executed is not evidence about the idea it
+    implements.** `#251` was deployed, measured, produced no effect, and was
+    written off by three sessions as "a rate fix against a floor problem" — then
+    found to have been dead on arrival, because the pruner evicted its cache
+    entries at 10s while it asked for 300s. Two of the three "measured failures"
+    in this incident turned out to be measuring something other than what they
+    claimed. Before concluding a fix does not work, prove the code ran: a log
+    line, a counter, a test that fails when it is removed.
+11. **Sequence deploys when you need attribution, and pin the commit.** The
+    02:53 deploy carried ~40 commits and its newest one was blamed for hours.
+    Deploy by pinned `commitId`, not branch head, so a pushed-but-unready commit
+    cannot ride along; give each change its own window; and set the threshold
+    that counts as an effect *before* looking (the longest quiet gap observed
+    with nothing fixed was 14.6 minutes, so anything shorter is noise).
