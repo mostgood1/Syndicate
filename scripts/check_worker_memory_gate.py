@@ -168,6 +168,39 @@ def _fetch_logs(key: str, start: datetime, end: datetime) -> list[dict]:
     return unique
 
 
+def _boot_boundaries(key: str, since: datetime) -> list[datetime]:
+    """When the process actually restarted, from the EVENTS API.
+
+    NOT from log text. refresh-worker emits >1000 lines per 20 minutes, the logs
+    API caps a window at 1000, and `BOOTED` lines are therefore dropped
+    unpredictably -- which made this tool report a boot at 15:31:42 that never
+    happened, while the events API showed the process had been up continuously
+    since the 14:31:49 deploy.
+
+    Events are authoritative, small, and cheap. `deploy_ended` and
+    `server_failed` are the only two ways this process restarts.
+    """
+    boots: list[datetime] = []
+    cursor = None
+    for _ in range(8):
+        params = {"limit": 100}
+        if cursor:
+            params["cursor"] = cursor
+        batch = _api(f"/services/{REFRESH_WORKER}/events", params, key=key)
+        if not batch:
+            break
+        for item in batch:
+            event = item.get("event", item)
+            cursor = item.get("cursor") or cursor
+            if str(event.get("type")) in {"deploy_ended", "server_failed"}:
+                when = _ts(event.get("timestamp"))
+                if when:
+                    boots.append(when)
+        if len(batch) < 100:
+            break
+    return sorted(b for b in boots if b >= since)
+
+
 def _oom_kills(key: str, since: datetime) -> list[datetime]:
     kills, cursor = [], None
     for _ in range(8):
@@ -190,25 +223,24 @@ def _oom_kills(key: str, since: datetime) -> list[datetime]:
     return sorted(k for k in kills if k >= since)
 
 
-def section_gate(rows: list[dict], kills: list[datetime]) -> None:
+def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime], window_start: datetime) -> None:
     print("=" * 84)
     print("GATE -- peak container_memory_mb per boot  (NOT 'no kills')")
     print("=" * 84)
 
     samples: list[tuple[datetime, float]] = []
-    boots: list[datetime] = []
     for row in rows:
-        message = str(row.get("message", ""))
         when = _ts(row.get("timestamp"))
         if not when:
             continue
-        if "BOOTED" in message or "Instance restarted" in message:
-            boots.append(when)
-        hit = _CONTAINER_MB.search(message)
+        hit = _CONTAINER_MB.search(str(row.get("message", "")))
         if hit:
             samples.append((when, float(hit.group(1))))
     samples.sort()
-    boots.sort()
+    # Boot boundaries come from the events API, not log text -- see
+    # `_boot_boundaries`. If none fall inside the window the process has been up
+    # the whole time, so the window start is the boundary.
+    boots = sorted(boots) or [window_start]
 
     if not samples:
         print("  no container_memory_mb samples in window -- cannot judge. NOT a pass.")
@@ -352,10 +384,16 @@ def main() -> int:
 
     rows = _fetch_logs(key, start, end)
     kills = _oom_kills(key, start)
-    print(f"log lines: {len(rows):,}   oom kills: {len(kills)}\n")
+    boots = _boot_boundaries(key, start)
+    print(f"log lines: {len(rows):,}   oom kills: {len(kills)}   restarts (events API): {len(boots)}")
+    # The logs API caps a window at 1000 rows and this worker emits well over
+    # that; subdivision recovers most of it but not provably all. So the peak
+    # below is a LOWER BOUND on the true peak -- which is the safe direction for
+    # a gate (it can only make us hold longer, never ship early).
+    print("note: memory peak is a LOWER BOUND -- log sampling is not exhaustive.\n")
 
     if args.section in ("gate", "all"):
-        section_gate(rows, kills)
+        section_gate(rows, kills, boots, start)
     if args.section in ("win-a", "all"):
         section_win_a(rows)
     if args.section in ("win-b", "all"):
