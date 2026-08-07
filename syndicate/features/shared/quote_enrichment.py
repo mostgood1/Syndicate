@@ -80,57 +80,12 @@ def _implied_probability(price: Any) -> float | None:
     return (100.0 / (value + 100.0)) if value > 0 else (abs(value) / (abs(value) + 100.0))
 
 
-# A book re-prices a LIVE market every few minutes. Past this, on a game that
-# is actually in progress, the market is suspended or already settled -- it is
-# not a price, it is a fossil.
-_DEAD_LIVE_MARKET_AGE_SECONDS = 900.0
-
-# `game_state` is not normalised across sports: production carries "live",
-# "In Progress", "scheduled", "Pre-Game", a bare clock ("3:39"), and a score
-# line ("66-65 | 3:39 - 4th"). Only the pregame words are reliably identifiable,
-# so pregame is matched explicitly and everything else with is_live set is
-# treated as in progress.
-_PREGAME_STATE_TOKENS = frozenset({"", "scheduled", "pre-game", "pregame", "upcoming", "not started", "warmup"})
-
-
-def _market_state(row: Mapping[str, Any], quote: Mapping[str, Any]) -> str:
-    """live / pregame / dead, judged on the BOOK clock (#244).
-
-    User-reported: "there are SO MANY stale/dead plays on the board (pitchers no
-    longer in the game)". Confirmed immediately on the served board -- Luis
-    Arraez and J.T. Realmuto both carried is_live=True with a book_age of
-    30,556 seconds. An 8.5-hour-old price on an in-progress game is not a slow
-    market, it is a closed one, and the pitcher it names was pulled hours ago.
-
-    Deliberately NOT judged on our capture clock. We may have looked a second
-    ago; what matters is that the book has not moved the number, which is the
-    same two-clocks distinction the card view already draws.
-
-    A stale PREGAME price is not dead -- books post early and leave numbers
-    alone for hours before first pitch, which is normal and tradeable.
-    """
-    state_text = str(row.get("game_state") or row.get("status_display") or "").strip().lower()
-    in_progress = bool(row.get("is_live")) and state_text not in _PREGAME_STATE_TOKENS
-    if not in_progress:
-        return "pregame"
-    try:
-        age = float(quote.get("book_age_seconds"))
-    except (TypeError, ValueError):
-        # No book clock on a live game is not evidence of life. These are the
-        # rows we can say least about, and floating them alongside verified-live
-        # markets is what the user is seeing.
-        return "dead"
-    return "dead" if age > _DEAD_LIVE_MARKET_AGE_SECONDS else "live"
-
-
 def _attach_board_score(row: dict[str, Any], quote: Mapping[str, Any]) -> None:
     """Stamp the blended board score and its components on a row (#243).
 
-    Also stamps `board_lane`, which is what splits the two boards: a row is an
-    `opportunity` only when a real market is quoting it right now. Everything
-    else -- a fixture whose books have not posted, a steam move two weeks out --
-    is a `watchlist` row. Both are legitimate; showing them in one list is what
-    made 63% of the board render as blanks.
+    Scoring only. The LANE comes from `opportunity_gate` (#245), which is the
+    single place that decides eligibility and which runs again at serve time so
+    its verdict cannot go stale in a cached pool.
 
     Never raises: a missing score costs a sort key, a raised exception costs the
     board.
@@ -144,19 +99,13 @@ def _attach_board_score(row: dict[str, Any], quote: Mapping[str, Any]) -> None:
             books_quoting=quote.get("books_quoting"),
             book_age_seconds=quote.get("book_age_seconds"),
         )
-        # `quote` present means a book is pricing this now, which is the whole
-        # definition of the opportunity lane -- not whether we managed to score
-        # it. A quoted row with no fair price (a one-sided market) still belongs
-        # on the board that shows prices.
-        #
-        # ...unless the market is DEAD (#244). A suspended in-play market keeps
-        # its last price forever, so it looks identical to a live one on every
-        # field except the book clock. Routed to its own lane rather than
-        # deleted: the row is real, it is just no longer bettable, and silently
-        # dropping rows is how a board starts lying in the other direction.
-        state = _market_state(row, quote)
-        row["market_state"] = state
-        row["board_lane"] = "stale" if state == "dead" else "opportunity"
+        # #245: the gate owns the lane. This used to compute its own
+        # live/pregame/dead verdict here, which is exactly the pattern that made
+        # ten fixes land in ten layers -- so it delegates now, and the same
+        # function runs again at serve time so the answer cannot go stale.
+        from syndicate.features.shared.opportunity_gate import annotate as gate_annotate
+
+        gate_annotate(row, quote)
         if scored:
             row["board_score"] = scored.get("score")
             row["board_score_components"] = scored

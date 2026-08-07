@@ -882,6 +882,55 @@ def _compute_intelligence_response(payload: dict[str, object], *, source: str = 
         return None
 
 
+# The row lists a board response can carry. Named explicitly rather than
+# discovered by walking the payload: a loose "does it look like a row?" walk
+# over this response descends into every nested quote and alternatives entry and
+# reported 101,648 "rows" for a 150-row board, which is how you end up
+# annotating a price as if it were an opportunity.
+_BOARD_ROW_LIST_KEYS = (
+    "recommendations",
+    "top_opportunities",
+    "top_live_opportunities",
+    "ranked_all",
+)
+
+
+def _regate_board_rows(payload: dict[str, object]) -> None:
+    """Re-run the eligibility gate over every row, at SERVE time (#245).
+
+    This is what removes the need for the board's client-side copy of the
+    staleness rule. `board_lane` is stamped during enrichment, but a candidate
+    pool can be republished from cache for a long time -- measured: capture age
+    pinned at 7,806s across four polls eight minutes apart -- so a lane decided
+    at build time can be badly out of date by the time anyone reads it. The gate
+    is a pure function over the row, so running it again here costs nothing and
+    means the answer is always current as of the request.
+
+    Mutates in place, over explicitly named lists, including the duplicated
+    `response.*` copies. Never raises.
+    """
+    try:
+        from syndicate.features.shared.opportunity_gate import annotate
+
+        seen: list[dict[str, object]] = []
+        for container in (payload, payload.get("response") if isinstance(payload.get("response"), dict) else {}):
+            if not isinstance(container, dict):
+                continue
+            for key in _BOARD_ROW_LIST_KEYS:
+                rows = container.get(key)
+                if isinstance(rows, list):
+                    seen.extend(row for row in rows if isinstance(row, dict))
+            by_sport = container.get("by_sport")
+            if isinstance(by_sport, dict):
+                for rows in by_sport.values():
+                    if isinstance(rows, list):
+                        seen.extend(row for row in rows if isinstance(row, dict))
+        for row in seen:
+            annotate(row)
+    except Exception:
+        return
+
+
 def _hydrate_board_response_payload(response_payload: dict[str, object] | None) -> dict[str, object]:
     current = dict(response_payload or {})
     nested = current.get("response") if isinstance(current.get("response"), dict) else {}
@@ -975,6 +1024,10 @@ def _hydrate_board_response_payload(response_payload: dict[str, object] | None) 
 
     _refresh_live_columns_from_artifact(current)
 
+    # #245: the gate is the LAST word on which lane a row is in, and it runs
+    # here so the answer is current as of this request rather than as of
+    # whenever the pool was last built.
+    _regate_board_rows(current)
     return current
 
 

@@ -1935,30 +1935,24 @@
   // it has no live market, which is the definition of the watchlist rather
   // than a defect. Falling back to "is there a quote" keeps this working for
   // rows enriched by a path that predates the field.
-  // #244: mirrors _market_state in quote_enrichment.py. Duplicated on purpose
-  // rather than waited for: board_lane is stamped when a pool is REBUILT, and a
-  // pool can be republished from cache for a long time, so a client with no
-  // fallback keeps showing dead plays until then. The server stamp wins
-  // whenever it is present.
-  const PREGAME_STATE_TOKENS = new Set(["", "scheduled", "pre-game", "pregame", "upcoming", "not started", "warmup"]);
-  const DEAD_LIVE_MARKET_AGE_SECONDS = 900;
-
+  // #245: the client does NOT decide eligibility. It reads the verdict.
+  //
+  // There used to be a JavaScript copy of the staleness rule here, mirroring
+  // the Python one, because a lane stamped at pool-build time could be hours
+  // stale by the time anyone read it. That duplication was the real defect --
+  // two rules that could disagree, in two languages. The gate now runs at SERVE
+  // time (_regate_board_rows), so `board_lane` is always current as of the
+  // request and there is exactly one place that decides.
   function itemMarketState(item) {
-    const stamped = String((item && item.market_state) || "").trim().toLowerCase();
-    if (stamped) return stamped;
-    const stateText = String((item && (item.game_state || item.status_display)) || "").trim().toLowerCase();
-    const inProgress = Boolean(item && item.is_live) && !PREGAME_STATE_TOKENS.has(stateText);
-    if (!inProgress) return "pregame";
-    const age = bookAgeValue(item);
-    if (age === null) return "dead";
-    return age > DEAD_LIVE_MARKET_AGE_SECONDS ? "dead" : "live";
+    return String((item && item.market_state) || "").trim().toLowerCase() || "pregame";
   }
 
   function itemLane(item) {
     const lane = String((item && item.board_lane) || "").trim().toLowerCase();
     if (lane) return lane;
-    if (!itemQuote(item)) return "watchlist";
-    return itemMarketState(item) === "dead" ? "stale" : "opportunity";
+    // Only for a payload served before the gate shipped. Not a second rule --
+    // a single fallback so an old response still renders something sane.
+    return itemQuote(item) ? "opportunity" : "watchlist";
   }
 
   function matchesLane(item) {
