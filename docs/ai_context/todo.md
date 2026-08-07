@@ -1,5 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
+### HOLD RELEASED 2026-08-07 19:11Z — all three services realigned on `3f8a3f0a`
+
+**The block below is HISTORY. Do not act on it.** It is kept because the
+reasoning about single-variable windows is reusable, not because the sequence is
+still pending.
+
+**What happened.** The user directed a full realignment of all three services.
+The three had drifted badly — live-odds-worker was **19 hours** behind:
+
+| service | was | now |
+|---|---|---|
+| web `srv-d88ahvrbc2fs73eodu30` | `cfefb1ed` | `3f8a3f0a` |
+| refresh-worker `srv-d91dpertqb8s73co8ls0` | `21efffae` (held since 14:31Z) | `3f8a3f0a` |
+| live-odds-worker `srv-d91dpertqb8s73co8lt0` | `6b816a15` (08-06 23:54Z) | `3f8a3f0a` |
+
+Deployed by pinned `commitId`, all live by 19:11:22Z. refresh-worker rebooted
+**19:10:30Z**, ~3.5h before first pitch — so the floor reset cleanly and a fresh
+boot faces the slate.
+
+**WIN A and WIN B code are now both deployed** (`a39fe3d6`, `c256cc3e`,
+`c8871b5a` are all ancestors of `3f8a3f0a`). The windows were collapsed
+deliberately, and the cost is lower than the block below assumes because the
+CORRECTION immediately following it had already established that WIN A's
+criterion **could not be measured as written**.
+
+**What was NOT done, and is the one live decision left:** the settlement autorun
+env var (`EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN`) was **left as
+it was**. Deploying code is reversible; re-enabling the autorun is the change
+that produced an eleven-hour crash loop, and it was never part of "realign the
+services". **WIN B's real question — does settlement COMPLETE and write its
+status — is therefore still unanswered**, and the gate checker will keep
+reporting `no settlement activity` until someone makes that call explicitly.
+
+**Gate state at the moment of the deploy** (`check_worker_memory_gate.py --hours 6`,
+boot 14:31:49Z, 270 min uptime): **MARGINAL** — 0 kills, but peak
+`container_memory_mb` **1788.6MB** against the 1500MB bar, and drifting up across
+boots (1540 → 1615 → 1789). *Never measured under slate load.* Re-run against the
+19:10:30Z boot once the slate is live; that measurement is still owed.
+
+---
+
+<details>
+<summary>HISTORICAL — the original hold and its sequencing rationale</summary>
+
 ### QUEUED ON refresh-worker — HELD DELIBERATELY, gated on the slate test (2026-08-07)
 
 **Deploy order is load-bearing. Do not collapse it.**
@@ -87,7 +131,35 @@ Watch for `PREVIOUS_RUN_NEVER_COMPLETED` on the following boot: that log line is
 the only durable evidence a SIGKILL leaves, and its absence-vs-presence is how
 you tell "settlement ran and was fine" from "settlement died silently again".
 
-### SHIPPED 2026-08-07 (#258, `c256cc3e`) -- an unidentified ledger record is now unaddressable. NOT YET DEPLOYED.
+</details>
+
+### S0 ANSWERED 2026-08-07 19:15Z -- the spend is attributed, and two premises were wrong
+
+Measured on production (`GET /api/ops/oddsapi/quota`), full detail in
+`plan_layer2_north_star.md` §S0. Three corrections that change what to do next:
+
+1. **`by_market_family` was never dead.** Production has **127,650 observations**
+   since 2026-07-28. The "2 observations" reading came from the **local mirror**,
+   which is a lossy cold-start artifact. Nothing needed reviving; we were reading
+   the wrong disk. (CLAUDE.md documents this exact trap.)
+2. **There is no "missing 84%". MLB IS the spend: 92.8%** of credits
+   (soccer 6.0%, wnba 1.0%, nfl 0.1%). The plan's instruction to look for a cheap
+   lever "in a sport nobody has looked at" is **falsified** -- soccer is 6%, so
+   there is nothing to win there. Any real saving comes out of MLB.
+3. **Capture is running.** Latest observation 18:44:02Z on a ~26-minute cadence.
+   The 90-second probe that "did not move" was shorter than one capture interval.
+
+**Burn: 62,076 credits/day -> 1.86M/month = 37.2% of the 5M cap** -- *more*
+headroom than §4d's 2.04M/40.7% baseline assumed, so S0b's projection lands
+nearer 79% than 82.6%.
+
+**Where it goes:** props 59.8%, segment 23.8%, alternate 11.9%, full_game 4.4%.
+Per-event-billed families total **95.5%**. §4d's "props are 98.5%" is right in
+shape but mis-attributed: a lever aimed only at `props` addresses 60%, not 98%.
+
+**Unblocks S0b** (enable `us2` everywhere; `eu`/`us_ex` on game lines only).
+
+### SHIPPED 2026-08-07 (#258, `c256cc3e`) -- an unidentified ledger record is now unaddressable. DEPLOYED 19:11Z in `3f8a3f0a`.
 
 Fixed at the function boundary: `_replace_ledger_line` refuses a null/blank
 identity and logs `REPLACE_LEDGER_LINE_REFUSED_NULL_IDENTITY`, rather than

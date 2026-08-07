@@ -386,16 +386,63 @@ rule buys less than it costs.**
 
 Ordered by what unblocks a **column**, not by subsystem.
 
-### S0 — instrument the spend before changing it (hours)
+### S0 — instrument the spend before changing it — **DONE 2026-08-07 19:15Z**
+
+Measured on **production** via `GET /api/ops/oddsapi/quota`. Every bullet below
+that is struck through was answered; two of them were answered *differently from
+what this plan assumed*, and the difference changes S0b.
+
 - ~~Confirm the OddsAPI cap.~~ **DONE: 5,000,000.**
-- **Revive `by_market_family` + add per-sport attribution** (currently 2
-  observations, both from 2026-08-01). Without it the savings levers in §4d are
-  assumptions and the per-sport split is unknown.
-- **Find the missing 84%.** MLB is ~11,055 of 67,844 credits/day. Measure where
-  the rest goes — probably soccer — **before** optimising MLB's prop cadence.
-  The cheapest lever is likely in a sport nobody has looked at.
-- **Confirm capture is actually running.** The quota counter did not move across
-  a 90-second probe on 2026-08-07; at 67,844/day it should have risen ~70.
+- ~~Revive `by_market_family`.~~ **IT WAS NEVER DEAD.** Production has
+  **127,650 observations** aggregating since **2026-07-28T02:36Z**. The "2
+  observations" reading came from the **local mirror**
+  (`reports/odds_control_plane/oddsapi_quota.json`), which is a lossy
+  cold-start artifact — exactly the trap CLAUDE.md documents. *No work was
+  needed; the instrument was working and we were reading the wrong disk.*
+- ~~Find the missing 84%.~~ **THERE IS NO MISSING 84%. MLB *is* the spend.**
+
+  | sport | credits | share |
+  |---|---|---|
+  | **mlb** | 489,055 | **92.8%** |
+  | soccer | 31,817 | 6.0% |
+  | wnba | 5,454 | 1.0% |
+  | nfl | 453 | 0.1% |
+
+  The assumption that the cheapest lever sat "in a sport nobody has looked at"
+  is **falsified**. Soccer is 6%; there is no cheap win hiding there. Any real
+  saving has to come out of MLB.
+
+- ~~Confirm capture is actually running.~~ **It is.** Latest observation
+  18:44:02Z against a ~26-minute cadence. The 90-second probe that "did not
+  move" was simply shorter than one capture interval — a sampling artifact, not
+  an outage.
+
+**Where the money actually goes** (`by_market_family`, credits):
+
+| family | credits | share |
+|---|---|---|
+| props | 315,046 | 59.8% |
+| segment | 125,204 | 23.8% |
+| alternate | 62,633 | 11.9% |
+| full_game | 22,990 | 4.4% |
+| event_list / other | 906 | 0.1% |
+
+**Per-event-billed families (props + segment + alternate) = 95.5%.** §4d's
+"props are 98.5% of cost" is right in shape and slightly overstated in
+attribution: *props alone* is 59.8%, and it is `segment` + `alternate` —
+both also per-event — that make up the rest. A lever aimed only at `props`
+addresses 60% of spend, not 98%.
+
+**Current burn, and it is better than §4d's baseline:**
+```
+API used = 422,246 since Aug 1 (6.80d)  ->  62,076 credits/day
+                                        ->  1.86M/month  =  37.2% of the 5M cap
+```
+§4d assumed a 2.04M/40.7% baseline. We have **more headroom than planned**,
+which makes S0b's ~4.13M projection land nearer 79% than 82.6%.
+
+*(The API's own header reports a 15M cap. Per the standing note, do not believe
+it — 5M is the contracted figure and every projection here uses it.)*
 
 ### S0b — enable the three regions, scoped (config, minutes)
 `us2` everywhere; `eu` and `us_ex` on **game lines only** (~30K/month each).
