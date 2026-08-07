@@ -159,6 +159,53 @@ shape but mis-attributed: a lever aimed only at `props` addresses 60%, not 98%.
 
 **Unblocks S0b** (enable `us2` everywhere; `eu`/`us_ex` on game lines only).
 
+### OPEN #263 -- projection PARITY across sports. Not all gaps are the same gap.
+
+User's framing, 2026-08-07: *"we need to add the level of richness soccer (and I
+assume MLB) has to all sports."* Filed, not started.
+
+Measured by `scripts/audit_layer1_completeness.py` (re-runnable, per market --
+it fetches per market because the unfiltered endpoint is a global top-N that
+silently drops thin markets). Identity, line and odds were ~100% everywhere.
+Only projections were missing:
+
+| sport | markets | projections | what is actually missing |
+|---|---|---|---|
+| MLB | 17 | 30-100% | `spreads_alt` + `totals_alt` are **0%** -- 584 rows of alternate lines with no model view |
+| soccer | 7 | wired 2026-08-07 | totals answer P(over) at **2.5 only**; no first-scorer field |
+| WNBA | 15 | wired, 76% | **game lines 0%** (props only); double/triple-double are binary, unanswerable from a mean |
+| NFL | 3 | **0%** | **NOTHING TO JOIN** -- see below |
+| NBA/NHL/NCAAF/NCAAB | - | unknown | no slate on the audited date; re-run in season |
+
+**The three gaps are different problems and must not be planned as one:**
+
+1. **NFL has no sim output at all.** Production holds exactly **4** NFL
+   artifacts: two `book_quotes` shards and two `current_week.json`. No
+   predictions, edges or recommendations of any kind. Fixing NFL means
+   *producing* a projection, not wiring one. (Compounded by the known
+   week-self-pins-to-1 bug -- forward scope is meaningless until that is fixed.)
+2. **WNBA has props but no game-level model.** Its source is a per-player mean
+   block; there is no win probability or team projection, so h2h/spreads/totals
+   stay blank until something produces them.
+3. **MLB's alternate lines are unmapped**, though the distribution that would
+   answer them already exists -- the cheapest of the three.
+
+**The richness ladder, and why parity is not one number.** These sports differ
+not only in coverage but in what their sim can honestly *say*:
+
+```
+MLB     full outcome DISTRIBUTION      -> true P(over) at ANY line
+soccer  win_probability + P(over 2.5)  -> true probability at SOME lines
+WNBA    means only                     -> edge_vs_line, NO probability
+NFL     nothing
+```
+
+**Do not close this by making every sport emit `model_prob_over`.** Three of the
+four cannot support it, and inventing a distribution to fill the column is how a
+fabricated edge reaches a stake. Parity means each sport emitting the strongest
+claim its source actually supports, labelled with its `basis` -- not the same
+columns everywhere.
+
 ### FIXED #262 -- books DISAGREE ON THE SIGN OF THE LINE inside one grid row
 
 Found while building `#261`. **This affected the live board, not just arbitrage.**

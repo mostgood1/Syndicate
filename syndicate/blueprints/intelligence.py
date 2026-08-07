@@ -2279,7 +2279,38 @@ def _attach_book_grid_projections(grid: list, *, sport: str, selected_date: str)
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=wnba date=%s", selected_date)
             return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
 
+    if sport == "soccer":
+        try:
+            from syndicate.features.shared.soccer_projections import (
+                attach_soccer_projections,
+                load_soccer_projections,
+            )
+            from syndicate.features.shared.source_roots import preferred_artifact_roots
+
+            roots = list(
+                preferred_artifact_roots(
+                    __file__, env_var="SYNDICATE_SOCCER_SOURCE_ROOT", local_dir_name="soccer_source"
+                )
+            )
+            index = load_soccer_projections(roots, selected_date)
+            if not index.matches:
+                return {
+                    "supported": True,
+                    "rows_with_projection": 0,
+                    "reason": "no soccer recommendations for this date",
+                }
+            return attach_soccer_projections(grid, index)
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=soccer date=%s", selected_date)
+            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
     if sport != "mlb":
+        # NFL is unwired because there is NOTHING TO WIRE, which is a different
+        # statement from "not done yet" and worth keeping distinct: production
+        # holds exactly 4 NFL artifacts (two book_quotes shards and two
+        # current_week.json), with no predictions/edges/recommendations of any
+        # kind. Audited 2026-08-07. Fixing NFL means producing a sim, not
+        # joining one.
         return {"supported": False, "reason": f"no projection source wired for {sport}"}
     try:
         from syndicate.features.mlb.sources import daily_artifact_path
