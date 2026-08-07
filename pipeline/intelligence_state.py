@@ -2001,13 +2001,6 @@ class IntelligenceStateService:
         self._running = False
         self._interval_seconds = max(10, _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30))
         self._wait_timeout_seconds = 30
-        # #241 follow-up: when the loop last fetched source artifacts. Its own
-        # clock, deliberately independent of the board build -- see
-        # _refresh_source_artifacts_if_due.
-        self._last_artifact_refresh_at = 0.0
-        self._artifact_refresh_interval_seconds = max(
-            30, _env_int("SYNDICATE_ARTIFACT_REFRESH_INTERVAL_SECONDS", 120)
-        )
         self._max_snapshots = max(5, _env_int("SYNDICATE_INTELLIGENCE_MAX_SNAPSHOTS", 12))
         self._snapshots: OrderedDict[str, IntelligenceSnapshot] = OrderedDict()
         self._watched_payloads: OrderedDict[str, dict[str, Any]] = OrderedDict()
@@ -2814,29 +2807,6 @@ class IntelligenceStateService:
         except Exception as exc:
             print(f"[intelligence_state] ADJUSTED_SCORE_ATTACH_FAILED error={exc}", flush=True)
 
-    def _refresh_source_artifacts_if_due(self) -> None:
-        """Fetch source artifacts on the loop's own cadence. Never raises.
-
-        Throttled independently of the board build (default 120s, overridable
-        with SYNDICATE_ARTIFACT_REFRESH_INTERVAL_SECONDS) because the two have
-        different costs: publishing a cached board is nearly free and happens
-        every few seconds, while a fetch is a handful of conditional requests
-        and, when a shard has genuinely moved, one real transfer.
-
-        Runs BEFORE any deferral check on purpose. A sim or odds refresh in
-        flight is a reason not to rebuild the board; it is not a reason to stop
-        collecting the data the next build will need -- and treating it as one
-        is how the worker ended up serving prices captured seven hours earlier.
-        """
-        try:
-            now = time.time()
-            if (now - float(self._last_artifact_refresh_at or 0.0)) < float(self._artifact_refresh_interval_seconds):
-                return
-            self._last_artifact_refresh_at = now
-            self._refresh_source_artifacts(central_today_iso())
-        except Exception as exc:
-            print(f"[intelligence_state] ARTIFACT_REFRESH_TICK_FAILED error={exc}", flush=True)
-
     def _refresh_source_artifacts(self, selected_date: str | None) -> None:
         """Fetch fresh source artifacts, unconditionally, before fingerprinting.
 
@@ -3434,20 +3404,6 @@ class IntelligenceStateService:
             # a factor -- settles whether the thread is genuinely idle or
             # actually working. Remove once resolved.
             print(f"[intelligence_state] LOOP_ITERATION pending_keys={len(self._pending_keys)} watched_payloads={len(self._watched_payloads)}", flush=True)
-            # #241 follow-up: fetch source artifacts HERE, in the loop itself.
-            #
-            # Putting this in the publication path was not enough and production
-            # said so within minutes: the state timestamp advanced every ~9
-            # seconds while no pull ran at all after boot, because the fast path
-            # publishes a cached pool without ever reaching the build. So the
-            # refresh was still, in effect, gated by the cache it exists to
-            # invalidate -- the same defect as #241 itself, one level up.
-            #
-            # The loop iteration is the only place guaranteed to run on a
-            # cadence regardless of cache state, deferral (an in-flight sim or
-            # odds refresh holds the board build off, and must NOT also hold off
-            # fetching), or whether anything was queued.
-            self._refresh_source_artifacts_if_due()
             # #93 follow-up. Independent of the canonical board-state flags
             # below -- this seeds the legacy _watched_payloads queue (the
             # storage that's actually live in production) with an explicit
