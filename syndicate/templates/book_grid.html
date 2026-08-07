@@ -170,7 +170,11 @@
       .then(function (r) { return r.json(); })
       .then(function (d) {
         state.rows = d.rows || [];
-        state.summary = d.summary || {};
+        // Same reasoning as `markets` below, and renderSummary depends on it:
+        // coverage describes the SLATE, not the tab you are looking at. A
+        // per-market response summarises only that market, so keep the figures
+        // from the unfiltered load instead of letting each tab overwrite them.
+        if (!market || !Object.keys(state.summary || {}).length) { state.summary = d.summary || {}; }
         // `markets` is filtered to the requested market when one is passed, so
         // keep the full list from the unfiltered load rather than collapsing
         // the tab bar to the tab you just clicked.
@@ -181,7 +185,16 @@
           state.market = pick || state.markets[0] || "";
         }
         el("bg-status").textContent = d.total_rows + " markets · " + (d.summary || {}).distinct_books + " books";
-        renderTabs(); renderSummary(); renderGrid();
+        renderTabs(); renderSummary();
+        // The UNFILTERED load exists only to discover the market list and the
+        // slate summary. It is exactly the global top-N the comment above warns
+        // about, so rendering it drops the thin rows of whichever tab we land on:
+        // measured 2026-08-07, the h2h tab showed 44 of its 60 rows and the
+        // one-book `first1` segment was missing from the board entirely. The
+        // per-market refetch was wired to tab clicks and never to first paint.
+        // Re-entry is safe: this call passes a market, so it cannot recurse.
+        if (!market && state.market) { load(state.market); return; }
+        renderGrid();
       })
       .catch(function (err) { el("bg-status").textContent = "failed: " + err; });
   }
