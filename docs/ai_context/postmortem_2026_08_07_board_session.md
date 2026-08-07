@@ -96,6 +96,75 @@ existed. Two required querying a different API endpoint; one required reading
 to the end of a log cycle instead of sampling the middle. *Absence of evidence
 in the one place you looked is not evidence of absence.*
 
+### 1.1b-RETRACTION — `#247` is NOT implicated, and neither is any single deploy
+
+The paragraph above says "something around that deploy pushed the pass over a
+line the guard was not watching." That framing is withdrawn. It let `#247` sit
+in §4 as verified-and-sound while §1.1b implied it was the trigger, and `#247`
+is a settlement market-gate fix that touches no memory path whatsoever. The
+02:53 deploy carried ~40 commits; naming the newest one is attribution by
+proximity, which is precisely §5.0's error committed a second time.
+
+A third session proposed `#232` instead — it added `book_quotes` to
+`_required_daily_artifact_paths`, finally delivering the 90MB shard to
+refresh-worker and making a long-standing uncached per-row read expensive there
+for the first time. The mechanism is right and it is the best available account
+of *why the read costs anything on this service at all*. **But the timing does
+not support a deploy trigger either**, and this is measured:
+
+```
+20:51:22Z  #232 (e5b1a8cb) deployed to refresh-worker
+21:50:04Z  repair pass logs ABSENT for nba/nhl/ncaaf/ncaab/soccer
+           and NOT for mlb/wnba/nfl -> those three shards were ALREADY local
+02:56:28Z  first OOM
+```
+
+The repair pass only fires for files that are missing, so MLB's shard was on the
+worker by 21:50Z — **five hours before the first OOM**, and across several
+deploys that produced none. So shard *presence* is necessary and not sufficient.
+
+**The likeliest remaining explanation is gradual, not a deploy at all:** the
+shard is append-only and grows all day, and one read costs ~6.3x its byte size
+(measured, below). At 21:50 it is small; by 02:53 it is 90MB, i.e. ~572MB per
+read. The OOM begins when shard size x that multiplier, plus the rest of the
+board build, crosses 4GiB. That predicts onset drifting later each day as the
+slate starts, and it is falsifiable: log the shard's size against OOM onset over
+two days. **Nobody has done that yet. Until someone does, "why now" is open, and
+three separate confident answers to it have now been wrong.**
+
+### 1.1d FALSIFIED — the read does not ratchet, so caching it is a CPU fix
+
+Third session probed the real shard (15.1MB / 39,370 rows), looping
+`read_book_quotes` while retaining nothing, then again interleaved with retained
+per-row objects to defeat arena reuse:
+
+```
+baseline                34.4MB
+ONE read               130.3MB   (+95.8MB = 6.3x file size)
+after del + gc          130.3MB   (returned to OS: 0.0MB)
+25 more reads            flat     (ratchet +0.0MB, both variants)
+```
+
+So §1.1c's "~200 full materialisations per board build" is real **as CPU**, and
+its memory conclusion is **falsified**: reads 2..200 are free. Peak is set
+entirely by the *first* read and is never returned to the OS.
+
+Consequences, stated plainly because two of them contradict work already
+shipped:
+- **`#252`'s cache is a latency fix, not a memory fix.** It removes ~200 redundant
+  parses per build. Expected effect on peak RSS: approximately zero. It was
+  committed describing itself as the memory mechanism; that claim is withdrawn.
+- The lever that moves peak is **not materialising the whole shard at all** —
+  stream-and-filter inside the reader, which already knows the identity filter it
+  is about to apply. Caching leaves the ~572MB first read exactly where it was.
+- Caveat the probe author stated and which is kept here: this is Windows/CPython.
+  The *no-ratchet* result is pymalloc-level and should port to Render; the
+  *0MB-reclaimed* figure is glibc-dependent and may not. Re-run on Render before
+  building on the second number.
+- Their first probe reported +227MB because `tracemalloc` was active and
+  inflating it. 95.8MB is the honest figure — the same instrument that has now
+  misled this incident three times.
+
 ### 1.1c MEASURED 2026-08-07 — the real per-build cost, and §1.1a's "prime suspect" was wrong
 
 Asked by a third session to check for a cache in `read_book_quotes`. There is
