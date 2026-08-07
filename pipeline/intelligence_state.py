@@ -2812,6 +2812,17 @@ class IntelligenceStateService:
             pull_hot_artifacts(date_str=selected_date)
         except Exception as exc:
             print(f"[intelligence_state] PULL_HOT_ARTIFACTS_FAILED error={exc}", flush=True)
+        # #250: this checkpoint exists to SPLIT the two pulls, because the gap
+        # between build_candidate_pool_start and post_pull_hot_artifacts is
+        # currently the single largest unattributed allocation on this worker
+        # and cannot be blamed on either call without it. Measured 2026-08-07
+        # on a cold boot: 171MB -> 1629MB anon in six seconds, across BOTH
+        # pulls. Neither reads a whole file into memory by inspection -- the
+        # bulk /export returned artifacts_received=0, and the odds_history
+        # transport streams 1MB chunks straight to disk -- so the obvious
+        # suspects are already weak and a finer sample is the only honest way
+        # to name the real one. Costs one cgroup file read per cycle.
+        _diag_log_all_process_memory("post_pull_hot_artifacts_bulk_only")
 
         # odds_history rides a separate, streamed transport: a real MLB shard
         # is ~51MB against pull_hot_artifacts' 24MB whole-response budget, so

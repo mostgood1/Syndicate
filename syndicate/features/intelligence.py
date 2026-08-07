@@ -2503,6 +2503,52 @@ def _query_preferences(
     }
 
 
+# #250. The hydrated overview loop below is ONE opaque stage to its caller's
+# circuit breaker: _build_candidate_pool checks headroom immediately before this
+# call and immediately after it, so a process that crosses the container limit
+# ninety seconds into sport 7 of 8 is never asked whether it should continue.
+#
+# Measured on refresh-worker 2026-08-07, a COLD boot (anon 84MB at BOOTED),
+# with the caller's pre-stage check having just passed:
+#     04:49:45  post_pull_hot_artifacts   2192.7MB   <- guard cleared here
+#     04:51:04  nhl   overview_sport_end  3532.9MB
+#     04:51:08  soccer board_contract     4095.8MB  100.0%  -> SIGKILL
+# Four seconds, one sport, and no checkpoint in between. Checking between
+# sports is the only place that spike can be seen coming, and it is nearly
+# free -- one cgroup file read per sport.
+#
+# The floor is per-SPORT headroom, not per-pass: the loop holds every sport's
+# hydrated overview simultaneously (peak is the SUM, see the comment inside),
+# so what matters is whether the next sport fits. Replayed against the trace
+# above: before nhl ~1376MB effective -> proceed; before soccer ~943MB ->
+# stop, which is the kill that would not have happened.
+_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 1000 * 1024 * 1024
+
+
+def _overview_headroom_exhausted(*, next_sport: str, sports_done: int, sports_total: int) -> bool:
+    """True when the next sport's hydration should be skipped for memory.
+
+    Never raises and defaults to False when headroom cannot be measured (local
+    dev has no cgroups) -- a missing measurement must not silently truncate the
+    board everywhere that is not Render.
+    """
+    try:
+        from syndicate.features.shared.memory_observability import memory_headroom_snapshot
+
+        snapshot = memory_headroom_snapshot(_OVERVIEW_MIN_SAFE_HEADROOM_BYTES)
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(f"[intelligence] OVERVIEW_MEMORY_CHECK_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return False
+    if snapshot is None or snapshot.get("sufficient", True):
+        return False
+    print(
+        f"[intelligence] OVERVIEW_STOPPED_FOR_MEMORY next_sport={next_sport} "
+        f"sports_done={sports_done} sports_total={sports_total} snapshot={snapshot}",
+        flush=True,
+    )
+    return True
+
+
 def build_intelligence_overview(
     *,
     selected_date: str | None = None,
@@ -2538,6 +2584,17 @@ def build_intelligence_overview(
         if not isinstance(sport, dict):
             continue
         sport_slug = _safe_text(sport.get("slug"), "sport").lower()
+        # Only the hydrated pass is gated. The skip_game_hydration=True pass
+        # runs all eight sports in ~2s for a few MB and its output is a
+        # FINGERPRINT -- truncating that would key the caller's cache off a
+        # partial sport list and quietly serve the wrong snapshot, which is a
+        # worse failure than the one being prevented.
+        if not skip_game_hydration and _overview_headroom_exhausted(
+            next_sport=sport_slug,
+            sports_done=len(overview),
+            sports_total=len([item for item in sports if isinstance(item, dict)]),
+        ):
+            break
         print(
             f"[intelligence] OVERVIEW_SPORT_BEGIN sport={sport_slug} "
             f"force_refresh={bool(force_refresh)} skip_game_hydration={bool(skip_game_hydration)}",
