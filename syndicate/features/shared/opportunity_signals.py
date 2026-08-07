@@ -296,6 +296,107 @@ def is_low_hold(prices: Iterable[Any], *, threshold_pct: float = 2.0) -> bool:
     return hold is not None and 0.0 <= hold < threshold_pct
 
 
+# Blended-score weights (#243). PROVISIONAL, and labelled as such on purpose:
+# nothing here is measured yet. #213 records the quote struck at bet time and
+# #214 derives closes, so the honest way to set these is to compare each
+# component's CLV once enough settled bets exist -- until then they are a
+# stated prior, not a finding. Kept as module constants so tuning is one edit
+# and the components ship alongside the score so a reader can disagree with the
+# weighting without having to trust it.
+_SCORE_SIM_WEIGHT = 0.5          # sim edge counts half as much as measured EV
+_SCORE_BOOK_CONFIDENCE = ((1, 0.5), (2, 0.7), (4, 0.85))   # books quoting -> factor
+_SCORE_FRESHNESS = ((300, 1.0), (1800, 0.9), (3600, 0.75), (10800, 0.5))  # seconds -> factor
+
+
+def _book_confidence(books_quoting: Any) -> float:
+    """How much a consensus of N books is worth trusting.
+
+    One book is not a market -- its "fair" price is just its own opinion
+    de-vigged. Five is a field. This is the difference between an edge and a
+    typo, and it is why `books_quoting` was put on the quote in the first place.
+    """
+    try:
+        count = int(books_quoting)
+    except (TypeError, ValueError):
+        return 0.5
+    for threshold, factor in _SCORE_BOOK_CONFIDENCE:
+        if count <= threshold:
+            return factor
+    return 1.0
+
+
+def _freshness_factor(book_age_seconds: Any) -> float:
+    """How much a price that moved N seconds ago is still worth.
+
+    Judged on the BOOK clock, never our capture clock. Decays hard: production
+    served a board where every price was ~7 hours old and it looked identical to
+    a live one, which is exactly the failure this factor exists to make visible
+    in the ranking rather than only in a column.
+    """
+    try:
+        age = float(book_age_seconds)
+    except (TypeError, ValueError):
+        # Unknown age is not fresh. Several sources publish no book clock at
+        # all, and treating that as "brand new" would float them to the top.
+        return 0.6
+    if age < 0:
+        return 0.6
+    for threshold, factor in _SCORE_FRESHNESS:
+        if age <= threshold:
+            return factor
+    return 0.25
+
+
+def blended_score(
+    *,
+    ev_pct: Any = None,
+    model_edge: Any = None,
+    books_quoting: Any = None,
+    book_age_seconds: Any = None,
+) -> dict[str, Any] | None:
+    """Rank a board row by value discounted for how much we trust it (#243).
+
+    VALUE is additive and in one unit (percentage points): expected value
+    against the no-vig fair price, plus the simulation's disagreement with that
+    same fair price at half weight. Both are vig-free, which is the only reason
+    they can be added at all -- #238's whole point.
+
+    RELIABILITY is multiplicative: a wide field of books and a price that moved
+    recently. Multiplicative because these are not additional value, they are
+    confidence in the value already computed -- a +15% EV from one book on a
+    seven-hour-old line should not outrank a +4% EV from seven books quoted a
+    minute ago, and additively it would.
+
+    Returns the score AND its components, because a single opaque number is not
+    something a bettor should be asked to trust. Returns None when there is no
+    value term at all -- a row with neither EV nor a sim edge has nothing to
+    rank, and scoring it zero would sort it above genuinely negative rows.
+    """
+    value_ev = _as_float(ev_pct)
+    value_sim = _as_float(model_edge)
+    if value_ev is None and value_sim is None:
+        return None
+    value = (value_ev or 0.0) + _SCORE_SIM_WEIGHT * (value_sim or 0.0)
+    confidence = _book_confidence(books_quoting)
+    freshness = _freshness_factor(book_age_seconds)
+    return {
+        "score": round(value * confidence * freshness, 4),
+        "value_pct": round(value, 4),
+        "ev_component": None if value_ev is None else round(value_ev, 4),
+        "sim_component": None if value_sim is None else round(_SCORE_SIM_WEIGHT * value_sim, 4),
+        "book_confidence": confidence,
+        "freshness_factor": freshness,
+    }
+
+
+def _as_float(value: Any) -> float | None:
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if parsed != parsed else parsed  # NaN
+
+
 def model_edge_pct(model_prob: Any, fair_prob: Any) -> float | None:
     """The simulation's disagreement with the market, in probability points.
 

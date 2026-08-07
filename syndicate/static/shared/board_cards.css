@@ -1734,3 +1734,13 @@ table.board-blotter tbody tr:last-child td {
 .board-blotter__field--edge {
   color: #4ecdc4;
 }
+
+/* #243: the blended board score -- the default sort. */
+.board-blotter__score {
+  font-weight: 800;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.board-blotter__score--pos { color: #2ecc71; }
+.board-blotter__score--neg { color: var(--cards-text-muted, #94a3b8); }
+.board-blotter__score--flat { color: var(--cards-text-dim, #64748b); }

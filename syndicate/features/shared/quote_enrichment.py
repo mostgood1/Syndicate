@@ -80,6 +80,39 @@ def _implied_probability(price: Any) -> float | None:
     return (100.0 / (value + 100.0)) if value > 0 else (abs(value) / (abs(value) + 100.0))
 
 
+def _attach_board_score(row: dict[str, Any], quote: Mapping[str, Any]) -> None:
+    """Stamp the blended board score and its components on a row (#243).
+
+    Also stamps `board_lane`, which is what splits the two boards: a row is an
+    `opportunity` only when a real market is quoting it right now. Everything
+    else -- a fixture whose books have not posted, a steam move two weeks out --
+    is a `watchlist` row. Both are legitimate; showing them in one list is what
+    made 63% of the board render as blanks.
+
+    Never raises: a missing score costs a sort key, a raised exception costs the
+    board.
+    """
+    try:
+        from syndicate.features.shared.opportunity_signals import blended_score
+
+        scored = blended_score(
+            ev_pct=quote.get("ev_pct"),
+            model_edge=row.get("model_edge_pct"),
+            books_quoting=quote.get("books_quoting"),
+            book_age_seconds=quote.get("book_age_seconds"),
+        )
+        # `quote` present means a book is pricing this now, which is the whole
+        # definition of the opportunity lane -- not whether we managed to score
+        # it. A quoted row with no fair price (a one-sided market) still belongs
+        # on the board that shows prices.
+        row["board_lane"] = "opportunity"
+        if scored:
+            row["board_score"] = scored.get("score")
+            row["board_score_components"] = scored
+    except Exception:
+        return
+
+
 def _model_edge_pct(model_prob: Any, fair_prob: Any) -> float | None:
     """The sim's disagreement with the de-vigged market, in points.
 
@@ -387,6 +420,9 @@ def enrich_candidate_rows(
                 candidate["edge"] = f"{edge_value:.1f}%"
                 candidate["edge_priced_against"] = "vigged_best_price"
                 candidate["ev_priced_against"] = quote.get("best_bookmaker")
+            # Scored LAST on this path: the sim component reads
+            # `model_edge_pct`, which the block above has only just written.
+            _attach_board_score(candidate, quote)
     except Exception:
         return candidates
     return candidates
@@ -469,6 +505,7 @@ def enrich_prop_rows(
             shown_implied = _implied_probability(row.get("odds"))
             if best_implied is not None and shown_implied is not None:
                 row["price_improvement_pct"] = round((shown_implied - best_implied) * 100.0, 2)
+            _attach_board_score(row, quote)
     except Exception:
         return rows
     return rows

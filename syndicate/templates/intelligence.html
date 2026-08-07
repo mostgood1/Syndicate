@@ -45,6 +45,7 @@
         <div class="board-more-filters__body">
           <div class="board-tabs cards-tabs" id="board-market-tabs" role="tablist" aria-label="Market family filter"></div>
           <div class="board-tabs cards-tabs" id="board-edge-tabs" role="tablist" aria-label="Minimum edge filter"></div>
+          <div class="board-tabs cards-tabs" id="board-lane-tabs" role="tablist" aria-label="Board lane"></div>
           <div class="board-tabs cards-tabs" id="board-view-tabs" role="tablist" aria-label="Board view"></div>
           <div class="board-tabs cards-tabs" id="board-steam-tabs" role="tablist" aria-label="Steam move filter"></div>
           <button type="button" id="board-clear-filters" class="cards-nav-pill board-clear-filters" hidden>Clear filters</button>
@@ -138,6 +139,16 @@
     { value: "cards", label: "Cards" },
     { value: "blotter", label: "Blotter" },
   ];
+  // #243: two boards, because they answer different questions and merging them
+  // is what made 63% of the default view render as blanks. Measured on the live
+  // board: of 230 rows, 146 were steam candidates for fixtures 16+ days out --
+  // unpriceable BY DEFINITION, since no book has posted those markets yet. They
+  // are not broken rows, they are simply not opportunities yet.
+  const LANE_TABS = [
+    { value: "opportunity", label: "Opportunities" },
+    { value: "watchlist", label: "Watchlist" },
+    { value: "all", label: "All" },
+  ];
   const DEFAULT_QUESTION = "top edges today";
 
   // The server's own resolved "today" (already Central-time-correct) --
@@ -229,6 +240,12 @@
         ? "blotter"
         : (window.matchMedia && window.matchMedia("(max-width: 900px)").matches ? "cards" : "blotter")),
     game: urlParams.get("game") || "all",
+    // #243: Opportunities by default -- a row a book is pricing right now.
+    // Shareable in the URL like the other real filters, because "look at the
+    // watchlist" is a thing you send someone.
+    lane: ["opportunity", "watchlist", "all"].includes(urlParams.get("lane") || "")
+      ? urlParams.get("lane")
+      : "opportunity",
     steamOnly: urlParams.get("steam") === "1",
     // Blotter column sort, client-side only (not persisted to the URL --
     // this is a viewing preference for the current session, not a
@@ -289,6 +306,7 @@
     if (state.marketFamily && state.marketFamily !== "all") url.searchParams.set("market_family", state.marketFamily); else url.searchParams.delete("market_family");
     if (state.minEdge > 0) url.searchParams.set("min_edge", String(state.minEdge)); else url.searchParams.delete("min_edge");
     if (state.view && state.view !== "blotter") url.searchParams.set("view", state.view); else url.searchParams.delete("view");
+    if (state.lane && state.lane !== "opportunity") url.searchParams.set("lane", state.lane); else url.searchParams.delete("lane");
     if (state.game && state.game !== "all") url.searchParams.set("game", state.game); else url.searchParams.delete("game");
     if (state.steamOnly) url.searchParams.set("steam", "1"); else url.searchParams.delete("steam");
     window.history.replaceState({}, "", url.toString());
@@ -371,6 +389,12 @@
     });
     renderTabs("board-view-tabs", VIEW_TABS, state.view, (value) => {
       state.view = value;
+      syncUrlState();
+      renderFilterTabs();
+      renderBoardBody();
+    });
+    renderTabs("board-lane-tabs", LANE_TABS, state.lane, (value) => {
+      state.lane = value;
       syncUrlState();
       renderFilterTabs();
       renderBoardBody();
@@ -1578,6 +1602,12 @@
   // trailing action-button column has no entry -- it isn't sortable.
   const BLOTTER_COLUMNS = [
     { key: "lane", label: "Lane", type: "number", getValue: (item) => (recommendationState(item) === "live" ? 1 : 0) },
+    // #243: the blended rank. Value (EV vs no-vig fair, plus the sim's
+    // disagreement at half weight) multiplied by how much the row deserves to
+    // be believed (field size, book freshness). Its components ship on the row
+    // and are shown in the cell title, because a single opaque number is not
+    // something a bettor should be asked to trust.
+    { key: "score", label: "Score", type: "number", getValue: (item) => boardScoreValue(item) },
     { key: "matchup", label: "Matchup", type: "string", getValue: (item) => displayTitle(item).toLowerCase() },
     { key: "pick", label: "Pick", type: "string", getValue: (item) => (propLine(item) || "").toLowerCase() },
     { key: "odds", label: "Odds", type: "number", getValue: (item) => {
@@ -1660,6 +1690,25 @@
     return `<div class="board-blotter__book">${escapeHtml(book.toUpperCase())} ${escapeHtml(formatAmerican(price))}</div>${better}${field}`;
   }
 
+  function renderBlotterScore(item) {
+    const score = boardScoreValue(item);
+    if (score === null) {
+      return '<span class="board-blotter__muted" title="No priced market yet, so nothing to score">&mdash;</span>';
+    }
+    const parts = (item && item.board_score_components) || {};
+    // The whole derivation in the tooltip. The weights are a stated prior, not
+    // a measured finding, so a reader has to be able to take the number apart.
+    const title = [
+      `value ${numeric(parts.value_pct)?.toFixed(2) ?? "?"}%`,
+      parts.ev_component !== null && parts.ev_component !== undefined ? `EV ${Number(parts.ev_component).toFixed(2)}` : null,
+      parts.sim_component !== null && parts.sim_component !== undefined ? `sim ${Number(parts.sim_component).toFixed(2)}` : null,
+      `books x${parts.book_confidence ?? "?"}`,
+      `fresh x${parts.freshness_factor ?? "?"}`,
+    ].filter(Boolean).join(" · ");
+    const tone = score > 0.01 ? "pos" : (score < -0.01 ? "neg" : "flat");
+    return `<span class="board-blotter__score board-blotter__score--${tone}" title="${escapeHtml(title)}">${score > 0 ? "+" : ""}${score.toFixed(1)}</span>`;
+  }
+
   function renderBlotterFair(item) {
     const fair = fairPriceValue(item);
     if (!Number.isFinite(fair)) {
@@ -1708,7 +1757,10 @@
       container.innerHTML = `<div class="board-empty">No opportunities match the current filters.</div>`;
       return;
     }
-    const activeColumn = BLOTTER_COLUMNS.find((col) => col.key === state.sortColumn) || BLOTTER_COLUMNS.find((col) => col.key === "edge");
+    // #243: Score is now the default sort. Edge ranked by the model alone,
+    // against a vigged price, with no account of how many books were quoting or
+    // how old the number was -- so a single stale book could top the board.
+    const activeColumn = BLOTTER_COLUMNS.find((col) => col.key === state.sortColumn) || BLOTTER_COLUMNS.find((col) => col.key === "score");
     const sortDirection = state.sortColumn ? state.sortDirection : "desc";
     const sorted = items.slice().sort((a, b) => compareBlotterItems(a, b, activeColumn, sortDirection));
     const headerCells = BLOTTER_COLUMNS.map((col) => {
@@ -1762,6 +1814,7 @@
               return `
                 <tr ${rowAttrs}>
                   <td data-label="State"><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}</td>
+                  <td data-label="Score">${renderBlotterScore(item)}</td>
                   <td data-label="Pick" class="board-blotter__cell--primary">
                     <div class="board-blotter__primary">${headshot}${escapeHtml(title)}</div>
                     <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}${updatedDisplay ? ` &middot; <span title="${escapeHtml(updatedIso)}">${escapeHtml(updatedDisplay)}</span>` : ""}</div>
@@ -1869,6 +1922,26 @@
     }
   }
 
+  // #243: which board a row belongs on. `board_lane` is stamped server-side by
+  // quote_enrichment when a book is actually pricing the row; anything without
+  // it has no live market, which is the definition of the watchlist rather
+  // than a defect. Falling back to "is there a quote" keeps this working for
+  // rows enriched by a path that predates the field.
+  function itemLane(item) {
+    const lane = String((item && item.board_lane) || "").trim().toLowerCase();
+    if (lane) return lane;
+    return itemQuote(item) ? "opportunity" : "watchlist";
+  }
+
+  function matchesLane(item) {
+    if (!state.lane || state.lane === "all") return true;
+    return itemLane(item) === state.lane;
+  }
+
+  function boardScoreValue(item) {
+    return numeric(item && item.board_score);
+  }
+
   function renderBoardBody() {
     const uiState = captureBoardUiState();
     // #165: deriveGameCards populates gameKeyMergeMap as a side effect --
@@ -1877,7 +1950,7 @@
     // renderGameCards' own internal derivation stay consistent.
     const dateFiltered = lastRenderItems.filter(matchesDateFilter);
     deriveGameCards(dateFiltered);
-    const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters);
+    const clientFiltered = lastRenderItems.filter(matchesFilters).filter(matchesClientFilters).filter(matchesLane);
     renderGameCards(dateFiltered);
     // Checked against the full date-filtered set, not clientFiltered -- a
     // watched pick should still alert while a different sport/edge/steam

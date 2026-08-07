@@ -12,6 +12,7 @@ import pytest
 from syndicate.features.shared.opportunity_signals import (
     american_price,
     arbitrage_profit_pct,
+    blended_score,
     consensus_fair_probability,
     devig,
     edge_pct,
@@ -203,3 +204,60 @@ def test_nothing_raises_on_garbage():
     assert devig([None, -110]) is None
     assert hold_pct([]) is None
     assert overround([-110]) is None  # one side is not a market
+
+
+# --- #243: blended score -------------------------------------------------
+
+
+def test_blended_score_returns_none_without_any_value_term():
+    # A row with neither EV nor a sim edge has nothing to rank. Scoring it 0
+    # would sort it above genuinely negative rows, which is worse than absent.
+    assert blended_score(books_quoting=7, book_age_seconds=10) is None
+
+
+def test_blended_score_discounts_a_thin_stale_row_below_a_wide_fresh_one():
+    """The ranking property that matters, stated as a test.
+
+    A +15% EV from ONE book on a seven-hour-old line must not outrank a +4% EV
+    from seven books quoted a minute ago. Additive reliability would let it;
+    multiplicative does not.
+    """
+    thin_stale = blended_score(ev_pct=15.0, books_quoting=1, book_age_seconds=25200)
+    wide_fresh = blended_score(ev_pct=4.0, books_quoting=7, book_age_seconds=60)
+    assert thin_stale is not None and wide_fresh is not None
+    assert wide_fresh["score"] > thin_stale["score"]
+
+
+def test_blended_score_exposes_its_components():
+    scored = blended_score(ev_pct=6.0, model_edge=4.0, books_quoting=7, book_age_seconds=60)
+    assert scored is not None
+    # value = 6.0 + 0.5*4.0 = 8.0, reliability = 1.0 * 1.0
+    assert scored["value_pct"] == pytest.approx(8.0)
+    assert scored["ev_component"] == pytest.approx(6.0)
+    assert scored["sim_component"] == pytest.approx(2.0)
+    assert scored["book_confidence"] == pytest.approx(1.0)
+    assert scored["freshness_factor"] == pytest.approx(1.0)
+    assert scored["score"] == pytest.approx(8.0)
+
+
+def test_blended_score_sim_edge_counts_half():
+    ev_only = blended_score(ev_pct=4.0, books_quoting=7, book_age_seconds=60)
+    sim_only = blended_score(model_edge=4.0, books_quoting=7, book_age_seconds=60)
+    assert ev_only is not None and sim_only is not None
+    assert sim_only["score"] == pytest.approx(ev_only["score"] / 2.0)
+
+
+def test_blended_score_treats_unknown_book_age_as_not_fresh():
+    # Several sources publish no book clock. Treating that as brand new would
+    # float exactly the least verifiable rows to the top.
+    unknown = blended_score(ev_pct=5.0, books_quoting=7, book_age_seconds=None)
+    fresh = blended_score(ev_pct=5.0, books_quoting=7, book_age_seconds=10)
+    assert unknown is not None and fresh is not None
+    assert unknown["score"] < fresh["score"]
+
+
+def test_blended_score_keeps_negative_value_negative():
+    # Most retail prices are -EV. A reliability multiplier must not flip a bad
+    # bet positive, only shrink it toward zero.
+    scored = blended_score(ev_pct=-6.0, books_quoting=7, book_age_seconds=60)
+    assert scored is not None and scored["score"] < 0
