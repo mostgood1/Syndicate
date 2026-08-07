@@ -159,9 +159,42 @@ shape but mis-attributed: a lever aimed only at `props` addresses 60%, not 98%.
 
 **Unblocks S0b** (enable `us2` everywhere; `eu`/`us_ex` on game lines only).
 
-### OPEN #262 -- books DISAGREE ON THE SIGN OF THE LINE inside one grid row
+### FIXED #262 -- books DISAGREE ON THE SIGN OF THE LINE inside one grid row
 
-Found while building `#261`. **This affects the live board, not just arbitrage.**
+Found while building `#261`. **This affected the live board, not just arbitrage.**
+
+**ROOT CAUSE, and it was two bugs stacked.** The diagnosis this was filed
+pending: the sign convention is *not* wrong upstream in `book_quotes` -- each
+book quotes a coherent pair. It was lost in the pivot, twice.
+
+1. **`market_sides_for_quote` checked the line's MAGNITUDE, not which side was
+   on it.** It accepted "the same line or its mirror", so an anchor of
+   `away +1.5` admitted all four of {away +1.5, home -1.5, away -1.5,
+   home +1.5} -- two different markets. Its own docstring already said
+   "spreads are SIGNED per side"; the code only compared `abs`.
+2. **`build_book_grid` keyed anchors on `abs(line)`**, so the two instances
+   collapsed to one row and **the second instance never got a row at all** --
+   half of every alternate-spread ladder was missing from the board.
+
+**Blast radius was wider than filed.** `market_sides_for_quote`'s other caller
+is `_fair_value_fields` (`odds_book_quotes.py:880`), so the **no-vig fair value
+and every EV derived from it were computed across two markets** on spread rows,
+not just the arbitrage numbers.
+
+**Fix.** `_expected_line_for_side` resolves the line a side must sit on:
+same side -> same line; `away`/`home` -> mirrored; everything else (over/under)
+-> shared. Keyed on side semantics, not market names, so a new market key cannot
+bypass it. `_canonical_line` normalises the grid anchor to the away/over
+perspective, so both ladder instances get their own row and the row's `line`
+always agrees with its own cells.
+
+**Verified by removal, not just by passing:** stashing the two source files makes
+**6 of 8** new tests fail (`tests/test_market_sides_line_sign.py`); the 2 that
+still pass are h2h and anchor-symmetry, which were correct before. 131 tests
+green across the ten suites touching the rule.
+
+*(Historical detail kept below because the measured row is the clearest statement
+of the defect.)*
 
 One production `spreads_alt` / `first5` row, `line=1.5`:
 

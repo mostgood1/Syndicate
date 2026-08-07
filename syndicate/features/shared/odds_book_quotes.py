@@ -595,6 +595,7 @@ def market_sides_for_quote(
         for field in ("sport", "kind", "event_id", "segment", "market", "player_name")
     )
     chosen_line = _line_value(chosen)
+    chosen_selection = str(chosen.get("selection") or "").strip().lower()
     sides: list[dict[str, Any]] = []
     for row in rows or ():
         if not isinstance(row, Mapping) or row.get("price") is None:
@@ -608,11 +609,52 @@ def market_sides_for_quote(
                 continue
         elif line is None:
             continue
-        elif abs(line - chosen_line) > 1e-9 and abs(line + chosen_line) > 1e-9:
-            # Neither the same line nor its mirror, so not this market instance.
-            continue
+        else:
+            expected = _expected_line_for_side(
+                chosen_line, chosen_selection, str(row.get("selection") or "").strip().lower()
+            )
+            if expected is None or abs(line - expected) > 1e-9:
+                continue
         sides.append(dict(row))
     return sides
+
+
+# Sides whose handicap MIRRORS. Everything else (over/under, and any pairing we
+# have not measured) shares one line.
+_MIRRORED_SIDES = frozenset({"away", "home"})
+
+
+def _expected_line_for_side(
+    chosen_line: float, chosen_selection: str, selection: str
+) -> float | None:
+    """The line `selection` must sit on to belong to `chosen`'s market instance.
+
+    #262. The previous rule accepted "the same line OR its mirror" without
+    checking WHICH SIDE was on which. For an anchor of `away +1.5` that admits
+    all four of {away +1.5, home -1.5, away -1.5, home +1.5} -- but those are
+    TWO different markets, and the caller then keeps one quote per (book, side)
+    across both of them.
+
+    Measured on production 2026-08-07 (`spreads_alt`, first5, one row):
+
+        betmgm     away -1.5 (+210)   home +1.5 (-295)
+        betrivers  away +1.5 (-240)   home -1.5 (+180)
+
+    so `best.away` ranked a -1.5 bet against a +1.5 bet as if interchangeable,
+    and the no-vig fair value derived from those sides was computed across two
+    markets. The docstring above already said "spreads are SIGNED per side"; the
+    code only checked the magnitude.
+
+    Returns None when the side is unusable, so the caller drops the row rather
+    than guessing.
+    """
+    if not selection:
+        return None
+    if selection == chosen_selection:
+        return chosen_line
+    if {selection, chosen_selection} == _MIRRORED_SIDES:
+        return -chosen_line
+    return chosen_line
 
 
 def _fair_value_fields(

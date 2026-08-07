@@ -98,6 +98,25 @@ def _better(price: int, than: int | None) -> bool:
     return than is None or price > than
 
 
+def _canonical_line(row: Mapping[str, Any]) -> float | None:
+    """The market instance's line, stated from ONE perspective (away / over).
+
+    #262. Spreads are signed per side, so `away +1.5` + `home -1.5` is one
+    market and `away -1.5` + `home +1.5` is a DIFFERENT one. The previous anchor
+    key was `abs(line)`, which gave both the same key -- so the two instances
+    collapsed into a single row whose sides came from whichever quote happened to
+    be freshest, and the second instance never got a row at all.
+
+    Normalising to the away/over side makes the two distinguishable and makes the
+    row's reported `line` unambiguous: it always names the away (or over) side's
+    line, so a cell's own line agrees with the row's.
+    """
+    line = _line_value(row)
+    if line is None:
+        return None
+    return -line if str(row.get("selection") or "").strip().lower() == "home" else line
+
+
 def _freshest_per_book_side(rows: Iterable[Mapping[str, Any]]) -> dict[tuple[str, str], dict[str, Any]]:
     """One quote per (book, side): the most recently observed.
 
@@ -149,8 +168,7 @@ def build_book_grid(
         # shared rule gather its sides.
         seen_anchors: set[float | None] = set()
         for anchor in group:
-            line = _line_value(anchor)
-            anchor_key = None if line is None else abs(line)
+            anchor_key = _canonical_line(anchor)
             if anchor_key in seen_anchors:
                 continue
             seen_anchors.add(anchor_key)
@@ -344,7 +362,10 @@ def build_book_grid(
                     "segment": key[3],
                     "market": key[4],
                     "player_name": key[5] or None,
-                    "line": anchor.get("line"),
+                    # Canonical (away/over perspective), not the anchor's raw
+                    # line -- which side anchored is an accident of iteration
+                    # order, and #262 is what that ambiguity cost.
+                    "line": anchor_key,
                     "home_team": first.get("home_team"),
                     "away_team": first.get("away_team"),
                     "commence_time": first.get("commence_time"),
