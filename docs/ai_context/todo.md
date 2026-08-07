@@ -2,20 +2,49 @@
 
 ### QUEUED ON refresh-worker — HELD DELIBERATELY, gated on the slate test (2026-08-07)
 
-**Do not deploy these individually. They are held on purpose.**
+**Deploy order is load-bearing. Do not collapse it.**
 
-| commit | what | risk |
-|---|---|---|
-| `c256cc3e` | `#258` null-identity ledger guard + `#257` instrumentation removal | low — deletions plus an early `return False` |
-| `a39fe3d6` | `#255` retention-shorter-than-reuse (makes `#251` real; owned by the other session) | low |
-| — | re-enable `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` **with `#256`** | **the real test** |
+```
+GATE    full MLB slate on 21efffae -- OBSERVATION ONLY, no deploy at all
+        pass = peak container_memory_mb between BOOTED events < ~1500MB
+WIN A   a39fe3d6  (#255)  ALONE                          -- 30+ min
+WIN B   c256cc3e  +  autorun env var re-enabled          -- 30+ min
+```
 
-**Why held.** refresh-worker went from 115 OOM kills in eleven hours to 96+
-minutes clean. That streak is the only measurement gating the settlement
-decision, and **every deploy reboots the worker and resets it.** Neither queued
-item is urgent — `#258` is latent and unreachable from its only production
-caller, and `#257`'s removal only reduces log noise. Deploying now would spend
-the one clean measurement we have and buy nothing.
+**The gate is observation only.** No deploy to refresh-worker until the slate
+has been watched. A deploy reboots the process, and the whole measurement is
+peak-within-a-boot across a real load — restarting mid-slate destroys the thing
+we are waiting for.
+
+**Why `#255` must be alone (WIN A).** It is the only held item that changes a
+*memory* variable: it makes `#251` execute for the first time, cutting hydrated
+overview rebuilds from ~90s to ~300s. That shifts allocation rate, retention and
+the floor — exactly the quantities being measured. `#251` has already been
+measured once against code that never ran; doing that twice would be a choice.
+
+**Why `#255` comes BEFORE the autorun, not after.** If settlement were
+re-enabled first and the floor moved, we could not tell whether it was
+settlement's cost or `#251` finally suppressing rebuilds. `#255` first makes the
+board-path cost a **known constant** before the riskiest change goes in.
+
+**Why bundling `c256cc3e` with the autorun is legitimate (WIN B).** The rule is
+"never bundle two things that could plausibly explain the outcome" — not "one
+commit per window". `c256cc3e` **provably cannot** explain a memory outcome:
+
+- `#257`'s removal deletes `print()` calls. Deleted logging cannot OOM a worker.
+- `#258` guards a path that is **unreachable** from its only production caller
+  (`_update_evaluation_ledger_record` routes identity-less records to append).
+  Latent, not live.
+
+So if WIN B dies, it is the autorun; if it holds, `c256cc3e` contributed nothing
+either way. **One side being provably inert is what makes a two-change window
+single-variable.** That is the test.
+
+**Why held at all.** refresh-worker went from 115 OOM kills in eleven hours to
+96+ minutes clean. That streak is the only measurement gating the settlement
+decision, and **every deploy reboots the worker and resets it.** Neither code
+change is urgent — `#258` is latent, `#257`'s removal only reduces log noise —
+so deploying now would spend the one clean measurement we have for nothing.
 
 **THE GATE — what releases them.** The worker holds clean **through a full MLB
 slate**, so we know the floor survives real load rather than an idle afternoon.
@@ -33,11 +62,14 @@ GET /v1/logs?ownerId=tea-d2bb5n95pdvs73cje4fg&resource=srv-...  -> grep CONTAINE
 Reference numbers: pre-fix per-cycle peaks were **2797–4048MB**; post-fix steady
 state is **380–870MB**. A slate peak under ~1500MB is a pass.
 
-**Then** deploy all three in ONE window (they all need a deploy anyway), and
-watch for the first *completed* settlement run. If it kills, the env var goes
-straight back out — `#256` claims the run before the work, so the worst case is
-one dead settlement day, not another eleven-hour loop. Watch for
-`PREVIOUS_RUN_NEVER_COMPLETED` on the following boot.
+**Then run WIN A, then WIN B** (see the order block above — not one window).
+
+In WIN B, watch for the first *completed* settlement run. If it kills, the env
+var goes straight back out — `#256` claims the run **before** the work, so the
+worst case is one dead settlement day rather than another eleven-hour loop.
+Watch for `PREVIOUS_RUN_NEVER_COMPLETED` on the following boot: that log line is
+the only durable evidence a SIGKILL leaves, and its absence-vs-presence is how
+you tell "settlement ran and was fine" from "settlement died silently again".
 
 ### SHIPPED 2026-08-07 (#258, `c256cc3e`) -- an unidentified ledger record is now unaddressable. NOT YET DEPLOYED.
 
