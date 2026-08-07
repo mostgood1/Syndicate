@@ -1,5 +1,190 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN (#255) -- DATA INTEGRITY: a null identity silently overwrites the wrong ledger record
+
+Not a memory bug. Found while writing `#254` and deliberately left unfixed there,
+because correcting it changes matching behaviour and does not belong inside a
+memory change.
+
+`_ledger_record_identity` (`intelligence_evaluation.py`) returns `None` when a
+record carries none of `portfolio_event_id` / `recommendation_id` /
+`prediction_id`. `_replace_ledger_line` then matches with
+`_ledger_record_identity(existing) == identity`. So a caller that passes
+`identity=None` **silently replaces the first identity-less record in the
+chunk** and returns `True`, reporting success.
+
+Found by accident: a test fixture without those fields replaced record `a` when
+it asked for record `b`, and the assertion that caught it was about ordering,
+not correctness. Nothing in production logs would show this — the function
+returns `True` either way.
+
+Fix shape: refuse a null identity outright (`if identity is None: return False`),
+and audit callers for whether any legitimately pass one. Needs a decision on
+whether a record with no identity should be replaceable at all, which is why it
+is filed rather than patched.
+
+### WRITTEN, TESTED, NOT DEPLOYED 2026-08-07 (#253, #254) -- the OOM FLOOR, as opposed to the rate
+
+Held out of production deliberately: `local_ad54d625`'s settlement-cadence env
+revert was mid-rollout, and shipping these on top would have made a fifth
+unattributable result. Deploy them **alone**, refresh-worker only, 30+ minutes.
+
+**FIVE hypotheses have now failed tonight.** In order: `#241` (reverted, then
+positively exonerated -- it ran 2h20m with zero kills); the book_quotes shard
+*transport* (split checkpoint measured ~300MB for both pulls, not the suspected
+1.4GB); `#238`'s de-vig (`market_sides_for_quote` receives the identity-filtered
+subset, tens of rows, never the 122k set); `#251` + `#252`; and the
+settlement-cadence env revert. That last one is the cleanest negative result of
+the night:
+
+```
+13:12:42  EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS deleted, verified absent
+13:17:21  OOM, 4.7 min later
+recent inter-kill gaps (min): 8.5, 8.2, 14.6, 4.7, 4.0, 2.8, 4.1, 5.9
+```
+
+Gaps are **shortening**, not lengthening. The var stays deleted regardless --
+24x the designed cadence on that path is indefensible on its own merits, and
+`#254` makes the path cheap rather than merely rare -- but hourly settlement was
+not the cause. **Treat no new hypothesis as likely until it is measured.**
+
+**Why these and not more rate fixes.** `#251` (hydrated rebuild rate limit) and
+`#252` (shard parse cache) both shipped and both failed to stop the kills. The
+reason is visible in one line: `container_memory_mb` 3108-3994MB **with
+`candidate_count=0`** and `MEMORY_GUARD_ABORT` firing before the build. Nothing
+was building; the floor was already there. **Retention survives cycles** -- the
+guard stops new work in the current cycle, not what earlier cycles retained --
+so no rate fix can touch it. These two are the first changes aimed at the floor.
+
+**#253 -- `mlb/cards.py` held up to 96 full page contexts.** Two module caches
+bounded by ENTRY COUNT only, never age, never bytes, and on the worker both keys
+are *guaranteed* to miss every cycle: the context key embeds
+`_path_cache_signature()` of the continuously-rewritten live-lens report, and
+the today key is `int(time.time() // 60)`. A guaranteed-miss cache evicting on
+count is not a cache, it is a retention buffer. The miss path also held **three**
+live copies (`result` went to the today cache *by reference* while a `deepcopy`
+went to the context cache and a second was returned), two of them retained.
+Worker: today cache is now a no-op (`#251`'s 300s rebuild floor vs a 60s bucket
+key is a mathematically zero hit rate), context limit 32 -> 2, copies 3 -> 2.
+**Web behaviour is byte-for-byte unchanged** and a test pins why the web path
+must keep its deepcopy: `_today_cache_get` returns its entry *without* copying,
+so aliasing the two web caches would let a caller corrupt the cached one.
+Evictions now log -- `3ca6c11d`'s count-only bound was invisible for three weeks
+because a 0%-hit cache looks identical to a working one from outside.
+
+**#254 -- the evaluation ledger, seven whole-file reads.** Production chunks
+measured **367,229,260** and **480,112,146** bytes against a
+`SKIP_OVERSIZED_LEDGER_CHUNK` ceiling of 256,000,000. This is the **exact defect
+`#75` fixed in `odds_lifecycle._load_jsonl_rows`**, unfixed here: a ceiling
+decides which files are *skipped* and never bounded what reading an accepted one
+costs. Three read paths had no ceiling at all. Two were on the **append path**,
+re-materialising the whole chunk *per record written* to produce one integer.
+Worst was `_replace_ledger_line`, which held **four** full copies live
+(`read_text`, `splitlines`, `new_lines`, and the joined output string) to update
+a **single record** -- ~2GB on a 480MB chunk, on the settlement path, against
+~1.4GB of headroom. All now stream; the rewrite goes to a temp file and
+`os.replace`, and on not-found the temp is discarded so the original is left
+byte-for-byte untouched.
+
+**Tests:** `tests/test_mlb_cards_context_cache_bounds.py` (9),
+`tests/test_evaluation_ledger_streaming.py` (9). `pytest -k "evaluation or
+settlement or ledger or cards"` 452 passed; `unittest tests.test_archives` 383
+passed.
+
+**MEASUREMENT TRAP -- read before verifying either of these.** A bare
+`container_memory_mb` sample is confounded by time-since-boot, because the floor
+*is* the ratchet: low 3 minutes after a kill, high 8 minutes in. Two consecutive
+pre-fix cycles read 3994.6MB and 3108.2MB, an 886MB *drop*, purely because a
+boot happened between them. **Every deploy forces a restart, so every fix looks
+good in its first few minutes** -- that is how this morning's false "RESOLVED"
+was written. Measure **peak `container_memory_mb` within a boot** and
+**time-to-next-OOM**, across several complete cycles.
+
+Pre-fix baseline, 11:00-13:20Z, 21 cycles:
+`time-to-next-OOM min 2.4m / median 6.0m / mean 6.6m / max 14.6m`;
+per-cycle peak floor 2797-4048MB where sample coverage was adequate.
+
+**Which of `#254`'s seven sites can actually explain a 3-6 minute kill cadence** --
+stated up front so the result is not credited to the wrong one:
+
+- **Site 2, `load_recent_evaluation_records` (64MB ceiling), is the prime
+  candidate.** It backs the board's scoring/ranking pass, so it runs every
+  build. A smaller blowup paid every cycle fits a 5-minute kill far better than
+  a large one paid rarely.
+- **Sites 5 + 6, the manifest writers on the APPEND path**, are the other live
+  candidates -- full chunk materialisation per record appended. See `#72`, which
+  records `record_prediction` writing a growing multi-MB file on the request
+  path, i.e. appends are frequent.
+- **Site 7, `_replace_ledger_line`, cannot be causing this.** ~2GB of live
+  copies is the most alarming number in the set, but it is on the settlement
+  path, now once-daily. It is a genuine landmine, not this week's explosion.
+
+**Flagged, not fixed:** the `identity=None` wrong-record replacement -- now filed
+as **`#255`** above rather than left in a comment.
+
+### SHIPPED 2026-08-07 (#249) -- the refresh-worker OOM loop: the circuit breaker was sized for a 2GB container. #241 is EXONERATED.
+
+`431fc5a9`, deployed to refresh-worker only.
+
+**The previous session's attribution was wrong, and so was its evidence.** It
+blamed `#241`, reverted `#241`/`#241 follow-up`/`#237`, and the restarts
+continued. The Render **events** API settles it:
+
+```
+deploy 00:26  930fccf0  #241                  -> 0 OOM
+deploy 00:52  fff935fd  #241 follow-up        -> 0 OOM     2h20m clean
+deploy 01:33  73148a64  #243                  -> 0 OOM
+deploy 02:46/02:53  75b79b8a  #247            -> first OOM 02:56:28, then every ~3 min
+```
+
+`#241` ran for 2h20m without a single OOM. That is why reverting it changed
+nothing.
+
+**Two "unknowns" from the handoff were readable all along:**
+
+- *"There is no OOM line."* Every restart is `server_failed` with
+  `reason.oomKilled.memoryLimit = "4Gi"`. It is in
+  `GET /v1/services/{id}/events`, **not** in the log stream. 21 kills.
+- *"Memory sits at 67-68.8%, so the sampler is missing the spike."* The
+  deployed `CONTAINER_MEMORY` instrumentation catches it exactly; nobody read
+  the tail of a cycle. One pass: `ncaab 2403MB 58.7% -> nhl 3496MB 85.4% ->
+  soccer 3947MB 96.4% -> soccer 4096MB 100.0%`.
+
+**The defect.** `_MIN_SAFE_MEMORY_HEADROOM_BYTES` was **900MB**, set when this
+container was 2GB and the biggest measured stage transition was 350-450MB. The
+container is 4GiB and the stage sitting directly behind the guard --
+`build_intelligence_overview(force_refresh=True, skip_game_hydration=False)` --
+has a **transient peak of ~1873MB**. The guard was clearing with 1873MB of
+headroom immediately before a stage that needed 1873MB. It fired **once in 1200
+log lines**, at 3629MB, far too late. Raised to **1900MB** -- the measurement,
+not a round number. Replayed against all five real checkpoints: both OOM cycles
+abort, the fresh-boot cycle (anon 305MB) still builds the board.
+
+**Rejected, so it is not retried:** adding an anon term to the guard. It is
+algebraically dead -- `effective = max - current + reclaimable` and
+`current >= anon`, so `effective <= max - anon` **always**; the existing
+reading is already the stricter one. On the real snapshot: effective 848.9 vs
+`max - anon` 1224.6.
+
+**STILL OPEN -- this bounds the damage, it does not make the pass cheaper:**
+
+1. **Why does the overview need ~1.9GB?** Per-sport samples say the climb is
+   NHL (`+1089MB` on a slate with **zero games**) then soccer. Start there.
+2. **Why does anon ratchet within one boot?** `post_pull_hot_artifacts` across
+   four boots: **1638, 2338, 2866, 2870MB**. Fresh boot is 85MB. Something is
+   retained across cycles.
+3. **The pass has been producing `candidate_count=0`** while spending 1.9GB to
+   do it. Fixing that may matter more than either of the above.
+4. **Do not trust an instrumentation gap for attribution.** The +1360MB between
+   `build_candidate_pool_start` and `post_pull_hot_artifacts` looks like it
+   belongs to the pull. It does not: both `/export` calls returned
+   `artifacts_received=0`, and the odds_history transport streams 1MB chunks
+   straight to disk. The allocator in that window is **unidentified**, and the
+   sample points are too far apart to name it. A finer checkpoint is needed
+   before anyone blames that code.
+
+---
+
 ### RECONCILIATION 2026-08-06 -- odds provenance -> per-book capture -> the opportunity contract (session close, archive-ready)
 
 One arc, in three acts. Everything below is committed and pushed through
@@ -15988,6 +16173,49 @@ error — surfaced a second, different, also-real bug instead.**
   cleanly, unlike manual triggers) and read it with the now-deployed fix,
   or (b) fix the manual-trigger hang first, since it's now a second bug in
   the way of the first.
+
+**Likely explanation for the manual-trigger hang, found on a follow-up
+question (not yet fixed, code-read only):** `_start_refresh_job`
+(`syndicate/blueprints/ops.py`) → `launch_refresh_run` spawns
+`refresh_odds_sources.py` as a `subprocess.Popen` child of **whichever
+service's process calls it** — `SYNDICATE_REFRESH_LAUNCH_MODE=detached_subprocess`
+is set identically on all three services (`render.yaml`), so there's no
+dispatch-elsewhere; the "external_runner"/"queue_state": "queued" fields in
+the response are a fixed label baked into that payload shape (confirmed by
+code read), not a live indicator — nothing actually gets queued to
+refresh-worker regardless of what that field says.
+
+My manual triggers went through `/api/ops/odds-refresh/run` on the **web**
+service — `standard` plan, **2GB**, the one CLAUDE.md's load-bearing rule
+says does "no heavy computation." A multi-league soccer refresh (or the
+full 4-sport combo) spawned as a subprocess there competes for that same 2GB
+ceiling with the request-serving Flask app itself — a plausible, not yet
+directly confirmed, explanation for "runs far longer than it should, never
+cleanly fails" instead of crashing. **The original two failures that started
+this whole investigation ran on refresh-worker's 4GB `pro`-plan container**
+(`launcherServiceId: srv-d91dpertqb8s73co8ls0`, confirmed from their own
+manifests) — enough headroom to run to completion and hit the real internal
+bug fast and cleanly, which is consistent with this theory: different
+container, different outcome, same command.
+
+**This does NOT implicate the other sports' automatic launches.** Soccer's
+own pregame autorun (live-odds-worker, confirmed enabled, ~4h cadence, see
+the concrete launch-history table above) and the weekly-sports autorun
+(nfl/ncaaf/ncaab, refresh-worker, `phase="live"`) each run in-process inside
+the worker service that already owns that cadence — never inside web. Many
+of both were directly observed completing successfully (`ok=True, rc=0`)
+throughout tonight's polling. **Nothing here suggests those need fixing.**
+
+**What's arguably worth fixing, not urgent, not done here (no code changed
+this pass — investigation only):** `/api/ops/odds-refresh/run` should
+probably dispatch onto refresh-worker (or at minimum accept an explicit
+lane/launch-mode override) for anything beyond a small, cheap refresh,
+rather than defaulting to running arbitrary-size OddsAPI fetches directly
+inside web's 2GB container. This predates tonight — it's a pre-existing gap
+in the ops endpoint, not something introduced by #106/#210/#234's work. It
+took two 13-minute hangs to even notice, which says this endpoint isn't
+routinely used for multi-sport pregame-scale triggers — worth flagging for
+whoever reaches for it next, not an active incident.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,
