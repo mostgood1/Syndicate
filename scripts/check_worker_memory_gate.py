@@ -13,9 +13,20 @@ THE GATE -- "did the floor survive a real slate?"
     WRONG answer: "no kills". A floor that reaches 3GB on a 15-game slate and
     merely fails to cross 4GiB reads as "fine" by kill count and "one game away"
     by margin. The margin is the signal.
-    RIGHT answer: peak container_memory_mb BETWEEN consecutive BOOTED events.
-    Reference: pre-fix per-cycle peaks 2797-4048MB; post-#253 steady state
-    380-870MB. Pass = slate peak under ~1500MB.
+    WRONG answer #2, this tool's OWN until 2026-08-07: peak
+    container_memory_mb. That is cgroup memory.current, which counts CLEAN PAGE
+    CACHE -- 600-1200MB of it on this worker, swinging independently of the
+    workload. A 1500MB bar on that number cannot be met by an IDLE process, and
+    it reported MARGINAL all day against ~2.3GB of real headroom.
+    RIGHT answer: peak accounted_rss_mb BETWEEN consecutive BOOTED events. RSS
+    is the anonymous set -- the part the kernel cannot evict, and therefore the
+    part that gets a container OOM-killed. Both numbers are printed; only RSS is
+    judged. The bar was RE-DERIVED on this basis by measuring RSS at the three
+    real kills of 2026-08-07 rather than carried over from the memory.current
+    observations -- see RSS_LETHAL_MB / GATE_PASS_MB for the measurement.
+    Reference (memory.current basis, so comparable to the CONTAINER column
+    only): pre-fix per-cycle peaks 2797-4048MB; post-#253 steady state
+    380-870MB.
 
 WIN A -- "did #255 work?"
     WRONG answer: "no kills". #255 makes #251 execute for the FIRST TIME (its
@@ -50,9 +61,45 @@ OWNER = "tea-d2bb5n95pdvs73cje4fg"
 
 PREFIX_PEAK_LOW, PREFIX_PEAK_HIGH = 2797.0, 4048.0     # pre-#253 per-cycle peaks
 STEADY_LOW, STEADY_HIGH = 380.0, 870.0                 # post-#253 steady state
-GATE_PASS_MB = 1500.0
+
+# ---------------------------------------------------------------------------
+# The bar, RE-DERIVED ON THE RSS BASIS 2026-08-07.
+#
+# The old 1500MB bar was derived from memory.current observations (the two
+# reference ranges above). Once the gate was corrected to judge accounted_rss_mb,
+# carrying that number across unchanged was a units mismatch -- the same error as
+# barring on memory.current, one layer in. So it was measured instead.
+#
+# MEASURED at the three real OOM kills of 2026-08-07 (14:11:07, 14:14:50,
+# 14:18:47; oomKilled={'memoryLimit': '4Gi'}):
+#
+#   time      container    rss    cache   note
+#   14:02:01     3912.6  3387.8   524.8
+#   14:14:19     3977.7  3476.3   501.4   31s before the 14:14:50 kill
+#   (idle samples the same day carried 1100-1200MB of cache)
+#
+# Two things fall out, and the second is the load-bearing one:
+#
+# 1. Death is at container ~4096MB, as expected.
+# 2. Under real memory pressure the kernel RECLAIMS, and cache compresses to
+#    ~500MB -- the two highest-RSS samples carry the LOWEST cache in the whole
+#    window. So cache is not a fixed tax on the ceiling; it gets out of the way.
+#    The anonymous set can therefore reach ~4096 - 500 = ~3600MB before the
+#    container dies, and the highest RSS actually observed before a kill was
+#    3476.3MB. That is the lethal level on this basis.
+RSS_LETHAL_MB = 3500.0
+
+# Largest within-boot RSS excursion observed on a live slate (21:58:54Z boot:
+# floor 858MB -> peak 1767MB). The bar is the lethal level minus one full
+# excursion, so a worker sitting AT the bar can still absorb its worst observed
+# working-set swing without reaching a kill. Rounded down from 2700 for margin.
+#
+# This is a stated safety rationale, not a number carried over from a different
+# metric -- if you change it, say what evidence moved it.
+GATE_PASS_MB = 2600.0
 
 _CONTAINER_MB = re.compile(r"container_memory_mb[\"']?\s*[:=]\s*([0-9.]+)")
+_ACCOUNTED_RSS_MB = re.compile(r"accounted_rss_mb[\"']?\s*[:=]\s*([0-9.]+)")
 
 
 def _repo_root() -> Path:
@@ -225,17 +272,49 @@ def _oom_kills(key: str, since: datetime) -> list[datetime]:
 
 def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime], window_start: datetime) -> None:
     print("=" * 84)
-    print("GATE -- peak container_memory_mb per boot  (NOT 'no kills')")
+    print("GATE -- peak accounted_rss_mb per boot  (NOT 'no kills', NOT memory.current)")
     print("=" * 84)
 
+    # CORRECTED 2026-08-07. This barred on `container_memory_mb` -- the cgroup's
+    # own memory.current -- which counts RECLAIMABLE PAGE CACHE. Measured on the
+    # 21:58:54Z boot, mid-slate:
+    #
+    #     container_memory_mb  peak 2804.9      <- what this used to judge
+    #     accounted_rss_mb     peak 1766.8      <- the unreclaimable part
+    #     cache + slab              601..1185   <- swings independently
+    #
+    # The cache floor alone runs 600-1200MB, so a 1500MB bar on memory.current
+    # could not be met by an IDLE worker. It was structurally unpassable, not
+    # merely strict, and it reported MARGINAL all day for a worker with ~2.3GB
+    # of real headroom. memory_observability.py:223 already treats
+    # inactive_file + slab_reclaimable as available; this never inherited it.
+    #
+    # The BAR VALUE is deliberately unchanged. Only the metric it points at is
+    # corrected -- the goalposts have not moved, they were aimed at the wrong
+    # field. An OOM kill happens when the anonymous set cannot fit; clean page
+    # cache is evicted first.
+    #
+    # CAVEAT on the reference numbers: PREFIX_PEAK_LOW/HIGH and STEADY_LOW/HIGH
+    # were measured as memory.current, so they OVERSTATE the anon component by
+    # whatever cache was resident at the time. Compare them to the container
+    # column below, never to the RSS column.
+    container_samples: list[tuple[datetime, float]] = []
     samples: list[tuple[datetime, float]] = []
     for row in rows:
         when = _ts(row.get("timestamp"))
         if not when:
             continue
-        hit = _CONTAINER_MB.search(str(row.get("message", "")))
-        if hit:
-            samples.append((when, float(hit.group(1))))
+        message = str(row.get("message", ""))
+        container_hit = _CONTAINER_MB.search(message)
+        if container_hit:
+            container_samples.append((when, float(container_hit.group(1))))
+        # ALL_PROCESS_MEMORY carries both numbers on one line, so the split is
+        # always same-instant -- never pair a container reading with an RSS
+        # reading from a different log line.
+        rss_hit = _ACCOUNTED_RSS_MB.search(message)
+        if rss_hit:
+            samples.append((when, float(rss_hit.group(1))))
+    container_samples.sort()
     samples.sort()
     # Boot boundaries come from the events API, not log text -- see
     # `_boot_boundaries`. If none fall inside the window the process has been up
@@ -243,11 +322,19 @@ def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime],
     boots = sorted(boots) or [window_start]
 
     if not samples:
-        print("  no container_memory_mb samples in window -- cannot judge. NOT a pass.")
+        # A worker that emits CONTAINER_MEMORY but no ALL_PROCESS_MEMORY leaves
+        # the gate unable to separate anon from cache. Say so rather than
+        # silently falling back to the number this fix exists to stop trusting.
+        if container_samples:
+            print(f"  {len(container_samples)} container_memory_mb samples but NO accounted_rss_mb.")
+            print("  memory.current alone cannot separate anon from reclaimable cache, which is")
+            print("  the whole point of this gate. Check that log_all_process_memory() still runs.")
+        else:
+            print("  no memory samples in window -- cannot judge. NOT a pass.")
         return
 
     bounds = boots or [samples[0][0]]
-    print(f"  {'boot':>10} {'window':>9} {'n':>5} {'peak MB':>9} {'final MB':>9}")
+    print(f"  {'boot':>10} {'window':>9} {'n':>5} {'peak RSS':>9} {'final RSS':>10} {'peak cont':>10}")
     peaks = []
     for i, boot in enumerate(bounds):
         end = bounds[i + 1] if i + 1 < len(bounds) else samples[-1][0] + timedelta(seconds=1)
@@ -256,8 +343,13 @@ def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime],
             continue
         peak = max(mb for _, mb in inside)
         peaks.append(peak)
+        # The container column is context, not the verdict: it is what the old
+        # bar judged, kept visible so a reading can be compared against the
+        # historical references and against every verdict quoted before today.
+        container_inside = [mb for t, mb in container_samples if boot <= t < end]
+        container_peak = f"{max(container_inside):>10.1f}" if container_inside else f"{'-':>10}"
         print(f"  {boot:%H:%M:%S} {(end-boot).total_seconds()/60:>8.0f}m {len(inside):>5} "
-              f"{peak:>9.1f} {inside[-1][1]:>9.1f}")
+              f"{peak:>9.1f} {inside[-1][1]:>10.1f} {container_peak}")
 
     if not peaks:
         print("  no samples inside any boot window. NOT a pass.")
@@ -279,12 +371,25 @@ def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime],
     kills_current = [k for k in kills if k >= current_boot]
     kills_earlier = [k for k in kills if k < current_boot]
 
+    current_container = [mb for t, mb in container_samples if t >= current_boot]
+
     print()
     print(f"  CURRENT BOOT {current_boot:%H:%M:%S}  uptime {current_span:.0f}m  "
-          f"PEAK {current_peak:.1f}MB   <-- this is the number that matters")
-    print(f"  worst peak anywhere in window: {worst:.1f}MB (context only; earlier boots may predate the fix)")
-    print(f"  reference: pre-fix cycles {PREFIX_PEAK_LOW:.0f}-{PREFIX_PEAK_HIGH:.0f}MB, "
-          f"container limit 4096MB, pass bar {GATE_PASS_MB:.0f}MB")
+          f"PEAK RSS {current_peak:.1f}MB   <-- this is the number that matters")
+    if current_container:
+        cache_gap = max(current_container) - current_peak
+        print(f"  same boot, memory.current peaked {max(current_container):.1f}MB "
+              f"-- {cache_gap:.0f}MB of it reclaimable cache, NOT a kill risk")
+    print(f"  worst RSS peak anywhere in window: {worst:.1f}MB (context only; earlier boots may predate the fix)")
+    print(f"  reference (memory.current basis -- compare to the container column, NOT to RSS):")
+    print(f"    pre-fix cycles {PREFIX_PEAK_LOW:.0f}-{PREFIX_PEAK_HIGH:.0f}MB, "
+          f"steady state {STEADY_LOW:.0f}-{STEADY_HIGH:.0f}MB")
+    print(f"  RSS basis: lethal ~{RSS_LETHAL_MB:.0f}MB (measured 3476MB 31s before a real kill;")
+    print(f"             cache compresses to ~500MB under pressure, so anon can reach ~3600)")
+    print(f"  container limit 4096MB, pass bar {GATE_PASS_MB:.0f}MB RSS "
+          f"= lethal minus one full observed excursion")
+    if current_peak >= RSS_LETHAL_MB:
+        print(f"  !! current peak is AT OR ABOVE the measured lethal level")
     print(f"  OOM kills since current boot: {len(kills_current)}")
     if kills_earlier:
         print(f"  ({len(kills_earlier)} earlier kills in the window predate this boot -- not counted)")
@@ -295,10 +400,10 @@ def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime],
         print(f"  VERDICT: TOO EARLY -- {current_span:.0f}m uptime. The floor is a function of")
         print("           time-since-boot, so a young boot always looks good. Wait.")
     elif current_peak < GATE_PASS_MB:
-        print(f"  VERDICT: PASS -- current boot peaked at {current_peak:.0f}MB over {current_span:.0f}m,")
+        print(f"  VERDICT: PASS -- current boot peaked at {current_peak:.0f}MB RSS over {current_span:.0f}m,")
         print(f"           under the {GATE_PASS_MB:.0f}MB bar, with {4096 - current_peak:.0f}MB of headroom.")
     else:
-        print(f"  VERDICT: MARGINAL -- no kills, but the current boot peaked at {current_peak:.0f}MB,")
+        print(f"  VERDICT: MARGINAL -- no kills, but the current boot peaked at {current_peak:.0f}MB RSS,")
         print(f"           over the {GATE_PASS_MB:.0f}MB bar. {4096 - current_peak:.0f}MB headroom left.")
         print("           Survived on margin, not headroom. Find out why the floor is climbing")
         print("           before deploying anything on top of it.")
