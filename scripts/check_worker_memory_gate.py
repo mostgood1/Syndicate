@@ -38,6 +38,8 @@ import argparse
 import json
 import re
 import statistics
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -69,12 +71,27 @@ def _render_key() -> str:
     raise SystemExit("RENDER_API_KEY not found in .env")
 
 
-def _api(path: str, params: dict | None = None, *, key: str):
+def _api(path: str, params: dict | None = None, *, key: str, attempts: int = 5):
+    """Render's logs API rate-limits, and a dropped window is not a neutral
+    failure here -- 429s land on the MOST RECENT chunks (they are requested
+    last), which is exactly the data the gate depends on. A silent gap would
+    read as 'quiet worker'. So: back off and retry, and pace every call."""
     url = "https://api.render.com/v1" + path
     if params:
         url += "?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key}", "Accept": "application/json"})
-    return json.loads(urllib.request.urlopen(req, timeout=180).read())
+    delay = 2.0
+    for attempt in range(1, attempts + 1):
+        try:
+            body = json.loads(urllib.request.urlopen(req, timeout=180).read())
+            time.sleep(0.35)  # pace: stay under the limit rather than recover from it
+            return body
+        except urllib.error.HTTPError as exc:
+            if exc.code != 429 or attempt == attempts:
+                raise
+            time.sleep(delay)
+            delay *= 2
+    raise RuntimeError("unreachable")
 
 
 def _ts(value) -> datetime | None:
@@ -84,31 +101,71 @@ def _ts(value) -> datetime | None:
         return None
 
 
+_LOG_LIMIT = 1000
+_MIN_CHUNK_SECONDS = 60
+
+
+def _fetch_log_chunk(key: str, start: datetime, end: datetime, depth: int = 0) -> list[dict]:
+    """One window, SUBDIVIDED whenever it comes back full.
+
+    A chunk that returns exactly `limit` rows is truncated, and the rows you did
+    not get are silently missing -- which is how the first version of this tool
+    reported two different "current boot" values for the same worker depending on
+    the lookback: busy hours hit the cap, later BOOTED lines fell off, and the
+    kill attribution keyed off an hours-old boot.
+
+    Silent truncation reading as complete data is the exact error class this
+    whole incident was made of, so it is detected rather than hoped against.
+    """
+    try:
+        resp = _api(
+            "/logs",
+            {
+                "ownerId": OWNER,
+                "resource": REFRESH_WORKER,
+                "limit": _LOG_LIMIT,
+                "startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "endTime": end.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+            key=key,
+        )
+        rows = (resp.get("logs") if isinstance(resp, dict) else resp) or []
+    except Exception as exc:
+        print(f"  ! log window {start:%H:%M:%S}-{end:%H:%M:%S} failed: {exc}")
+        return []
+
+    span = (end - start).total_seconds()
+    if len(rows) < _LOG_LIMIT or span <= _MIN_CHUNK_SECONDS or depth >= 8:
+        if len(rows) >= _LOG_LIMIT:
+            print(f"  ! {start:%H:%M:%S}-{end:%H:%M:%S} still truncated at {len(rows)} rows "
+                  f"({span:.0f}s) -- some lines in this window are NOT accounted for")
+        return rows
+
+    mid = start + timedelta(seconds=span / 2)
+    return _fetch_log_chunk(key, start, mid, depth + 1) + _fetch_log_chunk(key, mid, end, depth + 1)
+
+
 def _fetch_logs(key: str, start: datetime, end: datetime) -> list[dict]:
     """The logs API returns inconsistent windows for a bare `limit`, so always
-    pass explicit start/end, and chunk so a long lookback is not silently
-    truncated to the most recent slice."""
+    pass explicit start/end. Chunks are subdivided on truncation -- see
+    `_fetch_log_chunk`."""
     rows: list[dict] = []
     cursor = start
     while cursor < end:
-        chunk_end = min(cursor + timedelta(hours=1), end)
-        try:
-            resp = _api(
-                "/logs",
-                {
-                    "ownerId": OWNER,
-                    "resource": REFRESH_WORKER,
-                    "limit": 1000,
-                    "startTime": cursor.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                    "endTime": chunk_end.strftime("%Y-%m-%dT%H:%M:%SZ"),
-                },
-                key=key,
-            )
-            rows.extend((resp.get("logs") if isinstance(resp, dict) else resp) or [])
-        except Exception as exc:
-            print(f"  ! log window {cursor:%H:%M}-{chunk_end:%H:%M} failed: {exc}")
+        chunk_end = min(cursor + timedelta(minutes=30), end)
+        rows.extend(_fetch_log_chunk(key, cursor, chunk_end))
         cursor = chunk_end
-    return rows
+
+    # Dedupe: subdivision can re-fetch boundary rows.
+    seen: set[tuple] = set()
+    unique: list[dict] = []
+    for row in rows:
+        marker = (str(row.get("timestamp")), str(row.get("message"))[:200])
+        if marker in seen:
+            continue
+        seen.add(marker)
+        unique.append(row)
+    return unique
 
 
 def _oom_kills(key: str, since: datetime) -> list[datetime]:
@@ -174,7 +231,14 @@ def section_gate(rows: list[dict], kills: list[datetime]) -> None:
         print("  no samples inside any boot window. NOT a pass.")
         return
 
+    # Judge the CURRENT boot, not the worst boot in the window. A lookback that
+    # reaches into the outage contains 4GB peaks from builds that were dying
+    # every four minutes; verdicting on max(all boots) reports FAIL forever and
+    # is the same "which population am I measuring" error as counting kills
+    # across the whole window. `worst` is kept for context only.
     worst = max(peaks)
+    current_peak = peaks[-1]
+    current_span = (samples[-1][0] - bounds[-1]).total_seconds() / 60
     # Kills BEFORE the current boot belong to whatever was running then -- almost
     # always the outage itself. Counting them against the current build reports
     # FAIL forever for any window that reaches back far enough, which is exactly
@@ -184,21 +248,28 @@ def section_gate(rows: list[dict], kills: list[datetime]) -> None:
     kills_earlier = [k for k in kills if k < current_boot]
 
     print()
-    print(f"  WORST PEAK: {worst:.1f}MB   (pre-fix cycles were {PREFIX_PEAK_LOW:.0f}-{PREFIX_PEAK_HIGH:.0f}MB;"
-          f" post-#253 early samples were {STEADY_LOW:.0f}-{STEADY_HIGH:.0f}MB)")
-    print(f"  OOM kills since current boot ({current_boot:%H:%M:%S}): {len(kills_current)}")
+    print(f"  CURRENT BOOT {current_boot:%H:%M:%S}  uptime {current_span:.0f}m  "
+          f"PEAK {current_peak:.1f}MB   <-- this is the number that matters")
+    print(f"  worst peak anywhere in window: {worst:.1f}MB (context only; earlier boots may predate the fix)")
+    print(f"  reference: pre-fix cycles {PREFIX_PEAK_LOW:.0f}-{PREFIX_PEAK_HIGH:.0f}MB, "
+          f"container limit 4096MB, pass bar {GATE_PASS_MB:.0f}MB")
+    print(f"  OOM kills since current boot: {len(kills_current)}")
     if kills_earlier:
         print(f"  ({len(kills_earlier)} earlier kills in the window predate this boot -- not counted)")
 
     if kills_current:
         print("  VERDICT: FAIL -- killed on the CURRENT build. Do not proceed to WIN A.")
-    elif worst < GATE_PASS_MB:
-        print(f"  VERDICT: PASS -- worst peak {worst:.0f}MB is under the {GATE_PASS_MB:.0f}MB bar.")
+    elif current_span < 30:
+        print(f"  VERDICT: TOO EARLY -- {current_span:.0f}m uptime. The floor is a function of")
+        print("           time-since-boot, so a young boot always looks good. Wait.")
+    elif current_peak < GATE_PASS_MB:
+        print(f"  VERDICT: PASS -- current boot peaked at {current_peak:.0f}MB over {current_span:.0f}m,")
+        print(f"           under the {GATE_PASS_MB:.0f}MB bar, with {4096 - current_peak:.0f}MB of headroom.")
     else:
-        print(f"  VERDICT: MARGINAL -- no kills, but worst peak {worst:.0f}MB exceeds "
-              f"{GATE_PASS_MB:.0f}MB.")
-        print("           Survived on margin, not headroom. Treat as a fail and find out why")
-        print("           the floor is climbing before deploying anything on top of it.")
+        print(f"  VERDICT: MARGINAL -- no kills, but the current boot peaked at {current_peak:.0f}MB,")
+        print(f"           over the {GATE_PASS_MB:.0f}MB bar. {4096 - current_peak:.0f}MB headroom left.")
+        print("           Survived on margin, not headroom. Find out why the floor is climbing")
+        print("           before deploying anything on top of it.")
 
 
 def section_win_a(rows: list[dict]) -> None:
