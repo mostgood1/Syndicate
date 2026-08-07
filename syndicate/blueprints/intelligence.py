@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, jsonify, make_response, render_template, request
 from flask import redirect
 
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
@@ -2244,6 +2244,43 @@ def board_book_grid_api():
                 "rows": grid[:limit],
                 "server_time": _server_timestamp(),
             }
+        )
+    )
+
+
+@intelligence_bp.get("/market-board/books")
+def market_board_books_page():
+    """L1-A, the book grid — the BOOK VIEW of the Layer 1 market board (S1).
+
+    Lives under `/market-board` on purpose. That hub already is the Layer 1
+    family — its own copy reads "every quoted line for every game … not just
+    the recommendation engine's picks" — and routes to `/<sport>/market-board`
+    per sport. This is the same inventory pivoted by BOOK instead of by game, so
+    it belongs in that family rather than as an orphan page.
+
+    It is NOT part of Layer 2 and does not replace it. `/` is the consolidated
+    L2 recommendation surface; that answers "what should I bet". This answers
+    "show me every price". Collapsing them would lose the shortlist, which is
+    the product.
+
+    Sport-switchable in one page rather than one route per sport, because the
+    grid is identical across sports — only the market vocabulary differs, and
+    that comes from the data.
+    """
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    sport = str(request.args.get("sport") or "mlb").strip().lower()
+    sports = ["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"]
+    if sport not in sports:
+        sport = "mlb"
+    return _no_cache_response(
+        make_response(
+            render_template(
+                "book_grid.html",
+                sport=sport,
+                sports=sports,
+                selected_date=selected_date,
+                nav_path=request.path,
+            )
         )
     )
 

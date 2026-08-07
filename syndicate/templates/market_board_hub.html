@@ -31,6 +31,15 @@
       available, not just the recommendation engine's picks. Pick a sport to see its full inventory.
     </p>
     <div class="market-board-hub__grid">
+      {# S1/L1-A: the same Layer 1 inventory pivoted by BOOK rather than by
+         game. Listed first because it is the only view that shows all books at
+         once -- the per-sport boards below show one price per market. #}
+      <a class="market-board-hub__tile market-board-hub__tile--books"
+         href="/market-board/books{% if nav_date %}?date={{ nav_date }}{% endif %}">
+        <h2>Book Grid</h2>
+        <p>Every book's price side by side, with best price, consensus and no-vig. Thin or stale
+           quotes are shown greyed with the reason rather than hidden.</p>
+      </a>
       {% for sport in sports %}
         <a class="market-board-hub__tile" href="/{{ sport.slug }}/market-board{% if nav_date %}?date={{ nav_date }}{% endif %}">
           <h2>{{ sport.name }}</h2>

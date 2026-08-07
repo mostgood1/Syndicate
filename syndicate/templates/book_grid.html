@@ -1,0 +1,187 @@
+{% extends "shared/base.html" %}
+
+{% block title %}Syndicate | Market Board — Book Grid{% endblock %}
+{% block page_title %}Market Board — Book Grid{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* L1-A. Dense by design: the point is to see every book at once, so the grid
+     is scrolled horizontally inside its own container rather than wrapped. */
+  .bg-wrap { padding: 0 12px 40px; }
+  .bg-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+  .bg-controls select, .bg-controls input {
+    background: #131a24; color: #e8eef7; border: 1px solid #26313f;
+    border-radius: 6px; padding: 6px 9px; font-size: 13px;
+  }
+  .bg-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+  .bg-tab {
+    padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 12px;
+    background: #141b25; color: #9fb0c6; border: 1px solid #26313f; white-space: nowrap;
+  }
+  .bg-tab--on { background: #1d4ed8; color: #fff; border-color: #2563eb; }
+
+  .bg-summary { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #9fb0c6; margin-bottom: 10px; }
+  .bg-summary b { color: #e8eef7; }
+  .bg-warn { color: #f0b429; }
+
+  .bg-scroll { overflow-x: auto; border: 1px solid #1e2733; border-radius: 8px; }
+  table.bg { border-collapse: collapse; width: 100%; font-size: 12px; }
+  table.bg th, table.bg td { padding: 5px 8px; border-bottom: 1px solid #1a2230; text-align: right; white-space: nowrap; }
+  table.bg th { position: sticky; top: 0; background: #0f151d; color: #8fa2b8; font-weight: 600; z-index: 2; }
+  table.bg td.bg-mkt, table.bg th.bg-mkt { text-align: left; position: sticky; left: 0; background: #0f151d; z-index: 1; }
+  table.bg tr:hover td { background: #121a24; }
+
+  .bg-side { color: #8fa2b8; font-size: 11px; }
+  .bg-price { font-variant-numeric: tabular-nums; }
+  .bg-best { color: #34d399; font-weight: 700; }
+  /* Greyed WITH A REASON -- never hidden. The reason is served by the API. */
+  .bg-stale { color: #5b6675; text-decoration: underline dotted; cursor: help; }
+  .bg-missing { color: #2b3543; }
+  .bg-gap { color: #f0b429; font-size: 11px; cursor: help; }
+  .bg-meta { color: #7d8ea4; font-size: 11px; }
+  .bg-empty { padding: 30px; text-align: center; color: #7d8ea4; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bg-wrap">
+  <div class="bg-controls">
+    <label class="bg-meta">Sport
+      <select id="bg-sport">
+        {% for slug in sports %}<option value="{{ slug }}"{% if slug == sport %} selected{% endif %}>{{ slug|upper }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="bg-meta">Date <input type="date" id="bg-date" value="{{ selected_date }}" /></label>
+    <button class="bg-tab" id="bg-refresh">Refresh</button>
+    <a class="bg-tab" href="/market-board">&larr; Market Board</a>
+    <span class="bg-meta" id="bg-status">loading…</span>
+  </div>
+
+  <div class="bg-tabs" id="bg-market-tabs"></div>
+  <div class="bg-summary" id="bg-summary"></div>
+  <div class="bg-scroll"><table class="bg"><thead id="bg-head"></thead><tbody id="bg-body"></tbody></table></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  // Game lines first: they carry the widest book coverage (11 of 11 on MLB),
+  // so the grid opens on the markets that actually look like a grid. Props are
+  // thinner and are one tab away.
+  var GAME_LINES = ["h2h", "spreads", "totals"];
+  var state = { market: "h2h", markets: [], rows: [], summary: {} };
+
+  function el(id) { return document.getElementById(id); }
+  function fmtPrice(p) { return p === null || p === undefined ? "" : (p > 0 ? "+" + p : String(p)); }
+
+  function load() {
+    var sport = el("bg-sport").value;
+    var date = el("bg-date").value;
+    el("bg-status").textContent = "loading…";
+    fetch("/api/board/book-grid?sport=" + encodeURIComponent(sport) + "&date=" + encodeURIComponent(date) + "&limit=400")
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        state.rows = d.rows || [];
+        state.summary = d.summary || {};
+        state.markets = d.markets || [];
+        if (state.markets.indexOf(state.market) === -1) {
+          // Prefer a game line, then whatever exists.
+          var pick = GAME_LINES.filter(function (m) { return state.markets.indexOf(m) !== -1; })[0];
+          state.market = pick || state.markets[0] || "";
+        }
+        el("bg-status").textContent = d.total_rows + " markets · " + (d.summary || {}).distinct_books + " books";
+        renderTabs(); renderSummary(); renderGrid();
+      })
+      .catch(function (err) { el("bg-status").textContent = "failed: " + err; });
+  }
+
+  function renderTabs() {
+    var ordered = GAME_LINES.filter(function (m) { return state.markets.indexOf(m) !== -1; })
+      .concat(state.markets.filter(function (m) { return GAME_LINES.indexOf(m) === -1; }));
+    el("bg-market-tabs").innerHTML = ordered.map(function (m) {
+      return '<span class="bg-tab' + (m === state.market ? " bg-tab--on" : "") + '" data-m="' + m + '">' + m + "</span>";
+    }).join("");
+    Array.prototype.forEach.call(el("bg-market-tabs").children, function (node) {
+      node.onclick = function () { state.market = node.getAttribute("data-m"); renderTabs(); renderGrid(); };
+    });
+  }
+
+  function renderSummary() {
+    var s = state.summary || {};
+    // Coverage describes the SLATE, not the current tab -- the API summarises
+    // before filtering, deliberately.
+    el("bg-summary").innerHTML =
+      "<span><b>" + (s.rows || 0) + "</b> markets</span>" +
+      "<span><b>" + (s.distinct_books || 0) + "</b> books</span>" +
+      "<span><b>" + (s.pct_3plus_books || 0) + "%</b> with 3+ books</span>" +
+      "<span><b>" + (s.pct_two_sided || 0) + "%</b> two-sided</span>" +
+      '<span class="bg-warn">' + (s.rows_single_book || 0) + " single-book · " +
+        (s.rows_with_suspect_best || 0) + " stale best</span>" +
+      '<span class="bg-meta">coverage is for the whole slate, not this tab</span>';
+  }
+
+  function renderGrid() {
+    var rows = state.rows.filter(function (r) { return r.market === state.market; });
+    if (!rows.length) {
+      el("bg-head").innerHTML = "";
+      el("bg-body").innerHTML = '<tr><td class="bg-empty">No captured markets for this selection.</td></tr>';
+      return;
+    }
+    // Column set = every book seen in this tab, so the grid does not carry
+    // empty columns for books that never quote this market.
+    var books = [];
+    rows.forEach(function (r) { (r.books || []).forEach(function (b) { if (books.indexOf(b) === -1) books.push(b); }); });
+    books.sort();
+
+    el("bg-head").innerHTML = "<tr><th class='bg-mkt'>Market</th><th>Side</th><th>Best</th><th>Consensus</th>" +
+      books.map(function (b) { return "<th>" + b + "</th>"; }).join("") + "<th>Updated</th></tr>";
+
+    var html = [];
+    rows.forEach(function (r) {
+      var label = (r.player_name ? r.player_name : (r.away_team || "") + " @ " + (r.home_team || ""));
+      var lineTxt = (r.line === null || r.line === undefined) ? "" : " " + r.line;
+      (r.sides || []).forEach(function (side, idx) {
+        var best = (r.best || {})[side] || {};
+        var cells = books.map(function (b) {
+          var cell = ((r.cells || {})[b] || {})[side];
+          if (!cell || cell.price === null || cell.price === undefined) {
+            return '<td class="bg-missing">·</td>';
+          }
+          var cls = "bg-price";
+          var title = b + " · " + (cell.observed_at || "");
+          if (cell.stale) { cls += " bg-stale"; title = cell.reason || title; }
+          else if (best.bookmaker === b) { cls += " bg-best"; }
+          return '<td class="' + cls + '" title="' + title.replace(/"/g, "&quot;") + '">' + fmtPrice(cell.price) + "</td>";
+        }).join("");
+
+        var gapMark = "";
+        if (idx === 0 && r.gaps && r.gaps.length) {
+          gapMark = ' <span class="bg-gap" title="' + r.gaps.join(" · ").replace(/"/g, "&quot;") + '">&#9888;</span>';
+        }
+        var bestTxt = fmtPrice(best.price);
+        if (best.suspect_stale) { bestTxt = '<span class="bg-stale" title="' + String(r.gaps.join(" · ")).replace(/"/g, "&quot;") + '">' + bestTxt + "</span>"; }
+        else if (best.price !== undefined) { bestTxt = '<span class="bg-best">' + bestTxt + "</span>"; }
+
+        html.push(
+          "<tr>" +
+          (idx === 0 ? '<td class="bg-mkt" rowspan="' + r.sides.length + '">' + label + lineTxt + gapMark + "</td>" : "") +
+          '<td class="bg-side">' + side + "</td>" +
+          "<td>" + bestTxt + "</td>" +
+          '<td class="bg-meta">' + fmtPrice((r.consensus || {})[side]) + "</td>" +
+          cells +
+          (idx === 0 ? '<td class="bg-meta" rowspan="' + r.sides.length + '">' + (r.age_seconds === null ? "?" : Math.round(r.age_seconds / 60) + "m") + "</td>" : "") +
+          "</tr>"
+        );
+      });
+    });
+    el("bg-body").innerHTML = html.join("");
+  }
+
+  el("bg-refresh").onclick = load;
+  el("bg-sport").onchange = load;
+  el("bg-date").onchange = load;
+  load();
+})();
+</script>
+{% endblock %}
