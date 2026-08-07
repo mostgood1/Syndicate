@@ -94,6 +94,11 @@ def _markets_compatible(record_market: Any, row_market: Any, sport: Any) -> bool
     allow the match when neither can: an unknown market must not silently veto a
     row that every other signal says is right.
     """
+    # Hoisted out of the try: #259's check below reads these, and leaving them
+    # scoped to a block that can raise makes a NameError the failure mode of an
+    # import problem.
+    record_key: str | None = None
+    row_key: str | None = None
     try:
         from syndicate.features.shared.market_keys import canonical_market_key
 
@@ -107,6 +112,50 @@ def _markets_compatible(record_market: Any, row_market: Any, sport: Any) -> bool
     row_family = _market_family(row_market)
     if record_family and row_family:
         return record_family == row_family
+
+    # #259: an ABSENT market is not a compatible one.
+    #
+    # #247's fallback ("allow when neither side can answer") is right for two
+    # UNKNOWN vocabularies -- an unrecognised market must not veto a row every
+    # other signal says is right. It is wrong when a side is simply EMPTY.
+    # Measured on the real ledger 2026-08-07:
+    #
+    #     _markets_compatible("", "outs")      -> True
+    #     _markets_compatible("", "home_runs") -> True
+    #
+    # An empty market matched EVERY market, and 127 of 1,384 ledger records
+    # (9%) carry one. Combined with the overlapping identity keys #247 itself
+    # documents, that is precisely the failure #247 was written to prevent --
+    # a record settling against the wrong market -- reintroduced through the
+    # empty case rather than the mismatched one.
+    #
+    # "I don't recognise this market" and "there is no market here" are
+    # different states, and only the first deserves the benefit of the doubt.
+    #
+    # The refusal is narrow on purpose -- it fires only when one side is EMPTY
+    # and the other resolves to a REAL canonical market. Everything else keeps
+    # #247's benefit of the doubt, and its own tests pin both:
+    #
+    #   ("", "")                      -> allow. Neither party claims a market,
+    #                                    so the gate has no opinion and identity
+    #                                    and line decide.
+    #   ("some_unknown_market", "")   -> allow. An unrecognised vocabulary must
+    #                                    not veto a row every other signal says
+    #                                    is right. That is what #247 fixed.
+    #   ("", "outs")                  -> REFUSE. `outs` is a known market; the
+    #                                    record names none. There is nothing to
+    #                                    agree with, so "compatible" is a claim
+    #                                    nobody made.
+    #
+    # Only the third case is new, and it is the one measured on real data:
+    # 127 of 1,384 ledger records (9%) carry an empty market, and each matched
+    # outs, home_runs, strikeouts and every other market equally.
+    record_present = bool(str(record_market or "").strip())
+    row_present = bool(str(row_market or "").strip())
+    if record_present != row_present:
+        known_side = row_key if record_present is False else record_key
+        if known_side:
+            return False
     return True
 
 
