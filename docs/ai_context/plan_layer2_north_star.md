@@ -444,6 +444,40 @@ which makes S0b's ~4.13M projection land nearer 79% than 82.6%.
 *(The API's own header reports a 15M cap. Per the standing note, do not believe
 it — 5M is the contracted figure and every projection here uses it.)*
 
+### S0b — CODE SHIPPED 2026-08-07, ships DARK until two env vars are set
+
+**"`eu` and `us_ex` on game lines only" was not expressible before this.**
+`regions` was a single flat string (`ops_refresh.py`, `live_refresh_loop.py`)
+threaded to every fetch, so adding a region added it to the *prop* calls too --
+and props bill per EVENT while game lines bill per REQUEST. Measured S0:
+per-event families are **95.5% of all credits**, so the same region costs
+~30K/month on game lines and ~1M on props. Setting the flat var to the plan's
+target would not have implemented the plan; it would have blown the cap.
+
+`_game_line_regions()` in `scripts/fetch_mlb_oddsapi_local.py` (the module
+`refresh_mlb_oddsapi.py:165` actually loads -- "local" there means
+*Syndicate-owned*, not local-only) merges an EXTRAS list into the game-line call
+only. Extras, deliberately: a bad value can widen coverage but can never drop
+`us` and empty the board. Unset = exactly today's behaviour.
+
+Both lists are reported on the fetch result (`regions`, `game_line_regions`) so
+production can *prove* it took effect -- rule 10.
+
+**To activate** (both vars, all three services; an env change needs a DEPLOY, a
+restart does not re-inject):
+```
+SYNDICATE_LIVE_ODDS_REFRESH_REGIONS   = us,us2
+SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS = eu,us_ex
+```
+9 tests, including one asserting the prop calls stay on the base list -- that is
+the ~1M/month mistake, and it now fails loudly.
+
+**Still to do after activation:** make `consensus_fair_probability` PREFER the
+sharp books, or Pinnacle/Betfair are three votes among thirty-eight.
+
+<details>
+<summary>original S0b plan</summary>
+
 ### S0b — enable the three regions, scoped (config, minutes)
 `us2` everywhere; `eu` and `us_ex` on **game lines only** (~30K/month each).
 Lands at ~4.13M/month = 82.6% of cap before any lever. Then make
@@ -451,6 +485,8 @@ Lands at ~4.13M/month = 82.6% of cap before any lever. Then make
 and the exchanges are just three votes among thirty-eight.
 *Exit:* the L1-A grid shows 25 more books and `no_vig_fair` is anchored on
 Pinnacle/Betfair rather than a consensus of retail books.
+
+</details>
 
 ### S1 — L1-A, the book grid, PREGAME (days, serve-time only)
 Pivot `book_quotes` into per-book columns. Best-price highlight, `books_quoting`,

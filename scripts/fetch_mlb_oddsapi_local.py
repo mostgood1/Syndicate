@@ -1561,6 +1561,39 @@ def _append_mlb_book_quotes(date_str: str, rows: list[dict[str, Any]]) -> dict[s
         return None
 
 
+def _game_line_regions(regions: str) -> str:
+    """Regions for the GAME-LINE call only, from the base list plus S0b's extras.
+
+    THE SPLIT IS A BILLING FACT, NOT A PREFERENCE. OddsAPI bills game lines
+    per REQUEST and player props per EVENT, and measured on production
+    2026-08-07 the per-event families (props + segment + alternate) are
+    **95.5% of all credits**. So a region added to the game-line call costs
+    roughly 30K/month, while the same region added to the prop calls costs
+    ~1M. Wiring both through one flat `regions` string is what made the plan's
+    "eu and us_ex on game lines only" inexpressible.
+
+    Configured by `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` as EXTRAS, not a
+    replacement: the base `regions` is always kept, so a misconfigured value
+    can widen coverage but can never silently drop `us`. Unset (the default) is
+    exactly today's behaviour, which is why this can ship before the env var
+    exists anywhere.
+
+    Order-preserving dedupe so `us` stays first and a region named twice is
+    not billed twice.
+    """
+    extra = str(os.environ.get("SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS") or "").strip()
+    if not extra:
+        return regions
+    seen: set[str] = set()
+    merged: list[str] = []
+    for candidate in list(str(regions or "").split(",")) + list(extra.split(",")):
+        name = candidate.strip().lower()
+        if name and name not in seen:
+            seen.add(name)
+            merged.append(name)
+    return ",".join(merged) or regions
+
+
 def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = None, overwrite: bool = True, regions: str = "us", bookmakers: str | None = None, hitter_markets: list[str] | None = None) -> dict[str, Any]:
     _load_env()
     api_key = os.environ.get("ODDS_API_KEY") or os.environ.get("ODDSAPI_KEY")
@@ -1583,7 +1616,11 @@ def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = 
     if not overwrite and game_lines_path.exists() and pitcher_props_path.exists() and hitter_props_path.exists():
         return {"status": "skipped", "date": str(date_str), "out_dir": str(target_dir), "game_lines_path": str(game_lines_path), "pitcher_props_path": str(pitcher_props_path), "hitter_props_path": str(hitter_props_path), "reason": "overwrite=off and market files already exist"}
     live_events = _fetch_live_events_for_date(api_key, date_str)
-    game_lines_doc = fetch_live_game_lines_for_date(api_key, date_str, regions=regions, bookmakers=bookmakers, events=live_events)
+    # S0b: extra regions on GAME LINES ONLY. See _game_line_regions -- the split
+    # is a billing fact, not a preference, and applying these to the prop calls
+    # below would multiply spend by ~30x for the same regions.
+    game_lines_regions = _game_line_regions(regions)
+    game_lines_doc = fetch_live_game_lines_for_date(api_key, date_str, regions=game_lines_regions, bookmakers=bookmakers, events=live_events)
     pitcher_props_doc = fetch_live_pitcher_props_for_date(api_key, date_str, regions=regions, bookmakers=bookmakers, events=live_events)
     hitter_props_doc = fetch_live_hitter_props_for_date(api_key, date_str, regions=regions, bookmakers=bookmakers, markets=hitter_markets, events=live_events)
     # #209: drain the per-book quotes BEFORE the preserve-existing fallbacks
@@ -1618,6 +1655,13 @@ def fetch_and_write_live_odds_for_date(date_str: str, *, out_dir: Path | None = 
         "status": ("warning" if warnings else "ok"),
         "date": str(date_str),
         "mode": "live",
+        # Both region lists are reported because they can now legitimately
+        # differ (S0b). Without this there is no way to confirm from an artifact
+        # that the game-line widening actually took effect -- and a change that
+        # cannot be shown to have run is not evidence about the idea it
+        # implements (post-mortem rule 10).
+        "regions": regions,
+        "game_line_regions": game_lines_regions,
         "out_dir": str(target_dir),
         "game_lines_path": str(game_lines_path),
         "pitcher_props_path": str(pitcher_props_path),
