@@ -219,26 +219,73 @@ not an engineering project.
 2026-08-07 15:15Z = 399,211 over 5.88 days = **67,844/day = 2.04M/month**. This
 confirms the inherited plan's "2.02M/5M base" — that figure was right.
 
-Cost model is `credits = markets x regions`, so adding a region adds ~1x the
-current burn for whatever slice it is applied to.
+**CAP CONFIRMED: 5,000,000.** The 14.58M the headers report is not real.
 
-| option | added/mo | cumulative | % of 5M | % of 15M |
-|---|---|---|---|---|
-| baseline (`us`) | — | 2,035,317 | 40.7% | 13.6% |
-| 1. `eu` (**Pinnacle**) → game lines only | +998,773 | 3,034,090 | 60.7% | 20.2% |
-| 2. `us2` → everything | +2,035,317 | 5,069,406 | **101.4%** | 33.8% |
-| 3. `us_ex` + `uk` → game lines only | +1,997,546 | 7,066,952 | **141.3%** | 47.1% |
+### The cost structure — props are 98.5% of the bill
 
-**All three = 7.07M/month: impossible on a 5M cap, comfortable (47%) on 15M.**
+Everything else in this section follows from one fact: **OddsAPI serves player
+props only from `/events/{id}/odds`, so props cost ONE REQUEST PER EVENT**, while
+game lines are one request per *sport*. Measured on MLB:
 
-### The decision reduces to one question
+```
+game lines :  1 request  x  3 markets  =    3 credits per poll
+props      : 18 requests x 11 markets  =  198 credits per poll
+                                       -> props are 98.5% of cost, ~45% of rows
+```
 
-**Is the cap 5M or 15M?** Headers report 14.58M remaining; a standing operational
-note says the headers lie and the real cap is 5M. That note is now worth the
-entire book strategy. **Confirm with OddsAPI before spending anything.**
+An earlier draft of this section priced regions off *row share* (49% game /
+45% props) and was wrong by a factor of ~33 on the game-line adds. **Cost share
+and row share are not the same quantity.** Corrected:
 
-- **If 5M:** option 1 only. `us2` alone breaks the cap.
-- **If 15M:** take all three and stop worrying.
+| apply a region to… | added/month |
+|---|---|
+| **game lines only** | **+30,378** — effectively free |
+| props only | +2,004,942 — nearly doubles the bill |
+| everything | +2,035,320 |
+
+### The decision, priced correctly
+
+| configuration | /month | % of 5M cap |
+|---|---|---|
+| NAIVE — all three regions on everything | 8,141,280 | **163%** — impossible |
+| **SCOPED — `us2` everywhere, `eu`+`us_ex` on game lines only** | **4,131,396** | **82.6% — fits today** |
+
+`us2` costs real money because its value is *prop price-shopping*, which is the
+expensive family. `eu` and `us_ex` are fair-value anchors, only ever needed on
+game lines, and are therefore nearly free. Take all three.
+
+### Savings levers, to make room for live
+
+Applied to the scoped 4.13M. **Percentages marked ASSUMED need the
+`by_market_family` telemetry to confirm** — they are not measured.
+
+| lever | assumption | running total | % of cap |
+|---|---|---|---|
+| start | — | 4,131,396 | 82.6% |
+| **L1** event-scope props to board-eligible games only | ASSUMED 25% | 3,098,547 | 62.0% |
+| **L2** cadence by time-to-start (far games hourly) | ASSUMED 30% | 2,168,983 | 43.4% |
+| **L3** prune low-value prop markets | ~measured 10% | 1,952,085 | 39.0% |
+| **L4** off-hours gate | ASSUMED 10% | 1,756,876 | 35.1% |
+
+If the levers land anywhere near this, the configuration sits at **~35% of cap
+with ~3.2M/month free for the live tier** — which is what makes live props
+affordable at all (MLB live props alone are ~756K/month at 60s).
+
+L1 and L2 are the two that matter and both are real engineering, not config.
+
+### An open question worth answering early
+
+**MLB is only ~16% of measured spend** (11,055 of 67,844 credits/day). Where
+does the other 84% go? Soccer is the likely answer — many leagues, many
+fixtures, and `#239` showed its shards behave differently. Before spending
+effort on L1/L2 for MLB, measure the per-sport split: the cheapest lever may be
+in a sport nobody has looked at.
+
+### Declined, with reasons
+
+- **`uk`** — its only unique value was Betfair exchange, and **`betfair_ex_eu`
+  is already in `eu`**. Declined as redundant.
+- **`au`** — negligible value for US sports.
 
 ### Value ranking, independent of cost
 
