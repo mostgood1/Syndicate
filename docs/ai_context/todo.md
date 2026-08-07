@@ -16477,6 +16477,57 @@ rows (~71% of the board have no sim projection at all — separate from #44) ·
 
 ## Done
 
+### Board / quote-layer session 2026-08-06/07 — shipped items not previously recorded here
+
+Filed at session close via the #71 check, which caught that six shipped items had
+reached neither this file nor `todo_closed.md`. All are deployed and verified
+live unless noted. Full context: `postmortem_2026_08_07_board_session.md`,
+`handoff_board_build_next_session.md`.
+
+- **#239 — soccer shards quotes by FIXTURE date, so the pull never asked for
+  them.** The puller only ever requested today's date, got a 404, and logged
+  "absent", which read as "soccer captures no quotes". It captures plenty; the
+  8th's quotes live in `2026-08-08.jsonl`. Adds a 7-day fixture lookahead to the
+  *existing* presence-based repair pass — no periodic work. Soccer 0/3 → 3/3
+  priced.
+- **#240 — the blotter is the default view and showed none of the price work.**
+  `renderPriceStrip` was called only from the CARD template, while the blotter
+  loads above 900px viewport width. Everything #215–#239 built was rendered on a
+  surface most sessions never land on. Adds Book / Fair / EV / Age columns.
+- **#242 — `Number(null)` is `0`, and `0` is finite.** Every correctly-SUPPRESSED
+  fair value rendered as a real one ("0 at 0.0% hold"). `??` does not fall
+  through on an explicit null. Adds `numeric()`/`firstNumeric()`; `formatAmerican`
+  now rejects null/""/0. User caught this one on the live board.
+- **#245 — one gate decides board eligibility, and it runs at serve time.**
+  Replaces #244, which had written the same staleness rule twice in two
+  languages. `opportunity_gate.py` is pure and evaluated at serve time, so its
+  verdict cannot go stale inside a cached pool. Live: 14 opportunity / 20 dead /
+  166 watchlist of 200.
+- **#246 — settlement inputs were produced, then discarded.**
+  `emit_settlement_inputs` wrote `closing_lines_*.csv` / `finals_*.json` and
+  every publish was refused `SKIP_NOT_ALLOWLISTED` (15 in one pass, while that
+  same pass logged `closing_rows=7316 graded_rows=192`). Allowlisted. **Not yet
+  verified in production.**
+- **#248 — fetch append-only shards by their TAIL.** `book_quotes/<date>.jsonl`
+  only grows, so re-fetching 90MB to learn about the last few KB was waste. Uses
+  HTTP Range; the stream endpoint already served `send_file(conditional=True)`,
+  so no server change. Verified live: `STREAM_TAIL_OK appended_bytes=155304 /
+  5762 / 67600` against a 90MB shard. **Note:** this is a transfer-cost fix and
+  does NOT address the OOM — that was `read_book_quotes` materialising the whole
+  shard (one read = +95.8MB RSS, 6.3× file size, never returned), which is a
+  different defect in a different function.
+
+Also from that session and recorded elsewhere: **#235** (Layer 2 prop lane had no
+enrichment call), **#236** (WNBA identity), **#238** (no-vig fair value — EV had
+been measured against a vigged price, ~3.1 points low at our 6.25% median hold),
+**#243** (two boards + blended score), **#247** (settlement's market gate blocked
+every prop match).
+
+Reverted and NOT in effect: **#237** and **#241** (`94600923`, `d5028810`,
+`0d7c839c`). Both were reverted on a wrong attribution and were later measured
+innocent — reinstating them is a live option, see the post-mortem.
+
+
 **Closed items live in [`todo_closed.md`](todo_closed.md)** — 22 items from the
 2026-07-25/26 session plus everything before it. That file is a *record*; every
 lesson from a closed item that should still change what a future session does was
