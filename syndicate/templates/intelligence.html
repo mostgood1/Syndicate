@@ -147,6 +147,9 @@
   const LANE_TABS = [
     { value: "opportunity", label: "Opportunities" },
     { value: "watchlist", label: "Watchlist" },
+    // #244: suspended in-play markets. Kept reachable rather than deleted --
+    // the row is real, it is just no longer bettable.
+    { value: "stale", label: "Dead" },
     { value: "all", label: "All" },
   ];
   const DEFAULT_QUESTION = "top edges today";
@@ -243,7 +246,7 @@
     // #243: Opportunities by default -- a row a book is pricing right now.
     // Shareable in the URL like the other real filters, because "look at the
     // watchlist" is a thing you send someone.
-    lane: ["opportunity", "watchlist", "all"].includes(urlParams.get("lane") || "")
+    lane: ["opportunity", "watchlist", "stale", "all"].includes(urlParams.get("lane") || "")
       ? urlParams.get("lane")
       : "opportunity",
     steamOnly: urlParams.get("steam") === "1",
@@ -1746,6 +1749,11 @@
     // One hour is the same staleness line the card view's clock uses. Judged on
     // the BOOK clock, never on our capture clock -- a number the book last
     // moved 7 hours ago is dead regardless of how recently we looked at it.
+    // #244: a dead market is louder than a merely old one -- it is not a slow
+    // price, it is a suspended one, and the play it names may already be over.
+    if (itemMarketState(item) === "dead") {
+      return `<span class="board-blotter__age board-blotter__age--dead" title="Book has not moved this number in ${escapeHtml(text || "a long time")} on an in-progress game -- market suspended or settled">${escapeHtml(text || "stale")} dead</span>`;
+    }
     const stale = seconds >= 3600;
     return `<span class="board-blotter__age${stale ? " board-blotter__age--stale" : ""}" title="Since this book last moved the number">${escapeHtml(text || "&mdash;")}</span>`;
   }
@@ -1927,10 +1935,30 @@
   // it has no live market, which is the definition of the watchlist rather
   // than a defect. Falling back to "is there a quote" keeps this working for
   // rows enriched by a path that predates the field.
+  // #244: mirrors _market_state in quote_enrichment.py. Duplicated on purpose
+  // rather than waited for: board_lane is stamped when a pool is REBUILT, and a
+  // pool can be republished from cache for a long time, so a client with no
+  // fallback keeps showing dead plays until then. The server stamp wins
+  // whenever it is present.
+  const PREGAME_STATE_TOKENS = new Set(["", "scheduled", "pre-game", "pregame", "upcoming", "not started", "warmup"]);
+  const DEAD_LIVE_MARKET_AGE_SECONDS = 900;
+
+  function itemMarketState(item) {
+    const stamped = String((item && item.market_state) || "").trim().toLowerCase();
+    if (stamped) return stamped;
+    const stateText = String((item && (item.game_state || item.status_display)) || "").trim().toLowerCase();
+    const inProgress = Boolean(item && item.is_live) && !PREGAME_STATE_TOKENS.has(stateText);
+    if (!inProgress) return "pregame";
+    const age = bookAgeValue(item);
+    if (age === null) return "dead";
+    return age > DEAD_LIVE_MARKET_AGE_SECONDS ? "dead" : "live";
+  }
+
   function itemLane(item) {
     const lane = String((item && item.board_lane) || "").trim().toLowerCase();
     if (lane) return lane;
-    return itemQuote(item) ? "opportunity" : "watchlist";
+    if (!itemQuote(item)) return "watchlist";
+    return itemMarketState(item) === "dead" ? "stale" : "opportunity";
   }
 
   function matchesLane(item) {

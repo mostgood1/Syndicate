@@ -261,3 +261,48 @@ def test_blended_score_keeps_negative_value_negative():
     # bet positive, only shrink it toward zero.
     scored = blended_score(ev_pct=-6.0, books_quoting=7, book_age_seconds=60)
     assert scored is not None and scored["score"] < 0
+
+
+# --- #244: dead in-play markets ------------------------------------------
+
+
+def test_market_state_calls_a_stale_live_price_dead():
+    """The user-reported failure, as a test.
+
+    Production served Luis Arraez and J.T. Realmuto with is_live=True and a
+    book_age of 30,556s -- 8.5 hours. A book re-prices a live market every few
+    minutes, so that is a suspended market naming a pitcher pulled hours ago.
+    """
+    from syndicate.features.shared.quote_enrichment import _market_state
+
+    row = {"is_live": True, "game_state": "live"}
+    assert _market_state(row, {"book_age_seconds": 30556}) == "dead"
+    assert _market_state(row, {"book_age_seconds": 134}) == "live"
+
+
+def test_market_state_does_not_kill_a_stale_pregame_price():
+    # Books post early and leave numbers alone for hours before first pitch.
+    # That is normal and tradeable, not dead.
+    from syndicate.features.shared.quote_enrichment import _market_state
+
+    for state in ("scheduled", "Pre-Game", ""):
+        row = {"is_live": True, "game_state": state}
+        assert _market_state(row, {"book_age_seconds": 30556}) == "pregame"
+
+
+def test_market_state_treats_missing_book_clock_on_a_live_game_as_dead():
+    # No book clock on an in-progress game is not evidence of life. These are
+    # the rows we can say least about.
+    from syndicate.features.shared.quote_enrichment import _market_state
+
+    assert _market_state({"is_live": True, "game_state": "In Progress"}, {}) == "dead"
+
+
+def test_market_state_handles_unnormalised_state_text():
+    # Production carries "live", "In Progress", a bare clock, and a score line.
+    from syndicate.features.shared.quote_enrichment import _market_state
+
+    for state in ("In Progress", "3:39", "66-65 | 3:39 - 4th"):
+        row = {"is_live": True, "game_state": state}
+        assert _market_state(row, {"book_age_seconds": 60}) == "live"
+        assert _market_state(row, {"book_age_seconds": 99999}) == "dead"

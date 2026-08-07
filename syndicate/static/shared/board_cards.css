@@ -1744,3 +1744,10 @@ table.board-blotter tbody tr:last-child td {
 .board-blotter__score--pos { color: #2ecc71; }
 .board-blotter__score--neg { color: var(--cards-text-muted, #94a3b8); }
 .board-blotter__score--flat { color: var(--cards-text-dim, #64748b); }
+
+/* #244: a suspended in-play market. Louder than merely stale -- the play it
+   names may already be decided. */
+.board-blotter__age--dead {
+  color: #ef4444;
+  font-weight: 800;
+}
