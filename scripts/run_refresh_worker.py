@@ -1682,44 +1682,10 @@ def _heap_census(reason: str) -> None:
 
     Capped at 3 censuses per boot: it walks the whole heap and is not free.
     """
-    if _HEAP_CENSUS_DONE["count"] >= 3:
-        return
-    _HEAP_CENSUS_DONE["count"] += 1
     try:
-        import collections
-        import gc
-        import sys as _sys
+        from syndicate.features.shared.memory_observability import log_heap_census
 
-        gc.collect()
-        counts: "collections.Counter[str]" = collections.Counter()
-        shallow: "collections.Counter[str]" = collections.Counter()
-        biggest: list[tuple[int, str, str]] = []
-        for obj in gc.get_objects():
-            try:
-                name = type(obj).__name__
-                counts[name] += 1
-                size = _sys.getsizeof(obj)
-                shallow[name] += size
-                # Individually huge containers are worth naming outright -- one
-                # 500MB list is a different bug from ten million small dicts.
-                if size > 50_000_000:
-                    biggest.append((size, name, repr(obj)[:120]))
-            except Exception:
-                continue
-        payload = {
-            "reason": reason,
-            "census_index": _HEAP_CENSUS_DONE["count"],
-            "container_mb": _container_memory_mb(),
-            "gc_tracked_objects": sum(counts.values()),
-            "top_by_count": counts.most_common(20),
-            "top_by_shallow_mb": [
-                (name, round(total / (1024 * 1024), 1)) for name, total in shallow.most_common(20)
-            ],
-            "individually_huge": [
-                (round(size / (1024 * 1024), 1), name, text) for size, name, text in sorted(biggest, reverse=True)[:10]
-            ],
-        }
-        print(f"[refresh_worker] HEAP_CENSUS {json.dumps(payload, default=str)}", flush=True)
+        log_heap_census(reason)
     except Exception as exc:
         print(f"[refresh_worker] HEAP_CENSUS_FAILED {type(exc).__name__}: {exc}", flush=True)
 

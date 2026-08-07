@@ -565,6 +565,81 @@ def log_all_process_memory(stage: str, **extra: Any) -> dict[str, Any]:
     return payload
 
 
+_HEAP_CENSUS_STATE: dict[str, int] = {"count": 0}
+_HEAP_CENSUS_MAX_PER_PROCESS = 4
+
+
+def log_heap_census(reason: str, *, min_container_mb: float = 0.0) -> dict[str, Any] | None:
+    """What is this process actually holding, by object type?
+
+    #257. Eight mechanisms for refresh-worker's OOM were reasoned from source
+    across three sessions and all eight were wrong. This asks the process
+    instead of the code.
+
+    `gc.get_objects()`, deliberately NOT `tracemalloc`. tracemalloc tracks
+    allocation SITES, is blind to memory pymalloc has already handed back to its
+    arenas, and has misled this incident three separate times (including
+    inflating one probe by 2.4x). This answers the different and correct
+    question: what is reachable right now.
+
+    Shallow `sys.getsizeof` undercounts nested containers, so the COUNTS are the
+    primary signal -- 2GB of anything must appear as tens of millions of
+    objects, and the type distribution alone separates quote dicts from game
+    contexts from ledger rows. Any single object over 50MB is named outright,
+    because one huge list is a different bug from ten million small dicts.
+
+    Capped per process: walking the whole heap is not free, and this is
+    instrumentation meant to be deleted once it has answered.
+    """
+    if _HEAP_CENSUS_STATE["count"] >= _HEAP_CENSUS_MAX_PER_PROCESS:
+        return None
+    try:
+        current_mb = _bytes_to_mb(_read_container_memory_current_bytes())
+        if min_container_mb and (current_mb is None or current_mb < float(min_container_mb)):
+            return None
+
+        import collections
+        import gc
+
+        _HEAP_CENSUS_STATE["count"] += 1
+        gc.collect()
+        counts: Any = collections.Counter()
+        shallow: Any = collections.Counter()
+        huge: list[tuple[int, str, str]] = []
+        for obj in gc.get_objects():
+            try:
+                name = type(obj).__name__
+                counts[name] += 1
+                size = sys.getsizeof(obj)
+                shallow[name] += size
+                if size > 50 * _BYTES_PER_MB:
+                    huge.append((size, name, repr(obj)[:140]))
+            except Exception:
+                continue
+        payload = {
+            "reason": str(reason or "")[:80],
+            "census_index": _HEAP_CENSUS_STATE["count"],
+            "container_mb": current_mb,
+            "gc_tracked_objects": int(sum(counts.values())),
+            "top_by_count": counts.most_common(20),
+            "top_by_shallow_mb": [
+                (name, round(total / _BYTES_PER_MB, 1)) for name, total in shallow.most_common(20)
+            ],
+            "individually_huge_mb": [
+                (round(size / _BYTES_PER_MB, 1), name, text)
+                for size, name, text in sorted(huge, reverse=True)[:10]
+            ],
+        }
+        # print(..., flush=True) rather than logger.info -- see #37, logger.info
+        # never reaches Render's collector, which is a large part of why this
+        # incident stayed invisible.
+        print(f"HEAP_CENSUS {json.dumps(payload, default=str)}", flush=True)
+        return payload
+    except Exception as exc:  # pragma: no cover - diagnostic must never raise
+        print(f"HEAP_CENSUS_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def log_runtime_memory(stage: str, **extra: Any) -> None:
     log_process_tree_memory(stage, **extra)
     log_container_memory(stage, **extra)
