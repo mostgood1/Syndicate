@@ -868,6 +868,61 @@ def _launch_autorun_evaluation_settlement(
     if not _evaluation_settlement_should_run_now(now_epoch=time.time(), last_epoch=last_epoch):
         return False
 
+    # #256: CLAIM THE RUN BEFORE DOING THE WORK.
+    #
+    # This is the defect that turned an expensive pass into an eleven-hour
+    # outage. The status file below was written only at the END, and
+    # _evaluation_settlement_should_run_now is "self-catching-up by
+    # construction" (its own docstring) -- so if the process died mid-run, the
+    # epoch never advanced and the next boot ran it again. Measured on
+    # refresh-worker 2026-08-07: 110 OOM kills over eleven hours at ~4 minute
+    # intervals, which is one boot-to-kill cycle, repeating forever:
+    #
+    #     boot -> settlement fires (last run never completed)
+    #          -> 21 date chunks read whole and accumulated (see below)
+    #          -> OOM
+    #          -> status never written
+    #          -> boot -> settlement fires ...
+    #
+    # Every mitigation shipped that night missed it because they all guarded
+    # the BOARD path: #249/#250's circuit breakers sit in _build_candidate_pool,
+    # #251/#252 are board-build fixes, and #254 streamed seven readers in
+    # intelligence_evaluation.py -- a file settlement does not call. The board
+    # was already being refused correctly (candidate_count=0, MEMORY_GUARD_ABORT
+    # at 3588MB); it was being refused on memory settlement had already spent.
+    #
+    # Claiming first makes a crash cost ONE run, not every run forever. The
+    # trade is deliberate and it is the right way round: a genuine transient
+    # failure now waits for the next window instead of retrying, and the
+    # summary/error fields are still filled in by the final write below. An
+    # autorun that cannot make progress is a bad day; an autorun that kills its
+    # host and then retries is an outage.
+    #
+    # Deliberately NOT a short backoff-and-retry, which was the other proposal.
+    # A backoff still retries, and if the run is fatal the result is the same
+    # crash loop with a longer period -- slower, harder to spot, and it would
+    # have taken far more than eleven hours to notice. "Claimed today, so not
+    # again today" cannot loop by construction. The cost of being wrong is one
+    # missed settlement day, which the loud log below makes visible.
+    if str((last_status or {}).get("state") or "") == "started":
+        # The previous run claimed and never finished -- i.e. the process died
+        # inside it. This is the ONLY signal that the crash happened at all,
+        # because a killed process writes no traceback and no completion.
+        print(
+            "[evaluation_settlement] PREVIOUS_RUN_NEVER_COMPLETED "
+            f"claimed_epoch={last_epoch} -- the worker died inside settlement. "
+            "Not retrying today (see #256); investigate before re-enabling.",
+            flush=True,
+        )
+    _refresh_state_store()["write_json_file"](
+        status_path,
+        {
+            "epoch": time.time(),
+            "state": "started",
+            "note": "#256: claimed before the work; the final write replaces this with results",
+        },
+    )
+
     from syndicate.features.shared.evaluation_settlement import settle_ledger_for_dates
     from syndicate.features.shared.graded_outcomes import GRADED_OUTCOME_GRADERS
 
@@ -909,10 +964,31 @@ def _launch_autorun_evaluation_settlement(
         from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
         from syndicate.features.shared.ledger_bridge import bridge_settled_results
 
-        evaluation_records: list[dict[str, Any]] = []
+        # #256: bridge ONE DATE AT A TIME.
+        #
+        # This accumulated every record from all 21 lookback dates into a single
+        # list and held them simultaneously. Production ledger chunks measured
+        # 367,229,260 and 480,112,146 bytes on 2026-08-07, and the reader
+        # underneath (_read_chunk_records) has no size ceiling at all -- so this
+        # loop was the single largest allocation on a 4GiB worker, and it ran
+        # before anything else could be blamed for the floor.
+        #
+        # bridge_settled_results is per-record, so a date at a time is
+        # equivalent: the only thing lost is a cross-date view it never took.
+        # Peak is now one date instead of twenty-one.
+        bridge_totals: dict[str, int] = {}
+        bridged_dates = 0
         for target_date in target_dates:
-            evaluation_records.extend(_read_ledger_records_for_date(DEFAULT_LEDGER_PATH, target_date) or [])
-        bridge_summary = bridge_settled_results(evaluation_records=evaluation_records)
+            date_records = _read_ledger_records_for_date(DEFAULT_LEDGER_PATH, target_date) or []
+            if not date_records:
+                continue
+            date_summary = bridge_settled_results(evaluation_records=date_records) or {}
+            bridged_dates += 1
+            for key, value in date_summary.items():
+                if isinstance(value, (int, float)):
+                    bridge_totals[key] = bridge_totals.get(key, 0) + int(value)
+            del date_records
+        bridge_summary = {**bridge_totals, "dates_bridged": bridged_dates}
         print(f"[ledger_bridge] {json.dumps(bridge_summary, default=str)[:400]}", flush=True)
     except Exception as exc:  # noqa: BLE001
         bridge_summary = {"error": f"{type(exc).__name__}: {exc}"}
@@ -931,6 +1007,7 @@ def _launch_autorun_evaluation_settlement(
     chunk_diagnostics: dict[str, Any] = {}
     try:
         from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
+        from syndicate.features.shared.intelligence_evaluation import _count_jsonl_records
         from syndicate.features.shared.intelligence_evaluation import _ledger_chunk_path
 
         # Reported live 2026-08-05: after fixing DEFAULT_LEDGER_PATH to use
@@ -956,7 +1033,14 @@ def _launch_autorun_evaluation_settlement(
                 continue
             try:
                 stat = chunk_path.stat()
-                line_count = sum(1 for line in chunk_path.read_text(encoding="utf-8").splitlines() if line.strip())
+                # #256: streamed. This was
+                #   sum(1 for line in chunk_path.read_text(...).splitlines() if line.strip())
+                # inside a loop over all 21 lookback dates -- re-reading every
+                # 367-480MB chunk whole, a second time, purely to report a line
+                # count in a DIAGNOSTIC. Same defect #75 fixed in
+                # odds_lifecycle and #254 fixed in intelligence_evaluation;
+                # this is the third file it lived in.
+                line_count = _count_jsonl_records(chunk_path)
             except Exception as exc:
                 chunk_diagnostics[chunk_date] = {"exists": True, "error": f"{type(exc).__name__}: {exc}"}
                 continue
@@ -968,6 +1052,11 @@ def _launch_autorun_evaluation_settlement(
         status_path,
         {
             "epoch": time.time(),
+            # #256: pairs with the "started" claim written before the work. A
+            # status file left at "started" means the process died inside
+            # settlement -- the only durable evidence of that, since a SIGKILL
+            # writes no traceback.
+            "state": "completed",
             "dates": list(target_dates),
             "summary": summaries,
             "error": error_text,
@@ -1538,6 +1627,135 @@ def _diag_log_all_process_memory(stage: str) -> None:
         print(f"[refresh_worker] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
 
 
+# --- #257: memory explosion diagnostic -------------------------------------
+#
+# Why this exists. refresh-worker was OOM-killed 112+ times across eleven hours.
+# Seven mechanisms were proposed from source and all seven were wrong, because
+# every one of them guarded a stage DOWNSTREAM of where the memory is actually
+# spent. The trace that finally localised it, on #243 with settlement disabled:
+#
+#     14:04:02  boot                           275.4MB
+#     14:04:08  post_mlb_sim_tick              330.0MB
+#     14:04:22  pre_source_state_fingerprint  2508.5MB   <- +2.2GB in 14 SECONDS
+#     14:05:30  post_pull_hot_artifacts       3102.3MB
+#
+# Between those two checkpoints sit three unconditional ticks and the whole
+# autorun elif-chain, with no sample in between -- and "naming a suspect from an
+# instrumentation gap" is the error this entire incident is made of (it already
+# produced a false "+1360MB in the pull window" that turned out to be two
+# checkpoints too far apart). So: sample after every step, report the DELTA, and
+# when the delta is large enough to matter, census the heap.
+#
+# Note the decisive control: #243 ran 73 minutes clean at 01:33 today and dies
+# in ~3 minutes at 14:03. Same commit. So the variable is not code, and the
+# census is the only thing that can say what the process is actually holding.
+_MEM_LAST_MB: dict[str, float] = {}
+_HEAP_CENSUS_DONE: dict[str, int] = {"count": 0}
+
+
+def _container_memory_mb() -> float | None:
+    try:
+        from syndicate.features.shared.memory_observability import memory_headroom_snapshot
+
+        snapshot = memory_headroom_snapshot(0)
+        if isinstance(snapshot, dict):
+            value = snapshot.get("current_mb")
+            return float(value) if value is not None else None
+    except Exception:
+        return None
+    return None
+
+
+def _heap_census(reason: str) -> None:
+    """What is the process actually holding? Types by count and shallow bytes.
+
+    tracemalloc is the WRONG instrument here and has already misled this
+    incident three times -- it tracks allocation sites, is blind to retention
+    that pymalloc has handed back to its arenas, and inflated one local probe by
+    2.4x. `gc.get_objects()` answers the different, correct question: what is
+    reachable right now.
+
+    Shallow sizes undercount nested containers, so the COUNTS are the signal --
+    2GB of anything has to appear as tens of millions of objects, and the type
+    distribution alone distinguishes quote dicts from game contexts from ledger
+    records.
+
+    Capped at 3 censuses per boot: it walks the whole heap and is not free.
+    """
+    if _HEAP_CENSUS_DONE["count"] >= 3:
+        return
+    _HEAP_CENSUS_DONE["count"] += 1
+    try:
+        import collections
+        import gc
+        import sys as _sys
+
+        gc.collect()
+        counts: "collections.Counter[str]" = collections.Counter()
+        shallow: "collections.Counter[str]" = collections.Counter()
+        biggest: list[tuple[int, str, str]] = []
+        for obj in gc.get_objects():
+            try:
+                name = type(obj).__name__
+                counts[name] += 1
+                size = _sys.getsizeof(obj)
+                shallow[name] += size
+                # Individually huge containers are worth naming outright -- one
+                # 500MB list is a different bug from ten million small dicts.
+                if size > 50_000_000:
+                    biggest.append((size, name, repr(obj)[:120]))
+            except Exception:
+                continue
+        payload = {
+            "reason": reason,
+            "census_index": _HEAP_CENSUS_DONE["count"],
+            "container_mb": _container_memory_mb(),
+            "gc_tracked_objects": sum(counts.values()),
+            "top_by_count": counts.most_common(20),
+            "top_by_shallow_mb": [
+                (name, round(total / (1024 * 1024), 1)) for name, total in shallow.most_common(20)
+            ],
+            "individually_huge": [
+                (round(size / (1024 * 1024), 1), name, text) for size, name, text in sorted(biggest, reverse=True)[:10]
+            ],
+        }
+        print(f"[refresh_worker] HEAP_CENSUS {json.dumps(payload, default=str)}", flush=True)
+    except Exception as exc:
+        print(f"[refresh_worker] HEAP_CENSUS_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+def _mem_checkpoint(stage: str, *, census_threshold_mb: float = 700.0) -> None:
+    """Sample container memory, report the delta since the previous checkpoint,
+    and census the heap when a single step allocates more than the threshold.
+
+    One cgroup file read per call. The census only fires on a step that is
+    already pathological, so the cost lands exactly where the answer is.
+    """
+    try:
+        current = _container_memory_mb()
+        if current is None:
+            return
+        previous = _MEM_LAST_MB.get("value")
+        delta = (current - previous) if previous is not None else 0.0
+        _MEM_LAST_MB["value"] = current
+        _MEM_LAST_MB["stage"] = stage  # type: ignore[assignment]
+        print(
+            f"[refresh_worker] MEM_STEP stage={stage} container_mb={current:.1f} "
+            f"delta_mb={delta:+.1f} prev_stage={_MEM_LAST_MB.get('prev_stage')}",
+            flush=True,
+        )
+        _MEM_LAST_MB["prev_stage"] = stage  # type: ignore[assignment]
+        if delta >= census_threshold_mb:
+            print(
+                f"[refresh_worker] MEM_STEP_LARGE stage={stage} delta_mb={delta:+.1f} "
+                "-- censusing the heap",
+                flush=True,
+            )
+            _heap_census(f"large_step:{stage}")
+    except Exception as exc:
+        print(f"[refresh_worker] MEM_STEP_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+
+
 def main() -> int:
     store = _refresh_state_store()
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
@@ -1589,6 +1807,9 @@ def main() -> int:
         except Exception as exc:
             print(f"[refresh_worker] MLB_SIM_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
         _diag_log_all_process_memory("post_mlb_sim_tick")
+        # #257: everything from here to the intelligence pipeline was ONE blind
+        # window in which the container went 330MB -> 2508MB. Sample every step.
+        _mem_checkpoint("post_mlb_sim_tick")
 
         # Unconditional (not part of the claimed_count/elif chain below) so a
         # cycle that also claims a reconciliation-autorun turn still gets a
@@ -1599,6 +1820,7 @@ def main() -> int:
                 print(f"[refresh_worker] MLB_ACTUALS_TICK {json.dumps(mlb_actuals_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_ACTUALS_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
+        _mem_checkpoint("post_mlb_actuals_writer_tick")
 
         # Unconditional, same reasoning as the actuals-writer tick above --
         # a one-off, self-disabling backfill (see
@@ -1610,6 +1832,7 @@ def main() -> int:
                 print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL {json.dumps(mlb_betting_day_backfill_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL_ERROR {type(exc).__name__}: {exc}", flush=True)
+        _mem_checkpoint("post_mlb_betting_day_backfill_tick")
 
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):
@@ -1636,6 +1859,7 @@ def main() -> int:
                 refresh_cycle=refresh_cycle,
             )
 
+        _mem_checkpoint("post_contract_recovery")
         active_jobs = _current_active_job_count(latest_manifest_path)
         if active_jobs >= max_active_jobs:
             refresh_cycle["skipped_due_to_cap"] = 1
@@ -1734,6 +1958,25 @@ def main() -> int:
                 refresh_cycle=refresh_cycle,
             )
             return 0
+
+        # #257: end of the autorun chain. Paired with post_contract_recovery
+        # above, this brackets every autorun so a cycle that allocates inside
+        # one is attributable to the chain rather than to the pipeline that
+        # runs after it.
+        _mem_checkpoint("post_autorun_chain")
+        # The intelligence-state background loop runs in its own thread in this
+        # same process, so its allocations land here too. A census at the end of
+        # every cycle, once memory is genuinely high, is the only view of what
+        # survived the cycle -- which is the question seven source-reasoned
+        # hypotheses failed to answer.
+        _cycle_end_mb = _container_memory_mb()
+        if _cycle_end_mb is not None and _cycle_end_mb >= 2600.0:
+            print(
+                f"[refresh_worker] CYCLE_END_HIGH container_mb={_cycle_end_mb:.1f} "
+                f"iteration={iterations} -- censusing what survived the cycle",
+                flush=True,
+            )
+            _heap_census("cycle_end_high")
 
         iterations += 1
         if args.run_once:

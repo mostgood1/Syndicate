@@ -111,23 +111,42 @@ def _markets_compatible(record_market: Any, row_market: Any, sport: Any) -> bool
 
 
 def _read_chunk_records(chunk_path: Path) -> list[dict[str, Any]]:
+    """Every record in a ledger chunk, streamed.
+
+    #256. This was `read_text()` + `splitlines()` with **no size ceiling of any
+    kind** -- a whole-file string plus a list holding every line of it as its
+    own string, before a single record was parsed. It is the reader the
+    settlement autorun actually uses, and it is why #254 (which streamed seven
+    readers in `intelligence_evaluation.py`) had no effect: settlement does not
+    call any of them.
+
+    The measurement that makes this concrete: production logged
+    `SKIP_OVERSIZED_LEDGER_CHUNK ... bytes=367229260` and `bytes=480112146`
+    against a 256,000,000 ceiling on 2026-08-07. Those skip lines come from the
+    CEILINGED readers -- so the log was reporting the size of chunks that this
+    function was reading whole at the same moment, on the same worker.
+
+    Still returns a full list, because callers index and filter it. The caller
+    that mattered (`run_refresh_worker`'s ledger bridge) has been changed to
+    hold one date at a time rather than accumulating all 21.
+    """
     if not chunk_path.exists():
         return []
-    try:
-        content = chunk_path.read_text(encoding="utf-8")
-    except Exception:
-        return []
     records: list[dict[str, Any]] = []
-    for line in content.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            payload = json.loads(line)
-        except Exception:
-            continue
-        if isinstance(payload, dict):
-            records.append(payload)
+    try:
+        with chunk_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    payload = json.loads(line)
+                except Exception:
+                    continue
+                if isinstance(payload, dict):
+                    records.append(payload)
+    except Exception:
+        return records
     return records
 
 
