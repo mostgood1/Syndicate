@@ -39,6 +39,20 @@
   .bg-missing { color: #2b3543; }
   .bg-gap { color: #f0b429; font-size: 11px; cursor: help; }
   .bg-meta { color: #7d8ea4; font-size: 11px; }
+  /* Segment identity -- a game is quoted once per segment, so several rows share
+     one fixture legitimately. Badged, not inferred from row order. */
+  .bg-seg {
+    color: #9cc0e6; background: #16222f; border: 1px solid #24384d;
+    border-radius: 3px; padding: 0 4px; font-size: 10px; font-weight: 600;
+    cursor: help; white-space: nowrap;
+  }
+  /* A settled segment is VOID, not stale -- a different failure from a late
+     price, so it gets a different colour and never the stale treatment. */
+  .bg-void {
+    color: #0b0f14; background: #f0b429; border-radius: 3px;
+    padding: 0 4px; font-size: 10px; font-weight: 700;
+    cursor: help; white-space: nowrap;
+  }
   .bg-live { color: #34d399; font-size: 11px; font-weight: 600; }
   /* Modelled, not measured. Distinct colour + a trailing asterisk so it can
      never be mistaken for a two-sided no-vig consensus. */
@@ -80,6 +94,65 @@
 
   function el(id) { return document.getElementById(id); }
   function fmtPrice(p) { return p === null || p === undefined ? "" : (p > 0 ? "+" + p : String(p)); }
+
+  // Segment identity. A game is quoted once per segment, so the same fixture
+  // legitimately occupies several rows; without a visible segment they read as
+  // duplicates. `full` is badged too rather than left blank -- an unlabelled row
+  // among labelled ones invites the reader to guess, and the whole point here is
+  // that the reader should not have to.
+  var SEGMENTS = {
+    full:   { short: "Full", title: "full game" },
+    first5: { short: "F5",   title: "first 5 innings", innings: 5 },
+    first3: { short: "F3",   title: "first 3 innings", innings: 3 },
+    first1: { short: "F1",   title: "first inning",    innings: 1 }
+  };
+
+  // Longest market first (full > F5 > F3 > F1), so a game's segments sort into a
+  // stable, meaningful block. Zero-padded because this is concatenated into a
+  // string sort key, where "10" would otherwise precede "2".
+  var SEGMENT_ORDER = { full: 0, first5: 1, first3: 2, first1: 3 };
+  function segmentRank(segment) {
+    var rank = SEGMENT_ORDER[String(segment)];
+    return rank === undefined ? "9" : String(rank);
+  }
+
+  function segmentBadge(segment) {
+    if (segment === null || segment === undefined || segment === "") return "";
+    var key = String(segment);
+    var meta = SEGMENTS[key];
+    // An unrecognised segment is shown verbatim rather than hidden or coerced to
+    // "Full" -- a segment we cannot name is exactly the case worth seeing.
+    var short = meta ? meta.short : key;
+    var title = meta ? meta.title : "segment: " + key;
+    return ' <span class="bg-seg" title="' + title.replace(/"/g, "&quot;") + '">' + short + "</span>";
+  }
+
+  // Live-state validity. A first-5 line is not "stale" once the 5th is over --
+  // it is VOID, and a void price sitting beside a live full-game price is the
+  // dangerous case the plan's C4 calls out. Returns a reason string when the
+  // segment can no longer be bet, otherwise null.
+  //
+  // There is no `inning` field on the game object; the inning is only available
+  // inside `status_token`, which is "TOP 7" / "BOT 4" for a live MLB game
+  // (asserted in tests/test_game_chip_scoreboard.py). Parsed rather than assumed,
+  // and anything unparseable yields null -- no claim is better than a wrong one.
+  function segmentInningsElapsed(game) {
+    if (!game || game.state !== "live") return null;
+    var m = /(?:TOP|BOT|MID|END)\s*(\d+)/i.exec(String(game.status_token || ""));
+    return m ? Number(m[1]) : null;
+  }
+
+  function segmentDeadReason(segment, game) {
+    var meta = SEGMENTS[String(segment)];
+    if (!meta || !meta.innings) return null;
+    var inning = segmentInningsElapsed(game);
+    if (inning === null) return null;
+    // Strictly greater: "BOT 5" is still inside the first 5, "TOP 6" is not.
+    if (inning > meta.innings) {
+      return meta.title + " is over — this market is settled, not live";
+    }
+    return null;
+  }
 
   function load(market) {
     var sport = el("bg-sport").value;
@@ -151,7 +224,10 @@
     var side = p.side || (r.sides || [])[0];
     var best = (r.best || {})[side] || {};
     switch (key) {
-      case "mkt": return (r.player_name || (r.away_team || "") + " @ " + (r.home_team || "")) + " " + (r.line === null ? "" : r.line);
+      // Segment is part of the sort key, not decoration: without it the four
+      // segments of one game sort as equal and interleave with other games,
+      // which is what made them look like duplicates in the first place.
+      case "mkt": return (r.player_name || (r.away_team || "") + " @ " + (r.home_team || "")) + " " + (r.line === null ? "" : r.line) + " " + segmentRank(r.segment);
       case "date": return g.start_time_utc || "";
       case "game": return (g.state === "live" ? "0" : g.state === "pregame" ? "1" : "2") + (g.start_time_utc || "");
       case "proj": return p.projected === undefined || p.projected === null ? null : p.projected;
@@ -220,6 +296,17 @@
     rows.forEach(function (r) {
       var label = (r.player_name ? r.player_name : (r.away_team || "") + " @ " + (r.home_team || ""));
       var lineTxt = (r.line === null || r.line === undefined) ? "" : " " + r.line;
+      // A game appears once PER SEGMENT -- full, first5, first3, first1 are four
+      // different markets with different prices and different book counts (11 / 9
+      // / 5 / 1 on a sampled game). Without this badge they render as four
+      // identical game labels and read as duplicate rows, which is what a user
+      // reported. The segment is part of the row's identity, so it is shown on
+      // every row including "Full", never left to be inferred from position.
+      var segTxt = segmentBadge(r.segment);
+      var segDead = segmentDeadReason(r.segment, r.game);
+      var segDeadTxt = segDead
+        ? ' <span class="bg-void" title="' + segDead.replace(/"/g, "&quot;") + '">VOID</span>'
+        : "";
       (r.sides || []).forEach(function (side, idx) {
         var best = (r.best || {})[side] || {};
         var cells = books.map(function (b) {
@@ -366,7 +453,7 @@
         var span = ' rowspan="' + r.sides.length + '"';
         html.push(
           "<tr>" +
-          (idx === 0 ? '<td class="bg-mkt"' + span + ">" + label + lineTxt + gapMark + "</td>" : "") +
+          (idx === 0 ? '<td class="bg-mkt"' + span + ">" + label + lineTxt + segTxt + segDeadTxt + gapMark + "</td>" : "") +
           (idx === 0 ? "<td" + span + ">" + dateTxt + "</td>" : "") +
           (idx === 0 ? "<td" + span + ">" + gameTxt + "</td>" : "") +
           '<td class="bg-side">' + side + "</td>" +

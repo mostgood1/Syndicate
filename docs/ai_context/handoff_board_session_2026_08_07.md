@@ -5,6 +5,35 @@ marked otherwise.
 
 ---
 
+## 1. ~~FIRST TASK~~ — **VERIFIED 2026-08-07 19:30Z on production. Nothing to do.**
+
+Checked against a live pregame slate (15 MLB games, first pitch 22:40Z) — the
+condition local data could not produce, because 2026-07-12 is all `final`.
+
+**API** (`/api/board/book-grid?sport=mlb&date=2026-08-07&market=h2h&limit=60`):
+every row carries `projection.side = "home"` with a signed
+`edge_vs_market_pct`, and **both branches are exercised** — 12 positive edges
+(mark home) and **48 negative** (mark away). The negative branch is the one that
+had never been seen.
+
+**Rendered DOM** (`/market-board/books`): 15 games × 3 markets × 2 side-rows.
+**No row ever carries two markers** (`moreThanOne: 0`), and each (game, market)
+has exactly one `◄` with a tooltip, e.g. *"the model favours this side (edge
++12.9 pts on home)"*. The paired side renders "the model does not favour this
+side". `simSide` in `book_grid.html:258-274` trusts `proj.side` and flips via
+`r.sides` on a negative edge — it does not re-derive the side, which was the
+suspected failure mode.
+
+*Method note, since two sessions have now been burned by this:* a first pass
+counting `.bg-best` reported "44 rows with more than one marker". That class is
+**reused** by best-price and projection cells; the marker is the `◄`/title pair.
+A second pass grouped by game alone and reported "15 multi" — also wrong, because
+a game spans three markets. **Neither was a board bug.** Group by
+(game, market) and select on the title, not the class.
+
+<details>
+<summary>original task description</summary>
+
 ## 1. FIRST TASK — one unverified thing
 
 **Check the sim-side Best highlight on production.** `cfefb1ed` makes the green
@@ -21,6 +50,8 @@ Look at the `h2h` tab pregame: exactly one side per row should be green with a
 `simSide` logic in `book_grid.html` is wrong.
 
 ---
+
+</details>
 
 ## 2. State of the world
 
