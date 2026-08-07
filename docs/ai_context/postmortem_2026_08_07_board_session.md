@@ -60,6 +60,42 @@ missing the spike, and the useful signal is what runs immediately before
 `Instance restarted` (consistently `PERSIST_LOCKED_BEGIN`, i.e. the end of a
 board build).
 
+### 1.1b RESOLVED 2026-08-07 (#249) — and three claims in §1.1/§1.1a were false
+
+Fixed in `431fc5a9`. Corrections to what is written above, because the two
+paragraphs preceding this one sent the next session looking in the wrong place
+with the wrong tools:
+
+1. **"`Cause: #241`" (§1.1) was wrong, and §1.1a was right to withdraw it — but
+   `#241` is now positively *exonerated*, not merely unproven.** It was live
+   from 00:26 to 02:46 (**2h20m, zero OOM events**). The first OOM is
+   **02:56:28**, three minutes after `75b79b8a` deployed at 02:53. Nine deploys
+   that evening preceded it with no kills. The revert was therefore not just
+   ineffective, it removed working code for no reason.
+2. **"There is no OOM line" is false.** Every single restart is `server_failed`
+   carrying `reason.oomKilled.memoryLimit = "4Gi"`. It lives in the Render
+   **events** API (`GET /v1/services/{id}/events`), which was never queried —
+   only the log stream was. 21 kills were sitting there, already labelled.
+3. **"The sampler is missing the spike" is false.** The `CONTAINER_MEMORY`
+   instrumentation catches it precisely. The 67–68.8% readings are the *middle*
+   of a cycle; the end of one reads
+   `nhl 3496MB 85.4% -> soccer 3947MB 96.4% -> soccer 4096MB 100.0%`. The data
+   was already in production logs at the time that sentence was written.
+
+**The actual cause** was not in any of the suspect commits. The circuit breaker
+`_abort_build_candidate_pool_if_memory_critical` had a **900MB** floor — sized
+for a 2GB container and a 350–450MB stage — in front of a stage that transiently
+peaks at **~1873MB** on the 4GiB worker. It fired once in 1200 log lines, at
+3629MB. So `#247` did not *introduce* a leak; the guard had been unable to stop
+this class of failure for as long as the container had been 4GiB, and something
+around that deploy pushed the pass over a line the guard was not watching.
+
+**The methodological lesson, and it is the same one as §5.0:** three separate
+"we cannot know this" statements were all answerable from data that already
+existed. Two required querying a different API endpoint; one required reading
+to the end of a log cycle instead of sampling the middle. *Absence of evidence
+in the one place you looked is not evidence of absence.*
+
 ### 1.2 Things I shipped that made the board *look* fixed while it wasn't
 
 - `#242`: I rendered suppressed values as real ones. `Number(null)` is `0` and
