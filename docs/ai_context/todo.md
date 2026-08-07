@@ -1,6 +1,47 @@
 # Syndicate TODO — canonical cross-session list
 
-### OPEN (#258) -- DATA INTEGRITY: a null identity silently overwrites the wrong ledger record
+### SHIPPED 2026-08-07 (#258, `c256cc3e`) -- an unidentified ledger record is now unaddressable. NOT YET DEPLOYED.
+
+Fixed at the function boundary: `_replace_ledger_line` refuses a null/blank
+identity and logs `REPLACE_LEDGER_LINE_REFUSED_NULL_IDENTITY`, rather than
+falling back to a positional guess.
+
+**The decision that needed making** (which is why this was filed rather than
+patched inside `#254`): an unidentified record is **unaddressable**, not
+"matches the first one like it". Refusing changes matching behaviour, so it
+needed its own change and its own reasoning.
+
+**Severity, stated honestly: LATENT, not live.** The only production caller,
+`_update_evaluation_ledger_record`, already routes an identity-less record to
+append, so the path was unreachable from it. This is defence so the *next*
+caller cannot reintroduce it.
+
+Two tests, and the second matters more than the first: that `None`/`""`/`"   "`
+all refuse and leave the file byte-for-byte unchanged, **and that a real
+identity still finds its record with identity-less rows present** — the guard
+must not make orphan rows collateral damage.
+
+*(Filed briefly as #255, which was already taken by `a39fe3d6`. Renumbered
+because that one is committed and referenced from three places including the
+rules section, while this was an OPEN item costing one edit to move. IDs are
+stable and never reused — CLAUDE.md.)*
+
+### REMOVED 2026-08-07 (#257) -- the instrumentation, once it had answered
+
+120 lines out of `run_refresh_worker.py`: the per-step `MEM_STEP` checkpoints
+and the cycle-end census trigger. They were built to answer one question and
+they answered it — the worker loop allocates **+2.3MB across all five steps**,
+which proved the "14-second window" three sessions reasoned about was two
+**threads** interleaved in one log, not a call sequence.
+
+**Kept:** `log_heap_census()` in `memory_observability.py` and its single call
+site at `pre_source_state_fingerprint` — the highest point in the process where
+a runaway floor is visible before any expensive stage runs (it read 2508MB on a
+boot that started at 275MB during the outage). Fires only above 1200MB, capped
+at 4 per process, so on a healthy worker (380–870MB) it never runs. It never
+fired during the window that resolved the incident, which is exactly why it
+stays: eight mechanisms were reasoned from source that day and all eight were
+wrong. It is a smoke detector, not instrumentation.
 
 *(Filed briefly as #255, which was already taken by `a39fe3d6` "retention shorter
 than reuse". Renumbered to #258 because that one is committed and referenced from
