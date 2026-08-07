@@ -138,7 +138,84 @@ good is not an OddsJam-class product. It is a very well-instrumented guess.
 
 ---
 
-## 3. The three structural defects behind eleven symptoms
+## 2.8 THE RUNTIME EXECUTION MODEL — the constraint the first draft ignored
+
+The first version of this document traced the DATA FLOW and said nothing about
+how the worker actually executes. That was the biggest hole in it, and it was
+found the expensive way: by shipping a change that put refresh-worker into a
+restart loop. `CLAUDE.md` names this as "the single most important
+architectural constraint in the repo" and points at
+`runtime_execution_model.md` and `worker_architecture.md`. Any plan that does
+not budget for it is a plan for a different application.
+
+### The worker is ONE serial process with a priority chain
+
+`run_refresh_worker.py` dispatches autoruns through an `elif` chain. Exactly one
+fires per cycle, in this order:
+
+```
+1 mlb_refresh   2 weekly_sports   3 soccer_weekly   4 reconciliation
+5 evaluation_settlement    6 season_projections    7 preseason_projections
+```
+
+**Settlement is 5th of 7.** Any higher-priority autorun that is due preempts it
+for that cycle. So "close the feedback loop" is not only a matching problem
+(#247) — settlement is *structurally starvable*, and making it run more often by
+shortening its interval does nothing if reconciliation keeps winning the chain.
+
+The same process also hosts the intelligence-state background loop
+(`start_intelligence_state_background_loop`), so board publication, artifact
+pulls, the MLB sim tick and settlement all compete for one memory envelope.
+
+### Memory is the binding constraint, not CPU
+
+Measured on refresh-worker 2026-08-07, immediately before restarts:
+
+```
+ALL_PROCESS_MEMORY  accounted_rss_mb 2096   (real process RSS)
+CONTAINER_MEMORY    memory_current_mb 3103 / 4096  (75.8%)
+[refresh_worker] BOOTED  02:53:32 · 02:56:49 · 02:59:00 · 03:02:38
+```
+
+A ~3-minute restart loop. `build_intelligence_overview` has OOM-killed this
+worker before (documented in its own source comment). Note the standing caveat
+that `memory.current` includes page cache — but RSS alone was 2.1GB here, so
+this was not only cache.
+
+### What caused it, honestly
+
+**My own #241 change.** The loop-level artifact refresh streamed a 74MB quote
+shard plus ~40MB of odds_history **every 120 seconds**. Restart counts:
+
+| window | boots | worker deploys |
+|---|---|---|
+| 18:00–20:00 (before) | 0 | 0 |
+| 22:00–00:00 | 2 | 2 |
+| 01:00–03:10 (after #241) | 6 | 2 |
+
+Four unexplained restarts on a clean 3-minute cadence. Backing the interval off
+to 600s (`SYNDICATE_ARTIFACT_REFRESH_INTERVAL_SECONDS`) stopped it.
+
+### The rules this imposes on every phase below
+
+1. **New periodic work on refresh-worker is never free.** It competes with the
+   sim, the board build, and settlement inside a fixed 4GB envelope. Every phase
+   must state its worker cost and its cadence.
+2. **"Run it more often" is not a lever here.** It is the exact move that broke
+   the worker. Freshness must be bought with smaller transfers or better
+   invalidation, not higher frequency.
+3. **Position in the autorun chain is a feature of the design, not an accident.**
+   Anything that must run reliably cannot sit at position 5 behind four
+   autoruns that can each preempt it.
+4. **Every env change costs a deploy, and every deploy restarts the worker** —
+   killing in-flight sims. Config is not free either.
+5. **Serving is where freshness belongs when it is cheap.** #245's gate runs at
+   serve time precisely because a pure function on web costs nothing and does
+   not compete for the worker's memory. Prefer that shape.
+
+---
+
+## 3. The four structural defects behind eleven symptoms
 
 Every fix #235-#245 traces to one of these. Fixing symptoms is why there were
 eleven.
@@ -152,6 +229,11 @@ settlement's 4,560 `no_key_match` are one defect wearing three hats.
 reads is current. Nothing carries "as of when", so staleness is invisible until
 it reaches a human — the user saw 7-hour-old odds before any instrument did.
 
+**D4 — The worker's execution model is not budgeted for.** Work is added to a
+single serial process with a priority chain and a hard memory ceiling as though
+it were free. This is how a correct fix (#241) became an outage, and it is the
+defect this document itself committed by planning without it.
+
 **D3 — There is no closed loop.** Nothing measures whether output was correct,
 so no parameter can ever be tuned by evidence, and every quality question is
 settled by argument instead of data.
@@ -163,7 +245,26 @@ settled by argument instead of data.
 Five phases. Each has an exit criterion that is a **number**, not a judgement.
 Nothing in a later phase starts before its predecessor's number is met.
 
-### Phase 0 — Make the feedback loop RUN (revised)
+### Phase 0a — Worker stability, and a cadence settlement cannot be starved out of
+**Worker cost: reduces load; must be net-negative before anything else lands.**
+
+The chain and the memory ceiling (§2.8) make this the true floor. Two pieces:
+
+1. **Stop the restart loop.** Done for now by backing the artifact refresh off
+   to 600s. That is a mitigation, not a fix — the real answer is to stop
+   re-streaming a 74MB shard wholesale. Options, cheapest first: byte-range
+   append reads (the shard is append-only JSONL, so only the tail is ever new),
+   a per-sport split so MLB's 74MB does not move for a WNBA update, or a
+   summarised quote index the board can read instead of the raw log.
+2. **Take settlement out of position 5 of a 7-deep `elif` chain.** While it can
+   be preempted by four other autoruns it will never be a dependable input to
+   anything, no matter what its interval is set to.
+
+**Exit:** zero unexplained `BOOTED` lines over 2 hours; container memory stays
+under 70% across a full slate; settlement observed running on its configured
+cadence rather than when the chain happens to let it.
+
+### Phase 0b — Make the feedback loop RUN (revised)
 The original Phase 0 was a publish-transport fix built on a wrong premise (see
 §2.2). Transport is healthy; this is the real floor.
 
@@ -279,7 +380,9 @@ Rules that make the failure classes impossible rather than fixed:
 ## 7. Order of work
 
 ```
-Phase 0  make settlement RUN       ← the real floor (publish was a false alarm, §2.2)
+Phase 0a worker stability + cadence ← the actual floor (§2.8); everything else
+                                     competes with it for one 4GB envelope
+Phase 0b make settlement RUN       (publish was a false alarm, §2.2)
 Phase 1  identity contract        ← kills the largest defect class
 Phase 2  close the feedback loop  ← makes every later decision evidence-based
 Phase 3  fair value everywhere    ← sharp anchor + margin model
