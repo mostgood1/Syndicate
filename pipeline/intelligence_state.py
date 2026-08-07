@@ -1937,21 +1937,37 @@ def _diag_log_all_process_memory(stage: str) -> None:
         print(f"[intelligence_state] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
 
 
-# The container's hard limit is 2GB. Confirmed via live production diagnostics
-# that a single stage transition inside _build_candidate_pool can add
-# 350-450MB in well under a minute (page cache + heap combined, cgroup-
-# accounted) -- and that stdout/stderr from this background thread doesn't
-# reliably reach the platform's log collector before a SIGKILL under that
-# much memory pressure, so print-based diagnostics alone couldn't pinpoint
-# which exact stage. Rather than keep guessing, treat this as a circuit
-# breaker: check real, cheap (single cgroup file read, not full process
-# enumeration) headroom before each expensive stage and bail out to an
-# empty-but-valid pool (never cached -- see the `if pool["candidate_count"]
-# > 0` cache guard below) the moment it's not safe, instead of letting the
-# OS kill the whole process. A skipped cycle is far cheaper than a crash
-# loop: the process stays warm and the next cycle gets a fresh attempt
-# after this one's allocations are released.
-_MIN_SAFE_MEMORY_HEADROOM_BYTES = 900 * 1024 * 1024
+# Treat this as a circuit breaker: check real, cheap (single cgroup file read,
+# not full process enumeration) headroom before each expensive stage and bail
+# out to an empty-but-valid pool (never cached -- see the `if
+# pool["candidate_count"] > 0` cache guard below) the moment it's not safe,
+# instead of letting the OS kill the whole process. A skipped cycle is far
+# cheaper than a crash loop: the process stays warm and the next cycle gets a
+# fresh attempt after this one's allocations are released.
+#
+# The floor must be the cost of the stage being guarded, not a round number.
+# 900MB was set when refresh-worker's limit was 2GB and the largest measured
+# stage transition was 350-450MB. Both changed: the container is 4GiB, and the
+# stage this guard sits directly in front of -- build_intelligence_overview
+# with force_refresh=True, skip_game_hydration=False -- has a TRANSIENT peak of
+# ~1.9GB, which the end-of-stage sample cannot see because most of it is
+# released again.
+#
+# Measured on refresh-worker 2026-08-07 across four boots (OOM-killed at 4GiB
+# every ~3 minutes, 21 kills):
+#   stage                     anon RSS
+#   boot                          85MB
+#   build_candidate_pool_start   302-2202MB   (ratchets across cycles in a boot)
+#   post_pull_hot_artifacts     1638-2866MB
+#   ...then the overview pass runs and container memory reaches 4096.0MB
+# One instrumented cycle in full: post_pull 2223MB container -> soccer
+# board_contract 4096.0MB -> back to 2091MB. A ~1873MB transient against a
+# 900MB floor, so the guard cleared it every time and the kernel did not.
+#
+# This bounds the damage; it does not make the pass cheaper. Why the overview
+# needs ~1.9GB, and why anon ratchets from 302MB to 2.8GB across cycles within
+# a single boot, are both still open -- see docs/ai_context/todo.md.
+_MIN_SAFE_MEMORY_HEADROOM_BYTES = 1900 * 1024 * 1024
 
 
 def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:

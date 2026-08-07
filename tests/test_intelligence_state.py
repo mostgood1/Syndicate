@@ -3462,6 +3462,24 @@ class IntelligenceStateTests(unittest.TestCase):
         cache_key = service._candidate_pool_key("2026-06-10", "fingerprint-1")
         self.assertNotIn(cache_key, service._candidate_pools)
 
+    def test_memory_guard_floor_covers_the_overview_stage_it_guards(self) -> None:
+        # A circuit breaker whose floor is smaller than the stage it protects
+        # is not a circuit breaker. The floor sat at 900MB -- sized for a 2GB
+        # container and a 350-450MB stage -- while the stage immediately after
+        # the guard (build_intelligence_overview, force_refresh=True,
+        # skip_game_hydration=False) transiently peaks ~1.9GB on the 4GiB
+        # refresh-worker. Measured 2026-08-07 during a 21-kill OOM loop: the
+        # guard cleared at 2223MB container / 1873MB headroom, and the very
+        # next stage took the container to 4096.0MB and was SIGKILLed.
+        #
+        # Pinned so the floor cannot drift back below the cost it exists to
+        # cover without this failing and forcing a fresh measurement.
+        from pipeline import intelligence_state as intelligence_state_module
+
+        floor_mb = intelligence_state_module._MIN_SAFE_MEMORY_HEADROOM_BYTES / (1024 * 1024)
+        measured_overview_peak_mb = 1873.0
+        self.assertGreaterEqual(floor_mb, measured_overview_peak_mb)
+
     def test_build_candidate_pool_does_not_embed_full_odds_history_payload(self) -> None:
         # Confirmed in production as the dominant memory driver once
         # odds-history grew ~100x: this used to load AND embed the entire
