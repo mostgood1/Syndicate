@@ -118,13 +118,18 @@ def test_freshest_quote_per_book_wins():
     assert grid[0]["cells"]["dk"]["home"]["price"] == -130
 
 
-def test_a_best_price_lagging_the_market_is_labelled_suspect():
-    """A best price far clear of consensus is usually a stale line, not an edge.
+def test_a_stale_quote_does_not_win_the_best_selection():
+    """#S1b. A stale book that happens to have left a generous number behind
+    must not be presented as the best available bet.
 
-    Observed on the real 2026-07-29 shard: draftkings +388 where consensus was
-    +116, and 885 of 3,049 rows carried a laggard best. Layer 1 must not DROP it
-    -- a researcher wants to see it -- but presenting a six-hour-old number as
-    the best available bet is how a research surface becomes a trap.
+    Measured on production 2026-08-07: 1,528 of 3,246 MLB rows (47%) led with a
+    lagging best, because selection took the numerically best quote regardless
+    of age. Every downstream figure -- EV, edge, arbitrage, low hold, the Layer 2
+    blended score -- inherited it. Observed: draftkings +388 where consensus was
+    +116.
+
+    Layer 1 still SHOWS the stale quote (it hides nothing); it just no longer
+    wins.
     """
     grid = build_book_grid(
         [
@@ -134,10 +139,55 @@ def test_a_best_price_lagging_the_market_is_labelled_suspect():
         ],
         now=NOW,
     )
+    row = grid[0]
+    best = row["best"]["home"]
+    assert best["bookmaker"] == "fresh_b"        # the best FRESH price, +115
+    assert best["price"] == 115
+    assert best["suspect_stale"] is False
+    assert best["all_quotes_stale"] is False
+    # the correction stays visible rather than silent
+    assert best["best_including_stale"] == {"price": 388, "bookmaker": "stale_book"}
+    # and the stale quote is still a cell on the row
+    assert row["cells"]["stale_book"]["home"]["price"] == 388
+    assert row["cells"]["stale_book"]["home"]["stale"] is True
+
+
+def test_when_every_quote_is_stale_a_price_is_still_reported_and_flagged():
+    """Dropping the row would be the cheat the exit criterion forbids --
+    suspect-best falling only because the data vanished. A row with no current
+    quotes still renders a number, and says the number cannot be trusted."""
+    grid = build_book_grid(
+        [
+            _quote(selection="home", price=+388, bookmaker="a", snapshot_ts="2026-08-07T12:00:00Z"),
+            _quote(selection="home", price=+110, bookmaker="b", snapshot_ts="2026-08-07T12:05:00Z"),
+            # a fresh quote on the OTHER side sets the market's freshness bar
+            _quote(selection="away", price=-120, bookmaker="c", snapshot_ts="2026-08-07T19:59:00Z"),
+        ],
+        now=NOW,
+    )
     best = grid[0]["best"]["home"]
-    assert best["bookmaker"] == "stale_book"          # still reported
-    assert best["suspect_stale"] is True              # but labelled
-    assert best["lag_behind_freshest_seconds"] > 900
+    assert best["price"] == 388                  # still reported
+    assert best["all_quotes_stale"] is True      # and flagged
+    assert best["suspect_stale"] is True
+    joined = " | ".join(grid[0]["gaps"])
+    assert "every quote on home is stale" in joined
+    assert "no current price exists" in joined
+
+
+def test_consensus_is_also_computed_from_fresh_quotes_only():
+    """A "consensus" that averages in six-hour-old prices is not what the
+    market currently thinks."""
+    grid = build_book_grid(
+        [
+            _quote(selection="home", price=+400, bookmaker="stale", snapshot_ts="2026-08-07T12:00:00Z"),
+            _quote(selection="home", price=-110, bookmaker="fresh_a", snapshot_ts="2026-08-07T19:59:00Z"),
+            _quote(selection="home", price=-110, bookmaker="fresh_b", snapshot_ts="2026-08-07T19:59:30Z"),
+        ],
+        now=NOW,
+    )
+    # Both fresh books are -110, so a fresh-only consensus is -110. Including
+    # the +400 laggard would drag it far positive.
+    assert grid[0]["consensus"]["home"] == -110
 
 
 def test_a_fresh_best_is_not_labelled_suspect():

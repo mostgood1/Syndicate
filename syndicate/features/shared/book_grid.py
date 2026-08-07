@@ -175,18 +175,78 @@ def build_book_grid(
                     "age_seconds": _age_seconds(_observed_at(row), now=now),
                 }
 
-            # best price per side, and the consensus it should be read against
+            # Per-cell staleness FIRST, because #S1b's best/consensus selection
+            # below reads it. Each cell gets a reason string so the UI can grey
+            # it WITH A CAUSE rather than either hiding it or presenting it as
+            # current -- and the reason is written here, once, because a UI that
+            # re-derives it drifts from the flag and the two eventually disagree.
+            freshest_row_age = min(
+                (
+                    cells[b][s]["age_seconds"]
+                    for b in cells
+                    for s in cells[b]
+                    if cells[b][s].get("age_seconds") is not None
+                ),
+                default=None,
+            )
+            for book_key, sides_map in cells.items():
+                for side_key, cell in sides_map.items():
+                    age = cell.get("age_seconds")
+                    cell_lag = (
+                        round(age - freshest_row_age, 1)
+                        if age is not None and freshest_row_age is not None
+                        else None
+                    )
+                    cell["lag_behind_freshest_seconds"] = cell_lag
+                    if cell_lag is not None and cell_lag > _STALE_BEST_LAG_SECONDS:
+                        cell["stale"] = True
+                        cell["reason"] = f"{_duration(cell_lag)} behind the freshest quote on this market"
+                    else:
+                        cell["stale"] = False
+                        cell["reason"] = None
+
+            # best price per side, and the consensus it should be read against.
+            #
+            # #S1b: BOTH are selected from FRESH quotes only.
+            #
+            # Measured on production 2026-08-07: 1,528 of 3,246 MLB rows (47%)
+            # led with a best price that lagged the market, because selection
+            # took the numerically best quote regardless of age. A book that
+            # stopped updating six hours ago and happened to leave a generous
+            # number behind was being presented as the best available bet, and
+            # every downstream figure -- EV, edge, arbitrage, low hold, the
+            # Layer 2 blended score -- inherited it.
+            #
+            # Consensus gets the same treatment for the same reason: a
+            # "consensus" that averages in six-hour-old prices is not what the
+            # market currently thinks.
+            #
+            # Labelling was not enough. The stale quote is still shown as a
+            # cell (Layer 1 hides nothing) -- it just no longer wins.
             best: dict[str, dict[str, Any]] = {}
             consensus: dict[str, int | None] = {}
             for side in side_names:
-                prices = [
+                all_prices = [
                     (cells[book][side]["price"], book)
                     for book in books
                     if side in cells[book] and cells[book][side]["price"] is not None
                 ]
-                if not prices:
+                if not all_prices:
                     consensus[side] = None
                     continue
+                fresh_prices = [
+                    (price, book)
+                    for price, book in all_prices
+                    if not cells[book][side].get("stale")
+                ]
+                # Fall back to the full set only when NOTHING is fresh -- a row
+                # with no current quotes at all still has to render a number, and
+                # `all_quotes_stale` says the number cannot be trusted. Silently
+                # dropping the row would be the cheat the exit criterion
+                # forbids: suspect-best falls only because the data vanished.
+                all_stale = not fresh_prices
+                prices = fresh_prices or all_prices
+
                 top_price, top_book = prices[0]
                 for price, book in prices[1:]:
                     if _better(price, top_price):
@@ -209,68 +269,49 @@ def build_book_grid(
                 # suspect price is a thing a researcher wants to see). It labels
                 # it, so the UI can grey the cell instead of presenting a
                 # six-hour-old number as the best available bet.
+                # Staleness has ONE definition -- lag behind the freshest quote
+                # on the whole market instance -- and it is computed once, per
+                # cell, above. Reading the selected cell's own flag rather than
+                # recomputing a per-side variant keeps `suspect_stale` and the
+                # cell's own `stale` from ever disagreeing, which they did on
+                # first write: a side whose quotes were all old but close
+                # together looked fresh when compared only against each other.
                 best_cell = cells[top_book][side]
                 best_age = best_cell.get("age_seconds")
-                freshest_age = min(
-                    (
-                        cells[b][side]["age_seconds"]
-                        for b in books
-                        if side in cells[b] and cells[b][side].get("age_seconds") is not None
-                    ),
-                    default=None,
-                )
-                lag = (
-                    round(best_age - freshest_age, 1)
-                    if best_age is not None and freshest_age is not None
-                    else None
-                )
+                lag = best_cell.get("lag_behind_freshest_seconds")
+                # What the OLD rule would have picked, kept so the correction is
+                # visible rather than silent -- and so "is the fresh best much
+                # worse than the stale one" stays an answerable question.
+                stale_top_price, stale_top_book = all_prices[0]
+                for price, book in all_prices[1:]:
+                    if _better(price, stale_top_price):
+                        stale_top_price, stale_top_book = price, book
+
                 best[side] = {
                     "price": top_price,
                     "bookmaker": top_book,
                     "books_quoting": len(prices),
+                    "books_quoting_including_stale": len(all_prices),
                     "age_seconds": best_age,
                     "lag_behind_freshest_seconds": lag,
                     "edge_vs_consensus_pct": round(
                         (_implied_probability(side_consensus) - _implied_probability(top_price)) * 100, 2
                     ),
                     # Not "this is wrong" -- "do not read this as an edge without
-                    # looking at when it was posted".
-                    "suspect_stale": bool(lag is not None and lag > _STALE_BEST_LAG_SECONDS),
+                    # looking at when it was posted". After #S1b this can only be
+                    # true when EVERY quote on the side is stale, because a fresh
+                    # one would otherwise have won the selection.
+                    "suspect_stale": bool(best_cell.get("stale")),
+                    "all_quotes_stale": all_stale,
+                    "best_including_stale": (
+                        {"price": stale_top_price, "bookmaker": stale_top_book}
+                        if stale_top_book != top_book
+                        else None
+                    ),
                 }
 
             stamps = [c[s]["observed_at"] for c in cells.values() for s in c if c[s]["observed_at"]]
             newest = max(stamps) if stamps else None
-
-            # Per-cell staleness, so the UI can grey a cell WITH A REASON rather
-            # than either hiding it or presenting it as current. The reason is
-            # written here, once, because a UI that re-derives it will drift
-            # from the flag and the two will eventually disagree.
-            freshest_row_age = min(
-                (
-                    cells[b][s]["age_seconds"]
-                    for b in cells
-                    for s in cells[b]
-                    if cells[b][s].get("age_seconds") is not None
-                ),
-                default=None,
-            )
-            for book_key, sides_map in cells.items():
-                for side_key, cell in sides_map.items():
-                    age = cell.get("age_seconds")
-                    lag = (
-                        round(age - freshest_row_age, 1)
-                        if age is not None and freshest_row_age is not None
-                        else None
-                    )
-                    cell["lag_behind_freshest_seconds"] = lag
-                    if lag is not None and lag > _STALE_BEST_LAG_SECONDS:
-                        cell["stale"] = True
-                        cell["reason"] = (
-                            f"{_duration(lag)} behind the freshest quote on this market"
-                        )
-                    else:
-                        cell["stale"] = False
-                        cell["reason"] = None
 
             # Row-level gaps: why this row is not the full grid the reference
             # surface shows. Rendered greyed with these strings rather than
@@ -281,14 +322,17 @@ def build_book_grid(
                 gaps.append(f"only {len(books)} book quoting - no price shopping, no consensus")
             if len(side_names) < 2:
                 gaps.append("one-sided - no-vig fair value and hold cannot be computed")
+            # After #S1b a suspect best means EVERY quote on that side is stale,
+            # not that a stale one won the selection -- so the wording says the
+            # market has gone quiet rather than accusing the pick.
             suspect_sides = [s for s in side_names if (best.get(s) or {}).get("suspect_stale")]
             if suspect_sides:
                 worst_lag = max(
                     (best[s].get("lag_behind_freshest_seconds") or 0) for s in suspect_sides
                 )
                 gaps.append(
-                    f"best price on {', '.join(suspect_sides)} lags the market by "
-                    f"{_duration(worst_lag)} - likely a stale line, not an edge"
+                    f"every quote on {', '.join(suspect_sides)} is stale - freshest is "
+                    f"{_duration(worst_lag)} behind this market; no current price exists"
                 )
 
             first = sides_rows[0]
