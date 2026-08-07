@@ -1,5 +1,44 @@
 # Syndicate TODO — canonical cross-session list
 
+### QUEUED ON refresh-worker — HELD DELIBERATELY, gated on the slate test (2026-08-07)
+
+**Do not deploy these individually. They are held on purpose.**
+
+| commit | what | risk |
+|---|---|---|
+| `c256cc3e` | `#258` null-identity ledger guard + `#257` instrumentation removal | low — deletions plus an early `return False` |
+| `a39fe3d6` | `#255` retention-shorter-than-reuse (makes `#251` real; owned by the other session) | low |
+| — | re-enable `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` **with `#256`** | **the real test** |
+
+**Why held.** refresh-worker went from 115 OOM kills in eleven hours to 96+
+minutes clean. That streak is the only measurement gating the settlement
+decision, and **every deploy reboots the worker and resets it.** Neither queued
+item is urgent — `#258` is latent and unreachable from its only production
+caller, and `#257`'s removal only reduces log noise. Deploying now would spend
+the one clean measurement we have and buy nothing.
+
+**THE GATE — what releases them.** The worker holds clean **through a full MLB
+slate**, so we know the floor survives real load rather than an idle afternoon.
+
+**How to measure it — and this is the part that matters:** absence of kills is
+*not* the signal. Measure **peak `container_memory_mb` between consecutive
+`BOOTED` events**. If the floor climbs to ~3GB during a 15-game slate and merely
+fails to cross 4GiB, the kill count says "fine" and the margin says "one game
+away". The margin is the signal.
+
+```
+GET /v1/services/srv-d91dpertqb8s73co8ls0/events   -> server_failed carries reason.oomKilled
+GET /v1/logs?ownerId=tea-d2bb5n95pdvs73cje4fg&resource=srv-...  -> grep CONTAINER_MEMORY
+```
+Reference numbers: pre-fix per-cycle peaks were **2797–4048MB**; post-fix steady
+state is **380–870MB**. A slate peak under ~1500MB is a pass.
+
+**Then** deploy all three in ONE window (they all need a deploy anyway), and
+watch for the first *completed* settlement run. If it kills, the env var goes
+straight back out — `#256` claims the run before the work, so the worst case is
+one dead settlement day, not another eleven-hour loop. Watch for
+`PREVIOUS_RUN_NEVER_COMPLETED` on the following boot.
+
 ### SHIPPED 2026-08-07 (#258, `c256cc3e`) -- an unidentified ledger record is now unaddressable. NOT YET DEPLOYED.
 
 Fixed at the function boundary: `_replace_ledger_line` refuses a null/blank
