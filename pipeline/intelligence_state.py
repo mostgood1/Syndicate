@@ -2074,6 +2074,47 @@ class IntelligenceStateService:
         signature["odds_history"] = self._odds_history_signature(sport_slug, selected_date)
         return signature
 
+    def _book_quotes_signature(self, sport_slug: str, selected_date: str | None = None) -> dict[str, Any]:
+        """mtime+size of this sport's quote shard(s) (#241).
+
+        The fingerprint decides whether the candidate pool is rebuilt, and it
+        signed every source EXCEPT the one the board's prices come from. So a
+        freshly pulled quote shard changed nothing: same fingerprint, cache hit,
+        and the board kept serving quotes captured hours earlier. Measured
+        2026-08-07 -- capture age pinned at 7,806s across four polls eight
+        minutes apart.
+
+        stat() ONLY, never a read. `_odds_history_signature` above hashes its
+        whole payload, which is affordable there and would not be here: a real
+        MLB shard is ~55MB of JSONL and this runs every cycle on a 4GB worker.
+        mtime and size are exactly what change when a shard is appended to.
+
+        Soccer gets a forward window because it alone shards by FIXTURE date
+        (#239); every other sport writes to the slate date.
+        """
+        from syndicate.features.shared.odds_book_quotes import book_quotes_path
+
+        slug = str(sport_slug or "").strip().lower()
+        base = str(selected_date or central_today_iso()).strip()
+        dates = [base]
+        if slug == "soccer":
+            try:
+                start = date.fromisoformat(base)
+                dates.extend((start + timedelta(days=offset)).isoformat() for offset in range(1, 8))
+            except Exception:
+                pass
+        shards: list[dict[str, Any]] = []
+        for date_str in dates:
+            try:
+                path = book_quotes_path(slug, date_str)
+                stat = path.stat()
+                shards.append({"date": date_str, "size": stat.st_size, "mtime": round(stat.st_mtime, 3)})
+            except Exception:
+                # Absent is a stable, meaningful signature -- not an error. An
+                # out-of-season sport simply contributes nothing that changes.
+                continue
+        return {"shards": shards}
+
     def _odds_history_signature(self, sport_slug: str, selected_date: str | None = None) -> dict[str, Any]:
         shard_key = resolve_current_shard_key(sport_slug, selected_date or central_today_iso())
         candidate_paths = self._odds_history_paths_for_sport(sport_slug, shard_key)
@@ -2297,6 +2338,10 @@ class IntelligenceStateService:
                     "artifacts": artifact_signatures,
                     "advanced_inputs": advanced_signatures,
                     "odds_history": self._odds_history_signature(str(sport.get("slug") or "")),
+                    # #241: the shard the board's PRICES come from. Every other
+                    # source was signed here and this one was not, so a fresh
+                    # pull could never invalidate the candidate pool.
+                    "book_quotes": self._book_quotes_signature(str(sport.get("slug") or ""), selected_date),
                 }
             )
         payload = {
@@ -2761,6 +2806,32 @@ class IntelligenceStateService:
             )
         except Exception as exc:
             print(f"[intelligence_state] ADJUSTED_SCORE_ATTACH_FAILED error={exc}", flush=True)
+
+    def _refresh_source_artifacts(self, selected_date: str | None) -> None:
+        """Fetch fresh source artifacts, unconditionally, before fingerprinting.
+
+        Deliberately OUTSIDE the candidate-pool cache (#241). The pull that used
+        to live inside `_build_candidate_pool` could only run on a cache miss,
+        which made freshness depend on a fingerprint that only the pull could
+        move -- so on a quiet slate the worker never fetched anything again and
+        priced the board off whatever it happened to hold at boot.
+
+        Worker-only by construction: this is called from the board PUBLICATION
+        path, which `refuse_if_compute_in_request_path` already keeps out of web
+        requests. Never raises -- a failed pull means this cycle reads what it
+        has, exactly as before.
+        """
+        try:
+            from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
+
+            pulled = pull_hot_artifacts(date_str=selected_date)
+            if pulled:
+                print(
+                    f"[intelligence_state] SOURCE_ARTIFACTS_REFRESHED date={selected_date} written={pulled}",
+                    flush=True,
+                )
+        except Exception as exc:
+            print(f"[intelligence_state] SOURCE_ARTIFACT_REFRESH_FAILED error={exc}", flush=True)
 
     def _build_candidate_pool(self, selected_date: str | None, source_fingerprint: str) -> dict[str, Any]:
         cache_key = self._candidate_pool_key(selected_date, source_fingerprint)
@@ -3735,6 +3806,27 @@ class IntelligenceStateService:
                 run_key=_payload_key(request_payload),
                 sla_seconds=self._interval_seconds,
             ) or {}
+        # #241: pull BEFORE fingerprinting. This was a genuine deadlock, not a
+        # tuning problem: `pull_hot_artifacts` lived inside
+        # `_build_candidate_pool`, BELOW its cache-hit early return, so it only
+        # ran when the pool was already being rebuilt. But the pool is keyed on
+        # the source fingerprint, and the fingerprint only moves when new
+        # artifacts arrive, and new artifacts only arrive from the pull. Nothing
+        # changed because nothing was fetched, and nothing was fetched because
+        # nothing had changed.
+        #
+        # Measured 2026-08-07: the board served quotes captured at 16:25Z with
+        # an identical capture age (7,806s) across four polls eight minutes
+        # apart -- frozen, not merely old -- and refresh-worker logged pulls
+        # only ever within seconds of a service restart (20:51, 21:03, 21:50,
+        # 22:17, 23:55) and none in between. Every price on the board was
+        # 7 hours stale, which the user saw on the board before any instrument
+        # here reported it.
+        #
+        # Cheap to do every tick: the streamed transport sends `since=<local
+        # mtime>` and web answers 304 with no body when the copy is current
+        # (#237), so the steady state is a handful of empty round trips.
+        self._refresh_source_artifacts(selected_date)
         source_fingerprint = self._source_state_fingerprint(selected_date)
         print("[intelligence_state] RETURNED_FROM_SOURCE_STATE_FINGERPRINT", flush=True)
         cache_key = _payload_key(request_payload)
