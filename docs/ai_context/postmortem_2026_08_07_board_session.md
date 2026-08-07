@@ -33,7 +33,32 @@ refresh-worker OOM. I put that on a 2-minute timer inside a process that
 4 GB — ~1.4 GB headroom**.
 
 **Reverted** in `94600923`, `d5028810`, `0d7c839c` (reverting `#241`, `#241
-follow-up`, `#237`). Worker artifact behaviour is back to the known-good state.
+follow-up`, `#237`).
+
+### 1.1a CORRECTION — the revert did NOT stop the restarts
+
+Measured after the revert deployed at 04:08:13Z: **BOOTED at 04:12:58 and
+04:15:39** — the same ~3 minute cadence. So `#241` is **not proven** to be the
+cause, and my attribution above was another count-without-a-control.
+
+What is still true: restarts began during this session (0 in 18:00–20:00Z,
+before any of my changes) and the periodic pull was a genuine and documented
+memory risk that should not have been added. Removing it was correct on its own
+merits. But **the cause is unconfirmed and still live.**
+
+Remaining suspects, none eliminated:
+- **`#238`'s de-vig**, which runs on the worker during every board build.
+  `market_sides_for_quote` scans and copies the identified rows *per quote*, on
+  top of `read_book_quotes` already materialising ~122k dicts from a 90MB shard.
+  This is the largest new per-build allocation and it was never load-tested.
+- `#239`'s soccer lookahead adds 7 paths to the repair pass each cycle.
+- Something unrelated to this session that began around 20:00–22:00Z.
+
+**Next session: do not assume the cause. Bisect it.** Restarts leave no
+traceback, no OOM line, and memory samples sit at 67–68.8% — so the sampler is
+missing the spike, and the useful signal is what runs immediately before
+`Instance restarted` (consistently `PERSIST_LOCKED_BEGIN`, i.e. the end of a
+board build).
 
 ### 1.2 Things I shipped that made the board *look* fixed while it wasn't
 
@@ -143,6 +168,9 @@ Keep these; they are verified and add no worker load.
 
 ## 5. THE RULES THAT WOULD HAVE PREVENTED ALL OF IT
 
+0. **Do not attribute a regression without a control.** I blamed `#241`,
+   reverted it, and the restarts continued (§1.1a). A correlation with my own
+   changes is a hypothesis, not a cause.
 1. **A rate is a measurement; a count is an anecdote.** Always compute the
    denominator, and always check your own deploys before calling anything
    systemic.

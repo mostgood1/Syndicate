@@ -15,10 +15,18 @@
 
 ## State of production right now (2026-08-07 ~04:10Z)
 
-- **refresh-worker: reverted to its known-good artifact behaviour.** Commits
-  `94600923`, `d5028810`, `0d7c839c` reverted `#241`, `#241 follow-up` and
-  `#237`. Confirm `BOOTED` frequency is back to ~0/hour before doing anything
-  else — the last session's changes caused a ~3 minute restart loop.
+- **refresh-worker is STILL RESTARTING every ~3 minutes. This is the first
+  thing to fix and the cause is NOT known.** The last session reverted `#241`,
+  `#241 follow-up` and `#237` (`94600923`, `d5028810`, `0d7c839c`) believing
+  they were the cause; restarts continued after the revert deployed (BOOTED
+  04:12:58, 04:15:39). Restarts began during that session — 0 boots in
+  18:00–20:00Z beforehand — so something in it is implicated, but nothing is
+  proven. **Bisect; do not assume.** There is no traceback and no OOM line, and
+  memory samples sit at 67–68.8%, so the sampler is missing the spike. The
+  consistent last log line before `Instance restarted` is
+  `PERSIST_LOCKED_BEGIN` — the end of a board build. Prime unexamined suspect:
+  `#238`'s de-vig, which runs per quote during every board build on top of a
+  ~122k-row shard load, and was never load-tested on the worker.
 - `SYNDICATE_ARTIFACT_REFRESH_INTERVAL_SECONDS=120` is set on refresh-worker but
   now has **no reader** (its consumer was reverted). Harmless; remove it.
 - `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS=3600` **is** live and does
