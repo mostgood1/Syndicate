@@ -65,6 +65,45 @@ _MLB_TODAY_CACHE_MAX_ENTRIES = 64
 _MLB_CARDS_CONTEXT_CACHE: "OrderedDict[tuple[Any, ...], dict[str, Any]]" = OrderedDict()
 _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32
 
+# #253. Both caches above are bounded by ENTRY COUNT and nothing else -- not by
+# age, not by bytes -- and on the refresh-worker both keys are guaranteed to
+# miss on every cycle of a live slate:
+#
+#   * the context key includes _path_cache_signature() of the daily summary and
+#     the live-lens report, which is (st_mtime_ns << 16) ^ st_size. The live-lens
+#     report is rewritten continuously, so the key changes every cycle.
+#   * the today key includes _today_cache_bucket() == int(time.time() // 60), so
+#     it changes every 60 seconds regardless of anything else.
+#
+# A guaranteed-miss cache that evicts only on count is not a cache, it is a
+# retention buffer: steady state on the worker was up to 96 full MLB
+# cards-page contexts (64 + 32), dropped only when the 65th/33rd arrived.
+# Measured on refresh-worker 2026-08-07: the container sat at 3108-3994MB of
+# 4096 with candidate_count=0 and MEMORY_GUARD_ABORT firing before the build
+# even started -- i.e. the floor was retention carried over from earlier
+# cycles, not work in the current one.
+#
+# 3ca6c11d (2026-07-14, "Bound WNBA/NBA/MLB cards context caches to fix worker
+# memory growth") introduced these limits. They were the right idea sized with
+# the wrong unit; 32/64 are web-shaped numbers, where many requests genuinely
+# do share a 60-second bucket.
+#
+# The web service keeps its existing limits -- there the hit rate is real. The
+# worker gets 2 (the selected date plus the next-day rollover pool, which is
+# every distinct context it ever asks for) and skips the today cache entirely:
+# #251 put a 300s minimum rebuild interval on the hydrated overview, so a
+# 60-second bucket key can never be re-requested there. Its hit rate on the
+# worker is mathematically zero.
+_MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES_WORKER = 2
+
+
+def _cards_cache_limit() -> int:
+    return (
+        _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES
+        if _render_web_dyno()
+        else _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES_WORKER
+    )
+
 
 def _today_cache_get(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
     cached = _MLB_TODAY_CACHE.get(cache_key)
@@ -74,6 +113,11 @@ def _today_cache_get(cache_key: tuple[Any, ...]) -> dict[str, Any] | None:
 
 
 def _today_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
+    # #253: never populate this on a worker -- see the note above. The entry
+    # could not be read back before it was evicted, so every put was pure
+    # retention of a full page context.
+    if not _render_web_dyno():
+        return
     _MLB_TODAY_CACHE[cache_key] = result
     _MLB_TODAY_CACHE.move_to_end(cache_key)
     while len(_MLB_TODAY_CACHE) > _MLB_TODAY_CACHE_MAX_ENTRIES:
@@ -90,8 +134,26 @@ def _cards_context_cache_get(cache_key: tuple[Any, ...]) -> dict[str, Any] | Non
 def _cards_context_cache_put(cache_key: tuple[Any, ...], result: dict[str, Any]) -> None:
     _MLB_CARDS_CONTEXT_CACHE[cache_key] = result
     _MLB_CARDS_CONTEXT_CACHE.move_to_end(cache_key)
-    while len(_MLB_CARDS_CONTEXT_CACHE) > _MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES:
+    limit = _cards_cache_limit()
+    evicted = 0
+    while len(_MLB_CARDS_CONTEXT_CACHE) > limit:
         _MLB_CARDS_CONTEXT_CACHE.popitem(last=False)
+        evicted += 1
+    if evicted:
+        # #253: an eviction on the worker means a distinct context key was
+        # produced this cycle, i.e. the cache is thrashing rather than serving.
+        # That is the state 3ca6c11d's count-only bound left invisible for three
+        # weeks -- a "cache" with a 0% hit rate reads as working from the
+        # outside. If something later reintroduces a third key per cycle this
+        # line is the only thing that will say so. print(..., flush=True)
+        # rather than logger.info -- see #37, logger.info never reaches
+        # Render's collector.
+        print(
+            f"[mlb_cards] CONTEXT_CACHE_EVICTED count={evicted} "
+            f"size={len(_MLB_CARDS_CONTEXT_CACHE)} limit={limit} "
+            f"web={_render_web_dyno()}",
+            flush=True,
+        )
 
 
 def _render_web_dyno() -> bool:
@@ -5258,9 +5320,30 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         "skipWhenHidden": False,
         "poller": "shared.polling",
     }
-    _cards_context_cache_put(page_cache_key, deepcopy(result))
-    if cache_key is not None and games:
-        _today_cache_put(cache_key, result)
+    # #253. This used to hold THREE full copies of the page context live at
+    # once, two of them retained:
+    #     _cards_context_cache_put(page_cache_key, deepcopy(result))  # retained
+    #     _today_cache_put(cache_key, result)          # retained, BY REFERENCE
+    #     return deepcopy(result)
+    # `result` was not discarded -- it was handed to the today cache by
+    # reference -- so a single miss cost 3x the context and left 2x behind in
+    # two different caches.
+    #
+    # On the web service that shape is preserved exactly: both caches hit there,
+    # and they must not alias, because _today_cache_get returns its entry
+    # WITHOUT copying, so a caller that mutated it would corrupt the context
+    # cache too.
+    #
+    # On a worker the today cache is now a no-op (see _today_cache_put), so
+    # nothing else references `result` and it can go straight into the one cache
+    # that remains. That takes the miss path from three live copies to two, and
+    # from two retained to one.
+    if _render_web_dyno():
+        _cards_context_cache_put(page_cache_key, deepcopy(result))
+        if cache_key is not None and games:
+            _today_cache_put(cache_key, result)
+    else:
+        _cards_context_cache_put(page_cache_key, result)
     _log_cards_context_memory("end", game_count=len(games))
     return deepcopy(result)
 
