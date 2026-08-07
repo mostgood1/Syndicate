@@ -96,6 +96,49 @@ existed. Two required querying a different API endpoint; one required reading
 to the end of a log cycle instead of sampling the middle. *Absence of evidence
 in the one place you looked is not evidence of absence.*
 
+### 1.1c MEASURED 2026-08-07 — the real per-build cost, and §1.1a's "prime suspect" was wrong
+
+Asked by a third session to check for a cache in `read_book_quotes`. There is
+none — and looking for it found something bigger.
+
+**MEASURED (source):**
+- `read_book_quotes` has **no cache of any kind**. No `lru_cache`, no
+  module-level dict, no memoised loader. It opens the file, `json.loads` each
+  line, returns a fresh list.
+- `_QUOTE_CACHE_KEY = "_quote_rows_cache"` (`quote_enrichment.py:44`) is
+  **declared and never used anywhere**. The original author anticipated exactly
+  this and never wired it.
+- `read_book_quotes` has exactly **one** caller: `quote_ref_for_bet`
+  (`odds_book_quotes.py:757`), as its **first statement**.
+- `quote_ref_for_bet` is called from **three** sites in `quote_enrichment.py`
+  (258, 363, 486) and **every one is inside a `for row in rows:` loop**.
+
+⇒ **Every enriched row re-reads and re-parses the entire shard.** MLB's is
+90,155,656 bytes / ~122k rows. At ~200 candidates that is ~200 complete
+materialisations of a 122k-dict list per board build.
+
+This predates me (original `#215` code). What I changed: **`#235` added
+`enrich_prop_rows` to the intelligence prop lane**, multiplying how often it runs
+*on refresh-worker*. I did not add the per-call read; I made it hotter.
+
+**INFERRED (untested):** this is the mechanism behind the reported "+2.9GB in 73s
+that does not come back down". Hundreds of large short-lived allocations
+fragment pymalloc arenas; glibc does not return them to the OS, so `anon`
+ratchets while nothing is actually retained — retention-shaped RSS from pure
+transient churn. Falsify cheaply: loop `read_book_quotes` N times against the
+real shard holding no reference and watch RSS.
+
+**Fix shape:** hoist the read out of `quote_ref_for_bet` and pass rows in, or
+wire the cache `_QUOTE_CACHE_KEY` was meant for, keyed `(sport, date, mtime)`.
+One read per sport per build instead of one per row.
+
+**AND: §1.1a's "prime unexamined suspect: `#238`'s de-vig" was wrong.**
+`market_sides_for_quote` receives `identified` — the output of a *hard* identity
+filter (event_id / player_name / team pair) — not the 122k row set. For a player
+prop that is tens of rows. It is O(quotes × identified), bounded and small next
+to the per-row full-shard read above. I named it "prime suspect" having never
+measured it; the source says it is not. Deprioritise it.
+
 ### 1.2 Things I shipped that made the board *look* fixed while it wasn't
 
 - `#242`: I rendered suppressed values as real ones. `Number(null)` is `0` and

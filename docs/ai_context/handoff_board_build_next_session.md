@@ -95,7 +95,20 @@ advisory. This is W2 in the plan. Fix the scheduling, not the interval.
 
 ## The remaining work, in order
 
-**W1 — headroom.** `#248` (tail reads for append-only shards, 90 MB → KB) is
+**W1 — headroom. START HERE: the per-row full-shard read.** MEASURED
+2026-08-07: `quote_ref_for_bet` calls `read_book_quotes` as its first statement,
+`read_book_quotes` has **no cache**, and `quote_ref_for_bet` is called **per row**
+from three sites in `quote_enrichment.py`. So every enriched row re-reads and
+re-parses the whole 90MB / ~122k-row shard — ~200 full materialisations per board
+build. `_QUOTE_CACHE_KEY` at `quote_enrichment.py:44` is declared and never used;
+the original author saw this coming. Fix: hoist the read out and pass rows in, or
+wire that cache keyed `(sport, date, mtime)`. This is almost certainly the
+dominant per-build allocation and the likely driver behind the anon ratchet.
+(`#238`'s `market_sides_for_quote` is NOT the problem — it receives the
+identity-filtered subset, tens of rows, not 122k. The post-mortem's earlier
+"prime suspect" call was unmeasured and wrong.)
+
+**W1 (cont) — headroom.** `#248` (tail reads for append-only shards, 90 MB → KB) is
 shipped and verified; it makes the *existing* repair path cheaper and adds no
 periodic work. Still open: `#76` — `odds_events/<date>.jsonl` reaches **1.24 GB
 in a day** and nothing rotates it. `odds_history` is still pulled whole (~28 MB)
