@@ -3746,19 +3746,26 @@ class IntelligenceStateService:
         # _build_candidate_pool below.
         print("[intelligence_state] CALLING_SOURCE_STATE_FINGERPRINT", flush=True)
         _diag_log_all_process_memory("pre_source_state_fingerprint")
-        # #257: THE census point. Measured on refresh-worker 2026-08-07, boot at
-        # 275.4MB and this checkpoint reading 2508.5MB twenty seconds later --
-        # so 2.2GB is already resident HERE, before _source_state_fingerprint,
-        # before _build_candidate_pool, and upstream of every guard shipped in
-        # the last 24 hours (#249/#250/#251/#252/#254 all sit downstream).
+        # #257, KEPT as standing insurance rather than live instrumentation.
         #
-        # #257's first pass instrumented the refresh-worker LOOP and measured
-        # the whole thing at +2.3MB across five steps -- the "14-second window"
-        # between post_mlb_sim_tick and this line was never a call sequence at
-        # all, it was two THREADS' samples interleaved in one log. So the
-        # allocation is in this background thread, and the only honest way to
-        # name it is to ask what the heap is holding at this exact point rather
-        # than reason about it from source, which has now failed eight times.
+        # This is the highest point in the process where a runaway floor is
+        # visible before any expensive stage runs. During the 2026-08-07 outage
+        # this checkpoint read 2508MB on a boot that started at 275MB -- 2.2GB
+        # already resident, upstream of _source_state_fingerprint, upstream of
+        # _build_candidate_pool, and upstream of every guard shipped that day
+        # (#249/#250/#251/#252/#254 all sit downstream of it, which is why none
+        # of them moved the floor).
+        #
+        # It fires only above 1200MB and is capped at 4 per process, so on a
+        # healthy worker (steady state 380-870MB after #253) it never runs. It
+        # cost nothing and it never fired during the window that resolved the
+        # incident -- which is exactly why it is worth keeping: eight mechanisms
+        # were reasoned from source that day and all eight were wrong, and this
+        # is the one thing that asks the process instead of the code.
+        #
+        # The per-step MEM_STEP checkpoints from the same change were removed
+        # once they had answered; they were instrumentation, this is a smoke
+        # detector.
         try:
             from syndicate.features.shared.memory_observability import log_heap_census
 

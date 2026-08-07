@@ -107,6 +107,51 @@ def test_replace_ledger_line_drops_blank_lines_as_before():
         assert len(_rows(path)) == 1
 
 
+def test_a_null_identity_never_matches_anything(capfd):
+    """#258 -- data integrity.
+
+    `_ledger_record_identity` returns None for a record carrying none of
+    portfolio_event_id / recommendation_id / prediction_id, and the matcher
+    compares by equality. So `identity=None` silently replaced the FIRST
+    identity-less record in the chunk and returned True, reporting success.
+    Nothing in logs would show it: the return value is True either way and the
+    wrong record is structurally valid.
+
+    Latent rather than live -- the only production caller routes identity-less
+    records to append -- but an unidentified record must be UNADDRESSABLE.
+    """
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "ledger.jsonl"
+        rows = [{"note": "no identity fields at all"}, {"recommendation_id": "b", "value": 2}]
+        _write_ledger(path, rows)
+        before = path.read_bytes()
+
+        assert ev._ledger_record_identity(rows[0]) is None  # the precondition
+
+        for null_identity in (None, "", "   "):
+            assert ev._replace_ledger_line(path, null_identity, {"note": "clobbered"}) is False
+            assert path.read_bytes() == before, f"file was modified for identity={null_identity!r}"
+
+        assert "REPLACE_LEDGER_LINE_REFUSED_NULL_IDENTITY" in capfd.readouterr().out
+
+
+def test_a_real_identity_still_skips_identity_less_records():
+    # The guard must not make identity-less rows unwritable COLLATERAL -- a real
+    # identity should still find its record with such rows present.
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "ledger.jsonl"
+        target = {"recommendation_id": "real", "value": 1}
+        _write_ledger(path, [{"note": "orphan"}, target, {"note": "another orphan"}])
+
+        assert ev._replace_ledger_line(
+            path, ev._ledger_record_identity(target), {"recommendation_id": "real", "value": 42}
+        ) is True
+
+        after = _rows(path)
+        assert [r.get("value") for r in after] == [None, 42, None]
+        assert [r.get("note") for r in after] == ["orphan", None, "another orphan"]
+
+
 def test_only_the_first_match_is_replaced():
     with TemporaryDirectory() as tmp:
         path = Path(tmp) / "ledger.jsonl"

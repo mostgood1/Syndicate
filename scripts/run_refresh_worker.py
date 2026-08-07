@@ -1627,101 +1627,6 @@ def _diag_log_all_process_memory(stage: str) -> None:
         print(f"[refresh_worker] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
 
 
-# --- #257: memory explosion diagnostic -------------------------------------
-#
-# Why this exists. refresh-worker was OOM-killed 112+ times across eleven hours.
-# Seven mechanisms were proposed from source and all seven were wrong, because
-# every one of them guarded a stage DOWNSTREAM of where the memory is actually
-# spent. The trace that finally localised it, on #243 with settlement disabled:
-#
-#     14:04:02  boot                           275.4MB
-#     14:04:08  post_mlb_sim_tick              330.0MB
-#     14:04:22  pre_source_state_fingerprint  2508.5MB   <- +2.2GB in 14 SECONDS
-#     14:05:30  post_pull_hot_artifacts       3102.3MB
-#
-# Between those two checkpoints sit three unconditional ticks and the whole
-# autorun elif-chain, with no sample in between -- and "naming a suspect from an
-# instrumentation gap" is the error this entire incident is made of (it already
-# produced a false "+1360MB in the pull window" that turned out to be two
-# checkpoints too far apart). So: sample after every step, report the DELTA, and
-# when the delta is large enough to matter, census the heap.
-#
-# Note the decisive control: #243 ran 73 minutes clean at 01:33 today and dies
-# in ~3 minutes at 14:03. Same commit. So the variable is not code, and the
-# census is the only thing that can say what the process is actually holding.
-_MEM_LAST_MB: dict[str, float] = {}
-_HEAP_CENSUS_DONE: dict[str, int] = {"count": 0}
-
-
-def _container_memory_mb() -> float | None:
-    try:
-        from syndicate.features.shared.memory_observability import memory_headroom_snapshot
-
-        snapshot = memory_headroom_snapshot(0)
-        if isinstance(snapshot, dict):
-            value = snapshot.get("current_mb")
-            return float(value) if value is not None else None
-    except Exception:
-        return None
-    return None
-
-
-def _heap_census(reason: str) -> None:
-    """What is the process actually holding? Types by count and shallow bytes.
-
-    tracemalloc is the WRONG instrument here and has already misled this
-    incident three times -- it tracks allocation sites, is blind to retention
-    that pymalloc has handed back to its arenas, and inflated one local probe by
-    2.4x. `gc.get_objects()` answers the different, correct question: what is
-    reachable right now.
-
-    Shallow sizes undercount nested containers, so the COUNTS are the signal --
-    2GB of anything has to appear as tens of millions of objects, and the type
-    distribution alone distinguishes quote dicts from game contexts from ledger
-    records.
-
-    Capped at 3 censuses per boot: it walks the whole heap and is not free.
-    """
-    try:
-        from syndicate.features.shared.memory_observability import log_heap_census
-
-        log_heap_census(reason)
-    except Exception as exc:
-        print(f"[refresh_worker] HEAP_CENSUS_FAILED {type(exc).__name__}: {exc}", flush=True)
-
-
-def _mem_checkpoint(stage: str, *, census_threshold_mb: float = 700.0) -> None:
-    """Sample container memory, report the delta since the previous checkpoint,
-    and census the heap when a single step allocates more than the threshold.
-
-    One cgroup file read per call. The census only fires on a step that is
-    already pathological, so the cost lands exactly where the answer is.
-    """
-    try:
-        current = _container_memory_mb()
-        if current is None:
-            return
-        previous = _MEM_LAST_MB.get("value")
-        delta = (current - previous) if previous is not None else 0.0
-        _MEM_LAST_MB["value"] = current
-        _MEM_LAST_MB["stage"] = stage  # type: ignore[assignment]
-        print(
-            f"[refresh_worker] MEM_STEP stage={stage} container_mb={current:.1f} "
-            f"delta_mb={delta:+.1f} prev_stage={_MEM_LAST_MB.get('prev_stage')}",
-            flush=True,
-        )
-        _MEM_LAST_MB["prev_stage"] = stage  # type: ignore[assignment]
-        if delta >= census_threshold_mb:
-            print(
-                f"[refresh_worker] MEM_STEP_LARGE stage={stage} delta_mb={delta:+.1f} "
-                "-- censusing the heap",
-                flush=True,
-            )
-            _heap_census(f"large_step:{stage}")
-    except Exception as exc:
-        print(f"[refresh_worker] MEM_STEP_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
-
-
 def main() -> int:
     store = _refresh_state_store()
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
@@ -1773,9 +1678,6 @@ def main() -> int:
         except Exception as exc:
             print(f"[refresh_worker] MLB_SIM_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
         _diag_log_all_process_memory("post_mlb_sim_tick")
-        # #257: everything from here to the intelligence pipeline was ONE blind
-        # window in which the container went 330MB -> 2508MB. Sample every step.
-        _mem_checkpoint("post_mlb_sim_tick")
 
         # Unconditional (not part of the claimed_count/elif chain below) so a
         # cycle that also claims a reconciliation-autorun turn still gets a
@@ -1786,7 +1688,6 @@ def main() -> int:
                 print(f"[refresh_worker] MLB_ACTUALS_TICK {json.dumps(mlb_actuals_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_ACTUALS_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
-        _mem_checkpoint("post_mlb_actuals_writer_tick")
 
         # Unconditional, same reasoning as the actuals-writer tick above --
         # a one-off, self-disabling backfill (see
@@ -1798,7 +1699,6 @@ def main() -> int:
                 print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL {json.dumps(mlb_betting_day_backfill_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_BETTING_DAY_BACKFILL_ERROR {type(exc).__name__}: {exc}", flush=True)
-        _mem_checkpoint("post_mlb_betting_day_backfill_tick")
 
         refresh_cycle = {"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0}
         if _recover_stuck_claim(latest_manifest_path, timeout_minutes=stuck_claim_timeout_minutes):
@@ -1825,7 +1725,6 @@ def main() -> int:
                 refresh_cycle=refresh_cycle,
             )
 
-        _mem_checkpoint("post_contract_recovery")
         active_jobs = _current_active_job_count(latest_manifest_path)
         if active_jobs >= max_active_jobs:
             refresh_cycle["skipped_due_to_cap"] = 1
@@ -1924,25 +1823,6 @@ def main() -> int:
                 refresh_cycle=refresh_cycle,
             )
             return 0
-
-        # #257: end of the autorun chain. Paired with post_contract_recovery
-        # above, this brackets every autorun so a cycle that allocates inside
-        # one is attributable to the chain rather than to the pipeline that
-        # runs after it.
-        _mem_checkpoint("post_autorun_chain")
-        # The intelligence-state background loop runs in its own thread in this
-        # same process, so its allocations land here too. A census at the end of
-        # every cycle, once memory is genuinely high, is the only view of what
-        # survived the cycle -- which is the question seven source-reasoned
-        # hypotheses failed to answer.
-        _cycle_end_mb = _container_memory_mb()
-        if _cycle_end_mb is not None and _cycle_end_mb >= 2600.0:
-            print(
-                f"[refresh_worker] CYCLE_END_HIGH container_mb={_cycle_end_mb:.1f} "
-                f"iteration={iterations} -- censusing what survived the cycle",
-                flush=True,
-            )
-            _heap_census("cycle_end_high")
 
         iterations += 1
         if args.run_once:

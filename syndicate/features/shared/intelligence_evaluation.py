@@ -406,6 +406,34 @@ def _replace_ledger_line(file_path: Path, identity: str, payload: Mapping[str, A
     False is returned. That is why the temp file is discarded rather than
     promoted on the not-found path.
     """
+    # #258: a null identity must never match.
+    #
+    # `_ledger_record_identity` returns None for any record carrying none of
+    # portfolio_event_id / recommendation_id / prediction_id, and the loop below
+    # matches with `_ledger_record_identity(existing) == identity`. So a caller
+    # passing None silently replaced THE FIRST IDENTITY-LESS RECORD IN THE CHUNK
+    # and returned True, reporting success. Nothing in production logs would show
+    # it -- the function returns True either way, and the wrong record is
+    # structurally valid.
+    #
+    # Found by accident: a test fixture without those fields replaced record "a"
+    # when it asked for record "b", and the assertion that caught it was about
+    # ordering, not correctness.
+    #
+    # Severity, stated honestly: LATENT, not live. The only production caller
+    # (`_update_evaluation_ledger_record`) already routes an identity-less record
+    # to append instead, so this path is currently unreachable from it. This is
+    # defence at the function's own boundary so the next caller cannot
+    # reintroduce it -- an unidentified record must be UNADDRESSABLE, not
+    # "matches the first one like it".
+    if not str(identity or "").strip():
+        print(
+            "[intelligence_evaluation] REPLACE_LEDGER_LINE_REFUSED_NULL_IDENTITY "
+            f"path={file_path.name} -- an unidentified record cannot be targeted (#258)",
+            flush=True,
+        )
+        return False
+
     tmp_path = file_path.with_suffix(file_path.suffix + ".replace.tmp")
     replaced = False
     try:
