@@ -159,6 +159,39 @@ def _markets_compatible(record_market: Any, row_market: Any, sport: Any) -> bool
     return True
 
 
+# Market values that are not markets. A SURFACE name ("betting card") leaked
+# into the market identity field on WNBA pregame-prop rows until 2026-07-22;
+# these are matched exactly rather than by pattern, so a real market that
+# happens to contain one of these words is unaffected.
+_NON_MARKET_LABELS = frozenset({"betting card", "props", "prop", "board", "rank card", "-", "?", "n/a"})
+
+
+def _is_unsettleable_legacy_record(record: Mapping[str, Any]) -> bool:
+    """True when a record's market identity is structurally unusable (#260).
+
+    Not "we failed to match it" -- "there is nothing here that could ever
+    match". Two shapes, both pre-fix debris:
+
+      * an EMPTY market. 127 of 1,384 real records, last written 2026-08-01.
+      * a SURFACE name where a market should be ("betting card"). 360 records,
+        last written 2026-07-22, from WNBA pregame props whose builder
+        force-labelled every row with its heading.
+
+    Deliberately conservative: an unrecognised-but-present market is NOT legacy.
+    It might be a market we simply have no mapping for yet, and #247's whole
+    point is that an unknown market must not be treated as a failure. Only a
+    market that is absent, or is a known non-market label, qualifies.
+    """
+    recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
+    raw = record.get("market")
+    if not str(raw or "").strip() and isinstance(recommendation, Mapping):
+        raw = recommendation.get("market") or recommendation.get("market_label")
+    text = str(raw or "").strip().lower()
+    if not text:
+        return True
+    return text in _NON_MARKET_LABELS
+
+
 def _read_chunk_records(chunk_path: Path) -> list[dict[str, Any]]:
     """Every record in a ledger chunk, streamed.
 
@@ -381,6 +414,10 @@ def settle_ledger_for_date(
     unmatched_no_graded_rows = 0
     unmatched_no_key_match = 0
     unmatched_bad_result = 0
+    # #260: records that CANNOT settle because their market identity was
+    # malformed at write time. Counted separately so `settled` is measured
+    # against an ACHIEVABLE denominator.
+    unsettleable_legacy = 0
     unmatched_samples: list[dict[str, Any]] = []
     _MAX_SAMPLES = 5
     # Shared across every settled record in this call so repeated closes for
@@ -390,6 +427,26 @@ def settle_ledger_for_date(
     odds_payload_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
 
     for record in pending_records:
+        # #260: classify structurally-unsettleable records BEFORE anything else,
+        # so they leave the achievable denominator instead of masquerading as a
+        # matching failure.
+        #
+        # Measured on the real ledger 2026-08-07: 487 of 1,384 records (35%)
+        # carry a market that cannot resolve -- 360 say "betting card" (a
+        # SURFACE name that leaked into the market field) and 127 are empty.
+        # Both are PRE-FIX debris: the last "betting card" record was written
+        # 2026-07-22 and the last empty one 2026-08-01, and every record since
+        # carries a real market. The producer is already fixed; these can never
+        # settle no matter how correct the gate is.
+        #
+        # Left in `unmatched` they permanently depress the settled rate and make
+        # a working settlement look broken -- which is the "count without a
+        # denominator" error this codebase has now paid for repeatedly. They are
+        # NOT deleted: they are real history, just not settleable history.
+        if _is_unsettleable_legacy_record(record):
+            unmatched += 1
+            unsettleable_legacy += 1
+            continue
         record_sport = _record_sport(record) or sport_slug
         if not record_sport or record_sport not in _SUPPORTED_SPORTS:
             unmatched += 1
@@ -470,11 +527,24 @@ def settle_ledger_for_date(
         )
         settled += 1
 
+    # #260: the achievable denominator. `pending` counts everything in the
+    # ledger, including pre-fix records whose market identity was malformed at
+    # write time and which can never settle. Reporting `settled / pending`
+    # makes a working settlement look broken forever -- a count without a
+    # denominator, the error this codebase has paid for repeatedly.
+    settleable = max(0, len(pending_records) - unsettleable_legacy)
     return {
         "ok": True,
         "date": date_token,
         "sport": sport_slug,
         "pending": len(pending_records),
+        # Records that COULD settle: pending minus the structurally unusable.
+        # This is the denominator to quote.
+        "settleable": settleable,
+        "unsettleable_legacy": unsettleable_legacy,
+        "settled_rate_of_settleable": (
+            round(100.0 * (settled if not dry_run else 0) / settleable, 1) if settleable else None
+        ),
         "matched": matched,
         "settled": settled if not dry_run else 0,
         "would_settle": settled if dry_run else None,
@@ -511,6 +581,21 @@ def settle_ledger_for_dates(
         "results": results,
         "totals": {
             "pending": sum(int(r.get("pending") or 0) for r in results),
+            # #260. Quote `settled_rate_of_settleable`, not settled/pending:
+            # pre-fix records with a malformed market identity can never settle
+            # and would otherwise cap the rate below 100% forever.
+            "settleable": sum(int(r.get("settleable") or 0) for r in results),
+            "unsettleable_legacy": sum(int(r.get("unsettleable_legacy") or 0) for r in results),
+            "settled_rate_of_settleable": (
+                round(
+                    100.0
+                    * sum(int(r.get("settled") or 0) for r in results)
+                    / max(1, sum(int(r.get("settleable") or 0) for r in results)),
+                    1,
+                )
+                if sum(int(r.get("settleable") or 0) for r in results)
+                else None
+            ),
             "matched": sum(int(r.get("matched") or 0) for r in results),
             "settled": sum(int(r.get("settled") or 0) for r in results),
             "unmatched": sum(int(r.get("unmatched") or 0) for r in results),
