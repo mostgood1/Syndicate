@@ -101,23 +101,45 @@ SHORTLIST_KIND_FLOOR = 30
 # Minimum value% a row must carry to be shown. Env:
 # SYNDICATE_SHORTLIST_MIN_VALUE_PCT.
 #
-# **THIS IS NOT A "POSITIVE EV" GATE, and must never be described as one.** The
-# quantity is "the best available price beats the consensus no-vig fair", which
-# is L2-C's question, not a claim of positive expected value. That distinction
-# is why an earlier proposal to gate on `ev_pct >= 0` was withdrawn (see
-# `65b15a03`), and the withdrawal was right about WHERE: it belonged in
-# `opportunity_gate`, whose job `#245` fixed as "is this market live", and a
-# value judgement there would have baked "never trust the model" into liveness.
-# Here it is a SELECTION rule on the display artifact, which is the layer whose
-# job is deciding what is worth showing, and the ledger still carries every
-# gated row for S6 -- so nothing is lost to settlement by not displaying it.
+# **A JUNK FILTER, NOT A VALUE GATE.** It exists to drop rows priced materially
+# worse than a normal market, and nothing more. The board RANKS by score; the
+# floor's only job is to stop floor-then-merit seating garbage, because
+# `per_sport` and `kind_floor` guarantee slots get filled whether or not
+# anything deserves them.
 #
-# Measured on the served board, 2026-08-08 (200 rows): **105 were negative**,
-# median -0.702%, i.e. more than half the board was priced WORSE than the
-# market's own fair. That is a direct consequence of floor-then-merit with no
-# quality bar -- `per_sport` and `kind_floor` guarantee slots get filled whether
-# or not anything deserves them. At 0.0 this keeps 81 of 200.
-SHORTLIST_MIN_VALUE_PCT = 0.0
+# **-2.0, AND 0.0 WAS WRONG.** `ev_pct` is measured against the consensus no-vig
+# fair, so for any market where the book holds a margin it is
+# `1/overround - 1` -- NEGATIVE on every side. A realistic 3-book market
+# (-120/+105, -115/+100, -125/+110) scores **-1.0953 on BOTH sides**. A floor at
+# 0.0 therefore rejects every normally-priced market and keeps only rows where
+# cross-book dispersion beats consensus, silently converting the board from
+# "ranked opportunities" into a line-shopping screen. It shipped at 0.0 and did
+# exactly that (200 rows -> 103), and broke six wiring tests with `0 == 2`,
+# which read like a broken join.
+#
+# That is also the SEMANTIC objection `65b15a03` raised when it withdrew an
+# earlier `ev_pct >= 0` proposal -- "positive EV" is not what this quantity
+# means. Its PLACEMENT objection is answered by living here, in selection on the
+# display artifact, rather than in `opportunity_gate` (whose job `#245` fixed as
+# "is this market live"); the ledger still carries every gated row for S6, so
+# nothing is withheld from settlement by not displaying it.
+#
+# Sized from the served board, 2026-08-08, 200 rows before filtering:
+#
+#     p10 -7.120   p25 -5.700   p50 -0.666   p75 +1.118   p100 +4.243
+#     healthy 3-book market: -1.095
+#
+# There is a real gap between -2 and -3 (3 rows), so -2.0 sits about one point
+# below normal pricing and cuts the p25-and-below junk. Rows kept: 122 of 200 at
+# -2.0, against 95 at 0.0 and 147 at -5.0. The TOP of the board is unaffected at
+# any of these -- ranking is by score, and the excluded rows were never near it.
+#
+# **KNOWN BIAS, not yet fixed:** one global floor is sport-dependent, because
+# natural hold is. Soccer's 3-way markets hold more than MLB's 2-way, so soccer
+# rows sit legitimately lower -- soccer contributes 3 rows at -2.0 and 24 at
+# -5.0. A per-sport floor derived from each sport's measured hold is the correct
+# shape; see `#268`.
+SHORTLIST_MIN_VALUE_PCT = -2.0
 
 # Maximum book-clock age a quote may carry. Env:
 # SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS.

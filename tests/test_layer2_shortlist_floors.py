@@ -51,13 +51,22 @@ def _row(*, sport="mlb", kind="game", ev=1.0, age=3600.0, score=None):
 
 
 class ValueFloorTests(unittest.TestCase):
-    def test_negative_value_rows_are_dropped(self) -> None:
-        out = select_shortlist([_row(ev=2.0), _row(ev=-0.7), _row(ev=-8.72)], now=_NOW)
-        self.assertEqual(len(out["rows"]), 1)
-        self.assertEqual(out["rows_below_value_floor"], 2)
+    def test_junk_is_dropped_and_normal_pricing_is_kept(self) -> None:
+        """The floor is a junk filter, not a value gate.
 
-    def test_zero_is_kept_because_the_floor_is_inclusive(self) -> None:
-        out = select_shortlist([_row(ev=0.0)], now=_NOW, min_value_pct=0.0)
+        -0.7 is what a NORMALLY PRICED market looks like -- `ev_pct` is measured
+        against consensus no-vig fair, so it is `1/overround - 1` and negative
+        on every side of any market with hold (a realistic 3-book market scores
+        -1.0953 on both sides). Dropping it would empty the board of ordinary
+        markets, which is what the briefly-shipped 0.0 default did.
+        """
+        out = select_shortlist([_row(ev=2.0), _row(ev=-0.7), _row(ev=-8.72)], now=_NOW)
+        kept = sorted(r["ev_pct"] for r in out["rows"])
+        self.assertEqual(kept, [-0.7, 2.0])
+        self.assertEqual(out["rows_below_value_floor"], 1)
+
+    def test_the_floor_is_inclusive_at_its_boundary(self) -> None:
+        out = select_shortlist([_row(ev=-2.0)], now=_NOW, min_value_pct=-2.0)
         self.assertEqual(len(out["rows"]), 1)
 
     def test_the_kind_floor_cannot_re_seat_a_rejected_row(self) -> None:
@@ -128,7 +137,7 @@ class ReportingTests(unittest.TestCase):
     def test_both_rejections_are_reported_not_silent(self) -> None:
         """A board that shrinks must say which rule shrank it."""
         out = select_shortlist(
-            [_row(ev=-1.0), _row(age=100 * 3600), _row(ev=2.0)],
+            [_row(ev=-8.0), _row(age=100 * 3600), _row(ev=2.0)],
             now=_NOW,
             max_quote_age_seconds=24 * 3600,
         )
