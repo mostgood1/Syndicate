@@ -191,9 +191,37 @@ only, and WNBA's map had gaps (`MIN`, `POR` unresolved).
 WNBA is the one that mattered: **78 in-progress rows previously read `None`**, so
 `opportunity_gate` saw them as pregame and **live WNBA markets were rankable**.
 
-**SOCCER IS DELIBERATELY UNMAPPED** and a test pins that so it stays a decision.
-~10 leagues, no stable tri-code convention across feeds. **61 chips went
-unmatched on 08-08 — that is the size of the prize.** Needs its own pass.
+**SOCCER — CORRECTED 2026-08-08. IT IS NOT AN ALIAS PROBLEM, AND "61 chips is
+the size of the prize" (which this entry said earlier today) IS WRONG.**
+
+Measured before writing the alias table, which is why it was not written:
+
+```
+chips (61)      MLS, EPL, La Liga
+                CLB@MIA  CLT@CHI  SD@MIN  HOU@SKC  COV@ARS  GET@ALA ...
+
+grid names (22) ADO Den Haag, AZ Alkmaar, Cercle Brugge, PSV Eindhoven,
+                Standard Liege, Sporting Lisbon, Casa Pia, Arouca ...
+                -> Eredivisie, Belgian Pro League, Primeira Liga
+```
+
+**The scoreboard and the odds capture cover DIFFERENT LEAGUES.** Only 2 of 22
+grid clubs are MLS (Houston Dynamo, New England Revolution) and there is a
+`HOU @ NE` chip — so a PERFECT alias table would resolve about **one** game,
+not 61. The other 20 have no chip to match at any level of aliasing.
+
+Had the table been written it would have matched ~1 row and read as a broken
+alias map, sending the next person hunting in the wrong place.
+
+**THE REAL WORK** is league-coverage alignment, in `soccer/sources.py`'s
+`active_leagues_for_date` and the chip provider — not `team_aliases`. Either
+extend chips to the leagues we actually price, or narrow capture to the leagues
+we can state. The first is almost certainly right: we are already paying
+OddsAPI for those markets.
+
+The alias table is still needed **eventually** — once chips cover those leagues,
+`CLB` -> Columbus Crew starts to matter. It is step two, not step one. The test
+pinning `_alias_map("soccer") == {}` stays, so its absence remains a decision.
 
 **NFL week self-pinning — CURED AND VERIFIED 2026-08-08.** Supersedes the
 "filtered, not cured" note this entry originally carried.
