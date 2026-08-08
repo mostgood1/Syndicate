@@ -520,12 +520,53 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 	return meta
 
 
+def _live_lens_active_sports() -> tuple[str, ...]:
+	"""Which of the REGISTERED sports this service should actually tick.
+
+	`_LIVE_LENS_SPORTS` is the registry -- what has a builder, a validator and a
+	snapshot path. It is not, and was being used as, the answer to "what should
+	this service work on". Measured 2026-08-08: refresh-worker's
+	`SYNDICATE_ACTIVE_SPORTS` is `mlb,wnba,soccer,nfl`, yet the loop built NBA
+	every cycle at 1.6-42s and up to +321MB for a sport with no August slate --
+	roughly 10% of the long cycles. Nothing reconciled the two lists, and
+	`SYNDICATE_ACTIVE_SPORTS` was read in only two places, both web navigation
+	(`syndicate/app.py`, `blueprints/home.py`).
+
+	TWO DELIBERATE REFUSALS TO LET CONFIG SILENCE THE LOOP, because a background
+	stage that stops for a config reason and says nothing is the defect this
+	module keeps shipping:
+
+	  * UNSET means tick everything registered. It does NOT mean fall back to
+	    `home.py`'s `"mlb,wnba"` default, which would silently drop soccer, nfl
+	    and nba from the tick on any service that forgot the variable.
+	  * A value that matches NOTHING (a typo, a renamed sport) also ticks
+	    everything, rather than ticking nothing. An empty intersection is far
+	    more likely to be a mistake than an intention.
+
+	Either way the skipped set is reported on every tick -- see `_run_live_lens_tick`.
+	"""
+	raw = str(os.environ.get("SYNDICATE_ACTIVE_SPORTS") or "").strip()
+	if not raw:
+		return _LIVE_LENS_SPORTS
+	configured = {part.strip().lower() for part in raw.split(",") if part.strip()}
+	active = tuple(sport for sport in _LIVE_LENS_SPORTS if sport in configured)
+	return active or _LIVE_LENS_SPORTS
+
+
 def _run_live_lens_tick() -> dict[str, Any]:
 	date_str = central_today_iso()
-	results = {sport: _run_live_lens_tick_for_sport(sport, date_str) for sport in _LIVE_LENS_SPORTS}
+	active_sports = _live_lens_active_sports()
+	skipped_sports = [sport for sport in _LIVE_LENS_SPORTS if sport not in active_sports]
+	results = {sport: _run_live_lens_tick_for_sport(sport, date_str) for sport in active_sports}
 	meta = {
 		"startedAt": _utc_now(),
 		"date": date_str,
+		"activeSports": list(active_sports),
+		# Named, not merely absent. A sport missing from `results` is
+		# indistinguishable from a sport whose tick never got that far, and
+		# "not configured for this service" and "failed" must not share a
+		# spelling.
+		"skippedSports": skipped_sports,
 		"results": results,
 		"ok": all(bool(result.get("ok")) for result in results.values()),
 	}
@@ -628,7 +669,12 @@ def _live_lens_background_loop() -> None:
 			},
 		)
 		summary = {sport: result.get("ok") for sport, result in (meta.get("results") or {}).items()}
-		print(f"[live_lens_loop] TICK_COMPLETE results={summary} nextIntervalSeconds={interval_seconds}", flush=True)
+		print(
+			f"[live_lens_loop] TICK_COMPLETE results={summary} "
+			f"skipped={meta.get('skippedSports') or []} "
+			f"nextIntervalSeconds={interval_seconds}",
+			flush=True,
+		)
 		_LIVE_LENS_LOOP_STOP.wait(interval_seconds)
 
 
