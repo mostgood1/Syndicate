@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import fnmatch
 import hashlib
+import re
 import json
 import logging
 import os
@@ -518,6 +519,65 @@ class HotArtifactSweepResult(NamedTuple):
         return not self.failed_paths
 
 
+# Only TODAY's slate is hot. Everything older is an archive and belongs on disk,
+# not on the wire every cycle.
+#
+# THE BUG THIS FIXES, measured 2026-08-08: the sweep selected purely on mtime, so
+# any file the artifact PULL rewrote looked "changed" and was republished --
+# regardless of the slate it described. live-odds-worker was republishing
+# `oddsapi_player_props_2026-05-25.csv`, `game_cards_2026-05-26.csv` and
+# `smart_sim_2026-05-27_*.json` -- MAY artifacts, two and a half months dead --
+# on every boot. Web then wrote them, which moved their mtime again, so the next
+# sweep picked them up once more: a publish/pull ping-pong over an archive.
+#
+# That is what killed the service. `publish_hot_artifact` holds FOUR full copies
+# of each file at once (read_text -> encode for checksum -> json.dumps ->
+# encode), so a 51MB odds-history shard is ~200MB resident, and both the sender
+# (2Gi) and the receiver (web, also 2Gi, which parses the body whole) were dying
+# on it. One root cause, two OOMing services.
+#
+# 1 = today and yesterday, because a slate crosses UTC midnight and last night's
+# finals still settle this morning.
+_PUBLISH_MAX_AGE_DAYS = 1
+
+# Belt and braces, and independent of the date rule: an UNDATED file cannot be
+# aged out, and `boxscores_history.csv` is exactly that shape. Sized well above a
+# normal artifact and well under what four copies of it would cost on 2Gi.
+_PUBLISH_MAX_BYTES = 12 * 1024 * 1024
+
+_DATE_TOKEN = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
+
+
+def _artifact_date(path: Path) -> date | None:
+    """The slate a file describes, from its name. None when it carries no date.
+
+    Undated files (`current_week.json`, `boxscores_history.csv`) are NEVER aged
+    out on this rule -- there is nothing to judge them against, and silently
+    dropping them would be a coverage bug wearing a memory fix's clothes.
+    """
+    match = _DATE_TOKEN.search(path.name)
+    if not match:
+        return None
+    try:
+        return date(int(match.group(1)), int(match.group(2)), int(match.group(3)))
+    except ValueError:
+        return None
+
+
+def _publish_skip_reason(path: Path, today: date) -> str | None:
+    """Why this file must not be published, or None to publish it."""
+    artifact_date = _artifact_date(path)
+    if artifact_date is not None and (today - artifact_date).days > _PUBLISH_MAX_AGE_DAYS:
+        return f"stale_slate:{artifact_date.isoformat()}"
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return None
+    if size > _PUBLISH_MAX_BYTES:
+        return f"too_large:{size}"
+    return None
+
+
 def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepResult:
     """Sweep the allowlisted hot-artifact locations under the data root and publish
     any file modified at or after ``since_epoch_seconds``.
@@ -530,6 +590,8 @@ def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepR
     root = _data_root()
     published = 0
     failed: list[Path] = []
+    today = date.today()
+    skipped: dict[str, int] = {}
     for pattern in HOT_ARTIFACT_PATTERNS:
         for candidate in root.glob(pattern):
             try:
@@ -537,10 +599,19 @@ def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepR
                     continue
             except OSError:
                 continue
+            reason = _publish_skip_reason(candidate, today)
+            if reason is not None:
+                # Counted and logged, never silent: a sweep that quietly stops
+                # publishing a whole class of artifact is indistinguishable from
+                # one that has nothing to publish.
+                skipped[reason.split(":", 1)[0]] = skipped.get(reason.split(":", 1)[0], 0) + 1
+                continue
             if publish_hot_artifact(candidate):
                 published += 1
             else:
                 failed.append(candidate)
+    if skipped:
+        print(f"[artifact_publisher] SWEEP_SKIPPED {skipped}", flush=True)
     return HotArtifactSweepResult(published_count=published, failed_paths=tuple(failed))
 
 
