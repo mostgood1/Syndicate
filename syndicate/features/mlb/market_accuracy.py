@@ -182,6 +182,30 @@ def _row_title(row: dict[str, Any], matchup: str) -> str:
     return f"{matchup} {selection} {market}".strip()
 
 
+def _specific_market(row: dict[str, Any]) -> str:
+    """The row's market, made specific enough to canonicalise.
+
+    Hitter rows already carry a specific market (`hitter_hits` ->
+    `batter_hits`), but every pitcher row carries the generic BUCKET
+    `pitcher_props` and keeps which prop it actually is in `prop`. That is
+    unresolvable downstream: `canonical_market_key("mlb", "pitcher_props")`
+    returns `pitcher_props`, while the ledger's own label for the same bet
+    ("outs recorded") returns `outs`, so `_markets_compatible` vetoes the
+    match. Measured on 2026-07-08: 64 records whose player key matched a
+    graded row exactly were rejected on this alone, and it was the ONLY
+    market pair failing that check.
+
+    `pitcher_outs` and `pitcher_strikeouts` both canonicalise to the same key
+    as the ledger's labels, so promoting the bucket to `pitcher_<prop>`
+    closes it. `_row_title` already falls back to `prop` this way.
+    """
+    market = str(row.get("market") or "").strip()
+    prop = str(row.get("prop") or "").strip()
+    if prop and market in {"pitcher_props", "hitter_props"}:
+        return f"{market.split('_')[0]}_{prop}"
+    return market
+
+
 def _normalized_rows(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
     games = payload.get("games") if isinstance(payload.get("games"), dict) else {}
     rows_by_kind: dict[str, list[dict[str, Any]]] = {kind: [] for _, kind in _ROW_SETS}
@@ -197,7 +221,7 @@ def _normalized_rows(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]
                 normalized = {
                     "game_pk": int(row.get("game_pk") or game_pk or 0) or None,
                     "matchup": matchup,
-                    "market": str(row.get("market") or "").strip(),
+                    "market": _specific_market(row),
                     "title": _row_title(row, matchup),
                     "player_name": str(row.get("player_name") or row.get("pitcher_name") or "").strip() or None,
                     "team": str(row.get("team") or "").strip() or None,

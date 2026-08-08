@@ -187,3 +187,45 @@ class PitcherOddsFallbackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PitcherMarketLabelTests(unittest.TestCase):
+    """A graded pitcher row must name WHICH prop it is, or it cannot match.
+
+    Hitter rows carry a specific market (`hitter_hits` -> canonical
+    `batter_hits`), but every pitcher row carried the generic bucket
+    `pitcher_props`, keeping the actual prop in `prop`. `pitcher_props`
+    canonicalises to itself while the ledger's label for the same bet ("outs
+    recorded") canonicalises to `outs`, so `_markets_compatible` vetoed the
+    match. Measured on 2026-07-08: 64 records whose player key matched a
+    graded row exactly were rejected on this alone, and it was the ONLY market
+    pair failing that check. Fixing it took settlement 0 -> 64 would-settle.
+    """
+
+    def test_pitcher_bucket_is_promoted_to_the_specific_prop(self) -> None:
+        from syndicate.features.mlb.market_accuracy import _specific_market
+
+        self.assertEqual(_specific_market({"market": "pitcher_props", "prop": "outs"}), "pitcher_outs")
+
+    def test_promoted_label_canonicalises_to_the_ledgers_key(self) -> None:
+        from syndicate.features.mlb.market_accuracy import _specific_market
+        from syndicate.features.shared.market_keys import canonical_market_key
+
+        promoted = _specific_market({"market": "pitcher_props", "prop": "outs"})
+        self.assertEqual(
+            canonical_market_key("mlb", promoted),
+            canonical_market_key("mlb", "outs recorded"),
+            "the graded row and the ledger's own label must resolve to one key",
+        )
+
+    def test_specific_markets_are_left_alone(self) -> None:
+        from syndicate.features.mlb.market_accuracy import _specific_market
+
+        self.assertEqual(_specific_market({"market": "hitter_hits", "prop": "hits_1plus"}), "hitter_hits")
+        self.assertEqual(_specific_market({"market": "ml"}), "ml")
+
+    def test_missing_prop_leaves_the_bucket_unchanged(self) -> None:
+        """No prop means nothing to promote -- must not fabricate a label."""
+        from syndicate.features.mlb.market_accuracy import _specific_market
+
+        self.assertEqual(_specific_market({"market": "pitcher_props"}), "pitcher_props")
