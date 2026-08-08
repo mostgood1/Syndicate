@@ -2,9 +2,8 @@
 
 ### 2026-08-08 (late) — SOCCER `game.state`: FIXED, 0 → 300/300 rows. The nine-hypothesis chase was hunting a defect that did not exist
 
-**Code is on `main`, NOT DEPLOYED.** See the attribution note at the end — it
-landed inside `66d98120` ("todo: #268 ... keep it dark"), which is not what
-that commit is about.
+**NOT DEPLOYED.** See the attribution note at the end before hunting for the
+commit — this work collided with a concurrent session twice.
 
 **The tenth hypothesis refuted the ninth.** The previous session narrowed to
 "`build_cards_page_context` RETURNS AN EMPTY GAMES LIST for seven leagues".
@@ -81,20 +80,32 @@ leagues) was the mis-reading above.
 - `tests/test_layer2_shortlist_wiring.py` has **6 failures that predate this
   work** (verified by stashing). Untouched here, not diagnosed.
 
-#### ATTRIBUTION — a parallel session absorbed this commit
+#### ATTRIBUTION — a concurrent session absorbed then reset this commit
 
-Committed as `a81d8570` with its own message; a concurrent session's `git`
-staging then swept all five files into `66d98120`, whose message is about
-`#268`. `a81d8570` is **not an ancestor of `main`** and is dangling; the code
-is byte-identical on `main` (`git diff a81d8570 main -- <files>` empty).
-History was NOT rewritten to split them — that is not a safe operation while
-another session is pushing. **If you are looking for where the soccer join fix
-landed, it is `66d98120`.**
+Worth reading before trusting any commit SHA in this entry. Sequence:
 
-This is the same hazard the 08-08 evening entry logged in the other direction
-("a parallel session pushed six NFL commits mid-session"). Per-file staging
-protects the *other* session's work from yours; it does not protect yours from
-theirs. **After committing, check `git merge-base --is-ancestor <sha> main`.**
+1. Committed as `a81d8570`, five files, per-file staged.
+2. A concurrent session committed `66d98120` (message: `#268`), which **swept
+   all five of those files in**. `a81d8570` stopped being an ancestor of `main`.
+3. That session then **reset `66d98120` away**, so the five files returned to
+   the working tree as uncommitted modifications — and `a81d8570` is dangling.
+
+4. Re-committed as **`f5587752`**, verified an ancestor of `main`.
+
+If that SHA does not resolve, look for the content and not the commit:
+`_soccer_alias_to_name` in `team_aliases.py` is the marker.
+
+`docs/ai_context/todo.md` was deliberately NOT committed with the code — its
+working copy also held that session's uncommitted `#268` rewrite, and staging
+the file would have swept their work exactly as mine was swept. This entry
+therefore reached `main` inside **`43128451`** (their `#268` todo commit), one
+commit BELOW the code it describes.
+
+Same hazard the 08-08 evening entry logged in the other direction ("a parallel
+session pushed six NFL commits mid-session"). **Per-file staging protects the
+other session's work from yours; it does not protect yours from theirs.** After
+committing, check `git merge-base --is-ancestor <sha> main` — that is the check
+that caught this, and nothing else would have.
 
 #### OPERATIONAL — the lesson is about the instrument, not the bug
 
