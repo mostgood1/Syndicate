@@ -862,7 +862,47 @@ def _extract_report_hitter_predictions(game: Dict[str, Any], hr_calibration: Dic
             rec["team_side"] = str(side)
             rec["is_lineup_batter"] = True
         else:
-            rec.setdefault("is_lineup_batter", False)
+            # `_batter_side` needs confirmed/projected lineup ID sets on the
+            # GAME, and the eval reports do not carry them -- measured across
+            # all 46 local report dates: zero games have either field. So this
+            # branch was taken for every batter, and `setdefault(..., False)`
+            # then stamped is_lineup_batter=False over a row that says
+            # `"is_lineup_batter": true`, while `team` was never set at all.
+            #
+            # Both gates downstream read exactly those two fields:
+            # `_is_hitter_prediction_eligible` early-returns False on the flag
+            # before it ever consults pa_mean, and the caller skips any rec
+            # with an empty team. Result: **9,845 of 9,845** batter
+            # predictions rejected, so hitter props graded ZERO rows on every
+            # date -- with pa_mean > 0 on all 9,845, i.e. every one of them
+            # projected to bat.
+            #
+            # The row itself is the authority here and already carries `team`,
+            # `lineup_order` and `is_lineup_batter`. Fall back to it rather
+            # than inventing a looser eligibility rule: this leaves
+            # `_is_hitter_prediction_eligible` (shared with the live
+            # bet-placement path in daily_update_multi_profile) untouched, so
+            # a genuinely benched batter is still excluded.
+            row_team = str(row.get("team") or "").strip()
+            if row_team and not str(rec.get("team") or "").strip():
+                rec["team"] = row_team
+                for candidate_side in ("away", "home"):
+                    block = game.get(candidate_side) or {}
+                    if str(block.get("abbr") or "").strip().upper() == row_team.upper():
+                        rec["team_side"] = candidate_side
+                        rec["team_name"] = str(block.get("name") or "")
+                        break
+            row_flag = row.get("is_lineup_batter")
+            if isinstance(row_flag, bool):
+                # A batter appears in several prop blocks; in the lineup once
+                # is in the lineup.
+                previous = rec.get("is_lineup_batter")
+                rec["is_lineup_batter"] = bool(row_flag) if not isinstance(previous, bool) else bool(previous or row_flag)
+            else:
+                rec.setdefault("is_lineup_batter", False)
+            row_order = _safe_int(row.get("lineup_order"))
+            if row_order is not None and rec.get("lineup_order") is None:
+                rec["lineup_order"] = int(row_order)
         for key in ("ab_mean", "pa_mean"):
             value = _safe_float(row.get(key))
             if value is None:
@@ -1031,6 +1071,24 @@ def _collect_report_pitcher_recommendations(
     outs_prob_calibration = ((report_obj.get("meta") or {}).get("outs_prob_calibration") or {})
     so_prob_calibration = ((report_obj.get("meta") or {}).get("so_prob_calibration") or {})
 
+    # The report's per-side `market` block is EMPTY in the eval reports --
+    # measured across all 46 local report dates, every game, both sides. The
+    # model side (`pred`) is fully populated, so this path had distributions
+    # and no lines to price them against, and `line_value is None -> continue`
+    # dropped every pitcher prop. Unlike the hitter path, which reads
+    # `oddsapi_hitter_props_*` directly, this one never consulted the pitcher
+    # odds file at all. Fall back to it, keyed the same way the hitter path
+    # keys its own (normalized player name).
+    pitcher_odds_by_name: Dict[str, Dict[str, Any]] = {}
+    pitcher_lines_path = _odds_paths(date_str)["pitcher_lines"]
+    if pitcher_lines_path.exists():
+        pitcher_odds_doc = _read_json_dict(pitcher_lines_path)
+        pitcher_odds_by_name = {
+            normalize_pitcher_name(str(name)): markets
+            for name, markets in ((pitcher_odds_doc.get("pitcher_props") or {}) or {}).items()
+            if normalize_pitcher_name(str(name)) and isinstance(markets, dict)
+        }
+
     for game in report_obj.get("games") or []:
         if not isinstance(game, dict):
             continue
@@ -1042,6 +1100,10 @@ def _collect_report_pitcher_recommendations(
             side_props = pitcher_props.get(side) or {}
             pred = side_props.get("pred") or {}
             market = side_props.get("market") or {}
+            if not market:
+                starter_key = normalize_pitcher_name(str(starter_names.get(side) or ""))
+                if starter_key:
+                    market = pitcher_odds_by_name.get(starter_key) or {}
             for market_name in _iter_pitcher_market_names(policy):
                 market_spec = PITCHER_MARKET_SPECS.get(str(market_name)) or {}
                 market_key = str(market_spec.get("market_key") or "")
