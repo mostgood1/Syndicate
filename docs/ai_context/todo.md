@@ -213,8 +213,20 @@ not 61. The other 20 have no chip to match at any level of aliasing.
 Had the table been written it would have matched ~1 row and read as a broken
 alias map, sending the next person hunting in the wrong place.
 
-**THE REAL WORK** is league-coverage alignment, in `soccer/sources.py`'s
-`active_leagues_for_date` and the chip provider — not `team_aliases`. Either
+**NARROWED 2026-08-08, and it is NOT `active_leagues_for_date`.** All ten
+leagues are configured AND active for 08-08:
+
+    ['epl','la_liga','bundesliga','serie_a','ligue_1','mls','eredivisie',
+     'primeira_liga','championship','belgian_pro_league']
+
+Yet chips appear for only MLS/EPL/La Liga. So the chip BUILDER is not producing
+rows for the other seven despite them being active — which points at per-league
+artifact availability (schedule / live_state under
+`soccer_source/<league>/api/`), not at league selection. **Start there, not in
+`sources.py`.**
+
+**THE REAL WORK** is league-coverage alignment between the chip provider and the
+odds capture — not `team_aliases`. Either
 extend chips to the leagues we actually price, or narrow capture to the leagues
 we can state. The first is almost certainly right: we are already paying
 OddsAPI for those markets.
