@@ -1,5 +1,66 @@
 # Syndicate TODO — canonical cross-session list
 
+### SHIPPED 2026-08-08 (afternoon) — board plan: S1b verified, S2 planned, 4 fixes
+
+Continues `65b15a03`, which covered the L2-A projection faults. These are the
+commits after it, none of which had reached this file.
+
+| commit | what |
+|---|---|
+| `da20cd3e` | `_SCORE_SIM_WEIGHT` 0.5 → **0.0**, gated on S6 |
+| `cd91ff1b` | `plan_pregame_vs_live_cadence.md` — S2 planned, not built |
+| `a432f6d9` | NFL + WNBA team alias maps → `game.state` populates |
+| `bf56a643` | NFL week self-pinning — date filter on the board |
+
+**S1b NEEDED NO WORK — it is done and passing.** Measured:
+`rows_with_suspect_best` **1,794/15,123 (11.9%)** against the 47% the north-star
+plan records, and every remaining suspect row is also `all_quotes_stale`, so
+suspect-best survives only where nothing fresh existed. `rows_single_book` did
+not rise (the anti-cheat). **The plan's record was stale, not the code** — check
+before building.
+
+**`game.state` — the S2 blocker, 2 of 4 sports fixed.** Chips existed for every
+sport all along; the JOIN was failing because `_alias_map` handled mlb/nba/wnba
+only, and WNBA's map had gaps (`MIN`, `POR` unresolved).
+
+    sport    before -> after (rows with state, of 200)
+    mlb        60   -> 200
+    wnba        0   -> 144   (78 of them LIVE)
+    nfl         0   -> 0     blocked on chips, not aliases (see below)
+    soccer      0   -> 0     DELIBERATE, still unmapped
+
+WNBA is the one that mattered: **78 in-progress rows previously read `None`**, so
+`opportunity_gate` saw them as pregame and **live WNBA markets were rankable**.
+
+**SOCCER IS DELIBERATELY UNMAPPED** and a test pins that so it stays a decision.
+~10 leagues, no stable tri-code convention across feeds. **61 chips went
+unmatched on 08-08 — that is the size of the prize.** Needs its own pass.
+
+**NFL week self-pinning — FILTERED, NOT CURED.** `bf56a643` narrows the board to
+games actually on the requested date via ESPN. But `preseason_target_week` still
+returns `min(weeks whose status != "final")` and **nothing refreshes that status
+column** (`fetch_nfl_preseason_schedule.py` is a manual CLI wired into no
+pipeline). It has three other callers — `refresh_odds_sources`,
+`run_refresh_worker`, `blueprints/home` — so the root cause is open.
+**Expect NFL `with_state = 0` today and do not read it as a failed fix**: the
+board's NFL rows are regular season while the only chips are preseason. The real
+test is **08-13**, when six preseason games are on.
+
+**S2 IS PLANNED, NOT BUILT, and the plan says why the obvious version cannot
+ship:** uniform 5-minute pregame is ~3.6× current burn = **~134% of the 5M cap**.
+Tiering works because game lines bill per SPORT (4.4% of credits) while props
+bill per EVENT (59.8%) — so game lines can go fast and props cannot. That is
+arithmetic, not preference. Measured pregame p50 17.8 min, **p90 258 min**.
+
+**THE OPERATIONAL LESSON, and it cost more than any single bug today: THREE
+wrong readings came from measuring the WRONG BUILD.** `/api/board/book-grid`
+computes projections at serve time on **web**, while the L2 artifact is built on
+**refresh-worker** — they can be on different commits. Two more came from
+watchers that failed toward false confirmation (a field the endpoint never
+exposed; a truncated-prefix string compare that passed a pre-deploy artifact as
+post-deploy). **"Which build produced this number" belongs before interpretation,
+not as the recovery step.**
+
 ### 2026-08-08 — L2-A: three faults found, two fixed, and the one that blocks the board
 
 Written by the board session; the OOM session implemented the third fix. We split
