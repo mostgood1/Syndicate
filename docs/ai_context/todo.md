@@ -230,12 +230,21 @@ Ruled OUT by measurement, so nobody repeats these:
    (queried one league at a time so the export budget could not truncate it).
 5. **ORPHAN / future fixtures** — refuted: all 400 grid rows are TODAY.
 
-So: today's file exists, the league is active, the provider asks for it, and we
-are pricing 400 rows of real games — and no chip comes out. **The remaining
-candidate is that those `live_state_<today>.json` files carry `count: 0`**
-(`_soccer_has_live_game_via_artifact` reads exactly that field), i.e. the
-live-state poller is writing empty files for leagues whose fixtures the ODDS
-side is finding. Next step: read the `count` inside those files per league.
+6. **`live_state` `count: 0`** — REFUTED, and it was my own next-step guess.
+   Measured: `count` is **0 for ALL TEN leagues**, including mls/epl/la_liga
+   which DO produce 61 chips. So `live_state` is a RED HERRING — chips do not
+   come from that file. `_soccer_has_live_game_via_artifact` reads it for LIVE
+   DETECTION in the refresh loop, not for the chip builder. **Do not chase it.**
+
+So: today's file exists, the league is active, the provider fans out to it, and
+we are pricing 400 rows of real games — and no chip comes out.
+
+**WHERE TO ACTUALLY LOOK.** Chips come from
+`_SoccerDataProvider.games()` -> per-league card/schedule builders (NOT
+live_state). That path yields games for mls/epl/la_liga and nothing for the
+other seven. The question is what those builders read per league and why three
+succeed — start by diffing what the MLS branch finds against what the
+Eredivisie branch finds for the same date.
 
 **Consequence:** soccer `game.state` is None on a board carrying 400 live-today
 rows, so `opportunity_gate`'s dead-market rule cannot fire for any of them —
