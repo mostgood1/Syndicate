@@ -2,8 +2,9 @@
 
 ### 2026-08-08 (late) — SOCCER `game.state`: FIXED, 0 → 300/300 rows. The nine-hypothesis chase was hunting a defect that did not exist
 
-**NOT DEPLOYED.** See the attribution note at the end before hunting for the
-commit — this work collided with a concurrent session twice.
+**Code `f465edb4`, NOT DEPLOYED.** A concurrent-session `--amend` collision
+mangled the commit messages here and was repaired; see the attribution note at
+the end for the method, which is worth reusing.
 
 **The tenth hypothesis refuted the ninth.** The previous session narrowed to
 "`build_cards_page_context` RETURNS AN EMPTY GAMES LIST for seven leagues".
@@ -80,32 +81,49 @@ leagues) was the mis-reading above.
 - `tests/test_layer2_shortlist_wiring.py` has **6 failures that predate this
   work** (verified by stashing). Untouched here, not diagnosed.
 
-#### ATTRIBUTION — a concurrent session absorbed then reset this commit
+#### ATTRIBUTION — `git commit --amend` in a shared tree, and how it was repaired
 
-Worth reading before trusting any commit SHA in this entry. Sequence:
+**Resolved. Final history is `f465edb4` (code) → `ab04fe60` (this entry).**
+Kept because the failure mode is repo-wide and the repair method matters.
 
-1. Committed as `a81d8570`, five files, per-file staged.
-2. A concurrent session committed `66d98120` (message: `#268`), which **swept
-   all five of those files in**. `a81d8570` stopped being an ancestor of `main`.
-3. That session then **reset `66d98120` away**, so the five files returned to
-   the working tree as uncommitted modifications — and `a81d8570` is dangling.
+A concurrent session ran `git commit --amend` twice while this session was
+staging and committing the same tree. `--amend` in a shared checkout does not
+just rewrite your own commit — it absorbs whatever is in the tree and index,
+including another session's:
 
-4. Re-committed as **`f5587752`**, verified an ancestor of `main`.
+1. First amend swallowed five source files this session had unstaged. Reversed
+   with `git reset --mixed`; files returned to the tree intact.
+2. Second amend landed **on this session's freshly-created commit** and
+   replaced its message with theirs — the soccer fix, carrying an L2-A todo
+   message. Their own `git diff --cached` had been clean moments earlier; the
+   commit landed in the gap between the check and the amend.
+3. Separately, their `todo.md` staging absorbed this entry, because its edit
+   sat unstaged at the time.
 
-If that SHA does not resolve, look for the content and not the commit:
-`_soccer_alias_to_name` in `team_aliases.py` is the marker.
+**Nothing was ever lost — trees were byte-identical throughout.** Every round
+was attribution damage only. That is the thing to internalise: the symptom is
+never a missing file, so nothing in `git status` or a test run will show it.
 
-`docs/ai_context/todo.md` was deliberately NOT committed with the code — its
-working copy also held that session's uncommitted `#268` rewrite, and staging
-the file would have swept their work exactly as mine was swept. This entry
-therefore reached `main` inside **`43128451`** (their `#268` todo commit), one
-commit BELOW the code it describes.
+**The repair, and why not `reset --hard`.** The obvious fix
+(`reset --hard <tag>` + cherry-pick) would have destroyed **14 dirty tracked
+files** belonging to whoever else was working in the tree — the same class of
+mistake that caused the damage. Instead the two commits were rebuilt with
+`git commit-tree` (same trees, correct parents, original messages and
+authorship) and `main` moved with `git reset --soft`, which touches neither
+the working tree nor the index. Verified after: tree hash unchanged,
+`git status --porcelain` byte-identical before and after, index empty.
 
-Same hazard the 08-08 evening entry logged in the other direction ("a parallel
-session pushed six NFL commits mid-session"). **Per-file staging protects the
-other session's work from yours; it does not protect yours from theirs.** After
-committing, check `git merge-base --is-ancestor <sha> main` — that is the check
-that caught this, and nothing else would have.
+**How to apply.**
+- **Never `git commit --amend` in this repo.** A sibling session's commit can
+  land between your `--cached` check and the amend.
+- After every commit, run `git merge-base --is-ancestor <sha> main`. Nothing
+  else catches this — not `git status`, not `git log -1`, not a clean tree.
+- If you must rewrite shared history, use `commit-tree` + `reset --soft`, and
+  tag the originals first. Never `reset --hard` a tree you do not exclusively
+  own.
+- Per-file staging protects the *other* session's work from yours; it does not
+  protect yours from theirs. Same hazard as the 08-08 evening entry ("a
+  parallel session pushed six NFL commits mid-session"), from the other side.
 
 #### OPERATIONAL — the lesson is about the instrument, not the bug
 
