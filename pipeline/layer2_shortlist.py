@@ -63,13 +63,22 @@ def build_layer2_shortlist(
                 attach_projections,
             )
             from syndicate.features.shared.book_grid import build_book_grid
-            from syndicate.features.shared.odds_book_quotes import read_book_quotes
+            from syndicate.features.shared.odds_book_quotes import read_book_quotes, read_quote_last_seen
 
             quote_rows = read_book_quotes(sport, selected_date)
             if not quote_rows:
                 per_sport_stats[sport] = {"quote_rows": 0, "grid_rows": 0, "opportunities": 0}
                 continue
-            grid = build_book_grid(quote_rows, max_rows=max_grid_rows_per_sport)
+            # Last-seen turns the grid's single age into two: time since the
+            # price MOVED, and time since we LOOKED. Only the second is
+            # staleness, and scoring was discounting stable markets for the
+            # first. Empty for dates whose state predates the tracking, which
+            # leaves `seen_age_seconds` absent and the old behaviour intact.
+            try:
+                last_seen = read_quote_last_seen(sport, selected_date)
+            except Exception:
+                last_seen = {}
+            grid = build_book_grid(quote_rows, max_rows=max_grid_rows_per_sport, last_seen=last_seen)
 
             # ENRICH BEFORE RANKING. Without these three the persisted board is
             # unusable, and each failure is silent rather than empty:

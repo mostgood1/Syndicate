@@ -215,6 +215,12 @@ def _write_state(path: Path, state: Mapping[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def quote_key(row: Mapping[str, Any]) -> str:
+    """Public alias for the log's identity key, so consumers can join a grid
+    cell back to `read_quote_last_seen()` without reaching into a private."""
+    return _quote_key(row)
+
+
 def read_quote_last_seen(sport: str, date_str: str) -> dict[str, str]:
     """`_quote_key` -> ISO timestamp we last OBSERVED that market.
 

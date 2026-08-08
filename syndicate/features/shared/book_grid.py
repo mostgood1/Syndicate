@@ -62,6 +62,26 @@ def _observed_at(row: Mapping[str, Any]) -> str:
     return str(row.get("book_updated_at") or row.get("snapshot_ts") or row.get("captured_at") or "")
 
 
+def _seen_age_seconds(
+    row: Mapping[str, Any], last_seen: Mapping[str, str] | None, *, now: datetime
+) -> float | None:
+    """Seconds since we last OBSERVED this market, or None when unknown.
+
+    None is a real answer here and must not collapse to the movement age: dates
+    whose state file predates last-seen tracking have no entry, and reporting
+    the movement age in its place would recreate the exact confusion this field
+    exists to end.
+    """
+    if not last_seen:
+        return None
+    try:
+        from syndicate.features.shared.odds_book_quotes import quote_key
+    except Exception:
+        return None
+    stamp = last_seen.get(quote_key(row))
+    return _age_seconds(str(stamp or ""), now=now)
+
+
 def _age_seconds(stamp: str, *, now: datetime) -> float | None:
     if not stamp:
         return None
@@ -142,11 +162,25 @@ def build_book_grid(
     *,
     now: datetime | None = None,
     max_rows: int | None = None,
+    last_seen: Mapping[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Pivot raw `book_quotes` rows into per-market grid rows.
 
     Each returned row is one market instance carrying every book that quoted it
     and every side, plus the derived columns the reference surface shows.
+
+    `last_seen` (from `read_quote_last_seen`) turns `age_seconds` from one
+    number into two, and the distinction is the whole point:
+
+        age_seconds       time since this price last MOVED
+        seen_age_seconds  time since we last LOOKED at this market
+
+    `book_quotes` is a change log -- an unchanged price writes no row -- so
+    `_observed_at` can only ever answer the first. Measured 2026-08-08, all 100
+    MLB rows on the served board carried ~11.9h ages inside a 1.2-minute window,
+    which read as a capture outage and was in fact 100 motionless markets. Omit
+    `last_seen` and `seen_age_seconds` is simply absent, which every consumer
+    must treat as UNKNOWN rather than as fresh or as stale.
     """
     now = now or datetime.now(timezone.utc)
     materialised = [row for row in rows or () if isinstance(row, Mapping)]
@@ -191,6 +225,7 @@ def build_book_grid(
                     "line": row.get("line"),
                     "observed_at": _observed_at(row) or None,
                     "age_seconds": _age_seconds(_observed_at(row), now=now),
+                    "seen_age_seconds": _seen_age_seconds(row, last_seen, now=now),
                 }
 
             # Per-cell staleness FIRST, because #S1b's best/consensus selection
@@ -311,6 +346,7 @@ def build_book_grid(
                     "books_quoting": len(prices),
                     "books_quoting_including_stale": len(all_prices),
                     "age_seconds": best_age,
+                    "seen_age_seconds": best_cell.get("seen_age_seconds"),
                     "lag_behind_freshest_seconds": lag,
                     "edge_vs_consensus_pct": round(
                         (_implied_probability(side_consensus) - _implied_probability(top_price)) * 100, 2

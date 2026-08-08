@@ -401,16 +401,29 @@ def _book_confidence(books_quoting: Any) -> float:
     return 1.0
 
 
-def _freshness_factor(book_age_seconds: Any) -> float:
-    """How much a price that moved N seconds ago is still worth.
+def _freshness_factor(book_age_seconds: Any, seen_age_seconds: Any = None) -> float:
+    """How much a price we last OBSERVED N seconds ago is still worth.
 
     Judged on the BOOK clock, never our capture clock. Decays hard: production
     served a board where every price was ~7 hours old and it looked identical to
     a live one, which is exactly the failure this factor exists to make visible
     in the ranking rather than only in a column.
+
+    CORRECTED: `book_age_seconds` does not mean what this factor needs.
+    `book_quotes` is a change log -- an unchanged price writes no row -- so that
+    age is "time since this price last MOVED", and discounting it punishes a
+    market for being STABLE. Measured 2026-08-08: all 100 MLB rows on the served
+    board sat at ~11.9h inside a 1.2-minute window, every one of them scored
+    down to 0.5 or worse for the crime of not moving overnight.
+    `seen_age_seconds` is the real staleness clock and wins when present.
+
+    It is absent for any date whose quote state predates last-seen tracking, and
+    there the movement age remains the only signal available -- a deliberately
+    conservative fallback, not an equivalence.
     """
+    preferred = seen_age_seconds if seen_age_seconds is not None else book_age_seconds
     try:
-        age = float(book_age_seconds)
+        age = float(preferred)
     except (TypeError, ValueError):
         # Unknown age is not fresh. Several sources publish no book clock at
         # all, and treating that as "brand new" would float them to the top.
@@ -449,6 +462,7 @@ def blended_score(
     model_edge: Any = None,
     books_quoting: Any = None,
     book_age_seconds: Any = None,
+    quote_seen_age_seconds: Any = None,
     price: Any = None,
     fair_prob: Any = None,
 ) -> dict[str, Any] | None:
@@ -476,7 +490,7 @@ def blended_score(
         return None
     value = (value_ev or 0.0) + _SCORE_SIM_WEIGHT * (value_sim or 0.0)
     confidence = _book_confidence(books_quoting)
-    freshness = _freshness_factor(book_age_seconds)
+    freshness = _freshness_factor(book_age_seconds, quote_seen_age_seconds)
     # Third multiplicative reliability term, alongside book breadth and
     # freshness, for the same reason they are multiplicative: it is not
     # additional value, it is confidence in the value already computed.
