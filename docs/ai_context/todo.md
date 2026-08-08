@@ -620,6 +620,98 @@ cause, three symptoms, three different discovery dates.** Reading a finding from
 another sport back into your own is what turned a latent NFL outage into a
 committed fix; `#273` was found from NFL, and `#274` was found back from NCAAF.
 
+### WINDOW-TWO VERIFICATION RECIPE for `#273` / `#274` — run this AFTER `35254271` + `3770e241` deploy. Self-contained; needs nothing from the NFL lane
+
+**Status when this was written (2026-08-08 ~23:35Z).** The 22:22Z deploy was
+pinned to `77d0abba`, so **`1de982be` is LIVE and already verified in
+production**; `35254271` (NFL regular season) and `3770e241` (NCAAF) are
+**committed and NOT deployed**. Do not re-verify the first; do verify the other
+two once they land.
+
+**Production baselines measured 23:30Z on the CURRENT (pre-window-two) build**,
+so a fresh session can tell "the deploy worked" from "nothing changed":
+
+```
+NFL  preseason 08-05..08-24   20/20 exact id-set   <- ALREADY PASSING, 1de982be is live
+NCAAF 08-29 / 09-05 / 09-12 / 09-19    0 / 0 / 0 / 0 chips   <- the before picture
+```
+
+**Paste this. It needs only the repo venv and network.**
+
+```python
+import json, urllib.request, datetime as dt
+from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date as espn
+
+BASE = "https://syndicate-an21.onrender.com"
+
+def chips(sport, date):
+    url = f"{BASE}/api/board/game-chips?sports={sport}&date={date}"
+    payload = json.loads(urllib.request.urlopen(url, timeout=60).read().decode())
+    found = []
+    def walk(node):
+        if isinstance(node, dict):
+            if "game_key" in node or "gamePk" in node:
+                found.append(str(node.get("game_key") or node.get("gamePk")))
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+    walk(payload)
+    return set(found)
+
+# --- #274  NFL REGULAR SEASON -------------------------------------------
+# Expect EXACT COUNT match against ESPN. Ids are nflverse (2026_01_NE_SEA),
+# NOT ESPN numerics, so compare COUNTS here, not id sets.
+for date, expected in [("2026-09-09", 1), ("2026-09-10", 1), ("2026-09-11", 0),
+                       ("2026-09-13", 13), ("2026-09-14", 1), ("2026-09-20", 14)]:
+    got, truth = chips("nfl", date), len(espn("nfl", date))
+    print(f"NFL  {date}  prod={len(got):<3} espn={truth:<3} expected={expected:<3}"
+          f" {'OK' if len(got) == truth == expected else 'FAIL'}")
+
+# --- #273  NCAAF --------------------------------------------------------
+# Expect EXACT id-set match on 08-29 only. The other dates are bounded by the
+# card set, not the slate -- see #277 -- so assert the INVARIANT, not a count.
+print("NCAAF 2026-08-29 expect 8 cards, exact:", len(chips("ncaaf", "2026-08-29")) == 8)
+seen = {}
+d = dt.date(2026, 8, 26)
+while d <= dt.date(2026, 9, 26):
+    for key in chips("ncaaf", d.isoformat()):
+        seen[key] = seen.get(key, 0) + 1
+    d += dt.timedelta(days=1)
+print("NCAAF cards shown on >1 date (MUST be 0):", [k for k, n in seen.items() if n > 1])
+```
+
+**PASS CRITERIA, and read these before declaring anything:**
+
+| check | pass | notes |
+|---|---|---|
+| NFL 09-09/09-10/09-13/09-14/09-20 | counts equal ESPN **and** the expected column | 27/27 dates matched locally |
+| NFL 09-11 | **0** | a real empty date; not a failure |
+| NCAAF 08-29 | exactly **8** | the one exact-id date |
+| NCAAF duplicates | **empty list** | the load-bearing invariant |
+| NCAAF 09-05 | **still 0** | `#277`, EXPECTED. Not a regression |
+
+**THREE TRAPS, all of which have already caught someone:**
+
+1. **`0 == 0` is not a pass.** 2026-08-22 reads 0 chips and 0 ESPN games and is
+   *correct by accident* — it proves nothing. Only dates with real games test
+   anything. Do not count empty dates toward a success rate.
+2. **NCAAF counts will NOT equal ESPN**, and that is not a bug. The card set is
+   a curated subset (cfbd 99 week-1 games, 16 cards). The invariant — each card
+   on exactly one date, none on an ESPN-empty date — is what pins correctness.
+   Local result to reproduce: **48/48 across weeks 1–3, zero duplicated.**
+3. **NFL regular-season ids are nflverse, NCAAF's are synthetic
+   `{week}_{away}_{home}`, only NFL preseason uses ESPN numerics.** Compare id
+   SETS only for NFL preseason; compare counts and the invariant elsewhere. A
+   set comparison in the wrong place returns empty and looks like total failure.
+
+**If NFL regular-season dates return 0 after the deploy**, the first thing to
+check is not this code: confirm the deployed commit actually contains
+`35254271` (`git merge-base --is-ancestor 35254271 <deployed-sha>`). Two of
+tonight's wrong conclusions came from measuring a build that did not contain
+the fix.
+
 ### OPEN — `#277` NCAAF CARD COVERAGE: a 68-game Saturday produces ZERO cards. Card generation, not week resolution
 
 **Split out of `#273` deliberately, because `#273`'s resolver is fixed and this
