@@ -5668,6 +5668,7 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
         from syndicate.features.nfl.preseason_cards import build_preseason_cards_page_context
         from syndicate.features.nfl.sources import preseason_target_week
         from syndicate.features.nfl.sources import preseason_week_for_date
+        from syndicate.features.nfl.sources import regular_season_game_ids_for_date
 
         season = int(context.season) if context.season is not None else nfl_latest_season()
         # THE WEEK MUST FOLLOW THE REQUESTED DATE, not the global "week we are
@@ -5687,7 +5688,46 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
         # Falls back to the global target week whenever the date cannot be
         # resolved, which keeps the no-games case identical: an empty date
         # builds target-week cards and the filter below then drops them all.
-        target_week = preseason_week_for_date(season, context.context_label) or preseason_target_week(season)
+        target_week = preseason_week_for_date(season, context.context_label)
+        if target_week is None:
+            # NO PRESEASON GAME ON THIS DATE -- TRY THE REGULAR SEASON BEFORE
+            # GIVING UP. Without this branch NFL disappears from the board for
+            # the ENTIRE regular season, and it was three weeks from doing so.
+            #
+            # `build_game_chips` (game_chip_scoreboard.py:442) resolves context
+            # with NO week, so context.week is always None here and NFL ALWAYS
+            # takes this preseason branch. Once preseason ends (~08-29)
+            # preseason_target_week() returns None and the `return []` below
+            # fires forever. MEASURED by moving the clock forward:
+            #
+            #     today=2026-09-13   preseason_target_week=None   chips=0   ESPN=13
+            #     today=2026-09-20   preseason_target_week=None   chips=0   ESPN=14
+            #
+            # That is NCAAF's defect exactly (see todo #273), latent in NFL.
+            #
+            # This filters on the CSV's ids rather than through
+            # _nfl_games_on_requested_date, because the regular-season file is
+            # nflverse-keyed (`2026_01_NE_SEA`) while that helper matches ESPN
+            # numerics -- routing it through there would match nothing and, by
+            # its deliberate fail-closed rule, blank the whole regular season.
+            resolved = regular_season_game_ids_for_date(season, context.context_label)
+            if resolved is not None:
+                from syndicate.features.nfl.cards import build_cards_page_context
+                from syndicate.features.nfl.cards import build_nfl_market_board
+
+                regular_week, date_game_ids = resolved
+                regular_games = list(build_cards_page_context(regular_week, season=season).get("games") or [])
+                try:
+                    regular_board = list(build_nfl_market_board(season, regular_week).get("games") or [])
+                except Exception:
+                    regular_board = []
+                regular_games = _stamp_market_recommendations(regular_games, regular_board)
+                return [
+                    game
+                    for game in regular_games
+                    if str((game or {}).get("gamePk") or "").strip() in date_game_ids
+                ]
+            target_week = preseason_target_week(season)
         if target_week is None:
             return []
         games = list(build_preseason_cards_page_context(target_week, season=season).get("games") or [])

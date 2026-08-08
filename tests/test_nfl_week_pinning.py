@@ -294,6 +294,95 @@ def test_a_missing_schedule_file_cannot_resolve_a_week(tmp_path, monkeypatch):
     assert sources.preseason_week_for_date(2026, "2026-08-06") is None
 
 
+# ---------------------------------------------------------------------------
+# regular_season_game_ids_for_date: NFL was three weeks from vanishing entirely.
+#
+# build_game_chips resolves context with NO week, so context.week is always None
+# and NFL ALWAYS takes the preseason branch. Once preseason ends (~08-29),
+# preseason_target_week() returns None and games() returned []. MEASURED by
+# moving the clock forward: today=2026-09-13 -> 0 chips against ESPN's 13;
+# today=2026-09-20 -> 0 against 14. That is NCAAF's defect (todo #273), latent.
+# ---------------------------------------------------------------------------
+
+
+def _regular_schedule(tmp_path, rows, monkeypatch):
+    import csv as _csv
+
+    from syndicate.features.nfl import sources
+
+    path = tmp_path / "schedule_2026.csv"
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        w = _csv.DictWriter(fh, fieldnames=["game_id", "week", "gameday"])
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+    monkeypatch.setattr(sources, "real_schedule_path", lambda season: path)
+    return sources
+
+
+_REG_ROWS = [
+    {"game_id": "2026_01_NE_SEA", "week": "1", "gameday": "2026-09-09"},
+    {"game_id": "2026_01_SF_LA", "week": "1", "gameday": "2026-09-10"},
+    {"game_id": "2026_01_ARI_LAC", "week": "1", "gameday": "2026-09-13"},
+    {"game_id": "2026_01_ATL_PIT", "week": "1", "gameday": "2026-09-13"},
+    {"game_id": "2026_02_CAR_ATL", "week": "2", "gameday": "2026-09-20"},
+]
+
+
+def test_a_regular_season_date_resolves_its_week_and_ids(tmp_path, monkeypatch):
+    s = _regular_schedule(tmp_path, _REG_ROWS, monkeypatch)
+    assert s.regular_season_game_ids_for_date(2026, "2026-09-13") == (
+        1,
+        {"2026_01_ARI_LAC", "2026_01_ATL_PIT"},
+    )
+
+
+def test_the_regular_season_week_follows_the_date_not_the_clock(tmp_path, monkeypatch):
+    """A week-2 date resolves week 2 even while week 1 is 'current'."""
+    s = _regular_schedule(tmp_path, _REG_ROWS, monkeypatch)
+    assert s.regular_season_game_ids_for_date(2026, "2026-09-20") == (2, {"2026_02_CAR_ATL"})
+
+
+def test_a_midweek_date_with_one_game_is_not_the_whole_week(tmp_path, monkeypatch):
+    """The Wednesday opener must return ONE game, not all 16 of week 1 --
+    the regular-season branch previously did no date filtering at all."""
+    s = _regular_schedule(tmp_path, _REG_ROWS, monkeypatch)
+    assert s.regular_season_game_ids_for_date(2026, "2026-09-09") == (1, {"2026_01_NE_SEA"})
+
+
+def test_a_date_with_no_regular_season_games_is_None(tmp_path, monkeypatch):
+    s = _regular_schedule(tmp_path, _REG_ROWS, monkeypatch)
+    assert s.regular_season_game_ids_for_date(2026, "2026-09-11") is None
+
+
+def test_a_missing_regular_schedule_is_None(tmp_path, monkeypatch):
+    from syndicate.features.nfl import sources
+
+    monkeypatch.setattr(sources, "real_schedule_path", lambda season: tmp_path / "nope.csv")
+    assert sources.regular_season_game_ids_for_date(2026, "2026-09-13") is None
+
+
+@pytest.mark.parametrize("date_value", ["", None, "   "])
+def test_no_date_resolves_no_regular_season_week(tmp_path, monkeypatch, date_value):
+    s = _regular_schedule(tmp_path, _REG_ROWS, monkeypatch)
+    assert s.regular_season_game_ids_for_date(2026, date_value) is None
+
+
+def test_the_regular_season_is_NOT_filtered_through_the_ESPN_id_helper(tmp_path, monkeypatch):
+    """THE TRAP THIS DESIGN AVOIDS, and it would have blanked the season.
+
+    The regular-season file is nflverse-keyed (`2026_01_NE_SEA`) while
+    _nfl_games_on_requested_date matches ESPN numerics (`401873271`). Routing
+    regular-season cards through that helper matches NOTHING, and its
+    deliberate fail-closed rule then returns [] -- so the ids must be compared
+    in the card's own id space instead. This pins that the two id spaces really
+    are disjoint, so the separation is not merely stylistic.
+    """
+    _fake_events(monkeypatch, ["401873271", "401873272"])
+    regular_cards = [{"gamePk": "2026_01_NE_SEA"}, {"gamePk": "2026_01_SF_LA"}]
+    assert _nfl_games_on_requested_date(regular_cards, "2026-09-09") == []
+
+
 def test_a_mixed_date_takes_the_majority_week(tmp_path, monkeypatch):
     """A rescheduled game must not let one stray row pick the whole card set."""
     s = _dated_schedule(tmp_path, _REAL_ROWS + [
