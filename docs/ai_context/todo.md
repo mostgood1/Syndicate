@@ -620,6 +620,48 @@ cause, three symptoms, three different discovery dates.** Reading a finding from
 another sport back into your own is what turned a latent NFL outage into a
 committed fix; `#273` was found from NFL, and `#274` was found back from NCAAF.
 
+### OPEN — `#277` NCAAF CARD COVERAGE: a 68-game Saturday produces ZERO cards. Card generation, not week resolution
+
+**Split out of `#273` deliberately, because `#273`'s resolver is fixed and this
+is not, and collapsing them would let "NCAAF fixed" be recorded when it isn't.**
+
+`#273` made the board faithful to the NCAAF card set. **The card set is the
+remaining problem.** Measured 2026-08-08 on real data:
+
+```
+2026-09-05   ESPN 68 games   cards 0     <- the marquee Saturday
+2026-09-12   ESPN 80 games   cards 14
+2026-09-19   ESPN 71 games   cards 13
+2026-08-29   ESPN  8 games   cards 8     <- exact
+```
+
+**The obvious wrong explanation was checked FIRST and is refuted.** The suspicion
+is "the resolver picked the wrong week". It did not: cfbd's week files do **not**
+overlap — 09-05's 68 ESPN ids are **exclusively** in `cfbd_lines_2026_wk1.json`,
+zero of them in wk2 or wk3 — and **neither week 1's nor week 2's card set
+contains a single one of those 68 games**. So the week is right and the cards do
+not exist.
+
+The shape: cfbd lists **99** week-1 games, the board builds **16** cards, and
+those 16 land on 08-29 (8), 09-03 (4) and 09-04 (4) with **none on 09-05**. So
+the curated subset is not merely small, it is *distributed* in a way that empties
+the biggest slate of the week.
+
+**What this is NOT:** not the `context.week is None` contract gap (that is
+`#273`, fixed), and not a date-convention bug (the resolver joins by id and 48/48
+cards across weeks 1–3 land on exactly one date each). It is upstream — whatever
+selects which games get a card.
+
+**Where to start:** `_engine_rows_for_season_week(season, resolved_week)` in
+`features/ncaaf/cards.py` and the 2026 bootstrap branch beneath it — the card
+count tracks engine-row availability, not the slate. Establish the **rate**
+first: cards built ÷ cfbd games, per week, for weeks 1–4. A count of 16 means
+nothing without the 99 beside it.
+
+**Do not "fix" this by widening the date filter.** The filter is correct; making
+it looser would put games on dates they are not played on, which is the defect
+`#271`/`#273` removed.
+
 ### FIXED 2026-08-08 22:58Z — `#273` (`3770e241`) NCAAF resolver shipped. **Read the RESIDUAL before calling NCAAF fixed**
 
 Committed, **not deployed**. 48/48 cards across weeks 1–3 shown on exactly one
