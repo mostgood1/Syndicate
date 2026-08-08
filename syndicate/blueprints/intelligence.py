@@ -931,65 +931,11 @@ def _regate_board_rows(payload: dict[str, object]) -> None:
         return
 
 
-def _layer2_board_cards(selected_date: str, sport: str) -> list[dict[str, object]]:
-    """L2-A's board cards, READ from the artifact and sliced by sport.
-
-    NO TRANSFORMATION HERE. The cards are built on refresh-worker inside
-    `build_layer2_shortlist` and persisted; this reads them and narrows to the
-    requested sport, which is the same read-time slicing
-    `slice_intelligence_board_state_for_request` already does.
-
-    An earlier version mapped rows into cards right here, per request. That put
-    compute in the web service, which reads artifacts and does not compute --
-    and it meant the persisted artifact was not what the board displayed, which
-    defeats the whole reason L2-A is worker-side: settlement needs a record of
-    what was RECOMMENDED, and a card derived per request is recorded nowhere.
-    """
-    try:
-        from pipeline.intelligence_state import read_layer2_shortlist
-
-        shortlist = read_layer2_shortlist(selected_date)
-        cards = (shortlist or {}).get("cards") if isinstance(shortlist, dict) else None
-        if not isinstance(cards, list) or not cards:
-            return []
-        normalized_sport = str(sport or "all").strip().lower() or "all"
-        if normalized_sport != "all":
-            cards = [c for c in cards if str((c or {}).get("sport") or "").strip().lower() == normalized_sport]
-        return [dict(card) for card in cards if isinstance(card, dict)]
-    except Exception:
-        _LOGGER.exception("LAYER2_BOARD_CARDS_FAILED date=%s sport=%s", selected_date, sport)
-        return []
-
-
 def _hydrate_board_response_payload(response_payload: dict[str, object] | None) -> dict[str, object]:
     current = dict(response_payload or {})
     nested = current.get("response") if isinstance(current.get("response"), dict) else {}
     nested = dict(nested or {})
 
-    # LAYER 2 IS THE BOARD. The legacy pool carried 229 game + 18 prop rows
-    # against Layer 1's 2,726 priced instances -- starved, not stale. L2-A is
-    # built from the Layer 1 grid on refresh-worker and persisted; measured on
-    # its first production build, 239 rows selected from 8,277 opportunities
-    # across mlb/wnba/soccer, while this board was serving candidate_count=0
-    # for MLB during a live 13-game slate.
-    #
-    # ONE choke point, not per-endpoint: every board response passes through
-    # here, and putting the swap in each caller is the "same rule twice"
-    # mistake #244 already paid for.
-    #
-    # ONLY WHEN L2-A ACTUALLY HAS ROWS. An empty or unreadable shortlist leaves
-    # the existing payload completely untouched -- a new ranker must not be able
-    # to blank a board that works, and on any sport or date L2 has nothing for,
-    # the old behaviour is exactly preserved.
-    layer2_cards = _layer2_board_cards(
-        str(current.get("selected_date") or current.get("date") or "").strip(),
-        str(current.get("sport") or "all"),
-    )
-    if layer2_cards:
-        current["top_opportunities"] = [dict(card) for card in layer2_cards]
-        current["recommendations"] = [dict(card) for card in layer2_cards]
-        current["candidate_count"] = len(layer2_cards)
-        current["board_source"] = "layer2_shortlist"
 
     def _copy_items(key: str) -> list[dict[str, object]]:
         items = nested.get(key) if isinstance(nested.get(key), list) else []
