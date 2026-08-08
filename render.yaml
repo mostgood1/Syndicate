@@ -282,21 +282,61 @@ services:
       - key: RECONCILIATION_MLB_ACTUALS_WRITER_INTERVAL_SECONDS
         value: "3600"
       # Evaluation-ledger settlement autorun (evaluation_settlement.py,
-      # gated in scripts/run_refresh_worker.py). This was the single
-      # largest open gap in the 2026-08-02 end-to-end assessment: with no
-      # caller for settle_result(), every ledger record stayed "pending"
-      # forever, so reliability profiles / dynamic edge thresholds / policy
-      # promotion were all permanently inert (settled_count: 0 since
-      # 2026-06-10). Enabled after (a) a local dry-run match-rate check
-      # against real graded artifacts and (b) the ledger-bloat fix that
-      # made chunk reads safe (slim manifest_summary + oversized-chunk skip
-      # + scripts/compact_evaluation_ledger.py for the historical giants).
-      # Settlement reads only the target date's own chunk file, never full
-      # history.
+      # gated in scripts/run_refresh_worker.py).
+      #
+      # OFF BY AN EXPLICIT USER DECISION, and this block previously said the
+      # opposite. It read `value: "true"` under ten lines explaining why it had
+      # been enabled, while the key was ABSENT from all 92 env vars on the live
+      # refresh-worker -- deleted from the dashboard 2026-08-07 ~14:05Z during
+      # the OOM incident, and never reflected here. So the blueprint answered
+      # "is settlement on?" with a confident wrong answer plus a paragraph of
+      # justification. A blueprint that documents an aspiration as
+      # configuration is worse than no comment at all. (#275)
+      #
+      # It remains the largest open gap in the 2026-08-02 assessment -- with no
+      # caller for settle_result() every ledger record stays "pending", so
+      # reliability profiles, dynamic edge thresholds and policy promotion are
+      # all inert. It is off anyway, for two measured reasons:
+      #
+      # 1. IT DOES NOT FIT. Reading production's largest ledger chunk
+      #    (367,229,260 B, 2026-08-05) costs ~1,436MB resident, measured at
+      #    4.05-4.19x RSS per byte of JSON. refresh-worker's floor is ~1,600MB
+      #    and it makes real excursions to 2,357MB (accounted_rss_mb, not
+      #    memory.current) against a ~3,596MB lethal level. Settlement fits
+      #    against the floor and dies against the peak.
+      #
+      # 2. THE PER-RECORD COST IS O(records x chunk_bytes) AND UNHOISTED.
+      #    Every settled record rewrites the WHOLE chunk (~1.6 s on that chunk)
+      #    and round-trips the ENTIRE chunk index -- read_text + json.loads +
+      #    json.dumps(indent=2, sort_keys=True) + write_text, uncached, once
+      #    per record. The index holds one entry per ledger record ever written
+      #    and is never pruned, so unlike the chunk it is not bounded by the
+      #    slate. At a realistic settle volume that is hours, not minutes.
+      #
+      # BEFORE FLIPPING THIS BACK: run scripts/settlement_cost_preflight.py on
+      # refresh-worker (read-only; its default mode never opens a chunk), hoist
+      # the index round trip out of the per-record loop, and set
+      # EVALUATION_SETTLEMENT_LOOKBACK_DAYS to something small. The 21-day
+      # default was written for a grading backfill and is the reason a single
+      # run touches every large chunk.
       - key: EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN
-        value: "true"
-      - key: EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS
-        value: "21600"
+        value: "false"
+      # DELIBERATELY NOT SET, and this is not an oversight -- do not restore it.
+      #
+      # Setting this key AT ALL overrides _evaluation_settlement_should_run_now's
+      # once-per-Central-day-after-06:00 gate and restores interval-only
+      # behaviour (see that function's docstring). The "21600" that used to sit
+      # here is 4 runs a day: 24x the designed cadence, on the most expensive
+      # path in the worker. It was deleted from the live service 2026-08-07
+      # 13:12Z and the todo record is explicit that it stays deleted on its own
+      # merits, independent of whether it was the OOM cause.
+      #
+      # It is kept commented rather than removed because it is genuinely useful
+      # for ONE thing -- forcing a fast cycle to confirm a fix -- which the
+      # daily gate cannot do quickly. That is a hands-on diagnostic, not a
+      # deployed value.
+      # - key: EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS
+      #   value: "21600"
       - key: SYNDICATE_REQUIRE_HOSTED_STORAGE
         value: "true"
       - key: SYNDICATE_REFRESH_STATE_BACKEND
