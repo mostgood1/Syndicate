@@ -379,9 +379,45 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _ensure_sport_data_providers() -> None:
+    """Populate the provider registry if nothing has populated it yet.
+
+    THE REGISTRY IS A SIDE EFFECT OF IMPORTING A FLASK BLUEPRINT: every
+    provider is defined in `syndicate/blueprints/home.py` and registers itself
+    at module scope (home.py:5882). The web app imports that module to serve
+    routes, so the registry is always populated there -- and the WORKER never
+    imports it. `scripts/run_refresh_worker.py` and `pipeline/layer2_shortlist.py`
+    both reach `build_game_chips` without it.
+
+    MEASURED 2026-08-08 on the worker's own import graph: registry size 0,
+    `build_game_chips` returned 0 chips for EVERY sport, so `attach_game_state`
+    stamped `game.state` on nothing and the persisted Layer 2 artifact carried
+    it for no sport at all -- while the same call on web returned 720/720. Two
+    code paths, one function, opposite answers, and the worker's was the silent
+    one because zero chips is indistinguishable from a slate with no games.
+
+    This is the same defect class `board_enrichment`'s module docstring was
+    written for ("the worker path called none of them"): the call was added,
+    but its dependency was still web-only.
+
+    Costs ~24MB RSS once, measured, on a 4GB worker -- an import, not periodic
+    work. Lazy and inside the function on purpose: at module scope it would be
+    a circular import, since home.py imports this module's callers.
+    """
+    from syndicate.features.shared.sport_data_provider import SPORT_DATA_PROVIDERS
+
+    if SPORT_DATA_PROVIDERS:
+        return
+    try:
+        import syndicate.blueprints.home  # noqa: F401  -- registers providers on import
+    except Exception as exc:
+        print(f"[game_chips] SPORT_PROVIDER_REGISTRATION_FAILED error={exc}", flush=True)
+
+
 def build_game_chips(selected_date: str, sports: list[str]) -> list[dict[str, Any]]:
     from syndicate.features.shared.sport_data_provider import get_sport_data_provider
 
+    _ensure_sport_data_providers()
     date_value = _text(selected_date) or central_today_iso()
     normalized_sports = tuple(sorted({_text(slug).lower() for slug in sports if _text(slug)}))
     cache_key = (date_value, normalized_sports)

@@ -351,3 +351,54 @@ class BuildGameChipsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ProviderRegistrationOnWorkerPathTests(unittest.TestCase):
+    """The registry is a side effect of importing a Flask blueprint, and the
+    worker never imports it.
+
+    Measured 2026-08-08: on the worker's import graph the registry was empty,
+    so build_game_chips returned 0 chips for EVERY sport and attach_game_state
+    stamped game.state on nothing -- while the identical call on web matched
+    720/720 rows. Zero chips is indistinguishable from a slate with no games,
+    which is why it stayed silent.
+    """
+
+    def test_worker_import_graph_self_registers_in_a_fresh_interpreter(self) -> None:
+        """Runs in a SUBPROCESS on purpose.
+
+        In-process this cannot fail honestly: some earlier test has already
+        imported `blueprints.home`, so it sits in `sys.modules` and the
+        re-import is a no-op regardless of whether the fix is present. Only a
+        clean interpreter reproduces the worker, which is the condition that
+        was actually broken.
+        """
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        repo_root = Path(__file__).resolve().parents[1]
+        script = (
+            "import sys; sys.path.insert(0, r'%s')\n"
+            "import pipeline.layer2_shortlist\n"
+            "from syndicate.features.shared.sport_data_provider import SPORT_DATA_PROVIDERS\n"
+            "before = len(SPORT_DATA_PROVIDERS)\n"
+            "from syndicate.features.shared.game_chip_scoreboard import _ensure_sport_data_providers\n"
+            "_ensure_sport_data_providers()\n"
+            "print('RESULT', before, len(SPORT_DATA_PROVIDERS))\n"
+        ) % (repo_root,)
+        proc = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, timeout=300)
+        line = [l for l in (proc.stdout or "").splitlines() if l.startswith("RESULT")]
+        self.assertTrue(line, f"no RESULT line; stderr={(proc.stderr or '')[-600:]}")
+        _, before, after = line[0].split()
+        self.assertEqual(int(before), 0, "worker import graph should start with an EMPTY registry")
+        self.assertGreater(int(after), 0, "an empty registry silently yields 0 chips for every sport")
+
+    def test_registration_is_a_no_op_when_already_populated(self) -> None:
+        from syndicate.features.shared import game_chip_scoreboard as gcs
+        from syndicate.features.shared import sport_data_provider as sdp
+
+        sentinel = {"sentinel": object()}
+        with patch.dict(sdp.SPORT_DATA_PROVIDERS, sentinel, clear=True):
+            gcs._ensure_sport_data_providers()
+            self.assertEqual(list(sdp.SPORT_DATA_PROVIDERS), ["sentinel"])
