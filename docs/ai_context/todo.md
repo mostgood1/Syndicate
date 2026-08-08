@@ -1,5 +1,43 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (late) — SOCCER `game.state` VERIFIED IN PRODUCTION: 0 → 720/720. And the dead-market rule STILL cannot fire for 9 leagues
+
+Deployed in `1e602fd3` (web + refresh-worker, live 19:55:30Z). Measured on
+production immediately after:
+
+```
+before   {"chips": 61, "rows_matched": 0}      0 / 720
+after    {"chips": 61, "rows_matched": 720}  720 / 720   all 11 games
+```
+
+`rows_matched: 720` against `returned: 300` is not a double-count —
+`total_rows` is 720 and the endpoint returns a 300-row page. 100% of the grid.
+
+**BUT THE STATE VALUES ARE NOT ALL REAL, AND I PREDICTED THIS WRONG.** I told
+the other session to expect soccer's shortlist count to drop tonight as games
+go live/final, and not to read the drop as damage. **That will not happen for
+nine of the ten leagues, and the reason is the sim bug in the entry below.**
+
+`_unsimulated_game` (`soccer/cards.py:139`) reads `status_state` from the
+FIXTURE and defaults to `"pre"`. Fixtures come from the static season schedule
+artifact, which carries no live status. Only `_match_to_game` — the simulated
+path — carries a real `status_state`, because `build_soccer_artifacts` stamps
+it from the ESPN fixture fetch. So:
+
+- **MLS** (sim runs): state can be `live`/`final`, and the dead-market rule works.
+- **The other nine** (no sim): state is **permanently `pregame`**, at any hour.
+
+Measured 19:57Z — hours after the European kickoffs — all 11 games read
+`pregame`, including matches that had certainly finished.
+
+**Consequence: a SETTLED soccer market in those nine leagues can still rank.**
+That is the exact exposure `game.state` was supposed to close, and the join fix
+alone does not close it. It is gated on the sim actually running. The two items
+are one chain, not two independent bugs — fixing the join was necessary and is
+not sufficient.
+
+**Do not mark the soccer `game.state` exposure closed until the sim runs.**
+
 ### 2026-08-08 (late) — WHY SOCCER SIMS DON'T RUN: the sim subprocess dies in SECONDS for 9 of 10 leagues
 
 Traced top-down from the orchestrator, per instruction. Every stage below is
