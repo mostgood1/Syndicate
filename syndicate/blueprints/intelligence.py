@@ -2424,6 +2424,19 @@ def board_layer2_shortlist_api():
                 "kind_floor": shortlist.get("kind_floor"),
                 "horizon_days": shortlist.get("horizon_days"),
                 "rows_beyond_horizon": shortlist.get("rows_beyond_horizon"),
+                # Every selection rule reports what it rejected, or a shrinking
+                # board is indistinguishable from an outage. These are named
+                # here explicitly because this is one of the hops `65b15a03`
+                # flagged as building an EXPLICIT key list -- a new key on the
+                # shortlist reaches nothing unless it is added at each hop, and
+                # `rows_stale_kickoff` was silently absent from this payload
+                # while the filter was live and dropping rows.
+                "min_value_pct": shortlist.get("min_value_pct"),
+                "rows_below_value_floor": shortlist.get("rows_below_value_floor"),
+                "max_quote_age_seconds": shortlist.get("max_quote_age_seconds"),
+                "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
+                "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),
+                "rows_stale_kickoff": shortlist.get("rows_stale_kickoff"),
                 "opportunities_considered": shortlist.get("opportunities_considered"),
                 "returned": min(len(rows), limit),
                 "total_rows": len(rows),

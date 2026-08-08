@@ -208,6 +208,33 @@ class StaleKickoffGuardTests(unittest.TestCase):
         out = select_shortlist([self._row_at(99.0)], now=_NOW, stale_kickoff_seconds=0)
         self.assertEqual(len(out["rows"]), 1)
 
+
+    def test_a_pregame_state_after_kickoff_does_not_protect_the_row(self) -> None:
+        """The regression that shipped. `bool(state)` treated PRESENCE as
+        evidence, so when a concurrent fix (60689dee) took soccer rows from
+        `game.state: None` to `"pregame"`, this guard switched OFF for exactly
+        the rows it was written for. Measured 2026-08-08 20:30Z: the same match
+        still ranked #1 and #2, state='pregame', 6.02h after kickoff.
+
+        `pregame` after commence_time is a contradiction, not information.
+        """
+        out = select_shortlist([self._row_at(6.02, state="pregame")], now=_NOW)
+        self.assertEqual(len(out["rows"]), 0)
+        self.assertEqual(out["rows_stale_kickoff"], 1)
+
+    def test_an_unrecognised_state_fails_toward_the_clock(self) -> None:
+        out = select_shortlist([self._row_at(6.0, state="banana")], now=_NOW)
+        self.assertEqual(len(out["rows"]), 0)
+
+    def test_final_and_live_are_still_left_to_the_gate(self) -> None:
+        for state in ("live", "final", "in_progress", "post"):
+            out = select_shortlist([self._row_at(6.0, state=state)], now=_NOW)
+            self.assertEqual(len(out["rows"]), 1, f"{state} must be left to opportunity_gate")
+
+    def test_pregame_BEFORE_kickoff_is_untouched(self) -> None:
+        out = select_shortlist([self._row_at(-2.0, state="pregame")], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+
     def test_rejections_are_reported(self) -> None:
         out = select_shortlist([self._row_at(9.0), _row(ev=2.0)], now=_NOW)
         self.assertEqual(out["rows_stale_kickoff"], 1)

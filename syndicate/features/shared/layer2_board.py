@@ -215,16 +215,37 @@ def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:
     return _as_float(quote.get("book_age_seconds")) if isinstance(quote, Mapping) else None
 
 
-def _has_usable_game_state(row: Mapping[str, Any]) -> bool:
-    """True when something can actually tell us whether this game is running.
+# States that AFFIRMATIVELY say the game has started or finished. Only these
+# protect a row from the kickoff clock, because only these are claims the clock
+# could contradict.
+_STARTED_GAME_STATES = frozenset({"live", "in", "in_progress", "inprogress", "final", "post", "completed", "closed"})
 
-    `market_state: "pregame"` does NOT count on its own -- that is the value the
-    soccer fixture path hands out unconditionally, so treating it as evidence is
-    what let a finished match rank first.
+
+def _has_usable_game_state(row: Mapping[str, Any]) -> bool:
+    """True only when the state AFFIRMS the game started or finished.
+
+    **PRESENCE IS NOT EVIDENCE, and assuming it was let a finished match keep
+    the top of the board.** The first version of this returned `bool(state)`.
+    Hours later a concurrent fix (`60689dee`) repaired the team-branding read so
+    soccer rows stopped carrying `game.state: None` and started carrying
+    `"pregame"` -- and that turned this guard OFF for exactly the rows it was
+    written for. Measured on the served board 2026-08-08 20:30Z: the same
+    NEC Nijmegen v SC Telstar match still ranked **#1 and #2**, now
+    `state='pregame'`, **6.02 hours** after kickoff.
+
+    `pregame` after commence_time is a CONTRADICTION, not information. For nine
+    of the ten soccer leagues it is also permanent -- `_unsimulated_game`
+    defaults `status_state` to `"pre"` and only the simulated path (MLS) stamps
+    a real one -- so treating it as trustworthy means never applying the clock
+    to precisely the sport that needs it.
+
+    An unrecognised state is deliberately treated as NOT affirming: this guard
+    should fail toward applying the clock, and `opportunity_gate` still owns
+    every row whose state genuinely says live or final.
     """
     game = row.get("game")
     state = str((game or {}).get("state") or "").strip().lower() if isinstance(game, Mapping) else ""
-    return bool(state)
+    return state in _STARTED_GAME_STATES
 
 
 def _seconds_since_commence(row: Mapping[str, Any], now: datetime) -> float | None:
