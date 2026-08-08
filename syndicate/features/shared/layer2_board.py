@@ -128,6 +128,40 @@ def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, f
     return (out, "book_margin_model" if out else None)
 
 
+# A probability edge this large is a UNIT OR JOIN ERROR, not a finding.
+#
+# MEASURED on the first MLB pregame board carrying projections (2026-08-08):
+# 93 of 100 shortlisted rows had NEGATIVE EV against the market's own no-vig
+# price, ranked almost entirely by model edges of 9-48 points. On h2h rows the
+# implication is explicit and impossible to defend:
+#
+#     fair_probability 0.468  +  model_edge 39.38  ->  model says ~86%
+#     fair_probability 0.484  +  model_edge 40.60  ->  model says ~89%
+#
+# MLB games sit between roughly 35% and 65%. A model claiming 86-89% on a game
+# the market prices near even, on 41 of 51 game rows and skewed 80% to the away
+# side, is not sharp -- it disagrees with every market in one direction, which
+# is the signature of a units mismatch or a home/away join fault.
+#
+# NOTE ON THE SAMPLE, because it caught me out: the shortlist is the top N BY a
+# score this term dominates, so "every row has a huge edge" is partly a
+# selection effect and says nothing about the full distribution. What does NOT
+# wash out is the implied probability -- 86% is impossible regardless of how the
+# row was selected.
+#
+# So the bound is on PLAUSIBILITY IN PROBABILITY SPACE, not on magnitude for its
+# own sake: an edge is accepted only if the probability it implies is one a
+# bettor could act on. Deliberately generous -- a genuine 15-point edge is
+# enormous and still passes.
+_MODEL_EDGE_MAX_POINTS = 15.0
+
+# The real fix is an explicit `basis` on the projection, which #263's own filing
+# already argued for ("each sport emitting the strongest claim its source
+# actually supports, labelled with its basis"). That was written as a parity
+# principle; this is why it is a correctness requirement. Until projections
+# carry it, this bound is the guard -- and it is a GUARD, not a calibration.
+
+
 def _model_edge_for(row: Mapping[str, Any], side: str) -> float | None:
     """The sim's disagreement with the market, in POINTS OF PROBABILITY.
 
@@ -136,12 +170,23 @@ def _model_edge_for(row: Mapping[str, Any], side: str) -> float | None:
     rebounds, goals — and adding that to an EV percentage would be adding
     rebounds to percent. Those rows rank on EV alone, which is correct: we have
     no probability-space model view for them.
+
+    That guard filters by FIELD NAME, and 2026-08-08 showed the hole: a field
+    called `edge_vs_market_pct` that is not in probability points sails through
+    it. So the value is now bounded by what it implies as well as by where it
+    came from — see `_MODEL_EDGE_MAX_POINTS`. Rejected rows fall back to EV
+    alone, which cannot pick a side but also cannot invert one.
     """
     projection = row.get("projection")
     if not isinstance(projection, Mapping):
         return None
     edge = _as_float(projection.get("edge_vs_market_pct"))
     if edge is None:
+        return None
+    if abs(edge) > _MODEL_EDGE_MAX_POINTS:
+        # Dropped, not clamped. Clamping would keep an unusable number in the
+        # ranking at the ceiling value and make every affected row tie at the
+        # top -- a wrong answer wearing a plausible one's clothes (#242).
         return None
     # The projection is stated from one side; flip it for the other.
     projected_side = str(projection.get("side") or "").strip().lower()

@@ -118,7 +118,11 @@ def test_rows_without_a_value_term_are_excluded_not_zeroed():
 
 
 def test_ranked_best_first():
-    strong = _row(event_id="strong", projection={"edge_vs_market_pct": 20.0, "side": "over"})
+    # 12.0, not 20.0: the original figure was picked as "clearly bigger" rather
+    # than as a realistic edge, and it now exceeds _MODEL_EDGE_MAX_POINTS -- so
+    # the strong row was DROPPED and the weak one ranked first. The fixture was
+    # unrealistic, not the bound; 12 points is still an enormous edge.
+    strong = _row(event_id="strong", projection={"edge_vs_market_pct": 12.0, "side": "over"})
     weak = _row(event_id="weak", projection={"edge_vs_market_pct": 1.0, "side": "over"})
     result = build_layer2_rows([weak, strong])
     assert result["opportunities"][0]["event_id"] == "strong"
@@ -261,3 +265,50 @@ def test_horizon_can_be_disabled_for_a_forward_view():
     rows = [dict(_cand("nfl", "game", 99), commence_time="2026-09-10T17:00:00Z") for _ in range(5)]
     result = select_shortlist(rows, horizon_days=None, now=now)
     assert len(result["rows"]) == 5
+
+
+# ---------------------------------------------------------------------------
+# The model edge is bounded by what it IMPLIES, not just where it came from.
+# ---------------------------------------------------------------------------
+
+
+def test_an_implausible_model_edge_is_dropped_not_used():
+    """MEASURED on the first MLB pregame board carrying projections
+    (2026-08-08): 93 of 100 shortlisted rows had NEGATIVE EV against the
+    market's own no-vig price, ranked by model edges of 9-48 points. On h2h
+    that implies model win probabilities of 86-89% on games the market prices
+    near even -- a units mismatch or a home/away join fault, not an edge.
+
+    The name guard could not catch it: the field is literally called
+    `edge_vs_market_pct`.
+    """
+    from syndicate.features.shared import layer2_board
+
+    row = {"projection": {"edge_vs_market_pct": 39.38, "side": "away"}}
+    assert layer2_board._model_edge_for(row, "away") is None
+
+
+def test_a_large_but_plausible_edge_still_counts():
+    """Deliberately generous: a genuine 15-point edge is enormous and passes.
+    This is a guard against impossible values, not a calibration."""
+    from syndicate.features.shared import layer2_board
+
+    row = {"projection": {"edge_vs_market_pct": 12.0, "side": "away"}}
+    assert layer2_board._model_edge_for(row, "away") == 12.0
+
+
+def test_the_flip_is_bounded_too():
+    """The other side of a rejected projection must also be rejected --
+    otherwise flipping the sign smuggles the same bad number back in."""
+    from syndicate.features.shared import layer2_board
+
+    row = {"projection": {"edge_vs_market_pct": 39.38, "side": "away"}}
+    assert layer2_board._model_edge_for(row, "home") is None
+
+
+def test_a_dropped_edge_falls_back_to_ev_not_to_zero():
+    """EV alone cannot pick a side, but it cannot INVERT one either. Scoring a
+    rejected row zero would rank it above genuinely negative rows."""
+    from syndicate.features.shared.opportunity_signals import blended_score
+
+    assert blended_score(ev_pct=None, model_edge=None) is None
