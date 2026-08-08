@@ -1,5 +1,54 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (late) — OPERATIONAL RULES earned tonight (cheap to read, expensive to rediscover)
+
+**1. Nested payloads survive hop-by-hop key lists; top-level scalars do not.**
+`rows_stale_kickoff` read `None` on a payload where the filter was live and
+dropping rows, because `board_layer2_shortlist_api` names top-level keys
+explicitly and nobody added it. `unmatched_teams` survived the same endpoint
+untouched because it rides inside the `enrichment` blob and the endpoint's own
+`game_state` dict. **If you add a SCALAR to a payload that crosses that
+endpoint, name it there or it vanishes silently** — and a telemetry field that
+silently reads `None` is worse than none, because it reads as "the filter did
+nothing".
+
+**2. Fixing a join can disable a guard that relied on the join being broken.**
+`_has_usable_game_state` keyed on the presence of `game.state`, which was safe
+only while soccer rows carried `None`. Repairing the branding read gave every
+soccer row a state — permanently `"pregame"` for the nine leagues with no sim —
+so the guard switched off for exactly the rows it was written for and a settled
+match returned to #1. **`None` was load-bearing.** Before repairing a data path,
+grep for what reads the field you are about to start populating.
+
+**3. `git add <path>` gives NO protection; `git commit -- <paths>` does.**
+`.git/index` is one shared file per checkout, so an explicit `git add` appends
+to whatever a concurrent session has already staged, and the subsequent
+`git commit` takes the whole index. This bit twice tonight in both directions.
+The pathspec form commits only the named paths regardless of index state. Also:
+run `git diff --cached --stat` as a **gate before** committing, not as a receipt
+after — checking it afterwards is how the sweep got through.
+
+**4. Deploy cadence: one deploy carrying every ready fix, not several.** Two
+refresh-worker deploys ten minutes apart each killed an in-flight L2-A build
+(11–18 min), so the artifact did not rebuild for 31 minutes and the observation
+window was contaminated by the observer. Also confirmed: `generate_smartsim2_nfl_*`
+autoruns are nearly always in flight on that service, so "a deploy kills an NFL
+job" is the normal case, not a special cost.
+
+**5. `b1adad69` MUST NEVER SHIP.** A 444-line L2-A → board-card adapter that
+duplicated `layer2_rows_to_board_cards`, which already existed and already ran
+inside the shortlist build — a second card contract that can disagree with the
+first. Reverted by its author (`c9f5fcf6`); the real `#268` wiring is
+`48d8875a` (read side + flag, dark by default). Never on origin. If it appears
+on a branch, it is a mistake.
+
+**THE COMMON SHAPE, across every retraction on both sides tonight:** a number
+measured on a surface *adjacent* to the one that mattered — an endpoint instead
+of the board, a stashed tree instead of the merge-base, an import graph no
+process runs, a fresh adapter instead of the function already in a file read
+three times. **Ask "which graph, which build, which disk produced this number"
+first, not last.**
+
 ### 2026-08-08 (late) — BRANDING FIX VERIFIED (278 → 720/720) — and it RE-OPENED the settled-market hole
 
 `60689dee`, deployed to refresh-worker 20:17:20Z. Verified on the first
