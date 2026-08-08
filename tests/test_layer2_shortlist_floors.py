@@ -151,5 +151,67 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(out["max_quote_age_seconds"], SHORTLIST_MAX_QUOTE_AGE_SECONDS)
 
 
+class StaleKickoffGuardTests(unittest.TestCase):
+    """A market cannot be "pregame" after its own start time.
+
+    `opportunity_gate`'s dead-market rule is the real defence, but it reads
+    `game.state`, and for nine of the ten soccer leagues that state is
+    PERMANENTLY `pregame` -- `_unsimulated_game` defaults `status_state` to
+    "pre" and fixtures carry no live status, so only the SIMULATED path (MLS
+    alone) ever stamps a real one. The gate therefore cannot fire for them at
+    any hour.
+
+    Measured on the served board 2026-08-08 19:53Z: the **#1 and #2 ranked
+    rows** were a match that kicked off **5.47 hours earlier**, still labelled
+    pregame with `game.state: None`. Replaying that payload through this guard
+    takes it 115 -> 112 rows and puts MLB back on top.
+    """
+
+    def _row_at(self, hours_ago: float, *, state=None, ev: float = 3.0) -> dict:
+        started = (_NOW - timedelta(hours=hours_ago)).isoformat().replace("+00:00", "Z")
+        row = _row(ev=ev)
+        row["commence_time"] = started
+        row["market_state"] = "pregame"
+        if state is not None:
+            row["game"] = {"state": state}
+        return row
+
+    def test_a_finished_game_with_no_state_is_dropped(self) -> None:
+        out = select_shortlist([self._row_at(5.47)], now=_NOW)
+        self.assertEqual(len(out["rows"]), 0)
+        self.assertEqual(out["rows_stale_kickoff"], 1)
+
+    def test_a_row_with_a_real_state_is_left_to_the_gate(self) -> None:
+        """Never second-guess a working `game.state` -- MLB carries one, so its
+        rain delays keep being handled by the gate rather than by a clock."""
+        out = select_shortlist([self._row_at(5.47, state="live")], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["rows_stale_kickoff"], 0)
+
+    def test_a_delayed_start_inside_the_grace_survives(self) -> None:
+        out = select_shortlist([self._row_at(1.5)], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+
+    def test_a_pregame_row_is_untouched(self) -> None:
+        out = select_shortlist([self._row_at(-3.0)], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["rows_stale_kickoff"], 0)
+
+    def test_missing_commence_time_is_not_treated_as_stale(self) -> None:
+        """Absence of a start time is not evidence the game finished."""
+        row = _row(ev=3.0)
+        row.pop("commence_time", None)
+        out = select_shortlist([row], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+
+    def test_guard_is_disabled_at_zero(self) -> None:
+        out = select_shortlist([self._row_at(99.0)], now=_NOW, stale_kickoff_seconds=0)
+        self.assertEqual(len(out["rows"]), 1)
+
+    def test_rejections_are_reported(self) -> None:
+        out = select_shortlist([self._row_at(9.0), _row(ev=2.0)], now=_NOW)
+        self.assertEqual(out["rows_stale_kickoff"], 1)
+        self.assertEqual(len(out["rows"]), 1)
+
 if __name__ == "__main__":
     unittest.main()

@@ -141,6 +141,33 @@ SHORTLIST_KIND_FLOOR = 30
 # shape; see `#268`.
 SHORTLIST_MIN_VALUE_PCT = -2.0
 
+# Reject a row this long past its own commence_time when nothing can confirm the
+# game is still live. Env: SYNDICATE_SHORTLIST_STALE_KICKOFF_SECONDS.
+#
+# **A market cannot be "pregame" after its own start time.** `opportunity_gate`'s
+# dead-market rule is the real defence, but it is gated on `game.state`, and for
+# nine of the ten soccer leagues that state is PERMANENTLY `pregame`:
+# `_unsimulated_game` (`soccer/cards.py`) defaults `status_state` to `"pre"`, and
+# fixtures come from the static season schedule which carries no live status.
+# Only the SIMULATED path stamps a real status, and the sim runs for MLS alone.
+# So the gate cannot fire, at any hour, for those leagues.
+#
+# Measured on the served board 2026-08-08 19:53Z: the **#1 and #2 ranked rows**
+# were a match that kicked off **5.47 hours earlier**, still labelled `pregame`
+# with `game.state: None`. A settled market ranked first. That is the
+# "confident nonsense" failure `65b15a03` warns is worse than an empty board.
+#
+# This is a BACKSTOP, not a replacement for the gate. It fires only when the
+# state is unusable, so it cannot mask a working `game.state`:
+#   * a row with a real state (live/final) is left entirely to the gate
+#   * MLB carries real state, so rain delays keep being handled properly there
+#   * only rows with NO state evidence and a start time well past are dropped
+#
+# 2h is chosen to survive a delayed start in a sport that publishes no state,
+# while still catching this case an order of magnitude over. It would have
+# rejected the 5.47h match immediately.
+SHORTLIST_STALE_KICKOFF_SECONDS = 2 * 3600
+
 # Maximum book-clock age a quote may carry. Env:
 # SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS.
 #
@@ -186,6 +213,31 @@ def _row_value_pct(row: Mapping[str, Any]) -> float | None:
 def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:
     quote = row.get("quote")
     return _as_float(quote.get("book_age_seconds")) if isinstance(quote, Mapping) else None
+
+
+def _has_usable_game_state(row: Mapping[str, Any]) -> bool:
+    """True when something can actually tell us whether this game is running.
+
+    `market_state: "pregame"` does NOT count on its own -- that is the value the
+    soccer fixture path hands out unconditionally, so treating it as evidence is
+    what let a finished match rank first.
+    """
+    game = row.get("game")
+    state = str((game or {}).get("state") or "").strip().lower() if isinstance(game, Mapping) else ""
+    return bool(state)
+
+
+def _seconds_since_commence(row: Mapping[str, Any], now: datetime) -> float | None:
+    raw = str(row.get("commence_time") or "").strip()
+    if not raw:
+        return None
+    try:
+        stamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if stamp.tzinfo is None:
+        return None
+    return (now - stamp).total_seconds()
 
 
 def _as_float(value: Any) -> float | None:
@@ -534,6 +586,7 @@ def select_shortlist(
     now: datetime | None = None,
     min_value_pct: float | None = None,
     max_quote_age_seconds: float | None = None,
+    stale_kickoff_seconds: float | None = None,
 ) -> dict[str, Any]:
     """The rows that get PERSISTED. Everything else lives in the ledger.
 
@@ -559,10 +612,16 @@ def select_shortlist(
         if max_quote_age_seconds is not None
         else _env_float("SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS", SHORTLIST_MAX_QUOTE_AGE_SECONDS)
     )
+    stale_kickoff_ceiling = (
+        float(stale_kickoff_seconds)
+        if stale_kickoff_seconds is not None
+        else _env_float("SYNDICATE_SHORTLIST_STALE_KICKOFF_SECONDS", SHORTLIST_STALE_KICKOFF_SECONDS)
+    )
     by_sport: dict[str, list[Mapping[str, Any]]] = {}
     beyond_horizon = 0
     below_value_floor = 0
     beyond_quote_age = 0
+    stale_kickoff = 0
     for row in opportunities:
         if not _within_horizon(row, reference_now, horizon_days):
             beyond_horizon += 1
@@ -575,6 +634,14 @@ def select_shortlist(
         if value_pct is not None and value_pct < value_floor:
             below_value_floor += 1
             continue
+        # A market cannot be pregame after its own start time. Only fires when
+        # `game.state` is unusable, so a working state is always left to
+        # `opportunity_gate` rather than second-guessed here.
+        if stale_kickoff_ceiling > 0 and not _has_usable_game_state(row):
+            since_commence = _seconds_since_commence(row, reference_now)
+            if since_commence is not None and since_commence > stale_kickoff_ceiling:
+                stale_kickoff += 1
+                continue
         age_seconds = _row_quote_age_seconds(row)
         # An unknown age is NOT treated as fresh -- same call `_freshness_factor`
         # makes (0.6, not 1.0) and for the same reason: sources that publish no
@@ -627,6 +694,7 @@ def select_shortlist(
         "horizon_days": horizon_days,
         "min_value_pct": value_floor,
         "max_quote_age_seconds": age_ceiling,
+        "stale_kickoff_seconds": stale_kickoff_ceiling,
         # Logged, not silently dropped: a sport vanishing from the shortlist
         # should be attributable to its schedule rather than look like an outage.
         # Same contract for the two quality floors -- a board that shrinks must
@@ -634,5 +702,6 @@ def select_shortlist(
         "rows_beyond_horizon": beyond_horizon,
         "rows_below_value_floor": below_value_floor,
         "rows_beyond_quote_age": beyond_quote_age,
+        "rows_stale_kickoff": stale_kickoff,
         "persisted_bytes": len(json.dumps(selected, default=str)),
     }
