@@ -111,6 +111,152 @@ decision.** Nothing here enables it and nothing was deployed.
 >
 > Everything below is left as written. The struck numbers are marked in place.
 
+> **SECOND PASS, ~22:20Z — four cross-lane inputs resolved. The recommendation
+> holds; two of its reasons are now different and one is stronger.**
+>
+> **(a) THE TWO RSS READINGS ARE BOTH CORRECT AND I WAS FRAMING MINE WRONG.**
+> The WNBA lane quoted refresh-worker RSS at **1,602MB**; I quoted **2,357MB**.
+> Neither is wrong — pulled the full 2h distribution (422 samples, 4 windows
+> truncated at the 1000-row cap so the max is a **lower bound**):
+>
+> ```
+> RSS  min 85.0   median 1543.4   p90 1635.1   MAX 2357.2 @ 21:37:44Z
+> latest (22:17Z)  1624-1625      3 boots in the window: 20:17, 20:49, 21:22
+> ```
+>
+> So **1,625MB is the floor and 2,357MB is a real recurring excursion**, ~7 min
+> after a boot. My "headroom 1,239MB" arithmetic was right but framed as if
+> settlement runs *at* the peak. The honest form:
+>
+> ```
+> against the FLOOR   1625 + 1436 = 3061   ->  535MB under lethal   fits
+> against the PEAK    2357 + 1436 = 3793   ->  197MB OVER lethal    dies
+> ```
+>
+> **Settlement fits only if it lands in a trough and finishes before the next
+> excursion — and it runs for 10–45 minutes.** That is not a spike colliding with
+> a spike; it is a long occupation that has to avoid every excursion for its whole
+> duration. The gate's own `gate_pass_mb` assumes a measured **2,272MB** excursion
+> for exactly this reason. **Verdict unchanged, mechanism corrected.** I did not
+> quote `container_memory_headroom_mb` at any point — every number here is
+> `accounted_rss_mb`.
+>
+> **(b) THE LEARNING HALF NEEDS NO TRANSPORT. THE DISPLAY HALF IS SEVERED.**
+> The intelligence lane routed "the evaluation ledger cannot reach web, so the
+> layer's output has no route to the surface". Half right, and the half that is
+> wrong is the half that decides this. Checked with `is_hot_artifact_relative_path`:
+>
+> ```
+> False  data/prediction_ledger.json                    <- what /portfolio reads
+> False  reports/intelligence/evaluation_ledger_chunks/*.jsonl
+> False  reports/intelligence/performance_summary.json
+> True   reports/intelligence/intelligence_state.json   <- carries NO evaluation keys
+> True   settlement_inputs/*                            <- INPUTS, not results
+> ```
+>
+> So **every file that would carry a settled result to a human is un-allowlisted**
+> — including `prediction_ledger.json`, which is what `#216`'s ledger bridge was
+> built to populate. Allowlisting is not the fix for the chunks (367MB against a
+> transport that drops in the tens of MB), though `prediction_ledger.json` is
+> small enough that it might be for that one.
+>
+> **But settlement's primary consumers never cross a service boundary.**
+> `build_reliability_profile` / `adjust_confidence` are called from
+> `syndicate/features/intelligence.py:8696,8778` inside `run_intelligence_query`,
+> which CLAUDE.md makes worker-owned, and `recommendation_engine.py` imports the
+> same. **Reliability multipliers, dynamic edge thresholds and policy promotion
+> all read the worker's own ledger on the worker's own disk.** So enabling the
+> autorun *would* change what the board recommends, even while `/portfolio` and
+> `/intelligence/api/opportunity-board` keep showing zero. **It is not futile —
+> but you would be flying on the autorun status file alone**, which is
+> keyvalue-backed and is the only reason the 8,276/0 numbers above are readable
+> at all. "Did it run and what did it match" is observable; "what were the
+> results" is not.
+>
+> **(c) WNBA's ZERO IS A FOURTH INSTANCE OF THE SAME DEFECT — a grader reading a
+> path nothing writes.** Not "no results yet". Measured on production via
+> `/api/ops/wnba/artifact-counts?date=2026-08-07`, which already existed:
+>
+> ```
+> processed_root() returns  .../wnba_source/source_artifacts/data/processed
+>
+>   game_cards_2026-08-07.csv                    DEFAULT exists=False | other exists=True  rows=3
+>   props_recommendations_2026-08-07.csv         DEFAULT exists=False | other exists=True  rows=31
+>   props_recommendations_top_by_game_*.json     DEFAULT exists=False | other exists=True  rows=9
+>   recommendations_slate_2026-08-07.json        DEFAULT exists=False | other exists=True  rows=3
+>   props_edges / props_predictions              absent at BOTH
+>
+>   0 of 6 families at the root the grader uses · 4 of 6 at the other candidate root
+> ```
+>
+> `_wnba_graded_rows_for_date` calls `processed_root()`, gets the root where
+> nothing exists, and `build_local_market_accuracy_payload` returns
+> `available: false` — indistinguishable from an unplayed slate. **Same shape as
+> `#275`'s NFL fix: two of eight graders point at a directory nothing writes.**
+> `processed_root()` lives in `syndicate/features/wnba/sources.py`, the WNBA
+> lane's file — **routed, not touched.** Caveat: this is WEB's disk; settlement
+> runs on refresh-worker, where the layout is written by the same publisher, so
+> likely-but-not-proven there.
+>
+> **(d) PER-SPORT GRADED ROWS, 2026-07-19..08-08, with the CAUSE of each zero
+> classified** — the lead's question, and the point is that the four zeros have
+> four different causes that all render identically:
+>
+> | sport | rows | cause of a zero |
+> |---|---|---|
+> | soccer | **385** | — (10 of 21 dates non-zero) |
+> | mlb | **24** | — (1/date until 08-07, then 8) |
+> | wnba | 0 | **DEFECT** — grader reads the empty root, 0 of 6 families (c) |
+> | nfl | 0 | **DEFECT, now fixed + correctly still 0** — `#275`; the 2026 preseason `status` is never rewritten, so nothing is gradeable yet |
+> | nba, nhl | 0 | **LEGITIMATE** — out of season |
+> | ncaab, ncaaf | 0 | **LEGITIMATE** — out of season |
+>
+> ⇒ **409 of a possible 409+N, where the two in-season defects (wnba, nfl) are
+> worth an unknown N.** WNBA alone had 31 prop recommendations and 3 games on
+> 08-07 that the grader could not see.
+>
+> **UPDATE, same hour: the `official`→`all` lever below has been TAKEN by another
+> lane** — `graded_outcomes.py` now reads `all or playable or official`, with the
+> union check I did not do (`official` and `playable` are each subsets of `all`
+> and their union *is* `all`, so it is a straight swap, not a merge) and a 3.5×
+> measurement across three restored dates. **It was uncommitted in the shared
+> working tree when I found it, so I did not stage it and did not race them.**
+> Revised MLB: 08-07 goes 8 → 37, and the 16 one-row dates are unchanged, so
+> **MLB 24 → 53** and the total **409 → 438**. Two consequences worth stating:
+> the ceiling improves ~7%, and **the per-settled-record cost is paid 438 times
+> rather than 409** — this lever makes the wall-clock problem slightly worse, not
+> better, which is the correct trade but should not be a surprise.
+
+> **THE GATE, 46 MINUTES INTO THE CURRENT BOOT** (`check_worker_memory_gate.py`,
+> 22:17Z, after the 21:30:50Z deploy — *pre* the 23:15Z batch, so this baseline
+> is on the OLD side of that reboot):
+>
+> ```
+>         boot    window     n  peak RSS  final RSS  peak cont
+>   20:17:05       32m    94    1695.3     1682.3     2989.5
+>   20:49:02       33m   104    1738.2     1717.9     2921.8
+>   21:22:11        9m    31    1478.5     1393.1     2016.1
+>   21:30:50       46m   344    2357.2     1577.1     3031.1   <- current
+>
+>   7 restarts in the window · 0 OOM kills
+>   memory.current peaked 3031.1MB, of which 674MB reclaimable cache
+> ```
+>
+> **Peak RSS per boot has risen across the last four boots and the current one is
+> the highest observed.** Final RSS (1,577MB) sits far below peak (2,357MB), which
+> is the excursion shape point (a) makes: the worker is not *sitting* at 2.3GB, it
+> *visits* 2.3GB. A 10–45 minute settlement pass has to survive every visit.
+>
+> **(e) ONE PREMISE I SHOULD NOT HAVE LEANED ON.** I wrote that settlement's cost
+> "is the same arithmetic that produced 110 OOM kills over eleven hours". That
+> attribution is **contested inside this very file**: `#256`'s code comment
+> describes the settlement crash loop as the mechanism, while the `#253` entry
+> records that the control — the `#243` rollback — ran **with settlement already
+> off** and still died 5 times in 18 minutes. Per [[retraction is not innocence]]
+> that leaves settlement *not proven guilty*, not innocent. **My memory arithmetic
+> does not depend on it** — 1,436MB against a 2,357MB peak is measured
+> independently — so the claim is withdrawn rather than defended.
+
 #### FIRST: `render.yaml` AND PRODUCTION DISAGREE, AND THE FILE IS THE WRONG ONE
 
 `render.yaml:296` reads `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN:
