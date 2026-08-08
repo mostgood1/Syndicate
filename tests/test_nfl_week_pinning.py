@@ -110,3 +110,72 @@ def test_no_date_means_no_filtering(monkeypatch, date_value):
 def test_empty_input_is_a_no_op(monkeypatch):
     _fake_events(monkeypatch, ["401873271"])
     assert _nfl_games_on_requested_date([], "2026-08-06") == []
+
+
+# ---------------------------------------------------------------------------
+# preseason_target_week: keyed on `gameday`, not the never-refreshed `status`.
+# ---------------------------------------------------------------------------
+
+
+def _schedule(tmp_path, rows, monkeypatch):
+    import csv as _csv
+
+    from syndicate.features.nfl import sources
+
+    path = tmp_path / "schedule_preseason_2026.csv"
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        w = _csv.DictWriter(fh, fieldnames=["week", "gameday", "status"])
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+    monkeypatch.setattr(sources, "real_preseason_schedule_path", lambda season: path)
+    return sources
+
+
+def test_a_stale_status_column_no_longer_pins_the_week(tmp_path, monkeypatch):
+    """THE BUG. Nothing rewrites `status` -- fetch_nfl_preseason_schedule.py is
+    a manual CLI in no pipeline -- so every row read "Scheduled" and
+    min(unplayed) returned 1 forever, even after week 1 had been played."""
+    s = _schedule(tmp_path, [
+        {"week": "1", "gameday": "2026-08-07", "status": "Scheduled"},   # already past
+        {"week": "2", "gameday": "2026-08-13", "status": "Scheduled"},
+    ], monkeypatch)
+    monkeypatch.setattr(s, "central_today_iso", lambda: "2026-08-08", raising=False)
+    import syndicate.features.shared.timezone as tz
+    monkeypatch.setattr(tz, "central_today_iso", lambda: "2026-08-08")
+    assert s.preseason_target_week(2026) == 2
+
+
+def test_a_week_playing_TODAY_is_the_target(tmp_path, monkeypatch):
+    """>= today, not > today: a week whose games are today is the week we are
+    preparing for, and the old status rule agreed."""
+    s = _schedule(tmp_path, [{"week": "2", "gameday": "2026-08-13", "status": "Scheduled"}], monkeypatch)
+    import syndicate.features.shared.timezone as tz
+    monkeypatch.setattr(tz, "central_today_iso", lambda: "2026-08-13")
+    assert s.preseason_target_week(2026) == 2
+
+
+def test_all_games_past_means_preseason_is_over(tmp_path, monkeypatch):
+    s = _schedule(tmp_path, [{"week": "4", "gameday": "2026-08-29", "status": "Scheduled"}], monkeypatch)
+    import syndicate.features.shared.timezone as tz
+    monkeypatch.setattr(tz, "central_today_iso", lambda: "2026-09-10")
+    assert s.preseason_target_week(2026) is None
+
+
+def test_a_file_with_no_gamedays_falls_back_to_the_status_rule(tmp_path, monkeypatch):
+    """Separates "preseason is over" from "this file cannot answer by date".
+    Without it, a dateless schedule would silently report preseason finished."""
+    s = _schedule(tmp_path, [
+        {"week": "3", "gameday": "", "status": "Scheduled"},
+        {"week": "4", "gameday": "", "status": "Scheduled"},
+    ], monkeypatch)
+    import syndicate.features.shared.timezone as tz
+    monkeypatch.setattr(tz, "central_today_iso", lambda: "2026-08-08")
+    assert s.preseason_target_week(2026) == 3
+
+
+def test_a_missing_file_is_still_None(tmp_path, monkeypatch):
+    from syndicate.features.nfl import sources
+
+    monkeypatch.setattr(sources, "real_preseason_schedule_path", lambda season: tmp_path / "nope.csv")
+    assert sources.preseason_target_week(2026) is None

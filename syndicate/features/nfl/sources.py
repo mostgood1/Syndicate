@@ -268,7 +268,32 @@ def preseason_target_week(season: int) -> int | None:
     path = real_preseason_schedule_path(season)
     if not path.exists():
         return None
-    weeks_with_unplayed_games: set[int] = set()
+
+    # KEYED ON `gameday`, NOT `status`. MEASURED 2026-08-08.
+    #
+    # The status rule returned `min(weeks whose status != "final")`, and NOTHING
+    # EVER REWRITES THAT COLUMN: scripts/fetch_nfl_preseason_schedule.py is a
+    # manual CLI referenced by no pipeline (confirmed by grep across
+    # tools/daily_update.py, scripts/run_refresh_worker.py and
+    # scripts/refresh_odds_sources.py). The 2026 file was written 08-05 and
+    # still read "Scheduled" for all 49 games on 08-08 -- including week 1's
+    # single game, played 08-06 -- so min() returned 1 forever.
+    #
+    # That is the "week self-pins to 1" defect. Not a hardcode: a min() over a
+    # set that never shrinks because nobody refreshes its input.
+    #
+    # `gameday` needs no refresh to stay correct, so this asks the same question
+    # the docstring always did -- "which week should we be preparing for right
+    # now" -- against a column that cannot go stale.
+    #
+    # Deliberately >= today rather than > today: a week whose games are TODAY is
+    # the week we are preparing for, and the previous rule agreed (an unplayed
+    # game today was not "final").
+    from syndicate.features.shared.timezone import central_today_iso
+
+    today = str(central_today_iso() or "").strip()
+    weeks_ahead: set[int] = set()
+    weeks_unplayed_by_status: set[int] = set()
     with path.open("r", encoding="utf-8", newline="") as handle:
         for row in csv.DictReader(handle):
             try:
@@ -277,10 +302,37 @@ def preseason_target_week(season: int) -> int | None:
                 continue
             if week not in (1, 2, 3, 4):
                 continue
-            status = str(row.get("status") or "").strip().lower()
-            if status != "final":
-                weeks_with_unplayed_games.add(week)
-    return min(weeks_with_unplayed_games) if weeks_with_unplayed_games else None
+            gameday = str(row.get("gameday") or "").strip()
+            if today and gameday and gameday >= today:
+                weeks_ahead.add(week)
+            if str(row.get("status") or "").strip().lower() != "final":
+                weeks_unplayed_by_status.add(week)
+    if weeks_ahead:
+        return min(weeks_ahead)
+    # No dated row is still ahead. If the file also has no `gameday` at all we
+    # cannot answer by date, so fall back to the old status rule rather than
+    # silently reporting "preseason is over" from a column we never read.
+    # A file WITH gamedays that are all past genuinely means preseason is done.
+    return None if _preseason_schedule_has_gamedays(path) else (
+        min(weeks_unplayed_by_status) if weeks_unplayed_by_status else None
+    )
+
+
+def _preseason_schedule_has_gamedays(path: Path) -> bool:
+    """Does this schedule carry usable `gameday` values at all?
+
+    Separates "preseason is genuinely over" (dated rows, all past) from "this
+    file cannot answer by date" (no dates), so the fallback to the stale-status
+    rule only fires in the second case.
+    """
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if str(row.get("gameday") or "").strip():
+                    return True
+    except OSError:
+        return False
+    return False
 
 
 def build_preseason_module_links(selected_week: int, active_label: str, *, season: int | None = None) -> list[dict[str, Any]]:
