@@ -1,5 +1,77 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-08 (evening) — `#273` NCAAF CONTRIBUTES ZERO CHIPS ON EVERY DATE, ALWAYS. Cross-provider audit of all eight `games()` methods
+
+Found while answering the lead's cross-sport divergence question after `#271`.
+**NFL was not the worst case on this axis. NCAAF is, and unlike NFL's it is
+completely invisible.**
+
+**The structural cause is one line.** `build_game_chips`
+(`game_chip_scoreboard.py:442`) calls `resolve_context(requested_date=date_value)`
+with **no week**, so `context.week` is `None` for EVERY sport on the chips path.
+`_NCAAFDataProvider.games()` opens `if context.week is None: return []`.
+
+**Measured on production `/api/board/game-chips?sports=ncaaf` vs ESPN truth:**
+
+```
+        prod chips    ESPN ncaaf
+08-22       0             0        (correct by accident)
+09-05       0            68
+09-12       0            80
+```
+
+**0 of 148 real games** across the two in-season Saturdays checked on both
+surfaces. It has never been noticed because **zero chips is indistinguishable
+from "no slate"** — the same silence that hid the worker-registry defect earlier
+today. That shape has now bitten three times; treat an all-zero sport as a
+claim requiring a denominator, never as a quiet success.
+
+**Nuance so nobody "fixes" a working path:** the home-overview path
+(`_load_home_games`, `home.py:6848`) DOES pass `week=selected_week`, so NCAAF
+renders there. The defect is specific to chips/board.
+
+**The fix is near-transcription of `#271`.** `_FETCHERS` already carries
+`"ncaaf": lambda d: _fetch_espn_football_schedule("ncaaf", d)` — literally the
+same function NFL uses, different sport string. Fix lives in
+`_NCAAFDataProvider.games()` in `home.py`, NOT in `features/ncaaf/**`. Offered
+to the lead; unclaimed as of writing.
+
+#### THE FULL AUDIT — all eight providers, by what `games()` actually reads
+
+| provider | reads | chips-path result |
+|---|---|---|
+| mlb / nba / wnba / nhl / ncaab | `context_label` | date-correct |
+| nfl | `context_label` (+week, regular season) | fixed by `#271`, 20/20 exact |
+| **ncaaf** | **`context.week` only** | **0 on every date** |
+| **soccer** | **neither** | **51 identical rows on every date** |
+
+**SOCCER — independent confirmation of the soccer lane's diagnosis.** Their
+fetcher is perfectly date-discriminating; their provider is not:
+
+```
+ESPN soccer fetcher:  08-08 -> 11,  08-22 -> 52,  09-05 -> 56   overlap: 0
+soccer provider:      08-08 -> 59,  08-22 -> 82,  09-05 -> 67   shared:  51
+```
+
+Zero overlap available, 51 rows shared — and on production the same three
+leading ids head every date 08-08..09-12. The league set follows the date
+(`active_leagues_for_date` works); the fixtures inside each league do not. That
+is exactly their "a WEEK's fixtures joined against a TODAY-only odds grid",
+reached from the other end. **Their files, not touched — numbers handed over.**
+
+**THE PATTERN, and it is one pattern applied three times, not three bugs.** A
+date-blind week-keyed provider needs two separable halves: **(a)** resolve the
+unit (week) from the requested date, and **(b)** filter the resulting rows to
+that date by event id. NFL was missing both. **Soccer has (a) and is missing
+(b).** NCAAF is missing both. Half (b) is the one that actually removes the
+week/date translation, which is why the soccer lane's "date-key the pipeline,
+keep matchweek as presentation only" is the right general direction.
+
+**The transferable core is joining ESPN event ids to the local schedule's id
+column** rather than comparing dates. No date is ever compared to a date, so
+timezone-boundary errors become *unrepresentable* rather than handled. Applies
+to every week-keyed sport with a date-keyed fetcher — which is now all three.
+
 ### 2026-08-08 — I built the trap into the instrument I made to detect it, in four hours
 
 `4ec31e3d`. Read this one even if you skip the rest; the fix is trivial and the
