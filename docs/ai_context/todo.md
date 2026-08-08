@@ -254,7 +254,29 @@ we are pricing 400 rows of real games — and no chip comes out.
    ALL TEN leagues have `schedule_2026.json`. So it is not file presence and not
    the season.
 
-⇒ **STOP PROBING ARTIFACTS FROM OUTSIDE.** Eight hypotheses were tested from the
+9. **An exception in the per-league builder** — REFUTED, and this is the one
+   that finally narrowed it. `_SoccerDataProvider.games()` already wraps each
+   league in a try/except that prints `SOCCER_LEAGUE_GAMES_FAILED`. Measured on
+   WEB (which builds the chips), 2h window, **12,110 log lines: ZERO
+   occurrences.**
+
+⇒ **NARROWED TO ONE FUNCTION.** The seven leagues are not throwing —
+`build_cards_page_context(league, week, season)` in `soccer/cards.py` **RETURNS
+AN EMPTY GAMES LIST** for them. Not a provider bug, not error handling, not
+anything visible from the artifacts API.
+
+**NEXT STEP:** read what `build_cards_page_context` requires for a
+`(league, season, week)` triple, and why `serie_a 2026 wk1` yields nothing while
+`epl 2026 wk1` yields games. Identical season and week, so the difference is in
+what that function reads.
+
+**METHOD NOTE, worth more than the finding.** Nine hypotheses, eight refuted, and
+the instrument that finally discriminated was a `print` ALREADY IN THE CODE. The
+eight dead ends were all black-box probes of artifacts from outside. **Look for
+existing instrumentation before inventing a probe** — `SOCCER_LEAGUE_GAMES_FAILED`
+would have split "throwing" from "returning empty" on the first attempt.
+
+⇒ *(superseded) STOP PROBING ARTIFACTS FROM OUTSIDE.* Eight hypotheses were tested from the
 API and eight were refuted; the remaining difference is INSIDE the files or in
 how the builder reads them, and neither is visible through
 `/api/ops/artifacts/export`. **The next session should INSTRUMENT the path, not
