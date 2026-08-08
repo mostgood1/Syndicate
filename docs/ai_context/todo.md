@@ -1,5 +1,58 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-08 (evening) — `#274` THE LIVE-LENS MEMORY GATES, ALL FIVE BUILDERS MEASURED AT ONCE. **MLB's is 3-4x too LOW, and it is the one everyone trusted**
+
+First time every builder in the live-lens tick has been measured against the
+same clock on the same service. refresh-worker (4096MB), n=8 cycles,
+2026-08-08 21:31-22:05Z, MLB slate live:
+
+| sport | gate | worst container Δ | worst accounted_rss Δ | verdict |
+|---|---|---|---|---|
+| **mlb** | 300MB | **+951.5MB** | **+1106.9MB** | **badly low** |
+| soccer | 300MB | +81.1MB | +105.8MB | about right |
+| wnba | 300MB | +73.2MB | +24.2MB | right (recalibrated, `4bab50c1`) |
+| nba | **none** | +321.2MB | +180.9MB | ungated — and OUT OF SEASON |
+| nfl | **none** | +40.6MB | +40.0MB | ungated, no slate until 08-13 |
+
+**`#124` lowered MLB's gate 1800MB → 300MB from a measurement of "0-13MB per
+tick".** That measurement was taken on a day with no live MLB slate. Tonight,
+with one, the same build costs ~950MB. `397088a3` states outright that the cost
+*scales with the live slate* — the gate does not. So MLB's gate clears at 300MB
+and the build then allocates ~950MB, which is the exact shape that OOM-killed
+live-odds-worker and caused the migration to refresh-worker in the first place.
+
+**The ordering is the finding.** Soccer's gate — the only one whose own comment
+admits it is a guess ("NOT yet backed by a real production measurement") — is
+the closest to correct. MLB's, the one this file repeatedly cites as *the*
+measured gate, is the worst. **A number's provenance is not its accuracy: a
+real measurement of the wrong day is still the wrong number.** [[check guard
+thresholds against stage cost]]
+
+**CAVEATS, because this will get quoted.** One night, n=8, and these are
+*container* deltas with child-process churn mixed in (several are negative).
+They bound each build's cost from **below**, not above. Soccer's number will
+move once `c9fbb736`/`a03c2cfb` let its nine dead leagues do real work.
+
+#### NBA still has the disease WNBA was cured of, filed under "not in season"
+
+`nba/live_lens.py:564` — `build_live_lens_snapshot` calls
+`_compute_cards_page_context(date, allow_stored_date_fallback=False)`
+**unconditionally**. No `if_cached`, no `allow_rebuild`, **no headroom gate**,
+and six separate `_compute_*` calls per tick. That is precisely the
+pre-`44008605` WNBA pattern that cost +1,062MB and crash-looped a 2Gi service.
+It is cheap today only because NBA has no slate in August. Routed to the lead,
+not fixed here — not my sport.
+
+#### The tick's sport list ignores `SYNDICATE_ACTIVE_SPORTS` entirely
+
+`_LIVE_LENS_SPORTS` (`live_lens_loop.py:136`) is a hard-coded
+`("mlb","nba","wnba","soccer","nfl")`. `SYNDICATE_ACTIVE_SPORTS` is read in
+exactly two places — `syndicate/app.py:294` and `blueprints/home.py:549-551` —
+both web navigation. refresh-worker's value is `mlb,wnba,soccer,nfl`, so
+**NBA is not an active sport and the loop ticks it every cycle anyway**, at
+1.6-42s and up to +321MB, ~10% of the long cycles. Nothing reconciles the two
+lists and the participating-sport set is not derivable from one place.
+
 ### OPEN 2026-08-08 (evening) — `#273` NCAAF CONTRIBUTES ZERO CHIPS ON EVERY DATE, ALWAYS. Cross-provider audit of all eight `games()` methods
 
 Found while answering the lead's cross-sport divergence question after `#271`.
