@@ -17091,16 +17091,29 @@ the worker service that already owns that cadence — never inside web. Many
 of both were directly observed completing successfully (`ok=True, rc=0`)
 throughout tonight's polling. **Nothing here suggests those need fixing.**
 
-**What's arguably worth fixing, not urgent, not done here (no code changed
-this pass — investigation only):** `/api/ops/odds-refresh/run` should
-probably dispatch onto refresh-worker (or at minimum accept an explicit
-lane/launch-mode override) for anything beyond a small, cheap refresh,
-rather than defaulting to running arbitrary-size OddsAPI fetches directly
-inside web's 2GB container. This predates tonight — it's a pre-existing gap
-in the ops endpoint, not something introduced by #106/#210/#234's work. It
-took two 13-minute hangs to even notice, which says this endpoint isn't
-routinely used for multi-sport pregame-scale triggers — worth flagging for
-whoever reaches for it next, not an active incident.
+✅ **FIXED same session, user-directed** (`syndicate/blueprints/ops.py`):
+both manual-trigger entry points —
+`POST /api/ops/odds-refresh/run` (`api_ops_odds_refresh_run`) and the
+dashboard form `POST /ops/odds-refresh/run` (`page_ops_odds_refresh_run`) —
+now default `launch_mode` to `"manifest_only"` unless the caller passes an
+explicit override, same fix/same reasoning already shipped for
+`/api/ops/full-refresh/run`. `manifest_only` routes the job onto
+refresh-worker's existing claim loop
+(`scripts/run_refresh_worker.py`'s `_has_pending_external_contract` →
+`_spawn_pending_job`, already wired into the main loop and already used by
+every autorun — confirmed NOT dead code by reading the call sites, given
+this session's other findings about dead-code flags) instead of spawning
+directly inside whichever service's process handled the click/request.
+Neither endpoint's existing tests asserted on `launch_mode` before, so
+nothing broke; added 3 new tests
+(`test_odds_refresh_run_defaults_to_manifest_only_launch_mode`,
+`test_odds_refresh_run_honours_an_explicit_launch_mode`,
+`test_run_page_route_defaults_to_manifest_only_launch_mode`) —
+`tests/test_ops.py` 120/120 passing. **Not yet deployed** — committed
+locally, needs a push + Render deploy (web service) before it takes effect
+in production; the next manual trigger through either route should confirm
+`pending_external`/`external_runner` in the response instead of a live
+`pid`, and that refresh-worker's own status shows a `claimed_count` bump.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,

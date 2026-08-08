@@ -2156,6 +2156,21 @@ def api_ops_odds_refresh_run() -> Any:
     # Defaults to fast (unchanged for a bare POST), but a caller that
     # explicitly asks for "full" now gets it.
     requested_mode = str((payload or {}).get("mode") or "").strip().lower()
+    # Default to manifest_only, same reason and same fix as
+    # /api/ops/full-refresh/run just below -- without an explicit launch_mode
+    # this falls through to SYNDICATE_REFRESH_LAUNCH_MODE, detached_subprocess
+    # on the WEB service, spawning refresh_odds_sources.py inside web's 2GB
+    # container. Confirmed live 2026-08-06: two manual triggers through this
+    # exact route (soccer alone, then the full mlb/wnba/nfl/soccer combo) sat
+    # running/never finished for 13+ minutes each and had to be canceled --
+    # versus the same commands completing in ~3.5min, cleanly, when they ran
+    # on refresh-worker's 4GB box instead. manifest_only routes the job onto
+    # refresh-worker's own claim loop (scripts/run_refresh_worker.py's
+    # _has_pending_external_contract/_spawn_pending_job), which already
+    # exists and already runs every autorun -- this endpoint was the one
+    # caller not using it. An explicit launch_mode in the request still wins.
+    payload = dict(payload or {})
+    payload.setdefault("launch_mode", "manifest_only")
     try:
         job_id, job = _start_refresh_job(payload, mode=requested_mode or "fast")
     except ValueError as exc:
@@ -2328,6 +2343,12 @@ def page_ops_odds_refresh_run() -> Any:
             dry_run=_coerce_bool(_payload_value(payload, "dry_run")),
             mode=str(_payload_value(payload, "mode", "fast") or "fast"),
             force_refresh=_coerce_bool(_payload_value(payload, "force_refresh")),
+            # Same fix, same reason as /api/ops/odds-refresh/run just above --
+            # this dashboard-form route had the identical gap: no launch_mode
+            # passed at all, so it always fell through to detached_subprocess
+            # on whichever service serves the click (web). An explicit
+            # launch_mode field in the form/request still wins.
+            launch_mode=_payload_value(payload, "launch_mode", "manifest_only"),
         )
     except ValueError as exc:
         return jsonify({"ok": False, "error": str(exc)}), 400
