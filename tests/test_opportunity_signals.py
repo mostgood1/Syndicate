@@ -268,3 +268,94 @@ def test_blended_score_keeps_negative_value_negative():
 # See tests/test_opportunity_gate.py -- the same production cases (Luis Arraez
 # at 30,556s, the unnormalised game_state strings, the missing book clock) are
 # asserted there against the one implementation rather than a second copy.
+
+
+# ---------------------------------------------------------------------------
+# Price reliability: EV% is not comparable across price levels.
+# ---------------------------------------------------------------------------
+#
+# The first production L2-A shortlist ranked a 60-to-1 longshot #1. MEASURED
+# 2026-08-08: soccer h2h at +6000, fair_probability 0.0178, EV 8.64%, 5 books,
+# quote 4.9 hours old, score 2.16 -- top of the board.
+#
+# The freshness factor HAD fired (0.25). The defect was not staleness: the same
+# 8.64% EV needs a +0.0453 absolute probability edge at -110 and only +0.0014 at
+# +6000, a 32x difference. Our fair probability comes from a two-sided devig
+# whose ABSOLUTE error does not shrink as p shrinks, so at long odds the EV is
+# mostly estimation noise.
+
+_LONGSHOT_FAIR = 0.017809560682320254
+
+
+def test_the_production_longshot_is_demoted():
+    ev = expected_value_pct(6000, _LONGSHOT_FAIR)
+    before = blended_score(ev_pct=ev, books_quoting=5, book_age_seconds=17739.0)
+    after = blended_score(
+        ev_pct=ev, books_quoting=5, book_age_seconds=17739.0,
+        price=6000, fair_prob=_LONGSHOT_FAIR,
+    )
+    assert after["score"] < before["score"] / 5
+    assert after["price_reliability"] < 0.2
+
+
+@pytest.mark.parametrize("price,fair", [(-110, 0.5691), (150, 0.4346), (500, 0.1811)])
+def test_normally_priced_rows_are_untouched(price, fair):
+    """This must change nothing except at the extremes it exists for."""
+    ev = expected_value_pct(price, fair)
+    before = blended_score(ev_pct=ev, books_quoting=5, book_age_seconds=60)
+    after = blended_score(ev_pct=ev, books_quoting=5, book_age_seconds=60, price=price, fair_prob=fair)
+    assert after["score"] == before["score"]
+    assert after["price_reliability"] == 1.0
+
+
+def test_a_longshot_with_a_real_edge_still_ranks():
+    """NOT a longshot ban. A big absolute edge at long odds is still an edge."""
+    ev = expected_value_pct(6000, 0.05)
+    score = blended_score(ev_pct=ev, books_quoting=5, book_age_seconds=60, price=6000, fair_prob=0.05)
+    assert score["price_reliability"] == 1.0
+
+
+def test_the_longshot_no_longer_outranks_a_real_edge():
+    """The actual failure: a sub-noise longshot sitting above a solid row."""
+    longshot = blended_score(
+        ev_pct=expected_value_pct(6000, _LONGSHOT_FAIR),
+        books_quoting=5, book_age_seconds=17739.0, price=6000, fair_prob=_LONGSHOT_FAIR,
+    )
+    solid = blended_score(
+        ev_pct=expected_value_pct(-110, 0.55),
+        books_quoting=6, book_age_seconds=120, price=-110, fair_prob=0.55,
+    )
+    assert solid["score"] > longshot["score"]
+
+
+def test_missing_price_or_fair_prob_is_inert_not_punitive():
+    """Unknown must not score as bad. Backward compatible with every existing
+    caller that passes neither."""
+    score = blended_score(ev_pct=5.0, books_quoting=5, book_age_seconds=60)
+    assert score["price_reliability"] == 1.0
+    explicit_none = blended_score(
+        ev_pct=5.0, books_quoting=5, book_age_seconds=60, price=None, fair_prob=None
+    )
+    assert score["score"] == explicit_none["score"]
+
+
+def test_the_factor_is_multiplicative_with_the_others():
+    """Reliability terms compose; they are confidence in value, not value."""
+    score = blended_score(
+        ev_pct=10.0, books_quoting=1, book_age_seconds=17739.0,
+        price=6000, fair_prob=_LONGSHOT_FAIR,
+    )
+    expected = round(
+        10.0 * score["book_confidence"] * score["freshness_factor"] * score["price_reliability"], 4
+    )
+    assert score["score"] == expected
+
+
+def test_layer2_board_passes_price_and_fair_prob():
+    """Without this the factor is inert and the longshot ranks on price alone."""
+    import inspect
+
+    from syndicate.features.shared import layer2_board
+
+    source = inspect.getsource(layer2_board.build_layer2_rows)
+    assert "price=price" in source and "fair_prob=fair" in source

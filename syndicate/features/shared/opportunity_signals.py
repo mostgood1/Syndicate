@@ -307,6 +307,37 @@ _SCORE_SIM_WEIGHT = 0.5          # sim edge counts half as much as measured EV
 _SCORE_BOOK_CONFIDENCE = ((1, 0.5), (2, 0.7), (4, 0.85))   # books quoting -> factor
 _SCORE_FRESHNESS = ((300, 1.0), (1800, 0.9), (3600, 0.75), (10800, 0.5))  # seconds -> factor
 
+# EV% IS NOT COMPARABLE ACROSS PRICE LEVELS, and ranking on it alone put a
+# 60-to-1 longshot at the top of the board.
+#
+# MEASURED on the first production L2-A shortlist (2026-08-08): the #1 row was a
+# soccer h2h at +6000, fair_probability 0.0178, EV 8.64%, from 5 books. The same
+# 8.64% EV requires a wildly different absolute probability edge depending on
+# where the price sits:
+#
+#     price   implied   absolute edge needed for 8.64% EV
+#     -110    0.5238    +0.0453
+#     +150    0.4000    +0.0346
+#     +500    0.1667    +0.0144
+#     +6000   0.0164    +0.0014      <- 32x smaller than at -110
+#
+# `expected_value_pct` is right that EV answers "what does betting this return".
+# The error was ranking on it without accounting for how reliable the estimate
+# is AT THAT PRICE. Our fair probability comes from a two-sided devig over a
+# handful of books, and its ABSOLUTE error does not shrink as p shrinks -- so at
+# long odds the EV is dominated by estimation noise rather than by edge.
+#
+# The floor is the plausible absolute error in a devigged fair probability. It
+# is a STATED PRIOR, not a measurement -- same status as the weights above, and
+# the honest way to set it is the same: compare CLV by price bucket once enough
+# bets settle. Named for the job it serves so it is not reused for another
+# (rule 9): this is "how wrong can the DEVIG be", not "how wrong is the sim".
+_SCORE_DEVIG_ABS_ERROR_FLOOR = 0.01   # 1 probability point
+
+# Deliberately NOT a hard longshot ban. A +6000 row with a genuinely large
+# absolute edge still ranks; this only stops a sub-noise edge being amplified
+# into a headline EV by the price alone.
+
 
 def _book_confidence(books_quoting: Any) -> float:
     """How much a consensus of N books is worth trusting.
@@ -347,12 +378,34 @@ def _freshness_factor(book_age_seconds: Any) -> float:
     return 0.25
 
 
+def _price_reliability(price: Any, fair_prob: Any) -> float:
+    """How much of this row's EV survives plausible devig error at its price.
+
+    See `_SCORE_DEVIG_ABS_ERROR_FLOOR`. Returns 1.0 when the absolute
+    probability edge is at or above the error floor -- i.e. for any normally
+    priced row -- so this changes nothing except at the extremes it exists for.
+
+    Returns 1.0 rather than 0.0 when price or fair probability is missing:
+    unknown must not be scored as bad, and a row with no fair probability has
+    no EV either, so it has already been excluded upstream.
+    """
+    edge_points = edge_pct(price, fair_prob)
+    if edge_points is None:
+        return 1.0
+    absolute_edge = abs(float(edge_points)) / 100.0
+    if _SCORE_DEVIG_ABS_ERROR_FLOOR <= 0:
+        return 1.0
+    return round(min(1.0, absolute_edge / _SCORE_DEVIG_ABS_ERROR_FLOOR), 4)
+
+
 def blended_score(
     *,
     ev_pct: Any = None,
     model_edge: Any = None,
     books_quoting: Any = None,
     book_age_seconds: Any = None,
+    price: Any = None,
+    fair_prob: Any = None,
 ) -> dict[str, Any] | None:
     """Rank a board row by value discounted for how much we trust it (#243).
 
@@ -379,13 +432,18 @@ def blended_score(
     value = (value_ev or 0.0) + _SCORE_SIM_WEIGHT * (value_sim or 0.0)
     confidence = _book_confidence(books_quoting)
     freshness = _freshness_factor(book_age_seconds)
+    # Third multiplicative reliability term, alongside book breadth and
+    # freshness, for the same reason they are multiplicative: it is not
+    # additional value, it is confidence in the value already computed.
+    price_reliability = _price_reliability(price, fair_prob)
     return {
-        "score": round(value * confidence * freshness, 4),
+        "score": round(value * confidence * freshness * price_reliability, 4),
         "value_pct": round(value, 4),
         "ev_component": None if value_ev is None else round(value_ev, 4),
         "sim_component": None if value_sim is None else round(_SCORE_SIM_WEIGHT * value_sim, 4),
         "book_confidence": confidence,
         "freshness_factor": freshness,
+        "price_reliability": price_reliability,
     }
 
 

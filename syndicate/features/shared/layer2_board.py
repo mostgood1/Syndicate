@@ -210,6 +210,12 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                 model_edge=model_edge,
                 books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
                 book_age_seconds=side_best.get("age_seconds"),
+                # Without these the price-reliability term is inert and a
+                # longshot's EV ranks on price alone -- which is exactly how a
+                # +6000 soccer h2h reached #1 on the first production
+                # shortlist. See _SCORE_DEVIG_ABS_ERROR_FLOOR.
+                price=price,
+                fair_prob=fair,
             )
             candidate["ev_pct"] = ev
             candidate["model_edge_pct"] = model_edge
