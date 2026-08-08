@@ -1,5 +1,77 @@
 # Syndicate TODO — canonical cross-session list
 
+### SHIPPED 2026-08-08 — LAYER 2 IS WIRED AND IS NOW THE BOARD (5 commits)
+
+`cc454c41` wiring · `e3d98cac` endpoint · `a6fb0bae` own artifact ·
+`88da95e8` ranking · `f1d9f69f` L2-A becomes the board. All deployed.
+
+**PROVEN IN PRODUCTION (first build, 2026-08-08 02:02Z):** 239 rows selected
+from **8,277 opportunities** across mlb/wnba/soccer, against the legacy pool's
+229 game + 18 prop. Per-sport ingest: mlb 28,226 quote rows → 3,321 grid rows →
+5,113 opportunities → 100 selected (51 game / 49 prop — the kind floor working,
+without it MLB's prop volume takes every slot); wnba 635 → 100; soccer 39 → 39;
+nfl 2,490 → **0, all `rows_beyond_horizon`** (the ORPHAN regular-season board,
+34–156 days out, correctly excluded rather than silently dropped).
+
+**MEMORY: +47MB measured**, against +122MB projected from a 13.3MB local shard.
+Stage peak 819MB vs ~2329MB headroom. `post_layer2_shortlist` checkpoint added.
+
+**THREE MISTAKES MADE AND CAUGHT — do not repeat:**
+
+1. **Plumbed onto the canonical board state, which production never writes.**
+   `canonical_board_state_enabled()` and shadow-compare both default False;
+   `read_intelligence_board_state` returns None for every date; the board serves
+   from `combined_board_window`. Rows were built correctly, threaded through
+   three hops correctly, and deposited where nothing reads. Caught only because
+   the endpoint was built BEFORE the template change ("3 then 1").
+2. **Three of four hops build EXPLICIT key lists**, so a new pool key reaches
+   nothing unless named at each: `_build_candidate_pool` →
+   `_compute_board_publication_response` → `_build_intelligence_board_state` →
+   `slice_...` (this last one passes through). A chain-survival test now guards it.
+3. **Put the row→card mapping in the WEB SERVICE** (serve time). Wrong twice:
+   compute in a read-only service, and — worse — **the persisted artifact would
+   not have been what the board displayed**, which defeats the reason L2-A is
+   worker-side at all. Settlement needs a record of what was RECOMMENDED; a card
+   derived per request is recorded nowhere. Cards are now built on refresh-worker
+   and persisted; web reads and slices only. Tests pin BOTH halves.
+
+**RANKING FIX (`88da95e8`) — EV% is not comparable across price levels.** The
+first shortlist ranked a +6000 soccer longshot #1 (fair 0.0178, EV 8.64%, quote
+4.9h old). Freshness had already fired (0.25) — not a staleness bug. The same
+8.64% EV needs +0.0453 absolute edge at -110 and only **+0.0014 at +6000**, and
+the devig's absolute error does not shrink with p. Added a third multiplicative
+reliability term: that row 2.1596 → 0.3058; normally priced rows bit-for-bit
+identical; a longshot with a real edge still ranks. `_SCORE_DEVIG_ABS_ERROR_FLOOR`
+is a **stated prior**, same status as `_SCORE_SIM_WEIGHT` — set it honestly with
+CLV by price bucket once settlement runs.
+
+**NOT PROVEN:** the ranking fix is deployed but never read back in production.
+
+### OPEN — 11 PRE-EXISTING TEST FAILURES ON `main` (not from tonight's work)
+
+Verified pre-existing by stashing every change and re-running.
+
+- `tests/test_intelligence_state.py` — **8 failures**, incl.
+  `test_build_candidate_pool_skips_sports_without_manifests` (expects
+  candidate_count 1, gets 0, with `candidate_scoring output_count: 0` upstream).
+  Smells like local-mirror data dependence rather than a production bug, but
+  nobody has checked.
+- `tests/test_intelligence.py` — **3 failures**, one of which is
+  `test_intelligence_blotter_view_includes_odds_projected_and_live_columns` —
+  the blotter, i.e. the exact surface rule 5 says to verify on and the one #240
+  fixed.
+
+### OPEN — MLB `candidate_count = 0` DURING A LIVE 13-GAME SLATE
+
+Measured 2026-08-08 02:0xZ with 13 of 15 MLB games *In Progress* (some in the
+1st/2nd inning — I wrongly called the slate finished from the clock; check
+StatsAPI, not the hour). `POST /api/intelligence/query` returned
+`candidate_count: 0` for mlb, `debug_source: combined_board_window`.
+
+This is the original "Layer 2 board not working" symptom, it **predates all five
+commits above**, and none of them diagnose it. L2-A may route around it — that
+is not the same as fixing it.
+
 ### SHIPPED 2026-08-08 — both halves of the sim-timing defect from the audit below
 
 **`fddb82fd` — the tip-off sim fires once per GAME, not once per tick.** Measured
