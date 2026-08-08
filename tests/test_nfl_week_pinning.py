@@ -73,14 +73,32 @@ def test_a_schedule_failure_leaves_the_board_ALONE(monkeypatch):
     assert len(out) == 2
 
 
-def test_an_id_space_mismatch_does_not_empty_the_board(monkeypatch):
-    """If no card matches any event id the two sources are keyed differently.
-    Filtering to nothing would replace a wrong board with an empty one -- and
-    id-space mismatch is real here: the board keys on OddsAPI hex ids while the
-    schedule keys on ESPN numerics."""
+def test_espn_listing_games_we_do_not_have_returns_EMPTY(monkeypatch):
+    """The wrong-week case, and the first version got this backwards.
+
+    MEASURED across five dates after deploying that version: 08-13 and 08-14
+    both re-served the stale 401873271. ESPN correctly listed 6 and 3 week-2
+    games; the card set was preseason WEEK 1 (preseason_target_week still pins
+    to 1), so nothing matched and the fall-open branch re-served exactly the
+    stale row this function exists to remove.
+
+    If ESPN answered and listed games, an empty match means THE WEEK IS WRONG,
+    which we know -- not that ids are incompatible, which we would not. Falling
+    open was worse than falling closed.
+    """
     _fake_events(monkeypatch, ["999999999"])
     out = _nfl_games_on_requested_date(_games(), "2026-08-13")
-    assert len(out) == 2
+    assert out == []
+
+
+def test_we_only_fall_open_when_espn_CANNOT_ANSWER(monkeypatch):
+    """The genuine unknown is handled upstream: no events at all -> unfiltered.
+    That is the only case where "we do not know" is true."""
+    def _boom(*_a, **_k):
+        raise RuntimeError("espn unreachable")
+
+    monkeypatch.setattr("syndicate.features.shared.schedule_adapter.fetch_schedule_for_date", _boom)
+    assert len(_nfl_games_on_requested_date(_games(), "2026-08-13")) == 2
 
 
 @pytest.mark.parametrize("date_value", ["", None, "   "])

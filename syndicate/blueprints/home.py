@@ -5581,11 +5581,28 @@ def _nfl_games_on_requested_date(games: list[dict[str, Any]], requested_date: An
     event_ids = {str(event.event_id).strip() for event in events if str(getattr(event, "event_id", "") or "").strip()}
     if not event_ids:
         return games
-    filtered = [game for game in games if str((game or {}).get("gamePk") or "").strip() in event_ids]
-    # Only narrow when the join actually worked. If no card matched any event id
-    # the two sources are keyed differently, and filtering to nothing would
-    # replace a wrong board with an empty one.
-    return filtered if filtered else games
+    # ESPN ANSWERED AND LISTED GAMES, so an empty match means THE WEEK IS WRONG,
+    # not that the ids are incompatible. Return empty.
+    #
+    # The first version fell open here, reasoning that "no card matched" implied
+    # an id-space mismatch. MEASURED across five dates once deployed, that guard
+    # produced the wrong answer on two of them:
+    #
+    #     08-06  ['401873271']  correct
+    #     08-08  []             correct
+    #     08-12  []             correct
+    #     08-13  ['401873271']  WRONG -- ESPN has 6 week-2 games; week 1's card
+    #     08-14  ['401873271']  WRONG -- set matched none, so it fell open and
+    #                           re-served the stale game
+    #
+    # `preseason_target_week` still pins to week 1, so on a week-2 date NO card
+    # can match and falling open re-serves exactly the stale row this function
+    # exists to remove. Falling open was worse than falling closed.
+    #
+    # The genuine id-space risk is still handled -- just upstream: if ESPN
+    # cannot answer at all, `events` is empty and we returned unfiltered above.
+    # That is the only case where "we do not know" is true. Here we DO know.
+    return [game for game in games if str((game or {}).get("gamePk") or "").strip() in event_ids]
 
 
 class _NFLDataProvider(_HomeSportDataProviderBase):
