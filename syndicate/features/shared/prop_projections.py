@@ -485,12 +485,28 @@ def project_game_market(
         dist = payload.get("run_margin_dist")
         if not isinstance(dist, Mapping):
             return None
-        # Lines are SIGNED per side. home -1.5 means home must win by 2+, i.e.
-        # margin > 1.5. away +1.5 means away may lose by 1, i.e. margin < 1.5.
-        # The line as quoted is from that side's perspective, so it is converted
-        # to the home-minus-away frame before the distribution is walked.
+        # THE LINE ARRIVES IN THE AWAY/OVER FRAME. `#262` made the grid row's
+        # `line` canonical (`book_grid._canonical_line`) so a row's line always
+        # agrees with its own cells; before that it was whichever side happened
+        # to anchor, so this code was ambiguous and sometimes right by accident.
+        #
+        # With L = the away-frame line, home's own line is H = -L, and home
+        # covers when margin > -H, i.e. margin > +L. So the home branch must NOT
+        # negate: negating computes P(margin > -L), which is the home +L
+        # probability reported against the home -L market.
+        #
+        # MEASURED on production 2026-08-08 before the fix, same distribution at
+        # +/-1.5 on two rows:
+        #     line=+1.5 side=home -> 0.7386   (P(margin > -1.5), should be ~0.26)
+        #     line=-1.5 side=home -> 0.2296   (P(margin > +1.5), should be ~0.74)
+        # Inflated home probabilities of 0.67-0.74 on underdogs, which is where
+        # the board's 86-89% implied model views and 19-28 point "edges" came
+        # from -- confidently recommending bets the market prices at -4% to -8%.
+        #
+        # The away branch needs no change: it wants P(margin < away's line), and
+        # the away frame is exactly what it now receives.
         if side in {"home", "1"}:
-            prob = _dist_prob_over(dist, -line_value)
+            prob = _dist_prob_over(dist, line_value)
         elif side in {"away", "2"}:
             prob = _dist_prob_below(dist, line_value)
         else:
