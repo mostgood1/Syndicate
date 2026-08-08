@@ -956,10 +956,17 @@ NFL  preseason 08-05..08-24   20/20 exact id-set   <- ALREADY PASSING, 1de982be 
 NCAAF 08-29 / 09-05 / 09-12 / 09-19    0 / 0 / 0 / 0 chips   <- the before picture
 ```
 
-**Paste this. It needs only the repo venv and network.**
+**Run this from the repo root. VALIDATED BY EXECUTION at 23:50Z** — it runs
+clean and currently prints the pre-deploy picture below, so if you see something
+other than that before the deploy, the problem is your environment, not the
+fixes.
 
 ```python
-import json, urllib.request, datetime as dt
+import sys, os, json, urllib.request, datetime as dt
+# Bootstrap so this works saved-as-a-file, not only pasted. Without it,
+# `py -3 recipe.py` puts the SCRIPT's directory on sys.path instead of the repo
+# and dies with ModuleNotFoundError: No module named 'syndicate' -- measured.
+sys.path.insert(0, os.getcwd())
 from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date as espn
 
 BASE = "https://syndicate-an21.onrender.com"
@@ -986,8 +993,13 @@ def chips(sport, date):
 for date, expected in [("2026-09-09", 1), ("2026-09-10", 1), ("2026-09-11", 0),
                        ("2026-09-13", 13), ("2026-09-14", 1), ("2026-09-20", 14)]:
     got, truth = chips("nfl", date), len(espn("nfl", date))
-    print(f"NFL  {date}  prod={len(got):<3} espn={truth:<3} expected={expected:<3}"
-          f" {'OK' if len(got) == truth == expected else 'FAIL'}")
+    # 09-11 has no games, so its "OK" is the 0 == 0 pass trap #1 warns about.
+    # Labelled rather than removed: it still proves an empty date stays empty,
+    # it just must not be counted toward the pass rate.
+    verdict = "OK" if len(got) == truth == expected else "FAIL"
+    if expected == 0:
+        verdict += "  (0==0, does NOT count)"
+    print(f"NFL  {date}  prod={len(got):<3} espn={truth:<3} expected={expected:<3} {verdict}")
 
 # --- #273  NCAAF --------------------------------------------------------
 # Expect EXACT id-set match on 08-29 only. The other dates are bounded by the
