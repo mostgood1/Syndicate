@@ -54,8 +54,13 @@ CONTEXT = {
 }
 
 
-def _publish(payload):
-    """Stand in for the shared keyvalue store one writer/one reader apart."""
+def _publish(payload, *, live_merged: bool = True):
+    """Stand in for the shared keyvalue store one writer/one reader apart.
+
+    Defaults to the LIVE-MERGED variant, because that is what the live lens
+    should normally be consuming after `#280`. Pass live_merged=False to
+    exercise the fallback to a context built without tonight's scores.
+    """
     store: dict[str, object] = {}
 
     def _write(path, value):
@@ -65,7 +70,9 @@ def _publish(payload):
         return store.get(str(path))
 
     if payload is not None:
-        store[str(wnba_cards.wnba_cards_context_artifact_path("2026-08-08"))] = payload
+        if live_merged:
+            payload = dict(payload, live_status_merged=True)
+        store[str(wnba_cards.wnba_cards_context_artifact_path("2026-08-08", live_status_merged=live_merged))] = payload
     return _write, _read
 
 
@@ -274,3 +281,74 @@ def test_provenance_survives_the_api_boundary():
 
     assert payload["cards_context_source"] == "published_artifact"
     assert 100 <= payload["cards_context_age_seconds"] <= 200
+
+
+# --- #280: the live-status merge was bundled with the stored-date fallback ---
+
+
+def test_the_live_merged_variant_is_preferred_over_the_plain_one():
+    """Both variants can be published for the same date -- the board build
+    (merge off) and the live-lens rebuild (merge on) both go through
+    `build_cards_page_context`. A single key would let whichever ran last decide
+    what the lens sees."""
+    store: dict[str, object] = {}
+    store[str(wnba_cards.wnba_cards_context_artifact_path("2026-08-08", live_status_merged=False))] = dict(
+        CONTEXT, published_at=time.time(), live_status_merged=False
+    )
+    store[str(wnba_cards.wnba_cards_context_artifact_path("2026-08-08", live_status_merged=True))] = dict(
+        CONTEXT, published_at=time.time(), live_status_merged=True
+    )
+
+    with patch.object(wnba_cards, "_keyvalue_read_json_file", lambda path: store.get(str(path))):
+        context, _age, _stale = wnba_cards.load_published_cards_page_context("2026-08-08")
+
+    assert context is not None and context["live_status_merged"] is True
+
+
+def test_only_the_plain_variant_still_serves_the_slate_and_says_so():
+    """Falling back rather than refusing keeps the worst case at exactly
+    today's behaviour instead of a blank lens -- and the source name says the
+    status may be stale, so nobody reads a finished game rendered "Scheduled"
+    as a live one."""
+    _write, _read = _publish(dict(CONTEXT, published_at=time.time()), live_merged=False)
+
+    with patch.object(wnba_cards, "_keyvalue_read_json_file", _read), patch.object(
+        wnba_live_lens, "build_cards_page_context_if_cached", return_value=None
+    ), patch.object(
+        wnba_live_lens, "build_live_lines_payload", return_value={"games": []}
+    ), patch.object(wnba_live_lens, "_run_wnba_live_lens_tick", return_value=None):
+        snapshot = wnba_live_lens.build_live_lens_snapshot("2026-08-08")
+
+    assert len(snapshot["games"]) == 1
+    assert snapshot["cards_context_source"] == "published_artifact_no_live_status"
+
+
+def test_the_merge_flag_defaults_to_todays_behaviour_for_every_existing_caller():
+    """`None` must mean "follow allow_stored_date_fallback". Every caller in the
+    repo passes nothing, so the default is the whole blast radius of `#280`."""
+    assert wnba_cards._live_status_merge_enabled(True, None) is True
+    assert wnba_cards._live_status_merge_enabled(False, None) is False
+    # ...and only an explicit opt-in separates them.
+    assert wnba_cards._live_status_merge_enabled(False, True) is True
+    assert wnba_cards._live_status_merge_enabled(True, False) is False
+
+
+def test_the_merge_flag_is_part_of_the_cache_key():
+    """Two contexts for the same date that differ on whether tonight's scores
+    were merged are different objects. A key that ignored the flag would return
+    one for the other -- which is how a live lens renders a finished game as
+    scheduled."""
+    built: list[bool] = []
+
+    def _fake(selected_date, *, allow_stored_date_fallback=False, allow_live_status_merge=None):
+        built.append(wnba_cards._live_status_merge_enabled(allow_stored_date_fallback, allow_live_status_merge))
+        return dict(CONTEXT)
+
+    with patch.object(wnba_cards, "_build_cards_page_context_uncached", _fake), patch.object(
+        wnba_cards, "_keyvalue_write_json_file", lambda *a, **k: None
+    ):
+        wnba_cards._clear_build_cards_page_context_cache()
+        wnba_cards.build_cards_page_context("2026-08-08", allow_stored_date_fallback=False)
+        wnba_cards.build_cards_page_context("2026-08-08", allow_stored_date_fallback=False, allow_live_status_merge=True)
+
+    assert built == [False, True], "the merged variant must not be served from the unmerged cache entry"
