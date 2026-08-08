@@ -2464,6 +2464,98 @@ def board_book_grid_api():
     )
 
 
+@intelligence_bp.get("/api/board/layer2-shortlist")
+def board_layer2_shortlist_api():
+    """L2-A: the ranked shortlist, READ from the artifact the worker built.
+
+    A PURE READ. Unlike `/api/board/book-grid` above -- which is a serve-time
+    pivot and computes its own grid -- this computes nothing at all. The rows
+    were built on refresh-worker inside `_build_candidate_pool` and persisted
+    into the canonical board state.
+
+    That split is deliberate and is the reason L2-A cannot be a serve-time
+    pivot like L1-A: **a board recomputed per request cannot be settled.** S6
+    needs a record of what was recommended and at what price; recompute it on
+    every read and there is nothing to grade against, so `settled: 0` stays 0
+    structurally rather than for want of a settlement run. Each row therefore
+    carries its own `quote.price` and `quote.bookmaker`.
+
+    Why this endpoint exists before the board switches to it: the main board
+    renders `ranked_all` (the legacy pool -- 229 game + 18 prop rows against
+    Layer 1's 2,726 priced instances). Pointing the template at L2-A rows is
+    the goal, but the two row shapes differ, and swapping the data source
+    blind is how a "working" board renders blank. This makes the real rows
+    inspectable first.
+    """
+    from pipeline.intelligence_state import read_intelligence_board_state
+
+    sport = str(request.args.get("sport") or "all").strip().lower() or "all"
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    try:
+        limit = max(1, min(2000, int(str(request.args.get("limit") or "200").strip())))
+    except ValueError:
+        limit = 200
+
+    try:
+        state = read_intelligence_board_state(selected_date)
+    except Exception:
+        _LOGGER.exception("BOARD_LAYER2_SHORTLIST_READ_FAILURE date=%s", selected_date)
+        state = None
+
+    shortlist = (state or {}).get("layer2_shortlist")
+    if not isinstance(shortlist, dict):
+        # Absent is a REAL and distinguishable state, not an error: a board
+        # state written before this shipped, or an aborted build, carries no
+        # shortlist. Say so rather than returning an empty list, which would
+        # read identically to "the gate rejected everything today".
+        return _no_cache_response(
+            jsonify(
+                {
+                    "ok": True,
+                    "sport": sport,
+                    "date": selected_date,
+                    "shortlist_present": False,
+                    "reason": "no_board_state" if state is None else "no_layer2_shortlist_key",
+                    "returned": 0,
+                    "total_rows": 0,
+                    "rows": [],
+                    "server_time": _server_timestamp(),
+                }
+            )
+        )
+
+    rows = [row for row in (shortlist.get("rows") or []) if isinstance(row, dict)]
+    if sport != "all":
+        rows = [row for row in rows if str(row.get("sport") or "").strip().lower() == sport]
+
+    return _no_cache_response(
+        jsonify(
+            {
+                "ok": True,
+                "sport": sport,
+                "date": selected_date,
+                "shortlist_present": True,
+                # Both halves of the accounting, so a sport showing zero rows is
+                # attributable to its slate rather than to a broken read:
+                # `per_sport` is what was SELECTED, `per_sport_ingest` is what
+                # came IN.
+                "per_sport": shortlist.get("per_sport") or {},
+                "per_sport_ingest": shortlist.get("per_sport_ingest") or {},
+                "active_sports": shortlist.get("active_sports") or [],
+                "per_sport_limit": shortlist.get("per_sport_limit"),
+                "kind_floor": shortlist.get("kind_floor"),
+                "horizon_days": shortlist.get("horizon_days"),
+                "rows_beyond_horizon": shortlist.get("rows_beyond_horizon"),
+                "opportunities_considered": shortlist.get("opportunities_considered"),
+                "returned": min(len(rows), limit),
+                "total_rows": len(rows),
+                "rows": rows[:limit],
+                "server_time": _server_timestamp(),
+            }
+        )
+    )
+
+
 @intelligence_bp.get("/api/board/cross-book")
 def board_cross_book_api():
     """L2-B (arbitrage) and L2-C (low hold), over prices that COEXISTED (#261).
