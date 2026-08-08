@@ -1,5 +1,45 @@
 # Syndicate TODO — canonical cross-session list
 
+### SHIPPED 2026-08-08 — both halves of the sim-timing defect from the audit below
+
+**`fddb82fd` — the tip-off sim fires once per GAME, not once per tick.** Measured
+over 3h of a live slate: 10 launches, 8 of them `tip_off_window`, **49 game-sims
+across 15 games = 3.3x per game**, two games 5x. The branch sits before the 600s
+interval check and returns early, so it bypassed the rate limiter entirely.
+**The only thing holding the rate down was contention** — 239
+`intelligence_pipeline_busy` + 49 `previous_run_still_active` — so the resim rate
+was set by how busy the box was, not by policy, and would have risen on its own
+the moment the worker got faster. Also un-blocks `fingerprint_change` /
+`join_mismatch` / `board_missing`, which the unconditional early return had
+denied their turn for the whole pregame window.
+
+**`<lineup-state commit>` — lineups get an independent refresh.** New
+`syndicate/features/shared/mlb_lineup_state.py` + `_fetch_mlb_lineup_state`,
+called next to `_fetch_mlb_injuries`, added as a 5th fingerprint input. Breaks
+the circular dependency: previously the only writer of lineup data was
+`daily_update.py` itself, so a posted lineup could not move the fingerprint that
+would cause it to be read.
+
+Source is StatsAPI `schedule?hydrate=lineups,probablePitcher` — ONE call per
+slate. Verified live: 15/15 posted for 08-07, **0/15 for 08-08**, which is the
+projected-vs-final signal the audit called the enabler gap (finding 3).
+
+**This also fixes finding 1 as a side effect**: a stale look-ahead sim now gets
+redone when lineups post, because the fingerprint finally moves.
+
+Two deliberate choices worth not re-litigating: `status` is EXCLUDED from the
+hash (it walks Scheduled→Pre-Game→Warmup→In Progress and would re-introduce the
+over-simming just removed), and a failed fetch must NOT write an empty payload
+(an empty games map is indistinguishable from "not posted yet" and would read as
+a lineup retraction).
+
+**Expected on deploy:** one whole-slate resim, because adding a 5th input
+changes every stored fingerprint once.
+
+**Still open from the audit:** the 30-min force window vs 2–4h lineup posting
+(finding 4) — now partly moot, since the fingerprint reacts to posting directly
+— and five of eight sports still having NO invalidation of any kind (finding 5).
+
 ### AUDIT DONE 2026-08-08 — sim invalidation rules. Full writeup: `docs/ai_context/audit_sim_invalidation_rules.md`
 
 The user's "rules around sims esp MLB re lineup/start changes and final lineups",

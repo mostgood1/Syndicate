@@ -3254,10 +3254,17 @@ class MlbSimOddsFingerprintSliceTests(unittest.TestCase):
 
     def test_lineup_changes_still_trigger_a_resim(self) -> None:
         # The whole point is preserving real triggers while dropping noise.
+        #
+        # side_effect is positional, so it is coupled to the NUMBER and ORDER of
+        # _read_json_file_lenient calls in _mlb_sim_input_fingerprint_by_game:
+        #   1 lineups_last_known_by_team  2 odds  3 overrides  4 injuries
+        #   5 mlb_lineup_state  <- added with the independent lineup refresh
+        # A fifth read was added and this test failed with StopIteration rather
+        # than a wrong hash. If you add another input, extend these lists.
         events = [live_refresh_loop.ScheduleEvent(sport="mlb", event_id="1", home="BOS", away="NYY", start_time_utc=None)]
-        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["a"]}, {}, {}, {}]):
+        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["a"]}, {}, {}, {}, {}]):
             first = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-25", events)
-        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["b"]}, {}, {}, {}]):
+        with patch.object(live_refresh_loop, "_read_json_file_lenient", side_effect=[{"10": ["b"]}, {}, {}, {}, {}]):
             second = live_refresh_loop._mlb_sim_input_fingerprint_by_game("2026-07-25", events)
         self.assertNotEqual(first.get("1"), second.get("1"))
 

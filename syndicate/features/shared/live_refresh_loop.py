@@ -1179,6 +1179,45 @@ def _mlb_injuries_artifact_path(date_str: str) -> Path:
 	return data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / f"mlb_injuries_{date_slug}.json"
 
 
+def _mlb_lineup_state_artifact_path(date_str: str) -> Path:
+	date_slug = date_str.replace("-", "_")
+	return data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / f"mlb_lineup_state_{date_slug}.json"
+
+
+def _fetch_mlb_lineup_state(date_str: str) -> bool:
+	"""Refresh posted-lineup/probable-pitcher state INDEPENDENTLY of the sim.
+
+	The counterpart to `_fetch_mlb_injuries`, and the fix for the circular
+	dependency in the fingerprint's lineup input: until now the only writer of
+	lineup data was `daily_update.py` -- the run the fingerprint is meant to
+	trigger -- so a posted lineup could not move the fingerprint that would
+	cause it to be read. See mlb_lineup_state.py's module docstring and
+	docs/ai_context/audit_sim_invalidation_rules.md.
+
+	Best-effort, exactly like the injuries fetch: a failure leaves whatever
+	state is already on disk and never blocks the sim decision. It must NOT
+	write an empty payload on failure -- an empty games map is
+	indistinguishable from "lineups not posted yet" and would read as a real
+	lineup retraction, moving the fingerprint the wrong way.
+	"""
+	try:
+		from syndicate.features.shared.mlb_lineup_state import fetch_mlb_lineup_state
+
+		payload = fetch_mlb_lineup_state(date_str)
+		if not isinstance(payload, dict) or not payload.get("games"):
+			return False
+		write_json_file(_mlb_lineup_state_artifact_path(date_str), payload)
+		print(
+			f"[live_refresh_loop] MLB_LINEUP_STATE date={date_str} "
+			f"games={payload.get('games_total')} posted={payload.get('games_with_posted_lineups')}",
+			flush=True,
+		)
+		return True
+	except Exception as exc:
+		print(f"[live_refresh_loop] MLB_LINEUP_STATE_FAILED date={date_str} {type(exc).__name__}: {exc}", flush=True)
+		return False
+
+
 def _fetch_mlb_injuries(date_str: str, *, timeout_s: float = 60.0) -> bool:
 	# MLB's counterpart to _fetch_injuries above (NBA/WNBA) -- isolated in its
 	# own subprocess for the same reason (fetch_mlb_injuries.py mirrors
@@ -1231,6 +1270,11 @@ def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent
 	injuries_by_team = injuries_doc.get("teams") if isinstance(injuries_doc, dict) else None
 	if not isinstance(injuries_by_team, dict):
 		injuries_by_team = {}
+	# The independently-refreshed lineup input. Keyed by gamePk, which IS
+	# event.event_id, so unlike lineups_last_known_by_team.json (keyed by numeric
+	# team id) this needs no id resolution and has no degraded whole-file
+	# fallback -- a game either has a slice or hashes the stable empty shape.
+	lineup_state_doc = _read_json_file_lenient(_mlb_lineup_state_artifact_path(date_str))
 
 	odds_by_pair: dict[tuple[str, str], list[dict[str, Any]]] = {}
 	for row in odds_games:
@@ -1270,8 +1314,22 @@ def _mlb_sim_input_fingerprint_by_game(date_str: str, events: list[ScheduleEvent
 		# this fire on nearly every refresh.
 		odds_slice = _mlb_sim_odds_fingerprint_slice(odds_by_pair.get((event.home, event.away), []))
 		override_slice = overrides_for_date.get(game_pk, {})
+		try:
+			from syndicate.features.shared.mlb_lineup_state import lineup_slice_for_game
+
+			posted_slice: Any = lineup_slice_for_game(lineup_state_doc, game_pk)
+		except Exception:
+			# Never let this input break the fingerprint that already works.
+			# A constant on failure keeps the hash stable rather than jittering.
+			posted_slice = {"unavailable": True}
 		fingerprints[game_pk] = _hash_json_value(
-			{"lineups": lineup_slice, "odds": odds_slice, "overrides": override_slice, "injuries": injuries_slice}
+			{
+				"lineups": lineup_slice,
+				"odds": odds_slice,
+				"overrides": override_slice,
+				"injuries": injuries_slice,
+				"posted_lineups": posted_slice,
+			}
 		)
 	return fingerprints
 
@@ -1649,6 +1707,11 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	# reacts to whatever injuries snapshot is already on disk (or none),
 	# never blocks the sim decision itself.
 	_fetch_mlb_injuries(date_str)
+	# Same cadence and placement as the injuries fetch above, and for the same
+	# reason one step further out: this is the ONLY writer of lineup data that
+	# is not itself a sim run, so without it a posted lineup cannot move the
+	# fingerprint that would cause it to be read.
+	_fetch_mlb_lineup_state(date_str)
 	current_fingerprints = _mlb_sim_input_fingerprint_by_game(date_str, events)
 	stored_fingerprints = last.get("fingerprints") if last_date == date_str else None
 	if not isinstance(stored_fingerprints, dict):
