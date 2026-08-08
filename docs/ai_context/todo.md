@@ -1,6 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
-### 2026-08-08 (late) — `attach_game_state` IS A NO-OP ON THE WORKER, FOR EVERY SPORT. The provider registry is web-only
+### 2026-08-08 (late) — RETRACTED: "`attach_game_state` is a no-op on the worker" was WRONG. I tested an import graph no process runs
+
+**The entry below this one is false. Do not act on it.** Kept, struck through,
+because the mistake is more instructive than the claim was.
+
+**What I claimed:** the sport-provider registry is populated only by importing
+`syndicate/blueprints/home.py`, the worker never imports it, so
+`build_game_chips` returns 0 chips for every sport and the persisted Layer 2
+artifact has never carried `game.state`.
+
+**What is actually true.** `scripts/run_refresh_worker.py` imports
+`pipeline.intelligence_state`, which reaches `blueprints.home` **transitively**.
+Replaying the worker entrypoint's exact import list:
+
+```
+REGISTRY_AFTER_WORKER_IMPORTS 8 ['mlb','nba','ncaab','ncaaf','nfl','nhl','soccer','wnba']
+attach_game_state(soccer)  ->  {"chips": 59, "rows_matched": 300}
+```
+
+**How I got it wrong:** I tested `import pipeline.layer2_shortlist` ALONE. That
+graph really does show registry 0 — it is just not a graph any process runs in.
+I built a subprocess test around it, which made the wrong condition look
+rigorously verified.
+
+**What should have caught it immediately, and did:** the persisted artifact
+itself. `/api/board/layer2-shortlist` showed **112 of 115 rows carrying
+`game.state: "pregame"`** (mlb 100, wnba 12). Under my claim every row would
+have been `None`. The refuting number was one query away and I wrote the
+conclusion first.
+
+`f8c64692` is therefore **defensive only and fixes nothing live**. It is kept —
+the registry genuinely depends on an accident of import order in an unrelated
+module, and a narrower entrypoint would silently get 0 chips — but its comment,
+its test, and this entry now say so.
+
+**The `a432f6d9` numbers in this file (`mlb 60 -> 200`, `wnba 0 -> 144`) are
+NOT invalidated.** I said they were. They stand.
+
+**STILL OPEN AND NOW PROPERLY ISOLATED:** the 3 soccer rows on the persisted
+artifact carry `game.state: None` while mlb/wnba carry `pregame`, even though
+refresh-worker has had the join fix since 19:39Z and a direct call on the true
+worker graph matches 300/300. So something in `layer2_shortlist`'s own grid
+path differs from the endpoint's — a candidate is `selected_date`, since the
+refresh runs with `--date 2026-08-09` while the rows are 08-08. **That is the
+real remaining question, and it is not the registry.**
+
+**METHOD.** [[a rate, not a count]] again, in a new costume: I had a denominator
+available (115 artifact rows), did not look at it, and reasoned from a synthetic
+import instead. When a claim is "X never works", check the surface where X's
+output lands BEFORE building an instrument to prove the mechanism.
+
+### ~~2026-08-08 (late) — `attach_game_state` IS A NO-OP ON THE WORKER, FOR EVERY SPORT. The provider registry is web-only~~ (RETRACTED, see above)
 
 `f8c64692`, committed, **NOT deployed**. Bigger than the soccer work it came
 out of, and it invalidates numbers recorded earlier in this file.

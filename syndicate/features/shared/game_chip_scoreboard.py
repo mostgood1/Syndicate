@@ -382,27 +382,32 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
 def _ensure_sport_data_providers() -> None:
     """Populate the provider registry if nothing has populated it yet.
 
-    THE REGISTRY IS A SIDE EFFECT OF IMPORTING A FLASK BLUEPRINT: every
+    DEFENSIVE ONLY. This fixes no known live defect, and an earlier version of
+    this docstring claimed it did -- that claim was WRONG and the correction is
+    the useful part of this comment.
+
+    The registry is a side effect of importing a Flask blueprint: every
     provider is defined in `syndicate/blueprints/home.py` and registers itself
-    at module scope (home.py:5882). The web app imports that module to serve
-    routes, so the registry is always populated there -- and the WORKER never
-    imports it. `scripts/run_refresh_worker.py` and `pipeline/layer2_shortlist.py`
-    both reach `build_game_chips` without it.
+    at module scope (home.py:5882). Nothing on the worker imports that module
+    *deliberately* -- but `scripts/run_refresh_worker.py` imports
+    `pipeline.intelligence_state`, which reaches `blueprints.home`
+    transitively, so in practice all 8 providers ARE registered there.
+    Verified 2026-08-08 by replaying the worker entrypoint's exact import list:
+    registry size 8, and `attach_game_state` matched 300/300 soccer rows.
 
-    MEASURED 2026-08-08 on the worker's own import graph: registry size 0,
-    `build_game_chips` returned 0 chips for EVERY sport, so `attach_game_state`
-    stamped `game.state` on nothing and the persisted Layer 2 artifact carried
-    it for no sport at all -- while the same call on web returned 720/720. Two
-    code paths, one function, opposite answers, and the worker's was the silent
-    one because zero chips is indistinguishable from a slate with no games.
+    The false alarm came from testing `import pipeline.layer2_shortlist`
+    ALONE, which is not how the worker starts. That graph does show registry 0
+    -- an artificial condition no process actually runs in.
 
-    This is the same defect class `board_enrichment`'s module docstring was
-    written for ("the worker path called none of them"): the call was added,
-    but its dependency was still web-only.
+    What remains true, and why this stays: the dependency is an accident of
+    import order in an unrelated module. Anyone pruning
+    `intelligence_state`'s imports, or calling `build_game_chips` from a
+    genuinely narrower entrypoint, silently gets 0 chips for every sport -- and
+    zero chips is indistinguishable from a slate with no games. This makes the
+    requirement explicit and costs nothing when it is already satisfied.
 
-    Costs ~24MB RSS once, measured, on a 4GB worker -- an import, not periodic
-    work. Lazy and inside the function on purpose: at module scope it would be
-    a circular import, since home.py imports this module's callers.
+    Lazy and inside the function on purpose: at module scope it would be a
+    circular import, since home.py imports this module's callers.
     """
     from syndicate.features.shared.sport_data_provider import SPORT_DATA_PROVIDERS
 

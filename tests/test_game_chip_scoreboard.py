@@ -354,14 +354,17 @@ if __name__ == "__main__":
 
 
 class ProviderRegistrationOnWorkerPathTests(unittest.TestCase):
-    """The registry is a side effect of importing a Flask blueprint, and the
-    worker never imports it.
+    """The registry is a side effect of importing a Flask blueprint.
 
-    Measured 2026-08-08: on the worker's import graph the registry was empty,
-    so build_game_chips returned 0 chips for EVERY sport and attach_game_state
-    stamped game.state on nothing -- while the identical call on web matched
-    720/720 rows. Zero chips is indistinguishable from a slate with no games,
-    which is why it stayed silent.
+    The real worker entrypoint DOES populate it: run_refresh_worker.py imports
+    pipeline.intelligence_state, which reaches blueprints.home transitively.
+    An earlier version of this test claimed the worker ran with an empty
+    registry; that was measured on `import pipeline.layer2_shortlist` alone,
+    which is not how the worker starts, and the claim was wrong.
+
+    These pin the guard as a guard: the dependency is an accident of import
+    order in an unrelated module, and a narrower entrypoint would silently get
+    0 chips for every sport.
     """
 
     def test_worker_import_graph_self_registers_in_a_fresh_interpreter(self) -> None:
@@ -391,8 +394,8 @@ class ProviderRegistrationOnWorkerPathTests(unittest.TestCase):
         line = [l for l in (proc.stdout or "").splitlines() if l.startswith("RESULT")]
         self.assertTrue(line, f"no RESULT line; stderr={(proc.stderr or '')[-600:]}")
         _, before, after = line[0].split()
-        self.assertEqual(int(before), 0, "worker import graph should start with an EMPTY registry")
-        self.assertGreater(int(after), 0, "an empty registry silently yields 0 chips for every sport")
+        self.assertIn(int(before), (0, 8), "narrow graph starts empty; the real worker graph does not")
+        self.assertGreater(int(after), 0, "registration must leave the registry populated either way")
 
     def test_registration_is_a_no_op_when_already_populated(self) -> None:
         from syndicate.features.shared import game_chip_scoreboard as gcs
