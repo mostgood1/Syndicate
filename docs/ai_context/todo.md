@@ -1,5 +1,70 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 — #270 THE L2-A ENRICHMENT GAP IS ~6 THINGS, NOT 40. One is a cheap join.
+
+"The template reads 70 fields, an L2-A row carries 18, so ~40 are missing" is
+mine and it is **misleading**. 70 is every field the template *reads*, most of
+them aliases, sort keys and data-attributes. Traced through what `renderCard`
+actually puts on screen — via its own helpers, not a regex — there are **15
+user-visible card elements**, and L2-A already satisfies most.
+
+**A REGEX OVER THE TEMPLATE CANNOT ANSWER THIS and my first attempt was
+wrong.** It classified `matchup`, `team` and `writeup` as "logic only" because
+they reach the DOM through helper functions (`displayTeam`, `pickReasoning`,
+`cardFacts`), not through a literal `${item.x}`. Read `renderCard` and follow
+its helpers; do not pattern-match the template.
+
+#### The 15 elements, measured on the served board (112 rows: 74 game, 38 prop)
+
+| element | helper | status |
+|---|---|---|
+| title | `displayTitle` | **OK** — fixed tonight; "Freddie Freeman" / "Colorado Rockies" |
+| prop line | `propLine` | **OK** |
+| matchup fact | `displayMatchup` | **OK** |
+| odds fact | `displayOdds` | **OK** |
+| edge | `edgeValue` | **OK** |
+| state badge | `recommendationState` | **OK** — `game.state` carried |
+| steam badge | `isSteamCandidate` | absent; L2-A `kind` is only game/prop |
+| team | `displayTeam` | **PARTIAL** — 74 game rows fine, 38 prop rows have no `player_team` |
+| **Projected fact** | `displayProjection` | **JOINABLE — see below** |
+| Live proj. fact | `displayLiveProjection` | absent, needs live-lens production |
+| Live actual fact | `displayLiveActual` | absent, needs live-lens production |
+| reasoning | `pickReasoning` | absent — `writeup`/`summary`/`detail`, cards-pipeline output |
+| movement | `renderMovement` | absent — `line_odds_movement` |
+| headshot | `playerHeadshotUrl` | absent — player metadata |
+| confidence badge | `confidenceValue` | **DO NOT JOIN — see below** |
+
+Settlement fields (`settlement*`, `result`, `actual`) are **legitimately
+meaningless** on an unsettled recommendation. They are not a gap.
+
+#### THE ONE CHEAP JOIN: "Projected"
+
+`attach_projections` already runs in the shortlist build and stamps a
+`projection` object on the GRID row. `_model_edge_for` reads
+`projection.edge_vs_market_pct` off it and carries only the derived edge;
+`_IDENTITY_FIELDS` drops the rest. So the projected value the card wants is
+computed, present one hop upstream, and thrown away.
+
+Carrying it is a field-list change, not new production — and "Projected" is
+one of only five rows `cardFacts` renders, so it is the highest-value single
+fix in this list.
+
+#### DO NOT MAP `score.book_confidence` -> `confidence`
+
+It looks like a free win and it would make the card WORSE. The badge fires at
+`>= 0.7`; measured distribution is `{1.0: 67, 0.85: 19, 0.7: 26}`, so **112 of
+112 rows would show "High confidence"**. `book_confidence` means "how many
+books quote this", not "how confident is the model". A badge that fires on
+every row is worse than no badge.
+
+#### What this means for `#268`'s flag
+
+Flipping it does **not** produce a blank card. It produces a card missing
+narrative, live projections, movement and headshots — with title, matchup,
+odds, edge, team (game lines) and state badge all correct. Whether that is an
+upgrade depends on what it replaces, and right now it replaces an EMPTY board
+(`ranked_all: []` on every date). Against nothing, it is an upgrade today.
+
 ### 2026-08-08 (late) — #269 WNBA LIVE-LENS REGRESSION: FIXED, COMMITTED, **NOT DEPLOYED** (lead is batching one deploy)
 
 **User report:** WNBA live-lens has regressed. Confirmed on the consuming
