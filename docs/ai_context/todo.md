@@ -620,7 +620,51 @@ cause, three symptoms, three different discovery dates.** Reading a finding from
 another sport back into your own is what turned a latent NFL outage into a
 committed fix; `#273` was found from NFL, and `#274` was found back from NCAAF.
 
-### OPEN 2026-08-08 (evening) — `#273` NCAAF CONTRIBUTES ZERO CHIPS ON EVERY DATE, ALWAYS. Cross-provider audit of all eight `games()` methods
+### FIXED 2026-08-08 22:58Z — `#273` (`3770e241`) NCAAF resolver shipped. **Read the RESIDUAL before calling NCAAF fixed**
+
+Committed, **not deployed**. 48/48 cards across weeks 1–3 shown on exactly one
+date, zero duplicated, zero shown on a date ESPN calls empty. 08-29: 8 cards vs
+ESPN 8, exact. (08-22's `0 == 0` is correct **by accident** and was deliberately
+not counted as a passing case.) 173 passed.
+
+**I PREDICTED THIS WOULD BE A NEAR-TRANSCRIPTION OF THE NFL FIX. IT IS NOT, AND
+MY OWN RULE IS WHAT CAUGHT IT** — "measure the convention, do not inherit it".
+NCAAF cards carry a **synthetic `{week}_{away}_{home}` key**
+(`1_North_Carolina_TCU`), have **no date field at all**, and the card set is a
+**curated subset** (cfbd lists 99 week-1 games; the board builds 16 cards). So
+there is no ESPN id on the card to join and no `gameday` column to read —
+*neither* NFL resolver ports over.
+
+`cfbd_lines_{season}_wk{week}.json` is the bridge: ESPN-compatible numeric `id`,
+the `week`, and both team names, so ESPN ids join to cfbd rows and cfbd rows
+reconstruct the card key. Join rate week 1: **16/16 cards**. The date is still
+never compared to a date, and that mattered — **three week-1 cards sit at
+`09-05T00:00Z` and belong to ESPN's 09-04.**
+
+**THREE SHAPES FOR ONE CONTRACT GAP, which is the durable lesson:** NFL
+preseason needs an id join *because its dates are unusable*; NFL regular season
+must NOT have one *because its ids are unusable*; NCAAF needs a bridge file
+*because neither is available*. **The (a)/(b) decomposition generalises; the
+mechanism does not.** Anyone applying this to soccer should expect a fourth
+shape and measure before writing the filter.
+
+#### RESIDUAL — NCAAF card COVERAGE, needs an ID from the lead
+
+**This does not make 2026-09-05 show games.** It makes the board faithful to the
+card set, and the card set has its own gap: **09-05 is a 68-game Saturday and
+neither week 1's nor week 2's card set contains a single one of those games**,
+so that date still shows 0 — now honestly rather than structurally.
+
+Checked the obvious wrong explanation before filing: the cfbd week files do
+**not** overlap (09-05's 68 ids are exclusively in wk1), so this is **card
+generation, not week resolution**.
+
+**So the honest summary is: NCAAF went from structurally incapable of showing
+anything, to correctly showing whatever the card pipeline produces.** Do not
+record this as "NCAAF fixed" — record it as the resolver fixed and the card
+pipeline's coverage still open.
+
+### ~~OPEN~~ 2026-08-08 (evening) — `#273` NCAAF CONTRIBUTES ZERO CHIPS ON EVERY DATE, ALWAYS. Cross-provider audit of all eight `games()` methods
 
 Found while answering the lead's cross-sport divergence question after `#271`.
 **NFL was not the worst case on this axis. NCAAF is, and unlike NFL's it is
