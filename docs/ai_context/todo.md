@@ -255,7 +255,39 @@ not sufficient.
 
 **Do not mark the soccer `game.state` exposure closed until the sim runs.**
 
-### 2026-08-08 (late) — WHY SOCCER SIMS DON'T RUN: the sim subprocess dies in SECONDS for 9 of 10 leagues
+### ~~2026-08-08 (late) — WHY SOCCER SIMS DON'T RUN~~ — DIAGNOSIS SUPERSEDED, CAUSE FOUND
+
+**The "BLOCKED on observability" section below is STALE. Do not assign work on
+it.** The oversight session read it as the live blocker and was about to hand
+out the unblock — the entry's fault, not theirs.
+
+**Root cause found ~1h later and fixed in `c9fbb736`:** `_api_root` resolved
+`_source_roots()[0]` and discarded the repo fallback, so the schedule read
+returned nothing, `week_date_list` was empty, and `main()`'s `--week` branch
+raised `SystemExit` in **2 seconds before writing any artifact**. Reproduced
+locally with an empty runtime root — which is how it got unblocked WITHOUT the
+log access this entry says it needs.
+
+**The measurements below remain valid and are why the fix was findable** —
+process lifetimes, the MLS-vs-nine split, the 1800s timeout ruling out a
+timeout. Only the "blocked" conclusion is superseded.
+
+**The observability change is still worth doing, but as its own work, not as
+this blocker.** A clean `SystemExit` in a child whose stdout goes to a file
+produces nothing anywhere: no traceback, no `STEP_FAIL`, no timeout. The next
+silent failure will be equally invisible. Prefer echoing `STEP_FAIL` /
+non-zero return codes to the container's own stdout over the
+`HOT_ARTIFACT_PATTERNS` allowlist change — smaller blast radius, no
+interaction with the publisher sweep (`29746931`, unattributed, implicated in
+the web OOM).
+
+**PROCESS NOTE:** this entry sat for an hour saying "blocked" after it was
+unblocked, and a superseding entry above it was not enough to stop a reader
+acting on it. **When you supersede a conclusion, strike the original where it
+sits** — a later entry does not retract an earlier one for someone reading
+top-down and stopping at the first thing that looks actionable.
+
+### 2026-08-08 (late) — (superseded) the sim subprocess dies in SECONDS for 9 of 10 leagues
 
 Traced top-down from the orchestrator, per instruction. Every stage below is
 measured on production, not inferred.
