@@ -192,6 +192,97 @@ SHORTLIST_STALE_KICKOFF_SECONDS = 2 * 3600
 SHORTLIST_MAX_QUOTE_AGE_SECONDS = 24 * 3600
 
 
+# How many times a sport's OWN typical hold a row may be worse before it is
+# junk. Env: SYNDICATE_SHORTLIST_HOLD_MULTIPLE. Set to 0 to disable per-sport
+# calibration and use the flat `SHORTLIST_MIN_VALUE_PCT` everywhere.
+#
+# **THE FLAT FLOOR IS AN MLB-SHAPED DEFAULT.** `ev_pct` is measured against the
+# consensus no-vig fair, and for a normally-priced market that is exactly
+# `1/overround - 1` -- so `ev_pct == -hold_pct`, verified to four decimals
+# against `hold_pct()` on five price pairs (best -115/+110 -> hold 1.0953%,
+# measured ev -1.0953). A row's value% is therefore its market's hold, negated.
+#
+# Natural hold is a property of MARKET STRUCTURE, not of quality: soccer's
+# 3-way markets hold more than MLB's 2-way ones, so soccer rows sit structurally
+# lower on `ev_pct` while being priced perfectly normally. One global number
+# applied across both is not a neutral default -- it silently penalises every
+# sport whose markets are not shaped like MLB's. Measured on the served board:
+# soccer contributed 3 rows at -2.0 and 24 at -5.0.
+#
+# So the bar is expressed in units of the sport's own hold and CALIBRATED FROM
+# THE POOL BEING FILTERED, not from a hand-written table. A table of eight
+# numbers rots exactly the way the migration gate's hand-written per-sport
+# blocks did; a formula with its measurement attached does not.
+#
+# 2.0 = "a market may hold up to twice what this sport typically holds". Below
+# that it is normal pricing; beyond it the price is materially worse than the
+# sport's own market structure explains.
+SHORTLIST_HOLD_MULTIPLE = 2.0
+
+# Fewest two-sided markets needed before a sport's measured hold is trusted.
+# Under this the flat default is used, because a median over three markets is
+# not a market-structure measurement -- it is noise with a decimal point.
+SHORTLIST_HOLD_MIN_MARKETS = 8
+
+
+def _measured_floor_for_pool(rows: Iterable[Mapping[str, Any]], *, multiple: float, fallback: float) -> tuple[float, dict[str, Any]]:
+    """A sport's value floor, derived from its own measured hold.
+
+    Regroups the pool's one-side-per-row candidates back into markets, takes
+    each market's best-price hold, and puts the floor at `multiple` times the
+    median. Returns the floor AND the evidence, because a threshold that cannot
+    show its own measurement is the class of constant this repo has paid for
+    most often.
+
+    Falls back to the flat floor when too few markets carry two sides -- which
+    is not hypothetical: a 3-way soccer market whose third leg was gated out
+    leaves one side, and the SHORTLIST (as opposed to the pool) keeps ~1 side of
+    most soccer markets, which is why measuring here rather than downstream
+    matters.
+    """
+    from syndicate.features.shared.opportunity_signals import hold_pct
+
+    markets: dict[tuple[Any, ...], dict[str, Any]] = {}
+    for row in rows:
+        quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+        price = quote.get("price")
+        if price is None:
+            continue
+        key = (row.get("event_id"), row.get("market"), row.get("segment"), str(row.get("line")), row.get("player_name"))
+        markets.setdefault(key, {})[str(row.get("side"))] = price
+
+    holds: list[float] = []
+    for sides in markets.values():
+        if len(sides) < 2:
+            continue
+        value = hold_pct(list(sides.values()))
+        if value is not None:
+            holds.append(float(value))
+
+    if len(holds) < SHORTLIST_HOLD_MIN_MARKETS or multiple <= 0:
+        return fallback, {
+            "method": "flat_default",
+            "markets_measured": len(holds),
+            "floor": fallback,
+        }
+    holds.sort()
+    median_hold = holds[len(holds) // 2] if len(holds) % 2 else (holds[len(holds) // 2 - 1] + holds[len(holds) // 2]) / 2.0
+    # `-` because ev_pct is the NEGATED hold. A sport whose best prices routinely
+    # cross (negative hold, i.e. an arbitrage) would otherwise produce a floor
+    # above zero and reject its own normal rows, so the floor is never allowed
+    # to rise above the flat default.
+    derived = -abs(median_hold) * float(multiple)
+    floor = min(fallback, derived)
+    return floor, {
+        "method": "measured_hold",
+        "markets_measured": len(holds),
+        "median_hold_pct": round(median_hold, 4),
+        "multiple": float(multiple),
+        "derived_floor": round(derived, 4),
+        "floor": round(floor, 4),
+    }
+
+
 def _env_float(name: str, default: float) -> float:
     raw = str(os.environ.get(name) or "").strip()
     if not raw:
@@ -615,6 +706,7 @@ def select_shortlist(
     min_value_pct: float | None = None,
     max_quote_age_seconds: float | None = None,
     stale_kickoff_seconds: float | None = None,
+    hold_multiple_override: float | None = None,
 ) -> dict[str, Any]:
     """The rows that get PERSISTED. Everything else lives in the ledger.
 
@@ -640,6 +732,11 @@ def select_shortlist(
         if max_quote_age_seconds is not None
         else _env_float("SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS", SHORTLIST_MAX_QUOTE_AGE_SECONDS)
     )
+    hold_multiple = (
+        float(hold_multiple_override)
+        if hold_multiple_override is not None
+        else _env_float("SYNDICATE_SHORTLIST_HOLD_MULTIPLE", SHORTLIST_HOLD_MULTIPLE)
+    )
     stale_kickoff_ceiling = (
         float(stale_kickoff_seconds)
         if stale_kickoff_seconds is not None
@@ -653,14 +750,6 @@ def select_shortlist(
     for row in opportunities:
         if not _within_horizon(row, reference_now, horizon_days):
             beyond_horizon += 1
-            continue
-        # Both floors are applied BEFORE the per-sport buckets, so floor-then-merit
-        # cannot reach past them: `kind_floor` guarantees slots, and if a rejected
-        # row were still in the pool the guarantee would seat it anyway. That is
-        # exactly how 105 negative-value rows reached the served board.
-        value_pct = _row_value_pct(row)
-        if value_pct is not None and value_pct < value_floor:
-            below_value_floor += 1
             continue
         # A market cannot be pregame after its own start time. Only fires when
         # `game.state` is unusable, so a working state is always left to
@@ -684,8 +773,34 @@ def select_shortlist(
 
     selected: list[dict[str, Any]] = []
     per_sport_report: dict[str, dict[str, Any]] = {}
+    floor_report: dict[str, dict[str, Any]] = {}
 
     for sport, rows in by_sport.items():
+        # PER-SPORT VALUE FLOOR, calibrated from this sport's own pool.
+        #
+        # Measured here rather than before bucketing for two reasons. It is
+        # per-SPORT by definition, and the measurement needs the FULL pool: the
+        # shortlist keeps roughly one side of most 3-way soccer markets, so a
+        # hold measured downstream would see 1 usable market where the pool has
+        # dozens.
+        #
+        # Still applied BEFORE the kind split below, which is the property that
+        # matters: `kind_floor` guarantees slots, so a rejected row left in the
+        # pool would be re-seated by the guarantee. That is exactly how 105
+        # negative-value rows reached the served board.
+        sport_floor, floor_evidence = _measured_floor_for_pool(
+            rows, multiple=hold_multiple, fallback=value_floor
+        )
+        floor_report[sport] = floor_evidence
+        kept: list[Mapping[str, Any]] = []
+        for row in rows:
+            value_pct = _row_value_pct(row)
+            if value_pct is not None and value_pct < sport_floor:
+                below_value_floor += 1
+                continue
+            kept.append(row)
+        rows = kept
+
         ranked = sorted(rows, key=_score_of, reverse=True)
         game = [row for row in ranked if str(row.get("kind") or "") == "game"]
         prop = [row for row in ranked if str(row.get("kind") or "") == "prop"]
@@ -721,6 +836,8 @@ def select_shortlist(
         "kind_floor": int(kind_floor),
         "horizon_days": horizon_days,
         "min_value_pct": value_floor,
+        "hold_multiple": hold_multiple,
+        "value_floor_by_sport": floor_report,
         "max_quote_age_seconds": age_ceiling,
         "stale_kickoff_seconds": stale_kickoff_ceiling,
         # Logged, not silently dropped: a sport vanishing from the shortlist

@@ -240,5 +240,100 @@ class StaleKickoffGuardTests(unittest.TestCase):
         self.assertEqual(out["rows_stale_kickoff"], 1)
         self.assertEqual(len(out["rows"]), 1)
 
+class PerSportMeasuredFloorTests(unittest.TestCase):
+    """The floor is expressed in units of each sport's OWN hold.
+
+    `ev_pct` against the consensus no-vig fair is exactly `1/overround - 1`, so
+    `ev_pct == -hold_pct` -- verified to four decimals against `hold_pct()`
+    (best -115/+110 -> hold 1.0953%, measured ev -1.0953). A row's value% is its
+    market's hold, negated.
+
+    Natural hold is a property of MARKET STRUCTURE, not quality: soccer's 3-way
+    markets hold more than MLB's 2-way ones. A single global number is therefore
+    an MLB-shaped default that silently penalises every sport whose markets are
+    not shaped like MLB's -- measured, soccer contributed 3 rows at -2.0 and 24
+    at -5.0.
+
+    Replayed on the real pre-floor payload: mlb measured median hold -1.1417 ->
+    floor -2.2834; wnba +1.2048 -> -2.4096; soccer had only ONE two-sided market
+    in that sample and correctly declined to measure.
+    """
+
+    def _priced(self, sport, event, side, price, ev):
+        row = _row(sport=sport, ev=ev)
+        row["event_id"] = event
+        row["market"] = "h2h"
+        row["segment"] = "full"
+        row["side"] = side
+        row["quote"] = {"book_age_seconds": 3600.0, "price": price}
+        return row
+
+    def _two_sided_pool(self, sport, n, home=-110, away=-110, ev=-1.0):
+        rows = []
+        for i in range(n):
+            rows.append(self._priced(sport, f"e{i}", "home", home, ev))
+            rows.append(self._priced(sport, f"e{i}", "away", away, ev))
+        return rows
+
+    def test_a_measured_floor_is_derived_and_reported_with_its_evidence(self) -> None:
+        """A threshold that cannot show its own measurement is the class of
+        constant this repo has paid for most often."""
+        out = select_shortlist(self._two_sided_pool("mlb", 12), now=_NOW, stale_kickoff_seconds=0)
+        ev = out["value_floor_by_sport"]["mlb"]
+        self.assertEqual(ev["method"], "measured_hold")
+        self.assertEqual(ev["markets_measured"], 12)
+        self.assertAlmostEqual(ev["median_hold_pct"], 4.5455, places=3)
+        self.assertAlmostEqual(ev["floor"], -9.0909, places=3)
+
+    def test_too_few_markets_falls_back_to_the_flat_default(self) -> None:
+        """A median over three markets is not a market-structure measurement,
+        it is noise with a decimal point."""
+        out = select_shortlist(self._two_sided_pool("soccer", 3), now=_NOW, stale_kickoff_seconds=0)
+        ev = out["value_floor_by_sport"]["soccer"]
+        self.assertEqual(ev["method"], "flat_default")
+        self.assertEqual(ev["floor"], SHORTLIST_MIN_VALUE_PCT)
+
+    def test_a_wider_holding_sport_gets_a_looser_floor(self) -> None:
+        """The whole point: structure, not quality."""
+        tight = select_shortlist(self._two_sided_pool("mlb", 12, home=-102, away=-102), now=_NOW, stale_kickoff_seconds=0)
+        wide = select_shortlist(self._two_sided_pool("soccer", 12, home=-140, away=110), now=_NOW, stale_kickoff_seconds=0)
+        self.assertLess(
+            wide["value_floor_by_sport"]["soccer"]["floor"],
+            tight["value_floor_by_sport"]["mlb"]["floor"],
+            "the sport whose markets hold more must get the looser bar",
+        )
+
+    def test_the_floor_never_tightens_below_the_flat_default(self) -> None:
+        """DELIBERATE SAFETY PROPERTY, stated so it is not read as a bug.
+
+        A measured floor may only LOOSEN. Tonight a floor at 0.0 took the board
+        200 -> 103 and deleted two sports, so a mis-measured hold must not be
+        able to gut one. The cost is that a genuinely tight-holding sport keeps
+        the default bar rather than a stricter one -- the safer of the two
+        failure directions.
+        """
+        out = select_shortlist(self._two_sided_pool("mlb", 12, home=-101, away=-101), now=_NOW, stale_kickoff_seconds=0)
+        self.assertEqual(out["value_floor_by_sport"]["mlb"]["floor"], SHORTLIST_MIN_VALUE_PCT)
+
+    def test_a_crossed_market_does_not_invert_the_floor(self) -> None:
+        """Best prices that cross give a NEGATIVE hold. Without abs() that would
+        produce a floor ABOVE zero and reject the sport's own normal rows."""
+        out = select_shortlist(self._two_sided_pool("mlb", 12, home=105, away=105), now=_NOW, stale_kickoff_seconds=0)
+        self.assertLessEqual(out["value_floor_by_sport"]["mlb"]["floor"], 0.0)
+
+    def test_calibration_can_be_disabled(self) -> None:
+        out = select_shortlist(self._two_sided_pool("mlb", 12), now=_NOW, stale_kickoff_seconds=0, hold_multiple_override=0)
+        self.assertEqual(out["value_floor_by_sport"]["mlb"]["method"], "flat_default")
+
+    def test_one_sided_markets_are_not_measurable(self) -> None:
+        """A 3-way market whose third leg was gated out leaves one side; so does
+        most of the SHORTLIST for soccer. Measuring on the full pool rather than
+        downstream is why this is done inside select_shortlist."""
+        rows = [self._priced("soccer", f"e{i}", "home", -110, -1.0) for i in range(20)]
+        out = select_shortlist(rows, now=_NOW, stale_kickoff_seconds=0)
+        self.assertEqual(out["value_floor_by_sport"]["soccer"]["method"], "flat_default")
+        self.assertEqual(out["value_floor_by_sport"]["soccer"]["markets_measured"], 0)
+
+
 if __name__ == "__main__":
     unittest.main()
