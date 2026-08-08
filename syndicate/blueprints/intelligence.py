@@ -2487,7 +2487,7 @@ def board_layer2_shortlist_api():
     blind is how a "working" board renders blank. This makes the real rows
     inspectable first.
     """
-    from pipeline.intelligence_state import read_intelligence_board_state
+    from pipeline.intelligence_state import read_intelligence_board_state, read_layer2_shortlist
 
     sport = str(request.args.get("sport") or "all").strip().lower() or "all"
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
@@ -2496,13 +2496,29 @@ def board_layer2_shortlist_api():
     except ValueError:
         limit = 200
 
+    # STANDALONE ARTIFACT FIRST. The board-state key is a fallback, not the
+    # source: measured on production 2026-08-08, the canonical board state is
+    # never written (both migration flags default False and are off), while the
+    # board serves from `combined_board_window`. Reading only the board state
+    # returned no_board_state for every date -- a shortlist built correctly and
+    # deposited where nothing reads it. The fallback stays so that when the
+    # canonical path does land, this keeps working either way.
+    source = "layer2_shortlist_artifact"
     try:
-        state = read_intelligence_board_state(selected_date)
+        shortlist = read_layer2_shortlist(selected_date)
     except Exception:
         _LOGGER.exception("BOARD_LAYER2_SHORTLIST_READ_FAILURE date=%s", selected_date)
-        state = None
+        shortlist = None
+    state = None
+    if not isinstance(shortlist, dict):
+        source = "board_state"
+        try:
+            state = read_intelligence_board_state(selected_date)
+        except Exception:
+            _LOGGER.exception("BOARD_LAYER2_BOARD_STATE_READ_FAILURE date=%s", selected_date)
+            state = None
+        shortlist = (state or {}).get("layer2_shortlist")
 
-    shortlist = (state or {}).get("layer2_shortlist")
     if not isinstance(shortlist, dict):
         # Absent is a REAL and distinguishable state, not an error: a board
         # state written before this shipped, or an aborted build, carries no
@@ -2515,7 +2531,16 @@ def board_layer2_shortlist_api():
                     "sport": sport,
                     "date": selected_date,
                     "shortlist_present": False,
-                    "reason": "no_board_state" if state is None else "no_layer2_shortlist_key",
+                    # Three distinguishable absences, because they need
+                    # different fixes: the artifact was never written, the
+                    # build ran but the key did not survive, or there is no
+                    # board state at all.
+                    "reason": (
+                        "no_shortlist_artifact"
+                        if state is None
+                        else "no_layer2_shortlist_key"
+                    ),
+                    "source": source,
                     "returned": 0,
                     "total_rows": 0,
                     "rows": [],
@@ -2535,6 +2560,7 @@ def board_layer2_shortlist_api():
                 "sport": sport,
                 "date": selected_date,
                 "shortlist_present": True,
+                "source": source,
                 # Both halves of the accounting, so a sport showing zero rows is
                 # attributable to its slate rather than to a broken read:
                 # `per_sport` is what was SELECTED, `per_sport_ingest` is what

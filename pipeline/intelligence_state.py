@@ -1229,6 +1229,49 @@ def _intelligence_board_state_latest_pointer_path() -> Path:
     return reports_root() / "intelligence" / "board_state_latest_pointer.json"
 
 
+def _layer2_shortlist_path(selected_date: str) -> Path:
+    suffix = str(selected_date or "").strip().replace("-", "_") or _intelligence_state_daily_suffix()
+    return reports_root() / "intelligence" / f"layer2_shortlist_{suffix}.json"
+
+
+def write_layer2_shortlist(selected_date: str, shortlist: dict[str, Any]) -> dict[str, Any] | None:
+    """Persist L2-A as its OWN artifact, independent of the canonical migration.
+
+    WHY IT IS NOT JUST A KEY ON THE BOARD STATE. It is carried there too, but
+    the board state is written only when `canonical_board_state_enabled()` or
+    the shadow-compare flag is on -- BOTH default False -- and measured on
+    production 2026-08-08 `read_intelligence_board_state` returns None for
+    every date. Meanwhile the board actually serves from
+    `combined_board_window`. So a shortlist that lived only on the board state
+    would be built correctly, threaded through three hops correctly, and
+    deposited in a file nothing writes and nothing reads.
+
+    Its own artifact removes that dependency: L2-A does not need a migration
+    someone else owns to finish before it can be served. The board-state key
+    stays so that when the canonical path does land, L2-A is already carried.
+
+    Goes through refresh_state_store's `write_json_file` (keyvalue-backed) for
+    the same reason everything else shared does: refresh-worker writes it, web
+    reads it, and Render gives each service its own disk.
+    """
+    normalized_date = str(selected_date or "").strip()
+    if not normalized_date:
+        return None
+    payload = dict(shortlist or {})
+    payload["selected_date"] = normalized_date
+    payload["written_at"] = _utc_now()
+    write_json_file(_layer2_shortlist_path(normalized_date), payload)
+    return payload
+
+
+def read_layer2_shortlist(selected_date: str | None) -> dict[str, Any] | None:
+    normalized_date = str(selected_date or "").strip()
+    if not normalized_date:
+        return None
+    payload = read_json_file(_layer2_shortlist_path(normalized_date))
+    return payload if isinstance(payload, dict) else None
+
+
 def write_intelligence_board_state(state: dict[str, Any]) -> dict[str, Any] | None:
     normalized = dict(state or {})
     selected_date = str(normalized.get("selected_date") or "").strip()
@@ -3086,6 +3129,14 @@ class IntelligenceStateService:
         except Exception as exc:
             layer2_shortlist = {"rows": [], "error": f"{type(exc).__name__}: {exc}"}
             print(f"[intelligence_state] LAYER2_SHORTLIST_FAILED error={exc}", flush=True)
+        # Persisted as its OWN artifact, not only as a key on the board state.
+        # The board state is written only under the canonical-migration flags,
+        # both of which default False and are off in production -- so this write
+        # is what actually makes L2-A readable by web. See write_layer2_shortlist.
+        try:
+            write_layer2_shortlist(str(selected_date or ""), layer2_shortlist)
+        except Exception as exc:
+            print(f"[intelligence_state] LAYER2_SHORTLIST_WRITE_FAILED error={exc}", flush=True)
         _diag_log_all_process_memory("post_layer2_shortlist")
 
         pool = {

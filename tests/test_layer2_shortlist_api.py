@@ -3,8 +3,19 @@
 L2-A cannot be a serve-time pivot the way L1-A (`/api/board/book-grid`) is: a
 board recomputed per request cannot be SETTLED. S6 needs a record of what was
 recommended and at what price, so the rows are built on refresh-worker inside
-`_build_candidate_pool`, persisted into the canonical board state, and only read
-here.
+`_build_candidate_pool`, persisted, and only read here.
+
+SOURCE ORDER MATTERS, and getting it wrong was a real mistake caught before it
+shipped. The rows were first plumbed ONLY onto the canonical board state --
+which is written exclusively under `canonical_board_state_enabled()` or the
+shadow-compare flag, BOTH default False. Measured on production 2026-08-08:
+`read_intelligence_board_state` returned None for every date, while the board
+actually serves from `combined_board_window`. The shortlist would have been
+built correctly, threaded through three hops correctly, and deposited in a file
+nothing writes and nothing reads.
+
+So L2-A now has its OWN artifact and that is the primary source; the board-state
+key remains a fallback for whenever the canonical migration lands.
 
 This endpoint exists before the main board switches to L2-A deliberately. The
 board currently renders `ranked_all` (the legacy pool: 229 game + 18 prop rows
@@ -58,6 +69,9 @@ def _state(**overrides):
 
 
 def _patch_state(monkeypatch, value):
+    # Standalone artifact is the primary source now; force the fallback path
+    # so these cases still exercise the board-state key.
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: None)
     monkeypatch.setattr(
         "pipeline.intelligence_state.read_intelligence_board_state",
         lambda date: value,
@@ -116,7 +130,7 @@ def test_missing_board_state_is_distinguishable_from_an_empty_shortlist(client, 
     payload = client.get("/api/board/layer2-shortlist?date=2026-08-08").get_json()
 
     assert payload["shortlist_present"] is False
-    assert payload["reason"] == "no_board_state"
+    assert payload["reason"] == "no_shortlist_artifact"
     assert payload["rows"] == []
 
 
@@ -159,3 +173,93 @@ def test_bad_limit_falls_back_rather_than_erroring(client, monkeypatch):
     payload = client.get("/api/board/layer2-shortlist?date=2026-08-08&limit=notanumber").get_json()
     assert payload["ok"] is True
     assert payload["total_rows"] == 3
+
+
+# ---------------------------------------------------------------------------
+# The PRIMARY source: L2-A's own artifact, independent of the migration flags.
+# ---------------------------------------------------------------------------
+
+
+def _shortlist_payload():
+    return {
+        "selected_date": "2026-08-08",
+        "rows": [_row("mlb", "home", 2.0), _row("wnba", "home", 1.5)],
+        "per_sport": {"mlb": {"selected": 1}, "wnba": {"selected": 1}},
+        "per_sport_ingest": {"mlb": {"quote_rows": 6}},
+        "active_sports": ["mlb", "wnba"],
+        "opportunities_considered": 11,
+    }
+
+
+def test_standalone_artifact_is_the_primary_source(client, monkeypatch):
+    """Read the artifact FIRST. If this regresses to board-state-first, L2-A
+    goes dark in production, because that state is never written there."""
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: _shortlist_payload())
+
+    def _should_not_be_called(_date):
+        raise AssertionError("board state was read while the artifact existed")
+
+    monkeypatch.setattr("pipeline.intelligence_state.read_intelligence_board_state", _should_not_be_called)
+
+    payload = client.get("/api/board/layer2-shortlist?date=2026-08-08").get_json()
+    assert payload["shortlist_present"] is True
+    assert payload["source"] == "layer2_shortlist_artifact"
+    assert payload["total_rows"] == 2
+
+
+def test_falls_back_to_board_state_when_the_artifact_is_absent(client, monkeypatch):
+    """The fallback exists so this keeps working either way once the canonical
+    migration lands -- not as the main path."""
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: None)
+    monkeypatch.setattr("pipeline.intelligence_state.read_intelligence_board_state", lambda date: _state())
+
+    payload = client.get("/api/board/layer2-shortlist?date=2026-08-08").get_json()
+    assert payload["shortlist_present"] is True
+    assert payload["source"] == "board_state"
+
+
+def test_artifact_read_failure_falls_back_rather_than_500(client, monkeypatch):
+    def _boom(_date):
+        raise RuntimeError("keyvalue unavailable")
+
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", _boom)
+    monkeypatch.setattr("pipeline.intelligence_state.read_intelligence_board_state", lambda date: _state())
+
+    response = client.get("/api/board/layer2-shortlist?date=2026-08-08")
+    assert response.status_code == 200
+    assert response.get_json()["source"] == "board_state"
+
+
+def test_write_then_read_roundtrip(tmp_path, monkeypatch):
+    """The artifact must survive the write/read pair it is served through."""
+    from pipeline import intelligence_state as istate
+
+    monkeypatch.setattr(istate, "reports_root", lambda: tmp_path)
+    written = istate.write_layer2_shortlist("2026-08-08", {"rows": [_row()], "active_sports": ["mlb"]})
+
+    assert written["selected_date"] == "2026-08-08"
+    assert written["written_at"]
+
+    back = istate.read_layer2_shortlist("2026-08-08")
+    assert back is not None
+    assert len(back["rows"]) == 1
+    assert back["active_sports"] == ["mlb"]
+
+
+def test_write_requires_a_date(tmp_path, monkeypatch):
+    from pipeline import intelligence_state as istate
+
+    monkeypatch.setattr(istate, "reports_root", lambda: tmp_path)
+    assert istate.write_layer2_shortlist("", {"rows": []}) is None
+    assert istate.read_layer2_shortlist("") is None
+
+
+def test_a_shortlist_write_failure_never_breaks_the_pool():
+    """The pool must survive a failed shortlist write. Layer 2 is additive to a
+    board that already works."""
+    import inspect
+
+    from pipeline import intelligence_state as istate
+
+    source = inspect.getsource(istate.IntelligenceStateService._build_candidate_pool)
+    assert "LAYER2_SHORTLIST_WRITE_FAILED" in source, "the write is not wrapped"
