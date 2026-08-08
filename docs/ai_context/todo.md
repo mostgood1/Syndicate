@@ -71,15 +71,31 @@ leagues) was the mis-reading above.
 
 #### OPEN
 
-- **DEPLOY IS HELD, deliberately.** A deploy reboots the worker and resets the
-  2h MLB pregame-sweep timer, and `#265` still owes its first observed
-  `oddsapi_game_lines_<date>_pregame.json`. Ship this with that verification,
-  not before — same reasoning that holds `#266`/`#267`.
+- **STILL UNDEPLOYED, but the original reason is spent.** This was held so a
+  worker reboot could not reset the 2h MLB pregame-sweep timer before `#265`
+  observed its first freeze. **`#265` fired at 18:41Z** and a concurrent
+  session deployed `11aea7bf` at 18:59Z — which predates this work, so nothing
+  here shipped. Confirmed against production at the time of writing: chips
+  carry `abbr`/`score` only, and `book-grid?sport=soccer` reports
+  `{"chips": 61, "rows_matched": 0}`. **The remaining reason to hold is
+  different and still good:** `#265` owes the durable half — the frozen file
+  surviving tonight's ~04:5xZ collapse window — and a deploy reboots the
+  workers before that is known.
 - The four-entry vendor table covers clubs that PLAYED on 2026-08-08. Other
   fixtures will surface others, and `unmatched_teams` is how they show up. It
   does not grow per fixture — only per genuine vendor disagreement.
-- `tests/test_layer2_shortlist_wiring.py` has **6 failures that predate this
-  work** (verified by stashing). Untouched here, not diagnosed.
+- **Expect the L2-A shortlist to move when this deploys.** Soccer is 3 of 103
+  rows on the served shortlist; with `game.state` populated for the first time,
+  `opportunity_gate`'s dead-market rule can finally reject in-progress and
+  settled soccer markets. Some of what ranks today should stop ranking.
+- ~~`tests/test_layer2_shortlist_wiring.py` has 6 failures that predate this
+  work~~ — **WRONG, corrected.** They came from `037e42db`'s value floor on
+  `select_shortlist`, and were fixed in `e826ab9f` (14 pass). **My stash check
+  could not have caught this and I should not have trusted it:** stashing
+  removes only *uncommitted* changes, and `037e42db` was already committed on
+  `main`. "Fails with my changes stashed" proves the cause is not in my working
+  tree — it does NOT prove the cause is old. To date a failure, bisect or test
+  against the merge-base, not against a stash.
 
 #### ATTRIBUTION — `git commit --amend` in a shared tree, and how it was repaired
 
