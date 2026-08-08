@@ -195,15 +195,52 @@ WNBA is the one that mattered: **78 in-progress rows previously read `None`**, s
 ~10 leagues, no stable tri-code convention across feeds. **61 chips went
 unmatched on 08-08 — that is the size of the prize.** Needs its own pass.
 
-**NFL week self-pinning — FILTERED, NOT CURED.** `bf56a643` narrows the board to
-games actually on the requested date via ESPN. But `preseason_target_week` still
-returns `min(weeks whose status != "final")` and **nothing refreshes that status
-column** (`fetch_nfl_preseason_schedule.py` is a manual CLI wired into no
-pipeline). It has three other callers — `refresh_odds_sources`,
-`run_refresh_worker`, `blueprints/home` — so the root cause is open.
-**Expect NFL `with_state = 0` today and do not read it as a failed fix**: the
-board's NFL rows are regular season while the only chips are preseason. The real
-test is **08-13**, when six preseason games are on.
+**NFL week self-pinning — CURED AND VERIFIED 2026-08-08.** Supersedes the
+"filtered, not cured" note this entry originally carried.
+
+Three commits, each fixing a distinct defect, and the middle one was mine:
+
+| commit | |
+|---|---|
+| `bf56a643` | filter the board to games actually on the requested date (ESPN) |
+| `e9e33e4d` | that filter FELL OPEN on the wrong-week case and re-served the stale game |
+| `68cddf73` | **root cause**: `preseason_target_week` keyed on `gameday`, not `status` |
+
+**Root cause.** It returned `min(weeks whose status != "final")` and **nothing
+ever rewrites that column** — `fetch_nfl_preseason_schedule.py` is a manual CLI
+referenced by no pipeline (grep across `tools/daily_update.py`,
+`run_refresh_worker.py`, `refresh_odds_sources.py`). The 2026 file was written
+08-05 and still read "Scheduled" for all 49 games on 08-08, including week 1's
+game played 08-06. Not a hardcode: a `min()` over a set that never shrinks
+because nobody refreshes its input. `gameday` cannot go stale, so it keys on
+that, with a fallback to the old status rule ONLY when the file has no gamedays
+at all — which separates "preseason is over" from "this file cannot answer by
+date". That matters because three other callers depend on it
+(`refresh_odds_sources`, `run_refresh_worker`, `blueprints/home`).
+
+**VERIFIED on production**, `game-chips?sports=nfl`:
+
+```
+            originally   after bf56a643   after e9e33e4d   after 68cddf73
+2026-08-13  401873271    401873271        []               6 REAL GAMES
+2026-08-14  401873271    401873271        []               3 REAL GAMES
+```
+08-13 returns DET@CIN, GB@PIT, IND@NE, ARI@LV, LAC@HOU, TEN@SF with
+`state=pregame`. Matches ESPN exactly.
+
+**KNOWN BEHAVIOUR CHANGE, not a bug — flagged so it is not filed as one.**
+`2026-08-06` now returns 0 chips where it previously returned CAR@ARI, the one
+date the stale answer was accidentally right. `preseason_target_week` now
+returns 2, so week 1's card set is not built at all. The board is correct for
+today and forward and has LOST past preseason weeks. `>= today` was deliberate;
+if historical preseason dates ever matter, the filter must resolve the week
+FROM THE REQUESTED DATE rather than from today.
+
+**The lesson worth more than the fix:** `bf56a643`'s unit tests PASSED on the
+broken branch, because the fixture asserted the behaviour I had reasoned my way
+into (`test_an_id_space_mismatch_does_not_empty_the_board`). Five real dates
+against production disagreed immediately. Same shape as the wrong-build
+readings: verifying against something you control rather than against reality.
 
 **S2 IS PLANNED, NOT BUILT, and the plan says why the obvious version cannot
 ship:** uniform 5-minute pregame is ~3.6× current burn = **~134% of the 5M cap**.
