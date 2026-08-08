@@ -1,5 +1,96 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (late) — WHY SOCCER SIMS DON'T RUN: the sim subprocess dies in SECONDS for 9 of 10 leagues
+
+Traced top-down from the orchestrator, per instruction. Every stage below is
+measured on production, not inferred.
+
+**1. Orchestrator — HEALTHY.** Refresh runs do include soccer:
+`refresh_odds_sources.py --date 2026-08-09 --sports mlb,wnba,nfl,soccer
+--phase pregame --execution-mode source --skip-mirror`.
+
+**2. Step construction — HEALTHY.** `_build_soccer_steps` builds an artifacts
+step per active league, and **all ten leagues have been launched** in the last
+7 days. Captured from real process command lines:
+`build_soccer_artifacts.py --league <L> --week <N> --season 2026`.
+There is no league allowlist — `active_leagues_for_date` is month-based only.
+
+**3. Process lifetime — THIS IS THE DEFECT.** Reconstructed by grouping
+`ALL_PROCESS_MEMORY` process samples into contiguous runs:
+
+```
+league               runs samples  median_run  max_run
+mls                   107     518       0.2m     9.2m
+bundesliga             13      21       0.0m     0.1m
+ligue_1                15      21       0.0m     0.0m
+championship            8      14       0.0m     0.0m
+primeira_liga           9      13       0.0m     0.0m
+belgian_pro_league     11      12       0.0m     0.0m
+eredivisie              8      11       0.0m     0.1m
+la_liga                 8      10       0.0m     0.0m
+epl                     8       9       0.0m     0.0m
+serie_a                 9       9       0.0m     0.0m
+```
+
+**MLS survives minutes. The other nine die within seconds.** The per-step
+timeout is **1800s** (`_DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS`), so this is not
+a timeout and not starvation — it is an immediate exit.
+
+**4. Output — consistent with a crash.** `build_artifacts` writes
+`recommendations_<date>.json` on **every** non-crash path, including the
+"no ESPN fixtures" branch. No file therefore means the process died *before*
+writing, which matches a seconds-long lifetime exactly.
+
+**5. Reproduction — the code is NOT the problem.** The identical command run
+locally (`--league eredivisie --date 2026-08-08`) simulated 4 matches and 157
+player projections and wrote the file, in ~6 minutes. So the failure is
+specific to the worker environment, not the builder.
+
+#### BLOCKED — and the blocker is an observability gap, not the bug
+
+The child's stdout/stderr is redirected to `--stdout-path` on refresh-worker's
+own disk. **Nothing from it reaches Render's log collector**: zero `Traceback`,
+zero `STEP_FAIL`, zero `SOCCER_PLAYER_ROWS_*` lines in 7 days, despite
+`refresh_odds_sources.py` printing all three with `flush=True`. And
+`/api/ops/odds-refresh/logs` reads **web's** disk — it returns
+`exists: false` for a run stamped `20260806_213223`. Same
+[[worker counters unreadable from web]] wall as before.
+
+**To unblock, one small change, either of:**
+- allowlist the run's stdout / step manifest
+  (`reports/migration_runs/**/odds_refresh.json`,
+  `reports/refresh_status/**/refresh_status_manifest.json`) in
+  `HOT_ARTIFACT_PATTERNS` so `/api/ops/artifacts/export` can serve them; or
+- echo `STEP_FAIL` / non-zero return codes to the container's own stdout, not
+  only to the redirected file.
+
+Until then the crash reason is genuinely unknown. **Do not guess it** — the
+whole point of the measurement above is that it narrows to one question
+("what does this process print in its first two seconds on the worker") that
+one log line would answer.
+
+#### CONFIRMED SEPARATE DEFECT — two leagues have NO player roster seed at all
+
+```
+league             players_*.csv in git / on disk
+mls                players_2026.csv          <- only current-season file anywhere
+epl                players_2024, players_2025
+eredivisie         players_2025
+belgian_pro_league players_2025
+primeira_liga      NONE
+championship       NONE
+```
+
+`_load_player_rows` globs `players_*.csv` and concatenates **any** season, so
+the stale 2024/2025 files are fine. But **primeira_liga and championship have
+none**, so they hit `SOCCER_PLAYER_ROWS_MISSING` and produce **empty player
+props for every fixture, every cycle** — even on a run that otherwise
+succeeds. That print exists precisely so this is a five-second grep (#170), and
+it cannot be seen from web for the reason above.
+
+This does NOT explain the fast deaths (eredivisie has players and ran fine
+locally). Two distinct defects; do not merge them.
+
 ### 2026-08-08 (late) — SOCCER END-TO-END EVAL, all 10 leagues: the sim runs for MLS ONLY
 
 Requested before pushing the `game.state` fix. Measured against production,
