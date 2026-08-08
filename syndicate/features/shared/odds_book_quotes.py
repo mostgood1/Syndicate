@@ -400,11 +400,82 @@ def quote_rows_from_oddsapi_events(
 # refresh-worker this file is mutated only by the artifact pull, which runs
 # before the board build, so the shard is stable for the whole build.
 #
-# Bounded to two entries -- one live sport plus one -- because the value is a
-# 122k-dict list and caching every sport's shard would trade a churn problem
-# for a retention one.
+# BOUNDED BY BYTES, NOT BY ENTRY COUNT.
+#
+# This was `_BOOK_QUOTES_CACHE_MAX_ENTRIES = 2` -- "one live sport plus one".
+# That is a COUNT bound on a value whose size varies by two orders of magnitude
+# between sports, and the postmortem's rule for worker caches is explicit:
+# "any worker cache gets a byte budget and an eviction log, never a bare entry
+# count." `_MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES` was the same shape and stayed
+# invisible for three weeks.
+#
+# WHY IT MATTERED. Two entries was sized on refresh-worker (4Gi). MEASURED
+# 2026-08-08, live-odds-worker (2Gi) died with:
+#
+#     PEAK rss 1768MB against a 2048MB limit, lethal ~1548MB
+#       pid=39  1004.7MB  run_live_odds_refresh_worker.py   <- the parent
+#       pid=557  636.8MB  refresh_mlb_oddsapi.py            <- spawned refresh
+#
+# A read costs ~6.3x the shard's file size and is never returned to the OS
+# (postmortem section 1.1d, reproduced independently 2026-08-08). Production's
+# MLB shard is ~90MB, so ONE cached copy is ~570MB and two is ~1.14GB -- which
+# is essentially the whole parent. On a 4Gi worker that is affordable; on a 2Gi
+# service it leaves under 1GB for a subprocess that needs 640MB.
+#
+# WHAT EVICTION ACTUALLY BUYS, stated precisely because the obvious reading is
+# wrong: freeing an entry does NOT return memory to the OS. It lets the next
+# read REUSE those arenas instead of growing new ones, so the retained set
+# plateaus at roughly one shard rather than two. The win is the plateau, not a
+# reclaim -- do not expect RSS to drop when an eviction is logged.
+#
+# The budget is an ESTIMATE from file size, not sys.getsizeof: a shallow sizeof
+# on a 122k-dict list undercounts badly, and the file size is already in the
+# cache key, so this costs nothing.
 _BOOK_QUOTES_CACHE: "OrderedDict[tuple[str, int, int], list[dict[str, Any]]]" = OrderedDict()
-_BOOK_QUOTES_CACHE_MAX_ENTRIES = 2
+
+# Measured multiplier from file bytes to resident bytes (6.3x, twice).
+_BOOK_QUOTES_RSS_PER_FILE_BYTE = 6.3
+
+# Sized for the SMALLEST container that runs this, not the largest -- 2Gi.
+# Post-restart that service sits at ~426MB with the subprocess absent, and the
+# MLB odds refresh needs ~640MB, so the parent must stay under roughly 900MB to
+# survive it. That leaves ~500MB for this cache, which admits one MLB shard and
+# evicts anything beyond it.
+_BOOK_QUOTES_CACHE_MAX_RSS_BYTES = 500 * 1024 * 1024
+
+
+def _book_quotes_cache_estimated_bytes() -> int:
+    """Estimated resident cost of everything currently cached.
+
+    The third element of each key is the shard's file size, so this needs no
+    measurement pass over the values.
+    """
+    return int(sum(key[2] for key in _BOOK_QUOTES_CACHE) * _BOOK_QUOTES_RSS_PER_FILE_BYTE)
+
+
+def _evict_book_quotes_over_budget() -> None:
+    """Evict least-recently-used until the estimate is within budget.
+
+    Logged, per the same rule: a cache that evicts silently cannot be
+    distinguished from one that is simply never hit, and "is the cache
+    working?" then has no answer short of a heap dump.
+    """
+    while len(_BOOK_QUOTES_CACHE) > 1 and _book_quotes_cache_estimated_bytes() > _BOOK_QUOTES_CACHE_MAX_RSS_BYTES:
+        evicted_key, _ = _BOOK_QUOTES_CACHE.popitem(last=False)
+        print(
+            "[odds_book_quotes] CACHE_EVICT "
+            + json.dumps(
+                {
+                    "evicted_path": str(evicted_key[0]),
+                    "evicted_file_bytes": int(evicted_key[2]),
+                    "entries_after": len(_BOOK_QUOTES_CACHE),
+                    "estimated_rss_mb_after": round(_book_quotes_cache_estimated_bytes() / (1024 * 1024), 1),
+                    "budget_mb": round(_BOOK_QUOTES_CACHE_MAX_RSS_BYTES / (1024 * 1024), 1),
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
 
 
 def _book_quotes_cache_key(path: Path) -> tuple[str, int, int] | None:
@@ -460,8 +531,11 @@ def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
         if _book_quotes_cache_key(path) == cache_key:
             _BOOK_QUOTES_CACHE[cache_key] = rows
             _BOOK_QUOTES_CACHE.move_to_end(cache_key)
-            while len(_BOOK_QUOTES_CACHE) > _BOOK_QUOTES_CACHE_MAX_ENTRIES:
-                _BOOK_QUOTES_CACHE.popitem(last=False)
+            # Never evicts the entry just inserted (the loop keeps at least one):
+            # a shard larger than the whole budget must still be served from
+            # cache for the duration of THIS build, or we reintroduce the
+            # per-row re-read that #252 exists to stop.
+            _evict_book_quotes_over_budget()
     return rows
 
 
