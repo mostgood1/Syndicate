@@ -1,6 +1,13 @@
 # Syndicate TODO — canonical cross-session list
 
-### 2026-08-08 (late) — OPERATIONAL RULES earned tonight (cheap to read, expensive to rediscover)
+### 2026-08-08 (afternoon, ~21:00-21:30Z) — OPERATIONAL RULES earned today (cheap to read, expensive to rediscover)
+
+**TIMESTAMP NOTE:** entries in this block were originally headed "(late)". They
+were written in the AFTERNOON Central — 21:22Z is 4:22 PM CDT, not late night.
+Corrected in place. All the *arithmetic* in them is UTC and unaffected (a match
+kicking off 14:30Z and reading `pregame` at 19:57Z is 5.5h either way); only the
+labels were wrong. **Don't infer a local time from a "Z" stamp without
+converting** — CDT is UTC-5.
 
 **1. Nested payloads survive hop-by-hop key lists; top-level scalars do not.**
 `rows_stale_kickoff` read `None` on a payload where the filter was live and
@@ -49,7 +56,7 @@ process runs, a fresh adapter instead of the function already in a file read
 three times. **Ask "which graph, which build, which disk produced this number"
 first, not last.**
 
-### 2026-08-08 (late) — BRANDING FIX VERIFIED (278 → 720/720) — and it RE-OPENED the settled-market hole
+### 2026-08-08 (afternoon, ~21:00-21:30Z) — BRANDING FIX VERIFIED (278 → 720/720) — and it RE-OPENED the settled-market hole
 
 `60689dee`, deployed to refresh-worker 20:17:20Z. Verified on the first
 artifact written after it, 20:30:15Z. **Read the second half before celebrating.**
@@ -112,7 +119,7 @@ until you make the data present.
 | settled-market protection | rests entirely on the clock guard |
 | the real fix | the sim running — see `f0e0ad1`, blocked on the child's stdout |
 
-### 2026-08-08 (late) — RETRACTED: "`attach_game_state` is a no-op on the worker" was WRONG. I tested an import graph no process runs
+### 2026-08-08 (afternoon, ~21:00-21:30Z) — RETRACTED: "`attach_game_state` is a no-op on the worker" was WRONG. I tested an import graph no process runs
 
 **The entry below this one is false. Do not act on it.** Kept, struck through,
 because the mistake is more instructive than the claim was.
@@ -163,7 +170,7 @@ available (115 artifact rows), did not look at it, and reasoned from a synthetic
 import instead. When a claim is "X never works", check the surface where X's
 output lands BEFORE building an instrument to prove the mechanism.
 
-### ~~2026-08-08 (late) — `attach_game_state` IS A NO-OP ON THE WORKER, FOR EVERY SPORT. The provider registry is web-only~~ (RETRACTED, see above)
+### ~~2026-08-08 (afternoon, ~21:00-21:30Z) — `attach_game_state` IS A NO-OP ON THE WORKER, FOR EVERY SPORT. The provider registry is web-only~~ (RETRACTED, see above)
 
 `f8c64692`, committed, **NOT deployed**. Bigger than the soccer work it came
 out of, and it invalidates numbers recorded earlier in this file.
@@ -217,7 +224,7 @@ output, not the one that is easiest to query.**
 honestly, because an earlier test has already imported `blueprints.home` and
 the re-import is a no-op whether or not the fix is present.
 
-### 2026-08-08 (late) — SOCCER `game.state` VERIFIED IN PRODUCTION: 0 → 720/720. And the dead-market rule STILL cannot fire for 9 leagues
+### 2026-08-08 (afternoon, ~21:00-21:30Z) — SOCCER `game.state` VERIFIED IN PRODUCTION: 0 → 720/720. And the dead-market rule STILL cannot fire for 9 leagues
 
 Deployed in `1e602fd3` (web + refresh-worker, live 19:55:30Z). Measured on
 production immediately after:
@@ -255,7 +262,7 @@ not sufficient.
 
 **Do not mark the soccer `game.state` exposure closed until the sim runs.**
 
-### ~~2026-08-08 (late) — WHY SOCCER SIMS DON'T RUN~~ — DIAGNOSIS SUPERSEDED, CAUSE FOUND
+### ~~2026-08-08 (afternoon, ~21:00-21:30Z) — WHY SOCCER SIMS DON'T RUN~~ — DIAGNOSIS SUPERSEDED, CAUSE FOUND
 
 **The "BLOCKED on observability" section below is STALE. Do not assign work on
 it.** The oversight session read it as the live blocker and was about to hand
@@ -287,7 +294,7 @@ acting on it. **When you supersede a conclusion, strike the original where it
 sits** — a later entry does not retract an earlier one for someone reading
 top-down and stopping at the first thing that looks actionable.
 
-### 2026-08-08 (late) — (superseded) the sim subprocess dies in SECONDS for 9 of 10 leagues
+### 2026-08-08 (afternoon, ~21:00-21:30Z) — (superseded) the sim subprocess dies in SECONDS for 9 of 10 leagues
 
 Traced top-down from the orchestrator, per instruction. Every stage below is
 measured on production, not inferred.
@@ -378,7 +385,7 @@ it cannot be seen from web for the reason above.
 This does NOT explain the fast deaths (eredivisie has players and ran fine
 locally). Two distinct defects; do not merge them.
 
-### 2026-08-08 (late) — SOCCER END-TO-END EVAL, all 10 leagues: the sim runs for MLS ONLY
+### 2026-08-08 (afternoon, ~21:00-21:30Z) — SOCCER END-TO-END EVAL, all 10 leagues: the sim runs for MLS ONLY
 
 Requested before pushing the `game.state` fix. Measured against production,
 2026-08-08. **Nothing pushed; nothing deployed.**
@@ -481,7 +488,7 @@ api/...`) with **no top-level `manifests/`, `tracking/`, or `source_artifacts/`*
 - `recommendations_<date>.json` is already date-keyed and consistent with
   NCAAB's `api/` shape — that part is fine and should be the template.
 
-### 2026-08-08 (late) — SOCCER `game.state`: FIXED, 0 → 300/300 rows. The nine-hypothesis chase was hunting a defect that did not exist
+### 2026-08-08 (afternoon, ~21:00-21:30Z) — SOCCER `game.state`: FIXED, 0 → 300/300 rows. The nine-hypothesis chase was hunting a defect that did not exist
 
 **Code `f465edb4`, NOT DEPLOYED.** A concurrent-session `--amend` collision
 mangled the commit messages here and was repaired; see the attribution note at
