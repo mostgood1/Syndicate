@@ -215,8 +215,16 @@ def coverage(dates: list[str], sports: list[str]) -> dict[str, Any]:
         "graded_rows_by_sport_date": per_sport_date,
         "note": (
             "This is the CEILING on distinct outcomes settlement can match against. "
-            "Zero for a sport is not automatically a defect -- nba/nhl are out of "
-            "season, and soccer/ncaab/ncaaf graders are documented []-stubs."
+            "Zero for a sport is NOT self-explanatory and must not be read as "
+            "'grader missing': nba/nhl are legitimately out of season, but a sport "
+            "with a fully working grader can also grade nothing forever if its "
+            "upstream results never land. Measured 2026-08-08 by the soccer lane: "
+            "the soccer grader is real (14 rows on a live MLS date) and reads "
+            "results from the schedule artifact's status_state, so it sees an "
+            "outcome only where the schedule was re-fetched AFTER the match "
+            "finished -- mls 223 of 511 fixtures in post, eredivisie 0 of 306. "
+            "Zero reads identically in both cases. Check the upstream artifact "
+            "before attributing a zero to the grader."
         ),
     }
 
