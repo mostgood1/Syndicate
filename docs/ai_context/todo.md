@@ -247,8 +247,22 @@ we are pricing 400 rows of real games — and no chip comes out.
    `epl`/`la_liga` resolve week 1 and yield chips.** Same week number, opposite
    outcome — so it is not the week logic.
 
-⇒ **NARROWED TO: per-league CARD ARTIFACT availability for the resolved
-`(league, season, week)`.** Soccer is week-keyed per league, so
+8. **Card-artifact presence** — REFUTED. `epl` (chips) and `serie_a` (none)
+   have the SAME artifact shapes, and serie_a has MORE of them (28 vs 24):
+   both carry `api/schedule/schedule_2026.json`, `api/recommendations/`,
+   `api/picks/`, `api/odds/game_odds_current.csv`, `api/live_state/`, `props/`.
+   ALL TEN leagues have `schedule_2026.json`. So it is not file presence and not
+   the season.
+
+⇒ **STOP PROBING ARTIFACTS FROM OUTSIDE.** Eight hypotheses were tested from the
+API and eight were refuted; the remaining difference is INSIDE the files or in
+how the builder reads them, and neither is visible through
+`/api/ops/artifacts/export`. **The next session should INSTRUMENT the path, not
+guess at it**: call `_SoccerDataProvider.games()` directly for `serie_a` and
+`epl` on the same date and print what each returns and where it diverges. That
+is one debug run and it beats another round of black-box elimination.
+
+⇒ *(superseded) narrowed to per-league card artifact availability* Soccer is week-keyed per league, so
 `_SoccerDataProvider.games()` builds from that triple. Three leagues find cards
 and seven do not. Next: list what exists under the soccer card/schedule path for
 `serie_a` season 2026 week 1 versus `epl` season 2026 week 1 — identical week,
