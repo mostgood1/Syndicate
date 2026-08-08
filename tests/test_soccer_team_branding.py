@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.soccer import cards
@@ -128,3 +129,51 @@ class MatchToGameBrandingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_branding_path_prefers_a_root_that_actually_has_the_file(tmp_path, monkeypatch):
+    """`preferred_source_roots` appends a repo fallback on Render precisely so a
+    git-shipped file stays reachable when the mounted disk never received it.
+    Taking `[0]` discarded it unread.
+
+    Measured on refresh-worker 2026-08-08: soccer matched 278 of 720 board rows,
+    and the 14 unmatched clubs were exactly the ones needing the
+    branding-derived alias map, while identically-spelled clubs matched. An
+    empty branding read explains that split; web matched 720/720.
+    """
+    from syndicate.features.soccer import sources as soccer_sources
+
+    empty_root = tmp_path / "runtime"
+    stocked_root = tmp_path / "repo"
+    relative = Path("source_artifacts") / "data" / "processed" / "team_branding" / "eredivisie_team_branding.csv"
+    (stocked_root / relative).parent.mkdir(parents=True, exist_ok=True)
+    (stocked_root / relative).write_text("team_id,display_name\n1,Telstar\n", encoding="utf-8")
+    empty_root.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(
+        soccer_sources,
+        "preferred_source_roots",
+        lambda *a, **k: [empty_root, stocked_root],
+    )
+
+    resolved = soccer_sources.team_branding_path("eredivisie")
+
+    assert resolved == stocked_root / relative
+    assert resolved.is_file()
+
+
+def test_branding_path_is_stable_when_no_root_has_the_file(tmp_path, monkeypatch):
+    """Absence must still yield the first root's path, so a missing file is
+    reported at a stable location rather than raising."""
+    from syndicate.features.soccer import sources as soccer_sources
+
+    first = tmp_path / "a"
+    second = tmp_path / "b"
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.setattr(soccer_sources, "preferred_source_roots", lambda *a, **k: [first, second])
+
+    resolved = soccer_sources.team_branding_path("eredivisie")
+
+    assert resolved.parent.parent.parent.parent.parent == first
+    assert not resolved.exists()

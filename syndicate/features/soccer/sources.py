@@ -214,13 +214,43 @@ def _normalize_team_key(value: str) -> str:
 
 
 def team_branding_path(league: str) -> Path:
+    """The league's branding CSV, from the first root that actually HAS it.
+
+    Was `preferred_source_roots(...)[0]` — the runtime root only. That helper
+    deliberately appends a repo fallback on Render (`_append_repo_fallback`)
+    precisely so a file shipped in git stays reachable when the mounted disk
+    never received it, and taking `[0]` threw that away unread.
+
+    MEASURED 2026-08-08 on refresh-worker, from the shortlist artifact's own
+    enrichment payload: soccer `rows_matched` 278 of 720, with the 14 unmatched
+    clubs being exactly those that need the branding-derived alias map
+    (`NEC Nijmegen`, `SC Telstar`, `Sporting Lisbon`, `Vitória SC`, ...), while
+    clubs whose two feeds spell them identically matched fine. Same call on web
+    matched 720/720. An empty branding read explains that split exactly:
+    `_soccer_alias_to_name` is built from `all_teams`, which reads this file.
+
+    Same defect shape as the `#145` player-seed and `#170` schedule-seed
+    bootstraps — a per-league file that exists in git and not on the runtime
+    disk — but fixed at the read instead of by copying, since the fallback
+    already existed and only needed to be consulted.
+    """
     league = normalize_league(league)
-    root = preferred_source_roots(
+    roots = preferred_source_roots(
         __file__,
         env_var="SYNDICATE_SOCCER_SOURCE_ROOT",
         local_dir_name=f"soccer_source/{league}",
-    )[0]
-    return root / "source_artifacts" / "data" / "processed" / "team_branding" / f"{league}_team_branding.csv"
+    )
+    relative = Path("source_artifacts") / "data" / "processed" / "team_branding" / f"{league}_team_branding.csv"
+    for root in roots:
+        candidate = root / relative
+        try:
+            if candidate.is_file():
+                return candidate
+        except Exception:
+            continue
+    # Unchanged behaviour when nothing has it: the first root's path, so
+    # callers still get a stable location to report as missing.
+    return roots[0] / relative
 
 
 @lru_cache(maxsize=32)
