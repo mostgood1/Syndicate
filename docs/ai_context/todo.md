@@ -127,6 +127,90 @@ not immediately.
    dead board at end of slate, which is the failure the freshness rule exists to
    avoid. Recorded so the next reader does not rediscover it.
 
+#### FOLLOW-UP, same night: the restart hole closed, and two corrections to the record
+
+The lead and the publish lane independently reached the same root cause from the
+transport end within the hour. Genuine convergence — different evidence, same
+defect. Two things they each got wrong, both worth keeping:
+
+**`final_filtered: 0` is a REJECTION COUNTER, not a survivor count.**
+`intelligence.py:9682` increments it once per candidate dropped for being a
+finished game. `input 684 -> output 678, final_filtered 0` reads "678 survived,
+none dropped as final". It was read as "the scoring stage filters 678 down to
+0", which would be a catastrophic filter bug that does not exist. Measured
+across 12 cycles 18:18Z–21:46Z: `final_filtered` is **0 on every one**, while
+`state_invalid_filtered` runs 4–35. The real rejection channel is
+`state_invalid`, at 6 of 684 — under 1%.
+
+**Zero `STATE_READ_FROM_ARTIFACT` does NOT mean the disk copy is unreachable.**
+That line prints only when disk *wins* the freshness comparison
+(`intelligence_state.py:1753`); `STATE_DISK_READ_FAILED` prints only on an
+exception. Zero of both is exactly what "read every cycle, loses on timestamp"
+looks like. Web logged it at 16:07:03Z, 16:18:07Z, 16:37:42Z, 18:11:02Z and last
+at **18:19:51Z** — the path runs and does print; it went silent when the empty
+cycles resumed at 18:41Z. The distinction matters: "never reached" would imply a
+read-path bug that is not there.
+
+**The restart hole, closed.** The in-process record fails open for the first
+cycle after a boot. Second tier added: `daily_paths["history"]` is a per-date
+JSONL that `write_latest_intelligence_state` appends to on every successful
+write (`candidate_count`/`selected_date`/`updated_at`), on local disk and
+**independent of both transports** — so unlike keyvalue it does not go blind
+when a board is too large, and unlike the artifact it costs a few KB to consult
+instead of a 27MB `json.loads` on a process already short of memory. Tier order:
+in-process → history tail → keyvalue. Reads the LAST entry, not the last
+non-empty one, deliberately: if the newest write was itself empty the board has
+already been replaced and there is nothing to protect. 11 tests now, including
+a real byte-level tail read and a seek landing mid-record.
+
+**Still true at 22:13Z, during the live window:** `21:53:54 count=538`, then
+`22:00:33 / 22:05:53 / 22:11:21 count=0`. The ratchet is running right now.
+
+### #289 — CROSS-SPORT DIVERGENCE in the candidate pool: three sports of eight, and one frozen number
+
+Answering the lead's standing question on `by_sport {mlb 490, soccer 163,
+wnba 25}`. Measured across 12 scoring cycles, refresh-worker, 18:18Z–21:46Z:
+
+```
+18:18  mlb 132  soccer 164  wnba 31        20:13  mlb 484  soccer 164  wnba 20
+18:26  mlb 132  soccer 164  wnba 31        20:24  mlb 477  soccer 164  wnba 20
+18:35  mlb 132  soccer 164  wnba 32        20:46  mlb 480  (soccer and wnba ABSENT)
+19:03  mlb 178  soccer 164  wnba 30        20:56  mlb 498  soccer 163  wnba 20
+19:32  mlb 415  soccer 164  wnba 15        21:20  mlb 490  soccer 163  wnba 25
+19:47  mlb 431  soccer 164  wnba 20        21:46  mlb 504  soccer 163  wnba 24
+```
+
+**Never any sport but these three, on any cycle.** Legitimacy, one at a time:
+
+- **nba / nhl / ncaab — absent LEGITIMATELY.** Out of season in August.
+- **nfl — absent SILENTLY.** Owned and fixed by the NFL lane (`1de982be`,
+  not deployed): `context_label = "2026 Preseason"` was passed to
+  `fetch_schedule_for_date` as a date, ESPN answered a garbage date with an
+  empty scoreboard rather than an error, and the "confirmed empty slate" branch
+  deleted all 16 games. Expect NFL candidates to appear when that batch lands —
+  **do not attribute that movement to #286.**
+- **ncaaf — NOT the NFL bug, but its label is wrong.** `_nfl_games_on_requested_date`
+  is the only function of its kind and has exactly one call site
+  (`home.py:5664`), so NCAAF does not go through that filter. NCAAF genuinely
+  has no games in early August, so zero is plausibly legitimate. But its
+  `context_label` reads **`"2025 Week 1"` in August 2026** — a stale season
+  year. Flagged, not diagnosed; it is a separate correctness question from the
+  zero.
+- **soccer — the interesting one. 163–164 on every cycle for three and a half
+  hours**, never moving, while MLB walks 132 → 504 and WNBA 15 → 32. A number
+  that constant across an afternoon is not a live slate being re-measured; it is
+  a static set being re-counted. Consistent with the nine unsimulated leagues
+  reading off a static schedule (see the branding/`pregame` entries below), but
+  measured here from a different surface. **And it vanished entirely for one
+  cycle at 20:46** along with WNBA, with no error — the archetype: a sport
+  leaving the pool looks exactly like a sport having nothing to offer.
+
+**Cross-sport verdict for this lane's own defect (#286): NOT sport-specific.**
+`write_latest_intelligence_state` and `_read_state_payload` are sport-agnostic —
+they carry the whole board. The size threshold that decides the transport is a
+property of the combined payload, so a rich MLB slate is what pushes soccer's
+and WNBA's rows over the ceiling too. Every sport lost its board together.
+
 ### #287 — `/intelligence/api/opportunity-board` returns 0 for every sport: DIFFERENT root cause. Not fixed
 
 **Not the same bug as #286, and not a producer failure either.** The ledger it
@@ -186,6 +270,44 @@ Genuine fixture drift from several sessions' legitimate feature work, worth
 fixing, but it was never going to produce the production zero. **Cost of the
 guess:** the earlier note reasoned from `candidate_count 0` appearing in two
 places and assumed one cause; the two zeros have nothing to do with each other.
+
+
+
+#### What `test_build_candidate_pool_skips_sports_without_manifests` is ACTUALLY telling us
+
+Worth its own paragraph, because it is plausibly the only automated check in the
+repo aimed at per-sport manifest divergence, and **it stopped checking that some
+time ago without going green-for-the-wrong-reason — it went red for the wrong
+reason, which hid it just as well.**
+
+The test patches `syndicate.features.intelligence.collect_all_recommendations`
+to return exactly two rows (one MLB, one NBA) and expects the manifest gate to
+drop NBA, leaving 1. **That patch is a total no-op:** `pipeline/intelligence_state.py`
+does not reference `collect_all_recommendations` anywhere. Generation now runs a
+per-sport path that reads real artifacts, so the trace shows `generated=60` for
+mlb off `data/mlb_source/data/daily/sims/2026-06-10/` — **git-tracked**, so the
+number is a function of what that mirror holds on the machine running it.
+60 → 32 after dedup → 18 after exposure budgets, against an expected 1.
+
+So it is **both** stale *and* local-mirror dependent, and worse: **its NBA arm
+proves nothing.** NBA returned `generated=0` because there is no NBA data for
+2026-06-10, not because the manifest was missing — so deleting the manifest gate
+entirely would not change this test's NBA half at all. The one check we have for
+this class of defect has not been exercising it.
+
+This is the lead's network-dependent-test shape in a second costume: not "passes
+because the network is absent" but "the assertion's subject was replaced and
+nobody noticed, because the test kept producing *a* number". **Rebuilding it
+should start from what it is meant to assert, not from updating `1` to `18`** —
+an updated constant would re-freeze a test that is measuring the wrong thing.
+
+**Checked for the network-dependent shape in the other failures, per the lead:**
+the two `test_intelligence.py` query failures both run under
+`_patch_build_intelligence_overview(...)` with a fully synthetic fixture and no
+network or mirror reads — one fails `4.5 != '4.5'` (a float/str coercion drift),
+the other `False is not true`. Neither is data-dependent and neither is network-
+dependent. The blotter failure asserts a literal `<th>Odds</th><th>Projected</th><th>Live</th>`
+against a template that is now JS-rendered from `initial-intelligence-response`.
 
 
 ### 2026-08-08 — The rule is easy to state and evidently not easy to apply under momentum

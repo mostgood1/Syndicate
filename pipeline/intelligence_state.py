@@ -674,6 +674,66 @@ def _last_good_board_write(selected_date: str) -> tuple[str, int] | None:
         return _LAST_GOOD_BOARD_WRITES.get(str(selected_date or "").strip())
 
 
+# Tail size for the history probe below. The entries are a handful of fields
+# plus `top_opportunity_names`, so a few KB covers the last record comfortably
+# while staying nowhere near the cost this function exists to avoid.
+_HISTORY_TAIL_PROBE_BYTES = 65536
+
+
+def _last_board_write_from_history(selected_date: str) -> tuple[str, int] | None:
+    """The last write recorded for a date, read from that date's history JSONL.
+
+    The restart-safe middle tier between the in-process record and the
+    keyvalue read. `write_latest_intelligence_state` appends an entry here on
+    every successful write (`_intelligence_state_history_entry`: candidate_count,
+    selected_date, updated_at), with a plain local-disk append that is
+    **independent of both transports** -- so unlike the keyvalue copy it does
+    not go blind the moment a board is too large for the store, and unlike the
+    artifact copy it costs a few KB to consult instead of a 27MB json.loads on
+    a process that is already short of memory.
+
+    Reads the LAST entry, not the last non-empty one, on purpose: if the most
+    recent write for this date was itself empty then the board has already been
+    replaced and there is nothing left for the guard to protect.
+
+    Returns None on anything unexpected -- the caller fails open by design.
+    """
+    try:
+        path = _intelligence_state_daily_paths(str(selected_date or "").strip())["history"]
+        if not path.is_file():
+            return None
+        size = path.stat().st_size
+        if size <= 0:
+            return None
+        with path.open("rb") as handle:
+            if size > _HISTORY_TAIL_PROBE_BYTES:
+                handle.seek(-_HISTORY_TAIL_PROBE_BYTES, os.SEEK_END)
+            tail = handle.read()
+        for raw_line in reversed(tail.decode("utf-8", errors="replace").splitlines()):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except Exception:
+                # A partial first line is expected when the tail seek lands
+                # mid-record; a partial LAST line would mean a torn append,
+                # and skipping it just falls through to the next tier.
+                continue
+            if not isinstance(entry, dict):
+                continue
+            recorded_date = str(entry.get("selected_date") or "").strip()
+            if recorded_date and recorded_date != str(selected_date or "").strip():
+                continue
+            written_at = str(entry.get("updated_at") or entry.get("last_updated") or "").strip()
+            if not written_at:
+                return None
+            return written_at, int(entry.get("candidate_count") or 0)
+    except Exception:
+        return None
+    return None
+
+
 def _empty_write_would_clobber_good_board(incoming: dict[str, Any]) -> bool:
     """True when writing this empty state would erase a populated board that
     is still recent enough to trust.
@@ -698,6 +758,17 @@ def _empty_write_would_clobber_good_board(incoming: dict[str, Any]) -> bool:
             remembered_at, remembered_count = remembered
             if remembered_count > 0:
                 age_seconds = _timestamp_age_seconds(remembered_at)
+                if age_seconds is not None and 0 <= age_seconds < window:
+                    return True
+        # Second tier: the history JSONL. Survives a restart, and is written
+        # through neither transport, so it still sees a board the keyvalue read
+        # below cannot. Only consulted when the in-process record is absent or
+        # already stale, so the steady-state path stays a dict lookup.
+        historical = _last_board_write_from_history(selected_date)
+        if historical is not None:
+            historical_at, historical_count = historical
+            if historical_count > 0:
+                age_seconds = _timestamp_age_seconds(historical_at)
                 if age_seconds is not None and 0 <= age_seconds < window:
                     return True
         existing = read_json_file(_intelligence_state_daily_paths(selected_date)["state"])
