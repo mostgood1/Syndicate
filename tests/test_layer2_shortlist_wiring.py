@@ -56,6 +56,31 @@ def _two_sided(sport="mlb", event_id="evt-1"):
     return rows
 
 
+@pytest.fixture(autouse=True)
+def _no_quality_floor(monkeypatch):
+    """Pin OFF the shortlist's value floor and quote-age ceiling (#268).
+
+    These are WIRING tests -- their subject is "does a priced market reach the
+    persisted artifact", not "is it worth betting". Leaving the quality floors
+    at their defaults conflates the two, and it does so in the most misleading
+    possible way: a healthy market fails.
+
+    `_two_sided()` below is a realistic 3-book market (-120/+105, -115/+100,
+    -125/+110) and every side of it scores **ev_pct = -1.0953**. That is not a
+    bad fixture, it is `1/overround - 1` -- identical for both sides and
+    NEGATIVE for any market where the book holds a margin, which is all of them.
+    So a floor at 0.0 rejects every normally-priced market, and six of these
+    tests failed with `0 == 2` "Forward view unreachable", which reads exactly
+    like a broken join.
+
+    Pinned explicitly rather than left to the default so that changing the
+    default can never again silently turn a wiring failure into a selection
+    policy. The floors have their own tests in test_layer2_shortlist_floors.py.
+    """
+    monkeypatch.setenv("SYNDICATE_SHORTLIST_MIN_VALUE_PCT", "-99999")
+    monkeypatch.setenv("SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS", "0")
+
+
 @pytest.fixture
 def shard(monkeypatch):
     """Serve shards per sport without touching disk or the network."""
