@@ -3025,7 +3025,20 @@ def build_cards_page_context_if_cached(selected_date: str, *, allow_stored_date_
 # Only contexts built with allow_stored_date_fallback=False are published: the
 # `True` variant may substitute a DIFFERENT date's stored slate, which is
 # exactly the wrong thing to hand a live lens.
+# TWO bounds, not one, and the reason is a measurement I did not have when the
+# first version of this shipped. The publisher on refresh-worker is the Layer 2
+# board build, whose cadence I could not pin down (the loop's own tick spacing
+# is dominated by pull/publish_hot_artifacts and by deploys). A single bound
+# that the publisher cannot meet would refuse every context and put the lens
+# straight back to the empty page this whole change exists to fix.
+#
+# So: FRESH is the bar for "this is a live lens". Past it the context is still
+# SERVED -- a visible slate with a stated age beats a blank page -- and the
+# staleness is printed and stamped. HARD is where the data stops being about
+# the same thing at all (a context built this morning does not describe a night
+# slate) and is refused outright.
 _WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS = 900
+_WNBA_CARDS_CONTEXT_HARD_MAX_AGE_SECONDS = 7200
 _WNBA_CARDS_CONTEXT_MAX_BYTES = 8 * 1024 * 1024
 
 
@@ -3083,31 +3096,45 @@ def publish_cards_page_context(selected_date: str, context: dict[str, Any]) -> b
         return False
 
 
-def load_published_cards_page_context(selected_date: str, *, max_age_seconds: int | None = None) -> tuple[dict[str, Any] | None, float | None]:
-    """The published context and its age in seconds, or (None, age|None).
+def wnba_cards_context_hard_max_age_seconds() -> int:
+    raw = str(os.environ.get("SYNDICATE_WNBA_CARDS_CONTEXT_HARD_MAX_AGE_SECONDS") or "").strip()
+    try:
+        value = int(raw) if raw else _WNBA_CARDS_CONTEXT_HARD_MAX_AGE_SECONDS
+    except ValueError:
+        value = _WNBA_CARDS_CONTEXT_HARD_MAX_AGE_SECONDS
+    return max(0, value)
 
-    Returns the age even on a stale miss so the caller can say HOW stale rather
-    than only that it missed -- a live-lens snapshot frozen at pregame is a bug
-    this module has shipped before (`e8deadb7`), and it is invisible unless the
-    age travels with the data.
+
+def load_published_cards_page_context(selected_date: str, *, max_age_seconds: int | None = None) -> tuple[dict[str, Any] | None, float | None, bool]:
+    """Returns (context|None, age_seconds|None, is_stale).
+
+    The age comes back even when the context is refused, so a miss can say HOW
+    stale rather than only that it missed -- a live-lens snapshot frozen at
+    pregame is a bug this module has shipped before (`e8deadb7`), and it is
+    invisible unless the age travels with the data.
+
+    `is_stale` is True when the context is past the FRESH bound but inside the
+    HARD one: still returned, because a visible slate with a stated age beats
+    the blank page, and flagged so nobody reads it as live.
     """
-    limit = wnba_cards_context_max_age_seconds() if max_age_seconds is None else max(0, int(max_age_seconds))
+    fresh_limit = wnba_cards_context_max_age_seconds() if max_age_seconds is None else max(0, int(max_age_seconds))
+    hard_limit = wnba_cards_context_hard_max_age_seconds()
     try:
         payload = _keyvalue_read_json_file(wnba_cards_context_artifact_path(selected_date))
     except Exception:
-        return None, None
+        return None, None, False
     if not isinstance(payload, dict) or not isinstance(payload.get("games"), list):
-        return None, None
+        return None, None, False
     try:
         published_at = float(payload.get("published_at") or 0.0)
     except (TypeError, ValueError):
-        return None, None
+        return None, None, False
     if published_at <= 0:
-        return None, None
+        return None, None, False
     age_seconds = max(0.0, time.time() - published_at)
-    if limit and age_seconds > limit:
-        return None, age_seconds
-    return payload, age_seconds
+    if hard_limit and age_seconds > hard_limit:
+        return None, age_seconds, True
+    return payload, age_seconds, bool(fresh_limit and age_seconds > fresh_limit)
 
 
 def _clear_build_cards_page_context_cache() -> None:

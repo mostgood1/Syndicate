@@ -16,6 +16,7 @@ from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_cards_page_context_if_cached
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.cards import load_published_cards_page_context
+from syndicate.features.wnba.cards import wnba_cards_context_hard_max_age_seconds
 from syndicate.features.wnba.cards import wnba_cards_context_max_age_seconds
 from syndicate.features.wnba.sources import build_module_links
 
@@ -263,10 +264,20 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
             # PUBLISHED context is the same data through the shared keyvalue
             # store, which is what makes "consume, do not rebuild" actually
             # reachable from a worker instead of only sounding reachable.
-            published, cards_context_age_seconds = load_published_cards_page_context(selected_date)
+            published, cards_context_age_seconds, is_stale = load_published_cards_page_context(selected_date)
             if published is not None:
                 cards_context = published
-                cards_context_source = "published_artifact"
+                cards_context_source = "published_artifact_stale" if is_stale else "published_artifact"
+                if is_stale:
+                    # Served, not refused -- refusing put the lens back to the
+                    # blank page this change exists to remove. Loud, because a
+                    # stale slate read as live is the `e8deadb7` failure.
+                    print(
+                        f"[wnba_live_lens] CARDS_CONTEXT_STALE date={selected_date} "
+                        f"age_seconds={round(cards_context_age_seconds or 0.0, 1)} "
+                        f"fresh_max_seconds={wnba_cards_context_max_age_seconds()} served=true",
+                        flush=True,
+                    )
             elif allow_rebuild:
                 cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
                 cards_context_source = "rebuilt"
@@ -278,12 +289,12 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
                 # a data outage. The reason separates "nobody has published
                 # one" from "one exists and is too old" -- they need different
                 # fixes and used to print the same line.
-                reason = "no_published_context" if cards_context_age_seconds is None else "published_context_stale"
+                reason = "no_published_context" if cards_context_age_seconds is None else "past_hard_max_age"
                 print(
                     f"[wnba_live_lens] CARDS_CONTEXT_COLD date={selected_date} "
                     f"reason={reason} "
                     f"age_seconds={round(cards_context_age_seconds, 1) if cards_context_age_seconds is not None else 'none'} "
-                    f"max_age_seconds={wnba_cards_context_max_age_seconds()}",
+                    f"hard_max_seconds={wnba_cards_context_hard_max_age_seconds()}",
                     flush=True,
                 )
                 cards_context = {}

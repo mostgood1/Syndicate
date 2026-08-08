@@ -2854,7 +2854,24 @@ lines is the only reason capture was confirmed at all.
    exercising the render functions directly under node -- `/intelligence` did
    not load in the local driver within 90s (a known local-dev-server issue, see
    the run-syndicate skill's gotchas), so it has never been seen in a browser.
-3. **soccer/ncaab/ncaaf graders are stubs** -- their bets cannot settle until
+3. ~~**soccer/ncaab/ncaaf graders are stubs**~~ **-- REFUTED 2026-08-08, do
+   not plan around this.** All EIGHT sports have registered graders
+   (`GRADED_OUTCOME_GRADERS`), and soccer's produced **14 graded rows** on a
+   real MLS date (2026-07-17) when called directly. The soccer grader is a
+   working implementation delegating to `soccer.actuals.graded_rows_for_date`.
+
+   **The real blocker is upstream and is a different bug.** It grades from the
+   SCHEDULE artifact's `status_state`, so it only sees a result where the
+   schedule was re-fetched after the match finished:
+
+       mls          223 of 511 fixtures in `post`   (last result-bearing date 2026-07-18)
+       eredivisie     0 of 306                      -- every fixture frozen at `pre`
+
+   So a sport can have a working grader and still grade nothing, forever, and
+   **zero graded rows reads as "no results yet" either way** -- the
+   degraded-looks-legitimate shape again. Routed to the settlement lane.
+
+   ~~their bets cannot settle until
    those land, regardless of everything above.
 
 **Not deployed.** #209-#214 are committed but Render auto-deploy is off, and

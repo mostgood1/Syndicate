@@ -111,19 +111,58 @@ def test_the_tick_never_rebuilds_the_cards_page():
     assert snapshot["cards_context_source"] == "cold"
 
 
-def test_a_stale_published_context_is_refused_and_its_age_is_reported():
-    """Serving a 40-minute-old context as "live" is the `e8deadb7` defect class
-    (snapshots frozen at pregame). Refusing it silently is only half a fix --
-    the age has to be attributable, so the miss says how stale rather than only
-    that it missed."""
+def test_a_stale_context_is_served_and_flagged_rather_than_refused():
+    """Refusing a 40-minute-old context puts the lens back to the blank page
+    this whole change exists to remove. A visible slate with a stated age beats
+    a blank one -- so it is served, marked stale, and its age travels with it.
+    Serving it as if it were LIVE would be the `e8deadb7` defect (snapshots
+    frozen at pregame), which is what the flag exists to prevent."""
     published = dict(CONTEXT, published_at=time.time() - 2400)
     _write, _read = _publish(published)
 
     with patch.object(wnba_cards, "_keyvalue_read_json_file", _read):
-        context, age = wnba_cards.load_published_cards_page_context("2026-08-08")
+        context, age, is_stale = wnba_cards.load_published_cards_page_context("2026-08-08")
+
+    assert context is not None, "a stale slate is still better than an empty page"
+    assert is_stale is True
+    assert age is not None and age > 2000
+
+
+def test_past_the_hard_ceiling_it_is_refused_and_the_age_still_reported():
+    """A context built this morning does not describe a night slate. Past the
+    hard ceiling it stops being stale data and starts being the wrong data --
+    and the miss still says HOW stale, because a miss without an age cannot be
+    told from "nobody published one"."""
+    published = dict(CONTEXT, published_at=time.time() - 30000)
+    _write, _read = _publish(published)
+
+    with patch.object(wnba_cards, "_keyvalue_read_json_file", _read):
+        context, age, is_stale = wnba_cards.load_published_cards_page_context("2026-08-08")
 
     assert context is None
-    assert age is not None and age > 2000, "a stale miss must still report its age"
+    assert age is not None and age > 20000
+    assert is_stale is True
+
+
+def test_the_fresh_bound_being_unmeetable_cannot_empty_the_lens():
+    """The bound the publisher's real cadence has to clear is a GUESS (900s),
+    and a guessed threshold that silently disables the stage it guards is the
+    defect this repo keeps re-learning. Squeeze FRESH to zero and the lens must
+    still carry the slate."""
+    published = dict(CONTEXT, published_at=time.time() - 60)
+    _write, _read = _publish(published)
+
+    with patch.dict(
+        "os.environ", {"SYNDICATE_WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS": "1"}, clear=False
+    ), patch.object(wnba_cards, "_keyvalue_read_json_file", _read), patch.object(
+        wnba_live_lens, "build_cards_page_context_if_cached", return_value=None
+    ), patch.object(
+        wnba_live_lens, "build_live_lines_payload", return_value={"games": []}
+    ), patch.object(wnba_live_lens, "_run_wnba_live_lens_tick", return_value=None):
+        snapshot = wnba_live_lens.build_live_lens_snapshot("2026-08-08")
+
+    assert len(snapshot["games"]) == 1
+    assert snapshot["cards_context_source"] == "published_artifact_stale"
 
 
 def test_provenance_travels_with_the_snapshot():
