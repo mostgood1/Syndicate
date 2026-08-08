@@ -781,10 +781,41 @@ def cancel_latest_refresh_run(lane: str | None = None) -> dict[str, Any]:
         updated = _update_latest_state(state="canceled", exit_code=0, canceled_at=_utc_now(), lane=lane)
         return {"ok": True, "pid": None, "state": updated.get("state"), "detail": "Queued external refresh run canceled."}
     if pid is None:
+        # A manifest in `running` with a QUEUED external contract and no PID is
+        # exactly the condition `_has_pending_external_contract`
+        # (run_refresh_worker.py:1311) re-claims on EVERY tick -- it spawns
+        # another `run_queued_refresh_job.py` and nothing in that path bounds
+        # concurrency or checks whether a prior claim is still alive.
+        #
+        # Refusing to cancel it is precisely backwards: there is no process to
+        # kill *because* the run already died, and the stuck manifest is what
+        # keeps respawning it. INCIDENT 2026-08-08: this state survived an OOM
+        # kill and a clean reboot, and refresh-worker went 13 -> 35 processes in
+        # three minutes with nobody triggering anything. `cancel` was the
+        # natural tool and it raised `"No running refresh PID is recorded"` --
+        # declining to act on the one manifest that needed it.
+        contract = manifest.get("externalRunner") if isinstance(manifest.get("externalRunner"), dict) else {}
+        queue_state = str(contract.get("queue_state") or "").strip().lower()
+        if manifest_state == "running" and queue_state == "queued":
+            updated = _update_latest_state(state="failed", exit_code=1, canceled_at=_utc_now(), lane=lane)
+            return {
+                "ok": True,
+                "pid": None,
+                "state": updated.get("state"),
+                "detail": "Queued refresh contract had no live PID; manifest driven terminal so the worker stops re-claiming it.",
+            }
         raise ValueError("No running refresh PID is recorded in the latest manifest.")
     if not _pid_is_running(pid):
-        updated = _update_latest_state(state="failed", canceled_at=_utc_now(), lane=lane)
-        return {"ok": False, "pid": pid, "state": updated.get("state"), "detail": "Recorded PID is not running."}
+        # Same defect, other branch: the state change was already correct, but
+        # returning ok=False reported a successful terminalisation as a failure,
+        # so a caller watching `ok` believed the runaway was still uncancelled.
+        updated = _update_latest_state(state="failed", exit_code=1, canceled_at=_utc_now(), lane=lane)
+        return {
+            "ok": True,
+            "pid": pid,
+            "state": updated.get("state"),
+            "detail": "Recorded PID is not running; manifest driven terminal.",
+        }
 
     canceled = False
     stderr_text = ""
