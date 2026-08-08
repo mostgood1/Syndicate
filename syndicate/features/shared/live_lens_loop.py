@@ -307,6 +307,48 @@ def _soccer_live_lens_headroom_snapshot() -> dict[str, Any] | None:
 	return memory_headroom_snapshot(_soccer_live_lens_min_headroom_bytes())
 
 
+def _wnba_live_lens_memory_gate_enabled() -> bool:
+	return _env_bool("SYNDICATE_WNBA_LIVE_LENS_MEMORY_GATE_ENABLED", default=True)
+
+
+def _wnba_live_lens_min_headroom_bytes() -> int:
+	"""CALIBRATED FROM A REAL PRODUCTION MEASUREMENT, as this file already
+	instructed -- see `_mlb_live_lens_headroom_snapshot`'s own comment:
+
+	    "WNBA's builder now also computes a real live win-probability ... but
+	     deliberately still isn't gated here -- that computation is a clock
+	     parse + one logistic call + one blend, not a sampling loop, so its cost
+	     is expected to be negligible like NBA's. If real measurement ever shows
+	     otherwise, calibrate a WNBA-specific gate from that measurement --
+	     never copy this function's number."
+
+	Real measurement now shows otherwise. live-odds-worker (2Gi), 2026-08-08:
+
+	    03:03:54   581.5MB   live_lens_tick_after_build_nba
+	    03:04:01  1644.1MB   live_lens_tick_after_build_wnba   <- +1,062MB
+
+	One step, the single largest allocation on that service, and the ONLY
+	ungated builder in the tick. It OOM-killed the container repeatedly and
+	then crash-looped: boots at 03:07:56, 03:09:09, 03:10:31, 03:12:07.
+
+	1200MB = the measured 1,062MB plus ~13% margin. It is NOT copied from MLB's
+	number (that is the #124 mistake this file's history already records), and
+	it is a measurement of ONE build -- if WNBA's live slate is larger than the
+	one measured, this will be low. Re-measure rather than assume.
+	"""
+	raw = str(os.environ.get("SYNDICATE_WNBA_LIVE_LENS_MIN_HEADROOM_BYTES") or "").strip()
+	try:
+		return max(0, int(raw)) if raw else 1200 * 1024 * 1024
+	except ValueError:
+		return 1200 * 1024 * 1024
+
+
+def _wnba_live_lens_headroom_snapshot() -> dict[str, Any] | None:
+	if not _wnba_live_lens_memory_gate_enabled():
+		return None
+	return memory_headroom_snapshot(_wnba_live_lens_min_headroom_bytes())
+
+
 def _mlb_live_lens_headroom_snapshot() -> dict[str, Any] | None:
 	# Guards the MLB builder only: it's the one sport whose build reaches
 	# estimate_live (a real Monte Carlo resim, 120 sims per live game,
@@ -386,6 +428,26 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 				meta["skipped"] = True
 				meta["reason"] = "low_headroom"
 				meta["memoryHeadroom"] = headroom_snapshot
+				return meta
+		if sport == "wnba":
+			# The LAST ungated builder, and measurement showed it is the most
+			# expensive one on this service by a wide margin: +1,062MB in a
+			# single step (581.5 -> 1644.1MB, 2026-08-08), which OOM-killed a
+			# 2Gi container and then crash-looped it.
+			#
+			# The two sports that already had gates are the cheap ones here
+			# (MLB +97MB, soccer negligible on the same tick). The gates were
+			# placed by reasoning about which builder LOOKED heavy -- a resim
+			# loop -- and WNBA's was exempted for looking like "a clock parse
+			# plus one logistic call". Printed, like MLB's, because a gate that
+			# fires silently cannot be told from a builder that never ran.
+			headroom_snapshot = _wnba_live_lens_headroom_snapshot()
+			if headroom_snapshot is not None and not headroom_snapshot["sufficient"]:
+				meta["ok"] = False
+				meta["skipped"] = True
+				meta["reason"] = "low_headroom"
+				meta["memoryHeadroom"] = headroom_snapshot
+				print(f"[LIVE_LENS_TICK_DIAG] sport=wnba ok=False reason=low_headroom headroom={headroom_snapshot}", flush=True)
 				return meta
 		builder = _LIVE_LENS_BUILDERS[sport]
 		validator = _LIVE_LENS_VALIDATORS[sport]
