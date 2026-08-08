@@ -213,7 +213,36 @@ not 61. The other 20 have no chip to match at any level of aliasing.
 Had the table been written it would have matched ~1 row and read as a broken
 alias map, sending the next person hunting in the wrong place.
 
-**NARROWED 2026-08-08, and it is NOT `active_leagues_for_date`.** All ten
+**CONFIRMED A REAL DEFECT 2026-08-08 — four hypotheses tested, three refuted.**
+Chips are missing for leagues we are ACTIVELY PRICING TODAY.
+
+```
+soccer grid rows       400,  commence_time: ALL 2026-08-08
+chips                   61,  MLS / EPL / La Liga only
+grid clubs             Eredivisie, Belgian Pro League, Primeira Liga
+```
+
+Ruled OUT by measurement, so nobody repeats these:
+1. **Alias map** — a perfect table would match ~1 row; the leagues differ.
+2. **League selection** — all 10 active for 08-08, provider fans out to all.
+3. **Missing per-league artifacts** — every league has 22-50 artifacts.
+4. **Missing today's live_state** — every league HAS `live_state_2026-08-08.json`
+   (queried one league at a time so the export budget could not truncate it).
+5. **ORPHAN / future fixtures** — refuted: all 400 grid rows are TODAY.
+
+So: today's file exists, the league is active, the provider asks for it, and we
+are pricing 400 rows of real games — and no chip comes out. **The remaining
+candidate is that those `live_state_<today>.json` files carry `count: 0`**
+(`_soccer_has_live_game_via_artifact` reads exactly that field), i.e. the
+live-state poller is writing empty files for leagues whose fixtures the ODDS
+side is finding. Next step: read the `count` inside those files per league.
+
+**Consequence:** soccer `game.state` is None on a board carrying 400 live-today
+rows, so `opportunity_gate`'s dead-market rule cannot fire for any of them —
+the same exposure WNBA had before `a432f6d9`, where 78 in-progress rows were
+rankable.
+
+**NOT `active_leagues_for_date` (previous narrowing, still true).** All ten
 leagues are configured AND active for 08-08:
 
     ['epl','la_liga','bundesliga','serie_a','ligue_1','mls','eredivisie',
