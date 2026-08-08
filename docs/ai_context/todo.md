@@ -439,6 +439,30 @@ The pathspec form commits only the named paths regardless of index state. Also:
 run `git diff --cached --stat` as a **gate before** committing, not as a receipt
 after — checking it afterwards is how the sweep got through.
 
+**3a. AMENDMENT — the pathspec protects against a shared INDEX, not a shared
+WORKING TREE. It does not cover `todo.md`.** I wrote rule 3 and overstated its
+scope. It works exactly as claimed on code files: it correctly excluded another
+lane's *staged* `scripts/settlement_cost_preflight.py` from my own commit an
+hour after I wrote it. It cannot help with a file **every lane edits**, because
+those hunks sit UNSTAGED in a tree we all share — `git commit -- todo.md`
+faithfully commits the whole file, including three other sessions' paragraphs.
+
+Measured tonight: one `todo.md` commit absorbed the WNBA lane's entry, the
+settlement lane's "graders REFUTED" hunk, and mine. Nothing lost, nothing
+duplicated, all of it under one author. That is the **third distinct flavour**
+of attribution damage in one evening — after `--amend` landing on another
+session's commit, and `git add` appending to a shared index.
+
+**For `todo.md` specifically, the gate is `git diff -- docs/ai_context/todo.md`
+BEFORE you edit and again before you commit.** Confirm every hunk is yours. The
+staged check is necessary and not sufficient here, because the contamination
+arrives unstaged.
+
+**3b. Do not grep `todo.md` for a free item ID — ask the lead.** Two lanes
+grepped within minutes of each other, both saw `#271` free, both took it. Seven
+sessions reading one file cannot allocate by reading it. IDs are issued
+centrally.
+
 **4. Deploy cadence: one deploy carrying every ready fix, not several.** Two
 refresh-worker deploys ten minutes apart each killed an in-flight L2-A build
 (11–18 min), so the artifact did not rebuild for 31 minutes and the observation
