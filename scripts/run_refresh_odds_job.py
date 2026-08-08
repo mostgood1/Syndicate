@@ -411,14 +411,41 @@ def _queue_intelligence_snapshot_refresh(*, run_summary_path: Path) -> tuple[str
     return queued_key, payload
 
 
+_ECHO_STDERR_TAIL_CHARS = 4000
+
+
+def _diagnostic_tail(text: str, *, limit: int) -> str:
+    """Diagnostic tail, degrading to a raw tail if the helper can't be imported."""
+    try:
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))
+        from syndicate.features.shared.refresh_log_tail import diagnostic_tail
+
+        return diagnostic_tail(text, limit=limit)
+    except Exception:
+        return text[-limit:]
+
+
 def _echo_captured_output(*, stdout_text: str, stderr_text: str, failed: bool = False) -> None:
-    # On Render this process is launched with stdout/stderr DEVNULL'd, so these
-    # prints are free there; locally and under GHA they are the fastest way to
-    # see why a refresh failed. Full stdout echo stays gated behind the memory
-    # trace flag because the result JSON can be large.
+    # This process's own stdout DOES reach Render's log collector on
+    # refresh-worker -- confirmed 2026-08-08 by RETURN_CODE/SNAPSHOT_WRITTEN/
+    # LAUNCH_COMMAND lines in the Render logs API. The comment that used to sit
+    # here said the opposite ("launched with stdout/stderr DEVNULL'd, so these
+    # prints are free"), which is true of ops_refresh.py's detached launch but
+    # not of the path production actually takes, and it discouraged anyone from
+    # trusting this channel. It is the channel that works.
+    #
+    # What did NOT work was the window. [-4000:] of this child's stderr is its
+    # atexit memory dump every time: measured 2026-08-08T21:40:55Z, a soccer run
+    # exiting return_code=1 logged STDERR_LENGTH length=2130057 and the echoed
+    # tail contained PROCESS_TREE_MEMORY / CONTAINER_MEMORY / RUNTIME_SNAPSHOT
+    # and no traceback. Same budget, filtered content.
+    #
+    # Full stdout echo stays gated behind the memory trace flag because the
+    # result JSON can be large.
     if failed and stderr_text.strip():
         print("[refresh_job_child_stderr_tail]", flush=True)
-        print(stderr_text[-4000:], flush=True)
+        print(_diagnostic_tail(stderr_text, limit=_ECHO_STDERR_TAIL_CHARS), flush=True)
     if not _memory_trace_enabled():
         return
     if stdout_text.strip():
@@ -427,6 +454,64 @@ def _echo_captured_output(*, stdout_text: str, stderr_text: str, failed: bool = 
     if stderr_text.strip():
         print("[refresh_job_child_stderr]", flush=True)
         print(stderr_text, flush=True)
+
+
+def _result_payload_from_stdout(stdout_text: str) -> dict[str, Any]:
+    """The child's ``--json`` result, tolerating the plain-text lines before it.
+
+    This used to be a bare ``json.loads(stdout_text)``, and it FAILED ON EVERY
+    REAL RUN. ``refresh_odds_sources.py`` prints unconditionally to stdout
+    before it prints its JSON -- a `serial_gate` line, then one START and one
+    END per step -- so the stream is never a bare JSON document. Reproduced
+    locally 2026-08-08 on a one-sport dry run:
+
+        stdout chars: 21116
+        json.loads(stdout)            -> JSONDecodeError: line 1 column 2
+        json.loads(stdout[264:])      -> parses
+        prefix: "[refresh_odds_sources] serial_gate raw=None enabled=False ..."
+
+    264 characters of preamble, and the consequences ran the whole length of the
+    pipeline. ``stdout_payload`` fell back to ``{}``, so:
+
+    - ``_failure_summary_from_result`` was gated behind ``and stdout_payload``
+      and therefore NEVER RAN -- zero ``ODDS_REFRESH_FAILURE_SUMMARY`` lines in
+      seven days of refresh-worker logs, while steps were failing;
+    - ``failureSummary`` was never written to the run manifest, which is the one
+      record of a worker-side failure that crosses to web through the shared
+      keyvalue store;
+    - and on SUCCESS the ``if return_code == 0 and stdout_payload`` branch was
+      also false, so even a clean run persisted the stub failure payload instead
+      of the child's real result.
+
+    ``indent=2`` puts the object's opening brace alone on its own line, and the
+    preamble contains no such line, so anchoring there is unambiguous.
+    ``raw_decode`` rather than ``loads`` so anything printed after the object
+    (a watchdog line, a shutdown notice) cannot discard a result that parsed.
+    """
+    text = str(stdout_text or "")
+    if not text.strip():
+        return {}
+    decoder = json.JSONDecoder()
+    for candidate in _json_object_start_offsets(text):
+        try:
+            parsed, _ = decoder.raw_decode(text[candidate:])
+        except Exception:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return {}
+
+
+def _json_object_start_offsets(text: str) -> list[int]:
+    """Offsets of every ``{`` that opens a line, plus 0, in order."""
+    offsets: list[int] = []
+    if text.startswith("{"):
+        offsets.append(0)
+    index = text.find("\n{")
+    while index != -1:
+        offsets.append(index + 1)
+        index = text.find("\n{", index + 1)
+    return offsets
 
 
 def _failure_summary_from_result(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -464,7 +549,14 @@ def _failure_summary_from_result(payload: dict[str, Any]) -> list[dict[str, Any]
                     {
                         "name": name,
                         "return_code": step.get("return_code"),
-                        "stderr_tail": str(step.get("stderr_tail") or step.get("stderr") or "")[-1600:] or None,
+                        # Filtered, not a raw [-1600:]: when this falls back to
+                        # the raw `stderr` (a step that was not compacted), the
+                        # last 1600 characters are the child's atexit memory
+                        # dump, whose individual lines exceed that budget.
+                        "stderr_tail": _diagnostic_tail(
+                            str(step.get("stderr_tail") or step.get("stderr") or ""), limit=1600
+                        )
+                        or None,
                     }
                 )
         if failing_steps:
@@ -585,11 +677,7 @@ def main() -> int:
 
     state = "finished" if return_code == 0 else "failed"
     finished_at = _utc_now()
-    stdout_payload: dict[str, Any]
-    try:
-        stdout_payload = json.loads(stdout_text) if stdout_text.strip() else {}
-    except Exception:
-        stdout_payload = {}
+    stdout_payload = _result_payload_from_stdout(stdout_text)
 
     failure_payload: dict[str, Any] = {
         "ok": return_code == 0,
@@ -606,6 +694,21 @@ def main() -> int:
         if failure_summary:
             failure_payload["failureSummary"] = failure_summary
             print(f"ODDS_REFRESH_FAILURE_SUMMARY {json.dumps(failure_summary, default=str)}", flush=True)
+    if return_code != 0 and not failure_summary:
+        # A non-zero return code must ALWAYS leave a greppable marker, even when
+        # the result payload is unparseable or names no failing step. The old
+        # code printed the summary only when one could be built, so the single
+        # cheapest question during an incident -- "did a refresh fail, and
+        # which one?" -- had no answer to grep for. Names what is actually
+        # known rather than guessing at a cause.
+        print(
+            "ODDS_REFRESH_FAILED "
+            f"return_code={return_code} "
+            f"result_parsed={bool(stdout_payload)} "
+            f"stdout_chars={len(stdout_text)} stderr_chars={len(stderr_text)} "
+            f"command={json.dumps(command)}",
+            flush=True,
+        )
     _echo_captured_output(stdout_text=stdout_text, stderr_text=stderr_text, failed=return_code != 0)
     if return_code == 0 and stdout_payload:
         print(f"RESULT_FILE_WRITE_BEGIN path={stdout_path}", flush=True)

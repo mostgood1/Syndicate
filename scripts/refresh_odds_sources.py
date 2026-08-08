@@ -1466,8 +1466,24 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         **_extract_count_candidates(stderr_text),
     }
     runtime_seconds = _elapsed_seconds(started, finished)
+    # STEP_FAIL was only ever emitted on TIMEOUT, and the line below hardcoded
+    # status=ok regardless of the return code -- so a step that exited non-zero
+    # announced itself as "ok" and the failure marker was never written at all.
+    # Measured 2026-08-08: seven days of refresh-worker logs contained ZERO
+    # STEP_FAIL lines while the soccer refresh was exiting return_code=1 every
+    # ~45 seconds (contract 20260808_213457, 21:37:56Z onward). That absence was
+    # reasonably read by two sessions as "the child's output never reaches
+    # Render", which sent the fix at the wrong layer. It reaches Render; there
+    # was simply nothing to find.
+    step_status = "ok" if result.returncode == 0 else "failed"
+    if result.returncode != 0:
+        print(
+            f"STEP_FAIL name={step.name} status=failed runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} return_code={result.returncode}",
+            file=sys.stderr,
+            flush=True,
+        )
     print(
-        f"STEP_END name={step.name} status=ok runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
+        f"STEP_END name={step.name} status={step_status} runtime_seconds={runtime_seconds if runtime_seconds is not None else 'unknown'} return_code={result.returncode} timeout_seconds={timeout_seconds if timeout_seconds is not None else 'none'}",
         file=sys.stderr,
         flush=True,
     )
@@ -1504,14 +1520,39 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
 _FAILED_STEP_STDERR_TAIL_CHARS = 1600
 
 
+def _failed_step_stderr_tail(stderr_text: str) -> str:
+    """The diagnostic tail, falling back to a raw tail if the helper is absent.
+
+    Deliberately tolerant of the import failing: this module is executed as a
+    detached subprocess entrypoint, and a diagnostic helper must never be able
+    to turn a step failure into an import failure.
+    """
+    try:
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))
+        from syndicate.features.shared.refresh_log_tail import diagnostic_tail
+
+        return diagnostic_tail(stderr_text, limit=_FAILED_STEP_STDERR_TAIL_CHARS)
+    except Exception:
+        return stderr_text[-_FAILED_STEP_STDERR_TAIL_CHARS:]
+
+
 def _compact_step_result(step_result: dict[str, Any]) -> None:
     if not isinstance(step_result, dict):
         return
     # Keep a bounded stderr tail on FAILED steps: without it, the emitted JSON
-    # is the only surviving record on Render (wrapper stdout/stderr are
-    # DEVNULL'd) and a failing sport is undiagnosable from artifacts alone.
+    # is the only surviving record on Render and a failing sport is
+    # undiagnosable from artifacts alone.
+    #
+    # The budget stays 1600 chars -- this rides through the shared keyvalue
+    # store, which was at 194MB of a 256MB ceiling when this was written, so
+    # widening it is not free. What changed is WHAT fills it: a raw [-1600:]
+    # tail of this child's stderr is pure atexit memory dump (measured
+    # 2026-08-08: a 2,130,057-char stderr whose last lines were
+    # PROCESS_TREE_MEMORY, one of which alone exceeded 3,000 chars). Same cost,
+    # and now the window can actually reach the traceback.
     if not bool(step_result.get("ok")) and isinstance(step_result.get("stderr"), str) and step_result["stderr"].strip():
-        step_result["stderr_tail"] = step_result["stderr"][-_FAILED_STEP_STDERR_TAIL_CHARS:]
+        step_result["stderr_tail"] = _failed_step_stderr_tail(step_result["stderr"])
     if isinstance(step_result.get("stdout"), str):
         step_result["stdout"] = ""
     if isinstance(step_result.get("stderr"), str):
