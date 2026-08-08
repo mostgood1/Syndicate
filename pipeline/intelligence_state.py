@@ -1190,6 +1190,60 @@ def canonical_board_state_enabled() -> bool:
     return _env_bool(SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_FLAG, default=False)
 
 
+SYNDICATE_BOARD_L2A_ENABLED_FLAG = "SYNDICATE_BOARD_L2A_ENABLED"
+
+
+def board_l2a_fallback_enabled() -> bool:
+    """Whether the board may fall back to persisted L2-A cards (`#268`).
+
+    **DEFAULT OFF, AND THE DEFAULT IS THE POINT.** With this off the served
+    payload must be byte-identical to before, which is a test rather than a
+    hope -- "additive" code that changes the default path is exactly the failure
+    this gate exists to prevent.
+
+    Turning it ON is gated on `#268`'s four release conditions, not on the
+    wiring existing. The measured reason: the board template reads 70 fields per
+    row and ~40 of them have no source on an L2-A row, so a card built from one
+    renders leaner than a legacy card. That is a product decision, not a
+    deployment one.
+    """
+    return _env_bool(SYNDICATE_BOARD_L2A_ENABLED_FLAG, default=False)
+
+
+def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dict[str, Any]]:
+    """Persisted L2-A cards for these dates, shaped like a merged candidate.
+
+    Reads the artifact the WORKER already wrote (`layer2_rows_to_board_cards`
+    runs inside the shortlist build) rather than translating rows here. Two
+    reasons, and the second is the one that bites:
+
+      * `_recommendation_card` owns the card contract; emitting a second shape
+        here would be a parallel contract that can disagree with it (rule 7).
+      * a card derived at serve time is recorded NOWHERE, so settlement has no
+        record of what was recommended -- `todo.md` mistake #3.
+
+    Returns [] on any failure. A fallback that raises is worse than one that
+    declines, because it would take down the board it exists to fill.
+    """
+    cards: list[dict[str, Any]] = []
+    for requested_date in requested_dates or ():
+        try:
+            shortlist = read_layer2_shortlist(requested_date)
+        except Exception:
+            continue
+        if not isinstance(shortlist, Mapping):
+            continue
+        for card in shortlist.get("cards") or []:
+            if not isinstance(card, Mapping):
+                continue
+            tagged = dict(card)
+            tagged["game_date"] = resolve_candidate_game_date(tagged, fallback=requested_date)
+            tagged["source_board_date"] = requested_date
+            tagged.setdefault("sport", tagged.get("sport_slug"))
+            cards.append(tagged)
+    return cards
+
+
 def canonical_board_state_shadow_compare_enabled() -> bool:
     # Separate from the serving flag above: lets an operator watch
     # canonical-vs-legacy comparison logs in production (migration step 4's
@@ -4833,6 +4887,24 @@ def read_combined_intelligence_response(
     # sorted+deduped cards via _promote_board_contract_cards, keeps every
     # exposed list in one single, consistently-ordered representation
     # instead of maintaining two independently-sorted copies.
+    # #268: ADDITIVE FALLBACK, never a replacement. Only when the legacy pool
+    # produced nothing at all -- measured 2026-08-08, `ranked_all` was [] on
+    # every date while the L2-A artifact held 115 ranked rows, so the board
+    # rendered empty beside a full shortlist nothing read. The legacy pool takes
+    # precedence the instant it produces a single candidate, so fixing it
+    # automatically retires this path rather than requiring a revert.
+    #
+    # Fed in BEFORE `build_intelligence_board_contract` on purpose: the
+    # normaliser owns ranking, dedupe and the card contract, so L2-A rows are
+    # translated to fit the board rather than the board rewritten to fit L2-A.
+    # That is what preserves the existing formatting.
+    layer2_fallback_used = 0
+    if not merged_recommendations and board_l2a_fallback_enabled():
+        fallback_cards = _layer2_fallback_recommendations(requested_dates)
+        if fallback_cards:
+            merged_recommendations.extend(fallback_cards)
+            layer2_fallback_used = len(fallback_cards)
+
     contract_input = {"recommendations": merged_recommendations}
     board_contract = build_intelligence_board_contract(contract_input)
     combined = _promote_board_contract_cards({"board_contract": board_contract})
@@ -4849,6 +4921,12 @@ def read_combined_intelligence_response(
         "age_seconds": 0.0,
         "is_fresh": True,
     }
+    # Named, so a board filled from L2-A is never mistaken for the legacy pool
+    # having recovered. Absent when the fallback did not fire, which keeps the
+    # payload byte-identical with the flag off.
+    if layer2_fallback_used:
+        combined["state_meta"]["source"] = "combined_board_window+layer2_fallback"
+        combined["layer2_fallback_rows"] = layer2_fallback_used
 
     sliced = slice_intelligence_board_state_for_request(combined, sport=sport, limit=limit)
     sliced["board_contract"] = board_contract

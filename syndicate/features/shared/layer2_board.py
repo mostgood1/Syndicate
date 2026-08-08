@@ -546,6 +546,13 @@ def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[s
                 "sport": sport,
                 "sport_slug": sport,
                 "selection": _pick_label(row),
+                # The card's TITLE. Measured running real L2-A rows through
+                # `build_intelligence_board_contract`: every other display field
+                # resolved (matchup, market, selection, line, odds, edge, team)
+                # and this one came out empty, because the normaliser has no
+                # alias that reaches it. A prop titles on the player, a game
+                # line on the side being taken, and matchup is the last resort.
+                "display_name": _pick_label(row) or (f"{away} @ {home}" if home and away else None),
                 "player_name": row.get("player_name"),
                 "market": row.get("market"),
                 "market_key": row.get("market"),

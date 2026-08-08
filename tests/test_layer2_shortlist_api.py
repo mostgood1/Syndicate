@@ -161,6 +161,14 @@ def test_a_read_failure_does_not_500(client, monkeypatch):
     def _boom(_date):
         raise RuntimeError("artifact unreadable")
 
+    # BOTH reads must be patched. The endpoint tries the standalone artifact
+    # FIRST and only falls back to the board state, so patching the fallback
+    # alone left this test at the mercy of whatever `reports/intelligence/`
+    # happened to hold: with a real `layer2_shortlist_<date>.json` on disk it
+    # failed with `shortlist_present is True`, and with an empty reports root it
+    # passed. A test whose result depends on the local disk is measuring the
+    # disk, not the endpoint.
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", _boom)
     monkeypatch.setattr("pipeline.intelligence_state.read_intelligence_board_state", _boom)
     response = client.get("/api/board/layer2-shortlist?date=2026-08-08")
 
