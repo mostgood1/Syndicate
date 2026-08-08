@@ -1,5 +1,141 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 — L2-A: three faults found, two fixed, and the one that blocks the board
+
+Written by the board session; the OOM session implemented the third fix. We split
+the work and each disproved part of the other's reasoning, so the corrections
+below are load-bearing, not colour.
+
+#### THE HEADLINE, and it survives every fix shipped today
+
+**L2-A cannot pick a side until settlement validates the model.** This is not a
+coefficient problem and must not be treated as one:
+
+```
+blended_score = ev_pct + _SCORE_SIM_WEIGHT * model_edge
+```
+
+- at `0.5` an UNVALIDATED model outranks a measured quantity, and the board
+  selects rows where that model most disagrees with the market -- the worst
+  possible rule if it is miscalibrated. Measured: **286 of 300 shortlist rows
+  were NEGATIVE-EV** against the market's own no-vig price.
+- at `0.0` the score reduces to `ev_pct`, and EV against a proportional de-vig
+  is `1/overround - 1` -- **IDENTICAL for every side of a market**. So the board
+  ranks markets by hold and picks a side by tie-break. That is the exact state
+  we opened with: Famalicão@Estoril, draw -750 / home +4500 / away +6000, all
+  `ev=8.6383`, the draw ranked first.
+
+Both are bad; only one is bad *honestly*. `0.0` ships because it stops an
+unvalidated term outranking a measured one. **The missing input is `settled > 0`
+(S6), not a value of that constant.**
+
+**CONSEQUENCE FOR THE SURFACE, which is the third option a future reader will
+otherwise miss:** with the weight at 0, L2-A is a **low-hold / line-shopping
+board** and must not be presented as "our model found these". If the page cannot
+say that, keep it off the main board rather than raise the weight.
+
+*(An earlier proposal to gate on `ev_pct >= 0` was withdrawn. It is not
+"positive expected value" -- it is "the best price beats consensus fair", which
+is L2-C's question. It would also bake "never trust the model" into
+`opportunity_gate`, whose job `#245` defined as "is this market live".)*
+
+#### FIXED — spreads/totals read the line in the wrong frame (`7ece26f5`)
+
+`#262` made the grid row's `line` canonical in the AWAY frame so a row agrees
+with its own cells. `project_game_market` still negated it for home, on the
+older contract that the line arrives in the home frame -- and that consumer was
+not audited. With L = away-frame line, home's line is `-L` and home covers when
+`margin > +L`; negating yields the home `+L` probability against the home `-L`
+market.
+
+Measured, one distribution at ±1.5 (near-complementary is the signature):
+
+```
+line=+1.5 side=home -> 0.7386   is P(margin > -1.5), should be ~0.26
+line=-1.5 side=home -> 0.2296   is P(margin > +1.5), should be ~0.74
+```
+
+After: spread sides **25 away / 23 home** (skew gone), edges 3.93-14.60.
+The away branch was always correct and is unchanged.
+
+#### FIXED — a segment WIN and a segment MONEYLINE are different outcome spaces (`a6a08449`)
+
+The sim answers "does home LEAD at segment end", which for `first1` is mostly a
+TIE; the book lists two sides and the tie voids. Model fell correctly across
+segments while the 2-way market fair stayed pinned near 0.52, manufacturing the
+gap.
+
+**The evidence that isolated it to the FAIR, not the model** -- identical model
+probabilities, two markets:
+
+```
+segment   model_prob_home   h2h edge (2-way)      h2h_3_way edge (3-way)
+first1    0.241 (identical)  -31.83  15/15 bad     -2.66   0/15 bad
+first3    0.369 (identical)  -13.78   7/15         -2.33   2/15
+first5    0.420 (identical)  -11.62   4/15         -3.01   2/15
+full      0.463               -3.92   3/15         --
+```
+
+Fixed by renormalising the model into the decided space,
+`P(home | decided) = home/(home+away)`. **Robust to the open capture question
+below**: a proportional 2-way de-vig of two captured legs IS
+`P(home | home or away)` whether the market is genuinely tie-void or is a 3-way
+market missing its draw -- so both sides are in the same space either way. A
+proposal to REFUSE to price such rows was withdrawn: safe, but it discards real
+signal on every genuinely tie-void MLB F5 line.
+
+**CORRECTION NOT TO REPEAT:** this was first read as the sim being ~18 points
+biased low on home (median `model_prob_home` 0.356 vs MLB's ~54%). That was four
+segments POOLED into one median. `full` alone reads 0.463 and is healthy; 0.241
+for `first1` is CORRECT, because most first innings end tied and a tie is not a
+home win. Split by segment before calling a model biased.
+
+**VALIDATION CRITERION — state it as MAGNITUDE, not agreement.** After the fix
+the two markets answer different questions (outright vs conditional-on-decided),
+so their edges should both be SMALL but will not be EQUAL; a correct fix landing
+at -4.5 instead of -2.66 is not a failure. The sharpest free check is the
+**gradient**: the pre-fix error scaled with tie likelihood (first1 worst, full
+clean). If the fix is right that gradient VANISHES and all four segments look
+alike. A residual gradient means something still lives in the undecided space.
+
+#### OPEN
+
+- **Props are the largest bucket and nobody has looked.** 193 of 300 shortlist
+  rows, **191 of them negative-EV**, edge median 11.99. Neither of today's fixes
+  touches them. Do not assume the two game-line fixes cover this.
+- **Why do 2-way `h2h` rows exist at all for `first1`/`first3`/`first5`?** Two
+  markets for one game, one carrying a draw leg and one not. Both now price
+  correctly, so this is not urgent -- but it is a capture question worth
+  understanding.
+- **S6 / `settled > 0`** is the blocker for everything above. The condition for
+  raising `_SCORE_SIM_WEIGHT` off 0 is settlement running AND CLV decomposed by
+  component -- not a judgement that the numbers "look better".
+
+#### KEEP
+
+**`_MODEL_EDGE_MAX_POINTS` (15.0) should be permanent.** It caught BOTH faults
+above when neither the field-name guard nor any existing test did. It is a cheap
+assertion that a probability-space claim is actually in probability space, and
+it costs nothing once the inputs are correct. It bounds MAGNITUDE, not
+AUTHORITY -- capped at 15 while EV is -5, the term still outranked EV, which is
+why the weight change was needed as well.
+
+#### OPERATIONAL — "which build produced this number" is a FIRST-CLASS CHECK
+
+**Three of today's wrong readings came from measuring the wrong build, and all
+three failed toward FALSE CONFIRMATION:**
+
+1. an 83-of-118 spreads sample taken from web while web was still on a pre-fix
+   commit (the fix had only reached refresh-worker);
+2. a watcher polling for a field the endpoint did not expose;
+3. a truncated-prefix string compare that passed a pre-deploy artifact as
+   post-deploy.
+
+Ask which build produced a number BEFORE interpreting it, not after it looks
+wrong. Related repeats from the same night: a board called "empty" that was the
+observer's own deploy, and "MLB dropped from the board" that was the dead-market
+gate working correctly on a finished slate.
+
 ### 2026-08-08 — TWO CLAIMS THAT MUST NOT BE UPGRADED BY A LATER SUMMARY
 
 Both sessions that produced tonight's work ended here. These two are the ones a
