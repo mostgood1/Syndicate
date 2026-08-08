@@ -3439,6 +3439,36 @@ def _mlb_refresh_tick_owner_here() -> bool:
 _WEEKLY_SPORTS_TICK_EXCLUDABLE = ("nfl", "ncaaf", "ncaab")
 
 
+def _weekly_sports_game_horizon_days() -> int:
+	"""How far ahead a game counts as "the fast tick should own this sport".
+
+	1 = today and tomorrow, matching the Layer 2 shortlist horizon. A football
+	game kicking off tonight has had its market moving all day, so the day-of
+	window alone would start capturing too late to be worth much.
+	"""
+	raw = str(os.environ.get("WEEKLY_SPORTS_GAME_HORIZON_DAYS") or "").strip()
+	try:
+		return max(0, int(raw or 1))
+	except ValueError:
+		return 1
+
+
+def _weekly_sport_claimed_by_fast_tick(sport: str, date_str: str) -> bool:
+	"""Does this weekly sport have games near enough to belong on the fast tick?
+
+	Thin wrapper so both services name the same rule. `unknown_means_yes` is
+	inherited deliberately: an unresolvable schedule must not silently demote a
+	sport back to the 6-hourly path, because that failure is invisible -- it
+	looks exactly like a quiet week.
+	"""
+	try:
+		from syndicate.features.shared.schedule_adapter import sport_has_games_within
+
+		return sport_has_games_within(sport, date_str, horizon_days=_weekly_sports_game_horizon_days())
+	except Exception:
+		return True
+
+
 def _weekly_sports_refresh_tick_owner_here() -> bool:
 	# Mirrors _mlb_refresh_tick_owner_here's pattern exactly, for the same
 	# reason: without this split, this tick's own launch and refresh-worker's
@@ -3655,7 +3685,24 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 		if mlb_owned_elsewhere:
 			excluded_sports.add("mlb")
 		if weekly_sports_owned_elsewhere:
-			excluded_sports.update(_WEEKLY_SPORTS_TICK_EXCLUDABLE)
+			# ...except on days they actually have games. Measured 2026-08-07:
+			# blanket-excluding these left the NFL board 24 HOURS between
+			# captures (age_seconds ~86,455) against MLB's ~26 minutes, because
+			# the weekly autorun they were handed to runs 6-hourly and is
+			# default-OFF. Prices move continuously whether or not games are
+			# weekly, so a board built to show best-price-across-books cannot
+			# refresh a few times a day.
+			#
+			# The write race the split exists to prevent still cannot happen:
+			# refresh-worker's _active_weekly_sports_for_date drops exactly the
+			# sports this keeps, using the SAME predicate, so ownership is
+			# partitioned rather than shared. Do not reimplement the rule on
+			# either side.
+			excluded_sports.update(
+				sport
+				for sport in _WEEKLY_SPORTS_TICK_EXCLUDABLE
+				if not _weekly_sport_claimed_by_fast_tick(sport, selected_date)
+			)
 		launch_sports = ",".join(sport for sport in _live_refresh_loop_effective_sports(selected_date) if sport not in excluded_sports)
 	wnba_forced_through = False
 	if sim_blocks_refresh:
@@ -3683,7 +3730,11 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			for sport in effective_sports
 			if (sport != "wnba" or wnba_forced_through)
 			and (sport != "mlb" or _mlb_refresh_tick_owner_here())
-			and (sport not in _WEEKLY_SPORTS_TICK_EXCLUDABLE or _weekly_sports_refresh_tick_owner_here())
+			and (
+				sport not in _WEEKLY_SPORTS_TICK_EXCLUDABLE
+				or _weekly_sports_refresh_tick_owner_here()
+				or _weekly_sport_claimed_by_fast_tick(sport, selected_date)
+			)
 		]
 		if sports_to_launch:
 			launch_sports = ",".join(sports_to_launch)

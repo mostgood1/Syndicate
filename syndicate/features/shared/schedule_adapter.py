@@ -31,7 +31,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -348,7 +348,22 @@ _ESPN_FOOTBALL_LEAGUE = {
 }
 
 
-def _fetch_espn_football_schedule(sport: str, date_str: str, *, timeout: int = 12) -> list[dict[str, Any]]:
+def _fetch_espn_football_schedule(
+    sport: str,
+    date_str: str,
+    *,
+    timeout: int = 12,
+    strict: bool = False,
+) -> list[dict[str, Any]]:
+    """`strict=True` re-raises transport failures instead of returning [].
+
+    Default stays False so every existing caller is unchanged. The strict path
+    exists for callers that GATE on emptiness: a swallowed timeout and a genuine
+    "no games today" are the same empty list, and a gate that cannot tell them
+    apart silently turns itself off whenever ESPN is slow. That failure mode has
+    already burned this repo twice -- see audit_slate_coverage.py, which exits 2
+    on fetch failure for exactly this reason.
+    """
     league_slug = _ESPN_FOOTBALL_LEAGUE.get(sport)
     if not league_slug:
         return []
@@ -374,6 +389,8 @@ def _fetch_espn_football_schedule(sport: str, date_str: str, *, timeout: int = 1
         with urllib.request.urlopen(request_obj, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, TimeoutError, ValueError, OSError):
+        if strict:
+            raise
         return []
 
     rows: list[dict[str, Any]] = []
@@ -539,6 +556,87 @@ def fetch_schedule_for_date(sport: str, date_str: str, *, force_refresh: bool = 
         if event is not None:
             events.append(event)
     return events
+
+
+_GAME_WINDOW_CACHE: dict[tuple[str, str, int], tuple[float, bool]] = {}
+_GAME_WINDOW_TTL_SECONDS = 900.0
+
+
+def sport_has_games_within(
+    sport: str,
+    date_str: str,
+    *,
+    horizon_days: int = 1,
+    unknown_means_yes: bool = True,
+) -> bool:
+    """Does *sport* have any scheduled game from `date_str` through +horizon_days?
+
+    THE OWNERSHIP PREDICATE. NFL/NCAAF/NCAAB are "weekly sports": excluded from
+    the fast odds tick and handed to refresh-worker's 6-hourly weekly autorun.
+    That split exists to prevent a real write race -- both would otherwise target
+    the same non-date-partitioned football artifacts -- but it also meant NFL's
+    board went 24 hours between captures while MLB got one every ~26 minutes.
+
+    Both services call THIS function to decide ownership, so they partition on
+    one deterministic answer rather than coordinating through shared state:
+
+        games in the horizon  -> the fast tick owns it (prices move; capture often)
+        no games              -> the weekly autorun owns it (schedule/artifact work)
+
+    If the two ever disagreed the write race would come back, so neither side may
+    grow its own copy of this rule.
+
+    `unknown_means_yes` is the load-bearing default. `fetch_schedule_for_date`
+    returns [] for a swallowed timeout exactly as it does for "no games", so a
+    gate that treated empty as authoritative would silently hand NFL back to the
+    6-hourly path every time ESPN was slow -- the failure would look like normal
+    operation. On an unresolvable schedule we over-capture instead, which costs
+    OddsAPI credits rather than a dark board.
+    """
+    normalized_sport = str(sport or "").strip().lower()
+    try:
+        start = datetime.strptime(str(date_str).strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return bool(unknown_means_yes)
+    span = max(0, int(horizon_days))
+
+    cache_key = (normalized_sport, start.isoformat(), span)
+    now = datetime.now(timezone.utc).timestamp()
+    cached = _GAME_WINDOW_CACHE.get(cache_key)
+    if cached is not None and (now - cached[0]) < _GAME_WINDOW_TTL_SECONDS:
+        return cached[1]
+
+    fetcher = _FETCHERS.get(normalized_sport)
+    if fetcher is None:
+        return bool(unknown_means_yes)
+
+    resolved: bool | None = None
+    any_failed = False
+    for offset in range(span + 1):
+        day = (start + timedelta(days=offset)).isoformat()
+        try:
+            # strict, so a transport failure is distinguishable from an empty
+            # slate. Football goes through the ESPN fetcher directly to get it;
+            # anything else falls back to the cached path and is treated as
+            # unknown-on-empty only when every day came back empty.
+            if normalized_sport in _ESPN_FOOTBALL_LEAGUE:
+                rows = _fetch_espn_football_schedule(normalized_sport, day, strict=True)
+            else:
+                rows = fetcher(day)
+        except Exception:
+            any_failed = True
+            continue
+        if rows:
+            resolved = True
+            break
+
+    if resolved is None:
+        # Every day answered, none had games -> a real, trustworthy "no".
+        # Any day failed and none of the rest had games -> we do not know.
+        resolved = bool(unknown_means_yes) if any_failed else False
+
+    _GAME_WINDOW_CACHE[cache_key] = (now, resolved)
+    return resolved
 
 
 def events_starting_within(events: list[ScheduleEvent], *, now_epoch: float, window_minutes: int) -> list[ScheduleEvent]:

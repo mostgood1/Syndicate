@@ -273,8 +273,40 @@ def _weekly_sports_autorun_status_path() -> Path:
 
 
 def _active_weekly_sports_for_date(selected_date: str) -> str:
+    """Weekly sports this autorun still owns -- i.e. the ones NOT on the fast tick.
+
+    The other half of the ownership partition described in
+    live_refresh_loop.py's `_weekly_sport_claimed_by_fast_tick`. A sport with
+    games in the horizon belongs to the fast odds tick (prices move all day and
+    a 6-hourly capture left the NFL board 24 hours stale); a sport with no games
+    stays here for schedule/artifact work.
+
+    Dropping them here is what keeps the write race impossible. Both sides call
+    the SAME predicate, so a sport is claimed by exactly one owner. If this ever
+    stops mirroring the loop's exclusion, two refresh runs can target the same
+    non-date-partitioned football artifacts again -- the reason the blanket
+    split existed in the first place.
+    """
     active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
-    return ",".join(sport for sport in ("nfl", "ncaaf", "ncaab") if sport in active)
+    candidates = [sport for sport in ("nfl", "ncaaf", "ncaab") if sport in active]
+    try:
+        from syndicate.features.shared.live_refresh_loop import _weekly_sport_claimed_by_fast_tick
+
+        candidates = [
+            sport for sport in candidates if not _weekly_sport_claimed_by_fast_tick(sport, selected_date)
+        ]
+    except Exception:
+        # Cannot resolve ownership -> YIELD, do not run them here.
+        #
+        # The two failure directions are not symmetric. The fast tick claims on
+        # unknown, so yielding here means at worst nobody runs a weekly sport
+        # for a cycle -- a stale board, which is visible and which
+        # audit_slate_coverage.py (#264) is built to catch. Running them anyway
+        # would mean BOTH owners writing the same non-date-partitioned football
+        # artifact, which corrupts silently and is the exact race the blanket
+        # split existed to prevent. Prefer the loud failure.
+        return ""
+    return ",".join(candidates)
 
 
 def _launch_autorun_weekly_sports_refresh(

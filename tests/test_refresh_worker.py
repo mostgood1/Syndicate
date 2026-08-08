@@ -304,7 +304,14 @@ class RefreshWorkerTests(unittest.TestCase):
                     str(worker_status_path),
                     "--run-once",
                 ],
-            ), patch.object(module, "central_today_iso", return_value="2026-10-15"), patch.object(
+            ), patch.object(module, "central_today_iso", return_value="2026-10-15"), patch(
+                # Patched, not live: the predicate calls ESPN, and this test is
+                # about the autorun's launch shape, not about whether a real
+                # game falls on the fixture date. False = fast tick claims
+                # nothing, so the autorun still owns both sports.
+                "syndicate.features.shared.live_refresh_loop._weekly_sport_claimed_by_fast_tick",
+                return_value=False,
+            ), patch.object(
                 module, "launch_refresh_run", return_value=fake_launch_result
             ) as mocked_launch, patch.object(module.subprocess, "Popen") as mocked_popen:
                 exit_code = module.main()
@@ -364,9 +371,44 @@ class RefreshWorkerTests(unittest.TestCase):
         repo_root = Path(__file__).resolve().parents[1]
         module = self._load_module(repo_root)
 
-        self.assertEqual(module._active_weekly_sports_for_date("2026-07-15"), "")
-        self.assertEqual(module._active_weekly_sports_for_date("2026-10-15"), "nfl,ncaaf")
-        self.assertEqual(module._active_weekly_sports_for_date("2026-12-01"), "nfl,ncaaf,ncaab")
+        # Season filtering, with the fast tick claiming nothing. The predicate is
+        # patched because it calls ESPN, and this assertion is about season
+        # windows, not about whether a real game happens to fall on the date.
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._weekly_sport_claimed_by_fast_tick",
+            return_value=False,
+        ):
+            self.assertEqual(module._active_weekly_sports_for_date("2026-07-15"), "")
+            self.assertEqual(module._active_weekly_sports_for_date("2026-10-15"), "nfl,ncaaf")
+            self.assertEqual(module._active_weekly_sports_for_date("2026-12-01"), "nfl,ncaaf,ncaab")
+
+    def test_active_weekly_sports_for_date_yields_sports_the_fast_tick_claims(self) -> None:
+        # The other half of the ownership partition. A sport with games in the
+        # horizon belongs to the fast odds tick (a 6-hourly autorun left the NFL
+        # board 24h stale), so this autorun must drop it -- otherwise both write
+        # the same non-date-partitioned football artifacts.
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._weekly_sport_claimed_by_fast_tick",
+            side_effect=lambda sport, _date: sport == "nfl",
+        ):
+            self.assertEqual(module._active_weekly_sports_for_date("2026-10-15"), "ncaaf")
+
+    def test_active_weekly_sports_for_date_yields_when_ownership_unresolvable(self) -> None:
+        # Asymmetric on purpose: the fast tick CLAIMS on unknown, so this must
+        # YIELD on unknown. Both claiming corrupts a shared artifact silently;
+        # neither claiming is a stale board, which is visible and which
+        # audit_slate_coverage.py (#264) exists to catch.
+        repo_root = Path(__file__).resolve().parents[1]
+        module = self._load_module(repo_root)
+
+        with patch(
+            "syndicate.features.shared.live_refresh_loop._weekly_sport_claimed_by_fast_tick",
+            side_effect=RuntimeError("cannot resolve ownership"),
+        ):
+            self.assertEqual(module._active_weekly_sports_for_date("2026-10-15"), "")
 
     # 2026-07-29 follow-up: soccer's pregame pipeline (schedule/odds/props/
     # picks) is phases=("pregame",)-only (refresh_odds_sources.py's

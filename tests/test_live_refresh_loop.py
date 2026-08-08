@@ -2703,12 +2703,10 @@ class LiveRefreshLoopTests(unittest.TestCase):
         with patch.dict(os.environ, {"WEEKLY_SPORTS_REFRESH_TICK_OWNER": "false"}, clear=False):
             self.assertFalse(live_refresh_loop._weekly_sports_refresh_tick_owner_here())
 
-    def test_run_tick_excludes_weekly_sports_when_not_owner(self) -> None:
-        # Mirrors test_run_tick_excludes_mlb_when_not_owner: without this
-        # ownership split, live-odds-worker's tick and refresh-worker's
-        # weekly-sports autorun would both target the identical in-season
-        # nfl/ncaaf/ncaab artifacts -- a real write race once those sports
-        # are back in season, not just wasted duplicate work like MLB's case.
+    def _run_tick_with_weekly_ownership(self, *, claimed: bool):
+        # The predicate is patched rather than left live: it calls ESPN, and a
+        # unit test must not depend on whether a real football game happens to
+        # be scheduled on the fixture date.
         with patch.dict(
             os.environ,
             {
@@ -2724,13 +2722,39 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ), patch.object(
             live_refresh_loop, "_active_sports_for_date", return_value="mlb,nfl,ncaaf,ncaab"
         ), patch.object(
+            live_refresh_loop, "_weekly_sport_claimed_by_fast_tick", return_value=claimed
+        ), patch.object(
             live_refresh_loop, "launch_refresh_run", return_value={"ok": True, "pid": 4242}
         ) as mocked_launch:
             payload = live_refresh_loop._run_live_refresh_tick()
+        return payload, mocked_launch
+
+    def test_run_tick_excludes_weekly_sports_with_no_games(self) -> None:
+        # The original ownership split, still intact for its original reason:
+        # without it, live-odds-worker's tick and refresh-worker's weekly-sports
+        # autorun would both target the identical in-season nfl/ncaaf/ncaab
+        # artifacts -- a real write race, not just wasted duplicate work like
+        # MLB's case. On a day those sports have no games, the autorun keeps
+        # them and the tick must not touch them.
+        payload, mocked_launch = self._run_tick_with_weekly_ownership(claimed=False)
 
         self.assertTrue(payload["ok"])
         mocked_launch.assert_called_once()
         self.assertEqual(mocked_launch.call_args.kwargs["sports"], "mlb")
+
+    def test_run_tick_claims_weekly_sports_on_game_days(self) -> None:
+        # Measured 2026-08-07: the blanket exclusion left the NFL board 24 hours
+        # between captures (age_seconds ~86,455) against MLB's ~26 minutes,
+        # because the autorun it was handed to runs 6-hourly and is default-OFF.
+        # Prices move continuously whether or not games are weekly, so on a game
+        # day the fast tick takes ownership -- and refresh-worker's
+        # _active_weekly_sports_for_date drops exactly these, on the SAME
+        # predicate, so still only one owner writes.
+        payload, mocked_launch = self._run_tick_with_weekly_ownership(claimed=True)
+
+        self.assertTrue(payload["ok"])
+        mocked_launch.assert_called_once()
+        self.assertEqual(mocked_launch.call_args.kwargs["sports"], "mlb,nfl,ncaaf,ncaab")
 
     def test_run_tick_includes_weekly_sports_by_default(self) -> None:
         # Regression: with no ownership override configured, behavior is
