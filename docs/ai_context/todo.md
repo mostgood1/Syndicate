@@ -1,5 +1,59 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (late) — `attach_game_state` IS A NO-OP ON THE WORKER, FOR EVERY SPORT. The provider registry is web-only
+
+`f8c64692`, committed, **NOT deployed**. Bigger than the soccer work it came
+out of, and it invalidates numbers recorded earlier in this file.
+
+Every sport data provider is defined in `syndicate/blueprints/home.py` and
+registers itself **at module scope** (`home.py:5882`). The web app imports that
+module to serve routes, so its registry is always populated. **The worker never
+imports it** — neither `scripts/run_refresh_worker.py` nor
+`pipeline/layer2_shortlist.py` — and both reach `build_game_chips`.
+
+Measured on the worker's own import graph:
+
+```
+registry size:      0
+chips mlb+soccer:   0
+```
+
+**Zero chips for EVERY sport.** So `attach_game_state` on the worker stamped
+`game.state` on nothing, and **the persisted Layer 2 artifact has never carried
+it for any sport** — while the identical call on web returned 720/720. One
+function, two import graphs, opposite answers.
+
+It stayed silent because **zero chips is indistinguishable from a slate with no
+games.** This is precisely the defect class `board_enrichment`'s module
+docstring was written for ("the worker path called none of them"): the call was
+moved to the shared module, its dependency stayed web-only.
+
+**WHAT THIS INVALIDATES.** The `a432f6d9` alias table results recorded above —
+`mlb 60 -> 200`, `wnba 0 -> 144`, "78 in-progress WNBA rows previously read
+None" — were measured on the SERVE path. They were never true of the worker
+artifact, which is what Layer 2 ranks on. `opportunity_gate`'s dead-market rule
+has therefore never fired on the persisted board, for any sport. **If S2 is
+logged as blocked on `game.state`, this is the actual blocker.**
+
+**Fix:** register lazily inside `build_game_chips` — the choke point every
+caller shares. **~24MB RSS once, measured** on a 4GB worker; an import, not
+periodic work (checked explicitly because of `#241`). Lazy and in-function
+because `home.py` imports this module's callers, so module scope is circular.
+After: chips 0 → 59, rows_matched 0 → 300 on a worker-like graph.
+
+**HOW IT WAS CAUGHT, which is the transferable part.** A concurrent session
+saw `state=None` on an artifact built at 19:53 by a worker that had been
+running the join fix since 19:39, and said *"deploy latency doesn't cover this
+one."* They were right and I would have missed it: I had verified 720/720
+against the **web** endpoint and called the fix confirmed. Both measurements
+were correct; they measured different code paths, and only one of them is the
+path the board actually ranks on. **Verify on the surface that consumes the
+output, not the one that is easiest to query.**
+
+**The test runs in a subprocess deliberately** — in-process it cannot fail
+honestly, because an earlier test has already imported `blueprints.home` and
+the re-import is a no-op whether or not the fix is present.
+
 ### 2026-08-08 (late) — SOCCER `game.state` VERIFIED IN PRODUCTION: 0 → 720/720. And the dead-market rule STILL cannot fire for 9 leagues
 
 Deployed in `1e602fd3` (web + refresh-worker, live 19:55:30Z). Measured on
