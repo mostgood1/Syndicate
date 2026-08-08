@@ -11,6 +11,40 @@
 **The autorun stays OFF. This is the evidence for the decision, not the
 decision.** Nothing here enables it and nothing was deployed.
 
+> **CORRECTED WITHIN THE HOUR — the coverage half of this entry was wrong, and
+> the recommendation survives for a different reason.** I wrote "≤24 graded rows,
+> ≤0.29%" on the strength of a soccer bullet citing `6b068e7b`. The soccer lane
+> retracted that claim 40 minutes later (`4e63052f`) — they had measured the
+> local mirror. I cited their retracted number without re-deriving it, which is
+> the same error one hop downstream, and it is the error my own METHOD section
+> below warns about.
+>
+> **Re-measured properly**, by pulling all ten production `schedule_2026.json`
+> over `/api/ops/artifacts/export` and running the real grader against them:
+>
+> ```
+> soccer graded rows, 2026-07-19..08-08:  385   (10 of 21 dates non-zero)
+>   07-22  35   07-25 49   07-30  7   08-01 35   08-07 21
+>   07-23  70   07-26 56   07-31  7   08-02 63   08-08 42
+> ```
+>
+> **Soccer is the LARGEST source of graded outcomes in the repo, 16× MLB's 24.**
+> Revised ceiling **409**, not 24 — ~4.9% of the 8,276 pending, not 0.29%.
+> (One of the 08-08 rows is `Telstar @ NEC Nijmegen`, the exact settled match the
+> soccer lane found ranked #1 on the board six hours past kickoff. Settlement
+> would have graded it.)
+>
+> **This makes the memory verdict WORSE, not better, and moves the binding
+> constraint.** A run that settles ~400 records instead of ~24 pays the
+> per-settled-record costs 400 times: **~1.6 s** of chunk rewrite each (11 min),
+> plus the chunk-index round trip, which at 400k entries is **5.3 s each — 35
+> minutes**. So the true shape is not a memory *spike*; it is a **10–45 minute
+> occupation of refresh-worker at ~1.4GB above baseline**, during which an MLB
+> sim or an L2-A build only has to breathe. Recommendation unchanged; the reason
+> is now wall-clock and the index term, not scarcity of rows.
+>
+> Everything below is left as written. The struck numbers are marked in place.
+
 #### FIRST: `render.yaml` AND PRODUCTION DISAGREE, AND THE FILE IS THE WRONG ONE
 
 `render.yaml:296` reads `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN:
@@ -114,18 +148,23 @@ which is the point:
 - **wnba** — in season, and `market-accuracy` returns `available: false` on
   08-05, 08-06 and 08-07 (web). Real gap, not diagnosed here; it is the WNBA
   lane's file.
-- **soccer** — grader is REAL (the soccer lane measured 14 rows on a live MLS
-  date, `6b068e7b`), but it reads results from the schedule artifact's
-  `status_state`, so it sees an outcome only where the schedule was re-fetched
-  *after* the match ended. Last result-bearing date **2026-07-18**, one day
-  before this window opens. Zero, from a working grader.
+- **soccer** — ~~reads results from the schedule artifact's `status_state`, so it
+  sees an outcome only where the schedule was re-fetched after the match ended;
+  last result-bearing date 2026-07-18, one day before this window opens. Zero,
+  from a working grader.~~ **WRONG — see the correction at the top. 385 rows over
+  the window, the largest source in the repo.** The claim came from `6b068e7b`,
+  which its own author retracted in `4e63052f` as a local-mirror reading; I
+  carried it one hop further without re-deriving it.
 - **ncaab / ncaaf** — out of season.
 - **nfl** — zero, and it was zero for a *fourth* reason: see `#275`'s code fix
   below.
 
-⇒ **≤24 settleable outcomes against 8,276+ pending records: ≤0.29%.** A run
+⇒ ~~**≤24 settleable outcomes against 8,276+ pending records: ≤0.29%.** A run
 tonight spends ~1.4GB of a ~1.2GB budget to grade about two dozen rows, and then
-writes a `state: "completed"` status file that reads as coverage.
+writes a `state: "completed"` status file that reads as coverage.~~
+**CORRECTED: 409 (24 MLB + 385 soccer) against 8,276+ pending — ≤4.9%.** The run
+still does not fit in memory, and it now runs for 10–45 minutes while not
+fitting. See the correction at the top of this entry.
 
 **THE ONE PIECE OF GOOD NEWS, and it is the whole basis of the recommendation.**
 2026-08-07 is the **first date in the repo's history with real prop grading**:
@@ -203,16 +242,22 @@ today's chunk size and the index size, and it is read-only.
 
 #### RECOMMENDATION
 
-1. **Do not enable tonight.** It does not fit (1,436 needed vs 1,239 available at
-   a fresh boot, pre-slate), and it would grade ≤24 rows.
+1. **Do not enable tonight.** It does not fit — 1,436MB needed vs 1,239MB
+   available at a fresh boot, pre-slate — and with 409 rows in reach it would
+   hold that for 10–45 minutes rather than seconds.
 2. **Run the preflight on the worker** to close the two unknowns.
 3. **When it is enabled, enable it NARROW.** `EVALUATION_SETTLEMENT_LOOKBACK_DAYS=2`
    caps the read at recent chunks instead of sweeping 21. The 21-day default was
    written for a *grading* backfill (`#`-lookback docstring) and is the reason a
    crash reads every large chunk; with coverage now starting at 08-07 the
    backfill has almost nothing to recover.
-4. **The precondition is coverage, not memory.** Let the `#265` freeze accumulate
-   a few 37-row dates first. Waiting costs one date per night and loses nothing.
+4. ~~**The precondition is coverage, not memory.**~~ **CORRECTED — the
+   precondition IS memory, plus the per-record cost.** With 409 rows already
+   reachable there is no longer a coverage argument for waiting; there is a
+   capacity argument. The two changes that actually unblock this are hoisting the
+   chunk-index round trip out of the per-record loop (it is loaded and rewritten
+   whole for every settled record) and capping the lookback. MLB coverage still
+   improves from 08-07 forward, which only makes the case stronger later.
 5. **Take the `official` → `all` bucket decision** — a measured 4.6× on graded
    rows for zero memory.
 
@@ -251,6 +296,18 @@ output — copied from this file — and the soccer lane disproved it the same
 afternoon. Struck in `2472cbb8`. **An instrument that carries a wrong prior is
 worse than one with no prior, because the number it prints arrives
 pre-interpreted.**
+
+**AND THEN I DID IT AGAIN, ONE HOP OVER, WITHIN THE HOUR.** Having been corrected
+on the stub claim, I took the *replacement* claim from the same commit ("soccer
+grades nothing, last result-bearing date 07-18") and put it straight into my
+ceiling — where it was the difference between 24 and 409. Its author retracted it
+40 minutes later as a local-mirror reading. **A correction arriving from another
+lane is not a licence to trust that lane's next number.** Both errors are the same
+one: I re-derived neither, on a question where re-deriving cost one export call
+and a monkeypatched `schedule_payload`. The lesson is not "distrust other lanes"
+— their retraction was fast and honest and is why this got caught at all. It is
+that **a number load-bearing enough to change the recommendation must be measured
+by whoever is standing behind the recommendation.**
 
 ### OPEN 2026-08-08 (evening) — `#274` THE LIVE-LENS MEMORY GATES, ALL FIVE BUILDERS MEASURED AT ONCE. **MLB's is 3-4x too LOW, and it is the one everyone trusted**
 
