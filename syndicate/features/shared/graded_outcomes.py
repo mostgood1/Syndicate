@@ -78,7 +78,30 @@ def _mlb_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
         if not isinstance(day, dict) or str(day.get("date") or "") != date_str:
             continue
         by_kind = day.get("rows") if isinstance(day.get("rows"), dict) else {}
-        kind_rows = by_kind.get("official") or by_kind.get("playable") or by_kind.get("all") or []
+        # WIDEST TIER FIRST. This asks "what happened in this market", not "did
+        # the locked policy pick it" -- and every caller is settlement-side
+        # (`evaluation_settlement`, `emit_settlement_inputs`,
+        # `settlement_cost_preflight`). The ledger's recommendations are
+        # produced independently of the policy card, so grading only the
+        # policy's own picks means settlement can never match anything it did
+        # not also choose to bet.
+        #
+        # The old order short-circuited on `official` and discarded the rest,
+        # because `or` takes the first NON-EMPTY tier rather than the largest.
+        # Measured on restored dates:
+        #
+        #     2026-06-04   official 182   playable 789   all 971
+        #     2026-07-04   official 272   playable 510   all 782
+        #     2026-07-08   official 234   playable 392   all 626
+        #     TOTAL        official 688                  all 2379   -> 3.5x
+        #
+        # Safe as a straight swap rather than a union, verified on both dates:
+        # `official` and `playable` are each SUBSETS of `all`, and
+        # `union(official, playable) == all` exactly -- zero all-only rows, so
+        # nothing is invented and nothing is double-counted. Every row in `all`
+        # also carries a real result (win/loss), which the filter below
+        # re-checks anyway.
+        kind_rows = by_kind.get("all") or by_kind.get("playable") or by_kind.get("official") or []
         for row in kind_rows:
             if not isinstance(row, dict):
                 continue
