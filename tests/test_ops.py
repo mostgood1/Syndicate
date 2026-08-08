@@ -2110,6 +2110,92 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertIsNone(result["pid"])
             self.assertEqual(result["state"], "canceled")
 
+    def test_cancel_drives_a_stuck_queued_contract_terminal_when_no_pid_is_recorded(self) -> None:
+        # INCIDENT 2026-08-08. `_has_pending_external_contract`
+        # (run_refresh_worker.py:1311) re-claims a manifest that is `running`
+        # with a QUEUED externalRunner and no live pid -- spawning another
+        # run_queued_refresh_job.py on EVERY tick, with nothing bounding
+        # concurrency. refresh-worker went 13 -> 35 processes in three minutes
+        # with nobody triggering anything, survived an OOM kill, and resumed
+        # spawning on a clean boot because the manifest persisted.
+        #
+        # `cancel` was the natural tool and it RAISED -- declining to act on
+        # the one manifest that needed it, because there was no process to
+        # kill. There is no process to kill precisely BECAUSE the run died;
+        # the stuck manifest is what keeps respawning it.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            run_dir = reports_root / "migration_runs" / "2026-08-08" / "odds_refresh_20260808_223232"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "refresh_and_gate_run.json").write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-08-08",
+                        "runStamp": "20260808_223232",
+                        "artifactsDir": str(run_dir),
+                        "runSummaryPath": str(run_dir / "refresh_and_gate_run.json"),
+                        "state": "running",
+                        "externalRunner": {"kind": "external_runner", "queue_state": "queued", "command": "x"},
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ):
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.cancel_latest_refresh_run()
+
+            self.assertTrue(result["ok"], "cancel must succeed; there is nothing left to kill")
+            self.assertIsNone(result["pid"])
+            self.assertEqual(result["state"], "failed")
+            # The acceptance test: the claim-loop gate requires state == "running".
+            self.assertNotEqual(result["state"], "running")
+
+    def test_cancel_reports_success_when_the_recorded_pid_is_already_dead(self) -> None:
+        # Same defect, other branch. The state change was already correct, but
+        # returning ok=False reported a successful terminalisation as a
+        # failure -- so a caller watching `ok` believed a runaway was still
+        # uncancelled. Measured live: {"ok": false, "detail": "Recorded PID is
+        # not running.", "pid": 609} while the spawning continued.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            run_dir = reports_root / "migration_runs" / "2026-08-08" / "odds_refresh_20260808_223232"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            run_dir.mkdir(parents=True, exist_ok=True)
+            (run_dir / "refresh_and_gate_run.json").write_text(json.dumps({"state": "running"}), encoding="utf-8")
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps(
+                    {
+                        "date": "2026-08-08",
+                        "runStamp": "20260808_223232",
+                        "artifactsDir": str(run_dir),
+                        "runSummaryPath": str(run_dir / "refresh_and_gate_run.json"),
+                        "state": "running",
+                        "pid": 999999,
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=False):
+                from syndicate.features.shared import ops_refresh
+
+                result = ops_refresh.cancel_latest_refresh_run()
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["state"], "failed")
+
     def test_assert_no_active_refresh_run_ignores_alive_pid_once_state_is_terminal(self) -> None:
         # Confirmed live 2026-08-08: run_refresh_odds_job.py wrote
         # state="finished" to refresh-worker's manifest, but its own wrapper
