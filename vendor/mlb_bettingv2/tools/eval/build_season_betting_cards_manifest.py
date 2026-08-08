@@ -751,10 +751,22 @@ def _odds_paths(date_str: str) -> Dict[str, Path]:
     out: Dict[str, Path] = {}
     for key, filename in names.items():
         chosen: Optional[Path] = None
+        # Prefer the sealed pregame freeze over the live file. The live file
+        # is rewritten all day with only the events still in progress, so on
+        # a finished slate it holds just the last game or two and every other
+        # game grades as `Missing game-line match` -- measured 2026-08-07,
+        # 13 of 14 games lost, one graded row for the whole day. The frozen
+        # copy is the slate as it stood at first pitch, which is also the
+        # right price for grading and CLV. Falls back to the live file when
+        # no freeze exists (every date before the freeze was repaired).
+        stem = filename[: -len(".json")] if filename.endswith(".json") else filename
         for root in roots:
-            candidate = root / "market" / "oddsapi" / filename
-            if candidate.exists():
-                chosen = candidate
+            odds_dir = root / "market" / "oddsapi"
+            for candidate in (odds_dir / f"{stem}_pregame.json", odds_dir / filename):
+                if candidate.exists():
+                    chosen = candidate
+                    break
+            if chosen is not None:
                 break
         # Fall back to the first root so the caller's own "missing" warning
         # still names a sensible path rather than an empty one.

@@ -567,23 +567,135 @@ def _archive_oddsapi_refresh_outputs(*, source_root: Path, date_str: str, result
     }
 
 
+def _read_json_doc(path: Path) -> dict:
+    if not path.exists() or not path.is_file():
+        return {}
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def _oddsapi_commence_epoch(row: object) -> float | None:
+    if not isinstance(row, dict):
+        return None
+    try:
+        stamp = datetime.fromisoformat(str(row.get("commence_time") or "").replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if stamp.tzinfo is None:
+        return None
+    return stamp.timestamp()
+
+
+def _merge_pregame_game_lines(frozen_doc: dict, live_doc: dict, *, now_epoch: float) -> tuple[dict, int]:
+    """Per-EVENT merge of live game lines into the frozen pregame doc.
+
+    Per-event, not per-slate, and that distinction is load-bearing. A
+    slate-wide clock is computed from the file that is actively collapsing,
+    so once the survivors are the late West-Coast games the doc still looks
+    "pregame" and a slate-wide rule overwrites a full freeze with two games.
+    Verified against the real 2026-08-08 production doc: a slate-clock
+    version took the freeze 15 -> 2.
+
+    Each game carries its own commence_time, so the rule is exact: a game's
+    line updates only while THAT game has not started, and a frozen entry is
+    never dropped just because a later fetch stopped returning it.
+    """
+    frozen_games = {
+        str(row.get("event_id") or "").strip(): row
+        for row in (frozen_doc.get("games") or [])
+        if isinstance(row, dict) and str(row.get("event_id") or "").strip()
+    }
+    updated = 0
+    for row in live_doc.get("games") or []:
+        if not isinstance(row, dict):
+            continue
+        event_id = str(row.get("event_id") or "").strip()
+        if not event_id:
+            continue
+        epoch = _oddsapi_commence_epoch(row)
+        if epoch is not None and now_epoch >= epoch:
+            # Already under way: this line is live, not pregame. Keep the seal.
+            continue
+        if epoch is None and event_id in frozen_games:
+            # No clock for this event -- refuse to overwrite what we hold.
+            continue
+        frozen_games[event_id] = row
+        updated += 1
+    merged = dict(frozen_doc or {})
+    if not merged:
+        merged = {k: v for k, v in live_doc.items() if k != "games"}
+    merged["games"] = list(frozen_games.values())
+    return merged, updated
+
+
 def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict[str, str]:
+    """Seal the day's pregame odds before a live refresh overwrites them.
+
+    This existed but could never fire. The guard was `mode == "live" ->
+    skip`, and EVERY writer of these files stamps `"mode": "live"`
+    (fetch_daily_oddsapi_markets.py x4, fetch_mlb_oddsapi_local.py x4) --
+    there has never been a pregame-mode writer. So the condition was
+    unconditionally true and the freeze was unreachable: production held
+    **zero** `*_pregame.json` files (`/api/ops/artifacts/export`,
+    count=0, untruncated, 2026-08-08).
+
+    What that cost: the live refresh keeps rewriting one file per date with
+    only the events still live, so by the small hours a finished slate has
+    collapsed to its last West-Coast game -- measured 2026-08-05 13 games ->
+    1, 08-06 4 -> 1, 08-07 14 -> 2, each last written ~04:30Z the FOLLOWING
+    day. The grading builder then joins the day's report against that file
+    and warns `Missing game-line match` for every game that is gone, so a
+    full slate graded ONE row. No graded rows -> settlement matches nothing
+    -> the ledger stays fully pending, which is the same failure this
+    module's own `test_season_betting_cards_odds_paths` docstring describes
+    one layer up.
+
+    The correct test is each GAME's own clock, not a mode string and not a
+    slate-wide one: a game's line is frozen while that game has not started,
+    and a frozen game is never dropped because a later fetch stopped
+    returning it. The freeze therefore only ever grows, which is what makes
+    it survive the nightly collapse.
+    """
     snapshot_dir = _daily_snapshot_dir(source_root=source_root, date_str=date_str)
     market_dir = source_root / "data" / "market" / "oddsapi"
     slug = _date_slug(date_str)
     _ensure_dir(snapshot_dir)
+    now_epoch = datetime.now(timezone.utc).timestamp()
     copied: dict[str, str] = {}
-    for prefix in ("oddsapi_game_lines", "oddsapi_pitcher_props", "oddsapi_hitter_props"):
+
+    lines_path = market_dir / f"oddsapi_game_lines_{slug}.json"
+    frozen_lines_path = market_dir / f"oddsapi_game_lines_{slug}_pregame.json"
+    live_lines = _read_json_doc(lines_path)
+    merged_lines, updated = _merge_pregame_game_lines(
+        _read_json_doc(frozen_lines_path), live_lines, now_epoch=now_epoch
+    )
+    if merged_lines.get("games"):
+        payload = json.dumps(merged_lines, indent=2)
+        for destination in (frozen_lines_path, snapshot_dir / frozen_lines_path.name):
+            destination.write_text(payload, encoding="utf-8")
+            copied[destination.name] = str(destination)
+
+    # The props docs carry no per-event clock, so they use the slate clock
+    # taken from the MERGED freeze -- which never shrinks, and so cannot be
+    # fooled into looking pregame once the early games are gone.
+    slate_start: float | None = None
+    for row in merged_lines.get("games") or []:
+        epoch = _oddsapi_commence_epoch(row)
+        if epoch is not None and (slate_start is None or epoch < slate_start):
+            slate_start = epoch
+    slate_started = slate_start is not None and now_epoch >= slate_start
+    for prefix in ("oddsapi_pitcher_props", "oddsapi_hitter_props"):
         source_path = market_dir / f"{prefix}_{slug}.json"
         if not source_path.exists() or not source_path.is_file():
             continue
-        try:
-            source_doc = json.loads(source_path.read_text(encoding="utf-8"))
-        except Exception:
-            source_doc = {}
-        if str((source_doc or {}).get("mode") or "").strip().lower() == "live":
-            continue
         frozen_name = f"{prefix}_{slug}_pregame.json"
+        # Sealed once the slate starts. With no clock at all we cannot prove
+        # we are pregame, so write the first freeze and never clobber it.
+        if slate_started or (slate_start is None and (market_dir / frozen_name).exists()):
+            continue
         for destination in (market_dir / frozen_name, snapshot_dir / frozen_name):
             shutil.copy2(source_path, destination)
             copied[destination.name] = str(destination)
