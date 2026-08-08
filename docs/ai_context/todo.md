@@ -17201,6 +17201,38 @@ were resolved and nine already-closed rows removed from the open tables.
 > every OddsAPI HTTP seam necessarily has record_oddsapi_quota wired in yet;
 > the fix here was making that seam comply, not the monitoring.
 
+> **Latest, 2026-08-08T17:32Z (baseline rolled forward to 08-08T00:03Z — the
+> 7-day max-window cap, `_MAX_WINDOW_SECONDS`, not a billing reset:
+> `used`=515,486 this time, not 0):**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 62,944s (17.5h, 139,182 obs) | 96,255 | 5,505.2 | **3.96M** | **79.3%** |
+>
+> ⚠️ **Notably higher than the ~1,800-2,000/hr this had converged to across
+> five straight readings** (2.50M → 1.32M → 1.44M → 1.28M, all same prior
+> baseline). Two candidate explanations, neither confirmed:
+> 1. **This session's own #234/active-run-guard verification work** — two
+>    real (non-dry-run) manual triggers earlier tonight before the guard fix
+>    landed (soccer-only, then the full mlb/wnba/nfl/soccer combo), each
+>    running for several minutes before being canceled. Real API spend, but
+>    bounded and one-off, not ongoing.
+> 2. **`by_hour_utc` shows two massive spikes at 22:00/23:00 UTC — 113,680cr
+>    and 96,359cr, ~210k in 2 hours alone** — that's roughly 5-6pm Eastern,
+>    prime MLB evening first-pitch window, and doesn't line up with when this
+>    session's triggers ran (all daytime UTC). Looks like organic evening
+>    slate load, not test traffic.
+> `by_market_family` cumulative shifted shape for the first time in 5
+> readings: props down to 52.2% (was 61-64%), segment up to 29.3% (was
+> 22-23%), alternate up to 14.6% (was 11-12%) — consistent with more games
+> being live/near-live (event scoping giving segment/alternate markets full
+> tier more often) rather than a new leak. `race_detected_count` unchanged
+> at 6 despite heavy session activity — no new races.
+> **Still under the 5M target (79.3%), but this is the highest single
+> reading since #106 shipped. Re-check within a day; if it holds or climbs
+> rather than reverting toward the ~1,800-2,000/hr baseline, that's the
+> signal to actually investigate rather than assume evening-slate load.**
+
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
