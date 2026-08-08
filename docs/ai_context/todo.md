@@ -325,6 +325,55 @@ decision.** Nothing here enables it and nothing was deployed.
 >
 > Everything below is left as written. The struck numbers are marked in place.
 
+> **FOURTH PASS, ~00:10Z — RETRACTED: the 18.2% conversion rate, and every
+> per-date projection I built on it. The cost-per-record finding is unaffected.**
+>
+> The L2-A lane withdrew "the matcher converts 100% of overlapping records"
+> after running all nine restored dates instead of the one it came from:
+>
+> ```
+> date         ledger  graded  share_key  matched
+> 2026-06-04      792     971        172        0    <- 172 overlap, ZERO convert
+> 2026-07-08      352     626         64       64    <- the date it was generalised from
+> seven others    110   6,464          0        0
+> TOTAL         1,254   8,061        236       64
+> ```
+>
+> 06-04 converts none of 172 because that chunk is largely **basketball**
+> (`pts` 161, `3pm` 85) sitting on a date whose MLB grader emits hitter props —
+> the "overlaps" are player-name collisions across sports, correctly rejected by
+> `_markets_compatible`, plus 267 `betting card` rows `#260` already classes as
+> unsettleable. **So it is not a matcher failure; the two dates measure
+> different things.**
+>
+> **What I withdraw:** 18.2% as a rate, "~750 settled records per date", and
+> "hours per date / days for a 21-day sweep". Those were one date wearing a
+> denominator. n=2 usable dates disagreeing by a factor of infinity is two
+> observations, not a rate. **I adopted it from another lane and put it in a
+> commit message within the hour** — the third time tonight I have carried an
+> unverified cross-lane number, and the second time after writing myself a rule
+> about it.
+>
+> **What survives, because it never depended on the rate:** 4.6 s per settled
+> record (measured end to end, branch asserted), the index — not the chunk —
+> being the whole cost, and the ~100× available from hoisting the index round
+> trip out of the per-record loop.
+>
+> **State the cost as capacity, not as a projection.** The run's duration is
+> `4.6 s × (however many records settle)`, so:
+>
+> ```
+> a 10-minute settlement pass can afford  ~130 settled records
+> a 1-hour pass                            ~780
+> ```
+>
+> against a ledger holding ~9,000 records per date. **That framing needs no
+> conversion rate and cannot be invalidated by one**, which is exactly why it is
+> the form to use. And the inversion still holds a fortiori: **`#265` succeeding
+> is what makes the current implementation unshippable, not what makes it
+> ready** — it depends only on the freeze producing *more* settleable records,
+> not on how many more.
+
 > **THIRD PASS, ~23:40Z — THE BOTTLENECK IS THE INDEX, NOT THE CHUNK. Every
 > optimisation this repo has shipped on this path aimed at the wrong file, and
 > the fix is ~100×.**
