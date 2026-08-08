@@ -57,6 +57,11 @@ def build_layer2_shortlist(
         if not sport:
             continue
         try:
+            from syndicate.features.shared.board_enrichment import (
+                attach_game_state,
+                attach_margin_model,
+                attach_projections,
+            )
             from syndicate.features.shared.book_grid import build_book_grid
             from syndicate.features.shared.odds_book_quotes import read_book_quotes
 
@@ -65,6 +70,36 @@ def build_layer2_shortlist(
                 per_sport_stats[sport] = {"quote_rows": 0, "grid_rows": 0, "opportunities": 0}
                 continue
             grid = build_book_grid(quote_rows, max_rows=max_grid_rows_per_sport)
+
+            # ENRICH BEFORE RANKING. Without these three the persisted board is
+            # unusable, and each failure is silent rather than empty:
+            #
+            #   game state  -> opportunity_gate reads `game_state`/`is_live`.
+            #                  Absent, every row looks pregame and a SETTLED
+            #                  MARKET CAN RANK.
+            #   projections -> `edge_vs_market_pct`, the only probability-space
+            #                  model view. Absent, `model_edge_pct` is null on
+            #                  every row (#263) and blended_score falls back to
+            #                  EV alone -- which under proportional devig is
+            #                  `1/overround - 1`, IDENTICAL for every side of a
+            #                  market. The board then ranks markets by hold and
+            #                  picks a side by tie-break.
+            #   margin      -> fair value for one-sided rows; without it they
+            #                  carry none at all.
+            #
+            # Same functions the serve-time endpoint calls, so the board a user
+            # reads and the board that is persisted cannot drift.
+            enrichment: dict[str, object] = {}
+            for step, fn in (
+                ("game_state", lambda: attach_game_state(grid, sport=sport, selected_date=selected_date)),
+                ("projections", lambda: attach_projections(grid, sport=sport, selected_date=selected_date)),
+                ("margin_model", lambda: attach_margin_model(grid)),
+            ):
+                try:
+                    enrichment[step] = fn()
+                except Exception as exc:  # never let enrichment break the build
+                    enrichment[step] = {"error": f"{type(exc).__name__}"}
+
             result = build_layer2_rows(grid)
             sport_opportunities = list(result.get("opportunities") or [])
             # `sport` is carried on the grid row already, but stamp defensively:
@@ -77,6 +112,12 @@ def build_layer2_shortlist(
             per_sport_stats[sport] = {
                 "quote_rows": len(quote_rows),
                 "grid_rows": int(result.get("rows_in") or 0),
+                # Visible on purpose: "rows_with_projection: 0" is the signal that
+                # #263 has regressed, and it is invisible from a row count.
+                "enrichment": enrichment,
+                "rows_with_model_edge": sum(
+                    1 for row in sport_opportunities if row.get("model_edge_pct") is not None
+                ),
                 "sides_priced": int(result.get("sides_priced") or 0),
                 "candidates": int(result.get("candidates") or 0),
                 "scored": int(result.get("scored") or 0),
