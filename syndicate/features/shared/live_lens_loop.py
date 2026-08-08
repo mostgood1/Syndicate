@@ -564,6 +564,26 @@ def _live_lens_background_loop() -> None:
 	# *.jsonl here does nothing for web's read side without an explicit publish.
 	# Bounded to files changed since the previous tick so a slow cycle doesn't
 	# repeatedly re-scan/re-publish the same unchanged files.
+	#
+	# THE WATERMARK MUST BE STAMPED AT THE PUBLISH, NOT AT THE CYCLE START, and
+	# for four months it was stamped at the cycle start. Every file the tick
+	# writes has an mtime in [cycle_start, publish_start], which is strictly
+	# GREATER than a watermark set to cycle_start -- so the next cycle matched
+	# all of them again and re-sent everything the previous cycle had just sent.
+	# Each artifact went over the wire at least twice.
+	#
+	# Measured on refresh-worker 2026-08-08 21:31-22:05Z (n=8, deploy-free):
+	# publish was 48-74s per cycle at 73-103 artifacts, on a 246s median cycle
+	# whose configured interval is 60s -- so this was ~20-30% of the loop's wall
+	# clock with roughly half of it a resend, on the tick's own thread, ahead of
+	# every subsequent build.
+	#
+	# Stamping at publish_start (not after the publish returns) is deliberate:
+	# anything written DURING the sweep is then picked up next cycle rather than
+	# skipped. The bias stays on the safe side -- at worst one extra send, never
+	# a dropped file. There is no threshold here and nothing to tune; a guessed
+	# interval on this call is exactly the kind of number that silently disables
+	# the stage it guards.
 	last_publish_epoch = time.time()
 	while not _LIVE_LENS_LOOP_STOP.is_set():
 		started_at = _utc_now()
@@ -577,13 +597,24 @@ def _live_lens_background_loop() -> None:
 				print(f"[live_lens_loop] pull_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
 		meta = _run_live_lens_tick()
 		if _live_lens_publish_enabled():
+			publish_started_epoch = time.time()
 			try:
 				published_count = publish_changed_hot_artifacts(last_publish_epoch)
 				if published_count:
-					print(f"[live_lens_loop] published_hot_artifacts count={published_count}", flush=True)
+					print(
+						f"[live_lens_loop] published_hot_artifacts count={published_count} "
+						f"window_seconds={round(publish_started_epoch - last_publish_epoch, 1)} "
+						f"elapsed_seconds={round(time.time() - publish_started_epoch, 1)}",
+						flush=True,
+					)
+				# Advance ONLY on a clean sweep. An exception here means an
+				# unknown subset was sent, and moving the watermark past a
+				# failed window drops those files permanently -- the same
+				# reasoning pull_hot_artifacts already applies to its own
+				# persisted watermark.
+				last_publish_epoch = publish_started_epoch
 			except Exception as exc:
 				print(f"[live_lens_loop] publish_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
-		last_publish_epoch = started_epoch
 		write_json_file(
 			status_path,
 			{
