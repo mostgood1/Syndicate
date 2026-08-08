@@ -59,6 +59,22 @@ data/ncaaf_source/source_artifacts/*
 data/ncaaf_source/source_artifacts/data/*
 !data/ncaaf_source/source_artifacts/data/processed/
 
+# WNBA gets the NARROW version of the same exception -- team_branding only
+# (one 1.7KB CSV), not the whole processed/ subtree. NFL/NCAAF's processed/ is
+# static reference data; WNBA's is per-DATE artifact output (game_cards_*.csv,
+# props_*, recommendations_slate_*), which is regenerable and does not belong
+# in git. Measured 2026-08-08: production served 0 of 6 team slots with a
+# primary_color because this file exists on no Render root at all -- neither
+# the mounted disk nor the repo checkout. Same "real deploy input with no
+# production job that regenerates it" argument as e2cd339c, one file wide.
+!data/wnba_source/source_artifacts/
+data/wnba_source/source_artifacts/*
+!data/wnba_source/source_artifacts/data/
+data/wnba_source/source_artifacts/data/*
+!data/wnba_source/source_artifacts/data/processed/
+data/wnba_source/source_artifacts/data/processed/*
+!data/wnba_source/source_artifacts/data/processed/team_branding/
+
 # SmartSim 2.0 historical-truth caches: regenerable via ncaaf_historical_loader.py /
 # nfl_historical_loader.py (CFBD API / nflverse release download); mirror caches, not source.
 # Exception: NCAAF's games_{season}.json.gz (schedule-level, ~40-95KB each,

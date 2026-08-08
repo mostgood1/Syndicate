@@ -1,0 +1,16 @@
+team_id,abbreviation,location,display_name,primary_color,secondary_color,logo_url,source_snapshot_date
+20,ATL,Atlanta,Atlanta Dream,#e31837,#5091cc,https://a.espncdn.com/i/teamlogos/wnba/500/atl.png,2026-07-20
+19,CHI,Chicago,Chicago Sky,#5091cd,#ffd520,https://a.espncdn.com/i/teamlogos/wnba/500/chi.png,2026-07-20
+18,CON,Connecticut,Connecticut Sun,#f05023,#0a2240,https://a.espncdn.com/i/teamlogos/wnba/500/con.png,2026-07-20
+3,DAL,Dallas,Dallas Wings,#002b5c,#c4d600,https://a.espncdn.com/i/teamlogos/wnba/500/dal.png,2026-07-20
+129689,GS,Golden State,Golden State Valkyries,#b38fcf,#000000,https://a.espncdn.com/i/teamlogos/wnba/500/gs.png,2026-07-20
+5,IND,Indiana,Indiana Fever,#002d62,#e03a3e,https://a.espncdn.com/i/teamlogos/wnba/500/ind.png,2026-07-20
+17,LV,Las Vegas,Las Vegas Aces,#a7a8aa,#000000,https://a.espncdn.com/i/teamlogos/wnba/500/lv.png,2026-07-20
+6,LA,Los Angeles,Los Angeles Sparks,#552583,#fdb927,https://a.espncdn.com/i/teamlogos/wnba/500/la.png,2026-07-20
+8,MIN,Minnesota,Minnesota Lynx,#266092,#79bc43,https://a.espncdn.com/i/teamlogos/wnba/500/min.png,2026-07-20
+9,NY,New York,New York Liberty,#86cebc,#000000,https://a.espncdn.com/i/teamlogos/wnba/500/ny.png,2026-07-20
+11,PHX,Phoenix,Phoenix Mercury,#3c286e,#fa4b0a,https://a.espncdn.com/i/teamlogos/wnba/500/phx.png,2026-07-20
+132052,POR,Portland,Portland Fire,#cee5eb,#000000,https://a.espncdn.com/i/teamlogos/wnba/500/por.png,2026-07-20
+14,SEA,Seattle,Seattle Storm,#2c5235,#fee11a,https://a.espncdn.com/i/teamlogos/wnba/500/sea.png,2026-07-20
+131935,TOR,Toronto,Toronto Tempo,#33476d,#7b1b38,https://a.espncdn.com/i/teamlogos/wnba/500/tor.png,2026-07-20
+16,WSH,Washington,Washington Mystics,#e03a3e,#002b5c,https://a.espncdn.com/i/teamlogos/wnba/500/wsh.png,2026-07-20

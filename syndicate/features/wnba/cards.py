@@ -319,9 +319,38 @@ _ESPN_BRANDING_ABBR_ALIASES: dict[str, str] = {
 
 @lru_cache(maxsize=1)
 def _wnba_team_branding_index() -> dict[str, Any]:
-    root = preferred_source_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")[0]
-    path = root / "source_artifacts" / "data" / "processed" / "team_branding" / "wnba_team_branding.csv"
-    return team_branding_index_by_abbreviation(read_team_branding_snapshot(path))
+    """Every candidate root, both layouts -- this is a READ, so it falls back.
+
+    MEASURED on production web 2026-08-08: **0 of 6 team slots** on the served
+    /wnba/api/cards slate carried a `primary_color`. Two independent causes, and
+    fixing either one alone is a no-op:
+
+      1. `preferred_source_roots(...)[0]` discarded the repo fallback that
+         helper deliberately appends on Render (the defect class the soccer
+         session root-caused the same day in `60689dee`), and
+      2. the file was not in the repo to fall back TO -- `.gitignore`'s
+         `data/*_source/source_artifacts/` swallowed it. NFL and NCAAF were
+         given a narrow un-ignore for exactly this in `e2cd339c` ("Render's
+         persistent disk has no production job that regenerates any of them");
+         WNBA was never given the same treatment.
+
+    Confirmed absent from BOTH runtime roots via /api/ops/wnba/artifact-counts:
+    `.../wnba_source/source_artifacts/data/processed` has no files at all on
+    Render, while `.../wnba_source/data/processed` is where the day's artifacts
+    actually land -- so the hard-coded `source_artifacts` segment is a third
+    way to miss. Both layouts are tried, first non-empty wins.
+
+    Read-vs-write matters here: a READ should reach the repo mirror, a WRITE
+    must stay on the runtime disk. This one only reads.
+    """
+    roots = preferred_source_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
+    for root in roots:
+        for layout in (("source_artifacts", "data", "processed"), ("data", "processed")):
+            path = root.joinpath(*layout, "team_branding", "wnba_team_branding.csv")
+            index = team_branding_index_by_abbreviation(read_team_branding_snapshot(path))
+            if index:
+                return index
+    return {}
 
 
 def _wnba_branding(team_tri: str) -> Any | None:
