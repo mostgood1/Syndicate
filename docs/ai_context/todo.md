@@ -17170,11 +17170,29 @@ nothing broke; added 3 new tests
 (`test_odds_refresh_run_defaults_to_manifest_only_launch_mode`,
 `test_odds_refresh_run_honours_an_explicit_launch_mode`,
 `test_run_page_route_defaults_to_manifest_only_launch_mode`) —
-`tests/test_ops.py` 120/120 passing. **Not yet deployed** — committed
-locally, needs a push + Render deploy (web service) before it takes effect
-in production; the next manual trigger through either route should confirm
-`pending_external`/`external_runner` in the response instead of a live
-`pid`, and that refresh-worker's own status shows a `claimed_count` bump.
+`tests/test_ops.py` 120/120 passing. **Pushed and deployed**
+(`16235772`, `dep-d9rmfcon74is73f53u40`, confirmed `live`). No active sim
+at deploy time, checked first.
+
+⚠️ **Live end-to-end verification blocked by a separate, pre-existing,
+deeper issue — not fixed here, flagged only.** Tried a zero-cost `dry_run`
+trigger through the now-fixed route to confirm it works; got `ValueError: A
+refresh run is already active (pid=60)` both times, seconds apart. But
+`/api/ops/odds-refresh/status`'s own manifest read said that same run was
+`state: finished`, and `/api/ops/odds-refresh/cancel` on the same lane
+resolved to a **different** pid entirely (609, "Recorded PID is not
+running") — three different endpoints on the same web lane disagreeing
+about which run is "latest"/"active" at the same instant. Consistent with
+`WEB_CONCURRENCY=2`: two gunicorn workers, each apparently holding its own
+view of "latest" state, answering my requests inconsistently depending on
+which one served them. This is the same class of thing as the `?lane=`
+inconsistency found earlier tonight, but a level deeper (this one produces
+a hard block, not just a confusing read) and unrelated to the launch_mode
+fix itself. **Not chased further** — the fix is verified correct via the 3
+new unit tests (`launch_mode` argument asserted directly on the
+`launch_refresh_run` call), which don't depend on this multi-worker state
+consistency at all. Worth its own investigation if manual triggers keep
+getting blocked this way.
 
 **16** 🟢 **CLOSED 2026-07-25** (`1986caf6`, "Drop F7 markets; standard line
 wins, alternates kept as a ladder") — **do not treat this as an open decision**,
