@@ -5776,14 +5776,46 @@ class _NCAAFDataProvider(_HomeSportDataProviderBase):
         # does for NFL. Single always-regular-season path: NCAAF has no
         # preseason concept, so no phase branch is needed here (unlike
         # NFL's regular-season/preseason split above).
-        if context.week is None:
-            return []
         from syndicate.features.ncaaf.cards import build_ncaaf_market_board
         from syndicate.features.ncaaf.cards import build_smartsim_cards_page_context
 
-        games = list(build_smartsim_cards_page_context(context.week).get("games") or [])
+        # `if context.week is None: return []` USED TO BE THE WHOLE STORY HERE,
+        # and it made NCAAF contribute ZERO chips on every date, forever.
+        # `build_game_chips` (game_chip_scoreboard.py:442) resolves context with
+        # NO week, so context.week is ALWAYS None on the chips path. MEASURED on
+        # production 2026-08-08 against ESPN truth:
+        #
+        #     09-05   prod chips 0   ESPN 68
+        #     09-12   prod chips 0   ESPN 80
+        #
+        # 0 of 148 real games. It stayed invisible because zero chips is
+        # indistinguishable from "no slate" -- the same silence that hid the
+        # worker-registry defect. See todo #273.
+        #
+        # NOT a copy of either NFL resolver: NCAAF cards carry a synthetic
+        # `{week}_{away}_{home}` key, no date field, and the card set is a
+        # curated subset (16 cards against cfbd's 99 week-1 games), so a correct
+        # answer here is "the cards whose games fall on this date", never "every
+        # game ESPN lists".
+        week = context.week
+        date_card_keys: set[str] | None = None
+        if week is None:
+            from syndicate.features.ncaaf.sources import ncaaf_week_and_card_keys_for_date
+
+            season = int(context.season) if context.season is not None else int(ncaaf_default_season())
+            resolved = ncaaf_week_and_card_keys_for_date(season, context.context_label)
+            if resolved is None:
+                # Genuinely no NCAAF games on this date (or the date is
+                # unresolvable). Empty is correct and matches what the board
+                # already showed -- it just now means it.
+                return []
+            week, date_card_keys = resolved
+
+        games = list(build_smartsim_cards_page_context(week).get("games") or [])
+        if date_card_keys is not None:
+            games = [game for game in games if str((game or {}).get("gamePk") or "").strip() in date_card_keys]
         try:
-            board_games = list(build_ncaaf_market_board(context.week).get("games") or [])
+            board_games = list(build_ncaaf_market_board(week).get("games") or [])
         except Exception:
             board_games = []
         rows_by_game_id = {str(board_game.get("gamePk") or ""): board_game.get("rows") or [] for board_game in board_games if isinstance(board_game, dict)}

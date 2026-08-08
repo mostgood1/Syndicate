@@ -227,3 +227,82 @@ def ncaaf_target_week(season: int) -> int | None:
         except (TypeError, ValueError):
             continue
     return min(weeks_with_unplayed_games) if weeks_with_unplayed_games else None
+
+def ncaaf_week_and_card_keys_for_date(season: int, date_text: str) -> tuple[int, set[str]] | None:
+    """(week, card gamePk keys) for the real NCAAF games on `date_text`.
+
+    THE NCAAF HALF OF THE #273 FIX. `_NCAAFDataProvider.games()` opened with
+    ``if context.week is None: return []``, and `build_game_chips` resolves
+    context with NO week -- so NCAAF contributed ZERO chips on every date,
+    forever. MEASURED on production: 0 chips on 09-05 and 09-12 while ESPN had
+    68 and 80 real games. Silent, because zero chips is indistinguishable from
+    no slate.
+
+    DELIBERATELY NOT A COPY OF EITHER NFL RESOLVER, because NCAAF's data shape
+    differs from both and the difference was measured, not assumed:
+
+    * NCAAF cards carry a SYNTHETIC key -- ``f"{week}_{away}_{home}"`` with
+      spaces underscored (`1_North_Carolina_TCU`), built in three places in
+      cards.py. It is neither an ESPN numeric id nor an nflverse id, and the
+      card carries no date field at all, so neither NFL approach ports over.
+    * `cfbd_lines_{season}_wk{week}.json` is the bridge: it carries an
+      ESPN-compatible numeric ``id``, the ``week``, ``startDate``, and both
+      team names -- enough to reconstruct the card key AND join to ESPN.
+
+    So this joins ESPN event ids -> cfbd rows -> reconstructed card keys, and
+    the date is never compared to a date (same property that makes the NFL
+    preseason resolver immune to the UTC/local boundary: cfbd's ``startDate``
+    is UTC and is deliberately NOT used for matching).
+
+    Note the card set is a CURATED SUBSET: cfbd lists 99 week-1 games and the
+    board builds 16 cards. Measured join rate on 2026 week 1: 16/16 cards
+    resolved. So a correct result here is "the cards whose games fall on this
+    date", never "every game ESPN lists".
+
+    None if no cfbd week contains any of the date's ESPN ids.
+    """
+    date_value = str(date_text or "").strip()
+    if not date_value:
+        return None
+    try:
+        from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
+
+        events = fetch_schedule_for_date("ncaaf", date_value)
+    except Exception:
+        return None
+    event_ids = {str(getattr(event, "event_id", "") or "").strip() for event in events}
+    event_ids.discard("")
+    if not event_ids:
+        return None
+
+    data_root = default_ncaaf_source_root() / "data"
+    best: tuple[int, set[str]] | None = None
+    for week in range(1, 21):
+        path = data_root / f"cfbd_lines_{season}_wk{week}.json"
+        if not path.exists():
+            continue
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                rows = json.load(handle)
+        except Exception:
+            continue
+        if not isinstance(rows, list):
+            continue
+        keys: set[str] = set()
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("id") or "").strip() not in event_ids:
+                continue
+            away = str(row.get("awayTeam") or "").strip()
+            home = str(row.get("homeTeam") or "").strip()
+            row_week = row.get("week")
+            if not away or not home or row_week is None:
+                continue
+            keys.add(f"{row_week}_{away}_{home}".replace(" ", "_"))
+        # The date's games can only belong to one cfbd week in practice; take
+        # the week that matched the most of them rather than the first file
+        # that happened to match one.
+        if keys and (best is None or len(keys) > len(best[1])):
+            best = (week, keys)
+    return best
