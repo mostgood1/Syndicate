@@ -2662,6 +2662,10 @@ class IntelligenceStateService:
             "candidate_pools": {},
             "global_pool": [],
             "candidates": [],
+            # Present-but-empty, not absent: a reader that has to distinguish
+            # "no Layer 2 today" from "this build aborted" gets the same shape
+            # either way, and an abort is already visible via candidate_count 0.
+            "layer2_shortlist": {"rows": []},
         }
 
     @staticmethod
@@ -3049,11 +3053,47 @@ class IntelligenceStateService:
             except Exception as exc:
                 print(f"[intelligence_state] EXPOSURE_BUDGETS_FAILED error={exc}", flush=True)
 
+        # LAYER 2 SHORTLIST -- built here, persisted with the pool, read by web.
+        #
+        # Layer 2 had been building its own candidate pool while Layer 1 built a
+        # much better one, and they disagreed badly (measured 2026-08-07, MLB):
+        # L1 carried 2,726 priced market instances / 1,221 prop rows, L2 carried
+        # 229 game candidates and 18 prop rows. Starved, not stale -- and props
+        # are where the sim differentiates and where 95.5% of OddsAPI spend goes.
+        #
+        # ADDITIVE, deliberately. This does not replace `candidates`/`global_pool`
+        # above: every existing consumer keeps the pool it has, and Layer 2 lands
+        # beside it under its own key. A board that already works must not be
+        # taken down by a new ranker on its first night.
+        #
+        # Scoped to `manifests` -- the sports this build already resolved. All
+        # eight are never active at once (4 today, 7 at the October peak), so
+        # this never widens the set of shards read, and by this point
+        # _collect_candidates has already paid the first-read cost for each of
+        # them (postmortem §1.1d: first read is the whole cost, repeats are free).
+        layer2_shortlist: dict[str, Any] = {}
+        try:
+            from pipeline.layer2_shortlist import build_layer2_shortlist
+
+            layer2_shortlist = build_layer2_shortlist(str(selected_date or ""), list(manifests.keys()))
+            print(
+                f"[intelligence_state] LAYER2_SHORTLIST date={selected_date} "
+                f"rows={len(layer2_shortlist.get('rows') or [])} "
+                f"considered={layer2_shortlist.get('opportunities_considered')} "
+                f"sports={layer2_shortlist.get('active_sports')}",
+                flush=True,
+            )
+        except Exception as exc:
+            layer2_shortlist = {"rows": [], "error": f"{type(exc).__name__}: {exc}"}
+            print(f"[intelligence_state] LAYER2_SHORTLIST_FAILED error={exc}", flush=True)
+        _diag_log_all_process_memory("post_layer2_shortlist")
+
         pool = {
             "selected_date": selected_date,
             "source_fingerprint": source_fingerprint,
             "overview": [dict(item) for item in overview if isinstance(item, Mapping)],
             "candidate_count": len(global_pool),
+            "layer2_shortlist": layer2_shortlist,
             "candidate_pools": {
                 sport_slug: {
                     "sport": sport_slug,
@@ -3950,6 +3990,14 @@ class IntelligenceStateService:
             selected_date=selected_date,
             sport=str(request_payload.get("sport") or "all").strip().lower() or "all",
         )
+        # Carried explicitly from the pool. Every layer between the pool and the
+        # served board builds an EXPLICIT key list rather than passing keys
+        # through -- so a new key added to the pool reaches nothing unless it is
+        # named at each hop. Discovered before deploying rather than after: the
+        # shortlist would have been built on the worker, persisted in the pool,
+        # and been invisible on the board, which reads
+        # _build_intelligence_board_state's output.
+        response["layer2_shortlist"] = candidate_pool.get("layer2_shortlist") or {"rows": []}
         response = _decorate_response_with_state_meta(dict(response), None, source="worker", run_key=cache_key, sla_seconds=self._interval_seconds) or dict(response)
         _log_stage_timing("board_publication", (time.perf_counter() - request_started_at) * 1000.0)
         logger.info("BETTING_BOARD_PUBLISH_COMPLETE", extra={"selected_date": selected_date, "candidate_count": response_candidate_count, "snapshot_generated_at": response_last_updated})
@@ -3991,6 +4039,15 @@ class IntelligenceStateService:
             "board_contract": base_response.get("board_contract"),
             "live_pipeline": base_response.get("live_pipeline"),
             "state_meta": base_response.get("state_meta"),
+            # Second hop of the same explicit-key chain (see the matching
+            # comment in _compute_board_publication_response). This dict is the
+            # persisted artifact web reads via read_intelligence_board_state,
+            # and slice_intelligence_board_state_for_request does
+            # `dict(normalized_state)`, so once the key is here it survives to
+            # the response. Named rather than passed through, deliberately: an
+            # artifact that silently absorbs whatever the pool happens to carry
+            # is how a 75MB payload got embedded twice.
+            "layer2_shortlist": base_response.get("layer2_shortlist") or {"rows": []},
         }
 
     def queue_board_state_refresh(self, selected_date: str | None = None) -> str:
