@@ -1,5 +1,36 @@
 # Syndicate TODO — canonical cross-session list
 
+### AUDIT DONE 2026-08-08 — sim invalidation rules. Full writeup: `docs/ai_context/audit_sim_invalidation_rules.md`
+
+The user's "rules around sims esp MLB re lineup/start changes and final lineups",
+which he flagged as blocking the L2 rebuild. There was **no written statement of
+these rules anywhere**; the doc is that statement. Headline findings:
+
+1. **Validity is FILE EXISTENCE, not freshness.** The evening look-ahead writes
+   `daily_summary_<tomorrow>.json`; next day, `first_appearance` sees the file and
+   declines (`live_refresh_loop.py:2356` + `:1544`). A sim built at 18:36 the night
+   before is indistinguishable from one built at noon on game day. *Measured:* the
+   08-07 MLB update ran once, at 08-06T18:36 Central; `k_targets` got 0 rows.
+   **Today a sim never becomes invalid.**
+2. **The lineup input can only change as a side effect of a sim.**
+   `lineups_last_known_by_team.json` is written by `daily_update.py` itself and is
+   only ever *mirrored* elsewhere — there is no `_fetch_mlb_lineups`. Injuries got
+   exactly this fix (`_fetch_mlb_injuries`, whose comment names the bug); lineups
+   never did. Detection is incidental, via odds churn — which `#48` deliberately
+   damped.
+3. **No concept of a FINAL lineup.** Nothing distinguishes projected from posted.
+   The only `lineup_status` is a display string in `mlb/hr_targets.py:999`. The
+   question "have final lineups dropped?" cannot currently be asked. **This is the
+   enabler gap — fixes for 1, 2 and 4 all need it.**
+4. **30-min force window vs 2–4h lineup posting.** `tip_off_window` is the only
+   trigger that bypasses the 600s interval; it catches the event after the market.
+5. **Five of eight sports have NO invalidation at all.** MLB has 6 triggers,
+   NBA/WNBA have a lineup/injury fingerprint, and NHL/NFL/NCAAF/NCAAB/soccer are
+   time-driven only — nothing reads a scratch, lineup or injury for them.
+
+**NOT established:** whether any of this costs money (no look-ahead-vs-same-day
+backtest on settled outcomes). Mechanism proven, P&L impact not.
+
 ### SHIPPED 2026-08-08 (`f6810a64`) — the memory gate was measuring page cache, and its bar was in the wrong units
 
 **NOT DEPLOYED — dev tooling only, no deploy needed.** Two stacked errors:
