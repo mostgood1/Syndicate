@@ -1,5 +1,71 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 — The rule is easy to state and evidently not easy to apply under momentum
+
+Every operational rule in this file was written by someone who already knew it.
+That is the only interesting thing about this entry.
+
+**What I did.** I read soccer's schedule artifact from the LOCAL CHECKOUT, saw
+`eredivisie 0 of 306 fixtures in post`, and reported as a production fact that
+soccer's grader can never grade anything. I routed it to the oversight session,
+which put it in the cross-sport register and forwarded it to the settlement
+lane as reframing their cost assessment.
+
+Production, when I finally looked:
+
+```
+eredivisie  generated_at 2026-08-08T20:19:34   post 4, in 1, pre 301
+mls         generated_at 2026-08-08T20:19:31   post 269   every past fixture graded
+
+graded_rows(eredivisie, 2026-08-08) -> 21      graded_rows(mls, 2026-08-02) -> 63
+```
+
+The schedule builder had run **90 minutes before I called it broken.**
+
+**`CLAUDE.md` opens with this warning.** Not buried — the second section, titled
+*"Render is the source of truth — `data/**` in git is a lossy mirror"*, which
+says in bold that it applies to every task in the repo and tells you to check
+production before drawing any conclusion from a file under `data/`. I had read
+it that session. I had spent the preceding four hours telling other lanes to
+establish which build, which graph, which disk produced their numbers. I had
+retracted a different finding two hours earlier for the identical reason — an
+import graph no process runs.
+
+I caught it by accident. I went to *fix* the schedule builder and found it
+already did the thing I was about to add.
+
+**The oversight session's half is worse, and they said so first:** they took a
+single-sport measurement, generalised it into a cross-sport pattern, and
+distributed it — *"I amplified it because it was a good story. A working grader
+that grades nothing forever is exactly the shape my register was collecting,
+and that made me want it to be true."* A stale read is a mistake; a stale read
+with a distribution list is a mechanism. **Amplification needs its own check,
+and "which disk produced this?" is that check whether you took the measurement
+or merely received it.**
+
+**Why the rule fails specifically under momentum.** Every instance tonight
+happened while moving fast on something already understood. You are not
+choosing to skip the check; the check does not occur to you, because the number
+arrived inside a chain of reasoning that was working. The tell is *fluency* —
+the finding fits, it explains the symptom, it slots into the story. That is
+exactly when nobody asks where it came from.
+
+**How to apply, since "remember the rule" demonstrably does not work:**
+- Make it a property of the ARTIFACT, not of your attention. Any number that
+  will leave your session — into `todo.md`, into another lane, into a commit
+  message — states its source: production endpoint, local checkout, local
+  reproduction, or replayed production data. If it cannot state one, it is not
+  ready to leave.
+- **A retraction is cheap only if you can name the blast radius.** Mine was
+  survivable because I could say precisely which findings rested on local-only
+  data (one) and which were measured against production or reproduced
+  deliberately (the rest). Without that, every finding from the session becomes
+  suspect and the whole evening is re-audited.
+- Independent convergence from a *different instrument* beats a second look at
+  the same one. Two lanes reproduced my week/date and `[0]` findings from
+  opposite directions tonight; that is why those did not need re-auditing when
+  this one collapsed.
+
 ### DECISION INPUT 2026-08-08 (evening) — `#275` WHAT THE SETTLEMENT AUTORUN WOULD COST. **Recommendation: DO NOT switch it on tonight — it does not fit in the worker, and it would grade ≤24 rows**
 
 > **ID note:** the commits below say `#273`. `#273` was taken concurrently by the
