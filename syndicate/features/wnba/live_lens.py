@@ -594,4 +594,12 @@ def build_live_lens_api_payload(selected_date: str) -> dict[str, Any]:
     payload["players_included"] = bool(context.get("players_included", False))
     payload["pregame_portfolio"] = deepcopy(context.get("pregame_portfolio")) if isinstance(context.get("pregame_portfolio"), dict) else {"enabled": False, "selected": 0, "candidates": 0}
     payload["games"] = [dict(game) for game in (context.get("games") or []) if isinstance(game, dict)]
+    # NAMED HERE OR THEY VANISH. `build_rank_api_payload` copies an explicit
+    # key list, so a top-level scalar added upstream is silently dropped at this
+    # boundary -- todo.md's first operational rule, walked into within hours of
+    # reading it. Measured on the served payload 2026-08-08 22:29Z: both fields
+    # read `None`, which is worse than absent because it reads as "the tick had
+    # no provenance" rather than "this endpoint forgot to forward it".
+    payload["cards_context_source"] = context.get("cards_context_source")
+    payload["cards_context_age_seconds"] = context.get("cards_context_age_seconds")
     return payload

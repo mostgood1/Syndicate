@@ -248,3 +248,29 @@ def test_the_web_route_actually_passes_allow_rebuild():
 
     source = inspect.getsource(wnba_live_lens.build_live_lens_page_context)
     assert "allow_rebuild=True" in source
+
+
+def test_provenance_survives_the_api_boundary():
+    """`build_rank_api_payload` copies an EXPLICIT key list, so a top-level
+    scalar added upstream is silently dropped crossing it -- todo.md's first
+    operational rule. Measured on the served production payload 2026-08-08
+    22:29Z: `cards_context_source` and `cards_context_age_seconds` both read
+    `None`, which is worse than absent because it reads as "the tick had no
+    provenance" rather than "this endpoint forgot to forward it".
+
+    Nested payloads survive that boundary; scalars do not. These are scalars.
+    """
+    published = dict(CONTEXT, published_at=time.time() - 120)
+    _write, _read = _publish(published)
+
+    with patch.object(wnba_cards, "_keyvalue_read_json_file", _read), patch.object(
+        wnba_live_lens, "build_cards_page_context_if_cached", return_value=None
+    ), patch.object(
+        wnba_live_lens, "build_live_lines_payload", return_value={"games": []}
+    ), patch.object(wnba_live_lens, "_run_wnba_live_lens_tick", return_value=None), patch.object(
+        wnba_live_lens, "_load_live_lens_snapshot", return_value=None
+    ):
+        payload = wnba_live_lens.build_live_lens_api_payload("2026-08-08")
+
+    assert payload["cards_context_source"] == "published_artifact"
+    assert 100 <= payload["cards_context_age_seconds"] <= 200
