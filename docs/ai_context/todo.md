@@ -1,5 +1,193 @@
 # Syndicate TODO — canonical cross-session list
 
+### #286 — ROOT CAUSE, MLB `candidate_count = 0`: the empty-board guard is BLIND to a board too big for keyvalue. Fixed, committed, NOT deployed
+
+**ID note:** taken as #286 rather than #269 deliberately, before central
+allocation existed — three sessions were committing at once and the next few
+numbers were the ones most likely to be grabbed twice. That turned out to be
+the right call: #269–#273 were allocated (two lanes collided on #271) within
+the hour. **IDs are now allocated by the lead session — ask, do not grep.**
+#274–#285 remain free.
+
+**The board is not missing. It is on web's disk right now and is being masked
+by a newer, emptier copy of itself.** Measured 2026-08-08 21:4xZ:
+
+```
+web disk   reports/intelligence/intelligence_state_2026_08_08.json
+           27,420,309 bytes, Last-Modified 21:05:51Z,
+           top_opportunities[0] = Nelson Velázquez Total Bases, edge 0.5708
+web serve  POST /api/intelligence/query -> candidate_count 0,
+           state_last_updated 21:51:24Z, debug_source combined_board_window
+```
+
+#### The chain, first zero first
+
+1. `_empty_write_would_clobber_good_board` (`intelligence_state.py:629`) is the
+   #105-era guard that refuses to overwrite a populated board with an empty
+   one. It read the existing board with **`read_json_file`**, which on the
+   keyvalue backend consults **the keyvalue store ONLY**.
+2. A rich board serialises to **27.4MB against an 8.4MB ceiling**, so
+   `_write_state_payload` diverts it to the artifact transport. The keyvalue
+   copy therefore keeps whatever small payload it last held — an empty one.
+3. The next empty cycle asks keyvalue "is there a good board for this date?",
+   gets the stale empty copy, reads `candidate_count 0`, and **fails open**.
+   The empty write proceeds, keyvalue stays empty, and every later empty write
+   is permitted for the same reason. **Self-perpetuating.**
+4. `_read_state_payload` then picks the **fresher** of keyvalue vs. disk with no
+   regard for content, so the newer empty keyvalue copy beats the older rich
+   artifact. `_read_single_date_response_for_combining` filters it to `None` for
+   having 0 candidates → `COMBINED_BOARD_STATE_DATE_MISS`.
+
+**The guard is disabled by exactly the condition it exists to protect against.**
+Both halves were already written down in this repo — `_read_state_payload`'s own
+docstring and `_read_single_date_response_for_combining`'s own comment each name
+"`read_json_file` sees only keyvalue" as a trap — and neither was applied to the
+guard sitting between them. Same shape as the branding regression: not a missing
+measurement, a missing composition.
+
+#### The measurements (refresh-worker, Render logs API)
+
+| | |
+|---|---|
+| `STATE_PERSIST_BEGIN candidate_count=0` | **80 of 100** persists, 14:52Z–21:12Z |
+| `STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD` | **0**, ever — the guard has never fired |
+| empty persists inside the 1800s window | 21:05 wrote 511 candidates; 21:08 and 21:12 wrote 0 |
+| `CANDIDATE_POOL_READY` for 2026-08-08 | **14 of 22** builds returned 0 (18:11Z–21:12Z) |
+| `board_snapshot*.json` artifact publish | **92 of 92** `published=False` (18:57Z–21:14Z) |
+| `STATE_PERSIST_TRIMMED kept_full=0` | **100 of 100**, 16:40Z–21:14Z |
+
+#### THE SECOND, INDEPENDENT DEFECT — why 14 of 22 builds are empty at all
+
+`_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000MB` (`intelligence.py:2551`) on a
+**4096MB** container. Across 60 logged firings, 15:17Z–21:12Z, the best
+effective headroom ever seen was **2973.6MB** — it missed by 26MB at its best
+and was usually 200–400MB short. `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb
+sports_done=0 sports_total=8`: the pass abandons before hydrating a single
+sport, and `_collect_candidates` then reads `dashboard_games` off an empty
+overview. Zero candidates, ~2.5s, no error.
+
+That constant's own comment says the trade is acceptable "**while the pass is
+producing candidate_count=0 anyway**". That reasoning is now circular — the
+guard is what produces the zero. Not changed here: it is a real OOM circuit
+breaker (the 2026-08-07 measurement behind it — MLB alone costing 2.9GB — still
+stands) and re-tuning it needs its own memory measurement, not a guess. **Left
+open. See "what is NOT fixed" below.**
+
+**This defect alone does not explain the symptom.** Even at 8 good builds in
+three hours the board should show 511 candidates most of the time. It is the
+guard failure in #286 that converts an intermittent producer into a permanently
+empty board: only the empty results can be persisted over the good ones.
+
+#### The fix (`pipeline/intelligence_state.py`, committed, NOT deployed)
+
+An **in-process last-good-write record**, not a wider read. This module has
+exactly one production writer (`_background_loop` on refresh-worker), so the
+writing process already knows what it last wrote, for free. Re-reading the 27MB
+artifact inside the guard would be correct and unaffordable: the empty-write
+path is reached precisely when the box is under memory pressure — that is *why*
+the pass came back empty — and a `json.loads` of that payload is the worst
+allocation to add at that moment. The keyvalue read stays as the cross-process
+fallback for the first cycle after a restart. Protection stays bounded by the
+existing 1800s window, so an end-of-slate empty board still lands.
+
+New file `tests/test_intelligence_state_empty_board_guard.py`, 6 tests, own file
+deliberately (`test_intelligence_state.py` carries pre-existing failures and is
+being edited concurrently). Pre-fix behaviour reproduced and confirmed to invert:
+guard returns `False` before, `True` after, on the exact production shape.
+
+Also in the same commit: `STATE_ARTIFACT_FALLBACK_REFUSED`. `published=False`
+from `_write_state_payload` means the keyvalue write was already refused and
+**nothing crossed to web at all**, and it printed as an ordinary success line 92
+times tonight. It now says so in words.
+
+**Recovery is not instant on deploy.** Once empty writes stop, keyvalue still
+holds its last empty copy with a newer timestamp than the 21:05 artifact, so the
+board recovers on the **next non-empty build** (~30 min at the current cadence),
+not immediately.
+
+#### WHAT IS NOT FIXED — three separate things, all measured
+
+1. **The 3000MB overview headroom floor.** Above. Needs a memory measurement,
+   not a constant change. It is the reason the good cycles are only ~1 in 3.
+2. **`board_snapshot.json` / `board_snapshot_<date>.json` are not in
+   `HOT_ARTIFACT_PATTERNS`**, so `_write_state_payload`'s artifact fallback has
+   been a **guaranteed no-op** for them since it shipped — 92 of 92
+   `SKIP_NOT_ALLOWLISTED` tonight, while `intelligence_state.json` (which *is*
+   allowlisted) published fine 4 of 4. The comment at
+   `artifact_publisher.py:277` claiming both are "intentionally excluded" is
+   factually wrong about `intelligence_state.json`. **Allowlisting is not the
+   fix on its own**: the payload is 33.5MB and that file's own measurement says
+   the publish transport drops the connection above ~19.6MB, so it would trade a
+   silent skip for a silent disconnect. Not urgent — the read path uses
+   `intelligence_state_<date>.json`, which works — but it is dead code that
+   reads as live.
+3. **`_read_state_payload` picks fresher-wins with no content check.** With #286
+   fixed the empty copy stops being written, so this is no longer load-bearing.
+   Deliberately not changed: preferring non-empty unconditionally would pin a
+   dead board at end of slate, which is the failure the freshness rule exists to
+   avoid. Recorded so the next reader does not rediscover it.
+
+### #287 — `/intelligence/api/opportunity-board` returns 0 for every sport: DIFFERENT root cause. Not fixed
+
+**Not the same bug as #286, and not a producer failure either.** The ledger it
+reads lives on refresh-worker's disk and the endpoint runs on **web**.
+
+`api_opportunity_board` → `build_recommendation_performance_analytics_for_window`
+→ `_load_chunk_records_for_window` → `reports/intelligence/evaluation_ledger_chunks/<date>.jsonl`.
+
+Measured 2026-08-08 21:4xZ via `/api/ops/evaluation-settlement/status` (which
+reports refresh-worker's own view through the keyvalue store):
+
+```
+worker disk  2026-08-05.jsonl  9,055 lines  367,229,260 bytes
+             2026-08-06.jsonl  8,854 lines  182,506,476 bytes
+             all 28 other dates in the window: exists=false
+             total_recommendation_records 8276  pending 8276  settled 0  matched 0
+             autorun epoch 1786014197 = 2026-08-06T05:03Z (2.7 days stale)
+web serve    /intelligence/api/opportunity-board -> records [] , publish_count 0
+             window 2026-07-10..2026-08-08
+```
+
+`is_hot_artifact_relative_path("reports/intelligence/evaluation_ledger_chunks/2026-08-05.jsonl")`
+is **False** — the family has never been allowlisted, and it is gitignored, so
+nothing seeds it on a fresh checkout either. So web reads **0 of 30** dates
+against the worker's **2 of 30**.
+
+**Allowlisting is not the fix**: 367MB and 182MB chunks cannot cross the publish
+transport. This needs either a summarised artifact the worker publishes (the
+analytics output is small; the ledger is not) or the endpoint moving to a
+worker-computed, web-read summary — which is what the architecture says anyway.
+Note the second, independent problem visible in the same numbers: **0 settled of
+8,276 records**, and the autorun has not run since 08-06.
+
+### #288 — `tests/test_intelligence_state.py` failures: stale fixtures, NOT a reproduction of #286. Not fixed
+
+The thesis that these were the cheap local instrument for the production zero is
+**refuted**. Measured on `main` in this worktree:
+
+- **5 failures now, not 8** (`8 failed, 214 passed` was the earlier reading;
+  today `5 failed, 210 passed, 10 subtests passed` running the file alone).
+- `test_build_candidate_pool_skips_sports_without_manifests` asserts
+  `candidate_count == 1` and gets **18**, not 0. The trace is a *healthy*
+  pipeline: 60 MLB candidates generated → 32 survive dedup → 18 survive
+  exposure budgets. This matches the earlier reconciliation entry in this file
+  and **contradicts the later "gets 0, with `candidate_scoring output_count: 0`
+  upstream" note** — that reading is not reproducible here and should not be
+  built on.
+- The other four are mock/API drift, none related: `IndexError` at
+  `:2556`; `0 not greater than or equal to 1`; a `refresh_state_store` lambda
+  that "got an unexpected keyword argument 'ex'"; and one asserting a
+  `latest_key` promotion that **#124 deliberately refuses for sport-scoped
+  payloads** (`LATEST_KEY_PROMOTION_SKIPPED_SPORT_SCOPED` in its own captured
+  stdout). That last one is a test encoding behaviour the code intentionally
+  changed.
+
+Genuine fixture drift from several sessions' legitimate feature work, worth
+fixing, but it was never going to produce the production zero. **Cost of the
+guess:** the earlier note reasoned from `candidate_count 0` appearing in two
+places and assumed one cause; the two zeros have nothing to do with each other.
+
+
 ### 2026-08-08 — The rule is easy to state and evidently not easy to apply under momentum
 
 Every operational rule in this file was written by someone who already knew it.

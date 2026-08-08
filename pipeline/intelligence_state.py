@@ -626,6 +626,54 @@ def _empty_board_protection_window_seconds() -> int:
     return max(0, value)
 
 
+# Root-caused live 2026-08-08 (#286): the guard below could not see a good
+# board that was TOO BIG FOR KEYVALUE -- which is exactly when a board is good.
+#
+# `read_json_file` consults the keyvalue store ONLY on the keyvalue backend
+# (the same trap _read_state_payload and _read_single_date_response_for_combining
+# each already name in their own docstrings). A rich board serializes to ~27MB
+# against an 8.4MB ceiling, so _write_state_payload diverts it to the artifact
+# transport and the keyvalue copy keeps whatever small payload it last held --
+# an empty one. The next empty cycle then asked keyvalue "is there a good board
+# for this date?", got the stale empty copy back, read candidate_count 0, and
+# failed open. The empty write proceeded, keyvalue stayed empty, and every
+# subsequent empty write was permitted for the same reason. Self-perpetuating.
+#
+# Measured on refresh-worker 2026-08-08 14:52Z-21:12Z: STATE_PERSIST_BEGIN
+# candidate_count=0 on 80 of 100 persists, STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD
+# on ZERO of them -- including 21:08 and 21:12, three and seven minutes after a
+# 511-candidate board was written at 21:05, well inside the 1800s window.
+#
+# The fix is an in-process record rather than a wider read. This module has
+# exactly one production writer (_background_loop, refresh-worker), so the
+# writing process always knows what it last wrote, for free. Re-reading the
+# 27MB artifact here would be correct and unaffordable: the empty-write path is
+# reached precisely when the box is under memory pressure (that is why the pass
+# came back empty), and a json.loads of that payload is the worst allocation to
+# add at that moment. The keyvalue read stays as the cross-process fallback for
+# the first cycle after a restart, when there is no in-process record yet.
+_LAST_GOOD_BOARD_WRITES: "OrderedDict[str, tuple[str, int]]" = OrderedDict()
+_LAST_GOOD_BOARD_WRITES_LOCK = threading.Lock()
+_LAST_GOOD_BOARD_WRITES_MAX = 8
+
+
+def _record_good_board_write(selected_date: str, candidate_count: int, written_at: str) -> None:
+    """Remember that this process just persisted a populated board for a date."""
+    date_key = str(selected_date or "").strip()
+    if not date_key or candidate_count <= 0:
+        return
+    with _LAST_GOOD_BOARD_WRITES_LOCK:
+        _LAST_GOOD_BOARD_WRITES[date_key] = (str(written_at or _utc_now()), int(candidate_count))
+        _LAST_GOOD_BOARD_WRITES.move_to_end(date_key)
+        while len(_LAST_GOOD_BOARD_WRITES) > _LAST_GOOD_BOARD_WRITES_MAX:
+            _LAST_GOOD_BOARD_WRITES.popitem(last=False)
+
+
+def _last_good_board_write(selected_date: str) -> tuple[str, int] | None:
+    with _LAST_GOOD_BOARD_WRITES_LOCK:
+        return _LAST_GOOD_BOARD_WRITES.get(str(selected_date or "").strip())
+
+
 def _empty_write_would_clobber_good_board(incoming: dict[str, Any]) -> bool:
     """True when writing this empty state would erase a populated board that
     is still recent enough to trust.
@@ -640,7 +688,19 @@ def _empty_write_would_clobber_good_board(incoming: dict[str, Any]) -> bool:
         return False
     try:
         selected_date = str(incoming.get("selected_date") or "").strip()
-        existing = read_json_file(_intelligence_state_daily_paths(selected_date)["state"]) if selected_date else None
+        if not selected_date:
+            return False
+        # In-process record first: it is free, and it is the only source that
+        # sees a board written through the artifact transport. See the comment
+        # above this function for why the keyvalue read alone cannot.
+        remembered = _last_good_board_write(selected_date)
+        if remembered is not None:
+            remembered_at, remembered_count = remembered
+            if remembered_count > 0:
+                age_seconds = _timestamp_age_seconds(remembered_at)
+                if age_seconds is not None and 0 <= age_seconds < window:
+                    return True
+        existing = read_json_file(_intelligence_state_daily_paths(selected_date)["state"])
         if not isinstance(existing, dict):
             return False
         if str(existing.get("selected_date") or "").strip() != selected_date:
@@ -1815,6 +1875,20 @@ def _write_state_payload(path: Path, persisted: dict[str, Any]) -> None:
             f"[intelligence_state] STATE_PUBLISHED_AS_ARTIFACT path={path.name} published={published}",
             flush=True,
         )
+        if not published:
+            # #286. `published=False` is a total failure of this fallback, not a
+            # detail: the keyvalue write was already refused, so nothing crossed
+            # to web at all. Measured 2026-08-08 18:57Z-21:14Z: board_snapshot.json
+            # and board_snapshot_<date>.json published=False on 92 of 92 attempts
+            # (SKIP_NOT_ALLOWLISTED -- neither is in HOT_ARTIFACT_PATTERNS, while
+            # intelligence_state.json is), and every one of them read as an
+            # ordinary success line. Say it in words the next reader will grep.
+            print(
+                f"[intelligence_state] STATE_ARTIFACT_FALLBACK_REFUSED path={path.name} "
+                f"reason=publish_hot_artifact_returned_false "
+                f"effect=payload_did_not_cross_to_other_services",
+                flush=True,
+            )
     except Exception as exc:  # noqa: BLE001
         # Never re-raise: the caller's whole cycle is discarded on an exception
         # here, which is precisely the failure mode #43 is about.
@@ -1931,6 +2005,16 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
         write_json_file(LIVE_PIPELINE_LAST_SUCCESSFUL_PATH, live_pipeline)
     logger.info("INTELLIGENCE STATE PERSIST AFTER", extra={"candidate_count": candidate_count})
     logger.info("STATE WRITTEN", extra={"written": True, "candidate_count": int(normalized.get("candidate_count") or 0)})
+    # #286. Recorded AFTER the writes, so only a board that actually reached a
+    # transport is protected. The timestamp is the payload's own, not
+    # wall-clock now, so the protection window measures the age of the DATA the
+    # guard is protecting rather than the age of this bookkeeping entry.
+    if candidate_count > 0:
+        _record_good_board_write(
+            content_date or today_iso,
+            candidate_count,
+            str(normalized.get("state_last_updated") or normalized.get("last_updated") or _utc_now()),
+        )
     return normalized
 
 
