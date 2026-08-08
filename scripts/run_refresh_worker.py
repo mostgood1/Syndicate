@@ -1674,6 +1674,43 @@ def main() -> int:
         print(f"[refresh_worker] INTELLIGENCE_LOOP_START_RESULT started={loop_started}", flush=True)
     else:
         print("[refresh_worker] INTELLIGENCE_LOOP_DISABLED", flush=True)
+
+    # LIVE-LENS LOOP, MOVED HERE FROM live-odds-worker.
+    #
+    # Its heavy piece is MLB's vendored 120-sim-per-live-game Monte Carlo, run
+    # in-process with no batching. MEASURED 2026-08-08 with 13 MLB games live:
+    #
+    #     03:29:43   295.5MB   live_lens_tick_before_mlb
+    #     03:30:02  1740.8MB   live_lens_tick_after_build_mlb   <- +1,445MB
+    #                          killed 4 seconds later
+    #
+    # live-odds-worker is 2Gi with a ~700-900MB steady-state baseline, so a
+    # 1.4GB build cannot fit there at ANY gate threshold -- and the cost scales
+    # with the live slate, so it is worst exactly when the board matters most.
+    # #124 already had to LOWER MLB's headroom gate because the correct value
+    # (1800MB) was unsatisfiable on a 2Gi container; that was the squeeze
+    # showing, and it was read as a gate-tuning problem.
+    #
+    # This is the same move made for the MLB SIM tick on 2026-07-20
+    # (_mlb_sim_tick_owner_here), stopped one step short: the 4Gi service owns
+    # the simulations, while the 2Gi service was left running a
+    # ~1,560-simulation Monte Carlo.
+    #
+    # Ownership is the EXISTING env gate, not a new one -- SYNDICATE_ENABLE_
+    # LIVE_LENS_LOOP already defaults False and start_live_lens_loop() returns
+    # False when unset. Both services calling this is therefore safe by
+    # construction: whichever has the flag runs it, and the flag must be
+    # removed from live-odds-worker in the same change or BOTH will run it.
+    try:
+        _diag_log_all_process_memory("start_live_lens_loop_before")
+        from syndicate.features.shared.live_lens_loop import start_live_lens_loop
+
+        live_lens_started = start_live_lens_loop()
+        print(f"[refresh_worker] LIVE_LENS_LOOP_START_RESULT started={live_lens_started}", flush=True)
+        _diag_log_all_process_memory("start_live_lens_loop_after")
+    except Exception as exc:
+        print(f"[refresh_worker] LIVE_LENS_LOOP_START_FAILED {type(exc).__name__}: {exc}", flush=True)
+
     parser = argparse.ArgumentParser(description="Poll Syndicate refresh state and execute queued external-runner jobs.")
     parser.add_argument("--latest-manifest", default=str(_default_latest_manifest_path()))
     parser.add_argument("--worker-status", default=str(_default_worker_status_path()))
