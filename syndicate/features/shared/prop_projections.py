@@ -441,21 +441,72 @@ def project_game_market(
 
     if market_key in {"h2h", "moneyline", "h2h_3_way"}:
         # Straight from the simulation -- no line, no distribution walk.
+        home_prob = payload.get("home_win_prob")
+        away_prob = payload.get("away_win_prob")
         if side in {"home", "1"}:
-            prob = payload.get("home_win_prob")
+            prob = home_prob
         elif side in {"away", "2"}:
-            prob = payload.get("away_win_prob")
+            prob = away_prob
         elif side in {"draw", "tie", "x"}:
             prob = payload.get("tie_prob")
         else:
             return None
         if prob is None:
             return None
+
+        # A SEGMENT WIN AND A SEGMENT MONEYLINE ARE DIFFERENT OUTCOME SPACES.
+        #
+        # The sim answers "does the home team lead at the end of this segment",
+        # which for a short segment is mostly NO because the segment is TIED.
+        # The book's `h2h` lists two sides only, so a tie voids -- its price
+        # describes P(home wins | someone wins). Comparing the two directly
+        # subtracts a 3-outcome probability from a 2-outcome one.
+        #
+        # MEASURED on production 2026-08-08, MLB h2h, 15 games x 4 segments:
+        #
+        #     segment   model home_p   market fair   median edge
+        #     full        0.463          0.526        -3.92
+        #     first5      0.420          0.524       -11.62
+        #     first3      0.369          0.522       -13.78
+        #     first1      0.241          0.509       -31.83
+        #
+        # The model falls monotonically as the segment shortens -- CORRECT,
+        # ties get likelier. The market fair stays pinned near 0.52 at every
+        # segment -- because `_no_vig_over_probability` devigs the two listed
+        # sides and there is no third to devig. So the "edge" is an artifact
+        # that scales with how likely a tie is, and it is what put 29 of 60
+        # h2h rows over 15 points and made the board look systematically
+        # bearish on home.
+        #
+        # Renormalising into the decided space is the correct comparison, not a
+        # fudge: if the tie voids the bet, P(home | decided) is exactly what the
+        # price is offering. On `full` this is a no-op -- an MLB game cannot end
+        # tied, so home+away already sums to 1.
+        #
+        # NOT applied to `h2h_3_way`, where the draw is a listed side and the
+        # market's own three prices span the same space the sim does.
+        renormalised = False
+        if market_key in {"h2h", "moneyline"} and side not in {"draw", "tie", "x"}:
+            try:
+                decided = float(home_prob) + float(away_prob)
+            except (TypeError, ValueError):
+                decided = None
+            # Guard the degenerate case rather than dividing by ~0: a segment
+            # the sim thinks is almost never decided carries no usable signal,
+            # and scaling by 1/0.01 would manufacture a confident number out of
+            # simulation noise.
+            if decided is not None and decided >= 0.2 and abs(1.0 - decided) > 1e-6:
+                prob = float(prob) / decided
+                renormalised = True
+
         return {
             "projected": None,  # a win probability has no "projected value"
             "model_prob_over": round(float(prob), 4),
             "source": "game_simulation",
-            "basis": f"{basis}/win_prob",
+            # The basis says WHICH space this probability lives in, so a reader
+            # can tell a conditional number from a raw one without re-deriving
+            # it -- the `basis` discipline #263 asked for, applied here.
+            "basis": f"{basis}/win_prob_decided" if renormalised else f"{basis}/win_prob",
         }
 
     try:

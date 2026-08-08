@@ -15,6 +15,7 @@ from syndicate.features.shared.prop_projections import (
     PropProjectionIndex,
     attach_projections,
     load_prop_projections,
+    project_game_market,
     starter_ids_from_roster_snapshots,
 )
 
@@ -201,3 +202,94 @@ def test_a_missing_snapshot_directory_is_not_an_error():
     with TemporaryDirectory() as tmp:
         index = load_prop_projections(Path(tmp) / "missing.json")
     assert index.games == 0
+
+
+# ---------------------------------------------------------------------------
+# A SEGMENT WIN AND A SEGMENT MONEYLINE ARE DIFFERENT OUTCOME SPACES.
+# ---------------------------------------------------------------------------
+#
+# MEASURED on production 2026-08-08, MLB h2h, 15 games x 4 segments:
+#
+#     segment   model home_p   market fair   median edge
+#     full        0.463          0.526        -3.92
+#     first5      0.420          0.524       -11.62
+#     first3      0.369          0.522       -13.78
+#     first1      0.241          0.509       -31.83
+#
+# The model falls monotonically as the segment shortens -- CORRECT, ties get
+# likelier. The market fair stays pinned near 0.52 at every segment, because
+# the book lists two sides and there is no third to devig. The "edge" was an
+# artifact scaling with tie likelihood; it put 29 of 60 h2h rows over 15 points
+# and made the board look systematically bearish on home.
+
+
+class _StubIndex:
+    def __init__(self, payloads):
+        self._payloads = payloads
+
+    def game_payloads(self, **_kwargs):
+        return self._payloads
+
+
+# Real production numbers: first1 Atlanta @ NYY.
+_PAYLOADS = {
+    "first1": {"home_win_prob": 0.207, "away_win_prob": 0.186, "tie_prob": 0.607},
+    "full": {"home_win_prob": 0.533, "away_win_prob": 0.467, "tie_prob": 0.0},
+}
+
+
+def _project(market, segment, selection="home", payloads=None):
+    return project_game_market(
+        _StubIndex(payloads or _PAYLOADS),
+        sport="mlb", home_team="NYY", away_team="ATL",
+        market=market, selection=selection, line=None, segment=segment,
+    )
+
+
+def test_a_segment_moneyline_is_conditional_on_the_game_being_decided():
+    """If the tie voids the bet, P(home | decided) is exactly what the price
+    offers. 0.207 / (0.207 + 0.186) = 0.5267."""
+    out = _project("h2h", "first1")
+    assert out["model_prob_over"] == 0.5267
+
+
+def test_the_basis_says_which_space_the_number_lives_in():
+    """A reader must be able to tell a conditional number from a raw one
+    without re-deriving it -- the `basis` discipline #263 asked for."""
+    assert _project("h2h", "first1")["basis"] == "first1/win_prob_decided"
+    assert _project("h2h", "full")["basis"] == "full/win_prob"
+
+
+def test_a_full_game_is_untouched():
+    """An MLB game cannot end tied, so home+away already sums to 1 and this
+    must be a no-op. If it ever isn't, the renormalisation is corrupting the
+    market that was already correct."""
+    assert _project("h2h", "full")["model_prob_over"] == 0.533
+
+
+def test_a_three_way_market_is_NOT_renormalised():
+    """The draw is a listed side there, so the market's own three prices span
+    the same space the sim does. Renormalising would double-count."""
+    assert _project("h2h_3_way", "first1")["model_prob_over"] == 0.207
+
+
+def test_the_away_side_is_renormalised_the_same_way():
+    """Both sides must move into the same space, or they stop summing to 1."""
+    home = _project("h2h", "first1", selection="home")["model_prob_over"]
+    away = _project("h2h", "first1", selection="away")["model_prob_over"]
+    assert abs(home + away - 1.0) < 0.001
+
+
+def test_the_draw_side_is_never_renormalised():
+    """P(tie | decided) is nonsense -- the draw IS the undecided outcome."""
+    out = _project("h2h_3_way", "first1", selection="draw")
+    assert out["model_prob_over"] == 0.607
+
+
+def test_a_segment_that_is_almost_never_decided_is_left_alone():
+    """Guarded rather than divided: scaling by 1/0.01 manufactures a confident
+    number out of simulation noise."""
+    payloads = {"first1": {"home_win_prob": 0.05, "away_win_prob": 0.04, "tie_prob": 0.91}}
+    out = _project("h2h", "first1", payloads=payloads)
+    assert out["model_prob_over"] == 0.05
+    assert out["basis"] == "first1/win_prob"
