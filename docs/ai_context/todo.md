@@ -239,6 +239,21 @@ Ruled OUT by measurement, so nobody repeats these:
 So: today's file exists, the league is active, the provider fans out to it, and
 we are pricing 400 rows of real games — and no chip comes out.
 
+7. **Week resolution (the NFL-style pin)** — REFUTED. Every league resolves a
+   plausible season/week for 08-08:
+   `mls wk19 | epl wk1 | la_liga wk1 | eredivisie wk2 | primeira_liga wk2 |
+   belgian wk2 | serie_a wk1`.
+   **The decisive detail: `serie_a` resolves week 1 and yields NOTHING while
+   `epl`/`la_liga` resolve week 1 and yield chips.** Same week number, opposite
+   outcome — so it is not the week logic.
+
+⇒ **NARROWED TO: per-league CARD ARTIFACT availability for the resolved
+`(league, season, week)`.** Soccer is week-keyed per league, so
+`_SoccerDataProvider.games()` builds from that triple. Three leagues find cards
+and seven do not. Next: list what exists under the soccer card/schedule path for
+`serie_a` season 2026 week 1 versus `epl` season 2026 week 1 — identical week,
+so any difference is the answer.
+
 **WHERE TO ACTUALLY LOOK.** Chips come from
 `_SoccerDataProvider.games()` -> per-league card/schedule builders (NOT
 live_state). That path yields games for mls/epl/la_liga and nothing for the
