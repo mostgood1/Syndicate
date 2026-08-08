@@ -20,10 +20,31 @@ class GameChipBuilderTests(unittest.TestCase):
 
         self.assertEqual(chip["state"], "live")
         self.assertEqual(chip["status_token"], "TOP 7")
-        self.assertEqual(chip["away"], {"abbr": "NYY", "score": "4"})
-        self.assertEqual(chip["home"], {"abbr": "BOS", "score": "2"})
+        # `name` is empty here because this fixture carries only labels; the
+        # key is always present so consumers see one chip shape, and the board
+        # join falls back to `abbr` exactly as it did before names existed.
+        self.assertEqual(chip["away"], {"abbr": "NYY", "name": "", "score": "4"})
+        self.assertEqual(chip["home"], {"abbr": "BOS", "name": "", "score": "2"})
         self.assertEqual(chip["leader"], "away")
         self.assertEqual(chip["game_key"], "823759")
+
+    def test_chip_carries_the_full_club_name_when_the_provider_has_one(self) -> None:
+        """The abbr is a display label, not a reliable join key: soccer
+        tri-codes collide across leagues (STL is both Standard Liege and
+        St. Louis CITY SC), so `team_aliases` refuses to resolve them and an
+        abbr-only join matched 0 of 300 soccer board rows on 2026-08-08."""
+        chip = build_game_chip(
+            "soccer",
+            {
+                "gamePk": "401875654",
+                "away": {"abbr": "TEL", "name": "Telstar"},
+                "home": {"abbr": "NEC", "name": "NEC Nijmegen"},
+            },
+        )
+
+        self.assertEqual(chip["away"]["name"], "Telstar")
+        self.assertEqual(chip["home"]["name"], "NEC Nijmegen")
+        self.assertEqual(chip["away"]["abbr"], "TEL")
 
     def test_soccer_chip_carries_league_display(self) -> None:
         # #162: soccer's game dicts (soccer/cards.py) stamp league/

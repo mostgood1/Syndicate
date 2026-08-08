@@ -42,8 +42,20 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
     cannot do this -- "chc" is neither a prefix of "chicago" nor the initials of
     "chicago cubs" -- and that single gap is why 0 of 108 board candidates
     carried a quote on 2026-08-06.
+
+    Each side is tried against the chip's full club NAME and its abbr, first
+    hit wins. Name first because it is the unambiguous key: soccer tri-codes
+    collide across leagues, so `team_aliases` deliberately refuses to resolve
+    them and an abbr-only join cannot match those rows at all. Abbr is kept as
+    the fallback for providers that carry no name.
+
+    `unmatched_teams` is returned on purpose. The failure mode this join has is
+    a club whose two feeds spell it differently, and with no sample the symptom
+    is an empty column with nothing to act on -- which is how soccer sat at 0
+    matched rows through nine hypotheses.
     """
     matched = 0
+    unmatched: dict[str, int] = {}
     try:
         from syndicate.features.shared.game_chip_scoreboard import build_game_chips
         from syndicate.features.shared.team_aliases import teams_match
@@ -53,18 +65,23 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
         _LOGGER.exception("BOOK_GRID_GAME_STATE_FAILURE sport=%s date=%s", sport, selected_date)
         return {"chips": 0, "rows_matched": 0}
 
+    def _side_matches(row_team: str, chip_side: dict) -> bool:
+        for key in ("name", "abbr"):
+            token = (chip_side or {}).get(key)
+            if token and teams_match(sport, row_team, token):
+                return True
+        return False
+
     for row in grid:
         home = row.get("home_team")
         away = row.get("away_team")
         if not home or not away:
             continue
         for chip in chips:
-            chip_home = ((chip.get("home") or {}) or {}).get("abbr")
-            chip_away = ((chip.get("away") or {}) or {}).get("abbr")
-            if not chip_home or not chip_away:
-                continue
+            chip_home = (chip.get("home") or {}) if isinstance(chip.get("home"), dict) else {}
+            chip_away = (chip.get("away") or {}) if isinstance(chip.get("away"), dict) else {}
             try:
-                if teams_match(sport, home, chip_home) and teams_match(sport, away, chip_away):
+                if _side_matches(home, chip_home) and _side_matches(away, chip_away):
                     row["game"] = {
                         "state": chip.get("state"),
                         "start_time_utc": chip.get("start_time_utc"),
@@ -77,7 +94,16 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
                     break
             except Exception:
                 continue
-    return {"chips": len(chips), "rows_matched": matched}
+        else:
+            for team in (home, away):
+                unmatched[str(team)] = unmatched.get(str(team), 0) + 1
+
+    coverage = {"chips": len(chips), "rows_matched": matched}
+    if unmatched:
+        # Club names, not row counts, are the actionable unit: one unresolved
+        # club fails every market on its game.
+        coverage["unmatched_teams"] = sorted(unmatched, key=lambda name: (-unmatched[name], name))[:20]
+    return coverage
 
 
 def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:

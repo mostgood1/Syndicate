@@ -60,6 +60,22 @@ def _side_label(game: dict[str, Any], side: str) -> str:
     )
 
 
+def _side_name(game: dict[str, Any], side: str) -> str:
+    """The FULL club name, where the provider's game carries one.
+
+    The chip's `abbr` is a display label and is not always a usable join key:
+    soccer tri-codes collide across leagues (`STL` is both Standard Liege and
+    St. Louis CITY SC), so `team_aliases` correctly refuses to resolve them and
+    a board row joined on abbr alone cannot be matched. Every sport's card
+    builder already has the full name in the same dict -- carrying it on the
+    chip costs nothing and gives the join an unambiguous key. Empty when the
+    provider has only a label, in which case the join falls back to `abbr`
+    exactly as before.
+    """
+    container = game.get(side) if isinstance(game.get(side), dict) else {}
+    return _text(container.get("name")) or _text(game.get(f"{side}_name"))
+
+
 def _side_score(game: dict[str, Any], side: str) -> str | None:
     container = game.get(side) if isinstance(game.get(side), dict) else {}
     status = game.get("status") if isinstance(game.get("status"), dict) else {}
@@ -354,8 +370,8 @@ def build_game_chip(sport: str, game: dict[str, Any]) -> dict[str, Any]:
         "league_display": _text(game.get("league_display")) or None,
         "game_key": _game_key(game),
         "matchup": _matchup_text(game),
-        "away": {"abbr": _side_label(game, "away"), "score": away_score},
-        "home": {"abbr": _side_label(game, "home"), "score": home_score},
+        "away": {"abbr": _side_label(game, "away"), "name": _side_name(game, "away"), "score": away_score},
+        "home": {"abbr": _side_label(game, "home"), "name": _side_name(game, "home"), "score": home_score},
         "state": state,
         "status_token": status_token,
         "leader": leader,

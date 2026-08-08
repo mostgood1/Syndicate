@@ -30,12 +30,44 @@ take the board down.
 
 from __future__ import annotations
 
+import unicodedata
 from functools import lru_cache
 from typing import Any
 
 
 def normalize(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def fold_accents(value: Any) -> str:
+    """`normalize`, plus stripped diacritics and dots.
+
+    ESPN spells clubs with their real diacritics ("Vitória de Guimaraes",
+    "Alavés", "CF Montréal", "Union St.-Gilloise"); OddsAPI routinely does not.
+    A join that only casefolds treats those as different clubs.
+    """
+    decomposed = unicodedata.normalize("NFKD", str(value or ""))
+    stripped = "".join(ch for ch in decomposed if not unicodedata.combining(ch))
+    return normalize(stripped.replace(".", " "))
+
+
+# Pure club-type designators: they say what KIND of entity a club is, never
+# which one. Feeds disagree on whether to print them ("SC Telstar"/"Telstar",
+# "Houston Dynamo FC"/"Houston Dynamo", "KVC Westerlo"/"Westerlo"), so a
+# designator-free form is generated as an ADDITIONAL key -- and only kept when
+# it still names exactly one club (see `_soccer_alias_to_name`).
+_CLUB_TYPE_TOKENS = frozenset(
+    {
+        "fc", "cf", "sc", "cs", "sk", "ac", "afc", "ksv", "kvc", "kv", "kaa",
+        "cd", "ud", "sv", "vfb", "vfl", "bsc", "ssc", "as", "us", "rc", "ogc",
+        "rcd", "sd", "ca", "aj", "sl", "fk", "bk", "if", "ff",
+    }
+)
+
+
+def strip_club_tokens(value: Any) -> str:
+    """`fold_accents` with club-type designators removed. May return ""."""
+    return " ".join(word for word in fold_accents(value).split() if word not in _CLUB_TYPE_TOKENS)
 
 
 @lru_cache(maxsize=1)
@@ -130,6 +162,72 @@ _WNBA_ALIAS_SUPPLEMENT: dict[str, str] = {
 }
 
 
+# Soccer club names OddsAPI prints that no mechanical rule reaches from the
+# ESPN spelling -- a different name for the same club, not a different
+# formatting of it. MEASURED against production's own 2026-08-08 board (the
+# only honest way to build this): 18 of the slate's 22 clubs resolved straight
+# out of the team artifacts, and these four did not.
+#
+# Kept deliberately small. Anything a rule CAN reach (diacritics, "SC "/" FC"
+# designators) is reached by rule, so this table does not grow with every
+# fixture -- only with genuine vendor disagreements. `attach_game_state`
+# reports the club names it could not resolve so the next one is legible
+# instead of showing up as a silently unjoined row.
+_SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
+    "sint truiden": "sint-truidense",
+    "sporting lisbon": "sporting cp",
+    "union saint gilloise": "union st.-gilloise",
+    "vitoria sc": "vitória de guimaraes",
+}
+
+
+@lru_cache(maxsize=1)
+def _soccer_alias_to_name() -> dict[str, str]:
+    """Club token -> canonical ESPN club name, across every configured league.
+
+    Built FROM THE TEAM ARTIFACTS, not hand-written. ~10 leagues of ~200 clubs
+    with no stable tri-code convention is exactly the table that would be large
+    and wrong at the edges if typed out; but the repo already stores each
+    club's name, short name and abbreviation per league, so the map is derived.
+
+    AMBIGUOUS KEYS ARE DROPPED, not first-wins. Soccer tri-codes collide ACROSS
+    leagues far more than they do inside one -- measured on the real artifacts,
+    11 keys name two different clubs, and `stl` is both Standard Liege and
+    St. Louis CITY SC. First-wins would have joined a Belgian board row to an
+    MLS scoreboard. This is the same trap `_basketball_alias_to_name` documents
+    for the merged NBA/WNBA map: a confidently wrong answer is worse than none,
+    because the map is authoritative and skips the heuristics.
+    """
+    try:
+        from syndicate.features.soccer.sources import LEAGUE_DISPLAY_NAMES
+        from syndicate.features.soccer.sources import all_teams
+    except Exception:
+        return {}
+
+    candidates: dict[str, set[str]] = {}
+    for league in LEAGUE_DISPLAY_NAMES:
+        try:
+            teams = all_teams(league) or []
+        except Exception:
+            continue
+        for team in teams:
+            canonical = normalize((team or {}).get("name"))
+            if not canonical:
+                continue
+            for raw in (team.get("name"), team.get("short_name"), team.get("abbreviation")):
+                for key in (normalize(raw), fold_accents(raw), strip_club_tokens(raw)):
+                    if key:
+                        candidates.setdefault(key, set()).add(canonical)
+
+    mapping = {key: next(iter(names)) for key, names in candidates.items() if len(names) == 1}
+    for vendor_name, espn_name in _SOCCER_VENDOR_NAME_ALIASES.items():
+        canonical = mapping.get(normalize(espn_name)) or mapping.get(fold_accents(espn_name))
+        if canonical:
+            mapping.setdefault(normalize(vendor_name), canonical)
+            mapping.setdefault(fold_accents(vendor_name), canonical)
+    return mapping
+
+
 def _alias_map(sport: str) -> dict[str, str]:
     slug = normalize(sport)
     if slug == "mlb":
@@ -146,10 +244,8 @@ def _alias_map(sport: str) -> dict[str, str]:
             merged.update(mapping)
             return merged
         return mapping
-    # Soccer deliberately returns {} still. It is ~10 leagues of clubs with no
-    # stable tri-code convention across feeds, so a hand-written table would be
-    # both large and wrong at the edges. It needs its own pass against the real
-    # chip abbreviations, not a guess appended here.
+    if slug == "soccer":
+        return _soccer_alias_to_name()
     return {}
 
 
@@ -168,6 +264,13 @@ def canonical_team(sport: Any, value: Any) -> str | None:
     # Already a full name the map knows as a value.
     if token in set(mapping.values()):
         return token
+    # The map carries diacritic-free and designator-free keys, so a caller
+    # holding "Vitória SC" or "Houston Dynamo FC" resolves without having to
+    # spell the club the way the artifact does. Tried only after the literal
+    # forms, so an exact name always wins over a reduced one.
+    for reduced in (fold_accents(value), strip_club_tokens(value)):
+        if reduced and reduced != token and reduced in mapping:
+            return mapping[reduced]
     return None
 
 

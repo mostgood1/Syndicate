@@ -139,10 +139,47 @@ def test_tricodes_do_not_resolve_ACROSS_leagues(sport, abbr, name):
     assert teams_match(sport, name, abbr) is False
 
 
-def test_soccer_still_returns_no_map_deliberately():
-    """~10 leagues with no stable tri-code convention across feeds. A guessed
-    table would be large and wrong at the edges; it needs its own pass against
-    the real chip abbreviations. Pinned so its absence stays a decision."""
+def test_soccer_map_is_derived_from_the_team_artifacts():
+    """Supersedes `test_soccer_still_returns_no_map_deliberately`.
+
+    That test pinned soccer at `{}` because a HAND-WRITTEN table across ~10
+    leagues would be large and wrong at the edges. It is still hand-written
+    tables that are rejected -- this map is DERIVED from the per-league team
+    artifacts the repo already stores, so it is neither guessed nor typed out.
+    """
     from syndicate.features.shared.team_aliases import _alias_map
 
-    assert _alias_map("soccer") == {}
+    mapping = _alias_map("soccer")
+    assert len(mapping) > 200, "expected the full multi-league club set"
+    assert mapping.get("psv eindhoven") == "psv eindhoven"
+    assert mapping.get("nec") == "nec nijmegen"
+
+
+@pytest.mark.parametrize("odds_name,espn_token", [
+    # Reduced by rule: diacritics and club-type designators.
+    ("SC Telstar", "TEL"),
+    ("Houston Dynamo", "Houston Dynamo FC"),
+    ("Westerlo", "KVC Westerlo"),
+    ("CS Maritimo", "Maritimo"),
+    ("CF Estrela", "Estrela"),
+    # Reached only by the measured vendor-name table.
+    ("Sporting Lisbon", "Sporting CP"),
+    ("Sint Truiden", "Sint-Truidense"),
+    ("Union Saint-Gilloise", "Union St.-Gilloise"),
+    ("Vitória SC", "Vitória de Guimaraes"),
+])
+def test_soccer_vendor_spellings_resolve(odds_name, espn_token):
+    """Every club on production's 2026-08-08 board that did NOT resolve by
+    exact name. Before this, `attach_game_state` matched 0 of 300 soccer rows;
+    with these it matches all 300."""
+    assert teams_match("soccer", odds_name, espn_token) is True
+
+
+def test_soccer_tricodes_that_collide_across_leagues_resolve_to_nothing():
+    """`STL` is Standard Liege in Belgium and St. Louis CITY SC in MLS, and the
+    board joins per SPORT, not per league -- so first-wins would have joined a
+    Belgian row to an MLS scoreboard. 11 keys collide on the real artifacts."""
+    from syndicate.features.shared.team_aliases import canonical_team
+
+    assert canonical_team("soccer", "STL") is None
+    assert teams_match("soccer", "Standard Liege", "Standard Liege") is True
