@@ -1534,3 +1534,70 @@ class CandidateTraceReadOnlyScopeTests(unittest.TestCase):
         self.assertFalse(payload["sport_filter_applies"])
         self.assertEqual(payload["scope"], "all_sports")
         self.assertIn("read_only_trace", payload)
+
+
+class BookQuoteStateSidecarAllowlistTests(unittest.TestCase):
+    """The quote change-log's sidecar must cross services with the log itself.
+
+    `append_book_quotes` writes a row only when (line, price) CHANGES, and
+    records "when did we last OBSERVE this market" in `<date>.state.json`
+    beside the `.jsonl`. Only the `.jsonl` was allowlisted, so the service that
+    READS quotes (refresh-worker, via `pipeline/layer2_shortlist`) could never
+    see last-seen written by the service that CAPTURES them
+    (live-odds-worker). Different disks.
+
+    Measured 2026-08-08 with the threading deployed and sweeps confirmed
+    running (MLB capture 21:38:09Z): `quote_seen_age_seconds` was None on 112
+    of 112 board rows, so `_freshness_factor` fell back to movement age and
+    scored every row 0.25 -- the harshest discount -- for markets that had
+    merely not moved. Live and inert.
+    """
+
+    def _matches(self, path: str) -> bool:
+        import fnmatch
+
+        from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
+
+        return any(fnmatch.fnmatch(path, pattern) for pattern in HOT_ARTIFACT_PATTERNS)
+
+    def test_the_state_sidecar_is_published(self) -> None:
+        self.assertTrue(self._matches("mlb_source/tracking/book_quotes/2026-08-08.state.json"))
+
+    def test_the_quote_log_itself_still_publishes(self) -> None:
+        self.assertTrue(self._matches("mlb_source/tracking/book_quotes/2026-08-08.jsonl"))
+
+    def test_every_sport_is_covered_not_just_mlb(self) -> None:
+        for sport in ("mlb", "wnba", "soccer", "nhl", "nfl"):
+            self.assertTrue(self._matches(f"{sport}_source/tracking/book_quotes/2026-08-08.state.json"), sport)
+
+    def test_the_temp_write_file_is_not_published(self) -> None:
+        """`_write_state` writes `<name>.tmp` then renames. Publishing a
+        half-written file would be worse than publishing nothing."""
+        self.assertFalse(self._matches("mlb_source/tracking/book_quotes/2026-08-08.state.json.tmp"))
+
+    def test_the_pattern_does_not_widen_to_other_tracking_dirs(self) -> None:
+        """Deliberately one filename in one already-allowlisted directory --
+        not `tracking/**`. Republishing is implicated in web's OOM, so the
+        blast radius stays as small as the fix allows.
+
+        NOT asserted here: `tracking/odds_history/`. Its own PRE-EXISTING
+        pattern is `*_source/tracking/odds_history/*.json`, which already
+        matches any `.json` in that directory including a `.state.json`. That
+        breadth is not introduced by this change and is left alone rather than
+        narrowed in passing.
+        """
+        self.assertFalse(self._matches("mlb_source/tracking/other/2026-08-08.state.json"))
+        self.assertFalse(self._matches("mlb_source/tracking/book_quotes_archive/2026-08-08.state.json"))
+
+    def test_a_star_in_these_patterns_crosses_directory_separators(self) -> None:
+        """Worth pinning because it is easy to get wrong -- I did, twice, while
+        writing the test above.
+
+        These are `fnmatch` patterns, not `glob`: `*` matches `/` as well, so
+        `book_quotes/*.state.json` also matches a nested path. That is
+        pre-existing behaviour of EVERY pattern in this list (the sibling
+        `.jsonl` pattern included), not something this change introduces. A
+        reader assuming glob semantics will size the blast radius of any new
+        pattern too small.
+        """
+        self.assertTrue(self._matches("mlb_source/tracking/book_quotes/nested/2026-08-08.state.json"))

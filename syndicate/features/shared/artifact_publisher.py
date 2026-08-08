@@ -308,6 +308,25 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # allowlist alone (allowlisting only PERMITS a push; something has to make
     # it).
     "*_source/tracking/book_quotes/*.jsonl",
+    # The change log's SIDECAR, and without it the log is only half readable
+    # across services. `append_book_quotes` writes rows only when (line, price)
+    # CHANGES, and records "when did we last OBSERVE this market" in
+    # `<date>.state.json` next to it. The `.jsonl` publishes; the sidecar did
+    # not, so the service that reads quotes (refresh-worker, via
+    # `pipeline/layer2_shortlist`) could never see last-seen data written by the
+    # service that captures them (live-odds-worker). Different disks.
+    #
+    # Measured 2026-08-08 with the threading deployed and sweeps confirmed
+    # running (MLB capture 21:38:09Z): `quote_seen_age_seconds` was None on
+    # 112 of 112 board rows and `_freshness_factor` fell back to movement age,
+    # scoring every row 0.25 -- the harshest discount -- for markets that had
+    # simply not moved. The feature was live and inert.
+    #
+    # Cost, sized rather than assumed: 1.4MB per sport-date against the 13MB
+    # `.jsonl` already published from this same directory -- roughly 10% more
+    # on a path that already crosses. Deliberately narrow: this one filename
+    # pattern in one already-allowlisted directory, not `tracking/**`.
+    "*_source/tracking/book_quotes/*.state.json",
     # #124: the actual root cause of MLB live props reading zero everywhere
     # except web. syndicate/features/shared/live_lens_loop.py runs on
     # live-odds-worker (per its own header comment: "runs independently ...
