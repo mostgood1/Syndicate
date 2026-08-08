@@ -208,3 +208,62 @@ class LeagueSelectControlTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_api_reads_fall_back_to_the_repo_root_when_the_runtime_disk_lacks_them(tmp_path, monkeypatch):
+    """The soccer sim's whole failure mode, in one assertion.
+
+    `_api_root` resolved `_source_roots()[0]` -- the runtime disk only -- and
+    discarded the repo fallback `preferred_source_roots` appends on Render. With
+    an empty runtime disk the schedule read returns nothing, so:
+
+        available_weeks -> 0
+        default_week    -> 1        (the "no weeks" fallback, NOT the real week)
+        week_date_list  -> []
+        build_soccer_artifacts.py --week ... -> SystemExit in 2s, no artifact
+
+    Measured on production 2026-08-08: nine of ten leagues' sim processes lived
+    under a minute against an 1800s step timeout and wrote no
+    recommendations_*.json, and the process list showed them scoped to `week=1`
+    while their real matchweek was 2 -- both symptoms of exactly this.
+    """
+    from syndicate.features.soccer import sources as soccer_sources
+
+    empty_runtime = tmp_path / "runtime"
+    empty_runtime.mkdir()
+    repo_root = Path(soccer_sources.__file__).resolve().parents[3] / "data" / "soccer_source"
+
+    monkeypatch.setattr(
+        soccer_sources,
+        "_source_roots",
+        lambda: [empty_runtime, repo_root],
+    )
+    soccer_sources.schedule_payload.cache_clear()
+
+    try:
+        resolved = soccer_sources.schedule_path("eredivisie", 2026)
+        assert resolved.is_file(), "must resolve to the root that actually has the schedule"
+        assert repo_root in resolved.parents
+
+        assert len(soccer_sources.available_weeks("eredivisie", 2026)) > 0
+        assert soccer_sources.week_date_list("eredivisie", 2026, 2), "empty list is what raised SystemExit"
+    finally:
+        soccer_sources.schedule_payload.cache_clear()
+
+
+def test_api_read_path_reports_the_runtime_location_when_nothing_has_the_file(tmp_path, monkeypatch):
+    """Absence must still name the canonical runtime path, not a fallback that
+    never held the artifact -- otherwise a missing-file error points somewhere
+    misleading."""
+    from syndicate.features.soccer import sources as soccer_sources
+
+    first = tmp_path / "runtime"
+    second = tmp_path / "repo"
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.setattr(soccer_sources, "_source_roots", lambda: [first, second])
+
+    resolved = soccer_sources.schedule_path("eredivisie", 2026)
+
+    assert first in resolved.parents
+    assert not resolved.exists()

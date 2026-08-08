@@ -84,6 +84,46 @@ def _api_root(league: str) -> Path:
     return _source_roots()[0] / normalize_league(league) / "api"
 
 
+def _api_read_path(league: str, *parts: str) -> Path:
+    """A per-league artifact, from the first root that actually HAS it.
+
+    `_api_root` resolves `_source_roots()[0]` — the runtime disk only — and
+    `preferred_source_roots` appends a repo fallback on Render precisely so a
+    git-shipped artifact stays reachable when that disk never received it.
+    Every read below threw the fallback away unread, and the cost was the whole
+    soccer sim:
+
+        SYNDICATE_SOCCER_SOURCE_ROOT=<empty dir> \\
+          build_soccer_artifacts.py --league eredivisie --week 2 --season 2026
+        -> "no dates found for eredivisie week 2 season 2026"   exit in 2s
+
+    That `SystemExit` is `main()`'s `--week` branch: `week_date_list` reads the
+    schedule through this path, gets nothing, and bails BEFORE writing any
+    artifact. It matches the production symptom exactly — measured 2026-08-08,
+    nine of ten leagues' sim processes lived <1 minute against an 1800s step
+    timeout and produced no `recommendations_*.json`, while MLS ran for minutes
+    and produced one. A clean exit, so nothing appeared in any log as an error.
+
+    Same defect as `team_branding_path` (`60689dee`) and the same fix. WRITES
+    are unaffected: both builders write through their own `--out-root`
+    (`build_soccer_schedule.py:81`, `build_soccer_artifacts.py:215`), so
+    everything resolved here is a read.
+    """
+    league = normalize_league(league)
+    relative = Path(*parts)
+    roots = [root / league / "api" for root in _source_roots()]
+    for root in roots:
+        candidate = root / relative
+        try:
+            if candidate.is_file():
+                return candidate
+        except Exception:
+            continue
+    # Nothing has it: the runtime path, so a missing artifact is still reported
+    # at the canonical location rather than at a fallback that never held it.
+    return roots[0] / relative
+
+
 def load_json(path: Path) -> dict[str, Any] | None:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -96,7 +136,7 @@ def load_json(path: Path) -> dict[str, Any] | None:
 
 
 def recommendations_path(league: str, selected_date: str) -> Path:
-    return _api_root(league) / "recommendations" / f"recommendations_{selected_date}.json"
+    return _api_read_path(league, "recommendations", f"recommendations_{selected_date}.json")
 
 
 def recommendations_payload(league: str, selected_date: str) -> dict[str, Any] | None:
@@ -117,7 +157,7 @@ def recommendations_payload(league: str, selected_date: str) -> dict[str, Any] |
 
 
 def live_state_path(league: str, selected_date: str) -> Path:
-    return _api_root(league) / "live_state" / f"live_state_{selected_date}.json"
+    return _api_read_path(league, "live_state", f"live_state_{selected_date}.json")
 
 
 def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None:
@@ -127,7 +167,7 @@ def live_state_payload(league: str, selected_date: str) -> dict[str, Any] | None
 
 
 def picks_path(league: str, selected_date: str) -> Path:
-    return _api_root(league) / "picks" / f"picks_{selected_date}.csv"
+    return _api_read_path(league, "picks", f"picks_{selected_date}.csv")
 
 
 def picks_rows(league: str, selected_date: str) -> tuple[dict[str, str], ...]:
@@ -324,7 +364,7 @@ def all_teams(league: str) -> list[dict[str, Any]]:
 
 
 def rosters_path(league: str, season: int) -> Path:
-    return _api_root(league) / "rosters" / f"rosters_{season}.csv"
+    return _api_read_path(league, "rosters", f"rosters_{season}.csv")
 
 
 @lru_cache(maxsize=32)
@@ -382,7 +422,7 @@ def default_season(league: str) -> int:
 
 
 def schedule_path(league: str, season: int) -> Path:
-    return _api_root(league) / "schedule" / f"schedule_{season}.json"
+    return _api_read_path(league, "schedule", f"schedule_{season}.json")
 
 
 @lru_cache(maxsize=32)
