@@ -1,5 +1,108 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (late) — SOCCER END-TO-END EVAL, all 10 leagues: the sim runs for MLS ONLY
+
+Requested before pushing the `game.state` fix. Measured against production,
+2026-08-08. **Nothing pushed; nothing deployed.**
+
+```
+#  league              sched fixT cards cardT sim  rec pick prop live odds  card week
+1  epl                   380    0     1     0   1   .    .    Y    Y    Y   Wk1 08-21
+2  la_liga               380    0     9     0   9   .    .    Y    Y    Y   Wk1 08-15..21
+3  bundesliga            306    0     1     0   1   .    .    Y    Y    Y   Wk1 08-28
+4  serie_a               380    0    11     0  11   .    .    Y    Y    Y   Wk1 08-22..28
+5  ligue_1               306    0     1     0   1   .    .    Y    Y    Y   Wk1 08-21
+6  mls                   511    1    10     0   1   Y    Y    Y    Y    Y   Wk19 08-02..08
+7  eredivisie            306    4     9     4   0   .    Y    Y    Y    Y   Wk2 08-08..14
+8  primeira_liga         306    3     9     3   0   .    Y    Y    Y    Y   Wk2 08-08..14
+9  championship          552    0     1     0   1   .    .    Y    Y    Y   Wk1 08-14
+10 belgian_pro_league    306    3     9     3   0   .    Y    Y    Y    Y   Wk2 08-08..14
+```
+
+**THE HEADLINE: only MLS has written a `recommendations_*.json` in 24h.** The
+other nine wrote **zero**, while all ten refreshed schedule / odds / props /
+picks / live_state within 6h. So it is the SIM STEP ALONE that is not running —
+every other soccer step is healthy across all ten leagues.
+
+**The three leagues with a real slate today (eredivisie 4, primeira 3, belgian
+3 fixtures) have `simulated: 0`.** The seven showing `sim > 0` are simulated for
+their week-1 dates, **6-20 days away**. Exactly inverted: 100% of today's
+fixtures unsimulated, 100% of simulated fixtures ≥6 days out.
+
+**The code is fine — I ran it.** `build_soccer_artifacts.py --league eredivisie
+--date 2026-08-08` locally: *"confirmed lineups found for 1/4 fixtures"*,
+*"simulated 4 matches, 157 player projections"*, file written. **~6 minutes for
+one league on one date.** So this is an execution/scheduling failure on the
+worker, not a broken builder. **WHY it does not run there is NOT diagnosed** —
+that needs the Render logs API (worker counters are unreadable from web).
+
+#### Two artifact families are lying, and I misread both first
+
+- **`picks_*.csv` is EMPTY — 1 byte — for EVERY league and EVERY date**,
+  including MLS today. A whole artifact family that has never held a row.
+- **`props/<date>.csv` is OddsAPI PROP ODDS, not sim output** (`league,player,
+  market,line,over_price,under_price,book,...`). It refreshes daily for all ten
+  leagues, which makes the tree look alive.
+
+I read both as "the sim ran today" from file PRESENCE before opening them, and
+told the user so. **`recommendations_*.json` is the only sim artifact.** Same
+lesson as [[a rate, not a count]]: presence is not content, and here two
+families existed, refreshed on schedule, and carried nothing.
+
+#### Other measured gaps
+
+- **No `lineups` artifact family exists for any league.** Confirmed XI is
+  fetched from ESPN inside the sim run and never persisted, so lineup coverage
+  cannot be audited from artifacts at all — only from a sim's stdout.
+- **`/intelligence/api/opportunity-board` returns 0 records for EVERY sport**,
+  not just soccer. Separate from this work; not diagnosed.
+- `SOCCER_MATCH_PLAYER_PROPS_EMPTY` fired for 2 of 8 clubs (Willem II, ADO Den
+  Haag) — real per-club player-row gaps inside an otherwise-successful run.
+
+#### The board join fix is validated by this eval
+
+300 board rows attributed to **4 leagues with zero unattributed**: mls 144,
+eredivisie 122, primeira 19, belgian 15 — exactly the leagues playing today.
+Independent confirmation the derived alias map resolves real OddsAPI names.
+
+#### RECOMMENDATION — make the pipeline date-keyed, keep week as cards nav only
+
+The week view is load-bearing in exactly two places (the cards page's nav and
+`_soccer_artifact_scope_args`). **Everything else in the system is date-keyed**:
+odds, props, live_state, chips, the board grid, settlement, intelligence. Every
+week/date boundary is a translation, and this session plus the last one traced
+four separate defects to those translations.
+
+Concrete costs measured today:
+- **6 of 10 leagues present a "current" card view containing ZERO of today's
+  fixtures** (EPL's reads `Week 1 (2026-08-21)` — 13 days out).
+- The 61-chip misread that cost the previous session nine hypotheses happened
+  because chips are a WEEK's fixtures, mostly future, joined against a
+  TODAY-only odds grid.
+- `--week` scope loops every date in the week, so it multiplies the ~6 min/
+  league/date sim cost by 3-7x. Date scope makes the full 10-league sweep ~60
+  min sequential; week scope makes it hours. **That is a plausible cause of the
+  MLS-only symptom and should be tested first.**
+
+Keep matchweek as a presentation/nav affordance on the league cards page —
+soccer genuinely has matchweeks and a week view always shows something. But the
+provider feeding home/board (`_SoccerDataProvider.games()`) should return
+TODAY's fixtures, and the refresh scope should be `--date`, like every other
+sport.
+
+#### ARTIFACT NAMING — soccer is the odd one out
+
+Soccer is the only sport whose tree is **per-league** (`soccer_source/<league>/
+api/...`) with **no top-level `manifests/`, `tracking/`, or `source_artifacts/`**
+— every other sport has them. Alignment work, not yet done:
+- add `soccer_source/manifests/` per the other sports' contract;
+- retire or populate the empty `picks/` family — an always-empty artifact
+  family is worse than none, since it reads as coverage;
+- rename `props/<date>.csv` to say it is market odds (it sits beside sim output
+  and is not sim output);
+- `recommendations_<date>.json` is already date-keyed and consistent with
+  NCAAB's `api/` shape — that part is fine and should be the template.
+
 ### 2026-08-08 (late) — SOCCER `game.state`: FIXED, 0 → 300/300 rows. The nine-hypothesis chase was hunting a defect that did not exist
 
 **Code `f465edb4`, NOT DEPLOYED.** A concurrent-session `--amend` collision
