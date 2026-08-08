@@ -1,0 +1,390 @@
+league,player_id,player_name,team,position,is_goalkeeper,appearances,starts,minutes_played,shots_per90,xg_per90,xa_per90,shot_on_target_rate,expected_minutes_share,source
+primeira_liga,228458,Patrick Sequeira,Casa Pia,Goalkeeper,True,9,9,772.2,0.0,0.0,0.0,,0.78,espn_true_per90
+primeira_liga,104172,José Fonte,Casa Pia,Center Defender,False,9,9,810.0,0.4444,0.1111,0.0,0.25,0.8182,espn_true_per90
+primeira_liga,254447,Duplexe Tchamba,Casa Pia,Center Left Defender,False,4,4,360.0,1.25,0.25,0.0,0.2,0.3636,espn_true_per90
+primeira_liga,328225,Joao Goulart,Casa Pia,Center Right Defender,False,6,5,373.6,0.2409,0.0,0.0,1.0,0.3773,espn_true_per90
+primeira_liga,379808,Fahem Benaissa-Yahia,Casa Pia,Left Back,False,8,6,516.2,0.1744,0.0,0.0,0.0,0.5214,espn_true_per90
+primeira_liga,248860,Gaizka Larrazabal,Casa Pia,Right Back,False,11,11,927.8,0.9701,0.0,0.097,0.3,0.9372,espn_true_per90
+primeira_liga,336585,Rafael Brito,Casa Pia,Center Left Midfielder,False,4,2,183.8,0.0,0.0,0.0,,0.1856,espn_true_per90
+primeira_liga,300592,Yassin Oukili,Casa Pia,Center Right Midfielder,False,3,2,143.2,0.6286,0.0,0.0,0.0,0.1446,espn_true_per90
+primeira_liga,297156,Kelian Nsona Wa Saka,Casa Pia,Left Midfielder,False,4,3,271.2,0.0,0.0,0.3318,,0.274,espn_true_per90
+primeira_liga,231196,Jeremy Livolant,Casa Pia,Right Midfielder,False,11,11,954.5,1.7914,0.2829,0.2829,0.5789,0.9642,espn_true_per90
+primeira_liga,201763,Cassiano,Casa Pia,Forward,False,11,7,586.2,1.0747,0.3071,0.0,0.5714,0.5921,espn_true_per90
+primeira_liga,402986,Renato Nhaga,Casa Pia,Substitute,False,10,7,622.4,0.8676,0.1446,0.0,0.1667,0.6287,espn_true_per90
+primeira_liga,239216,Max Svensson,Casa Pia,Substitute,False,6,1,177.4,4.0589,0.0,0.0,0.375,0.1792,espn_true_per90
+primeira_liga,149660,André Geraldes,Casa Pia,Substitute,False,11,7,759.3,0.1185,0.0,0.0,1.0,0.7669,espn_true_per90
+primeira_liga,337004,Oluwakorede Osundina,Casa Pia,Substitute,False,6,3,249.0,1.4457,0.3614,0.0,0.25,0.2515,espn_true_per90
+primeira_liga,333001,Miguel Sousa,Casa Pia,Substitute,False,8,2,210.5,0.0,0.0,0.4275,,0.2126,espn_true_per90
+primeira_liga,177898,Rui Silva,Sporting CP,Goalkeeper,True,9,9,810.0,0.0,0.0,0.0,,0.8182,espn_true_per90
+primeira_liga,304106,Gonçalo Inácio,Sporting CP,Center Left Defender,False,11,11,990.0,0.4545,0.0,0.1818,0.2,1.0,espn_true_per90
+primeira_liga,343964,Ousmane Diomande,Sporting CP,Center Right Defender,False,4,4,327.1,1.1007,0.0,0.0,0.0,0.3304,espn_true_per90
+primeira_liga,287025,Maxi Araújo,Sporting CP,Left Back,False,8,6,555.5,1.4581,0.0,0.162,0.2222,0.5611,espn_true_per90
+primeira_liga,333209,Iván Fresneda,Sporting CP,Right Back,False,9,7,458.4,0.0,0.0,0.0,,0.4631,espn_true_per90
+primeira_liga,274159,Francisco Trincão,Sporting CP,Attacking Midfielder,False,11,11,963.4,2.6158,0.2803,0.1868,0.3571,0.9731,espn_true_per90
+primeira_liga,270752,Hidemasa Morita,Sporting CP,Left Midfielder,False,8,5,378.9,0.9502,0.0,0.0,0.0,0.3827,espn_true_per90
+primeira_liga,274911,Morten Hjulmand,Sporting CP,Right Midfielder,False,11,11,990.0,1.3636,0.1818,0.0909,0.1333,1.0,espn_true_per90
+primeira_liga,272722,Luis Suárez,Sporting CP,Forward,False,11,11,904.0,4.9782,0.6969,0.1991,0.44,0.9131,espn_true_per90
+primeira_liga,262591,Pedro Gonçalves,Sporting CP,Attacking Midfielder Left,False,11,11,904.6,4.5764,0.7959,0.4974,0.5,0.9138,espn_true_per90
+primeira_liga,296969,Geny Catamo,Sporting CP,Attacking Midfielder Right,False,9,7,458.4,2.1595,0.0,0.1963,0.4545,0.4631,espn_true_per90
+primeira_liga,258923,Giorgi Kochorashvili,Sporting CP,Substitute,False,9,3,340.9,1.5839,0.0,0.0,0.1667,0.3444,espn_true_per90
+primeira_liga,314473,Zeno Debast,Sporting CP,Substitute,False,8,7,663.0,0.543,0.0,0.0,0.25,0.6696,espn_true_per90
+primeira_liga,362794,Conrad Harder,Sporting CP,Substitute,False,4,0,59.6,9.0589,1.5098,0.0,0.6667,0.0602,espn_true_per90
+primeira_liga,376274,Geovany Quenda,Sporting CP,Substitute,False,11,4,545.1,1.8162,0.1651,0.6604,0.4545,0.5506,espn_true_per90
+primeira_liga,259871,Ricardo Mangas,Sporting CP,Substitute,False,6,5,402.1,0.8954,0.4477,0.0,0.5,0.4061,espn_true_per90
+primeira_liga,236200,Lucas Oliveira,C.D. Nacional,Goalkeeper,True,6,6,540.0,0.0,0.0,0.0,,0.5455,espn_true_per90
+primeira_liga,225543,Léo Santos,C.D. Nacional,Center Left Defender,False,11,10,942.9,0.6681,0.1909,0.0,0.4286,0.9525,espn_true_per90
+primeira_liga,269954,Ulisses,C.D. Nacional,Center Right Defender,False,5,3,224.4,0.4011,0.0,0.0,1.0,0.2266,espn_true_per90
+primeira_liga,351497,José Gomes,C.D. Nacional,Left Back,False,11,11,960.0,0.5625,0.0938,0.2812,0.5,0.9697,espn_true_per90
+primeira_liga,124019,João Aurélio,C.D. Nacional,Right Back,False,10,10,887.0,0.5073,0.0,0.0,0.2,0.8959,espn_true_per90
+primeira_liga,216371,Matheus Dias,C.D. Nacional,Center Midfielder,False,10,10,844.1,0.9596,0.0,0.0,0.1111,0.8527,espn_true_per90
+primeira_liga,183972,Filipe Soares,C.D. Nacional,Left Midfielder,False,10,2,314.2,0.573,0.0,0.0,0.0,0.3173,espn_true_per90
+primeira_liga,228403,Liziero,C.D. Nacional,Right Midfielder,False,11,11,901.6,1.098,0.0,0.2995,0.0909,0.9107,espn_true_per90
+primeira_liga,82009,Jesús Ramírez,C.D. Nacional,Forward,False,11,11,950.1,2.463,0.5684,0.0,0.5385,0.9597,espn_true_per90
+primeira_liga,215279,Witi,C.D. Nacional,Left Forward,False,11,5,471.3,1.3367,0.0,0.0,0.2857,0.4761,espn_true_per90
+primeira_liga,265388,Paulinho,C.D. Nacional,Right Forward,False,11,11,933.8,1.7348,0.0964,0.0,0.3333,0.9432,espn_true_per90
+primeira_liga,165576,André Sousa,C.D. Nacional,Substitute,False,3,0,21.0,4.2857,0.0,0.0,0.0,0.0212,espn_true_per90
+primeira_liga,346832,Joel Silva,C.D. Nacional,Substitute,False,5,0,73.8,2.44,0.0,0.0,0.0,0.0745,espn_true_per90
+primeira_liga,278802,Andrew,Gil Vicente,Goalkeeper,True,11,11,955.4,0.0,0.0,0.0,,0.965,espn_true_per90
+primeira_liga,183070,Jonathan Buatu,Gil Vicente,Center Left Defender,False,11,11,945.0,0.6667,0.0,0.0,0.1429,0.9545,espn_true_per90
+primeira_liga,313888,Marvin Elimbi,Gil Vicente,Center Right Defender,False,11,11,990.0,0.3636,0.0,0.0,0.0,1.0,espn_true_per90
+primeira_liga,250888,Ghislain Konan,Gil Vicente,Left Back,False,11,11,983.8,0.4574,0.0,0.0,0.6,0.9937,espn_true_per90
+primeira_liga,345768,Hevertton Santos,Gil Vicente,Right Back,False,8,2,214.5,0.0,0.0,0.4196,,0.2166,espn_true_per90
+primeira_liga,312549,Luís Esteves,Gil Vicente,Attacking Midfielder,False,10,10,838.5,2.6833,0.322,0.2147,0.44,0.847,espn_true_per90
+primeira_liga,309575,Facundo Cáseres,Gil Vicente,Left Midfielder,False,11,11,911.9,0.1974,0.0,0.0,0.5,0.9211,espn_true_per90
+primeira_liga,313229,Pablo,Gil Vicente,Forward,False,11,11,841.1,2.1401,0.856,0.107,0.55,0.8496,espn_true_per90
+primeira_liga,358927,Martín Fernández,Gil Vicente,Attacking Midfielder Left,False,9,4,354.7,1.5222,0.2537,0.2537,0.1667,0.3583,espn_true_per90
+primeira_liga,279658,Sergio Bermejo,Gil Vicente,Attacking Midfielder Right,False,8,4,338.5,1.8612,0.0,0.0,0.1429,0.3419,espn_true_per90
+primeira_liga,384482,Gustavo Varela,Gil Vicente,Substitute,False,10,0,171.3,3.6767,0.5252,0.5252,0.5714,0.1731,espn_true_per90
+primeira_liga,304634,Zé Carlos,Gil Vicente,Substitute,False,11,9,776.3,0.9274,0.0,0.0,0.125,0.7842,espn_true_per90
+primeira_liga,332042,Santiago García,Gil Vicente,Substitute,False,11,9,745.2,2.2947,0.2415,0.0,0.4211,0.7527,espn_true_per90
+primeira_liga,338296,Zé Carlos,Gil Vicente,Substitute,False,11,2,346.2,0.7799,0.0,0.0,0.0,0.3497,espn_true_per90
+primeira_liga,284798,João Valido,Arouca,Goalkeeper,True,9,9,810.0,0.0,0.0,0.0,,0.8182,espn_true_per90
+primeira_liga,301904,José Fontán,Arouca,Center Left Defender,False,10,10,888.4,0.6078,0.1013,0.0,0.1667,0.8974,espn_true_per90
+primeira_liga,307191,Boris Popovic,Arouca,Center Right Defender,False,7,7,630.0,0.4286,0.1429,0.0,0.6667,0.6364,espn_true_per90
+primeira_liga,345110,Arnau Solà,Arouca,Left Back,False,8,6,498.9,0.5412,0.0,0.1804,0.0,0.5039,espn_true_per90
+primeira_liga,256725,Alex Pinto,Arouca,Right Back,False,5,3,263.3,0.0,0.0,0.0,,0.2659,espn_true_per90
+primeira_liga,346774,Lee Hyun-Ju,Arouca,Attacking Midfielder,False,9,7,622.1,1.5913,0.0,0.2893,0.1818,0.6284,espn_true_per90
+primeira_liga,316899,Taichi Fukui,Arouca,Left Midfielder,False,11,10,864.3,0.5207,0.1041,0.1041,0.2,0.873,espn_true_per90
+primeira_liga,355525,Pedro Santos,Arouca,Right Midfielder,False,5,4,321.2,0.2802,0.0,0.0,0.0,0.3244,espn_true_per90
+primeira_liga,381385,Dylan Nandín,Arouca,Forward,False,7,5,406.7,1.3277,0.0,0.0,0.3333,0.4108,espn_true_per90
+primeira_liga,281113,Näis Djouahra,Arouca,Attacking Midfielder Left,False,11,10,801.0,1.6854,0.5618,0.1124,0.5333,0.8091,espn_true_per90
+primeira_liga,284853,Alfonso Trezza,Arouca,Attacking Midfielder Right,False,11,10,778.5,1.0405,0.4625,0.1156,0.5556,0.7863,espn_true_per90
+primeira_liga,285232,Mateo Flores,Arouca,Substitute,False,3,0,70.4,0.0,0.0,0.0,,0.0711,espn_true_per90
+primeira_liga,217150,Brian Mansilla,Arouca,Substitute,False,9,0,135.0,3.3323,0.0,0.0,0.2,0.1364,espn_true_per90
+primeira_liga,324959,Miguel Puche,Arouca,Substitute,False,10,2,301.7,1.7899,0.0,0.2983,0.3333,0.3047,espn_true_per90
+primeira_liga,287434,Amadou Dante,Arouca,Substitute,False,8,5,479.8,1.1254,0.0,0.0,0.1667,0.4847,espn_true_per90
+primeira_liga,119440,David Simão,Arouca,Substitute,False,10,7,607.5,0.4444,0.0,0.0,0.3333,0.6137,espn_true_per90
+primeira_liga,202353,Simão Bertelli,AVS,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,0.6667,espn_true_per90
+primeira_liga,82720,Cristian Devenish,AVS,Center Left Defender,False,11,11,945.0,0.0,0.0,0.0,,0.875,espn_true_per90
+primeira_liga,184036,Aderlan Santos,AVS,Center Right Defender,False,5,5,369.2,1.7063,0.0,0.0,0.1429,0.3419,espn_true_per90
+primeira_liga,185902,Kiki,AVS,Left Back,False,11,9,726.2,0.4957,0.0,0.0,0.0,0.6724,espn_true_per90
+primeira_liga,307930,Pedro Lima,AVS,Attacking Midfielder,False,9,5,520.1,1.9034,0.173,0.173,0.3636,0.4816,espn_true_per90
+primeira_liga,284914,Jaume Grau,AVS,Left Midfielder,False,12,12,1053.4,0.5126,0.0,0.0,0.1667,0.9754,espn_true_per90
+primeira_liga,283792,Ángel Algobia,AVS,Right Midfielder,False,8,7,427.6,0.2105,0.0,0.0,0.0,0.3959,espn_true_per90
+primeira_liga,276349,Jordi Escobar,AVS,Forward,False,3,2,112.1,0.8026,0.0,0.0,0.0,0.1038,espn_true_per90
+primeira_liga,271823,Rafael Barbosa,AVS,Attacking Midfielder Left,False,11,7,615.0,2.0489,0.1463,0.2927,0.2143,0.5694,espn_true_per90
+primeira_liga,362144,Babatunde Akinsola,AVS,Attacking Midfielder Right,False,12,11,910.4,1.2852,0.0,0.1977,0.1538,0.8429,espn_true_per90
+primeira_liga,407001,Guilherme Neiva,AVS,Substitute,False,6,0,169.4,2.1255,0.0,0.0,0.25,0.1568,espn_true_per90
+primeira_liga,302630,Tiago Galletto,AVS,Substitute,False,5,1,150.4,0.5982,0.0,0.0,0.0,0.1393,espn_true_per90
+primeira_liga,119532,Diego Duarte,AVS,Substitute,False,9,2,307.0,2.6389,0.2932,0.0,0.5556,0.2842,espn_true_per90
+primeira_liga,352200,Gustavo Mendonça,AVS,Substitute,False,3,0,73.3,0.0,0.0,0.0,,0.0679,espn_true_per90
+primeira_liga,124021,Nenê,AVS,Substitute,False,9,1,191.8,5.1603,0.9382,0.0,0.4545,0.1776,espn_true_per90
+primeira_liga,330458,Lazar Carevic,FC Famalicao,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,1.0,espn_true_per90
+primeira_liga,282086,Justin de Haas,FC Famalicao,Center Left Defender,False,9,9,810.0,0.5556,0.2222,0.0,0.4,0.8182,espn_true_per90
+primeira_liga,287018,Leonardo Realpe,FC Famalicao,Center Right Defender,False,10,10,865.6,0.3119,0.104,0.0,0.3333,0.8743,espn_true_per90
+primeira_liga,219663,Rafa,FC Famalicao,Left Back,False,7,5,398.3,0.452,0.0,0.226,0.5,0.4023,espn_true_per90
+primeira_liga,366785,Rodrigo Pinheiro,FC Famalicao,Right Back,False,11,11,990.0,0.4545,0.0909,0.0909,0.4,1.0,espn_true_per90
+primeira_liga,347406,Gustavo Sá,FC Famalicao,Attacking Midfielder,False,11,11,950.6,1.5149,0.1894,0.0,0.3125,0.9602,espn_true_per90
+primeira_liga,368008,Mathias De Amorim,FC Famalicao,Left Midfielder,False,10,10,846.5,1.4886,0.1063,0.1063,0.0714,0.855,espn_true_per90
+primeira_liga,261366,Tommie van de Looi,FC Famalicao,Right Midfielder,False,10,9,821.8,1.0951,0.0,0.0,0.2,0.8301,espn_true_per90
+primeira_liga,306034,Simon Elisor,FC Famalicao,Forward,False,11,10,813.1,2.4351,0.1107,0.1107,0.4091,0.8213,espn_true_per90
+primeira_liga,314606,Sorriso,FC Famalicao,Attacking Midfielder Left,False,11,11,957.0,2.257,0.094,0.094,0.25,0.9667,espn_true_per90
+primeira_liga,229573,Gil Dias,FC Famalicao,Attacking Midfielder Right,False,11,8,659.2,3.0035,0.1365,0.273,0.2273,0.6659,espn_true_per90
+primeira_liga,390389,Yassir Zabiri,FC Famalicao,Substitute,False,5,1,132.1,2.0436,0.0,0.0,0.3333,0.1335,espn_true_per90
+primeira_liga,342743,Otar Mamageishvili,FC Famalicao,Substitute,False,6,1,103.4,0.8707,0.0,0.0,0.0,0.1044,espn_true_per90
+primeira_liga,370133,Pedro Santos,FC Famalicao,Substitute,False,6,1,160.8,1.6788,0.0,0.0,0.0,0.1625,espn_true_per90
+primeira_liga,228401,Gabriel Batista,Santa Clara,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,1.0,espn_true_per90
+primeira_liga,181290,Luís Rocha,Santa Clara,Center Defender,False,5,5,450.0,0.4,0.0,0.0,0.0,0.4545,espn_true_per90
+primeira_liga,177918,Frederico Venâncio,Santa Clara,Center Left Defender,False,9,9,720.0,0.25,0.0,0.0,0.5,0.7273,espn_true_per90
+primeira_liga,373576,Sidney,Santa Clara,Center Right Defender,False,11,11,966.4,0.6519,0.0,0.0,0.1429,0.9762,espn_true_per90
+primeira_liga,290212,Adriano,Santa Clara,Center Left Midfielder,False,11,10,920.9,0.8796,0.0,0.0,0.1111,0.9302,espn_true_per90
+primeira_liga,351573,Serginho,Santa Clara,Center Right Midfielder,False,11,10,811.5,1.9964,0.2218,0.0,0.2778,0.8197,espn_true_per90
+primeira_liga,301819,Matheus Pereira,Santa Clara,Left Midfielder,False,10,8,721.0,0.9987,0.0,0.1248,0.25,0.7283,espn_true_per90
+primeira_liga,269912,Wendel,Santa Clara,Forward,False,7,6,478.8,1.5037,0.188,0.3759,0.375,0.4837,espn_true_per90
+primeira_liga,297080,Gabriel Silva,Santa Clara,Center Left Forward,False,8,6,482.7,3.5426,0.1865,0.0,0.3684,0.4876,espn_true_per90
+primeira_liga,298067,Vinícius,Santa Clara,Center Right Forward,False,11,8,668.0,2.56,0.5389,0.0,0.4211,0.6747,espn_true_per90
+primeira_liga,116745,Paulo Victor,Santa Clara,Substitute,False,9,6,532.5,0.3381,0.0,0.0,0.0,0.5378,espn_true_per90
+primeira_liga,306663,Pedro Ferreira,Santa Clara,Substitute,False,11,6,605.4,0.892,0.0,0.0,0.1667,0.6115,espn_true_per90
+primeira_liga,386928,João Costa,Santa Clara,Substitute,False,5,0,58.7,3.067,0.0,1.5335,0.5,0.0593,espn_true_per90
+primeira_liga,307660,Elias Manoel,Santa Clara,Substitute,False,5,0,108.2,3.3278,0.0,0.0,0.5,0.1093,espn_true_per90
+primeira_liga,314863,MT,Santa Clara,Substitute,False,8,6,630.0,1.2857,0.1429,0.0,0.4444,0.6364,espn_true_per90
+primeira_liga,319267,Lukás Hornícek,Braga,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,1.0,espn_true_per90
+primeira_liga,301417,Bright Arrey-Mbi,Braga,Center Left Defender,False,7,6,512.8,0.0,0.0,0.0,,0.518,espn_true_per90
+primeira_liga,92335,Paulo Oliveira,Braga,Center Right Defender,False,5,5,367.5,0.0,0.0,0.0,,0.3713,espn_true_per90
+primeira_liga,344843,Leonardo Lelo,Braga,Left Back,False,11,11,910.7,0.2965,0.0,0.3953,0.3333,0.9199,espn_true_per90
+primeira_liga,250906,Carvalho,Braga,Right Back,False,3,3,233.6,1.1558,0.3853,0.0,0.3333,0.236,espn_true_per90
+primeira_liga,398386,Diego Rodrigues,Braga,Center Left Midfielder,False,6,3,319.1,0.8463,0.2821,0.0,0.6667,0.3223,espn_true_per90
+primeira_liga,326029,Jean-Baptiste Gorby,Braga,Center Right Midfielder,False,11,9,745.0,1.0872,0.0,0.0,0.2222,0.7526,espn_true_per90
+primeira_liga,324373,Roger Fernandes,Braga,Right Midfielder,False,4,4,326.3,3.5857,0.2758,0.2758,0.6154,0.3296,espn_true_per90
+primeira_liga,301262,Amine El Ouazzani,Braga,Center Left Forward,False,7,5,473.3,1.7113,0.3803,0.0,0.3333,0.4781,espn_true_per90
+primeira_liga,303808,Pau Víctor,Braga,Center Right Forward,False,10,7,561.0,1.7648,0.1604,0.0,0.2727,0.5666,espn_true_per90
+primeira_liga,324930,Gustaf Lagerbielke,Braga,Substitute,False,10,8,779.8,0.2308,0.1154,0.0,0.5,0.7877,espn_true_per90
+primeira_liga,347459,Mario Dorgeles,Braga,Substitute,False,6,3,300.6,1.1974,0.2994,0.0,0.25,0.3037,espn_true_per90
+primeira_liga,184423,Ricardo Horta,Braga,Substitute,False,9,7,611.4,2.9442,0.5888,0.0,0.65,0.6175,espn_true_per90
+primeira_liga,400353,Sandro Vidigal,Braga,Substitute,False,3,0,41.6,2.1619,0.0,0.0,0.0,0.0421,espn_true_per90
+primeira_liga,265984,Víctor Gómez,Braga,Substitute,False,11,8,770.3,0.7011,0.1168,0.0,0.5,0.7781,espn_true_per90
+primeira_liga,340560,Bernardo,Tondela,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,1.0,espn_true_per90
+primeira_liga,336590,Brayan Medina,Tondela,Center Left Defender,False,9,9,810.0,0.5556,0.0,0.0,0.2,0.8182,espn_true_per90
+primeira_liga,206735,João Afonso,Tondela,Center Right Defender,False,4,4,360.0,0.25,0.0,0.0,0.0,0.3636,espn_true_per90
+primeira_liga,321383,Emmanuel Maviram,Tondela,Left Back,False,9,7,639.2,0.9855,0.0,0.0,0.1429,0.6457,espn_true_per90
+primeira_liga,324512,Tiago Manso,Tondela,Right Back,False,11,8,661.1,1.2253,0.1361,0.0,0.4444,0.6678,espn_true_per90
+primeira_liga,290102,Joseph Hodge,Tondela,Attacking Midfielder,False,5,4,303.3,0.8902,0.0,0.0,0.0,0.3064,espn_true_per90
+primeira_liga,218691,Cícero,Tondela,Left Midfielder,False,5,3,210.6,0.4273,0.0,0.0,1.0,0.2127,espn_true_per90
+primeira_liga,93334,Hélder,Tondela,Right Midfielder,False,7,4,337.8,0.0,0.0,0.0,,0.3412,espn_true_per90
+primeira_liga,366012,Miro,Tondela,Forward,False,4,4,281.1,2.2415,0.0,0.0,0.2857,0.2839,espn_true_per90
+primeira_liga,287809,Pedro Maranhão,Tondela,Attacking Midfielder Left,False,11,9,800.0,3.375,0.225,0.0,0.3667,0.8081,espn_true_per90
+primeira_liga,381139,Yarlen,Tondela,Attacking Midfielder Right,False,10,5,440.7,1.2252,0.0,0.0,0.5,0.4452,espn_true_per90
+primeira_liga,384293,Xabi Huarte,Tondela,Substitute,False,4,1,134.2,2.6816,0.0,0.0,0.5,0.1356,espn_true_per90
+primeira_liga,353247,Yefrei Rodriguez,Tondela,Substitute,False,11,1,345.1,1.5646,0.0,0.0,0.5,0.3486,espn_true_per90
+primeira_liga,359925,Juan Sebastián Rodríguez,Tondela,Substitute,False,11,7,660.0,0.2727,0.0,0.0,0.5,0.6667,espn_true_per90
+primeira_liga,333221,Sie Outtara,Tondela,Substitute,False,5,1,123.5,1.457,0.0,0.0,0.0,0.1248,espn_true_per90
+primeira_liga,158211,Caio Secco,Moreirense,Goalkeeper,True,7,7,630.0,0.0,0.0,0.0,,0.6364,espn_true_per90
+primeira_liga,219004,Jobson Maracás,Moreirense,Center Left Defender,False,10,10,885.4,0.1016,0.1016,0.0,1.0,0.8944,espn_true_per90
+primeira_liga,177563,Marcelo,Moreirense,Center Right Defender,False,10,10,900.0,0.7,0.1,0.0,0.2857,0.9091,espn_true_per90
+primeira_liga,406868,Kiko,Moreirense,Left Back,False,10,10,828.3,0.6519,0.1087,0.0,0.1667,0.8367,espn_true_per90
+primeira_liga,333090,Dinis Pinto,Moreirense,Right Back,False,11,11,984.1,0.4573,0.0,0.4573,0.4,0.9941,espn_true_per90
+primeira_liga,266670,Alan,Moreirense,Attacking Midfielder,False,11,11,944.3,1.3344,0.1906,0.2859,0.3571,0.9538,espn_true_per90
+primeira_liga,359248,Mateja Stjepanovic,Moreirense,Left Midfielder,False,11,11,966.7,0.5586,0.0,0.0,0.1667,0.9764,espn_true_per90
+primeira_liga,285846,Lawrence Ofori,Moreirense,Right Midfielder,False,4,3,206.6,0.4356,0.0,0.4356,0.0,0.2087,espn_true_per90
+primeira_liga,202570,Guilherme Schettine,Moreirense,Forward,False,10,9,670.1,2.4175,0.9401,0.0,0.5556,0.6769,espn_true_per90
+primeira_liga,321375,Kiko Bondoso,Moreirense,Attacking Midfielder Left,False,8,8,591.9,0.3041,0.0,0.3041,0.0,0.5979,espn_true_per90
+primeira_liga,276645,Cedric Teguia,Moreirense,Attacking Midfielder Right,False,10,7,552.1,0.9782,0.0,0.0,0.0,0.5576,espn_true_per90
+primeira_liga,393761,Álvaro Martínez,Moreirense,Substitute,False,5,1,141.2,0.0,0.0,0.0,,0.1426,espn_true_per90
+primeira_liga,343635,Rodri Alonso,Moreirense,Substitute,False,5,0,76.9,1.17,0.0,0.0,0.0,0.0777,espn_true_per90
+primeira_liga,394475,Yan Maranhão,Moreirense,Substitute,False,8,2,251.6,2.1463,0.3577,0.3577,0.3333,0.2541,espn_true_per90
+primeira_liga,289695,Bernardo Martins,Moreirense,Substitute,False,8,3,372.3,1.9338,0.2417,0.2417,0.5,0.3761,espn_true_per90
+primeira_liga,346589,André Gomes,Alverca,Goalkeeper,True,10,10,900.0,0.0,0.0,0.0,,0.9091,espn_true_per90
+primeira_liga,332351,Kaiky Naves,Alverca,Center Defender,False,10,10,854.1,0.7376,0.0,0.0,0.0,0.8627,espn_true_per90
+primeira_liga,367550,Bastien Meupiyou,Alverca,Center Left Defender,False,9,9,810.0,0.2222,0.0,0.0,0.5,0.8182,espn_true_per90
+primeira_liga,364697,Steven Baseya,Alverca,Center Right Defender,False,4,2,208.1,0.4325,0.0,0.0,0.0,0.2102,espn_true_per90
+primeira_liga,332008,Tomás Mendes,Alverca,Center Left Midfielder,False,5,3,312.3,0.2881,0.0,0.2881,0.0,0.3155,espn_true_per90
+primeira_liga,358445,Alexsandro Amorim,Alverca,Center Right Midfielder,False,11,11,930.5,0.677,0.0967,0.0,0.2857,0.9399,espn_true_per90
+primeira_liga,380857,Isaac James,Alverca,Left Midfielder,False,5,4,371.2,0.2425,0.0,0.2425,0.0,0.3749,espn_true_per90
+primeira_liga,324296,Gonçalo Esteves,Alverca,Right Midfielder,False,5,2,162.6,1.1072,0.5536,0.0,0.5,0.1642,espn_true_per90
+primeira_liga,97026,Marko Milovanovic,Alverca,Forward,False,11,11,772.9,1.7466,0.3493,0.0,0.4,0.7808,espn_true_per90
+primeira_liga,321359,Chiquinho,Alverca,Center Left Forward,False,4,4,332.4,1.6247,0.0,0.0,0.1667,0.3357,espn_true_per90
+primeira_liga,406867,Cédric Nuozzi,Alverca,Center Right Forward,False,10,6,539.1,1.5025,0.1669,0.0,0.5556,0.5445,espn_true_per90
+primeira_liga,192505,Sandro Lima,Alverca,Substitute,False,10,0,218.6,1.2349,0.8233,0.4116,1.0,0.2208,espn_true_per90
+primeira_liga,406869,Tiago Leite,Alverca,Substitute,False,6,0,64.1,7.0247,0.0,0.0,0.4,0.0647,espn_true_per90
+primeira_liga,276256,Nabili Touaizi,Alverca,Substitute,False,11,9,838.2,0.3221,0.0,0.0,0.0,0.8467,espn_true_per90
+primeira_liga,303812,Sabit Abdulai,Alverca,Substitute,False,8,7,486.1,1.1109,0.0,0.0,0.3333,0.491,espn_true_per90
+primeira_liga,141624,Joel Robles,Estoril,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,1.0,espn_true_per90
+primeira_liga,320945,Felix Bacher,Estoril,Center Defender,False,11,11,990.0,0.6364,0.0,0.0,0.0,1.0,espn_true_per90
+primeira_liga,284764,Pedro Amaral,Estoril,Center Left Defender,False,7,7,555.4,0.9723,0.0,0.0,0.1667,0.561,espn_true_per90
+primeira_liga,306030,Kévin Boma,Estoril,Center Right Defender,False,10,10,900.0,0.7,0.1,0.0,0.4286,0.9091,espn_true_per90
+primeira_liga,243734,Jordan Holsgrove,Estoril,Center Left Midfielder,False,11,11,935.2,1.8286,0.0962,0.2887,0.2632,0.9446,espn_true_per90
+primeira_liga,307733,Nodar Lominadze,Estoril,Center Right Midfielder,False,9,7,494.4,1.2742,0.3641,0.0,0.2857,0.4994,espn_true_per90
+primeira_liga,401300,Tiago Parente,Estoril,Left Midfielder,False,9,4,403.6,0.892,0.223,0.0,0.25,0.4077,espn_true_per90
+primeira_liga,373605,Pedro Carvalho,Estoril,Right Midfielder,False,11,8,666.1,0.6756,0.0,0.1351,0.0,0.6728,espn_true_per90
+primeira_liga,272488,Yanis Begraoui,Estoril,Forward,False,11,8,695.3,2.4594,0.6472,0.1294,0.4211,0.7023,espn_true_per90
+primeira_liga,185343,João Carvalho,Estoril,Center Left Forward,False,11,11,972.5,2.3137,0.2776,0.2776,0.48,0.9823,espn_true_per90
+primeira_liga,245913,Rafik Guitane,Estoril,Center Right Forward,False,10,6,437.1,1.4413,0.4118,0.4118,0.7143,0.4415,espn_true_per90
+primeira_liga,367588,Fabrício Andrade,Estoril,Substitute,False,5,0,133.0,2.0307,0.0,0.0,0.3333,0.1343,espn_true_per90
+primeira_liga,361726,Tiago Brito,Estoril,Substitute,False,4,0,66.3,1.3564,0.0,0.0,0.0,0.067,espn_true_per90
+primeira_liga,144046,Pizzi,Estoril,Substitute,False,6,1,159.1,0.5658,0.0,0.0,0.0,0.1607,espn_true_per90
+primeira_liga,301543,Patrick de Paula,Estoril,Substitute,False,8,2,344.3,1.8299,0.0,0.0,0.1429,0.3478,espn_true_per90
+primeira_liga,271900,Alejandro Marqués,Estoril,Substitute,False,7,2,210.9,1.2802,0.0,0.0,0.6667,0.213,espn_true_per90
+primeira_liga,379981,André Lacximicant,Estoril,Substitute,False,11,5,509.3,3.0039,0.1767,0.1767,0.2353,0.5145,espn_true_per90
+primeira_liga,130499,Renan Ribeiro,Estrela,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,1.0,espn_true_per90
+primeira_liga,303631,Bernardo Schappo,Estrela,Center Defender,False,9,8,730.7,0.6159,0.0,0.0,0.0,0.7381,espn_true_per90
+primeira_liga,338229,Atanas Chernev,Estrela,Center Left Defender,False,11,11,955.6,0.5651,0.0,0.0,0.0,0.9653,espn_true_per90
+primeira_liga,297764,Luan Patrick,Estrela,Center Right Defender,False,11,11,953.3,0.0,0.0,0.0,,0.9629,espn_true_per90
+primeira_liga,351541,Paulo Moreira,Estrela,Center Left Midfielder,False,10,10,818.3,0.5499,0.22,0.0,0.6,0.8266,espn_true_per90
+primeira_liga,357717,Robinho,Estrela,Center Right Midfielder,False,8,4,339.8,0.2649,0.0,0.0,0.0,0.3432,espn_true_per90
+primeira_liga,332394,Sidny Lopes Cabral,Estrela,Right Midfielder,False,11,11,975.4,2.4912,0.4613,0.1845,0.4074,0.9853,espn_true_per90
+primeira_liga,325067,Alan Godoy,Estrela,Forward,False,6,3,299.2,2.4067,0.0,0.0,0.125,0.3022,espn_true_per90
+primeira_liga,250059,Jovane Cabral,Estrela,Center Left Forward,False,6,4,419.5,2.5747,0.0,0.0,0.25,0.4237,espn_true_per90
+primeira_liga,408949,Gastão,Estrela,Center Right Forward,False,6,4,256.7,1.0519,0.0,0.3506,0.3333,0.2593,espn_true_per90
+primeira_liga,319827,Abraham Marcus,Estrela,Substitute,False,10,9,797.7,1.3538,0.0,0.2256,0.0833,0.8058,espn_true_per90
+primeira_liga,216290,Rodrigo Pinho,Estrela,Substitute,False,9,2,238.2,2.2671,0.0,0.3778,0.1667,0.2406,espn_true_per90
+primeira_liga,277312,Kikas,Estrela,Substitute,False,10,7,671.4,2.5469,0.4021,0.134,0.5263,0.6782,espn_true_per90
+primeira_liga,382780,Guilherme Montoia,Estrela,Substitute,False,7,3,354.0,0.5084,0.0,0.0,0.5,0.3576,espn_true_per90
+primeira_liga,267578,Ianis Stoica,Estrela,Substitute,False,10,4,386.8,1.8615,0.4654,0.0,0.375,0.3907,espn_true_per90
+primeira_liga,238903,Diogo Costa,FC Porto,Goalkeeper,True,11,11,990.0,0.0,0.0,0.0,,1.0,espn_true_per90
+primeira_liga,221788,Jan Bednarek,FC Porto,Center Left Defender,False,11,11,876.9,0.3079,0.0,0.0,0.3333,0.8857,espn_true_per90
+primeira_liga,268437,Nehuén Pérez,FC Porto,Center Right Defender,False,5,4,364.6,0.4937,0.2469,0.0,0.5,0.3683,espn_true_per90
+primeira_liga,364657,Martim Fernandes,FC Porto,Left Back,False,4,2,144.7,0.6222,0.0,0.0,0.0,0.1461,espn_true_per90
+primeira_liga,346111,Alberto Costa,FC Porto,Right Back,False,9,8,703.7,1.0231,0.0,0.6394,0.125,0.7108,espn_true_per90
+primeira_liga,307601,Alan Varela,FC Porto,Center Midfielder,False,11,11,910.2,0.6922,0.0,0.0,0.4286,0.9194,espn_true_per90
+primeira_liga,307381,Gabri Veiga,FC Porto,Left Midfielder,False,10,7,541.1,2.3286,0.1663,0.6653,0.3571,0.5466,espn_true_per90
+primeira_liga,373520,Victor Froholdt,FC Porto,Right Midfielder,False,11,11,957.5,1.0339,0.188,0.282,0.1818,0.9672,espn_true_per90
+primeira_liga,364815,Samu Aghehowa,FC Porto,Forward,False,10,9,628.2,4.0112,0.8595,0.1433,0.6429,0.6346,espn_true_per90
+primeira_liga,292268,Borja Sainz,FC Porto,Left Forward,False,11,9,734.4,3.3087,0.3676,0.2451,0.3704,0.7418,espn_true_per90
+primeira_liga,256909,Pepê,FC Porto,Right Forward,False,9,9,689.8,1.3047,0.2609,0.2609,0.3,0.6968,espn_true_per90
+primeira_liga,127420,Luuk de Jong,FC Porto,Substitute,False,4,2,234.8,1.9163,0.3833,0.0,0.6,0.2372,espn_true_per90
+primeira_liga,376664,William Gomes,FC Porto,Substitute,False,8,4,389.2,3.4691,0.4625,0.0,0.3333,0.3931,espn_true_per90
+primeira_liga,345752,Dominik Prpic,FC Porto,Substitute,False,5,0,91.5,0.0,0.0,0.0,,0.0924,espn_true_per90
+primeira_liga,289513,Zaidu Sanusi,FC Porto,Substitute,False,7,2,303.9,0.8883,0.2961,0.2961,0.3333,0.307,espn_true_per90
+primeira_liga,270505,Stephen Eustáquio,FC Porto,Substitute,False,5,0,152.6,1.1798,0.0,0.0,0.5,0.1541,espn_true_per90
+primeira_liga,216134,Charles,Vitória de Guimaraes,Goalkeeper,True,4,4,360.0,0.0,0.0,0.0,,0.3333,espn_true_per90
+primeira_liga,345742,Miguel Nóbrega,Vitória de Guimaraes,Center Left Defender,False,5,3,294.3,0.9173,0.3058,0.0,0.3333,0.2725,espn_true_per90
+primeira_liga,332686,João Mendes,Vitória de Guimaraes,Left Back,False,11,11,902.0,0.9978,0.0,0.0,0.2,0.8352,espn_true_per90
+primeira_liga,324007,Miguel Maga,Vitória de Guimaraes,Right Back,False,12,12,974.4,0.1847,0.0,0.0,0.0,0.9022,espn_true_per90
+primeira_liga,324008,Tomás Händel,Vitória de Guimaraes,Center Left Midfielder,False,3,3,270.0,1.3333,0.0,0.3333,0.0,0.25,espn_true_per90
+primeira_liga,189474,Tiago Silva,Vitória de Guimaraes,Center Right Midfielder,False,4,3,286.6,2.198,0.314,0.0,0.2857,0.2654,espn_true_per90
+primeira_liga,252095,Oumar Camara,Vitória de Guimaraes,Left Midfielder,False,8,4,432.9,1.4552,0.4158,0.2079,0.4286,0.4009,espn_true_per90
+primeira_liga,324487,Vando Félix,Vitória de Guimaraes,Right Midfielder,False,6,3,316.2,0.2847,0.0,0.0,0.0,0.2927,espn_true_per90
+primeira_liga,351586,Gustavo da Silva,Vitória de Guimaraes,Forward,False,6,6,496.8,3.0795,0.1811,0.1811,0.2941,0.46,espn_true_per90
+primeira_liga,275984,Nuno Santos,Vitória de Guimaraes,Rear Center Forward,False,5,3,222.6,1.617,0.0,0.4042,0.0,0.2061,espn_true_per90
+primeira_liga,286545,Orest Lebedenko,Vitória de Guimaraes,Substitute,False,5,1,176.9,1.5259,0.0,0.0,0.0,0.1638,espn_true_per90
+primeira_liga,322491,Alioune Ndoye,Vitória de Guimaraes,Substitute,False,10,1,285.3,3.1549,0.631,0.0,0.5,0.2641,espn_true_per90
+primeira_liga,127575,Nélson Oliveira,Vitória de Guimaraes,Substitute,False,12,9,701.4,1.9247,0.3849,0.0,0.4,0.6494,espn_true_per90
+primeira_liga,304076,Telmo Arcanjo,Vitória de Guimaraes,Substitute,False,11,7,605.4,1.0406,0.0,0.0,0.5714,0.5606,espn_true_per90
+primeira_liga,303051,Guillem Molina,AVS,Right Back,False,3,3,254.7,0.0,0.0,0.0,,0.2358,espn_true_per90
+primeira_liga,225168,Kobamelo Kodisang,AVS,Substitute,False,4,1,115.8,0.0,0.0,0.0,,0.1072,espn_true_per90
+primeira_liga,324002,Iyad Mohamed,Casa Pia,Center Left Midfielder,False,8,4,380.0,0.2368,0.2368,0.0,1.0,0.3838,espn_true_per90
+primeira_liga,307846,Tiago Morais,Casa Pia,Substitute,False,8,3,307.3,1.7571,0.0,0.0,0.3333,0.3104,espn_true_per90
+primeira_liga,156818,Sebastián Pérez,Casa Pia,Substitute,False,10,7,618.2,0.5824,0.0,0.0,0.0,0.6244,espn_true_per90
+primeira_liga,290188,Christian Marques,Tondela,Center Right Defender,False,9,9,810.0,0.2222,0.0,0.0,0.5,0.8182,espn_true_per90
+primeira_liga,313915,Pedro Bondo,FC Famalicao,Left Back,False,7,6,509.8,0.5296,0.0,0.0,0.3333,0.5149,espn_true_per90
+primeira_liga,407398,Umar Abubakar,FC Famalicao,Substitute,False,8,0,57.7,4.6818,0.0,0.0,0.3333,0.0583,espn_true_per90
+primeira_liga,105237,Ibrahima Ba,FC Famalicao,Substitute,False,6,3,307.2,0.8788,0.0,0.0,0.3333,0.3104,espn_true_per90
+primeira_liga,218262,Rodrigo Abascal,Vitória de Guimaraes,Center Left Defender,False,11,11,990.0,0.4545,0.0,0.1818,0.2,0.9167,espn_true_per90
+primeira_liga,320918,Fabio Gomez,Vitória de Guimaraes,Substitute,False,6,3,280.7,2.5651,0.0,0.0,0.375,0.2599,espn_true_per90
+primeira_liga,297037,Beni,Vitória de Guimaraes,Substitute,False,11,9,723.8,0.373,0.1243,0.0,0.3333,0.6702,espn_true_per90
+primeira_liga,351602,Paulo Vitor,AVS,Substitute,False,4,2,252.1,0.0,0.0,0.0,,0.2334,espn_true_per90
+primeira_liga,364655,Jorge Meireles,Estrela,Substitute,False,9,5,422.4,1.2784,0.0,0.2131,0.3333,0.4267,espn_true_per90
+primeira_liga,286109,Anatoliy Trubin,Benfica,Goalkeeper,True,9,9,810.0,0.0,0.0,0.0,,0.8182,espn_true_per90
+primeira_liga,119289,Nicolás Otamendi,Benfica,Center Left Defender,False,10,10,900.0,0.9,0.1,0.0,0.3333,0.9091,espn_true_per90
+primeira_liga,346588,António Silva,Benfica,Center Right Defender,False,8,7,641.4,0.1403,0.0,0.0,0.0,0.6479,espn_true_per90
+primeira_liga,329653,Samuel Dahl,Benfica,Left Back,False,11,10,887.0,0.5073,0.1015,0.0,0.2,0.896,espn_true_per90
+primeira_liga,308979,Amar Dedic,Benfica,Right Back,False,8,8,667.9,0.2695,0.1348,0.1348,0.5,0.6746,espn_true_per90
+primeira_liga,292921,Enzo Barrenechea,Benfica,Center Left Midfielder,False,10,10,824.4,0.4367,0.0,0.0,0.5,0.8327,espn_true_per90
+primeira_liga,301520,Richard Ríos,Benfica,Center Right Midfielder,False,11,11,923.2,3.1196,0.0,0.0,0.1875,0.9325,espn_true_per90
+primeira_liga,313415,Andreas Schjelderup,Benfica,Left Midfielder,False,9,5,458.1,1.1788,0.1965,0.1965,0.1667,0.4627,espn_true_per90
+primeira_liga,212900,Fredrik Aursnes,Benfica,Right Midfielder,False,11,11,985.8,0.7304,0.0913,0.0,0.125,0.9957,espn_true_per90
+primeira_liga,220819,Vangelis Pavlidis,Benfica,Center Left Forward,False,11,10,910.1,3.3624,0.89,0.2967,0.5,0.9193,espn_true_per90
+primeira_liga,364180,Franjo Ivanovic,Benfica,Center Right Forward,False,9,6,473.6,3.4203,0.5701,0.0,0.6111,0.4784,espn_true_per90
+primeira_liga,271854,Leandro Barreiro,Benfica,Substitute,False,11,1,250.3,2.1578,0.0,0.7193,0.3333,0.2528,espn_true_per90
+primeira_liga,339191,Gianluca Prestianni,Benfica,Substitute,False,8,2,269.8,3.6699,0.3336,0.3336,0.2727,0.2725,espn_true_per90
+primeira_liga,334530,Henrique Araújo,Benfica,Substitute,False,5,0,18.3,9.82,0.0,0.0,0.5,0.0185,espn_true_per90
+primeira_liga,256607,Florentino,Benfica,Substitute,False,3,0,36.5,0.0,0.0,0.0,,0.0369,espn_true_per90
+primeira_liga,275479,Cezary Miszta,Rio Ave,Goalkeeper,True,10,10,900.0,0.0,0.0,0.0,,0.9091,espn_true_per90
+primeira_liga,265909,Jonathan Panzo,Rio Ave,Center Defender,False,9,9,717.5,0.1254,0.0,0.0,0.0,0.7247,espn_true_per90
+primeira_liga,306864,Nelson Abbey,Rio Ave,Center Left Defender,False,6,6,530.8,0.0,0.0,0.0,,0.5361,espn_true_per90
+primeira_liga,325226,Andreas Ntoi,Rio Ave,Center Right Defender,False,10,9,824.3,0.2184,0.0,0.1092,0.0,0.8326,espn_true_per90
+primeira_liga,310001,Brandon Aguilera,Rio Ave,Center Left Midfielder,False,10,9,704.6,0.7664,0.0,0.0,0.3333,0.7117,espn_true_per90
+primeira_liga,387654,Theofanis Bakoulas,Rio Ave,Center Right Midfielder,False,3,2,158.1,0.0,0.0,0.0,,0.1597,espn_true_per90
+primeira_liga,312967,Nicolaos Athanasiou,Rio Ave,Left Midfielder,False,11,9,807.9,0.557,0.0,0.1114,0.0,0.816,espn_true_per90
+primeira_liga,249163,Marios Vrousai,Rio Ave,Right Midfielder,False,11,11,886.3,1.4217,0.1015,0.1015,0.5,0.8952,espn_true_per90
+primeira_liga,301209,Clayton,Rio Ave,Forward,False,11,10,880.5,2.0443,0.7155,0.2044,0.55,0.8894,espn_true_per90
+primeira_liga,345224,Ole Pohlmann,Rio Ave,Center Left Forward,False,9,6,513.2,0.8769,0.0,0.0,0.4,0.5184,espn_true_per90
+primeira_liga,324574,André Luiz,Rio Ave,Center Right Forward,False,11,10,866.8,3.3225,0.4153,0.4153,0.4062,0.8756,espn_true_per90
+primeira_liga,278788,Georgios Liavas,Rio Ave,Substitute,False,11,4,468.8,0.384,0.0,0.192,0.5,0.4735,espn_true_per90
+primeira_liga,358393,Francisco Petrasso,Rio Ave,Substitute,False,9,7,588.9,0.3056,0.0,0.0,0.5,0.5949,espn_true_per90
+primeira_liga,250068,Marc Gual,Rio Ave,Substitute,False,9,1,155.1,2.3209,0.0,0.0,0.0,0.1567,espn_true_per90
+primeira_liga,387656,Antonis Papakanellos,Rio Ave,Substitute,False,4,0,68.6,1.3125,0.0,0.0,0.0,0.0693,espn_true_per90
+primeira_liga,317232,Zé Vitor,C.D. Nacional,Center Left Defender,False,9,9,782.7,0.8049,0.115,0.0,0.2857,0.7906,espn_true_per90
+primeira_liga,318755,Chiheb Labidi,C.D. Nacional,Left Midfielder,False,9,9,654.4,1.5129,0.0,0.0,0.3636,0.661,espn_true_per90
+primeira_liga,351579,Martim Gustavo,C.D. Nacional,Substitute,False,6,0,53.3,0.0,0.0,0.0,,0.0538,espn_true_per90
+primeira_liga,369840,Pablo Ruan,C.D. Nacional,Substitute,False,7,6,432.3,1.6654,0.0,0.0,0.5,0.4367,espn_true_per90
+primeira_liga,120708,Sergi Gómez,Alverca,Center Defender,False,10,10,880.5,0.0,0.0,0.0,,0.8894,espn_true_per90
+primeira_liga,399003,Davy Gui,Alverca,Substitute,False,10,1,270.1,2.9984,0.3332,0.0,0.2222,0.2729,espn_true_per90
+primeira_liga,98573,Gabriel Martínez,Braga,Substitute,False,10,2,337.1,1.6019,0.0,0.267,0.3333,0.3405,espn_true_per90
+primeira_liga,287494,Rodrigo Zalazar,Braga,Substitute,False,10,8,710.7,4.0522,0.5065,0.1266,0.3125,0.7179,espn_true_per90
+primeira_liga,285112,Diogo Calila,Santa Clara,Substitute,False,7,1,166.2,1.083,0.0,0.0,0.5,0.1679,espn_true_per90
+primeira_liga,365774,Gilberto Batista,Moreirense,Substitute,False,8,2,233.1,0.0,0.0,0.0,,0.2355,espn_true_per90
+primeira_liga,311592,Joel Jorquera,Moreirense,Substitute,False,4,0,30.1,2.9861,0.0,0.0,0.0,0.0304,espn_true_per90
+primeira_liga,319697,Alisson Santos,Sporting CP,Substitute,False,9,0,79.0,9.1082,0.0,1.1385,0.0,0.0798,espn_true_per90
+primeira_liga,300514,Georgios Vagiannidis,Sporting CP,Substitute,False,8,4,517.1,0.6963,0.0,0.1741,0.75,0.5223,espn_true_per90
+primeira_liga,291193,Tiago Esgaio,Arouca,Substitute,False,10,8,775.6,0.116,0.0,0.0,0.0,0.7835,espn_true_per90
+primeira_liga,178579,Barbero,Arouca,Substitute,False,10,6,494.9,2.0003,0.0,0.1818,0.3636,0.4999,espn_true_per90
+primeira_liga,407341,Agustín Moreira,Gil Vicente,Substitute,False,6,3,268.3,3.3543,0.0,0.3354,0.1,0.271,espn_true_per90
+primeira_liga,387204,Rodrigo Mora,FC Porto,Substitute,False,9,4,337.2,2.9356,0.2669,0.0,0.1818,0.3406,espn_true_per90
+primeira_liga,398750,Afonso Assis,Moreirense,Substitute,False,4,1,120.5,0.0,0.0,0.0,,0.1217,espn_true_per90
+primeira_liga,359433,Landerson,Moreirense,Substitute,False,7,2,262.1,0.0,0.0,0.3434,,0.2647,espn_true_per90
+primeira_liga,177690,Lucas João,C.D. Nacional,Substitute,False,6,0,46.6,1.9305,0.0,0.0,1.0,0.0471,espn_true_per90
+primeira_liga,277705,Dario Spikic,Rio Ave,Substitute,False,10,7,513.5,0.8764,0.3505,0.0,0.6,0.5187,espn_true_per90
+primeira_liga,329691,Tomás Araújo,Benfica,Center Right Defender,False,9,6,515.2,0.5241,0.1747,0.0,0.3333,0.5204,espn_true_per90
+primeira_liga,228595,Sphephelo Sithole,Tondela,Substitute,False,9,7,661.1,0.2723,0.1361,0.0,0.5,0.6677,espn_true_per90
+primeira_liga,338888,Marcos Peña,FC Famalicao,Substitute,False,4,2,137.4,0.0,0.0,0.0,,0.1388,espn_true_per90
+primeira_liga,172285,Murilo,Gil Vicente,Substitute,False,9,7,615.5,2.7781,0.0,0.4387,0.3684,0.6217,espn_true_per90
+primeira_liga,274289,Moura,FC Porto,Substitute,False,9,8,625.7,1.0069,0.1438,0.1438,0.2857,0.632,espn_true_per90
+primeira_liga,50959,João Moutinho,Braga,Center Left Midfielder,False,9,7,586.5,1.0742,0.0,0.0,0.4286,0.5924,espn_true_per90
+primeira_liga,285434,Fran Navarro,Braga,Substitute,False,8,5,366.5,0.9823,0.4911,0.0,0.75,0.3702,espn_true_per90
+primeira_liga,241197,Daniel Rivas,AVS,Left Back,False,8,3,328.8,0.5475,0.0,0.2737,0.5,0.3044,espn_true_per90
+primeira_liga,381436,Diogo Spencer,AVS,Attacking Midfielder Right,False,9,9,721.3,0.4991,0.1248,0.1248,0.5,0.6678,espn_true_per90
+primeira_liga,309501,Ryan,Estrela,Substitute,False,4,1,153.5,0.0,0.0,0.0,,0.155,espn_true_per90
+primeira_liga,379620,Francisco Chissumba,Alverca,Substitute,False,9,7,618.8,0.5818,0.0,0.0,0.25,0.6251,espn_true_per90
+primeira_liga,360071,Julián Martinez,Alverca,Substitute,False,3,2,205.6,0.4377,0.0,0.0,0.0,0.2077,espn_true_per90
+primeira_liga,352651,Diogo Travassos,Moreirense,Substitute,False,7,5,483.3,2.0483,0.1862,0.0,0.1818,0.4882,espn_true_per90
+primeira_liga,380131,Kevin Prieto,Casa Pia,Substitute,False,3,0,42.4,0.0,0.0,0.0,,0.0429,espn_true_per90
+primeira_liga,379304,Motez Nourani,C.D. Nacional,Substitute,False,3,0,29.2,3.0801,0.0,0.0,0.0,0.0295,espn_true_per90
+primeira_liga,130792,Bruno Lourenco,AVS,Substitute,False,7,2,233.1,1.9306,0.0,0.0,0.2,0.2158,espn_true_per90
+primeira_liga,332660,Óscar Rivas,Vitória de Guimaraes,Center Right Defender,False,9,9,810.0,1.0,0.1111,0.0,0.2222,0.75,espn_true_per90
+primeira_liga,409828,Miguel Nogueira,Vitória de Guimaraes,Attacking Midfielder,False,6,5,348.7,1.2904,0.0,0.0,0.2,0.3229,espn_true_per90
+primeira_liga,345751,Gonçalo Nogueira,Vitória de Guimaraes,Left Midfielder,False,4,3,186.5,0.0,0.0,0.4827,,0.1727,espn_true_per90
+primeira_liga,370770,Matija Mitrovic,Vitória de Guimaraes,Substitute,False,9,3,423.4,1.9129,0.2125,0.0,0.2222,0.3921,espn_true_per90
+primeira_liga,359911,Matías Rocha,Arouca,Center Right Defender,False,3,3,270.0,0.6667,0.0,0.0,0.0,0.2727,espn_true_per90
+primeira_liga,300121,Pablo Gozálbez,Arouca,Substitute,False,8,4,309.0,2.3297,0.0,0.0,0.125,0.3122,espn_true_per90
+primeira_liga,350513,Deniz Gül,FC Porto,Substitute,False,8,0,155.3,2.898,1.1592,0.0,0.6,0.1568,espn_true_per90
+primeira_liga,223776,Pablo Rosario,FC Porto,Substitute,False,7,2,335.1,0.2686,0.2686,0.0,1.0,0.3385,espn_true_per90
+primeira_liga,140388,Bebeto,Tondela,Right Back,False,8,7,599.2,0.3004,0.0,0.0,0.0,0.6052,espn_true_per90
+primeira_liga,187884,Ivan Cavaleiro,Tondela,Substitute,False,8,6,546.7,2.3047,0.1646,0.0,0.2143,0.5522,espn_true_per90
+primeira_liga,290047,Ricard Sánchez,Estoril,Substitute,False,5,4,289.8,0.9317,0.3106,0.3106,0.3333,0.2927,espn_true_per90
+primeira_liga,238901,Ferro,Estoril,Substitute,False,8,5,530.6,0.3392,0.0,0.0,0.5,0.536,espn_true_per90
+primeira_liga,216021,Lincoln,Alverca,Substitute,False,8,7,594.0,1.3637,0.1515,0.303,0.6667,0.6,espn_true_per90
+primeira_liga,361468,Gabriel Moscardo,Braga,Substitute,False,6,1,199.1,1.3558,0.0,0.0,0.0,0.2012,espn_true_per90
+primeira_liga,271772,Lucas Soares,Santa Clara,Right Midfielder,False,9,9,719.4,0.7507,0.0,0.0,0.3333,0.7266,espn_true_per90
+primeira_liga,403567,José Tavares,Santa Clara,Substitute,False,5,0,66.7,0.0,0.0,0.0,,0.0674,espn_true_per90
+primeira_liga,338644,Brenner,Santa Clara,Substitute,False,8,5,405.1,2.2217,0.0,0.0,0.3,0.4092,espn_true_per90
+primeira_liga,346462,Anthony Carter,Santa Clara,Substitute,False,5,1,130.2,0.6913,0.0,0.6913,1.0,0.1315,espn_true_per90
+primeira_liga,295087,Jefferson Encada,Estrela,Right Midfielder,False,8,5,392.3,0.0,0.0,0.0,,0.3962,espn_true_per90
+primeira_liga,399285,Alex Sola,Estrela,Substitute,False,3,0,9.0,0.0,0.0,0.0,,0.0091,espn_true_per90
+primeira_liga,314864,Figueiredo,Alverca,Center Left Forward,False,5,5,285.6,3.1507,0.3151,0.3151,0.5,0.2885,espn_true_per90
+primeira_liga,312752,Gian Cabezas,Alverca,Substitute,False,5,0,36.0,2.4993,0.0,0.0,0.0,0.0364,espn_true_per90
+primeira_liga,176423,Rony Lopes,Tondela,Attacking Midfielder,False,6,6,371.4,2.1807,0.2423,0.4846,0.5556,0.3752,espn_true_per90
+primeira_liga,306191,Remy Vita,Tondela,Substitute,False,4,2,227.2,1.1882,0.0,0.0,0.0,0.2295,espn_true_per90
+primeira_liga,355060,Hugo Félix,Tondela,Substitute,False,6,1,211.6,3.4035,0.0,0.0,0.375,0.2137,espn_true_per90
+primeira_liga,216035,Jordan Pefok,Tondela,Substitute,False,7,5,391.2,2.3007,0.0,0.0,0.4,0.3951,espn_true_per90
+primeira_liga,308603,Georgiy Sudakov,Benfica,Substitute,False,8,7,548.0,1.9708,0.4927,0.0,0.5,0.5535,espn_true_per90
+primeira_liga,215818,Luquinhas,Santa Clara,Substitute,False,5,2,160.8,0.5596,0.0,0.0,1.0,0.1625,espn_true_per90
+primeira_liga,151321,Tómané,AVS,Forward,False,8,7,605.8,1.3371,0.0,0.0,0.2222,0.5609,espn_true_per90
+primeira_liga,336456,Óscar Perea,AVS,Attacking Midfielder Left,False,6,5,362.2,3.4788,0.2485,0.0,0.2857,0.3354,espn_true_per90
+primeira_liga,343359,Sidi Bane,AVS,Substitute,False,8,6,564.9,0.956,0.1593,0.0,0.3333,0.523,espn_true_per90
+primeira_liga,332687,Vasco Sousa,Moreirense,Left Midfielder,False,6,4,312.8,1.7261,0.2877,0.0,0.3333,0.316,espn_true_per90
+primeira_liga,234940,Joao Graça,Rio Ave,Substitute,False,3,0,35.6,0.0,0.0,0.0,,0.036,espn_true_per90
+primeira_liga,364176,Tamás Nikitscher,Rio Ave,Substitute,False,7,0,101.7,0.8847,0.0,0.8847,0.0,0.1028,espn_true_per90
+primeira_liga,304965,Jakub Kiwior,FC Porto,Center Left Defender,False,7,7,630.0,0.4286,0.0,0.1429,0.3333,0.6364,espn_true_per90
+primeira_liga,357235,Antoine Joujou,FC Famalicao,Substitute,False,7,2,237.1,2.6572,0.3796,0.0,0.5714,0.2395,espn_true_per90
+primeira_liga,392622,João Simões,Sporting CP,Substitute,False,5,3,194.9,2.3084,0.0,0.0,0.2,0.1969,espn_true_per90
+primeira_liga,266318,Fotis Ioannidis,Sporting CP,Substitute,False,7,0,162.2,3.3298,1.1099,0.0,0.5,0.1638,espn_true_per90
+primeira_liga,332252,Leandro Antonetti,Estrela,Substitute,False,3,0,25.5,3.5336,0.0,0.0,1.0,0.0257,espn_true_per90
+primeira_liga,341739,Juan Castillo,Vitória de Guimaraes,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,0.6667,espn_true_per90
+primeira_liga,410817,Noah Saviolo,Vitória de Guimaraes,Substitute,False,8,4,333.1,1.8916,0.0,0.2702,0.2857,0.3084,espn_true_per90
+primeira_liga,301593,David Sousa,Casa Pia,Center Left Defender,False,7,7,630.0,1.1429,0.1429,0.0,0.25,0.6364,espn_true_per90
+primeira_liga,330211,Dailon Livramento,Casa Pia,Substitute,False,7,3,282.4,3.5062,0.0,0.0,0.1818,0.2852,espn_true_per90
+primeira_liga,255249,Sikou Niakate,Braga,Center Left Defender,False,5,5,432.2,1.2494,0.0,0.0,0.0,0.4366,espn_true_per90
+primeira_liga,219304,Florian Grillitsch,Braga,Substitute,False,5,2,216.0,1.2502,0.0,0.0,0.3333,0.2181,espn_true_per90
+primeira_liga,354375,Antonio Espigares,Gil Vicente,Substitute,False,3,0,61.6,0.0,0.0,0.0,,0.0622,espn_true_per90
+primeira_liga,206601,Jakub Brabec,Rio Ave,Center Defender,False,6,6,540.0,0.0,0.0,0.0,,0.5455,espn_true_per90
+primeira_liga,243754,Omar Richards,Rio Ave,Substitute,False,3,2,169.4,0.0,0.0,0.0,,0.1711,espn_true_per90
+primeira_liga,372025,Eric Da Silva Moreira,Rio Ave,Substitute,False,3,0,71.8,1.253,0.0,0.0,1.0,0.0726,espn_true_per90
+primeira_liga,367717,Espen Van Ee,Arouca,Substitute,False,4,1,82.1,2.1935,1.0968,0.0,0.5,0.0829,espn_true_per90
+primeira_liga,384419,João Rêgo,Benfica,Substitute,False,6,0,47.3,3.8079,1.904,0.0,1.0,0.0477,espn_true_per90
+primeira_liga,206714,Samu,Vitória de Guimaraes,Substitute,False,7,4,399.2,2.4799,0.2254,0.2254,0.1818,0.3696,espn_true_per90
+primeira_liga,368325,Diogo Sousa,Vitória de Guimaraes,Substitute,False,4,2,185.4,1.9412,0.0,0.0,0.5,0.1717,espn_true_per90
+primeira_liga,334793,Oumar Ngom,Estrela,Substitute,False,5,3,310.0,2.3224,0.0,0.2903,0.125,0.3132,espn_true_per90
+primeira_liga,303866,Joelson Mendes,Gil Vicente,Substitute,False,6,4,343.0,2.0991,0.2624,0.2624,0.125,0.3465,espn_true_per90
+primeira_liga,75433,André Ferreira,Moreirense,Goalkeeper,True,4,4,360.0,0.0,0.0,0.0,,0.3636,espn_true_per90
+primeira_liga,229443,Dodi Lukébakio,Benfica,Substitute,False,6,5,419.9,3.4297,0.0,0.6431,0.4375,0.4241,espn_true_per90
+primeira_liga,283147,Kaique Rocha,Casa Pia,Center Defender,False,5,5,416.0,1.2981,0.2164,0.0,0.1667,0.4202,espn_true_per90
+primeira_liga,373547,Daniel Azevedo,Casa Pia,Substitute,False,3,2,217.8,0.0,0.0,0.0,,0.22,espn_true_per90
+primeira_liga,332352,Kaique,C.D. Nacional,Goalkeeper,True,5,5,450.0,0.0,0.0,0.0,,0.4545,espn_true_per90
+primeira_liga,360362,Julien Lomboto,Rio Ave,Center Defender,False,3,2,130.2,0.0,0.0,0.0,,0.1315,espn_true_per90
+primeira_liga,287575,Gustavo Assunção,AVS,Right Midfielder,False,5,5,431.2,0.6262,0.0,0.0,0.3333,0.3992,espn_true_per90
+primeira_liga,289498,João Gonçalves,AVS,Goalkeeper,True,4,4,360.0,0.0,0.0,0.0,,0.3333,espn_true_per90
+primeira_liga,368011,Omar Fayed,Arouca,Center Right Defender,False,3,2,180.4,0.0,0.0,0.0,,0.1823,espn_true_per90
+primeira_liga,345515,Goncalo Costa,Estoril,Left Back,False,3,3,189.0,1.4286,0.0,0.0,0.0,0.1909,espn_true_per90
+primeira_liga,294295,Antef Tsoungui,Estoril,Right Back,False,3,3,238.7,0.7541,0.0,0.0,0.0,0.2411,espn_true_per90
+primeira_liga,194019,Rúben Semedo,AVS,Center Right Defender,False,3,3,259.3,0.0,0.0,0.0,,0.2401,espn_true_per90

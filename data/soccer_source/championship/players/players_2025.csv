@@ -1,0 +1,462 @@
+league,player_id,player_name,team,position,is_goalkeeper,appearances,starts,minutes_played,shots_per90,xg_per90,xa_per90,shot_on_target_rate,expected_minutes_share,source
+championship,134929,Ryan Allsop,Birmingham City,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,0.8889,espn_true_per90
+championship,263133,Christoph Klarer,Birmingham City,Center Left Defender,False,9,9,810.0,0.3333,0.0,0.0,0.0,1.0,espn_true_per90
+championship,238884,Phil Neumann,Birmingham City,Center Right Defender,False,5,5,435.9,0.0,0.0,0.0,,0.5382,espn_true_per90
+championship,251627,Alex Cochrane,Birmingham City,Left Back,False,7,6,516.3,0.8716,0.0,0.0,0.2,0.6374,espn_true_per90
+championship,217071,Bright Osayi-Samuel,Birmingham City,Right Back,False,8,7,596.6,0.1509,0.0,0.0,0.0,0.7365,espn_true_per90
+championship,301248,Jay Stansfield,Birmingham City,Attacking Midfielder,False,8,8,654.1,2.6142,0.4128,0.1376,0.2632,0.8075,espn_true_per90
+championship,256598,Paik Seung-Ho,Birmingham City,Left Midfielder,False,9,8,748.2,0.8421,0.1203,0.0,0.1429,0.9236,espn_true_per90
+championship,286056,Tomoki Iwata,Birmingham City,Right Midfielder,False,9,9,796.1,0.6783,0.0,0.0,0.1667,0.9829,espn_true_per90
+championship,276904,Kyogo Furuhashi,Birmingham City,Forward,False,9,5,468.1,2.1152,0.0,0.0,0.2727,0.5778,espn_true_per90
+championship,216186,Keshi Anderson,Birmingham City,Attacking Midfielder Left,False,5,2,219.3,1.2311,0.0,0.0,0.3333,0.2708,espn_true_per90
+championship,194403,Demarai Gray,Birmingham City,Attacking Midfielder Right,False,9,9,745.8,2.0515,0.1207,0.1207,0.2353,0.9208,espn_true_per90
+championship,284641,Tommy Doyle,Birmingham City,Substitute,False,9,2,210.3,1.7122,0.0,0.0,0.0,0.2596,espn_true_per90
+championship,207538,Lyndon Dykes,Birmingham City,Substitute,False,8,2,200.0,3.15,0.9,0.0,0.2857,0.2469,espn_true_per90
+championship,282892,Taylor Gardner-Hickman,Blackburn Rovers,Substitute,False,5,3,282.4,0.3186,0.0,0.0,0.0,0.3923,espn_true_per90
+championship,291434,Ethan Laird,Birmingham City,Substitute,False,7,4,373.3,1.4467,0.0,0.2411,0.1667,0.4608,espn_true_per90
+championship,219390,Alex Palmer,Ipswich Town,Goalkeeper,True,7,7,630.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,291174,Jacob Greaves,Ipswich Town,Center Left Defender,False,6,6,540.0,0.6667,0.1667,0.0,0.75,0.8571,espn_true_per90
+championship,243440,Dara O'Shea,Ipswich Town,Center Right Defender,False,7,7,630.0,1.0,0.0,0.0,0.2857,1.0,espn_true_per90
+championship,283086,Leif Davis,Ipswich Town,Left Back,False,7,7,616.6,0.8758,0.0,0.146,0.1667,0.9787,espn_true_per90
+championship,9426,Ben Johnson,Ipswich Town,Right Back,False,3,3,219.1,1.2325,0.0,0.0,0.0,0.3477,espn_true_per90
+championship,139744,Jack Taylor,Ipswich Town,Center Left Midfielder,False,4,3,263.6,1.0245,0.0,0.0,0.3333,0.4183,espn_true_per90
+championship,246825,Azor Matusiwa,Ipswich Town,Center Right Midfielder,False,7,7,606.4,0.2968,0.0,0.0,0.0,0.9625,espn_true_per90
+championship,269343,Jack Clarke,Ipswich Town,Left Midfielder,False,7,4,345.0,2.3476,0.7825,0.0,0.3333,0.5477,espn_true_per90
+championship,238192,Chiedozie Ogbene,Sheffield United,Right Midfielder,False,6,5,415.1,0.2168,0.0,0.2168,0.0,0.5125,espn_true_per90
+championship,241325,George Hirst,Ipswich Town,Forward,False,7,6,499.6,2.3419,0.5404,0.1801,0.3846,0.793,espn_true_per90
+championship,223547,Sammie Szmodics,Ipswich Town,Rear Center Forward,False,7,4,386.0,2.3314,0.0,0.0,0.3,0.6128,espn_true_per90
+championship,211756,Conor Chaplin,Portsmouth,Substitute,False,7,4,376.4,2.8692,0.0,0.0,0.0,0.5228,espn_true_per90
+championship,31810,Ashley Young,Ipswich Town,Substitute,False,5,1,150.1,0.5994,0.0,0.0,0.0,0.2383,espn_true_per90
+championship,243334,Nathan Broadhead,Wrexham,Substitute,False,7,1,219.2,2.4638,0.4106,0.0,0.1667,0.2706,espn_true_per90
+championship,134909,Thomas Kaminski,Charlton Athletic,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,192034,Amari'i Bell,Charlton Athletic,Center Left Defender,False,8,8,720.0,0.125,0.0,0.0,0.0,1.0,espn_true_per90
+championship,186298,Lloyd Jones,Charlton Athletic,Center Right Defender,False,8,8,713.2,1.5144,0.0,0.0,0.4167,0.9905,espn_true_per90
+championship,262796,Joshua Edwards,Charlton Athletic,Left Back,False,7,7,551.1,0.4899,0.0,0.0,0.0,0.7654,espn_true_per90
+championship,274062,Kayne Ramsay,Charlton Athletic,Right Back,False,7,6,530.0,0.6793,0.0,0.0,0.25,0.7361,espn_true_per90
+championship,243713,Sonny Carey,Charlton Athletic,Attacking Midfielder,False,8,8,618.1,2.6211,0.2912,0.0,0.3889,0.8584,espn_true_per90
+championship,184165,Greg Docherty,Charlton Athletic,Left Midfielder,False,8,8,712.0,1.3905,0.0,0.2528,0.2727,0.9888,espn_true_per90
+championship,243543,Conor Coventry,Charlton Athletic,Right Midfielder,False,8,8,720.0,0.5,0.0,0.0,0.25,1.0,espn_true_per90
+championship,283196,Charlie Kelman,Charlton Athletic,Forward,False,8,6,405.1,0.8886,0.0,0.0,0.75,0.5627,espn_true_per90
+championship,336361,Tyreece Campbell,Charlton Athletic,Attacking Midfielder Left,False,8,8,637.1,2.2603,0.0,0.1413,0.0625,0.8848,espn_true_per90
+championship,310354,Robert Apter,Charlton Athletic,Attacking Midfielder Right,False,5,5,382.6,2.3521,0.2352,0.0,0.4,0.5314,espn_true_per90
+championship,303110,Isaac Olaofe,Charlton Athletic,Substitute,False,7,0,76.2,2.3628,1.1814,1.1814,0.5,0.1058,espn_true_per90
+championship,227435,Macaulay Gillesphey,Charlton Athletic,Substitute,False,5,1,169.2,1.0638,0.5319,0.0,0.5,0.235,espn_true_per90
+championship,259283,Harvey Knibbs,Charlton Athletic,Substitute,False,7,0,108.0,2.4995,0.8332,0.0,0.6667,0.15,espn_true_per90
+championship,346449,Miles Leaburn,Charlton Athletic,Substitute,False,8,2,348.7,2.581,0.0,0.0,0.3,0.4843,espn_true_per90
+championship,286433,Egil Selvik,Watford,Goalkeeper,True,7,7,585.0,0.0,0.0,0.0,,0.8125,espn_true_per90
+championship,342837,James Abankwah,Watford,Center Left Defender,False,5,5,426.3,0.2111,0.0,0.0,0.0,0.5921,espn_true_per90
+championship,313891,Kévin Keben,Watford,Center Right Defender,False,7,7,630.0,0.4286,0.0,0.0,0.0,0.875,espn_true_per90
+championship,249112,Marc Bola,Watford,Left Back,False,5,5,414.3,0.2172,0.0,0.0,0.0,0.5755,espn_true_per90
+championship,243552,Jeremy Ngakia,Watford,Right Back,False,6,5,453.5,1.3891,0.0,0.0,0.2857,0.6299,espn_true_per90
+championship,283699,Imran Louza,Watford,Center Midfielder,False,5,5,432.2,2.2907,0.4165,0.4165,0.3636,0.6003,espn_true_per90
+championship,289365,Hector Kyprianou,Watford,Left Midfielder,False,8,7,589.2,0.7637,0.0,0.0,0.2,0.8183,espn_true_per90
+championship,104658,Moussa Sissoko,Watford,Right Midfielder,False,7,6,531.1,0.5084,0.0,0.0,0.3333,0.7376,espn_true_per90
+championship,345364,Luca Kjerrumgaard,Watford,Forward,False,7,5,440.1,2.0451,0.409,0.0,0.6,0.6112,espn_true_per90
+championship,137393,Mamadou Doumbia,Watford,Left Forward,False,4,2,149.1,3.0183,0.0,0.0,0.0,0.2071,espn_true_per90
+championship,296530,Kwadwo Baah,Watford,Right Forward,False,8,2,284.5,3.7967,0.3164,0.0,0.25,0.3951,espn_true_per90
+championship,328535,Nestory Irankunda,Watford,Substitute,False,8,6,466.9,2.8913,0.3855,0.1928,0.3333,0.6485,espn_true_per90
+championship,268986,Edo Kayembe,Watford,Substitute,False,7,4,386.0,1.3989,0.0,0.0,0.3333,0.5362,espn_true_per90
+championship,347046,Max Alleyne,Watford,Substitute,False,7,6,506.8,0.5328,0.0,0.0,0.0,0.7038,espn_true_per90
+championship,307069,Carl Rushworth,Coventry City,Goalkeeper,True,9,9,810.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,269341,Liam Kitching,Coventry City,Center Left Defender,False,9,9,772.9,0.8151,0.0,0.0,0.4286,0.9542,espn_true_per90
+championship,303931,Bobby Thomas,Coventry City,Center Right Defender,False,9,9,810.0,1.3333,0.1111,0.1111,0.4167,1.0,espn_true_per90
+championship,206172,Jay Da Silva,Coventry City,Left Back,False,9,9,734.5,0.3676,0.0,0.0,0.0,0.9068,espn_true_per90
+championship,281139,Milan van Ewijk,Coventry City,Right Back,False,9,9,782.3,0.8053,0.0,0.5752,0.1429,0.9658,espn_true_per90
+championship,286967,Jack Rudoni,Coventry City,Attacking Midfielder,False,6,6,540.0,3.5,0.3333,0.1667,0.2381,0.6667,espn_true_per90
+championship,191337,Matt Grimes,Coventry City,Left Midfielder,False,9,9,798.9,0.5633,0.0,0.1127,0.0,0.9863,espn_true_per90
+championship,256015,Victor Torp,Coventry City,Right Midfielder,False,8,8,648.1,3.1939,0.6943,0.0,0.3913,0.8001,espn_true_per90
+championship,240495,Brandon Thomas-Asante,Coventry City,Forward,False,9,8,690.0,2.7393,0.6522,0.3913,0.381,0.8518,espn_true_per90
+championship,246954,Ephron Mason-Clark,Coventry City,Attacking Midfielder Left,False,6,6,432.3,2.0817,0.2082,0.2082,0.5,0.5337,espn_true_per90
+championship,302002,Tatsuhiro Sakamoto,Coventry City,Attacking Midfielder Right,False,7,6,476.5,1.8889,0.1889,0.0,0.2,0.5882,espn_true_per90
+championship,340205,Miguel Ángel Brau,Coventry City,Substitute,False,4,0,45.9,0.0,0.0,0.0,,0.0567,espn_true_per90
+championship,229106,Ben Sheaf,Wrexham,Substitute,False,6,4,307.6,0.8778,0.0,0.0,1.0,0.3798,espn_true_per90
+championship,220474,Haji Wright,Coventry City,Substitute,False,9,8,674.0,3.7388,1.0682,0.0,0.3571,0.8321,espn_true_per90
+championship,177607,Jamie Allen,Coventry City,Substitute,False,7,1,181.2,0.4968,0.0,0.4968,0.0,0.2237,espn_true_per90
+championship,277234,Ivor Pandur,Hull City,Goalkeeper,True,9,9,810.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,326187,Charlie Hughes,Hull City,Center Left Defender,False,8,8,720.0,0.375,0.0,0.0,0.3333,0.8889,espn_true_per90
+championship,243576,Ryan Giles,Hull City,Left Back,False,9,9,803.2,0.2241,0.0,0.5603,0.0,0.9916,espn_true_per90
+championship,279786,Cody Drameh,Hull City,Right Back,False,6,6,465.8,0.7728,0.0,0.1932,0.75,0.5751,espn_true_per90
+championship,159450,John Lundstram,Hull City,Center Midfielder,False,9,9,712.5,0.5052,0.1263,0.0,0.5,0.8797,espn_true_per90
+championship,249851,Regan Slater,Hull City,Left Midfielder,False,9,4,455.9,1.1844,0.0,0.0,0.1667,0.5629,espn_true_per90
+championship,153613,Matt Crooks,Hull City,Right Midfielder,False,3,2,205.0,0.878,0.439,0.0,0.5,0.2531,espn_true_per90
+championship,306812,Kyle Joseph,Hull City,Forward,False,8,5,478.3,1.8817,0.3763,0.0,0.4,0.5905,espn_true_per90
+championship,349100,Joel Ndala,Hull City,Left Forward,False,5,4,281.9,1.9158,0.0,0.0,0.3333,0.348,espn_true_per90
+championship,235695,Kasey Palmer,Hull City,Substitute,False,7,3,218.4,2.473,0.0,0.0,0.0,0.2696,espn_true_per90
+championship,277531,Joe Gelhardt,Hull City,Substitute,False,9,7,590.8,2.7419,0.3047,0.0,0.4444,0.7294,espn_true_per90
+championship,193010,Oliver McBurnie,Hull City,Substitute,False,9,8,731.3,1.9691,0.7384,0.3692,0.5625,0.9029,espn_true_per90
+championship,275735,Gavin Bazunu,Southampton,Goalkeeper,True,6,6,540.0,0.0,0.0,0.0,,0.75,espn_true_per90
+championship,152475,Jack Stephens,Southampton,Center Defender,False,6,6,540.0,1.0,0.1667,0.0,0.3333,0.75,espn_true_per90
+championship,354014,Joshua Quarshie,Southampton,Center Left Defender,False,4,4,360.0,0.5,0.0,0.0,0.0,0.5,espn_true_per90
+championship,300966,Ronnie Edwards,Southampton,Center Right Defender,False,4,3,262.0,0.3435,0.0,0.0,0.0,0.3639,espn_true_per90
+championship,324164,Shea Charles,Southampton,Center Left Midfielder,False,8,8,708.3,1.1436,0.0,0.0,0.1111,0.9837,espn_true_per90
+championship,255916,Flynn Downes,Southampton,Center Right Midfielder,False,5,4,341.1,0.5277,0.0,0.0,0.0,0.4737,espn_true_per90
+championship,300103,Welington,Southampton,Left Midfielder,False,3,3,146.8,2.452,0.0,0.0,0.0,0.2039,espn_true_per90
+championship,194116,Adam Armstrong,Southampton,Forward,False,8,5,410.0,4.61,0.439,0.0,0.2857,0.5694,espn_true_per90
+championship,355359,Jay Robinson,Southampton,Center Left Forward,False,7,4,369.6,3.4096,0.2435,0.2435,0.3571,0.5133,espn_true_per90
+championship,153012,Ryan Fraser,Southampton,Center Right Forward,False,8,6,574.2,0.4702,0.0,0.3135,0.6667,0.7976,espn_true_per90
+championship,293347,Cameron Archer,Southampton,Substitute,False,7,2,234.9,3.0651,0.3831,0.0,0.5,0.3262,espn_true_per90
+championship,251399,Ryan Manning,Southampton,Substitute,False,8,5,545.2,1.4857,0.3302,0.0,0.2222,0.7572,espn_true_per90
+championship,359707,Damion Downs,Southampton,Substitute,False,4,1,151.8,3.5571,0.0,0.5928,0.0,0.2108,espn_true_per90
+championship,346820,Mateus Fernandes,Southampton,Substitute,False,3,2,188.6,1.909,0.0,0.4773,0.25,0.2619,espn_true_per90
+championship,251936,Ross Stewart,Southampton,Substitute,False,7,2,241.8,2.9782,0.7445,0.0,0.625,0.3358,espn_true_per90
+championship,17861,Danny Ward,Wrexham,Goalkeeper,True,4,4,360.0,0.0,0.0,0.0,,0.4444,espn_true_per90
+championship,156365,Conor Coady,Wrexham,Center Defender,False,5,5,441.1,0.4081,0.0,0.0,0.0,0.5446,espn_true_per90
+championship,294311,Lewis Brunt,Wrexham,Center Left Defender,False,7,5,508.8,0.3538,0.0,0.0,0.0,0.6281,espn_true_per90
+championship,295012,Max Cleworth,Wrexham,Center Right Defender,False,9,9,810.0,0.6667,0.0,0.3333,0.1667,1.0,espn_true_per90
+championship,269288,Lewis O'Brien,Wrexham,Center Left Midfielder,False,9,9,810.0,1.2222,0.3333,0.2222,0.6364,1.0,espn_true_per90
+championship,234449,George Dobson,Wrexham,Center Right Midfielder,False,9,9,810.0,0.7778,0.1111,0.0,0.5714,1.0,espn_true_per90
+championship,135430,Matty James,Wrexham,Attacking Midfielder,False,9,5,499.5,0.5406,0.0,0.0,0.0,0.6166,espn_true_per90
+championship,251076,Ryan Barnett,Wrexham,Right Midfielder,False,6,2,201.7,0.0,0.0,0.0,,0.249,espn_true_per90
+championship,189605,Kieffer Moore,Wrexham,Center Left Forward,False,9,9,752.3,2.5124,0.4786,0.0,0.2857,0.9287,espn_true_per90
+championship,182338,Josh Windass,Wrexham,Center Right Forward,False,6,6,386.2,3.0298,0.6992,0.0,0.3077,0.4767,espn_true_per90
+championship,190576,Ryan Hardie,Wrexham,Substitute,False,4,2,162.3,3.3266,0.0,0.0,0.5,0.2004,espn_true_per90
+championship,243757,Sam Smith,Wrexham,Substitute,False,7,0,126.6,3.5545,0.7109,0.0,0.4,0.1563,espn_true_per90
+championship,266411,Ryan Longman,Wrexham,Substitute,False,9,7,647.0,1.252,0.1391,0.1391,0.4444,0.7988,espn_true_per90
+championship,163970,James McClean,Wrexham,Substitute,False,8,3,288.4,2.1846,0.0,0.6242,0.2857,0.356,espn_true_per90
+championship,243685,Solomon Brynn,Middlesbrough,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,223792,Dael Fry,Middlesbrough,Center Defender,False,5,4,368.6,0.2442,0.2442,0.0,1.0,0.512,espn_true_per90
+championship,240589,Alfie Jones,Middlesbrough,Center Left Defender,False,8,8,718.6,0.3757,0.1252,0.0,0.6667,0.9981,espn_true_per90
+championship,136380,Luke Ayling,Middlesbrough,Center Right Defender,False,8,8,720.0,0.5,0.0,0.25,0.25,1.0,espn_true_per90
+championship,282978,Hayden Hackney,Middlesbrough,Center Left Midfielder,False,8,8,703.4,1.4075,0.128,0.2559,0.1818,0.9769,espn_true_per90
+championship,293826,Aidan Morris,Middlesbrough,Center Right Midfielder,False,8,8,675.1,0.9332,0.0,0.1333,0.4286,0.9376,espn_true_per90
+championship,291699,Samuel Silvera,Middlesbrough,Left Midfielder,False,6,4,446.9,0.8055,0.0,0.0,0.0,0.6207,espn_true_per90
+championship,232311,Callum Brittain,Middlesbrough,Right Midfielder,False,7,7,593.9,0.6062,0.0,0.0,0.25,0.8248,espn_true_per90
+championship,314791,Tommy Conway,Middlesbrough,Forward,False,8,8,597.1,2.1101,0.3014,0.1507,0.2857,0.8293,espn_true_per90
+championship,268606,Delano Burgzorg,Middlesbrough,Center Left Forward,False,5,1,146.6,3.6825,0.6137,0.0,0.3333,0.2037,espn_true_per90
+championship,292002,Morgan Whittaker,Middlesbrough,Center Right Forward,False,7,6,441.2,1.4279,0.0,0.408,0.4286,0.6128,espn_true_per90
+championship,272281,Neto Borges,Bristol City,Substitute,False,7,2,213.0,1.6903,0.0,0.4226,0.0,0.2629,espn_true_per90
+championship,232681,Abdoulaye Kante,Middlesbrough,Substitute,False,4,1,83.5,0.0,0.0,0.0,,0.116,espn_true_per90
+championship,195816,Lawrence Vigouroux,Swansea City,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,207350,Cameron Burgess,Swansea City,Center Left Defender,False,8,8,720.0,0.75,0.0,0.0,0.0,1.0,espn_true_per90
+championship,275596,Ben Cabango,Swansea City,Center Right Defender,False,8,8,704.8,0.1277,0.0,0.0,0.0,0.9789,espn_true_per90
+championship,233348,Josh Tymon,Swansea City,Left Back,False,8,8,720.0,0.125,0.0,0.125,0.0,1.0,espn_true_per90
+championship,263129,Joshua Key,Swansea City,Right Back,False,8,8,704.7,0.7663,0.0,0.0,0.0,0.9787,espn_true_per90
+championship,163274,Ethan Galbraith,Swansea City,Attacking Midfielder,False,8,8,662.7,1.2222,0.0,0.1358,0.4444,0.9205,espn_true_per90
+championship,150603,Jay Fulton,Swansea City,Left Midfielder,False,3,1,96.6,0.0,0.0,0.0,,0.1341,espn_true_per90
+championship,306826,Gonçalo Franco,Swansea City,Right Midfielder,False,7,7,629.8,1.2861,0.1429,0.0,0.2222,0.8747,espn_true_per90
+championship,250786,Liam Cullen,Swansea City,Forward,False,7,3,310.0,1.4517,0.2903,0.0,0.4,0.4305,espn_true_per90
+championship,297791,Eom Ji-Sung,Swansea City,Attacking Midfielder Left,False,7,3,267.7,1.0084,0.0,0.0,0.6667,0.3719,espn_true_per90
+championship,319788,Ronald,Swansea City,Attacking Midfielder Right,False,8,7,625.9,1.1504,0.4314,0.1438,0.625,0.8693,espn_true_per90
+championship,322158,Zan Vipotnik,Swansea City,Substitute,False,7,5,413.3,3.4838,0.871,0.2177,0.4375,0.5741,espn_true_per90
+championship,307402,Zeidane Inoussa,Swansea City,Substitute,False,8,5,452.3,1.393,0.0,0.398,0.4286,0.6281,espn_true_per90
+championship,330240,Melker Widell,Swansea City,Substitute,False,6,0,64.0,1.4054,0.0,0.0,0.0,0.0889,espn_true_per90
+championship,257938,Vladan Kovacevic,Norwich City,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,246922,Harry Darling,Norwich City,Center Defender,False,8,8,720.0,1.125,0.125,0.0,0.2222,1.0,espn_true_per90
+championship,286667,José Córdoba,Norwich City,Center Left Defender,False,5,5,439.1,0.6149,0.0,0.205,0.3333,0.6098,espn_true_per90
+championship,291947,Jakov Medic,Norwich City,Center Right Defender,False,7,7,630.0,0.0,0.0,0.1429,,0.875,espn_true_per90
+championship,306605,Mirko Topic,Norwich City,Center Left Midfielder,False,8,6,523.3,1.0319,0.0,0.0,0.0,0.7268,espn_true_per90
+championship,365340,Jacob Wright,Norwich City,Center Right Midfielder,False,3,2,187.6,0.4796,0.0,0.0,1.0,0.2606,espn_true_per90
+championship,205646,Jeff Schlupp,Norwich City,Left Midfielder,False,5,1,131.3,0.6853,0.0,0.6853,0.0,0.1824,espn_true_per90
+championship,206219,Jack Stacey,Norwich City,Right Midfielder,False,7,6,493.5,0.3647,0.1824,0.1824,0.5,0.6854,espn_true_per90
+championship,256613,Josh Sargent,Norwich City,Forward,False,8,8,697.8,2.9663,0.6448,0.0,0.3913,0.9692,espn_true_per90
+championship,369980,Ante Crnac,Norwich City,Center Left Forward,False,8,7,609.6,1.7715,0.0,0.0,0.1667,0.8467,espn_true_per90
+championship,304073,Mathias Kvistgaarden,Norwich City,Substitute,False,5,2,182.0,1.4838,0.4946,0.0,0.6667,0.2527,espn_true_per90
+championship,346906,Kellen Fisher,Norwich City,Substitute,False,7,4,414.4,0.0,0.0,0.0,,0.5756,espn_true_per90
+championship,324586,Jovon Makama,Norwich City,Substitute,False,6,1,110.1,3.2689,1.6344,0.0,0.75,0.153,espn_true_per90
+championship,301554,Marcelino Núñez,Ipswich Town,Substitute,False,5,2,186.8,3.8542,0.0,0.4818,0.0,0.2965,espn_true_per90
+championship,292004,Benjamin Chrisene,Norwich City,Substitute,False,3,2,177.1,0.5081,0.0,0.0,0.0,0.246,espn_true_per90
+championship,266846,Steven Benda,Millwall,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,190963,Jake Cooper,Millwall,Center Left Defender,False,8,8,720.0,0.875,0.0,0.125,0.1429,1.0,espn_true_per90
+championship,256912,Japhet Tanganga,Sheffield United,Center Right Defender,False,8,8,720.0,0.5,0.0,0.0,0.0,0.8889,espn_true_per90
+championship,353201,Tristan Crama,Millwall,Right Back,False,8,8,695.7,0.5174,0.0,0.1294,0.0,0.9663,espn_true_per90
+championship,316109,Josh Coburn,Millwall,Attacking Midfielder,False,7,7,569.7,1.7378,0.158,0.0,0.2727,0.7912,espn_true_per90
+championship,287894,Billy Mitchell,Millwall,Left Midfielder,False,4,3,254.6,0.707,0.0,0.0,0.0,0.3536,espn_true_per90
+championship,225522,Casper de Norre,Millwall,Right Midfielder,False,3,3,270.0,1.6667,0.0,0.0,0.2,0.375,espn_true_per90
+championship,359214,Mihailo Ivanovic,Millwall,Forward,False,7,6,516.8,2.9607,0.0,0.1742,0.2353,0.7177,espn_true_per90
+championship,308402,Femi Azeez,Millwall,Attacking Midfielder Left,False,3,2,205.0,2.1948,0.0,0.0,0.0,0.2848,espn_true_per90
+championship,310173,Camiel Neghli,Millwall,Attacking Midfielder Right,False,8,7,556.2,3.0745,0.3236,0.0,0.1579,0.7725,espn_true_per90
+championship,281730,Luke Cundle,Millwall,Substitute,False,5,4,337.7,1.3324,0.2665,0.0,0.6,0.4691,espn_true_per90
+championship,320328,Aidomo Emakhu,Millwall,Substitute,False,8,5,440.0,1.6362,0.0,0.0,0.25,0.6112,espn_true_per90
+championship,252773,Macaulay Langstaff,Millwall,Substitute,False,5,0,85.3,5.2755,1.0551,0.0,0.4,0.1185,espn_true_per90
+championship,146223,Ryan Leonard,Millwall,Substitute,False,8,5,472.4,0.5715,0.0,0.0,0.0,0.6561,espn_true_per90
+championship,165266,Massimo Luongo,Millwall,Substitute,False,7,5,461.1,0.9759,0.0,0.0,0.0,0.6405,espn_true_per90
+championship,246933,Jamie Cumming,Oxford United,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,257117,Michal Helik,Oxford United,Center Left Defender,False,8,8,720.0,0.75,0.0,0.125,0.0,1.0,espn_true_per90
+championship,179466,Greg Leigh,Oxford United,Left Back,False,7,4,342.4,1.3142,0.2628,0.0,0.2,0.4756,espn_true_per90
+championship,341407,Brodie Spencer,Oxford United,Right Back,False,6,6,540.0,0.3333,0.0,0.0,0.5,0.75,espn_true_per90
+championship,349181,Will Lankshear,Oxford United,Attacking Midfielder,False,8,8,634.3,2.2703,0.4257,0.0,0.25,0.8809,espn_true_per90
+championship,196686,Cameron Brannagan,Oxford United,Left Midfielder,False,8,8,710.2,1.9009,0.2534,0.0,0.4,0.9864,espn_true_per90
+championship,171575,Will Vaulks,Oxford United,Right Midfielder,False,6,2,215.0,2.5114,0.0,0.0,0.3333,0.2986,espn_true_per90
+championship,68601,Mark Harris,Oxford United,Forward,False,6,2,150.4,1.1969,0.0,0.0,0.0,0.2089,espn_true_per90
+championship,293339,Tyler Goodrham,Oxford United,Attacking Midfielder Left,False,4,4,282.1,1.9145,0.0,0.3191,0.0,0.3917,espn_true_per90
+championship,328022,Stanley Mills,Oxford United,Attacking Midfielder Right,False,8,2,249.0,1.8069,0.0,0.0,0.4,0.3459,espn_true_per90
+championship,259032,Siriki Dembele,Oxford United,Substitute,False,8,1,234.4,1.1519,0.0,0.0,0.0,0.3255,espn_true_per90
+championship,208840,Hidde ter Avest,Oxford United,Substitute,False,3,2,190.0,0.0,0.0,0.0,,0.2639,espn_true_per90
+championship,179557,Jack Currie,Oxford United,Substitute,False,6,4,376.1,0.2393,0.0,0.0,1.0,0.5223,espn_true_per90
+championship,258885,Nicolas Schmid,Portsmouth,Goalkeeper,True,5,5,385.5,0.0,0.0,0.0,,0.5354,espn_true_per90
+championship,191358,Conor Shaughnessy,Portsmouth,Center Left Defender,False,6,6,501.3,0.7182,0.0,0.0,0.0,0.6962,espn_true_per90
+championship,212275,Regan Poole,Portsmouth,Center Right Defender,False,8,8,720.0,0.375,0.0,0.0,0.3333,1.0,espn_true_per90
+championship,202333,Connor Ogilvie,Portsmouth,Left Back,False,8,8,675.0,1.4667,0.0,0.0,0.0909,0.9375,espn_true_per90
+championship,251412,Jordan Williams,Portsmouth,Right Back,False,5,3,289.3,0.0,0.0,0.0,,0.4019,espn_true_per90
+championship,320459,Adrian Segecic,Portsmouth,Attacking Midfielder,False,8,7,584.6,2.6171,0.4618,0.0,0.2941,0.812,espn_true_per90
+championship,227789,Andre Dozzell,Portsmouth,Left Midfielder,False,8,8,704.5,0.6388,0.1278,0.0,0.2,0.9785,espn_true_per90
+championship,4775,John Swift,Portsmouth,Right Midfielder,False,8,7,561.7,1.2818,0.0,0.3205,0.125,0.7801,espn_true_per90
+championship,198187,Colby Bishop,Portsmouth,Forward,False,8,8,705.6,1.7857,0.1276,0.0,0.5,0.98,espn_true_per90
+championship,307854,Florian Bianchini,Portsmouth,Attacking Midfielder Left,False,6,4,325.9,1.6569,0.0,0.2762,0.5,0.4526,espn_true_per90
+championship,293335,Zak Swanson,Portsmouth,Substitute,False,7,5,404.8,1.3341,0.0,0.0,0.1667,0.5622,espn_true_per90
+championship,357086,Thomas Waddingham,Portsmouth,Substitute,False,4,0,54.8,3.2847,0.0,0.0,0.0,0.0761,espn_true_per90
+championship,338292,Terry Devlin,Portsmouth,Substitute,False,5,0,57.5,1.5647,0.0,0.0,1.0,0.0799,espn_true_per90
+championship,371578,Yang Min-Hyeok,Portsmouth,Substitute,False,3,2,160.2,3.9331,0.5619,0.0,0.4286,0.2225,espn_true_per90
+championship,43468,Joe Walsh,Queens Park Rangers,Goalkeeper,True,4,4,360.0,0.0,0.0,0.0,,0.4444,espn_true_per90
+championship,325989,Amadou Salif Mbengue,Queens Park Rangers,Center Left Defender,False,8,7,625.0,0.288,0.0,0.0,0.0,0.7716,espn_true_per90
+championship,250584,Liam Morrison,Queens Park Rangers,Center Right Defender,False,8,8,720.0,0.5,0.0,0.125,0.0,0.8889,espn_true_per90
+championship,361430,João Henrique,Queens Park Rangers,Left Back,False,6,3,272.8,1.6499,0.0,0.33,0.2,0.3367,espn_true_per90
+championship,392106,Kieran Morgan,Queens Park Rangers,Right Back,False,3,3,215.9,0.8338,0.4169,0.0,0.5,0.2665,espn_true_per90
+championship,272629,Nicolas Madsen,Queens Park Rangers,Left Midfielder,False,9,7,669.1,0.8071,0.1345,0.1345,0.6667,0.826,espn_true_per90
+championship,236119,Sam Field,Queens Park Rangers,Right Midfielder,False,5,4,336.2,1.0708,0.0,0.0,0.0,0.4151,espn_true_per90
+championship,288616,Karamoko Dembele,Queens Park Rangers,Attacking Midfielder Left,False,8,6,499.1,1.9835,0.0,0.0,0.3636,0.6162,espn_true_per90
+championship,43187,Steve Cook,Queens Park Rangers,Substitute,False,6,4,372.6,0.9661,0.0,0.0,0.0,0.46,espn_true_per90
+championship,306532,Harvey Vale,Queens Park Rangers,Substitute,False,7,5,395.7,1.3646,0.2274,0.2274,0.5,0.4886,espn_true_per90
+championship,281722,Rumarn Burrell,Queens Park Rangers,Substitute,False,9,6,536.0,1.5111,0.1679,0.1679,0.4444,0.6618,espn_true_per90
+championship,367706,Rayan Kolli,Queens Park Rangers,Substitute,False,5,1,183.0,2.9515,0.0,0.0,0.0,0.2259,espn_true_per90
+championship,233301,Daniel Iversen,Preston North End,Goalkeeper,True,8,8,720.0,0.0,0.0,0.125,,1.0,espn_true_per90
+championship,261431,Lewis Gibson,Preston North End,Center Defender,False,8,8,714.6,0.6297,0.0,0.0,0.6,0.9925,espn_true_per90
+championship,10176,Andrew Hughes,Preston North End,Center Left Defender,False,7,7,617.1,0.7293,0.0,0.0,0.0,0.857,espn_true_per90
+championship,241314,Jordan Storey,Preston North End,Center Right Defender,False,8,8,717.2,0.6274,0.1255,0.1255,0.4,0.9962,espn_true_per90
+championship,301558,Stefán Teitur Thórdarson,Preston North End,Center Left Midfielder,False,5,2,168.6,1.0674,0.0,0.0,0.5,0.2342,espn_true_per90
+championship,240722,Alistair McCann,Preston North End,Center Right Midfielder,False,8,7,622.1,0.2893,0.0,0.0,0.0,0.8641,espn_true_per90
+championship,223590,Benjamin Whiteman,Preston North End,Attacking Midfielder,False,8,8,720.0,1.0,0.0,0.25,0.125,1.0,espn_true_per90
+championship,221307,Andrija Vukcevic,Preston North End,Left Midfielder,False,7,2,182.6,0.0,0.0,0.0,,0.2537,espn_true_per90
+championship,313009,Thierry Small,Preston North End,Right Midfielder,False,8,8,660.2,1.4995,0.1363,0.1363,0.4545,0.9169,espn_true_per90
+championship,180496,Michael Smith,Preston North End,Center Left Forward,False,8,5,459.1,2.1563,0.196,0.0,0.1818,0.6377,espn_true_per90
+championship,275444,Milutin Osmajic,Preston North End,Center Right Forward,False,6,6,523.8,1.5465,0.5155,0.0,0.6667,0.7275,espn_true_per90
+championship,179624,Liam Lindsay,Preston North End,Substitute,False,4,1,133.8,0.0,0.0,0.0,,0.1858,espn_true_per90
+championship,261531,Pol Valentín,Preston North End,Substitute,False,7,6,480.2,0.0,0.0,0.1874,,0.6669,espn_true_per90
+championship,306013,Alfie Devine,Preston North End,Substitute,False,7,6,459.6,1.9581,0.3916,0.0,0.3,0.6384,espn_true_per90
+championship,308243,Odeluga Offiah,Preston North End,Substitute,False,6,0,94.3,0.0,0.0,0.0,,0.131,espn_true_per90
+championship,274976,Mads Frökjaer,Preston North End,Substitute,False,4,0,91.3,0.0,0.0,0.0,,0.1268,espn_true_per90
+championship,258902,Viktor Johansson,Stoke City,Goalkeeper,True,9,9,810.0,0.0,0.0,0.1111,,1.0,espn_true_per90
+championship,246945,Ben Wilmot,Stoke City,Center Left Defender,False,9,9,810.0,0.6667,0.0,0.0,0.1667,1.0,espn_true_per90
+championship,323201,Bosun Lawal,Stoke City,Center Right Defender,False,8,8,690.1,1.4346,0.1304,0.0,0.2727,0.852,espn_true_per90
+championship,121473,Aaron Cresswell,Stoke City,Left Back,False,8,8,720.0,0.75,0.0,0.125,0.1667,0.8889,espn_true_per90
+championship,311116,Junior Tchamadeu,Stoke City,Right Back,False,9,8,733.8,0.368,0.0,0.0,0.3333,0.9059,espn_true_per90
+championship,362208,Bae Jun-Ho,Stoke City,Attacking Midfielder,False,9,7,626.1,1.4375,0.0,0.1438,0.4,0.7729,espn_true_per90
+championship,40192,Lewis Baker,Stoke City,Left Midfielder,False,6,6,540.0,1.1667,0.3333,0.0,0.2857,0.6667,espn_true_per90
+championship,194822,Ben Pearson,Stoke City,Right Midfielder,False,5,4,260.2,0.0,0.0,0.0,,0.3213,espn_true_per90
+championship,346910,Divin Mubama,Stoke City,Forward,False,9,8,672.0,1.8749,0.2678,0.0,0.4286,0.8297,espn_true_per90
+championship,250478,Sorba Thomas,Stoke City,Attacking Midfielder Left,False,9,9,810.0,1.7778,0.3333,0.4444,0.5,1.0,espn_true_per90
+championship,305628,Million Manhoef,Stoke City,Attacking Midfielder Right,False,9,8,675.0,3.6,0.4,0.0,0.4074,0.8333,espn_true_per90
+championship,303044,Tatsuki Seko,Stoke City,Substitute,False,9,6,550.5,0.3269,0.0,0.1635,0.0,0.6797,espn_true_per90
+championship,277100,Róbert Bozeník,Stoke City,Substitute,False,7,1,121.2,1.4853,0.0,0.0,0.0,0.1496,espn_true_per90
+championship,273628,Ashley Phillips,Stoke City,Substitute,False,5,2,240.4,0.0,0.0,0.0,,0.2967,espn_true_per90
+championship,347313,Jamie Donley,Stoke City,Substitute,False,3,0,50.2,3.5842,0.0,1.7921,0.5,0.062,espn_true_per90
+championship,286810,Jacob Widell Zetterström,Derby County,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,223451,Matthew Clarke,Derby County,Center Left Defender,False,8,8,720.0,0.625,0.125,0.0,0.2,1.0,espn_true_per90
+championship,138866,Danny Batth,Derby County,Center Right Defender,False,4,3,239.8,0.0,0.0,0.0,,0.333,espn_true_per90
+championship,219593,Craig Forsyth,Derby County,Left Back,False,5,5,450.0,0.2,0.0,0.0,0.0,0.625,espn_true_per90
+championship,218482,Ryan Nyambe,Derby County,Right Back,False,4,3,237.5,0.3789,0.0,0.0,1.0,0.3299,espn_true_per90
+championship,312539,Liam Thompson,Derby County,Center Left Midfielder,False,3,3,232.0,0.3879,0.0,0.0,0.0,0.3222,espn_true_per90
+championship,271858,Kenzo Goudmijn,Derby County,Center Right Midfielder,False,3,1,95.0,1.8957,0.0,0.0,0.0,0.1319,espn_true_per90
+championship,191598,Kayden Jackson,Derby County,Right Midfielder,False,6,2,222.3,0.4049,0.0,0.0,1.0,0.3087,espn_true_per90
+championship,199193,Ebrima Adams,Derby County,Center Left Forward,False,8,8,643.9,0.6989,0.1398,0.0,0.2,0.8943,espn_true_per90
+championship,194823,Carlton Morris,Derby County,Center Right Forward,False,8,8,720.0,1.375,0.5,0.0,0.4545,1.0,espn_true_per90
+championship,138905,Andreas Weimann,Derby County,Substitute,False,8,2,199.1,1.3564,0.4521,0.0,0.3333,0.2765,espn_true_per90
+championship,345407,David Ozoh,Derby County,Substitute,False,6,2,254.2,0.0,0.0,0.0,,0.353,espn_true_per90
+championship,243581,Dion Sanderson,Derby County,Substitute,False,8,7,630.0,0.0,0.0,0.0,,0.875,espn_true_per90
+championship,281728,Joshua Griffiths,West Bromwich Albion,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,275109,Nathaniel Phillips,West Bromwich Albion,Center Right Defender,False,8,8,720.0,1.5,0.125,0.0,0.4167,1.0,espn_true_per90
+championship,236141,Callum Styles,West Bromwich Albion,Left Back,False,7,6,558.5,0.9668,0.0,0.0,0.0,0.7757,espn_true_per90
+championship,215075,Darnell Furlong,Ipswich Town,Right Back,False,6,6,540.0,0.8333,0.0,0.1667,0.0,0.8571,espn_true_per90
+championship,317857,Isaac Price,West Bromwich Albion,Attacking Midfielder,False,8,8,697.5,2.4515,0.3871,0.129,0.4211,0.9688,espn_true_per90
+championship,191596,Alex Mowatt,West Bromwich Albion,Left Midfielder,False,8,8,644.4,0.9777,0.0,0.0,0.2857,0.895,espn_true_per90
+championship,243465,Jayson Molumby,West Bromwich Albion,Right Midfielder,False,8,8,717.0,0.7532,0.0,0.0,0.3333,0.9958,espn_true_per90
+championship,272749,Aune Heggebo,West Bromwich Albion,Forward,False,8,7,641.6,1.9639,0.1403,0.2806,0.2143,0.8911,espn_true_per90
+championship,212520,Karlan Grant,West Bromwich Albion,Attacking Midfielder Left,False,3,2,191.8,1.408,0.0,0.0,0.3333,0.2663,espn_true_per90
+championship,308560,Tom Fellows,Southampton,Attacking Midfielder Right,False,7,7,490.9,1.0999,0.0,0.0,0.0,0.6819,espn_true_per90
+championship,228558,Ousmane Diakite,West Bromwich Albion,Substitute,False,4,1,99.8,1.8041,0.0,0.0,0.5,0.1386,espn_true_per90
+championship,231066,George Campbell,West Bromwich Albion,Substitute,False,8,7,631.1,0.4278,0.0,0.0,0.3333,0.8766,espn_true_per90
+championship,169337,Jed Wallace,West Bromwich Albion,Substitute,False,8,3,286.4,1.8857,0.3143,0.0,0.3333,0.3977,espn_true_per90
+championship,305052,Balazs Toth,Blackburn Rovers,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,274535,Sean McLoughlin,Blackburn Rovers,Center Left Defender,False,6,6,493.1,0.5476,0.0,0.0,0.0,0.6848,espn_true_per90
+championship,231572,Dominic Hyam,Wrexham,Center Right Defender,False,8,8,717.1,0.1255,0.0,0.0,0.0,0.8853,espn_true_per90
+championship,227224,Yuri Ribeiro,Blackburn Rovers,Left Back,False,7,7,586.4,0.3069,0.0,0.0,0.0,0.8145,espn_true_per90
+championship,307162,Ryan Alebiousu,Blackburn Rovers,Right Back,False,8,8,636.9,0.5653,0.0,0.0,0.0,0.8846,espn_true_per90
+championship,315674,Axel Henriksson,Blackburn Rovers,Attacking Midfielder,False,3,1,80.9,1.1121,0.0,0.0,1.0,0.1124,espn_true_per90
+championship,182136,Lewis Travis,Derby County,Left Midfielder,False,6,6,521.8,0.1725,0.0,0.1725,0.0,0.7247,espn_true_per90
+championship,184876,Sondre Tronstad,Blackburn Rovers,Right Midfielder,False,8,8,707.6,1.1448,0.0,0.0,0.1111,0.9827,espn_true_per90
+championship,283613,Yuki Ohashi,Blackburn Rovers,Forward,False,8,6,516.8,2.264,0.1742,0.1742,0.3846,0.7178,espn_true_per90
+championship,323976,Dion De Neve,Blackburn Rovers,Attacking Midfielder Left,False,5,1,76.6,1.1752,0.0,0.0,1.0,0.1064,espn_true_per90
+championship,192991,Ryan Hedges,Blackburn Rovers,Attacking Midfielder Right,False,8,8,643.2,1.2594,0.1399,0.1399,0.2222,0.8933,espn_true_per90
+championship,282982,Sidnei Tavares,Blackburn Rovers,Substitute,False,6,4,348.1,1.5511,0.0,0.0,0.0,0.4835,espn_true_per90
+championship,277151,Augustus Kargbo,Blackburn Rovers,Substitute,False,8,3,405.3,1.9983,0.222,0.222,0.3333,0.563,espn_true_per90
+championship,277384,Makhtar Gueye,Blackburn Rovers,Substitute,False,6,0,72.5,4.9669,0.0,0.0,0.25,0.1007,espn_true_per90
+championship,276826,Lewis Miller,Blackburn Rovers,Substitute,False,7,3,355.1,1.0137,0.0,0.0,0.0,0.4932,espn_true_per90
+championship,262792,Michael Cooper,Sheffield United,Goalkeeper,True,9,9,810.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,269276,Rhys Norrington-Davies,Queens Park Rangers,Center Left Defender,False,6,6,465.9,0.3863,0.0,0.0,0.0,0.5752,espn_true_per90
+championship,367427,Tyler Bindon,Sheffield United,Center Right Defender,False,4,4,350.6,1.2837,0.0,0.0,0.0,0.4328,espn_true_per90
+championship,354729,Sydie Peck,Sheffield United,Defensive Midfielder,False,9,9,782.7,1.6099,0.0,0.0,0.3571,0.9663,espn_true_per90
+championship,263132,Harrison Burrows,Sheffield United,Left Back,False,9,8,720.8,1.1237,0.0,0.0,0.2222,0.8899,espn_true_per90
+championship,283798,Femi Seriki,Sheffield United,Right Back,False,7,2,218.0,0.8258,0.0,0.0,0.0,0.2691,espn_true_per90
+championship,236912,Gustavo Hamer,Sheffield United,Center Left Midfielder,False,9,8,743.7,2.4204,0.0,0.121,0.2,0.9181,espn_true_per90
+championship,254023,Callum O'Hare,Sheffield United,Center Right Midfielder,False,9,9,753.2,1.0754,0.1195,0.1195,0.3333,0.9299,espn_true_per90
+championship,281729,Louie Barry,Sheffield United,Left Midfielder,False,7,5,364.6,1.4809,0.0,0.0,0.3333,0.4502,espn_true_per90
+championship,350353,Andre Brooks,Sheffield United,Right Midfielder,False,5,3,242.5,1.1133,0.0,0.0,0.0,0.2994,espn_true_per90
+championship,227777,Tyrese Campbell,Sheffield United,Forward,False,9,8,630.3,1.428,0.2856,0.0,0.3,0.7781,espn_true_per90
+championship,147255,Jack Robinson,Birmingham City,Substitute,False,6,5,434.8,0.414,0.0,0.0,0.0,0.5367,espn_true_per90
+championship,280550,Sam McCallum,Sheffield United,Substitute,False,5,1,118.2,2.2845,0.0,0.0,0.3333,0.1459,espn_true_per90
+championship,328023,Thomas Cannon,Sheffield United,Substitute,False,9,2,271.0,1.3286,0.0,0.0,0.25,0.3345,espn_true_per90
+championship,345197,Ryan One,Sheffield United,Substitute,False,4,0,89.7,0.0,0.0,0.0,,0.1107,espn_true_per90
+championship,325556,Radek Vítek,Bristol City,Goalkeeper,True,9,9,810.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,232415,Zak Vyner,Bristol City,Center Defender,False,9,9,810.0,0.5556,0.0,0.0,0.0,1.0,espn_true_per90
+championship,41966,Robert Atkinson,Bristol City,Center Left Defender,False,9,9,713.5,0.3784,0.1261,0.0,0.6667,0.8809,espn_true_per90
+championship,291438,George Tanner,Bristol City,Center Right Defender,False,8,4,470.7,0.0,0.0,0.0,,0.5811,espn_true_per90
+championship,283189,Adam Randell,Bristol City,Center Left Midfielder,False,9,9,725.5,0.9924,0.0,0.1241,0.0,0.8957,espn_true_per90
+championship,41011,Jason Knight,Bristol City,Center Right Midfielder,False,7,7,624.1,1.0095,0.0,0.0,0.2857,0.7705,espn_true_per90
+championship,378851,Yu Hirakawa,Bristol City,Left Midfielder,False,9,2,265.4,1.6953,0.0,0.0,0.0,0.3277,espn_true_per90
+championship,206581,Ross McCrorie,Bristol City,Right Midfielder,False,9,8,698.2,2.1913,0.1289,0.3867,0.2353,0.862,espn_true_per90
+championship,243406,Emil Riis Jakobsen,Bristol City,Forward,False,9,9,689.9,2.3481,0.5218,0.1305,0.2778,0.8517,espn_true_per90
+championship,308891,Anis Mehmeti,Bristol City,Center Left Forward,False,9,9,802.6,2.9156,0.4486,0.3364,0.2692,0.9908,espn_true_per90
+championship,236014,Scott Twine,Bristol City,Center Right Forward,False,9,9,711.9,2.6548,0.3793,0.2528,0.2857,0.8789,espn_true_per90
+championship,330006,Sinclair Armstrong,Bristol City,Substitute,False,8,0,116.8,2.3112,0.0,0.0,1.0,0.1442,espn_true_per90
+championship,205701,Mark Sykes,Bristol City,Substitute,False,9,6,500.7,0.1798,0.0,0.1798,0.0,0.6181,espn_true_per90
+championship,296398,Jakub Stolarczyk,Leicester City,Goalkeeper,True,8,8,720.0,0.0,0.0,0.0,,1.0,espn_true_per90
+championship,155211,Jannik Vestergaard,Leicester City,Center Left Defender,False,8,8,720.0,1.125,0.125,0.0,0.3333,1.0,espn_true_per90
+championship,284081,Caleb Okoli,Leicester City,Center Right Defender,False,5,5,429.3,0.2096,0.0,0.0,0.0,0.5963,espn_true_per90
+championship,227706,Luke Thomas,Leicester City,Left Back,False,8,8,623.5,0.2887,0.0,0.0,0.5,0.866,espn_true_per90
+championship,259497,Boubakary Soumaré,Leicester City,Left Midfielder,False,7,7,585.0,0.1538,0.0,0.1538,0.0,0.8125,espn_true_per90
+championship,261448,Oliver Skipp,Leicester City,Right Midfielder,False,5,4,320.6,0.2807,0.0,0.0,0.0,0.4452,espn_true_per90
+championship,123518,Jordan Ayew,Leicester City,Forward,False,8,7,617.6,2.4772,0.1457,0.0,0.4118,0.8578,espn_true_per90
+championship,225549,Stephy Mavididi,Leicester City,Attacking Midfielder Left,False,7,6,390.5,2.0745,0.0,0.0,0.4444,0.5423,espn_true_per90
+championship,318680,Fatawu Issahaku,Leicester City,Attacking Midfielder Right,False,8,8,675.8,2.7969,0.2664,0.1332,0.3333,0.9385,espn_true_per90
+championship,232662,Patson Daka,Leicester City,Substitute,False,8,1,232.3,2.7124,0.0,0.3875,0.1429,0.3226,espn_true_per90
+championship,202332,Harry Winks,Leicester City,Substitute,False,7,4,466.9,1.1566,0.0,0.0,0.0,0.6485,espn_true_per90
+championship,307073,Kasey McAteer,Ipswich Town,Substitute,False,7,3,279.9,1.9295,0.0,0.0,0.3333,0.4442,espn_true_per90
+championship,389329,Jeremy Monga,Leicester City,Substitute,False,7,2,267.4,0.673,0.3365,0.3365,0.5,0.3714,espn_true_per90
+championship,228421,Wout Faes,Leicester City,Substitute,False,7,3,335.4,0.8051,0.2684,0.2684,0.6667,0.4658,espn_true_per90
+championship,191582,Dominic Iorfa,Sheffield Wednesday,Center Defender,False,9,9,784.7,0.6882,0.1147,0.0,0.5,0.9687,espn_true_per90
+championship,194108,Max Lowe,Sheffield Wednesday,Center Left Defender,False,9,9,810.0,0.1111,0.0,0.0,0.0,1.0,espn_true_per90
+championship,387770,Gabriel Otegbayo,Sheffield Wednesday,Center Right Defender,False,6,3,252.1,0.714,0.0,0.0,0.5,0.3112,espn_true_per90
+championship,143632,Liam Palmer,Sheffield Wednesday,Left Back,False,9,9,769.9,0.7014,0.0,0.0,0.5,0.9505,espn_true_per90
+championship,240588,Yan Valery,Sheffield Wednesday,Right Back,False,9,9,789.7,1.1397,0.0,0.114,0.3,0.9749,espn_true_per90
+championship,130079,Barry Bannan,Sheffield Wednesday,Center Midfielder,False,9,9,791.4,1.1372,0.2274,0.2274,0.5,0.977,espn_true_per90
+championship,224342,Svante Ingelsson,Sheffield Wednesday,Center Left Midfielder,False,9,9,804.1,0.7835,0.0,0.0,0.2857,0.9927,espn_true_per90
+championship,352804,Bailey Cadamarteri,Sheffield Wednesday,Center Left Forward,False,9,8,734.3,1.716,0.1226,0.0,0.2143,0.9065,espn_true_per90
+championship,178089,Jamal Lowe,Sheffield Wednesday,Center Right Forward,False,9,5,461.2,1.561,0.1951,0.0,0.125,0.5694,espn_true_per90
+championship,386590,Olaf Kobacki,Sheffield Wednesday,Substitute,False,4,2,214.5,2.0979,0.0,0.0,0.2,0.2648,espn_true_per90
+championship,325548,Charlie McNeill,Sheffield Wednesday,Substitute,False,6,3,265.5,1.695,0.0,0.339,0.2,0.3278,espn_true_per90
+championship,352803,Sean Fusire,Sheffield Wednesday,Substitute,False,7,1,177.0,0.5084,0.0,0.0,0.0,0.2186,espn_true_per90
+championship,225545,Ike Ugbo,Sheffield Wednesday,Substitute,False,8,2,189.4,4.2767,0.0,0.0,0.3333,0.2338,espn_true_per90
+championship,191425,Callum Elder,Derby County,Left Midfielder,False,6,6,495.0,0.3636,0.1818,0.0,0.5,0.6875,espn_true_per90
+championship,308509,Joe Ward,Derby County,Substitute,False,4,0,65.8,2.7343,0.0,0.0,0.5,0.0914,espn_true_per90
+championship,330607,Bobby Clark,Derby County,Substitute,False,7,4,386.8,1.6286,0.0,0.0,0.1429,0.5373,espn_true_per90
+championship,294308,Kaine Kesler Hayden,Coventry City,Substitute,False,5,0,79.4,1.1339,1.1339,1.1339,1.0,0.098,espn_true_per90
+championship,282647,Ellis Simms,Coventry City,Substitute,False,7,0,103.0,8.7336,1.7467,0.0,0.5,0.1272,espn_true_per90
+championship,172838,Josh Murphy,Portsmouth,Attacking Midfielder Left,False,4,4,339.2,1.8574,0.0,0.2653,0.1429,0.4711,espn_true_per90
+championship,362253,Pape Diallo,Norwich City,Left Midfielder,False,5,5,389.2,1.1562,0.0,0.0,0.4,0.5406,espn_true_per90
+championship,179196,Emiliano Marcondes,Norwich City,Center Left Forward,False,5,3,223.8,2.815,0.0,0.0,0.4286,0.3108,espn_true_per90
+championship,345568,Oscar Schwartau,Norwich City,Substitute,False,6,2,254.1,0.7085,0.0,0.0,0.0,0.3528,espn_true_per90
+championship,308778,Toby Collyer,West Bromwich Albion,Substitute,False,7,0,80.4,2.2382,0.0,0.0,0.0,0.1117,espn_true_per90
+championship,82568,Michael Johnston,West Bromwich Albion,Substitute,False,7,5,420.9,2.1381,0.2138,0.6414,0.2,0.5846,espn_true_per90
+championship,243380,Todd Cantwell,Blackburn Rovers,Attacking Midfielder,False,7,7,626.8,1.8666,0.4308,0.1436,0.6154,0.8706,espn_true_per90
+championship,232382,Scott Wharton,Blackburn Rovers,Substitute,False,4,2,233.4,1.157,0.0,0.0,0.6667,0.3241,espn_true_per90
+championship,285471,Willum Thór Willumsson,Birmingham City,Substitute,False,3,2,158.2,1.7064,0.0,0.0,0.0,0.1953,espn_true_per90
+championship,318359,Eiran Cashin,Birmingham City,Substitute,False,4,1,144.6,2.4901,0.0,0.0,0.25,0.1785,espn_true_per90
+championship,251853,Max Bird,Bristol City,Substitute,False,4,0,99.9,1.8023,0.9012,0.0,0.5,0.1233,espn_true_per90
+championship,229789,Robert Dickie,Bristol City,Substitute,False,8,7,603.3,0.7459,0.0,0.0,0.2,0.7448,espn_true_per90
+championship,364534,Fally Mayulu,Bristol City,Substitute,False,4,0,22.6,7.9752,0.0,0.0,0.0,0.0279,espn_true_per90
+championship,328014,Zak Sturge,Millwall,Substitute,False,4,2,207.7,0.0,0.0,0.0,,0.2884,espn_true_per90
+championship,251631,Finn Azaz,Southampton,Substitute,False,7,6,434.1,2.2806,0.2073,0.2073,0.2727,0.6029,espn_true_per90
+championship,297299,Sontje Hansen,Middlesbrough,Substitute,False,6,1,159.9,2.2517,0.5629,0.0,0.75,0.2221,espn_true_per90
+championship,234320,Hamza Choudhury,Leicester City,Substitute,False,6,4,357.1,0.0,0.0,0.0,,0.4959,espn_true_per90
+championship,409131,Ernie Weaver,Sheffield Wednesday,Substitute,False,6,4,353.1,0.2549,0.0,0.0,0.0,0.4359,espn_true_per90
+championship,408684,Reece Johnson,Sheffield Wednesday,Substitute,False,3,0,38.2,0.0,0.0,0.0,,0.0472,espn_true_per90
+championship,301853,Eric Bocat,Stoke City,Substitute,False,5,1,130.6,1.3788,0.0,0.0,0.0,0.1612,espn_true_per90
+championship,359097,Malick Yalcouyé,Swansea City,Attacking Midfielder,False,6,4,266.8,1.0121,0.0,0.3374,0.0,0.3705,espn_true_per90
+championship,366358,Djibril Soumaré,Sheffield United,Center Midfielder,False,4,2,176.9,1.526,0.0,0.0,0.0,0.2184,espn_true_per90
+championship,356943,Ryan Andrews,Watford,Substitute,False,3,0,29.4,0.0,0.0,0.0,,0.0408,espn_true_per90
+championship,231890,Paul Smyth,Queens Park Rangers,Attacking Midfielder Left,False,6,2,175.5,1.0253,1.0253,0.0,1.0,0.2167,espn_true_per90
+championship,378784,Richard Kone,Queens Park Rangers,Substitute,False,8,6,581.1,2.9425,0.6195,0.0,0.2632,0.7175,espn_true_per90
+championship,318388,Jonathan Varane,Queens Park Rangers,Substitute,False,8,6,471.0,0.9554,0.0,0.0,0.2,0.5815,espn_true_per90
+championship,295370,Jaden Philogene,Ipswich Town,Attacking Midfielder Left,False,6,5,388.1,3.2462,0.9275,0.0,0.4286,0.6161,espn_true_per90
+championship,274971,Jens Cajuste,Ipswich Town,Substitute,False,6,3,263.7,1.0238,0.0,0.3413,0.0,0.4186,espn_true_per90
+championship,281121,Taylor Harwood-Bellis,Southampton,Center Right Defender,False,5,5,450.0,1.4,0.2,0.0,0.5714,0.625,espn_true_per90
+championship,168424,John Egan,Hull City,Center Right Defender,False,8,8,720.0,0.75,0.125,0.0,0.1667,0.8889,espn_true_per90
+championship,222608,Babajide David,Hull City,Substitute,False,7,3,274.0,1.6426,0.3285,0.3285,0.6,0.3382,espn_true_per90
+championship,18973,Sam Long,Oxford United,Substitute,False,7,6,585.0,0.9231,0.0,0.0,0.0,0.8125,espn_true_per90
+championship,119004,Matt Phillips,Oxford United,Substitute,False,4,2,171.2,2.1032,0.0,0.0,0.5,0.2377,espn_true_per90
+championship,171144,Ricardo Pereira,Leicester City,Substitute,False,5,2,220.0,2.0453,0.8181,0.0,0.6,0.3056,espn_true_per90
+championship,320417,Mohamed Belloumi,Hull City,Substitute,False,4,1,98.4,4.5722,0.0,0.0,0.6,0.1215,espn_true_per90
+championship,297798,Marko Stamenic,Swansea City,Substitute,False,5,4,391.2,0.2301,0.0,0.0,0.0,0.5433,espn_true_per90
+championship,324213,Rocco Vata,Watford,Substitute,False,5,1,149.1,2.4142,0.6035,1.2071,0.5,0.2071,espn_true_per90
+championship,349681,Vivaldo Semedo,Watford,Substitute,False,5,3,263.3,4.1018,0.3418,0.3418,0.4167,0.3657,espn_true_per90
+championship,287353,Brian De Keersmaecker,Oxford United,Center Right Midfielder,False,6,6,525.4,1.1991,0.0,0.3426,0.1429,0.7297,espn_true_per90
+championship,287466,Przemyslaw Placheta,Oxford United,Substitute,False,6,5,375.9,2.634,0.2395,0.0,0.1818,0.522,espn_true_per90
+championship,259089,Jimmy Dunne,Queens Park Rangers,Right Back,False,7,7,601.7,0.1496,0.0,0.2991,0.0,0.7429,espn_true_per90
+championship,141870,Kenny McLean,Norwich City,Substitute,False,5,4,339.8,0.2648,0.0,0.2648,1.0,0.472,espn_true_per90
+championship,334109,Sverre Nypan,Middlesbrough,Substitute,False,6,2,276.5,1.6276,0.0,0.0,0.2,0.384,espn_true_per90
+championship,312182,Daniel Jebbison,Preston North End,Substitute,False,5,2,181.3,2.4815,0.0,0.0,0.2,0.2519,espn_true_per90
+championship,181092,Chuba Akpom,Ipswich Town,Substitute,False,4,2,176.6,1.5286,0.0,0.0,0.0,0.2804,espn_true_per90
+championship,212953,Ben Godfrey,Sheffield United,Right Back,False,4,4,315.5,0.2853,0.0,0.0,0.0,0.3895,espn_true_per90
+championship,227438,Daniel Kelly,Millwall,Substitute,False,3,0,36.2,2.4828,0.0,0.0,0.0,0.0503,espn_true_per90
+championship,260874,Wes Harding,Millwall,Substitute,False,4,1,79.7,0.0,0.0,0.0,,0.1107,espn_true_per90
+championship,277005,Nathan Wood,Southampton,Center Defender,False,4,4,337.2,0.2669,0.0,0.2669,0.0,0.4683,espn_true_per90
+championship,249172,Mads Roerslev,Southampton,Substitute,False,5,3,266.9,0.0,0.0,0.0,,0.3707,espn_true_per90
+championship,243514,Josh Maja,West Bromwich Albion,Substitute,False,6,1,108.7,2.4837,0.8279,0.0,0.3333,0.151,espn_true_per90
+championship,272404,Luke Le Roux,Portsmouth,Substitute,False,5,1,180.7,0.0,0.0,0.0,,0.2509,espn_true_per90
+championship,297191,Márk Kosznovszky,Portsmouth,Substitute,False,3,1,94.7,0.0,0.0,0.0,,0.1316,espn_true_per90
+championship,192027,Ethan Horvath,Sheffield Wednesday,Goalkeeper,True,7,7,630.0,0.0,0.0,0.0,,0.7778,espn_true_per90
+championship,350661,Lewis Koumas,Birmingham City,Rear Center Forward,False,6,3,268.6,1.3405,0.0,0.0,0.0,0.3316,espn_true_per90
+championship,159150,Marvin Ducksch,Birmingham City,Substitute,False,3,1,111.1,3.2406,0.0,0.0,0.5,0.1371,espn_true_per90
+championship,192929,Matt Targett,Middlesbrough,Substitute,False,5,4,405.0,0.4444,0.2222,0.2222,0.5,0.5625,espn_true_per90
+championship,306297,Mamadou Kaly Sene,Middlesbrough,Substitute,False,5,1,155.9,1.1543,1.1543,0.0,1.0,0.2166,espn_true_per90
+championship,141706,Danny Ings,Sheffield United,Substitute,False,3,0,47.7,3.7728,0.0,0.0,0.0,0.0589,espn_true_per90
+championship,276218,Tahith Chong,Sheffield United,Substitute,False,3,0,57.6,0.0,0.0,0.0,,0.0711,espn_true_per90
+championship,192031,Isaac Hayden,Queens Park Rangers,Substitute,False,5,1,171.6,0.0,0.0,0.0,,0.2118,espn_true_per90
+championship,265960,Koki Saito,Queens Park Rangers,Substitute,False,6,4,376.5,3.1074,0.239,0.0,0.4615,0.4648,espn_true_per90
+championship,251509,Chris Mepham,West Bromwich Albion,Center Left Defender,False,5,5,450.0,0.0,0.0,0.0,,0.625,espn_true_per90
+championship,303060,Ryoya Morishita,Blackburn Rovers,Substitute,False,5,4,246.3,1.8269,0.3654,0.0,0.4,0.3421,espn_true_per90
+championship,298939,Liam Gibbs,Norwich City,Substitute,False,4,1,135.6,1.9909,0.0,0.0,0.3333,0.1884,espn_true_per90
+championship,231826,Lewie Coyle,Hull City,Substitute,False,6,5,472.4,0.1905,0.0,0.1905,1.0,0.5831,espn_true_per90
+championship,310259,Ivan Azón,Ipswich Town,Substitute,False,4,1,112.4,4.0032,0.0,0.0,0.2,0.1784,espn_true_per90
+championship,291513,Max Johnston,Derby County,Right Midfielder,False,5,5,427.9,0.8412,0.0,0.0,0.25,0.5944,espn_true_per90
+championship,164154,Joe Bryan,Millwall,Substitute,False,5,4,366.0,0.2459,0.0,0.0,0.0,0.5083,espn_true_per90
+championship,398124,Raees Bangura-Williams,Millwall,Substitute,False,3,0,44.7,8.0483,2.0121,0.0,0.5,0.0621,espn_true_per90
+championship,280554,Arthur Okonkwo,Wrexham,,False,6,5,450.0,0.0,0.0,0.0,,0.5556,espn_true_per90
+championship,310598,Callum Doyle,Wrexham,Center Left Defender,False,4,4,301.2,0.2988,0.0,0.0,0.0,0.3719,espn_true_per90
+championship,28761,Luke Harris,Oxford United,Substitute,False,4,0,72.8,1.2366,0.0,0.0,0.0,0.1011,espn_true_per90
+championship,307060,Nik Prelec,Oxford United,Substitute,False,5,3,266.9,1.0118,0.3373,0.0,0.3333,0.3706,espn_true_per90
+championship,137433,Josh Knight,Portsmouth,Substitute,False,4,2,235.3,0.0,0.0,0.0,,0.3269,espn_true_per90
+championship,296615,Lewis Dobbin,Preston North End,Substitute,False,4,3,214.2,1.6804,0.4201,0.4201,0.25,0.2976,espn_true_per90
+championship,330045,Sindre Walle Egeli,Ipswich Town,Substitute,False,3,1,99.5,2.7125,0.0,0.0,0.0,0.158,espn_true_per90
+championship,290105,Mark McGuinness,Sheffield United,Center Left Defender,False,5,5,450.0,0.0,0.0,0.0,,0.5556,espn_true_per90
+championship,335913,Alex Matos,Sheffield United,Left Midfielder,False,5,3,269.7,0.0,0.0,0.0,,0.333,espn_true_per90
+championship,204286,James Bree,Charlton Athletic,Substitute,False,4,3,266.5,1.3507,0.6754,0.6754,0.5,0.3702,espn_true_per90
+championship,197924,Reece Burke,Charlton Athletic,Substitute,False,4,2,220.6,0.408,0.0,0.0,0.0,0.3064,espn_true_per90
+championship,296408,Thierno Ballo,Millwall,Substitute,False,3,2,155.6,1.1566,0.0,0.0,1.0,0.2162,espn_true_per90
+championship,275716,Filip Yavorov Krastev,Oxford United,Left Midfielder,False,4,4,276.4,0.9769,0.0,0.0,0.0,0.3839,espn_true_per90
+championship,142055,Bobby De Cordova-Reid,Leicester City,Substitute,False,3,1,85.7,4.2027,0.0,0.0,0.0,0.119,espn_true_per90
+championship,97867,Jordan James,Leicester City,Substitute,False,4,3,208.0,2.1635,0.4327,0.0,0.6,0.2889,espn_true_per90
+championship,378458,Harrison Armstrong,Preston North End,Substitute,False,4,1,159.8,0.0,0.0,0.0,,0.2219,espn_true_per90
+championship,289637,David Strelec,Middlesbrough,Substitute,False,4,3,225.5,3.1925,0.3991,0.0,0.375,0.3132,espn_true_per90
+championship,197627,Alan Browne,Middlesbrough,Substitute,False,4,1,151.2,0.5951,0.0,0.0,0.0,0.2101,espn_true_per90
+championship,356940,Harry Amass,Sheffield Wednesday,Left Midfielder,False,5,5,427.9,1.0516,0.0,0.0,0.2,0.5283,espn_true_per90
+championship,310030,Tomás Rigo,Stoke City,Right Midfielder,False,5,4,325.4,1.6592,0.0,0.0,0.5,0.4018,espn_true_per90
+championship,30173,Lamine Cisse,Stoke City,Substitute,False,5,1,88.9,2.0257,0.0,0.0,0.0,0.1097,espn_true_per90
+championship,194118,Patrick Roberts,Birmingham City,Right Midfielder,False,5,3,242.9,0.741,0.3705,0.3705,0.5,0.2999,espn_true_per90
+championship,203095,Marc Leonard,Birmingham City,Substitute,False,3,1,127.8,2.1135,0.0,0.0,0.3333,0.1577,espn_true_per90
+championship,288958,Adam Idah,Swansea City,Substitute,False,4,0,81.4,3.3153,0.0,1.1051,0.0,0.1131,espn_true_per90
+championship,221961,Amir Hadziahmetovic,Hull City,Right Midfielder,False,5,4,318.0,0.283,0.0,0.0,0.0,0.3926,espn_true_per90
+championship,308216,Darko Gyabi,Hull City,Substitute,False,4,1,131.3,0.6855,0.0,0.0,0.0,0.1621,espn_true_per90
+championship,317076,Enis Destan,Hull City,Substitute,False,5,0,44.2,10.1833,0.0,0.0,0.2,0.0546,espn_true_per90
+championship,281721,Matthew Pollock,Watford,Center Defender,False,4,4,360.0,0.5,0.0,0.0,0.0,0.5,espn_true_per90
+championship,291712,Jeremy Petris,Watford,Center Left Defender,False,3,3,270.0,0.0,0.0,0.0,,0.375,espn_true_per90
+championship,326075,Andri Gudjohnsen,Blackburn Rovers,Substitute,False,4,2,200.8,1.7926,0.0,0.0,0.25,0.2789,espn_true_per90
+championship,341273,Samuel Iling-Junior,West Bromwich Albion,Substitute,False,3,2,173.5,2.0747,0.5187,0.0,0.25,0.241,espn_true_per90
+championship,251701,Ben Brereton Díaz,Derby County,Center Left Forward,False,4,4,313.2,2.0112,0.2873,0.0,0.2857,0.4351,espn_true_per90
+championship,5289,Patrick Agyemang,Derby County,Substitute,False,4,2,227.5,1.9781,0.0,0.7912,0.2,0.316,espn_true_per90
+championship,159312,Paul Nardi,Queens Park Rangers,Goalkeeper,True,5,5,450.0,0.0,0.0,0.0,,0.5556,espn_true_per90
+championship,138048,Michael Frey,Queens Park Rangers,Substitute,False,4,1,118.6,2.2769,0.0,0.0,0.3333,0.1464,espn_true_per90
+championship,343995,Léo Scienza,Southampton,Substitute,False,3,0,62.2,1.4476,0.0,0.0,0.0,0.0863,espn_true_per90
+championship,386434,Caspar Jander,Southampton,Substitute,False,4,3,286.1,0.3146,0.0,0.0,0.0,0.3973,espn_true_per90
+championship,223919,Sam Edmundson,Middlesbrough,Center Defender,False,3,3,137.2,0.0,0.0,0.0,,0.1905,espn_true_per90
+championship,262566,Julián Carranza,Leicester City,Substitute,False,3,0,74.3,2.4233,0.0,0.0,0.5,0.1032,espn_true_per90
+championship,277614,Josh Eccles,Coventry City,Substitute,False,3,2,150.6,0.0,0.0,0.0,,0.1859,espn_true_per90
+championship,290037,Pelle Mattsson,Norwich City,Center Right Midfielder,False,3,3,270.0,0.3333,0.0,0.0,0.0,0.375,espn_true_per90
+championship,294427,Issa Kaboré,Wrexham,Right Midfielder,False,4,4,321.5,0.5599,0.0,0.8399,0.0,0.3969,espn_true_per90
+championship,250648,George Brown,Sheffield Wednesday,Center Left Forward,False,4,2,189.8,3.3196,0.9485,0.0,0.4286,0.2343,espn_true_per90
+championship,324659,Derek Mazou-Sacko,Millwall,Right Midfielder,False,3,3,257.7,0.6985,0.0,0.0,0.0,0.3579,espn_true_per90
+championship,246943,William Smallbone,Millwall,Substitute,False,3,1,107.8,2.5044,0.0,0.0,0.3333,0.1497,espn_true_per90
+championship,148172,Nampalys Mendy,Watford,Center Right Midfielder,False,3,2,188.9,0.4765,0.0,0.0,0.0,0.2623,espn_true_per90
+championship,304152,Caleb Wiley,Watford,Substitute,False,3,1,92.8,1.9403,0.0,0.0,0.5,0.1288,espn_true_per90
+championship,367694,Kai Andrews,Coventry City,Substitute,False,3,0,33.5,0.0,0.0,0.0,,0.0414,espn_true_per90
+championship,138159,Ben Mee,Sheffield United,Center Left Defender,False,3,3,262.2,0.0,0.0,0.0,,0.3237,espn_true_per90
