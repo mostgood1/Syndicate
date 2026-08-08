@@ -118,12 +118,37 @@ def test_rows_without_a_value_term_are_excluded_not_zeroed():
 
 
 def test_ranked_best_first():
-    # 12.0, not 20.0: the original figure was picked as "clearly bigger" rather
-    # than as a realistic edge, and it now exceeds _MODEL_EDGE_MAX_POINTS -- so
-    # the strong row was DROPPED and the weak one ranked first. The fixture was
-    # unrealistic, not the bound; 12 points is still an enormous edge.
-    strong = _row(event_id="strong", projection={"edge_vs_market_pct": 12.0, "side": "over"})
-    weak = _row(event_id="weak", projection={"edge_vs_market_pct": 1.0, "side": "over"})
+    # Ranked on EV, not on model edge. With _SCORE_SIM_WEIGHT at 0 (gated on
+    # S6) a model edge cannot order anything, so a fixture that differed ONLY
+    # in model edge produced a tie and this test failed -- correctly reporting
+    # that the board can no longer rank by the model. It now differs in the
+    # term that actually ranks.
+    #
+    # History worth keeping: this fixture first used model edges of 20.0 vs
+    # 1.0, which tripped _MODEL_EDGE_MAX_POINTS once that bound existed. 20
+    # points was chosen as "clearly bigger", not as a realistic edge.
+    # BOTH sides are required: EV comes from a two-sided de-vig, and a
+    # one-sided `best` yields no fair, no EV, no score, and an EMPTY
+    # opportunities list -- which is how the first attempt at this fixture
+    # failed with an IndexError rather than a ranking assertion.
+    #
+    # The two rows differ in HOLD, because that is what the board now ranks on:
+    # EV against a proportional de-vig is 1/overround - 1, so a tighter market
+    # scores higher. strong ~2.4% hold, weak ~11.5%.
+    strong = _row(
+        event_id="strong",
+        best={
+            "over": {"price": -105, "bookmaker": "dk", "age_seconds": 15.0, "books_quoting": 9},
+            "under": {"price": -105, "bookmaker": "dk", "age_seconds": 15.0, "books_quoting": 9},
+        },
+    )
+    weak = _row(
+        event_id="weak",
+        best={
+            "over": {"price": -130, "bookmaker": "dk", "age_seconds": 15.0, "books_quoting": 9},
+            "under": {"price": -130, "bookmaker": "dk", "age_seconds": 15.0, "books_quoting": 9},
+        },
+    )
     result = build_layer2_rows([weak, strong])
     assert result["opportunities"][0]["event_id"] == "strong"
 

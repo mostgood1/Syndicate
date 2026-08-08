@@ -303,7 +303,52 @@ def is_low_hold(prices: Iterable[Any], *, threshold_pct: float = 2.0) -> bool:
 # stated prior, not a finding. Kept as module constants so tuning is one edit
 # and the components ship alongside the score so a reader can disagree with the
 # weighting without having to trust it.
-_SCORE_SIM_WEIGHT = 0.5          # sim edge counts half as much as measured EV
+# ZERO UNTIL THE MODEL IS VALIDATED. Was 0.5.
+#
+# MEASURED across all four MLB market families on 2026-08-08, after two
+# genuine projection faults were fixed (spreads line-frame, h2h decided-space):
+#
+#     family    n     median edge   negative-EV rows
+#     spreads    48      10.36        40/48
+#     totals     35      10.80        32/35
+#     h2h        24      12.49        23/24
+#     props     193      11.99       191/193
+#     ALL       300                  286/300
+#
+# Four independent families cannot each have their own arithmetic bug producing
+# one signature. What they share is this weight. With ev_pct ~ -5 and
+# model_edge ~ +12, the score is positive and DOMINATED BY THE MODEL TERM -- so
+# the board was not selecting good bets, it was selecting rows where an
+# UNVALIDATED model most disagrees with the market. That is the worst possible
+# selection rule if the model is miscalibrated, and `settled: 0` means nobody
+# has ever checked whether it is.
+#
+# This is not "turn the model off". It is: stop an unvalidated term outranking a
+# measured one, and state the condition to turn it back on.
+#
+# TO RAISE IT AGAIN you need S6: `settled > 0` and CLV decomposed BY COMPONENT,
+# so the EV term and the sim term can be compared on outcomes rather than on
+# taste. That is what this constant's own comment below already demanded, and
+# what nobody has been able to supply.
+#
+# CONSEQUENCE, STATED RATHER THAN DISCOVERED LATER: at 0.0 `blended_score`
+# reduces to `ev_pct`, and EV against a proportional de-vig is `1/overround - 1`
+# -- IDENTICAL for every side of a market. So L2-A cannot pick a side at all.
+# It orders markets by hold and breaks ties arbitrarily, which is the exact
+# state this board opened in (Famalicao/Estoril: draw -750, home +4500, away
+# +6000, all ev 8.6383).
+#
+# That is not an argument for a higher weight. There is NO value of this
+# constant that produces a credible recommendation board, because the missing
+# input is `settled > 0`, not a coefficient. 0.5 grants authority we have not
+# earned; 0.0 grants none and leaves a board that cannot discriminate. Both are
+# bad; only one is bad honestly.
+#
+# THEREFORE THE SURFACE MUST SAY WHAT IT IS: with this at 0, L2-A is a low-hold
+# / line-shopping board and must NOT be presented as "our model found these".
+# If the page cannot say that, keep it off the main board rather than raising
+# this number to make it look like a model board.
+_SCORE_SIM_WEIGHT = 0.0          # was 0.5; see above -- gated on S6, not taste
 _SCORE_BOOK_CONFIDENCE = ((1, 0.5), (2, 0.7), (4, 0.85))   # books quoting -> factor
 _SCORE_FRESHNESS = ((300, 1.0), (1800, 0.9), (3600, 0.75), (10800, 0.5))  # seconds -> factor
 

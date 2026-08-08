@@ -229,22 +229,57 @@ def test_blended_score_discounts_a_thin_stale_row_below_a_wide_fresh_one():
 
 
 def test_blended_score_exposes_its_components():
+    # Derived from the constant, NOT hardcoded: these previously asserted
+    # against a literal 0.5 and so tested the WEIGHT rather than the blend.
+    # When the weight moved to 0 (gated on S6) they failed for a reason that
+    # had nothing to do with whether the mechanism works.
+    from syndicate.features.shared.opportunity_signals import _SCORE_SIM_WEIGHT
+
     scored = blended_score(ev_pct=6.0, model_edge=4.0, books_quoting=7, book_age_seconds=60)
     assert scored is not None
-    # value = 6.0 + 0.5*4.0 = 8.0, reliability = 1.0 * 1.0
-    assert scored["value_pct"] == pytest.approx(8.0)
+    expected_sim = _SCORE_SIM_WEIGHT * 4.0
     assert scored["ev_component"] == pytest.approx(6.0)
-    assert scored["sim_component"] == pytest.approx(2.0)
+    assert scored["sim_component"] == pytest.approx(expected_sim)
+    assert scored["value_pct"] == pytest.approx(6.0 + expected_sim)
     assert scored["book_confidence"] == pytest.approx(1.0)
     assert scored["freshness_factor"] == pytest.approx(1.0)
-    assert scored["score"] == pytest.approx(8.0)
+    assert scored["score"] == pytest.approx(6.0 + expected_sim)
 
 
-def test_blended_score_sim_edge_counts_half():
+def test_blended_score_weights_the_sim_edge_by_the_constant():
+    from syndicate.features.shared.opportunity_signals import _SCORE_SIM_WEIGHT
+
     ev_only = blended_score(ev_pct=4.0, books_quoting=7, book_age_seconds=60)
     sim_only = blended_score(model_edge=4.0, books_quoting=7, book_age_seconds=60)
     assert ev_only is not None and sim_only is not None
-    assert sim_only["score"] == pytest.approx(ev_only["score"] / 2.0)
+    assert sim_only["score"] == pytest.approx(ev_only["score"] * _SCORE_SIM_WEIGHT)
+
+
+def test_the_sim_weight_is_zero_until_settlement_validates_the_model():
+    """Pins the CURRENT value with its reason, so raising it is deliberate.
+
+    MEASURED 2026-08-08 across all four MLB families, after two real projection
+    faults were fixed: 286 of 300 rows were negative-EV, every family with a
+    median model edge of 10-12. Four independent families cannot each have
+    their own arithmetic bug producing one signature -- what they shared was
+    this weight. At 0.5, with ev ~ -5 and model_edge ~ +12, the score was
+    dominated by the model term, so the board selected rows where an
+    UNVALIDATED model most disagreed with the market.
+
+    Raising it requires S6: settled > 0 and CLV decomposed BY COMPONENT, so the
+    EV and sim terms can be compared on outcomes rather than on taste.
+    """
+    from syndicate.features.shared.opportunity_signals import _SCORE_SIM_WEIGHT
+
+    assert _SCORE_SIM_WEIGHT == 0.0
+
+
+def test_with_the_weight_at_zero_a_model_edge_cannot_rescue_a_negative_ev_row():
+    """The failure this change exists to stop: a -5 EV row scoring positive
+    because the model liked it by +12."""
+    scored = blended_score(ev_pct=-5.0, model_edge=12.0, books_quoting=7, book_age_seconds=60)
+    assert scored is not None
+    assert scored["score"] < 0
 
 
 def test_blended_score_treats_unknown_book_age_as_not_fresh():
