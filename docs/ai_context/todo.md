@@ -1,6 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
-### 2026-08-08 (evening) — #271 RETRACTION: "the live-lens tick runs every ~22 minutes" was DEPLOY SPACING, not tick spacing
+### 2026-08-08 — I built the trap into the instrument I made to detect it, in four hours
+
+`4ec31e3d`. Read this one even if you skip the rest; the fix is trivial and the
+mechanism is not.
+
+**What I did, in order.**
+
+1. Soccer's board rows carried no `game.state` and nobody could say which clubs
+   failed to resolve. So I added `unmatched_teams` to `attach_game_state`,
+   explicitly reasoning: *"the failure mode is one club spelled two ways, and
+   with no sample the symptom is a blank column with nothing to act on."*
+2. Four hours later that field reported, for NFL:
+
+   ```
+   {"chips": 0, "rows_matched": 0,
+    "unmatched_teams": ["Houston Texans","Indianapolis Colts", ...20 clubs]}
+   ```
+
+3. Which reads, unmistakably, as a broken alias map. It is not. **NFL's earliest
+   board row is 2026-08-13.** There is no slate today, there were no chips to
+   match against, and the join did not fail — it had nothing to do. A sport out
+   of season would report that identical shape every hour, forever.
+
+**Why it happened, which is the part worth carrying.** `unmatched_teams` answers
+*"which clubs did the join fail to resolve?"* That question is only meaningful
+when there was something to resolve against. With zero chips the honest answer
+is a different sentence entirely — `reason: "no_chips_for_date"` — and I had
+spelled both with the same words.
+
+**The pattern is the one this file keeps rediscovering**, and I had *named* it
+that same afternoon before walking into it: **the degraded state and the
+legitimate state look identical.** Zero rows. A null column. An empty file. A
+`pregame` status. Today alone: WNBA's model column is null by design while
+soccer's is null by defect; soccer grades zero rows because nobody re-fetches
+its schedule, which reads exactly like "no results yet"; nine leagues' sims
+exited cleanly with `SystemExit`, which logs like nothing happening at all.
+
+**The specific trap for anyone adding a diagnostic:** a field that explains a
+failure will also be read as *asserting* that failure. If it can be emitted in
+a healthy state, it will eventually be read as an incident. Mine would have sent
+the next person hunting an NFL alias bug that does not exist — the precise cost
+I added it to prevent, inverted.
+
+**How to apply.**
+- Before adding a diagnostic field, ask what it says when **nothing is wrong**.
+  If that is indistinguishable from the failure, the field is not finished.
+- Prefer a `reason` that names the state over a list that implies blame. `0` and
+  `not applicable` are different answers and must not share a spelling.
+- Emitting a count and a sample is not enough. `chips: 0` was right there
+  alongside `unmatched_teams` and I still misread my own output — the reader
+  will not do the cross-check for you, so the payload has to make the
+  distinction impossible to miss.
+
+The four-hour gap between naming a pattern and reproducing it is not a lapse in
+attention. It is how strong the pull is toward reporting what you were looking
+for rather than what is true.
+
+### 2026-08-08 (evening) — #272 RETRACTION: "the live-lens tick runs every ~22 minutes" was DEPLOY SPACING, not tick spacing
+
+> **ID note:** this entry was written as `#271` and commit `646b7e31`'s message
+> still says so. `#271` was taken concurrently by the NFL lane (`f5c6d04b`,
+> closed as commit `1de982be`), which has three inbound references in this file;
+> this entry had none, so this one moved to `#272`. Both of us checked the file
+> before taking the number and neither of us was wrong at the time we looked —
+> **on a shared checkout, "grep for a free ID" is a read that goes stale between
+> the read and the write.** Re-check immediately before committing, and prefer
+> renumbering the entry with no inbound references.
 
 **I measured the observer.** I reported 7 WNBA ticks in 3h45m against a 60s
 interval and called it a cadence problem. Every one of those "ticks" was the
