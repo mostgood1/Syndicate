@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 from datetime import date as date_cls
+from datetime import timedelta
 from functools import lru_cache
 import io
 import json
@@ -454,6 +455,52 @@ def week_matches(league: str, season: int, week: int) -> list[dict[str, Any]]:
 def week_date_list(league: str, season: int, week: int) -> list[str]:
     dates = {str(row.get("date") or "")[:10] for row in week_matches(league, season, week)}
     return sorted(date_str for date_str in dates if date_str)
+
+
+def week_dates_within_horizon(
+    league: str,
+    season: int,
+    week: int,
+    *,
+    reference_date: str | None = None,
+    horizon_days: int | None = None,
+) -> list[str]:
+    """The week's dates, bounded to what the board can actually rank.
+
+    WHY THIS EXISTS. Soccer's refresh scopes by `--week`, which loops EVERY
+    date in the matchweek. Measured 2026-08-08, one sweep across the ten active
+    leagues:
+
+        26 league-dates.  FOUR of them were today.
+
+    la_liga's week 1 alone is six dates spanning Aug 15-21; serie_a's is four
+    across Aug 22-28. So 22 of 26 were simulating fixtures up to twenty days
+    out, re-run on every 4h/8h sweep, at a measured ~145s each -- **~63 minutes
+    of continuous sim per sweep**. On the same service where the live-lens loop
+    was observed stretching a 60-second interval to 22 minutes.
+
+    Bounding to today+`horizon_days` (1, matching Layer 2's own `horizon_days`)
+    takes that to ~7 league-dates, ~17 minutes, and loses nothing the board can
+    rank -- a fixture three weeks away cannot appear on it.
+
+    RETURNS AN EMPTY LIST when the league has nothing inside the horizon, and
+    that is deliberate: a league whose next fixture is Aug 21 should simulate
+    NOTHING today. Callers must treat empty as "nothing to do", not as an
+    error -- an empty date list raising `SystemExit` is precisely the silent
+    failure that took two sessions to find (`c9fbb736`).
+
+    `horizon_days=None` preserves the full-week behaviour for direct CLI use.
+    """
+    dates = week_date_list(league, season, week)
+    if horizon_days is None:
+        return dates
+    try:
+        first = date_cls.fromisoformat(str(reference_date or central_today_iso())[:10])
+    except ValueError:
+        return dates
+    last = first + timedelta(days=max(0, int(horizon_days)))
+    first_iso, last_iso = first.isoformat(), last.isoformat()
+    return [date_str for date_str in dates if first_iso <= date_str <= last_iso]
 
 
 def default_week(league: str, season: int, *, reference_date: str | None = None) -> int:

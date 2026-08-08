@@ -386,6 +386,7 @@ def main() -> int:
     parser.add_argument("--date", default=None, help="ISO date, default today")
     parser.add_argument("--week", type=int, default=None, help="Matchweek number (requires --season); loops over every date the schedule artifact lists for that week, same as build_soccer_artifacts.py --week")
     parser.add_argument("--season", type=int, default=None)
+    parser.add_argument("--horizon-days", type=int, default=None, help="With --week, only write picks for dates within N days of --date/today. Omit for the whole week.")
     parser.add_argument("--source-root", default=str(REPO_ROOT / "data" / "soccer_source"))
     parser.add_argument("--out-root", default=str(REPO_ROOT / "data" / "soccer_source"))
     args = parser.parse_args()
@@ -393,14 +394,31 @@ def main() -> int:
     if args.week is not None:
         from syndicate.features.soccer.sources import default_season
         from syndicate.features.soccer.sources import week_date_list
+        from syndicate.features.soccer.sources import week_dates_within_horizon
 
         season = args.season or default_season(args.league)
-        dates = week_date_list(args.league, season, args.week)
-        if not dates:
+        week_dates = week_date_list(args.league, season, args.week)
+        # Same two-empties distinction as build_soccer_artifacts.py: no dates
+        # for the week at all is a missing schedule artifact (a real error);
+        # dates that all fall outside the horizon is normal for a league whose
+        # next fixture is weeks away.
+        if not week_dates:
             raise SystemExit(
                 f"no dates found for {args.league} week {args.week} season {season}; "
                 f"run scripts/build_soccer_schedule.py --league {args.league} --season {season} first"
             )
+        dates = week_dates_within_horizon(
+            args.league, season, args.week,
+            reference_date=args.date, horizon_days=args.horizon_days,
+        )
+        if not dates:
+            print(
+                f"{args.league} week {args.week} has {len(week_dates)} date(s) "
+                f"({week_dates[0]}..{week_dates[-1]}), none within "
+                f"{args.horizon_days} day(s) of {args.date or 'today'}; no picks to write",
+                flush=True,
+            )
+            return 0
         for iso_date in dates:
             _write_picks_for_date(args.league, iso_date, source_root=Path(args.source_root), out_root=Path(args.out_root))
         return 0

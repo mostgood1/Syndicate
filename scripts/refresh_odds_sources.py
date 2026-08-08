@@ -1014,6 +1014,20 @@ _SOCCER_LEAGUE_SLUGS = (
 )
 
 
+# Matches Layer 2's own `horizon_days` default: the board ranks today and
+# tomorrow, so simulating past that is work nothing can consume. Env-overridable
+# for a backfill that legitimately wants the whole week.
+def _soccer_sim_horizon_days() -> int:
+    raw = str(os.environ.get("SYNDICATE_SOCCER_SIM_HORIZON_DAYS") or "").strip()
+    try:
+        return max(0, int(raw)) if raw else 1
+    except ValueError:
+        return 1
+
+
+_SOCCER_SIM_HORIZON_DAYS = _soccer_sim_horizon_days()
+
+
 def _soccer_artifact_scope_args(league: str, fallback_date: str) -> tuple[str, ...]:
     # Regenerating only args.date's fixtures meant a match several days out
     # in the currently-displayed week (soccer's cards are week-based nav,
@@ -1026,11 +1040,27 @@ def _soccer_artifact_scope_args(league: str, fallback_date: str) -> tuple[str, .
     # whole week too. build_soccer_artifacts.py already supports this via
     # --week/--season (loops every date the schedule artifact lists for that
     # week); this just always uses it instead of a single --date.
+    # HORIZON, added 2026-08-08. The week scope above is still right for
+    # WHICH week; what it got wrong was simulating every date IN it. Measured
+    # across the ten active leagues, one sweep was **26 league-dates and only
+    # FOUR were today** -- la_liga's week 1 alone spans six dates Aug 15-21,
+    # serie_a's four across Aug 22-28. At ~145s per league-date that is ~63
+    # minutes of continuous sim per sweep, on 4h/8h intervals, for fixtures up
+    # to twenty days out that no board can rank.
+    #
+    # Bounding to today+1 (Layer 2's own `horizon_days`) takes it to ~7
+    # league-dates, ~17 minutes. Measured, not estimated. It matters because
+    # this runs on refresh-worker, where the live-lens loop was concurrently
+    # observed stretching a 60-second interval to 22 minutes.
+    #
+    # A league with nothing inside the horizon now writes nothing and exits 0
+    # with a plain message -- deliberately NOT the `SystemExit` that made the
+    # missing-schedule case invisible for two sessions.
     try:
         season = soccer_default_season(league)
         week = soccer_default_week(league, season)
         if soccer_week_date_list(league, season, week):
-            return ("--week", str(week), "--season", str(season))
+            return ("--week", str(week), "--season", str(season), "--horizon-days", str(_SOCCER_SIM_HORIZON_DAYS))
     except Exception:
         pass
     # Fall back to single-date scope if the current week can't be resolved

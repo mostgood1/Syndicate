@@ -322,6 +322,7 @@ def main() -> int:
     parser.add_argument("--date", default=None, help="ISO date, default today")
     parser.add_argument("--week", type=int, default=None, help="Matchweek number (requires --season); loops build_artifacts over every date the schedule artifact lists for that week")
     parser.add_argument("--season", type=int, default=None)
+    parser.add_argument("--horizon-days", type=int, default=None, help="With --week, only simulate dates within N days of --date/today. Omit for the whole week.")
     parser.add_argument("--simulations", type=int, default=_DEFAULT_SIMULATIONS)
     parser.add_argument("--source-root", default=str(REPO_ROOT / "data" / "soccer_source"))
     parser.add_argument("--out-root", default=str(REPO_ROOT / "data" / "soccer_source"))
@@ -330,14 +331,36 @@ def main() -> int:
     if args.week is not None:
         from syndicate.features.soccer.sources import default_season
         from syndicate.features.soccer.sources import week_date_list
+        from syndicate.features.soccer.sources import week_dates_within_horizon
 
         season = args.season or default_season(args.league)
-        dates = week_date_list(args.league, season, args.week)
-        if not dates:
+        week_dates = week_date_list(args.league, season, args.week)
+        # TWO DIFFERENT EMPTIES, and conflating them is what cost two sessions.
+        # No dates for the week AT ALL means the schedule artifact is missing or
+        # unreadable -- a real error, and the one that silently killed nine
+        # leagues' sims (see sources._api_read_path). Dates that exist but all
+        # fall outside the horizon is normal and expected: a league whose next
+        # fixture is three weeks out has nothing to simulate today.
+        if not week_dates:
             raise SystemExit(
                 f"no dates found for {args.league} week {args.week} season {season}; "
                 f"run scripts/build_soccer_schedule.py --league {args.league} --season {season} first"
             )
+        dates = week_dates_within_horizon(
+            args.league,
+            season,
+            args.week,
+            reference_date=args.date,
+            horizon_days=args.horizon_days,
+        )
+        if not dates:
+            print(
+                f"{args.league} week {args.week} has {len(week_dates)} date(s) "
+                f"({week_dates[0]}..{week_dates[-1]}), none within "
+                f"{args.horizon_days} day(s) of {args.date or 'today'}; nothing to simulate",
+                flush=True,
+            )
+            return 0
         for iso_date in dates:
             build_artifacts(
                 args.league,

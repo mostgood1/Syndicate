@@ -267,3 +267,39 @@ def test_api_read_path_reports_the_runtime_location_when_nothing_has_the_file(tm
 
     assert first in resolved.parents
     assert not resolved.exists()
+
+
+def test_week_dates_within_horizon_bounds_the_sim_to_what_the_board_can_rank():
+    """The measured cost this exists to remove.
+
+    One sweep across the ten active leagues on 2026-08-08 was 26 league-dates
+    and only FOUR were today -- la_liga's week 1 alone spans six dates
+    Aug 15-21. At ~145s per league-date that is ~63 minutes of continuous sim
+    per sweep, on 4h/8h intervals, for fixtures up to twenty days out.
+    """
+    from syndicate.features.soccer import sources as soccer_sources
+
+    # la_liga week 1 is the worst case: six dates, none of them today.
+    full = soccer_sources.week_dates_within_horizon("la_liga", 2026, 1)
+    assert len(full) >= 4, "expected the full week when no horizon is given"
+
+    bounded = soccer_sources.week_dates_within_horizon(
+        "la_liga", 2026, 1, reference_date="2026-08-08", horizon_days=1
+    )
+    assert bounded == [], "a league whose next fixture is a week away simulates nothing today"
+
+    # eredivisie is mid-season: today and tomorrow are in the week, Aug 14 is not.
+    bounded = soccer_sources.week_dates_within_horizon(
+        "eredivisie", 2026, 2, reference_date="2026-08-08", horizon_days=1
+    )
+    assert bounded == ["2026-08-08", "2026-08-09"]
+
+
+def test_week_dates_within_horizon_defaults_to_the_whole_week():
+    """`horizon_days=None` must preserve the pre-existing CLI behaviour, so a
+    deliberate backfill still gets every date."""
+    from syndicate.features.soccer import sources as soccer_sources
+
+    assert soccer_sources.week_dates_within_horizon(
+        "eredivisie", 2026, 2
+    ) == soccer_sources.week_date_list("eredivisie", 2026, 2)
