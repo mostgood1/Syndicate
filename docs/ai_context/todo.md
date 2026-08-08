@@ -1,5 +1,82 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (evening) — #271 RETRACTION: "the live-lens tick runs every ~22 minutes" was DEPLOY SPACING, not tick spacing
+
+**I measured the observer.** I reported 7 WNBA ticks in 3h45m against a 60s
+interval and called it a cadence problem. Every one of those "ticks" was the
+**first tick after a reboot**: refresh-worker was deployed five times in the
+window (20:07:32, 20:17:05, 20:49:02, 21:22:11, 21:30:50Z). The ~22-minute
+figure is the spacing between *deploys*.
+
+`todo.md` already carried this exact lesson from earlier the same day — "two
+deploys inside ten minutes restarting the worker mid-build … contaminated the
+observation window" — and I read that file before starting. **A rate measured
+across a restart is not a rate.** Check the deploys API for the window before
+reporting any cadence on Render. [[a rate, not a count]]
+
+**The 6-of-7 `CARDS_CONTEXT_COLD` finding is NOT affected** and stands: every
+tick that ran degraded. Only the denominator's *cause* was misattributed.
+
+#### What the cadence actually is, measured across a deploy-free window (21:31–22:00Z)
+
+```
+cycle period, start-to-start:  n=5   min=126s  median=246s  max=542s
+configured interval:           60s
+```
+
+Where the median ~246s goes — and it is **not** one thing:
+
+| | |
+|---|---|
+| `_LIVE_LENS_LOOP_STOP.wait(interval)` | 60s, fixed |
+| `pull_hot_artifacts` | 8–27s (33–82 artifacts/cycle) |
+| all five sport builds | 37–459s — MLB dominates at **76–253s** with a live slate |
+| `publish_changed_hot_artifacts` | 48–74s (73–103 artifacts/cycle) |
+
+So: **serialising behind builds, not skipped by a guard** (0 `low_headroom` in
+the window), and **more than half the median cycle is sleep + pull + publish
+rather than sport work**. The WNBA leg itself is 4–20s. Per-sport measurements:
+mlb 3.6/6.3/10.3/11.5/13.3/16.0/16.6s pre-deploy, 76/251/253s once MLB's slate
+went live; nba 1.6–42s; wnba 4.0–19.7s; soccer 0.5–9.4s; nfl 1.7–52s.
+
+**The cheapest available win is not in the sport builds.** `pull_hot_artifacts`
++ `publish_changed_hot_artifacts` cost ~60–130s per cycle and both run
+unconditionally, every cycle, on the same thread as the tick. They are the term
+to attack before anyone optimises a builder. NOT DONE — measured, not fixed.
+
+#### refresh-worker capacity, for the soccer lane that is about to add load
+
+Container memory since the 21:30 boot, and **split before anyone calls it a
+leak** ([[memory.current is page cache]]):
+
+```
+21:31  container  657.7MB   accounted_rss  385.8   unexplained   271.9   procs 2
+21:42  container 1835.9MB   accounted_rss 1365.1   unexplained   470.8   procs 12
+21:54  container 2247.1MB   accounted_rss 1497.5   unexplained   749.6   procs 12
+22:00  container 2832.5MB   accounted_rss 1445.9   unexplained  1386.6   procs 10
+```
+
+Container reads 69.2% of 4096MB, but ~1387MB of it is unaccounted — consistent
+with page cache from pulling/publishing 80+ artifacts every cycle. **Real
+process RSS peaked at 1602MB.** Note `container_memory_headroom_mb` in these
+lines is the RAW `max - current`; the gates use `memory_headroom_snapshot`,
+which adds reclaimable file cache back, so the number the gates see is higher
+than 1263MB and I did **not** measure it at that instant. Do not quote the raw
+number as gate headroom.
+
+#### #269 follow-up shipped in the same pass: ONE staleness bound was the wrong shape
+
+The first version of the published-context fix refused any context older than
+900s. That bound is a **guess** — the publisher is the Layer 2 board build,
+whose cadence I could not pin down — and a guessed threshold that silently
+disables the stage it guards is the defect this file keeps re-learning. Refusing
+would have put the lens straight back to the blank page the fix exists to
+remove. Now two bounds: past FRESH (900s) the context is **served, flagged
+`published_artifact_stale`, and printed**; only past HARD (7200s) is it refused,
+because a context built this morning is not stale data about tonight's slate,
+it is the wrong data. A test squeezes FRESH to 1s and asserts the lens still
+carries the slate.
+
 ### 2026-08-08 — #270 THE L2-A ENRICHMENT GAP IS ~6 THINGS, NOT 40. One is a cheap join.
 
 "The template reads 70 fields, an L2-A row carries 18, so ~40 are missing" is
@@ -1690,7 +1767,84 @@ autorun YIELDS on unknown. Both-claim corrupts silently; neither-claim is a stal
 board, which `audit_slate_coverage.py` (#264) catches. `_fetch_espn_football_schedule`
 gained `strict=` so a timeout is distinguishable from an empty slate at all.
 
-### OPEN — NFL schedule is DATE-BLIND. Two stacked defects, root-caused not fixed.
+### CLOSED 2026-08-08 (`#271`, commit `1de982be`) — NFL date-blindness: BOTH stacked defects fixed, plus two the entry did not know about
+
+**The two entries below are RESOLVED.** Kept for the reasoning; read this block
+for what is actually true now. **Committed, NOT deployed** — held for the lead's
+batched deploy.
+
+**Both original defects were already fixed and already live** before this lane
+picked the work up — `bf56a643` + `e9e33e4d` (the date filter) and `68cddf73`
+(gameday-keyed `preseason_target_week`), all ancestors of `d59086f6`, which web
+and refresh-worker have been running since 21:31Z. So the entry below described
+a state that no longer existed. **Check the deployed commit before trusting an
+OPEN entry written earlier the same day** — three fixes landed between the
+entry being written and being read.
+
+**What was still broken, MEASURED not assumed.** Production
+`/api/board/game-chips?sports=nfl`, 20 dates 08-05..08-24 against ESPN truth:
+**15/20 correct, and the 5 misses were an exact pattern** — every date OUTSIDE
+the one resolved target week returned 0 chips.
+
+```
+08-06         ESPN  1              ->  0     week 1, already past
+08-20..08-23  ESPN  2, 3, 10, 1    ->  0     week 3, still ahead
+08-13..08-15  ESPN  6, 3, 7        ->  6,3,7 week 2 == target week
+```
+
+The date filter shipped, but the card set it filtered was still built from
+`preseason_target_week()` — **one global week for every request**. Strictly
+better than the original defect (a stale game on every date) and still
+date-blind: a board looking one week ahead showed nothing at all.
+
+**Fix: `preseason_week_for_date(season, date)` — resolves the week BY GAME ID.**
+This is what kills the UTC-vs-local trap the entry below warns about, and it
+kills it *structurally* rather than by getting the arithmetic right: the CSV
+`gameday` is a UTC date, ESPN buckets by US-local date, and CAR @ ARI is
+`2026-08-07` in the CSV but `08-06` to ESPN. Joining ESPN's event ids to the
+CSV's `game_id` column means no date is ever compared to another date, so an
+off-by-one day is not merely avoided, it is **unrepresentable**. All 30 ids ESPN
+returned across the 20-date window resolved to a CSV week, zero unknown.
+Result: **exact id-set match on 20/20 dates**, verified locally end-to-end
+through `_NFLDataProvider.games()` against live ESPN.
+
+**BLAST RADIUS WAS RECORDED AS 3 CALLERS. IT IS 7.** The decision entry below
+lists `refresh_odds_sources.py`, `run_refresh_worker.py`, `blueprints/home.py`.
+Also calling `preseason_target_week`: `blueprints/nfl.py:284`,
+`features/nfl/preseason_cards.py:260`, `features/nfl/live_lens.py` (×3), and
+`features/shared/live_lens_loop.py:101`. So the chosen option's cost was
+understated by more than half. **Resolved by not paying it**: the new function
+is additive and `preseason_target_week` is untouched, because those seven
+callers genuinely want the global "which week are we preparing for" answer —
+only the board wants the per-request one. Blast radius for them: zero.
+
+#### THE ONE NOBODY HAD SEEN — a non-date label was deleting every NFL card
+
+Found by a test failing for the right reason, and it was **live in the already
+shipped filter**, not introduced here. `_build_sport_overview` sets
+`context_label = f"{season} Preseason"` (`home.py:6676`) and passes it down as
+`requested_date`. **ESPN answers a garbage date with an empty scoreboard rather
+than an error** — measured: `fetch_schedule_for_date("nfl", "2026 Preseason")`
+→ `[]`, no exception — so the confirmed-empty-slate branch returned **no games
+at all** to the home overview and, through `_load_home_games`, to the
+intelligence layer. That path now returns 16 games; it was returning 0.
+
+The "fails closed" reasoning was right for *a real date with no games* and
+wrong for *a label that never denoted a date*. The second is the same "we
+cannot answer" case the empty-string guard already declined to filter on — the
+function had the right branch and simply did not reach it.
+
+**METHOD NOTE, and it is the transferable one.** The failing test was
+`test_home.py::test_preseason_games_carry_game_market_recommendations...`,
+which had been passing — it is **network-dependent**: offline, ESPN raises, the
+filter falls open, the test passes. Online, ESPN returns `[]` and it fails. A
+test that passes only when the network is *down* was hiding a live production
+bug. Before blaming your own diff for a new failure, check whether the function
+that failed is even in your diff — mine was not (`git diff HEAD` touched
+`games()`, not the filter), which is what identified it as pre-existing in
+about a minute.
+
+### ~~OPEN — NFL schedule is DATE-BLIND. Two stacked defects, root-caused not fixed.~~ (CLOSED, see above)
 
 `/api/board/game-chips?sports=nfl` returns the same `401873271` for every date
 08-05..08-13. Confirmed live.
@@ -1720,13 +1874,28 @@ week-resolves-to-None. Note the artifact export endpoint is allowlist-limited �
 it returned empty for `*refresh_status/latest*`, a path that certainly exists —
 so absence there is never evidence.
 
-### OPEN — DECISION NEEDED: `preseason_target_week` staleness
+### ~~OPEN — DECISION NEEDED: `preseason_target_week` staleness~~ (RESOLVED — option (b) shipped as `68cddf73`, see `#271`)
 
 Two options, user's call: (a) wire `fetch_nfl_preseason_schedule.py` into a daily
 step — fixes the source, but adds periodic worker work, which caused a restart
 loop before; or (b) date-based fallback inside the function — cheaper, but changes
 behaviour for its three callers (`refresh_odds_sources.py`, `run_refresh_worker.py`,
 `blueprints/home.py`) at once.
+
+**Outcome:** (b) shipped in `68cddf73` (gameday-keyed, deployed 21:31Z) and is
+confirmed working — `preseason_target_week(2026)` now returns **2**, not 1.
+**The "three callers" count was wrong: there are seven** (see `#271`). The extra
+four are `blueprints/nfl.py`, `features/nfl/preseason_cards.py`,
+`features/nfl/live_lens.py` (×3) and `features/shared/live_lens_loop.py`. All
+seven want the global answer this function gives, so the wider blast radius
+turned out to be harmless — but it was **understated by more than half at the
+moment the decision was made**, which is worth remembering the next time a
+decision is framed as "cheap, only N callers": count them, do not inherit the
+count.
+
+`fetch_nfl_preseason_schedule.py` is still a manual CLI in no pipeline, so the
+`status` column is still stale forever. Nothing reads it now except the
+no-gamedays fallback, so that is tolerable, not fixed.
 
 ### HOLD RELEASED 2026-08-07 19:11Z — all three services realigned on `3f8a3f0a`
 
