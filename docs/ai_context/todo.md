@@ -1,5 +1,219 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (evening) — `#276` PUBLISH PATH: the transport was never broken. **The board is empty because an EMPTY board fits the keyvalue store and a GOOD one does not.**
+
+Two commits, both **COMMITTED, NOT DEPLOYED**: `a56d4c4c` (refresh failure
+observability) and the publish-transport commit below. Neither touches the
+allowlist. **The thing actually blocking `ranked_all` is in
+`pipeline/intelligence_state.py` and I did not touch it** — it belongs to the
+intelligence lane, which has the measurement.
+
+#### THE HANDED-DOWN DIAGNOSIS WAS HALF WRONG, AND THE WRONG HALF WAS THE LOAD-BEARING ONE
+
+I was told: "`intelligence_state_<date>.json` exceeds the keyvalue ceiling and
+falls back to artifact publish; that fallback last succeeded at 16:50:51Z, so
+the worker has been computing state web cannot see for hours."
+
+**The fallback works.** Measured on both ends:
+
+```
+refresh-worker  21:05:45Z  STATE_PUBLISHED_AS_ARTIFACT intelligence_state.json           published=True
+refresh-worker  21:05:51Z  STATE_PUBLISHED_AS_ARTIFACT intelligence_state_2026_08_08.json published=True
+web's own disk             x-artifact-size 27420309   x-artifact-mtime 21:05:51Z
+web's own disk (content)   candidate_count 150   by_sport {mlb 60, wnba 7, serie a 60}
+                           state_last_updated 2026-08-08T21:02:08Z
+```
+
+A good 150-candidate board reached web's disk at 21:05:51Z and web still served
+an empty one. So "the artifact never arrives" was never the problem.
+
+**Probe technique worth reusing:** `/api/ops/artifacts/stream?path=<rel>&since=99999999999`
+answers **304 with `X-Artifact-Size` and `X-Artifact-Mtime` and no body**. That
+is a free, exact read of what is on web's disk — no 27MB transfer, no memory
+cost on a 2Gi service. It also answers **403** for a path that is not
+allowlisted, which distinguishes "missing" from "refused" in one call.
+
+#### THE ACTUAL MECHANISM — size decides the transport, recency decides the winner, and empty is always small
+
+`refresh-worker` `STATE_PERSIST_BEGIN`, one evening:
+
+```
+19:56:38  candidate_count=150      20:33:28  candidate_count=150      21:05:39  candidate_count=150
+19:59:43  candidate_count=0        20:36:30  candidate_count=0        21:08:36  candidate_count=0
+20:01:34  candidate_count=0        20:38:18  candidate_count=0        21:10:31  candidate_count=0
+                                                                     21:12:34  candidate_count=0
+```
+
+Every good cycle is followed by two or three empty ones **for today's own date**
+(the global `BOARD_SNAPSHOT_PATH` is only written when
+`represents_today_or_dateless`, and `/api/ops/board-snapshot/inspect` shows
+`selected_date 2026-08-08`, `snapshot_generated_at 21:12:34Z`,
+`candidate_count_field 0`, `recorded_sport all`).
+
+- 150 candidates → 27,420,309 bytes → over the 8,388,608 ceiling → artifact.
+- 0 candidates → small → **fits keyvalue** → newer timestamp.
+- `_read_state_payload` returns whichever is fresher. **21:12:34Z empty beats
+  21:02:08Z good, permanently.**
+
+Consequence, measured on web: `COMBINED_BOARD_STATE_DATE_MISS` on 08-08/09/10 at
+21:19, 21:22, 21:23, 21:30, 21:32, 21:33, 21:34, 21:41, 21:42, 21:51Z — with
+**zero `STATE_READ_FROM_ARTIFACT` and zero `STATE_DISK_READ_FAILED` in three
+hours.** The good disk copy is never reached. `_read_single_date_response_for_combining`
+then drops the date for count 0.
+
+**`_empty_write_would_clobber_good_board` never fires** — zero
+`STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD` lines. It compares the incoming 0 against
+a copy that is already 0, so once the ratchet starts it consents to every
+subsequent empty write.
+
+**THE GENERAL SHAPE, and it is the reusable part:** when two transports carry
+the same logical object and *which one a payload takes is decided by its SIZE*,
+recency is the wrong tiebreak — because size correlates with quality. The store
+systematically ratchets toward emptiness. The freshness rule's own docstring
+argues correctly against preferring the store, and still loses.
+
+#### DOES THE `board_snapshot` ALLOWLIST FIX HELP? NO. I DELIBERATELY DID NOT ADD IT.
+
+`board_snapshot.json` / `board_snapshot_*.json` genuinely are not allowlisted —
+confirmed from both ends (worker `published=False` on ~20 consecutive cycles
+20:33–21:14; web's stream endpoint answers **403** for both while answering 304
+for `intelligence_state*`). It is a real hole. It is **not** on the path to
+`ranked_all`, for two reasons that must both be fixed before the entry is worth
+adding:
+
+1. The combined window reads `intelligence_state_<date>.json`. board_snapshot is
+   not consulted.
+2. **Web's only reader of board_snapshot is `read_json_file(BOARD_SNAPSHOT_PATH)`
+   — keyvalue-only. It never looks at disk.** So the entry alone would push
+   **33,524,880 bytes** to web every ~90s to a file nothing reads.
+
+Allowlisting permits a transfer; it does not make a reader. Add the entry in the
+same change as a disk-consulting read, not before.
+
+**Sizing note for whoever does that:** `board_snapshot` is 33.5MB **even on a
+0-candidate cycle** — larger than the 27.4MB state. `persisted =
+_compact_state_for_persist(normalized)` is applied to the state, but
+`board_snapshot_payload = _intelligence_board_snapshot_payload(normalized)` is
+built from the **uncompacted** payload, so it carries the whole
+`analysis`/`evaluation_record` blob compaction exists to strip. Compacting it
+would very likely take it under the keyvalue ceiling and delete the problem
+rather than transporting it.
+
+#### SHIPPED — the publish transport stops holding four copies of every file
+
+`29746931` diagnosed the four-copy mechanism correctly (`read_text` → `.encode()`
+for the checksum → `json.dumps` → `.encode()`) and then bounded only *which files
+the sweep selects*, by slate age and 12MB of size. **`publish_hot_artifact`'s
+DIRECT callers were never bounded by either rule** — #43's board-state fallback,
+#112's odds_history fallback, #124's live-lens loop all call it straight. So the
+four-copy path is not historical: it is what carries the board state today.
+
+Files at or above 4MB now publish as a raw streamed body with the relative path
+and checksum in headers; the receiver streams to a temp file, verifies the
+checksum, then renames. Measured on the real 27,420,309-byte production payload
+with `tracemalloc`:
+
+```
+                      before              after           reduction
+sender  peak    84.0 MB (3.21x)     2.0 MB (0.08x)          42x
+web     peak    65.4 MB (2.50x)     2.0 MB (0.08x)          33x
+wire         30,308,012 bytes    27,420,309 bytes        10.5% less
+```
+
+**This change REDUCES what publishing costs; it adds nothing.** 63MB less
+transient on a 2Gi web service that had 675MB headroom when measured.
+
+Both request forms stay accepted on one route, so deploy order is not
+load-bearing and **live-odds-worker stays safe pinned on `11aea7bf`**. The sender
+falls back to the JSON envelope on 400/404/405/415 (an older receiver) but
+**not** on 403, which is the allowlist genuinely refusing.
+
+Verified over real HTTP against a locally-run app with separate sender/receiver
+data roots, using the real production artifact: `transport=stream`, 27,420,309
+bytes in 2.61s, sha256 identical, parses back to `candidate_count 150`, no `.tmp`
+left behind.
+
+#### SHIPPED `a56d4c4c` — a failed refresh was diagnosable all along; we were reading the wrong 1600 bytes
+
+The "sim failures are invisible" item is real but **the cause was not DEVNULL and
+not a missing print.** This wrapper's stdout **does** reach Render —
+refresh-worker's logs carry its `RETURN_CODE`, `SNAPSHOT_WRITTEN` and
+`LAUNCH_COMMAND` right now. Three defects meant there was nothing in it to find:
+
+1. **`STEP_FAIL` was only wired to the timeout branch**, and `STEP_END` hardcoded
+   `status=ok` regardless of return code. A step exiting non-zero announced
+   itself as `ok`. "Zero `STEP_FAIL` in 7 days" was **a correct measurement and a
+   trap** — it was read as a dead channel and sent two sessions to `DEVNULL` and
+   `HOT_ARTIFACT_PATTERNS`.
+2. **`json.loads(stdout_text)` failed on every real run.** The child prints a
+   `serial_gate` line and a START/END pair per step to stdout before its `--json`
+   document. Reproduced locally: **264 chars of preamble**, whole-stream parse
+   raises, parse from the first brace succeeds. Everything was gated on it, so
+   `_failure_summary_from_result` **never ran** (zero
+   `ODDS_REFRESH_FAILURE_SUMMARY` in 7 days) and `failureSummary` never reached
+   the run manifest. On SUCCESS the same falsy payload sent clean runs down the
+   failure branch too.
+3. **Every stderr window was a raw `[-N:]` aimed at the noisiest part of the
+   stream.** Profiling the child's real 503,266-char stderr by first token:
+
+```
+ALL_PROCESS_MEMORY   4 lines   493,457 chars   98.05%
+MAIN_THREAD_STACK    4 lines     2,524 chars
+PROCESS_ENUM_DEBUG   4 lines     1,556 chars
+STEP_START/STEP_END  2 lines     1,069 chars    0.21%   <- the signal
+```
+
+Four lines are 98% of the stream, and one `PROCESS_TREE_MEMORY` line measured
+over 3,000 chars — larger than the whole 1600-char budget. **The tail could not
+hold one line of noise, let alone reach past it.** Raising the budget was never
+the fix. `refresh_log_tail.diagnostic_tail` drops the known high-volume lines and
+anchors on the LAST traceback (a traceback's most useful line is its last, so a
+plain tail truncates from the wrong end). It is a filter, not a parser:
+unrecognised lines are KEPT.
+
+The 1600-char manifest budget is **unchanged** — it rides the keyvalue store,
+which is at **194MB of a 256MB ceiling**. Same cost, different content.
+
+#### STILL FAILING RIGHT NOW, and `c9fbb736` did NOT fix it
+
+From production run `20260808_215502`, via
+`/api/ops/odds-refresh/logs?stream=stdout&lane=refresh-worker&raw=1`:
+
+```
+9 of 10  soccer_*_artifacts    rc=1   (mls the only rc=0)
+10 of 10 soccer_*_live_state   rc=0
+```
+
+The exact MLS-vs-nine split from the original measurement, so the `_api_root`
+fix did not close it. The wrapper has been exiting `return_code=1` every ~45s
+since 21:37:56Z. Reported to the soccer lane; not diagnosed here.
+
+#### TWO MORE BADLY-AIMED WINDOWS, found and NOT fixed (in `load_latest_refresh_log`)
+
+- `/api/ops/odds-refresh/logs` returns first-32KB + last-32KB with
+  `[truncated 1033881 bytes in the middle]`, and **the first 32KB is entirely
+  the startup `ALL_PROCESS_MEMORY` dump.** The failing steps sit in the dropped
+  middle — this is why the soccer traceback still could not be retrieved.
+- It serialises the log as a Python bytes-repr (`b'...\n...'`), so newlines
+  arrive escaped and the whole thing renders as one enormous line.
+
+Left alone deliberately rather than widening scope. Note the endpoint **does**
+work for `lane=refresh-worker` — the "`exists: false`, it reads web's disk"
+claim elsewhere in this file is wrong for that lane.
+
+#### METHOD NOTES
+
+- **Ask which surface consumes the output.** Every wrong belief here came from
+  measuring an adjacent one: `published=False` on the worker (true, but for
+  board_snapshot, not the state), a raw stderr tail (present, but 98% noise), a
+  `STEP_FAIL` grep (empty, because it was never emitted).
+- **An absent log line is not evidence of a broken channel.** Check that the
+  line is *emitted* before concluding it is *lost*. That single inversion cost
+  two sessions their diagnosis.
+- **A green test can assert nothing.** `with self.assertRaises(Exception):
+  json.loads(raw)` passed because `json` was not imported and `NameError` is an
+  `Exception`. Pin the exception type when the assertion IS the measurement.
+
 ### 2026-08-08 — The rule is easy to state and evidently not easy to apply under momentum
 
 Every operational rule in this file was written by someone who already knew it.
@@ -110,6 +324,63 @@ decision.** Nothing here enables it and nothing was deployed.
 > is now wall-clock and the index term, not scarcity of rows.
 >
 > Everything below is left as written. The struck numbers are marked in place.
+
+> **THIRD PASS, ~23:40Z — THE BOTTLENECK IS THE INDEX, NOT THE CHUNK. Every
+> optimisation this repo has shipped on this path aimed at the wrong file, and
+> the fix is ~100×.**
+>
+> I stopped assembling the per-record cost from components and measured
+> `settle_result(persist=True)` end to end on production-sized data. Three
+> points, real code, branch asserted:
+>
+> ```
+> chunk_mb   index_mb   s / settled record
+>   100.7      21.8        4.604
+>    50.3      21.8        4.694    <- chunk HALVED, no change at all
+>    50.3       2.2        0.727    <- index /10, 6.5x faster
+> ```
+>
+> **Halving the chunk changed nothing. Shrinking the index 10× cut the time
+> 6.5×.** The per-record cost is almost entirely the chunk-INDEX round trip:
+> `read_text` + `json.loads` + `json.dumps(indent=2, sort_keys=True)` +
+> `write_text`, uncached, once per settled record.
+>
+> **That is the opposite of where all the prior work went.** `#254` streamed the
+> readers; `#256` streamed `_read_chunk_records` and `_replace_ledger_line`; the
+> ledger-bloat fix compacted the chunks. All of it targeted the CHUNK — which
+> these numbers say is now effectively free. The index was never touched, is
+> never pruned, and holds one entry per ledger record **ever written**.
+>
+> Production's index is unmeasured (not in `HOT_ARTIFACT_PATTERNS`, and
+> refresh-worker serves no HTTP) but grows ~9,000 entries/date since 2026-06-10
+> — plausibly ~500k entries / ~120MB, **~5× the index in this test**. At the
+> measured 18.2% conversion rate on ~9,000 records/date that is ~750 settled
+> records/date, which projects to **hours per date and days for a 21-day sweep**.
+> My earlier "10–45 minutes" was low by an order of magnitude, and so was my
+> component estimate (~1.6s assembled vs **4.6s** measured).
+>
+> **Consequences.** Verdict unchanged, reason much clearer. The index hoist —
+> load once per run, mutate in memory, write once — is **~100× on the dominant
+> term**, small and contained, and should be scoped as *the* fix rather than as
+> tidying. `LOOKBACK_DAYS=2` matters far less than I said: it bounds how many
+> chunks are read, and the chunks are not the cost.
+>
+> **METHOD, and this is the transferable half. My first end-to-end run reported
+> 0.02 s/record — 80× FASTER than my own components — and I almost filed it.**
+> It was measuring an append, not a rewrite. `_is_chunked_ledger_path` returns
+> True *only* for the module-level `DEFAULT_LEDGER_PATH`, so any temp ledger
+> takes the FLAT branch, where the target does not exist and
+> `_update_evaluation_ledger_record` falls through to `_append_jsonl`.
+> **`_read_ledger_records_for_date`'s own docstring warns about exactly this** —
+> "that made every settlement test/repro against a temp ledger vacuously pass" —
+> and I walked into it anyway, one function away from having read the warning.
+> The harness now asserts the branch by line count (a rewrite keeps it identical,
+> an append raises it by one) and refuses to print a number without it.
+>
+> **The general form is nastier than "confirm the code ran": a test fixture can
+> silently select a CHEAPER code path than production takes, and the failure
+> presents as a GOOD result.** An 80×-favourable number invites no suspicion at
+> all. Assert the branch, not just the outcome.
 
 > **SECOND PASS, ~22:20Z — four cross-lane inputs resolved. The recommendation
 > holds; two of its reasons are now different and one is stronger.**
