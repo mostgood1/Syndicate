@@ -88,12 +88,68 @@ def _basketball_alias_to_name(league: str) -> dict[str, str]:
         return {}
 
 
+# NFL, static. The 32 franchises are stable, and unlike MLB/NBA there is no
+# in-repo source that carries BOTH the tri-code and the full club name: the
+# schedule CSVs hold tri-codes only, while OddsAPI rows hold full names only.
+# Deriving one from the other is exactly the string heuristic #218 established
+# cannot work ("GB" is neither a prefix of "green bay" nor its initials as a
+# whole word).
+#
+# MEASURED 2026-08-08: with no map, `teams_match("nfl", "Carolina Panthers",
+# "CAR")` was False, so `attach_game_state` matched 0 rows and every NFL board
+# row carried `game.state = None`. That silently disables `opportunity_gate`'s
+# dead-market rule -- a SETTLED NFL market could rank -- and it is the hard
+# blocker on the S2 cadence tiers, which key on game state.
+_NFL_ALIAS_TO_NAME: dict[str, str] = {
+    "ari": "arizona cardinals", "atl": "atlanta falcons", "bal": "baltimore ravens",
+    "buf": "buffalo bills", "car": "carolina panthers", "chi": "chicago bears",
+    "cin": "cincinnati bengals", "cle": "cleveland browns", "dal": "dallas cowboys",
+    "den": "denver broncos", "det": "detroit lions", "gb": "green bay packers",
+    "hou": "houston texans", "ind": "indianapolis colts", "jax": "jacksonville jaguars",
+    "kc": "kansas city chiefs", "lv": "las vegas raiders", "lac": "los angeles chargers",
+    "lar": "los angeles rams", "mia": "miami dolphins", "min": "minnesota vikings",
+    "ne": "new england patriots", "no": "new orleans saints", "nyg": "new york giants",
+    "nyj": "new york jets", "phi": "philadelphia eagles", "pit": "pittsburgh steelers",
+    "sf": "san francisco 49ers", "sea": "seattle seahawks", "tb": "tampa bay buccaneers",
+    "ten": "tennessee titans", "was": "washington commanders",
+    # Alternates real feeds emit. ESPN uses WSH/JAC/LVR; nflverse uses OAK/SD/STL
+    # for relocated clubs in historical rows.
+    "wsh": "washington commanders", "jac": "jacksonville jaguars",
+    "lvr": "las vegas raiders", "oak": "las vegas raiders",
+    "sd": "los angeles chargers", "stl": "los angeles rams",
+}
+
+# WNBA gaps. The vendored `_WNBA_TEAM_ALIASES_LOCAL` resolves SEA and LVA but
+# NOT min/por -- measured 2026-08-08, and today's slate carried a POR chip, so
+# this is a live gap rather than a theoretical one. Supplemented rather than
+# replaced: the vendored map is the source of truth where it answers, and this
+# only fills what it leaves None.
+_WNBA_ALIAS_SUPPLEMENT: dict[str, str] = {
+    "min": "minnesota lynx", "por": "portland fire", "gs": "golden state valkyries",
+    "gsv": "golden state valkyries", "tor": "toronto tempo",
+}
+
+
 def _alias_map(sport: str) -> dict[str, str]:
     slug = normalize(sport)
     if slug == "mlb":
         return _mlb_alias_to_name()
+    if slug == "nfl":
+        return dict(_NFL_ALIAS_TO_NAME)
     if slug in {"nba", "wnba"}:
-        return _basketball_alias_to_name(slug)
+        mapping = _basketball_alias_to_name(slug)
+        if slug == "wnba":
+            # setdefault direction matters: the vendored map wins where it has
+            # an answer, so a future vendor fix silently takes precedence over
+            # this supplement rather than being shadowed by it.
+            merged = dict(_WNBA_ALIAS_SUPPLEMENT)
+            merged.update(mapping)
+            return merged
+        return mapping
+    # Soccer deliberately returns {} still. It is ~10 leagues of clubs with no
+    # stable tri-code convention across feeds, so a hand-written table would be
+    # both large and wrong at the edges. It needs its own pass against the real
+    # chip abbreviations, not a guess appended here.
     return {}
 
 

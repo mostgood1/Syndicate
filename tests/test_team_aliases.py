@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import unittest
 
+import pytest
+
 from syndicate.features.shared.team_aliases import canonical_team, teams_match
 
 
@@ -70,3 +72,77 @@ class TeamAliasTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ---------------------------------------------------------------------------
+# NFL and the WNBA gaps. MEASURED 2026-08-08.
+# ---------------------------------------------------------------------------
+#
+# `_alias_map` handled mlb/nba/wnba only, so NFL fell through to the heuristics
+# and `teams_match("nfl", "Carolina Panthers", "CAR")` was False. Consequence:
+# `attach_game_state` matched 0 rows, every NFL board row carried
+# `game.state = None`, and `opportunity_gate`'s dead-market rule silently could
+# not apply -- a SETTLED NFL market could rank. It is also the hard blocker on
+# the S2 cadence tiers, which key on game state.
+
+
+@pytest.mark.parametrize("abbr,name", [
+    ("CAR", "Carolina Panthers"), ("ARI", "Arizona Cardinals"),
+    ("GB", "Green Bay Packers"), ("SF", "San Francisco 49ers"),
+    ("KC", "Kansas City Chiefs"), ("NE", "New England Patriots"),
+])
+def test_nfl_tricodes_resolve(abbr, name):
+    assert teams_match("nfl", name, abbr) is True
+
+
+@pytest.mark.parametrize("abbr,name", [
+    ("WSH", "Washington Commanders"),   # ESPN
+    ("JAC", "Jacksonville Jaguars"),    # ESPN
+    ("LVR", "Las Vegas Raiders"),
+    ("OAK", "Las Vegas Raiders"),       # nflverse historical
+    ("SD", "Los Angeles Chargers"),
+])
+def test_nfl_feed_alternates_resolve(abbr, name):
+    """Real feeds disagree on codes; a map that only knows one spelling joins
+    on some days and not others."""
+    assert teams_match("nfl", name, abbr) is True
+
+
+@pytest.mark.parametrize("abbr,name", [
+    ("CAR", "Arizona Cardinals"), ("NYG", "New York Jets"), ("LAC", "Los Angeles Rams"),
+])
+def test_nfl_does_not_match_the_wrong_club(abbr, name):
+    """Same-city and same-initial pairs are where a heuristic would guess."""
+    assert teams_match("nfl", name, abbr) is False
+
+
+@pytest.mark.parametrize("abbr,name", [("MIN", "Minnesota Lynx"), ("POR", "Portland Fire")])
+def test_wnba_supplement_fills_the_vendored_gaps(abbr, name):
+    """The vendored map resolved SEA and LVA but not these, and the 2026-08-08
+    slate carried a POR chip -- a live gap, not a theoretical one."""
+    assert teams_match("wnba", name, abbr) is True
+
+
+def test_the_vendored_wnba_map_still_wins_where_it_answers():
+    assert teams_match("wnba", "Seattle Storm", "SEA") is True
+    assert teams_match("wnba", "Las Vegas Aces", "LVA") is True
+
+
+@pytest.mark.parametrize("sport,abbr,name", [
+    ("nfl", "MIN", "Minnesota Lynx"),
+    ("wnba", "MIN", "Minnesota Vikings"),
+])
+def test_tricodes_do_not_resolve_ACROSS_leagues(sport, abbr, name):
+    """The trap the basketball map is already documented against: leagues share
+    tri-codes, and a cross-league match is worse than no match because the map
+    is authoritative and skips the heuristic fallback."""
+    assert teams_match(sport, name, abbr) is False
+
+
+def test_soccer_still_returns_no_map_deliberately():
+    """~10 leagues with no stable tri-code convention across feeds. A guessed
+    table would be large and wrong at the edges; it needs its own pass against
+    the real chip abbreviations. Pinned so its absence stays a decision."""
+    from syndicate.features.shared.team_aliases import _alias_map
+
+    assert _alias_map("soccer") == {}
