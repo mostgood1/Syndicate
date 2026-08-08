@@ -1,5 +1,164 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (evening) — S6: settlement settled its first records. THREE dead gates, none a threshold
+
+`settled: 0` was never one problem. It was **three independent gates, each
+keyed on a field that nothing populates, each rejecting 100% of its input** —
+stacked, so fixing any one alone still reads zero. That is the pattern to
+carry forward: when a counter is *exactly* zero rather than small, look for a
+guard reading a field no writer sets, not for a threshold to loosen.
+
+Measured on 2026-07-08, a 14-game slate, graded rows:
+
+```
+    1   production today  (odds destroyed + policy gate)
+   14   #265 odds restored             moneyline only
+  196   #266 + hitter gate
+  222   #266 + pitcher gate    hits 116 · TB 37 · H+R+R 32 · HR 10 · pitcher 26 · ml 1
+```
+
+Across 9 recovered dates: **1,946 graded rows** (was 0), 1,025W/921L,
+ROI −6.49%. Settlement: **matched 0 → 64, would_settle 0 → 64** of 350
+settleable. First non-zero settlement this system has produced.
+
+#### #265 — the pregame odds freeze never fired (`908f96d1`, DEPLOYED, **NOT YET VERIFIED**)
+
+`_freeze_oddsapi_pregame_markets` skipped any doc whose `mode` was `"live"`.
+**Every writer stamps `"mode": "live"`** (8 call sites, two modules); no
+pregame-mode writer has ever existed. The guard was unconditionally true, so
+the freeze was unreachable — production held **zero** `*_pregame.json` files
+(`/api/ops/artifacts/export`, count=0, untruncated). Nothing read them either:
+the grading builder only ever looked for the live filename. Dead both ends.
+
+Meanwhile the live refresh rewrites one file per date holding only events
+still in progress, so a finished slate collapses to its last West-Coast game:
+
+```
+2026-08-05  13 games -> 1     last written 08-06 04:34Z
+2026-08-06   4 games -> 1     last written 08-07 04:27Z
+2026-08-07  14 games -> 2     last written 08-08 04:40Z
+2026-08-08  15 games            intact — captured pregame
+```
+
+**38 of 62 published dates are collapsed, continuously since 2026-07-02** —
+five weeks, not three days. Git proves these were not small slates: 07-07 holds
+15 in git vs 1 in production; 07-10 15 vs 3; 07-11 15 vs 0.
+
+**The join was never wrong.** `line_lookup.get((away_name, home_name))` matches
+exact full team names and both sides use them. Its input was being destroyed.
+
+Fixed per **GAME's own clock**, not a mode string and not a slate-wide one. A
+slate-wide clock is computed from the file that is collapsing, so once only the
+late games survive it still reads "pregame" and overwrites a full freeze with
+two — replaying the real 08-08 doc through a slate-clock version took the
+freeze **15 → 2**. Per-event, the freeze only ever grows. A/B, same date and
+thresholds: collapsed odds → 1 graded row, restored → 15.
+
+**VERIFICATION STILL OWED.** Deployed to both workers 17:05Z. MLB's pregame
+sweep is on a **2h cadence** (`_PREGAME_SWEEP_INTERVAL_FALLBACK`); last fire
+16:49Z, so the first post-deploy sweep was due ~18:49Z. Until a
+`oddsapi_game_lines_<date>_pregame.json` is observed, this is shipped and
+plausible, not fixed. The snapshot copy is allowlisted
+(`*_source/data/daily/snapshots/*/*.json`) so it IS visible from web.
+
+#### #266 — both prop families graded zero (`9f8489f3`, **NOT DEPLOYED**)
+
+**Hitters:** `_extract_report_hitter_predictions` resolved team and lineup
+status only via `_batter_side`, which needs `confirmed_lineup_ids` /
+`projected_lineup_ids` on the GAME. The eval reports carry neither — zero games
+across all 46 report dates. So `setdefault("is_lineup_batter", False)` stamped
+False over rows whose own payload says `"is_lineup_batter": true`, and `team`
+was never set. Both downstream gates read exactly those fields:
+
+```
+is_lineup_batter   False on 9,845 of 9,845
+team               empty on 9,845 of 9,845
+pa_mean > 0         true on 9,845 of 9,845      <- every one projected to bat
+```
+
+Fixed by falling back to the row, which already carries team / lineup_order /
+is_lineup_batter. **`_is_hitter_prediction_eligible` is deliberately untouched**
+— it is shared with the live bet-placement path in `daily_update_multi_profile`,
+so a genuinely benched batter is still excluded (pinned by test).
+
+**Pitchers:** the report's per-side `market` block is empty on every game of
+every date, and unlike the hitter path this one never read the pitcher odds
+file — model distributions with no lines to price against. Now falls back to
+`oddsapi_pitcher_props_*`.
+
+#### #267 — graded pitcher rows named the bucket, not the prop (`e64283bf`, **NOT DEPLOYED**)
+
+With props grading, settlement still matched zero. Hitter rows carry a specific
+market; every pitcher row carried the generic bucket `pitcher_props` and kept
+the actual prop in a `prop` field `_normalized_rows` dropped:
+
+```
+canonical_market_key("mlb", "pitcher_props")  -> "pitcher_props"
+canonical_market_key("mlb", "outs recorded")  -> "outs"     <- the ledger
+canonical_market_key("mlb", "pitcher_outs")   -> "outs"     <- after this
+```
+
+64 records whose player key matched a graded row EXACTLY were vetoed on this
+alone, and it was the **only** market pair failing that check.
+
+#### RECOVERY — git history is a real odds source, with a hard coverage limit
+
+**`refresh_history/<date>/<timestamp>/` is git-tracked** (the per-refresh
+archive, 9 files / 4 dates) — it is NOT visible via `/api/ops/artifacts/export`
+because `data/market/oddsapi/**` is not allowlisted (`*_source/data/market/*.json`
+does not cross into `oddsapi/`). Absence there is not evidence of absence on the
+worker; that question is still open.
+
+Git holds **102 odds files over 47 dates, 44 with a full slate**. Restored 9
+dates (game lines + prop odds) at **zero API credits and zero writes to Render**.
+
+**THE TRAP, and it is CLAUDE.md's intersection trap again:** git's odds coverage
+ends **2026-07-14**; production's evaluation ledger has only **two** chunks,
+08-05 and 08-06. **Disjoint.** Git can recover odds only for dates with no
+production ledger records to settle. The 9 usable dates came from the LOCAL
+ledger mirror, whose production counterparts no longer exist. For 08-05 onward
+the only authoritative source is an OddsAPI **historical** re-fetch
+(`/historical/sports/{sport}/events` + per-event odds, script exists, quota
+healthy at 515k of the real 5M cap).
+
+#### OPEN — what is NOT fixed
+
+- **Deploy `#266`/`#267`.** Held deliberately: a deploy reboots the worker and
+  resets the 2h pregame-sweep timer, which would have cost tonight's freeze.
+  Both only matter to a settlement autorun that is OFF, so nothing is lost by
+  waiting for `#265` to verify.
+- **286 of 350 remain `no_key_overlap`** — ledger records naming players and
+  markets absent from the graded set. That is **COVERAGE** (we grade starters'
+  outs; the ledger recommends far more), not a matching bug. Do not read 64/350
+  as a broken matcher.
+- **The policy gate is a SECOND, independent limiter on graded rows.** With
+  complete odds and default thresholds the builder still selected **1** row from
+  a 15-game slate; only permissive thresholds gave 15. Production's "1 graded
+  row" therefore has two stacked causes, and an earlier reading in this session
+  wrongly attributed all of it to the destroyed odds. Settlement is using a
+  **bet-selection** tool as its **outcome** source — that is the design question
+  underneath all of this and it is unaddressed.
+- **08-05..08-07 odds are destroyed and unrecoverable from these files.**
+- **`_SCORE_SIM_WEIGHT` stays 0.** 64 settled records is not a CLV
+  decomposition. The condition in `65b15a03` is unchanged.
+- **WNBA and soccer show 0 graded rows** for reasons unrelated to any of the
+  above. Not diagnosed; not claimed healthy.
+- **This defect class is MLB-only.** Only MLB has the freeze, the
+  `market/oddsapi` tree, and the live-events-driven fetch that collapses the
+  file. No other sport publishes market artifacts at all; the only other
+  carry-forward hits are play-by-play score logic, not odds.
+
+#### OPERATIONAL
+
+**Exactly zero is a different signal from small.** All three gates rejected
+100%, and each was a field read that no writer populates. `#251`, `#263`, the
+freeze, and both prop gates are now the same story. Check whether the field is
+EVER set before tuning anything.
+
+**A parallel session pushed six NFL commits mid-session** (`a432f6d9..e9e33e4d`,
+12:39). Per-file staging kept them separate — `git add -A` would have swept
+them in. Verify your own commit is still an ancestor after any push.
+
 ### SHIPPED 2026-08-08 (afternoon) — board plan: S1b verified, S2 planned, 4 fixes
 
 Continues `65b15a03`, which covered the L2-A projection faults. These are the
