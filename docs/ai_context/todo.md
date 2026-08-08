@@ -906,7 +906,9 @@ and a monkeypatched `schedule_payload`. The lesson is not "distrust other lanes"
 that **a number load-bearing enough to change the recommendation must be measured
 by whoever is standing behind the recommendation.**
 
-### OPEN 2026-08-08 (evening) — `#274` THE LIVE-LENS MEMORY GATES, ALL FIVE BUILDERS MEASURED AT ONCE. **MLB's is 3-4x too LOW, and it is the one everyone trusted**
+### OPEN 2026-08-08 (evening) — `#281` THE LIVE-LENS MEMORY GATES, ALL FIVE BUILDERS MEASURED AT ONCE. **MLB's is 3-4x too LOW, and it is the one everyone trusted**
+
+> **ID note:** written as `#274`, which the NFL lane also took (`35254271`, regular-season entry, several inbound references). Moved to `#281` per the lead's central allocation. **Second ID collision from this lane in one evening** — the first was `#271`/`#272`. Grepping for a free ID is a read that goes stale between the read and the write, and self-allocation across seven concurrent sessions does not converge: three lanes simultaneously believed they held `#278`. IDs are now requested from the lead, not grepped for.
 
 First time every builder in the live-lens tick has been measured against the
 same clock on the same service. refresh-worker (4096MB), n=8 cycles,
