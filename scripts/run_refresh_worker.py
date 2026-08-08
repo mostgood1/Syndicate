@@ -126,6 +126,37 @@ def _bootstrap_soccer_schedule_seed_files() -> None:
         print(f"[refresh_worker] SOCCER_SCHEDULE_SEED_BOOTSTRAPPED leagues={seeded_leagues}", flush=True)
 
 
+def _bootstrap_soccer_history_seed_files() -> None:
+    # Third of the same family as #145 (players) and #170 (schedule), and the
+    # one that was actually stopping every non-MLS sim from producing anything.
+    #
+    # `build_soccer_artifacts.py`'s `_load_team_ratings` reads per-league match
+    # history from its `--source-root`, which on the worker is the RUNTIME disk.
+    # The history CSVs are committed to git for all nine non-MLS leagues and
+    # nothing ever copied them across, so the sim raised
+    #
+    #   "no match history under <root>/<league>/history;
+    #    run fetch_soccer_history_local.py --kind matches first"
+    #
+    # and exited in TWO SECONDS, before writing any artifact. Reproduced
+    # directly against an empty source root, 2026-08-08.
+    #
+    # MLS is legitimately absent here and must stay absent: it has no
+    # `history/` directory in git because it sources team history from ASA
+    # (`fetch_asa_mls_team_history`) instead. That is exactly why MLS was the
+    # ONE league still producing recommendations while the other nine went
+    # silent -- the split that made this look like a per-league data problem
+    # for two sessions.
+    #
+    # Note this is the SECOND stage of the same failure: `c9fbb736` fixed the
+    # schedule read (which had pinned every league to `--week 1`), and the run
+    # then got one step further and died here instead. Both had to be fixed;
+    # neither alone produces a sim.
+    seeded_leagues = _bootstrap_soccer_seed_files(relative_subdir="history", glob_pattern="*.csv")
+    if seeded_leagues:
+        print(f"[refresh_worker] SOCCER_HISTORY_SEED_BOOTSTRAPPED leagues={seeded_leagues}", flush=True)
+
+
 def _default_latest_manifest_path() -> Path:
     # This poll loop only ever runs on refresh-worker, and it's the only
     # process that claims queued/external-runner contracts -- so its manifest
@@ -1668,6 +1699,7 @@ def main() -> int:
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     _bootstrap_soccer_player_seed_files()
     _bootstrap_soccer_schedule_seed_files()
+    _bootstrap_soccer_history_seed_files()
     if str(os.environ.get("SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP") or "").strip().lower() in {"1", "true", "yes", "on"}:
         print("[refresh_worker] INTELLIGENCE_LOOP_ENABLED calling start_intelligence_state_background_loop()", flush=True)
         loop_started = start_intelligence_state_background_loop()

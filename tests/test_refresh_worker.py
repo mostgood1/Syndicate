@@ -52,9 +52,31 @@ class RefreshWorkerTests(unittest.TestCase):
                 ["players_2024.csv", "players_2025.csv"],
             )
 
-            # A league with no committed players/ dir at all (e.g.
-            # championship) must not get one manufactured out of nothing.
-            self.assertFalse((fake_data_root / "soccer_source" / "championship" / "players").exists())
+            # A league with no committed players/ dir must not get one
+            # manufactured out of nothing.
+            #
+            # This used to name `championship` as the example. That rotted on
+            # 2026-08-08 when championship and primeira_liga -- the two leagues
+            # that had NO player history anywhere, and so produced empty player
+            # props on every otherwise-successful sim -- were finally seeded.
+            # The contract is unchanged; only the example was stale, so assert
+            # it against the repo instead of against one league name.
+            repo_soccer = repo_root / "data" / "soccer_source"
+            leagues_with_seeds = {
+                d.name for d in repo_soccer.iterdir()
+                if d.is_dir() and list((d / "players").glob("players_*.csv"))
+            }
+            leagues_without_seeds = {
+                d.name for d in repo_soccer.iterdir()
+                if d.is_dir() and not list((d / "players").glob("players_*.csv"))
+            }
+            for league in leagues_without_seeds:
+                self.assertFalse(
+                    (fake_data_root / "soccer_source" / league / "players").exists(),
+                    f"{league} has no committed players/ and must not have one manufactured",
+                )
+            for league in leagues_with_seeds:
+                self.assertTrue((fake_data_root / "soccer_source" / league / "players").exists())
 
             # Never overwrites anything already on disk -- rerunning after a
             # league already has real, freshly-generated data must be a
@@ -1168,3 +1190,64 @@ class RefreshWorkerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+def test_soccer_history_seed_bootstrap_copies_match_history(tmp_path, monkeypatch):
+    """The second stage of the soccer-sim failure, and the one that actually
+    kept every non-MLS league silent.
+
+    `build_soccer_artifacts._load_team_ratings` reads per-league match history
+    from its --source-root, which on the worker is the runtime disk. The CSVs
+    are committed to git for all nine non-MLS leagues and nothing copied them
+    across, so the sim raised "no match history under <root>/<league>/history"
+    and exited in TWO SECONDS before writing anything.
+
+    Reproduced 2026-08-08 against an empty source root, and verified fixed:
+    with history seeded, belgian_pro_league simulated 3 matches / 158 player
+    projections in 145s and wrote its recommendations artifact.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "rrw", Path(__file__).resolve().parents[1] / "scripts" / "run_refresh_worker.py"
+    )
+    rrw = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rrw)
+
+    data_root = tmp_path / "runtime"
+    data_root.mkdir()
+    monkeypatch.setattr(rrw, "_refresh_state_store", lambda: {"data_root": lambda: data_root})
+
+    seeded = rrw._bootstrap_soccer_seed_files(relative_subdir="history", glob_pattern="*.csv")
+
+    assert seeded, "expected the git-tracked history CSVs to be seeded"
+    # MLS must NOT be seeded: it has no history/ in git because it sources team
+    # history from ASA instead. That asymmetry is exactly why MLS was the one
+    # league still producing sims while the other nine went silent.
+    assert "mls" not in seeded
+    for league in ("belgian_pro_league", "eredivisie", "primeira_liga"):
+        assert league in seeded
+        assert list((data_root / "soccer_source" / league / "history").glob("*.csv"))
+
+
+def test_soccer_history_seed_bootstrap_never_overwrites_real_pipeline_output(tmp_path, monkeypatch):
+    """Same narrow contract the players/schedule bootstraps hold: only ever
+    copies into a subdirectory with NO matching files yet, so it can never
+    replace something the real pipeline has written."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "rrw2", Path(__file__).resolve().parents[1] / "scripts" / "run_refresh_worker.py"
+    )
+    rrw = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(rrw)
+
+    data_root = tmp_path / "runtime"
+    existing = data_root / "soccer_source" / "eredivisie" / "history"
+    existing.mkdir(parents=True)
+    (existing / "matches_2025.csv").write_text("REAL PIPELINE OUTPUT\n", encoding="utf-8")
+    monkeypatch.setattr(rrw, "_refresh_state_store", lambda: {"data_root": lambda: data_root})
+
+    seeded = rrw._bootstrap_soccer_seed_files(relative_subdir="history", glob_pattern="*.csv")
+
+    assert "eredivisie" not in seeded
+    assert (existing / "matches_2025.csv").read_text(encoding="utf-8") == "REAL PIPELINE OUTPUT\n"
