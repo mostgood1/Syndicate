@@ -1,5 +1,70 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 — #278 BOTH WORKERS RUN THE MLB ODDS SWEEP. `render.yaml` says one should.
+
+**`SYNDICATE_MLB_REFRESH_TICK_OWNER` does not exist in production, on either
+service.** Queried the Render env API directly, not the blueprint. And
+`live_refresh_loop.py:3582`:
+
+```python
+raw = str(os.environ.get("SYNDICATE_MLB_REFRESH_TICK_OWNER") or "").strip().lower()
+if not raw:
+    return True          # <- defaults TRUE when unset
+```
+
+So both services believe they own the MLB tick. **Confirmed empirically rather
+than inferred from the code — both publish the same artifact:**
+
+```
+live-odds-worker  PUBLISH_OK oddsapi_game_lines_2026_08_08_pregame.json   40 lines  21:06:58, 21:09:17, 21:11:33 ...
+refresh-worker    PUBLISH_OK  same file                                   17 lines  21:31:58, 21:40:47, 21:45:03 ...
+```
+
+`render.yaml:769` sets it `"true"` on live-odds-worker, with a comment stating
+that worker is *"the sole MLB odds-refresh owner again, **not just nominally
+excluded from a race with another owner**"* — describing an incident already
+fixed once. **The variable that enforces it is not set.**
+
+#### THE PATTERN, and it is now three instances in one evening
+
+`render.yaml` disagrees with live env **in both directions**:
+
+| key | blueprint | production |
+|---|---|---|
+| `SYNDICATE_MLB_REFRESH_TICK_OWNER` | `"true"` on live-odds-worker | **absent on both** |
+| `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN` | `"true"` (`:296`) | **absent** (settlement lane) |
+| its interval companion | declared | **absent** (settlement lane) |
+
+**Do not read deploy state from the blueprint.** A config file that is
+confidently wrong is worse than none: it is how someone reads "is settlement
+on?" and gets a paragraph of justification attached to a lie. A full
+blueprint-vs-live diff is read-only, needs no deploy, and is commissioned for
+window two.
+
+#### CONSEQUENCES, ranked — none of these are measured
+
+1. **Two writers racing the same artifact files.** The one that matters
+   tonight, because two of those files are `#265`'s frozen pregame snapshot and
+   the `.state.json` sidecar allowlisted in `517ad668` hours earlier.
+2. **Duplicate OddsAPI spend** on every MLB sweep, against a 5M cap. Real,
+   bounded, measurable later.
+3. **Publish volume** that other lanes may be attributing elsewhere. Note
+   `39ebb945`'s double-publish watermark is a DIFFERENT doubling, so the two
+   compound rather than explain each other.
+
+#### WHAT IT DOES TO `#265`'s CLAIM 3
+
+If the frozen file survives the collapse it will have survived **two writers**,
+which is stronger than the test was designed for. If it does not, *"the
+collapse overwrote it"* and *"the other owner overwrote it"* become competing
+explanations **with the same signature** — so publisher identity is being
+captured per observation while the watch runs, rather than reconstructed after.
+
+#### NOT FIXED TONIGHT, deliberately
+
+Setting the env var requires a deploy, and this repo's own note is that a
+restart does not re-inject env vars. Window two, lead's call.
+
 ### 2026-08-08 (evening) — `#276` PUBLISH PATH: the transport was never broken. **The board is empty because an EMPTY board fits the keyvalue store and a GOOD one does not.**
 
 Two commits, both **COMMITTED, NOT DEPLOYED**: `a56d4c4c` (refresh failure
