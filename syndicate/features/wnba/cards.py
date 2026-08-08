@@ -38,6 +38,7 @@ from syndicate.features.shared.team_branding import read_team_branding_snapshot
 from syndicate.features.shared.team_branding import team_branding_index_by_abbreviation
 from syndicate.features.shared.refresh_state_store import read_text_file as _keyvalue_read_text_file
 from syndicate.features.shared.refresh_state_store import read_text_file_result as _keyvalue_read_text_file_result
+from syndicate.features.shared.refresh_state_store import write_json_file as _keyvalue_write_json_file
 from syndicate.features.shared.refresh_state_store import write_text_file as _keyvalue_write_text_file
 from syndicate.features.wnba.sources import available_dates
 from syndicate.features.wnba.sources import build_module_links
@@ -2925,11 +2926,22 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
         return cached[1]
     result = _build_cards_page_context_uncached(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
     _BUILD_CARDS_PAGE_CONTEXT_CACHE[cache_key] = (now, result)
+    # The builder publishes; the live-lens tick consumes. See
+    # publish_cards_page_context below for why the in-process cache alone
+    # could never serve a consumer in another container.
+    if not allow_stored_date_fallback:
+        publish_cards_page_context(selected_date, result)
     return result
 
 
 def build_cards_page_context_if_cached(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any] | None:
-    """The context ONLY if it is already built and fresh. Never builds.
+    """The context ONLY if this PROCESS already built it, within 12s. Never builds.
+
+    IN-PROCESS ONLY, and that is the whole caveat: `_BUILD_CARDS_PAGE_CONTEXT_
+    CACHE` is a module-level dict, so it is warm only for the interpreter that
+    filled it. Use `load_published_cards_page_context` for a consumer in another
+    container -- see its docstring for what relying on this one alone cost.
+
 
     MEASURED 2026-08-08 on live-odds-worker (2Gi): the WNBA live-lens tick
     called `build_cards_page_context` every tick and the build cost
@@ -2951,6 +2963,122 @@ def build_cards_page_context_if_cached(selected_date: str, *, allow_stored_date_
     if cached is not None and (time.monotonic() - cached[0]) < _CARDS_PAGE_CONTEXT_TTL_SECONDS:
         return cached[1]
     return None
+
+
+# --- The cross-service form of that cache -----------------------------------
+#
+# `44008605` made the WNBA live-lens tick a consumer of
+# `build_cards_page_context_if_cached` and called the /wnba endpoints "the
+# builders, on web". Both halves are right; the join between them was not. That
+# cache is an in-process dict, the tick runs on a worker, and the routes run on
+# web -- two containers, two interpreters, two separate dicts. The tick's read
+# could never hit, so it degraded on EVERY tick.
+#
+# MEASURED on refresh-worker 2026-08-08 18:00-21:45Z (the loop moved there in
+# `397088a3`): 6 of 7 WNBA ticks printed CARDS_CONTEXT_COLD, and
+# /wnba/api/live-lens served `games: 0, rank_cards: 0` with its "no stored rows"
+# empty state -- against a real 3-game slate whose /wnba/api/cards showed
+# IND @ CHI live with 1:49 left in the 4th.
+#
+# Two more reasons the same read could never hit, each sufficient on its own:
+#   * the cache key carries `allow_stored_date_fallback`, and the /wnba routes
+#     build with `True` (blueprints/wnba.py `_allow_stored_date_fallback`) while
+#     the tick asks for `False` -- so even in ONE process the keys differ;
+#   * the TTL is 12s and the observed tick spacing was ~22 minutes.
+#
+# This is the persisted form CLAUDE.md's worker rule actually asks for. It goes
+# through `refresh_state_store`, which is keyvalue-backed on Render
+# (SYNDICATE_REFRESH_STATE_BACKEND=keyvalue on all three services, one shared
+# Redis), precisely because Render's disks cannot be shared. The builder
+# publishes; the tick reads a JSON blob and never rebuilds a page -- the ~1GB
+# rebuild `44008605` removed does NOT come back.
+#
+# Only contexts built with allow_stored_date_fallback=False are published: the
+# `True` variant may substitute a DIFFERENT date's stored slate, which is
+# exactly the wrong thing to hand a live lens.
+_WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS = 900
+_WNBA_CARDS_CONTEXT_MAX_BYTES = 8 * 1024 * 1024
+
+
+def wnba_cards_context_artifact_path(selected_date: str) -> Path:
+    return _refresh_state_data_root() / "live" / f"wnba_cards_context_{str(selected_date).strip()}.json"
+
+
+def wnba_cards_context_max_age_seconds() -> int:
+    raw = str(os.environ.get("SYNDICATE_WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS") or "").strip()
+    try:
+        value = int(raw) if raw else _WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS
+    except ValueError:
+        value = _WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS
+    return max(0, value)
+
+
+def publish_cards_page_context(selected_date: str, context: dict[str, Any]) -> bool:
+    """Publish the just-built context for consumers in other containers.
+
+    Never raises: a page render must not fail because the shared store is
+    unavailable, and the consumer already degrades deliberately on a miss.
+    """
+    if not isinstance(context, dict):
+        return False
+    if str(os.environ.get("SYNDICATE_WNBA_CARDS_CONTEXT_PUBLISH_ENABLED") or "").strip().lower() in {"0", "false", "no", "off"}:
+        return False
+    games = context.get("games") if isinstance(context.get("games"), list) else []
+    payload = {
+        # Wall clock, not time.monotonic(): the reader is a different process,
+        # and monotonic clocks are not comparable across them.
+        "published_at": time.time(),
+        "date": str(context.get("date") or selected_date).strip() or str(selected_date),
+        "requested_date": str(context.get("requested_date") or selected_date).strip() or str(selected_date),
+        "source_path": str(context.get("source_path") or "").strip(),
+        "games": games,
+    }
+    try:
+        encoded = json.dumps(payload, default=str)
+    except Exception:
+        return False
+    if len(encoded) > _WNBA_CARDS_CONTEXT_MAX_BYTES:
+        # The shared keyvalue is a 256MB starter instance. A slate big enough to
+        # blow past this is a real signal, not a reason to fail silently.
+        print(
+            f"[wnba_cards] CARDS_CONTEXT_PUBLISH_SKIPPED date={selected_date} "
+            f"reason=too_large bytes={len(encoded)} games={len(games)}",
+            flush=True,
+        )
+        return False
+    try:
+        _keyvalue_write_json_file(wnba_cards_context_artifact_path(selected_date), payload)
+        return True
+    except Exception as error:
+        print(f"[wnba_cards] CARDS_CONTEXT_PUBLISH_FAILED date={selected_date} error={type(error).__name__}: {error}", flush=True)
+        return False
+
+
+def load_published_cards_page_context(selected_date: str, *, max_age_seconds: int | None = None) -> tuple[dict[str, Any] | None, float | None]:
+    """The published context and its age in seconds, or (None, age|None).
+
+    Returns the age even on a stale miss so the caller can say HOW stale rather
+    than only that it missed -- a live-lens snapshot frozen at pregame is a bug
+    this module has shipped before (`e8deadb7`), and it is invisible unless the
+    age travels with the data.
+    """
+    limit = wnba_cards_context_max_age_seconds() if max_age_seconds is None else max(0, int(max_age_seconds))
+    try:
+        payload = _keyvalue_read_json_file(wnba_cards_context_artifact_path(selected_date))
+    except Exception:
+        return None, None
+    if not isinstance(payload, dict) or not isinstance(payload.get("games"), list):
+        return None, None
+    try:
+        published_at = float(payload.get("published_at") or 0.0)
+    except (TypeError, ValueError):
+        return None, None
+    if published_at <= 0:
+        return None, None
+    age_seconds = max(0.0, time.time() - published_at)
+    if limit and age_seconds > limit:
+        return None, age_seconds
+    return payload, age_seconds
 
 
 def _clear_build_cards_page_context_cache() -> None:

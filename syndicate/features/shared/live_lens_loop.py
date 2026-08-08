@@ -331,16 +331,41 @@ def _wnba_live_lens_min_headroom_bytes() -> int:
 	ungated builder in the tick. It OOM-killed the container repeatedly and
 	then crash-looped: boots at 03:07:56, 03:09:09, 03:10:31, 03:12:07.
 
-	1200MB = the measured 1,062MB plus ~13% margin. It is NOT copied from MLB's
-	number (that is the #124 mistake this file's history already records), and
-	it is a measurement of ONE build -- if WNBA's live slate is larger than the
-	one measured, this will be low. Re-measure rather than assume.
+	1200MB was the measured 1,062MB plus ~13% margin.
+
+	RE-CALIBRATED 2026-08-08 to 300MB, and the reason is the one this file keeps
+	learning: THE STAGE IT GUARDS CHANGED EIGHT MINUTES AFTER THE NUMBER WAS SET.
+	`44008605` landed at 22:24 CDT and removed the `build_cards_page_context`
+	call that the 1,062MB was a measurement OF; `56d67061` set 1200MB at 22:16
+	against a builder that no longer exists in that form. A threshold calibrated
+	to a deleted cost is the #124 defect wearing new clothes.
+
+	What the guarded step costs NOW, measured on refresh-worker (4096MB) across
+	all 7 WNBA ticks 2026-08-08 18:00-21:45Z (before -> after_build, container):
+
+	    595.3 ->  748.8   (+153.5)      793.7 ->  863.3   (+69.6)
+	    703.9 ->  792.5   ( +88.7)      765.4 ->  857.8   (+92.4)
+	    708.0 ->  797.2   ( +89.3)     1051.0 -> 1122.9   (+71.9)
+	                                   1105.8 -> 1179.0   (+73.2)
+
+	Worst 153.5MB, mean ~91MB. 300MB is worst-measured + ~95% margin -- the same
+	"worst measured + margin" philosophy #124 established, applied to what this
+	gate actually guards. It now matches MLB's number by CONVERGENCE, not by
+	copying: two different builders were separately measured into the same
+	neighbourhood.
+
+	It did not fire once in that window (0 of 7 skipped, headroom 2.9-3.5GB), so
+	this is not the cause of the WNBA live-lens regression -- see
+	`load_published_cards_page_context` for what was. It is still worth fixing:
+	refresh-worker also holds the MLB daily sim, and a 1200MB bar on a service
+	that has been measured past 1.4GB resident would silently skip a ~90MB step
+	at exactly the moment a live slate is running.
 	"""
 	raw = str(os.environ.get("SYNDICATE_WNBA_LIVE_LENS_MIN_HEADROOM_BYTES") or "").strip()
 	try:
-		return max(0, int(raw)) if raw else 1200 * 1024 * 1024
+		return max(0, int(raw)) if raw else 300 * 1024 * 1024
 	except ValueError:
-		return 1200 * 1024 * 1024
+		return 300 * 1024 * 1024
 
 
 def _wnba_live_lens_headroom_snapshot() -> dict[str, Any] | None:

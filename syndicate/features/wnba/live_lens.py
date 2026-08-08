@@ -15,6 +15,8 @@ from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.cards import build_cards_page_context
 from syndicate.features.wnba.cards import build_cards_page_context_if_cached
 from syndicate.features.wnba.cards import build_live_lines_payload
+from syndicate.features.wnba.cards import load_published_cards_page_context
+from syndicate.features.wnba.cards import wnba_cards_context_max_age_seconds
 from syndicate.features.wnba.sources import build_module_links
 
 
@@ -168,6 +170,11 @@ def _snapshot_context(selected_date: str, payload: dict[str, Any] | None) -> dic
         card_sections=[dict(section) for section in _snapshot_list(snapshot, "card_sections") if isinstance(section, dict)],
     )
     context["games"] = games
+    # Carried, not recomputed: this context is a REPLAY of a snapshot some other
+    # process built, so the only honest provenance is the one that shipped with
+    # it. Recomputing it here would describe this read, not that build.
+    context["cards_context_source"] = str(snapshot.get("cards_context_source") or "").strip() or None
+    context["cards_context_age_seconds"] = snapshot.get("cards_context_age_seconds") if isinstance(snapshot.get("cards_context_age_seconds"), (int, float)) else None
     context["requested_date"] = _snapshot_text(snapshot, "requested_date", selected_date)
     context["lookahead_applied"] = bool(snapshot.get("lookahead_applied", False))
     context["players_included"] = bool(snapshot.get("players_included", False))
@@ -242,24 +249,48 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
     #
     # `allow_rebuild` exists so the WNBA route can still force one when a human
     # is actually waiting for the page.
+    cards_context_source = "cold"
+    cards_context_age_seconds: float | None = None
     try:
         cards_context = build_cards_page_context_if_cached(selected_date, allow_stored_date_fallback=False)
-        if cards_context is None:
-            if allow_rebuild:
+        if cards_context is not None:
+            cards_context_source = "process_cache"
+            cards_context_age_seconds = 0.0
+        else:
+            # The in-process cache above is warm only for the interpreter that
+            # filled it, and the tick's interpreter is never that one -- the
+            # /wnba routes run on web, this tick runs on refresh-worker. The
+            # PUBLISHED context is the same data through the shared keyvalue
+            # store, which is what makes "consume, do not rebuild" actually
+            # reachable from a worker instead of only sounding reachable.
+            published, cards_context_age_seconds = load_published_cards_page_context(selected_date)
+            if published is not None:
+                cards_context = published
+                cards_context_source = "published_artifact"
+            elif allow_rebuild:
                 cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+                cards_context_source = "rebuilt"
+                cards_context_age_seconds = 0.0
             else:
                 # Degraded, and SAID SO. A silent empty context here is
                 # indistinguishable from "no WNBA games today", which is
                 # exactly the class of blank this project keeps mistaking for
-                # a data outage.
+                # a data outage. The reason separates "nobody has published
+                # one" from "one exists and is too old" -- they need different
+                # fixes and used to print the same line.
+                reason = "no_published_context" if cards_context_age_seconds is None else "published_context_stale"
                 print(
                     f"[wnba_live_lens] CARDS_CONTEXT_COLD date={selected_date} "
-                    f"reason=rebuild_suppressed_on_worker",
+                    f"reason={reason} "
+                    f"age_seconds={round(cards_context_age_seconds, 1) if cards_context_age_seconds is not None else 'none'} "
+                    f"max_age_seconds={wnba_cards_context_max_age_seconds()}",
                     flush=True,
                 )
                 cards_context = {}
     except Exception:
         cards_context = {}
+        cards_context_source = "error"
+        cards_context_age_seconds = None
     resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date
     # gameLens is attached upstream, once, inside build_cards_page_context
     # itself (syndicate/features/wnba/cards.py) -- both this page and the
@@ -348,6 +379,14 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
     context["source_date_display"] = str(cards_context.get("source_date_display") or resolved_date).strip() or resolved_date
     context["generated_at"] = str(cards_context.get("generated_at") or cards_context.get("generatedAt") or "").strip() or None
     context["odds_refreshed_at"] = str(cards_context.get("odds_refreshed_at") or cards_context.get("oddsRefreshedAt") or "").strip() or None
+    # Provenance travels WITH the snapshot. A live lens built off a context
+    # published 14 minutes ago is not wrong the way an empty one is, but it is
+    # not live either, and `e8deadb7` ("live snapshots freezing at pregame
+    # state") is the same defect class arriving without a label. Whoever reads
+    # this snapshot can now tell which of the three sources fed it and how old
+    # that source was.
+    context["cards_context_source"] = cards_context_source
+    context["cards_context_age_seconds"] = round(cards_context_age_seconds, 1) if cards_context_age_seconds is not None else None
     context["live_lens_contract"] = {
         "sport": "wnba",
         "module": "live_lens",
@@ -356,6 +395,21 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
     context["api_payload"] = build_rank_api_payload(context)
     context["contract_ready_payload"] = dict(context["api_payload"])
     return context
+
+
+def _game_status_text(game: dict[str, Any]) -> str:
+    """`game["status"]` is a DICT under the board contract, not a string.
+
+    `_safe_text` on a dict returns its repr, so the live-lens card eyebrow was
+    rendering `{'clock': '', 'detail': 'Final', 'final': True, ...}` verbatim.
+    Surfaced 2026-08-08 while replaying the fixed tick over the production
+    slate; it is only visible once the lens has rows at all, which is why the
+    empty-snapshot regression hid it.
+    """
+    status = game.get("status")
+    if isinstance(status, dict):
+        return _safe_text(status.get("status") or status.get("detail"), "Stored lens")
+    return _safe_text(status, "Stored lens")
 
 
 def _metric_rows(game: dict[str, Any], *, limit: int = 4) -> list[dict[str, str]]:
@@ -491,7 +545,7 @@ def _rank_card(game: dict[str, Any], selected_date: str, *, live_line: float | N
         summary = f"Total pts {int(round(current_total))}. {summary}"
     return {
         "title": f"{_safe_text(away.get('abbr'), 'AWY')} @ {_safe_text(home.get('abbr'), 'HOM')}",
-        "eyebrow": _safe_text(game.get("status"), "Stored lens"),
+        "eyebrow": _game_status_text(game),
         "badge": badge,
         "meta": _safe_text(game.get("detail"), selected_date),
         "metrics": metrics,
@@ -506,7 +560,15 @@ def build_live_lens_page_context(selected_date: str) -> dict[str, Any]:
     warn_if_compute_in_request_path("build_live_lens_page_context")
     snapshot = _load_live_lens_snapshot()
     if snapshot is None or not validate_live_lens_snapshot(snapshot) or not _snapshot_list(snapshot, "rank_cards"):
-        snapshot = build_live_lens_snapshot(selected_date)
+        # allow_rebuild=True, and it was NOT wired before: `44008605` added the
+        # parameter and wrote that it "exists so the WNBA route can still force
+        # one when a human is actually waiting for the page", but no caller in
+        # the repo ever passed it. So this fallback -- the one path where a
+        # rebuild is the job being asked for -- degraded exactly like the
+        # background tick, and the page could not recover from a cold worker
+        # snapshot even on a service that builds this same context for
+        # /wnba/cards on every request.
+        snapshot = build_live_lens_snapshot(selected_date, allow_rebuild=True)
     context = _empty_live_lens_context(selected_date) if snapshot is None else _snapshot_context(selected_date, snapshot)
     context["cards"] = [dict(card) for card in context.get("rank_cards") or [] if isinstance(card, dict)]
     return attach_live_lens_contract(context, sport="wnba", module="live_lens")

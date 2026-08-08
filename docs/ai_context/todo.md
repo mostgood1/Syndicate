@@ -1,5 +1,129 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (late) — #269 WNBA LIVE-LENS REGRESSION: FIXED, COMMITTED, **NOT DEPLOYED** (lead is batching one deploy)
+
+**User report:** WNBA live-lens has regressed. Confirmed on the consuming
+surface, with a live game on the board:
+
+```
+GET /wnba/api/live-lens?date=2026-08-08  ->  games: 0, rank_cards: 0
+                                             "No stored WNBA live-lens rows"
+GET /wnba/api/cards?date=2026-08-08      ->  games: 3
+                                             IND @ CHI  Live  1:49 - 4th
+```
+
+**ROOT CAUSE — a consumer reading a producer's in-process dict across two
+containers.** `44008605` (2026-08-07 22:24 CDT) made the live-lens tick call
+`build_cards_page_context_if_cached`, which returns the context only if
+`_BUILD_CARDS_PAGE_CONTEXT_CACHE` is warm within 12s, and named "the /wnba
+endpoints, on web" as the builders. That cache is a **module-level dict**. The
+tick runs on refresh-worker (moved there by `397088a3`). Two containers, two
+interpreters, two separate dicts — the read could never hit.
+
+Measured on refresh-worker, 2026-08-08 18:00–21:45Z, via the Render logs API:
+
+| | |
+|---|---|
+| `live_lens_tick_before_wnba` | 7 |
+| `live_lens_tick_after_build_wnba` | 7 |
+| `CARDS_CONTEXT_COLD` | **6 of 7 ticks** |
+| `reason=low_headroom` | **0** |
+
+**Two further reasons the same read could never hit, each sufficient alone** —
+found only by reading the key, not the function:
+- the cache key carries `allow_stored_date_fallback`; the /wnba routes build
+  with `True` (`blueprints/wnba.py::_allow_stored_date_fallback` returns `True`)
+  while the tick asks for `False`. **Even in one process the keys differ.**
+- 12s TTL against an observed tick spacing of ~22 minutes.
+
+**And the escape hatch was never wired.** `44008605` added `allow_rebuild` and
+wrote that it "exists so the WNBA route can still force one when a human is
+actually waiting". `grep -rn allow_rebuild` → **3 hits, all inside the function
+that defines it.** No caller ever passed it, so `build_live_lens_page_context`
+— the one path where a rebuild IS the job being asked for — degraded exactly
+like the background tick and could not recover from a cold worker snapshot.
+
+#### The headroom gate (`56d67061`) was NOT the cause — and was still wrong
+
+Refuted on its own terms: **0 of 7 ticks skipped**, headroom 2.9–3.5GB. It also
+already inherits the `#79 step 2` reclaimable-file correction via the shared
+`memory_headroom_snapshot`, so it is not measuring `memory.current` naively.
+
+But 1200MB was calibrated to a build that **`44008605` deleted eight minutes
+later**. What the gate guards now, all 7 ticks (container, before → after_build):
+`+153.5, +88.7, +89.3, +69.6, +92.4, +71.9, +73.2 MB` — worst 153.5, mean ~91.
+Re-calibrated to **300MB** (worst measured + ~95%). It matches MLB's number by
+convergence, not by copying, and the docstring says so.
+
+*This is [[check guard thresholds against stage cost]] with a new twist: the
+threshold was honest when written and the stage it guarded shrank by 10x under
+it, in the same session, by the same author. **A guard and the stage it guards
+have to be re-measured together — a commit that changes a stage's cost owns
+every threshold calibrated to the old one.***
+
+#### The fix (all committed, none deployed)
+
+1. **`publish_cards_page_context` / `load_published_cards_page_context`**
+   (`wnba/cards.py`) — the builder publishes the context through
+   `refresh_state_store`, which is keyvalue-backed on all three services
+   (one shared Redis) precisely because Render's disks cannot be shared. The
+   tick reads a JSON blob and **never rebuilds a page** — the ~1GB rebuild
+   `44008605` removed does not come back. Only the
+   `allow_stored_date_fallback=False` variant is published: the `True` variant
+   may substitute a *different date's* stored slate.
+2. **Provenance travels with the snapshot** — `cards_context_source`
+   (`process_cache` / `published_artifact` / `rebuilt` / `cold`) and
+   `cards_context_age_seconds`, and the cold marker now separates
+   `no_published_context` from `published_context_stale age=…`. Those needed
+   different fixes and printed the same line. Guards the `e8deadb7` class
+   (snapshots frozen at pregame) by making staleness *nameable*.
+3. **`allow_rebuild=True` wired** on `build_live_lens_page_context`.
+4. **Gate re-calibrated** 1200MB → 300MB.
+5. **Card eyebrow rendered a dict repr** — `game["status"]` is a dict under the
+   board contract and went through `_safe_text`, so a card with a real slate
+   showed `{'clock': '', 'detail': 'Final', ...}` to the user. Only reachable
+   once the lens has rows, which is why the empty-snapshot regression hid it.
+
+**Verified on a production payload with the process cache deliberately cold —
+the exact condition the worker tick runs in** (real code, prod `/wnba/api/cards`
+slate, `build_cards_page_context` patched to raise if touched):
+
+```
+source = published_artifact   age = 0.2s
+games = 3   rank_cards = 3    valid snapshot: True
+   SEA @ POR | Scheduled | 7:30 PM CT
+   IND @ CHI | Final     | Final
+   LVA @ MIN | Final     | Final
+```
+
+**128 green** across `test_wnba_live_lens_published_cards_context.py` (new),
+`test_wnba_live_lens_headroom_gate.py`, `test_wnba_live_lens_game_shape.py`,
+`test_wnba_live_snapshots_local.py`, `test_live_lens_loop.py`, plus 41 in the
+WNBA cards suites (the publish hook rides inside `build_cards_page_context`).
+
+#### OPEN, and honest about it
+
+- **NOT DEPLOYED.** Nothing above is live. Deploy-ready; lead owns the batch.
+- **Residual staleness is bounded, not eliminated.** The published context can
+  be up to `SYNDICATE_WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS` (default 900s) old,
+  and scores come from it. It is *visible* now (`cards_context_age_seconds`)
+  rather than silent. Tighten once the publish cadence on refresh-worker is
+  measured — do not guess it.
+- **The tick ran 7 times in 3h45m against a 60s interval** (~22 min spacing).
+  Not investigated; not WNBA-specific. Likely the loop serialising behind MLB's
+  build. Worth a look — a live lens on a 22-minute cadence is barely live.
+- **The `allow_stored_date_fallback` key split is a landmine elsewhere.** Any
+  other consumer of `build_cards_page_context_if_cached` has the same problem;
+  WNBA is currently the only one.
+
+*METHOD note, and it is the reusable one: the leading hypothesis handed to me
+was **right about the mechanism and wrong about which service**. It named
+live-odds-worker; `397088a3` had already moved the loop to refresh-worker, and
+the gate that hypothesis called compounding was measurably not firing. Checking
+`/v1/services/*/env-vars` before reading any more code is what separated them —
+**config is part of the graph, and a hypothesis about a worker is unfalsifiable
+until you know which worker is running the code.*** [[enumerate env changes when bisecting]]
+
 ### 2026-08-08 (afternoon, ~21:00-21:30Z) — OPERATIONAL RULES earned today (cheap to read, expensive to rediscover)
 
 **TIMESTAMP NOTE:** entries in this block were originally headed "(late)". They

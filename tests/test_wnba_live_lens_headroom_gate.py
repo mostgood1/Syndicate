@@ -37,11 +37,34 @@ def test_wnba_is_gated_at_all():
     assert 'sport == "wnba"' in source, "WNBA builder is unguarded again"
 
 
-def test_gate_is_calibrated_from_the_measurement_not_copied():
-    """This file's own history says: calibrate from measurement, never copy
-    MLB's number. 1200MB = the measured 1,062MB plus margin."""
-    assert live_lens_loop._wnba_live_lens_min_headroom_bytes() >= 1062 * 1024 * 1024
-    assert live_lens_loop._wnba_live_lens_min_headroom_bytes() != live_lens_loop._mlb_live_lens_min_headroom_bytes()
+def test_gate_is_calibrated_to_the_stage_it_currently_guards():
+    """RE-CALIBRATED 2026-08-08: 1200MB -> 300MB.
+
+    The original 1200MB was the measured 1,062MB plus margin, and it was
+    honestly derived -- from a builder that `44008605` deleted EIGHT MINUTES
+    LATER. The guarded step is now a JSON read plus a rank-card pass, measured
+    across 7/7 refresh-worker ticks at +69.6 to +153.5MB.
+
+    The assertion that used to live here (`>= 1062MB`, `!= MLB's number`) was
+    pinning the old cost, so it would have failed the fix rather than caught the
+    drift. What is worth pinning is the RELATIONSHIP to the measurement: high
+    enough to cover the worst observed build, low enough that a 4Gi service
+    running a resident sim can still satisfy it.
+    """
+    required = live_lens_loop._wnba_live_lens_min_headroom_bytes()
+    assert required >= 154 * 1024 * 1024, "below the worst measured build (+153.5MB)"
+    assert required <= 600 * 1024 * 1024, "a bar this high cannot be met beside a resident MLB sim"
+
+
+def test_gate_matching_mlb_is_convergence_not_a_copy():
+    """MLB's gate is also 300MB, and this file's history warns loudly against
+    copying it. They match because two builders were separately measured into
+    the same neighbourhood (MLB 0-13MB, WNBA 69-154MB) and given the same
+    worst-measured-plus-margin treatment -- so pin the SOURCE of the number, not
+    its inequality to MLB's. If WNBA's builder gets expensive again, re-measure;
+    do not reach for MLB's constant."""
+    assert "300" in (live_lens_loop._wnba_live_lens_min_headroom_bytes.__doc__ or "")
+    assert "153.5" in (live_lens_loop._wnba_live_lens_min_headroom_bytes.__doc__ or "")
 
 
 def test_gate_is_overridable_by_env():
