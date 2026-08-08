@@ -916,12 +916,61 @@ def _evaluation_settlement_autorun_status_path() -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "evaluation_settlement_autorun_status.json"
 
 
+# #275: emitted ONCE PER PROCESS, and deliberately BEFORE the disabled-autorun
+# early return below, because it must report from the service that cannot be
+# asked.
+#
+# The chunk index is the DOMINANT term in settlement's per-record cost -- measured
+# 2026-08-08, halving the chunk changed nothing while shrinking the index 10x cut
+# the cost 6.5x. It is also the one term nobody can see: it is not in
+# HOT_ARTIFACT_PATTERNS so it never crosses to web, refresh-worker serves no HTTP,
+# and two lanes independently confirmed there is no path to it from any service
+# with an API. A subsystem whose dominant cost is observable only from a process
+# that publishes nothing cannot be priced without changing it first -- this is
+# that change, and it is the cheapest possible one.
+#
+# WHY THIS IS NOT "periodic worker work is never free" (#241): it is one
+# `Path.stat()` -- a metadata syscall, no read, no parse, no allocation -- fired
+# once per process lifetime, not once per cycle. The worker reboots often enough
+# (7 restarts in two hours on 2026-08-08) that the number arrives promptly
+# regardless. Guarded once-per-boot rather than rate-limited so it cannot become
+# periodic work by accident later.
+#
+# Reaches the Render logs API only via print(..., flush=True); logger.info does
+# not survive the collector.
+_EVALUATION_LEDGER_INDEX_SIZE_REPORTED = False
+
+
+def _report_evaluation_ledger_index_size() -> None:
+    global _EVALUATION_LEDGER_INDEX_SIZE_REPORTED
+    if _EVALUATION_LEDGER_INDEX_SIZE_REPORTED:
+        return
+    _EVALUATION_LEDGER_INDEX_SIZE_REPORTED = True
+    try:
+        from syndicate.features.shared.intelligence_evaluation import DEFAULT_LEDGER_PATH
+        from syndicate.features.shared.intelligence_evaluation import _ledger_index_path
+
+        index_path = _ledger_index_path(DEFAULT_LEDGER_PATH)
+        size = index_path.stat().st_size if index_path.exists() else -1
+        print(
+            "[evaluation_settlement] LEDGER_INDEX_SIZE "
+            f"bytes={size} path={index_path} autorun_enabled={_evaluation_settlement_auto_refresh_enabled()} "
+            "-- #275: the dominant per-record cost term; ~2.58MB RSS and ~0.058s per MB of this file, "
+            "PER SETTLED RECORD, until the round trip is hoisted out of the loop",
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Never let a diagnostic break the refresh cycle.
+        print(f"[evaluation_settlement] LEDGER_INDEX_SIZE_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
 def _launch_autorun_evaluation_settlement(
     *,
     latest_manifest_path: Path,
     worker_status_path: Path,
     refresh_cycle: dict[str, int],
 ) -> bool:
+    _report_evaluation_ledger_index_size()
     if not _evaluation_settlement_auto_refresh_enabled():
         return False
 
