@@ -1,0 +1,146 @@
+"""The two quality floors on the L2-A shortlist.
+
+Measured on the SERVED board, 2026-08-08 (`/api/board/layer2-shortlist`, 200
+rows): **105 rows carried negative value%**, median -0.702, range -8.72..+4.24.
+More than half the board was priced worse than the market's own no-vig fair.
+That is floor-then-merit with no quality bar: `per_sport` and `kind_floor`
+guarantee slots are filled whether or not anything deserves them, so the floors
+must be applied BEFORE the per-sport buckets or the guarantee re-seats the rows
+they just rejected.
+
+The value floor is NOT a positive-EV gate and must never be relabelled as one --
+it is "best price beats consensus fair", which is L2-C's question. `65b15a03`
+withdrew an earlier `ev_pct >= 0` proposal, correctly, because it was headed for
+`opportunity_gate`, whose job `#245` fixed as "is this market live". This is a
+selection rule on the DISPLAY artifact; the ledger still carries every gated row
+for S6.
+
+The age ceiling is deliberately loose. Same 200 rows: mlb's 100 quotes all sat
+within a 1.2-minute window 11.46h old, wnba's 36 within 13h, while soccer showed
+a real 1.85-22.2h spread. 100 markets do not independently freeze inside 1.2
+minutes -- that is one stale capture, and a ceiling tight enough to act on it
+(<=6h) leaves 3 of 200 rows and deletes two sports. So the ceiling is a backstop
+against dead quotes, not the instrument for that lag.
+"""
+
+from __future__ import annotations
+
+import os
+import unittest
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
+
+from syndicate.features.shared.layer2_board import (
+    SHORTLIST_MAX_QUOTE_AGE_SECONDS,
+    SHORTLIST_MIN_VALUE_PCT,
+    select_shortlist,
+)
+
+_NOW = datetime(2026, 8, 8, 18, 0, tzinfo=timezone.utc)
+
+
+def _row(*, sport="mlb", kind="game", ev=1.0, age=3600.0, score=None):
+    return {
+        "sport": sport,
+        "kind": kind,
+        "ev_pct": ev,
+        "commence_time": (_NOW + timedelta(hours=3)).isoformat().replace("+00:00", "Z"),
+        "quote": {"book_age_seconds": age},
+        "score": {"score": score if score is not None else ev},
+    }
+
+
+class ValueFloorTests(unittest.TestCase):
+    def test_negative_value_rows_are_dropped(self) -> None:
+        out = select_shortlist([_row(ev=2.0), _row(ev=-0.7), _row(ev=-8.72)], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["rows_below_value_floor"], 2)
+
+    def test_zero_is_kept_because_the_floor_is_inclusive(self) -> None:
+        out = select_shortlist([_row(ev=0.0)], now=_NOW, min_value_pct=0.0)
+        self.assertEqual(len(out["rows"]), 1)
+
+    def test_the_kind_floor_cannot_re_seat_a_rejected_row(self) -> None:
+        """The whole point. kind_floor guarantees 30 prop slots; if the floors
+        ran after bucketing, the guarantee would drag negative rows back in --
+        which is how 105 of them reached the served board."""
+        rows = [_row(kind="prop", ev=-5.0) for _ in range(40)] + [_row(kind="game", ev=3.0)]
+        out = select_shortlist(rows, now=_NOW, kind_floor=30)
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["rows"][0]["kind"], "game")
+
+    def test_a_row_with_no_value_at_all_is_not_dropped(self) -> None:
+        """Absence of a measurement is not a negative measurement."""
+        row = _row()
+        row.pop("ev_pct")
+        row["score"] = {"score": 1.0}
+        out = select_shortlist([row], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+
+    def test_floor_is_env_tunable(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_MIN_VALUE_PCT": "2.0"}, clear=False):
+            out = select_shortlist([_row(ev=1.0), _row(ev=2.5)], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["min_value_pct"], 2.0)
+
+
+class QuoteAgeCeilingTests(unittest.TestCase):
+    def test_quotes_beyond_the_ceiling_are_dropped(self) -> None:
+        out = select_shortlist(
+            [_row(age=3600.0), _row(age=48 * 3600.0)], now=_NOW, max_quote_age_seconds=24 * 3600
+        )
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["rows_beyond_quote_age"], 1)
+
+    def test_unknown_age_is_kept(self) -> None:
+        """No book clock is not evidence of staleness -- the score already
+        discounts it (0.6). Excluding it would delete whole sources."""
+        row = _row()
+        row["quote"] = {}
+        out = select_shortlist([row], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+
+    def test_default_ceiling_does_not_delete_todays_board(self) -> None:
+        """The measured clusters -- mlb 11.46h, wnba 13.0h, soccer up to 22.2h --
+        must all survive the DEFAULT. A ceiling that silently emptied the board
+        would look identical to an outage."""
+        rows = [
+            _row(sport="mlb", age=11.46 * 3600),
+            _row(sport="wnba", age=13.0 * 3600),
+            _row(sport="soccer", age=22.2 * 3600),
+        ]
+        out = select_shortlist(rows, now=_NOW)
+        self.assertEqual(len(out["rows"]), 3, "default ceiling must not gut the live board")
+        self.assertEqual(out["rows_beyond_quote_age"], 0)
+
+    def test_ceiling_is_env_tunable(self) -> None:
+        with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS": "21600"}, clear=False):
+            out = select_shortlist([_row(age=11.46 * 3600), _row(age=1800.0)], now=_NOW)
+        self.assertEqual(len(out["rows"]), 1)
+        self.assertEqual(out["max_quote_age_seconds"], 21600.0)
+
+    def test_zero_ceiling_disables_the_rule(self) -> None:
+        out = select_shortlist([_row(age=100 * 3600)], now=_NOW, max_quote_age_seconds=0)
+        self.assertEqual(len(out["rows"]), 1)
+
+
+class ReportingTests(unittest.TestCase):
+    def test_both_rejections_are_reported_not_silent(self) -> None:
+        """A board that shrinks must say which rule shrank it."""
+        out = select_shortlist(
+            [_row(ev=-1.0), _row(age=100 * 3600), _row(ev=2.0)],
+            now=_NOW,
+            max_quote_age_seconds=24 * 3600,
+        )
+        self.assertEqual(out["rows_below_value_floor"], 1)
+        self.assertEqual(out["rows_beyond_quote_age"], 1)
+        self.assertEqual(len(out["rows"]), 1)
+
+    def test_defaults_are_the_documented_ones(self) -> None:
+        out = select_shortlist([_row(ev=1.0)], now=_NOW)
+        self.assertEqual(out["min_value_pct"], SHORTLIST_MIN_VALUE_PCT)
+        self.assertEqual(out["max_quote_age_seconds"], SHORTLIST_MAX_QUOTE_AGE_SECONDS)
+
+
+if __name__ == "__main__":
+    unittest.main()

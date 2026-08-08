@@ -43,6 +43,7 @@ INTEGRATION (not yet wired — deliberately):
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
@@ -96,6 +97,73 @@ SHORTLIST_ROWS_PER_SPORT = 100
 # for it in quality, and an unused floor flows to the other kind rather than
 # being wasted on a sport that has only one.
 SHORTLIST_KIND_FLOOR = 30
+
+# Minimum value% a row must carry to be shown. Env:
+# SYNDICATE_SHORTLIST_MIN_VALUE_PCT.
+#
+# **THIS IS NOT A "POSITIVE EV" GATE, and must never be described as one.** The
+# quantity is "the best available price beats the consensus no-vig fair", which
+# is L2-C's question, not a claim of positive expected value. That distinction
+# is why an earlier proposal to gate on `ev_pct >= 0` was withdrawn (see
+# `65b15a03`), and the withdrawal was right about WHERE: it belonged in
+# `opportunity_gate`, whose job `#245` fixed as "is this market live", and a
+# value judgement there would have baked "never trust the model" into liveness.
+# Here it is a SELECTION rule on the display artifact, which is the layer whose
+# job is deciding what is worth showing, and the ledger still carries every
+# gated row for S6 -- so nothing is lost to settlement by not displaying it.
+#
+# Measured on the served board, 2026-08-08 (200 rows): **105 were negative**,
+# median -0.702%, i.e. more than half the board was priced WORSE than the
+# market's own fair. That is a direct consequence of floor-then-merit with no
+# quality bar -- `per_sport` and `kind_floor` guarantee slots get filled whether
+# or not anything deserves them. At 0.0 this keeps 81 of 200.
+SHORTLIST_MIN_VALUE_PCT = 0.0
+
+# Maximum book-clock age a quote may carry. Env:
+# SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS.
+#
+# **DELIBERATELY LOOSE, AND THE DEFAULT IS NOT THE INTERESTING NUMBER.** The
+# measurement that set it, same 200 rows:
+#
+#     mlb     n=100  min=11.46h  med=11.46h  max=11.48h   <- 1.2-minute spread
+#     wnba    n= 36  min=12.47h  med=12.98h  max=13.00h
+#     soccer  n= 64  min= 1.85h  med= 5.88h  max=22.20h   <- a real spread
+#
+# 100 MLB quotes did not independently stop moving inside the same 1.2 minutes.
+# That is ONE capture event ~11.5h stale, not 100 stable markets, and the board
+# is reading quotes far older than the odds file we know exists. A floor tight
+# enough to act on that (<=6h) leaves **3 of 200 rows** and deletes two sports,
+# so it would hide the symptom by emptying the board rather than fix the lag.
+#
+# So this is a backstop against genuinely dead quotes, NOT the instrument for
+# the staleness problem -- `_freshness_factor` already discounts age
+# multiplicatively in the score, which is the right shape while the cause is
+# unknown. Tighten it only after the uniform-lag question is answered. Cost of
+# each value, measured: <=12h keeps 142, <=6h keeps 37, <=4h keeps 13.
+SHORTLIST_MAX_QUOTE_AGE_SECONDS = 24 * 3600
+
+
+def _env_float(name: str, default: float) -> float:
+    raw = str(os.environ.get(name) or "").strip()
+    if not raw:
+        return float(default)
+    try:
+        return float(raw)
+    except ValueError:
+        return float(default)
+
+
+def _row_value_pct(row: Mapping[str, Any]) -> float | None:
+    value = _as_float(row.get("ev_pct"))
+    if value is not None:
+        return value
+    score = row.get("score")
+    return _as_float(score.get("value_pct")) if isinstance(score, Mapping) else None
+
+
+def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:
+    quote = row.get("quote")
+    return _as_float(quote.get("book_age_seconds")) if isinstance(quote, Mapping) else None
 
 
 def _as_float(value: Any) -> float | None:
@@ -436,6 +504,8 @@ def select_shortlist(
     kind_floor: int = SHORTLIST_KIND_FLOOR,
     horizon_days: int | None = SHORTLIST_HORIZON_DAYS,
     now: datetime | None = None,
+    min_value_pct: float | None = None,
+    max_quote_age_seconds: float | None = None,
 ) -> dict[str, Any]:
     """The rows that get PERSISTED. Everything else lives in the ledger.
 
@@ -451,11 +521,40 @@ def select_shortlist(
     the shortlist.
     """
     reference_now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    value_floor = (
+        float(min_value_pct)
+        if min_value_pct is not None
+        else _env_float("SYNDICATE_SHORTLIST_MIN_VALUE_PCT", SHORTLIST_MIN_VALUE_PCT)
+    )
+    age_ceiling = (
+        float(max_quote_age_seconds)
+        if max_quote_age_seconds is not None
+        else _env_float("SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS", SHORTLIST_MAX_QUOTE_AGE_SECONDS)
+    )
     by_sport: dict[str, list[Mapping[str, Any]]] = {}
     beyond_horizon = 0
+    below_value_floor = 0
+    beyond_quote_age = 0
     for row in opportunities:
         if not _within_horizon(row, reference_now, horizon_days):
             beyond_horizon += 1
+            continue
+        # Both floors are applied BEFORE the per-sport buckets, so floor-then-merit
+        # cannot reach past them: `kind_floor` guarantees slots, and if a rejected
+        # row were still in the pool the guarantee would seat it anyway. That is
+        # exactly how 105 negative-value rows reached the served board.
+        value_pct = _row_value_pct(row)
+        if value_pct is not None and value_pct < value_floor:
+            below_value_floor += 1
+            continue
+        age_seconds = _row_quote_age_seconds(row)
+        # An unknown age is NOT treated as fresh -- same call `_freshness_factor`
+        # makes (0.6, not 1.0) and for the same reason: sources that publish no
+        # book clock would otherwise pass a bar they were never measured against.
+        # It is not excluded either, because absence of a clock is not evidence
+        # of staleness; the score already discounts it.
+        if age_seconds is not None and age_ceiling > 0 and age_seconds > age_ceiling:
+            beyond_quote_age += 1
             continue
         sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
         by_sport.setdefault(sport, []).append(row)
@@ -498,8 +597,14 @@ def select_shortlist(
         "per_sport_limit": int(per_sport),
         "kind_floor": int(kind_floor),
         "horizon_days": horizon_days,
+        "min_value_pct": value_floor,
+        "max_quote_age_seconds": age_ceiling,
         # Logged, not silently dropped: a sport vanishing from the shortlist
         # should be attributable to its schedule rather than look like an outage.
+        # Same contract for the two quality floors -- a board that shrinks must
+        # say which rule shrank it, or the next reader diagnoses an outage.
         "rows_beyond_horizon": beyond_horizon,
+        "rows_below_value_floor": below_value_floor,
+        "rows_beyond_quote_age": beyond_quote_age,
         "persisted_bytes": len(json.dumps(selected, default=str)),
     }
