@@ -220,16 +220,80 @@ def _to_float(value: Any) -> float | None:
 
 
 def _nfl_schedule_paths() -> list[Path]:
+    """Every NFL schedule CSV on disk.
+
+    #273: this globbed `default_nfl_source_root() / "data"`, a subdirectory that
+    does not exist for NFL. `nfl/sources.py`'s own `data_path()` is
+    `default_nfl_source_root().joinpath(...)` -- the source root IS the data
+    directory -- so `real_schedule_path(2026)` resolves to
+    `data/nfl_source/schedule_2026.csv` while this looked in
+    `data/nfl_source/data/`. The `/ "data"` was carried over from
+    `_ncaaf_lines_paths` below, where it is CORRECT (ncaaf_source really does
+    have a `data/` subdirectory). One layout assumption, two sports, right once.
+
+    Consequence: `root.exists()` was False, so this returned `[]` and the NFL
+    grader produced ZERO rows for every date since it was written -- the fourth
+    instance of this file's own rule that *exactly* zero means a read of
+    something nothing writes, not a threshold to loosen. It was invisible
+    because the settlement autorun is off and, when it did run, `nfl: 0` is
+    indistinguishable from an offseason date.
+
+    Both locations are searched now rather than swapping one guess for another:
+    a mirror that grows a `data/` subdir later must not silently go dark again.
+    """
     from syndicate.features.nfl.sources import default_nfl_source_root
 
-    root = default_nfl_source_root() / "data"
-    if not root.exists():
-        return []
+    root = default_nfl_source_root()
     # Every schedule_{season}.csv the mirror has on disk -- scanning all of
     # them (rather than guessing a season from date_str's year, which is
     # wrong for the January stub of a season that started the prior
     # calendar year) so a January date still resolves against the right file.
-    return sorted(root.glob("schedule_*.csv"))
+    # Also picks up schedule_preseason_{season}.csv, which is a separate file
+    # with its own rows; dates do not collide, so the union is correct.
+    paths: list[Path] = []
+    for candidate_root in (root, root / "data"):
+        if candidate_root.exists():
+            paths.extend(candidate_root.glob("schedule_*.csv"))
+    return sorted(set(paths))
+
+
+# Affirmative "this game has been played" values, as an ALLOWLIST.
+#
+# #273, and this half matters more than the path fix. `schedule_preseason_2026.csv`
+# carries `status: "Scheduled"` with `away_score: "0"` / `home_score: "0"` on all
+# 49 games -- PLACEHOLDER ZEROS, not results. The blank-score guard below cannot
+# see them, because "0" is not blank. So repairing the path alone would have made
+# the grader emit, for every unplayed preseason game:
+#
+#     moneyline home -> margin 0 -> "push"
+#     moneyline away -> margin 0 -> "push"
+#     spread / total  -> graded against a 0-0 "actual"
+#
+# i.e. fabricated settled outcomes on games that have not kicked off. That is
+# strictly worse than the zero it replaced, and settlement would have written
+# them into the ledger as real results.
+#
+# The broken path was the only thing preventing that -- the same shape as the
+# soccer lane's `_has_usable_game_state` regression the same day: a data path
+# repaired, and a guard that had been silently relying on it being broken.
+# Measured across the mirror: preseason 2023/2024/2025 are `Final` on every row
+# (49/49, 49/49, 48/48), 2026 is `Scheduled` on every row (49/49) with 49 of 49
+# scored 0-0. `schedule_{season}.csv` (regular season) has NO status column at
+# all and no 0-0 rows, so it keeps the blank-score rule unchanged.
+_NFL_PLAYED_STATUSES = frozenset({"final", "final/ot", "final ot", "completed", "closed", "post", "status_final"})
+
+
+def _nfl_game_is_played(game: Mapping[str, Any]) -> bool:
+    """True only when the row affirmatively says the game finished.
+
+    Allowlist, not denylist: an unrecognised status must NOT grade. A new status
+    string appearing upstream should cost us a missed settlement, never an
+    invented one. Rows with no `status` column keep the previous behaviour
+    (scores present = played), which is correct for `schedule_{season}.csv`.
+    """
+    if "status" not in game:
+        return True
+    return str(game.get("status") or "").strip().lower() in _NFL_PLAYED_STATUSES
 
 
 def _nfl_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
@@ -237,6 +301,8 @@ def _nfl_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     for schedule_path in _nfl_schedule_paths():
         for game in _read_schedule_csv(schedule_path):
             if str(game.get("gameday") or "").strip() != date_str:
+                continue
+            if not _nfl_game_is_played(game):
                 continue
             home_score = _to_float(game.get("home_score"))
             away_score = _to_float(game.get("away_score"))
