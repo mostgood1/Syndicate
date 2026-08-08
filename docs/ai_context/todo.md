@@ -1,5 +1,68 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (late) — BRANDING FIX VERIFIED (278 → 720/720) — and it RE-OPENED the settled-market hole
+
+`60689dee`, deployed to refresh-worker 20:17:20Z. Verified on the first
+artifact written after it, 20:30:15Z. **Read the second half before celebrating.**
+
+```
+                 before          after
+soccer    chips=61 matched=278   chips=61 matched= 720  unmatched 14 -> 0
+mlb                              chips=15 matched=3604  unmatched 0
+wnba                             chips= 3 matched= 372  unmatched 0
+nfl                              chips= 0 matched=   0  unmatched 20  (no slate — legitimate)
+```
+
+Root cause confirmed, not merely plausible: `team_branding_path` took
+`preferred_source_roots(...)[0]` and never consulted the repo fallback that
+helper appends on Render for exactly this case. All 14 previously-unmatched
+clubs resolved, and mlb/wnba went to zero unmatched too.
+
+The artifact also rebuilt on a normal cycle once deploys stopped — the earlier
+19:59→20:17 gap was **two deploys inside ten minutes restarting the worker
+mid-build**, not a broken writer. One deploy carrying both fixes would have
+been correct; shipping a no-op first and the real fix ten minutes later was bad
+cadence and contaminated the observation window.
+
+#### THE REGRESSION — repairing a join turned OFF the guard protecting the board
+
+`_has_usable_game_state` (`layer2_board.py`) keyed on the PRESENCE of
+`game.state`. That was safe only while soccer rows carried `game: None`. After
+`60689dee` every soccer row has a state — and for the **nine leagues with no
+sim it is `"pregame"` permanently**, because `_unsimulated_game` defaults
+`status_state` to `"pre"` off a static schedule with no live status.
+
+So the guard switched off for exactly the rows it was written for. Measured on
+the served board 20:30Z: **SC Telstar @ NEC Nijmegen ranked #1 and #2 again,
+6.02 hours past a 14:30Z kickoff, carrying `state: "pregame"`.**
+
+**Both halves of this were in my own notes** — "the join will populate state"
+and "that value stays `pregame` forever for nine leagues" — recorded in
+separate entries and never joined to the predicate that consumed them. That is
+the whole failure: not a missing measurement, a missing composition.
+
+Fixed by the concurrent session with `_STARTED_GAME_STATES`, an allowlist where
+only affirmative started/finished states (`live`/`final`/...) protect a row from
+the kickoff clock. Stricter than the "pregame after commence_time" version I had
+started writing, and it needs no `commence_time`, so it degrades better. I
+stopped mid-edit when the file changed under me rather than racing them on it.
+
+**GENERAL LESSON, and it is the useful one from this whole session.** *Fixing a
+join can disable a guard that was silently relying on the join being broken.*
+`None` was load-bearing. Before repairing a data path, grep for what reads the
+field you are about to start populating — presence-based guards are invisible
+until you make the data present.
+
+#### Where soccer actually stands
+
+| | |
+|---|---|
+| chip/alias join | fixed, verified both surfaces |
+| branding read | fixed, verified (278 → 720) |
+| `game.state` for the 9 unsimulated leagues | **still wrong** — `pregame` forever |
+| settled-market protection | rests entirely on the clock guard |
+| the real fix | the sim running — see `f0e0ad1`, blocked on the child's stdout |
+
 ### 2026-08-08 (late) — RETRACTED: "`attach_game_state` is a no-op on the worker" was WRONG. I tested an import graph no process runs
 
 **The entry below this one is false. Do not act on it.** Kept, struck through,
