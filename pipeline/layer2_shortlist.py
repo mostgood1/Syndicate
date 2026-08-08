@@ -117,4 +117,26 @@ def build_layer2_shortlist(
     # showing zero rows attributable to its slate rather than to a broken read.
     shortlist["per_sport_ingest"] = per_sport_stats
     shortlist["opportunities_considered"] = len(opportunities)
+
+    # BOARD CARDS ARE BUILT HERE, ON THE WORKER, AND PERSISTED.
+    #
+    # They were briefly translated at serve time instead, inside
+    # `_hydrate_board_response_payload`. That was wrong twice over: it put a
+    # per-request transformation over every shortlist row into the web service,
+    # which reads artifacts and does not compute; and it meant the artifact was
+    # not what the board actually showed, which defeats the reason L2-A is
+    # worker-side at all -- settlement needs a record of what was RECOMMENDED,
+    # and a card derived per request is not recorded anywhere.
+    #
+    # Web now reads `cards` and slices them by sport. A slice is a read-time
+    # narrowing of persisted data, which is what
+    # slice_intelligence_board_state_for_request already does; a field mapping
+    # is not.
+    try:
+        from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards
+
+        shortlist["cards"] = layer2_rows_to_board_cards(shortlist.get("rows") or [])
+    except Exception as exc:
+        shortlist["cards"] = []
+        shortlist["cards_error"] = f"{type(exc).__name__}: {exc}"
     return shortlist

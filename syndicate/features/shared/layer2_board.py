@@ -273,6 +273,98 @@ def _score_of(row: Mapping[str, Any]) -> float:
 SHORTLIST_HORIZON_DAYS = 1
 
 
+def _pick_label(row: Mapping[str, Any]) -> str:
+    """What the bettor is actually taking, as one readable string.
+
+    A prop is the player; a game side is the team that side refers to. The
+    board's card normaliser falls back through
+    selection -> pick -> name -> player_name and defaults to the literal string
+    "candidate", so a game row with no player name would render as "candidate"
+    on every line without this.
+    """
+    player = str(row.get("player_name") or "").strip()
+    if player:
+        return player
+    side = str(row.get("side") or "").strip().lower()
+    if side == "home":
+        return str(row.get("home_team") or "Home").strip()
+    if side == "away":
+        return str(row.get("away_team") or "Away").strip()
+    return side.title() or "—"
+
+
+def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Translate L2-A rows into the shape the board card normaliser expects.
+
+    THE BOARD IS NOT REWRITTEN TO FIT L2-A; L2-A IS TRANSLATED TO FIT THE BOARD.
+    `build_intelligence_board_contract` -> `_recommendation_card` already owns
+    the card contract and every surface downstream reads its output. Emitting a
+    second, parallel card shape would be a second contract that can disagree
+    with the first (rule 7, and #244's dead-market rule written twice is what
+    that costs).
+
+    The mapping is small because the normaliser is tolerant -- it falls back
+    through several aliases per field. The fields that actually matter:
+
+        selection  what is being taken   (player, else the side's team)
+        market     which market
+        line       the handicap/total, None for h2h
+        odds       the PRICE WE RECOMMEND -- quote.price, not a consensus.
+                   Settlement grades against this, so it must be the same
+                   number the shortlist ranked.
+        edge       the value term, EV against the no-vig fair price
+
+    `score` is carried through untouched so a reader can see the components
+    (ev, sim, book confidence, freshness, price reliability) rather than being
+    asked to trust one opaque number.
+    """
+    cards: list[dict[str, Any]] = []
+    for row in rows or ():
+        if not isinstance(row, Mapping):
+            continue
+        quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+        score = row.get("score") if isinstance(row.get("score"), Mapping) else {}
+        sport = str(row.get("sport") or "").strip().lower()
+        home = str(row.get("home_team") or "").strip()
+        away = str(row.get("away_team") or "").strip()
+        cards.append(
+            {
+                "sport": sport,
+                "sport_slug": sport,
+                "selection": _pick_label(row),
+                "player_name": row.get("player_name"),
+                "market": row.get("market"),
+                "market_key": row.get("market"),
+                "line": row.get("line"),
+                "odds": quote.get("price"),
+                "edge": row.get("ev_pct"),
+                "team": home if str(row.get("side") or "").lower() == "home" else away,
+                "home_team": home,
+                "away_team": away,
+                "matchup": f"{away} @ {home}" if home and away else "",
+                "commence_time": row.get("commence_time"),
+                "event_id": row.get("event_id"),
+                "game_pk": row.get("event_id"),
+                "kind": row.get("kind"),
+                "segment": row.get("segment"),
+                "side": row.get("side"),
+                # Carried verbatim so the board can show WHY a row ranks, and
+                # so nothing downstream has to recompute a ranking that was
+                # already decided (and persisted) on the worker.
+                "score": dict(score),
+                "quote": dict(quote),
+                "board_lane": row.get("board_lane"),
+                "market_state": row.get("market_state"),
+                "gate": row.get("gate"),
+                "ev_pct": row.get("ev_pct"),
+                "model_edge_pct": row.get("model_edge_pct"),
+                "surface_key": "layer2",
+                "source": "layer2_shortlist",
+            }
+        )
+    return cards
+
+
 def _within_horizon(row: Mapping[str, Any], now: datetime, horizon_days: int | None) -> bool:
     if horizon_days is None:
         return True

@@ -263,3 +263,26 @@ def test_a_shortlist_write_failure_never_breaks_the_pool():
 
     source = inspect.getsource(istate.IntelligenceStateService._build_candidate_pool)
     assert "LAYER2_SHORTLIST_WRITE_FAILED" in source, "the write is not wrapped"
+
+
+def test_written_at_is_served(client, monkeypatch):
+    """Without a build timestamp, a reading taken after a deploy cannot be told
+    apart from one taken before -- so no ranking or wiring change can be
+    verified in production. A watcher armed for exactly that polled for ten
+    minutes against a pre-fix artifact and could never have known."""
+    payload = dict(_shortlist_payload())
+    payload["written_at"] = "2026-08-08T02:31:00+00:00"
+    payload["cards"] = [_row()]
+    monkeypatch.setattr("pipeline.intelligence_state.read_layer2_shortlist", lambda date: payload)
+
+    served = client.get("/api/board/layer2-shortlist?date=2026-08-08").get_json()
+    assert served["written_at"] == "2026-08-08T02:31:00+00:00"
+    assert served["cards_present"] == 1
+
+
+def test_written_at_is_stamped_by_the_writer(tmp_path, monkeypatch):
+    from pipeline import intelligence_state as istate
+
+    monkeypatch.setattr(istate, "reports_root", lambda: tmp_path)
+    istate.write_layer2_shortlist("2026-08-08", {"rows": [], "cards": []})
+    assert istate.read_layer2_shortlist("2026-08-08")["written_at"]
