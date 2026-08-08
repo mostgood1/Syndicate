@@ -56,7 +56,24 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-REFRESH_WORKER = "srv-d91dpertqb8s73co8ls0"
+# ALL THREE SERVICES, not one.
+#
+# This file used to hardcode refresh-worker alone. On 2026-08-08 it was run to
+# answer "is Syndicate OOMing", reported `oom kills: 0`, and was believed --
+# while WEB was being OOM-killed every couple of minutes on its own 2Gi limit.
+# A gate that names one of three services cannot answer a question about the
+# platform, and phrasing its output as "the gate" invited exactly that error.
+#
+# refresh-worker is still the DEFAULT for the WIN A / WIN B sections, which are
+# about that worker's specific code paths. The GATE section now covers all
+# three, because memory is a property of every service that has a limit.
+SERVICES: dict[str, str] = {
+    "web": "srv-d88ahvrbc2fs73eodu30",
+    "refresh-worker": "srv-d91dpertqb8s73co8ls0",
+    "live-odds-worker": "srv-d91dpertqb8s73co8lt0",
+}
+
+REFRESH_WORKER = SERVICES["refresh-worker"]
 OWNER = "tea-d2bb5n95pdvs73cje4fg"
 
 PREFIX_PEAK_LOW, PREFIX_PEAK_HIGH = 2797.0, 4048.0     # pre-#253 per-cycle peaks
@@ -87,16 +104,46 @@ STEADY_LOW, STEADY_HIGH = 380.0, 870.0                 # post-#253 steady state
 #    The anonymous set can therefore reach ~4096 - 500 = ~3600MB before the
 #    container dies, and the highest RSS actually observed before a kill was
 #    3476.3MB. That is the lethal level on this basis.
-RSS_LETHAL_MB = 3500.0
-
-# Largest within-boot RSS excursion observed on a live slate (21:58:54Z boot:
-# floor 858MB -> peak 1767MB). The bar is the lethal level minus one full
-# excursion, so a worker sitting AT the bar can still absorb its worst observed
-# working-set swing without reaching a kill. Rounded down from 2700 for margin.
+# DERIVED FROM THE CONTAINER LIMIT, not hardcoded -- because the limit is not
+# the same on every service. refresh-worker is 4Gi; web and live-odds-worker are
+# 2Gi. `RSS_LETHAL_MB = 3500` was correct for the 4Gi worker and is NONSENSE on
+# a 2Gi service, where 3500MB is above the whole container. Applying it there
+# would be rule 9 for the fifth time in one incident: a constant reused for a
+# job it was not measured for.
 #
-# This is a stated safety rationale, not a number carried over from a different
-# metric -- if you change it, say what evidence moved it.
-GATE_PASS_MB = 2600.0
+# The measurement that generalises is not the number, it is the RELATIONSHIP:
+# under real memory pressure the kernel reclaims and cache compresses to about
+# 500MB (measured -- the two highest-RSS samples before the 14:14:50 kill carried
+# the LOWEST cache of the window). So the anonymous set can reach roughly
+# `limit - 500MB` before the container dies.
+CACHE_FLOOR_UNDER_PRESSURE_MB = 500.0
+
+
+def rss_lethal_mb(container_limit_mb: float) -> float:
+    """The RSS level at which this container dies, for ITS limit.
+
+    4096 -> ~3596, consistent with 3476MB observed 31s before a real kill.
+    2048 -> ~1548.
+    """
+    return max(0.0, float(container_limit_mb) - CACHE_FLOOR_UNDER_PRESSURE_MB)
+
+
+def gate_pass_mb(container_limit_mb: float, observed_excursion_mb: float | None = None) -> float:
+    """Lethal minus one full working-set excursion.
+
+    A service sitting AT the bar can absorb its worst observed swing without
+    reaching a kill. The excursion is MEASURED PER SERVICE from its own samples
+    rather than assumed, because refresh-worker's swing is an MLB sim fan-out
+    and web's is a request pattern -- there is no reason those match. Falls back
+    to the refresh-worker figure (858 -> 1767MB, ~900MB) only when a service has
+    too few samples to measure its own, and the report says when it did.
+    """
+    excursion = float(observed_excursion_mb) if observed_excursion_mb else 900.0
+    return max(0.0, rss_lethal_mb(container_limit_mb) - excursion)
+
+
+# Retained for the historical narrative in the docstring; NOT used as a bar.
+RSS_LETHAL_MB_4GI_REFERENCE = 3500.0
 
 _CONTAINER_MB = re.compile(r"container_memory_mb[\"']?\s*[:=]\s*([0-9.]+)")
 _ACCOUNTED_RSS_MB = re.compile(r"accounted_rss_mb[\"']?\s*[:=]\s*([0-9.]+)")
@@ -152,7 +199,7 @@ _LOG_LIMIT = 1000
 _MIN_CHUNK_SECONDS = 60
 
 
-def _fetch_log_chunk(key: str, start: datetime, end: datetime, depth: int = 0) -> list[dict]:
+def _fetch_log_chunk(key: str, start: datetime, end: datetime, depth: int = 0, *, service: str = REFRESH_WORKER) -> list[dict]:
     """One window, SUBDIVIDED whenever it comes back full.
 
     A chunk that returns exactly `limit` rows is truncated, and the rows you did
@@ -169,7 +216,7 @@ def _fetch_log_chunk(key: str, start: datetime, end: datetime, depth: int = 0) -
             "/logs",
             {
                 "ownerId": OWNER,
-                "resource": REFRESH_WORKER,
+                "resource": service,
                 "limit": _LOG_LIMIT,
                 "startTime": start.strftime("%Y-%m-%dT%H:%M:%SZ"),
                 "endTime": end.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -189,10 +236,10 @@ def _fetch_log_chunk(key: str, start: datetime, end: datetime, depth: int = 0) -
         return rows
 
     mid = start + timedelta(seconds=span / 2)
-    return _fetch_log_chunk(key, start, mid, depth + 1) + _fetch_log_chunk(key, mid, end, depth + 1)
+    return _fetch_log_chunk(key, start, mid, depth + 1, service=service) + _fetch_log_chunk(key, mid, end, depth + 1, service=service)
 
 
-def _fetch_logs(key: str, start: datetime, end: datetime) -> list[dict]:
+def _fetch_logs(key: str, start: datetime, end: datetime, *, service: str = REFRESH_WORKER) -> list[dict]:
     """The logs API returns inconsistent windows for a bare `limit`, so always
     pass explicit start/end. Chunks are subdivided on truncation -- see
     `_fetch_log_chunk`."""
@@ -200,7 +247,7 @@ def _fetch_logs(key: str, start: datetime, end: datetime) -> list[dict]:
     cursor = start
     while cursor < end:
         chunk_end = min(cursor + timedelta(minutes=30), end)
-        rows.extend(_fetch_log_chunk(key, cursor, chunk_end))
+        rows.extend(_fetch_log_chunk(key, cursor, chunk_end, service=service))
         cursor = chunk_end
 
     # Dedupe: subdivision can re-fetch boundary rows.
@@ -215,7 +262,7 @@ def _fetch_logs(key: str, start: datetime, end: datetime) -> list[dict]:
     return unique
 
 
-def _boot_boundaries(key: str, since: datetime) -> list[datetime]:
+def _boot_boundaries(key: str, since: datetime, *, service: str = REFRESH_WORKER) -> list[datetime]:
     """When the process actually restarted, from the EVENTS API.
 
     NOT from log text. refresh-worker emits >1000 lines per 20 minutes, the logs
@@ -233,7 +280,7 @@ def _boot_boundaries(key: str, since: datetime) -> list[datetime]:
         params = {"limit": 100}
         if cursor:
             params["cursor"] = cursor
-        batch = _api(f"/services/{REFRESH_WORKER}/events", params, key=key)
+        batch = _api(f"/services/{service}/events", params, key=key)
         if not batch:
             break
         for item in batch:
@@ -248,13 +295,13 @@ def _boot_boundaries(key: str, since: datetime) -> list[datetime]:
     return sorted(b for b in boots if b >= since)
 
 
-def _oom_kills(key: str, since: datetime) -> list[datetime]:
+def _oom_kills(key: str, since: datetime, *, service: str = REFRESH_WORKER) -> list[datetime]:
     kills, cursor = [], None
     for _ in range(8):
         params = {"limit": 100}
         if cursor:
             params["cursor"] = cursor
-        batch = _api(f"/services/{REFRESH_WORKER}/events", params, key=key)
+        batch = _api(f"/services/{service}/events", params, key=key)
         if not batch:
             break
         for item in batch:
@@ -270,9 +317,10 @@ def _oom_kills(key: str, since: datetime) -> list[datetime]:
     return sorted(k for k in kills if k >= since)
 
 
-def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime], window_start: datetime) -> None:
+def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime], window_start: datetime,
+                 *, label: str = "refresh-worker") -> None:
     print("=" * 84)
-    print("GATE -- peak accounted_rss_mb per boot  (NOT 'no kills', NOT memory.current)")
+    print(f"GATE [{label}] -- peak accounted_rss_mb per boot  (NOT 'no kills', NOT memory.current)")
     print("=" * 84)
 
     # CORRECTED 2026-08-07. This barred on `container_memory_mb` -- the cgroup's
@@ -298,6 +346,8 @@ def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime],
     # were measured as memory.current, so they OVERSTATE the anon component by
     # whatever cache was resident at the time. Compare them to the container
     # column below, never to the RSS column.
+    limit_mb: float | None = None
+    _limit_re = re.compile(r"container_memory_max_mb[\"']?\s*[:=]\s*([0-9.]+)")
     container_samples: list[tuple[datetime, float]] = []
     samples: list[tuple[datetime, float]] = []
     for row in rows:
@@ -305,6 +355,10 @@ def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime],
         if not when:
             continue
         message = str(row.get("message", ""))
+        if limit_mb is None:
+            limit_hit = _limit_re.search(message)
+            if limit_hit:
+                limit_mb = float(limit_hit.group(1))
         container_hit = _CONTAINER_MB.search(message)
         if container_hit:
             container_samples.append((when, float(container_hit.group(1))))
@@ -381,14 +435,19 @@ def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime],
         print(f"  same boot, memory.current peaked {max(current_container):.1f}MB "
               f"-- {cache_gap:.0f}MB of it reclaimable cache, NOT a kill risk")
     print(f"  worst RSS peak anywhere in window: {worst:.1f}MB (context only; earlier boots may predate the fix)")
+    effective_limit = limit_mb or 4096.0
+    lethal = rss_lethal_mb(effective_limit)
+    excursion = (max(p for p in peaks) - min(mb for _, mb in samples)) if len(samples) > 1 else None
+    bar = gate_pass_mb(effective_limit, excursion)
     print(f"  reference (memory.current basis -- compare to the container column, NOT to RSS):")
     print(f"    pre-fix cycles {PREFIX_PEAK_LOW:.0f}-{PREFIX_PEAK_HIGH:.0f}MB, "
           f"steady state {STEADY_LOW:.0f}-{STEADY_HIGH:.0f}MB")
-    print(f"  RSS basis: lethal ~{RSS_LETHAL_MB:.0f}MB (measured 3476MB 31s before a real kill;")
-    print(f"             cache compresses to ~500MB under pressure, so anon can reach ~3600)")
-    print(f"  container limit 4096MB, pass bar {GATE_PASS_MB:.0f}MB RSS "
-          f"= lethal minus one full observed excursion")
-    if current_peak >= RSS_LETHAL_MB:
+    print(f"  container limit {effective_limit:.0f}MB"
+          f"{'' if limit_mb else '  (ASSUMED -- no container_memory_max_mb in telemetry)'}")
+    print(f"  RSS basis: lethal ~{lethal:.0f}MB = limit - {CACHE_FLOOR_UNDER_PRESSURE_MB:.0f}MB reclaimable-under-pressure")
+    print(f"  pass bar {bar:.0f}MB RSS = lethal minus one excursion "
+          f"({'measured ' + format(excursion, '.0f') + 'MB' if excursion else 'assumed 900MB, too few samples'})")
+    if current_peak >= lethal:
         print(f"  !! current peak is AT OR ABOVE the measured lethal level")
     print(f"  OOM kills since current boot: {len(kills_current)}")
     if kills_earlier:
@@ -399,12 +458,12 @@ def section_gate(rows: list[dict], kills: list[datetime], boots: list[datetime],
     elif current_span < 30:
         print(f"  VERDICT: TOO EARLY -- {current_span:.0f}m uptime. The floor is a function of")
         print("           time-since-boot, so a young boot always looks good. Wait.")
-    elif current_peak < GATE_PASS_MB:
+    elif current_peak < bar:
         print(f"  VERDICT: PASS -- current boot peaked at {current_peak:.0f}MB RSS over {current_span:.0f}m,")
-        print(f"           under the {GATE_PASS_MB:.0f}MB bar, with {4096 - current_peak:.0f}MB of headroom.")
+        print(f"           under the {bar:.0f}MB bar, with {effective_limit - current_peak:.0f}MB of headroom.")
     else:
         print(f"  VERDICT: MARGINAL -- no kills, but the current boot peaked at {current_peak:.0f}MB RSS,")
-        print(f"           over the {GATE_PASS_MB:.0f}MB bar. {4096 - current_peak:.0f}MB headroom left.")
+        print(f"           over the {bar:.0f}MB bar. {effective_limit - current_peak:.0f}MB headroom left.")
         print("           Survived on margin, not headroom. Find out why the floor is climbing")
         print("           before deploying anything on top of it.")
 
@@ -479,30 +538,70 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--hours", type=float, default=3.0, help="lookback window (default 3)")
     parser.add_argument("--section", choices=["gate", "win-a", "win-b", "all"], default="all")
+    parser.add_argument(
+        "--service",
+        choices=[*SERVICES, "all"],
+        default="all",
+        help="which service's GATE to report (default all three). The OOM-kill "
+             "summary always covers all three regardless.",
+    )
     args = parser.parse_args()
 
     key = _render_key()
     end = datetime.now(timezone.utc)
     start = end - timedelta(hours=args.hours)
-    print(f"refresh-worker {REFRESH_WORKER}")
-    print(f"window {start:%Y-%m-%d %H:%M}Z .. {end:%H:%M}Z ({args.hours}h)\n")
+    print(f"window {start:%Y-%m-%d %H:%M}Z .. {end:%H:%M}Z ({args.hours}h)")
 
-    rows = _fetch_logs(key, start, end)
-    kills = _oom_kills(key, start)
-    boots = _boot_boundaries(key, start)
-    print(f"log lines: {len(rows):,}   oom kills: {len(kills)}   restarts (events API): {len(boots)}")
-    # The logs API caps a window at 1000 rows and this worker emits well over
-    # that; subdivision recovers most of it but not provably all. So the peak
-    # below is a LOWER BOUND on the true peak -- which is the safe direction for
-    # a gate (it can only make us hold longer, never ship early).
-    print("note: memory peak is a LOWER BOUND -- log sampling is not exhaustive.\n")
+    selected = list(SERVICES) if args.service == "all" else [args.service]
 
-    if args.section in ("gate", "all"):
-        section_gate(rows, kills, boots, start)
-    if args.section in ("win-a", "all"):
-        section_win_a(rows)
-    if args.section in ("win-b", "all"):
-        section_win_b(rows)
+    # KILL COUNTS FOR EVERY SERVICE FIRST, before any per-service detail.
+    # "Is Syndicate OOMing" is a platform question and must be answerable from
+    # the top of the output. Reading a single service's `oom kills: 0` and
+    # reporting no OOM -- while web died every two minutes on its own 2Gi limit
+    # -- is the exact failure this summary exists to prevent.
+    print("\n" + "=" * 84)
+    print("OOM KILLS, ALL SERVICES  (the platform question, answered first)")
+    print("=" * 84)
+    any_kills = False
+    for label, service in SERVICES.items():
+        try:
+            service_kills = _oom_kills(key, start, service=service)
+        except Exception as exc:
+            print(f"  {label:18} UNREADABLE ({type(exc).__name__}) -- absence here is NOT evidence")
+            continue
+        marker = "  <-- KILLS" if service_kills else ""
+        any_kills = any_kills or bool(service_kills)
+        print(f"  {label:18} {len(service_kills):3d} in window{marker}")
+        for when in service_kills[-4:]:
+            print(f"      {when:%Y-%m-%d %H:%M:%S}Z")
+    if not any_kills:
+        print("  none in window -- across ALL THREE services, not just one.")
+
+    refresh_rows: list[dict] = []
+    for label in selected:
+        service = SERVICES[label]
+        print("\n" + "-" * 84)
+        print(f"{label} {service}")
+        rows = _fetch_logs(key, start, end, service=service)
+        kills = _oom_kills(key, start, service=service)
+        boots = _boot_boundaries(key, start, service=service)
+        print(f"log lines: {len(rows):,}   oom kills: {len(kills)}   restarts (events API): {len(boots)}")
+        # The logs API caps a window at 1000 rows and these services emit well
+        # over that; subdivision recovers most of it but not provably all. So the
+        # peak below is a LOWER BOUND on the true peak -- the safe direction for
+        # a gate (it can only make us hold longer, never ship early).
+        print("note: memory peak is a LOWER BOUND -- log sampling is not exhaustive.\n")
+        if args.section in ("gate", "all"):
+            section_gate(rows, kills, boots, start, label=label)
+        if label == "refresh-worker":
+            refresh_rows = rows
+
+    # WIN A / WIN B are about refresh-worker's own code paths, not platform
+    # memory, so they stay scoped to it rather than being run per service.
+    if args.section in ("win-a", "all") and refresh_rows:
+        section_win_a(refresh_rows)
+    if args.section in ("win-b", "all") and refresh_rows:
+        section_win_b(refresh_rows)
     return 0
 
 
