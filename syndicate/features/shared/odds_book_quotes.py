@@ -215,6 +215,26 @@ def _write_state(path: Path, state: Mapping[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+def read_quote_last_seen(sport: str, date_str: str) -> dict[str, str]:
+    """`_quote_key` -> ISO timestamp we last OBSERVED that market.
+
+    The companion to the change log. `book_age_seconds` and
+    `capture_age_seconds` on a quote both answer "when did this price last
+    MOVE"; this answers "when did we last look", and only the second one is a
+    staleness measure. A market can be legitimately motionless for twelve hours
+    and still be perfectly fresh.
+
+    Empty for any date whose state file predates this (2-element entries), which
+    is the correct degraded answer -- unknown, not zero, and callers must not
+    read a missing entry as stale.
+    """
+    out: dict[str, str] = {}
+    for key, value in _load_state(_state_path(sport, date_str)).items():
+        if isinstance(value, (list, tuple)) and len(value) >= 3 and value[2]:
+            out[str(key)] = str(value[2])
+    return out
+
+
 def append_book_quotes(
     *,
     sport: str,
@@ -241,6 +261,7 @@ def append_book_quotes(
         appended: list[dict[str, Any]] = []
         seen_this_call: set[str] = set()
         considered = 0
+        observed = 0
         for raw in rows or ():
             if not isinstance(raw, Mapping):
                 continue
@@ -256,16 +277,41 @@ def append_book_quotes(
             if key in seen_this_call:
                 continue
             seen_this_call.add(key)
+            observed += 1
+            previous = state.get(key) or []
             current = [normalized.get("line"), normalized.get("price")]
-            if state.get(key) == current:
+            # LAST-SEEN, third slot. This log is a CHANGE log by design: a price
+            # that has not moved writes no row, so the newest row for a key keeps
+            # its ORIGINAL `book_updated_at` and `captured_at`. Both age fields
+            # downstream are therefore "time since this price last MOVED", not
+            # "time since we last LOOKED" -- and nothing recorded the latter at
+            # all, so a stable market and a market we stopped observing were
+            # indistinguishable.
+            #
+            # That is what made the served board look 11.9h stale: measured
+            # 2026-08-08, all 100 MLB rows carried book ages inside a 1.2-minute
+            # window ~11.9h wide, growing with wall-clock across rebuilds of a
+            # 1.4-minute-old artifact. Not a capture outage -- the change log
+            # working exactly as specified, read as if it were a freshness clock.
+            #
+            # Kept as a third element rather than a dict so every existing
+            # 2-element state file still loads and compares correctly: the
+            # equality check below slices to the first two.
+            if list(previous[:2]) == current:
+                state[key] = current + [captured_at]
                 continue
-            state[key] = current
+            state[key] = current + [captured_at]
             appended.append(normalized)
 
         if appended:
             with path.open("a", encoding="utf-8") as handle:
                 for row in appended:
                     handle.write(json.dumps(row, separators=(",", ":")) + "\n")
+        # Written whenever anything was OBSERVED, not only when something
+        # changed. Previously this was inside `if appended`, so a refresh that
+        # confirmed every price unchanged left no trace it had run -- which is
+        # precisely the evidence needed to tell "stable" from "stopped looking".
+        if appended or observed:
             _write_state(state_path, state)
 
         result = {
