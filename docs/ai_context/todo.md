@@ -3075,16 +3075,33 @@ lines is the only reason capture was confirmed at all.
    real MLS date (2026-07-17) when called directly. The soccer grader is a
    working implementation delegating to `soccer.actuals.graded_rows_for_date`.
 
-   **The real blocker is upstream and is a different bug.** It grades from the
-   SCHEDULE artifact's `status_state`, so it only sees a result where the
-   schedule was re-fetched after the match finished:
+   **~~The real blocker is upstream~~ -- I RETRACTED THIS 40 MINUTES LATER. It
+   was measured on the LOCAL MIRROR (07-20 vintage), not production.** I wrote
+   that soccer grades nothing because the schedule never captures results
+   (`eredivisie 0 of 306 post`). Production, checked properly:
 
-       mls          223 of 511 fixtures in `post`   (last result-bearing date 2026-07-18)
-       eredivisie     0 of 306                      -- every fixture frozen at `pre`
+       eredivisie  generated_at 2026-08-08T20:19:34   post 4, in 1, pre 301
+       mls         generated_at 2026-08-08T20:19:31   post 269, pre 242
+                                                      every past-dated fixture post
 
-   So a sport can have a working grader and still grade nothing, forever, and
-   **zero graded rows reads as "no results yet" either way** -- the
-   degraded-looks-legitimate shape again. Routed to the settlement lane.
+   The schedule builder captures results and had run 90 minutes earlier. And
+   the grader produces rows against it -- replayed with production schedules
+   staged into a temp root:
+
+       graded_rows(eredivisie, 2026-08-07) ->  7      graded_rows(mls, 2026-08-01) -> 35
+       graded_rows(eredivisie, 2026-08-08) -> 21      graded_rows(mls, 2026-08-02) -> 63
+
+   **So soccer grading is NOT blocked.** If soccer bets fail to settle the
+   cause is downstream -- ledger join, market-key canonicalisation, the
+   `no_key_overlap` class -- not an absence of graded outcomes.
+
+   **`CLAUDE.md` opens by warning that `data/**` in git is a lossy mirror and
+   that you must not diagnose missing data from the local checkout.** I did
+   exactly that, on the failure this repo documents at the top of its own
+   instructions, and routed the result to another lane that was sizing work
+   against it. I caught it only because I went to fix the schedule builder and
+   found it already did what I was about to add. **Check production first --
+   the warning is first in the file for a reason.**
 
    ~~their bets cannot settle until those land, regardless of everything above.~~
 
