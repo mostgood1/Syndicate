@@ -886,6 +886,51 @@ def _record_mlb_sim_check(epoch: float, date_str: str, fingerprints: dict[str, s
 	)
 
 
+def _mlb_tip_off_simmed_path() -> Path:
+	return _meta_dir() / "mlb_tip_off_simmed.json"
+
+
+def _read_mlb_tip_off_simmed(date_str: str) -> set[str]:
+	"""Games that have already had their one forced tip-off sim, for *date_str*.
+
+	Date-scoped rather than accumulating: a stored record for a different date
+	reads as empty, so the set clears itself on rollover with no sweep. Kept in
+	its own file rather than folded into last_mlb_sim_check.json because that
+	record is rewritten by the fingerprint path on its own cadence, and losing
+	the tip-off marks to an unrelated write would silently restore the old
+	resim-every-tick behaviour.
+
+	Fails OPEN (empty set) on any read problem: an unreadable marker means we
+	resim a game once more than needed, which is the same cost as today. The
+	opposite failure -- wrongly believing a game was already simmed -- would
+	skip the late-scratch check this trigger exists for.
+	"""
+	payload = read_json_file(_mlb_tip_off_simmed_path())
+	if not isinstance(payload, dict) or str(payload.get("date") or "") != str(date_str):
+		return set()
+	pks = payload.get("game_pks")
+	if not isinstance(pks, list):
+		return set()
+	return {str(pk).strip() for pk in pks if str(pk or "").strip()}
+
+
+def _record_mlb_tip_off_simmed(date_str: str, game_pks: Any) -> None:
+	"""Union the freshly-simmed games into the marker. Never raises."""
+	try:
+		if not isinstance(game_pks, (list, tuple, set)):
+			return
+		fresh = {str(pk).strip() for pk in game_pks if str(pk or "").strip()}
+		if not fresh:
+			return
+		merged = sorted(_read_mlb_tip_off_simmed(date_str) | fresh)
+		write_json_file(
+			_mlb_tip_off_simmed_path(),
+			{"date": str(date_str), "game_pks": merged, "recordedAt": _utc_now()},
+		)
+	except Exception:
+		pass
+
+
 def _mlb_daily_summary_path(date_str: str) -> Path:
 	date_slug = date_str.replace("-", "_")
 	return data_root() / "mlb_source" / "source_artifacts" / "data" / "daily" / f"daily_summary_{date_slug}.json"
@@ -1552,9 +1597,42 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 	window_minutes = _event_sim_force_window_minutes()
 	if window_minutes > 0:
 		starting_soon = events_starting_within(events, now_epoch=now_epoch, window_minutes=window_minutes)
-		if starting_soon:
-			tip_off_game_pks = sorted({str(event.event_id).strip() for event in starting_soon if str(event.event_id or "").strip()})
-			return {"force": True, "reason": "tip_off_window", "game_pks": tip_off_game_pks}
+		# ONCE PER GAME, not once per tick-while-in-window.
+		#
+		# This branch sits BEFORE the interval check below and returns early, so
+		# it bypasses the 600s rate limiter entirely. It fires for any game
+		# within the window and returns ALL of them, so on a staggered slate --
+		# where something is nearly always within 30 minutes of first pitch --
+		# the window is effectively always open and a game sitting in it was
+		# resimmed on every launch opportunity until it started.
+		#
+		# MEASURED on production over 3 hours of a live slate (2026-08-07
+		# 21:32-00:32Z): 10 launches, 8 of them tip_off_window, 49 game-sims
+		# across 15 distinct games -- 3.3x per game, two games simmed 5x. The
+		# only thing holding it lower was resource contention (239
+		# intelligence_pipeline_busy + 49 previous_run_still_active deferrals),
+		# so the effective resim rate was set by how busy the box was rather
+		# than by any deliberate rule -- it would have risen on its own the
+		# moment the worker got faster.
+		#
+		# The trigger exists to catch a LATE SCRATCH before first pitch. One
+		# forced recheck per game does that; the other 3-4 are pure cost, paid
+		# in the window where lineups are already settled.
+		already = _read_mlb_tip_off_simmed(date_str)
+		pending = sorted(
+			{
+				str(event.event_id).strip()
+				for event in starting_soon
+				if str(event.event_id or "").strip() and str(event.event_id).strip() not in already
+			}
+		)
+		if pending:
+			return {"force": True, "reason": "tip_off_window", "game_pks": pending}
+		# Every game in the window has had its tip-off sim. Deliberately fall
+		# THROUGH rather than returning -- the fingerprint/join-mismatch/
+		# board-missing triggers below must still get their turn, which is
+		# exactly what the old unconditional early return denied them for the
+		# whole pregame window.
 
 	last = _read_last_mlb_sim_check()
 	last_epoch = float(last.get("epoch") or 0.0)
@@ -2140,6 +2218,14 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 			pass
 		_write_active_pointer(dict(_MLB_SIM_RUN_META))
 		_write_last_attempt_marker(dict(_MLB_SIM_RUN_META))
+		# Recorded HERE, after Popen succeeded -- not at decision time. The
+		# decision is computed on every tick and is frequently discarded
+		# (measured: 239 intelligence_pipeline_busy + 49
+		# previous_run_still_active deferrals in 3 hours), so marking a game
+		# "tip-off simmed" when the decision was formed would retire the
+		# late-scratch check for games that were never actually simmed.
+		if str(decision.get("reason") or "") == "tip_off_window":
+			_record_mlb_tip_off_simmed(date_str, decision.get("game_pks"))
 		print(f"[live_refresh_loop] MLB_DAILY_SIM_TRIGGERED date={date_str} reason={decision.get('reason')} pid={process.pid} run_stamp={run_stamp}", flush=True)
 		return {"ok": True, "pid": process.pid, "command": command, "reason": decision.get("reason"), "run_stamp": run_stamp}
 	except Exception as exc:
