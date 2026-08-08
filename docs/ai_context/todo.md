@@ -2871,8 +2871,7 @@ lines is the only reason capture was confirmed at all.
    **zero graded rows reads as "no results yet" either way** -- the
    degraded-looks-legitimate shape again. Routed to the settlement lane.
 
-   ~~their bets cannot settle until
-   those land, regardless of everything above.
+   ~~their bets cannot settle until those land, regardless of everything above.~~
 
 **Not deployed.** #209-#214 are committed but Render auto-deploy is off, and
 deploying kills in-flight sims. Nothing in the settlement chain produces live
