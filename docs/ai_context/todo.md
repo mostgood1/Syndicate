@@ -1,5 +1,53 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 — TWO CLAIMS THAT MUST NOT BE UPGRADED BY A LATER SUMMARY
+
+Both sessions that produced tonight's work ended here. These two are the ones a
+future summary will get wrong, because the shipped code *looks* like the fix.
+
+**1. `29746931` (publisher sweep) is UNPROVEN against the failure it targets.**
+
+live-odds-worker's kills stopped at **03:57:26Z**. The fix deployed at
+**04:20:39Z** — 23 minutes LATER. The recovery is therefore **not attributable
+to the fix**. The sweep is watermark-based and plausibly drained itself once a
+batch completed.
+
+The fix is right on the merits: `publish_hot_artifact` holds FOUR full copies of
+each file at once (`read_text` -> `.encode()` for checksum -> `json.dumps` ->
+`.encode()`), so a 51MB shard is ~200MB resident — allocated and freed BETWEEN
+stage-boundary samples, which is why a service could be OOM-killed while
+sampling at 158MB RSS. The sweep also selected purely on mtime, republishing
+**May artifacts two and a half months dead** on every boot in a publish/pull
+ping-pong. Same root cause explains WEB, which parses that body whole on its own
+2Gi — and why web's kills never correlated with anyone's deploys.
+
+**THE REAL TEST is the next boot that would have republished the archive.**
+Until that is observed, this is "shipped and plausible", not "fixed".
+
+**2. `#263` is NOT closed. `rows_with_model_edge` is 0 on EVERY sport**, for four
+different reasons that need four different fixes:
+
+| sport | reading | why |
+|---|---|---|
+| wnba | 0 | null BY DESIGN — means only, no distribution |
+| soccer | 0 | 3 matches in source against 35 scheduled |
+| nfl | 0 | no source at all |
+| **mlb** | **`pct_projected: 54.3`, `pct_with_edge: 0.0`** | **AMBIGUOUS** |
+
+MLB is the one that matters and it is unresolved: the slate was over at 04:15Z,
+so a missing market fair is as likely as a broken join. **The clean test is
+tomorrow's PREGAME MLB board.** Non-zero closes it; still zero means the join is
+broken and that is the next bug.
+
+Until MLB is non-zero, L2-A ranks on `1/overround - 1` — identical for every side
+of a market — so it orders markets by hold and picks a side by tie-break.
+Pointing the main page at it would ship confident nonsense, which is worse than
+the empty board it would replace (#242's failure mode, one layer up).
+
+*Confirmed working and not in doubt: dead-market gating drops 5,900 settled MLB
+markets that were previously ranking; the horizon filter removes NFL's 2,490 rows
+for games 34+ days out.*
+
 ### SHIPPED 2026-08-08 — LAYER 2 IS WIRED AND IS NOW THE BOARD (5 commits)
 
 `cc454c41` wiring · `e3d98cac` endpoint · `a6fb0bae` own artifact ·
