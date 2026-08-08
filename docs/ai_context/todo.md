@@ -1,5 +1,257 @@
 # Syndicate TODO — canonical cross-session list
 
+### DECISION INPUT 2026-08-08 (evening) — `#275` WHAT THE SETTLEMENT AUTORUN WOULD COST. **Recommendation: DO NOT switch it on tonight — it does not fit in the worker, and it would grade ≤24 rows**
+
+> **ID note:** the commits below say `#273`. `#273` was taken concurrently by the
+> NCAAF-chips lane, which already has an OPEN entry in this file; this entry had
+> no inbound references, so it moved to `#275` per the `#271`→`#272` precedent.
+> Commit messages `b2d7e36f` still read `#273`. Third ID collision today — rule
+> 3b is right, grepping this file cannot allocate a number.
+
+**The autorun stays OFF. This is the evidence for the decision, not the
+decision.** Nothing here enables it and nothing was deployed.
+
+#### FIRST: `render.yaml` AND PRODUCTION DISAGREE, AND THE FILE IS THE WRONG ONE
+
+`render.yaml:296` reads `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN:
+value: "true"`, above a 10-line comment explaining why it was enabled. **It is
+absent from the live service.** Enumerated all 92 env vars on refresh-worker
+(`srv-d91dpertqb8s73co8ls0`) via the Render API: no key matching `SETTLE`. The
+dashboard deletion (~14:05Z 2026-08-07, during the OOM incident) is
+authoritative and the blueprint was never updated. **Anyone who reads
+`render.yaml` to answer "is settlement on" gets the wrong answer with a
+paragraph of justification attached.** Worth reconciling whichever way the
+decision goes.
+
+`SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED=true` — the WRITE side is on
+and recording (board-state fingerprints present for 08-03..08-08). Only the
+settle side is dark.
+
+#### THE COST, MEASURED — it does not fit, at the most favourable moment of the day
+
+| term | measured | basis |
+|---|---|---|
+| chunk read → RSS | **4.05–4.19× per byte of JSON** | 2 real chunks × 2 scale factors, psutil around gc |
+| production peak chunk | 367,229,260 B (2026-08-05, 9,055 records) | autorun status file |
+| ⇒ **peak RSS, one date** | **~1,436 MB** | extrapolation, see caveat |
+| rewrite per settled record | 0.00456 s per chunk-MB → **~1.6 s** on that chunk | local NVMe; Render's disk is slower, so a lower bound |
+| chunk-index round trip **per settled record** | 2.58 MB RSS and 0.058 s **per index-MB** | synthetic indexes at 869 / 100k / 400k entries |
+| grader input build | **~0.18 s per date** (n=6, production) | clean negative — the grader is not the cost |
+
+Against that, refresh-worker **right now** (`check_worker_memory_gate.py`, boot
+21:30:50Z, 22 min uptime, tonight's MLB slate **not started**):
+
+```
+peak accounted_rss_mb   2357.2       <- current boot
+lethal (RSS basis)      3596         = 4096 limit - 500 reclaimable-under-pressure
+HEADROOM                1239 MB
+settlement needs        1436 MB      <- one date, before the index term
+```
+
+**Short by ~200MB at the best moment of the day**, and the floor is the ratchet:
+this is a 22-minute-old boot before a full slate, and the worker's own measured
+excursion is **2,272MB**. That is the same arithmetic that produced 110 OOM
+kills over eleven hours on 2026-08-07 (`#256`), and `#256`'s claim-before-work
+fix stops the *loop*, not the *kill*.
+
+**EXTRAPOLATION CAVEAT, stated because it is the weak link.** The 4.1× ratio was
+measured on records averaging 10.5–11.8KB; production's average 20.6KB (08-06)
+to 40.6KB (08-05). It holds only if the bigger records are bigger in the same
+*way* — more nested dicts, not one long string. Checked: on the largest local
+record, 94% of bytes are nested dicts (`recommendation` 7,896 + `prediction`
+2,180 + `artifact_metadata` 1,556 of 13,301). So the shape carries. It is still
+an extrapolation.
+
+**TWO NUMBERS ARE UNKNOWN AND BOTH ONLY EXIST ON THE WORKER'S DISK:** today's
+chunk size, and the chunk-index size. The index is the nastier one — it holds
+one entry per ledger record **ever written**, is never pruned, and is
+round-tripped whole (`read_text` + `json.loads` +
+`json.dumps(indent=2, sort_keys=True)` + `write_text`) **once per settled
+record**, uncached. Unlike the chunk it is not bounded by the slate. At 400k
+entries that is **5.3 s and 238 MB per settled record**. It is not in
+`HOT_ARTIFACT_PATTERNS` and refresh-worker serves no HTTP, so nobody has ever
+seen its size.
+
+#### THE HARDER HALF: it would grade almost nothing, and that is worse than not running
+
+Last real production run — **2026-08-06T11:03:17Z**, and nothing since:
+
+```
+total_recommendation_records  8276
+matched                          0
+settled                          0
+unmatched_no_graded_rows      3716   (44.9%)
+unmatched_no_key_match        4560   (55.1%)
+graded_rows_available            1   <- ONE row, mlb 2026-08-05, across 8 sports x 2 dates
+```
+
+**That reading is stale in the one way that matters: every settlement fix is now
+deployed.** `d59086f6` (refresh-worker, 21:30:50Z today) contains `#247`,
+`#259`, `#260`, `#265`, `#266`, `#267`. **The "NOT DEPLOYED" notes on `#266` and
+`#267` elsewhere in this file are wrong as of tonight** — the lead's batched
+deploy carried them. So the 0-of-8,276 was produced by code that no longer runs.
+
+But the binding constraint was never the matcher. Measured on production
+**today**, counting the bucket the grader actually reads
+(`official` → `playable` → `all`, filtered to win/loss/push/void):
+
+```
+MLB graded rows, 21-day settlement window (2026-07-19..08-08)
+  07-19  0     07-26  1     08-02  1
+  07-20  1     07-27  1     08-03  0
+  07-21  1     07-28  1     08-04  1
+  07-22  1     07-29  1     08-05  1
+  07-23  1     07-30  1     08-06  0
+  07-24  1     07-31  1     08-07  8   <- the outlier
+  07-25  1     08-01  1     08-08  no day entry yet
+                                  TOTAL  24
+```
+
+Every other sport contributes **zero in this window**, and the reasons differ —
+which is the point:
+
+- **nba / nhl** — legitimately out of season.
+- **wnba** — in season, and `market-accuracy` returns `available: false` on
+  08-05, 08-06 and 08-07 (web). Real gap, not diagnosed here; it is the WNBA
+  lane's file.
+- **soccer** — grader is REAL (the soccer lane measured 14 rows on a live MLS
+  date, `6b068e7b`), but it reads results from the schedule artifact's
+  `status_state`, so it sees an outcome only where the schedule was re-fetched
+  *after* the match ended. Last result-bearing date **2026-07-18**, one day
+  before this window opens. Zero, from a working grader.
+- **ncaab / ncaaf** — out of season.
+- **nfl** — zero, and it was zero for a *fourth* reason: see `#275`'s code fix
+  below.
+
+⇒ **≤24 settleable outcomes against 8,276+ pending records: ≤0.29%.** A run
+tonight spends ~1.4GB of a ~1.2GB budget to grade about two dozen rows, and then
+writes a `state: "completed"` status file that reads as coverage.
+
+**THE ONE PIECE OF GOOD NEWS, and it is the whole basis of the recommendation.**
+2026-08-07 is the **first date in the repo's history with real prop grading**:
+
+```
+2026-08-07   all = 37    hitter_hits 7 · hitter_hits_runs_rbis 7 · hitter_home_runs 8
+             official= 8   hitter_rbis 5 · hitter_runs 4 · hitter_total_bases 5 · ml 1
+             playable=29
+2026-08-05   all =  1    a single moneyline at +3100
+```
+
+That is `#265` (pregame odds freeze) and `#266` (prop grading) landing. The
+"1 per date" pattern before it is the collapsed-odds artefact. **So coverage
+goes from ~1/date to ~37/date starting 08-07** — settlement's value is almost
+entirely in the future, not in the 21-day backfill, and every night it waits
+costs one date rather than losing history.
+
+**A FREE 4.6× IS SITTING RIGHT THERE.** `_mlb_graded_rows_for_date` takes
+`by_kind.get("official") or by_kind.get("playable") or by_kind.get("all")` —
+`official` is truthy at 8 rows, so it short-circuits and **discards 29 of 37
+graded outcomes (78%) on the one date with real coverage.** `official` is a
+*bet-selection* bucket; settlement wants *outcomes*. This is the S6 entry's
+"settlement is using a bet-selection tool as its outcome source" made concrete
+and countable. Not changed here — it is a contract decision, not a bug — but it
+is the cheapest single lever on the settled rate and it costs no memory.
+
+#### `#275` CODE — the NFL grader read a directory nothing writes (`b2d7e36f`, committed, **NOT DEPLOYED**)
+
+Found while counting the ceiling, not while looking for it.
+
+`_nfl_schedule_paths` globbed `default_nfl_source_root() / "data"`. For NFL the
+source root **is** the data directory — `nfl/sources.py`'s `data_path()` is
+`default_nfl_source_root().joinpath(...)`. That subdirectory does not exist, so
+the function returned `[]` and **the NFL grader has produced zero rows for every
+date since it was written**. The `/ "data"` was copied from `_ncaaf_lines_paths`,
+where it is correct. One layout assumption, two sports, right once.
+
+**Fixing only the path would have been worse than the bug.**
+`schedule_preseason_2026.csv` carries `status: "Scheduled"` with
+`away_score: "0"` / `home_score: "0"` on **all 49 games**. The blank-score guard
+cannot see those — `"0"` is not blank — so every unplayed preseason game would
+have emitted two moneyline **pushes** plus a 0-0 spread and total, and
+settlement would have persisted them as real outcomes. **The broken path was the
+only thing preventing fabricated settlements.** Same shape as the soccer lane's
+`_has_usable_game_state` regression the same afternoon: repair a data path, and
+a guard that was silently relying on it being broken switches off.
+
+So the status gate is an **allowlist** (`final`, `completed`, …), never a
+denylist: an unrecognised status must cost a missed settlement, not an invented
+one. Grounded in the mirror, not guessed — preseason 2023/24/25 are `Final` on
+49/49, 49/49, 48/48; 2026 is `Scheduled` on 49/49 with 49 of 49 at 0-0. Files
+with no `status` column (the 272-row regular-season schedule) keep the
+blank-score rule.
+
+**It does not increase what settles tonight and is not claimed to.** NFL still
+grades 0 in-window, correctly — the 2026 preseason `status` column is never
+rewritten by any pipeline (`#271`). Verified both directions: 2025-08-07 now
+grades 4 rows where it graded 0; 2026-08-07 still grades 0 rather than two
+fabricated pushes.
+
+#### THE INSTRUMENT — `scripts/settlement_cost_preflight.py` (`52bf5243`, `2472cbb8`)
+
+Answers both halves without enabling anything. **The default mode never opens a
+chunk** — it stats them and applies the measured coefficients — and that is
+load-bearing, not fastidious: *reading one production chunk IS the ~1.4GB
+allocation under investigation*, so a prober that read them to measure them
+would be the outage it was written to forecast. Pinned by test, because the
+regression would still print correct numbers, just after spending the memory.
+`--coverage` reports the graded-row ceiling (~0.18s/date). `--dry-run` costs
+what settlement costs, warns first, and writes nothing (verified: chunk and
+index md5 unchanged across a real run).
+
+**Run it on refresh-worker before any decision** — it is the only way to get
+today's chunk size and the index size, and it is read-only.
+
+#### RECOMMENDATION
+
+1. **Do not enable tonight.** It does not fit (1,436 needed vs 1,239 available at
+   a fresh boot, pre-slate), and it would grade ≤24 rows.
+2. **Run the preflight on the worker** to close the two unknowns.
+3. **When it is enabled, enable it NARROW.** `EVALUATION_SETTLEMENT_LOOKBACK_DAYS=2`
+   caps the read at recent chunks instead of sweeping 21. The 21-day default was
+   written for a *grading* backfill (`#`-lookback docstring) and is the reason a
+   crash reads every large chunk; with coverage now starting at 08-07 the
+   backfill has almost nothing to recover.
+4. **The precondition is coverage, not memory.** Let the `#265` freeze accumulate
+   a few 37-row dates first. Waiting costs one date per night and loses nothing.
+5. **Take the `official` → `all` bucket decision** — a measured 4.6× on graded
+   rows for zero memory.
+
+#### WHAT IT UNBLOCKS (currently unanswerable, in priority order)
+
+- **WIN B** — "does settlement COMPLETE and write its status", open since
+  2026-08-07 and blocked on exactly this switch.
+- **`unmatched_no_key_match` after `#247`** — 4,560 records were unblocked in
+  code and nobody has ever seen the result, because every attempt crash-looped.
+- **`_SCORE_SIM_WEIGHT`** — pinned at 0.0 (`da20cd3e`) gated on S6; it needs a
+  CLV decomposition, which needs settled rows.
+- **Realized CLV / ROI / calibration** — `avg_clv` is always `None`; reliability
+  multipliers, dynamic edge thresholds and policy promotion are all downstream.
+- **Precedent that this layer pays:** the best-price re-grade already measured
+  **+2.79 ROI points**.
+
+#### METHOD
+
+**Coverage, per CLAUDE.md.** Local `evaluation_ledger_chunks/` holds 13 files,
+largest 8.9MB, none inside the 21-day window — it would have reported the
+projection as "1.1MB peak, no problem". Production's is 350MB. Every ledger
+number above comes from the production status endpoint or the Render API; the
+coefficient measurements used **untracked local mirror** chunks (real records,
+wrong scale) and are labelled as extrapolations. The MLB/WNBA graded-row counts
+are **web-disk** reads; settlement runs on refresh-worker's disk. Those agree on
+the one date where both are observable (mlb 08-05 → 1 both sides), which is
+n=1 — non-vacuous, not strong.
+
+**The grader was the obvious suspect and it is innocent.** ~0.18s per date on
+production, no caching effect on repeat. Recording that as a negative result so
+nobody re-measures it.
+
+**A refuted claim reached the instrument before it reached me.** I wrote
+"soccer/ncaab/ncaaf graders are documented []-stubs" into the preflight's own
+output — copied from this file — and the soccer lane disproved it the same
+afternoon. Struck in `2472cbb8`. **An instrument that carries a wrong prior is
+worse than one with no prior, because the number it prints arrives
+pre-interpreted.**
+
 ### OPEN 2026-08-08 (evening) — `#274` THE LIVE-LENS MEMORY GATES, ALL FIVE BUILDERS MEASURED AT ONCE. **MLB's is 3-4x too LOW, and it is the one everyone trusted**
 
 First time every builder in the live-lens tick has been measured against the
