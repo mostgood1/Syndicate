@@ -1,5 +1,118 @@
 # Syndicate TODO — canonical cross-session list
 
+### SHIPPED 2026-08-08 (`f6810a64`) — the memory gate was measuring page cache, and its bar was in the wrong units
+
+**NOT DEPLOYED — dev tooling only, no deploy needed.** Two stacked errors:
+
+1. **Metric.** The gate barred on `container_memory_mb` = cgroup `memory.current`,
+   which counts clean page cache — 600–1200MB on this worker. A 1500MB bar on
+   that number **cannot be met by an idle process**. It reported MARGINAL all day
+   against ~2.3GB of real headroom. `memory_observability.py:223` already treated
+   `inactive_file + slab_reclaimable` as available; the gate never inherited it.
+2. **Units.** Correcting the metric and keeping 1500 would be the same error one
+   layer in — that number was *derived from* `memory.current` observations. So it
+   was **re-derived by measuring RSS at the three real OOM kills of 08-07**:
+
+```
+14:02:01  container 3912.6  rss 3387.8  cache  524.8
+14:14:19  container 3977.7  rss 3476.3  cache  501.4   <- 31s before the kill
+(idle samples the same day carried 1100-1200MB of cache)
+```
+
+**The load-bearing observation is the cache column: under pressure the kernel
+reclaims, and the two highest-RSS samples carry the LOWEST cache.** Cache is not
+a fixed tax on the ceiling — it gets out of the way. So anon can reach
+~4096−500 = ~3600MB. `RSS_LETHAL_MB = 3500` (measured). `GATE_PASS_MB = 2600`
+= lethal minus one full observed within-boot excursion (858→1767MB).
+
+**Consequence: the slate reading is PASS** — 1767MB RSS, 2329MB headroom, zero
+kills. Every "MARGINAL" verdict quoted on 08-07 is subject to this correction.
+WIN A confirmed (rebuild interval median 369s → `#251` executing). **WIN B still
+unanswered** — settlement autorun remains OFF by user decision.
+
+*Caveat on that reading: four slate-window deploys (19:10, 20:45, 21:45, 21:58,
+all manual) reset peak-within-a-boot four times, and a 429 put a 30-minute hole
+in the log window. No boot ever saw a full slate.*
+
+### SHIPPED 2026-08-08 (`19f65e64`) — NFL preseason odds were fetched, paid for, and discarded before the board
+
+**NOT YET DEPLOYED.** `/api/board/book-grid?sport=nfl` carried 1,246 rows across
+272 events with `commence_time` 2026-09-10..2027-01-10 — the entire regular
+season, 34–156 days out — while the one real preseason game in the window
+(CAR @ ARI, 08-06) had no row at all.
+
+Plumbing, not fetching. `fetch_nfl_preseason_odds.py` already pulls the real
+`americanfootball_nfl_preseason` key, then wrote only to a CSV for the preseason
+cards page. `book-grid` reads `book_quotes` and nothing else. Added
+`_append_nfl_preseason_book_quotes`, **before** `build_odds_rows` (which drops
+events it can't match against the stale schedule mirror).
+
+**Method note worth keeping:** the absence was established **by team name, never
+by event id**. The board keys on OddsAPI hex ids, the schedule on ESPN numerics —
+an id comparison reports "absent" for the wrong reason even when capture works.
+
+### SHIPPED 2026-08-08 (`cc06beb6`) — NFL joins the fast odds tick on game days
+
+**NOT YET DEPLOYED.** NFL board rows were `age_seconds ~86,455` — **24 hours** —
+against MLB's ~26 minutes. `nfl/ncaaf/ncaab` are `_WEEKLY_SPORTS_TICK_EXCLUDABLE`:
+blanket-removed from the fast tick and handed to a **6-hourly** autorun that is
+**default-OFF**. Best case 14× worse than MLB; observed case, not running.
+
+Fixed as a **partition, not a shared claim** — one predicate,
+`schedule_adapter.sport_has_games_within`, called by both services:
+
+```
+games in horizon -> fast tick owns it,  autorun drops it
+no games         -> autorun owns it,    fast tick excludes it
+```
+
+This preserves the write race the blanket rule existed to prevent (both owners
+target the same non-date-partitioned football artifacts). **Neither side may grow
+its own copy of the rule.**
+
+**Failure directions are deliberately asymmetric** — fast tick CLAIMS on unknown,
+autorun YIELDS on unknown. Both-claim corrupts silently; neither-claim is a stale
+board, which `audit_slate_coverage.py` (#264) catches. `_fetch_espn_football_schedule`
+gained `strict=` so a timeout is distinguishable from an empty slate at all.
+
+### OPEN — NFL schedule is DATE-BLIND. Two stacked defects, root-caused not fixed.
+
+`/api/board/game-chips?sports=nfl` returns the same `401873271` for every date
+08-05..08-13. Confirmed live.
+
+1. **The date is discarded.** `_HomeSportDataProviderBase.resolve_context`
+   (`home.py:5249`) leaves `week=None`; `_NFLDataProvider.games()` (`home.py:5536`)
+   is week-keyed and **never reads `context.context_label`**. MLB's provider does.
+2. **The week can never advance.** `preseason_target_week` (`nfl/sources.py:246`)
+   returns `min(weeks where status != "final")`. Nothing rewrites `status` —
+   `fetch_nfl_preseason_schedule.py` is a manual CLI wired into **no** pipeline.
+   All 49 rows still read `Scheduled`, so `min()` returns 1 forever. Preseason
+   week 1 has exactly ONE game, hence one repeated chip.
+
+**A trustworthy date source already exists and works:** `fetch_schedule_for_date("nfl", d)`
+→ ESPN. Verified: 08-06→1, 08-07→**0**, 08-13→6, 08-14→3. So "no NFL games today"
+was correct all along; the withdrawal was right about the *source*, not the claim.
+
+**Trap for whoever fixes it:** the CSV says that game is `2026-08-07`, ESPN buckets
+it under `08-06` — UTC date vs US-local date for a night kickoff. Pick a
+convention deliberately.
+
+**DISPROVEN hypothesis** (don't re-derive): that `schedule_preseason_2026.csv` is
+absent on production. Production logs show `smartsim2_preseason_projections_2026_wk1.csv`
+and `context_label: "2026 Preseason"`, both of which require the file to exist and
+`preseason_target_week` to return 1. It is week-pins-to-1, **not**
+week-resolves-to-None. Note the artifact export endpoint is allowlist-limited —
+it returned empty for `*refresh_status/latest*`, a path that certainly exists —
+so absence there is never evidence.
+
+### OPEN — DECISION NEEDED: `preseason_target_week` staleness
+
+Two options, user's call: (a) wire `fetch_nfl_preseason_schedule.py` into a daily
+step — fixes the source, but adds periodic worker work, which caused a restart
+loop before; or (b) date-based fallback inside the function — cheaper, but changes
+behaviour for its three callers (`refresh_odds_sources.py`, `run_refresh_worker.py`,
+`blueprints/home.py`) at once.
+
 ### HOLD RELEASED 2026-08-07 19:11Z — all three services realigned on `3f8a3f0a`
 
 **The block below is HISTORY. Do not act on it.** It is kept because the
