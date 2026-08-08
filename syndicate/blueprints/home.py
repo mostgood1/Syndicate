@@ -5527,6 +5527,67 @@ class _NCAABDataProvider(_HomeSportDataProviderBase):
         return []
 
 
+def _nfl_games_on_requested_date(games: list[dict[str, Any]], requested_date: Any) -> list[dict[str, Any]]:
+    """Keep only the games actually played on `requested_date`.
+
+    THE WEEK-SELF-PINNING BUG, root-caused 2026-08-07. Two defects stacked:
+
+    1. `_HomeSportDataProviderBase.resolve_context` packs the requested date into
+       `context_label` and leaves `week=None`, and this provider is WEEK-KEYED --
+       it never read the date at all. MLB's provider passes `context_label`
+       straight into its cards builder; NFL had no equivalent path.
+    2. With `week=None` it falls to the preseason branch, where
+       `preseason_target_week` returns `min(weeks whose status != "final")`.
+       Nothing ever rewrites that status column --
+       `scripts/fetch_nfl_preseason_schedule.py` is a manual CLI wired into no
+       pipeline -- so `min()` returns 1 forever.
+
+    MEASURED on production: `/api/board/game-chips?sports=nfl` returned the SAME
+    game_key 401873271 (CAR @ ARI) for 08-05, 08-06, 08-07, 08-08 AND 08-12,
+    because preseason week 1 contains exactly one game. Date-blind.
+
+    The authority here is `fetch_schedule_for_date`, which for NFL is a pure
+    ESPN scoreboard call and genuinely date-aware -- verified live: 08-06 -> 1
+    game, 08-07 -> 0, 08-13 -> 6, 08-14 -> 3. Unlike MLB/NBA's fetchers it
+    reads no local artifact, so it also works from a dev box.
+
+    FAILS CLOSED, deliberately. An unresolvable schedule returns the games
+    UNFILTERED rather than an empty list: this is a display filter, and a
+    network blip must not blank a board that has real cards. Silence must not
+    read as "no games" -- but neither should it delete them.
+
+    Date convention worth knowing: ESPN buckets by US-local date, while the
+    preseason CSV's `gameday` carries the UTC date. CAR @ ARI is `2026-08-07`
+    in the CSV and `08-06` to ESPN, because it started 00:00Z. This trusts
+    ESPN, since the board's own date is Central.
+    """
+    date_text = str(requested_date or "").strip()
+    if not date_text or not games:
+        return games
+    try:
+        from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
+
+        events = fetch_schedule_for_date("nfl", date_text)
+    except Exception:
+        return games
+    if not events:
+        # A CONFIRMED empty slate. fetch_schedule_for_date returns [] both for
+        # "no games" and for a swallowed transport error, so this cannot tell
+        # them apart -- but returning [] is right for the common case and the
+        # alternative (showing yesterday's game every day) is the bug being
+        # fixed. The strict variant added for the S2 ownership predicate is the
+        # way to distinguish them if this ever needs to.
+        return []
+    event_ids = {str(event.event_id).strip() for event in events if str(getattr(event, "event_id", "") or "").strip()}
+    if not event_ids:
+        return games
+    filtered = [game for game in games if str((game or {}).get("gamePk") or "").strip() in event_ids]
+    # Only narrow when the join actually worked. If no card matched any event id
+    # the two sources are keyed differently, and filtering to nothing would
+    # replace a wrong board with an empty one.
+    return filtered if filtered else games
+
+
 class _NFLDataProvider(_HomeSportDataProviderBase):
     slug = "nfl"
 
@@ -5582,7 +5643,8 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
             board_games = list(build_nfl_preseason_market_board(season, target_week).get("games") or [])
         except Exception:
             board_games = []
-        return _stamp_market_recommendations(games, board_games)
+        games = _stamp_market_recommendations(games, board_games)
+        return _nfl_games_on_requested_date(games, context.context_label)
 
     def pregame_props(self, context: SportContext, home_games: list[dict[str, Any]], *, is_active_today: bool) -> list[dict[str, Any]]:
         if not is_active_today:
