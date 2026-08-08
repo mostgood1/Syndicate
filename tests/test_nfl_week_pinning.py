@@ -112,6 +112,22 @@ def test_empty_input_is_a_no_op(monkeypatch):
     assert _nfl_games_on_requested_date([], "2026-08-06") == []
 
 
+@pytest.mark.parametrize("label", ["2026 Preseason", "2026 Regular Season", "latest"])
+def test_a_NON_DATE_LABEL_must_not_wipe_the_board(monkeypatch, label):
+    """MEASURED 2026-08-08 on the shipped code, and it deleted every card.
+
+    `_build_sport_overview` sets `context_label = f"{season} Preseason"` and
+    passes it down as `requested_date`. ESPN answers a garbage date with an
+    EMPTY scoreboard rather than an error, so the confirmed-empty-slate branch
+    returned no games at all for the home overview and the intelligence layer.
+
+    A label that never denoted a date is the same "we cannot answer" case as no
+    date at all -- so it must not filter, exactly like the empty-string guard.
+    """
+    _fake_events(monkeypatch, [])
+    assert len(_nfl_games_on_requested_date(_games(), label)) == 2
+
+
 # ---------------------------------------------------------------------------
 # preseason_target_week: keyed on `gameday`, not the never-refreshed `status`.
 # ---------------------------------------------------------------------------
@@ -179,3 +195,109 @@ def test_a_missing_file_is_still_None(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sources, "real_preseason_schedule_path", lambda season: tmp_path / "nope.csv")
     assert sources.preseason_target_week(2026) is None
+
+
+# ---------------------------------------------------------------------------
+# preseason_week_for_date: the week must follow the REQUESTED date, not the
+# global "week we are preparing for".
+#
+# MEASURED on production 2026-08-08, after the date filter above had shipped:
+# chips were right on 15 of 20 dates in 08-05..08-24, and the 5 misses were an
+# exact pattern -- every date OUTSIDE the resolved target week returned 0.
+# target_week was 2, so 08-06 (week 1, ESPN 1 game) and 08-20..08-23 (week 3,
+# ESPN 2/3/10/1 games) all served nothing. Strictly better than the original
+# stale-game-everywhere defect, still date-blind.
+# ---------------------------------------------------------------------------
+
+
+def _dated_schedule(tmp_path, rows, monkeypatch):
+    import csv as _csv
+
+    from syndicate.features.nfl import sources
+
+    path = tmp_path / "schedule_preseason_2026.csv"
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        w = _csv.DictWriter(fh, fieldnames=["game_id", "week", "gameday", "status"])
+        w.writeheader()
+        for r in rows:
+            w.writerow(r)
+    monkeypatch.setattr(sources, "real_preseason_schedule_path", lambda season: path)
+    return sources
+
+
+_REAL_ROWS = [
+    {"game_id": "401873271", "week": "1", "gameday": "2026-08-07", "status": "Scheduled"},
+    {"game_id": "401873272", "week": "2", "gameday": "2026-08-13", "status": "Scheduled"},
+    {"game_id": "401873285", "week": "3", "gameday": "2026-08-20", "status": "Scheduled"},
+]
+
+
+def test_a_week_3_date_resolves_to_week_3(tmp_path, monkeypatch):
+    """THE MEASURED MISS. 08-20 served 0 chips because the card set was week 2."""
+    s = _dated_schedule(tmp_path, _REAL_ROWS, monkeypatch)
+    _fake_events(monkeypatch, ["401873285"])
+    assert s.preseason_week_for_date(2026, "2026-08-20") == 3
+
+
+def test_a_past_week_1_date_still_resolves_to_week_1(tmp_path, monkeypatch):
+    """The other measured miss: 08-06 is behind the target week, not ahead."""
+    s = _dated_schedule(tmp_path, _REAL_ROWS, monkeypatch)
+    _fake_events(monkeypatch, ["401873271"])
+    assert s.preseason_week_for_date(2026, "2026-08-06") == 1
+
+
+def test_the_UTC_vs_LOCAL_day_offset_cannot_bite(tmp_path, monkeypatch):
+    """CAR @ ARI is `2026-08-07` in the CSV and `08-06` to ESPN -- a 00:00Z
+    kickoff. Resolving by game_id rather than by comparing dates is what makes
+    that difference structurally unable to produce an off-by-one day."""
+    s = _dated_schedule(tmp_path, _REAL_ROWS, monkeypatch)
+    _fake_events(monkeypatch, ["401873271"])
+    assert s.preseason_week_for_date(2026, "2026-08-06") == 1
+
+
+@pytest.mark.parametrize("date_value", ["", None, "   "])
+def test_no_date_cannot_resolve_a_week(tmp_path, monkeypatch, date_value):
+    s = _dated_schedule(tmp_path, _REAL_ROWS, monkeypatch)
+    _fake_events(monkeypatch, ["401873271"])
+    assert s.preseason_week_for_date(2026, date_value) is None
+
+
+def test_a_date_with_no_games_falls_back(tmp_path, monkeypatch):
+    """None, not a guess -- the caller then uses preseason_target_week() and the
+    date filter drops the cards, which is how an empty slate stays empty."""
+    s = _dated_schedule(tmp_path, _REAL_ROWS, monkeypatch)
+    _fake_events(monkeypatch, [])
+    assert s.preseason_week_for_date(2026, "2026-08-08") is None
+
+
+def test_espn_unreachable_falls_back(tmp_path, monkeypatch):
+    s = _dated_schedule(tmp_path, _REAL_ROWS, monkeypatch)
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("espn unreachable")
+
+    monkeypatch.setattr("syndicate.features.shared.schedule_adapter.fetch_schedule_for_date", _boom)
+    assert s.preseason_week_for_date(2026, "2026-08-20") is None
+
+
+def test_ids_absent_from_the_schedule_fall_back(tmp_path, monkeypatch):
+    s = _dated_schedule(tmp_path, _REAL_ROWS, monkeypatch)
+    _fake_events(monkeypatch, ["999999999"])
+    assert s.preseason_week_for_date(2026, "2026-08-20") is None
+
+
+def test_a_missing_schedule_file_cannot_resolve_a_week(tmp_path, monkeypatch):
+    from syndicate.features.nfl import sources
+
+    monkeypatch.setattr(sources, "real_preseason_schedule_path", lambda season: tmp_path / "nope.csv")
+    _fake_events(monkeypatch, ["401873271"])
+    assert sources.preseason_week_for_date(2026, "2026-08-06") is None
+
+
+def test_a_mixed_date_takes_the_majority_week(tmp_path, monkeypatch):
+    """A rescheduled game must not let one stray row pick the whole card set."""
+    s = _dated_schedule(tmp_path, _REAL_ROWS + [
+        {"game_id": "401873286", "week": "3", "gameday": "2026-08-20", "status": "Scheduled"},
+    ], monkeypatch)
+    _fake_events(monkeypatch, ["401873285", "401873286", "401873272"])
+    assert s.preseason_week_for_date(2026, "2026-08-20") == 3

@@ -335,6 +335,67 @@ def _preseason_schedule_has_gamedays(path: Path) -> bool:
     return False
 
 
+def preseason_week_for_date(season: int, date_text: str) -> int | None:
+    """Which preseason week contains `date_text`, a US-local (Central) board date?
+
+    ADDITIVE. preseason_target_week() above answers a DIFFERENT question --
+    "which week are we preparing for right now" -- and its seven callers all
+    genuinely want that global answer. This is the per-request question the
+    board needs, and it is deliberately a separate function so that adding it
+    changes nothing for them.
+
+    RESOLVED BY GAME ID, NOT BY DATE ARITHMETIC, and that is the entire point.
+    The CSV's `gameday` is a UTC date while ESPN buckets by US-local date, so
+    CAR @ ARI is `2026-08-07` in the CSV and `08-06` to ESPN -- a 00:00Z
+    kickoff. Joining ESPN's event ids to the `game_id` column sidesteps the
+    conversion completely, because an id carries no timezone and so cannot be
+    off by one day. MEASURED across 2026-08-05..08-24: all 30 ids ESPN returned
+    in that window resolved to a CSV week, with zero unknown ids.
+
+    None whenever we cannot answer -- ESPN unreachable, no games that date, or
+    no returned id present in the CSV -- so callers fall back to
+    preseason_target_week() and behave exactly as they did before.
+    """
+    date_value = str(date_text or "").strip()
+    if not date_value:
+        return None
+    path = real_preseason_schedule_path(int(season))
+    if not path.exists():
+        return None
+    try:
+        from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
+
+        events = fetch_schedule_for_date("nfl", date_value)
+    except Exception:
+        return None
+    event_ids = {str(getattr(event, "event_id", "") or "").strip() for event in events}
+    event_ids.discard("")
+    if not event_ids:
+        return None
+
+    weeks: list[int] = []
+    try:
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            for row in csv.DictReader(handle):
+                if str(row.get("game_id") or "").strip() not in event_ids:
+                    continue
+                try:
+                    week = int(row.get("week") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if week in (1, 2, 3, 4):
+                    weeks.append(week)
+    except OSError:
+        return None
+    if not weeks:
+        return None
+    # A date never spans two preseason weeks in practice (confirmed across the
+    # whole 2026 window), but ESPN can carry a rescheduled game, so pick the
+    # week most of the date's games belong to and break a tie on the lower week
+    # rather than letting one stray row decide the whole card set.
+    return min(sorted(set(weeks)), key=lambda week: (-weeks.count(week), week))
+
+
 def build_preseason_module_links(selected_week: int, active_label: str, *, season: int | None = None) -> list[dict[str, Any]]:
     """Preseason's own nav -- deliberately NOT a branch inside
     build_module_links() above, since preseason's week domain (1-4) and

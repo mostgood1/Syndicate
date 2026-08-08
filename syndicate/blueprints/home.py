@@ -5527,6 +5527,9 @@ class _NCAABDataProvider(_HomeSportDataProviderBase):
         return []
 
 
+_ISO_DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
 def _nfl_games_on_requested_date(games: list[dict[str, Any]], requested_date: Any) -> list[dict[str, Any]]:
     """Keep only the games actually played on `requested_date`.
 
@@ -5563,6 +5566,20 @@ def _nfl_games_on_requested_date(games: list[dict[str, Any]], requested_date: An
     """
     date_text = str(requested_date or "").strip()
     if not date_text or not games:
+        return games
+    # A NON-DATE LABEL IS NOT A DATE, and treating it as one silently deleted
+    # the entire preseason card set. MEASURED 2026-08-08 on the shipped code:
+    # `_build_sport_overview` sets `context_label = f"{season} Preseason"`
+    # (home.py:6676) and passes it straight down here as `requested_date`.
+    # ESPN answers a garbage date with an empty scoreboard rather than an
+    # error, so `events` came back `[]` and the confirmed-empty-slate branch
+    # below returned NO GAMES for the home overview and the intelligence layer,
+    # both of which reach this through _load_home_games.
+    #
+    # That branch is right for a real date with no games and wrong for a label
+    # that never denoted a date at all -- the same "we cannot answer" case the
+    # empty-`date_text` guard above already declines to filter on.
+    if not _ISO_DATE_RE.fullmatch(date_text):
         return games
     try:
         from syndicate.features.shared.schedule_adapter import fetch_schedule_for_date
@@ -5650,9 +5667,27 @@ class _NFLDataProvider(_HomeSportDataProviderBase):
         from syndicate.features.nfl.preseason_cards import build_nfl_preseason_market_board
         from syndicate.features.nfl.preseason_cards import build_preseason_cards_page_context
         from syndicate.features.nfl.sources import preseason_target_week
+        from syndicate.features.nfl.sources import preseason_week_for_date
 
         season = int(context.season) if context.season is not None else nfl_latest_season()
-        target_week = preseason_target_week(season)
+        # THE WEEK MUST FOLLOW THE REQUESTED DATE, not the global "week we are
+        # preparing for". MEASURED on production 2026-08-08, after the date
+        # filter below had already shipped: chips were correct on 15 of 20 dates
+        # in 08-05..08-24, and the 5 misses were an exact pattern -- every date
+        # OUTSIDE the single resolved target week returned 0 chips.
+        #
+        #     08-06         ESPN 1  ->  0   week 1, already past
+        #     08-20..08-23  ESPN 2,3,10,1 -> 0 each   week 3, still ahead
+        #
+        # preseason_target_week was 2, so only week-2 dates could produce a
+        # card that survived the filter. That is strictly better than the
+        # original defect (a stale game on every date) but still date-blind:
+        # a board looking a week ahead showed nothing at all.
+        #
+        # Falls back to the global target week whenever the date cannot be
+        # resolved, which keeps the no-games case identical: an empty date
+        # builds target-week cards and the filter below then drops them all.
+        target_week = preseason_week_for_date(season, context.context_label) or preseason_target_week(season)
         if target_week is None:
             return []
         games = list(build_preseason_cards_page_context(target_week, season=season).get("games") or [])
