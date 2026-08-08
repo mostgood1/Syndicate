@@ -1,5 +1,185 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (late) — SOCCER `game.state`: FIXED, 0 → 300/300 rows. The nine-hypothesis chase was hunting a defect that did not exist
+
+**Code is on `main`, NOT DEPLOYED.** See the attribution note at the end — it
+landed inside `66d98120` ("todo: #268 ... keep it dark"), which is not what
+that commit is about.
+
+**The tenth hypothesis refuted the ninth.** The previous session narrowed to
+"`build_cards_page_context` RETURNS AN EMPTY GAMES LIST for seven leagues".
+Measured against production's own per-league API, it returns games for **all
+ten**:
+
+```
+mls 10 | serie_a 11 | la_liga 9 | eredivisie 9 | primeira_liga 9 | belgian 9
+epl  1 | bundesliga 1 | ligue_1 1 | championship 1          == 61
+```
+
+**61 — the chip count itself.** The ten leagues sum to exactly the number that
+had been quoted four times in this file as evidence that leagues were missing.
+Nothing was ever empty.
+
+**Where the eight-hypothesis chase went wrong.** The chip list was read as
+`MLS, EPL, La Liga | CLB@MIA CLT@CHI SD@MIN HOU@SKC COV@ARS GET@ALA ...` — the
+first six of sixty-one, in league order, MLS first because `_active_leagues`
+sorts it there. **League coverage was inferred from the head of a sorted list.**
+The Eredivisie/Belgian/Primeira chips were at positions 30-61 the whole time,
+which is why "the scoreboard and the odds capture cover DIFFERENT LEAGUES" read
+as true. It was false. **All nine hypotheses were about the wrong side of the
+join.**
+
+#### The actual defect — an unresolvable join key, in three parts
+
+`attach_game_state` joined `grid.home_team` (OddsAPI full names) against
+`chip.home.abbr` (ESPN tri-codes) through `teams_match`, and
+`_alias_map("soccer")` returned `{}`. **0 of 300 rows, measured.**
+
+1. **Chips carried no club name.** `build_game_chip` emitted `abbr` only,
+   though every provider's game dict already holds the full name beside it.
+   Soccer is the sport where abbr is *unusable* as a key: **11 tri-codes name
+   two different clubs across leagues** on the real artifacts, `stl` being both
+   Standard Liege and St. Louis CITY SC — and the board joins per SPORT, not
+   per league. Chips now carry `name`; the join tries name then abbr per side.
+2. **Soccer had no alias map**, pinned at `{}` by a test on the grounds that a
+   hand-written table across ~10 leagues would be large and wrong at the edges.
+   Right about hand-written tables, wrong that it was the only option: the repo
+   already stores name/short_name/abbreviation per club, so the map is
+   **derived** — 450 keys, none typed out. Ambiguous keys are **dropped, not
+   first-wins** (the trap `_basketball_alias_to_name` documents for the merged
+   NBA/WNBA map: a confident wrong answer skips the heuristic fallback).
+3. **The residue is genuine vendor disagreement, and it is small.** 18 of the
+   slate's 22 clubs resolve straight from the artifacts once diacritics and
+   club-type designators are reduced by rule (`SC Telstar`/`Telstar`,
+   `KVC Westerlo`/`Westerlo`, `Houston Dynamo FC`/`Houston Dynamo`). Four
+   needed a measured table: Sporting Lisbon→Sporting CP, Sint
+   Truiden→Sint-Truidense, Union Saint-Gilloise→Union St.-Gilloise, Vitória
+   SC→Vitória de Guimaraes.
+
+**Result — full unmocked path over production's 2026-08-08 board: 300/300 rows,
+11/11 games, all `pregame`.** Was 0. `opportunity_gate`'s dead-market rule can
+now fire for soccer; before this, every soccer row looked pregame forever — the
+exposure WNBA had before `a432f6d9`.
+
+`attach_game_state` now returns `unmatched_teams`. The failure mode is one club
+spelled two ways, and with no sample it presents as a blank column with nothing
+to act on — which is exactly how this survived nine hypotheses.
+
+The alias-table item this file carried as "step two, needed eventually" **is
+step one and is done.** Its premise (that chips must first be extended to more
+leagues) was the mis-reading above.
+
+#### OPEN
+
+- **DEPLOY IS HELD, deliberately.** A deploy reboots the worker and resets the
+  2h MLB pregame-sweep timer, and `#265` still owes its first observed
+  `oddsapi_game_lines_<date>_pregame.json`. Ship this with that verification,
+  not before — same reasoning that holds `#266`/`#267`.
+- The four-entry vendor table covers clubs that PLAYED on 2026-08-08. Other
+  fixtures will surface others, and `unmatched_teams` is how they show up. It
+  does not grow per fixture — only per genuine vendor disagreement.
+- `tests/test_layer2_shortlist_wiring.py` has **6 failures that predate this
+  work** (verified by stashing). Untouched here, not diagnosed.
+
+#### ATTRIBUTION — a parallel session absorbed this commit
+
+Committed as `a81d8570` with its own message; a concurrent session's `git`
+staging then swept all five files into `66d98120`, whose message is about
+`#268`. `a81d8570` is **not an ancestor of `main`** and is dangling; the code
+is byte-identical on `main` (`git diff a81d8570 main -- <files>` empty).
+History was NOT rewritten to split them — that is not a safe operation while
+another session is pushing. **If you are looking for where the soccer join fix
+landed, it is `66d98120`.**
+
+This is the same hazard the 08-08 evening entry logged in the other direction
+("a parallel session pushed six NFL commits mid-session"). Per-file staging
+protects the *other* session's work from yours; it does not protect yours from
+theirs. **After committing, check `git merge-base --is-ancestor <sha> main`.**
+
+#### OPERATIONAL — the lesson is about the instrument, not the bug
+
+The previous session's own method note said *"look for existing instrumentation
+before inventing a probe"*, and it was right — it just stopped one step short:
+**the counter already in hand was the instrument.** `61` was quoted repeatedly
+as the size of the prize while being, exactly, the sum that disproved the
+premise. **Before another round of elimination, add up what you already
+measured.**
+
+And a corollary to "exactly zero is a different signal from small": zero here
+was a join whose KEY could not resolve, not a missing producer. Both sides
+existed and were correct the whole time. **When a join reads zero, prove the key
+can resolve before auditing either side's contents.**
+
+### 2026-08-08 — #268 BUILD THE L2-A WIRING, BUT KEEP IT DARK (user decision)
+
+**Explicit instruction: the wiring may be built and merged; it must NOT change
+what the board serves until the release conditions below are met.** Default
+off, and the served page identical with the flag off — that is the acceptance
+bar for merging it, separate from the bar for enabling it. The reason is
+measured, not cautious: enabling it today loses most of what the board renders.
+
+**FIRST, A CORRECTION THIS FILE CAUSED.** `65b15a03` records `f1d9f69f` as
+"L2-A becomes the board". **It is not the board and never has been.** Measured
+2026-08-08 on the served page, not the endpoint:
+
+- `home.py` contains **zero** references to `layer2` or `shortlist`
+- **nothing** in `syndicate/templates/` or `syndicate/static/` fetches
+  `/api/board/layer2-shortlist`
+- the page's own embedded state is `ranked_all: []`, `recommendations: []`,
+  `top_opportunities: []`, `source: combined_board_window`
+
+L2-A is an endpoint with no UI consumer. A session in the evening verified "the
+board" three separate times against the API and called it live and healthy;
+the user then said they could not see anything, and they were right. **Verify
+the RENDERED PAGE. An endpoint returning 200 with rows is not a board.**
+
+#### Why a swap loses the board
+
+The template reads **70 fields** off a row. An L2-A row carries **18**. Overlap
+is **9**.
+
+Of the 61 missing, ~20 are pure mapping and safe (`matchup` <- `game.matchup`,
+`odds` <- `quote.price`, `selection`/`pick` <- `side`, `game_id` <-
+`event_id`, `fair_price` <- `quote.fair_probability`, `board_score` <-
+`score`, and so on). **~40 have no source on an L2-A row at all**: headshots,
+`player_id`/`player_team`, `writeup`, `reasoning`, `summary`, `question`,
+`live_projection`, `live_total`, `sim_projection`, `movement`,
+`price_improvement_pct`, every `settlement*` field, `result`, `actual`,
+`quality`, `confidence`, `candidate_type`.
+
+And `model_edge_pct` is **0 of 103 rows** (#263), so the model column renders
+blank even after wiring.
+
+#### RELEASE CONDITIONS — all four before the flag is turned ON
+
+1. **`ranked_all` is non-empty.** It is `[]` on EVERY date (`/`,
+   `?date=2026-08-08`, `?date=2026-08-09`), with `selected_date: null` even
+   when a date is supplied. This is the open "MLB `candidate_count = 0`" item
+   and it predates all of today. If this is fixed, the rich board returns and
+   L2-A becomes a second lane rather than a substitute -- which is the better
+   outcome and should be tried FIRST.
+2. **The ~40 unsourced fields have a source**, or the card design explicitly
+   accepts leaner rows. This overlaps `#263` almost entirely -- projections are
+   the same missing input.
+3. **An adapter with a PARITY TEST**: extract the template's field list
+   programmatically (70 is too many to eyeball) and assert the adapter emits
+   every one with either a documented mapping or an explicit None. A field
+   going missing must be a test failure, never a blank cell found on the page.
+4. **Adapter is worker-side and persisted.** Not serve-time. The persisted
+   artifact must be what the board displays or settlement has no record of what
+   was recommended -- todo mistake #3, already paid for once.
+
+#### How it is wired (dark)
+
+**Additive, never replacing.** L2-A renders only where `ranked_all` is empty,
+or as a separately labelled lane, so nothing working today can break and the
+legacy pool resumes precedence the moment it is fixed.
+
+**Gated on `SYNDICATE_BOARD_L2A_ENABLED`, default OFF.** With the flag off the
+served payload must be byte-identical to before — that is a test, not a hope,
+because "additive" code that changes the default path is the failure mode this
+gate exists to prevent.
+
 ### 2026-08-08 (evening) — S6: settlement settled its first records. THREE dead gates, none a threshold
 
 `settled: 0` was never one problem. It was **three independent gates, each
