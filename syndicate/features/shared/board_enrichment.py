@@ -99,7 +99,21 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
                 unmatched[str(team)] = unmatched.get(str(team), 0) + 1
 
     coverage = {"chips": len(chips), "rows_matched": matched}
-    if unmatched:
+    # NO CHIPS IS NOT A JOIN FAILURE, and reporting it as one is the exact
+    # confusion this field was added to remove. Measured 2026-08-08: NFL
+    # returned `chips: 0, unmatched_teams: [20 clubs]`, which reads as a broken
+    # alias map -- but NFL's earliest board row was 2026-08-13, so there was
+    # simply no slate to match against. A sport out of season would report the
+    # same shape, every hour, forever.
+    #
+    # `unmatched_teams` answers "which clubs did the join fail to resolve",
+    # which is only a meaningful question when there was something to resolve
+    # against. With zero chips the honest answer is `no_chips_for_date`, and
+    # the two states must not be spelled the same way -- that is the
+    # degraded-looks-legitimate trap in miniature.
+    if not chips:
+        coverage["reason"] = "no_chips_for_date"
+    elif unmatched:
         # Club names, not row counts, are the actionable unit: one unresolved
         # club fails every market on its game.
         coverage["unmatched_teams"] = sorted(unmatched, key=lambda name: (-unmatched[name], name))[:20]
