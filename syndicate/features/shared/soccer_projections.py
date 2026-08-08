@@ -164,6 +164,59 @@ def _mean_projection(mean: float, line: Any, *, basis: str) -> dict[str, Any]:
     return projection
 
 
+_LIVE_OR_DONE = {"live", "in_progress", "final", "completed"}
+
+
+def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) -> None:
+    """Turn a model probability into an EDGE, or say why it cannot be one.
+
+    #263. This module emitted `model_prob_over` and nothing priced it, so every
+    soccer row reached Layer 2 with `model_edge_pct` null -- and with no model
+    edge `blended_score` falls back to EV alone, which under proportional devig
+    is `1/overround - 1`: IDENTICAL for every side of a market. Measured on the
+    live board, all three sides of Famalicao@Estoril carried ev=8.6383, so a
+    -750 draw and a +6000 longshot ranked as equally good bets.
+
+    THREE REFUSALS, each deliberate:
+
+    - a mean is not a probability, so mean-based rows never get an edge here;
+    - a 3-WAY market cannot be de-vigged on two legs. `_no_vig_over_probability`
+      pairs home against away and would silently drop the draw, inflating the
+      fair in the bettor's favour -- the most dangerous direction, and the exact
+      trap `market_sides_for_quote`'s docstring already warns about;
+    - a pregame projection cannot be priced against a LIVE market. Same rule
+      prop_projections applies, for the same measured reason (a +23-point "edge"
+      on a coin-flip game once the score, not the model, moved the line).
+    """
+    model_prob = projection.get("model_prob_over")
+    if model_prob is None:
+        return
+
+    sides = [str(side).strip().lower() for side in (row.get("sides") or [])]
+    if "draw" in sides or len(sides) > 2:
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = "3-way market: two-leg de-vig would drop the draw"
+        return
+
+    state = str(((row.get("game") or {}).get("state") or "")).strip().lower()
+    if state in _LIVE_OR_DONE:
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = (
+            f"game is {state}: a pregame projection cannot be priced against a live market"
+        )
+        return
+
+    from syndicate.features.shared.prop_projections import _no_vig_over_probability
+
+    fair = _no_vig_over_probability(row)
+    projection["market_fair_prob_over"] = fair
+    if fair is None:
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = "one-sided market: no two-sided fair to price against"
+        return
+    projection["edge_vs_market_pct"] = round((float(model_prob) - float(fair)) * 100.0, 2)
+
+
 def attach_soccer_projections(
     grid: Iterable[Mapping[str, Any]], index: SoccerProjectionIndex
 ) -> dict[str, Any]:
@@ -232,6 +285,9 @@ def attach_soccer_projections(
 
         if projection is None:
             continue
+        # #263: a model probability that is never priced against the market
+        # cannot rank anything.
+        _price_against_market(row, projection)
         row["projection"] = projection  # type: ignore[index]
         projected += 1
         if projection.get("model_prob_over") is not None:
