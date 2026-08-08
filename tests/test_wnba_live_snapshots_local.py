@@ -1274,7 +1274,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
 
     def test_live_lens_card_surface_shows_total_points_and_live_line(self) -> None:
         with patch(
-            "syndicate.features.wnba.live_lens.build_cards_page_context",
+            "syndicate.features.wnba.live_lens.build_cards_page_context_if_cached",
             return_value={
                 "date": "2026-05-21",
                 "source_path": "wnba_cards.json",
@@ -1331,7 +1331,7 @@ class WnbaLiveSnapshotLocalTests(unittest.TestCase):
 
     def test_live_lens_card_surface_does_not_fallback_to_cards_total(self) -> None:
         with patch(
-            "syndicate.features.wnba.live_lens.build_cards_page_context",
+            "syndicate.features.wnba.live_lens.build_cards_page_context_if_cached",
             return_value={
                 "date": "2026-05-21",
                 "source_path": "wnba_cards.json",

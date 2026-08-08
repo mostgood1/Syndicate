@@ -13,6 +13,7 @@ from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.timezone import central_today_iso
 from syndicate.features.wnba.cards import build_cards_page_context
+from syndicate.features.wnba.cards import build_cards_page_context_if_cached
 from syndicate.features.wnba.cards import build_live_lines_payload
 from syndicate.features.wnba.sources import build_module_links
 
@@ -225,10 +226,38 @@ def validate_live_lens_snapshot(snapshot: Any) -> bool:
     return True
 
 
-def build_live_lens_snapshot(selected_date: str, *, limit: int = 50) -> dict[str, Any]:
+def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebuild: bool = False) -> dict[str, Any]:
     _run_wnba_live_lens_tick(selected_date)
+    # CONSUME, DO NOT REBUILD. Measured 2026-08-08 on live-odds-worker (2Gi):
+    # this call cost +1,062MB in a single step (581.5 -> 1644.1MB), which was
+    # the largest allocation on the service, OOM-killed the container and then
+    # crash-looped it. The tick interval is longer than the context cache's 12s
+    # TTL, so every tick missed and paid a full rebuild.
+    #
+    # The /wnba endpoints stay the builders -- on web, where building a page is
+    # the job being asked for. A background tick that rebuilds a whole cards
+    # page to read a few fields off it is the inversion CLAUDE.md's rule names:
+    # workers consume artifacts, and missing data degrades rather than
+    # triggering an on-demand backfill.
+    #
+    # `allow_rebuild` exists so the WNBA route can still force one when a human
+    # is actually waiting for the page.
     try:
-        cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+        cards_context = build_cards_page_context_if_cached(selected_date, allow_stored_date_fallback=False)
+        if cards_context is None:
+            if allow_rebuild:
+                cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+            else:
+                # Degraded, and SAID SO. A silent empty context here is
+                # indistinguishable from "no WNBA games today", which is
+                # exactly the class of blank this project keeps mistaking for
+                # a data outage.
+                print(
+                    f"[wnba_live_lens] CARDS_CONTEXT_COLD date={selected_date} "
+                    f"reason=rebuild_suppressed_on_worker",
+                    flush=True,
+                )
+                cards_context = {}
     except Exception:
         cards_context = {}
     resolved_date = str(cards_context.get("date") or selected_date).strip() or selected_date

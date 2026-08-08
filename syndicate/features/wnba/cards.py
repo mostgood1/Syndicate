@@ -2928,6 +2928,31 @@ def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: 
     return result
 
 
+def build_cards_page_context_if_cached(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any] | None:
+    """The context ONLY if it is already built and fresh. Never builds.
+
+    MEASURED 2026-08-08 on live-odds-worker (2Gi): the WNBA live-lens tick
+    called `build_cards_page_context` every tick and the build cost
+    **+1,062MB in one step** (581.5 -> 1644.1MB), OOM-killing the container and
+    then crash-looping it. The tick interval is longer than this cache's 12s
+    TTL, so it missed every single time and paid a full rebuild every time.
+
+    A live-lens TICK has no business rebuilding a whole cards page. Under
+    CLAUDE.md's rule -- "if data is missing at request time, the correct
+    behaviour is a degraded state, not an on-request backfill" -- the tick is a
+    CONSUMER. The /wnba endpoints remain the builders, on web, where a page
+    build is the actual job being asked for.
+
+    Returns None on a miss so the caller can degrade deliberately rather than
+    silently triggering the thing that killed the service.
+    """
+    cache_key = (str(selected_date), bool(allow_stored_date_fallback))
+    cached = _BUILD_CARDS_PAGE_CONTEXT_CACHE.get(cache_key)
+    if cached is not None and (time.monotonic() - cached[0]) < _CARDS_PAGE_CONTEXT_TTL_SECONDS:
+        return cached[1]
+    return None
+
+
 def _clear_build_cards_page_context_cache() -> None:
     _BUILD_CARDS_PAGE_CONTEXT_CACHE.clear()
 
