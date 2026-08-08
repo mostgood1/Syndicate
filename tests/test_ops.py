@@ -2110,6 +2110,32 @@ class OpsRefreshApiTests(unittest.TestCase):
             self.assertIsNone(result["pid"])
             self.assertEqual(result["state"], "canceled")
 
+    def test_assert_no_active_refresh_run_ignores_alive_pid_once_state_is_terminal(self) -> None:
+        # Confirmed live 2026-08-08: run_refresh_odds_job.py wrote
+        # state="finished" to refresh-worker's manifest, but its own wrapper
+        # process (the recorded pid) was still alive minutes later --
+        # blocking every new manifest_only/external_runner launch (#234's
+        # fix) even though the job had already reported completion. A
+        # terminal state is the job's own word that it's done; a lingering
+        # OS process past that point must not override it.
+        with TemporaryDirectory() as tmp_dir:
+            repo_root = Path(tmp_dir)
+            reports_root = repo_root / "reports"
+            latest_dir = reports_root / "refresh_status" / "latest"
+            latest_dir.mkdir(parents=True, exist_ok=True)
+            (latest_dir / "refresh_status_latest.json").write_text(
+                json.dumps({"state": "finished", "pid": 60, "externalRunner": {"kind": "external_runner", "queue_state": "queued"}}),
+                encoding="utf-8",
+            )
+
+            with patch.dict(os.environ, {"SYNDICATE_REPORTS_ROOT": str(reports_root)}, clear=False), patch(
+                "syndicate.features.shared.ops_refresh.REPO_ROOT", repo_root
+            ), patch("syndicate.features.shared.ops_refresh._pid_is_running", return_value=True):
+                from syndicate.features.shared import ops_refresh
+
+                # Must not raise -- the manifest already says finished.
+                ops_refresh._assert_no_active_refresh_run()
+
     def test_assert_no_active_refresh_run_blocks_alive_pid(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             repo_root = Path(tmp_dir)

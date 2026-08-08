@@ -450,6 +450,11 @@ def _this_instance_identity() -> str:
 _LEGACY_REFRESH_LANE_KEY = "global"
 _REFRESH_WORKER_LANE_KEY = "refresh-worker"
 
+# A manifest that has already self-reported one of these is done, for good,
+# from the job's own authority -- see _assert_no_active_refresh_run's use of
+# this below.
+_TERMINAL_REFRESH_STATES = frozenset({"finished", "failed", "canceled"})
+
 
 def _per_service_refresh_lanes_enabled() -> bool:
     raw = str(os.environ.get("SYNDICATE_REFRESH_RUN_PER_SERVICE_LANES") or "").strip().lower()
@@ -646,7 +651,19 @@ def _assert_no_active_refresh_run(lane: str | None = None) -> None:
         state = str(manifest.get("state") or "").strip().lower()
         pid_raw = manifest.get("pid")
         pid = int(pid_raw) if isinstance(pid_raw, int) or (isinstance(pid_raw, str) and str(pid_raw).strip().isdigit()) else None
-    if pid is not None:
+    # Confirmed live 2026-08-08: a refresh-worker manifest already reporting
+    # `state: finished` (the job's own, authoritative word that it's done)
+    # still blocked new launches, because run_refresh_odds_job.py's own
+    # wrapper process (the "pid" recorded here) can remain alive for a while
+    # after writing that state -- and _refresh_run_still_active only checks
+    # OS pid liveness + command match, with no awareness that the manifest
+    # it's reading already says done. A terminal state is written by the job
+    # itself; a lingering OS process past that point (cleanup, a watchdog
+    # thread, or a coincidentally-reused pid within the same container's
+    # lifetime -- the risk _this_instance_identity()'s own docstring already
+    # flags for the cross-redeploy case) is not evidence the refresh is
+    # still running, so it must not override what the job already reported.
+    if pid is not None and state not in _TERMINAL_REFRESH_STATES:
         try:
             if _refresh_run_still_active(manifest, run_summary=run_summary):
                 raise ValueError(f"A refresh run is already active (pid={pid}). Cancel it before starting a new run.")
@@ -665,7 +682,7 @@ def _assert_no_active_refresh_run(lane: str | None = None) -> None:
         if not isinstance(run_summary, dict):
             return None, None, None
         run_summary_state = str(run_summary.get("state") or "").strip().lower()
-        if run_summary_state not in {"finished", "failed", "canceled"}:
+        if run_summary_state not in _TERMINAL_REFRESH_STATES:
             return None, None, None
         exit_code_raw = run_summary.get("exitCode")
         exit_code = int(exit_code_raw) if isinstance(exit_code_raw, int) or (isinstance(exit_code_raw, str) and str(exit_code_raw).strip().isdigit()) else None
