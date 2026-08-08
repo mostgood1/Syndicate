@@ -428,6 +428,52 @@ both web navigation. refresh-worker's value is `mlb,wnba,soccer,nfl`, so
 1.6-42s and up to +321MB, ~10% of the long cycles. Nothing reconciles the two
 lists and the participating-sport set is not derivable from one place.
 
+### FIXED 2026-08-08 (evening) — `#274` (`35254271`) NFL was THREE WEEKS from vanishing from the board for the entire regular season
+
+Found by taking `#273`'s NCAAF finding and asking it of my own sport. **NFL had
+the identical defect, latent**, and nothing would have surfaced it until the
+regular season started and the board silently showed no NFL at all.
+
+`build_game_chips` resolves context with **no week**, so `context.week` is
+always `None` on the chips path and NFL **always** takes the preseason branch.
+Once preseason ends (~08-29) `preseason_target_week()` returns `None` and
+`games()` returned `[]`. Measured by moving the clock forward:
+
+```
+today=2026-09-13   preseason_target_week=None   chips=0   ESPN=13
+today=2026-09-20   preseason_target_week=None   chips=0   ESPN=14
+```
+
+**`regular_season_game_ids_for_date()` is the companion to
+`preseason_week_for_date()` and works the OPPOSITE way round on purpose.** Two
+measured reasons, and both are the kind of thing a later "simplification" would
+destroy:
+
+1. **THE TWO NFL SCHEDULE FILES USE DIFFERENT DATE CONVENTIONS.** Preseason
+   `gameday` is a **UTC** date (CAR @ ARI is `2026-08-07`, `gametime` 00:00,
+   ESPN buckets it 08-06). Regular-season `gameday` is the **US-LOCAL** date
+   (`2026-09-09`, `gametime` 20:20) and agrees with ESPN exactly — 2026 week 1's
+   four gamedays split 16 games **1/1/13/1** and ESPN returns 1/1/13/1 for those
+   same dates. So the preseason file needs the id join and the regular-season
+   file must NOT have one; its date column is already the answer.
+2. **THE ID SPACES ARE DISJOINT.** The regular-season file is nflverse-keyed
+   (`2026_01_NE_SEA`); ESPN's are numeric (`401873271`). Routing regular-season
+   cards through `_nfl_games_on_requested_date` matches **nothing**, and that
+   helper's deliberate fail-closed rule would then **blank the whole regular
+   season**. Pinned by a test so the separation cannot be tidied away.
+
+**Verified:** regular season **27/27 dates** (09-09..10-05) count match;
+date-keyed not clock-keyed (probing 09-09 with today=09-20 still returns week
+1's Wednesday opener); **preseason unchanged at 20/20 exact id-set**. 268 passed
+scoped, 649 passed including `tests/test_archives.py`.
+
+**THE GENERALISABLE BIT:** the same `context.week is None` fact produces a
+*different* symptom per sport — NCAAF returns nothing today, NFL would have
+returned nothing in three weeks, soccer returns the same 51 rows forever. **One
+cause, three symptoms, three different discovery dates.** Reading a finding from
+another sport back into your own is what turned a latent NFL outage into a
+committed fix; `#273` was found from NFL, and `#274` was found back from NCAAF.
+
 ### OPEN 2026-08-08 (evening) — `#273` NCAAF CONTRIBUTES ZERO CHIPS ON EVERY DATE, ALWAYS. Cross-provider audit of all eight `games()` methods
 
 Found while answering the lead's cross-sport divergence question after `#271`.
