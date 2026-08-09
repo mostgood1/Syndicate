@@ -1,5 +1,47 @@
 # Syndicate TODO — canonical cross-session list
 
+### #311 — OPEN, UNOWNED. The refresh-worker's concurrency cap is inert, for two independent reasons, and the second one is the interesting one
+
+**Coordinator's failure first, because it is the reusable part.** I told the
+`#282` lane that `#311` and `#312` were "written up and unowned". They were not.
+They existed only in a session-local task tracker, which **no other lane can
+read**. The lane checked `origin/main`, found nothing, and said so. That is the
+same shape as `SYNDICATE_BOARD_L2A_ENABLED` being set on the service that never
+runs the code: **a record kept somewhere with no causal path to its reader is
+not a record.** If it is not in `todo.md` on `origin/main`, it does not exist.
+
+Measured by the `#282` lane in `scripts/run_refresh_worker.py`:
+
+1. **The cap is never enforced.** `:1879` computes `active_jobs >= max_active_jobs`,
+   writes a `throttled` status, and then `return`s **only under `--run-once`**.
+   The long-running loop has no `continue`, so it falls straight through to
+   `:1890` and spawns anyway.
+2. **Even with a `continue`, it could not fire.** `_current_active_job_count`
+   (`:1269-1280`) returns **0** when the manifest is `running` with no live pid —
+   which is *exactly* the condition `_has_pending_external_contract`
+   (`:1365-1372`) requires in order to re-claim. **The two predicates are
+   mutually exclusive by construction, so the cap reads zero precisely when the
+   thing it bounds is running.**
+
+`SYNDICATE_REFRESH_WORKER_MAX_ACTIVE_JOBS` is unset on both workers → defaults
+to 1. A limit of 1 that cannot be reached and would not be honoured if it were.
+
+This is the root defect behind `#279`'s nine OOM kills. `#282` **bounds the
+damage and does not remove it**. Possibly also behind `#318`'s five concurrent
+publishers — unverified, and worth checking before assuming the publish endpoint
+is the right place to fix that.
+
+### #312 — OPEN, UNOWNED. A flag disabled via the env API is re-enabled by the next blueprint sync. Write this as a class, not a soccer bug
+
+`render.yaml:532-533` hardcodes `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN: "true"`.
+So turning it off with the single-key env endpoint is **not durable** — the next
+`render.yaml` push from any lane silently turns it back on, via `blueprint_sync`,
+with no deploy anyone ordered (see `#284`).
+
+**The general form:** any flag an operator might reasonably disable at runtime,
+while the blueprint hardcodes a literal, is a flag that re-enables itself. Needs
+a sweep of `render.yaml` for that pattern, not a one-line soccer fix.
+
 ### 2026-08-09 (21:1xZ) — `pool=0` WHILE `shortlist rows=155` IS `#290`, not a new defect. `#319` closed as a duplicate before it was opened
 
 `CANDIDATE_POOL_READY count=0` on the same cycle, same second, as
@@ -64,6 +106,24 @@ Target for `#285`, stated as the acceptance bar: **one good build per 30 minutes
 permanently.** `#290`'s answer travels with it unchanged — *do not lower the
 floor; the fix is to need less, not to permit more.*
 ### #282 — SHIPPED (committed, NOT deployed). Soccer sim split into per-league-date jobs. And the premise the brief was written on was false: soccer sims were never off
+
+> **ATTRIBUTION CORRECTION + AN ORPHANED FINDING, added by the coordinator
+> 2026-08-09 ~21:3xZ.** I credited `de1a6906` and `50afe2ae` to the `#282` lane.
+> **They are not its commits.** Every lane commits as `github-actions[bot]`, so
+> the author field distinguishes nothing — an assumption worth retiring
+> permanently, because it will mislead again.
+>
+> Those two belong to a different, unidentified soccer lane, and their content is
+> **not** folded into `#282` and is not recorded anywhere else. Placing it here
+> so it survives:
+>
+> - **All 10 soccer leagues ARE active**, so the chip gap is **per-league
+>   artifact availability**, not league coverage (`50afe2ae`, 13:11Z).
+> - **Soccer week resolution is refuted** as the cause; narrowed to per-league
+>   card artifacts (`de1a6906`, 13:23Z).
+>
+> Two hypotheses killed, which is what makes the next attempt cheap. **Unowned.**
+> Do not re-derive them, and do not attribute them to `#282`'s lane.
 
 **The deliverable, in one line:** one soccer job used to be all ten leagues
 (~10–20 minutes of real work); it is now one league on one date. `--soccer-leagues`
