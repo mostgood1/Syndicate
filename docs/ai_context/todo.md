@@ -4604,12 +4604,58 @@ two — replaying the real 08-08 doc through a slate-clock version took the
 freeze **15 → 2**. Per-event, the freeze only ever grows. A/B, same date and
 thresholds: collapsed odds → 1 graded row, restored → 15.
 
-**VERIFICATION STILL OWED.** Deployed to both workers 17:05Z. MLB's pregame
+~~**VERIFICATION STILL OWED.**~~ Deployed to both workers 17:05Z. MLB's pregame
 sweep is on a **2h cadence** (`_PREGAME_SWEEP_INTERVAL_FALLBACK`); last fire
 16:49Z, so the first post-deploy sweep was due ~18:49Z. Until a
 `oddsapi_game_lines_<date>_pregame.json` is observed, this is shipped and
 plausible, not fixed. The snapshot copy is allowlisted
 (`*_source/data/daily/snapshots/*/*.json`) so it IS visible from web.
+
+##### VERIFIED 2026-08-09 ~20:55Z — the WRITER works, and it is caught mid-collapse. The READER was never built.
+
+**The write half PASSES, on the strongest available evidence.** Not "the file
+exists" — the freeze and the live file already disagree, today, in exactly the
+direction the fix predicts:
+
+```
+oddsapi_game_lines_2026_08_09_pregame.json   games: 15   <- full slate, held
+oddsapi_game_lines_2026_08_09.json           games: 11   <- already collapsing
+```
+
+Four `*_pregame.json` now exist in production where there were **zero**: 08-08
+(game_lines, hitter_props, pitcher_props) and 08-09 (game_lines). The frozen
+doc still carries `"mode": "live"` — which is the point, and is itself the proof
+the mode-guard removal took: that stamp is precisely what made the freeze
+unreachable before.
+
+**The read half does not exist.** `grep '_pregame\.json'` across `syndicate/`,
+`pipeline/` and `scripts/` returns exactly **one file** — `scripts/refresh_mlb_oddsapi.py`
+(`:670`, `:694`), the writer. Every reader still builds the live filename:
+
+- `syndicate/features/mlb/sources.py:198` — `f"oddsapi_game_lines_{...}.json"`,
+  used by `cards.py:2280,2344`
+- `syndicate/features/shared/odds_refresh_tracking.py:2696` —
+  `_flatten_mlb_game_lines(snapshot_root / f"oddsapi_game_lines_{date_slug}.json")`
+
+So this entry's own "**dead both ends**" was half-revived: the freeze produces a
+15-game artifact that **nothing consumes**, while the tracking sync reads the
+11-game collapsing one.
+
+⚠️ **DO NOT ESCALATE THIS TO "GRADING IS BROKEN" — I did not establish that.**
+`_sync_csv_tracking` is a *sync* keyed on
+`["event_key","segment","market","selection"]`. If it accumulates across cycles,
+then early cycles already captured all 15 games and the later collapsed reads
+simply add nothing — in which case the freeze is redundant for tracking rather
+than load-bearing. **Whether it accumulates or replaces is unmeasured**, and it
+decides whether the missing reader costs anything at all.
+
+Next step is that one question, not a fix. `#265`'s A/B ("collapsed odds → 1
+graded row, restored → 15") says the input matters *somewhere*; it does not say
+the tracking CSV is where.
+
+**Also open, smaller:** 08-08 froze all three families, 08-09 has only
+`game_lines` so far. Could be sweep timing (props are a separate job) or a
+per-family gap — unresolved, and worth one read tomorrow once the day is done.
 
 #### #266 — both prop families graded zero (`9f8489f3`, ~~NOT DEPLOYED~~ **DEPLOYED 2026-08-09**, see the list audit at the top)
 
