@@ -349,7 +349,24 @@ taken shortly after a restart.
 **Two data points cannot distinguish warm-up from coincidence.** The test is
 cheap and nobody has run it: sample `/intelligence` every 30s across a deploy
 boundary and plot `recommendations` length against seconds-since-boot. If it is
-warm-up, the empty window is bounded and reproducible on demand.
+warm-up, the empty window is bounded and reproducible on demand. **Sample the
+WARM baseline first, before the deploy** — otherwise the cold half has nothing
+to be compared against and the shape gets inferred from one side, which is
+exactly how the constancy assumption got in.
+
+**BOUNDING THE RETRODICTION, because the loose form will get repeated.** "Every
+empty-board reading last night was taken shortly after a restart" puts a class
+of **observations** in question, NOT a class of **conclusions**. Findings with
+an independent mechanism are unaffected:
+- **`#286` stands** — verified by `STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD` firing
+  nine times in the log. A mechanism observed directly, not inferred from an
+  empty board.
+- **`#290`'s floor stands** — measured as `headroom 2926.7 vs required 3000`
+  from the worker's own telemetry, independent of what the board rendered.
+- **In scope**: any reasoning that ran *from* "the board reads 0" *to* a cause.
+
+"Some readings were confounded" and "the findings were wrong" are very different
+claims, and only the first is supported.
 
 **Why the old gate never fired** — worth keeping, because the mistake is
 reusable. The fallback was gated `if not merged_recommendations`, with the
