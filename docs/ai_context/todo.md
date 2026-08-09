@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### #309 — FIX WRITTEN, NOT DEPLOYED. WNBA graded 0 rows because the grader read a different root than the producer writes. `17d4f203` is DEPLOYED AND INERT
+### #309 — FIXED AND DEPLOYED 2026-08-09. WNBA graded 0 rows because the grader read a different root than the producer writes. `17d4f203` is DEPLOYED AND INERT
 
 Full trace: `docs/ai_context/diagnosis_grader_coverage_wnba.md`.
 
@@ -65,11 +65,36 @@ file**, as `wnba/sources.py::_strict_artifact_path` already did. New
 `wnba/cards.py` depend on it and several carry the workarounds above; they need
 revisiting deliberately, not sweeping. Tests: `tests/test_wnba_grader_root_per_file.py`.
 
-**NOT DEPLOYED. Deploy-readiness reported to the lead, not acted on.**
+#### BEFORE REVERTING THIS, READ THIS. The empirical case is stronger than the structural one
 
-**This does NOT by itself produce graded rows** — see `#310`. With the root
-correct, `available: false` becomes attributable to the recon dependency instead
-of to the wrong directory, which is the point.
+Everything above is the *structural* argument — producer and consumer resolve
+differently, therefore resolve per file. That argument is correct and it is
+**not** the reason to keep this. The reason is that **WNBA's real artifact
+history is physically split across both roots by era**, measured on production
+2026-08-09 20:01Z once the `#310` allowlist made the files visible:
+
+```
+wnba_source/data/processed/                     recon_props_2026-05-20 .. 05-25
+wnba_source/source_artifacts/data/processed/    recon_props_2026-05-27 .. 06-26
+                                                recon_games_2026-05-27, 05-28,
+                                                             06-21, 06-23
+```
+
+**No single-root choice can read both sets.** Whichever root a one-shot
+heuristic picks, it is blind to one era of this sport's own data — so per-file
+resolution is not a defensive improvement over `roots[0]`, it is **the only
+thing that can read WNBA at all.** A future reader weighing a revert needs this
+paragraph, not the paragraph above it.
+
+**DEPLOYED 2026-08-09.** refresh-worker `8ef48371` 19:49:12Z, web `04e41842`
+19:57:12Z. Both manual, no `render.yaml` change, no blueprint sync.
+
+**This does NOT by itself produce graded rows, and after the `#310` probe that is
+no longer a caveat but a measured fact.** WNBA boxscore ingestion stopped
+**2026-05-24** and the recon builders have been unreachable since, so the grader
+still reads zero. **A fix that makes a defect visible is not a fix for the
+defect.** `#309` and `#310` were both prerequisites for the question being
+askable; `#314` owns the cure.
 
 ### #310 — ANSWERED (probe run 2026-08-09 20:01Z). The instrument built to diagnose this measured the wrong six files, and two dead `_has_files` helpers are why the fix took the shape it did
 
