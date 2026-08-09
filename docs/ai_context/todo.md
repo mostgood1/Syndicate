@@ -67,11 +67,129 @@ Also resolved tonight: the L2-A shortlist is **not** empty (145 rows), closing
 the "necessary but maybe not sufficient" caveat on the `SYNDICATE_BOARD_L2A_ENABLED`
 flag move.
 
-**D. RESERVED, STUBS OWED:** `#315` (the state loop's configured 60s interval
-vs its measured 15m35s cadence — a live board cannot run on a full-world
-recompute), `#316` (`SKIP_OVERSIZED_LEDGER_CHUNK`: four days' evaluation ledger
-chunks at 132MB–480MB against a 64MB ceiling — the feedback loop starved at its
-input). `#317` is written below.
+**D. STUBS NOW WRITTEN** — `#315`, `#316` below; `#298`/`#300`/`#303`/`#305`
+recovered below; `#317` written by its lane below.
+
+### #315 — OPEN. The board's refresh interval is decorative: configured 60s, measured 15m35s. A live toggle cannot run on this
+
+`SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS = 60` on refresh-worker.
+Observed snapshot writes 2026-08-09: 19:23:22Z → 19:38:57Z = **15m35s apart**.
+The loop *ticks* every 60s; a full state computation takes ~15 minutes, so the
+loop is saturated and never finishes inside its own window. **The setting is not
+the constraint — the full-world recompute is**, so tuning the env var changes
+nothing.
+
+Tolerable for a pregame board. **Unusable for the North Star plan's live
+toggle**, which is the reason this is an item and not a note. Needs incremental
+update — recompute what changed — not a whole-world rebuild on a timer. Real
+work, not a config fix.
+
+⚠️ **This interacts with `#317`.** A 15-minute cycle means a board that fails to
+land is stale for 15 minutes before anyone can even observe the next attempt,
+and it means every diagnostic window shorter than ~15 min can miss an entire
+cycle. That is exactly how this audit's own "the persist is never reached" claim
+was produced — see the correction in `#317`.
+
+### #316 — OPEN. The evaluation ledger is skipped wholesale: four days' chunks at 132MB–480MB against a 64MB ceiling
+
+Measured on refresh-worker 2026-08-09 19:59:36Z, four consecutive lines:
+
+```
+[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path=2026-08-08.jsonl bytes=132000551 ceiling=64000000
+[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path=2026-08-07.jsonl bytes=321685236 ceiling=64000000
+[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path=2026-08-06.jsonl bytes=480112146 ceiling=64000000
+[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path=2026-08-05.jsonl bytes=367229260 ceiling=64000000
+```
+
+**The feedback loop starved at its input**, and unlike most of today's failures
+this one says so loudly — the guard is correct and instrumented; it is the
+*input* that is wrong. 2 to 7.5× over the ceiling, and **growing** (08-06 is
+480MB). This is an accumulator: something appends per cycle without bound.
+
+Two questions before any fix, in order: **why is a day's ledger 480MB** (find
+what appends), and **is a 64MB ceiling right** given what the evaluator needs.
+Do not raise the ceiling first — that is the shape of `#241` and of the 900MB
+floor guarding a 1873MB stage. Note `ADJUSTED_SCORES_ATTACHED evaluation_records=909`
+in the same cycle, so *something* reaches the evaluator; the skip is not total,
+which makes the degradation partial and invisible rather than loud.
+
+Related, not the same: `#314` (WNBA boxscore ingestion stopped 2026-05-24) is
+the feedback loop starved at a *different* input.
+
+### #298/#300 — SHIPPED `0071dbf9`, recovered by the list audit. An unknown game state must FAIL the staleness floor, not skip it
+
+`game_state_of` resolved the ambiguous rest to `pregame`, and `build_layer2_rows`
+set `game_state`/`is_live` only inside `if game:`. So a row whose teams never
+matched a chip carried neither, read as pregame, and was **exempted from the
+staleness rules rather than failing them.** A failed join silently became a
+relaxed rule — the guard cannot reject what it cannot see.
+
+Measured 2026-08-09 15:29Z: **12 of 200 displayed rows (6.0%)**, all soccer, all
+one match, every one for a match already 48 minutes old — four of them
+`player_first_goal_scorer`, a market a single goal settles or reprices
+violently. mlb 0/100 and wnba 0/70 were clean.
+
+**Scoped to the measured harm, not the category.** The first version demoted
+every row with no confirmed state, which would have taken the 146-of-230
+population of far-out fixtures — those have no chip yet and resolving them to
+`pregame` is *correct*, because they genuinely have not started. The rule is now
+"no confirmed state **AND** its own kickoff has passed", where `pregame` is not
+a default but a false claim. An unreadable or missing `commence_time` returns
+the conservative answer: this gates a demotion, so an unparseable clock is not
+evidence a game is under way.
+
+This is the canonical instance of **"unknown must not map to the permissive
+branch"** — see Operational notes.
+
+### #303 — MEASURED, and it WITHDREW an alarm. OddsAPI burn is 0.29× its own hours' norm, not 3.4× above it
+
+Recovered by the list audit: this existed **only in commit `4cf0f58a`**, and it
+bears on the 5M call budget. Neither the alarm nor its retraction was ever in
+this file.
+
+Sampled `latest.used` five times over 35.6 minutes, keyed on **`observedAt`
+rather than read time**:
+
+```
+03:40:13 -> 04:04:38   +108 cr / 24.4 min = 265 cr/h
+04:04:38 -> 04:05:44   + 14 cr /  1.1 min = 764 cr/h
+04:05:44 -> 04:11:22   + 54 cr /  5.6 min = 575 cr/h
+04:11:22 -> 04:15:51   + 40 cr /  4.5 min = 535 cr/h
+OVERALL                +216 cr / 35.6 min = 364 cr/h
+```
+
+**The single-sample comparison is not the argument — the internal inconsistency
+is**, and it does not depend on trusting any one interval:
+
+| | |
+|---|---|
+| window mean | **3.4×** the 12-day daily average |
+| same clock hours now | **0.29×** the 12-day norm for those hours |
+
+The 155% window is contaminated; the 19.4-day figure is **withdrawn**. Also
+recorded there: §4d's `us2` price rests on a **stale book map**.
+
+### #305 — SHIPPED `802b36a4`, recovered by the list audit. Corrections from coordination, incl. the `#299` reframing that changes the fix
+
+Four things corrected after review by the coordinating session and the
+L2-A/settlement lane; three changed a conclusion, not a wording.
+
+**`#299` is NOT "the join discards `event_id`".** Corrected: grepping
+`event_id|game_id|game_pk` in `graded_outcomes.py` returns **no matches**, and
+`GRADED_OUTCOME_FIELDS` has no event identifier at all. MLB's graded side
+carries `game_pk` (StatsAPI); the record side carries an OddsAPI hash. **Nothing
+is thrown away — the two sides were never given a common identifier**, and the
+ids they do have are in different namespaces. A design gap needing a
+`game_pk ↔ event_id` bridge, not an omission needing a one-liner. The bridge
+already exists implicitly in the chip join and is never exposed to settlement.
+
+That also demotes "NCAAF discards the CFBD id" from a second fix to **evidence
+for the first**: emitting it would bridge nothing, because CFBD is a *third*
+namespace.
+
+**DO NOT ADD `market` TO THE GRADED KEY SET.** Only identifier-shaped keys are
+safe in a value-intersection join; `h2h` is shared by every row of that type, so
+a record would match a graded row for a **different game**.
 
 ### #317 — ROOT CAUSE, the board that computes and never lands: the persist RUNS, and **both** of its transports fail. The worker's own publish OOM-kills the web service it is publishing to
 
