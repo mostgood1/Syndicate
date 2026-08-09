@@ -274,10 +274,30 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "soccer_source/*/api/odds/game_odds_current.csv",
     "soccer_source/*/props/*.csv",
     "soccer_source/*/api/picks/picks_*.csv",
-    # Note: reports/intelligence/board_snapshot.json and intelligence_state.json are
-    # intentionally excluded here. They're written through refresh_state_store's
-    # write_json_file, which already goes over the shared keyvalue (Redis) backend on
-    # Render, so all three services see them without needing this HTTP push at all.
+    # CORRECTED 2026-08-08. This note used to read: "reports/intelligence/
+    # board_snapshot.json and intelligence_state.json are intentionally excluded
+    # here. They're written through refresh_state_store's write_json_file, which
+    # already goes over the shared keyvalue (Redis) backend on Render, so all
+    # three services see them without needing this HTTP push at all."
+    #
+    # BOTH HALVES ARE FALSE, and believing either one costs a board.
+    #
+    # `intelligence_state.json` IS in this list (see #43's entries above) and the
+    # HTTP push is currently the ONLY way a rich board reaches web at all.
+    #
+    # And neither file fits the keyvalue store. Measured in production
+    # 2026-08-08: intelligence_state 27,420,309 bytes and board_snapshot
+    # 33,524,880 bytes, against an 8,388,608 ceiling -- rejected on every cycle.
+    # `board_snapshot` is genuinely still excluded, but for the opposite reason
+    # to the one stated: not because keyvalue carries it, but because web's only
+    # reader of it (`read_json_file(BOARD_SNAPSHOT_PATH)`) consults the keyvalue
+    # store and never looks at disk, so an entry here would push ~33.5MB every
+    # cycle to a file nothing reads. Allowlisting PERMITS a transfer; it does not
+    # make a reader. Add the entry with a disk-consulting read, not before.
+    #
+    # (It is also a near-duplicate: its `response` key is the whole state, and
+    # its top-level `board_contract` is a second copy of the 6.54MB already
+    # inside that -- so it carries nothing intelligence_state_<date>.json lacks.)
     #
     # #112: odds_history's per-shard payload is ALSO written through
     # write_json_file/the keyvalue backend by default -- but it can exceed the
