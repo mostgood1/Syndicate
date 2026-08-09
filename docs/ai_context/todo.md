@@ -758,6 +758,61 @@ question, since a curated list at least fails loudly while a presence check
 against the wrong disk fails silently forever.
 
 
+#### `#276` CORRECTION — the repair-pass false-present is NOT long-standing. It dates to `c9fbb736`, 21:31Z tonight
+
+My addendum above said the repair pass concluded soccer's schedule was present
+"every cycle, forever". **That is wrong, and the soccer lane caught it.** Checked
+against the commit rather than assumed:
+
+```
+BEFORE c9fbb736   schedule_path -> _api_root(league) -> _source_roots()[0]
+                  the RUNTIME DISK ONLY -> is_file() False -> repair REQUESTED it
+AFTER  c9fbb736   schedule_path -> _api_read_path -> "first root that HAS it"
+                  repo fallback included -> is_file() True -> repair SKIPS it
+```
+
+So the repair pass was **working correctly for soccer's schedule until 21:31Z on
+2026-08-08**, and `c9fbb736` — a correct fix for a different problem, making
+git-shipped artifacts reachable when the mounted disk never received them — is
+what fed it a repo path in exactly the case the repair pass exists to handle.
+
+**Scope, measured rather than assumed:** in the same test the other six required
+artifacts (MLB/WNBA) resolved correctly under the data root and were requested;
+only the soccer schedule was skipped. So the observed false-present was
+**soccer-schedule-only**, not platform-wide. `e92f0529`'s fix is still right and
+still worth having — judging presence at `(data_root / relative)` is robust to
+whatever any helper returns, rather than merely compatible with today's helpers —
+but it should be recorded as **hardening plus a one-file regression fix**, not as
+the repair of a long-standing platform defect.
+
+**`#293`'s audit is still warranted** and its shape is unchanged: all five soccer
+read helpers (schedule, recommendations, live_state, picks, rosters) now return
+"first root that has it", so anything else in the codebase judging presence from
+a soccer `sources.py` path has the same false-present.
+
+**THE PATTERN, and it is the third instance in one evening** — credit to the
+soccer lane for naming it: *repairing a path switches off something that was
+quietly depending on that path being broken.*
+
+| what was repaired | what silently depended on it staying broken |
+|---|---|
+| `game.state` populated for soccer rows | the stale-kickoff guard keyed on `game.state` being ABSENT |
+| soccer sims made to do real work | the contract retry loop was harmless only while sims died in 2s |
+| soccer reads made to see the repo copy | the repair pass was correct only while the helper COULDN'T see it |
+
+**The dependency is never written down, because nobody writes down "this works
+because that other thing is broken."** Before repairing a read path, grep for
+what asks a *presence* question about it — the guard is invisible until you make
+the data present. (Same lesson as the `None`-was-load-bearing entry earlier in
+this file, now with three instances rather than one.)
+
+**METHOD:** I dated a defect from a repro (`SYNDICATE_DATA_ROOT` empty) that
+cannot distinguish "always broken" from "broken since tonight", and wrote
+"forever" anyway. The check that settles it is one `git show <sha>^:<file>` and I
+did not run it until someone else asked. **A repro proves the defect exists; only
+history dates it.**
+
+
 ### #286 — ROOT CAUSE, MLB `candidate_count = 0`: the empty-board guard is BLIND to a board too big for keyvalue. Fixed, committed, NOT deployed
 
 **ID note:** taken as #286 rather than #269 deliberately, before central
