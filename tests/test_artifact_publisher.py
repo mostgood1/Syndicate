@@ -1916,3 +1916,95 @@ class StreamedPublishSenderTests(unittest.TestCase):
 
             self.assertFalse(result)
             self.assertEqual(len(calls), 1)
+
+
+class ArtifactExportNamesOnlyTests(unittest.TestCase):
+    """`?names_only=1` returns an inventory, not bodies.
+
+    THE INCIDENT: at 2026-08-08T21:29:41Z a lane called
+    /api/ops/artifacts/export?pattern=reports/intelligence/intelligence_state*.json&names_only=1
+    and web returned 30,308,015 bytes. The parameter DID NOT EXIST -- Flask
+    ignores unknown query args, so it ran as a full-body export while its author
+    believed the flag was protecting them. 30MB through the 2Gi web service from
+    a query that was meant to list filenames.
+    """
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def _seed(self, tmp_dir: str) -> bytes:
+        body = json.dumps({"rows": ["x" * 256] * 400}).encode("utf-8")
+        target = Path(tmp_dir) / HOT_RELATIVE_PATH
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(body)
+        return body
+
+    def test_names_only_returns_sizes_and_not_content(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            body = self._seed(tmp_dir)
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_DATA_ROOT": tmp_dir, "ADMIN_TOKEN": "secret-token"},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/artifacts/export?names_only=1",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+            self.assertEqual(response.status_code, 200)
+            payload = response.get_json()
+            self.assertTrue(payload["names_only"])
+            entry = payload["artifacts"][HOT_RELATIVE_PATH]
+            self.assertEqual(entry["bytes"], len(body))
+            self.assertIn("mtime", entry)
+            # The whole point: the body must not be in the response at all.
+            self.assertNotIn("rows", response.get_data(as_text=True))
+            self.assertLess(len(response.get_data()), len(body))
+
+    def test_the_body_carrying_form_is_unchanged(self) -> None:
+        """Without the flag, the endpoint still returns content -- this fix must
+        not quietly change what existing callers (the puller) receive."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self._seed(tmp_dir)
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_DATA_ROOT": tmp_dir, "ADMIN_TOKEN": "secret-token"},
+                clear=False,
+            ):
+                response = self.client.get(
+                    "/api/ops/artifacts/export",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+            payload = response.get_json()
+            self.assertNotIn("names_only", payload)
+            self.assertIn("rows", payload["artifacts"][HOT_RELATIVE_PATH])
+
+    def test_names_only_honours_the_pattern_filter(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            self._seed(tmp_dir)
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_DATA_ROOT": tmp_dir, "ADMIN_TOKEN": "secret-token"},
+                clear=False,
+            ):
+                matching = self.client.get(
+                    "/api/ops/artifacts/export?names_only=1&pattern=wnba_source/*",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+                non_matching = self.client.get(
+                    "/api/ops/artifacts/export?names_only=1&pattern=nhl_source/*",
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+            self.assertEqual(matching.get_json()["count"], 1)
+            self.assertEqual(non_matching.get_json()["count"], 0)
+
+    def test_names_only_still_requires_the_admin_token(self) -> None:
+        """Widening what can be asked cheaply must not widen who may ask."""
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.get(
+                "/api/ops/artifacts/export?names_only=1",
+                headers={"Authorization": "Bearer wrong-token"},
+            )
+        self.assertEqual(response.status_code, 401)
