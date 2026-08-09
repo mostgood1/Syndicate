@@ -1,5 +1,152 @@
 # Syndicate TODO — canonical cross-session list
 
+### #309 — FIX WRITTEN, NOT DEPLOYED. WNBA graded 0 rows because the grader read a different root than the producer writes. `17d4f203` is DEPLOYED AND INERT
+
+Full trace: `docs/ai_context/diagnosis_grader_coverage_wnba.md`.
+
+**The correction that matters most, because the register and
+`betting_contract_lifecycle.md` §7 both carry the wrong version:** `17d4f203`
+was recorded as *"fixed, NOT DEPLOYED"*. **Both halves are wrong.**
+
+```
+git merge-base --is-ancestor 17d4f203 27a7e9df   ->  true
+web            live 2026-08-09T16:41:43Z trigger=api commit=27a7e9df
+refresh-worker live 2026-08-09T16:41:10Z trigger=api commit=27a7e9df
+```
+
+It is running, and it changes nothing. It replaced `roots[0]` with "first root
+that HAS files" via `any(candidate.iterdir())`, and **root1 holds 427 files on
+production** (`?names_only=1`), so the check short-circuits True on the first
+candidate and the behaviour is byte-identical to what it replaced. **This holds
+regardless of deploy state**, so it was never a deploy away from working. The
+commit's claim that *"the root-order fix ALONE is sufficient"* is refuted.
+
+> **"Does this directory contain anything" is not "does it contain the file you
+> asked for."** That sentence generalises past WNBA and is the whole finding.
+
+**The real cause**, live env-vars identical on web and refresh-worker:
+
+| | resolver | resolves to |
+|---|---|---|
+| PRODUCER | `refresh_odds_sources._local_source_artifact_root("wnba")` → `SYNDICATE_DATA_ROOT/wnba_source`, then writes `artifact_root/data/processed` | `wnba_source/data/processed` |
+| CONSUMER | `graded_outcomes._wnba_graded_rows_for_date` → `processed_root()` → `preferred_artifact_roots(...)[0]` | `wnba_source/source_artifacts/data/processed` |
+
+`SYNDICATE_WNBA_SOURCE_ROOT`'s basename is not `source_artifacts`, so
+`preferred_artifact_roots` appends the `source_artifacts` variant **first**.
+`/api/ops/wnba/artifact-counts?date=2026-08-08` `[live]`: `game_cards`,
+`props_recommendations`, `recommendations_slate` all False at root1, True at
+root2. `/wnba/api/market-accuracy` returns `games.available false, props.available
+false` for 08-05/06/08 — the `{"available": False}` early return, i.e. 0 rows.
+
+**WNBA-only, and the reason is one function choice.**
+`current_odds_root_for_sport` uses `preferred_artifact_roots` for wnba and
+`preferred_source_roots` for nba/nhl. Only the former injects a `source_artifacts`
+variant. **nba and nhl are correct by construction.** `17d4f203` was right to
+scope to WNBA and wrong about why.
+
+**A different lane found this 2026-08-01 and worked around it** rather than
+fixing it: `cards.py:3878` documents the exact defect, and
+`_game_cards_keyvalue_path` hardcodes the other root outright. Every WNBA
+consumer debugged so far carries its own workaround. **The grader is the one that
+never got one, so it is the one that reads zero.**
+
+**Fix written:** `live_lens_local._artifact_path` now accepts a single root
+(unchanged for nba/nhl) **or** an ordered candidate list resolved **per requested
+file**, as `wnba/sources.py::_strict_artifact_path` already did. New
+`wnba.sources.processed_roots()`; `market_accuracy` and the grader use it.
+`processed_root()` is **deliberately left alone** — ~20 call sites in
+`wnba/cards.py` depend on it and several carry the workarounds above; they need
+revisiting deliberately, not sweeping. Tests: `tests/test_wnba_grader_root_per_file.py`.
+
+**NOT DEPLOYED. Deploy-readiness reported to the lead, not acted on.**
+
+**This does NOT by itself produce graded rows** — see `#310`. With the root
+correct, `available: false` becomes attributable to the recon dependency instead
+of to the wrong directory, which is the point.
+
+### #310 — OPEN. The instrument built to diagnose this measured the wrong six files, and two dead `_has_files` helpers are why the fix took the shape it did
+
+**`/api/ops/wnba/artifact-counts` was purpose-built for exactly the `#309`
+defect, and of the six files it checked, ONE (`props_recommendations`) is
+something the grader reads.** Both `recon_*` files — which gate
+`{"available": False}` and therefore decide whether anything is graded at all —
+were absent from the list. `props_edges` / `props_predictions` are checked, look
+alarming when absent, and **are never read by the grader**.
+
+So *"0 of 6 families"*, the measurement `17d4f203` rests on, **is a true
+measurement of the wrong six files.** An instrument purpose-built for a defect,
+answering a neighbouring question. This corrects a premise that was passed to the
+grader-coverage lane as a blocker: the absence of `props_edges`/`props_predictions`
+does not affect grading.
+
+**The grader needs four files in two gated pairs** (`live_lens_local.py:347,480`)
+— either side missing ⇒ `{"available": False}` ⇒ zero rows:
+
+```
+games:  recommendations (or recommendations_sim)  +  recon_games
+props:  props_recommendations                     +  recon_props
+```
+
+and both `recon_*` are built from **`boxscores_{date}.csv`**
+(`_build_local_recon_{games,props}_artifact` return `(0, None)` without it).
+
+**Done here:** the endpoint now checks the grader's real inputs first and reports
+`grader_readiness` per pair plus `boxscores_present`, so "can this date be graded"
+is answered directly instead of being reassembled from six independent booleans.
+Exercised locally: `recommendations true, props_recommendations true,
+boxscores_present true, recon_games false, recon_props false` — attributable.
+
+**Second defect in the same instrument, found while verifying the first.**
+`repo_root_from` is hardcoded to `parents[3]`, correct only for modules three
+packages deep. `ops.py` is two, so `preferred_artifact_roots(__file__, ...)` from
+there resolved local-mirror candidates to **the directory above the repo** and
+every file read `exists: false`. **Masked in production because
+`SYNDICATE_WNBA_SOURCE_ROOT` is set** (verified live — the endpoint reported
+correct `/opt/render/project/data/...` paths throughout), so it only fires where
+that env var is absent, and there it reports a confident, uniform *"everything is
+missing"* from the endpoint someone reaches for to find out what is missing.
+Fixed for the three WNBA endpoints by asking the WNBA module for its own roots.
+
+> **RIDER, NOT TAKEN — other lanes' sports.** `repo_root_from`'s `parents[3]` is
+> also wrong for `features/intelligence.py` (depth 2) and the three
+> `features/football/ingestion/*` modules (depth 4). Not swept: masked wherever
+> an env var is set, and a sweep is how a fix for one sport becomes an outage for
+> another. Needs its own owner and its own measurement.
+
+**Dead code removed.** `_has_files()` was defined in **both**
+`preferred_source_roots` and `preferred_artifact_roots` and **called in neither**
+— dead code shaped exactly like the guard every reader assumes is in place.
+Plausibly why `17d4f203` hand-rolled `any(iterdir())`: reimplementing a helper
+already present, already unused, already the wrong test.
+
+**Allowlist addition, DIAGNOSTIC.** `recon_games_*`, `recon_props_*` and dated
+`boxscores_*` were in no `HOT_ARTIFACT_PATTERNS` entry (only the *undated*
+`boxscores_history.csv`), so they could never cross services or be inventoried
+from web. **An export returning nothing for them was an allowlist artifact, not
+evidence of absence** — stated because this lane could not otherwise prove
+whether WNBA's zero is a missing producer or a missing join. Added **WNBA-only**,
+glob `boxscores_2*` so it never takes the ~20MB history file; a `*_source/`
+wildcard would pull NBA's and NHL's in too and web already OOMs at 2Gi (`#302`).
+
+**Carrying `#208`'s lesson explicitly, per the lead:** allowlisting **permits** a
+transfer, it does not **make** one happen.
+- *What should change:* after the next WNBA refresh cycle writes them,
+  `?names_only=1&pattern=*wnba_source/data/processed/recon_*` should return a
+  non-empty listing on web.
+- *What would prove it did:* that listing being non-empty. **If it stays empty
+  AND `artifact-counts` reports `boxscores_present: true` with
+  `recon_games: false` for the same date, the files are genuinely not being
+  produced** — the builders had their precondition and wrote nothing — which is a
+  producer defect, not a visibility one. The two are otherwise indistinguishable.
+
+**Open, and the reason this is not closed:** whether the recon files exist on
+refresh-worker's disk is still unmeasured. **Do not use the local checkout to
+answer it** — the mirror copies `recon_*` for the single `-Date` it was invoked
+with while sweeping `boxscores_` over a window, so "41 boxscores, 0 recon" locally
+is **weak evidence, not strong**, and this lane nearly reported it as strong.
+
+**NOT DEPLOYED.**
+
 ### #285 — OPEN. The worker's retained memory is NOT in the Python object graph, and `HEAP_CENSUS` cannot see 93% of it
 
 First result on the ratchet isolated in `#290`. **Nothing shipped — both candidate

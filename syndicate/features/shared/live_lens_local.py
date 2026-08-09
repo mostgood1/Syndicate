@@ -7,13 +7,43 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs
 
 
-def _artifact_path(root: Path, filename: str) -> Path:
-    return root / filename
+# `#309`. Accepts EITHER a single root (unchanged behaviour, which is what nba
+# and nhl pass) OR an ordered list of candidate roots, in which case the file is
+# resolved PER REQUESTED FILE rather than by picking one root up front.
+#
+# The distinction this encodes, measured live on WNBA 2026-08-09:
+# **"does this directory contain anything" is not "does it contain the file you
+# asked for."** `17d4f203` fixed `current_odds_root_for_sport("wnba")` to return
+# the "first root that HAS files" via `any(candidate.iterdir())`, and that check
+# short-circuits True on a root holding 427 stale files while every artifact for
+# the requested date sits on the next candidate. Deployed (ancestor of the live
+# `27a7e9df`) and byte-identical to the `roots[0]` it replaced.
+#
+# `wnba/sources.py::_strict_artifact_path` already resolves correctly and is the
+# model: ask each candidate for THE FILE, not for its emptiness.
+#
+# Falling back to the first candidate when nothing matches keeps the reported
+# path stable, so a genuinely absent artifact names the same location it always
+# did rather than a new and different-looking one.
+def _artifact_path(root: Path | Sequence[Path], filename: str) -> Path:
+    if isinstance(root, Path):
+        return root / filename
+    candidates = [Path(candidate) / filename for candidate in root]
+    if not candidates:
+        raise ValueError("_artifact_path requires at least one candidate root")
+    for candidate in candidates:
+        try:
+            if candidate.is_file():
+                return candidate
+        except OSError:
+            continue
+    return candidates[0]
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -344,7 +374,7 @@ def _apply_accuracy_result(bucket: dict[str, Any], result: str | None, price: An
     bucket["profit_total"] += float(profit)
 
 
-def _score_market_games_day(root: Path, date_str: str) -> dict[str, Any]:
+def _score_market_games_day(root: Path | Sequence[Path], date_str: str) -> dict[str, Any]:
     rec_rows = _read_csv_rows(_artifact_path(root, f"recommendations_{date_str}.csv"))
     if not rec_rows:
         rec_rows = _read_csv_rows(_artifact_path(root, f"recommendations_sim_{date_str}.csv"))
@@ -477,7 +507,7 @@ def _pick_top_play(plays: list[dict[str, Any]]) -> dict[str, Any] | None:
     return candidates[0] if candidates else None
 
 
-def _score_market_props_day(root: Path, date_str: str) -> dict[str, Any]:
+def _score_market_props_day(root: Path | Sequence[Path], date_str: str) -> dict[str, Any]:
     props_rows = _read_csv_rows(_artifact_path(root, f"props_recommendations_{date_str}.csv"))
     recon_rows = _read_csv_rows(_artifact_path(root, f"recon_props_{date_str}.csv"))
     if not props_rows or not recon_rows:
@@ -554,7 +584,9 @@ def _score_market_props_day(root: Path, date_str: str) -> dict[str, Any]:
     }
 
 
-def build_local_market_accuracy_payload(query_string: str, artifact_root: Path) -> dict[str, Any] | None:
+def build_local_market_accuracy_payload(
+    query_string: str, artifact_root: Path | Sequence[Path]
+) -> dict[str, Any] | None:
     params = parse_qs(query_string or "", keep_blank_values=True)
     date_list = _parse_single_or_window(params, default_days=30)
     if not date_list:

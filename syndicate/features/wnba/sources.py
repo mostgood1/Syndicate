@@ -39,6 +39,29 @@ def processed_root() -> Path:
     return current_odds_root_for_sport("wnba")
 
 
+def processed_roots() -> list[Path]:
+    """Every candidate processed root, in preference order, for callers that can
+    resolve PER REQUESTED FILE.
+
+    `#309`. `processed_root()` has to pick one directory up front and gets it
+    wrong in production: measured 2026-08-09, it returns
+    `.../wnba_source/source_artifacts/data/processed` while the refresh pipeline
+    writes `.../wnba_source/data/processed`. Both roots exist and both hold
+    files, so no single-root heuristic can tell them apart -- `any(iterdir())`
+    answers "does this directory contain anything", which is True for the wrong
+    one (427 files, none for the requested date).
+
+    Deliberately ADDITIVE. `processed_root()` keeps its exact behaviour because
+    ~20 call sites in `wnba/cards.py` depend on it, several of which already
+    carry their own hand-rolled workarounds for this same defect (see
+    `cards.py:3878`, and `_game_cards_keyvalue_path` which hardcodes the other
+    root outright). Changing the shared accessor underneath them would silently
+    re-point every one of those; they need to be revisited deliberately, not
+    swept.
+    """
+    return [(root / "data" / "processed").resolve() for root in _source_roots()]
+
+
 def _strict_artifact_path(filename: str, subdir: tuple[str, ...]) -> Path:
     roots = _source_roots()
     for root in roots:

@@ -1708,8 +1708,8 @@ def api_ops_wnba_artifact_counts() -> Any:
     if not date:
         return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
     try:
-        from syndicate.features.shared.source_roots import preferred_artifact_roots
         from syndicate.features.wnba.sources import processed_root as wnba_processed_root
+        from syndicate.features.wnba.sources import processed_roots as wnba_processed_roots
     except Exception as exc:
         return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
 
@@ -1717,15 +1717,58 @@ def api_ops_wnba_artifact_counts() -> Any:
     # root whether or not that location actually has anything written to it,
     # so report every candidate root's status rather than just the first one
     # -- that mismatch is exactly what made this endpoint necessary.
-    candidate_roots = [
-        candidate / "data" / "processed"
-        for candidate in preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
+    # `#310`. Ask the WNBA module for its own roots (`processed_roots()`, which
+    # calls `preferred_artifact_roots` with `wnba/sources.py`'s `__file__`)
+    # instead of resolving them from THIS file.
+    #
+    # `repo_root_from` is hardcoded to `parents[3]`, which is only correct for
+    # modules three packages deep. `ops.py` is two, so passing `__file__` from
+    # here resolved the local-mirror candidates to the directory ABOVE the repo
+    # and every file read `exists: false`.
+    #
+    # It is masked in production because `SYNDICATE_WNBA_SOURCE_ROOT` is set,
+    # so `preferred_artifact_roots` takes its env branch and never touches
+    # `repo_root` -- verified live 2026-08-09, this endpoint reported correct
+    # `/opt/render/project/data/...` paths throughout. **The failure only
+    # appears where that env var is absent, and there it reports a confident,
+    # uniform "everything is missing".** That is the worst possible behaviour
+    # for the endpoint someone reaches for to find out what is missing.
+    candidate_roots = wnba_processed_roots()
+    # `#310`. THE GRADER'S INPUTS COME FIRST, and they were absent from this
+    # list entirely until now.
+    #
+    # This endpoint was built specifically to diagnose WNBA grading a zero, and
+    # of the six files it originally checked, exactly ONE
+    # (`props_recommendations`) is something the grader reads. Both `recon_*`
+    # files -- which gate `{"available": False}` and therefore decide whether any
+    # row is graded at all -- were not checked. `props_edges` and
+    # `props_predictions` are checked, look alarming when absent, and **are
+    # never read by the grader**.
+    #
+    # So "0 of 6 families" was a true measurement of the wrong six files, and
+    # `17d4f203` was built on it. An instrument purpose-built for a defect,
+    # answering a neighbouring question.
+    #
+    # `_score_market_games_day` / `_score_market_props_day` (live_lens_local.py)
+    # read these in two gated PAIRS -- either side of a pair missing yields
+    # `{"available": False}` and zero graded rows:
+    #     games: recommendations   (or recommendations_sim)  +  recon_games
+    #     props: props_recommendations                       +  recon_props
+    # and both recon files are BUILT from `boxscores_{date}.csv`
+    # (refresh_wnba_oddsapi_props._build_local_recon_{games,props}_artifact,
+    # which return (0, None) without it), so it is listed too.
+    grader_input_names = [
+        f"recommendations_{date}.csv",
+        f"recommendations_sim_{date}.csv",
+        f"recon_games_{date}.csv",
+        f"props_recommendations_{date}.csv",
+        f"recon_props_{date}.csv",
+        f"boxscores_{date}.csv",
     ]
-    file_names = [
+    file_names = grader_input_names + [
         f"game_cards_{date}.csv",
         f"props_edges_{date}.csv",
         f"props_predictions_{date}.csv",
-        f"props_recommendations_{date}.csv",
         f"props_recommendations_top_by_game_{date}.json",
         f"recommendations_slate_{date}.json",
     ]
@@ -1736,12 +1779,41 @@ def api_ops_wnba_artifact_counts() -> Any:
             for root in candidate_roots
         ]
 
+    def _resolves_anywhere(file_name: str) -> bool:
+        return any(bool(entry.get("exists")) for entry in results.get(file_name) or [])
+
+    # `#310`. Answer the question the caller actually has -- "can this date be
+    # graded" -- instead of leaving them to reassemble it from a file list.
+    # Reported per PAIR because that is how the grader gates: either side
+    # missing yields `{"available": False}`, and a reader looking at six
+    # independent booleans has no way to know that.
+    games_pair = {
+        "recommendations": _resolves_anywhere(f"recommendations_{date}.csv") or _resolves_anywhere(f"recommendations_sim_{date}.csv"),
+        "recon_games": _resolves_anywhere(f"recon_games_{date}.csv"),
+    }
+    props_pair = {
+        "props_recommendations": _resolves_anywhere(f"props_recommendations_{date}.csv"),
+        "recon_props": _resolves_anywhere(f"recon_props_{date}.csv"),
+    }
+    grader_readiness = {
+        "games": {**games_pair, "gradeable": all(games_pair.values())},
+        "props": {**props_pair, "gradeable": all(props_pair.values())},
+        # The recon builders' own precondition. If this is present and the recon
+        # files are not, the builder had what it needed and still produced
+        # nothing -- which is a DIFFERENT defect from missing inputs and the two
+        # are otherwise indistinguishable.
+        "boxscores_present": _resolves_anywhere(f"boxscores_{date}.csv"),
+        "note": "resolved per requested file across every candidate root (`#309`), not against processed_root alone",
+    }
+
     return jsonify(
         {
             "ok": True,
             "date": date,
             "processed_root": str(wnba_processed_root()),
             "candidate_roots": [str(root) for root in candidate_roots],
+            "grader_input_files": grader_input_names,
+            "grader_readiness": grader_readiness,
             "results": results,
         }
     )
@@ -1763,15 +1835,28 @@ def api_ops_wnba_live_lines_export_diag() -> Any:
     # write) -- this is the only way to observe whether that step's
     # _export_live_snapshot_artifacts call actually ran and what it wrote.
     try:
-        from syndicate.features.shared.source_roots import preferred_artifact_roots
         from syndicate.features.wnba.sources import processed_root as wnba_processed_root
+        from syndicate.features.wnba.sources import processed_roots as wnba_processed_roots
     except Exception as exc:
         return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
 
-    candidate_roots = [
-        candidate / "data" / "processed"
-        for candidate in preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
-    ]
+    # `#310`. Ask the WNBA module for its own roots (`processed_roots()`, which
+    # calls `preferred_artifact_roots` with `wnba/sources.py`'s `__file__`)
+    # instead of resolving them from THIS file.
+    #
+    # `repo_root_from` is hardcoded to `parents[3]`, which is only correct for
+    # modules three packages deep. `ops.py` is two, so passing `__file__` from
+    # here resolved the local-mirror candidates to the directory ABOVE the repo
+    # and every file read `exists: false`.
+    #
+    # It is masked in production because `SYNDICATE_WNBA_SOURCE_ROOT` is set,
+    # so `preferred_artifact_roots` takes its env branch and never touches
+    # `repo_root` -- verified live 2026-08-09, this endpoint reported correct
+    # `/opt/render/project/data/...` paths throughout. **The failure only
+    # appears where that env var is absent, and there it reports a confident,
+    # uniform "everything is missing".** That is the worst possible behaviour
+    # for the endpoint someone reaches for to find out what is missing.
+    candidate_roots = wnba_processed_roots()
     results = [
         {
             "root": str(root),
@@ -1798,15 +1883,28 @@ def api_ops_wnba_live_lines_raw() -> Any:
         return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
     try:
         from syndicate.features.shared.refresh_state_store import read_text_file as _state_read_text
-        from syndicate.features.shared.source_roots import preferred_artifact_roots
         from syndicate.features.wnba.sources import processed_root as wnba_processed_root
+        from syndicate.features.wnba.sources import processed_roots as wnba_processed_roots
     except Exception as exc:
         return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
 
-    candidate_roots = [
-        candidate / "data" / "processed"
-        for candidate in preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
-    ]
+    # `#310`. Ask the WNBA module for its own roots (`processed_roots()`, which
+    # calls `preferred_artifact_roots` with `wnba/sources.py`'s `__file__`)
+    # instead of resolving them from THIS file.
+    #
+    # `repo_root_from` is hardcoded to `parents[3]`, which is only correct for
+    # modules three packages deep. `ops.py` is two, so passing `__file__` from
+    # here resolved the local-mirror candidates to the directory ABOVE the repo
+    # and every file read `exists: false`.
+    #
+    # It is masked in production because `SYNDICATE_WNBA_SOURCE_ROOT` is set,
+    # so `preferred_artifact_roots` takes its env branch and never touches
+    # `repo_root` -- verified live 2026-08-09, this endpoint reported correct
+    # `/opt/render/project/data/...` paths throughout. **The failure only
+    # appears where that env var is absent, and there it reports a confident,
+    # uniform "everything is missing".** That is the worst possible behaviour
+    # for the endpoint someone reaches for to find out what is missing.
+    candidate_roots = wnba_processed_roots()
     file_name = f"live_lines_{date}.jsonl"
     results = []
     for root in candidate_roots:

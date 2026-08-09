@@ -94,6 +94,43 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # this session's market board work started reading it directly.
     "*_source/source_artifacts/data/processed/oddsapi_player_props_*.csv",
     "*_source/data/processed/oddsapi_player_props_*.csv",
+    # `#310`, DIAGNOSTIC. The WNBA grader's actual result inputs, and the file
+    # both recon builders are built from. Until now `recon_games_*`,
+    # `recon_props_*` and dated `boxscores_*` were in no pattern here (only the
+    # UNDATED `boxscores_history.csv`, two blocks down), so they could never
+    # cross services and could never be inventoried from web -- meaning an
+    # `/api/ops/artifacts/export` query returning nothing for them was an
+    # ALLOWLIST ARTIFACT, not evidence of absence. That is the specific hole
+    # that stopped this lane proving whether WNBA's zero graded rows are a
+    # missing producer or a missing join.
+    #
+    # #208'S LESSON, CARRIED DELIBERATELY: allowlisting PERMITS a transfer, it
+    # does not MAKE one happen. Adding these does not by itself publish
+    # anything.
+    #
+    # WHAT SHOULD CHANGE: `sweep_changed_hot_artifacts` on the writing service
+    # now has these in scope, so after the next WNBA refresh cycle writes them,
+    # `?names_only=1&pattern=*wnba_source/data/processed/recon_*` should return
+    # a non-empty listing on web.
+    # WHAT WOULD PROVE IT DID: that listing being non-empty. If it stays empty
+    # AND `/api/ops/wnba/artifact-counts` reports `boxscores_present: true` with
+    # `recon_games: false` for the same date, the files are genuinely not being
+    # produced -- the builders had their precondition and wrote nothing -- and
+    # that is a producer defect, not a visibility one. Those two readings are
+    # otherwise indistinguishable, which is why both are named here.
+    # WNBA ONLY, and the glob is `boxscores_2*` so it takes the small dated
+    # per-slate files and never `boxscores_history.csv` (NBA's is ~20MB and is
+    # deliberately excluded two blocks down). A `*_source/` wildcard here would
+    # pull NBA's and NHL's dated boxscores into every sweep as well, and web is
+    # already OOMing at 2Gi on oversized payloads (`#302`) -- widening this is a
+    # separate decision with its own measurement, not a free side effect of a
+    # WNBA diagnostic.
+    "wnba_source/data/processed/recon_games_*.csv",
+    "wnba_source/data/processed/recon_props_*.csv",
+    "wnba_source/data/processed/boxscores_2*.csv",
+    "wnba_source/source_artifacts/data/processed/recon_games_*.csv",
+    "wnba_source/source_artifacts/data/processed/recon_props_*.csv",
+    "wnba_source/source_artifacts/data/processed/boxscores_2*.csv",
     # Same set again, one directory shallower: some sports (confirmed for WNBA)
     # write their processed artifacts straight to "<sport>_source/data/processed/"
     # rather than nesting under a "source_artifacts" nested root, so the patterns

@@ -185,11 +185,23 @@ def _local_market_accuracy_graded_rows_for_date(
 
 def _wnba_graded_rows_for_date(date_str: str) -> list[dict[str, Any]]:
     from syndicate.features.shared.live_lens_local import build_local_market_accuracy_payload
-    from syndicate.features.wnba.sources import processed_root
+    from syndicate.features.wnba.sources import processed_roots
 
-    root = processed_root()
+    # `#309`. Was `processed_root()` -- ONE root, chosen before any filename is
+    # known. Measured live 2026-08-09: it returned
+    # `.../wnba_source/source_artifacts/data/processed` while the refresh
+    # pipeline writes `.../wnba_source/data/processed`, so this grader read an
+    # unrelated directory and every WNBA date scored `{"available": False}` ->
+    # zero graded rows, indistinguishable from an unplayed slate.
+    #
+    # `roots` is now every candidate, resolved per requested file downstream.
+    # NOTE this alone does not guarantee rows: `_score_market_{games,props}_day`
+    # need `recon_games_{date}.csv` / `recon_props_{date}.csv` alongside the
+    # recommendations, and either side of a pair missing still yields
+    # `{"available": False}`. See `#310`.
+    roots = processed_roots()
     return _local_market_accuracy_graded_rows_for_date(
-        "wnba", date_str, build_payload=lambda qs: build_local_market_accuracy_payload(qs, root)
+        "wnba", date_str, build_payload=lambda qs: build_local_market_accuracy_payload(qs, roots)
     )
 
 

@@ -22,12 +22,6 @@ def preferred_source_roots(
 ) -> list[Path]:
     env_value = str(os.environ.get(env_var) or "").strip()
 
-    def _has_files(path: Path) -> bool:
-        try:
-            return path.exists() and path.is_dir() and any(path.iterdir())
-        except Exception:
-            return path.exists()
-
     def _append_repo_fallback(candidates: list[Path]) -> None:
         if not _strict_hosted_storage_enabled():
             return
@@ -81,15 +75,25 @@ def preferred_artifact_roots(
     env_var: str,
     local_dir_name: str,
 ) -> list[Path]:
+    # `#310`. A `_has_files()` helper was defined here (and again in
+    # `preferred_source_roots`) and CALLED IN NEITHER. Removed rather than
+    # documented: dead code shaped exactly like the guard every reader assumes
+    # is already in place is worse than no code at all.
+    #
+    # It is plausibly why `17d4f203` hand-rolled `any(candidate.iterdir())` in
+    # `current_odds_root_for_sport` -- reimplementing a helper that was already
+    # present, already unused, and already the wrong test. "Does this directory
+    # contain anything" is not "does it contain the file you asked for": on
+    # production that check passed on a root holding 427 stale files while the
+    # requested date's artifacts sat on the next candidate.
+    #
+    # These functions return CANDIDATES in preference order, deliberately
+    # without probing the filesystem. Callers that need a real file resolve per
+    # requested file across the list -- see `wnba/sources.py::_strict_artifact_path`
+    # and `live_lens_local._artifact_path` (`#309`).
     env_value = str(os.environ.get(env_var) or "").strip()
     repo_root = repo_root_from(file_path)
     candidates: list[Path] = []
-
-    def _has_files(path: Path) -> bool:
-        try:
-            return path.exists() and path.is_dir() and any(path.iterdir())
-        except Exception:
-            return path.exists()
 
     def _append_root(root: Path) -> None:
         resolved = root.resolve()
