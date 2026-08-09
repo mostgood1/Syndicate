@@ -458,7 +458,69 @@ namespace.
 safe in a value-intersection join; `h2h` is shared by every row of that type, so
 a record would match a graded row for a **different game**.
 
-### #317 — ROOT CAUSE, the board that computes and never lands: the persist RUNS, and **both** of its transports fail. The worker's own publish OOM-kills the web service it is publishing to
+### #318 — OPEN. Web OOMs every ~14 min and **nothing on the service can say why**: `CONTAINER_MEMORY` reports 91.7% next to a 189MB process and cannot split the two. Instrument fixed (`7cceb781`), NOT DEPLOYED
+
+**The measurement that stops the guessing.** Web, 2026-08-09T21:00:47Z, seconds
+before an `oomKilled` at a 2GiB limit:
+
+```
+CONTAINER_MEMORY     memory_current_mb 1877.1  memory_pct_of_max 91.7
+PROCESS_TREE_MEMORY  self_rss_mb 189.1  child_count 0
+```
+
+**1.7GB is unattributed to any process.** `memory.current` counts clean page
+cache the kernel drops before it OOM-kills anything, so 91.7% is consistent
+with a runaway leak *and* with a container that is merely warm. Nothing on web
+could tell them apart — and that is why this item produced **two wrong root
+causes in one hour** (see the retraction in `#317`). `#285` is the same trap on
+refresh-worker and its lesson never reached web.
+
+`7cceb781` wires `_read_container_memory_stat()` — which has read
+`anon`/`inactive_file` since `#79`, and which `memory_headroom_snapshot`
+already uses — into `log_container_memory`, the line people actually read.
+Additive; absent keys stay **absent**, not `0`, so an unparseable cgroup cannot
+read as "plenty of room". `python -m pytest tests/test_memory_observability.py`
+→ **10 passed**.
+
+**Read `memory_unreclaimable_mb` on the next boot before proposing any fix.**
+Everything below is a lead, not a cause, and stays that way until that number
+exists.
+
+#### Six kills, and they are not six independent events
+
+All on instance `-454rz`, all `oomKilled {"memoryLimit": "2Gi"}`: 20:09:18,
+20:30:39, 20:47:11, 20:55:19, 21:02:11, 21:18:25. Intervals 21m, 16m, 8m, 7m,
+16m — **not trending**, so not a slow leak.
+
+But the 21:02:11 kill lands **during `bootstrap_data_root: Syncing …
+mlb_source/source_artifacts`**, 28s after gunicorn booted from the previous
+kill. `SYNDICATE_BOOTSTRAP_ON_START=1`, so **every kill pays a heavy artifact
+re-sync on the way back up**, and a boot-time OOM re-triggers it. At least one
+of the six is a crash-loop echo, not a fresh cause. Do not quote "six kills" as
+six data points.
+
+#### Leads, unranked and unproven
+
+- **`WARNING: compute in request path` fired ~24 times in one minute** on web
+  (`request_path_guard`), immediately before the 21:02 kill. That is the
+  load-bearing architectural rule in `CLAUDE.md` being violated in production,
+  and it is a warning rather than a refusal.
+- **Large synchronous response bodies on user traffic**:
+  `/api/board/book-grid?sport=mlb&date=2026-08-09&limit=600` → **3,872,635
+  bytes**; `/wnba/api/source/cards` → 740,071. Real browser traffic on
+  `/market-board`, i.e. a user was on the site during the kills.
+- The publish flood — **retracted as a cause**, see `#317`. Kept only so nobody
+  re-derives it.
+
+#### Deploy-readiness
+
+`7cceb781` is instrumentation only: two files, +91 lines, no behaviour change,
+one extra procfs read per already-instrumented stage. Safe to deploy on its
+own and **worth deploying first** — every other candidate fix here is
+unfalsifiable without it. It does not stop the OOMs and must not be reported as
+if it did.
+
+### #317 — ROOT CAUSE, the board that computes and never lands: the persist RUNS, and **both** of its transports fail — keyvalue on size, the artifact fallback on a web service that is OOM-cycling (`#318`)
 
 **Status: root-caused and evidenced on production, not fixed. Read-only lane.**
 
@@ -518,23 +580,27 @@ Re-verified 21:0xZ: `/api/home` → `http=000` at 40s, then `502`, then `502`;
 The receiver's *streamed* path is **not** the memory bug: `_publish_streamed_body`
 (`syndicate/blueprints/ops.py:926`) streams to disk 1MB at a time and is correct.
 
-**What kills web is measurable, and it is the OTHER publish path at flood
-rate.** Web's own access log, 20:08:38Z–20:09:12Z (34 seconds, the run-up to
-the OOM), is ~60 `POST /api/ops/artifacts/publish` at up to **5 per second**,
-from **five distinct source IPs** (`10.195.130.5`, `10.196.186.6`,
-`10.197.69.3`, `10.199.88.158`, `10.194.27.5`) — concurrent publishers, all
-answering `200` with ~100-byte bodies, i.e. all *small* files. Small files skip
-`_should_stream_publish` (`_PUBLISH_STREAM_MIN_BYTES = 4MB`) and take the JSON
-envelope, which `ops.py:1001-1015` holds as **three full copies** — raw body,
-parsed dict with the file as a `str`, and that `str` re-encoded to disk. One
-kilobyte file costs four kilobytes and that is fine; sixty concurrent of them
-across gunicorn workers on a 2Gi instance is not. `/healthz` answered `200`
-2 seconds before the kill, so this is a fast blow-up, not a slow leak.
+**What kills web is `#318` and I got it wrong twice before measuring it
+properly. Both wrong answers are recorded below, because the shape of the
+mistake is the reusable part.**
 
-> **Do not carry forward the guess this note first contained** — that the
-> pressure was the worker's `/api/ops/artifacts/export?pattern=` pulls. That is
-> a real 30MB-response problem (`ops.py:1075`) but it is **not** what the
-> access log shows in the OOM window. Publishes are.
+- *First guess:* the worker's `/api/ops/artifacts/export?pattern=` pulls. A
+  real 30MB-response problem (`ops.py:1075`), but **not present** in the OOM
+  window's access log.
+- *Second guess, and the one that looked rigorous:* a small-file publish flood
+  — ~60 `POST /api/ops/artifacts/publish` in the 34s before the 20:09:18Z kill,
+  from five source IPs, on the three-copy JSON-envelope path (`ops.py:1001`).
+  **Also wrong**, and it failed two checks I should have run before writing it
+  down:
+  1. **It does not generalise.** Across all six kills, publishes precede five —
+     but the 21:02:11Z kill had **zero** publishes and 13 log lines total in
+     45s. One window is a correlation, not a cause.
+  2. **The arithmetic does not work.** `WEB_CONCURRENCY=2`,
+     `GUNICORN_THREADS=4` → **8 concurrent request slots, not 60.** Sixty
+     requests over 34 seconds queue through eight slots. Three copies of a
+     few-hundred-KB file, eight at a time, is single-digit MB.
+
+See `#318` for what the evidence actually supports.
 
 Corroborating, same window, on WEB: `[INTEL_STATUS_TIMING] … has_snapshot:
 False` for **both** `read_latest_intelligence_state_response` and
@@ -577,14 +643,11 @@ both be true before a board can land, and neither is a one-line edit:
 1. **Get the payload under 8,388,608 bytes** so keyvalue carries it and the
    HTTP path stops being load-bearing. Aliasing the duplicated `board_contract`
    is the first cut; 6.3MB of `cards` inside it needs its own decision.
-2. **Stop the web OOM cycle**, or the fallback has nothing to POST to. The
-   measured trigger is the *small-file* publish flood on the JSON-envelope path
-   (`ops.py:1001`, three resident copies), ~5/s from five concurrent
-   publishers. Two candidate levers, neither taken here: make the JSON path
-   stream to disk like `_publish_streamed_body` already does (removing the
-   3-copy shape at every size, not just above 4MB), and/or bound publisher
-   concurrency. Note the sender's `timeout_seconds: int = 10` default
-   (`artifact_publisher.py:637`) means a slow web also silently drops boards.
+2. **Stop the web OOM cycle** (`#318`), or the fallback has nothing to POST to.
+   Do not act on the publish-flood theory — it is retracted above. Note
+   separately that the sender's `timeout_seconds: int = 10` default
+   (`artifact_publisher.py:637`) means a merely *slow* web silently drops
+   boards too, without an OOM being involved at all.
 
 Fixing (1) alone still leaves `/api/home` down. Fixing (2) alone leaves a
 27.6MB body against a path measured to drop the connection above ~19.6MB.
@@ -603,13 +666,35 @@ Fixing (1) alone still leaves `/api/home` down. Fixing (2) alone leaves a
 
 Every cycle since 20:04 computes **zero** candidates while the L2 shortlist
 still finds 145 rows from 3,319 considered. `STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD`
-is correctly refusing to publish those zeros over the retained 150. **Unproven
-hypothesis, stated as such:** the pool's inputs are pulled from web
-(`artifact_publisher` PULL_*), web has been 502/OOM since 20:05, and
-`PULL_OK … artifacts_received=0 written=0` appears throughout — so this may be
-a *consequence* of the web outage rather than an independent bug. It needs its
-own owner and its own measurement against a healthy web. Do not assume either
-direction.
+is correctly refusing to publish those zeros over the retained 150.
+
+**ANSWERED by another lane, and it supersedes my hypothesis.** I guessed this
+was a knock-on of the web outage starving the worker's artifact pulls. A
+separate lane measured it properly: `CANDIDATE_POOL_READY` is 0 on **24 of 25
+cycles, each 3–43s after a memory guard fires**, making `#285` the gate. Their
+measurement, not re-derived here — recorded so nobody re-runs mine.
+
+**Sequencing consequence for `#317` and `#318`, and it is the important part:**
+a repaired transport tonight **carries nothing**, because the pool is empty
+before the transport is reached. So neither `#317` nor `#318` can be validated
+against "the board appears" — that gate belongs to `#285`. The success test for
+this lane is narrower and still worth having: `STATE_PERSIST_BEGIN` with a
+non-zero count followed by a `PUBLISH_OK` rather than a 502. For `#318` it is
+"web stops dying every 14 minutes", which is user-visible on its own and
+independent of whether any board ever renders.
+
+### #318 — OPEN, and it REFUTES its own parent. The publish flood does NOT OOM the web service; request-path compute does. `/api/board/book-grid` is the discriminator
+
+**Status: claimed, measuring. Read `#317` first — this item exists to correct
+one link in its chain.**
+
+`#317` concluded that web OOM-cycles because ~60 concurrent small-file publishes
+take the JSON-envelope path in `ops.py:1001-1015`, which holds three resident
+copies. **The three-copy shape is real and I measured it. It is not what kills
+web.** Both halves matter and they are recorded separately below.
+
+<!-- lane in progress; full measurement, the correction, and deploy-readiness
+land in the follow-up commit on this item. -->
 
 ### #309 — FIXED AND DEPLOYED 2026-08-09. WNBA graded 0 rows because the grader read a different root than the producer writes. `17d4f203` is DEPLOYED AND INERT
 
