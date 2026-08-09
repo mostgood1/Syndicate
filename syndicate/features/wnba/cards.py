@@ -2947,19 +2947,33 @@ _CARDS_PAGE_CONTEXT_TTL_SECONDS = 12
 _BUILD_CARDS_PAGE_CONTEXT_CACHE: dict[tuple[str, bool], tuple[float, dict[str, Any]]] = {}
 
 
-def build_cards_page_context(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
-    cache_key = (str(selected_date), bool(allow_stored_date_fallback))
+def build_cards_page_context(
+    selected_date: str,
+    *,
+    allow_stored_date_fallback: bool = False,
+    allow_live_status_merge: bool | None = None,
+) -> dict[str, Any]:
+    live_merge = _live_status_merge_enabled(allow_stored_date_fallback, allow_live_status_merge)
+    # The merge flag is part of the KEY, not just the build. Two contexts for
+    # the same date that differ on whether tonight's scores were merged are
+    # different objects, and the cache returning one for the other is how a
+    # live lens ends up rendering a finished game as scheduled.
+    cache_key = (str(selected_date), bool(allow_stored_date_fallback), bool(live_merge))
     now = time.monotonic()
     cached = _BUILD_CARDS_PAGE_CONTEXT_CACHE.get(cache_key)
     if cached is not None and (now - cached[0]) < _CARDS_PAGE_CONTEXT_TTL_SECONDS:
         return cached[1]
-    result = _build_cards_page_context_uncached(selected_date, allow_stored_date_fallback=allow_stored_date_fallback)
+    result = _build_cards_page_context_uncached(
+        selected_date,
+        allow_stored_date_fallback=allow_stored_date_fallback,
+        allow_live_status_merge=allow_live_status_merge,
+    )
     _BUILD_CARDS_PAGE_CONTEXT_CACHE[cache_key] = (now, result)
     # The builder publishes; the live-lens tick consumes. See
     # publish_cards_page_context below for why the in-process cache alone
     # could never serve a consumer in another container.
     if not allow_stored_date_fallback:
-        publish_cards_page_context(selected_date, result)
+        publish_cards_page_context(selected_date, result, live_status_merged=live_merge)
     return result
 
 
@@ -2987,7 +3001,11 @@ def build_cards_page_context_if_cached(selected_date: str, *, allow_stored_date_
     Returns None on a miss so the caller can degrade deliberately rather than
     silently triggering the thing that killed the service.
     """
-    cache_key = (str(selected_date), bool(allow_stored_date_fallback))
+    cache_key = (
+        str(selected_date),
+        bool(allow_stored_date_fallback),
+        bool(_live_status_merge_enabled(allow_stored_date_fallback, None)),
+    )
     cached = _BUILD_CARDS_PAGE_CONTEXT_CACHE.get(cache_key)
     if cached is not None and (time.monotonic() - cached[0]) < _CARDS_PAGE_CONTEXT_TTL_SECONDS:
         return cached[1]
@@ -3042,8 +3060,15 @@ _WNBA_CARDS_CONTEXT_HARD_MAX_AGE_SECONDS = 7200
 _WNBA_CARDS_CONTEXT_MAX_BYTES = 8 * 1024 * 1024
 
 
-def wnba_cards_context_artifact_path(selected_date: str) -> Path:
-    return _refresh_state_data_root() / "live" / f"wnba_cards_context_{str(selected_date).strip()}.json"
+def wnba_cards_context_artifact_path(selected_date: str, *, live_status_merged: bool = False) -> Path:
+    # TWO KEYS, deliberately. A context built with tonight's scores merged and
+    # one built without are different data, and a single key would let whichever
+    # builder ran last decide what the live lens sees -- the board build
+    # (merge off) and the live-lens rebuild (merge on) both publish. The
+    # consumer prefers the live variant and falls back to the plain one, so the
+    # worst case is exactly today's behaviour rather than a blank lens.
+    suffix = "_live" if live_status_merged else ""
+    return _refresh_state_data_root() / "live" / f"wnba_cards_context{suffix}_{str(selected_date).strip()}.json"
 
 
 def wnba_cards_context_max_age_seconds() -> int:
@@ -3055,7 +3080,7 @@ def wnba_cards_context_max_age_seconds() -> int:
     return max(0, value)
 
 
-def publish_cards_page_context(selected_date: str, context: dict[str, Any]) -> bool:
+def publish_cards_page_context(selected_date: str, context: dict[str, Any], *, live_status_merged: bool = False) -> bool:
     """Publish the just-built context for consumers in other containers.
 
     Never raises: a page render must not fail because the shared store is
@@ -3073,6 +3098,10 @@ def publish_cards_page_context(selected_date: str, context: dict[str, Any]) -> b
         "date": str(context.get("date") or selected_date).strip() or str(selected_date),
         "requested_date": str(context.get("requested_date") or selected_date).strip() or str(selected_date),
         "source_path": str(context.get("source_path") or "").strip(),
+        # Recorded IN the payload as well as in the key, so a consumer that
+        # reads one artifact can still say which variant it got without
+        # inferring it from a filename.
+        "live_status_merged": bool(live_status_merged),
         "games": games,
     }
     try:
@@ -3089,7 +3118,9 @@ def publish_cards_page_context(selected_date: str, context: dict[str, Any]) -> b
         )
         return False
     try:
-        _keyvalue_write_json_file(wnba_cards_context_artifact_path(selected_date), payload)
+        _keyvalue_write_json_file(
+            wnba_cards_context_artifact_path(selected_date, live_status_merged=live_status_merged), payload
+        )
         return True
     except Exception as error:
         print(f"[wnba_cards] CARDS_CONTEXT_PUBLISH_FAILED date={selected_date} error={type(error).__name__}: {error}", flush=True)
@@ -3119,19 +3150,34 @@ def load_published_cards_page_context(selected_date: str, *, max_age_seconds: in
     """
     fresh_limit = wnba_cards_context_max_age_seconds() if max_age_seconds is None else max(0, int(max_age_seconds))
     hard_limit = wnba_cards_context_hard_max_age_seconds()
-    try:
-        payload = _keyvalue_read_json_file(wnba_cards_context_artifact_path(selected_date))
-    except Exception:
+
+    def _read(live_merged: bool) -> tuple[dict[str, Any] | None, float | None]:
+        try:
+            payload = _keyvalue_read_json_file(
+                wnba_cards_context_artifact_path(selected_date, live_status_merged=live_merged)
+            )
+        except Exception:
+            return None, None
+        if not isinstance(payload, dict) or not isinstance(payload.get("games"), list):
+            return None, None
+        try:
+            published_at = float(payload.get("published_at") or 0.0)
+        except (TypeError, ValueError):
+            return None, None
+        if published_at <= 0:
+            return None, None
+        return payload, max(0.0, time.time() - published_at)
+
+    # PREFER the live-merged variant, FALL BACK to the plain one. A merged
+    # context carries tonight's real status; the plain one renders a finished
+    # game as scheduled. Falling back rather than refusing keeps the worst case
+    # at exactly today's behaviour instead of a blank lens -- the same choice
+    # the FRESH/HARD split makes, for the same reason.
+    payload, age_seconds = _read(True)
+    if payload is None:
+        payload, age_seconds = _read(False)
+    if payload is None or age_seconds is None:
         return None, None, False
-    if not isinstance(payload, dict) or not isinstance(payload.get("games"), list):
-        return None, None, False
-    try:
-        published_at = float(payload.get("published_at") or 0.0)
-    except (TypeError, ValueError):
-        return None, None, False
-    if published_at <= 0:
-        return None, None, False
-    age_seconds = max(0.0, time.time() - published_at)
     if hard_limit and age_seconds > hard_limit:
         return None, age_seconds, True
     return payload, age_seconds, bool(fresh_limit and age_seconds > fresh_limit)
@@ -3181,7 +3227,40 @@ def build_wnba_market_board(selected_date: str) -> dict[str, Any]:
     )
 
 
-def _build_cards_page_context_uncached(selected_date: str, *, allow_stored_date_fallback: bool = False) -> dict[str, Any]:
+def _live_status_merge_enabled(allow_stored_date_fallback: bool, allow_live_status_merge: bool | None) -> bool:
+    """Whether to merge ESPN's live status into the artifact games.
+
+    ONE FLAG WAS DOING TWO UNRELATED JOBS. `allow_stored_date_fallback` gated
+    both "you may substitute a DIFFERENT date's stored slate" and "you may merge
+    TONIGHT's live scores". The WNBA live lens correctly refuses the first and
+    was thereby denied the second.
+
+    MEASURED on production 2026-08-08 22:31Z, same instant, same service, six
+    consecutive stable reads:
+
+        /wnba/api/cards      (fallback=True)   3 games   Scheduled, Final, Final
+        /wnba/api/live-lens  (fallback=False)  2 games   Scheduled, Scheduled
+
+    `generated_at` was current on both, so this was not a stale cache -- the
+    live-lens path built a worse context, and a game that had finished rendered
+    as not-yet-started. That is the `e8deadb7` freeze class arriving through a
+    flag name rather than a stale artifact.
+
+    `None` means "follow allow_stored_date_fallback", which is exactly today's
+    behaviour for every existing caller. Only a caller that explicitly wants
+    live status without the date substitution passes True.
+    """
+    if allow_live_status_merge is None:
+        return bool(allow_stored_date_fallback)
+    return bool(allow_live_status_merge)
+
+
+def _build_cards_page_context_uncached(
+    selected_date: str,
+    *,
+    allow_stored_date_fallback: bool = False,
+    allow_live_status_merge: bool | None = None,
+) -> dict[str, Any]:
     requested_date = str(selected_date or "").strip() or parse_iso_date(selected_date).isoformat()
     schedule_has_games = has_games_for_date(requested_date)
     if schedule_has_games is False and not allow_stored_date_fallback:
@@ -3350,7 +3429,7 @@ def _build_cards_page_context_uncached(selected_date: str, *, allow_stored_date_
             source_title = "WNBA live scoreboard fallback"
             had_artifact_games = False
             used_public_scoreboard_fallback = True
-    elif games and allow_stored_date_fallback and resolved_date == central_today_iso():
+    elif games and _live_status_merge_enabled(allow_stored_date_fallback, allow_live_status_merge) and resolved_date == central_today_iso():
         # Merge ESPN's live status/score into the odds-rich artifact games
         # instead of discarding the odds/sim/props data for a bare
         # scoreboard-only view -- this is the same fresh source the

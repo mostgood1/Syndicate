@@ -19,9 +19,42 @@ stable and never reused; check both files before taking a number, and before
 finishing run the #71 check that shipped work actually reached one of them. It carries the current
 priority order, what has been *validated* against production versus merely
 believed, and a set of operational facts that are expensive to rediscover — among
-them: **Render auto-deploy is OFF** (pushing to `main` ships nothing on its own),
-**deploying kills an in-flight MLB sim**, and `logger.info` never reaches Render's
-log collector (use `print(..., flush=True)`).
+them: **Render auto-deploy is OFF — but that is true of CODE and false of
+CONFIG** (see below), **deploying kills an in-flight MLB sim**, and `logger.info`
+never reaches Render's log collector (use `print(..., flush=True)`).
+
+### Pushing `render.yaml` IS a production change (`#284`)
+
+`autoDeploy = no` on all three services, so pushing `.py` to `main` really does
+ship nothing. **`blueprint_sync` is a separate mechanism that bypasses it.**
+Measured 2026-08-08: a web deploy at 23:02:26Z carried `trigger =
+blueprint_sync` with no user in it, rewrote env vars on two live services
+(refresh-worker 92 → 93 keys), and 502'd every route for ~2 minutes. Nobody
+deployed it; a `render.yaml` commit had been pushed.
+
+It fires on `render.yaml` changes, not on every push — 1 `blueprint_sync` against
+19 `api` deploys over 20. So:
+
+- **Pushing `.py` is free. Pushing `render.yaml` applies to production.** Get an
+  explicit decision first; committing is still safe.
+- **A sync writes the WHOLE env block, not your diff.** The blast radius of a
+  one-key edit is every value in the file, including drift nobody has read.
+  Enumerate before pushing: diff `render.yaml` against each service's live
+  `/v1/services/<id>/env-vars` (paginate — `limit` > 100 returns HTTP 400).
+- **Absent ≠ off. Check the code's default for any key you add or remove.**
+  `_evaluation_settlement_auto_refresh_enabled` treats absent as **False**;
+  `_mlb_refresh_tick_owner_here` defaults **True**. The same edit is a no-op in
+  one case and a behaviour change in the other.
+- A deploy nobody remembers ordering is findable: `/v1/services/<id>/deploys` →
+  `trigger`.
+
+**Why this is stated at this length:** the old one-liner was *literally true and
+materially misleading*, which is the worst combination — it read as a guarantee
+that pushes are free, and seven parallel sessions batched deploys all evening on
+that basis. A near-miss the same night: `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS`
+sat in the blueprint while absent from the live service, and setting that key
+**at all** overrides the settlement autorun's daily gate (`int(raw or 86400)`) —
+4 runs/day of a ~1.4GB job. It was commented out four hours before the sync fired.
 
 ## Render is the source of truth — `data/**` in git is a lossy mirror
 

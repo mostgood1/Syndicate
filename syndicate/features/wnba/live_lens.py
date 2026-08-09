@@ -267,7 +267,10 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
             published, cards_context_age_seconds, is_stale = load_published_cards_page_context(selected_date)
             if published is not None:
                 cards_context = published
-                cards_context_source = "published_artifact_stale" if is_stale else "published_artifact"
+                merged = bool(published.get("live_status_merged"))
+                cards_context_source = "published_artifact" if merged else "published_artifact_no_live_status"
+                if is_stale:
+                    cards_context_source += "_stale"
                 if is_stale:
                     # Served, not refused -- refusing put the lens back to the
                     # blank page this change exists to remove. Loud, because a
@@ -279,7 +282,14 @@ def build_live_lens_snapshot(selected_date: str, *, limit: int = 50, allow_rebui
                         flush=True,
                     )
             elif allow_rebuild:
-                cards_context = build_cards_page_context(selected_date, allow_stored_date_fallback=False)
+                # allow_live_status_merge=True, allow_stored_date_fallback=False:
+                # tonight's real scores, and NOT another date's stored slate.
+                # Those were one flag until `#280`, which is why this path
+                # rendered a finished game as "Scheduled" while /wnba/api/cards
+                # showed it Final at the same instant on the same service.
+                cards_context = build_cards_page_context(
+                    selected_date, allow_stored_date_fallback=False, allow_live_status_merge=True
+                )
                 cards_context_source = "rebuilt"
                 cards_context_age_seconds = 0.0
             else:

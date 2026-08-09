@@ -24,9 +24,24 @@ watermark is either correct or it is not, and it was not.
 from __future__ import annotations
 
 import unittest
+from typing import NamedTuple
 from unittest.mock import patch
 
 from syndicate.features.shared import live_lens_loop
+
+
+class _Sweep(NamedTuple):
+    """Stand-in for HotArtifactSweepResult: the real one's `all_succeeded` is
+    what lets a watermark-based caller refuse to advance past a window in which
+    some file silently failed. `publish_hot_artifact` never raises, so
+    "did not throw" was never the same claim."""
+
+    published_count: int
+    failed_paths: tuple
+
+    @property
+    def all_succeeded(self) -> bool:
+        return not self.failed_paths
 
 
 def _run_cycles(count: int, *, publish_side_effect=None):
@@ -49,8 +64,10 @@ def _run_cycles(count: int, *, publish_side_effect=None):
     def _publish(since_epoch):
         windows.append(since_epoch)
         if publish_side_effect is not None:
-            publish_side_effect()
-        return 1
+            result = publish_side_effect()
+            if result is not None:
+                return result
+        return _Sweep(1, ())
 
     remaining = {"n": count}
 
@@ -65,7 +82,7 @@ def _run_cycles(count: int, *, publish_side_effect=None):
     ), patch.object(
         live_lens_loop, "_run_live_lens_tick", return_value={"ok": True, "results": {}}
     ), patch.object(live_lens_loop, "_live_lens_publish_enabled", return_value=True), patch.object(
-        live_lens_loop, "publish_changed_hot_artifacts", side_effect=_publish
+        live_lens_loop, "sweep_changed_hot_artifacts", side_effect=_publish
     ), patch.object(live_lens_loop, "write_json_file"), patch.object(
         live_lens_loop, "_live_lens_loop_interval_seconds", return_value=60
     ):
@@ -135,3 +152,50 @@ class PublishWatermarkTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SilentFailureTests(unittest.TestCase):
+    """`publish_hot_artifact` NEVER RAISES -- a network blip or an unreachable
+    web service returns False and is logged. So "the call did not throw" was
+    never the same claim as "every file went through", and the watermark fix
+    above still advanced past silently-failed files.
+
+    `HotArtifactSweepResult.all_succeeded` exists for exactly this and its own
+    docstring names the failure: *"a caller that advances a persisted watermark
+    on any non-raising return would permanently skip a file that failed for a
+    transient reason"*. This call site was that caller.
+    """
+
+    def tearDown(self) -> None:
+        live_lens_loop._LIVE_LENS_LOOP_STOP.set()
+
+    def test_a_silently_failed_file_holds_the_watermark(self) -> None:
+        calls = {"n": 0}
+
+        def _one_failure():
+            calls["n"] += 1
+            if calls["n"] == 1:
+                # Published some, failed one, returned normally. No exception.
+                return _Sweep(5, (object(),))
+            return None
+
+        windows = _run_cycles(3, publish_side_effect=_one_failure)
+
+        self.assertEqual(
+            windows[0], windows[1],
+            "a sweep with failed paths must retry its window, not skip past the failures",
+        )
+        self.assertNotEqual(
+            windows[1], windows[2],
+            "...and must resume advancing once a later sweep is clean",
+        )
+
+    def test_the_failure_count_is_reported_not_just_the_published_count(self) -> None:
+        """A published count alone cannot distinguish a clean sweep from one
+        that dropped files -- the same class of ambiguity as "103 changed" vs
+        "103 resent", which is what let the watermark bug live four months."""
+        import inspect
+
+        source = inspect.getsource(live_lens_loop._live_lens_background_loop)
+        self.assertIn("failed=", source)
+        self.assertIn("all_succeeded", source)

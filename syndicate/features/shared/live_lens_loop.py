@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
+from syndicate.features.shared.artifact_publisher import sweep_changed_hot_artifacts
 from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
 from syndicate.features.mlb.live_lens import build_live_lens_snapshot_internal as _mlb_build
 from syndicate.features.mlb.live_lens import live_lens_snapshot_path as _mlb_snapshot_path
@@ -640,20 +640,31 @@ def _live_lens_background_loop() -> None:
 		if _live_lens_publish_enabled():
 			publish_started_epoch = time.time()
 			try:
-				published_count = publish_changed_hot_artifacts(last_publish_epoch)
-				if published_count:
+				# sweep_changed_hot_artifacts, NOT the publish_changed_hot_artifacts
+				# wrapper. `publish_hot_artifact` NEVER RAISES -- a network blip or
+				# an unreachable web service returns False and is logged -- so
+				# "did not throw" is not "everything went through", and this call
+				# site was advancing its watermark on the weaker of the two.
+				# `HotArtifactSweepResult.all_succeeded` exists for exactly this
+				# and its own docstring names the failure: "a caller that advances
+				# a persisted watermark on any non-raising return would
+				# permanently skip a file that failed for a transient reason".
+				# That was still true here after the watermark fix above.
+				sweep = sweep_changed_hot_artifacts(last_publish_epoch)
+				if sweep.published_count or sweep.failed_paths:
 					print(
-						f"[live_lens_loop] published_hot_artifacts count={published_count} "
+						f"[live_lens_loop] published_hot_artifacts count={sweep.published_count} "
+						f"failed={len(sweep.failed_paths)} "
 						f"window_seconds={round(publish_started_epoch - last_publish_epoch, 1)} "
 						f"elapsed_seconds={round(time.time() - publish_started_epoch, 1)}",
 						flush=True,
 					)
-				# Advance ONLY on a clean sweep. An exception here means an
-				# unknown subset was sent, and moving the watermark past a
-				# failed window drops those files permanently -- the same
-				# reasoning pull_hot_artifacts already applies to its own
-				# persisted watermark.
-				last_publish_epoch = publish_started_epoch
+				# Advance ONLY past a window every candidate in which is confirmed
+				# published. A failure then retries next cycle instead of vanishing
+				# -- the same reasoning pull_hot_artifacts already applies to its
+				# own persisted watermark.
+				if sweep.all_succeeded:
+					last_publish_epoch = publish_started_epoch
 			except Exception as exc:
 				print(f"[live_lens_loop] publish_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
 		write_json_file(

@@ -32,9 +32,47 @@ def current_odds_root_for_sport(sport_slug: str) -> Path:
             return (roots[0] / "data" / "processed").resolve()
         return (Path(__file__).resolve().parents[3] / "data" / "nba_source" / "data" / "processed").resolve()
     if slug == "wnba":
+        # FIRST ROOT THAT HAS FILES, not roots[0]. `preferred_artifact_roots`
+        # unconditionally puts the `source_artifacts` variant first whether or
+        # not anything was ever written there -- /api/ops/wnba/artifact-counts
+        # exists because of exactly this mismatch and its own comment says so.
+        #
+        # MEASURED on production web 2026-08-08 via that endpoint:
+        #
+        #   .../wnba_source/source_artifacts/data/processed   0 of 6 families
+        #   .../wnba_source/data/processed                    game_cards,
+        #                                                     props_recommendations,
+        #                                                     top_by_game,
+        #                                                     recommendations_slate
+        #
+        # So `processed_root()` returned an EMPTY directory, and everything
+        # downstream read as "no data" rather than "wrong directory".
+        # `build_market_accuracy_payload` -> `_artifact_root()` -> here is the
+        # visible consequence: WNBA `market-accuracy` served `available: false`
+        # across 07-19..08-08 and graded 0 rows while soccer graded 385 and MLB
+        # 53 -- indistinguishable from an unplayed slate.
+        #
+        # UNLIKE the branding instance of this same `[0]` defect (`92823414`),
+        # the file really is present on another candidate root here, so the
+        # root-order fix ALONE is sufficient. That distinction is the whole
+        # question to ask at each site: is the data absent, or merely looked for
+        # in the wrong place first?
+        #
+        # WNBA ONLY. nba/nhl above are the same shape and are NOT changed --
+        # their roots have not been measured, and a sweep is how a fix for one
+        # sport becomes an outage for another.
         roots = preferred_artifact_roots(__file__, env_var="SYNDICATE_WNBA_SOURCE_ROOT", local_dir_name="wnba_source")
-        if roots:
-            return (roots[0] / "data" / "processed").resolve()
+        candidates = [(root / "data" / "processed").resolve() for root in roots]
+        for candidate in candidates:
+            try:
+                if candidate.is_dir() and any(candidate.iterdir()):
+                    return candidate
+            except Exception:
+                continue
+        if candidates:
+            # Nothing populated anywhere: keep today's answer so a genuinely
+            # empty deployment reports the same path it always did.
+            return candidates[0]
         return (Path(__file__).resolve().parents[3] / "data" / "wnba_source" / "data" / "processed").resolve()
     if slug == "nhl":
         roots = preferred_source_roots(__file__, env_var="SYNDICATE_NHL_SOURCE_ROOT", local_dir_name="nhl_source")

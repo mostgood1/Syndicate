@@ -240,6 +240,456 @@ turns out true is the one nobody goes back to check the reasoning of.**
 [[retraction is not innocence]]
 
 
+### 2026-08-09 — NINTH COLLISION, and it happened INSIDE the act of diagnosing the collision mechanism. `#294` is released; this lane holds `#293`
+
+**The lead did the right thing and it still collided.** Told that answering from
+memory was the defect, they went and read `origin/main`'s `todo.md` — the
+durable record — and allocated `#294` to work that had already claimed `#293`
+in `87bf670b`. **Because `87bf670b` is unpushed.** That is the third staleness
+point, demonstrated by the person naming it, one message after naming it.
+
+```
+grep           stale between read and write
+ask the lead   stale between the lead's read and their reply   (slower, not faster)
+read main      stale for every ID claimed in an UNPUSHED commit
+```
+
+Their own scan makes the third point better than any argument: `279 280 282 283
+290 291` all report free on `origin/main` and **all six are verbally allocated
+and sitting in unpushed commits** — the in-flight work, which is exactly the
+work most likely to collide.
+
+**RESOLUTION: this lane keeps `#293`**, because it is written into this file in
+the commit that claimed it and that is the rule. **`#294` is RELEASED — free for
+the next taker.** Recorded here so it does not become a phantom, which is the
+failure `#292` had (allocated by message hours earlier, present in neither file,
+and therefore about to be handed to someone else).
+
+#### THE HONEST CAVEAT ON MY OWN FIX, which this collision exposes
+
+Atomic claim is necessary and **not sufficient**. A stub heading committed but
+not pushed is still invisible to everyone — my `#293` claim was, which is *how*
+this collision happened. Git arbitrates at PUSH time: two lanes claiming one
+number hit a conflict that is loud, immediate and unmissable. But nothing
+arbitrates a claim that never leaves the local branch.
+
+**So the rule is: claim the ID by appending its stub in the same commit, and
+PUSH THAT COMMIT PROMPTLY — do not let an ID claim sit in a deploy-batching
+queue.** A todo stub is docs; it never triggers `blueprint_sync` and is safe to
+push while config commits wait (`#284`). Where a claim must sit unpushed, say so
+when quoting the number, because until it is pushed the ID is *reserved in one
+tree*, not allocated.
+
+I proposed atomic claiming and then held my own claim in an unpushed batch for
+the same reason the lead kept hand-allocating after adopting the fix: **the
+broken mechanism was the one already in my hands.** Same shape, same evening,
+one message apart.
+
+### OPEN 2026-08-09 — `#292` DOES SETTLEMENT GRADE AGAINST BEST PRICE OR THE ARBITRARY RETAINED BOOK? A validity question about the evaluation layer, not a settlement follow-up
+
+**Unmeasured. Highest-value open item from the `#275` lane, and rated by the
+lead above everything else outstanding.**
+
+What is established: settlement takes closing price from `odds_refresh_tracking`'s
+stamped `closing_price` when `build_market_history_view` reports
+`history_points > 0`, else it falls back to the graded row's own price.
+**Whether that stamp contains best-of-book or the arbitrary retained book was
+never measured, and whether it differs per sport is unknown.**
+
+**Why it outranks the rest:** the single-book capture defect was platform-wide
+across three classes (5 books fetched, 1 kept), and best-price re-grading already
+measured **+2.79 ROI points**. If the stamp is the retained book, **every
+cross-sport ROI number in this repo compares unlike with unlike** — including
+the ones that decided which models to keep. That makes it a validity question
+about the evaluation layer rather than a settlement question.
+
+**START AT THE WRITER, NOT AT SETTLEMENT.** Settlement only reads what
+`odds_refresh_tracking` stamped, so auditing the reader hunts a defect that
+lives upstream. Unowned; needs its own lane.
+
+### OPEN 2026-08-09 — `#293` BLUEPRINT-vs-LIVE CONFIG AUDIT (supersedes the mis-numbered `#281` on `70e60b55` / `2ddccb97`)
+
+**Claimed atomically — see the ID note below.** `scripts/blueprint_sync_preview.py`
+(`70e60b55`) and the refresh-worker tick-owner declaration (`2ddccb97`) were
+committed under `#281`, which was **already** the live-lens memory-gate entry
+(`86eb1271`). Those commits are not being amended; this heading is the record.
+
+Shipped: the preview gate, exit 1 when a sync would write anything. Run
+2026-08-09: **1 pending write across three services**
+(`SYNDICATE_MLB_REFRESH_TICK_OWNER` on refresh-worker), zero collateral.
+Remaining: push all three window-two commits together, then re-run the gate.
+
+> **ID NOTE — claimed by WRITING, not by asking, and that is the point.** Both
+> IDs above were taken by appending these stubs in the same commit that claims
+> them, after scanning `todo.md` + `todo_closed.md` for the highest in use (291).
+> **`#292` had been allocated by the lead hours earlier and existed only in
+> session messages — it appears nowhere in either file**, which is precisely the
+> failure mode that produced eight collisions tonight and two from central
+> allocation. An ID living in a session's memory is not allocated; it is
+> remembered. Claim and record must be the same write, or the allocator's view
+> goes stale between the read and the reply exactly as grepping did.
+
+
+### 2026-08-09 (~01:00Z) — `#275` SETTLEMENT LANE CLOSED. Recommendation: **do not enable the autorun.** Four things remain open and are named here so they are not lost
+
+**The deliverable was a cost, not a survey, and it did not change across five
+rounds of evidence.** What changed is that every number under it is now one I
+measured rather than inherited.
+
+```
+~1,436 MB   to read production's largest ledger chunk (367MB, 2026-08-05)
+ ~1,600 MB   refresh-worker floor          2,357 MB  its recurring peak
+ ~3,596 MB   lethal
+    4.6 s   per settled record, end-to-end, BRANCH ASSERTED
+```
+
+Fits against the floor with 535MB spare, goes **197MB over lethal** against the
+peak — and it is a 10–45 minute occupation, so it must miss *every* excursion.
+
+**THE FINDING WITH THE MOST LEVERAGE: the index, not the chunk, is the entire
+per-record cost.**
+
+```
+chunk_mb   index_mb   s/record
+  100.7      21.8       4.604
+   50.3      21.8       4.694   <- chunk HALVED, no change
+   50.3       2.2       0.727   <- index /10, 6.5x faster
+```
+
+`#254` streamed the readers, `#256` streamed `_read_chunk_records` and
+`_replace_ledger_line`, the ledger-bloat work compacted the chunks — **three
+rounds of optimisation, all aimed at the file that turned out not to matter.**
+Hoisting the index round trip out of the per-record loop is ~100× on the
+dominant term and is a hard prerequisite, not an optimisation.
+
+**State the cost as capacity, never as a projection:** duration =
+`4.6 s × (however many settle)`, so a 10-minute pass affords ~130 settled records
+against ~9,000 per date. That form makes the decision **without a conversion
+rate**, which is why it survived two retractions that killed every rate-based
+version.
+
+#### SHIPPED
+
+| | |
+|---|---|
+| `b2d7e36f` | `#273` NFL grader read a directory nothing writes — and a path-only fix would have persisted 49 phantom pushes |
+| `52bf5243` `2472cbb8` | `scripts/settlement_cost_preflight.py`, read-only |
+| `bac6f762` | `render.yaml` claimed settlement was ON; second key would have run it 4×/day |
+| `25d72d8d` | ledger-index size reported from the one service that can see it |
+| `9fe01882` | `#284` "pushing to main ships nothing" is true of CODE, false of CONFIG |
+| `70e60b55` | `#281` `scripts/blueprint_sync_preview.py` — gate before any `render.yaml` push |
+| `2ddccb97` | `#281` refresh-worker declared a NON-owner of the MLB sweep — **held for window two** |
+
+> **ID COLLISION — the two `#281` rows above are MIS-NUMBERED and I am not
+> amending them.** `#281` was already allocated to the live-lens memory-gate
+> entry by the lead's own central allocation (`86eb1271`, "live-lens memory-gate
+> entry #274 -> #281"), and that entry is live at the `### OPEN ... #281 THE
+> LIVE-LENS MEMORY GATES` heading in this file. It was then allocated to me for
+> the blueprint env-diff work. **`70e60b55` and `2ddccb97` carry the wrong ID**;
+> a replacement is requested from the lead and will be recorded here rather than
+> rewritten into the commits, per the standing no-amend rule.
+>
+> **This is the EIGHTH ID collision of the night and the SECOND from central
+> allocation** (`#290` was the first, hours after grepping was banned for
+> producing exactly this). That matters more than the number: the remedy failed
+> for the *identical* reason the thing it replaced failed — **the allocator's
+> view is stale between the read and the reply.** Centralising a stale read does
+> not make it fresh; it moves it. A registry that assigns from a durable record
+> at write time would; a session answering from memory cannot. Recorded because
+> [[the failure of a remedy is more useful than the failure it replaced]].
+
+#### STILL OPEN — four things, in value order
+
+1. **Does settlement grade against BEST price or the arbitrary retained book,
+   and does it differ per sport?** Unanswered. All that is established: closing
+   price comes from `odds_refresh_tracking`'s stamped `closing_price` when
+   `history_points > 0`, else the graded row's own price. **Whether that stamp is
+   best-of-book was never measured.** The single-book capture defect was
+   platform-wide and best-price re-grading already measured **+2.79 ROI points**
+   — so this decides whether every cross-sport ROI number compares like with
+   like. Larger than anything else in this lane.
+2. **The chunk-index hoist.** Scoped for window two as a prerequisite.
+3. **Production index size is still unmeasured.** `25d72d8d` reports it but is
+   undeployed, so the dominant term rests on a 21.8MB *test* index. Note
+   `?names_only=1` (`0175df58`) does **not** help here — verified, neither
+   `evaluation_ledger_chunks/index.json` nor the chunks are allowlisted, so no
+   HTTP route reaches them at any size. The log probe is the only route.
+4. **The 438-row ceiling is stale in the favourable direction.** WNBA's
+   `processed_root()` fix (`17d4f203`) is undeployed; re-run the per-sport count
+   after. No estimate offered.
+
+#### METHOD — the two that generalise
+
+**A fixture can select a cheaper code path than production and the failure
+presents as a GOOD result.** `_is_chunked_ledger_path` returns True only for the
+module-level `DEFAULT_LEDGER_PATH`, so any temp ledger takes the FLAT branch and
+falls through to `_append_jsonl` — measuring an append while believing you
+measured a rewrite. **80× more favourable, which is exactly why nothing invited
+suspicion.** A wrong number that looks bad gets investigated; one that looks good
+gets published. The harness now asserts the branch by line count (a rewrite keeps
+it identical, an append raises it) and refuses to report without it. And
+`_read_ledger_records_for_date`'s own docstring warned about this — a correct,
+prominent, recent warning that failed to fire when the situation arose.
+
+**A rate borrowed from another lane broke this lane's published numbers TWICE**
+— a 17× error from a stale-mirror claim, then an 18.2% conversion rate carried
+into a commit message within the hour, *after* writing the rule about it.
+Vigilance did not work; three sessions broke the same rule including its author.
+**What worked was designing the borrowed number out of the conclusion.** Where a
+contested figure can be removed from a claim, that beats remembering to check it.
+Corollary adopted across lanes: **put the n IN the number** — `216/date (n=1)`
+survives paraphrase, "though that's one date" does not.
+
+
+### 2026-08-09 (early) — WNBA lane close-out: `#280` flag split + the `[0]` question ANSWERED, and the settlement lane's `(c)` is FIXED
+
+Two commits, neither deployed, both window two.
+
+**`17d4f203` closes the WNBA half of the settlement lane's grader audit — the
+`(c)` block further down this file, `processed_root()` reading 0 of 6 families.**
+Their diagnosis was exact and needs no repeating; the chain is
+`build_market_accuracy_payload` → `_artifact_root()` → `processed_root()` →
+`current_odds_root_for_sport("wnba")` → `preferred_artifact_roots(...)[0]`.
+Now: **first root that HAS files**, in the existing preference order. The
+preferred root still wins when populated, and when nothing is populated
+anywhere it returns `candidates[0]` — today's answer — so an empty deployment
+reports the same path it always did. **WNBA only**; the `nba`/`nhl` branches
+directly above are the same shape, are NOT measured, and are NOT touched. A
+test pins that `nba`'s `roots[0]` is unchanged.
+
+#### The general answer, and it is worth more than the fix
+
+The register had five `preferred_*_roots(...)[0]` sites and two incompatible
+readings of them: the soccer lane's `60689dee` (one-line fix, worked) versus my
+`92823414` (one-line fix would have changed **nothing**, because the branding
+CSV was on no root at all and `.gitignore` had swallowed it). Their conclusion
+was *"`[0]` is necessary and never sufficient."*
+
+`17d4f203` is the counter-example that resolves it: **the file IS present on
+another candidate root here, so the root-order fix alone IS sufficient.**
+
+So the register item is not "five one-line fixes" and not "five bootstraps".
+**It is a QUESTION to ask at each site: is the data absent, or merely looked for
+in the wrong place first?** One confirmed instance of each now exists. Identical
+symptom, and the difference between a ten-minute change and a bootstrap.
+Whoever takes `nba/cards.py:178` and `ncaab/cards.py:23` should ask it before
+writing anything.
+
+**And the detail that should not be lost:** `/api/ops/wnba/artifact-counts`
+exists *because of this exact mismatch*, and its own comment states it
+verbatim — *"processed_root() unconditionally prefers a source_artifacts
+candidate root whether or not that location actually has anything written to
+it."* **An instrument was built to report the defect, and the defect was never
+fixed.** The instrument became the mitigation.
+
+#### `#280` (`3e821a27`) — one flag gated two unrelated permissions
+
+`allow_stored_date_fallback` gated both "you may substitute a DIFFERENT date's
+stored slate" and "you may merge TONIGHT's live scores". The live lens correctly
+refuses the first and was thereby denied the second. Measured same-instant,
+same service:
+
+```
+/wnba/api/cards      (fallback=True)   3 games   Scheduled, Final, Final
+/wnba/api/live-lens  (fallback=False)  2 games   Scheduled, Scheduled
+```
+
+`allow_live_status_merge=None` means "follow the old flag" — byte-for-byte
+today's behaviour for every existing caller, all four combinations pinned.
+**UNVERIFIED IN PRODUCTION and deliberately so:** the worker-side display is
+already correct without it (the worker reaches live status by a different,
+ungated path), so `#280`'s value is on the **web rebuild** path specifically.
+Measure that before calling it done rather than assuming the flag split is what
+fixed anything.
+
+#### Routed out of this lane
+
+- **`#291`** (allocated `#290` first; the intelligence lane had already landed
+  `d9454eea` under that number — **seventh ID collision of the night, and the
+  first from central allocation**, which failed for the identical reason
+  grepping did: the allocator's view is stale between their read and their
+  reply) — `test_odds_control_plane::test_odds_history_prefers_artifact_history_over_tracking` is **flaky, not failing**: three isolated runs with no code change gave PASS, PASS, then FAIL, and the failures name a *different* file each time (`artifact`, `tracking`). The path-ORDER assertion passes every time; only the loader's choice varies. All three fixtures are written in the same instant, so an mtime tie-break is a **hypothesis, not a finding**. Non-involvement established by tripwire — patching `current_odds_root_for_sport` to raise on `wnba` and confirming the branch never executed — rather than by re-running until green.
+
+### 2026-08-08 (22:32–01:41Z) — `#279` NINE OOM KILLS ENDED BY SOMETHING NOBODY HAS IDENTIFIED. A fix that worked, a runaway it caused, and one claim we cannot make
+
+**Read the labels. Three of the claims below are verified by measurement and
+two are explicitly NOT, and the difference is the point of the entry.**
+
+#### VERIFIED — the soccer sim fix works
+
+`SOCCER_HISTORY_SEED_BOOTSTRAPPED` fired at 22:28:02 across all ten leagues,
+and **eredivisie simulated and persisted across four consecutive samples**
+where every prior measurement had it dying inside one. `a03c2cfb` +
+`c9fbb736` together fixed a sim that had produced nothing for nine of ten
+leagues for weeks. **That result should not be buried under the incident it
+triggered.**
+
+#### VERIFIED — my fix converted a latent defect into a live one
+
+Sims doing real 145s work instead of dying in 2s turned a harmless respawn into
+a runaway:
+
+```
+23:52  procs  9  refresh_odds  2
+23:59  procs 57  refresh_odds 24
+00:51  procs 75  refresh_odds 34    -> OOM (4Gi)
+```
+
+**NINE OOM kills in 82 minutes**, all `oomKilled` at 4Gi, all the same instance
+(`...-pfk9m`), **every one of them AFTER the cancel fix went live**. I first
+recorded three, oversight found eight, the WNBA lane found the ninth (23:14).
+**Three people converged on three different numbers by each reading a
+different truncated window** — the count itself needed triangulating:
+
+```
+23:14:xx          <- first, 11 min after the fix went live at 23:03:34
+23:29:45
+23:41:07  +11.4
+23:51:52  +10.8
+00:04:15  +12.4
+00:14:38  +10.4
+00:26:17  +11.7
+00:39:56  +13.7
+00:51:29  +11.6   <- last, then nothing
+```
+
+**The cadence is FLAT at ~11.6 min, not accelerating.** I reported "14.1 → 11.6,
+accelerating" from three points. Across the nine-kill series there is no trend. Three
+points read as a trend — the same too-few-samples error that produced the 5-sample
+live-lens median and the n=7 memory "peak" tonight. **Three lanes, three
+instruments, same mistake.**
+
+**COST: refresh-worker was effectively unavailable 23:29–00:51 during a live MLB
+slate.** Not degraded — dying every eleven minutes.
+
+**THE TICK IS INNOCENT — there is no launcher timer.** I described this as a
+"45-second retry cadence" for an hour and that framing implies a scheduler. There
+is none. `_has_pending_external_contract` (`run_refresh_worker.py:1311`) re-claims
+any manifest that is `running` + `queue_state: queued` + no live pid, and spawns
+another job. **Every tick faithfully executed a truthful instruction derived from
+stale state.** That is why three restarts changed nothing: *reboots clear
+processes, not state.*
+
+Generalised, and worth carrying: **a component faithfully executing a truthful
+instruction derived from stale state is indistinguishable from a malfunctioning
+one — except that restarting it does nothing.** That last clause is the
+diagnostic.
+
+#### VERIFIED — `cancel` was broken in TWO DIFFERENT WAYS, and the distinction matters
+
+"cancel was broken" is too coarse. **One branch refused to act. The other acted
+and lied about it.** They need separate fixes and they produced separate
+failures:
+
+```
+no pid recorded     -> raised "No running refresh PID is recorded"
+pid recorded, dead  -> set state=failed but returned ok=False
+```
+
+The first **declined to act** on the one manifest that needed it — a real
+refusal, nothing changed. The second **acted correctly and misreported it**: the
+state change happened, and only the return value was wrong. That distinction is
+load-bearing, because it means the pre-fix code's defect on that branch was
+purely in what it *reported*, not in what it *did* — which is exactly why a
+22:41Z call could genuinely terminalise a manifest while everyone watching `ok`
+believed nothing had happened. **The second is the one that cost an hour**: it did the right thing and reported it as a
+failure, so `{"ok": false, "detail": "Recorded PID is not running.", "pid": 609}`
+read as "still uncancelled" while the state change had in fact happened. Fixed
+in `35407b9d` (code) + `c8419c7c` (tests), deployed 23:03:34Z. Both branches now
+drive the manifest terminal; the claim-loop gate requires `running`, so terminal
+stops the re-claiming.
+
+#### **NOT VERIFIED — that the cancel fix stopped this runaway**
+
+The call returned exactly what was predicted, on both lanes:
+`{"ok":true,"pid":109,"state":"failed"}`. **But it landed at 01:41:26Z and
+`refresh_odds_sources` had been at ZERO since 00:53** — 48 minutes earlier.
+
+```
+00:51  procs 75  refresh_odds 34   <- last OOM
+00:53  procs  5  refresh_odds  0
+01:41  procs  5  refresh_odds  0   <- cancel lands HERE
+```
+
+**The deploy did not stop it either** — it went live 23:03:34Z and **all eight
+OOM kills followed it.** The fix was live for the entire crash loop. It is
+correct and tested regardless; an endpoint that refuses to cancel an
+already-dead run is backwards whatever happened tonight. But "this stopped the
+runaway" is not supported by the timeline and is not claimed.
+
+**ONE MECHANISM IS ELIMINATED, and the evidence is the cancel call itself.**
+At 01:41:26Z — **50 minutes after spawning stopped** — cancel found the manifest
+still `running` with a dead `pid 109` and had to drive it terminal. So the
+manifest was NOT terminal when the loop stopped, and **manifest resolution is
+excluded as the cause.** A call that failed to prove its own purpose produced a
+real elimination instead.
+
+**A SECOND, INDEPENDENT ARGUMENT AGAINST "a cancel ended it".** The pre-fix
+dead-PID branch *did* write `state="failed"` while returning `ok:false` — so a
+22:41Z call genuinely terminalised the default-lane manifest, **two hours before
+the stop, and the loop ran through it for another nine kills.** A real
+terminalisation on that lane did not stop this. Complete cancel history for the
+night: three calls ~22:41Z (all pre-fix), then nothing until 01:41:26Z. **A
+three-hour gap straddling the 00:51:30 stop.**
+
+Remaining candidates, both testable from artifacts rather than logs:
+- the **queued contract was consumed** (the claim had nothing left to re-claim)
+- the **spawned jobs began failing earlier** for an unrelated reason
+
+Note these are different mechanisms with identical appearance, and only the
+second leaves the loop able to recur unchanged.
+
+#### **NOT VERIFIED — that the loop is unbounded**
+
+I reported "not self-limiting, each OOM makes the next arrive sooner" from three
+boot gaps. **Across eight intervals the cadence is flat at ~11.6 min with no
+trend, and then it stopped on its own and stayed stopped.** No deploy, no
+restart, no human action in the events between 00:39:56 and 00:51:29. If enough
+kills eventually exhaust the queued contract, the loop *is* eventually
+self-limiting — a materially weaker claim than the one I made. **Unresolved, and
+it changes how urgent `#282` is.**
+
+Worth recording precisely, because both readings were honest: "crash loop" was
+right when said, and the competing "one kill is not a loop" was right when *it*
+was said. The system changed under both. That is not a correction to either
+lane — it is a caution about asserting a regime from a snapshot.
+
+`refresh_status_by_lane` is empty from web, so the worker's manifest state
+cannot be read from outside. That is why this is unresolved rather than
+answered, and it is its own gap.
+
+#### THE OPEN RISK, stated as a risk rather than a loose end
+
+**A resolved incident with an unidentified cause is an open risk, not a closed
+item.** Nine kills stopped without anyone doing anything, and we cannot say it
+will not recur — because we cannot say what ended it. The 522-sample acceptance
+soak (`MAX process_count 12`, `MAX soccer procs 0`, no `server_failed` for 50
+min) proves the system is HEALTHY; it does not prove it is FIXED. Those are
+different claims and merging them is how this returns unannounced.
+
+#### STILL OPEN
+
+- **A real concurrency bound in the claim path.** The actual defect. Nothing
+  bounds how many claims run at once; `cancel` only cleans up after.
+- **`#282` per-league grouping** (user-directed): one job = one league-date
+  instead of ~7, cutting steady-state overlap ~6x. **Bounds the damage, does not
+  remove the defect** — both are needed.
+- **No way to read worker manifest state from web**, which is what made the
+  self-limiting question unanswerable.
+
+#### THE METHOD LESSON, which is the same one four times tonight
+
+Every wrong call I made had the identical shape: **a sound argument about the
+wrong variable.** The env change that couldn't work because a 4h timer can't
+produce a 45s cadence. The "blocked on observability" entry built on a correct
+zero-`STEP_FAIL` measurement whose inference was backwards. The grader "blocker"
+read off a stale local mirror. The firing decision I argued for on *timing* while
+never asking what the load *was*.
+
+**I caught the fourth one before anyone acted on it.** That is the only
+improvement I can claim, and it came from asking "what would have to be true for
+this to be wrong?" rather than from being more careful.
+
 ### 2026-08-08 — #278 BOTH WORKERS RUN THE MLB ODDS SWEEP. `render.yaml` says one should.
 
 **`SYNDICATE_MLB_REFRESH_TICK_OWNER` does not exist in production, on either
@@ -518,6 +968,136 @@ claim elsewhere in this file is wrong for that lane.
 - **A green test can assert nothing.** `with self.assertRaises(Exception):
   json.loads(raw)` passed because `json` was not imported and `NameError` is an
   `Exception`. Pin the exception type when the assertion IS the measurement.
+#### `#276` ADDENDUM — three more defects in this subsystem, all shipped. `e92f0529`, `6161ade3`, `a56d4c4c`. NOT DEPLOYED (window two)
+
+**1. The repair pass could not see past the git checkout, and for soccer it never
+once asked for a real file.** `_missing_required_artifact_relative_paths` exists
+so a copy that NEVER ARRIVED can be requested by exact path, because a
+`since=`-scoped pull can only fetch what changed. Some per-sport helpers resolve
+through `preferred_source_roots()`, which appends the REPO checkout as a
+cold-start fallback. Measured with `SYNDICATE_DATA_ROOT` on an empty directory:
+
+```
+schedule_path('mls', 2026) -> <repo>/data/soccer_source/mls/api/schedule/schedule_2026.json
+is_file()                  -> True        <- the git-tracked cold-start copy
+relative_to(data_root)     -> ValueError
+```
+
+Both branches dropped it silently — `is_file()` short-circuits on the repo copy,
+and the `relative_to` that would have caught the escape raises into a bare
+`continue`. **The repair pass concluded soccer's season schedule was PRESENT
+because it found the mirror in git, while the runtime disk had none.** This is
+CLAUDE.md's own warning turned into a code path: *don't diagnose missing data
+from the local checkout.* Presence is now judged at `(data_root / relative)`,
+and a path resolving outside the root is re-anchored on its `<sport>_source/…`
+segment. **Sport-general by construction, surfaced by soccer** because soccer's
+helpers are the ones that do the fallback — worth checking any other helper that
+resolves through `preferred_source_roots`.
+
+**2. `names_only=1` did not suppress bodies because `names_only` DID NOT EXIST.**
+The 21:29:41Z 30,308,015-byte response was not a broken flag — the export
+endpoint reads only `since`, `path`, `pattern`, and Flask ignores unknown query
+args, so it ran as an ordinary full-body export while its author believed the
+flag was protecting them. 30,308,015 is the JSON envelope of one 27,420,309-byte
+state file, **within three bytes** of the envelope size measured independently
+on the publish path — so it was one artifact's body, exactly as an un-flagged
+export gives. **A silently ignored safety flag is worse than an absent one**,
+because it reads as protection in the caller's own command line. Implemented
+rather than rejected (`6161ade3`): `?names_only=1` returns `{bytes, mtime}` per
+match and never reads a file.
+
+**3. The publisher's own test suite could never complete, and that is why (1)
+was invisible.** Three defects, all proven pre-existing in a clean worktree at
+HEAD:
+
+- **Two tests HUNG rather than failed** (standalone: exit 124; located with
+  `faulthandler.dump_traceback_later`). Their mocks set
+  `read.return_value = <bytes>`, so every read returned the same non-empty bytes
+  forever while `pull_streamed_artifact` drains with
+  `while True: chunk = response.read(n); if not chunk: break` — an infinite loop
+  writing 1MB chunks to disk.
+- One test **failed unconditionally** since `29746931`: its fixture is pinned to
+  `2026-07-13` while the sweep now judges freshness by the slate date in the
+  filename.
+- Four assertions counted `path=` requests across **both** transports; `#209`'s
+  quote logs ride `/artifacts/stream` and also carry `path=`.
+
+**115 → 119 passed in ~10s, where before the file never finished.** Unhiding the
+hang is what surfaced defect (1): those tests had never once run to completion,
+so nothing had ever checked their result.
+
+**METHOD, and it is the one worth keeping.** *A test that hangs is worse than one
+that fails, because a failure is reported and a hang is indistinguishable from a
+slow machine.* I spent three runs blaming contention — there genuinely were six
+other sessions running suites — before instrumenting instead of inferring. The
+same shape as the soccer lane's "zero `STEP_FAIL` in 7 days": a real
+environmental explanation was available and wrong.
+
+**Answering the lead's cross-sport question directly:** defect (1) is
+**sport-general with a soccer-shaped trigger** — the code is shared, the blind
+spot fires for whichever sport's helper falls back to the repo. Defect (2) is
+sport-independent. And on "can the allowlist be derived rather than curated":
+**not from the writers**, because nothing declares what it writes; but the
+`is_file()`-versus-`data_root` bug above is the more useful half of that
+question, since a curated list at least fails loudly while a presence check
+against the wrong disk fails silently forever.
+
+
+#### `#276` CORRECTION — the repair-pass false-present is NOT long-standing. It dates to `c9fbb736`, 21:31Z tonight
+
+My addendum above said the repair pass concluded soccer's schedule was present
+"every cycle, forever". **That is wrong, and the soccer lane caught it.** Checked
+against the commit rather than assumed:
+
+```
+BEFORE c9fbb736   schedule_path -> _api_root(league) -> _source_roots()[0]
+                  the RUNTIME DISK ONLY -> is_file() False -> repair REQUESTED it
+AFTER  c9fbb736   schedule_path -> _api_read_path -> "first root that HAS it"
+                  repo fallback included -> is_file() True -> repair SKIPS it
+```
+
+So the repair pass was **working correctly for soccer's schedule until 21:31Z on
+2026-08-08**, and `c9fbb736` — a correct fix for a different problem, making
+git-shipped artifacts reachable when the mounted disk never received them — is
+what fed it a repo path in exactly the case the repair pass exists to handle.
+
+**Scope, measured rather than assumed:** in the same test the other six required
+artifacts (MLB/WNBA) resolved correctly under the data root and were requested;
+only the soccer schedule was skipped. So the observed false-present was
+**soccer-schedule-only**, not platform-wide. `e92f0529`'s fix is still right and
+still worth having — judging presence at `(data_root / relative)` is robust to
+whatever any helper returns, rather than merely compatible with today's helpers —
+but it should be recorded as **hardening plus a one-file regression fix**, not as
+the repair of a long-standing platform defect.
+
+**`#293`'s audit is still warranted** and its shape is unchanged: all five soccer
+read helpers (schedule, recommendations, live_state, picks, rosters) now return
+"first root that has it", so anything else in the codebase judging presence from
+a soccer `sources.py` path has the same false-present.
+
+**THE PATTERN, and it is the third instance in one evening** — credit to the
+soccer lane for naming it: *repairing a path switches off something that was
+quietly depending on that path being broken.*
+
+| what was repaired | what silently depended on it staying broken |
+|---|---|
+| `game.state` populated for soccer rows | the stale-kickoff guard keyed on `game.state` being ABSENT |
+| soccer sims made to do real work | the contract retry loop was harmless only while sims died in 2s |
+| soccer reads made to see the repo copy | the repair pass was correct only while the helper COULDN'T see it |
+
+**The dependency is never written down, because nobody writes down "this works
+because that other thing is broken."** Before repairing a read path, grep for
+what asks a *presence* question about it — the guard is invisible until you make
+the data present. (Same lesson as the `None`-was-load-bearing entry earlier in
+this file, now with three instances rather than one.)
+
+**METHOD:** I dated a defect from a repro (`SYNDICATE_DATA_ROOT` empty) that
+cannot distinguish "always broken" from "broken since tonight", and wrote
+"forever" anyway. The check that settles it is one `git show <sha>^:<file>` and I
+did not run it until someone else asked. **A repro proves the defect exists; only
+history dates it.**
+
+
 ### #286 — ROOT CAUSE, MLB `candidate_count = 0`: the empty-board guard is BLIND to a board too big for keyvalue. Fixed, committed, NOT deployed
 
 **ID note:** taken as #286 rather than #269 deliberately, before central
@@ -1504,6 +2084,30 @@ that **a number load-bearing enough to change the recommendation must be measure
 by whoever is standing behind the recommendation.**
 
 ### OPEN 2026-08-08 (evening) — `#281` THE LIVE-LENS MEMORY GATES, ALL FIVE BUILDERS MEASURED AT ONCE. **MLB's is 3-4x too LOW, and it is the one everyone trusted**
+
+> **BEFORE ACTING ON THIS IN WINDOW TWO — the baseline these gates are measured
+> against is itself drifting, and that changes the fix.** The intelligence lane
+> measured `run_refresh_worker.py` going **85MB → 1381MB in 55 minutes (~24MB/min,
+> 71% of all process RSS)** with the expensive MLB overview blocked on every
+> cycle — so the ratchet is not any live-lens builder. Every builder cost in the
+> table below still stands; what moves underneath them is the floor.
+>
+> **That gives two failure modes with the SAME symptom — a guard that never
+> passes — and opposite fixes:**
+>
+> | | |
+> |---|---|
+> | WNBA's 1200MB gate | **miscalibrated against a build that no longer existed** (deleted 8 min later by `44008605`) → fix the number |
+> | the 3000MB overview floor | **correctly calibrated against a baseline that drifted underneath it** → fix the drift, NOT the number |
+>
+> **The symptom alone cannot tell them apart.** The discriminator is the
+> intelligence lane's: measure the guarded stage's cost *independently*, then
+> compare it against the baseline at the time the guard fires. Raising MLB's gate
+> to match a +951MB build is the right move only if the baseline is stable; if it
+> is climbing 24MB/min from boot, a correctly-sized gate still becomes
+> unsatisfiable 15–20 minutes into every boot and the raise makes MLB's build
+> skip during exactly the live slates it exists for. **Measure both before
+> touching the constant.**
 
 > **ID note:** written as `#274`, which the NFL lane also took (`35254271`, regular-season entry, several inbound references). Moved to `#281` per the lead's central allocation. **Second ID collision from this lane in one evening** — the first was `#271`/`#272`. Grepping for a free ID is a read that goes stale between the read and the write, and self-allocation across seven concurrent sessions does not converge: three lanes simultaneously believed they held `#278`. IDs are now requested from the lead, not grepped for.
 
@@ -21024,8 +21628,29 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
   each near-continuous even though every individual run ends. Per-side unit tests passed every time; only the
   joint invariant test (#63) catches it.
 
-- **Render auto-deploy is OFF.** Pushing to `main` ships nothing; deploys must be
-  triggered per service via the Render API. Confirmed 2026-07-25.
+- **Render auto-deploy is OFF — for CODE. Pushing `render.yaml` IS a production
+  change.** `autoDeploy = no` on all three services, so pushing `.py` really does
+  ship nothing (confirmed 2026-07-25). **But `blueprint_sync` bypasses it**
+  (`#284`, measured 2026-08-08): a web deploy at 23:02:26Z carried
+  `trigger = blueprint_sync` with no user in it, rewrote env vars on two live
+  services (refresh-worker 92 → 93 keys) and 502'd every route for ~2 minutes.
+  Nobody deployed it — a `render.yaml` commit had been pushed. It fires on
+  `render.yaml` changes, not every push (1 `blueprint_sync` vs 19 `api` over 20
+  deploys).
+  - **A sync writes the WHOLE env block, not your diff**, so a one-key edit ships
+    every value in the file, including drift nobody has read. Enumerate first:
+    diff the blueprint against each service's live `/v1/services/<id>/env-vars`
+    (paginate — `limit` > 100 returns HTTP 400).
+  - **Absent ≠ off.** `_evaluation_settlement_auto_refresh_enabled` treats absent
+    as False; `_mlb_refresh_tick_owner_here` defaults **True**. Same edit, no-op
+    in one case and a behaviour change in the other.
+  - The old one-liner was **literally true and materially misleading** — it read
+    as "pushes are free", and seven parallel sessions batched deploys all evening
+    on that basis. Near-miss the same night:
+    `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` sat in the blueprint while
+    absent from the service, and setting that key *at all* overrides settlement's
+    daily gate (`int(raw or 86400)`) — 4 runs/day of a ~1.4GB job. Commented out
+    four hours before the sync fired.
 - **Deploying kills an in-flight MLB sim.** Check before deploying:
   `curl -s -H "X-Admin-Token: $ADMIN_TOKEN" "$BASE/api/ops/live-refresh/state?sim_date=$(date +%F)"`
   and look at `sim_run_status.state`. A full slate takes ~15 min.

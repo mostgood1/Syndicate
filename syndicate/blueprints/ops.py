@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 import os
 import sys
@@ -919,8 +920,84 @@ def api_ops_ncaaf_season_weeks() -> Any:
     )
 
 
+_PUBLISH_STREAM_CHUNK_BYTES = 1024 * 1024
+
+
+def _publish_streamed_body() -> Any:
+    """Receive a raw streamed artifact body, one chunk resident at a time.
+
+    The JSON form below reads the whole body, parses it into a dict holding a
+    full copy of the file as a str, and then encodes that str again on the way
+    to disk -- three full copies of the artifact on a 2Gi instance. Measured
+    2026-08-08: refresh-worker publishes `intelligence_state_2026_08_08.json` at
+    27,420,309 bytes on every cycle that produces a real board, and web had
+    675MB of headroom at the time. #29746931 identified this exact shape as the
+    reason web was OOMing "with no correlation to anyone's deploys" and fixed
+    only which files the sweep selects; the direct publishers were never bounded.
+
+    Metadata arrives in headers so the body can stay raw. Checksum is verified
+    BEFORE the rename, so a truncated transfer leaves the previous artifact in
+    place rather than replacing it with a partial one -- the failure mode that
+    matters here, since every consumer of these files reads them whole.
+    """
+    relative_path = str(request.headers.get("X-Artifact-Path") or "").strip().replace("\\", "/")
+    if not relative_path:
+        return jsonify({"ok": False, "error": "X-Artifact-Path is required."}), 400
+    if relative_path.startswith("/") or ".." in relative_path.split("/"):
+        return jsonify({"ok": False, "error": "invalid relative_path."}), 400
+    if not is_hot_artifact_relative_path(relative_path):
+        return jsonify({"ok": False, "error": "relative_path is not an allowed hot artifact."}), 403
+
+    expected_checksum = str(request.headers.get("X-Artifact-Checksum") or "").strip().lower()
+    target_path = data_root() / Path(relative_path)
+    temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    digest = hashlib.sha256()
+    written = 0
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        stream = request.stream
+        with temp_path.open("wb") as handle:
+            while True:
+                chunk = stream.read(_PUBLISH_STREAM_CHUNK_BYTES)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                written += len(chunk)
+                handle.write(chunk)
+        if expected_checksum and digest.hexdigest() != expected_checksum:
+            temp_path.unlink(missing_ok=True)
+            return (
+                jsonify(
+                    {
+                        "ok": False,
+                        "error": "checksum mismatch",
+                        "relative_path": relative_path,
+                        "bytes": written,
+                    }
+                ),
+                400,
+            )
+        os.replace(temp_path, target_path)
+    except Exception as exc:
+        try:
+            temp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    return jsonify({"ok": True, "relative_path": relative_path, "bytes": written, "transport": "stream"}), 200
+
+
 @ops_bp.post("/api/ops/artifacts/publish")
 def api_ops_artifacts_publish() -> Any:
+    # Two accepted forms on one route, deliberately. The JSON envelope stays
+    # because live-odds-worker is pinned to an older commit and must keep
+    # publishing, and because a receiver that only understood the new form would
+    # make the deploy order load-bearing. The sender picks the streamed form by
+    # size and falls back on a 4xx that means "unsupported".
+    if str(request.headers.get("X-Artifact-Path") or "").strip():
+        return _publish_streamed_body()
+
     payload = _request_data()
     relative_path = str(payload.get("relative_path") or "").strip().replace("\\", "/")
     content = payload.get("content")
@@ -992,7 +1069,60 @@ def api_ops_artifacts_export() -> Any:
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
     subset_pattern = str(request.args.get("pattern") or "").strip().replace("\\", "/")
+    # ?names_only=1 -- inventory without bodies. Answers "what exists, how big,
+    # how fresh" for a matched set at a few bytes per file.
+    #
+    # THE INCIDENT THIS COMES FROM, 2026-08-08 21:29:41Z: a lane doing routine
+    # reconnaissance called
+    #   /api/ops/artifacts/export?pattern=reports/intelligence/intelligence_state*.json&names_only=1
+    # and web returned 30,308,015 bytes. That was read as "names_only=1 does not
+    # suppress bodies". It is worse than that -- THE PARAMETER DID NOT EXIST.
+    # Flask ignores unknown query args, so the request ran as an ordinary
+    # full-body export and the flag the caller believed was protecting them was
+    # never read by anything. 30MB through the 2Gi service, from a query whose
+    # author thought they had asked for names.
+    #
+    # (30,308,015 is the JSON envelope of one 27,420,309-byte state file, within
+    # three bytes of the figure measured independently on the publish path --
+    # so it was one artifact's body, exactly as an un-flagged export would give.)
+    #
+    # Implemented rather than rejected: the intent was reasonable and the cheap
+    # inventory is genuinely useful, which is why someone reached for it. An
+    # unknown-parameter rejection would also have prevented this and is a
+    # bigger, separate behaviour change across every ops route.
+    names_only = _coerce_bool(request.args.get("names_only"))
     artifacts: dict[str, str] = {}
+    if names_only:
+        listing: dict[str, dict[str, Any]] = {}
+        for pattern in HOT_ARTIFACT_PATTERNS:
+            for path in root.glob(pattern):
+                if not path.is_file():
+                    continue
+                relative_path = relative_to_data_root(path)
+                if not relative_path or not is_hot_artifact_relative_path(relative_path):
+                    continue
+                if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
+                    continue
+                try:
+                    stat = path.stat()
+                    if since_epoch is not None and stat.st_mtime < since_epoch:
+                        continue
+                    listing[relative_path] = {"bytes": stat.st_size, "mtime": stat.st_mtime}
+                except Exception:
+                    continue
+        # No `truncated` key on purpose: this path never reads a file, so there
+        # is no budget to exceed and nothing to truncate. Reporting a field that
+        # is structurally always False would invite a caller to trust it on the
+        # body-carrying path too.
+        return jsonify(
+            {
+                "ok": True,
+                "count": len(listing),
+                "names_only": True,
+                "bytes": sum(int(entry["bytes"]) for entry in listing.values()),
+                "artifacts": listing,
+            }
+        )
     # Hard byte ceiling on one response (#50). This handler accumulates whole
     # file contents into a dict and serialises it, so an unbounded matched set
     # is unbounded memory on a 2GB web instance -- and the client
