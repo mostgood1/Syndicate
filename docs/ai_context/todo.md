@@ -1,5 +1,245 @@
 # Syndicate TODO — canonical cross-session list
 
+### #285 — OPEN. The worker's retained memory is NOT in the Python object graph, and `HEAP_CENSUS` cannot see 93% of it
+
+First result on the ratchet isolated in `#290`. **Nothing shipped — both candidate
+fixes are production changes and the service has only just stabilised.**
+
+**DECISION 2026-08-09 ~02:15Z, by the oversight lane, deliberately not left to
+this lane to carry: do nothing that night; resume in window two, `MALLOC_ARENA_MAX`
+first, then `malloc_trim(0)` as the discriminator.** Reasons, recorded so the
+next session does not re-litigate them: the worker had been stable for exactly
+one hour after nine OOM kills; `#265`'s collapse observation was ~2.5h in and a
+restart would add a fifth boundary to a log already being hand-separated into
+collapse-signature vs reboot-signature; the slope only matters because it
+crosses the `#290` overview floor, which has starved the board all evening
+regardless; and `MALLOC_ARENA_MAX` via `render.yaml` means a blueprint sync,
+which applies the **whole file** — currently including a held
+`SYNDICATE_MLB_REFRESH_TICK_OWNER` change. **Two entangled config changes for a
+diagnostic.** The single-key env API avoids the entanglement but still needs a
+deploy to take effect.
+
+**Note the ordering here contradicts this entry's own "options" list below**,
+which promotes `malloc_trim` to first on discriminating power. Both orderings
+are defensible and the difference is what you optimise for: `MALLOC_ARENA_MAX`
+is cheaper and may *fix* it without a code deploy; `malloc_trim` is the only one
+that *tells you which world you are in*. **If `MALLOC_ARENA_MAX` produces a null
+result, that is uninformative rather than exculpating — it never tested
+hypothesis (2) — so do not close the item on it.**
+
+#### The census is blind here, and that is the finding
+
+Measured on the 00:51:51Z boot, 2026-08-09, under `#290`'s control condition
+(hydrated overview blocked on every cycle, so it is excluded by construction):
+
+```
+                  container_mb   gc_objects   Python heap, shallow
+01:03:43  idx 1      2564.9        381,063          99.7 MB
+01:05:22  idx 2      2654.2        308,068          81.4 MB
+01:07:06  idx 3      2926.7        319,683          84.0 MB
+01:09:05  idx 4      2827.2        321,233          84.3 MB
+
+01:08:05   run_refresh_worker.py RSS = 1151.7 MB     individually_huge_mb: []
+```
+
+**~84MB of gc-tracked Python objects against 1152MB of process RSS.**
+
+**THE SAMPLE PAIR — this is the whole argument. Read it before any summary of
+it, because it is the thing that gets lost when a finding is compressed into a
+conclusion:**
+
+```
+01:03:43   container 2564.9 MB   gc_objects 381,063
+01:05:22   container 2654.2 MB   gc_objects 308,068
+           container  +89.3 MB   gc_objects  -72,995
+```
+
+**A collection ran, 73,000 objects went away, and the resident set went UP.**
+Memory Python had finished with was not returned to the OS. Everything else in
+this entry is context for that pair.
+
+**So `HEAP_CENSUS` reports a healthy 84MB while the process holds 1.15GB.**
+Anyone who points it at this concludes "no leak". Fifth instance tonight of an
+instrument reading fine because of what it cannot see. [[a rate, not a count]]
+
+#### EXACTLY what the census can and cannot see — measured, not assumed
+
+`log_heap_census` (`memory_observability.py:572`) walks **`gc.get_objects()`**,
+which returns only objects that can participate in reference cycles. Verified
+locally on 3.11 rather than reasoned from docs:
+
+```
+                gc-tracked?   sys.getsizeof
+str  (40MB)        False         40.0 MB      <- invisible
+bytes(40MB)        False         40.0 MB      <- invisible
+ndarray(38MB)      False         38.1 MB      <- invisible
+DataFrame          True          15.3 MB         visible
+```
+
+**`str`, `bytes` and `ndarray` are all untracked, so the census never sees
+them** — on a Monte Carlo platform whose hot path is numpy arrays and parsed
+JSON strings, it is blind to the three things the workload is mostly made of.
+
+**This also disarms `individually_huge_mb`.** The `>50MB` check runs *inside*
+the `gc.get_objects()` loop, so a live 500MB ndarray is never a candidate.
+`individually_huge_mb: []` therefore means "no huge **container**", not "no huge
+object", and carries no weight against the hypotheses below.
+
+**Correction to this item's first version, which I got wrong:** I wrote that
+numpy buffers were undercounted because shallow sizing reads only the header.
+That is not the mechanism — `sys.getsizeof(ndarray)` *does* report the full
+buffer. They are invisible because they are never enumerated. Same blindness,
+different cause, and the difference matters: no amount of fixing the sizing
+would reveal them.
+
+#### What is excluded, and what is NOT
+
+**Excluded:** a leak in gc-tracked containers. That graph is small and shrinking
+(381k → 308k objects while RSS rose).
+
+**Both still open, and this instrument cannot narrow between them:**
+
+1. **allocator retention** — freed by Python, never returned to the OS (glibc
+   arenas and/or pymalloc). The gc-down-while-RSS-up sample fits this.
+2. **live `str`/`bytes`/`ndarray`** held by references the census cannot
+   enumerate.
+
+**Do not read the small census number as evidence for (1).** It is equally
+consistent with (2), and my first write-up leaned on `individually_huge_mb: []`
+as if it excluded (2). It does not.
+
+#### The discriminator is one call and is also the likely fix
+
+`malloc_trim(0)` releases only *already-freed* arena memory. RSS drops → (1),
+and the trim is the remedy. RSS holds → (2), and the work becomes finding what
+holds the buffers. The losing branch costs nothing.
+
+**Two facts make (1) the stronger prior:** there is **no `MALLOC_ARENA_MAX` and
+no `malloc_trim` anywhere in the repo** (grepped `*.py`/`*.yaml`/`*.md`, zero
+hits), and `run_refresh_worker.py` is multithreaded Python on glibc running
+several background loops — the textbook setup for per-thread arenas that grow
+and never return.
+
+#### Options, cheapest first — NOT taken, needs an owner's decision
+
+- **`malloc_trim(0)` at an existing RSS checkpoint** — ~4 lines of `ctypes`,
+  before/after in one log line. **Now the FIRST choice, not the second**: it is
+  the only one of these that discriminates (1) from (2), because it releases
+  only already-freed memory regardless of object type — which is exactly the
+  axis the census cannot resolve. Needs a code deploy.
+- **`MALLOC_ARENA_MAX=2`** — env only, no code. **Demoted**: it only helps if
+  (1) is true, and if (2) is true it does nothing and the null result is
+  uninformative rather than exculpating. Fine as a follow-on once `malloc_trim`
+  has said which world we are in.
+- **Nothing tonight** — defensible. The slope only matters because it crosses
+  the `#290` overview floor.
+
+Both are restarts, so neither belongs inside another lane's measurement window.
+
+#### THE REUSABLE DIAGNOSTIC — how to tell a bad threshold from a drifted baseline
+
+`#290` reached its answer because the guard had been blocking the expensive
+stage long enough to leave a clean control condition. **That was luck. A lane
+hitting this fresh would not have it**, and the symptom — "the guard is never
+satisfied" — is identical whether the threshold is wrong or the baseline has
+drifted underneath it. Tonight had one of each (WNBA's 1200MB gate was genuinely
+miscalibrated; this one is correctly calibrated). The method that does not
+depend on luck:
+
+1. **Measure the guarded stage's cost independently of the guard** — a
+   before/after around one execution, in **anon/process RSS**, never
+   `container_memory_mb` (page cache inflates it, ~1.4GB here).
+2. **Measure the baseline's own trajectory while the stage is NOT running.** If
+   the guard already blocks it, that condition is free; otherwise disable the
+   stage deliberately for a few cycles.
+3. **Compare.** Stage cost > available headroom at a *flat* baseline ⇒ the
+   threshold is right and the stage is too expensive. Baseline rising into the
+   threshold with the stage idle ⇒ the baseline is the bug and lowering the
+   threshold converts "degraded" into "OOM-killed".
+
+Step 2 is the one everyone skips, and it is the one that distinguishes them.
+
+### #290 — ITEM 4 ANSWERED: the 3000MB overview floor is roughly RIGHT. `run_refresh_worker.py` itself is the ratchet. DO NOT lower the floor
+
+**Supersedes my own earlier steer in `#286`, which said to "suspect a stale
+constant". That was wrong and acting on it would have been harmful.** Lowering
+the floor converts "board empty" into "worker OOM-killed", which is strictly
+worse.
+
+**The floor is not oversized.** MLB's hydrated overview genuinely costs
+**+2531MB anon** — this file's own 2026-08-07 measurement, `478MB anon → 3009MB
+anon` across the pass. Real process memory, not page cache. From tonight's
+baseline that lands at ~4.4GB on a 4096MB container. The guard is right.
+
+#### The clean experiment — the guard built its own control condition
+
+With the hydrated overview blocked by the guard on **every** cycle since the
+00:51:51Z boot, anything still growing cannot be the overview. Measured
+2026-08-09 on refresh-worker:
+
+```
+              procs   process RSS   container_mb
+00:51:51        2       85.5 MB       277        <- fresh boot
+01:05:22        4     1343.7          2654
+01:20:07        7     1418.4          2753
+01:35:08       12     1861.9          3238
+01:47:12       12     1934.0          3327
+```
+
+**+1849MB of real RSS in 55 minutes with the expensive stage never running.**
+And the holder is named, not inferred:
+
+```
+pid=39   1381.1 MB   python scripts/run_refresh_worker.py    <- 71% of all RSS
+pid=793   217.1 MB   tools/daily_update.py --workflow ui-daily
+         ~550 MB     eight transient children combined
+```
+
+**The long-lived worker process went 85MB → 1381MB in 55 minutes without running
+the stage everyone has been blaming.** At ~24MB/min the baseline crosses the
+3000MB floor 15–20 minutes after every boot and never recovers — which is why
+the good-build rate *decayed* through the evening rather than being stable.
+
+**This retires the standing open question "why does anon ratchet within one
+boot?" as: NOT the overview.** That was the assumption; it is now excluded by
+construction rather than by argument.
+
+Item 4 therefore decomposes, and only one half is a threshold:
+- **the real fix** — in-process retention in `run_refresh_worker.py`. Unowned.
+- **not the fix** — the `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` constant. Leave it.
+
+#### `container_memory_mb` currently overstates pressure by ~1.4GB
+
+`container 3327 / rss 1934` — the gap is page cache. The guard already adds
+reclaimable back so it is not fooled; **humans reading the raw number are.**
+Same trap as the 2.7GB plateau. [[memory.current is page cache]]
+
+#### Sequencing, measured rather than assumed
+
+The process-stacking fix **worked** — last OOM 00:51:29Z, 52+ minutes clean,
+process count 79 → 5–12, builds resumed every ~2–3 min. **And the board is still
+zero**, because every build hits this floor: 12 `OVERVIEW_STOPPED_FOR_MEMORY`
+firings since that boot, all `next_sport=mlb sports_done=0`, headroom 2159–2660
+against 3000, `candidate_scoring in 0 out 0 by_sport {}`. **`#286` cannot help
+until this clears — it protects a good board from being erased, and there are no
+good boards to protect.**
+
+#### METHOD — I got the right answer from invalid evidence, and that is the entry
+
+I reported an "accelerating OOM crash loop, 14 → 11.6 → 10.3 min" off four boot
+timestamps. Checking the events API afterwards: `deploy`, **`server_restarted
+{"triggeredByUser": ...}` — a human pressed restart** — one real `oomKilled`,
+and another `deploy`. **One kill, not four.** Three of the four boots were
+things we did to it ourselves.
+
+The loop turned out to be real — nine genuine `oomKilled` events between 23:14Z
+and 00:51Z — but **it began an hour after I claimed it, so nothing I had was
+evidence for it.** A boot timestamp does not carry its cause; the events API
+does. Worth recording precisely *because* the conclusion held: **a claim that
+turns out true is the one nobody goes back to check the reasoning of.**
+[[retraction is not innocence]]
+
+
 ### 2026-08-09 — NINTH COLLISION, and it happened INSIDE the act of diagnosing the collision mechanism. `#294` is released; this lane holds `#293`
 
 **The lead did the right thing and it still collided.** Told that answering from
@@ -1264,6 +1504,54 @@ analytics output is small; the ledger is not) or the endpoint moving to a
 worker-computed, web-read summary — which is what the architecture says anyway.
 Note the second, independent problem visible in the same numbers: **0 settled of
 8,276 records**, and the autorun has not run since 08-06.
+
+### #288 — RESOLVED for the manifest half: the gate is now tested for what it does, and a silent skip is now a greppable line
+
+`tests/test_candidate_pool_manifest_gate.py`, 9 tests, plus one production log
+line. The rest of #288 (the four unrelated mock/API-drift failures below) is
+still open.
+
+**The gate, stated once so nobody has to re-derive it:** a sport reaches the
+candidate pool **if and only if** it has a readable manifest at
+`reports_root()/manifests/<slug>.json`. `_available_sport_manifests` silently
+`continue`s a sport whose manifest is missing, and the loop consuming it
+(`intelligence_state.py:3201`) is the **only** place candidates are matched to a
+sport — so a candidate for an unmanifested sport is discarded with no iteration
+ever touching it.
+
+**The property the old test lacked, verified by mutation rather than asserted:**
+
+```
+real gate      -> keys ['mlb']         MANIFEST_GATE_SKIPPED_SPORTS logged: True
+gate removed   -> keys ['mlb','nba']   logged: False
+=> test_a_sport_without_a_manifest_is_dropped FAILS under the mutation
+```
+
+The old test **passed with the gate deleted.** This one cannot. And nothing in
+the new file reads `data/`, so the machine-dependent `18` is gone by
+construction rather than by being updated to a different constant.
+
+The test worth knowing about is
+`test_the_drop_is_attributable_to_the_manifest_and_nothing_else`: both sports are
+identical in the overview and the only difference is which manifest file exists;
+deleting mlb's and adding nba's flips which survives. **That is exactly the flaw
+that made the old NBA arm prove nothing** — it returned 0 for want of data, not
+for want of a manifest, and no assertion could tell the two apart.
+
+**`MANIFEST_GATE_SKIPPED_SPORTS date=… skipped=nba,nhl kept=mlb`** — one line per
+build, only when something is skipped, nothing at all on a fully-manifested
+slate, one line rather than one per sport. All three pinned as tests: a
+diagnostic that fires on a healthy slate is noise, and this worker already
+prints hundreds of lines a cycle. It converts the archetype from unobservable to
+greppable **for this one gate**: absent-legitimately and absent-silently stop
+producing the identical output. Establishing why each of the five missing sports
+was missing cost a cross-provider audit today; this covers the manifest half of
+that question for free, forever.
+
+**Scope, honestly:** this does not make every silent absence visible. It makes
+*this* gate's silent absence visible. NFL's was a garbage `context_label` reaching
+ESPN (`1de982be`), NCAAF's is something else again — each gate needs its own
+line, and that is the shape of the work rather than a reason to skip it.
 
 ### #288 — `tests/test_intelligence_state.py` failures: stale fixtures, NOT a reproduction of #286. Not fixed
 
@@ -2685,6 +2973,21 @@ Corrected in place. All the *arithmetic* in them is UTC and unaffected (a match
 kicking off 14:30Z and reading `pregame` at 19:57Z is 5.5h either way); only the
 labels were wrong. **Don't infer a local time from a "Z" stamp without
 converting** — CDT is UTC-5.
+
+**0. A commit subject starting with `#<id>` IS SILENTLY DELETED BY REBASE.**
+Git's default `--cleanup` treats a leading `#` as a comment, and
+`git rebase --continue` re-uses the message *with cleanup enabled* — so the
+subject line vanishes and the second paragraph becomes the subject. **Hit three
+times across two rebases in one lane**, on both clean replays and conflict
+resolutions, so every lane landing a `#<id>` commit through a conflict will hit
+it. This is a direct consequence of `#<id>` being the naming convention.
+
+Fix: `git commit -F <file> --cleanup=verbatim` when authoring, and after any
+`rebase --continue` **check `git log --oneline -1` and repair with
+`git commit --amend -F <file> --cleanup=verbatim`**. Repairing a non-HEAD commit
+needs `git branch -f tmp HEAD; git reset --hard <parent>; git commit --amend -F …;
+git cherry-pick -n tmp; git commit -F … --cleanup=verbatim` — interactive rebase
+is unavailable in these sessions.
 
 **1. Nested payloads survive hop-by-hop key lists; top-level scalars do not.**
 `rows_stale_kickoff` read `None` on a payload where the filter was live and
