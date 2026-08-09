@@ -1028,7 +1028,16 @@ def _soccer_sim_horizon_days() -> int:
 _SOCCER_SIM_HORIZON_DAYS = _soccer_sim_horizon_days()
 
 
-def _soccer_artifact_scope_args(league: str, fallback_date: str) -> tuple[str, ...]:
+def _soccer_artifact_scope_args(league: str, fallback_date: str, *, pinned_date: str = "") -> tuple[str, ...]:
+    # PINNED DATE (#282). When the caller has already resolved a single
+    # league-date -- which is what the per-league launcher in
+    # run_refresh_worker.py does -- take it verbatim and skip the week
+    # resolution below entirely. This is the "one league, one date" unit the
+    # whole per-league split exists to produce, and resolving the week again
+    # here would silently widen it back out to every in-horizon date in the
+    # matchweek, which is exactly the regression 16c26e5f was fixing.
+    if str(pinned_date or "").strip():
+        return ("--date", str(pinned_date).strip())
     # Regenerating only args.date's fixtures meant a match several days out
     # in the currently-displayed week (soccer's cards are week-based nav,
     # not date-based) never got refreshed until "today" naturally caught up
@@ -1082,6 +1091,48 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     except Exception:
         active_leagues = set(_SOCCER_LEAGUE_SLUGS)
     league_slugs = tuple(league for league in _SOCCER_LEAGUE_SLUGS if league in active_leagues)
+
+    # PER-LEAGUE SCOPE (#282). Without --soccer-leagues this is every active
+    # league, i.e. exactly the previous behaviour; the flag exists so the
+    # refresh-worker launcher can spend one JOB on one league-date instead of
+    # one job on all of them. Why that matters is a concurrency argument, not
+    # a throughput one: `_has_pending_external_contract` re-claims a wedged
+    # manifest on EVERY poll tick with nothing bounding how many claims run at
+    # once, so the steady-state overlap of a runaway is
+    # job_duration / poll_interval. Shrinking the job shrinks the overlap and
+    # the per-overlap footprint. See the #282 todo entry for the measured
+    # numbers -- and note it BOUNDS that failure, it does not remove it.
+    requested_text = str(getattr(args, "soccer_leagues", "") or "").strip()
+    if requested_text:
+        requested = tuple(
+            slug for slug in (part.strip().lower() for part in requested_text.split(",")) if slug
+        )
+        unknown = [slug for slug in requested if slug not in _SOCCER_LEAGUE_SLUGS]
+        if unknown:
+            # Loud, not empty. An unrecognised slug silently producing zero
+            # steps is indistinguishable from "that league is out of season",
+            # and a soccer refresh that quietly does nothing is precisely the
+            # failure that hid the broken sim for two sessions.
+            raise SystemExit(
+                f"--soccer-leagues named unknown league(s): {', '.join(unknown)}. "
+                f"Known: {', '.join(_SOCCER_LEAGUE_SLUGS)}"
+            )
+        selected = tuple(league for league in league_slugs if league in set(requested))
+        skipped_inactive = [slug for slug in requested if slug not in set(league_slugs)]
+        # Attributable zero: distinguishes "asked for a league that is out of
+        # season on this date" from "asked for nothing" from "the active-league
+        # lookup itself failed". All three previously rendered as an empty step
+        # list.
+        print(
+            f"SOCCER_LEAGUE_SCOPE date={args.date} requested={','.join(requested)} "
+            f"active={','.join(league_slugs) or 'none'} selected={','.join(selected) or 'none'} "
+            f"skipped_out_of_season={','.join(skipped_inactive) or 'none'}",
+            file=sys.stderr,
+            flush=True,
+        )
+        league_slugs = selected
+
+    pinned_date = str(getattr(args, "soccer_date", "") or "").strip()
     steps: list[RefreshStep] = []
     for league in league_slugs:
         steps.append(
@@ -1111,7 +1162,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     "scripts/build_soccer_artifacts.py",
                     "--league",
                     league,
-                    *_soccer_artifact_scope_args(league, args.date),
+                    *_soccer_artifact_scope_args(league, args.date, pinned_date=pinned_date),
                     "--source-root",
                     str(soccer_root),
                     "--out-root",
@@ -1165,7 +1216,7 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     "scripts/build_soccer_picks.py",
                     "--league",
                     league,
-                    *_soccer_artifact_scope_args(league, args.date),
+                    *_soccer_artifact_scope_args(league, args.date, pinned_date=pinned_date),
                     "--source-root",
                     str(soccer_root),
                     "--out-root",
@@ -2617,6 +2668,22 @@ def main() -> int:
         help="Comma-separated HOME-AWAY tricode pairs (e.g. LVA-NYL,SEA-CHI) forwarded to "
         "refresh_wnba_oddsapi_props.py's --only-matchups when --force-refresh applies to wnba. "
         "Omit to resimulate WNBA's whole slate as today.",
+    )
+    parser.add_argument(
+        "--soccer-leagues",
+        default="",
+        help=(
+            "Comma-separated soccer league slugs to build steps for (default: every league in season "
+            "for --date). Lets a caller run one league per job instead of all ten -- see #282."
+        ),
+    )
+    parser.add_argument(
+        "--soccer-date",
+        default="",
+        help=(
+            "Pin soccer's simulation/picks scope to exactly this date instead of resolving the "
+            "horizon-bounded matchweek. Pairs with --soccer-leagues to make one job == one league-date."
+        ),
     )
     parser.add_argument("--continue-on-error", action="store_true", default=True, help="Continue across sports even when one refresh fails.")
     parser.add_argument("--no-continue-on-error", action="store_false", dest="continue_on_error")

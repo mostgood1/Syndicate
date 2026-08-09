@@ -1185,6 +1185,8 @@ def launch_refresh_run(
     force_refresh_sports: str | None = None,
     wnba_only_matchups: str | None = None,
     lane: str | None = None,
+    soccer_leagues: str | None = None,
+    soccer_date: str | None = None,
 ) -> dict[str, Any]:
     launch_mode = _resolve_launch_mode(launch_mode)
     # The queued/external-runner path is always claimed and executed by
@@ -1267,6 +1269,15 @@ def launch_refresh_run(
         refresh_command.extend(["--season", str(season)])
     if week is not None:
         refresh_command.extend(["--week", str(week)])
+    # #282: scope one launch to one league-date. Omitted entirely == the old
+    # behaviour (every in-season league, horizon-bounded matchweek), so this is
+    # additive for every existing caller.
+    soccer_leagues_text = str(soccer_leagues or "").strip()
+    if soccer_leagues_text:
+        refresh_command.extend(["--soccer-leagues", soccer_leagues_text])
+    soccer_date_text = str(soccer_date or "").strip()
+    if soccer_date_text:
+        refresh_command.extend(["--soccer-date", soccer_date_text])
     refresh_command.extend(["--execution-mode", execution_mode_text])
     if effective_skip_mirror:
         refresh_command.append("--skip-mirror")

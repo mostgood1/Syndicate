@@ -447,6 +447,128 @@ def _soccer_active_for_date(selected_date: str) -> bool:
     return "soccer" in active
 
 
+# PER-LEAGUE-DATE UNITS (#282), user-directed.
+#
+# THE PROBLEM THIS BOUNDS. `_has_pending_external_contract` re-claims a
+# manifest that is `running` + `queue_state: queued` + no live pid, on every
+# poll tick, and NOTHING in that path bounds how many claims run concurrently.
+# So when a manifest wedges, the steady-state overlap is
+#
+#     concurrent jobs ~= job_duration / poll_interval
+#
+# On 2026-08-08 that arithmetic OOM-killed refresh-worker nine times in 82
+# minutes (process count 13 -> 79). Shrinking the JOB shrinks both terms of the
+# damage: fewer overlapping jobs, and each one holding a fraction of the work.
+#
+# MEASURED IN PRODUCTION, 2026-08-09, off refresh-worker's own
+# ALL_PROCESS_MEMORY per-process lists (STEP_END never reaches the log
+# collector -- run_refresh_odds_job.py pipes the orchestrator's stdout/stderr
+# to files). Eight consecutive whole-sport jobs:
+#
+#     job start   eredivisie  primeira_liga  belgian_pro_league   whole job
+#     01:55Z         596s          315s            340s            1391s
+#     04:45Z         332s          322s            363s            1154s
+#     05:55Z         179s          251s            187s             660s
+#     08:04Z         182s          168s            209s             603s
+#     09:03Z         146s          211s            216s             616s
+#     09:56Z         155s          203s            234s             628s
+#     13:56Z         147s          191s            228s             606s
+#     17:56Z         311s          431s            390s            1213s
+#
+# The other seven in-season leagues exit in ~0s -- 16c26e5f's horizon bound
+# means they have nothing inside today+1 to simulate.
+#
+# SO THE HONEST RATIO IS ~2.8x, NOT THE ~6x THE ORIGINAL ESTIMATE ASSUMED, and
+# the reason is worth keeping: concurrency after the split is set by the
+# LONGEST SINGLE UNIT, not the average one. Three leagues do essentially all
+# the work, so splitting ten ways buys 616/216 ~= 2.9x on the median job and
+# 1213/431 ~= 2.8x on the worst observed one -- not 10x, and not the 6x that
+# an equal-league-dates model predicts. Still a real reduction: at a 30s poll
+# interval a wedged claim goes from ~20 concurrent jobs to ~7, each holding one
+# league instead of ten.
+def _soccer_refresh_units(selected_date: str) -> tuple[list[dict[str, str]], str]:
+    """Every (league, date) the soccer sim should cover, and how we got it.
+
+    Returns (units, scope_kind). `scope_kind` is part of the contract, not
+    debug colour: it says which of three different things an empty or small
+    unit list MEANS, and those must never render identically.
+
+      league_date  -- the schedule resolved; one unit per in-horizon date
+      league_only  -- the schedule did NOT resolve for some league, so that
+                      league falls back to its own horizon-bounded matchweek
+                      (still one league per job, just possibly >1 date)
+    """
+    from syndicate.features.soccer.sources import active_leagues_for_date
+    from syndicate.features.soccer.sources import default_season
+    from syndicate.features.soccer.sources import default_week
+    from syndicate.features.soccer.sources import week_dates_within_horizon
+
+    horizon_raw = str(os.environ.get("SYNDICATE_SOCCER_SIM_HORIZON_DAYS") or "").strip()
+    try:
+        horizon_days = max(0, int(horizon_raw)) if horizon_raw else 1
+    except ValueError:
+        horizon_days = 1
+
+    units: list[dict[str, str]] = []
+    scope_kind = "league_date"
+    for league in active_leagues_for_date(selected_date):
+        try:
+            season = default_season(league)
+            week = default_week(league, season, reference_date=selected_date)
+            dates = week_dates_within_horizon(
+                league,
+                season,
+                week,
+                reference_date=selected_date,
+                horizon_days=horizon_days,
+            )
+        except Exception as exc:
+            # Degrade to league-only scope rather than dropping the league.
+            # Dropping it would be a silent zero, and the whole point of this
+            # change is that a soccer league producing nothing must say why.
+            print(
+                f"[refresh_worker] SOCCER_UNIT_RESOLVE_FAILED league={league} date={selected_date} "
+                f"error={type(exc).__name__}: {exc} fallback=league_only",
+                flush=True,
+            )
+            units.append({"league": league, "date": ""})
+            scope_kind = "league_only"
+            continue
+        if not dates:
+            # Legitimately nothing inside the horizon for this league. Not a
+            # unit, and not a failure -- but it must be distinguishable from
+            # the exception branch above, which is why they log differently.
+            continue
+        for date_text in dates:
+            units.append({"league": league, "date": str(date_text)})
+    return units, scope_kind
+
+
+def _soccer_unit_key(unit: dict[str, str]) -> str:
+    return f"{unit.get('league') or ''}|{unit.get('date') or ''}"
+
+
+def _soccer_unit_launch_spacing_seconds(unit_count: int) -> int:
+    """How long to wait between two per-league launches.
+
+    Default spreads one full pass over the same interval the whole-sport job
+    used, so each league's own refresh PERIOD is unchanged -- this trades a
+    single ~10-20 minute burst every 4h for ~10 short jobs spread across the
+    same 4h, which is the entire point. Without it, the first tick after a
+    deploy would find every unit stale and fire them back-to-back on
+    consecutive 30s ticks, recreating by design the overlap this exists to
+    prevent.
+    """
+    raw = str(os.environ.get("SYNDICATE_SOCCER_LEAGUE_LAUNCH_SPACING_SECONDS") or "").strip()
+    if raw:
+        try:
+            return max(1, int(raw))
+        except ValueError:
+            pass
+    interval = _soccer_weekly_refresh_interval_seconds()
+    return max(60, interval // max(1, int(unit_count)))
+
+
 def _launch_autorun_soccer_weekly_refresh(
     *,
     latest_manifest_path: Path,
@@ -461,14 +583,52 @@ def _launch_autorun_soccer_weekly_refresh(
 
     status_path = _soccer_weekly_autorun_status_path()
     last_status = _refresh_state_store()["read_json_file"](status_path) or {}
-    last_epoch = float((last_status or {}).get("epoch") or 0.0)
-    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_soccer_weekly_refresh_interval_seconds()):
+
+    # #282: one job per league-date instead of one job for all ten leagues.
+    units, scope_kind = _soccer_refresh_units(selected_date)
+    if not units:
+        # Every in-season league resolved cleanly and none has a fixture inside
+        # the horizon. A real, attributable zero -- say so once per tick rather
+        # than returning a bare False that looks identical to "disabled".
+        print(
+            f"[refresh_worker] SOCCER_UNITS_EMPTY date={selected_date} reason=no_fixtures_in_horizon",
+            flush=True,
+        )
         return False
+
+    now = time.time()
+    interval_seconds = float(_soccer_weekly_refresh_interval_seconds())
+    spacing_seconds = float(_soccer_unit_launch_spacing_seconds(len(units)))
+
+    # Spacing gate. Distinct from the per-unit interval below: that one decides
+    # WHETHER a unit is due, this one decides whether it is this tick's turn.
+    last_launch_epoch = float(last_status.get("lastLaunchEpoch") or last_status.get("epoch") or 0.0)
+    if last_launch_epoch > 0.0 and (now - last_launch_epoch) < spacing_seconds:
+        return False
+
+    # Never stack a soccer job on top of a live one. launch_refresh_run's own
+    # _assert_no_active_refresh_run would raise here, which is caught below and
+    # written out as an `error` status -- true but misleading, since declining
+    # to start a second job is correct behaviour, not a failure.
+    if _current_active_job_count(latest_manifest_path) > 0:
+        return False
+
+    unit_epochs = last_status.get("unitEpochs") if isinstance(last_status.get("unitEpochs"), dict) else {}
+    due = [unit for unit in units if (now - float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0)) >= interval_seconds]
+    if not due:
+        return False
+    # Stalest first, so a unit can never be starved by ordering.
+    due.sort(key=lambda unit: float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0))
+    unit = due[0]
+    unit_league = str(unit.get("league") or "")
+    unit_date = str(unit.get("date") or "")
 
     try:
         result = launch_refresh_run(
             date=selected_date,
             sports="soccer",
+            soccer_leagues=unit_league,
+            soccer_date=unit_date,
             # #148: was "all" -- ran soccer_{league}_odds/props/schedule
             # (fetch_soccer_oddsapi_odds_local.py/fetch_soccer_oddsapi_props_local.py,
             # direct OddsAPI calls) from refresh-worker on top of
@@ -491,25 +651,70 @@ def _launch_autorun_soccer_weekly_refresh(
             launch_mode="web_process",
         )
     except Exception as exc:
-        _refresh_state_store()["write_json_file"](status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+        # Stamp the unit even on failure. Leaving its epoch untouched would
+        # make a permanently-failing unit the stalest one forever, so the
+        # stalest-first pick above would return it every spacing interval and
+        # nothing else would ever run -- a starvation bug that only appears
+        # once something is already broken.
+        _refresh_state_store()["write_json_file"](
+            status_path,
+            {
+                **last_status,
+                "epoch": time.time(),
+                "lastLaunchEpoch": time.time(),
+                "sports": "soccer",
+                "date": selected_date,
+                "unitEpochs": {**unit_epochs, _soccer_unit_key(unit): time.time()},
+                "lastUnit": _soccer_unit_key(unit),
+                "scopeKind": scope_kind,
+                "unitCount": len(units),
+                "error": f"{type(exc).__name__}: {exc}",
+            },
+        )
+        print(
+            f"[refresh_worker] SOCCER_UNIT_LAUNCH_FAILED league={unit_league} unit_date={unit_date or 'week_scope'} "
+            f"error={type(exc).__name__}: {exc}",
+            flush=True,
+        )
         _write_worker_status(
             worker_status_path=worker_status_path,
             latest_manifest_path=latest_manifest_path,
             state="error",
-            detail=f"Failed to auto-launch soccer weekly refresh: {type(exc).__name__}: {exc}",
+            detail=f"Failed to auto-launch soccer refresh for {unit_league} {unit_date or '(week scope)'}: {type(exc).__name__}: {exc}",
             ran_job=False,
             latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
             refresh_cycle=refresh_cycle,
         )
         return False
 
-    _refresh_state_store()["write_json_file"](status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date})
+    launched_epoch = time.time()
+    _refresh_state_store()["write_json_file"](
+        status_path,
+        {
+            **last_status,
+            "epoch": launched_epoch,
+            "lastLaunchEpoch": launched_epoch,
+            "sports": "soccer",
+            "date": selected_date,
+            "unitEpochs": {**unit_epochs, _soccer_unit_key(unit): launched_epoch},
+            "lastUnit": _soccer_unit_key(unit),
+            "scopeKind": scope_kind,
+            "unitCount": len(units),
+            "error": None,
+        },
+    )
     refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    print(
+        f"[refresh_worker] SOCCER_UNIT_LAUNCHED league={unit_league} unit_date={unit_date or 'week_scope'} "
+        f"scope_kind={scope_kind} unit={due.index(unit) + 1}/{len(units)} due={len(due)} "
+        f"spacing_seconds={int(spacing_seconds)} pid={int(result.get('pid') or 0)}",
+        flush=True,
+    )
     _write_worker_status(
         worker_status_path=worker_status_path,
         latest_manifest_path=latest_manifest_path,
         state="launched",
-        detail=f"Auto-launched soccer weekly refresh for {selected_date}.",
+        detail=f"Auto-launched soccer refresh for {unit_league} {unit_date or '(week scope)'} on {selected_date}.",
         ran_job=True,
         run_exit_code=None,
         latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,

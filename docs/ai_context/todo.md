@@ -1,5 +1,149 @@
 # Syndicate TODO — canonical cross-session list
 
+### #282 — SHIPPED (committed, NOT deployed). Soccer sim split into per-league-date jobs. And the premise the brief was written on was false: soccer sims were never off
+
+**The deliverable, in one line:** one soccer job used to be all ten leagues
+(~10–20 minutes of real work); it is now one league on one date. `--soccer-leagues`
+and `--soccer-date` on `refresh_odds_sources.py`, plumbed through
+`launch_refresh_run`, with `_launch_autorun_soccer_weekly_refresh` picking one
+unit per launch, stalest-first, spread across the same 4h interval.
+
+**THIS BOUNDS THE DAMAGE. IT DOES NOT REMOVE THE DEFECT.** There is still no
+concurrency guard in the claim path. An unterminated claim loop still grows
+without limit — just more slowly, from a lower base, with more headroom to
+notice. See `#279`'s "a real concurrency bound in the claim path", still
+unowned, and the two findings below that make it worse than it reads.
+
+#### FIRST: "soccer sims are OFF by standing instruction" was not true
+
+I was briefed that soccer was running degraded with sims disabled until this
+landed. Three independent reads say otherwise, and the lead has since confirmed
+the instruction was never applied:
+
+- **Live env on refresh-worker:** `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN
+  = 'true'`, `..._INTERVAL_SECONDS = '14400'` (queried the env-vars API, 94 keys).
+- **The live deploy contains all three soccer sim fixes.** refresh-worker was on
+  `27a7e9df`; `git merge-base --is-ancestor` puts `c9fbb736`, `a03c2cfb` and
+  `16c26e5f` all inside it. So the pre-incident "sims die in 2s, retries are
+  harmless no-ops" state did not apply.
+- **A sim actually ran**, 17:56:36Z → 18:16:49Z on 2026-08-09.
+
+**Nothing was mitigating this all evening.** The configuration that produced nine
+OOM kills was the configuration running. It did not recur — max concurrent
+soccer sims was **1 across 1200 samples** — so the amplification is latent, not
+live, but nobody was holding it back. [[instrument blindness]]
+
+#### The measurement, and the correction to the arithmetic that justified this item
+
+`STEP_END` never reaches Render's log collector — `run_refresh_odds_job.py:619`
+runs the orchestrator with `stdout=PIPE, stderr=PIPE` and writes both to files.
+That absence is legitimate, not a lost signal, and it is why this was measured
+off `ALL_PROCESS_MEMORY`'s per-process `cmdline` lists instead. Eight
+consecutive whole-sport jobs on refresh-worker:
+
+```
+job start   eredivisie  primeira_liga  belgian_pro_league   whole job
+01:55Z         596s          315s            340s            1391s
+04:45Z         332s          322s            363s            1154s
+05:55Z         179s          251s            187s             660s
+08:04Z         182s          168s            209s             603s
+09:03Z         146s          211s            216s             616s
+09:56Z         155s          203s            234s             628s
+13:56Z         147s          191s            228s             606s
+17:56Z         311s          431s            390s            1213s
+```
+
+The other seven in-season leagues exit in ~0s — `16c26e5f`'s horizon bound
+leaves them nothing inside today+1 to simulate.
+
+**THE BRIEF'S ~6x IS WRONG. THE REAL FIGURE IS ~2.8–2.9x, and the reason is the
+part worth keeping:** concurrency after the split is set by the **longest single
+unit**, not the average one. Three leagues do essentially all the work, so
+splitting ten ways buys `616/216 ≈ 2.9x` on the median job and `1213/431 ≈ 2.8x`
+on the worst observed one. An equal-league-dates model predicts 6x and a
+count-the-leagues model predicts 10x; both are wrong for the same reason, which
+is that they average over a distribution whose maximum is what matters.
+
+At the live 30s poll interval, a wedged claim goes from ~20 concurrent jobs
+(median) / ~40 (worst) to ~7 / ~20, each holding one league instead of ten.
+
+#### Write volume — the thing this could have quietly made worse
+
+More, smaller jobs means more launches on a path already implicated in write
+pressure, so this was measured rather than argued:
+
+- **Launches per 4h interval go from 1 to 4.** Not 10 — the unit resolver returns
+  **4 units** for 2026-08-09 (`belgian_pro_league` ×1, `eredivisie` ×1,
+  `primeira_liga` ×2 dates). Those are exactly the three leagues that did real
+  sim work in production, which is an independent check that the resolver
+  matches reality rather than the local mirror.
+- **5 state writes per launch, in-process, measured:** 3 in the
+  `launch_refresh_run` enqueue (`refresh_status_manifest`,
+  `refresh_status_latest`, `refresh_and_gate_run`) + 2 in the launcher
+  (autorun status, worker status). The claim/execute writes downstream are
+  unchanged per job — this adds none — they just happen 4× instead of 1×.
+- **Denominator:** refresh-worker already emits **794 `PUBLISH_OK`/hour**
+  (measured, 2h window). The added state writes are ~13/hour. Different write
+  paths, so that is a scale reference and not a like-for-like ratio — but the
+  cost is not close to the benefit's order of magnitude.
+- Idle ticks write nothing: the loop's only unconditional `_write_worker_status`
+  is behind `elif args.run_once`, which never fires in the long-running worker.
+
+#### Composition with `16c26e5f`, which was the stated risk
+
+`--soccer-date` short-circuits `_soccer_artifact_scope_args` before it resolves
+the matchweek, so a pinned unit emits `--date` and **not** `--week`/`--horizon-days`.
+Test `test_pinned_date_scopes_the_sim_to_one_date_and_drops_week_scope` asserts
+the absence, because reintroducing week scope per league is the exact
+regression that would undo `16c26e5f` while looking like a working split.
+
+#### Design decisions that are not obvious from the diff
+
+- **Spacing gate, separate from the per-unit interval.** The interval decides
+  whether a unit is *due*; spacing decides whether it is *this tick's turn*
+  (default `interval // unit_count`). Without it, the first tick after a deploy
+  finds every unit stale and fires them on consecutive 30s ticks — rebuilding
+  the overlap this exists to prevent, by design rather than by accident.
+- **A failed launch still stamps its unit epoch.** Otherwise a permanently
+  failing unit stays the stalest forever, stalest-first returns it every window,
+  and nothing else ever runs. A starvation bug that only appears once something
+  is already broken.
+- **Unresolvable schedule degrades to league-only scope, never to whole-sport.**
+  Worst case keeps the bound.
+- **Unknown league slug raises `SystemExit`** rather than building zero steps,
+  and out-of-season leagues emit `SOCCER_LEAGUE_SCOPE ... skipped_out_of_season=`.
+  Three different zeros — unknown slug, out of season, nothing in horizon — that
+  previously all rendered as an empty step list. [[unknown must not default permissive]]
+
+#### Two findings handed off, both unowned, NEITHER FIXED HERE
+
+**A. The active-jobs cap cannot fire, for two independent reasons.**
+`run_refresh_worker.py:1879` computes `active_jobs >= max_active_jobs`, writes a
+`throttled` status, and then `return`s **only if `--run-once`**. The
+long-running loop has no `continue`, so it falls through and spawns anyway.
+And even with a `continue` it could not help: `_current_active_job_count`
+returns 0 when the manifest is `running` with no live pid, which is *exactly*
+the condition `_has_pending_external_contract` requires to re-claim. The two
+predicates are mutually exclusive by construction — the cap reads zero
+precisely when the runaway is running.
+`SYNDICATE_REFRESH_WORKER_MAX_ACTIVE_JOBS` is unset on both workers, so it
+defaults to 1: a limit of 1 that cannot be reached and would not be honoured.
+
+**B. `render.yaml:532` hardcodes `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN:
+"true"`.** Turning soccer off through the single-key env API is therefore
+undone by the next blueprint sync from any lane. Same class as `#284`/`#278`.
+
+#### Deploy readiness
+
+Committed, **not deployed**, no production change made — every Render call in
+this lane was a GET. Code-only, so a push does not ship it; it needs an explicit
+deploy of refresh-worker. **Deploying kills an in-flight sim**, and a soccer job
+is up to ~20 minutes, so check before triggering one.
+
+Tests: `tests/test_refresh_worker.py` + `tests/test_refresh_odds_sources.py` +
+`tests/test_refresh_queue_runner.py`, **91 passed**. Seven of those are new and
+named for the failure they prevent, not the feature they cover.
+
 ### LIST AUDIT 2026-08-09 (~20:40Z) — 10 IDs shipped and were never written here, and every "NOT DEPLOYED" note below is now false
 
 Full-list pass at the user's request: (1) is anything listed that no longer
@@ -1659,8 +1803,11 @@ different claims and merging them is how this returns unannounced.
 - **A real concurrency bound in the claim path.** The actual defect. Nothing
   bounds how many claims run at once; `cancel` only cleans up after.
 - **`#282` per-league grouping** (user-directed): one job = one league-date
-  instead of ~7, cutting steady-state overlap ~6x. **Bounds the damage, does not
-  remove the defect** — both are needed.
+  instead of ~7. **SHIPPED 2026-08-09, committed not deployed — see `#282` at the
+  top of this file.** The "~6x" written here was wrong: measured, it is
+  **~2.8–2.9x**, because the reduction is set by the longest single league and
+  three leagues do all the work. Still **bounds the damage and does not remove
+  the defect** — both are needed, and the bullet above is the one still unowned.
 - **No way to read worker manifest state from web**, which is what made the
   self-limiting question unanswerable.
 

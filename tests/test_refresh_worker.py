@@ -474,6 +474,10 @@ class RefreshWorkerTests(unittest.TestCase):
                     "--run-once",
                 ],
             ), patch.object(module, "central_today_iso", return_value="2026-07-29"), patch.object(
+                module,
+                "_soccer_refresh_units",
+                return_value=([{"league": "mls", "date": "2026-07-29"}], "league_date"),
+            ), patch.object(
                 module, "launch_refresh_run", return_value=fake_launch_result
             ) as mocked_launch, patch.object(module.subprocess, "Popen") as mocked_popen:
                 exit_code = module.main()
@@ -482,6 +486,13 @@ class RefreshWorkerTests(unittest.TestCase):
             mocked_launch.assert_called_once()
             called_kwargs = mocked_launch.call_args.kwargs
             self.assertEqual(called_kwargs["sports"], "soccer")
+            # #282: the launch must be scoped to ONE league-date, not the whole
+            # sport. Asserted on the arguments rather than on "a launch
+            # happened", because the pre-#282 code also launched exactly once
+            # here -- the outcome is identical and only the scope distinguishes
+            # them.
+            self.assertEqual(called_kwargs["soccer_leagues"], "mls")
+            self.assertEqual(called_kwargs["soccer_date"], "2026-07-29")
             # #148: was "all" -- ran soccer's odds/props/schedule steps
             # directly from refresh-worker, a second direct OddsAPI caller
             # for soccer alongside live-odds-worker (same violation class
@@ -1251,3 +1262,206 @@ def test_soccer_history_seed_bootstrap_never_overwrites_real_pipeline_output(tmp
 
     assert "eredivisie" not in seeded
     assert (existing / "matches_2025.csv").read_text(encoding="utf-8") == "REAL PIPELINE OUTPUT\n"
+
+
+# ---------------------------------------------------------------------------
+# #282 -- per-league-date soccer sim scoping.
+#
+# What these protect, stated as the failure rather than the feature: on
+# 2026-08-08 a wedged manifest made `_has_pending_external_contract` re-claim
+# and respawn on every 30s poll tick with nothing bounding concurrency, and
+# because one soccer job was 10-20 minutes of real work, the overlap reached
+# ~31 concurrent jobs and OOM-killed refresh-worker nine times in 82 minutes.
+# Splitting the job so one job == one league-date cuts the overlap to
+# job_duration/poll_interval on the LONGEST SINGLE LEAGUE.
+#
+# These tests bound the damage. They do NOT test a concurrency guard, because
+# there still isn't one -- that is #279's separate open item.
+# ---------------------------------------------------------------------------
+
+
+def _load_rrw(name: str):
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        name, Path(__file__).resolve().parents[1] / "scripts" / "run_refresh_worker.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _RecordingStore:
+    """Minimal refresh-state-store double that also COUNTS writes.
+
+    The write count is the point, not incidental: more, smaller jobs means more
+    launcher invocations and more manifest churn, on a launcher already firing
+    every ~30s. A change that moves cost out of memory and into write volume
+    without anyone noticing would be a bad trade made silently.
+    """
+
+    def __init__(self, reports_root: Path) -> None:
+        self._reports_root = reports_root
+        self.files: dict[str, dict] = {}
+        self.write_count = 0
+
+    def as_dict(self) -> dict:
+        return {
+            "read_json_file": lambda path: self.files.get(str(path)),
+            "write_json_file": self._write,
+            "reports_root": lambda: self._reports_root,
+            "data_root": lambda: self._reports_root,
+            "assert_refresh_state_backend_ready": lambda **_kwargs: None,
+        }
+
+    def _write(self, path, payload) -> None:
+        self.write_count += 1
+        self.files[str(path)] = payload
+
+
+def _soccer_launch_harness(tmp_path, monkeypatch, *, units, launch_result=None, launch_error=None):
+    rrw = _load_rrw("rrw_282")
+    reports_root = tmp_path / "reports"
+    store = _RecordingStore(reports_root)
+    monkeypatch.setattr(rrw, "_refresh_state_store", store.as_dict)
+    monkeypatch.setattr(rrw, "central_today_iso", lambda: "2026-08-09")
+    monkeypatch.setattr(rrw, "_soccer_active_for_date", lambda _date: True)
+    monkeypatch.setattr(rrw, "_soccer_refresh_units", lambda _date: (list(units), "league_date"))
+    monkeypatch.setattr(rrw, "_current_active_job_count", lambda _path: 0)
+    monkeypatch.setattr(rrw, "_latest_manifest_payload", lambda _path: {"state": "idle"})
+    monkeypatch.setenv("SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN", "true")
+    # Spacing of 1s keeps the round-robin observable without sleeping; the
+    # spacing gate itself gets its own test below.
+    monkeypatch.setenv("SYNDICATE_SOCCER_LEAGUE_LAUNCH_SPACING_SECONDS", "1")
+
+    calls: list[dict] = []
+
+    def fake_launch(**kwargs):
+        calls.append(kwargs)
+        if launch_error is not None:
+            raise launch_error
+        return launch_result or {"ok": True, "pid": 777, "state": "running"}
+
+    monkeypatch.setattr(rrw, "launch_refresh_run", fake_launch)
+    return rrw, store, calls
+
+
+def _run_soccer_autorun(rrw, tmp_path):
+    return rrw._launch_autorun_soccer_weekly_refresh(
+        latest_manifest_path=tmp_path / "latest.json",
+        worker_status_path=tmp_path / "worker.json",
+        refresh_cycle={"claimed_count": 0, "reclaimed_count": 0, "skipped_due_to_cap": 0},
+    )
+
+
+def test_soccer_autorun_launches_one_league_date_not_the_whole_sport(tmp_path, monkeypatch):
+    units = [
+        {"league": "eredivisie", "date": "2026-08-09"},
+        {"league": "primeira_liga", "date": "2026-08-09"},
+        {"league": "belgian_pro_league", "date": "2026-08-10"},
+    ]
+    rrw, _store, calls = _soccer_launch_harness(tmp_path, monkeypatch, units=units)
+
+    assert _run_soccer_autorun(rrw, tmp_path) is True
+    assert len(calls) == 1
+    # ONE league and ONE date -- the whole deliverable. Pre-#282 this call
+    # carried neither kwarg and the job covered all ten leagues.
+    assert calls[0]["soccer_leagues"] == "eredivisie"
+    assert calls[0]["soccer_date"] == "2026-08-09"
+    assert calls[0]["sports"] == "soccer"
+    assert calls[0]["phase"] == "live"
+
+
+def test_soccer_autorun_round_robins_across_units_without_repeating(tmp_path, monkeypatch):
+    units = [
+        {"league": "eredivisie", "date": "2026-08-09"},
+        {"league": "primeira_liga", "date": "2026-08-09"},
+        {"league": "belgian_pro_league", "date": "2026-08-10"},
+    ]
+    rrw, _store, calls = _soccer_launch_harness(tmp_path, monkeypatch, units=units)
+
+    launched: list[tuple[str, str]] = []
+    for _ in range(len(units)):
+        # Spacing is 1s; advance the clock rather than sleeping.
+        base = time.time()
+        monkeypatch.setattr(rrw.time, "time", lambda base=base, n=len(launched): base + 10.0 * (n + 1))
+        assert _run_soccer_autorun(rrw, tmp_path) is True
+        launched.append((calls[-1]["soccer_leagues"], calls[-1]["soccer_date"]))
+
+    # Every unit exactly once before any repeats -- a unit must not be starved
+    # by ordering, which is why the picker sorts by staleness rather than
+    # taking the first due entry.
+    assert sorted(launched) == sorted((u["league"], u["date"]) for u in units)
+
+
+def test_soccer_autorun_spacing_gate_blocks_a_second_launch_in_the_same_window(tmp_path, monkeypatch):
+    units = [
+        {"league": "eredivisie", "date": "2026-08-09"},
+        {"league": "primeira_liga", "date": "2026-08-09"},
+    ]
+    rrw, _store, calls = _soccer_launch_harness(tmp_path, monkeypatch, units=units)
+    monkeypatch.setenv("SYNDICATE_SOCCER_LEAGUE_LAUNCH_SPACING_SECONDS", "3600")
+
+    assert _run_soccer_autorun(rrw, tmp_path) is True
+    # Second tick, immediately after: a unit IS due, but it is not its turn.
+    # Without this gate the first tick after a deploy finds every unit stale
+    # and fires them on consecutive 30s ticks -- rebuilding the overlap this
+    # change exists to prevent, by design rather than by accident.
+    assert _run_soccer_autorun(rrw, tmp_path) is False
+    assert len(calls) == 1
+
+
+def test_soccer_autorun_does_not_stack_on_an_active_job(tmp_path, monkeypatch):
+    units = [{"league": "eredivisie", "date": "2026-08-09"}]
+    rrw, _store, calls = _soccer_launch_harness(tmp_path, monkeypatch, units=units)
+    monkeypatch.setattr(rrw, "_current_active_job_count", lambda _path: 1)
+
+    assert _run_soccer_autorun(rrw, tmp_path) is False
+    assert calls == []
+
+
+def test_soccer_autorun_stamps_a_failed_unit_so_it_cannot_starve_the_others(tmp_path, monkeypatch):
+    units = [
+        {"league": "eredivisie", "date": "2026-08-09"},
+        {"league": "primeira_liga", "date": "2026-08-09"},
+    ]
+    rrw, store, calls = _soccer_launch_harness(
+        tmp_path, monkeypatch, units=units, launch_error=RuntimeError("boom")
+    )
+
+    assert _run_soccer_autorun(rrw, tmp_path) is False
+    assert len(calls) == 1
+    status = next(payload for path, payload in store.files.items() if "soccer_weekly_autorun_status" in path)
+    # A permanently-failing unit that never gets stamped stays the stalest
+    # forever, so stalest-first would return it every window and nothing else
+    # would ever run. The bug only appears once something is already broken,
+    # which is exactly when it is hardest to see.
+    assert status["unitEpochs"]["eredivisie|2026-08-09"] > 0
+    assert status["error"].startswith("RuntimeError")
+
+
+def test_soccer_autorun_reports_an_empty_unit_list_rather_than_returning_a_bare_false(tmp_path, monkeypatch, capsys):
+    rrw, _store, calls = _soccer_launch_harness(tmp_path, monkeypatch, units=[])
+
+    assert _run_soccer_autorun(rrw, tmp_path) is False
+    assert calls == []
+    # "No fixtures in the horizon" and "autorun disabled" both return False.
+    # They must not look the same from outside.
+    assert "SOCCER_UNITS_EMPTY" in capsys.readouterr().out
+
+
+def test_soccer_autorun_status_write_count_is_one_per_launch(tmp_path, monkeypatch):
+    """More jobs must not mean more writes PER job.
+
+    Per-league scoping multiplies the number of launches by the unit count, so
+    the per-launch write cost is what decides whether this trades memory
+    pressure for write pressure. One status write per launch keeps the added
+    volume proportional to launches and nothing worse.
+    """
+    units = [{"league": "eredivisie", "date": "2026-08-09"}]
+    rrw, store, _calls = _soccer_launch_harness(tmp_path, monkeypatch, units=units)
+
+    before = store.write_count
+    assert _run_soccer_autorun(rrw, tmp_path) is True
+    # One autorun-status write plus one worker-status write.
+    assert store.write_count - before == 2

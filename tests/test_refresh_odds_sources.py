@@ -842,5 +842,110 @@ class NflStepsPreseasonGatingTests(unittest.TestCase):
         self.assertEqual(names, ["nfl_oddsapi_refresh"])
 
 
+class SoccerLeagueScopeTests(unittest.TestCase):
+    """#282 -- one job == one league-date.
+
+    The launcher side lives in run_refresh_worker.py; this is the receiving
+    end. `--soccer-leagues` decides WHICH league gets steps, `--soccer-date`
+    decides which date its sim covers, and both default to the previous
+    whole-sport behaviour when absent.
+    """
+
+    def _load_module(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "refresh_odds_sources.py"
+        spec = importlib.util.spec_from_file_location("test_refresh_odds_sources_soccer", script_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def _make_args(self, **overrides):
+        base = dict(date="2026-08-09", soccer_leagues="", soccer_date="")
+        base.update(overrides)
+        return argparse.Namespace(**base)
+
+    def test_no_league_filter_builds_steps_for_every_active_league(self) -> None:
+        module = self._load_module()
+        with patch.object(module, "soccer_active_leagues_for_date", return_value=list(module._SOCCER_LEAGUE_SLUGS)):
+            steps = module._build_soccer_steps(self._make_args())
+
+        # Step names are soccer_<league>_<suffix>, and the suffix itself may
+        # contain an underscore (live_state), so match on the league prefix
+        # rather than trying to split the tail off.
+        for league in module._SOCCER_LEAGUE_SLUGS:
+            self.assertTrue(
+                any(step.name.startswith(f"soccer_{league}_") for step in steps),
+                f"no steps built for {league}",
+            )
+
+    def test_league_filter_builds_steps_for_only_that_league(self) -> None:
+        module = self._load_module()
+        with patch.object(module, "soccer_active_leagues_for_date", return_value=list(module._SOCCER_LEAGUE_SLUGS)):
+            steps = module._build_soccer_steps(self._make_args(soccer_leagues="eredivisie"))
+
+        self.assertTrue(steps)
+        for step in steps:
+            self.assertTrue(step.name.startswith("soccer_eredivisie_"), step.name)
+
+    def test_unknown_league_slug_fails_loudly_instead_of_building_nothing(self) -> None:
+        module = self._load_module()
+        # An unrecognised slug silently yielding zero steps is
+        # indistinguishable from "that league is out of season" -- and a
+        # soccer refresh that quietly does nothing is the exact failure that
+        # hid the broken sim for two sessions.
+        with patch.object(module, "soccer_active_leagues_for_date", return_value=list(module._SOCCER_LEAGUE_SLUGS)):
+            with self.assertRaises(SystemExit) as caught:
+                module._build_soccer_steps(self._make_args(soccer_leagues="eredivisie,not_a_league"))
+        self.assertIn("not_a_league", str(caught.exception))
+
+    def test_out_of_season_league_is_reported_not_silently_dropped(self) -> None:
+        module = self._load_module()
+        stderr = io.StringIO()
+        with patch.object(module, "soccer_active_leagues_for_date", return_value=["mls"]), patch.object(
+            module.sys, "stderr", stderr
+        ):
+            steps = module._build_soccer_steps(self._make_args(soccer_leagues="epl"))
+
+        self.assertEqual(steps, [])
+        emitted = stderr.getvalue()
+        self.assertIn("SOCCER_LEAGUE_SCOPE", emitted)
+        self.assertIn("skipped_out_of_season=epl", emitted)
+        self.assertIn("selected=none", emitted)
+
+    def test_pinned_date_scopes_the_sim_to_one_date_and_drops_week_scope(self) -> None:
+        module = self._load_module()
+        with patch.object(module, "soccer_active_leagues_for_date", return_value=list(module._SOCCER_LEAGUE_SLUGS)):
+            steps = module._build_soccer_steps(
+                self._make_args(soccer_leagues="eredivisie", soccer_date="2026-08-10")
+            )
+
+        artifacts = next(step for step in steps if step.name == "soccer_eredivisie_artifacts")
+        command = list(artifacts.command)
+        self.assertIn("--date", command)
+        self.assertEqual(command[command.index("--date") + 1], "2026-08-10")
+        # Must NOT reintroduce week scope. 16c26e5f bounded the sim to
+        # today+1 (26 league-dates -> 7); resolving the matchweek again here
+        # would widen one unit back out to every in-horizon date in the week,
+        # which is the regression that composition is supposed to prevent.
+        self.assertNotIn("--week", command)
+        self.assertNotIn("--horizon-days", command)
+
+    def test_without_a_pinned_date_the_horizon_bounded_week_scope_is_preserved(self) -> None:
+        module = self._load_module()
+        with patch.object(module, "soccer_active_leagues_for_date", return_value=["eredivisie"]), patch.object(
+            module, "soccer_week_date_list", return_value=["2026-08-09", "2026-08-10"]
+        ), patch.object(module, "soccer_default_season", return_value=2026), patch.object(
+            module, "soccer_default_week", return_value=2
+        ):
+            steps = module._build_soccer_steps(self._make_args())
+
+        artifacts = next(step for step in steps if step.name == "soccer_eredivisie_artifacts")
+        command = list(artifacts.command)
+        self.assertIn("--week", command)
+        self.assertIn("--horizon-days", command)
+
+
 if __name__ == "__main__":
     unittest.main()
