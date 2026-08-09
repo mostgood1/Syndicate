@@ -291,6 +291,29 @@ that every EV, edge, hold and arbitrage number downstream is computed against �
 so a cross-sport comparison of any of those is comparing a sharp-anchored MLB
 number against a retail-anchored one everywhere else.
 
+**Where that does and does not reach L2-A — read `select_shortlist` before
+extending this.** `[code]` The obvious inference is that the cross-sport
+shortlist ranks sports against each other on incomparable EV. **Half of that is
+wrong, and it is the alarming half:**
+
+| step | cross-sport? | verdict |
+|---|---|---|
+| bucketing (`layer2_board.py:793`) | **no** — `by_sport`, `per_sport = 100` and `kind_floor = 30` **each** | a soccer row never loses a slot to an MLB row |
+| value floor (`:813` → `_measured_floor_for_pool`, `:228`) | **no** — floor = `multiple × median best-price hold`, **from that sport's own pool** | **partially self-correcting**: hold is a property of the book set, so sharper books → lower hold → lower floor |
+| final ordering (`:851`) | **YES** — `selected.sort(key=_score_of, reverse=True)` over every sport at once | **this is the real exposure** |
+
+So it is an **ordering** effect, not a **selection** effect. With
+`score.sim_component` null on 100/100 measured rows, `_score_of` is EV-driven,
+so a shifted EV baseline moves a sport's rows up or down the *displayed* list.
+
+**Direction and magnitude are unmeasured and are not guessed here.** A sharp
+anchor yields a tighter no-vig fair, and whether that raises or lowers apparent
+EV depends on which side is priced.
+
+**It has also never been observed.** `active_sports: ["mlb"]` throughout this
+trace — one sport — so **cross-sport ordering did not occur at any point that
+was measured.** `[code]`, not `[live]`.
+
 ### Cost — the 155% reading is real and the window is contaminated
 
 > **HEADLINE, so it is not quoted without its caveat: `projected_30d_credits =
@@ -601,6 +624,22 @@ active_sports          ["mlb"]
   reach the ranking. `layer2_shortlist.py:128-134` states the consequence: under
   proportional de-vig, EV is `1/overround - 1`, **identical for every side of a
   market**, so the board ranks markets by hold and picks a side by tie-break.
+
+**`rows_below_value_floor: 0` does not mean the floor is inert.** `[code]` The
+floor is not the flat `min_value_pct: -2.0` the payload reports at top level —
+that is only the *fallback*. `_measured_floor_for_pool` (`layer2_board.py:228`)
+derives a floor **per sport, from that sport's own pool**: regroup the one-side
+rows back into markets, take each market's best-price hold, and set the floor at
+`hold_multiple × median`. It reports its own evidence in `value_floor_by_sport`,
+and it falls back to the flat value only when too few markets carry two sides —
+*"which is not hypothetical"*, per its docstring, for exactly soccer's 10.3%
+two-sided rate (§2).
+
+Worth knowing for two reasons beyond this table. It is one of the few thresholds
+in the repo that **measures itself and shows its working** rather than carrying a
+constant. And it is what keeps §1's fair-value asymmetry from becoming a
+selection bias — hold is a property of the book set, so a sharper book set lowers
+the hold *and* the floor together.
 
 ### `#300` — the entire cross-sport shortlist is one in-progress game priced 21 hours stale
 
