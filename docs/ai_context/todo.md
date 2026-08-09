@@ -560,27 +560,110 @@ graded row for a **different** game on `h2h` alone, pass `_markets_compatible`
 settlement**, which is worse than no match because it looks identical to a right
 one. Only identifier-shaped keys are safe to add.
 
-### OPEN 2026-08-09 — `#292` DOES SETTLEMENT GRADE AGAINST BEST PRICE OR THE ARBITRARY RETAINED BOOK? A validity question about the evaluation layer, not a settlement follow-up
+### ANSWERED 2026-08-09 — `#292` SETTLEMENT GRADES AGAINST **NEITHER**. The stamp is per-book with no `max()` anywhere, and settlement's reader **cannot reach it at all** — 0/47 joins on production
 
-**Unmeasured. Highest-value open item from the `#275` lane, and rated by the
-lead above everything else outstanding.**
+**The question was "best price or the retained book". The answer is that the
+premise of a single platform-wide behaviour is wrong three times over: there is
+no best-price selection on this path in any sport; "the retained book" is a
+different thing in each sport; and the stamp is unreachable by the code that
+consumes it, so in practice it has priced nothing.**
 
-What is established: settlement takes closing price from `odds_refresh_tracking`'s
-stamped `closing_price` when `build_market_history_view` reports
-`history_points > 0`, else it falls back to the graded row's own price.
-**Whether that stamp contains best-of-book or the arbitrary retained book was
-never measured, and whether it differs per sport is unknown.**
+Measured 2026-08-09 against production web `https://syndicate-an21.onrender.com`
+(`/api/ops/odds-history/inspect`), shard key `2026-08-08` unless stated.
 
-**Why it outranks the rest:** the single-book capture defect was platform-wide
-across three classes (5 books fetched, 1 kept), and best-price re-grading already
-measured **+2.79 ROI points**. If the stamp is the retained book, **every
-cross-sport ROI number in this repo compares unlike with unlike** — including
-the ones that decided which models to keep. That makes it a validity question
-about the evaluation layer rather than a settlement question.
+#### 1. The writer stamps ONE BOOK per market state. There is no cross-book max.
 
-**START AT THE WRITER, NOT AT SETTLEMENT.** Settlement only reads what
-`odds_refresh_tracking` stamped, so auditing the reader hunts a defect that
-lives upstream. Unowned; needs its own lane.
+`odds_refresh_tracking.py:1599-1602` stamps `closing_line`/`closing_price` from
+`previous_line`/`previous_odds` of **one row**. The key it stores under is
+`_odds_history_market_key(row)`, which appends `book=`/`bookmaker=` when the row
+carries one — so **each book gets its own `market_state` and its own stamp.**
+Grep for a best-price selection on this path returns nothing: `max()` over books
+exists only in `odds_book_quotes.best_price_by_market` and
+`emit_settlement_inputs._closing_rows`, neither of which `evaluation_settlement`
+calls. Not "best price", and not by accident — by construction.
+
+#### 2. "The retained book" is a DIFFERENT thing per sport. Live histogram:
+
+| sport | market states | states carrying a real book token | book distribution | stamped | stamp rate |
+|---|---|---|---|---|---|
+| mlb | 3,945 | 330 | fanatics 45, kalshi 45, fanduel 39, draftkings 36, betmgm 33, williamhill_us 33, betrivers 30, novig 30, polymarket 15, **pinnacle 12**, mybookieag 6 | 39 | **0.99%** |
+| soccer | 419 | 413 | betonlineag 63, lowvig 63, bovada 56, betrivers 45, betus 43, betmgm 43, draftkings 33, fanatics 33, fanduel 24, mybookieag 7, williamhill_us 3 | 0 | **0.00%** |
+| wnba | 114 | 0 | 12 game keys labelled `bookmaker=oddsapi_consensus`; 102 prop keys carry none | 8 | **7.02%** |
+
+`oddsapi_consensus` **is not a book.** It is the literal default at
+`odds_refresh_tracking.py:2544`, applied because `game_cards_{date}.csv` has no
+`bookmaker` column at all (`_flatten_basketball_game_cards`). So NBA/WNBA game
+closes are stamped with the book identity **erased**, and because that flattener
+puts `home_ml` in the `line` field, the WNBA h2h stamp reads
+`closing_line == closing_price == 108.62412523678876` while its **spreads and
+totals stamps carry `closing_price: null`** — a stamp with no price in it.
+
+The sharp-book asymmetry from `#211` is visible right here: `pinnacle` appears in
+MLB's distribution and in no other sport's.
+
+**No data either way** for nhl/nba (probed `2026-06-05` and `2026-08-08`),
+nfl/ncaaf (`2026_wk1`, `2026_wk0`, `2026-08-08`), ncaab (`2026-08-08`) — all
+returned `market_count: 0`, i.e. off-season/preseason with no shard on web's
+disk. That is a bounded negative over those six shard keys, **not** a finding
+that those sports behave correctly.
+
+#### 3. THE LOAD-BEARING RESULT: settlement's reader can never join to the stamp.
+
+Ran the **real** `_candidate_market_id` + `_market_state_from_payload` over the
+**real** production key set, in the maximally favourable case (the bet is on
+exactly the market that carries a stamp):
+
+```
+mlb    join_attempts 39   hits 0   misses 39
+wnba   join_attempts  8   hits 0   misses  8
+sample: reader looked up  MLB:1832664964f1aa706bdd77989f364361:H2H:-168
+        writer stored key event_id=1832664964f1aa706bdd77989f364361|home_team=Philadelphia Phillies|away_team=Toronto Blue Jays|market=h2h|bookmaker=draftkings
+```
+
+`build_market_id` has **no bookmaker token**, so the reader always looks up a
+colon-joined `SPORT:EVENT:MARKET:...`. The writer always stores a pipe-joined
+`field=value` composite. `_market_state_from_payload`'s second branch scans for
+`value["market_id"] == market_id` — and **0 of 3,945 / 114 / 419 market states
+carry a `market_id` field at all**, so that branch cannot rescue it either.
+Both lookups miss, `history_points` falls to whatever `_recent_history_rows`
+supplies, and the `else` at `odds_lifecycle.py:850` takes
+`_event_price(closing_entry)` — the last observation of a single book.
+
+**So the stamp is not the wrong book. It is dead weight.** `#295` established
+this value's granularity; this establishes that settlement never reads it.
+
+#### 4. And settlement has settled nothing anyway (bounded to web's disk)
+
+`/api/ops/evaluation-settlement/status`, dates `2026-07-17`..`2026-08-06`:
+`total_recommendation_records 8276`, `pending 8276`, `matched 0`, `settled 0`,
+**`already_resolved_records 0`**. Zero settled records exist in that window on
+web. Settlement itself runs on refresh-worker against its local copies, so this
+is web's view over 21 dates, not a claim about the worker's ledger.
+
+#### What this changes
+
+**Good news first, because it is real:** the best-price producer already exists
+and is already correct. `scripts/emit_settlement_inputs.py::_closing_rows` takes
+`closing_quotes()` from the `#209` per-book log and picks the best payout across
+books, writing `closing_lines_{date}.csv` with a `closing_bookmaker` column.
+`prediction_reconciliation` reads it. This is the classic **"producer exists but
+isn't joined"** — `evaluation_settlement` is simply pointed at the other,
+book-blind path.
+
+So the remedy is not "add a bookmaker dimension to `odds_history`" (measured and
+rejected in `odds_book_quotes`' docstring: ~250MB shards on 2GB services, four
+consumers that assume one book per game). It is to point `evaluation_settlement`
+at `closing_quotes()`/`best_price_by_market()` the way `emit_settlement_inputs`
+already does, and let the `odds_refresh_tracking` stamp stay display-only.
+
+**The validity conclusion the lead asked for:** past cross-sport ROI/CLV numbers
+are not "graded against different books" — for the evaluation ledger they were
+**never graded against a close at all**, so price CLV there is uninformative
+rather than biased. The `+2.79 ROI points` from `#211` remains the size of the
+prize, and it is still unclaimed on this path. Separate, larger lane — needs the
+join fixed before any re-grade is meaningful.
+
+Probes: `probe_292.py`, `probe_292_join.py` (session scratchpad, read-only).
 
 ### OPEN 2026-08-09 — `#293` BLUEPRINT-vs-LIVE CONFIG AUDIT (supersedes the mis-numbered `#281` on `70e60b55` / `2ddccb97`)
 
