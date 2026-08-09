@@ -52,10 +52,16 @@ this file.
 merged candidates become 0 promoted cards." Measured 20:04:24Z on the live
 worker: `LAYER2_SHORTLIST rows=145`, `CANDIDATE_POOL_READY count=590`,
 `BOARD_PUBLICATION_RESPONSE_READY candidate_count=590`. **The board promotes
-fine.** `STATE_PERSIST_BEGIN` never fires and no skip path logs a reason, so the
-persist is not being *skipped*, it is not being *reached*; the snapshot froze at
-19:38:57Z across 40 polls / 42 min. That is `#317`, and it — not promotion — is
-what empties the board.
+fine.** The snapshot froze at 19:38:57Z across 40 polls / 42 min. That is
+`#317`, and it — not promotion — is what empties the board.
+
+> **CORRECTED by `#317` at 21:0xZ — the sentence that used to sit here said
+> "`STATE_PERSIST_BEGIN` never fires and no skip path logs a reason, so the
+> persist is not being *skipped*, it is not being *reached*." That is false.**
+> `STATE_PERSIST_BEGIN candidate_count=150` fired at 20:09:16Z, and
+> `STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD` at 20:22:25Z. The persist runs every
+> cycle. It fails one layer lower, at the transport, and it says so loudly on
+> four separate lines nobody had grepped for. See `#317`.
 
 Also resolved tonight: the L2-A shortlist is **not** empty (145 rows), closing
 the "necessary but maybe not sufficient" caveat on the `SYNDICATE_BOARD_L2A_ENABLED`
@@ -65,7 +71,134 @@ flag move.
 vs its measured 15m35s cadence — a live board cannot run on a full-world
 recompute), `#316` (`SKIP_OVERSIZED_LEDGER_CHUNK`: four days' evaluation ledger
 chunks at 132MB–480MB against a 64MB ceiling — the feedback loop starved at its
-input), `#317` (the persist, lane running).
+input). `#317` is written below.
+
+### #317 — ROOT CAUSE, the board that computes and never lands: the persist RUNS, and **both** of its transports fail. The worker's own publish OOM-kills the web service it is publishing to
+
+**Status: root-caused and evidenced on production, not fixed. Read-only lane.**
+
+**The premise this lane was given was wrong, and the wrong premise is the
+finding.** The brief said `STATE_PERSIST_BEGIN` never fires, that no skip path
+logs, and therefore that the persist "is not being *reached*". Measured on
+refresh-worker `srv-d91dpertqb8s73co8ls0` (Render logs API, 19:45Z–20:40Z):
+
+```
+20:09:16  STATE_PERSIST_BEGIN candidate_count=150
+20:22:25  STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD date=2026-08-09 incoming=0
+```
+
+The persist is reached on every cycle. `write_latest_intelligence_state`
+(`pipeline/intelligence_state.py:1974`) runs to completion and returns
+normally. **Nothing in that function is the bug.** The 20:04 log excerpt the
+brief was built on had simply been cut before the next line —
+`RETURNED_FROM_COMPUTE_BOARD_PUBLICATION_RESPONSE` fires 1.2ms after
+`BOARD_PUBLICATION_RESPONSE_READY`, every time.
+
+#### What actually happens, one full cycle, 20:09:14Z–20:09:45Z
+
+| step | line | outcome |
+|---|---|---|
+| ledger | `BOARD_STATE_LEDGER_RECORDED recommendation_count=150` | ok |
+| persist | `STATE_PERSIST_BEGIN candidate_count=150` | ok |
+| keyvalue | `KEYVALUE_WRITE_REJECTED .../intelligence_state.json size_bytes=27638247 max_bytes=8388608` | **refused, 3.3× over** |
+| fallback | `STATE_TOO_LARGE_FOR_KEYVALUE path=intelligence_state.json falling_back_to_artifact` | as designed |
+| publish | `PUBLISH_FAILED path=reports/intelligence/intelligence_state.json transport=stream error=HTTP Error 502` | **refused** |
+| verdict | `STATE_ARTIFACT_FALLBACK_REFUSED reason=publish_hot_artifact_returned_false effect=payload_did_not_cross_to_other_services` | says it in words |
+
+Repeated identically for `intelligence_state_2026_08_09.json`, and for
+`board_snapshot.json` / `board_snapshot_2026_08_09.json` (33,562,679 bytes)
+where the fallback dies one step earlier at `SKIP_NOT_ALLOWLISTED` — **37
+refusals between 20:09 and 20:27 alone.** That last one is *deliberate* and
+documented at `artifact_publisher.py:314-337`: board_snapshot is excluded
+because web's only reader of it consults keyvalue and never disk, so
+allowlisting it would push 33.5MB/cycle to a file nothing reads. **That
+exclusion is correct and must not be "fixed" by adding the pattern.**
+
+#### The part that makes this self-sustaining
+
+Render events, web `srv-d88ahvrbc2fs73eodu30`, same instance `-454rz`:
+
+```
+20:05:02  server_failed  unhealthy: HTTP health check failed (timed out after 5 seconds)
+20:09:18  server_failed  oomKilled {"memoryLimit": "2Gi"}
+20:09:37  server_available
+```
+
+**The 502 at 20:09:23 is web coming back from an OOM 5 seconds earlier.** Small
+files 502'd in the same window too (`roster_3_TOR_at_PHI...json`,
+`meta.json`) — so the 502 is *web being dead*, not "27MB is too big to POST".
+Re-verified 21:0xZ: `/api/home` → `http=000` at 40s, then `502`, then `502`;
+`/api/intelligence/status` → `200`, then `502`, `502`. Web is still cycling.
+
+The receiver is **not** the memory bug: `_publish_streamed_body`
+(`syndicate/blueprints/ops.py:926`) streams to disk 1MB at a time and is
+correct. The pressure is on the *other* direction — the worker's per-cycle
+`/api/ops/artifacts/export?pattern=…` pulls, which `jsonify` whole artifact
+bodies into one dict (the 30,308,015-byte incident already recorded at
+`ops.py:1075`). Sender and receiver are both 2Gi and both are the same board.
+
+#### So the causal chain is
+
+```
+rich board (150–590 candidates)
+  -> 27.6MB state / 33.5MB snapshot
+  -> keyvalue refuses (8.39MB ceiling, cannot be raised: ~9MB closes the connection)
+  -> artifact fallback POSTs to a web service that is OOM-cycling
+  -> 502
+  -> nothing crosses; web keeps serving the 19:38:57Z board, candidate_count 0
+```
+
+**Why an empty board USED to write and a good one does not:** 19:23:22Z and
+19:38:57Z both carried `candidate_count: 0`. A zero-candidate payload is small
+enough for keyvalue. **Size is the discriminator, exactly as the brief
+guessed.** `SYNDICATE_BOARD_L2A_ENABLED` is a red herring — it is `True` on the
+worker and the payload is still 33.5MB.
+
+#### Where the 27.6MB is (worker's own `KEYVALUE_PAYLOAD_COMPOSITION`)
+
+`board_contract=6,333,444`, and inside it `cards=6,332,399`; `board_snapshot`'s
+`response=29,546,715` with a **second** 6,333,444-byte `board_contract` beside
+it. `_compact_state_for_persist` (`:1726`) does run and does alias
+`response.analysis` and the duplicate candidate lists — but it has **no rule for
+`board_contract`**, which is the single largest object and is stored twice.
+That is the concrete size lever and it is not a redesign.
+
+#### Deploy-readiness
+
+**Nothing to deploy. No code changed in this lane.** Two independent things must
+both be true before a board can land, and neither is a one-line edit:
+
+1. **Get the payload under 8,388,608 bytes** so keyvalue carries it and the
+   HTTP path stops being load-bearing. Aliasing the duplicated `board_contract`
+   is the first cut; 6.3MB of `cards` inside it needs its own decision.
+2. **Stop the web OOM cycle**, or the fallback has nothing to POST to. Prime
+   suspect is the worker's own `artifacts/export?pattern=` pulls, not the
+   publishes.
+
+Fixing (1) alone still leaves `/api/home` down. Fixing (2) alone leaves a
+27.6MB body against a path measured to drop the connection above ~19.6MB.
+
+#### Second, separate defect found while measuring — NOT the persist
+
+`CANDIDATE_POOL_READY` collapsed and has not recovered:
+
+```
+20:04:21  count=590      <- last non-zero
+20:12:35  count=0        <- LAYER2_SHORTLIST rows=145 considered=3319 on the SAME cycle
+20:18:09  count=0
+20:22:06  count=0   (rows=145 considered=3302)
+20:24:56  count=0
+```
+
+Every cycle since 20:04 computes **zero** candidates while the L2 shortlist
+still finds 145 rows from 3,319 considered. `STATE_WRITE_SKIPPED_EMPTY_OVER_GOOD`
+is correctly refusing to publish those zeros over the retained 150. **Unproven
+hypothesis, stated as such:** the pool's inputs are pulled from web
+(`artifact_publisher` PULL_*), web has been 502/OOM since 20:05, and
+`PULL_OK … artifacts_received=0 written=0` appears throughout — so this may be
+a *consequence* of the web outage rather than an independent bug. It needs its
+own owner and its own measurement against a healthy web. Do not assume either
+direction.
 
 ### #309 — FIXED AND DEPLOYED 2026-08-09. WNBA graded 0 rows because the grader read a different root than the producer writes. `17d4f203` is DEPLOYED AND INERT
 
