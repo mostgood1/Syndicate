@@ -50,6 +50,24 @@ version.
 | `70e60b55` | `#281` `scripts/blueprint_sync_preview.py` — gate before any `render.yaml` push |
 | `2ddccb97` | `#281` refresh-worker declared a NON-owner of the MLB sweep — **held for window two** |
 
+> **ID COLLISION — the two `#281` rows above are MIS-NUMBERED and I am not
+> amending them.** `#281` was already allocated to the live-lens memory-gate
+> entry by the lead's own central allocation (`86eb1271`, "live-lens memory-gate
+> entry #274 -> #281"), and that entry is live at the `### OPEN ... #281 THE
+> LIVE-LENS MEMORY GATES` heading in this file. It was then allocated to me for
+> the blueprint env-diff work. **`70e60b55` and `2ddccb97` carry the wrong ID**;
+> a replacement is requested from the lead and will be recorded here rather than
+> rewritten into the commits, per the standing no-amend rule.
+>
+> **This is the EIGHTH ID collision of the night and the SECOND from central
+> allocation** (`#290` was the first, hours after grepping was banned for
+> producing exactly this). That matters more than the number: the remedy failed
+> for the *identical* reason the thing it replaced failed — **the allocator's
+> view is stale between the read and the reply.** Centralising a stale read does
+> not make it fresh; it moves it. A registry that assigns from a durable record
+> at write time would; a session answering from memory cannot. Recorded because
+> [[the failure of a remedy is more useful than the failure it replaced]].
+
 #### STILL OPEN — four things, in value order
 
 1. **Does settlement grade against BEST price or the arbitrary retained book,
