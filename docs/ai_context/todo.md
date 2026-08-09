@@ -1224,9 +1224,55 @@ and today already produced a deployed-and-inert fix, a concurrency cap that
 could not fire and a reader pointed at a source nothing writes.
 [[confirm the code ran]]
 
+#### The good-build window is the first ~15 minutes of a boot, and that is the whole item
+
+Anchoring the numbers above to the boot that produced them —
+`dep-d9sdhi2jobas73f4thq0`, commit `8ef48371`, live 19:49:12Z:
+
+```
+19:49  boot                          worker ~85 MB
+20:04  pool = 590                    worker 1034.1 MB      <- 15 min in
+20:24  OVERVIEW_STOPPED_FOR_MEMORY   anon 1525.2 MB        <- 35 min in
+21:40  still stopped                 worker 1533.6 MB
+```
+
+**Every good board this service has produced today was produced inside the
+first quarter-hour of an instance's life.** That is `#290`'s "crosses the floor
+15-20 minutes after every boot and never recovers" seen from the board's side
+rather than the guard's, and it is why the good-build rate *decayed* through the
+evening instead of being stable. It also means a deploy is not a fix and will
+look like one: the next 15 minutes after ANY restart will produce boards whether
+or not the trim works. **Judge this at T+30min, not T+5.**
+[[worker memory is boot-confounded]]
+
 #### Deploy-readiness
 
-Code-only, no `render.yaml`, no env keys. `tests/test_malloc_trim_release.py`
+Deploy target is **refresh-worker `srv-d91dpertqb8s73co8ls0` only.**
+`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `true` there and
+`false` on web `srv-d88ahvrbc2fs73eodu30` (read 2026-08-09), so
+`_build_candidate_pool` never runs on web and all three trims are unreachable
+there. There was an MLB sim and two NFL smartsim jobs in flight at 21:40Z; a
+deploy kills them. [[deploys kill in-flight sims]]
+
+Code-only, no `render.yaml`, no env keys.
+
+**`tests/test_intelligence_state.py` has three failures on this machine and
+none of them are this change** — verified by running the same tree twice, once
+at the parent commit and once with the patch applied on top of it, rather than
+by comparing two checkouts. The first attempt at that comparison was invalid: a
+clean `git worktree` at the
+parent commit does not carry the main checkout's UNTRACKED `data/` mirror, and
+`test_build_candidate_pool_does_not_embed_full_odds_history_payload` is
+sensitive to exactly that. It passes at base and with the patch in the
+worktree, and fails in the main checkout either way. Two of the three
+(`test_read_latest_response_syncs_shared_backend_state`,
+`test_background_loop_survives_board_window_watch_exception`) fail at the
+parent commit as well. The trim itself cannot affect any of them: on Windows
+`MALLOC_TRIM_INIT` reports `available: false` and the call returns before it
+does anything. A worktree A/B is not a free substitute for an in-place one on
+this repo. [[render is source of truth]]
+
+`tests/test_malloc_trim_release.py`
 (7 tests) pins the two things a test process can actually assert: that each trim
 runs **before** the guard whose verdict it is meant to change — a trim placed
 after would deploy, log a healthy release every cycle, and change nothing — and
