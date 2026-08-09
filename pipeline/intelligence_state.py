@@ -1804,6 +1804,39 @@ def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
     if isinstance(board_contract, dict) and _matches_recommendations(board_contract.get("cards")):
         compact["board_contract"] = {**board_contract, "cards": _alias_marker("recommendations")}
 
+    # #317. `board_contract` is stored TWICE -- once at the top level and again
+    # inside `response` -- and only the top-level copy was ever reduced. Measured
+    # on the 27,638,247-byte payload that keyvalue refused 2026-08-09 20:09:16Z:
+    # board_contract = 6,333,444 at the top level and a SECOND 6,333,444-byte
+    # copy beside `response`. The rule above could not reach it, and the
+    # `response.analysis` rule right at the top of this function already
+    # established that a nested duplicate of a top-level object is the shape to
+    # look for -- this is the same shape, one key over, and it was simply never
+    # written.
+    #
+    # Same equality guard as everywhere else in this function: alias only what
+    # provably matches byte for byte, because a wrong board beats a small one.
+    #
+    # Compared on the ORIGINAL `state`, deliberately, NOT on `compact`. By this
+    # point the top-level copy may already have had its `cards` aliased while
+    # the nested twin has not, so comparing the reduced forms would never match
+    # and this rule would silently never fire -- the exact failure mode of a
+    # guard that looks right and is inert. If the two were identical on the way
+    # in, the nested one is a duplicate; the reader restores it from whatever
+    # the top-level copy expands to.
+    original_response = state.get("response") if isinstance(state, dict) else None
+    nested_response = compact.get("response")
+    if isinstance(nested_response, dict) and isinstance(original_response, dict) and "board_contract" in original_response:
+        top_blob = json.dumps(state.get("board_contract"), sort_keys=True, default=str)
+        nested_blob = json.dumps(original_response.get("board_contract"), sort_keys=True, default=str)
+        # The alias marker is ~30 bytes; aliasing a trivially small contract
+        # makes the payload bigger, the same trap _ALIAS_MIN_BYTES guards above.
+        if top_blob == nested_blob and len(nested_blob) >= _ALIAS_MIN_BYTES:
+            compact["response"] = {
+                **nested_response,
+                "board_contract": _alias_marker("board_contract"),
+            }
+
     return compact
 
 
@@ -1834,6 +1867,12 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
         for key in _CANDIDATE_ALIAS_RESPONSE:
             if restored.get(key) == marker:
                 restored[key] = recommendations
+        # #317. Restored from `expanded`, not `state`, and deliberately AFTER the
+        # top-level board_contract has had its own `cards` alias resolved above --
+        # otherwise response.board_contract would come back still carrying an
+        # unresolved marker where a reader expects the card list.
+        if restored.get("board_contract") == _alias_marker("board_contract"):
+            restored["board_contract"] = expanded.get("board_contract")
         expanded["response"] = restored
 
     return expanded
