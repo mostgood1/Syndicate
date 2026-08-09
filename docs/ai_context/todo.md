@@ -45,6 +45,160 @@ the same reason the lead kept hand-allocating after adopting the fix: **the
 broken mechanism was the one already in my hands.** Same shape, same evening,
 one message apart.
 
+### OPEN 2026-08-09 — `#306` A STAGE THAT PRODUCES NOTHING MUST REPORT *WHY*, AND THE REASONS MUST NEVER RENDER IDENTICALLY
+
+**This is the pattern, not the counter.** Every hard bug this session was an
+instance of failing it, and the fix already exists in one place, unused.
+
+`emit_settlement_inputs`'s autorun diagnostic is the only instrument in the
+system that separates the two:
+```
+unmatched_no_graded_rows   3,716   <- NO PRODUCER   (nothing to match against)
+unmatched_no_key_match     4,560   <- NOT JOINED    (producer exists, keys disjoint)
+```
+Everything else in the platform renders both as one `0`. The distinction is not
+cosmetic — it points at opposite halves of the system, and getting it wrong
+sends the work to the wrong place. With `graded_rows_available = 1` across eight
+sport×date pairs, those 4,560 "key" failures were failing against a candidate
+pool of **one row** — so fixing the matcher settles 0 → 0, and "settlements did
+not increase" is evidence about neither the matcher nor the keys.
+
+**The argument that this needs a name: two independent reinventions in one
+session, by one lane, because nothing surfaced the pattern.**
+- `#296`'s `sweep_state` — `pending` vs `no_slate` vs `swept`, so a sport with no
+  quotes says *why* instead of vanishing.
+- `select_shortlist`'s `rows_stale_kickoff` / `rows_beyond_quote_age` — so a
+  shrinking board says *which rule* shrank it.
+
+Both were built from scratch, hours apart, to answer the same question the
+settlement diagnostic already answers. Related prior art: `audit_slate_coverage`'s
+THIN, and `read_quote_last_seen`'s docstring insisting a missing entry is
+*unknown*, never *stale*.
+
+**Rules this implies, all of them paid for tonight:**
+1. A zero must be attributable. `returned: 0` with no counter is indistinguishable
+   from an outage — that is how `#265`'s collapse, `#286`'s empty board and the
+   L2-A board's 1,075 dropped rows all read as breakage.
+2. State the reason on **every** branch, including the healthy one. A consumer
+   that infers "fine" from an absent key cannot tell it from a payload written
+   before the field existed (`#296` states `sweep_state: "swept"` for this).
+3. Absent ≠ null ≠ zero. `#270`'s projection, `#297`'s missing team key and
+   `seen_age_seconds` all turn on this.
+4. An instrument must not be able to break the stage it measures — count
+   defensively, degrade to the conservative answer (`#296`'s chip lookup,
+   the `cells_with_seen_age` walk).
+5. A **failed query must never render as a negative result.** A Render env fetch
+   returning `invalid limit: too large` printed `<ABSENT>` for both services and
+   agreed with the expected answer. Print the denominator that proves the query
+   ran (`93 vars fetched`).
+
+### OPEN 2026-08-09 — `#295` THE "CLOSING PRICE" IS A POLLING-BOUNDARY VALUE, NOT THE CLOSING PRICE
+
+Both mechanisms that produce a closing price record **the last pregame value
+observed at a polling boundary**, not the last quote before first pitch:
+
+```
+true closing    last quote strictly before commence
+seal            last quote as of the last FREEZE CYCLE before commence
+tracking stamp  last quote as of the previous TICK before the live transition
+                (odds_refresh_tracking.py:1591-1601, by its own comment)
+```
+
+They agree when nothing moves late and diverge exactly when it does — which is
+when CLV is worth measuring. Measured 08-08: agreement on 7 of 9 games;
+`ac5e9213` was sealed at `-140` from a quote **4.5 hours stale** against a true
+close of `-181` set 51 seconds before first pitch.
+
+**Scope, measured rather than assumed:** only **three** `*_pregame.json`
+artifacts exist in all of production (MLB, 08-08 only — the freeze was dead code
+until then), and `evaluation_settlement.py:496` takes its closing price from the
+tracking stamp, using the seal's price only as a fallback. So "every CLV number
+ever" is **wrong**: there is no historical corpus. The defect is a live
+granularity problem on the primary path, not a retroactive one.
+
+**Next measurement:** tick density near commence, per sport. If the interval
+varies by sport the CLV error is sport-dependent — a cross-sport register item.
+
+### OPEN 2026-08-09 — `#296` A SPORT WITH NO QUOTES MUST SAY WHY, NOT VANISH — *fix written, uncommitted*
+
+The L2-A board is quote-driven; the board it replaces is card/schedule-driven.
+So a sport that has not been swept yet **vanishes** rather than degrading, which
+is indistinguishable from being broken.
+
+Measured 2026-08-09 02:58Z: MLB had **15 scheduled games and no quote log at
+all** (HTTP 404), because MLB capture for a date begins ~06:43Z (first
+`captured_at` on the 08-08 log). So for ~6 hours nightly the biggest sport is
+absent from the board with no marker, at exactly the hours someone is looking.
+
+Fix: `pipeline/layer2_shortlist.py` now reports `sweep_state` on both branches —
+`pending` (scheduled games > 0, zero quotes), `no_slate` (zero of both), `swept`.
+The schedule is known hours before the odds, so the chip count separates them.
+Stated on the swept branch too, or a consumer cannot tell "swept" from a payload
+written before the field existed. A chip-lookup failure degrades to `no_slate`
+rather than claiming a pending sweep it cannot evidence.
+
+### OPEN 2026-08-09 — `#297` A BET LOGGED FROM AN L2-A ROW WAS UNSETTLEABLE BY CONSTRUCTION — *fix written, uncommitted*
+
+A board row names teams `home_team`/`away_team`; `_evaluation_record_keys` reads
+`home`/`away`/`team`. **Those never collide.** `_graded_row_keys` emits only
+`{selection, player, team, home, away, title}`. So a bet logged straight from an
+L2-A row reached the ledger with no team value in its key set.
+
+Measured on real production rows, 2026-08-09:
+```
+GAME row -> record keys {event_id, market}   <- neither type is EVER emitted by
+                                                a graded row: empty intersection
+                                                against every graded row that
+                                                could exist. 84 of 200 rows.
+PROP row -> {event_id, market, 'sonia citron'} <- the player name is the ONLY
+                                                viable key; works because names
+                                                happen to be unique and agree
+```
+It returns 200 and dies silently at grading — `#258` through a new door.
+
+Fix: `normalize_portfolio_event_identity()` in `evaluation_settlement.py` (next
+to the extractor it exists to satisfy), called on the **write path** in the
+`/api/intelligence/portfolio-event` endpoint. Maps names into the keys the
+extractor reads; non-destructive.
+
+**Pass condition is a non-empty key intersection, NOT an HTTP 200.** Still owed:
+the live half. `graded_rows_for_date` returned **0 rows for wnba/soccer/mlb on
+08-08** (autorun off + the `#265` seal damage), so this is proven *structural*
+and the normalization half is **unobserved**. Only that step catches a
+normalization mismatch. Bets already in the ledger keep the thin identity.
+
+### OPEN 2026-08-09 — `#299` SETTLEMENT'S TWO SIDES HOLD IDENTIFIERS IN DIFFERENT NAMESPACES, WITH NO BRIDGE
+
+**Write this version, not the "one-line omission" one it was first described as —
+that framing was retracted.** Nothing is discarded:
+
+```
+grep event_id|game_id|game_pk  in graded_outcomes.py   -> NO MATCHES
+GRADED_OUTCOME_FIELDS = (sport, market, selection, player, team, home, away,
+                         title, line, actual, odds, result, pnl, closing_price)
+                                            ^ no event identifier, ever
+graded side (MLB)  game_pk   823834                            <- StatsAPI
+record side        event_id  a22463fa1e60fc06243141f286915661  <- OddsAPI hash
+```
+
+The graded side has **no** event identifier; its MLB source (`market_accuracy.py:222`)
+carries `game_pk`, a different namespace from the OddsAPI hash the record holds.
+Adding `game_pk` to the key set widens it with values that can never equal a
+hash. **Design gap, not an omission** — describing it as the latter sends someone
+looking for a line to fix. The bridge exists implicitly in the odds/board join
+(chips match OddsAPI events to games) but is never exposed to settlement.
+
+This explains settlement coverage better than data quality does: matching bets on
+English while both sides hold ids they cannot compare. The settlement lane's
+measurement and conclusion both stand — the matcher is not the problem.
+
+**DO NOT ADD `market` (or any category-shaped key) TO A VALUE-INTERSECTION JOIN.**
+A market token is shared by every row of that type, so a record would overlap a
+graded row for a **different** game on `h2h` alone, pass `_markets_compatible`
+(same market), and skip the line check (h2h has no line) — a **silently wrong
+settlement**, which is worse than no match because it looks identical to a right
+one. Only identifier-shaped keys are safe to add.
+
 ### OPEN 2026-08-09 — `#292` DOES SETTLEMENT GRADE AGAINST BEST PRICE OR THE ARBITRARY RETAINED BOOK? A validity question about the evaluation layer, not a settlement follow-up
 
 **Unmeasured. Highest-value open item from the `#275` lane, and rated by the
@@ -1073,6 +1227,15 @@ and WNBA's rows over the ceiling too. Every sport lost its board together.
 
 **Not the same bug as #286, and not a producer failure either.** The ledger it
 reads lives on refresh-worker's disk and the endpoint runs on **web**.
+
+> **CORRECTION 2026-08-09.** This entry has carried "the ledger can't cross —
+> it's 367MB against a ~19.6MB transport" as the reason. **True, and not the
+> binding one.** `is_hot_artifact_relative_path()` **rejects
+> `reports/intelligence/evaluation_ledger.jsonl` and its chunk dir outright** —
+> the path is not allowlisted at all, so there is no transport for size to be
+> measured against. Anyone optimising the transport, sharding the file, or
+> raising the budget would have got nowhere. Size was a property of a route that
+> does not exist. See the disk-split item and `#306`.
 
 `api_opportunity_board` → `build_recommendation_performance_analytics_for_window`
 → `_load_chunk_records_for_window` → `reports/intelligence/evaluation_ledger_chunks/<date>.jsonl`.
