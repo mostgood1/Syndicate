@@ -2261,6 +2261,19 @@ def _diag_log_all_process_memory(stage: str) -> None:
 _MIN_SAFE_MEMORY_HEADROOM_BYTES = 1900 * 1024 * 1024
 
 
+def _release_freed_memory_to_os(reason: str) -> dict[str, Any] | None:
+    # Import inside the call, matching every other memory_observability use in
+    # this module: this is instrumentation-shaped code and must not turn an
+    # import problem into a dead board loop.
+    try:
+        from syndicate.features.shared.memory_observability import release_freed_memory_to_os
+
+        return release_freed_memory_to_os(reason)
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(f"[intelligence_state] MALLOC_TRIM_FAILED reason={reason} {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
     try:
         from syndicate.features.shared.memory_observability import memory_headroom_snapshot
@@ -3121,6 +3134,23 @@ class IntelligenceStateService:
         # reading nothing every time. Best-effort/never-raises by design, so
         # a network blip just means this cycle reads stale local data.
         _diag_log_all_process_memory("build_candidate_pool_start")
+        # #285. Trim BEFORE the guard reads, never after: the guard's verdict is
+        # the only thing in this function that consumes the number, so a trim
+        # that runs afterwards changes nothing this cycle. All three trims in
+        # this function are placed immediately in front of a guard for that
+        # reason, and the ordering is pinned in tests/test_malloc_trim_release.py
+        # because a late trim logs an identical-looking healthy release.
+        #
+        # This first one is the anti-ratchet. It releases everything freed since
+        # the previous cycle -- by this loop, by the live-lens loop, by the MLB
+        # sim tick, by every other thread sharing this process's heap -- and
+        # that accumulated arena high-water mark is what `#290` measured
+        # crossing the overview floor 15-20 minutes after each boot and never
+        # coming back. Measured 2026-08-09 21:04-21:20Z: this process sat flat
+        # at 1408-1502MB RSS across six cycles in which the overview never once
+        # ran, against an 85MB boot baseline. A plateau, not a slope -- which is
+        # the shape a high-water mark has and a leak does not.
+        _release_freed_memory_to_os("pre_build_candidate_pool_start_guard")
         if _abort_build_candidate_pool_if_memory_critical("build_candidate_pool_start"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
         try:
@@ -3161,6 +3191,20 @@ class IntelligenceStateService:
         except Exception as exc:
             print(f"[intelligence_state] PULL_ODDS_HISTORY_FAILED error={exc}", flush=True)
         _diag_log_all_process_memory("post_pull_hot_artifacts")
+        # #285, second trim. The guard that has actually been starving the board
+        # is not this one -- it is `_overview_headroom_exhausted`, which fires
+        # per-sport INSIDE build_intelligence_overview below, and it fired on
+        # `next_sport=mlb sports_done=0` for 23 of the 24 zero-candidate cycles
+        # measured 19:55-21:12Z. This call site is the last point before that
+        # guard runs, so it is the one that decides whether MLB is allowed to
+        # hydrate at all.
+        #
+        # Not redundant with the trim at the top: both pulls above have just
+        # released their transport buffers. Worth stating what this has to
+        # close, because it is smaller than the floor arithmetic suggests --
+        # the worker process was at 1034.1MB RSS on the one cycle that built
+        # 590 candidates and 1493.9MB on the plateau that builds none. 465MB.
+        _release_freed_memory_to_os("pre_overview_headroom_guard")
         if _abort_build_candidate_pool_if_memory_critical("post_pull_hot_artifacts"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
 
@@ -3189,6 +3233,16 @@ class IntelligenceStateService:
             if not isinstance(overview, list):
                 overview = []
         _diag_log_all_process_memory("post_build_overview")
+        # #285, third trim -- the one that matters on a cycle that SUCCEEDS.
+        # MLB's hydrated overview costs +2531MB anon (this file's own 2026-08-07
+        # measurement, 478MB -> 3009MB across the pass) and most of that is
+        # scratch that Python frees as each sport finishes. `overview` itself
+        # stays live and is not touched by this. Without a trim here the freed
+        # scratch stays resident for the ~3 minutes until the next cycle's
+        # top-of-loop trim, and everything else sharing this process -- the MLB
+        # sim tick every ~32s, the live-lens loop, every child spawn -- has to
+        # fit underneath it. That window is where the OOM kills happened.
+        _release_freed_memory_to_os("post_build_overview_guard")
         if _abort_build_candidate_pool_if_memory_critical("post_build_overview"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
         preferences = _query_preferences(

@@ -977,7 +977,102 @@ it now has a date.
 **`#310` closes.** The remaining work — why boxscore ingestion stopped on
 2026-05-24 — is `#314`'s question and needs its own owner.
 
-### #285 — OPEN. The worker's retained memory is NOT in the Python object graph, and `HEAP_CENSUS` cannot see 93% of it
+### #285 — `malloc_trim(0)` SHIPPED, NOT DEPLOYED. And the target is 465MB, not 900MB: the exact worker RSS that produced the day's one good board is measured
+
+**The discriminator from this item's own "options" list is now code, committed,
+awaiting a deploy the user performs.** Three calls to a new
+`release_freed_memory_to_os()` in `_build_candidate_pool`, each placed
+immediately in front of a memory guard, plus a one-time `MALLOC_TRIM_INIT` line
+that names which branch the `ctypes` binding took.
+
+#### THE NUMBER THIS TURNS ON — the last good build's worker RSS, measured
+
+Two `ALL_PROCESS_MEMORY` samples from the same service on the same day, one from
+the single cycle that produced a board and one from the plateau that has
+produced none:
+
+```
+20:04:14  post_pool_assembled     worker RSS 1034.1 MB   container 2155.7    <- pool = 590
+21:04:21  post_pull_hot_artifacts worker RSS 1408.5 MB   container 3054.7    <- pool = 0
+21:20:18  post_pool_assembled     worker RSS 1493.9 MB   container 3135.4    <- pool = 0
+```
+
+**The gap is 460MB, not the ~900MB a floor-vs-anon calculation suggests.** That
+calculation is not wrong, it is answering a different question: `headroom ≈ 4096
+− anon − active_file` (verified against three live snapshots to within 6MB), so
+clearing 3000 outright needs `anon + active_file ≤ 1096` against ~2000 today.
+But the board does not need the guard to clear *outright* — it needs the
+process returned to the state it was demonstrably in at 20:04, and that state is
+`worker 1034MB`. **Release ~465MB from this one process and the condition that
+built 590 candidates is restored.** Judge the deploy against 1034, not against
+the floor.
+
+#### What the 77-minute plateau adds to this item
+
+Measured 21:04:21–21:20:18Z, six consecutive cycles, from the ring buffer at
+`/api/ops/intelligence/memory-diagnostics`:
+
+- **The worker process is flat at 1408→1502MB across sixteen minutes** — +6MB/min,
+  against the +24MB/min `#290` measured post-boot. **A plateau, not a slope.**
+  That is the shape a high-water mark has and a leak does not, and it is new
+  evidence for hypothesis (1) that this item did not have.
+- **The worker IS the anon.** cgroup `anon` 1525–1600MB against worker RSS
+  1494MB; `accounted_rss_mb` reads 2020 only because forked children
+  double-count shared pages. One process, ~1.4GB above its 85MB boot baseline.
+- **`pull_hot_artifacts` is EXONERATED as a per-cycle cost.** The `#250` comment
+  in `intelligence_state.py` still describes "171MB → 1629MB anon in six seconds
+  across BOTH pulls" as the single largest unattributed allocation. Across six
+  cycles with the split checkpoint that comment asked for now in place:
+  `build_candidate_pool_start → post_pull_hot_artifacts` is −116, +0.3, +30, 0,
+  −2, −2 MB. **It was a cold-boot one-off, not a recurring driver.** Anyone
+  reading that comment today is being pointed at the wrong stage.
+
+#### Why `malloc_trim` and not `MALLOC_ARENA_MAX`, restated now that it is free
+
+The recorded reason arena_max was deferred — that it means a `render.yaml`
+blueprint sync, which applies the whole file — **does not apply to
+`mallopt(M_ARENA_MAX, 2)` via `ctypes`, which is code-only.** That objection is
+gone. It is still the follow-on and not the first move, for the reason this item
+already gives: it only helps if (1) is true and a null result from it never
+tested (2). Shipping both together would have bought a worse experiment for a
+marginally better chance. **If the trim line reports a small
+`anon_released_by_trim_mb` and anon stays high, arena_max would not have saved
+it either** — that is hypothesis (2) and the work becomes finding what holds the
+buffers.
+
+#### How to read the result — the whole experiment is one log line
+
+```
+MALLOC_TRIM {"reason": ..., "rc": ..., "anon_before_mb": ..., "anon_after_gc_mb": ...,
+             "anon_after_mb": ..., "anon_released_by_trim_mb": ..., "rss_released_mb": ...}
+```
+
+`anon_after_gc_mb` sits between the other two deliberately. `gc.collect()` runs
+first because `malloc_trim` releases only what Python has *already* freed, and
+the two are measured separately so a drop caused by the collection can never be
+reported as evidence for allocator retention. The collection is expected to move
+anon by roughly nothing — that is exactly what this item's 01:03/01:05 sample
+pair showed — and if it ever does move it, that is a finding about (2).
+
+**Grep `MALLOC_TRIM_INIT` first, before reading any `MALLOC_TRIM` line.** This
+binding cannot be executed anywhere in this repo's development environment
+(Windows, no WSL, no Docker), so its first execution is in production. Without
+that line a failed `dlopen` and a trim that released nothing are both silence,
+and today already produced a deployed-and-inert fix, a concurrency cap that
+could not fire and a reader pointed at a source nothing writes.
+[[confirm the code ran]]
+
+#### Deploy-readiness
+
+Code-only, no `render.yaml`, no env keys. `tests/test_malloc_trim_release.py`
+(7 tests) pins the two things a test process can actually assert: that each trim
+runs **before** the guard whose verdict it is meant to change — a trim placed
+after would deploy, log a healthy release every cycle, and change nothing — and
+that the gc and trim halves stay separately attributed. It cannot assert the
+release itself; that is the kernel's business, and the production log line is
+the only place it is visible.
+
+#### Original framing, retained below
 
 First result on the ratchet isolated in `#290`. **Nothing shipped — both candidate
 fixes are production changes and the service has only just stabilised.**

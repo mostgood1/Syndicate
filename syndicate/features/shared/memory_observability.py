@@ -686,6 +686,185 @@ def log_runtime_memory(stage: str, **extra: Any) -> None:
     log_container_memory(stage, **extra)
 
 
+# #285. `gc.collect()` returns memory to PYTHON. It does not return it to the
+# KERNEL, and the cgroup guards in this repo measure the kernel's number. That
+# gap is the whole of this helper.
+#
+# THE SAMPLE PAIR that motivates it, measured on refresh-worker 2026-08-09
+# under `#290`'s control condition (the hydrated overview blocked on every
+# cycle, so it is excluded by construction):
+#
+#     01:03:43   container 2564.9 MB   gc_objects 381,063
+#     01:05:22   container 2654.2 MB   gc_objects 308,068
+#                container  +89.3 MB   gc_objects  -72,995
+#
+# A collection ran, 73,000 objects went away, and the resident set went UP.
+#
+# `malloc_trim(0)` asks glibc to hand back the pages it is holding that are
+# ALREADY FREE. It cannot touch a live object, so it is safe by construction:
+# the worst case is that nothing is free and it costs a few milliseconds.
+#
+# It is also the DISCRIMINATOR `#285` was left needing. That item closed with
+# two hypotheses the heap census provably cannot separate, because
+# `gc.get_objects()` never enumerates `str`/`bytes`/`ndarray` (verified on 3.11,
+# all three untracked) -- which on a Monte Carlo platform is most of what the
+# workload is made of:
+#
+#   (1) allocator retention -- freed by Python, never returned to the OS.
+#   (2) live str/bytes/ndarray held by references the census cannot walk.
+#
+# The before/after in this line settles it in one cycle and needs no new
+# instrument: anon drops => (1), and this call is also the remedy. anon holds
+# => (2), and the work becomes finding what holds the buffers. Log BOTH the
+# cgroup `anon` and this process's RSS -- anon is what the guards read, RSS is
+# what attributes the change to this process rather than a sibling.
+#
+# Why cgroup `anon` and not `container_memory_mb`: `memory.current` includes
+# reclaimable page cache, ~1.4GB of it here, and reading the raw number as
+# pressure has now misled this incident twice. [[memory.current is page cache]]
+#
+# Deliberately NOT `MALLOC_ARENA_MAX`: that is an env var, it only helps if (1)
+# is true, and a null result from it would be uninformative rather than
+# exculpating -- it never tests (2). It is the correct follow-on once this has
+# said which world we are in, not the first move.
+_MALLOC_TRIM_STATE: dict[str, Any] = {"resolved": False, "fn": None, "unavailable_reason": ""}
+
+
+def _resolve_malloc_trim() -> Any:
+    """Bind glibc's `malloc_trim`, once, or say out loud why it could not.
+
+    Returns None on anything that is not glibc -- Windows, musl, a libc without
+    the symbol. Callers must treat None as "no trim happened", never as an
+    error: this is an optimisation, and every non-Linux developer machine in
+    this repo takes that branch on every call.
+
+    THE ONE-TIME `MALLOC_TRIM_INIT` LINE IS NOT DECORATION. This binding cannot
+    be executed anywhere in this repo's development environment -- Windows, no
+    WSL, no Docker -- so the first proof that it works at all is a production
+    log line. Without this line a failed `dlopen` and a successful trim that
+    happened to release nothing look identical from outside: both are silence.
+    That is the exact shape of today's deployed-and-inert fix, a concurrency
+    cap that could not fire, and a reader pointed at a source nothing writes.
+    Grep `MALLOC_TRIM_INIT` after the deploy and the branch is named.
+    """
+    if _MALLOC_TRIM_STATE["resolved"]:
+        return _MALLOC_TRIM_STATE["fn"]
+    _MALLOC_TRIM_STATE["resolved"] = True
+    library = None
+    if not sys.platform.startswith("linux"):
+        _MALLOC_TRIM_STATE["unavailable_reason"] = f"platform={sys.platform}"
+    else:
+        try:
+            import ctypes
+            import ctypes.util
+
+            candidates = ["libc.so.6", ctypes.util.find_library("c"), None]
+            for candidate in candidates:
+                try:
+                    libc = ctypes.CDLL(candidate, use_errno=True)
+                except Exception:
+                    continue
+                trim = getattr(libc, "malloc_trim", None)
+                if trim is None:
+                    continue
+                trim.argtypes = [ctypes.c_size_t]
+                trim.restype = ctypes.c_int
+                _MALLOC_TRIM_STATE["fn"] = trim
+                library = candidate or "<main program>"
+                break
+            else:
+                _MALLOC_TRIM_STATE["unavailable_reason"] = "symbol_not_found"
+        except Exception as exc:  # pragma: no cover - defensive, must never raise
+            _MALLOC_TRIM_STATE["unavailable_reason"] = f"{type(exc).__name__}: {exc}"
+    payload = {
+        "available": _MALLOC_TRIM_STATE["fn"] is not None,
+        "library": library,
+        "platform": sys.platform,
+        "pid": os.getpid(),
+        "unavailable_reason": _MALLOC_TRIM_STATE["unavailable_reason"] or None,
+    }
+    print(f"MALLOC_TRIM_INIT {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
+    return _MALLOC_TRIM_STATE["fn"]
+
+
+def release_freed_memory_to_os(reason: str, *, collect_first: bool = True) -> dict[str, Any] | None:
+    """Return already-freed heap pages to the kernel; log what moved.
+
+    Never raises. Returns None when no trim was attempted (non-glibc), so a
+    caller can tell "trimmed nothing" from "could not trim" -- those are
+    different findings and collapsing them is how a null result gets read as
+    evidence.
+
+    `collect_first` runs a full `gc.collect()` first, because `malloc_trim`
+    releases only what Python has ALREADY freed and uncollected cycle garbage
+    is not yet free. The two are measured separately in the emitted line
+    (`anon_after_gc_mb` between before and after) precisely so this does not
+    become one undifferentiated number: the collect is expected to move anon by
+    roughly nothing -- that is what the 01:03/01:05 sample pair above showed --
+    and if it ever does move it, that is a finding about hypothesis (2) and
+    must not be silently credited to the trim.
+    """
+    trim = _resolve_malloc_trim()
+    label = str(reason or "").strip() or "unspecified"
+    if trim is None:
+        return None
+    import time as _time
+
+    stat_before = _read_container_memory_stat()
+    anon_before = stat_before.get("anon") if stat_before else None
+    rss_before = _current_process_rss_bytes()
+    anon_after_gc = anon_before
+    gc_collected = None
+    gc_elapsed_ms = None
+    if collect_first:
+        try:
+            import gc
+
+            gc_started_at = _time.perf_counter()
+            gc_collected = int(gc.collect())
+            gc_elapsed_ms = round((_time.perf_counter() - gc_started_at) * 1000.0, 1)
+            stat_after_gc = _read_container_memory_stat()
+            anon_after_gc = stat_after_gc.get("anon") if stat_after_gc else anon_before
+        except Exception:
+            anon_after_gc = anon_before
+    started_at = _time.perf_counter()
+    try:
+        rc = int(trim(0))
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(f"MALLOC_TRIM reason={label} error={type(exc).__name__}: {exc}", flush=True)
+        return None
+    elapsed_ms = round((_time.perf_counter() - started_at) * 1000.0, 1)
+    stat_after = _read_container_memory_stat()
+    anon_after = stat_after.get("anon") if stat_after else None
+    rss_after = _current_process_rss_bytes()
+    payload: dict[str, Any] = {
+        "reason": label,
+        # glibc returns 1 when it actually released memory, 0 when it could
+        # not. Reported rather than swallowed: rc=1 with a flat anon means
+        # something else grew during the call, which is a different story from
+        # rc=0 (nothing was free to give back) and points at hypothesis (2).
+        "rc": rc,
+        "elapsed_ms": elapsed_ms,
+        "gc_collected": gc_collected,
+        "gc_elapsed_ms": gc_elapsed_ms,
+        "anon_before_mb": _bytes_to_mb(anon_before),
+        "anon_after_gc_mb": _bytes_to_mb(anon_after_gc),
+        "anon_after_mb": _bytes_to_mb(anon_after),
+        # Attributed, not lumped: the trim's own contribution is measured from
+        # the post-gc reading, so a drop caused by the collection can never be
+        # reported as evidence for allocator retention.
+        "anon_released_by_trim_mb": _bytes_to_mb(anon_after_gc - anon_after) if (anon_after_gc is not None and anon_after is not None) else None,
+        "anon_released_mb": _bytes_to_mb(anon_before - anon_after) if (anon_before is not None and anon_after is not None) else None,
+        "rss_before_mb": _bytes_to_mb(rss_before),
+        "rss_after_mb": _bytes_to_mb(rss_after),
+        "rss_released_mb": _bytes_to_mb(rss_before - rss_after) if (rss_before is not None and rss_after is not None) else None,
+    }
+    # print(..., flush=True), not logger.info -- #37, logger.info never reaches
+    # Render's log collector and this line is the entire experiment.
+    print(f"MALLOC_TRIM {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
+    return payload
+
+
 def log_dataframe_memory(name: str, df: Any) -> None:
     rows = None
     columns = None
