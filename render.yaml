@@ -485,6 +485,23 @@ services:
       # access of its own (see run_mlb_daily_sim_job.py's --refresh-current-oddsapi off).
       - key: MLB_ENABLE_REFRESH_WORKER_AUTORUN
         value: "false"
+      # #281: the OTHER half of the ownership split above, which was prose here
+      # and a key only on live-odds-worker. `_mlb_refresh_tick_owner_here`
+      # (live_refresh_loop.py) DEFAULTS TRUE when unset -- "so a service with no
+      # explicit opinion keeps today's behavior" -- so with no declaration this
+      # worker also answered "yes, I own the MLB sweep". Both services did.
+      #
+      # NO-OP TODAY, BY MEASUREMENT, and stated that way on purpose: over a
+      # 40-minute window 2026-08-08, refresh-worker issued ZERO mlb
+      # refresh_odds_sources runs while live-odds-worker issued 11. The MLB odds
+      # path here is already closed by MLB_ENABLE_REFRESH_WORKER_AUTORUN=false
+      # directly above, and the cross-service refresh-run lock
+      # (_refresh_run_still_active) makes a collision safe rather than harmful.
+      # This closes the LATENT path -- if that flag is ever flipped back, the
+      # #129 duplicate-OddsAPI-caller incident returns silently, because the
+      # ownership answer lives in a default rather than in this file.
+      - key: SYNDICATE_MLB_REFRESH_TICK_OWNER
+        value: "false"
       - key: WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN
         value: "true"
       - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
