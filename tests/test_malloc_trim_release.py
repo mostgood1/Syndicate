@@ -56,7 +56,9 @@ def test_resolution_announces_which_branch_it_took(capsys):
     # names the branch -- NOT that it says available, which is false on the
     # machine running this test and true on Render.
     memory_observability._MALLOC_TRIM_STATE.clear()
-    memory_observability._MALLOC_TRIM_STATE.update({"resolved": False, "fn": None, "unavailable_reason": ""})
+    memory_observability._MALLOC_TRIM_STATE.update(
+        {"resolved": False, "fn": None, "libc": None, "unavailable_reason": ""}
+    )
     capsys.readouterr()
 
     memory_observability._resolve_malloc_trim()

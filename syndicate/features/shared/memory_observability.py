@@ -727,7 +727,7 @@ def log_runtime_memory(stage: str, **extra: Any) -> None:
 # is true, and a null result from it would be uninformative rather than
 # exculpating -- it never tests (2). It is the correct follow-on once this has
 # said which world we are in, not the first move.
-_MALLOC_TRIM_STATE: dict[str, Any] = {"resolved": False, "fn": None, "unavailable_reason": ""}
+_MALLOC_TRIM_STATE: dict[str, Any] = {"resolved": False, "fn": None, "libc": None, "unavailable_reason": ""}
 
 
 def _resolve_malloc_trim() -> Any:
@@ -770,6 +770,11 @@ def _resolve_malloc_trim() -> Any:
                 trim.argtypes = [ctypes.c_size_t]
                 trim.restype = ctypes.c_int
                 _MALLOC_TRIM_STATE["fn"] = trim
+                # Hold the CDLL too. The function pointer's lifetime is tied to
+                # the library object's and `libc` is a local -- free insurance,
+                # and it makes the dependency explicit rather than relying on
+                # ctypes never calling dlclose.
+                _MALLOC_TRIM_STATE["libc"] = libc
                 library = candidate or "<main program>"
                 break
             else:
