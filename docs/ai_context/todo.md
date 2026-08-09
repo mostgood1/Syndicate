@@ -180,7 +180,36 @@ answer it** — the mirror copies `recon_*` for the single `-Date` it was invoke
 with while sweeping `boxscores_` over a window, so "41 boxscores, 0 recon" locally
 is **weak evidence, not strong**, and this lane nearly reported it as strong.
 
-**NOT DEPLOYED.**
+#### READ THE PROBE WITH THIS TABLE. An empty result has FOUR causes
+
+Measured 19:49Z 2026-08-09: the worker deployed and web did not, and the export
+returned `count=0` **that could not have returned anything else**. An empty
+`recon_*` listing is the single most over-readable number in this entry, so it
+never gets interpreted alone:
+
+| export `recon_*` | `boxscores_present` | verdict |
+|---|---|---|
+| any value | — | **`web` NOT on `d7f932e4` ⇒ NO VERDICT.** Check first, every time |
+| non-empty | — | the allowlist was the whole blocker; `#310` closes |
+| `count=0` | **false** | the **post-game leg never ran** for this date — `#314`'s shape. Not a recon-builder defect; the builders were never reachable |
+| `count=0` | **true** | the builders had their precondition and wrote nothing ⇒ **producer defect**, `#310`'s open half closes as such |
+
+**The first row is the one that costs a night.** Both surfaces
+(`artifact-counts`, `/api/ops/artifacts/export`) run on **web** and glob **web's
+own** `HOT_ARTIFACT_PATTERNS`, while the publish side needs the same constant on
+**refresh-worker**. Same constant, both sides, deployed independently — so
+**read the live commit on every service the question touches, at the same
+instant, before reading any number off any of them.** `grader_readiness` being
+absent from the response is the cheap tell that web is behind.
+
+**The third row is the lead's catch and is not hypothetical:** arming the sweep
+does not make the builders run. If the post-game leg is not executing (the
+frozen `status: Scheduled` observation above), the write side being armed changes
+nothing, and an empty result must **not** be attributed to the thing that was
+just fixed.
+
+**NOT DEPLOYED TO WEB.** refresh-worker went live on `8ef48371` at 19:49:12Z
+(write side armed); web remains on `27a7e9df`, so the probe cannot answer yet.
 
 ### #285 — OPEN. The worker's retained memory is NOT in the Python object graph, and `HEAP_CENSUS` cannot see 93% of it
 
