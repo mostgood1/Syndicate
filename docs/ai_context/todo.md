@@ -1,5 +1,86 @@
 # Syndicate TODO — canonical cross-session list
 
+### #290 — ITEM 4 ANSWERED: the 3000MB overview floor is roughly RIGHT. `run_refresh_worker.py` itself is the ratchet. DO NOT lower the floor
+
+**Supersedes my own earlier steer in `#286`, which said to "suspect a stale
+constant". That was wrong and acting on it would have been harmful.** Lowering
+the floor converts "board empty" into "worker OOM-killed", which is strictly
+worse.
+
+**The floor is not oversized.** MLB's hydrated overview genuinely costs
+**+2531MB anon** — this file's own 2026-08-07 measurement, `478MB anon → 3009MB
+anon` across the pass. Real process memory, not page cache. From tonight's
+baseline that lands at ~4.4GB on a 4096MB container. The guard is right.
+
+#### The clean experiment — the guard built its own control condition
+
+With the hydrated overview blocked by the guard on **every** cycle since the
+00:51:51Z boot, anything still growing cannot be the overview. Measured
+2026-08-09 on refresh-worker:
+
+```
+              procs   process RSS   container_mb
+00:51:51        2       85.5 MB       277        <- fresh boot
+01:05:22        4     1343.7          2654
+01:20:07        7     1418.4          2753
+01:35:08       12     1861.9          3238
+01:47:12       12     1934.0          3327
+```
+
+**+1849MB of real RSS in 55 minutes with the expensive stage never running.**
+And the holder is named, not inferred:
+
+```
+pid=39   1381.1 MB   python scripts/run_refresh_worker.py    <- 71% of all RSS
+pid=793   217.1 MB   tools/daily_update.py --workflow ui-daily
+         ~550 MB     eight transient children combined
+```
+
+**The long-lived worker process went 85MB → 1381MB in 55 minutes without running
+the stage everyone has been blaming.** At ~24MB/min the baseline crosses the
+3000MB floor 15–20 minutes after every boot and never recovers — which is why
+the good-build rate *decayed* through the evening rather than being stable.
+
+**This retires the standing open question "why does anon ratchet within one
+boot?" as: NOT the overview.** That was the assumption; it is now excluded by
+construction rather than by argument.
+
+Item 4 therefore decomposes, and only one half is a threshold:
+- **the real fix** — in-process retention in `run_refresh_worker.py`. Unowned.
+- **not the fix** — the `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` constant. Leave it.
+
+#### `container_memory_mb` currently overstates pressure by ~1.4GB
+
+`container 3327 / rss 1934` — the gap is page cache. The guard already adds
+reclaimable back so it is not fooled; **humans reading the raw number are.**
+Same trap as the 2.7GB plateau. [[memory.current is page cache]]
+
+#### Sequencing, measured rather than assumed
+
+The process-stacking fix **worked** — last OOM 00:51:29Z, 52+ minutes clean,
+process count 79 → 5–12, builds resumed every ~2–3 min. **And the board is still
+zero**, because every build hits this floor: 12 `OVERVIEW_STOPPED_FOR_MEMORY`
+firings since that boot, all `next_sport=mlb sports_done=0`, headroom 2159–2660
+against 3000, `candidate_scoring in 0 out 0 by_sport {}`. **`#286` cannot help
+until this clears — it protects a good board from being erased, and there are no
+good boards to protect.**
+
+#### METHOD — I got the right answer from invalid evidence, and that is the entry
+
+I reported an "accelerating OOM crash loop, 14 → 11.6 → 10.3 min" off four boot
+timestamps. Checking the events API afterwards: `deploy`, **`server_restarted
+{"triggeredByUser": ...}` — a human pressed restart** — one real `oomKilled`,
+and another `deploy`. **One kill, not four.** Three of the four boots were
+things we did to it ourselves.
+
+The loop turned out to be real — nine genuine `oomKilled` events between 23:14Z
+and 00:51Z — but **it began an hour after I claimed it, so nothing I had was
+evidence for it.** A boot timestamp does not carry its cause; the events API
+does. Worth recording precisely *because* the conclusion held: **a claim that
+turns out true is the one nobody goes back to check the reasoning of.**
+[[retraction is not innocence]]
+
+
 ### 2026-08-08 — #278 BOTH WORKERS RUN THE MLB ODDS SWEEP. `render.yaml` says one should.
 
 **`SYNDICATE_MLB_REFRESH_TICK_OWNER` does not exist in production, on either
