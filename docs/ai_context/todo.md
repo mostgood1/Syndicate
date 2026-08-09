@@ -20901,8 +20901,29 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
   each near-continuous even though every individual run ends. Per-side unit tests passed every time; only the
   joint invariant test (#63) catches it.
 
-- **Render auto-deploy is OFF.** Pushing to `main` ships nothing; deploys must be
-  triggered per service via the Render API. Confirmed 2026-07-25.
+- **Render auto-deploy is OFF — for CODE. Pushing `render.yaml` IS a production
+  change.** `autoDeploy = no` on all three services, so pushing `.py` really does
+  ship nothing (confirmed 2026-07-25). **But `blueprint_sync` bypasses it**
+  (`#284`, measured 2026-08-08): a web deploy at 23:02:26Z carried
+  `trigger = blueprint_sync` with no user in it, rewrote env vars on two live
+  services (refresh-worker 92 → 93 keys) and 502'd every route for ~2 minutes.
+  Nobody deployed it — a `render.yaml` commit had been pushed. It fires on
+  `render.yaml` changes, not every push (1 `blueprint_sync` vs 19 `api` over 20
+  deploys).
+  - **A sync writes the WHOLE env block, not your diff**, so a one-key edit ships
+    every value in the file, including drift nobody has read. Enumerate first:
+    diff the blueprint against each service's live `/v1/services/<id>/env-vars`
+    (paginate — `limit` > 100 returns HTTP 400).
+  - **Absent ≠ off.** `_evaluation_settlement_auto_refresh_enabled` treats absent
+    as False; `_mlb_refresh_tick_owner_here` defaults **True**. Same edit, no-op
+    in one case and a behaviour change in the other.
+  - The old one-liner was **literally true and materially misleading** — it read
+    as "pushes are free", and seven parallel sessions batched deploys all evening
+    on that basis. Near-miss the same night:
+    `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` sat in the blueprint while
+    absent from the service, and setting that key *at all* overrides settlement's
+    daily gate (`int(raw or 86400)`) — 4 runs/day of a ~1.4GB job. Commented out
+    four hours before the sync fired.
 - **Deploying kills an in-flight MLB sim.** Check before deploying:
   `curl -s -H "X-Admin-Token: $ADMIN_TOKEN" "$BASE/api/ops/live-refresh/state?sim_date=$(date +%F)"`
   and look at `sim_run_status.state`. A full slate takes ~15 min.

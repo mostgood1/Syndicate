@@ -1069,60 +1069,7 @@ def api_ops_artifacts_export() -> Any:
             return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
 
     subset_pattern = str(request.args.get("pattern") or "").strip().replace("\\", "/")
-    # ?names_only=1 -- inventory without bodies. Answers "what exists, how big,
-    # how fresh" for a matched set at a few bytes per file.
-    #
-    # THE INCIDENT THIS COMES FROM, 2026-08-08 21:29:41Z: a lane doing routine
-    # reconnaissance called
-    #   /api/ops/artifacts/export?pattern=reports/intelligence/intelligence_state*.json&names_only=1
-    # and web returned 30,308,015 bytes. That was read as "names_only=1 does not
-    # suppress bodies". It is worse than that -- THE PARAMETER DID NOT EXIST.
-    # Flask ignores unknown query args, so the request ran as an ordinary
-    # full-body export and the flag the caller believed was protecting them was
-    # never read by anything. 30MB through the 2Gi service, from a query whose
-    # author thought they had asked for names.
-    #
-    # (30,308,015 is the JSON envelope of one 27,420,309-byte state file, within
-    # three bytes of the figure measured independently on the publish path --
-    # so it was one artifact's body, exactly as an un-flagged export would give.)
-    #
-    # Implemented rather than rejected: the intent was reasonable and the cheap
-    # inventory is genuinely useful, which is why someone reached for it. An
-    # unknown-parameter rejection would also have prevented this and is a
-    # bigger, separate behaviour change across every ops route.
-    names_only = _coerce_bool(request.args.get("names_only"))
     artifacts: dict[str, str] = {}
-    if names_only:
-        listing: dict[str, dict[str, Any]] = {}
-        for pattern in HOT_ARTIFACT_PATTERNS:
-            for path in root.glob(pattern):
-                if not path.is_file():
-                    continue
-                relative_path = relative_to_data_root(path)
-                if not relative_path or not is_hot_artifact_relative_path(relative_path):
-                    continue
-                if subset_pattern and not fnmatch.fnmatch(relative_path, subset_pattern):
-                    continue
-                try:
-                    stat = path.stat()
-                    if since_epoch is not None and stat.st_mtime < since_epoch:
-                        continue
-                    listing[relative_path] = {"bytes": stat.st_size, "mtime": stat.st_mtime}
-                except Exception:
-                    continue
-        # No `truncated` key on purpose: this path never reads a file, so there
-        # is no budget to exceed and nothing to truncate. Reporting a field that
-        # is structurally always False would invite a caller to trust it on the
-        # body-carrying path too.
-        return jsonify(
-            {
-                "ok": True,
-                "count": len(listing),
-                "names_only": True,
-                "bytes": sum(int(entry["bytes"]) for entry in listing.values()),
-                "artifacts": listing,
-            }
-        )
     # Hard byte ceiling on one response (#50). This handler accumulates whole
     # file contents into a dict and serialises it, so an unbounded matched set
     # is unbounded memory on a 2GB web instance -- and the client
