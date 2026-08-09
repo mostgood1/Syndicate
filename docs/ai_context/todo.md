@@ -65,15 +65,24 @@ instruction derived from stale state is indistinguishable from a malfunctioning
 one — except that restarting it does nothing.** That last clause is the
 diagnostic.
 
-#### VERIFIED — `cancel` refused to cancel, in two ways
+#### VERIFIED — `cancel` was broken in TWO DIFFERENT WAYS, and the distinction matters
+
+"cancel was broken" is too coarse. **One branch refused to act. The other acted
+and lied about it.** They need separate fixes and they produced separate
+failures:
 
 ```
 no pid recorded     -> raised "No running refresh PID is recorded"
 pid recorded, dead  -> set state=failed but returned ok=False
 ```
 
-The first declined to act on the one manifest that needed it. **The second is
-the one that cost an hour**: it did the right thing and reported it as a
+The first **declined to act** on the one manifest that needed it — a real
+refusal, nothing changed. The second **acted correctly and misreported it**: the
+state change happened, and only the return value was wrong. That distinction is
+load-bearing, because it means the pre-fix code's defect on that branch was
+purely in what it *reported*, not in what it *did* — which is exactly why a
+22:41Z call could genuinely terminalise a manifest while everyone watching `ok`
+believed nothing had happened. **The second is the one that cost an hour**: it did the right thing and reported it as a
 failure, so `{"ok": false, "detail": "Recorded PID is not running.", "pid": 609}`
 read as "still uncancelled" while the state change had in fact happened. Fixed
 in `35407b9d` (code) + `c8419c7c` (tests), deployed 23:03:34Z. Both branches now
@@ -138,6 +147,15 @@ lane — it is a caution about asserting a regime from a snapshot.
 `refresh_status_by_lane` is empty from web, so the worker's manifest state
 cannot be read from outside. That is why this is unresolved rather than
 answered, and it is its own gap.
+
+#### THE OPEN RISK, stated as a risk rather than a loose end
+
+**A resolved incident with an unidentified cause is an open risk, not a closed
+item.** Nine kills stopped without anyone doing anything, and we cannot say it
+will not recur — because we cannot say what ended it. The 522-sample acceptance
+soak (`MAX process_count 12`, `MAX soccer procs 0`, no `server_failed` for 50
+min) proves the system is HEALTHY; it does not prove it is FIXED. Those are
+different claims and merging them is how this returns unannounced.
 
 #### STILL OPEN
 
