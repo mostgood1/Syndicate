@@ -536,6 +536,33 @@ def log_process_tree_memory(stage: str, **extra: Any) -> dict[str, Any]:
 
 
 def log_container_memory(stage: str, **extra: Any) -> dict[str, Any]:
+    """`memory.current` AND the anon/cache split that says whether it matters.
+
+    `#318`. This logger reported `memory.current` alone, and on a 2GiB service
+    that is not a reading anyone can act on. Measured on web 2026-08-09
+    21:00:47Z, seconds before an `oomKilled`:
+
+        CONTAINER_MEMORY  memory_current_mb 1877.1  memory_pct_of_max 91.7
+        PROCESS_TREE_MEMORY  self_rss_mb 189.1  child_count 0
+
+    91.7% of the limit with 189MB accounted to any process. Those two lines are
+    equally consistent with a runaway leak and with a container that is simply
+    warm with evictable page cache, and nothing else on the service could tell
+    them apart -- so six OOM kills in 69 minutes were diagnosed by guessing at
+    which requests looked expensive.
+
+    `_read_container_memory_stat()` has read `anon`/`inactive_file` since `#79`
+    and `memory_headroom_snapshot` already uses it for exactly this reason.
+    It was simply never wired into the line that gets logged, which is the one
+    people actually read. That is the whole change: no new capability, no
+    behaviour change, one more small procfs read beside the two this function
+    already does.
+
+    Read `memory_unreclaimable_mb` first. `memory_current_mb` counts clean page
+    cache the kernel will drop before it ever OOM-kills anything; the anonymous
+    figure is the part that cannot be reclaimed and is therefore the part that
+    kills the container.
+    """
     memory_current_bytes = _read_container_memory_current_bytes()
     memory_max_bytes = _read_container_memory_max_bytes()
     payload = {
@@ -548,6 +575,20 @@ def log_container_memory(stage: str, **extra: Any) -> dict[str, Any]:
     if isinstance(memory_current_bytes, int) and isinstance(memory_max_bytes, int) and memory_max_bytes > 0:
         payload["memory_headroom_mb"] = _bytes_to_mb(memory_max_bytes - memory_current_bytes)
         payload["memory_pct_of_max"] = round(100.0 * memory_current_bytes / memory_max_bytes, 1)
+    # Absent keys stay None rather than 0. A cgroup this cannot parse must not
+    # report "0MB anonymous, plenty of room" -- that is the permissive-on-
+    # unknown shape that turns a failed read into a false all-clear.
+    stat = _read_container_memory_stat()
+    if stat:
+        reclaimable_bytes = max(0, stat.get("inactive_file", 0) + stat.get("slab_reclaimable", 0))
+        payload["memory_anon_mb"] = _bytes_to_mb(stat.get("anon")) if "anon" in stat else None
+        payload["memory_inactive_file_mb"] = _bytes_to_mb(stat.get("inactive_file")) if "inactive_file" in stat else None
+        payload["memory_reclaimable_mb"] = _bytes_to_mb(reclaimable_bytes)
+        if isinstance(memory_current_bytes, int):
+            unreclaimable_bytes = max(0, memory_current_bytes - reclaimable_bytes)
+            payload["memory_unreclaimable_mb"] = _bytes_to_mb(unreclaimable_bytes)
+            if isinstance(memory_max_bytes, int) and memory_max_bytes > 0:
+                payload["memory_unreclaimable_pct_of_max"] = round(100.0 * unreclaimable_bytes / memory_max_bytes, 1)
     payload.update(extra)
     print(f"CONTAINER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
     return payload

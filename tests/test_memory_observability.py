@@ -208,3 +208,53 @@ def test_memory_stat_absent_falls_back_to_the_conservative_calculation(monkeypat
     assert snapshot["headroom_mb"] == 868.0
     assert snapshot["sufficient"] is False
     assert "stat_mb" not in snapshot
+
+
+def test_container_memory_log_separates_reclaimable_cache_from_anonymous(monkeypatch, capsys):
+    # #318. The real web numbers, 2026-08-09T21:00:47Z, seconds before an
+    # oomKilled at a 2GiB limit. The line used to carry memory_current_mb
+    # 1877.1 / 91.7% and nothing else, next to a PROCESS_TREE_MEMORY reading
+    # self_rss_mb 189.1 -- a 1.7GB gap that the logger could not attribute.
+    #
+    # Attributed here the harmless way: mostly clean page cache. The assertion
+    # that matters is that the two readings are DIFFERENT, so 91.7% can no
+    # longer be quoted as though it were the pressure.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(1877.1 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(2048 * BYTES_PER_MB))
+    monkeypatch.setattr(
+        memory_observability,
+        "_read_container_memory_stat",
+        lambda: {
+            "anon": int(402.0 * BYTES_PER_MB),
+            "inactive_file": int(1400.0 * BYTES_PER_MB),
+            "slab_reclaimable": int(20.0 * BYTES_PER_MB),
+        },
+    )
+
+    payload = memory_observability.log_container_memory("build_live_lines_payload_local_return")
+
+    # The pre-existing fields are untouched -- this is additive.
+    assert payload["memory_current_mb"] == pytest.approx(1877.1, abs=0.2)
+    assert payload["memory_pct_of_max"] == pytest.approx(91.7, abs=0.2)
+    # ...and the new ones say the container is nowhere near its real ceiling.
+    assert payload["memory_anon_mb"] == pytest.approx(402.0, abs=0.2)
+    assert payload["memory_reclaimable_mb"] == pytest.approx(1420.0, abs=0.2)
+    assert payload["memory_unreclaimable_mb"] == pytest.approx(457.1, abs=0.2)
+    assert payload["memory_unreclaimable_pct_of_max"] == pytest.approx(22.3, abs=0.2)
+    # Emitted, not merely returned: the log line is the whole point of #318.
+    assert "memory_unreclaimable_mb" in capsys.readouterr().err
+
+
+def test_container_memory_log_omits_the_split_when_memory_stat_is_unreadable(monkeypatch):
+    # Unknown must not read as "22% used, plenty of room". With no memory.stat
+    # the split keys are ABSENT rather than 0, so a reader that keys off them
+    # gets nothing to misread instead of a fabricated all-clear.
+    monkeypatch.setattr(memory_observability, "_read_container_memory_current_bytes", lambda: int(1877.1 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_max_bytes", lambda: int(2048 * BYTES_PER_MB))
+    monkeypatch.setattr(memory_observability, "_read_container_memory_stat", lambda: {})
+
+    payload = memory_observability.log_container_memory("stage")
+
+    assert payload["memory_pct_of_max"] == pytest.approx(91.7, abs=0.2)
+    for key in ("memory_anon_mb", "memory_reclaimable_mb", "memory_unreclaimable_mb", "memory_unreclaimable_pct_of_max"):
+        assert key not in payload
