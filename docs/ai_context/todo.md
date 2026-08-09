@@ -1,5 +1,50 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-09 — NINTH COLLISION, and it happened INSIDE the act of diagnosing the collision mechanism. `#294` is released; this lane holds `#293`
+
+**The lead did the right thing and it still collided.** Told that answering from
+memory was the defect, they went and read `origin/main`'s `todo.md` — the
+durable record — and allocated `#294` to work that had already claimed `#293`
+in `87bf670b`. **Because `87bf670b` is unpushed.** That is the third staleness
+point, demonstrated by the person naming it, one message after naming it.
+
+```
+grep           stale between read and write
+ask the lead   stale between the lead's read and their reply   (slower, not faster)
+read main      stale for every ID claimed in an UNPUSHED commit
+```
+
+Their own scan makes the third point better than any argument: `279 280 282 283
+290 291` all report free on `origin/main` and **all six are verbally allocated
+and sitting in unpushed commits** — the in-flight work, which is exactly the
+work most likely to collide.
+
+**RESOLUTION: this lane keeps `#293`**, because it is written into this file in
+the commit that claimed it and that is the rule. **`#294` is RELEASED — free for
+the next taker.** Recorded here so it does not become a phantom, which is the
+failure `#292` had (allocated by message hours earlier, present in neither file,
+and therefore about to be handed to someone else).
+
+#### THE HONEST CAVEAT ON MY OWN FIX, which this collision exposes
+
+Atomic claim is necessary and **not sufficient**. A stub heading committed but
+not pushed is still invisible to everyone — my `#293` claim was, which is *how*
+this collision happened. Git arbitrates at PUSH time: two lanes claiming one
+number hit a conflict that is loud, immediate and unmissable. But nothing
+arbitrates a claim that never leaves the local branch.
+
+**So the rule is: claim the ID by appending its stub in the same commit, and
+PUSH THAT COMMIT PROMPTLY — do not let an ID claim sit in a deploy-batching
+queue.** A todo stub is docs; it never triggers `blueprint_sync` and is safe to
+push while config commits wait (`#284`). Where a claim must sit unpushed, say so
+when quoting the number, because until it is pushed the ID is *reserved in one
+tree*, not allocated.
+
+I proposed atomic claiming and then held my own claim in an unpushed batch for
+the same reason the lead kept hand-allocating after adopting the fix: **the
+broken mechanism was the one already in my hands.** Same shape, same evening,
+one message apart.
+
 ### OPEN 2026-08-09 — `#292` DOES SETTLEMENT GRADE AGAINST BEST PRICE OR THE ARBITRARY RETAINED BOOK? A validity question about the evaluation layer, not a settlement follow-up
 
 **Unmeasured. Highest-value open item from the `#275` lane, and rated by the
