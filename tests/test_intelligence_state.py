@@ -3371,72 +3371,21 @@ class IntelligenceStateTests(unittest.TestCase):
         mocked_logger_info.assert_any_call("WORKER RUN", extra={"payload_key": snapshot_key})
         mocked_logger_info.assert_any_call("STATE WRITTEN", extra={"written": True, "candidate_count": 0})
 
-    def test_build_candidate_pool_skips_sports_without_manifests(self) -> None:
-        service = IntelligenceStateService()
-        status = {
-            "selected_date": "2026-06-10",
-            "tracked_summary": {"tracked_ok": 1, "tracked_total": 1},
-            "advanced_summary": {"tracked_ok": 1, "tracked_total": 1},
-            "readiness_gate": {"ok": True},
-            "sports": [
-                {
-                    "slug": "mlb",
-                    "name": "MLB",
-                    "context_label": "2026-06-10",
-                    "data_health": "ready",
-                    "active_today": True,
-                    "tracked_ready": True,
-                    "advanced_ready": True,
-                    "advanced_gate": {"ready": True},
-                    "data_warnings": [],
-                    "artifacts": [],
-                    "advanced_inputs": [],
-                },
-                {
-                    "slug": "nba",
-                    "name": "NBA",
-                    "context_label": "2026-06-10",
-                    "data_health": "ready",
-                    "active_today": True,
-                    "tracked_ready": True,
-                    "advanced_ready": True,
-                    "advanced_gate": {"ready": True},
-                    "data_warnings": [],
-                    "artifacts": [],
-                    "advanced_inputs": [],
-                },
-            ],
-        }
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            reports_root = Path(tmp_dir) / "reports"
-            manifests_root = reports_root / "manifests"
-            manifests_root.mkdir(parents=True, exist_ok=True)
-            (manifests_root / "mlb.json").write_text(
-                '{"sport":"mlb","last_updated":"2026-06-10T10:00:00Z","artifact_paths":["reports/intelligence/mlb.json"],"status":"complete"}',
-                encoding="utf-8",
-            )
-
-            with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
-                # _build_candidate_pool's overview fallback now calls
-                # build_intelligence_overview directly instead of
-                # build_intelligence_status (only .get("sports") was ever
-                # read from the latter -- see the comment at that call site).
-                with patch("pipeline.intelligence_state.build_intelligence_overview", return_value=status["sports"]):
-                    with patch(
-                        "syndicate.features.intelligence.collect_all_recommendations",
-                        return_value=[
-                            {"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0, "odds": -110},
-                            {"name": "NBA Play", "sport": "NBA", "market": "Points", "score": 89.0, "odds": -110},
-                        ],
-                    ):
-                        pool = service._build_candidate_pool("2026-06-10", "fingerprint-1")
-
-        self.assertEqual(pool["candidate_count"], 1)
-        self.assertEqual(set(pool["candidate_pools"].keys()), {"mlb"})
-        self.assertEqual(pool["candidate_pools"]["mlb"]["last_updated"], "2026-06-10T10:00:00Z")
-        self.assertEqual(pool["global_pool"][0]["name"], "MLB Play")
-        self.assertEqual(pool["candidates"], pool["global_pool"])
+    # #288. `test_build_candidate_pool_skips_sports_without_manifests` lived
+    # here and was REMOVED rather than repaired, because it asserted nothing.
+    # It patched `syndicate.features.intelligence.collect_all_recommendations`,
+    # which pipeline/intelligence_state.py does not reference anywhere -- so the
+    # patch was a no-op, the count it produced came from whatever real
+    # git-tracked mirror data sat in data/mlb_source/.../2026-06-10/ on the
+    # machine running it, and its NBA arm returned 0 for want of NBA data on
+    # that date rather than for want of a manifest. Deleting the manifest gate
+    # entirely did not change its result.
+    #
+    # DO NOT restore it by updating the expected constant -- that re-freezes a
+    # test measuring the wrong thing. The gate's real contract is pinned in
+    # tests/test_candidate_pool_manifest_gate.py, which goes through the real
+    # _available_sport_manifests, reads nothing from data/, and is verified by
+    # mutation to FAIL when the gate is removed.
 
     def test_build_candidate_pool_aborts_early_when_memory_critical(self) -> None:
         # Production confirmed: this background thread's memory can spike

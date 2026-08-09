@@ -522,6 +522,54 @@ worker-computed, web-read summary — which is what the architecture says anyway
 Note the second, independent problem visible in the same numbers: **0 settled of
 8,276 records**, and the autorun has not run since 08-06.
 
+### #288 — RESOLVED for the manifest half: the gate is now tested for what it does, and a silent skip is now a greppable line
+
+`tests/test_candidate_pool_manifest_gate.py`, 9 tests, plus one production log
+line. The rest of #288 (the four unrelated mock/API-drift failures below) is
+still open.
+
+**The gate, stated once so nobody has to re-derive it:** a sport reaches the
+candidate pool **if and only if** it has a readable manifest at
+`reports_root()/manifests/<slug>.json`. `_available_sport_manifests` silently
+`continue`s a sport whose manifest is missing, and the loop consuming it
+(`intelligence_state.py:3201`) is the **only** place candidates are matched to a
+sport — so a candidate for an unmanifested sport is discarded with no iteration
+ever touching it.
+
+**The property the old test lacked, verified by mutation rather than asserted:**
+
+```
+real gate      -> keys ['mlb']         MANIFEST_GATE_SKIPPED_SPORTS logged: True
+gate removed   -> keys ['mlb','nba']   logged: False
+=> test_a_sport_without_a_manifest_is_dropped FAILS under the mutation
+```
+
+The old test **passed with the gate deleted.** This one cannot. And nothing in
+the new file reads `data/`, so the machine-dependent `18` is gone by
+construction rather than by being updated to a different constant.
+
+The test worth knowing about is
+`test_the_drop_is_attributable_to_the_manifest_and_nothing_else`: both sports are
+identical in the overview and the only difference is which manifest file exists;
+deleting mlb's and adding nba's flips which survives. **That is exactly the flaw
+that made the old NBA arm prove nothing** — it returned 0 for want of data, not
+for want of a manifest, and no assertion could tell the two apart.
+
+**`MANIFEST_GATE_SKIPPED_SPORTS date=… skipped=nba,nhl kept=mlb`** — one line per
+build, only when something is skipped, nothing at all on a fully-manifested
+slate, one line rather than one per sport. All three pinned as tests: a
+diagnostic that fires on a healthy slate is noise, and this worker already
+prints hundreds of lines a cycle. It converts the archetype from unobservable to
+greppable **for this one gate**: absent-legitimately and absent-silently stop
+producing the identical output. Establishing why each of the five missing sports
+was missing cost a cross-provider audit today; this covers the manifest half of
+that question for free, forever.
+
+**Scope, honestly:** this does not make every silent absence visible. It makes
+*this* gate's silent absence visible. NFL's was a garbage `context_label` reaching
+ESPN (`1de982be`), NCAAF's is something else again — each gate needs its own
+line, and that is the shape of the work rather than a reason to skip it.
+
 ### #288 — `tests/test_intelligence_state.py` failures: stale fixtures, NOT a reproduction of #286. Not fixed
 
 The thesis that these were the cheap local instrument for the production zero is

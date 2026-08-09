@@ -2388,6 +2388,21 @@ class IntelligenceStateService:
         # build_intelligence_status calls.
         overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=False, skip_game_hydration=True)
         manifests: OrderedDict[str, dict[str, Any]] = OrderedDict()
+        # #288. A sport dropped here contributes nothing to the pool, and the
+        # loop in _build_candidate_pool that consumes this dict is the ONLY
+        # place candidates are matched to a sport -- so a candidate whose sport
+        # has no manifest is discarded with no iteration ever touching it.
+        #
+        # That was invisible. "This sport has no manifest" and "this sport has
+        # no games" produced the identical observable: absent from by_sport,
+        # zero candidates, no warning. Measured 2026-08-08, twelve consecutive
+        # scoring cycles carried only mlb/soccer/wnba out of eight configured
+        # sports, and establishing WHY for each of the other five took a
+        # cross-provider audit that this one line would have shortcut.
+        #
+        # One line per build, only when something is actually skipped -- not
+        # one per sport, and nothing at all on a fully-manifested slate.
+        skipped: list[str] = []
         for sport in overview if isinstance(overview, list) else []:
             if not isinstance(sport, dict):
                 continue
@@ -2397,8 +2412,15 @@ class IntelligenceStateService:
             manifest_path = reports_root() / "manifests" / f"{sport_slug}.json"
             manifest = read_json_file(manifest_path)
             if not isinstance(manifest, dict):
+                skipped.append(sport_slug)
                 continue
             manifests[sport_slug] = manifest
+        if skipped:
+            print(
+                f"[intelligence_state] MANIFEST_GATE_SKIPPED_SPORTS date={selected_date} "
+                f"skipped={','.join(sorted(skipped))} kept={','.join(manifests.keys()) or '-'}",
+                flush=True,
+            )
         return manifests
 
     @staticmethod
