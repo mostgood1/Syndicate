@@ -5,6 +5,28 @@
 First result on the ratchet isolated in `#290`. **Nothing shipped — both candidate
 fixes are production changes and the service has only just stabilised.**
 
+**DECISION 2026-08-09 ~02:15Z, by the oversight lane, deliberately not left to
+this lane to carry: do nothing that night; resume in window two, `MALLOC_ARENA_MAX`
+first, then `malloc_trim(0)` as the discriminator.** Reasons, recorded so the
+next session does not re-litigate them: the worker had been stable for exactly
+one hour after nine OOM kills; `#265`'s collapse observation was ~2.5h in and a
+restart would add a fifth boundary to a log already being hand-separated into
+collapse-signature vs reboot-signature; the slope only matters because it
+crosses the `#290` overview floor, which has starved the board all evening
+regardless; and `MALLOC_ARENA_MAX` via `render.yaml` means a blueprint sync,
+which applies the **whole file** — currently including a held
+`SYNDICATE_MLB_REFRESH_TICK_OWNER` change. **Two entangled config changes for a
+diagnostic.** The single-key env API avoids the entanglement but still needs a
+deploy to take effect.
+
+**Note the ordering here contradicts this entry's own "options" list below**,
+which promotes `malloc_trim` to first on discriminating power. Both orderings
+are defensible and the difference is what you optimise for: `MALLOC_ARENA_MAX`
+is cheaper and may *fix* it without a code deploy; `malloc_trim` is the only one
+that *tells you which world you are in*. **If `MALLOC_ARENA_MAX` produces a null
+result, that is uninformative rather than exculpating — it never tested
+hypothesis (2) — so do not close the item on it.**
+
 #### The census is blind here, and that is the finding
 
 Measured on the 00:51:51Z boot, 2026-08-09, under `#290`'s control condition
@@ -20,10 +42,21 @@ Measured on the 00:51:51Z boot, 2026-08-09, under `#290`'s control condition
 01:08:05   run_refresh_worker.py RSS = 1151.7 MB     individually_huge_mb: []
 ```
 
-**~84MB of gc-tracked Python objects against 1152MB of process RSS**, nothing
-individually large. Between the first two samples **`gc_objects` FELL by 73,000
-while container memory ROSE by 90MB** — a collection ran, objects went away, and
-the resident set did not come back.
+**~84MB of gc-tracked Python objects against 1152MB of process RSS.**
+
+**THE SAMPLE PAIR — this is the whole argument. Read it before any summary of
+it, because it is the thing that gets lost when a finding is compressed into a
+conclusion:**
+
+```
+01:03:43   container 2564.9 MB   gc_objects 381,063
+01:05:22   container 2654.2 MB   gc_objects 308,068
+           container  +89.3 MB   gc_objects  -72,995
+```
+
+**A collection ran, 73,000 objects went away, and the resident set went UP.**
+Memory Python had finished with was not returned to the OS. Everything else in
+this entry is context for that pair.
 
 **So `HEAP_CENSUS` reports a healthy 84MB while the process holds 1.15GB.**
 Anyone who points it at this concludes "no leak". Fifth instance tonight of an
