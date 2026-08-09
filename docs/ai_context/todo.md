@@ -1,5 +1,71 @@
 # Syndicate TODO — canonical cross-session list
 
+### #285 — OPEN. The worker's retained memory is NOT in the Python object graph, and `HEAP_CENSUS` cannot see 93% of it
+
+First result on the ratchet isolated in `#290`. **Nothing shipped — both candidate
+fixes are production changes and the service has only just stabilised.**
+
+#### The census is blind here, and that is the finding
+
+Measured on the 00:51:51Z boot, 2026-08-09, under `#290`'s control condition
+(hydrated overview blocked on every cycle, so it is excluded by construction):
+
+```
+                  container_mb   gc_objects   Python heap, shallow
+01:03:43  idx 1      2564.9        381,063          99.7 MB
+01:05:22  idx 2      2654.2        308,068          81.4 MB
+01:07:06  idx 3      2926.7        319,683          84.0 MB
+01:09:05  idx 4      2827.2        321,233          84.3 MB
+
+01:08:05   run_refresh_worker.py RSS = 1151.7 MB     individually_huge_mb: []
+```
+
+**~84MB of gc-tracked Python objects against 1152MB of process RSS**, nothing
+individually large. Between the first two samples **`gc_objects` FELL by 73,000
+while container memory ROSE by 90MB** — a collection ran, objects went away, and
+the resident set did not come back.
+
+**So `HEAP_CENSUS` reports a healthy 84MB while the process holds 1.15GB.**
+Anyone who points it at this concludes "no leak". Fifth instance tonight of an
+instrument reading fine because of what it cannot see. [[a rate, not a count]]
+
+#### What is excluded, and what is NOT
+
+**Excluded:** a Python-object leak. The graph is small and shrinking.
+
+**Still open, and the census cannot distinguish them** — both are invisible to
+it, so do not let a small census number pick the tidy one:
+
+1. **glibc arena retention / fragmentation** — freed by Python, never returned to
+   the OS. The gc-down-while-RSS-up sample is this signature.
+2. **numpy/pandas buffers held by live references** — `top_by_shallow_mb` counts
+   the object header only, so a live 500MB DataFrame reads as ~100 bytes and
+   would produce exactly the observed numbers.
+
+#### The discriminator is one call and is also the likely fix
+
+`malloc_trim(0)` releases only *already-freed* arena memory. RSS drops → (1),
+and the trim is the remedy. RSS holds → (2), and the work becomes finding what
+holds the buffers. The losing branch costs nothing.
+
+**Two facts make (1) the stronger prior:** there is **no `MALLOC_ARENA_MAX` and
+no `malloc_trim` anywhere in the repo** (grepped `*.py`/`*.yaml`/`*.md`, zero
+hits), and `run_refresh_worker.py` is multithreaded Python on glibc running
+several background loops — the textbook setup for per-thread arenas that grow
+and never return.
+
+#### Options, cheapest first — NOT taken, needs an owner's decision
+
+- **`MALLOC_ARENA_MAX=2`** — env only, no code. The only option that tests the
+  hypothesis without a code change, and if it works the fix is already deployed.
+  Watch whether the ~24MB/min slope from `#290` drops.
+- **`malloc_trim(0)` at an existing RSS checkpoint** — ~4 lines of `ctypes`,
+  before/after in one log line. Diagnostic and remedy together; needs a deploy.
+- **Nothing tonight** — defensible. The slope only matters because it crosses
+  the `#290` overview floor.
+
+Both are restarts, so neither belongs inside another lane's measurement window.
+
 ### #290 — ITEM 4 ANSWERED: the 3000MB overview floor is roughly RIGHT. `run_refresh_worker.py` itself is the ratchet. DO NOT lower the floor
 
 **Supersedes my own earlier steer in `#286`, which said to "suspect a stale
