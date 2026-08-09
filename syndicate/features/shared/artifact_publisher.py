@@ -454,6 +454,129 @@ def _record_hot_artifact_pull_watermark(epoch: float) -> None:
         pass
 
 
+# Above this, publish the file as a raw streamed body rather than a JSON
+# envelope.
+#
+# THE COST THIS REMOVES, which #29746931 diagnosed correctly and then did not
+# fix. `publish_hot_artifact` holds FOUR full copies of every file at once:
+# read_text (str) -> .encode() for the checksum (bytes) -> json.dumps (str) ->
+# .encode() (bytes). That commit bounded which files the SWEEP selects, by slate
+# age and by 12MB of size. It did not touch the mechanism, and it does not apply
+# to `publish_hot_artifact`'s DIRECT callers at all -- the #43 board-state
+# fallback, #112's odds_history fallback, and #124's live-lens loop all call it
+# straight and are bounded by nothing.
+#
+# So the four-copy path is not hypothetical and not historical: it is what
+# carries today's board state. Measured 2026-08-08, refresh-worker published
+# `intelligence_state_2026_08_08.json` at 27,420,309 bytes -- and web receives it
+# by json.loads-ing that whole body on a 2Gi instance that had 675MB of headroom
+# at the time. odds_history shards reach 51MB on a real MLB slate.
+#
+# 4MB: comfortably above the ordinary artifact (kilobytes) so the common path
+# keeps the proven JSON envelope, and comfortably below anything that has ever
+# caused a problem here.
+_PUBLISH_STREAM_MIN_BYTES = 4 * 1024 * 1024
+
+_PUBLISH_STREAM_CHUNK_BYTES = 1024 * 1024
+
+# Status codes that mean "this receiver predates the streaming form", as opposed
+# to a real refusal. 403 is deliberately NOT here: that is the allowlist saying
+# no, and retrying the same file as JSON would only be refused again.
+_PUBLISH_STREAM_UNSUPPORTED_STATUSES = frozenset({400, 404, 405, 415})
+
+
+def _should_stream_publish(file_path: Path) -> bool:
+    try:
+        return file_path.stat().st_size >= _PUBLISH_STREAM_MIN_BYTES
+    except OSError:
+        return False
+
+
+def _file_checksum(file_path: Path) -> str:
+    """sha256 of the file, one chunk resident at a time."""
+    digest = hashlib.sha256()
+    with file_path.open("rb") as handle:
+        while True:
+            chunk = handle.read(_PUBLISH_STREAM_CHUNK_BYTES)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _publish_streamed(
+    file_path: Path,
+    *,
+    relative_path: str,
+    url: str,
+    token: str,
+    timeout_seconds: int,
+) -> bool | None:
+    """Publish by streaming the file's bytes. True/False on a real outcome,
+    None when the receiver does not support this form and the caller should
+    fall back.
+
+    The metadata rides in headers precisely so the body can stay raw: the
+    moment relative_path and checksum live *inside* the body, the body has to
+    be built in memory, which is the cost being removed. urllib sends a
+    file-like `data` in blocks when Content-Length is set, so the sender never
+    holds more than one block.
+    """
+    try:
+        size = file_path.stat().st_size
+        checksum = _file_checksum(file_path)
+    except OSError as exc:
+        print(f"[artifact_publisher] SKIP_READ_FAILED path={file_path} error={exc}", flush=True)
+        return False
+
+    try:
+        with file_path.open("rb") as handle:
+            request_obj = urllib_request.Request(
+                url,
+                data=handle,
+                method="POST",
+                headers={
+                    "Content-Type": "application/octet-stream",
+                    "Content-Length": str(size),
+                    "X-Artifact-Path": relative_path,
+                    "X-Artifact-Checksum": checksum,
+                    "Authorization": f"Bearer {token}",
+                },
+            )
+            with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
+                response.read()
+        print(
+            f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url} transport=stream bytes={size}",
+            flush=True,
+        )
+        return True
+    except urllib_error.HTTPError as exc:
+        if int(getattr(exc, "code", 0) or 0) in _PUBLISH_STREAM_UNSUPPORTED_STATUSES:
+            print(
+                f"[artifact_publisher] PUBLISH_STREAM_UNSUPPORTED path={relative_path} "
+                f"status={exc.code} falling_back_to_json bytes={size}",
+                flush=True,
+            )
+            return None
+        print(
+            f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} transport=stream error={exc}",
+            flush=True,
+        )
+        return False
+    except (urllib_error.URLError, TimeoutError, OSError) as exc:
+        print(
+            f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} transport=stream error={exc}",
+            flush=True,
+        )
+        return False
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[artifact_publisher] PUBLISH_UNEXPECTED_ERROR path={relative_path} url={url} transport=stream error={exc}",
+            flush=True,
+        )
+        return False
+
+
 def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     """Best-effort push of a single allowlisted artifact to the web service.
 
@@ -472,6 +595,26 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         return False
 
     file_path = Path(path)
+
+    # Big files go up as a raw streamed body instead of a JSON envelope. See
+    # _PUBLISH_STREAM_MIN_BYTES for the measurement and the reasoning; below the
+    # threshold nothing changes, because the four-copy cost of a kilobyte file
+    # is four kilobytes and the JSON envelope is the proven path.
+    if _should_stream_publish(file_path):
+        streamed = _publish_streamed(
+            file_path,
+            relative_path=relative_path,
+            url=url,
+            token=token,
+            timeout_seconds=timeout_seconds,
+        )
+        if streamed is not None:
+            return streamed
+        # None means the receiver does not understand the streaming form (an
+        # older web deploy). Fall through to the JSON envelope, which every
+        # deploy understands. This is what makes the change safe in either
+        # deploy order, including live-odds-worker being deliberately pinned.
+
     try:
         content = file_path.read_text(encoding="utf-8")
     except Exception as exc:
@@ -562,6 +705,15 @@ _PUBLISH_MAX_AGE_DAYS = 1
 # Belt and braces, and independent of the date rule: an UNDATED file cannot be
 # aged out, and `boxscores_history.csv` is exactly that shape. Sized well above a
 # normal artifact and well under what four copies of it would cost on 2Gi.
+#
+# DELIBERATELY NOT RAISED when the streamed transport landed, even though the
+# "four copies on 2Gi" half of its justification no longer applies to files this
+# large. The other half still does: this bound is what stops the SWEEP shipping
+# bulk artifacts (51MB odds_history shards) on every cycle, and that cost is
+# bandwidth, disk churn and receiver time, not just sender memory. Making the
+# transport cheap is not a reason to start moving more through it -- that would
+# be the #29746931 ping-pong again, wearing a performance fix's clothes. Raise
+# it only with a measured reason and its own verification.
 _PUBLISH_MAX_BYTES = 12 * 1024 * 1024
 
 _DATE_TOKEN = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
@@ -1076,6 +1228,50 @@ def _required_daily_artifact_paths(date_str: str) -> list[Path]:
 _SOCCER_FIXTURE_LOOKAHEAD_DAYS = 7
 
 
+_SOURCE_TREE_MARKER = re.compile(r"(?:^|/)([a-z0-9]+_source/.*)$")
+
+
+def _relative_under_data_root(path: Path, root: Path) -> str | None:
+    """This artifact's path RELATIVE TO THE RUNTIME DATA ROOT, wherever the
+    caller's helper happened to resolve it.
+
+    THE BUG THIS FIXES, measured 2026-08-08. Some per-sport path helpers resolve
+    through `preferred_source_roots(...)`, which appends the REPO checkout as a
+    cold-start fallback. `schedule_path('mls', 2026)` therefore returns the
+    repo's copy, not the runtime disk's:
+
+        SYNDICATE_DATA_ROOT = <empty temp dir>
+        schedule_path       -> <repo>/data/soccer_source/mls/api/schedule/schedule_2026.json
+        is_file()           -> True          <- the git-tracked cold-start copy
+        relative_to(root)   -> ValueError
+
+    So the repair pass concluded soccer's season schedule was PRESENT because it
+    found the mirror in git, and skipped it -- while the runtime disk had none.
+    Both branches of the old code dropped it silently: `is_file()` short-circuits
+    on the repo copy, and the `relative_to` that would have caught it raises into
+    a bare `continue`. A required artifact that can never be requested is exactly
+    the class this repair pass exists to eliminate, and it had a blind spot for
+    precisely the sport whose helpers do the fallback.
+
+    This is CLAUDE.md's own warning as a code path: "don't diagnose missing data
+    from the local checkout". The repair pass was doing exactly that.
+
+    Re-anchors on the `<sport>_source/...` segment, which every artifact path in
+    this repo carries and which is identical under either root. Returns None when
+    there is no such segment, since then there is genuinely nothing to ask for.
+    """
+    try:
+        resolved = path.resolve()
+    except Exception:
+        return None
+    try:
+        return resolved.relative_to(root).as_posix()
+    except Exception:
+        pass
+    match = _SOURCE_TREE_MARKER.search(resolved.as_posix())
+    return match.group(1) if match else None
+
+
 def _missing_required_artifact_relative_paths(date_str: str) -> list[str]:
     relative_paths: list[str] = []
     try:
@@ -1084,9 +1280,14 @@ def _missing_required_artifact_relative_paths(date_str: str) -> list[str]:
         return relative_paths
     for path in _required_daily_artifact_paths(date_str):
         try:
-            if path.is_file():
+            relative = _relative_under_data_root(path, root)
+            if not relative:
                 continue
-            relative = path.resolve().relative_to(root).as_posix()
+            # Presence is judged ON THE RUNTIME DISK, never at whatever path the
+            # helper returned -- see _relative_under_data_root. Asking "does the
+            # repo have a copy" answers a question nobody asked.
+            if (root / relative).is_file():
+                continue
         except Exception:
             continue
         # The same allowlist the writer enforces. Asking for something outside

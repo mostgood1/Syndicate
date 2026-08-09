@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import tempfile
 import time
 import unittest
+from datetime import date
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
@@ -110,6 +113,29 @@ def _write_required_daily_artifact(data_root: str, date_str: str) -> Path:
         (schedule_dir / f"schedule_{default_season(league)}.json").write_text(json.dumps({"weeks": [], "matches": []}), encoding="utf-8")
     return target
 
+
+
+
+def _body_then_eof(payload: bytes):
+    """A response `read` that yields the body once and then signals EOF.
+
+    `mock.read.side_effect = _body_then_eof(<bytes>` returns the SAME non-empty bytes on every)
+    call, and `pull_streamed_artifact` drains a response with
+    `while True: chunk = response.read(n); if not chunk: break`. A fixture that
+    never empties is therefore an infinite loop writing 1MB chunks to disk, and
+    it HANGS the suite rather than failing it -- two tests in this file did
+    exactly that (reproduced standalone: exit 124; located with
+    faulthandler.dump_traceback_later, both at artifact_publisher.py:1383).
+
+    The bulk pull calls `read()` with no arguments and wants the JSON body; the
+    streaming pull calls `read(n)` and wants bytes until EOF. Splitting on the
+    argument gives both what a real HTTP response would give them.
+    """
+
+    def _read(*args, **kwargs):
+        return payload if not args else b""
+
+    return _read
 
 
 class HotArtifactAllowlistTests(unittest.TestCase):
@@ -295,7 +321,7 @@ class PublishHotArtifactClientTests(unittest.TestCase):
 
             mocked_response = MagicMock()
             mocked_response.__enter__.return_value = mocked_response
-            mocked_response.read.return_value = b"{}"
+            mocked_response.read.side_effect = _body_then_eof(b"{}")
 
             with patch.dict(
                 os.environ,
@@ -340,7 +366,17 @@ class PublishHotArtifactClientTests(unittest.TestCase):
     def test_publish_changed_hot_artifacts_only_publishes_recent_matching_files(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             data_root = Path(tmp_dir)
-            fresh = data_root / HOT_RELATIVE_PATH
+            # TODAY's date, not the module-level HOT_RELATIVE_PATH's hardcoded
+            # 2026-07-13. This test asserts the sweep publishes a file it calls
+            # "fresh", and since `29746931` added _PUBLISH_MAX_AGE_DAYS the sweep
+            # judges freshness by the SLATE DATE IN THE FILENAME. A fixture
+            # pinned to a July date is stale on every day after 2026-07-14, so
+            # this test failed unconditionally from the moment that bound
+            # landed -- `SWEEP_SKIPPED {'stale_slate': 1}`, published 0 != 1.
+            # It was red for the wrong reason, which is the same as being off:
+            # it could no longer catch a real regression in the sweep.
+            fresh_date = date.today().isoformat()
+            fresh = data_root / f"wnba_source/source_artifacts/data/processed/recommendations_slate_{fresh_date}.json"
             fresh.parent.mkdir(parents=True, exist_ok=True)
             fresh.write_text("{}", encoding="utf-8")
             not_allowlisted = data_root / "reports" / "intelligence" / "evaluation_ledger_chunks" / "part_1.json"
@@ -351,7 +387,7 @@ class PublishHotArtifactClientTests(unittest.TestCase):
 
             mocked_response = MagicMock()
             mocked_response.__enter__.return_value = mocked_response
-            mocked_response.read.return_value = b"{}"
+            mocked_response.read.side_effect = _body_then_eof(b"{}")
 
             with patch.dict(
                 os.environ,
@@ -395,7 +431,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
             _write_required_daily_artifact(tmp_dir, "2026-07-20")
             mocked_response = MagicMock()
             mocked_response.__enter__.return_value = mocked_response
-            mocked_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+            mocked_response.read.side_effect = _body_then_eof(json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8"))
 
             with patch.dict(
                 os.environ,
@@ -415,8 +451,13 @@ class PullHotArtifactClientTests(unittest.TestCase):
             # their filename at all, so the date-pattern glob above can
             # never match them -- they're always fetched by exact path
             # instead, every cycle, regardless of watermark or presence).
-            self.assertEqual(mocked_urlopen.call_count, 5)
+            #
+            # Counted over the EXPORT endpoint only. #209's per-book quote logs
+            # are pulled through /artifacts/stream (they are far too big for
+            # export's 24MB budget) and are unconditional, so a bare
+            # call_count here started counting a second transport's requests.
             requested_urls = {call.args[0].full_url for call in mocked_urlopen.call_args_list}
+            self.assertEqual(len([url for url in requested_urls if "/artifacts/export?" in url]), 5, requested_urls)
             pattern_urls = {url for url in requested_urls if "pattern=" in url}
             live_lens_urls = {url for url in requested_urls if "path=live%2F" in url}
             # Every request now carries a since= floor: "no watermark" used to
@@ -459,7 +500,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             mocked_response = MagicMock()
             mocked_response.__enter__.return_value = mocked_response
-            mocked_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+            mocked_response.read.side_effect = _body_then_eof(json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8"))
 
             with patch.dict(
                 os.environ,
@@ -494,7 +535,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
             }
             mocked_response = MagicMock()
             mocked_response.__enter__.return_value = mocked_response
-            mocked_response.read.return_value = json.dumps(export_payload).encode("utf-8")
+            mocked_response.read.side_effect = _body_then_eof(json.dumps(export_payload).encode("utf-8"))
 
             with patch.dict(
                 os.environ,
@@ -533,7 +574,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
         # everything again.
         empty_response = MagicMock()
         empty_response.__enter__.return_value = empty_response
-        empty_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+        empty_response.read.side_effect = _body_then_eof(json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8"))
 
         with TemporaryDirectory() as tmp_dir:
             _write_required_daily_artifact(tmp_dir, "2026-07-24")
@@ -589,7 +630,9 @@ class PullHotArtifactClientTests(unittest.TestCase):
 
                 empty_response = MagicMock()
                 empty_response.__enter__.return_value = empty_response
-                empty_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+                empty_response.read.side_effect = _body_then_eof(
+                    json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+                )
                 with patch("urllib.request.urlopen", return_value=empty_response) as mocked_urlopen:
                     pull_hot_artifacts(date_str="2026-07-24")
                     # No watermark was recorded after the failure, so this
@@ -645,7 +688,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
             def _fake_urlopen(*_args, **_kwargs):
                 mocked_response = MagicMock()
                 mocked_response.__enter__.return_value = mocked_response
-                mocked_response.read.return_value = json.dumps(export_payload).encode("utf-8")
+                mocked_response.read.side_effect = _body_then_eof(json.dumps(export_payload).encode("utf-8"))
                 return mocked_response
 
             results: list[int] = []
@@ -691,7 +734,7 @@ class PullHotArtifactClientTests(unittest.TestCase):
             }
             mocked_response = MagicMock()
             mocked_response.__enter__.return_value = mocked_response
-            mocked_response.read.return_value = json.dumps(export_payload).encode("utf-8")
+            mocked_response.read.side_effect = _body_then_eof(json.dumps(export_payload).encode("utf-8"))
 
             with patch.dict(
                 os.environ,
@@ -992,7 +1035,7 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
     def _run_pull(self, tmp_dir: str, date_str: str) -> list[str]:
         mocked_response = MagicMock()
         mocked_response.__enter__.return_value = mocked_response
-        mocked_response.read.return_value = json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8")
+        mocked_response.read.side_effect = _body_then_eof(json.dumps({"ok": True, "count": 0, "artifacts": {}}).encode("utf-8"))
         with patch.dict(
             os.environ,
             {
@@ -1028,6 +1071,29 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         "https://syndicate.onrender.com/api/ops/artifacts/export?path=live%2Fwnba_live_lens.json",
     }
 
+    @staticmethod
+    def _export_path_urls(urls: list[str]) -> list[str]:
+        """The `path=` requests that go through /artifacts/EXPORT.
+
+        These assertions used to match on the substring "path=" alone, which was
+        unambiguous until #209 added the per-book quote logs
+        (`*_source/tracking/book_quotes/*.jsonl`). Those are pulled through
+        /artifacts/STREAM -- a different endpoint, chosen because a quote log is
+        far too big for export's 24MB whole-response budget -- and they also
+        carry `path=`. So one pull now issues ~16 extra `path=` requests that
+        have nothing to do with either the live-lens snapshots or the
+        missing-artifact repair pass these tests are about.
+
+        Not hidden, split: `_quote_log_stream_urls` below asserts the stream
+        pulls happen, so widening the transport stays covered rather than
+        becoming invisible to this class.
+        """
+        return [url for url in urls if "/artifacts/export?" in url and "path=" in url]
+
+    @staticmethod
+    def _quote_log_stream_urls(urls: list[str]) -> list[str]:
+        return [url for url in urls if "/artifacts/stream?" in url]
+
     def test_missing_artifact_triggers_one_exact_path_request_per_required_file_with_no_since(self) -> None:
         # #124: daily_top_props and then the locked-policy summary both
         # joined season_betting_day in the required list (all three written
@@ -1054,11 +1120,17 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        path_urls = [url for url in urls if "path=" in url]
+        path_urls = self._export_path_urls(urls)
         live_lens_urls = [url for url in path_urls if url in self._LIVE_LENS_SNAPSHOT_URLS]
         repair_urls = [url for url in path_urls if url not in self._LIVE_LENS_SNAPSHOT_URLS]
         self.assertEqual(set(live_lens_urls), self._LIVE_LENS_SNAPSHOT_URLS, urls)
         self.assertEqual(len(repair_urls), 7, urls)
+        # #209's quote logs ride the stream endpoint, and they are a real part
+        # of a pull -- asserted rather than merely filtered out above.
+        self.assertTrue(
+            all("tracking%2Fbook_quotes%2F" in url for url in self._quote_log_stream_urls(urls)),
+            self._quote_log_stream_urls(urls),
+        )
         # ?path= is the endpoint's single-artifact form: one stat and one read,
         # no glob over the matched set. That is what makes ignoring the
         # watermark safe here -- the ceiling exists to bound response SIZE, and
@@ -1083,9 +1155,14 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
             _write_required_daily_artifact(tmp_dir, "2026-07-26")
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        path_urls = {url for url in urls if "path=" in url}
+        path_urls = set(self._export_path_urls(urls))
         self.assertEqual(path_urls, self._LIVE_LENS_SNAPSHOT_URLS, urls)
-        self.assertEqual(len(urls), 5, urls)
+        # 2 date-pattern pulls + 3 live-lens snapshots. Counted over the export
+        # endpoint only: the quote-log stream pulls (#209) are unconditional and
+        # their number varies with the soccer look-ahead window, so folding them
+        # into a fixed total would make this assertion break on a calendar
+        # change rather than on a repair-pass regression.
+        self.assertEqual(len([url for url in urls if "/artifacts/export?" in url]), 5, urls)
 
     def test_repair_runs_after_the_normal_date_scoped_pull(self) -> None:
         # Ordering matters: the incremental pull may itself supply the file, in
@@ -1095,7 +1172,9 @@ class MissingRequiredArtifactRepairTests(unittest.TestCase):
         with TemporaryDirectory() as tmp_dir:
             urls = self._run_pull(tmp_dir, "2026-07-26")
 
-        self.assertEqual(len(urls), 12, urls)
+        # Counted over the export endpoint: the quote-log stream pulls (#209)
+        # are a separate, unconditional transport and vary in number.
+        self.assertEqual(len([url for url in urls if "/artifacts/export?" in url]), 12, urls)
         self.assertNotIn("path=", urls[0])
         self.assertNotIn("path=", urls[1])
         for later_url in urls[2:]:
@@ -1601,3 +1680,239 @@ class BookQuoteStateSidecarAllowlistTests(unittest.TestCase):
         pattern too small.
         """
         self.assertTrue(self._matches("mlb_source/tracking/book_quotes/nested/2026-08-08.state.json"))
+
+
+class StreamedPublishTransportTests(unittest.TestCase):
+    """Large artifacts publish as a raw streamed body, not a JSON envelope.
+
+    `publish_hot_artifact` held FOUR full copies of every file at once
+    (read_text -> encode for the checksum -> json.dumps -> encode), and the
+    receiver held roughly three more (body bytes -> parsed dict carrying a full
+    str copy -> re-encode on write). `29746931` named this mechanism as the
+    reason web was OOMing "with no correlation to anyone's deploys" and then
+    bounded only which files the SWEEP selects. The DIRECT publishers -- #43's
+    board-state fallback, #112's odds_history fallback, #124's live-lens loop --
+    were left unbounded, and the board state is exactly what goes through them:
+    27,420,309 bytes published on every cycle that produces a real board
+    (measured on refresh-worker 2026-08-08, confirmed landed on web's disk).
+
+    Measured on that same real 27,420,309-byte payload:
+
+        sender    peak 84.0MB (3.21x) -> 2.0MB (0.08x)   42x
+        receiver  peak 65.4MB (2.50x) -> 2.0MB (0.08x)   33x
+        wire      30,308,012 bytes -> 27,420,309 bytes   10.5% less
+
+    Two forms stay accepted on one route. live-odds-worker is pinned to an
+    older commit and must keep publishing, and a receiver that understood only
+    the new form would make the deploy order load-bearing.
+    """
+
+    def setUp(self) -> None:
+        app = create_app()
+        app.testing = True
+        self.client = app.test_client()
+
+    def _big_payload(self) -> bytes:
+        from syndicate.features.shared.artifact_publisher import _PUBLISH_STREAM_MIN_BYTES
+
+        return json.dumps({"rows": ["x" * 512] * ((_PUBLISH_STREAM_MIN_BYTES // 512) + 64)}).encode("utf-8")
+
+    def test_the_streamed_form_writes_the_file_and_verifies_the_checksum(self) -> None:
+        body = self._big_payload()
+        checksum = hashlib.sha256(body).hexdigest()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_DATA_ROOT": tmp_dir, "ADMIN_TOKEN": "secret-token"},
+                clear=False,
+            ):
+                response = self.client.post(
+                    "/api/ops/artifacts/publish",
+                    data=body,
+                    content_type="application/octet-stream",
+                    headers={
+                        "Authorization": "Bearer secret-token",
+                        "X-Artifact-Path": HOT_RELATIVE_PATH,
+                        "X-Artifact-Checksum": checksum,
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get_json()["transport"], "stream")
+                self.assertEqual(response.get_json()["bytes"], len(body))
+                written = Path(tmp_dir) / HOT_RELATIVE_PATH
+                self.assertTrue(written.is_file())
+                self.assertEqual(written.read_bytes(), body)
+
+    def test_a_corrupted_transfer_leaves_the_previous_artifact_in_place(self) -> None:
+        """The failure that matters: every consumer reads these files whole, so
+        a truncated body must not replace a good one."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            target = Path(tmp_dir) / HOT_RELATIVE_PATH
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("the good previous artifact", encoding="utf-8")
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_DATA_ROOT": tmp_dir, "ADMIN_TOKEN": "secret-token"},
+                clear=False,
+            ):
+                response = self.client.post(
+                    "/api/ops/artifacts/publish",
+                    data=b"truncated",
+                    content_type="application/octet-stream",
+                    headers={
+                        "Authorization": "Bearer secret-token",
+                        "X-Artifact-Path": HOT_RELATIVE_PATH,
+                        "X-Artifact-Checksum": hashlib.sha256(b"the whole thing").hexdigest(),
+                    },
+                )
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(target.read_text(encoding="utf-8"), "the good previous artifact")
+            self.assertEqual(list(target.parent.glob("*.tmp")), [])
+
+    def test_the_streamed_form_honours_the_same_allowlist(self) -> None:
+        """Widening the transport must not widen what may cross."""
+        with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+            response = self.client.post(
+                "/api/ops/artifacts/publish",
+                data=b"data",
+                content_type="application/octet-stream",
+                headers={
+                    "Authorization": "Bearer secret-token",
+                    "X-Artifact-Path": "mlb_source/source_artifacts/data/statcast/2026.csv",
+                },
+            )
+        self.assertEqual(response.status_code, 403)
+        for bad in ("/etc/passwd", "wnba_source/../../etc/passwd"):
+            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
+                response = self.client.post(
+                    "/api/ops/artifacts/publish",
+                    data=b"data",
+                    content_type="application/octet-stream",
+                    headers={"Authorization": "Bearer secret-token", "X-Artifact-Path": bad},
+                )
+            self.assertEqual(response.status_code, 400, bad)
+
+    def test_the_json_envelope_still_works_unchanged(self) -> None:
+        """live-odds-worker is pinned on 11aea7bf and publishes this way."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with patch.dict(
+                os.environ,
+                {"SYNDICATE_DATA_ROOT": tmp_dir, "ADMIN_TOKEN": "secret-token"},
+                clear=False,
+            ):
+                response = self.client.post(
+                    "/api/ops/artifacts/publish",
+                    json={"relative_path": HOT_RELATIVE_PATH, "content": '{"ok": true}'},
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertNotIn("transport", response.get_json())
+                self.assertEqual(
+                    (Path(tmp_dir) / HOT_RELATIVE_PATH).read_text(encoding="utf-8"), '{"ok": true}'
+                )
+
+
+class _FakePublishResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def read(self):
+        return b"{}"
+
+
+class StreamedPublishSenderTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from syndicate.features.shared import artifact_publisher
+
+        self.module = artifact_publisher
+
+    def _write(self, root: str, size: int) -> Path:
+        path = Path(root) / HOT_RELATIVE_PATH
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"y" * size)
+        return path
+
+    def test_small_files_keep_the_json_envelope(self) -> None:
+        """Below the threshold the four-copy cost is four kilobytes, and the
+        envelope is the proven path."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = self._write(tmp_dir, 1024)
+            self.assertFalse(self.module._should_stream_publish(path))
+
+    def test_large_files_stream(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = self._write(tmp_dir, self.module._PUBLISH_STREAM_MIN_BYTES + 1)
+            self.assertTrue(self.module._should_stream_publish(path))
+
+    def test_checksum_matches_a_whole_file_hash(self) -> None:
+        """Chunked hashing must agree with the receiver's, or every large
+        publish would be rejected as corrupt."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = self._write(tmp_dir, (self.module._PUBLISH_STREAM_CHUNK_BYTES * 2) + 7)
+            self.assertEqual(
+                self.module._file_checksum(path), hashlib.sha256(path.read_bytes()).hexdigest()
+            )
+
+    def test_an_older_receiver_falls_back_to_the_json_envelope(self) -> None:
+        """Deploy order must not be load-bearing: a web instance predating the
+        streamed form answers 4xx, and the file must still publish."""
+        from urllib.error import HTTPError
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = self._write(tmp_dir, self.module._PUBLISH_STREAM_MIN_BYTES + 1)
+            calls: list[str] = []
+
+            def fake_urlopen(request_obj, *args, **kwargs):
+                content_type = str(request_obj.headers.get("Content-type") or "")
+                calls.append(content_type)
+                if "octet-stream" in content_type:
+                    raise HTTPError(url="u", code=404, msg="no route", hdrs=None, fp=None)
+                return _FakePublishResponse()
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": tmp_dir,
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+                    result = self.module.publish_hot_artifact(path)
+
+            self.assertTrue(result)
+            self.assertEqual(len(calls), 2)
+            self.assertIn("octet-stream", calls[0])
+            self.assertIn("json", calls[1])
+
+    def test_a_real_refusal_is_not_retried_as_json(self) -> None:
+        """403 is the allowlist saying no. Re-sending the same bytes as JSON
+        would only be refused again, at four times the memory."""
+        from urllib.error import HTTPError
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            path = self._write(tmp_dir, self.module._PUBLISH_STREAM_MIN_BYTES + 1)
+            calls: list[str] = []
+
+            def fake_urlopen(request_obj, *args, **kwargs):
+                calls.append(str(request_obj.headers.get("Content-type") or ""))
+                raise HTTPError(url="u", code=403, msg="not allowlisted", hdrs=None, fp=None)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "SYNDICATE_DATA_ROOT": tmp_dir,
+                    "ADMIN_TOKEN": "secret-token",
+                    "SYNDICATE_WEB_PUBLISH_URL": "https://syndicate.onrender.com",
+                },
+                clear=False,
+            ):
+                with patch("urllib.request.urlopen", side_effect=fake_urlopen):
+                    result = self.module.publish_hot_artifact(path)
+
+            self.assertFalse(result)
+            self.assertEqual(len(calls), 1)
