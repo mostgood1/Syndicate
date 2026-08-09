@@ -523,6 +523,81 @@ claim elsewhere in this file is wrong for that lane.
 - **A green test can assert nothing.** `with self.assertRaises(Exception):
   json.loads(raw)` passed because `json` was not imported and `NameError` is an
   `Exception`. Pin the exception type when the assertion IS the measurement.
+#### `#276` ADDENDUM — three more defects in this subsystem, all shipped. `e92f0529`, `6161ade3`, `a56d4c4c`. NOT DEPLOYED (window two)
+
+**1. The repair pass could not see past the git checkout, and for soccer it never
+once asked for a real file.** `_missing_required_artifact_relative_paths` exists
+so a copy that NEVER ARRIVED can be requested by exact path, because a
+`since=`-scoped pull can only fetch what changed. Some per-sport helpers resolve
+through `preferred_source_roots()`, which appends the REPO checkout as a
+cold-start fallback. Measured with `SYNDICATE_DATA_ROOT` on an empty directory:
+
+```
+schedule_path('mls', 2026) -> <repo>/data/soccer_source/mls/api/schedule/schedule_2026.json
+is_file()                  -> True        <- the git-tracked cold-start copy
+relative_to(data_root)     -> ValueError
+```
+
+Both branches dropped it silently — `is_file()` short-circuits on the repo copy,
+and the `relative_to` that would have caught the escape raises into a bare
+`continue`. **The repair pass concluded soccer's season schedule was PRESENT
+because it found the mirror in git, while the runtime disk had none.** This is
+CLAUDE.md's own warning turned into a code path: *don't diagnose missing data
+from the local checkout.* Presence is now judged at `(data_root / relative)`,
+and a path resolving outside the root is re-anchored on its `<sport>_source/…`
+segment. **Sport-general by construction, surfaced by soccer** because soccer's
+helpers are the ones that do the fallback — worth checking any other helper that
+resolves through `preferred_source_roots`.
+
+**2. `names_only=1` did not suppress bodies because `names_only` DID NOT EXIST.**
+The 21:29:41Z 30,308,015-byte response was not a broken flag — the export
+endpoint reads only `since`, `path`, `pattern`, and Flask ignores unknown query
+args, so it ran as an ordinary full-body export while its author believed the
+flag was protecting them. 30,308,015 is the JSON envelope of one 27,420,309-byte
+state file, **within three bytes** of the envelope size measured independently
+on the publish path — so it was one artifact's body, exactly as an un-flagged
+export gives. **A silently ignored safety flag is worse than an absent one**,
+because it reads as protection in the caller's own command line. Implemented
+rather than rejected (`6161ade3`): `?names_only=1` returns `{bytes, mtime}` per
+match and never reads a file.
+
+**3. The publisher's own test suite could never complete, and that is why (1)
+was invisible.** Three defects, all proven pre-existing in a clean worktree at
+HEAD:
+
+- **Two tests HUNG rather than failed** (standalone: exit 124; located with
+  `faulthandler.dump_traceback_later`). Their mocks set
+  `read.return_value = <bytes>`, so every read returned the same non-empty bytes
+  forever while `pull_streamed_artifact` drains with
+  `while True: chunk = response.read(n); if not chunk: break` — an infinite loop
+  writing 1MB chunks to disk.
+- One test **failed unconditionally** since `29746931`: its fixture is pinned to
+  `2026-07-13` while the sweep now judges freshness by the slate date in the
+  filename.
+- Four assertions counted `path=` requests across **both** transports; `#209`'s
+  quote logs ride `/artifacts/stream` and also carry `path=`.
+
+**115 → 119 passed in ~10s, where before the file never finished.** Unhiding the
+hang is what surfaced defect (1): those tests had never once run to completion,
+so nothing had ever checked their result.
+
+**METHOD, and it is the one worth keeping.** *A test that hangs is worse than one
+that fails, because a failure is reported and a hang is indistinguishable from a
+slow machine.* I spent three runs blaming contention — there genuinely were six
+other sessions running suites — before instrumenting instead of inferring. The
+same shape as the soccer lane's "zero `STEP_FAIL` in 7 days": a real
+environmental explanation was available and wrong.
+
+**Answering the lead's cross-sport question directly:** defect (1) is
+**sport-general with a soccer-shaped trigger** — the code is shared, the blind
+spot fires for whichever sport's helper falls back to the repo. Defect (2) is
+sport-independent. And on "can the allowlist be derived rather than curated":
+**not from the writers**, because nothing declares what it writes; but the
+`is_file()`-versus-`data_root` bug above is the more useful half of that
+question, since a curated list at least fails loudly while a presence check
+against the wrong disk fails silently forever.
+
+
 ### #286 — ROOT CAUSE, MLB `candidate_count = 0`: the empty-board guard is BLIND to a board too big for keyvalue. Fixed, committed, NOT deployed
 
 **ID note:** taken as #286 rather than #269 deliberately, before central
