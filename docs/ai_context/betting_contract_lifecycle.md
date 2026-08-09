@@ -232,13 +232,40 @@ misconfiguration available — `us2` leaking onto per-event prop calls, ~1M
 credits/month — **is ruled out by direct measurement.** Recorded with the values
 so nobody re-opens it.
 
-Note the base list is `us`, not `us,us2` as S0b's activation text specifies, yet
-MLB returns `us2` books (`espnbet`, `hardrockbet`, `fliff`, `rebet`, `ballybet`,
-`betparx`). **That is unexplained here** and is the one loose thread in this
-section; it may be a third variable, a per-sport override, or extras applied
-somewhere the two vars above do not describe.
+**Confirmed from the data side too, which is the stronger test.** `[live]`
+04:19Z, comparing a **prop** market (base regions only — `_game_line_regions`
+merges the extras into the game-line call *only*, `fetch_mlb_oddsapi_local.py:1564`)
+against §4d's published region→book mapping:
 
-### Cost — 155% of cap, and the excess is NOT explained by the regions
+```
+batter_total_bases (PROP, us only), 14 distinct books
+  eu-labelled present     : NONE
+  us_ex-labelled present  : NONE
+  us2-labelled present    : ballybet betparx espnbet fliff hardrockbet hardrockbet_oh rebet
+```
+
+**Zero `eu` and zero `us_ex` books reach a prop row.** The ~1M/month guard holds
+in the data, not just in the env block.
+
+**And that resolves the loose thread: those seven are not `us2`-only books.**
+They arrive on prop calls under a base list of `us` with no `PROP_REGIONS`
+override and no path that could add a region to a prop fetch — so they are in
+`us`. **§4d's region→book mapping is stale** (it was queried once, 2026-08-07, at
+1 credit per region). That matters beyond bookkeeping: §4d prices `us2` at
+**+2,004,942/month** on the reasoning that *"`us2` costs real money because its
+value is prop price-shopping"* — and seven of its eight books are already
+arriving free on `us`. **Re-query the region→book mapping before anyone buys
+`us2`.** Not filed as a defect; recorded as a costed assumption that no longer
+holds.
+
+### Cost — the 155% reading is real and the window is contaminated
+
+> **HEADLINE, so it is not quoted without its caveat: `projected_30d_credits =
+> 7,737,455 = 155% of cap` is a true reading of a 27.6-hour window that
+> CONTAINS A KNOWN INCIDENT. The standing rate is the 12-day aggregate —
+> 74,870/day = 2.25M/month = 45% of cap — and even that includes the incident,
+> so the real baseline is BELOW 45%. Do not carry "the cap is exhausted in 19.4
+> days"; it is not supported.**
 
 `[live]` `[web]` `GET /api/ops/oddsapi/quota`, 03:54:31Z. The 30-day projection
 is the endpoint's own field.
@@ -250,44 +277,57 @@ projected_30d_credits (reported)                                         7,737,4
 ```
 
 S0 measured **62,076/day = 37.2%** on 2026-08-07. The window is **4.15×** that.
-At 257,916/day the 5,000,000 contracted cap is exhausted in **19.4 days**. The
-header's `remaining: 14,187,817` is not real; every percentage is against 5M.
+The header's `remaining: 14,187,817` is not real; every percentage is against 5M.
 
-**A 27.6-hour window covers one full diurnal cycle, so its mean is directly
-comparable to the 12-day daily mean.** The window carries **3.44×** a typical
-day's burn, over a period long enough that the diurnal shape cannot explain it.
+**The window contains a known incident.** refresh-worker ran an unbounded
+process-spawn leak from ~22:35Z to 00:51Z (up to **26 concurrent
+`refresh_odds_sources` processes**) plus **nine OOM kills each followed by a
+fresh boot**, and every process and every reboot re-runs odds fetches. That is
+entirely inside the 27.6-hour window `[asserted]`.
 
-**Attribution — the window contains a known incident.** refresh-worker ran an
-unbounded process-spawn leak from ~22:35Z to 00:51Z (up to **26 concurrent
-`refresh_odds_sources` processes**) plus **nine OOM kills each followed by a fresh
-boot**, and every process and every reboot re-runs odds fetches. That is entirely
-inside the 27.6-hour window `[asserted]`.
-
-**Discriminator, measured `[live]`:**
+**Discriminator — the current rate, sampled `[live]` from `latest.used`, using
+`observedAt` rather than read time:**
 
 ```
-03:54:31Z  used 812,183
-04:04:38Z  used 812,291     +108 credits / 10.1 min  =   642 cr/h
-aggregate expectation for hour 04                    =   504 cr/h    -> 1.27x
-window mean                                          = 10,594 cr/h   -> 3.4x a normal day
+03:40:13 -> 04:04:38   +108 cr / 24.4 min  =   265 cr/h
+04:04:38 -> 04:05:44   + 14 cr /  1.1 min  =   764 cr/h
+04:05:44 -> 04:11:22   + 54 cr /  5.6 min  =   575 cr/h
+04:11:22 -> 04:15:51   + 40 cr /  4.5 min  =   535 cr/h
+OVERALL                +216 cr / 35.6 min  =   364 cr/h
+
+hour-weighted expectation from the 12d aggregate  =  1,263 cr/h   -> measured 0.29x
+window mean                                       = 10,554 cr/h   -> 29x the current rate
+12d daily average                                 =  3,120 cr/h
 ```
 
-**The current rate is ~1.3× its own hour's historical norm, not 3.4×.** If the
-burn were structurally elevated, the trough hour would read ~1,700/h; it reads
-642/h. **That points to the window being inflated by the incident rather than the
-rate being structural** — see §1.1 for the longer sample.
+**The current rate is 0.29× its own hours' historical norm — not 3.4× above it.**
+
+**The internal inconsistency is the actual argument**, and it does not depend on
+trusting any single sample. A window mean taken over a *full diurnal cycle*
+should land near the daily average. Instead:
+
+```
+window mean            = 3.4x  the 12-day daily average
+same clock hours NOW   = 0.29x the 12-day norm for those hours
+```
+
+**A uniform structural increase cannot produce both. A burst confined to part of
+the window can** — which is the shape of the spawn incident.
 
 Two caveats that keep this honest:
-- The aggregate baseline **includes the incident night**, so the 504/h
-  expectation is itself inflated and the true ratio is somewhat above 1.27.
-- **The trough hour is the weakest hour to test.** 642 cr/h at 04:00Z does not
+- The 12-day baseline **includes the incident night**, so the 1,263 cr/h
+  expectation is inflated and 0.29× is *generous* to the structural hypothesis.
+- **The trough is the weakest hour to test in.** 364 cr/h at 04:00Z does not
   prove the 22:00Z peak is normal. **The decisive test is a peak-hour comparison
-  against the same clock hours on a prior day**, which this endpoint's aggregate
-  `by_hour_utc` cannot provide because it has no per-day breakdown.
+  against the same clock hours on a prior day**, and the quota endpoint has **no
+  per-day breakdown**, so it cannot be run from this surface. Listed in §11.
 
-**Do not act on 155% as a structural rate without the peak-hour test.** The
-number is real; the *inference* from it to "we exhaust the cap in 19.4 days" is
-not yet established, and the two lead to very different decisions.
+**Bottom line for a spend decision:** the 155% is a real reading of a
+contaminated window. The defensible standing rate is the 12-day aggregate at
+**45% of cap**, itself an upper bound. **The 19.4-day exhaustion figure that
+follows from 257,916/day is withdrawn** — it was a true measurement carrying an
+unearned inference, which is the same shape as the retractions this file has
+been collecting all night.
 
 Cost structure — S0's shape holds, and the multiplier is on call count, not on
 cost per call:
@@ -827,7 +867,7 @@ Allocated by the coordinating session.
 | **`#300`** | L2-A: absent game-state chip → `pregame` → 24 h ceiling → 100/100 rows, one in-progress game, 21 h prices. **Blocks the board swap.** | `[live]` |
 | **`#301`** | `/api/board/game-chips` ignores `sport` — identical 65-chip list for all eight | `[live]` |
 | **`#302`** | Web OOM; `book-grid?limit=2000` 502s reproducibly; L1-A pivot has no payload ceiling | `[live]` |
-| **`#303`** | OddsAPI at 155% of cap — **but see §1: attribution to the refresh-worker incident is open and the peak-hour test is not yet run** | `[live]`, inference open |
+| **`#303`** | OddsAPI: a 155%-of-cap reading over a **contaminated** window. Standing rate is **45% of cap** and falling. **The 19.4-day exhaustion figure is withdrawn.** §4d's `us2` pricing rests on a **stale region→book map** — 7 of its 8 books already arrive free on `us` | `[live]`; the structural inference is refuted, the peak-hour test remains open |
 | **`#304`** | Two ledgers on two disks; bets log on web, settle on refresh-worker | `[structural]` |
 | **`#305`** | soccer `prop_source_in` 162/162 missing `market_key` | `[live]` |
 
@@ -843,7 +883,8 @@ So absence here is never read as evidence.
   refresh-worker's process; local returns 0 for all eight sports.
 - **The peak-hour burn comparison** (§1) — the decisive test for whether 155% is
   structural or incident-inflated. The quota endpoint has no per-day breakdown.
-- **Why MLB returns `us2` books when the base region list reads `us`** (§1).
+- **A fresh region→book query.** §1 shows §4d's map is stale from the *data*
+  side; confirming it costs 1 credit per region against `/v4/sports/.../odds`.
 - **`#292`** — best-price vs retained book. Requires refresh-worker's disk.
 - **L2-B and L2-C row counts.** The endpoints exist and share the row.
 - **Whether a web-logged bet reaches refresh-worker's ledger** — needs a
