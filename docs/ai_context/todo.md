@@ -1202,6 +1202,64 @@ marginally better chance. **If the trim line reports a small
 it either** — that is hypothesis (2) and the work becomes finding what holds the
 buffers.
 
+#### DEPLOYED 23:11:48Z. The cost is measured, not asserted — do not re-litigate it
+
+`e3b378de` reached `live` on refresh-worker at **2026-08-09T23:11:48.988Z**
+(`dep-d9sggpp42hec73c97pl0`). **T0 is `finishedAt`, not `startedAt`** — the API
+hands you `startedAt` first, it read 23:08:23Z, and the old instance
+(`8ef48371`, boot 19:49:12Z) was still serving for another 3m26s. Two lanes
+independently keyed a T+30 to the wrong one of those, which would have called
+the verdict inside the boot window both had agreed not to trust. **A deploy
+timestamp is not a boot timestamp.**
+
+Rung 1, first pool cycle, 30 seconds after boot:
+
+```
+23:12:18  MALLOC_TRIM_INIT {"available": true, "library": "libc.so.6",
+                            "pid": 38, "platform": "linux",
+                            "unavailable_reason": null}
+```
+
+The binding bound, in **pid 38** — the long-lived `run_refresh_worker.py`
+process that holds the 1.4GB. Both halves matter: a trim that bound in a
+short-lived child would report `available:true` and be useless.
+
+**COST, measured on the first real cycle rather than assured:**
+
+```
+trim_elapsed 1.4ms      gc_elapsed 59.9ms      3x per ~3-minute cycle
+```
+
+`#241` caused a production restart loop and left the standing rule that worker
+periodic work is never free. This is the answer to that objection, up front and
+in numbers: ~184ms per cycle, ~0.1% of a 3-minute interval. There is no cost
+argument against it and no reason to gate it behind a flag.
+[[worker periodic work is never free]]
+
+**AND THE ATTRIBUTION SPLIT ALREADY PAID FOR ITSELF, on the very first line:**
+
+```
+anon_before 132.5  ->  anon_after_gc 137.7  ->  anon_after 128.4
+anon_released_by_trim 9.3        anon_released (net) 4.1
+```
+
+**The `gc.collect()` RAISED anon by 5.2MB** — other threads allocating during
+it — while the trim dropped it 9.3MB. A single net figure would have reported
+the trim at less than half its actual effect. At T+30 that is exactly the
+difference between "hypothesis (1) confirmed" and "go build the root-walking
+sizer for hypothesis (2)".
+
+**So: `anon_released_by_trim_mb` is the discriminating field. `anon_released_mb`
+is not.** The general shape is worth more than this instance — *a net figure
+across two mechanisms operating in opposite directions attributes to neither.*
+
+The 9.3MB itself is **discarded**: anon was 132MB on a 30-second-old process
+against the 1525MB that latched on the previous boot. Too small to celebrate,
+too small to worry about, and about a baseline that does not exist yet. The
+only weak signal in it worth keeping is `rc=1` — glibc had retained free memory
+to hand back half a minute into a fresh process, which makes rung 2 at T+30
+more likely to be readable than null.
+
 #### How to read the result — the whole experiment is one log line
 
 ```
