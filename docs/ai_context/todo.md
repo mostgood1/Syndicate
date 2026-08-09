@@ -29,18 +29,51 @@ the resident set did not come back.
 Anyone who points it at this concludes "no leak". Fifth instance tonight of an
 instrument reading fine because of what it cannot see. [[a rate, not a count]]
 
+#### EXACTLY what the census can and cannot see — measured, not assumed
+
+`log_heap_census` (`memory_observability.py:572`) walks **`gc.get_objects()`**,
+which returns only objects that can participate in reference cycles. Verified
+locally on 3.11 rather than reasoned from docs:
+
+```
+                gc-tracked?   sys.getsizeof
+str  (40MB)        False         40.0 MB      <- invisible
+bytes(40MB)        False         40.0 MB      <- invisible
+ndarray(38MB)      False         38.1 MB      <- invisible
+DataFrame          True          15.3 MB         visible
+```
+
+**`str`, `bytes` and `ndarray` are all untracked, so the census never sees
+them** — on a Monte Carlo platform whose hot path is numpy arrays and parsed
+JSON strings, it is blind to the three things the workload is mostly made of.
+
+**This also disarms `individually_huge_mb`.** The `>50MB` check runs *inside*
+the `gc.get_objects()` loop, so a live 500MB ndarray is never a candidate.
+`individually_huge_mb: []` therefore means "no huge **container**", not "no huge
+object", and carries no weight against the hypotheses below.
+
+**Correction to this item's first version, which I got wrong:** I wrote that
+numpy buffers were undercounted because shallow sizing reads only the header.
+That is not the mechanism — `sys.getsizeof(ndarray)` *does* report the full
+buffer. They are invisible because they are never enumerated. Same blindness,
+different cause, and the difference matters: no amount of fixing the sizing
+would reveal them.
+
 #### What is excluded, and what is NOT
 
-**Excluded:** a Python-object leak. The graph is small and shrinking.
+**Excluded:** a leak in gc-tracked containers. That graph is small and shrinking
+(381k → 308k objects while RSS rose).
 
-**Still open, and the census cannot distinguish them** — both are invisible to
-it, so do not let a small census number pick the tidy one:
+**Both still open, and this instrument cannot narrow between them:**
 
-1. **glibc arena retention / fragmentation** — freed by Python, never returned to
-   the OS. The gc-down-while-RSS-up sample is this signature.
-2. **numpy/pandas buffers held by live references** — `top_by_shallow_mb` counts
-   the object header only, so a live 500MB DataFrame reads as ~100 bytes and
-   would produce exactly the observed numbers.
+1. **allocator retention** — freed by Python, never returned to the OS (glibc
+   arenas and/or pymalloc). The gc-down-while-RSS-up sample fits this.
+2. **live `str`/`bytes`/`ndarray`** held by references the census cannot
+   enumerate.
+
+**Do not read the small census number as evidence for (1).** It is equally
+consistent with (2), and my first write-up leaned on `individually_huge_mb: []`
+as if it excluded (2). It does not.
 
 #### The discriminator is one call and is also the likely fix
 
@@ -56,15 +89,42 @@ and never return.
 
 #### Options, cheapest first — NOT taken, needs an owner's decision
 
-- **`MALLOC_ARENA_MAX=2`** — env only, no code. The only option that tests the
-  hypothesis without a code change, and if it works the fix is already deployed.
-  Watch whether the ~24MB/min slope from `#290` drops.
 - **`malloc_trim(0)` at an existing RSS checkpoint** — ~4 lines of `ctypes`,
-  before/after in one log line. Diagnostic and remedy together; needs a deploy.
+  before/after in one log line. **Now the FIRST choice, not the second**: it is
+  the only one of these that discriminates (1) from (2), because it releases
+  only already-freed memory regardless of object type — which is exactly the
+  axis the census cannot resolve. Needs a code deploy.
+- **`MALLOC_ARENA_MAX=2`** — env only, no code. **Demoted**: it only helps if
+  (1) is true, and if (2) is true it does nothing and the null result is
+  uninformative rather than exculpating. Fine as a follow-on once `malloc_trim`
+  has said which world we are in.
 - **Nothing tonight** — defensible. The slope only matters because it crosses
   the `#290` overview floor.
 
 Both are restarts, so neither belongs inside another lane's measurement window.
+
+#### THE REUSABLE DIAGNOSTIC — how to tell a bad threshold from a drifted baseline
+
+`#290` reached its answer because the guard had been blocking the expensive
+stage long enough to leave a clean control condition. **That was luck. A lane
+hitting this fresh would not have it**, and the symptom — "the guard is never
+satisfied" — is identical whether the threshold is wrong or the baseline has
+drifted underneath it. Tonight had one of each (WNBA's 1200MB gate was genuinely
+miscalibrated; this one is correctly calibrated). The method that does not
+depend on luck:
+
+1. **Measure the guarded stage's cost independently of the guard** — a
+   before/after around one execution, in **anon/process RSS**, never
+   `container_memory_mb` (page cache inflates it, ~1.4GB here).
+2. **Measure the baseline's own trajectory while the stage is NOT running.** If
+   the guard already blocks it, that condition is free; otherwise disable the
+   stage deliberately for a few cycles.
+3. **Compare.** Stage cost > available headroom at a *flat* baseline ⇒ the
+   threshold is right and the stage is too expensive. Baseline rising into the
+   threshold with the stage idle ⇒ the baseline is the bug and lowering the
+   threshold converts "degraded" into "OOM-killed".
+
+Step 2 is the one everyone skips, and it is the one that distinguishes them.
 
 ### #290 — ITEM 4 ANSWERED: the 3000MB overview floor is roughly RIGHT. `run_refresh_worker.py` itself is the ratchet. DO NOT lower the floor
 
@@ -2113,6 +2173,21 @@ Corrected in place. All the *arithmetic* in them is UTC and unaffected (a match
 kicking off 14:30Z and reading `pregame` at 19:57Z is 5.5h either way); only the
 labels were wrong. **Don't infer a local time from a "Z" stamp without
 converting** — CDT is UTC-5.
+
+**0. A commit subject starting with `#<id>` IS SILENTLY DELETED BY REBASE.**
+Git's default `--cleanup` treats a leading `#` as a comment, and
+`git rebase --continue` re-uses the message *with cleanup enabled* — so the
+subject line vanishes and the second paragraph becomes the subject. **Hit three
+times across two rebases in one lane**, on both clean replays and conflict
+resolutions, so every lane landing a `#<id>` commit through a conflict will hit
+it. This is a direct consequence of `#<id>` being the naming convention.
+
+Fix: `git commit -F <file> --cleanup=verbatim` when authoring, and after any
+`rebase --continue` **check `git log --oneline -1` and repair with
+`git commit --amend -F <file> --cleanup=verbatim`**. Repairing a non-HEAD commit
+needs `git branch -f tmp HEAD; git reset --hard <parent>; git commit --amend -F …;
+git cherry-pick -n tmp; git commit -F … --cleanup=verbatim` — interactive rebase
+is unavailable in these sessions.
 
 **1. Nested payloads survive hop-by-hop key lists; top-level scalars do not.**
 `rows_stale_kickoff` read `None` on a payload where the filter was live and
