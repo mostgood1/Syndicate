@@ -740,6 +740,34 @@ down, which is the ratchet `#318` needs `memory_unreclaimable_mb` to classify.
 > window really did carry 84 publishes. A zero from a truncated scan is missing
 > data.
 
+#### Second-resolution, because per-minute counts hide bursts
+
+Web access log, 21:25–21:45 (1200s), 1082 publish requests:
+
+```
+sustained average      0.90/s        peak 10s window        7.1/s
+busiest single second  11/s          seconds with any pub   275 of 1200
+distribution (req/s -> seconds)  1:72 2:30 3:27 4:28 5:43 6:20 7:30 8:16 9:7 10:1 11:1
+```
+
+| min | MiB | publishes | busiest sec |
+|---|---|---|---|
+| 21:27 | **441** | 137 | **11** — busiest second of the evening, and flat |
+| 21:30 | 467 | 126 | 8 |
+| 21:31 | **1631** | 94 | 9 — spike, following the 21:30 render |
+| 21:38 | **1677** | **8** | 4 — 1.6 GiB plateau on eight publishes |
+
+**The busiest second of the evening sat in a minute at 441 MiB**, and the
+plateau held ~1650 MiB for eleven minutes while publishes fell to 8/min. Not a
+weak relationship — an absent one.
+
+> This also reconciles a cross-lane number that looked like a discrepancy. The
+> `#311` lane measured **0.94/s** caller-side (`PUBLISH_OK` over 15 min) against
+> the brief's **~5/s**, and proposed chasing failed/retried publishes to explain
+> the gap. **There is no gap:** 0.90/s endpoint-side agrees with their 0.94/s to
+> 4%, and the ~5/s was an 8-second burst inside one sweep. Publishing is idle
+> 77% of seconds. An average and a burst are not two measurements in conflict.
+
 #### And the per-request cost, measured rather than reasoned about
 
 The real route (`api_ops_artifacts_publish`) driven with a 3.9MB artifact,
