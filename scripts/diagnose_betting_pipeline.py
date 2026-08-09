@@ -120,7 +120,7 @@ def stage_odds_acquisition(logs: list[dict]) -> Stage:
     return stage
 
 
-def stage_odds_artifacts(date: str) -> Stage:
+def stage_odds_artifacts(date: str, *, include_export: bool = False) -> Stage:
     """Do today's odds files exist, and is the slate INTACT?
 
     The subtle failure is not absence, it is EROSION: the live file is
@@ -129,6 +129,22 @@ def stage_odds_artifacts(date: str) -> Stage:
     full slate; the gap between them is the real health signal.
     """
     stage = Stage(name="2. odds artifacts on disk")
+    if not include_export:
+        stage.unknown = True
+        stage.notes.append(
+            "SKIPPED -- /api/ops/artifacts/export is not safe to poll. Pass --with-export to run it."
+        )
+        stage.notes.append(
+            "Why: `ops.py` globs HOT_ARTIFACT_PATTERNS across the whole artifact tree BEFORE "
+            "filtering to the requested pattern, so the cost is in the walk, not the response size."
+        )
+        stage.notes.append(
+            "Measured 2026-08-09: web OOM gaps were 16-28 min, then three of my own diagnostic "
+            "runs at ~21:46/~21:49/~21:52 were each followed by an OOM within ~60s (21:46:59, "
+            "21:49:50, 21:52:09). n=3 on an already-cycling service, so CONTRIBUTING is likely "
+            "and PROVEN is not claimed -- but a diagnostic must not be a load source."
+        )
+        return stage
     slug = date.replace("-", "_")
     base = f"mlb_source/data/daily/snapshots/{date}"
 
@@ -344,6 +360,12 @@ def main() -> int:
     parser.add_argument("--sport", default=None, help="restrict Layer 1 to one sport")
     parser.add_argument("--json", action="store_true", help="machine-readable output")
     parser.add_argument(
+        "--with-export",
+        action="store_true",
+        help="run the artifact-export probe. OFF by default: the endpoint globs the whole "
+        "artifact tree and is a plausible contributor to web OOMs. Use it deliberately, once.",
+    )
+    parser.add_argument(
         "--log-limit",
         type=int,
         default=1000,
@@ -364,7 +386,7 @@ def main() -> int:
     stages = [
         services_stage,
         stage_odds_acquisition(worker_logs),
-        stage_odds_artifacts(date),
+        stage_odds_artifacts(date, include_export=args.with_export),
         stage_layer1(sports),
         stage_layer2a(worker_logs),
         stage_layer2bc(),
