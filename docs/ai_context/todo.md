@@ -323,6 +323,34 @@ layer2_fallback_rows = <n>          <- present ONLY when the fallback fired
 That is the monitor: this entry closes when the field stops appearing on a day
 the legacy pool should have produced a board, not when the board looks full.
 
+**INTERMITTENT, NOT CONSTANT — and this changes where to start.** Re-measured
+after `27a7e9df` deployed:
+```
+16:29Z   candidate_count 156   recommendations []          <- DROP PRESENT
+16:45Z+  candidate_count 156   recommendations HAS ITEMS   <- DROP ABSENT
+         layer2_fallback_rows ABSENT, state_meta.source "combined_board_window"
+```
+So the board recovered on its own, from the legacy pool, with the fallback
+correctly dormant. **Pool size is not the variable** — 156 in both readings. A
+constant drop would be a broken function; an intermittent one is a state or
+timing dependency, which is a different search.
+
+**HYPOTHESIS (n=2, NOT established): it is a post-restart warm-up.** Both
+readings sit just after a deploy — the broken one **~1 minute** after web went
+live at 16:28:17Z, the healthy one **~4 minutes** after 16:41:43Z. If something
+`build_intelligence_board_contract` or `_promote_board_contract_cards` depends
+on is not loaded yet on a fresh process, the board would render empty for a few
+minutes after every deploy and then recover unattended.
+
+That would also retrodict last night: the board was repeatedly observed empty
+during the heaviest deploy activity of the session, and each observation was
+taken shortly after a restart.
+
+**Two data points cannot distinguish warm-up from coincidence.** The test is
+cheap and nobody has run it: sample `/intelligence` every 30s across a deploy
+boundary and plot `recommendations` length against seconds-since-boot. If it is
+warm-up, the empty window is bounded and reproducible on demand.
+
 **Why the old gate never fired** — worth keeping, because the mistake is
 reusable. The fallback was gated `if not merged_recommendations`, with the
 stated reasoning that "the legacy pool takes precedence the instant it produces
