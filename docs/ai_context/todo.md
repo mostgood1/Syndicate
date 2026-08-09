@@ -1,5 +1,68 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-09 (21:1xZ) — `pool=0` WHILE `shortlist rows=155` IS `#290`, not a new defect. `#319` closed as a duplicate before it was opened
+
+`CANDIDATE_POOL_READY count=0` on the same cycle, same second, as
+`LAYER2_SHORTLIST rows=155 considered=3324` looked like a fresh contradiction.
+It is the memory floor. **Measured across every cycle in a 77-minute window,
+not just the one that raised it:**
+
+```
+19:55-21:12Z:  25 pool builds   24 zero   1 non-zero (590)
+
+  pool = 0    -> a memory guard fired 3-43s earlier:  24 of 24
+                   23x  OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb sports_done=0
+                    1x  MEMORY_GUARD_ABORT stage=build_candidate_pool_start  (20:29:34)
+  pool = 590  -> no guard fired at all:                1 of 1   (20:04:21)
+```
+
+**No exceptions in either direction.** The one build that looked like an
+exception — 20:29:35, zero with no `OVERVIEW_STOPPED` — was the *other* guard,
+`_abort_build_candidate_pool_if_memory_critical`, one second earlier. **A 24/25
+pattern with one shrug in it is an argument; 25/25 with both guards named is a
+finding.** Chase the outlier.
+
+**Why the two counters disagree — structural, not a join or a data gap.**
+`build_layer2_shortlist(selected_date, manifests.keys())` reads the Layer 1 odds
+grid directly and never touches `candidate_entries`. `_collect_candidates` reads
+`dashboard_games`/`home_rails` off the **hydrated** `build_intelligence_overview`
+— the exact call `#290`'s floor blocks. They share only `manifests.keys()`,
+which is why the shortlist correctly reports `sports=['mlb','soccer','wnba']`
+while the pool is empty.
+
+#### THE REUSABLE PART — the shortlist is a FREE IN-SITU CONTROL for the pool
+
+Same process, same cycle, same second, same sports, same date, same odds data.
+One path: **3,324 considered / 155 promoted.** The other: **0.**
+
+That single pairing kills, at once and with no further work: missing artifacts,
+a stale local mirror, a broken join, absent odds, manifest gaps, a date-window
+mismatch, and wrong contract counters. **Every one of them would have to break
+the shortlist too, and it is healthy on all 24 zero cycles** (145–155 rows,
+3,302–3,502 considered).
+
+Two properties make it worth generalising rather than filing as trivia:
+
+1. **It costs nothing and nobody built it.** A control that already runs on
+   every cycle beats an instrument someone has to design — and this same day
+   produced four instruments that measured a population *adjacent* to the one
+   being asked about. Look for an existing second path before building a probe.
+2. **The DISAGREEMENT is the signal.** The reflex on two counters disagreeing is
+   "which one is right". Here neither is wrong, and the gap between them
+   localises the fault to what the two paths do not share. When two counters over
+   the same population diverge, ask what differs in how they are *reached*
+   before asking which is correct.
+
+**Consequence for sequencing, and it reordered tonight:** a transport fix
+(`#317`) changes nothing visible while **24 of 25 cycles have nothing to
+transport.** `#290`/`#285` gates all of it. The 20:04:21 cycle proves the chain
+works end to end — 590 candidates, same code, same day — the moment the overview
+is allowed to run. **Do not report a fixed transport as a fixed board.**
+
+Target for `#285`, stated as the acceptance bar: **one good build per 30 minutes.
+`#286` bridges the gaps between them, so at that rate the board stays populated
+permanently.** `#290`'s answer travels with it unchanged — *do not lower the
+floor; the fix is to need less, not to permit more.*
 ### #282 — SHIPPED (committed, NOT deployed). Soccer sim split into per-league-date jobs. And the premise the brief was written on was false: soccer sims were never off
 
 **The deliverable, in one line:** one soccer job used to be all ten leagues
