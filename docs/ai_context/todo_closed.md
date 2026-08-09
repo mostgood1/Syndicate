@@ -478,3 +478,56 @@ Five defects, in order of how load-bearing they were.
   a symptom with at least two distinct root causes — do not treat it as a solved
   class.* (This warning is also carried in `todo.md`'s Operational notes, because
   it is still live.)
+
+---
+
+## Recovered 2026-08-09 by the list audit — shipped 08-05/08-06, never recorded anywhere
+
+These six IDs appeared in commit subjects and in **neither** `todo.md` nor this
+file, found by running the `#71` check across every commit since 2026-08-05.
+They are one coherent workstream — retiring "infer a wager from display text" —
+and it finished. Recorded here for the record; nothing outstanding.
+
+The lesson that *is* still live was promoted to `todo.md`: **a counter built
+before the fixes is what located them.** Three changes that day passed their
+tests and did nothing in production, and a later three-line change moved
+`top_props` from 0-of-14 priced to 12-of-14 — an effect invisible for as long as
+it existed because nothing counted it.
+
+- **#222/#223** (`1f6c27b9`) — `opportunity_contract_metrics`: count, per sport
+  and per lane, how many rows arrive without a canonical `market_key`, an
+  `entity_name` for props, or an event identity. Instrumented at three points,
+  deliberately including the prop source *going in* to `_finalize_home_prop_rows`
+  so the numbers describe what producers emit rather than what that function
+  patched up. Served at `/api/ops/opportunity-contract/status`. **Sequenced
+  before the fixes on purpose.**
+- **#225** (`5dd3632d`) — closed the four gaps the counter named, each located
+  rather than guessed: four more prop builders carry a canonical key
+  (`_prop_rows_from_nhl_cards`, `_prop_rows_from_mlb_live_games`,
+  `_prop_rows_from_nba_live_lens`, `_prop_rows_from_props_recommendations_csv`).
+  **The counter also lied about itself** — `prop_dashboard_row` was recorded
+  *before* `enrich_prop_rows` ran, so `quoted` read 0 while the same build served
+  priced rows.
+- **#227** (`fc63965a`) — MLB HR targets carried **no `market` key at all** and
+  set only `name`, never `player_name`: every HR-target row was both keyless and
+  entity-less to the contract. Market fixed rather than derived
+  (`batter_home_runs`), because deriving it from a label would introduce a guess
+  where a certainty exists. `line` deliberately stays `"-"` — "support" is a
+  model confidence score, not a betting line.
+- **#228** (`b8c93bc7`) — the last 2 of 18 WNBA keyless prop rows: blocks,
+  steals, turnovers, double-double were missing from the basketball map. ⚠️
+  **Filled from the feed's vocabulary, NOT confirmed against those two rows** —
+  web began 502-ing under the repeated dashboard rebuilds being used to force
+  fresh counters, and a two-row lookup was not worth destabilising it. Inferred,
+  and said so.
+- **#229** (`ed10dc9b`) — rails stop being a data source. `home_rails` is a
+  *presentation* shape, and three consumers were reading
+  `home_rails["pregame"]["items"]` as the opportunity feed. The overview now
+  publishes `prop_opportunities` under its own name. Covers all four read sites
+  including the `live` lane at `intelligence.py:7201` that a first pass missed.
+- **#230** (`3bfba211`) — deleted the prose scraper, the last place the codebase
+  inferred a wager from display text. `_game_bet_candidates_from_game`
+  regex-scraped candidates out of a human-readable panel, producing 32 MLS
+  "candidates" reading *"Projected score: New England Revolution 1.4 - CF
+  Montreal 2.1"* and literally *"Simulations: 400"* — surviving only because a
+  truthiness bug happened to prune them.
