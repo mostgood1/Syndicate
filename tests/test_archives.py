@@ -291,7 +291,17 @@ class DateArchiveHelperTests(unittest.TestCase):
             ]
         }
 
-        with patch("syndicate.features.mlb.cards.load_json_file", side_effect=lambda path: game_lines_payload if "oddsapi_game_lines_2026_05_28.json" in str(path) else None):
+        # #317: game lines now come through load_oddsapi_game_lines_doc, which
+        # lives in sources.py and merges the live doc with the #265 pregame
+        # freeze. Patching cards.load_json_file no longer intercepts that read.
+        # Worth stating because of HOW this failed: not with an error, but by
+        # falling through to the real artifact on disk and asserting 8.5
+        # against an expected 9.5 -- a stale patch target returning plausible
+        # data rather than nothing.
+        with patch(
+            "syndicate.features.mlb.cards.load_oddsapi_game_lines_doc",
+            side_effect=lambda date: game_lines_payload if date == "2026-05-28" else None,
+        ), patch("syndicate.features.mlb.cards.load_json_file", return_value=None):
             payload = source_cards_api_payload(context)
 
         tracked = ((payload.get("games") or [{}])[0].get("trackedGameLines") or {})

@@ -41,7 +41,7 @@ from syndicate.features.mlb.sources import daily_artifact_path
 from syndicate.features.mlb.sources import daily_ladders_path
 from syndicate.features.mlb.sources import daily_rfi_targets_path
 from syndicate.features.mlb.sources import daily_ops_report_path
-from syndicate.features.mlb.sources import daily_snapshot_oddsapi_game_lines_path
+from syndicate.features.mlb.sources import daily_snapshot_oddsapi_game_lines_path, load_oddsapi_game_lines_doc
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path
 from syndicate.features.mlb.sources import daily_snapshot_lineups_path
@@ -2277,8 +2277,10 @@ def _enrich_games_with_tracked_market_lines(games: list[dict[str, Any]], selecte
     """
     today_iso = central_today_iso()
     render_web_dyno = _render_web_dyno()
-    game_lines_path = daily_snapshot_oddsapi_game_lines_path(selected_date) if selected_date else None
-    game_lines_doc = load_json_file(game_lines_path) if game_lines_path else None
+    # #265/#317: live lines, backfilled from the pregame freeze for games the
+    # live file has already dropped. See load_oddsapi_game_lines_doc -- live
+    # still wins every event it carries.
+    game_lines_doc = load_oddsapi_game_lines_doc(selected_date) if selected_date else None
     shared_game_lines_doc = (
         load_odds_history_payload_for_sport("mlb", resolve_current_shard_key("mlb", selected_date))
         if selected_date == today_iso and not render_web_dyno
@@ -2341,12 +2343,18 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
         if cached_payload is not None:
             return cached_payload
     lineups_path = daily_snapshot_lineups_path(selected_date) if selected_date else None
+    # Still needed by _snapshot_market_summary below, which reports WHERE the
+    # doc came from. The live filename remains the right thing to name there:
+    # it is the artifact this slate is refreshed into, and the freeze is a
+    # backfill behind it rather than a second source of record.
     game_lines_path = daily_snapshot_oddsapi_game_lines_path(selected_date) if selected_date else None
     pitcher_props_path = daily_snapshot_oddsapi_pitcher_props_path(selected_date) if selected_date else None
     hitter_props_path = daily_snapshot_oddsapi_hitter_props_path(selected_date) if selected_date else None
     ops_report_path = daily_ops_report_path(selected_date) if selected_date else None
     lineups_doc = load_json_file(lineups_path) if lineups_path else None
-    game_lines_doc = load_json_file(game_lines_path) if game_lines_path else None
+    # #265/#317: see the sibling call site above -- the live file collapses as
+    # the slate runs, and the freeze holds the games it has dropped.
+    game_lines_doc = load_oddsapi_game_lines_doc(selected_date) if selected_date else None
     shared_game_lines_doc = (
         load_odds_history_payload_for_sport("mlb", resolve_current_shard_key("mlb", selected_date))
         if selected_date == today_iso and not render_web_dyno

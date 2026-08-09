@@ -1259,8 +1259,11 @@ class EnrichGamesWithTrackedMarketLinesTests(unittest.TestCase):
         }
 
     def test_backfills_moneyline_and_total_odds_when_markets_are_empty(self) -> None:
-        with patch("syndicate.features.mlb.cards.daily_snapshot_oddsapi_game_lines_path", return_value="fake/path.json"), patch(
-            "syndicate.features.mlb.cards.load_json_file", return_value=self._game_lines_doc()
+        # #317: the seam moved from (path + load_json_file) to a single
+        # loader that merges the live doc with the #265 pregame freeze.
+        with patch(
+            "syndicate.features.mlb.cards.load_oddsapi_game_lines_doc",
+            return_value=self._game_lines_doc(),
         ):
             enriched = _enrich_games_with_tracked_market_lines([self._game()], "2026-07-23")
 
@@ -1274,8 +1277,9 @@ class EnrichGamesWithTrackedMarketLinesTests(unittest.TestCase):
     def test_does_not_overwrite_an_existing_recommendation_engine_market(self) -> None:
         game = self._game()
         game["markets"] = {"ml": {"selection": "home", "model_prob": 0.695, "odds": "-229"}}
-        with patch("syndicate.features.mlb.cards.daily_snapshot_oddsapi_game_lines_path", return_value="fake/path.json"), patch(
-            "syndicate.features.mlb.cards.load_json_file", return_value=self._game_lines_doc()
+        with patch(
+            "syndicate.features.mlb.cards.load_oddsapi_game_lines_doc",
+            return_value=self._game_lines_doc(),
         ):
             enriched = _enrich_games_with_tracked_market_lines([game], "2026-07-23")
 
@@ -1286,12 +1290,12 @@ class EnrichGamesWithTrackedMarketLinesTests(unittest.TestCase):
 
     def test_no_odds_artifact_leaves_games_unchanged(self) -> None:
         game = self._game()
-        with patch("syndicate.features.mlb.cards.daily_snapshot_oddsapi_game_lines_path", return_value=None):
+        with patch("syndicate.features.mlb.cards.load_oddsapi_game_lines_doc", return_value=None):
             enriched = _enrich_games_with_tracked_market_lines([game], "2026-07-23")
         self.assertEqual(enriched[0]["markets"], {})
 
     def test_non_dict_game_entries_pass_through_unchanged(self) -> None:
-        with patch("syndicate.features.mlb.cards.daily_snapshot_oddsapi_game_lines_path", return_value=None):
+        with patch("syndicate.features.mlb.cards.load_oddsapi_game_lines_doc", return_value=None):
             enriched = _enrich_games_with_tracked_market_lines([None, "not a game"], "2026-07-23")
         self.assertEqual(enriched, [None, "not a game"])
 
@@ -1373,3 +1377,83 @@ class HitterRemovedFromActualPayloadTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoadOddsapiGameLinesDocTests(unittest.TestCase):
+    """#265/#317 -- the live game-lines file collapses as a slate runs; the
+    pregame freeze holds the full slate and had no reader.
+
+    Measured on production 2026-08-09 ~21:0xZ: freeze 15 games, live 10, and
+    /mlb/api/market-board carried rows for exactly the 10 live games while the
+    5 blank ones were exactly the 5 the live file had dropped. These tests pin
+    the merge that closes that, and specifically pin LIVE WINNING -- a freeze
+    that could overwrite a live price would be a worse bug than the one it fixes.
+    """
+
+    @staticmethod
+    def _game(event_id: str, home: str, away: str, price: int) -> dict:
+        return {
+            "event_id": event_id,
+            "home_team": home,
+            "away_team": away,
+            "markets": {"h2h": {"home_odds": price}},
+        }
+
+    def _run(self, live, frozen):
+        from syndicate.features.mlb import sources as mlb_sources
+
+        def fake_load(path):
+            return frozen if str(path).endswith("_pregame.json") else live
+
+        with patch.object(mlb_sources, "load_json_file", fake_load):
+            return mlb_sources.load_oddsapi_game_lines_doc("2026-08-09")
+
+    def test_restores_games_the_live_file_has_dropped(self) -> None:
+        live = {"games": [self._game("a", "BAL", "TOR", -115)]}
+        frozen = {"games": [self._game("a", "BAL", "TOR", -200), self._game("b", "NYY", "ATL", 105)]}
+        merged = self._run(live, frozen)
+        self.assertEqual({g["event_id"] for g in merged["games"]}, {"a", "b"})
+        self.assertEqual(merged["pregame_backfill"]["restored_games"], 1)
+
+    def test_live_price_wins_over_the_frozen_one(self) -> None:
+        # The freeze is deliberately stale. For an event live still carries,
+        # the live quote is the true one.
+        live = {"games": [self._game("a", "BAL", "TOR", -115)]}
+        frozen = {"games": [self._game("a", "BAL", "TOR", -200)]}
+        merged = self._run(live, frozen)
+        self.assertEqual(len(merged["games"]), 1)
+        self.assertEqual(merged["games"][0]["markets"]["h2h"]["home_odds"], -115)
+
+    def test_falls_back_to_team_names_when_event_id_is_absent(self) -> None:
+        live = {"games": [{"home_team": "BAL", "away_team": "TOR", "markets": {}}]}
+        frozen = {"games": [{"home_team": "BAL", "away_team": "TOR", "markets": {}}]}
+        merged = self._run(live, frozen)
+        self.assertEqual(len(merged["games"]), 1, "same matchup must not be duplicated")
+
+    def test_no_freeze_returns_the_live_doc_untouched(self) -> None:
+        live = {"games": [self._game("a", "BAL", "TOR", -115)]}
+        merged = self._run(live, None)
+        self.assertIs(merged, live)
+        self.assertNotIn("pregame_backfill", merged)
+
+    def test_no_live_doc_still_serves_the_frozen_slate(self) -> None:
+        frozen = {"games": [self._game("a", "BAL", "TOR", -200)]}
+        merged = self._run(None, frozen)
+        self.assertEqual(len(merged["games"]), 1)
+
+    def test_neither_present_returns_none(self) -> None:
+        self.assertIsNone(self._run(None, None))
+
+    def test_identical_docs_add_nothing(self) -> None:
+        doc = {"games": [self._game("a", "BAL", "TOR", -115)]}
+        merged = self._run(doc, {"games": list(doc["games"])})
+        self.assertEqual(len(merged["games"]), 1)
+        self.assertNotIn("pregame_backfill", merged, "a no-op merge must not annotate the payload")
+
+    def test_unidentifiable_frozen_games_are_not_restored(self) -> None:
+        # No event_id and no team names: nothing to dedupe on, so admitting it
+        # risks a duplicate row. Dropping it is the conservative answer.
+        live = {"games": [self._game("a", "BAL", "TOR", -115)]}
+        frozen = {"games": [{"markets": {}}]}
+        merged = self._run(live, frozen)
+        self.assertIs(merged, live)

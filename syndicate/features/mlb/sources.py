@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from functools import lru_cache
 import gzip
 import json
@@ -197,6 +198,84 @@ def daily_snapshot_injuries_path(selected_date: str) -> Path:
 def daily_snapshot_oddsapi_game_lines_path(selected_date: str) -> Path:
     filename = f"oddsapi_game_lines_{selected_date.replace('-', '_')}.json"
     return daily_snapshot_file_path(selected_date, filename)
+
+
+def daily_snapshot_oddsapi_game_lines_pregame_path(selected_date: str) -> Path:
+    """The `#265` freeze: the full slate as it stood before games started.
+
+    The live file is REWRITTEN each refresh with only events still in
+    progress, so a slate collapses as the day runs. The freeze is written
+    per-event off each game's own clock and therefore only ever grows.
+    """
+    filename = f"oddsapi_game_lines_{selected_date.replace('-', '_')}_pregame.json"
+    return daily_snapshot_file_path(selected_date, filename)
+
+
+def load_oddsapi_game_lines_doc(selected_date: str) -> dict[str, Any] | None:
+    """Live game lines, backfilled from the pregame freeze (`#265`, `#317`).
+
+    THE FREEZE HAD NO READER. `#265` fixed the writer and production now
+    holds a full-slate `*_pregame.json`, but every consumer still built the
+    live filename, so the artifact was written and never used -- that entry's
+    own "dead both ends", half-revived.
+
+    Measured on production 2026-08-09 ~21:0xZ, and this is the cost of the
+    missing reader rather than a hypothetical:
+
+        pregame freeze                 15 games
+        live game-lines file           10 games
+        /mlb/api/market-board          10 of 15 games carried any rows,
+                                       and the 5 blank ones were EXACTLY
+                                       the 5 the live file had dropped
+
+    So the merge: the freeze supplies the slate, live supplies the prices.
+    LIVE WINS on every event it still carries, because for a game in
+    progress the live quote is the true one and the freeze is deliberately
+    stale. The freeze only ever fills events live has forgotten -- it can
+    add a game back, never overwrite a fresher price.
+
+    Keyed on `event_id`, the identifier both sides already carry. Team names
+    are the fallback for older docs written before it was emitted; they are
+    NOT the primary key, because one club spelled two ways is the failure
+    mode that cost `#317`'s sibling nine hypotheses.
+    """
+    live_doc = load_json_file(daily_snapshot_oddsapi_game_lines_path(selected_date)) if selected_date else None
+    frozen_doc = load_json_file(daily_snapshot_oddsapi_game_lines_pregame_path(selected_date)) if selected_date else None
+
+    live_games = live_doc.get("games") if isinstance(live_doc, dict) and isinstance(live_doc.get("games"), list) else []
+    frozen_games = frozen_doc.get("games") if isinstance(frozen_doc, dict) and isinstance(frozen_doc.get("games"), list) else []
+
+    # No freeze, or nothing to add: hand back exactly what the caller used to
+    # get. A backfill that cannot help must not change the payload's shape.
+    if not frozen_games:
+        return live_doc if isinstance(live_doc, dict) else None
+    if not isinstance(live_doc, dict):
+        return frozen_doc if isinstance(frozen_doc, dict) else None
+
+    def _identity(game: Any) -> str:
+        if not isinstance(game, Mapping):
+            return ""
+        event_id = str(game.get("event_id") or "").strip().lower()
+        if event_id:
+            return event_id
+        away = str(game.get("away_team") or "").strip().lower()
+        home = str(game.get("home_team") or "").strip().lower()
+        return f"{away}|{home}" if away and home else ""
+
+    seen = {key for key in (_identity(game) for game in live_games) if key}
+    restored = [game for game in frozen_games if _identity(game) and _identity(game) not in seen]
+    if not restored:
+        return live_doc
+
+    merged = dict(live_doc)
+    merged["games"] = [*live_games, *restored]
+    # Say what happened, so a thin board is attributable rather than mysterious.
+    merged["pregame_backfill"] = {
+        "restored_games": len(restored),
+        "live_games": len(live_games),
+        "frozen_games": len(frozen_games),
+    }
+    return merged
 
 
 def daily_snapshot_oddsapi_hitter_props_path(selected_date: str) -> Path:
