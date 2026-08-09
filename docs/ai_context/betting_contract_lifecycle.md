@@ -841,13 +841,42 @@ both reported rather than reconciled:
 |---|---|---|---|
 | soccer | 385 rows | 0 | — |
 | mlb | 53 rows | 1 | — |
-| **wnba** | **0 — DEFECT** | 0 | `processed_root()` read a root with **0 of 6 artifact families**. Fixed by `17d4f203`, **not deployed** |
+| **wnba** | **0 — DEFECT** | 0 | `processed_root()` read the wrong root. `17d4f203` was **deployed and inert**; really fixed by `d31091f7` (`#309`), pending deploy — see correction below |
 | **nfl** | **0 — DEFECT** | 0 | grader read a directory nothing writes; fixed (`b2d7e36f`), **still correctly 0** — no NFL games played |
 | nba / nhl / ncaab / ncaaf | 0 | 0 | **MEANINGLESS** — out of season |
 
 **Four zeros, four causes, all rendering identically**: a deployed fix, an
-undeployed fix, a fix that correctly still reads zero, and four legitimate
+inert fix, a fix that correctly still reads zero, and four legitimate
 out-of-season absences.
+
+**Correction, 2026-08-09 (`#309`/`#310`).** The WNBA row above was wrong in both
+halves and is kept rather than deleted, because the way it was wrong is the
+point.
+
+- **"Not deployed" was false.** `17d4f203` is an ancestor of the live
+  `27a7e9df` on web and refresh-worker (16:41Z).
+- **"Fixed" was false.** The fix guards with `any(candidate.iterdir())` — "does
+  this directory contain anything", not "does it contain the file you asked
+  for". Root1 holds **427 files** on production, so it short-circuits True on
+  the first candidate and returns `candidates[0]`: byte-identical to the
+  pre-fix behaviour. Root1 is non-empty but *stale* — 43 `game_cards`, none for
+  the requested date.
+- **"0 of 6 artifact families" did not measure the grader's inputs.**
+  `/api/ops/wnba/artifact-counts`, the endpoint built to diagnose this,
+  checked six files of which **one** is a grader input, and omitted both
+  `recon_*` files entirely. The measurement this row rested on was of a
+  neighbouring population.
+
+The real cause is that producer and consumer resolve **different roots from the
+same env, by design**: the producer writes `<root>/data/processed`, while
+`preferred_artifact_roots` unconditionally prepends a `<root>/source_artifacts`
+variant for WNBA. NBA and NHL route through `preferred_source_roots`, which
+injects no such variant — they are correct **by construction, not by luck**.
+NCAAB is not covered by that statement.
+
+A second, independent blocker survives the root fix: the grader needs four
+files in two gated pairs, and both `recon_*` builders require
+`boxscores_{date}.csv`. So a correct root can still settle zero.
 
 ### `#295` — closing price is a polling-boundary value. The deflated version.
 
