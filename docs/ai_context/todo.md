@@ -63,7 +63,11 @@ fixed anything.
 
 #### Routed out of this lane
 
-- **`#290`** — `test_odds_control_plane::test_odds_history_prefers_artifact_history_over_tracking` is **flaky, not failing**: three isolated runs with no code change gave PASS, PASS, then FAIL, and the failures name a *different* file each time (`artifact`, `tracking`). The path-ORDER assertion passes every time; only the loader's choice varies. All three fixtures are written in the same instant, so an mtime tie-break is a **hypothesis, not a finding**. Non-involvement established by tripwire — patching `current_odds_root_for_sport` to raise on `wnba` and confirming the branch never executed — rather than by re-running until green.
+- **`#291`** (allocated `#290` first; the intelligence lane had already landed
+  `d9454eea` under that number — **seventh ID collision of the night, and the
+  first from central allocation**, which failed for the identical reason
+  grepping did: the allocator's view is stale between their read and their
+  reply) — `test_odds_control_plane::test_odds_history_prefers_artifact_history_over_tracking` is **flaky, not failing**: three isolated runs with no code change gave PASS, PASS, then FAIL, and the failures name a *different* file each time (`artifact`, `tracking`). The path-ORDER assertion passes every time; only the loader's choice varies. All three fixtures are written in the same instant, so an mtime tie-break is a **hypothesis, not a finding**. Non-involvement established by tripwire — patching `current_odds_root_for_sport` to raise on `wnba` and confirming the branch never executed — rather than by re-running until green.
 
 ### 2026-08-08 (22:32–01:41Z) — `#279` NINE OOM KILLS ENDED BY SOMETHING NOBODY HAS IDENTIFIED. A fix that worked, a runaway it caused, and one claim we cannot make
 
@@ -1536,6 +1540,30 @@ that **a number load-bearing enough to change the recommendation must be measure
 by whoever is standing behind the recommendation.**
 
 ### OPEN 2026-08-08 (evening) — `#281` THE LIVE-LENS MEMORY GATES, ALL FIVE BUILDERS MEASURED AT ONCE. **MLB's is 3-4x too LOW, and it is the one everyone trusted**
+
+> **BEFORE ACTING ON THIS IN WINDOW TWO — the baseline these gates are measured
+> against is itself drifting, and that changes the fix.** The intelligence lane
+> measured `run_refresh_worker.py` going **85MB → 1381MB in 55 minutes (~24MB/min,
+> 71% of all process RSS)** with the expensive MLB overview blocked on every
+> cycle — so the ratchet is not any live-lens builder. Every builder cost in the
+> table below still stands; what moves underneath them is the floor.
+>
+> **That gives two failure modes with the SAME symptom — a guard that never
+> passes — and opposite fixes:**
+>
+> | | |
+> |---|---|
+> | WNBA's 1200MB gate | **miscalibrated against a build that no longer existed** (deleted 8 min later by `44008605`) → fix the number |
+> | the 3000MB overview floor | **correctly calibrated against a baseline that drifted underneath it** → fix the drift, NOT the number |
+>
+> **The symptom alone cannot tell them apart.** The discriminator is the
+> intelligence lane's: measure the guarded stage's cost *independently*, then
+> compare it against the baseline at the time the guard fires. Raising MLB's gate
+> to match a +951MB build is the right move only if the baseline is stable; if it
+> is climbing 24MB/min from boot, a correctly-sized gate still becomes
+> unsatisfiable 15–20 minutes into every boot and the raise makes MLB's build
+> skip during exactly the live slates it exists for. **Measure both before
+> touching the constant.**
 
 > **ID note:** written as `#274`, which the NFL lane also took (`35254271`, regular-season entry, several inbound references). Moved to `#281` per the lead's central allocation. **Second ID collision from this lane in one evening** — the first was `#271`/`#272`. Grepping for a free ID is a read that goes stale between the read and the write, and self-allocation across seven concurrent sessions does not converge: three lanes simultaneously believed they held `#278`. IDs are now requested from the lead, not grepped for.
 
