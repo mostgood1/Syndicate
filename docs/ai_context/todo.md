@@ -683,18 +683,14 @@ non-zero count followed by a `PUBLISH_OK` rather than a 502. For `#318` it is
 "web stops dying every 14 minutes", which is user-visible on its own and
 independent of whether any board ever renders.
 
-### #318 — OPEN, and it REFUTES its own parent. The publish flood does NOT OOM the web service; request-path compute does. `/api/board/book-grid` is the discriminator
+### #319 — OPEN. The publish flood is not merely "retracted", it is MEASURED INNOCENT: 154 publishes/min with flat memory, while every spike lands on a minute with request-path compute
 
-**Status: claimed, measuring. Read `#317` first — this item exists to correct
-one link in its chain.**
+**Status: claimed, measuring. `#318` owns the web OOM; this item owns the
+quantitative exoneration of the transport `#317` blamed, so nobody re-derives
+it a third time.**
 
-`#317` concluded that web OOM-cycles because ~60 concurrent small-file publishes
-take the JSON-envelope path in `ops.py:1001-1015`, which holds three resident
-copies. **The three-copy shape is real and I measured it. It is not what kills
-web.** Both halves matter and they are recorded separately below.
-
-<!-- lane in progress; full measurement, the correction, and deploy-readiness
-land in the follow-up commit on this item. -->
+<!-- lane in progress; the flat-vs-spike table, the measured per-transport cost,
+and deploy-readiness land in the follow-up commit on this item. -->
 
 ### #309 — FIXED AND DEPLOYED 2026-08-09. WNBA graded 0 rows because the grader read a different root than the producer writes. `17d4f203` is DEPLOYED AND INERT
 
