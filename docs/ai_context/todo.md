@@ -135,6 +135,34 @@ whether WNBA's zero is a missing producer or a missing join. Added **WNBA-only**
 glob `boxscores_2*` so it never takes the ~20MB history file; a `*_source/`
 wildcard would pull NBA's and NHL's in too and web already OOMs at 2Gi (`#302`).
 
+**USE `2026-08-07`. THE DATE IS LOAD-BEARING** — a date with no finished WNBA
+slate reads **identically** to a producer defect, which is the exact confusion
+this entry exists to prevent. Measured on production 2026-08-09, WNBA slates are
+tiny and several dates are 1 game:
+
+```
+date         game_cards rows        date         game_cards rows
+2026-08-02        1                 2026-08-06        1
+2026-08-05        2                 2026-08-07        3   <- USE THIS
+                                    2026-08-08        1
+```
+
+`2026-08-07` (3 games) is the largest recent slate; `2026-08-05` (2) is the
+fallback. Both have `game_cards` **and** `props_recommendations` present at
+root2 `[live]`. Avoid 1-game dates: a single unmatched game is indistinguishable
+from noise.
+
+> **AND A FINDING THAT LANDED WHILE PICKING THE DATE, which strengthens the
+> producer hypothesis without proving it.** `[live]` 2026-08-09,
+> `/api/ops/wnba/status-trace`: the `game_cards`-derived rows report
+> **`status: 'Scheduled'`, `final: False` for EVERY date 08-02..08-08** —
+> including games a week old. **The artifact is frozen at pregame.** The WNBA
+> grader does not read `status_state` (it reads the recon files), so this does
+> **not** block grading directly and must not be reported as the cause. What it
+> does say is that the **post-game leg of the WNBA refresh is not running for
+> these dates** — and that is the same leg that would write `boxscores_*` and
+> therefore the recon files. Independent, and it points the same way.
+
 **Carrying `#208`'s lesson explicitly, per the lead:** allowlisting **permits** a
 transfer, it does not **make** one happen.
 - *What should change:* after the next WNBA refresh cycle writes them,
