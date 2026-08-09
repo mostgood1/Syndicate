@@ -130,12 +130,33 @@ files 502'd in the same window too (`roster_3_TOR_at_PHI...json`,
 Re-verified 21:0xZ: `/api/home` → `http=000` at 40s, then `502`, then `502`;
 `/api/intelligence/status` → `200`, then `502`, `502`. Web is still cycling.
 
-The receiver is **not** the memory bug: `_publish_streamed_body`
-(`syndicate/blueprints/ops.py:926`) streams to disk 1MB at a time and is
-correct. The pressure is on the *other* direction — the worker's per-cycle
-`/api/ops/artifacts/export?pattern=…` pulls, which `jsonify` whole artifact
-bodies into one dict (the 30,308,015-byte incident already recorded at
-`ops.py:1075`). Sender and receiver are both 2Gi and both are the same board.
+The receiver's *streamed* path is **not** the memory bug: `_publish_streamed_body`
+(`syndicate/blueprints/ops.py:926`) streams to disk 1MB at a time and is correct.
+
+**What kills web is measurable, and it is the OTHER publish path at flood
+rate.** Web's own access log, 20:08:38Z–20:09:12Z (34 seconds, the run-up to
+the OOM), is ~60 `POST /api/ops/artifacts/publish` at up to **5 per second**,
+from **five distinct source IPs** (`10.195.130.5`, `10.196.186.6`,
+`10.197.69.3`, `10.199.88.158`, `10.194.27.5`) — concurrent publishers, all
+answering `200` with ~100-byte bodies, i.e. all *small* files. Small files skip
+`_should_stream_publish` (`_PUBLISH_STREAM_MIN_BYTES = 4MB`) and take the JSON
+envelope, which `ops.py:1001-1015` holds as **three full copies** — raw body,
+parsed dict with the file as a `str`, and that `str` re-encoded to disk. One
+kilobyte file costs four kilobytes and that is fine; sixty concurrent of them
+across gunicorn workers on a 2Gi instance is not. `/healthz` answered `200`
+2 seconds before the kill, so this is a fast blow-up, not a slow leak.
+
+> **Do not carry forward the guess this note first contained** — that the
+> pressure was the worker's `/api/ops/artifacts/export?pattern=` pulls. That is
+> a real 30MB-response problem (`ops.py:1075`) but it is **not** what the
+> access log shows in the OOM window. Publishes are.
+
+Corroborating, same window, on WEB: `[INTEL_STATUS_TIMING] … has_snapshot:
+False` for **both** `read_latest_intelligence_state_response` and
+`read_latest_intelligence_board_snapshot_response`, and
+`PERSIST_LOCKED_BEGIN … snapshot_count=0`. Web is not serving a stale board
+from a bad read path — it has nothing at all, exactly as the refused transports
+predict.
 
 #### So the causal chain is
 
@@ -171,9 +192,14 @@ both be true before a board can land, and neither is a one-line edit:
 1. **Get the payload under 8,388,608 bytes** so keyvalue carries it and the
    HTTP path stops being load-bearing. Aliasing the duplicated `board_contract`
    is the first cut; 6.3MB of `cards` inside it needs its own decision.
-2. **Stop the web OOM cycle**, or the fallback has nothing to POST to. Prime
-   suspect is the worker's own `artifacts/export?pattern=` pulls, not the
-   publishes.
+2. **Stop the web OOM cycle**, or the fallback has nothing to POST to. The
+   measured trigger is the *small-file* publish flood on the JSON-envelope path
+   (`ops.py:1001`, three resident copies), ~5/s from five concurrent
+   publishers. Two candidate levers, neither taken here: make the JSON path
+   stream to disk like `_publish_streamed_body` already does (removing the
+   3-copy shape at every size, not just above 4MB), and/or bound publisher
+   concurrency. Note the sender's `timeout_seconds: int = 10` default
+   (`artifact_publisher.py:637`) means a slow web also silently drops boards.
 
 Fixing (1) alone still leaves `/api/home` down. Fixing (2) alone leaves a
 27.6MB body against a path measured to drop the connection above ~19.6MB.
