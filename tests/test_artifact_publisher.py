@@ -846,6 +846,137 @@ class ArtifactPublishEndpointTests(unittest.TestCase):
             leftovers = list(written_path.parent.glob(f"{written_path.name}.*.tmp"))
             self.assertEqual(leftovers, [])
 
+    def test_envelope_content_larger_than_one_encode_chunk_round_trips_exactly(self) -> None:
+        # #319 made the envelope write the artifact a megabyte at a time
+        # instead of encoding it whole. A chunk boundary landing mid-character
+        # would corrupt the file in a way no size check would notice, so this
+        # spans several chunks and includes multi-byte and astral characters
+        # at deliberately awkward offsets.
+        from syndicate.blueprints.ops import _PUBLISH_ENCODE_CHUNK_CHARS
+
+        filler = "a" * (_PUBLISH_ENCODE_CHUNK_CHARS - 1)
+        content = json.dumps(
+            {
+                "boundary_probe": [f"{filler}é", f"{filler}\U0001f600", f"{filler}中"],
+                "tail": "done",
+            }
+        )
+        self.assertGreater(len(content), 2 * _PUBLISH_ENCODE_CHUNK_CHARS)
+
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": str(data_root)},
+                clear=False,
+            ):
+                response = self.client.post(
+                    "/api/ops/artifacts/publish",
+                    json={"relative_path": HOT_RELATIVE_PATH, "content": content},
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+
+            self.assertEqual(response.status_code, 200)
+            written_path = data_root / HOT_RELATIVE_PATH
+            self.assertEqual(written_path.read_text(encoding="utf-8"), content)
+            self.assertEqual(response.get_json()["bytes"], len(content.encode("utf-8")))
+
+    def test_malformed_json_envelope_is_rejected_not_written(self) -> None:
+        # The body is read uncached and decoded before parsing, so the failure
+        # modes of that decode need to stay 400s rather than 500s or, worse, a
+        # partially written artifact over a good one.
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            target = data_root / HOT_RELATIVE_PATH
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text('{"good": true}', encoding="utf-8")
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": str(data_root)},
+                clear=False,
+            ):
+                for body in (b'{"relative_path": "x", "content"', b"\xff\xfe not utf-8", b"[]"):
+                    response = self.client.post(
+                        "/api/ops/artifacts/publish",
+                        data=body,
+                        content_type="application/json",
+                        headers={"Authorization": "Bearer secret-token"},
+                    )
+                    self.assertEqual(response.status_code, 400, body)
+
+            # The previously good artifact is untouched.
+            self.assertEqual(target.read_text(encoding="utf-8"), '{"good": true}')
+            self.assertEqual(list(target.parent.glob(f"{target.name}.*.tmp")), [])
+
+    def test_envelope_peak_memory_stays_near_one_copy_of_the_artifact(self) -> None:
+        # The three tests above pass against the pre-#319 receiver too -- the
+        # behaviour is deliberately unchanged and only the memory moved, so
+        # without this one nothing here would notice the regression.
+        #
+        # Verified in both directions on this artifact: 2.43x with the fix and
+        # 3.42x with json.loads(<bytes>) restored, stable across repeats. The
+        # 3.0x bound sits between them, so the revert fails here rather than
+        # passing quietly.
+        import tracemalloc
+
+        content = json.dumps({"rows": [{"i": i, "name": "Home Team FC"} for i in range(60_000)]})
+        artifact_bytes = len(content.encode("utf-8"))
+        self.assertGreater(artifact_bytes, 1_000_000, "too small for the ratio to mean anything")
+        body = json.dumps({"relative_path": HOT_RELATIVE_PATH, "content": content}).encode("utf-8")
+
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": str(data_root)},
+                clear=False,
+            ):
+                def publish():
+                    return self.client.post(
+                        "/api/ops/artifacts/publish",
+                        data=body,
+                        content_type="application/json",
+                        headers={"Authorization": "Bearer secret-token"},
+                    )
+
+                publish()  # warm: first-call import/setup allocations are not the subject
+                tracemalloc.start()
+                tracemalloc.reset_peak()
+                response = publish()
+                _, peak = tracemalloc.get_traced_memory()
+                tracemalloc.stop()
+
+            self.assertEqual(response.status_code, 200)
+            ratio = peak / artifact_bytes
+            self.assertLess(
+                ratio,
+                3.0,
+                f"envelope receive peaked at {ratio:.2f}x the artifact "
+                f"({peak:,} bytes for {artifact_bytes:,}); it must not hold the "
+                f"raw body, the decoded envelope and the content all at once",
+            )
+
+    def test_form_encoded_publish_still_works(self) -> None:
+        # live-odds-worker is pinned to an older commit; the non-JSON branch
+        # exists for senders this repo cannot redeploy and must not regress
+        # when the JSON branch is rewritten.
+        with TemporaryDirectory() as tmp_dir:
+            data_root = Path(tmp_dir)
+            with patch.dict(
+                os.environ,
+                {"ADMIN_TOKEN": "secret-token", "SYNDICATE_DATA_ROOT": str(data_root)},
+                clear=False,
+            ):
+                response = self.client.post(
+                    "/api/ops/artifacts/publish",
+                    data={"relative_path": HOT_RELATIVE_PATH, "content": '{"candidate_count": 7}'},
+                    headers={"Authorization": "Bearer secret-token"},
+                )
+
+            self.assertEqual(response.status_code, 200)
+            written_path = data_root / HOT_RELATIVE_PATH
+            self.assertEqual(json.loads(written_path.read_text(encoding="utf-8"))["candidate_count"], 7)
+
 
 class ArtifactExportEndpointTests(unittest.TestCase):
     # Phase 4 of migrating off the daily-update GHA cron: read-only

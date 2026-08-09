@@ -683,14 +683,124 @@ non-zero count followed by a `PUBLISH_OK` rather than a 502. For `#318` it is
 "web stops dying every 14 minutes", which is user-visible on its own and
 independent of whether any board ever renders.
 
-### #319 — OPEN. The publish flood is not merely "retracted", it is MEASURED INNOCENT: 154 publishes/min with flat memory, while every spike lands on a minute with request-path compute
+### #319 — The publish flood is not merely "retracted", it is MEASURED INNOCENT: 154 publishes/min sat FLAT, and every spike landed on a minute with request-path compute. Envelope receive hardened anyway (`ops.py`), NOT DEPLOYED and NOT AN OOM FIX
 
-**Status: claimed, measuring. `#318` owns the web OOM; this item owns the
-quantitative exoneration of the transport `#317` blamed, so nobody re-derives
-it a third time.**
+**Status: measured, arrived at independently and in parallel with `#318`'s
+retraction of the same claim. `#318` owns the web OOM. This item owns the
+number that closes the publish-flood theory for good — a retraction leaves
+"not proven guilty", and this is "proven innocent".**
 
-<!-- lane in progress; the flat-vs-spike table, the measured per-transport cost,
-and deploy-readiness land in the follow-up commit on this item. -->
+#### The controlled comparison `#317` never had
+
+Web `srv-d88ahvrbc2fs73eodu30`, instance `-454rz`, 2026-08-09. Requests counted
+from web's own access log; memory from `/v1/metrics/memory`.
+
+| minute | mem (MiB) | publishes | `book-grid`/`market-board` | verdict |
+|---|---|---|---|---|
+| 20:43 | 745 → 748 | **154** (+10 export, +13 stream) | 0 | **flat** |
+| 20:44 | 748 | 132 | 0 | flat |
+| 20:45 | 749 | 110 | 0 | flat |
+| 20:47 | **1784** → reboot 20:47:26 | **24** | 3 | **spike** |
+| 20:55 | **1602** → restart | **24** | 2 | **spike** |
+| 21:08 | 434 | **168** — highest in the window | 0 | flat |
+
+**The correlation with publishes is negative.** The heaviest artifact minute in
+the whole window (177 requests, zero app-log lines) did not move memory 3 MiB.
+Both spikes landed on the two lowest non-zero publish minutes, and both carry
+`WARNING: compute in request path` (17 and 15 occurrences) — `#318`'s lead, with
+a control behind it now.
+
+> **State the window:** publish-per-minute counts are valid for **20:42–21:10
+> only**. Earlier minutes read `0` in my first sweep because backward
+> pagination ran out, not because nothing was published — the 20:08–20:09 kill
+> window really did carry 84 publishes. A zero from a truncated scan is missing
+> data.
+
+#### And the per-request cost, measured rather than reasoned about
+
+The real route (`api_ops_artifacts_publish`) driven with a 3.9MB artifact,
+`tracemalloc` peak, branch asserted by spying on the write helper:
+
+| transport | peak | × artifact |
+|---|---|---|
+| JSON envelope | 14.0 MiB | **3.76×** |
+| streamed body | 3.0 MiB | 0.81× |
+
+`WEB_CONCURRENCY=2 × GUNICORN_THREADS=4` = **8 concurrent slots**, so the whole
+envelope path tops out near **112 MiB — about 5% of the 2Gi limit.** `#317`
+needed ~1.4 GiB and this cannot supply it. (`#318` reached the same conclusion
+by arithmetic and put it at "single-digit MB" for "a few-hundred-KB" files; the
+files are up to 4MB and the true figure is ~112 MiB. Still nowhere near enough,
+so the conclusion holds and only the magnitude was off.)
+
+#### The inference that produced the wrong answer, named so it is not repeated
+
+`#317` read `~60 POST … 200 118` in the access log as *"all answering 200 with
+~100-byte bodies, i.e. all SMALL files."* **The 118 is the response size, and
+this route's response is a fixed-size receipt** — `{"ok":true,"relative_path":
+…,"bytes":N}` — for *both* transports. It carries no artifact content, so it
+says nothing whatsoever about the size of what was uploaded.
+
+What was actually uploaded in that window, from the publisher's own logs
+(live-odds-worker, 20:07:50–20:09:20): **60 publishes, 17 of them streamed,
+totalling 141,035,786 bytes** — 12.2MB, 12.0MB, 9.0MB, 5.6MB, 5.3MB, 4.3MB.
+The flood was mostly *large* files on the *correct* path. **Read the field you
+already have: a response length is about the response.**
+
+#### Two things found while measuring, neither a cause, both real
+
+1. **Every odds_history artifact is published two or three times per sweep.**
+   `soccer_source/tracking/odds_history/2026-08-22.json` and
+   `soccer_source/artifacts/soccer/odds_history/2026-08-22.json` both go up at
+   **12,216,580 bytes each**, and the set repeats ~4s later. Roughly 141MB of
+   uploads per 90s where ~47MB is distinct. Wasteful, not fatal; needs its own
+   owner.
+2. **`POST /api/intelligence/query` is 500ing on production**, 20:46:33Z:
+   `TypeError: unhashable type: 'dict'` at `syndicate/features/intelligence.py:188`,
+   `if score in {None, ""}` — a dict reaches `score`. Distinct from the OOM.
+
+#### What changed, and what it is not
+
+`syndicate/blueprints/ops.py` — the envelope receive path only:
+
+- `json.loads(<bytes>)` decodes internally, so the **raw body, the decoded
+  envelope and the extracted content were all resident together. That parse,
+  not the write, set the peak** — chunking the write alone moved the number
+  **zero**. Decoding to `str` and dropping the bytes before parsing is what
+  worked: **3.76× → 2.63×.**
+- The write encodes 1MB at a time instead of whole, and now removes its `.tmp`
+  on failure — `write_text()` left one behind per failed publish, on the disk
+  that holds the artifacts.
+- Envelope and form branches share one validated writer; the form branch is
+  kept because live-odds-worker is pinned (`0071dbf9`).
+
+**This is NOT the OOM fix and must not be banked as one.** It is worth having
+only because the envelope is still the fallback when a streamed publish is
+refused, and a 27.6MB `intelligence_state` down it cost ~104 MiB in one request
+and now costs ~73 MiB.
+
+`tests/test_artifact_publisher.py` +4 tests. Three are behaviour guards that
+**pass against the old receiver too** — the behaviour is deliberately
+unchanged. The fourth asserts the thing that actually changed, and was
+**verified in both directions**: 2.43× with the fix, 3.42× with
+`json.loads(<bytes>)` restored, bound at 3.0×.
+
+`python -m pytest tests/test_artifact_publish_retention.py
+tests/test_artifact_publisher.py tests/test_ops.py tests/test_request_path_guard.py
+tests/test_odds_refresh_tracking.py` → **294 passed**, on the final tree.
+
+> Windows-only aside: concurrent `os.replace` onto one target fails ~10% of the
+> time with `WinError 5`. **Pre-existing, not introduced** — measured 6/60 with
+> the old `write_text` shape and 8/60 with the new one. POSIX rename does not
+> behave this way, so Render is unaffected.
+
+#### Deploy-readiness
+
+**Safe to deploy, no rush, and it fixes nothing user-visible.** One file plus
+tests, no env change, no `render.yaml`. Behaviour is identical on every input
+the suite covers; only peak memory moves. Deploy it *with* something else —
+shipping it alone invites exactly the mis-attribution this entry argues
+against. `#318`'s instrument (`7cceb781`) is the one worth deploying first.
 
 ### #309 — FIXED AND DEPLOYED 2026-08-09. WNBA graded 0 rows because the grader read a different root than the producer writes. `17d4f203` is DEPLOYED AND INERT
 

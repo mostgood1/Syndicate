@@ -988,6 +988,44 @@ def _publish_streamed_body() -> Any:
     return jsonify({"ok": True, "relative_path": relative_path, "bytes": written, "transport": "stream"}), 200
 
 
+# Encoding a whole `content` str in one call is a second full copy of the
+# artifact; a megabyte at a time is not. Slicing a str is by code point, so a
+# chunk boundary can never split a character.
+_PUBLISH_ENCODE_CHUNK_CHARS = 1024 * 1024
+
+
+def _write_published_artifact(relative_path: str, content: Any) -> Any:
+    """Validate and atomically write one envelope-form artifact."""
+    if not relative_path or content is None:
+        return jsonify({"ok": False, "error": "relative_path and content are required."}), 400
+    if relative_path.startswith("/") or ".." in relative_path.split("/"):
+        return jsonify({"ok": False, "error": "invalid relative_path."}), 400
+    if not is_hot_artifact_relative_path(relative_path):
+        return jsonify({"ok": False, "error": "relative_path is not an allowed hot artifact."}), 403
+
+    if not isinstance(content, str):
+        content = str(content)
+
+    target_path = data_root() / Path(relative_path)
+    temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
+    try:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        with temp_path.open("wb") as handle:
+            for start in range(0, len(content), _PUBLISH_ENCODE_CHUNK_CHARS):
+                handle.write(content[start : start + _PUBLISH_ENCODE_CHUNK_CHARS].encode("utf-8"))
+        os.replace(temp_path, target_path)
+    except Exception as exc:
+        # write_text() left the .tmp behind on any failure, on the same disk
+        # that holds the artifacts, once per failed publish.
+        try:
+            temp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+    return jsonify({"ok": True, "relative_path": relative_path, "bytes": target_path.stat().st_size}), 200
+
+
 @ops_bp.post("/api/ops/artifacts/publish")
 def api_ops_artifacts_publish() -> Any:
     # Two accepted forms on one route, deliberately. The JSON envelope stays
@@ -998,26 +1036,54 @@ def api_ops_artifacts_publish() -> Any:
     if str(request.headers.get("X-Artifact-Path") or "").strip():
         return _publish_streamed_body()
 
+    # MEASURED on this receiver 2026-08-09 against a 3.9MB artifact, peak
+    # resident as a multiple of the artifact:
+    #
+    #     envelope, before   3.76x  (14.0 MiB)
+    #     envelope, after    2.63x  ( 9.8 MiB)
+    #     streamed form      0.81x  ( 3.0 MiB)   <- unchanged, already correct
+    #
+    # THIS IS NOT THE WEB OOM, and must not be reported as if it were. Same
+    # service, same evening: minutes serving 154 publishes sat flat at ~748
+    # MiB, while every 1.6-1.8 GiB spike landed on a minute serving 24-74. The
+    # bound is why -- 8 gunicorn slots x 14 MiB was ~112 MiB, ~5% of the 2Gi
+    # limit. See #319; the cause is request-path compute, see #318.
+    #
+    # It is worth having anyway because the envelope is still what a refused
+    # streamed publish falls back to, and a 27.6MB intelligence_state down
+    # that path cost ~104 MiB in a single request and now costs ~73 MiB.
+    if request.mimetype == "application/json":
+        raw = request.get_data(cache=False)
+        # Decode to str and drop the bytes BEFORE parsing. json.loads(bytes)
+        # decodes internally and holds the bytes and the decoded envelope and
+        # the extracted content all at once -- that parse, not the write, is
+        # what sets the peak here. Chunking the write alone changed nothing.
+        try:
+            text = raw.decode("utf-8")
+        except Exception:
+            text = None
+        del raw
+        payload = None
+        if text is not None:
+            try:
+                payload = json.loads(text)
+            except Exception:
+                payload = None
+        del text
+        if not isinstance(payload, dict):
+            return jsonify({"ok": False, "error": "relative_path and content are required."}), 400
+        relative_path = str(payload.get("relative_path") or "").strip().replace("\\", "/")
+        # pop, so the envelope dict stops being a second reference to the
+        # artifact the moment we have our own.
+        content = payload.pop("content", None)
+        payload = None
+        return _write_published_artifact(relative_path, content)
+
     payload = _request_data()
-    relative_path = str(payload.get("relative_path") or "").strip().replace("\\", "/")
-    content = payload.get("content")
-    if not relative_path or content is None:
-        return jsonify({"ok": False, "error": "relative_path and content are required."}), 400
-    if relative_path.startswith("/") or ".." in relative_path.split("/"):
-        return jsonify({"ok": False, "error": "invalid relative_path."}), 400
-    if not is_hot_artifact_relative_path(relative_path):
-        return jsonify({"ok": False, "error": "relative_path is not an allowed hot artifact."}), 403
-
-    target_path = data_root() / Path(relative_path)
-    try:
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = target_path.parent / f"{target_path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp"
-        temp_path.write_text(str(content), encoding="utf-8")
-        os.replace(temp_path, target_path)
-    except Exception as exc:
-        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
-
-    return jsonify({"ok": True, "relative_path": relative_path, "bytes": target_path.stat().st_size}), 200
+    return _write_published_artifact(
+        str(payload.get("relative_path") or "").strip().replace("\\", "/"),
+        payload.get("content"),
+    )
 
 
 @ops_bp.get("/api/ops/artifacts/export")
