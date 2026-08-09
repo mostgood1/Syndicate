@@ -1,5 +1,70 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-09 (early) — WNBA lane close-out: `#280` flag split + the `[0]` question ANSWERED, and the settlement lane's `(c)` is FIXED
+
+Two commits, neither deployed, both window two.
+
+**`17d4f203` closes the WNBA half of the settlement lane's grader audit — the
+`(c)` block further down this file, `processed_root()` reading 0 of 6 families.**
+Their diagnosis was exact and needs no repeating; the chain is
+`build_market_accuracy_payload` → `_artifact_root()` → `processed_root()` →
+`current_odds_root_for_sport("wnba")` → `preferred_artifact_roots(...)[0]`.
+Now: **first root that HAS files**, in the existing preference order. The
+preferred root still wins when populated, and when nothing is populated
+anywhere it returns `candidates[0]` — today's answer — so an empty deployment
+reports the same path it always did. **WNBA only**; the `nba`/`nhl` branches
+directly above are the same shape, are NOT measured, and are NOT touched. A
+test pins that `nba`'s `roots[0]` is unchanged.
+
+#### The general answer, and it is worth more than the fix
+
+The register had five `preferred_*_roots(...)[0]` sites and two incompatible
+readings of them: the soccer lane's `60689dee` (one-line fix, worked) versus my
+`92823414` (one-line fix would have changed **nothing**, because the branding
+CSV was on no root at all and `.gitignore` had swallowed it). Their conclusion
+was *"`[0]` is necessary and never sufficient."*
+
+`17d4f203` is the counter-example that resolves it: **the file IS present on
+another candidate root here, so the root-order fix alone IS sufficient.**
+
+So the register item is not "five one-line fixes" and not "five bootstraps".
+**It is a QUESTION to ask at each site: is the data absent, or merely looked for
+in the wrong place first?** One confirmed instance of each now exists. Identical
+symptom, and the difference between a ten-minute change and a bootstrap.
+Whoever takes `nba/cards.py:178` and `ncaab/cards.py:23` should ask it before
+writing anything.
+
+**And the detail that should not be lost:** `/api/ops/wnba/artifact-counts`
+exists *because of this exact mismatch*, and its own comment states it
+verbatim — *"processed_root() unconditionally prefers a source_artifacts
+candidate root whether or not that location actually has anything written to
+it."* **An instrument was built to report the defect, and the defect was never
+fixed.** The instrument became the mitigation.
+
+#### `#280` (`3e821a27`) — one flag gated two unrelated permissions
+
+`allow_stored_date_fallback` gated both "you may substitute a DIFFERENT date's
+stored slate" and "you may merge TONIGHT's live scores". The live lens correctly
+refuses the first and was thereby denied the second. Measured same-instant,
+same service:
+
+```
+/wnba/api/cards      (fallback=True)   3 games   Scheduled, Final, Final
+/wnba/api/live-lens  (fallback=False)  2 games   Scheduled, Scheduled
+```
+
+`allow_live_status_merge=None` means "follow the old flag" — byte-for-byte
+today's behaviour for every existing caller, all four combinations pinned.
+**UNVERIFIED IN PRODUCTION and deliberately so:** the worker-side display is
+already correct without it (the worker reaches live status by a different,
+ungated path), so `#280`'s value is on the **web rebuild** path specifically.
+Measure that before calling it done rather than assuming the flag split is what
+fixed anything.
+
+#### Routed out of this lane
+
+- **`#290`** — `test_odds_control_plane::test_odds_history_prefers_artifact_history_over_tracking` is **flaky, not failing**: three isolated runs with no code change gave PASS, PASS, then FAIL, and the failures name a *different* file each time (`artifact`, `tracking`). The path-ORDER assertion passes every time; only the loader's choice varies. All three fixtures are written in the same instant, so an mtime tie-break is a **hypothesis, not a finding**. Non-involvement established by tripwire — patching `current_odds_root_for_sport` to raise on `wnba` and confirming the branch never executed — rather than by re-running until green.
+
 ### 2026-08-08 (22:32–01:41Z) — `#279` NINE OOM KILLS ENDED BY SOMETHING NOBODY HAS IDENTIFIED. A fix that worked, a runaway it caused, and one claim we cannot make
 
 **Read the labels. Three of the claims below are verified by measurement and
