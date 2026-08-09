@@ -79,6 +79,14 @@ def _no_quality_floor(monkeypatch):
     """
     monkeypatch.setenv("SYNDICATE_SHORTLIST_MIN_VALUE_PCT", "-99999")
     monkeypatch.setenv("SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS", "0")
+    # And the stale-kickoff floor, for the same reason plus a worse one: it is
+    # measured against the WALL CLOCK, while `_quote()` pins
+    # commence_time=2026-08-08T23:05:00Z. So these tests passed on 2026-08-08
+    # and began failing at 01:05Z on 08-09 -- permanently, and on five tests at
+    # once, with `KeyError: 'mlb'` on the SELECTION report while the ingest
+    # report stayed healthy. That reads exactly like a broken join and is in
+    # fact the calendar. A wiring test must not depend on the day it is run.
+    monkeypatch.setenv("SYNDICATE_SHORTLIST_STALE_KICKOFF_SECONDS", "0")
 
 
 @pytest.fixture

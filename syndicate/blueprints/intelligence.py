@@ -1930,6 +1930,18 @@ def intelligence_portfolio_event_api():
             response.status_code = 400
             return _no_cache_response(response)
 
+        # #297. Normalize BEFORE the bundle is built and persisted: a board row
+        # names teams `home_team`/`away_team`, the settlement key extractor
+        # reads `home`/`away`/`team`, and those never collide -- so a bet logged
+        # from an L2-A row reaches the ledger with no team value in its key set
+        # and can never be matched to a graded row. Measured on production:
+        # a game row's key set was {event_id, market}, neither of which a graded
+        # row ever emits. It returns 200 and fails silently at grading, so this
+        # has to happen on the write path rather than be repaired later.
+        from syndicate.features.shared.evaluation_settlement import normalize_portfolio_event_identity
+
+        portfolio_event = normalize_portfolio_event_identity(portfolio_event)
+
         selected_date = str(payload.get("date") or payload.get("selected_date") or central_today_iso()).strip() or central_today_iso()
         question = str(payload.get("question") or "manual portfolio event").strip() or "manual portfolio event"
         sport = str(payload.get("sport") or "").strip() or None
@@ -2219,7 +2231,7 @@ def board_book_grid_api():
     capture is not.
     """
     from syndicate.features.shared.book_grid import book_grid_summary, build_book_grid
-    from syndicate.features.shared.odds_book_quotes import read_book_quotes
+    from syndicate.features.shared.odds_book_quotes import read_book_quotes, read_quote_last_seen
 
     sport = str(request.args.get("sport") or "mlb").strip().lower()
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
@@ -2235,8 +2247,19 @@ def board_book_grid_api():
         _LOGGER.exception("BOARD_BOOK_GRID_READ_FAILURE sport=%s date=%s", sport, selected_date)
         rows = []
 
+    # Last-seen, same as the persisted build. `pipeline/layer2_shortlist` passes
+    # it and these endpoints did not, so the served grid discounted a motionless
+    # market as stale while the persisted board did not -- the exact drift the
+    # shortlist's own comment claims cannot happen ("same functions the
+    # serve-time endpoint calls"). Absent sidecar leaves `seen_age_seconds`
+    # absent, which every consumer already treats as unknown.
     try:
-        grid = build_book_grid(rows)
+        last_seen = read_quote_last_seen(sport, selected_date)
+    except Exception:
+        last_seen = {}
+
+    try:
+        grid = build_book_grid(rows, last_seen=last_seen)
     except Exception:
         _LOGGER.exception("BOARD_BOOK_GRID_BUILD_FAILURE sport=%s date=%s", sport, selected_date)
         grid = []
@@ -2475,7 +2498,7 @@ def board_cross_book_api():
         cross_book_summary,
     )
     from syndicate.features.shared.book_grid import build_book_grid
-    from syndicate.features.shared.odds_book_quotes import read_book_quotes
+    from syndicate.features.shared.odds_book_quotes import read_book_quotes, read_quote_last_seen
 
     sport = str(request.args.get("sport") or "mlb").strip().lower()
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
@@ -2500,8 +2523,16 @@ def board_cross_book_api():
         _LOGGER.exception("BOARD_CROSS_BOOK_READ_FAILURE sport=%s date=%s", sport, selected_date)
         rows = []
 
+    # Same last-seen threading as /api/board/book-grid above: cross-book edges
+    # are ranked partly on freshness, so a stale-looking motionless market is
+    # exactly the row this endpoint would wrongly demote.
     try:
-        grid = build_book_grid(rows)
+        last_seen = read_quote_last_seen(sport, selected_date)
+    except Exception:
+        last_seen = {}
+
+    try:
+        grid = build_book_grid(rows, last_seen=last_seen)
     except Exception:
         _LOGGER.exception("BOARD_CROSS_BOOK_BUILD_FAILURE sport=%s date=%s", sport, selected_date)
         grid = []

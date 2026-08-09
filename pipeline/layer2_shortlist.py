@@ -67,17 +67,56 @@ def build_layer2_shortlist(
 
             quote_rows = read_book_quotes(sport, selected_date)
             if not quote_rows:
-                per_sport_stats[sport] = {"quote_rows": 0, "grid_rows": 0, "opportunities": 0}
+                # #296. Zero quotes means one of two things and they must not
+                # look alike: the sweep has NOT RUN YET, or it ran and the sport
+                # has no slate. The board is quote-driven, so a sport in the
+                # first state does not degrade -- it VANISHES, which is
+                # indistinguishable from being broken.
+                #
+                # Measured 2026-08-09 02:58Z: MLB had 15 scheduled games and no
+                # quote log at all, because MLB capture for a date begins
+                # ~06:43Z (first captured_at on the 08-08 log). So for ~6 hours
+                # nightly the biggest sport is simply missing from the board
+                # with no marker -- exactly when someone is most likely looking.
+                #
+                # The schedule is known hours before the odds are, so the chip
+                # count is what separates the two. Asked with an empty grid: it
+                # loads the same chips and reports `rows_matched: 0`, which is
+                # the honest answer here.
+                try:
+                    scheduled = int(
+                        (attach_game_state([], sport=sport, selected_date=selected_date) or {}).get("chips") or 0
+                    )
+                except Exception:
+                    scheduled = 0
+                per_sport_stats[sport] = {
+                    "quote_rows": 0,
+                    "grid_rows": 0,
+                    "opportunities": 0,
+                    "scheduled_games": scheduled,
+                    # A zero must be attributable -- same contract as
+                    # `rows_stale_kickoff` and audit_slate_coverage's THIN.
+                    "sweep_state": "pending" if scheduled > 0 else "no_slate",
+                }
                 continue
             # Last-seen turns the grid's single age into two: time since the
             # price MOVED, and time since we LOOKED. Only the second is
             # staleness, and scoring was discounting stable markets for the
             # first. Empty for dates whose state predates the tracking, which
             # leaves `seen_age_seconds` absent and the old behaviour intact.
+            last_seen_error: str | None = None
             try:
                 last_seen = read_quote_last_seen(sport, selected_date)
-            except Exception:
+            except Exception as exc:
+                # Swallowing this is correct -- last-seen is an enhancement and
+                # its absence must not fail the build -- but swallowing it
+                # SILENTLY is not. Measured 2026-08-09: `quote_seen_age_seconds`
+                # was null on 200/200 served rows and `freshness_factor` sat at
+                # 0.25 (the harshest discount) on every one, and nothing in the
+                # payload could distinguish "the sidecar never reached this
+                # service" from "it loaded and matched nothing".
                 last_seen = {}
+                last_seen_error = f"{type(exc).__name__}: {exc}"
             grid = build_book_grid(quote_rows, max_rows=max_grid_rows_per_sport, last_seen=last_seen)
 
             # ENRICH BEFORE RANKING. Without these three the persisted board is
@@ -118,9 +157,41 @@ def build_layer2_shortlist(
                 if not str(row.get("sport") or "").strip():
                     row["sport"] = sport
             opportunities.extend(sport_opportunities)
+            # BOTH numbers, because either alone is ambiguous. `last_seen_keys`
+            # is what this service could READ (0 => the `.state.json` sidecar
+            # never crossed to this disk, or predates the 3-element format);
+            # `cells_with_seen_age` is what actually JOINED (>0 keys but 0 cells
+            # => the sidecar is here and the key shapes disagree). Reporting one
+            # without the other cannot tell a delivery gap from a join gap.
+            # Counted defensively: an instrument that can raise is worse than no
+            # instrument, and this one walks a nested shape it does not own.
+            cells_with_seen_age = 0
+            try:
+                for grid_row in grid:
+                    if not isinstance(grid_row, Mapping):
+                        continue
+                    for by_side in (grid_row.get("cells") or {}).values():
+                        if not isinstance(by_side, Mapping):
+                            continue
+                        for cell in by_side.values():
+                            if isinstance(cell, Mapping) and cell.get("seen_age_seconds") is not None:
+                                cells_with_seen_age += 1
+            except Exception:
+                cells_with_seen_age = -1  # walked and failed, distinct from a real 0
             per_sport_stats[sport] = {
                 "quote_rows": len(quote_rows),
                 "grid_rows": int(result.get("rows_in") or 0),
+                # Stated on BOTH branches on purpose: a consumer that has to
+                # infer "swept" from the absence of a key cannot tell it from a
+                # payload written before this field existed.
+                "sweep_state": "swept",
+                "scheduled_games": int(
+                    ((enrichment.get("game_state") or {}) if isinstance(enrichment.get("game_state"), dict) else {}).get("chips")
+                    or 0
+                ),
+                "last_seen_keys": len(last_seen),
+                "cells_with_seen_age": cells_with_seen_age,
+                **({"last_seen_error": last_seen_error} if last_seen_error else {}),
                 # Visible on purpose: "rows_with_projection: 0" is the signal that
                 # #263 has regressed, and it is invisible from a row count.
                 "enrichment": enrichment,

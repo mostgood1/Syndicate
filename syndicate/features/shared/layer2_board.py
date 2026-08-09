@@ -501,6 +501,28 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                 candidate["game_state"] = game.get("state")
                 candidate["is_live"] = str(game.get("state") or "").strip().lower() == "live"
 
+            # #270. The sim's projected value for this market. Carried here
+            # explicitly rather than added to `_IDENTITY_FIELDS`, which is
+            # identity -- this is a FACT about the market, and widening the
+            # identity tuple to smuggle facts through is how that comment stops
+            # being true.
+            #
+            # `attach_projections` already stamps it on the grid row, and every
+            # sport's join agrees on the key (`wnba_projections.py:164`,
+            # `soccer_projections.py:291`, `prop_projections.py:712` all write
+            # `row["projection"]`). Nothing copied it onto the candidate, so the
+            # board's "Projected" fact had nothing to render even where the
+            # projection existed -- measured on production 2026-08-09, soccer
+            # carried 216 rows_with_projection and wnba 83, and `projection`
+            # appeared on zero served rows.
+            #
+            # Absent stays absent rather than becoming null: a missing
+            # projection is unknown, and the props pipeline distinguishes
+            # "no projection" from "projection of 0".
+            projection = row.get("projection")
+            if projection is not None:
+                candidate["projection"] = projection
+
             # Eligibility BEFORE scoring: a dead market should never be ranked,
             # and the gate is the one place that decision lives (#245).
             opportunity_gate.annotate(candidate, quote)

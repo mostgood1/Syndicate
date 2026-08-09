@@ -257,6 +257,72 @@ def _graded_rows_for_date(sport: str, date_str: str) -> list[dict[str, Any]]:
     return graded_rows_for_date(sport, date_str)
 
 
+def normalize_portfolio_event_identity(event: Mapping[str, Any]) -> dict[str, Any]:
+    """Make a logged bet joinable against graded rows. #297.
+
+    Lives next to `_evaluation_record_keys` deliberately: it exists only to
+    satisfy that extractor, and separating them is how the two drift apart.
+
+    A board row names teams `home_team`/`away_team` and the player
+    `player_name`. `_evaluation_record_keys` reads `home`/`away`/`team`/`player`
+    (among others). Those never collide, so a bet logged straight from a board
+    row contributes NO team or player value to its key set -- and
+    `_graded_row_keys` emits only `selection/player/team/home/away/title`, so
+    the intersection is empty and the record can never be settled. It logs 200
+    and dies silently weeks later, which is #258 returning through a new door.
+
+    Measured on production L2-A rows, 2026-08-09:
+        GAME row -> {event_id, market}   <- neither type is EVER emitted by a
+                                            graded row: unsettleable, always
+        PROP row -> {event_id, market, 'sonia citron'}   <- the player name is
+                                            the ONLY viable key
+
+    The join is on normalized VALUES, not key names, so the fix is to place the
+    names the grader also carries under the keys the extractor reads. Team and
+    player names are the shared vocabulary; `event_id` is not, because the
+    graded side has no event identifier at all (its MLB source carries
+    `game_pk`, a different namespace entirely -- see #299).
+
+    Deliberately NOT added: anything category-shaped. A market token like `h2h`
+    is shared by every row of that type, so adding it would let a record overlap
+    a graded row for a DIFFERENT game, pass `_markets_compatible` (same market),
+    and skip the line check (h2h has no line) -- a silently WRONG settlement,
+    which is worse than no match because it looks identical to a right one.
+
+    Non-destructive: only fills keys that are absent, so a caller that already
+    speaks the ledger's vocabulary is left alone.
+    """
+    out = dict(event)
+    recommendation = dict(out.get("recommendation")) if isinstance(out.get("recommendation"), Mapping) else None
+    target = recommendation if recommendation is not None else out
+
+    def _fill(key: str, value: Any) -> None:
+        text = str(value or "").strip()
+        if text and not str(target.get(key) or "").strip():
+            target[key] = text
+
+    home = target.get("home") or target.get("home_team") or out.get("home_team")
+    away = target.get("away") or target.get("away_team") or out.get("away_team")
+    _fill("home", home)
+    _fill("away", away)
+    _fill("player", target.get("player") or target.get("player_name") or out.get("player_name"))
+
+    # `team` is the side actually backed, which is what a graded row records for
+    # a game market. For a prop it is the player's team when known -- absent on
+    # every sport's prop rows today (#270), and that absence removes a JOIN key
+    # rather than a display field.
+    side = str(target.get("side") or out.get("side") or "").strip().lower()
+    if side == "home":
+        _fill("team", home)
+    elif side == "away":
+        _fill("team", away)
+    _fill("team", target.get("player_team") or out.get("player_team"))
+
+    if recommendation is not None:
+        out["recommendation"] = recommendation
+    return out
+
+
 def _evaluation_record_keys(record: Mapping[str, Any]) -> set[str]:
     recommendation = record.get("recommendation") if isinstance(record.get("recommendation"), Mapping) else {}
     keys = {
