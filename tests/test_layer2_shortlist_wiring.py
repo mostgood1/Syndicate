@@ -87,6 +87,13 @@ def _no_quality_floor(monkeypatch):
     # report stayed healthy. That reads exactly like a broken join and is in
     # fact the calendar. A wiring test must not depend on the day it is run.
     monkeypatch.setenv("SYNDICATE_SHORTLIST_STALE_KICKOFF_SECONDS", "0")
+    # #298's gate rule is the same hazard in a second place: it demotes a row
+    # whose kickoff has passed with no confirmed game state, and `_quote()`
+    # pins commence_time to a fixed past date while these fixtures attach no
+    # chip. Left on, every row here would be watchlist and these five tests
+    # would fail on every day after 2026-08-08 -- the identical calendar
+    # dependency the comment above documents. Disabled for the same reason.
+    monkeypatch.setenv("SYNDICATE_GATE_DEMOTE_UNKNOWN_GAME_STATE", "0")
 
 
 @pytest.fixture
