@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### LIST AUDIT 2026-08-09 (~20:40Z) — 10 IDs shipped and were never written here, and every "NOT DEPLOYED" note below is now false
+
+Full-list pass at the user's request: (1) is anything listed that no longer
+matters, (2) has anything earlier been forgotten. Both yielded. Read this
+before trusting a status line further down.
+
+**A. EVERY `NOT DEPLOYED` / `NOT YET VERIFIED` ANNOTATION BELOW IS STALE.**
+Both services deployed 2026-08-09 (worker `8ef48371` 19:49Z, web `04e41842`
+19:57Z, plus a later web deploy). Verified by `git merge-base --is-ancestor`
+against both live commits — all eight are DEPLOYED on both:
+
+| commit | item | said | actually |
+|---|---|---|---|
+| `9f8489f3` | `#266` both prop families graded zero | **NOT DEPLOYED** | deployed |
+| `e64283bf` | `#267` graded pitcher rows named the bucket | **NOT DEPLOYED** | deployed |
+| `b2d7e36f` | `#275` NFL grader read a directory nothing writes | **NOT DEPLOYED** | deployed |
+| `908f96d1` | `#265` pregame odds freeze never fired | DEPLOYED, **NOT VERIFIED** | deployed; verification still owed |
+| `3770e241` | `#273` NCAAF resolver | — | deployed |
+| `35254271` | `#274` NFL board week | — | deployed |
+| `1de982be` | `#271` NFL date-blindness | — | deployed |
+| `c9fbb736` | soccer sims | — | deployed |
+
+**Why this matters more than tidiness:** `#309` was mis-diagnosed today for
+exactly this reason — `17d4f203` was recorded "fixed, NOT DEPLOYED" and was in
+fact deployed *and* inert. **A deploy annotation is true only on the day it is
+written.** Do not trust one; run `git merge-base --is-ancestor <commit>
+<live-commit>` against the service that matters.
+
+**B. TEN IDs APPEAR IN COMMIT SUBJECTS AND IN NEITHER `todo.md` NOR
+`todo_closed.md`** — the `#71` check failing, measured across all commits since
+2026-08-05:
+
+- **From 08-05/08-06, ~4 days unrecorded:** `#223` (`1f6c27b9` identity-gap
+  measurement), `#225` (`5dd3632d` close the four gaps the counter named),
+  `#227` (`fc63965a` HR targets carried no market/player field), `#228`
+  (`b8c93bc7` last WNBA keyless rows), `#229` (`ed10dc9b` rails stop being a
+  data source), `#230` (`3bfba211` delete the prose scraper).
+- **From today:** `#298`/`#300` (`0071dbf9` an unknown game state must FAIL the
+  floor), `#303` (`4cf0f58a` burn attribution — withdrew the 19.4-day figure),
+  `#305` (`802b36a4` coordination corrections).
+
+`#303` is the one to act on. It carries a **measured** OddsAPI burn rate
+(216 credits / 35.6 min = 364 cr/h, sampled 5× on `observedAt` not read time)
+that **withdrew** an earlier 3.4×-above-norm alarm — the same clock hours now
+read 0.29× the 12-day norm. That bears directly on the 5M call budget and
+**exists only in a commit message.** Neither the claim nor its retraction is in
+this file.
+
+**C. SUPERSEDED TONIGHT — do not work `#308` as written.** `#308` says "156
+merged candidates become 0 promoted cards." Measured 20:04:24Z on the live
+worker: `LAYER2_SHORTLIST rows=145`, `CANDIDATE_POOL_READY count=590`,
+`BOARD_PUBLICATION_RESPONSE_READY candidate_count=590`. **The board promotes
+fine.** `STATE_PERSIST_BEGIN` never fires and no skip path logs a reason, so the
+persist is not being *skipped*, it is not being *reached*; the snapshot froze at
+19:38:57Z across 40 polls / 42 min. That is `#317`, and it — not promotion — is
+what empties the board.
+
+Also resolved tonight: the L2-A shortlist is **not** empty (145 rows), closing
+the "necessary but maybe not sufficient" caveat on the `SYNDICATE_BOARD_L2A_ENABLED`
+flag move.
+
+**D. RESERVED, STUBS OWED:** `#315` (the state loop's configured 60s interval
+vs its measured 15m35s cadence — a live board cannot run on a full-world
+recompute), `#316` (`SKIP_OVERSIZED_LEDGER_CHUNK`: four days' evaluation ledger
+chunks at 132MB–480MB against a 64MB ceiling — the feedback loop starved at its
+input), `#317` (the persist, lane running).
+
 ### #309 — FIXED AND DEPLOYED 2026-08-09. WNBA graded 0 rows because the grader read a different root than the producer writes. `17d4f203` is DEPLOYED AND INERT
 
 Full trace: `docs/ai_context/diagnosis_grader_coverage_wnba.md`.
