@@ -5076,15 +5076,39 @@ def read_combined_intelligence_response(
     # translated to fit the board rather than the board rewritten to fit L2-A.
     # That is what preserves the existing formatting.
     layer2_fallback_used = 0
-    if not merged_recommendations and board_l2a_fallback_enabled():
-        fallback_cards = _layer2_fallback_recommendations(requested_dates)
-        if fallback_cards:
-            merged_recommendations.extend(fallback_cards)
-            layer2_fallback_used = len(fallback_cards)
-
     contract_input = {"recommendations": merged_recommendations}
     board_contract = build_intelligence_board_contract(contract_input)
     combined = _promote_board_contract_cards({"board_contract": board_contract})
+
+    # #308. Gated on the PROMOTED BOARD being empty, not the merged pool.
+    #
+    # This was `if not merged_recommendations`, on the stated reasoning that
+    # "the legacy pool takes precedence the instant it produces a single
+    # candidate". That encoded an assumption about HOW the pool fails -- by
+    # producing nothing -- and it does not. Measured 2026-08-09 on
+    # /intelligence: candidate_count 156, recommendations [],
+    # layer2_fallback_rows ABSENT. The pool was full, the board was empty, and
+    # the guard read "pool healthy, stand down" at exactly the wrong moment. A
+    # guard whose trigger encodes an assumption about the failure mode is only
+    # as good as that assumption.
+    #
+    # Still ADDITIVE and never a replacement, and still self-retiring: a board
+    # that promotes even one card leaves the fallback dormant, so fixing #308
+    # switches this off without a revert. What changed is only WHICH emptiness
+    # is asked about -- the one the user actually sees.
+    if not (combined.get("top_opportunities") or []) and board_l2a_fallback_enabled():
+        fallback_cards = _layer2_fallback_recommendations(requested_dates)
+        if fallback_cards:
+            # Re-promote through the SAME contract rather than appending to the
+            # output: the normaliser owns ranking, dedupe and the card shape, so
+            # L2-A rows are translated to fit the board instead of the board
+            # being rewritten to fit L2-A. That is what preserves the existing
+            # formatting, and it is why this re-enters the pipeline here rather
+            # than pushing cards straight onto `combined`.
+            merged_recommendations.extend(fallback_cards)
+            layer2_fallback_used = len(fallback_cards)
+            board_contract = build_intelligence_board_contract({"recommendations": merged_recommendations})
+            combined = _promote_board_contract_cards({"board_contract": board_contract})
     combined["ranked_all"] = list(combined.get("top_opportunities") or [])
     combined["ok"] = True
     combined["selected_date"] = None

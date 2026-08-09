@@ -285,6 +285,55 @@ the same reason the lead kept hand-allocating after adopting the fix: **the
 broken mechanism was the one already in my hands.** Same shape, same evening,
 one message apart.
 
+### OPEN 2026-08-09 — `#308` 156 MERGED CANDIDATES BECOME 0 PROMOTED CARDS. **A FALLBACK NOW MASKS THIS — READ THIS BEFORE TRUSTING A RENDERING BOARD**
+
+**Written BEFORE the mask shipped, deliberately.** Once the board renders, the
+pressure to chase this disappears, and an unfixed defect behind a working
+surface is how it becomes permanent.
+
+Measured on `/intelligence` (the page that calls the combined path), 2026-08-09
+16:29Z, flag on, web live on `0071dbf9`:
+```
+candidate_count        156      <- merged_recommendations is NON-EMPTY
+recommendations        []       <- zero survive
+layer2_fallback_rows   ABSENT   <- the L2-A fallback did NOT fire
+```
+The drop is between `build_intelligence_board_contract(contract_input)` and
+`_promote_board_contract_cards(...)` (`pipeline/intelligence_state.py:5085-5087`).
+156 candidates go in, `top_opportunities`/`recommendations` come out empty.
+**Nobody has looked inside those two functions yet** — the measurement locates
+the drop, it does not explain it.
+
+**Do not measure this on `/api/intelligence/query`.** That endpoint's
+`candidate_count` comes from a DIFFERENT function (`:4238`), so its number and
+the merged population are unrelated — a `60` there says nothing about the `156`
+here. Two sessions read the wrong surface before this was noticed. Use
+`/intelligence`.
+
+**THE MASK, and how to tell it is masking:** the L2-A fallback now fires when
+the *promoted board* is empty rather than when the *merged pool* is empty, so
+the board renders from the L2-A shortlist while this defect is unfixed. The
+fallback is additive and never a replacement, and it is **named** in the
+payload:
+```
+state_meta.source = "combined_board_window+layer2_fallback"
+layer2_fallback_rows = <n>          <- present ONLY when the fallback fired
+```
+**So `layer2_fallback_rows` present on a normal day means `#308` IS STILL LIVE.**
+That is the monitor: this entry closes when the field stops appearing on a day
+the legacy pool should have produced a board, not when the board looks full.
+
+**Why the old gate never fired** — worth keeping, because the mistake is
+reusable. The fallback was gated `if not merged_recommendations`, with the
+stated reasoning that "the legacy pool takes precedence the instant it produces
+a single candidate, so fixing it automatically retires this path". That encodes
+an assumption about **how the pool fails** — by producing nothing. It does not.
+It produces 156 that are annihilated downstream, so the guard read "the pool is
+healthy, stand down" at the exact moment the board was broken. **A guard whose
+trigger encodes an assumption about the failure mode is only as good as that
+assumption**, and this one was wrong in the direction that makes the guard
+silent. Gate on the OUTPUT you care about, not the INPUT you expect to fail.
+
 ### OPEN 2026-08-09 — `#306` A STAGE THAT PRODUCES NOTHING MUST REPORT *WHY*, AND THE REASONS MUST NEVER RENDER IDENTICALLY
 
 **This is the pattern, not the counter.** Every hard bug this session was an

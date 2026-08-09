@@ -122,14 +122,47 @@ class PrecedenceTests(unittest.TestCase):
         having recovered."""
         self.assertIn("layer2_fallback", "combined_board_window+layer2_fallback")
 
-    def test_the_legacy_pool_takes_precedence_by_construction(self) -> None:
-        """The guard is `not merged_recommendations` -- a single legacy
-        candidate retires this path with no revert needed. Encoded here so the
-        precedence rule survives a refactor of the window builder."""
+    def test_the_fallback_is_gated_on_the_PROMOTED_board_not_the_merged_pool(self) -> None:
+        """#308. This test previously pinned the literal source of the OLD gate,
+        `if not merged_recommendations and board_l2a_fallback_enabled():`, and
+        it passed for exactly as long as the guard was wrong.
+
+        The guard encoded an assumption about HOW the legacy pool fails -- by
+        producing nothing. It does not. Measured on production: candidate_count
+        156, recommendations [], fallback never fired. The pool was full, the
+        board was empty, and the guard stood down.
+
+        So the rule being pinned is now the one that matters: the fallback asks
+        whether the board a user SEES is empty, not whether the pool that feeds
+        it is. Still self-retiring -- one promoted card leaves it dormant.
+        """
         import inspect
 
         source = inspect.getsource(state)
-        self.assertIn("if not merged_recommendations and board_l2a_fallback_enabled():", source)
+        self.assertIn('if not (combined.get("top_opportunities") or []) and board_l2a_fallback_enabled():', source)
+        self.assertNotIn(
+            "if not merged_recommendations and board_l2a_fallback_enabled():",
+            source,
+            "the input-gated guard is the #308 defect and must not come back",
+        )
+
+    def test_a_full_pool_that_promotes_nothing_still_fires_the_fallback(self) -> None:
+        """The #308 case itself, behaviourally rather than by source text: a
+        NON-empty merged pool whose cards all vanish in promotion must still
+        reach the fallback. Under the old gate this was the exact scenario that
+        left the board empty."""
+        promoted = {"top_opportunities": [], "recommendations": []}
+        with patch.object(state, "_read_single_date_response_for_combining",
+                          return_value={"by_sport": {"mlb": [{"pick": "x"}]}}), \
+             patch.object(state, "build_intelligence_board_contract", return_value={}), \
+             patch.object(state, "_promote_board_contract_cards", return_value=dict(promoted)) as promote, \
+             patch.object(state, "_layer2_fallback_recommendations", return_value=[{"pick": "l2a"}]) as loader, \
+             patch.object(state, "board_l2a_fallback_enabled", return_value=True):
+            state._COMBINED_INTELLIGENCE_RESPONSE_CACHE.clear()
+            state.read_combined_intelligence_response(dates=["2026-08-09"], sport="all")
+
+        loader.assert_called_once()
+        self.assertEqual(promote.call_count, 2, "the fallback must be re-promoted through the same contract")
 
 
 if __name__ == "__main__":
