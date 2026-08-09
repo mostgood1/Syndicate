@@ -323,6 +323,33 @@ layer2_fallback_rows = <n>          <- present ONLY when the fallback fired
 That is the monitor: this entry closes when the field stops appearing on a day
 the legacy pool should have produced a board, not when the board looks full.
 
+**THESE ARE TWO DIFFERENT FAILURES, NOT ONE INTERMITTENT ONE.** Treating them
+as one thing sent the investigation at a hypothesis built on the wrong half:
+```
+A: the pool DIES                candidate_count 0      observed 19:05Z
+B: the pool survives, board empty   156 -> 0           observed 16:29Z
+```
+**A is not evidence about B.** The warm-up hypothesis below was built on B; the
+19:05Z event is A, and it neither confirms nor refutes it. Any future reading
+must say which one it is, and `candidate_count` is the discriminator: zero means
+A, non-zero-with-an-empty-board means B.
+
+**Consequence for the fallback, and it is easy to bank wrongly:** the L2-A
+fallback fired for the first time at 19:05Z (`layer2_fallback_rows: 169`,
+`source: combined_board_window+layer2_fallback`, payload 31MB → 1.7MB) and the
+board held. **That is evidence the fallback works. It is NOT evidence the #308
+gate change was needed** — `candidate_count 0` means `merged_recommendations`
+was empty, which is precisely what the OLD input-gated guard fired on. It would
+have caught that save identically.
+
+**The gate change exists for B, and B has never fired in production.** The first
+real test of it is a combination nobody has yet observed:
+```
+candidate_count NON-ZERO  and  layer2_fallback_rows PRESENT
+```
+Until that pair is seen, the B path is untested — and banking 19:05Z as "the
+gate is proven" leaves it assumed-covered by an event that never exercised it.
+
 **INTERMITTENT, NOT CONSTANT — and this changes where to start.** Re-measured
 after `27a7e9df` deployed:
 ```
