@@ -258,6 +258,39 @@ arriving free on `us`. **Re-query the region→book mapping before anyone buys
 `us2`.** Not filed as a defect; recorded as a costed assumption that no longer
 holds.
 
+### Why only MLB has the wide grid — and what it does to fair value
+
+`[code]`. The env block above is set on **all three services**, yet only MLB
+returns `eu`/`us_ex` books. The reason is not policy:
+
+```
+12 OddsAPI fetchers in scripts/
+SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS / _game_line_regions appear in EXACTLY ONE
+  -> scripts/fetch_mlb_oddsapi_local.py:1564
+every other sport reads only the base list
+  -> live_refresh_loop.py:2711 and ops_refresh.py:1223, both defaulting to "us"
+```
+
+**The S0b split is a per-sport *implementation*, present once, not a per-sport
+scope.** The variable is configured platform-wide and read by one fetcher.
+
+**The consequence is the part that matters, and it is not about cost.** The
+`eu`/`us_ex` books are the **fair-value anchors** — `pinnacle`, `betfair_ex_eu`,
+`matchbook` — and they reach **MLB and no other sport**. The North Star's own
+stated follow-up to S0b is *"make `consensus_fair_probability` PREFER the sharp
+books, or Pinnacle/Betfair are three votes among thirty-eight."* **That work is
+structurally MLB-only until the extras are threaded into the other eleven
+fetchers**, because for wnba, soccer, nfl and the rest there is no sharp book in
+the pool to prefer. Their `no_vig_fair` is a consensus of US retail — and §2
+shows soccer reaching a two-sided consensus on only **10.3%** of rows to begin
+with.
+
+Not filed as a defect: nothing is broken and the scoping may be deliberate. But
+it is a **silent per-sport asymmetry in fair value**, and fair value is the input
+that every EV, edge, hold and arbitrage number downstream is computed against —
+so a cross-sport comparison of any of those is comparing a sharp-anchored MLB
+number against a retail-anchored one everywhere else.
+
 ### Cost — the 155% reading is real and the window is contaminated
 
 > **HEADLINE, so it is not quoted without its caveat: `projected_30d_credits =
@@ -885,6 +918,10 @@ So absence here is never read as evidence.
   structural or incident-inflated. The quota endpoint has no per-day breakdown.
 - **A fresh region→book query.** §1 shows §4d's map is stale from the *data*
   side; confirming it costs 1 credit per region against `/v4/sports/.../odds`.
+- **Whether the sharp-anchor asymmetry (§1) is deliberate.** Established that
+  only MLB's fetcher reads the game-line extras; **not** established whether
+  that was a choice or an unfinished rollout. That determines whether it is a
+  scoping decision to record or eleven fetchers to change.
 - **`#292`** — best-price vs retained book. Requires refresh-worker's disk.
 - **L2-B and L2-C row counts.** The endpoints exist and share the row.
 - **Whether a web-logged bet reaches refresh-worker's ledger** — needs a
