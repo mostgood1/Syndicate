@@ -1,5 +1,50 @@
 # Syndicate TODO — canonical cross-session list
 
+### OPEN 2026-08-09 — `#292` DOES SETTLEMENT GRADE AGAINST BEST PRICE OR THE ARBITRARY RETAINED BOOK? A validity question about the evaluation layer, not a settlement follow-up
+
+**Unmeasured. Highest-value open item from the `#275` lane, and rated by the
+lead above everything else outstanding.**
+
+What is established: settlement takes closing price from `odds_refresh_tracking`'s
+stamped `closing_price` when `build_market_history_view` reports
+`history_points > 0`, else it falls back to the graded row's own price.
+**Whether that stamp contains best-of-book or the arbitrary retained book was
+never measured, and whether it differs per sport is unknown.**
+
+**Why it outranks the rest:** the single-book capture defect was platform-wide
+across three classes (5 books fetched, 1 kept), and best-price re-grading already
+measured **+2.79 ROI points**. If the stamp is the retained book, **every
+cross-sport ROI number in this repo compares unlike with unlike** — including
+the ones that decided which models to keep. That makes it a validity question
+about the evaluation layer rather than a settlement question.
+
+**START AT THE WRITER, NOT AT SETTLEMENT.** Settlement only reads what
+`odds_refresh_tracking` stamped, so auditing the reader hunts a defect that
+lives upstream. Unowned; needs its own lane.
+
+### OPEN 2026-08-09 — `#293` BLUEPRINT-vs-LIVE CONFIG AUDIT (supersedes the mis-numbered `#281` on `70e60b55` / `2ddccb97`)
+
+**Claimed atomically — see the ID note below.** `scripts/blueprint_sync_preview.py`
+(`70e60b55`) and the refresh-worker tick-owner declaration (`2ddccb97`) were
+committed under `#281`, which was **already** the live-lens memory-gate entry
+(`86eb1271`). Those commits are not being amended; this heading is the record.
+
+Shipped: the preview gate, exit 1 when a sync would write anything. Run
+2026-08-09: **1 pending write across three services**
+(`SYNDICATE_MLB_REFRESH_TICK_OWNER` on refresh-worker), zero collateral.
+Remaining: push all three window-two commits together, then re-run the gate.
+
+> **ID NOTE — claimed by WRITING, not by asking, and that is the point.** Both
+> IDs above were taken by appending these stubs in the same commit that claims
+> them, after scanning `todo.md` + `todo_closed.md` for the highest in use (291).
+> **`#292` had been allocated by the lead hours earlier and existed only in
+> session messages — it appears nowhere in either file**, which is precisely the
+> failure mode that produced eight collisions tonight and two from central
+> allocation. An ID living in a session's memory is not allocated; it is
+> remembered. Claim and record must be the same write, or the allocator's view
+> goes stale between the read and the reply exactly as grepping did.
+
+
 ### 2026-08-09 (~01:00Z) — `#275` SETTLEMENT LANE CLOSED. Recommendation: **do not enable the autorun.** Four things remain open and are named here so they are not lost
 
 **The deliverable was a cost, not a survey, and it did not change across five
