@@ -23,10 +23,30 @@ a runaway:
 23:52  procs  9  refresh_odds  2
 23:59  procs 57  refresh_odds 24
 00:51  procs 75  refresh_odds 34    -> OOM (4Gi)
-
-OOM kills: 22:53:18, 00:26:17, 00:39:56, 00:51:29
-boot gaps: 14.1 min -> 11.6 min
 ```
+
+**EIGHT OOM kills in 82 minutes**, all `oomKilled` at 4Gi, all the same instance
+(`...-pfk9m`). I originally recorded three, because three were all I looked at:
+
+```
+23:29:45          <- 26 min AFTER the cancel fix went live at 23:03:34
+23:41:07  +11.4
+23:51:52  +10.8
+00:04:15  +12.4
+00:14:38  +10.4
+00:26:17  +11.7
+00:39:56  +13.7
+00:51:29  +11.6   <- last, then nothing
+```
+
+**The cadence is FLAT at ~11.6 min, not accelerating.** I reported "14.1 → 11.6,
+accelerating" from three points. Across eight intervals there is no trend. Three
+points read as a trend — the same too-few-samples error that produced the 5-sample
+live-lens median and the n=7 memory "peak" tonight. **Three lanes, three
+instruments, same mistake.**
+
+**COST: refresh-worker was effectively unavailable 23:29–00:51 during a live MLB
+slate.** Not degraded — dying every eleven minutes.
 
 **THE TICK IS INNOCENT — there is no launcher timer.** I described this as a
 "45-second retry cadence" for an hour and that framing implies a scheduler. There
@@ -68,19 +88,40 @@ The call returned exactly what was predicted, on both lanes:
 01:41  procs  5  refresh_odds  0   <- cancel lands HERE
 ```
 
-**The deploy did not stop it either** — it went live 23:03:34Z and OOMs
-continued at 00:26, 00:39, 00:51. What ended it at 00:51:30 is unknown. The
-fix is correct and tested regardless; an endpoint that refuses to cancel an
+**The deploy did not stop it either** — it went live 23:03:34Z and **all eight
+OOM kills followed it.** The fix was live for the entire crash loop. It is
+correct and tested regardless; an endpoint that refuses to cancel an
 already-dead run is backwards whatever happened tonight. But "this stopped the
 runaway" is not supported by the timeline and is not claimed.
 
+**ONE MECHANISM IS ELIMINATED, and the evidence is the cancel call itself.**
+At 01:41:26Z — **50 minutes after spawning stopped** — cancel found the manifest
+still `running` with a dead `pid 109` and had to drive it terminal. So the
+manifest was NOT terminal when the loop stopped, and **manifest resolution is
+excluded as the cause.** A call that failed to prove its own purpose produced a
+real elimination instead.
+
+Remaining candidates, both testable from artifacts rather than logs:
+- the **queued contract was consumed** (the claim had nothing left to re-claim)
+- the **spawned jobs began failing earlier** for an unrelated reason
+
+Note these are different mechanisms with identical appearance, and only the
+second leaves the loop able to recur unchanged.
+
 #### **NOT VERIFIED — that the loop is unbounded**
 
-I reported "not self-limiting, each OOM makes the next arrive sooner", and the
-boot gaps did tighten 14.1 → 11.6 min. **Then it stopped on its own and stayed
-stopped for 50 minutes.** If enough OOMs eventually clear the queued contract,
-the loop *is* eventually self-limiting — a materially weaker claim than the one
-I made. **Unresolved, and it changes how urgent `#282` is.**
+I reported "not self-limiting, each OOM makes the next arrive sooner" from three
+boot gaps. **Across eight intervals the cadence is flat at ~11.6 min with no
+trend, and then it stopped on its own and stayed stopped.** No deploy, no
+restart, no human action in the events between 00:39:56 and 00:51:29. If enough
+kills eventually exhaust the queued contract, the loop *is* eventually
+self-limiting — a materially weaker claim than the one I made. **Unresolved, and
+it changes how urgent `#282` is.**
+
+Worth recording precisely, because both readings were honest: "crash loop" was
+right when said, and the competing "one kill is not a loop" was right when *it*
+was said. The system changed under both. That is not a correction to either
+lane — it is a caution about asserting a regime from a snapshot.
 
 `refresh_status_by_lane` is empty from web, so the worker's manifest state
 cannot be read from outside. That is why this is unresolved rather than
