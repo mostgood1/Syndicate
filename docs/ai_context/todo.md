@@ -1744,7 +1744,7 @@ restart does not re-inject env vars. Window two, lead's call.
 
 ### 2026-08-08 (evening) — `#276` PUBLISH PATH: the transport was never broken. **The board is empty because an EMPTY board fits the keyvalue store and a GOOD one does not.**
 
-Two commits, both **COMMITTED, NOT DEPLOYED**: `a56d4c4c` (refresh failure
+Two commits, both ~~COMMITTED, NOT DEPLOYED~~ **DEPLOYED 2026-08-09** (list audit): `a56d4c4c` (refresh failure
 observability) and the publish-transport commit below. Neither touches the
 allowlist. **The thing actually blocking `ranked_all` is in
 `pipeline/intelligence_state.py` and I did not touch it** — it belongs to the
@@ -1955,7 +1955,7 @@ claim elsewhere in this file is wrong for that lane.
 - **A green test can assert nothing.** `with self.assertRaises(Exception):
   json.loads(raw)` passed because `json` was not imported and `NameError` is an
   `Exception`. Pin the exception type when the assertion IS the measurement.
-#### `#276` ADDENDUM — three more defects in this subsystem, all shipped. `e92f0529`, `6161ade3`, `a56d4c4c`. NOT DEPLOYED (window two)
+#### `#276` ADDENDUM — three more defects in this subsystem, all shipped. `e92f0529`, `6161ade3`, `a56d4c4c`. ~~NOT DEPLOYED (window two)
 
 **1. The repair pass could not see past the git checkout, and for soccer it never
 once asked for a real file.** `_missing_required_artifact_relative_paths` exists
@@ -2961,7 +2961,7 @@ graded outcomes (78%) on the one date with real coverage.** `official` is a
 and countable. Not changed here — it is a contract decision, not a bug — but it
 is the cheapest single lever on the settled rate and it costs no memory.
 
-#### `#275` CODE — the NFL grader read a directory nothing writes (`b2d7e36f`, committed, **NOT DEPLOYED**)
+#### `#275` CODE — the NFL grader read a directory nothing writes (`b2d7e36f`, ~~NOT DEPLOYED~~ **DEPLOYED 2026-08-09**, see the list audit at the top)
 
 Found while counting the ceiling, not while looking for it.
 
@@ -3674,7 +3674,7 @@ odds, edge, team (game lines) and state badge all correct. Whether that is an
 upgrade depends on what it replaces, and right now it replaces an EMPTY board
 (`ranked_all: []` on every date). Against nothing, it is an upgrade today.
 
-### 2026-08-08 (late) — #269 WNBA LIVE-LENS REGRESSION: FIXED, COMMITTED, **NOT DEPLOYED** (lead is batching one deploy)
+### 2026-08-08 (late) — #269 WNBA LIVE-LENS REGRESSION: FIXED, COMMITTED, ~~NOT DEPLOYED~~ **DEPLOYED 2026-08-09** (see the list audit at the top)
 
 **User report:** WNBA live-lens has regressed. Confirmed on the consuming
 surface, with a live game on the board:
@@ -3777,7 +3777,7 @@ WNBA cards suites (the publish hook rides inside `build_cards_page_context`).
 
 #### OPEN, and honest about it
 
-- **NOT DEPLOYED.** Nothing above is live. Deploy-ready; lead owns the batch.
+- ~~**NOT DEPLOYED.** Nothing above is live. Deploy-ready; lead owns the batch.~~ **DEPLOYED 2026-08-09** — see the list audit at the top.
 - **Residual staleness is bounded, not eliminated.** The published context can
   be up to `SYNDICATE_WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS` (default 900s) old,
   and scores come from it. It is *visible* now (`cards_context_age_seconds`)
@@ -4327,7 +4327,7 @@ api/...`) with **no top-level `manifests/`, `tracking/`, or `source_artifacts/`*
 
 ### 2026-08-08 (afternoon, ~21:00-21:30Z) — SOCCER `game.state`: FIXED, 0 → 300/300 rows. The nine-hypothesis chase was hunting a defect that did not exist
 
-**Code `f465edb4`, NOT DEPLOYED.** A concurrent-session `--amend` collision
+**Code `f465edb4`, ~~NOT DEPLOYED~~ DEPLOYED 2026-08-09** (list audit). A concurrent-session `--amend` collision
 mangled the commit messages here and was repaired; see the attribution note at
 the end for the method, which is worth reusing.
 
@@ -4571,7 +4571,7 @@ Across 9 recovered dates: **1,946 graded rows** (was 0), 1,025W/921L,
 ROI −6.49%. Settlement: **matched 0 → 64, would_settle 0 → 64** of 350
 settleable. First non-zero settlement this system has produced.
 
-#### #265 — the pregame odds freeze never fired (`908f96d1`, DEPLOYED, **NOT YET VERIFIED**)
+#### #265 — the pregame odds freeze never fired (`908f96d1`, DEPLOYED; **verification STILL OWED** as of 2026-08-09 — this is the one stale note the audit could not clear)
 
 `_freeze_oddsapi_pregame_markets` skipped any doc whose `mode` was `"live"`.
 **Every writer stamps `"mode": "live"`** (8 call sites, two modules); no
@@ -4611,7 +4611,7 @@ sweep is on a **2h cadence** (`_PREGAME_SWEEP_INTERVAL_FALLBACK`); last fire
 plausible, not fixed. The snapshot copy is allowlisted
 (`*_source/data/daily/snapshots/*/*.json`) so it IS visible from web.
 
-#### #266 — both prop families graded zero (`9f8489f3`, **NOT DEPLOYED**)
+#### #266 — both prop families graded zero (`9f8489f3`, ~~NOT DEPLOYED~~ **DEPLOYED 2026-08-09**, see the list audit at the top)
 
 **Hitters:** `_extract_report_hitter_predictions` resolved team and lineup
 status only via `_batter_side`, which needs `confirmed_lineup_ids` /
@@ -4636,7 +4636,7 @@ every date, and unlike the hitter path this one never read the pitcher odds
 file — model distributions with no lines to price against. Now falls back to
 `oddsapi_pitcher_props_*`.
 
-#### #267 — graded pitcher rows named the bucket, not the prop (`e64283bf`, **NOT DEPLOYED**)
+#### #267 — graded pitcher rows named the bucket, not the prop (`e64283bf`, ~~NOT DEPLOYED~~ **DEPLOYED 2026-08-09**, see the list audit at the top)
 
 With props grading, settlement still matched zero. Hitter rows carry a specific
 market; every pitcher row carried the generic bucket `pitcher_props` and kept
