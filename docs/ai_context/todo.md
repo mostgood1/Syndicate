@@ -71,7 +71,7 @@ revisiting deliberately, not sweeping. Tests: `tests/test_wnba_grader_root_per_f
 correct, `available: false` becomes attributable to the recon dependency instead
 of to the wrong directory, which is the point.
 
-### #310 — OPEN. The instrument built to diagnose this measured the wrong six files, and two dead `_has_files` helpers are why the fix took the shape it did
+### #310 — ANSWERED (probe run 2026-08-09 20:01Z). The instrument built to diagnose this measured the wrong six files, and two dead `_has_files` helpers are why the fix took the shape it did
 
 **`/api/ops/wnba/artifact-counts` was purpose-built for exactly the `#309`
 defect, and of the six files it checked, ONE (`props_recommendations`) is
@@ -208,8 +208,57 @@ frozen `status: Scheduled` observation above), the write side being armed change
 nothing, and an empty result must **not** be attributed to the thing that was
 just fixed.
 
-**NOT DEPLOYED TO WEB.** refresh-worker went live on `8ef48371` at 19:49:12Z
-(write side armed); web remains on `27a7e9df`, so the probe cannot answer yet.
+#### ANSWERED 2026-08-09 20:01Z — ROW 3. It is neither a visibility defect nor a recon-builder defect
+
+Both services current (web `04e41842` 19:57:12Z, refresh-worker `8ef48371`
+19:49:12Z — row-1 check passed before any number was read). Probe on
+`2026-08-07` **and** `2026-08-05`, identical on both:
+
+```
+recommendations       true      recon_games    false
+props_recommendations true      recon_props    false
+boxscores_present     FALSE  <- the discriminator
+```
+
+And the allowlist worked — the files are now visible, which is what makes the
+zero interpretable:
+
+```
+recon_*      37 files   latest 2026-06-26
+boxscores_*  548 files  525 distinct dates  2023-05-05 .. 2026-05-24
+neither exists for ANY date in the settlement window 07-19..08-08
+```
+
+Stable across 4 reads, 19:58–20:01Z, so this is a completed sweep and not a
+mid-publish snapshot.
+
+**VERDICT: the post-game leg stopped and never resumed. WNBA boxscore ingestion
+has produced nothing since `2026-05-24` — eleven weeks.** `_build_local_recon_*`
+returns `(0, None)` without `boxscores_{date}.csv`, so the recon builders have
+not been *reachable* since then, and the grader has had nothing to read. **The
+`#310` fix was necessary to see this and is not itself the cure**; `#309` is not
+the cure either. Both were prerequisites for the question being askable.
+
+Corroborated by the frozen `status: Scheduled` observation above — same leg, and
+it now has a date.
+
+**Two riders that fall out of the data:**
+
+- **`recon_props` continues to 06-26 while `boxscores` stop 05-24.** Those later
+  recon files therefore did **not** come from `_build_local_recon_*` (which
+  cannot run without boxscores) — they came from the copy / source-app-fallback
+  path. `SYNDICATE_WNBA_SOURCE_APP_FALLBACK = false` on both services, measured
+  2026-08-09 ~19:35Z. **Plausible cause of the second stoppage, NOT established**
+  — the flag's set-date was not measured, and one date is not a cause.
+- **`#309` is validated empirically, not just structurally.** The recon files are
+  split across BOTH roots by era — `recon_props_2026-05-20..25` at
+  `wnba_source/data/processed`, `recon_props_2026-05-27..06-26` and all four
+  `recon_games_*` at `.../source_artifacts/data/processed`. **No single-root
+  choice could ever have found both sets.** Per-requested-file resolution is
+  load-bearing for this sport's real history, not a defensive nicety.
+
+**`#310` closes.** The remaining work — why boxscore ingestion stopped on
+2026-05-24 — is `#314`'s question and needs its own owner.
 
 ### #285 — OPEN. The worker's retained memory is NOT in the Python object graph, and `HEAP_CENSUS` cannot see 93% of it
 
