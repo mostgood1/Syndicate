@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### 2026-08-08 (22:32–01:41Z) — `#279` A FIX THAT WORKED, AND THE RUNAWAY IT CAUSED. Four OOMs, and the honest label on each claim
+### 2026-08-08 (22:32–01:41Z) — `#279` NINE OOM KILLS ENDED BY SOMETHING NOBODY HAS IDENTIFIED. A fix that worked, a runaway it caused, and one claim we cannot make
 
 **Read the labels. Three of the claims below are verified by measurement and
 two are explicitly NOT, and the difference is the point of the entry.**
@@ -25,11 +25,15 @@ a runaway:
 00:51  procs 75  refresh_odds 34    -> OOM (4Gi)
 ```
 
-**EIGHT OOM kills in 82 minutes**, all `oomKilled` at 4Gi, all the same instance
-(`...-pfk9m`). I originally recorded three, because three were all I looked at:
+**NINE OOM kills in 82 minutes**, all `oomKilled` at 4Gi, all the same instance
+(`...-pfk9m`), **every one of them AFTER the cancel fix went live**. I first
+recorded three, oversight found eight, the WNBA lane found the ninth (23:14).
+**Three people converged on three different numbers by each reading a
+different truncated window** — the count itself needed triangulating:
 
 ```
-23:29:45          <- 26 min AFTER the cancel fix went live at 23:03:34
+23:14:xx          <- first, 11 min after the fix went live at 23:03:34
+23:29:45
 23:41:07  +11.4
 23:51:52  +10.8
 00:04:15  +12.4
@@ -40,7 +44,7 @@ a runaway:
 ```
 
 **The cadence is FLAT at ~11.6 min, not accelerating.** I reported "14.1 → 11.6,
-accelerating" from three points. Across eight intervals there is no trend. Three
+accelerating" from three points. Across the nine-kill series there is no trend. Three
 points read as a trend — the same too-few-samples error that produced the 5-sample
 live-lens median and the n=7 memory "peak" tonight. **Three lanes, three
 instruments, same mistake.**
@@ -100,6 +104,14 @@ still `running` with a dead `pid 109` and had to drive it terminal. So the
 manifest was NOT terminal when the loop stopped, and **manifest resolution is
 excluded as the cause.** A call that failed to prove its own purpose produced a
 real elimination instead.
+
+**A SECOND, INDEPENDENT ARGUMENT AGAINST "a cancel ended it".** The pre-fix
+dead-PID branch *did* write `state="failed"` while returning `ok:false` — so a
+22:41Z call genuinely terminalised the default-lane manifest, **two hours before
+the stop, and the loop ran through it for another nine kills.** A real
+terminalisation on that lane did not stop this. Complete cancel history for the
+night: three calls ~22:41Z (all pre-fix), then nothing until 01:41:26Z. **A
+three-hour gap straddling the 00:51:30 stop.**
 
 Remaining candidates, both testable from artifacts rather than logs:
 - the **queued contract was consumed** (the claim had nothing left to re-claim)
