@@ -683,7 +683,7 @@ non-zero count followed by a `PUBLISH_OK` rather than a 502. For `#318` it is
 "web stops dying every 14 minutes", which is user-visible on its own and
 independent of whether any board ever renders.
 
-### #319 — The publish flood is not merely "retracted", it is MEASURED INNOCENT: 154 publishes/min sat FLAT, and every spike landed on a minute with request-path compute. Envelope receive hardened anyway (`ops.py`), NOT DEPLOYED and NOT AN OOM FIX
+### #319 — The publish flood is not merely "retracted", it is MEASURED INNOCENT: 141–168 publishes/min sat FLAT, while a board/home render preceded a spike 2/2. Envelope receive hardened anyway (`ops.py`), NOT DEPLOYED and NOT AN OOM FIX
 
 **Status: measured, arrived at independently and in parallel with `#318`'s
 retraction of the same claim. `#318` owns the web OOM. This item owns the
@@ -695,20 +695,44 @@ number that closes the publish-flood theory for good — a retraction leaves
 Web `srv-d88ahvrbc2fs73eodu30`, instance `-454rz`, 2026-08-09. Requests counted
 from web's own access log; memory from `/v1/metrics/memory`.
 
-| minute | mem (MiB) | publishes | `book-grid`/`market-board` | verdict |
+| minute | mem (MiB) | publishes | board/home render | verdict |
 |---|---|---|---|---|
-| 20:43 | 745 → 748 | **154** (+10 export, +13 stream) | 0 | **flat** |
-| 20:44 | 748 | 132 | 0 | flat |
-| 20:45 | 749 | 110 | 0 | flat |
-| 20:47 | **1784** → reboot 20:47:26 | **24** | 3 | **spike** |
-| 20:55 | **1602** → restart | **24** | 2 | **spike** |
-| 21:08 | 434 | **168** — highest in the window | 0 | flat |
+| 20:43 | 745 → 748 | **154** (+10 export, +13 stream) | none | **flat** |
+| 20:44 | 748 | 132 | none | flat |
+| 20:45 | 749 | 110 | none | flat |
+| 20:47 | **1784** → reboot 20:47:26 | **24** | yes (+17 `compute in request path`) | **spike** |
+| 20:55 | **1602** → restart | **24** | yes (+15 `compute in request path`) | **spike** |
+| 21:08 | 434 | **168** — highest in the window | none | flat |
 
-**The correlation with publishes is negative.** The heaviest artifact minute in
-the whole window (177 requests, zero app-log lines) did not move memory 3 MiB.
-Both spikes landed on the two lowest non-zero publish minutes, and both carry
-`WARNING: compute in request path` (17 and 15 occurrences) — `#318`'s lead, with
-a control behind it now.
+**The correlation with publishes is negative.** The heaviest artifact minute
+(177 requests, zero app-log lines) did not move memory 3 MiB. Both spikes
+landed on the two lowest non-zero publish minutes.
+
+**Replicated on a fresh window, 21:12–21:42, which I had not looked at when the
+above was written.** Renders counted by `BETTING_PAYLOAD_READ` /
+`MLB_GAME_MARKET_ROWS_DIAG`, one pair per `/api/home`-class render:
+
+```
+min     MiB  publish  render        min     MiB  publish  render
+21:14   475      112       0        21:27   441      137       0
+21:16   483       53      17        21:29   467       71       0
+21:17   461       49      16        21:30   467      126      16
+21:18  1679       62       0  SPIKE 21:31  1631       94       0  SPIKE
+21:21   337      141       0        21:33  1674       24       0  (plateau)
+21:24   418      114       0        21:38  1677        8       0  (plateau)
+```
+
+**A render precedes a spike 2/2; the 28 minutes with no render produced no
+spike; and 141 and 137 publishes/min are flat.** Note the spike then *plateaus*
+at ~1650 MiB for eleven minutes on almost no traffic — it does not come back
+down, which is the ratchet `#318` needs `memory_unreclaimable_mb` to classify.
+
+> **A correction to my own first pass, made before this was committed:** I had
+> written `/api/board/book-grid` as the discriminator. The 21:18 spike has no
+> `book-grid` and no `compute in request path` line at all — it has an
+> `/api/home` render at 21:17:18. The class is **any board/home render in the
+> request path**, not that one endpoint. `book-grid` was the most visible
+> member of the class in the first window I happened to open.
 
 > **State the window:** publish-per-minute counts are valid for **20:42–21:10
 > only**. Earlier minutes read `0` in my first sweep because backward
