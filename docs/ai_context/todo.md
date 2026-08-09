@@ -1,5 +1,114 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-08 (22:32–01:41Z) — `#279` A FIX THAT WORKED, AND THE RUNAWAY IT CAUSED. Four OOMs, and the honest label on each claim
+
+**Read the labels. Three of the claims below are verified by measurement and
+two are explicitly NOT, and the difference is the point of the entry.**
+
+#### VERIFIED — the soccer sim fix works
+
+`SOCCER_HISTORY_SEED_BOOTSTRAPPED` fired at 22:28:02 across all ten leagues,
+and **eredivisie simulated and persisted across four consecutive samples**
+where every prior measurement had it dying inside one. `a03c2cfb` +
+`c9fbb736` together fixed a sim that had produced nothing for nine of ten
+leagues for weeks. **That result should not be buried under the incident it
+triggered.**
+
+#### VERIFIED — my fix converted a latent defect into a live one
+
+Sims doing real 145s work instead of dying in 2s turned a harmless respawn into
+a runaway:
+
+```
+23:52  procs  9  refresh_odds  2
+23:59  procs 57  refresh_odds 24
+00:51  procs 75  refresh_odds 34    -> OOM (4Gi)
+
+OOM kills: 22:53:18, 00:26:17, 00:39:56, 00:51:29
+boot gaps: 14.1 min -> 11.6 min
+```
+
+**THE TICK IS INNOCENT — there is no launcher timer.** I described this as a
+"45-second retry cadence" for an hour and that framing implies a scheduler. There
+is none. `_has_pending_external_contract` (`run_refresh_worker.py:1311`) re-claims
+any manifest that is `running` + `queue_state: queued` + no live pid, and spawns
+another job. **Every tick faithfully executed a truthful instruction derived from
+stale state.** That is why three restarts changed nothing: *reboots clear
+processes, not state.*
+
+Generalised, and worth carrying: **a component faithfully executing a truthful
+instruction derived from stale state is indistinguishable from a malfunctioning
+one — except that restarting it does nothing.** That last clause is the
+diagnostic.
+
+#### VERIFIED — `cancel` refused to cancel, in two ways
+
+```
+no pid recorded     -> raised "No running refresh PID is recorded"
+pid recorded, dead  -> set state=failed but returned ok=False
+```
+
+The first declined to act on the one manifest that needed it. **The second is
+the one that cost an hour**: it did the right thing and reported it as a
+failure, so `{"ok": false, "detail": "Recorded PID is not running.", "pid": 609}`
+read as "still uncancelled" while the state change had in fact happened. Fixed
+in `35407b9d` (code) + `c8419c7c` (tests), deployed 23:03:34Z. Both branches now
+drive the manifest terminal; the claim-loop gate requires `running`, so terminal
+stops the re-claiming.
+
+#### **NOT VERIFIED — that the cancel fix stopped this runaway**
+
+The call returned exactly what was predicted, on both lanes:
+`{"ok":true,"pid":109,"state":"failed"}`. **But it landed at 01:41:26Z and
+`refresh_odds_sources` had been at ZERO since 00:53** — 48 minutes earlier.
+
+```
+00:51  procs 75  refresh_odds 34   <- last OOM
+00:53  procs  5  refresh_odds  0
+01:41  procs  5  refresh_odds  0   <- cancel lands HERE
+```
+
+**The deploy did not stop it either** — it went live 23:03:34Z and OOMs
+continued at 00:26, 00:39, 00:51. What ended it at 00:51:30 is unknown. The
+fix is correct and tested regardless; an endpoint that refuses to cancel an
+already-dead run is backwards whatever happened tonight. But "this stopped the
+runaway" is not supported by the timeline and is not claimed.
+
+#### **NOT VERIFIED — that the loop is unbounded**
+
+I reported "not self-limiting, each OOM makes the next arrive sooner", and the
+boot gaps did tighten 14.1 → 11.6 min. **Then it stopped on its own and stayed
+stopped for 50 minutes.** If enough OOMs eventually clear the queued contract,
+the loop *is* eventually self-limiting — a materially weaker claim than the one
+I made. **Unresolved, and it changes how urgent `#282` is.**
+
+`refresh_status_by_lane` is empty from web, so the worker's manifest state
+cannot be read from outside. That is why this is unresolved rather than
+answered, and it is its own gap.
+
+#### STILL OPEN
+
+- **A real concurrency bound in the claim path.** The actual defect. Nothing
+  bounds how many claims run at once; `cancel` only cleans up after.
+- **`#282` per-league grouping** (user-directed): one job = one league-date
+  instead of ~7, cutting steady-state overlap ~6x. **Bounds the damage, does not
+  remove the defect** — both are needed.
+- **No way to read worker manifest state from web**, which is what made the
+  self-limiting question unanswerable.
+
+#### THE METHOD LESSON, which is the same one four times tonight
+
+Every wrong call I made had the identical shape: **a sound argument about the
+wrong variable.** The env change that couldn't work because a 4h timer can't
+produce a 45s cadence. The "blocked on observability" entry built on a correct
+zero-`STEP_FAIL` measurement whose inference was backwards. The grader "blocker"
+read off a stale local mirror. The firing decision I argued for on *timing* while
+never asking what the load *was*.
+
+**I caught the fourth one before anyone acted on it.** That is the only
+improvement I can claim, and it came from asking "what would have to be true for
+this to be wrong?" rather than from being more careful.
+
 ### 2026-08-08 — #278 BOTH WORKERS RUN THE MLB ODDS SWEEP. `render.yaml` says one should.
 
 **`SYNDICATE_MLB_REFRESH_TICK_OWNER` does not exist in production, on either
