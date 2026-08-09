@@ -1307,12 +1307,20 @@ class OpsRefreshApiTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
+            # `#310`: the endpoint now asks the WNBA module for its own roots
+            # rather than resolving them from `ops.py`'s `__file__`, because
+            # `repo_root_from` is hardcoded to `parents[3]` and `ops.py` is only
+            # two packages deep -- from there it resolved the local-mirror
+            # candidates to the directory ABOVE the repo and every file read
+            # `exists: false`. So the patch target is the name as BOUND IN
+            # `wnba.sources` (it does `from ... import preferred_artifact_roots`
+            # at module load, so patching the source module is a no-op here).
             with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
-                "syndicate.features.shared.source_roots.preferred_artifact_roots",
+                "syndicate.features.wnba.sources.preferred_artifact_roots",
                 return_value=[fake_root],
             ), patch(
                 "syndicate.features.wnba.sources.processed_root",
-                return_value=processed,
+                return_value=processed.resolve(),
             ):
                 response = self.client.get(
                     "/api/ops/wnba/artifact-counts?date=2026-07-13",
@@ -1332,6 +1340,64 @@ class OpsRefreshApiTests(unittest.TestCase):
         self.assertTrue(top_by_game_entries[0]["exists"])
         self.assertEqual(top_by_game_entries[0]["data_rows"], 0)
         self.assertFalse(results["props_recommendations_2026-07-13.csv"][0]["exists"])
+
+    def test_wnba_artifact_counts_reports_grader_readiness(self) -> None:
+        """`#310`. This endpoint was purpose-built to diagnose WNBA grading a
+        zero and checked six files of which exactly ONE (`props_recommendations`)
+        is something the grader reads -- both `recon_*` files, which gate
+        `{"available": False}` and therefore decide whether anything is graded at
+        all, were absent from the list. "0 of 6 families" was a true measurement
+        of the wrong six files, and `17d4f203` was built on it.
+
+        The grader reads two GATED PAIRS (`live_lens_local.py:347,480`); either
+        side missing yields zero rows. `boxscores` is the recon builders' own
+        precondition, so present-boxscores + absent-recon is a PRODUCER defect
+        and is distinguishable here from simply missing inputs.
+        """
+        with TemporaryDirectory() as tmp_dir:
+            fake_root = Path(tmp_dir) / "wnba_source"
+            processed = fake_root / "data" / "processed"
+            processed.mkdir(parents=True, exist_ok=True)
+            # The real production shape: recommendations and boxscores land,
+            # recon does not.
+            for name in (
+                "recommendations_2026-07-13.csv",
+                "props_recommendations_2026-07-13.csv",
+                "boxscores_2026-07-13.csv",
+            ):
+                (processed / name).write_text("a,b\n1,2\n", encoding="utf-8")
+
+            with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False), patch(
+                "syndicate.features.wnba.sources.preferred_artifact_roots",
+                return_value=[fake_root],
+            ), patch(
+                "syndicate.features.wnba.sources.processed_root",
+                return_value=processed.resolve(),
+            ):
+                response = self.client.get(
+                    "/api/ops/wnba/artifact-counts?date=2026-07-13",
+                    headers={"X-Admin-Token": "secret-token"},
+                )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+
+        # The grader's real inputs are checked at all -- they were not before.
+        for name in ("recon_games_2026-07-13.csv", "recon_props_2026-07-13.csv"):
+            self.assertIn(name, payload["results"])
+            self.assertIn(name, payload["grader_input_files"])
+
+        readiness = payload["grader_readiness"]
+        self.assertTrue(readiness["games"]["recommendations"])
+        self.assertTrue(readiness["props"]["props_recommendations"])
+        self.assertFalse(readiness["games"]["recon_games"])
+        self.assertFalse(readiness["props"]["recon_props"])
+        # Either side of a pair missing => not gradeable.
+        self.assertFalse(readiness["games"]["gradeable"])
+        self.assertFalse(readiness["props"]["gradeable"])
+        # The discriminator: the builders had their precondition and produced
+        # nothing, which is a different defect from missing inputs.
+        self.assertTrue(readiness["boxscores_present"])
 
     def test_ops_page_requires_admin_token(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):

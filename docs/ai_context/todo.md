@@ -44,6 +44,13 @@ false` for 08-05/06/08 — the `{"available": False}` early return, i.e. 0 rows.
 variant. **nba and nhl are correct by construction.** `17d4f203` was right to
 scope to WNBA and wrong about why.
 
+> **DO NOT EXTEND THIS TO NCAAB.** The statement above covers nba and nhl only,
+> because those are the two branches of `current_odds_root_for_sport` that were
+> read. NCAAB's `preferred_source_roots(...)[0]` use is a separate site, is
+> **not** covered by this finding, and stays open. Named explicitly because
+> "correct by construction" is exactly the kind of sentence a later reader
+> generalises one sport too far.
+
 **A different lane found this 2026-08-01 and worked around it** rather than
 fixing it: `cards.py:3878` documents the exact defect, and
 `_game_cards_keyvalue_path` hardcodes the other root outright. Every WNBA
@@ -107,11 +114,11 @@ that env var is absent, and there it reports a confident, uniform *"everything i
 missing"* from the endpoint someone reaches for to find out what is missing.
 Fixed for the three WNBA endpoints by asking the WNBA module for its own roots.
 
-> **RIDER, NOT TAKEN — other lanes' sports.** `repo_root_from`'s `parents[3]` is
-> also wrong for `features/intelligence.py` (depth 2) and the three
-> `features/football/ingestion/*` modules (depth 4). Not swept: masked wherever
-> an env var is set, and a sweep is how a fix for one sport becomes an outage for
-> another. Needs its own owner and its own measurement.
+> **RIDER — allocated as `#313`, NOT TAKEN HERE.** `repo_root_from`'s
+> `parents[3]` is also wrong for `features/intelligence.py` (depth 2) and the
+> three `features/football/ingestion/*` modules (depth 4). Not swept: masked
+> wherever an env var is set, and a sweep is how a fix for one sport becomes an
+> outage for another. Needs its own owner and its own measurement.
 
 **Dead code removed.** `_has_files()` was defined in **both**
 `preferred_source_roots` and `preferred_artifact_roots` and **called in neither**
