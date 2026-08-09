@@ -2082,7 +2082,29 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     daily_paths = _intelligence_state_daily_paths(content_date or today_iso)
     state_meta = dict(normalized.get("state_meta") or {})
     live_pipeline = dict(normalized.get("live_pipeline") or {})
-    board_snapshot_payload = _intelligence_board_snapshot_payload(normalized)
+    # #317. Compacted for the SAME reason `persisted` is, and it was not.
+    # `_compact_state_for_persist` was wired into the state payload below and
+    # never into this one, so board_snapshot crossed the keyvalue boundary
+    # carrying every duplicate the state payload had already shed. Measured on
+    # production 2026-08-09 23:29:11Z, one cycle after the board_contract alias
+    # deployed:
+    #
+    #   board_snapshot.json  size_bytes=31,433,352  max_bytes=8,388,608   (3.7x)
+    #     under=response  top_opportunities 6,423,157
+    #                     recommendations   6,423,157
+    #                     board_contract    6,420,391
+    #                     by_sport          5,606,951
+    #                     top_live_opps     2,279,021
+    #
+    # Three of those five are the SAME candidate list, and the alias rules that
+    # collapse them had simply never been applied to this payload. That is why
+    # the board built 259 candidates at 23:22:08Z and served zero: computed
+    # correctly, refused at the transport, every cycle.
+    #
+    # Note this is additive to the sibling write's compaction, not a substitute:
+    # they are different payloads (`_intelligence_board_snapshot_payload` reshapes
+    # `normalized`), so each needs its own pass.
+    board_snapshot_payload = _compact_state_for_persist(_intelligence_board_snapshot_payload(normalized))
     # #43: shrink before crossing the keyvalue boundary. Redis closed the
     # connection on the full ~8.9MB payload, discarding a correctly computed
     # board every cycle. See _compact_state_for_persist.
@@ -5332,7 +5354,11 @@ def _latest_non_empty_intelligence_board_snapshot_response(payload: dict[str, An
         candidate_paths.append(path)
 
     for path in candidate_paths:
-        snapshot = read_json_file(path)
+        # #317. Same pairing as the primary reader above. This is the FALLBACK
+        # path, which makes it the easier one to miss and the worse one to get
+        # wrong: it runs precisely when the primary read failed, so an
+        # unexpanded alias here would surface only during an incident.
+        snapshot = _expand_persisted_state(read_json_file(path))
         if not isinstance(snapshot, dict):
             continue
         decorated = _decorate_intelligence_board_snapshot_response(snapshot, requested_date=requested_date, source_label="board_snapshot_latest", strict_date=False, requested_sport=requested_sport)
@@ -5346,7 +5372,13 @@ def read_latest_intelligence_board_snapshot_response(payload: dict[str, Any] | N
     requested_sport = _requested_sport_from_payload(payload)
     _ = force_refresh
     snapshot_path = _intelligence_state_read_path("board_snapshot", BOARD_SNAPSHOT_PATH)
-    snapshot = read_json_file(snapshot_path)
+    # #317. MUST pair with the compaction now applied to this payload on write.
+    # Without it the aliases resolve to nothing and every consumer receives
+    # `{"__alias_of__": "recommendations"}` where it expects a card list -- a
+    # board that looks populated and renders garbage, which is strictly worse
+    # than the empty one this is fixing. Tolerates un-aliased payloads, so
+    # snapshots written before the compaction still read correctly.
+    snapshot = _expand_persisted_state(read_json_file(snapshot_path))
     if isinstance(snapshot, dict):
         decorated = _decorate_intelligence_board_snapshot_response(snapshot, requested_date=requested_date, source_label="board_snapshot", strict_date=False, requested_sport=requested_sport)
         if isinstance(decorated, dict):
