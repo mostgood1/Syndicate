@@ -1,5 +1,98 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-09 (~01:00Z) — `#275` SETTLEMENT LANE CLOSED. Recommendation: **do not enable the autorun.** Four things remain open and are named here so they are not lost
+
+**The deliverable was a cost, not a survey, and it did not change across five
+rounds of evidence.** What changed is that every number under it is now one I
+measured rather than inherited.
+
+```
+~1,436 MB   to read production's largest ledger chunk (367MB, 2026-08-05)
+ ~1,600 MB   refresh-worker floor          2,357 MB  its recurring peak
+ ~3,596 MB   lethal
+    4.6 s   per settled record, end-to-end, BRANCH ASSERTED
+```
+
+Fits against the floor with 535MB spare, goes **197MB over lethal** against the
+peak — and it is a 10–45 minute occupation, so it must miss *every* excursion.
+
+**THE FINDING WITH THE MOST LEVERAGE: the index, not the chunk, is the entire
+per-record cost.**
+
+```
+chunk_mb   index_mb   s/record
+  100.7      21.8       4.604
+   50.3      21.8       4.694   <- chunk HALVED, no change
+   50.3       2.2       0.727   <- index /10, 6.5x faster
+```
+
+`#254` streamed the readers, `#256` streamed `_read_chunk_records` and
+`_replace_ledger_line`, the ledger-bloat work compacted the chunks — **three
+rounds of optimisation, all aimed at the file that turned out not to matter.**
+Hoisting the index round trip out of the per-record loop is ~100× on the
+dominant term and is a hard prerequisite, not an optimisation.
+
+**State the cost as capacity, never as a projection:** duration =
+`4.6 s × (however many settle)`, so a 10-minute pass affords ~130 settled records
+against ~9,000 per date. That form makes the decision **without a conversion
+rate**, which is why it survived two retractions that killed every rate-based
+version.
+
+#### SHIPPED
+
+| | |
+|---|---|
+| `b2d7e36f` | `#273` NFL grader read a directory nothing writes — and a path-only fix would have persisted 49 phantom pushes |
+| `52bf5243` `2472cbb8` | `scripts/settlement_cost_preflight.py`, read-only |
+| `bac6f762` | `render.yaml` claimed settlement was ON; second key would have run it 4×/day |
+| `25d72d8d` | ledger-index size reported from the one service that can see it |
+| `9fe01882` | `#284` "pushing to main ships nothing" is true of CODE, false of CONFIG |
+| `70e60b55` | `#281` `scripts/blueprint_sync_preview.py` — gate before any `render.yaml` push |
+| `2ddccb97` | `#281` refresh-worker declared a NON-owner of the MLB sweep — **held for window two** |
+
+#### STILL OPEN — four things, in value order
+
+1. **Does settlement grade against BEST price or the arbitrary retained book,
+   and does it differ per sport?** Unanswered. All that is established: closing
+   price comes from `odds_refresh_tracking`'s stamped `closing_price` when
+   `history_points > 0`, else the graded row's own price. **Whether that stamp is
+   best-of-book was never measured.** The single-book capture defect was
+   platform-wide and best-price re-grading already measured **+2.79 ROI points**
+   — so this decides whether every cross-sport ROI number compares like with
+   like. Larger than anything else in this lane.
+2. **The chunk-index hoist.** Scoped for window two as a prerequisite.
+3. **Production index size is still unmeasured.** `25d72d8d` reports it but is
+   undeployed, so the dominant term rests on a 21.8MB *test* index. Note
+   `?names_only=1` (`0175df58`) does **not** help here — verified, neither
+   `evaluation_ledger_chunks/index.json` nor the chunks are allowlisted, so no
+   HTTP route reaches them at any size. The log probe is the only route.
+4. **The 438-row ceiling is stale in the favourable direction.** WNBA's
+   `processed_root()` fix (`17d4f203`) is undeployed; re-run the per-sport count
+   after. No estimate offered.
+
+#### METHOD — the two that generalise
+
+**A fixture can select a cheaper code path than production and the failure
+presents as a GOOD result.** `_is_chunked_ledger_path` returns True only for the
+module-level `DEFAULT_LEDGER_PATH`, so any temp ledger takes the FLAT branch and
+falls through to `_append_jsonl` — measuring an append while believing you
+measured a rewrite. **80× more favourable, which is exactly why nothing invited
+suspicion.** A wrong number that looks bad gets investigated; one that looks good
+gets published. The harness now asserts the branch by line count (a rewrite keeps
+it identical, an append raises it) and refuses to report without it. And
+`_read_ledger_records_for_date`'s own docstring warned about this — a correct,
+prominent, recent warning that failed to fire when the situation arose.
+
+**A rate borrowed from another lane broke this lane's published numbers TWICE**
+— a 17× error from a stale-mirror claim, then an 18.2% conversion rate carried
+into a commit message within the hour, *after* writing the rule about it.
+Vigilance did not work; three sessions broke the same rule including its author.
+**What worked was designing the borrowed number out of the conclusion.** Where a
+contested figure can be removed from a claim, that beats remembering to check it.
+Corollary adopted across lanes: **put the n IN the number** — `216/date (n=1)`
+survives paraphrase, "though that's one date" does not.
+
+
 ### 2026-08-09 (early) — WNBA lane close-out: `#280` flag split + the `[0]` question ANSWERED, and the settlement lane's `(c)` is FIXED
 
 Two commits, neither deployed, both window two.
