@@ -5122,20 +5122,36 @@ class IntelligenceStateService:
                 # state's own board_snapshot write already uses this same
                 # helper (#105); this path -- reached via _persist_locked, not
                 # that function -- was the one still missing it.
-                _write_state_payload(
-                    BOARD_SNAPSHOT_PATH,
+                # #317. THIS is the write that actually runs on the live loop,
+                # and it was the one still uncompacted. Four commits added
+                # aliasing to `write_latest_intelligence_state`'s board_snapshot
+                # write at :2249 and every one of them was inert, because the
+                # background loop reaches board_snapshot through _persist_locked
+                # instead. Measured 2026-08-10 01:01:18Z on the deploy that
+                # supposedly fixed this:
+                #
+                #   board_contract 8,073,892 | top_live_opportunities 8,072,869
+                #   top_opportunities 8,019,382 | recommendations 8,019,382
+                #   by_sport 4,531,059                       total 30,137,809
+                #
+                # top_opportunities and recommendations byte-identical in size
+                # and neither aliased -- the signature of compaction never
+                # having run, not of it running and failing.
+                #
+                # The comment above records the same lesson one layer down:
+                # this path was ALSO the last to get _write_state_payload's size
+                # fallback. Two independent fixes have now had to be applied
+                # here separately after being applied at :2249 first. If a third
+                # is ever needed, extract the pair into one helper rather than
+                # patching this site again.
+                compacted_board_snapshot = _compact_state_for_persist(
                     {
                         "latest_key": latest_snapshot.key,
                         **board_snapshot_payload,
-                    },
+                    }
                 )
-                _write_state_payload(
-                    daily_paths["board_snapshot"],
-                    {
-                        "latest_key": latest_snapshot.key,
-                        **board_snapshot_payload,
-                    },
-                )
+                _write_state_payload(BOARD_SNAPSHOT_PATH, compacted_board_snapshot)
+                _write_state_payload(daily_paths["board_snapshot"], compacted_board_snapshot)
             except Exception as exc:
                 # _write_state_payload itself never raises (it swallows and
                 # logs its own ARTIFACT_FALLBACK_FAILED) -- this remains as a
