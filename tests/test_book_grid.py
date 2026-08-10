@@ -13,7 +13,11 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from syndicate.features.shared.book_grid import book_grid_summary, build_book_grid
+from syndicate.features.shared.book_grid import (
+    book_grid_summary,
+    build_book_grid,
+    freshest_rows_for_grid,
+)
 
 NOW = datetime(2026, 8, 7, 20, 0, 0, tzinfo=timezone.utc)
 
@@ -282,3 +286,84 @@ def test_widest_rows_come_first():
         rows.append(_quote(event_id="wide", selection="home", price=-110, bookmaker=book))
     grid = build_book_grid(rows, now=NOW)
     assert grid[0]["event_id"] == "wide"
+
+
+# ---------------------------------------------------------------------------
+# `#331` -- the streaming reduction that lets the worker pivot a 217MB shard.
+#
+# These are equivalence tests, not behaviour tests: `freshest_rows_for_grid`
+# claims the reduced stream produces the IDENTICAL grid, so the only thing worth
+# asserting is that it does. Both failure modes below were real -- each produced
+# a grid of the right length, with the right total byte size, and different
+# contents. Counts and sizes cannot catch this class; only comparison can.
+# ---------------------------------------------------------------------------
+
+
+def _reduced_grid(rows):
+    return build_book_grid(freshest_rows_for_grid(iter(rows)), now=NOW)
+
+
+def test_reduction_drops_a_quote_that_is_neither_anchor_nor_freshest():
+    # The only rows droppable are the strictly-superseded middle ones: the FIRST
+    # observation is kept because it may anchor the line, the LAST because it is
+    # the price the grid shows. Everything between is what the 478,782 -> 41,233
+    # reduction on the real shard is made of.
+    rows = [
+        _quote(bookmaker="a", snapshot_ts="2026-08-07T18:00:00Z", price=-105),
+        _quote(bookmaker="a", snapshot_ts="2026-08-07T18:30:00Z", price=-115),
+        _quote(bookmaker="a", snapshot_ts="2026-08-07T19:00:00Z", price=-110),
+    ]
+    kept = freshest_rows_for_grid(iter(rows))
+    assert [r["snapshot_ts"] for r in kept] == [
+        "2026-08-07T18:00:00Z",     # anchor
+        "2026-08-07T19:00:00Z",     # freshest
+    ]
+    assert build_book_grid(rows, now=NOW) == _reduced_grid(rows)
+
+
+def test_reduction_preserves_the_anchor_row_not_just_the_freshest():
+    # The regression that made 972 of 5,547 production rows differ. The row that
+    # ESTABLISHES a line is usually not the freshest row for its cell, and
+    # `market_sides_for_quote` gathers sides using the anchor's own line and
+    # selection -- so dropping the anchor silently re-anchors the market.
+    rows = [
+        _quote(market="spreads", selection="home", line=-1.5, bookmaker="a",
+               snapshot_ts="2026-08-07T18:00:00Z", price=-110),
+        _quote(market="spreads", selection="away", line=1.5, bookmaker="a",
+               snapshot_ts="2026-08-07T18:01:00Z", price=-110),
+        _quote(market="spreads", selection="home", line=-1.5, bookmaker="a",
+               snapshot_ts="2026-08-07T19:00:00Z", price=-125),
+    ]
+    assert build_book_grid(rows, now=NOW) == _reduced_grid(rows)
+
+
+def test_reduction_preserves_file_order():
+    # Returning kept rows in first-seen order rather than file order permuted
+    # 2,006 of 5,547 production rows at IDENTICAL total byte length.
+    rows = [
+        _quote(market="totals", selection="over", line=8.5, bookmaker="a",
+               snapshot_ts="2026-08-07T18:00:00Z"),
+        _quote(market="totals", selection="under", line=8.5, bookmaker="b",
+               snapshot_ts="2026-08-07T18:05:00Z"),
+        _quote(market="totals", selection="over", line=8.5, bookmaker="a",
+               snapshot_ts="2026-08-07T19:30:00Z"),
+        _quote(market="totals", selection="over", line=9.5, bookmaker="c",
+               snapshot_ts="2026-08-07T18:02:00Z"),
+    ]
+    kept = freshest_rows_for_grid(iter(rows))
+    # The kept rows must be a SUBSEQUENCE of the input, in input order -- not
+    # merely the same set. Order decides which row anchors each line.
+    positions = [rows.index(row) for row in kept]
+    assert positions == sorted(positions)
+    assert build_book_grid(rows, now=NOW) == _reduced_grid(rows)
+
+
+def test_reduction_drops_priceless_rows_the_grid_would_drop_anyway():
+    rows = [_quote(price=None, bookmaker="a"), _quote(price=-110, bookmaker="b")]
+    assert len(freshest_rows_for_grid(iter(rows))) == 1
+    assert build_book_grid(rows, now=NOW) == _reduced_grid(rows)
+
+
+def test_reduction_of_an_empty_stream_is_an_empty_grid():
+    assert freshest_rows_for_grid(iter([])) == []
+    assert _reduced_grid([]) == []

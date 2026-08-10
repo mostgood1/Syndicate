@@ -157,6 +157,84 @@ def _freshest_per_book_side(rows: Iterable[Mapping[str, Any]]) -> dict[tuple[str
     return freshest
 
 
+def freshest_rows_for_grid(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse a change-log stream to only the rows the grid can still use.
+
+    WHY (`#331`). `build_book_grid` retains every priced row in `instances`
+    until the pivot finishes, so peak memory scales with QUOTE EVENTS rather
+    than with markets. Measured 2026-08-09 (MLB, 217MB shard, 478,782 rows):
+    the whole-shard pivot peaks at 1,334MB. refresh-worker plateaus at
+    2.65-2.70GB of 4GB, so that spike does not fit -- and the book-grid tick
+    runs every 10 minutes. `#241` is the standing reminder of what periodic
+    worker work that does not fit costs (a ~3-minute restart loop).
+
+    The reduction is lossless FOR THIS CONSUMER, which is the only claim being
+    made. The grid reads each market instance through `_freshest_per_book_side`,
+    which keeps exactly one row per (book, side) -- the most recently observed.
+    So any strictly-older row for an identical (instance, line, book, side) is
+    already discarded downstream, and dropping it here changes nothing except
+    when it is dropped.
+
+    Keyed on the RAW `line` string rather than `_canonical_line`, deliberately:
+    a finer key can only ever retain more rows, so a normalisation difference
+    degrades to keeping a redundant row instead of silently dropping an anchor.
+
+    Ties resolve last-wins (`>=`), matching `_freshest_per_book_side` exactly --
+    a `>` here would pick the other row of a same-timestamp pair and make the
+    two paths disagree on precisely the rows this function claims are equivalent.
+
+    Priceless rows are dropped because `build_book_grid` drops them itself.
+    Rows with an empty book or side are KEPT: the grid's grouping pass does not
+    filter them, and one can still be the anchor that establishes a line.
+
+    FILE ORDER IS PART OF THE CONTRACT, and this is not a detail. `build_book_grid`
+    anchors on the FIRST row of a group carrying a given canonical line, so the
+    order rows arrive in selects which row anchors, which line the row reports,
+    and therefore which cells and staleness flags come out. Returning rows in
+    first-seen order instead of file order changed 2,006 of 5,547 grid rows at
+    identical byte length when this was first written -- a permutation, silent
+    in every count and every size check. The kept rows are re-sorted into their
+    original positions so the reduced stream is a SUBSEQUENCE of the full one.
+
+    ANCHORS ARE RETAINED SEPARATELY, and this is the subtle half. `build_book_grid`
+    picks one anchor per distinct `_canonical_line` in a group, and passes it to
+    `market_sides_for_quote`, which gathers that market's sides using THE ANCHOR'S
+    own line and selection. So the anchor is not just a starting point -- it
+    decides which rows count as sides. The freshest row for a cell is very often
+    NOT the first row to establish that line, so keeping only freshest rows
+    silently re-anchors 972 of 5,547 rows. Keeping the first-in-file row per
+    (instance, canonical line) as well makes the original anchor available at its
+    original position, and the anchor loop then selects exactly what it did before.
+    """
+    freshest: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
+    anchors: dict[tuple[str, ...], tuple[int, dict[str, Any]]] = {}
+    for index, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            continue
+        if _price(row.get("price")) is None:
+            continue
+        instance = tuple(str(row.get(field) or "") for field in _INSTANCE_FIELDS)
+        materialised = row if isinstance(row, dict) else dict(row)
+        key = instance + (
+            str(row.get("line") or ""),
+            str(row.get("bookmaker") or "").strip(),
+            str(row.get("selection") or "").strip(),
+        )
+        current = freshest.get(key)
+        if current is None or _observed_at(row) >= _observed_at(current[1]):
+            freshest[key] = (index, materialised)
+        anchor_key = instance + (str(_canonical_line(row)),)
+        if anchor_key not in anchors:
+            anchors[anchor_key] = (index, materialised)
+
+    # Union by original position: a row that is both an anchor and a freshest
+    # cell must appear once, not twice, or the grid sees a duplicate quote.
+    kept: dict[int, dict[str, Any]] = {index: row for index, row in freshest.values()}
+    for index, row in anchors.values():
+        kept.setdefault(index, row)
+    return [kept[index] for index in sorted(kept)]
+
+
 def build_book_grid(
     rows: Iterable[Mapping[str, Any]],
     *,

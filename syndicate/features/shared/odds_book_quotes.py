@@ -55,7 +55,7 @@ import os
 from collections import OrderedDict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Iterator, Mapping
 
 from syndicate.features.shared.refresh_state_store import data_root
 
@@ -599,6 +599,41 @@ def _book_quotes_cache_key(path: Path) -> tuple[str, int, int] | None:
     except Exception:
         return None
     return (str(path), stat.st_mtime_ns, stat.st_size)
+
+
+def iter_book_quotes(sport: str, date_str: str) -> Iterator[dict[str, Any]]:
+    """Stream a shard's rows one at a time. NOT cached, by design (`#331`).
+
+    `read_book_quotes` returns -- and caches -- the whole list, which is right
+    for callers that scan a shard repeatedly inside one request. It is wrong for
+    the book-grid pivot: that reads a shard ONCE per tick, and holding 478,782
+    parsed dicts (measured 2026-08-09, MLB) costs ~1.3GB that the cache then
+    keeps alive afterwards.
+
+    Yielding leaves peak memory to whatever the CONSUMER retains, so pairing
+    this with `freshest_rows_for_grid` bounds the pivot by market count instead
+    of by quote-event count.
+
+    Partial reads are not swallowed. A transient IO error mid-file raises here
+    rather than silently ending the iteration, because a short read that looks
+    like a complete one would make a truncated board indistinguishable from a
+    quiet one -- the same failure `read_book_quotes` avoids by not caching a
+    partial result.
+    """
+    path = book_quotes_path(sport, date_str)
+    if not path.is_file():
+        return
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                parsed = json.loads(line)
+            except Exception:
+                continue
+            if isinstance(parsed, dict):
+                yield parsed
 
 
 def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
