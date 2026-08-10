@@ -272,6 +272,31 @@ would still have gone green — via disk.
 **The existing backlog drains on its own** (every key carries the 2-day TTL), or
 immediately via `POST /api/ops/keyvalue/expire-run-artifacts?dry_run=0`.
 
+#### VALIDATED — the reclaim landed and evictions stopped
+
+`/api/ops/keyvalue/diagnostics` + `/usage`, straddling the
+`expire-run-artifacts?dry_run=0` call (5,198 keys, every one already carrying
+the 2-day TTL, so this only accelerated a scheduled expiry):
+
+```
+15:18:38  used=247.92M (96.8%)  keys=7010  evicted=38865  migration_runs=209.91MB/5258
+15:23:24  used= 40.70M (15.9%)  keys=1808  evicted=38865  migration_runs=  2.82MB/60
+```
+
+**96.8% -> 15.9%, and `evicted_keys` frozen at 38,865 across the window** — the
+count is the discriminator, not the percentage: a falling percentage could just
+be a quiet minute, but eviction is what silently deletes a board, and it stopped.
+
+The 60 residual keys are `skipped_recent` (< 6h). They stop accruing once
+refresh-worker carries `aa13805d` — it is a `launch_refresh_run` caller, and
+there is argv-level proof it writes the bucket (`--run-summary-path
+.../migration_runs/2026-08-11/odds_refresh_20260810_150413/...`, 15:04Z).
+live-odds-worker, the dominant writer, is already on it via `5ea6aabd`.
+
+**Not claimed: that this fixes a zero board.** It removes eviction as a *cause*.
+`#285` owns the pool, and with `#317`/`#322` putting the payload on the wire at
+812KB, a recurrence now has one fewer suspect rather than none.
+
 #### RETRACTED: my "the Render logs `text` filter is unreliable" caveat was wrong
 
 **I wrote that the filter returns lines not containing the search string. It
@@ -1924,6 +1949,12 @@ it now has a date.
 2026-05-24 — is `#314`'s question and needs its own owner.
 
 ### #285 — ARENA CAP MET THE SUCCESS TEST at T+29 (4/4 boards, 0 guard latches). Trim-only result below; the open question is now plateau-vs-later-crossing
+
+> **Provenance:** this entry was written by the `#285` lane but landed on
+> `origin/main` inside `#324`'s commit `3f9cf183` — another instance of the
+> shared-tree staging race (a file staged between one lane's
+> `git diff --cached` check and its `git commit`). Content is unaltered;
+> only the attribution is wrong. Do not re-commit it.
 
 **`cb3946a2` (`mallopt(M_ARENA_MAX, 2)`) live on refresh-worker 2026-08-10T14:53:17Z,
 verified applied: `MALLOC_ARENA_INIT {"applied": true, "rc": 1, "max_arenas": 2,
