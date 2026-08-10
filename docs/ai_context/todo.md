@@ -274,6 +274,36 @@ trip and has printed none. > ## ROOT CAUSE, measured 2026-08-10 20:2xZ. **THE AB
 > mechanism.** Recording the three excluded branches so the next person starts
 > where I stopped rather than re-walking them.
 
+> ## THE STRUCTURAL NUMBER behind all of the above, and it reframes `#285`
+>
+> ```
+> _OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000 MB   on a 4096 MB container
+>   -> the overview may only run when 73.2% of the container is FREE
+>   -> everything else on this service must fit in 1,096 MB
+> ```
+>
+> **The board build is gated on a condition that is only comfortably true just
+> after a boot.** That is the mechanism behind "every good board this week was
+> built in the first 15 minutes of a boot", and it is why this presented as a
+> board defect rather than a memory one. The margin is **2.5%** (74.7 MB on a
+> 3,000 MB floor, measured 21:05:31Z), so it OSCILLATES rather than latching --
+> 55 aborts in 105 minutes pre-reboot and 0 in 29 minutes post-reboot are both
+> honest readings of one system sitting on a boundary.
+>
+> **Which makes the inert rate limiter the CHEAPER target than `#285`'s ~725MB.**
+> The hydrated rebuild is what the floor is sized against -- MLB alone measured
+> +2.9GB in 73s. Winning back 725MB of ratchet treats the symptom; making the
+> limiter fire removes the demand. Neither has been attempted, and the limiter
+> is the smaller change.
+>
+> **Do not size that floor from `container_memory_mb`.** `headroom_mb` is NOT
+> `max - current`: `memory_headroom_snapshot` adds reclaimable page cache back
+> (`#79 step 2`), because cgroup v2's `memory.current` counts evictable file
+> cache the kernel drops rather than OOM-killing over. Measured 21:05:31Z: raw
+> 1,832.7 + reclaimable 1,242.0 = effective 3,074.7. So that series is ~55%
+> evictable cache; **`anon` (1,011.7 MB) is the number that predicts both an
+> abort and an OOM.** Same trap as `project_memory_current_is_page_cache`.
+
 > **The instrument is landed and NOT deployed.** Its author landed it in
 > `c2f0434e` (`BOARD_OVERVIEW_READY`, `BOARD_RAW_CANDIDATES`) and said plainly
 > that it "lost the race" — the root cause was found by another route first, so
