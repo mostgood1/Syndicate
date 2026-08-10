@@ -788,6 +788,25 @@ Peak anon is 995 MiB against a 2048 limit — the margin is real but it is
 headroom, not immunity, and `#319` measured a board/home render preceding a
 memory spike 2/2.
 
+**Residual, sharpened by an independent sample sweep 14:04Z–15:00Z (`#317`'s
+lane, re-derived rather than taken from the reading above).** The anon figure
+is not flat, and the shape says which risk this is:
+
+```
+14:04:09   918.6      14:58:43    949.9      <- baseline drift, +31 MB / 55 min
+14:48:00   936.5      14:59:11   1016.8      <- spike begins
+14:58:33   942.1      14:59:50   1056.0      <- +106 MB in ~90s
+                      15:00:02   1034.1      <- partially recedes
+```
+
+**The spike recedes, so this is request-driven working memory, not a pure
+leak** — which is the more actionable finding, because it means the peak scales
+with slate size. Observed peak is 51.8% of the limit **on a 2-game evening**;
+2026-08-09's six kills happened on a full slate. `#285`'s arena cap plausibly
+made this survivable rather than absent. The baseline drift is too small and
+too short a window to call a leak — say so, and re-measure on a busy slate
+before anyone concludes the margin holds.
+
 **The measurement that stops the guessing.** Web, 2026-08-09T21:00:47Z, seconds
 before an `oomKilled` at a 2GiB limit:
 
