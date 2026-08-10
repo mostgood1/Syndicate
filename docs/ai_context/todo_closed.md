@@ -16,6 +16,45 @@ work takes the next free number (see the counter at the top of `todo.md`).
 
 ---
 
+## Closed 2026-08-10 — the board that computed and never landed, and the OOM nobody could diagnose (`#317`, `#318`)
+
+| # | What shipped |
+|---|---|
+| `#317` | **The intelligence board computed correctly every cycle and reached production never.** The brief this started from said `STATE_PERSIST_BEGIN` never fires and therefore the persist "is not being reached" — false. It fired (`candidate_count=150`, 20:09:16Z), and `write_latest_intelligence_state` ran to completion. The board died one layer lower, on **both** transports at once: keyvalue refused it on size (`27,638,247` bytes against an `8,388,608` ceiling) and the artifact fallback got `HTTP Error 502` because web was OOM-cycling. `board_snapshot*.json` failed one step earlier still, at `SKIP_NOT_ALLOWLISTED` — **deliberately**, and it must stay that way (`artifact_publisher.py`: web's only reader consults keyvalue, never disk, so allowlisting it would push 33.5MB/cycle at a file nothing reads). **Why empty boards wrote and good ones did not: size was the discriminator** — the two snapshots that did land (19:23Z, 19:38Z) both carried `candidate_count: 0`, and a zero-candidate payload fits. Fixed under `#322` by compressing the payload rather than aliasing it (aliasing was played out at ~13MB; what remained was not duplicated): `14,286,066 → 811,656` bytes at 313 candidates. |
+| `#318` | **Web OOM-killed every ~14 minutes on a 2GiB limit — 18 `server_failed` between 2026-08-09T02:40Z and 2026-08-10T03:46Z** — and nothing on the service could say why: `CONTAINER_MEMORY` reported `memory_current_mb 1877.1 / 91.7%` next to a `PROCESS_TREE_MEMORY` reading `self_rss_mb 189.1, child_count 0`, with **1.7GB unattributed** and no way to split reclaimable page cache from anonymous. `_read_container_memory_stat()` had read `anon`/`inactive_file` since `#79` and `memory_headroom_snapshot` already used it; it was simply never wired into the line people read. Now it is. |
+
+**Commits.** `7cceb781` (`memory_observability.log_container_memory` emits `memory_anon_mb` / `memory_inactive_file_mb` / `memory_reclaimable_mb` / `memory_unreclaimable_mb` / `memory_unreclaimable_pct_of_max`; absent keys stay **absent**, not `0`, so an unparseable cgroup cannot read as "plenty of room"; +2 tests, `tests/test_memory_observability.py` 10 passed). `04ab001d`, `93fae5a8`, `b975c26b`, `aad29190` (findings and two retractions). The `#317` cure itself is `#322`'s (`ef3f6a2b`, `863ecd59`, `2f6dcece`); the OOM recovery is most likely `cb3946a2` (`#285`, glibc arena cap).
+
+**Verified in production 2026-08-10T15:0xZ**, refresh-worker `cb3946a2` / web `d25b1aaa`:
+
+```
+KEYVALUE_WRITE_REJECTED   0   in 13:30-15:30Z      (was: every cycle)
+STATE_PERSIST_BEGIN      30   in 13:30-15:30Z, incl. candidate_count=150
+snapshot_generated_at         2026-08-10T10:06:31-05:00, advancing (was frozen 42 min)
+top_opportunities_count     150  (was 0)
+/api/home                   200  (was 000/502)
+web server_failed             0  in the ~11h since the 03:46:49Z deploy
+```
+
+The `kvrej=0` reading is only meaningful *because* `persist=30` with a populated
+`150` accompanies it — `kvrej=0` with `persist=0` would mean nothing was
+attempted, not that anything succeeded. That pairing was the stated success test.
+
+**Instrument confirmed live, not merely shipped** — `git merge-base --is-ancestor 7cceb781 d25b1aaa` → true, and it is emitting.
+
+**Three wrong root causes were published on `#318` before the right method was
+applied**, all by the same lane, all retracted in the file rather than deleted:
+the worker's `artifacts/export` pulls; a small-file publish flood; and page
+cache. The publish-flood claim carried byte counts and source IPs, which made it
+*read* rigorous — it failed on a missing concurrency denominator
+(`WEB_CONCURRENCY=2 × GUNICORN_THREADS=4` is **8** request slots, not 60) and on
+coverage (publishes preceded 5 of 6 kills; the 6th had zero traffic and landed
+during `bootstrap_data_root`, i.e. was a crash-loop echo, so the six kills were
+never six independent data points). `#319` later measured the flood **innocent**
+outright. The surviving lessons are promoted to `todo.md`'s Operational notes.
+
+Full writeups in `todo.md`'s git history (this file's entries as of `aad29190`).
+
 ## Closed 2026-08-05 — WNBA CI test-order pollution + empty-slate message mismatch (`task_b4637457`)
 
 | # | What shipped |

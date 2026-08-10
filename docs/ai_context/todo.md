@@ -960,209 +960,14 @@ namespace.
 safe in a value-intersection join; `h2h` is shared by every row of that type, so
 a record would match a graded row for a **different game**.
 
-### #318 — RESOLVED 2026-08-10, and **not by this lane**. Instrument `7cceb781` DEPLOYED in `d25b1aaa` and emitting; the OOM stopped. Web OOMed every ~14 min and nothing on the service could say why: `CONTAINER_MEMORY` reported 91.7% next to a 189MB process and could not split the two
+### `#317` / `#318` — CLOSED 2026-08-10, archived to `todo_closed.md`
 
-**Post-deploy readings, web `d25b1aaa` (deployed 2026-08-10T03:46:49Z), taken 14:50Z:**
-
-```
-server_failed since deploy : 0     (was: every ~14 min)
-oomKilled since deploy     : 0
-instance -rszpz            : 661 consecutive minute-samples, one instance, no restart
-anon high-water            : 995 MiB of 2048 (49%)
-```
-
-The instrument now answers the question it was written for — the split that
-`memory_pct_of_max` alone could never give:
-
-```
-CONTAINER_MEMORY  memory_current_mb 1227.9  = memory_anon_mb 936.5
-                                            + memory_inactive_file_mb 239.5 (reclaimable 287.3)
-```
-
-**Do not read this as "`7cceb781` fixed the OOM." It cannot have.** It is an
-observability change with no behaviour change, and it shipped inside
-`d25b1aaa` alongside several lanes' work — `cb3946a2` (`#285`, cap glibc
-arenas) is an anon-ratchet fix and is the far likelier cause. Attributing the
-recovery here would be banking a success against the wrong cause. What this
-entry can claim is narrow and real: **the split now exists, so the next
-regression is diagnosable instead of guessable.**
-
-**Residual, not closed:** `/api/home` still takes ~40s to return its 1.45MB.
-Peak anon is 995 MiB against a 2048 limit — the margin is real but it is
-headroom, not immunity, and `#319` measured a board/home render preceding a
-memory spike 2/2.
-
-**Residual, sharpened by an independent sample sweep 14:04Z–15:00Z (`#317`'s
-lane, re-derived rather than taken from the reading above).** The anon figure
-is not flat, and the shape says which risk this is:
-
-```
-14:04:09   918.6      14:58:43    949.9      <- baseline drift, +31 MB / 55 min
-14:48:00   936.5      14:59:11   1016.8      <- spike begins
-14:58:33   942.1      14:59:50   1056.0      <- +106 MB in ~90s
-                      15:00:02   1034.1      <- partially recedes
-```
-
-**The spike recedes, so this is request-driven working memory, not a pure
-leak** — which is the more actionable finding, because it means the peak scales
-with slate size. Observed peak is 51.8% of the limit **on a 2-game evening**;
-2026-08-09's six kills happened on a full slate. `#285`'s arena cap plausibly
-made this survivable rather than absent. The baseline drift is too small and
-too short a window to call a leak — say so, and re-measure on a busy slate
-before anyone concludes the margin holds.
-
-**The measurement that stops the guessing.** Web, 2026-08-09T21:00:47Z, seconds
-before an `oomKilled` at a 2GiB limit:
-
-```
-CONTAINER_MEMORY     memory_current_mb 1877.1  memory_pct_of_max 91.7
-PROCESS_TREE_MEMORY  self_rss_mb 189.1  child_count 0
-```
-
-**1.7GB is unattributed to any process.** `memory.current` counts clean page
-cache the kernel drops before it OOM-kills anything, so 91.7% is consistent
-with a runaway leak *and* with a container that is merely warm. Nothing on web
-could tell them apart — and that is why this item produced **two wrong root
-causes in one hour** (see the retraction in `#317`). `#285` is the same trap on
-refresh-worker and its lesson never reached web.
-
-`7cceb781` wires `_read_container_memory_stat()` — which has read
-`anon`/`inactive_file` since `#79`, and which `memory_headroom_snapshot`
-already uses — into `log_container_memory`, the line people actually read.
-Additive; absent keys stay **absent**, not `0`, so an unparseable cgroup cannot
-read as "plenty of room". `python -m pytest tests/test_memory_observability.py`
-→ **10 passed**.
-
-**Read `memory_unreclaimable_mb` on the next boot before proposing any fix.**
-Everything below is a lead, not a cause, and stays that way until that number
-exists.
-
-#### Six kills, and they are not six independent events
-
-All on instance `-454rz`, all `oomKilled {"memoryLimit": "2Gi"}`: 20:09:18,
-20:30:39, 20:47:11, 20:55:19, 21:02:11, 21:18:25. Intervals 21m, 16m, 8m, 7m,
-16m — **not trending**, so not a slow leak.
-
-But the 21:02:11 kill lands **during `bootstrap_data_root: Syncing …
-mlb_source/source_artifacts`**, 28s after gunicorn booted from the previous
-kill. `SYNDICATE_BOOTSTRAP_ON_START=1`, so **every kill pays a heavy artifact
-re-sync on the way back up**, and a boot-time OOM re-triggers it. At least one
-of the six is a crash-loop echo, not a fresh cause. Do not quote "six kills" as
-six data points.
-
-#### Leads, unranked and unproven
-
-- **`WARNING: compute in request path` fired ~24 times in one minute** on web
-  (`request_path_guard`), immediately before the 21:02 kill. That is the
-  load-bearing architectural rule in `CLAUDE.md` being violated in production,
-  and it is a warning rather than a refusal.
-- **Large synchronous response bodies on user traffic**:
-  `/api/board/book-grid?sport=mlb&date=2026-08-09&limit=600` → **3,872,635
-  bytes**; `/wnba/api/source/cards` → 740,071. Real browser traffic on
-  `/market-board`, i.e. a user was on the site during the kills.
-- The publish flood — **retracted as a cause**, see `#317`. Kept only so nobody
-  re-derives it.
-
-#### Deploy-readiness
-
-`7cceb781` is instrumentation only: two files, +91 lines, no behaviour change,
-one extra procfs read per already-instrumented stage. Safe to deploy on its
-own and **worth deploying first** — every other candidate fix here is
-unfalsifiable without it. It does not stop the OOMs and must not be reported as
-if it did.
-
-### #317 — ROOT CAUSE, the board that computes and never lands: the persist RUNS, and **both** of its transports fail — keyvalue on size, the artifact fallback on a web service that is OOM-cycling (`#318`)
-
-> **UPDATE 2026-08-10 ~01:40Z — SIZE SIDE FIXED STRUCTURALLY. Aliasing was
-> played out; the payload is now compressed. 14,286,066 → 811,656 bytes at
-> tonight's 313 candidates, measured, a 10.3× margin under the ceiling.**
->
-> Five commits of alias work took the snapshot 31.4MB → ~13MB and then ran out
-> of things to dedupe, because **what remained was not duplicated.** Worker
-> composition at 2026-08-10T01:25:29Z, one deploy after the last alias landed:
->
-> ```
-> board_snapshot.json  response=13,176,875  board_contract=7,101,446
->   under response:    recommendations=7,028,263  top_live_opportunities=5,950,386
->                      by_sport=185,633  top_opportunities=35
-> ```
->
-> `recommendations` (7.03MB) is the SOURCE every alias resolves against, so it
-> can never itself be aliased. The **top-level** `board_contract` (7.10MB) holds
-> `cards`, a different shape from a candidate, so byte-equality can never
-> collapse it — note the brief's "board_contract → gone" was the *nested* copy
-> only. Two irreducible ~7MB objects against an 8,388,608 ceiling.
->
-> **The fix is `_compress_oversized_values` (zlib+base64, level 6) applied in
-> `_write_state_payload`** — the single choke point, so both the keyvalue and
-> artifact transports carry the same bytes. Measured on real payloads:
->
-> | candidates | raw | after aliases | + compression | headroom vs cap |
-> |---|---|---|---|---|
-> | 313 (tonight) | 14,286,066 | 5,203,823 | **811,656** | **10.3×** |
-> | 700 | 32,046,016 | 11,666,643 | 1,811,364 | 4.6× |
-> | 1500 | 69,023,804 | 25,136,347 | 3,877,571 | 2.2× |
->
-> Ratio is a flat ~17.7× because candidates are homogeneous records with a
-> shared key vocabulary — the most compressible thing JSON produces. **This is
-> why it is durable where aliasing was not: it scales with the slate.** The
-> aliases are kept and still do real work (14.3MB → 5.2MB before compression);
-> compression composes with them rather than replacing them. Cost: 236ms
-> compress / 88ms expand at 313 candidates, on a ~4-minute cycle. Level 6 over 9
-> deliberately — 9 costs 4× the CPU for 6% more ratio.
->
-> **Only individually-large TOP-LEVEL values are compressed, and that is
-> load-bearing, not tidiness.** `_read_state_payload` chooses keyvalue-vs-artifact
-> by comparing `_state_payload_timestamp` on the RAW payload; compressing the
-> whole thing would blind that comparison and it would silently start preferring
-> the wrong transport. `KEYVALUE_PAYLOAD_COMPOSITION` also stays legible — it
-> keeps naming the same objects, now at on-wire size.
->
-> **The two write sites are now ONE function** (`_board_snapshot_persist_payload`).
-> The comment at `_persist_locked` asked in as many words that a third fix
-> extract the pair instead of patching the site again; this was the third
-> (`#105`'s size fallback, then four inert compaction commits, then this).
-> `BoardSnapshotWriteSiteParityTests` fails if either site grows its own payload
-> construction back.
->
-> **Fixtures are built by `_intelligence_board_snapshot_payload` and wrapped
-> exactly as `_persist_locked` wraps it**, per the trap that caused the four
-> inert commits. Doing that is what surfaced `#320` below.
->
-> **VALIDATED ON PRODUCTION, T+35, anchored on `deploys/…finishedAt` (02:20:35Z),
-> never `startedAt`.** Four persist cycles, `board_snapshot` rejections **0**
-> throughout, `snapshot_generated_at` advancing every cycle:
->
-> ```
-> 02:28  persist=1 [150]           bs_kvrej=0  served=150  gen=02:25:18
-> 02:37  persist=2 [150,150]       bs_kvrej=0  served=None gen=—        <- web OOM (#318), recovered
-> 02:49  persist=3 [150,150,150]   bs_kvrej=0  served=150  gen=02:43:45
-> 02:56  persist=4 [150,150,150,0] bs_kvrej=0  served=150  gen=02:43:45
-> ```
->
-> `persist>0` alongside `kvrej=0` is the pair that matters — `kvrej=0` with
-> `persist=0` means nothing was attempted, and the first post-deploy window read
-> exactly that way before a cycle completed. The 02:37 `None` is web dying on its
-> own OOM cadence (`#318`), not the payload; it recovered by 02:40.
->
-> **`KEYVALUE_WRITE_REJECTED` DOES NOT STOP ENTIRELY, AND THAT IS EXPECTED —
-> read the key before concluding anything.** A second, unrelated write is still
-> refused every cycle:
->
-> ```
-> .../intelligence/board_snapshot.json      <- THIS lane. Now 0 rejections.
-> .../intelligence/query_state_cache.json   <- NOT this lane. Still rejected.
-> ```
->
-> `query_state_cache.json` is `STATE_PATH`. **Now fixed under `#322` below.**
-> **Filter `KEYVALUE_WRITE_REJECTED` by key regardless — the two writes are
-> independent and one being healthy says nothing about the other.**
->
-> **NOT YET VALIDATED IN PRODUCTION**, and note the sequencing that still holds:
-> `#285` gates whether any board reaches the transport at all, so the success
-> test here remains narrow — `KEYVALUE_WRITE_REJECTED` stops while
-> `STATE_PERSIST_BEGIN` keeps firing. `kvrej=0` with `persist=0` means nothing
-> was attempted, not that it succeeded.
+The board's persist reached production (`#317`, cured by `#322`'s compression)
+and web stopped OOM-killing (`#318`, most likely `cb3946a2`/`#285`'s arena cap).
+Verified 2026-08-10T15:0xZ: `KEYVALUE_WRITE_REJECTED` 0 over two hours with
+`STATE_PERSIST_BEGIN` 30 incl. `candidate_count=150`, snapshot advancing,
+`top_opportunities_count` 150. **The residual that outlived both items is in
+Operational notes below, not here** — it is unowned.
 
 ### #322 — `query_state_cache.json`: the last write still refused every cycle. 33MB of snapshots against the same 8.39MB ceiling, so the deterministic trim was running CONSTANTLY — and every trimmed entry is a key recomputed after reboot
 
@@ -24167,6 +23972,38 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ---
 
 ## Operational notes worth not rediscovering
+
+- **UNOWNED RESIDUAL from `#318` (closed 2026-08-10). Web holds ~1GB of
+  ANONYMOUS memory and nobody has attributed it to a code path.** The OOMs
+  stopped, so the item closed; the gigabyte did not. Measured on web
+  `d25b1aaa` at 2026-08-10T14:59Z: `memory_anon_mb 1016.8` against
+  `memory_inactive_file_mb 259.2` — **~77% anonymous, not page cache**, on a
+  service that is supposed to read precomputed artifacts and nothing more, and
+  whose own `PROCESS_TREE_MEMORY` reads `self_rss_mb 189.1` with
+  `child_count: 0` (so it is not a subprocess). **The shape says which risk this
+  is:** a sample sweep 14:04Z–15:00Z caught anon spiking `949.9 → 1056.0`
+  (+106MB in ~90s) and then *receding* to 1034.1 — request-driven working
+  memory, so **the peak scales with slate size.** That peak is 51.8% of the
+  2048MB limit **on a 2-game evening**; the six kills of 2026-08-09 happened on
+  a full slate. `#285`'s arena cap plausibly made this survivable rather than
+  absent. **Do not read the current margin as immunity — re-measure on a busy
+  slate before anyone does.** The instrument to do it with is live
+  (`log_container_memory`, `7cceb781`); it did not exist for the six kills,
+  which is why they were diagnosed by guessing.
+
+- **A guard/instrument that cannot distinguish the healthy case from the
+  unhealthy one produces confident wrong answers, not silence.** (2026-08-10,
+  `#317`/`#318`) `CONTAINER_MEMORY` reported `91.7% of max` for months; that
+  number is consistent with a runaway leak *and* with a container merely warm
+  with evictable cache, and the reader cannot tell which. Three successive root
+  causes were published off it before anyone added the one field that decides.
+  **Before attributing anything to a reading, state what that reading would look
+  like if the cause were different.** If the answer is "the same", the reading is
+  not evidence yet — fix the instrument first, and expect that to be the cheaper
+  work. Related and repeatedly relevant: `#79`/`#285` are the same trap on
+  refresh-worker, and the lesson had to be rediscovered on web because it had
+  only ever been written down for the worker.
+
 
 - **To measure ONE change when several are already pushed, deploy by pinned
   `commitId`, not branch head.** (2026-08-07, #254) Render's
