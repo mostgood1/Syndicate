@@ -775,11 +775,19 @@ class ArtifactPublishEndpointTests(unittest.TestCase):
         self.client = app.test_client()
 
     def test_requires_admin_token(self) -> None:
-        response = self.client.post(
-            "/api/ops/artifacts/publish",
-            json={"relative_path": HOT_RELATIVE_PATH, "content": "{}"},
-        )
-        self.assertEqual(response.status_code, 503)
+        # Isolate the env. This asserts the NO-TOKEN-CONFIGURED path (503),
+        # which silently assumed ADMIN_TOKEN was absent from os.environ --
+        # true only if nothing earlier in the session loaded `.env`. Anything
+        # that touches the publish/state path does, and the test then sees a
+        # real token and returns 401. Order-dependent, and it fails naming
+        # THIS test rather than whatever leaked the variable.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ADMIN_TOKEN", None)
+            response = self.client.post(
+                "/api/ops/artifacts/publish",
+                json={"relative_path": HOT_RELATIVE_PATH, "content": "{}"},
+            )
+            self.assertEqual(response.status_code, 503)
 
     def test_rejects_unauthorized_request(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
@@ -990,8 +998,16 @@ class ArtifactExportEndpointTests(unittest.TestCase):
         self.client = app.test_client()
 
     def test_export_requires_admin_token(self) -> None:
-        response = self.client.get("/api/ops/artifacts/export")
-        self.assertEqual(response.status_code, 503)
+        # Isolate the env. This asserts the NO-TOKEN-CONFIGURED path (503),
+        # which silently assumed ADMIN_TOKEN was absent from os.environ --
+        # true only if nothing earlier in the session loaded `.env`. Anything
+        # that touches the publish/state path does, and the test then sees a
+        # real token and returns 401. Order-dependent, and it fails naming
+        # THIS test rather than whatever leaked the variable.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ADMIN_TOKEN", None)
+            response = self.client.get("/api/ops/artifacts/export")
+            self.assertEqual(response.status_code, 503)
 
     def test_export_rejects_unauthorized_request(self) -> None:
         with patch.dict(os.environ, {"ADMIN_TOKEN": "secret-token"}, clear=False):
@@ -1460,8 +1476,16 @@ class ArtifactStreamEndpointTests(unittest.TestCase):
         self.client = app.test_client()
 
     def test_stream_requires_admin_token(self) -> None:
-        response = self.client.get("/api/ops/artifacts/stream?path=x")
-        self.assertEqual(response.status_code, 503)
+        # Isolate the env. This asserts the NO-TOKEN-CONFIGURED path (503),
+        # which silently assumed ADMIN_TOKEN was absent from os.environ --
+        # true only if nothing earlier in the session loaded `.env`. Anything
+        # that touches the publish/state path does, and the test then sees a
+        # real token and returns 401. Order-dependent, and it fails naming
+        # THIS test rather than whatever leaked the variable.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("ADMIN_TOKEN", None)
+            response = self.client.get("/api/ops/artifacts/stream?path=x")
+            self.assertEqual(response.status_code, 503)
 
     def test_stream_refuses_a_path_outside_the_allowlist(self) -> None:
         with TemporaryDirectory() as tmp_dir:

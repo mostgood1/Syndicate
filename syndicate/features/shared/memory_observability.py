@@ -90,6 +90,23 @@ def _read_container_memory_current_bytes() -> int | None:
     return None
 
 
+def container_memory_current_mb() -> float | None:
+    """The cgroup's current memory, as ONE file read. `#327`.
+
+    Exists so a hot loop can sample memory without paying for
+    `get_all_process_memory_snapshot()`, which walks every process in the
+    container. That cost is fine a few times a minute and ruinous per-artifact
+    inside a 94-file publish sweep.
+
+    WHY THE CHEAP READ IS ALSO THE RIGHT ONE HERE: `container_memory_mb` is the
+    cgroup figure the OOM killer acts on, and during the `#327` excursion it
+    diverged from `accounted_rss_mb` by ~800MB. For "did this stage take the
+    container near its cap", this is the number that matters -- the process
+    walk buys attribution, not accuracy.
+    """
+    return _bytes_to_mb(_read_container_memory_current_bytes())
+
+
 def _read_container_memory_max_bytes() -> int | None:
     # memory.current alone can't say how close a container is to being
     # OOM-killed -- it includes reclaimable page cache and looks alarming

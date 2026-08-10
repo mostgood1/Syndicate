@@ -29,7 +29,10 @@ The two assertions that matter are NOT "a sample was emitted":
 """
 from __future__ import annotations
 
+import time
 import unittest
+import tempfile
+from pathlib import Path
 from unittest.mock import patch
 
 from syndicate.features.shared import live_lens_loop
@@ -42,24 +45,52 @@ class _Sweep:
         self.all_succeeded = not failed_paths
 
 
-def _run_one_cycle(*, publish_raises: bool = False, pull_enabled: bool = True):
-    """Drive exactly one loop iteration, capturing every memory sample."""
+def _run_one_cycle(*, publish_raises: bool = False, pull_enabled: bool = True, in_sweep_mb=None):
+    """Drive exactly one loop iteration, capturing every memory sample.
+
+    `in_sweep_mb` is the sequence of cgroup readings the in-sweep sampler will
+    see, one per published artifact -- how a mid-sweep transient is simulated.
+    """
     samples: list[tuple[str, dict]] = []
+    readings = list(in_sweep_mb or [])
 
     def _record(stage, **kwargs):
         samples.append((stage, kwargs))
         return {"stage": stage}
 
     def _sweep(_since):
+        # ONE positional arg, exactly like the real signature and like the
+        # doubles in test_live_lens_loop_publish_watermark. The sampler runs on
+        # its own thread, so the sweep is not asked to cooperate at all.
         if publish_raises:
             raise RuntimeError("publish exploded")
-        return _Sweep(7, ())
+        # Give the sampler thread time to take its readings while "publishing".
+        deadline = time.time() + 1.5
+        while readings and time.time() < deadline:
+            time.sleep(0.02)
+        return _Sweep(len(readings) or 7, ())
 
     def stop_after_one(_seconds: float) -> bool:
         live_lens_loop._LIVE_LENS_LOOP_STOP.set()
         return True
 
-    with patch.object(live_lens_loop, "log_and_persist_process_memory", side_effect=_record), patch.object(
+    # The sampler polls on a timer; hand it the sequence and then hold the
+    # last value so a slow thread cannot run off the end.
+    cgroup = list(readings)
+    cursor = {"i": 0}
+
+    def _next_reading():
+        if not cgroup:
+            return None
+        value = cgroup[min(cursor["i"], len(cgroup) - 1)]
+        cursor["i"] += 1
+        return value
+
+    with patch.object(live_lens_loop, "_PUBLISH_SAMPLER_INTERVAL_SECONDS", 0.01), patch.object(
+        live_lens_loop, "log_and_persist_process_memory", side_effect=_record
+    ), patch.object(
+        live_lens_loop, "container_memory_current_mb", side_effect=_next_reading
+    ), patch.object(
         live_lens_loop, "_live_lens_pull_enabled", return_value=pull_enabled
     ), patch.object(live_lens_loop, "pull_hot_artifacts", return_value=3), patch.object(
         live_lens_loop, "_run_live_lens_tick", return_value={"ok": True, "results": {}}
@@ -153,6 +184,82 @@ class PublishSweepInstrumentationTests(unittest.TestCase):
         self.assertNotIn("live_lens_pull_before", stages)
         self.assertNotIn("live_lens_pull_after", stages)
         self.assertIn("live_lens_publish_after", stages)
+
+
+class InSweepSamplingTests(unittest.TestCase):
+    """`#327`: the endpoints are blind to a transient INSIDE the sweep.
+
+    Measured in production 2026-08-10 and the reason the fifth elimination was
+    retracted: a 94-artifact 53.6s sweep whose before/after read +152MB while a
+    mid-sweep sample caught +970MB and container 3459.1MB, 84% of the cap. The
+    peak was allocated and released BETWEEN the endpoints, so no amount of
+    before/after precision could ever have seen it.
+    """
+
+    def tearDown(self) -> None:
+        live_lens_loop._LIVE_LENS_LOOP_STOP.set()
+
+    def test_a_midsweep_spike_invisible_to_the_endpoints_is_captured(self) -> None:
+        """The exact production shape: low, low, SPIKE, low, low.
+
+        A before/after pair sees the two lows and reports nothing. The in-sweep
+        sampler must report the spike and where it happened.
+        """
+        readings = [1080.0, 1090.0, 3459.1, 1200.0, 1233.0]
+        after = next(
+            kw for stage, kw in _run_one_cycle(in_sweep_mb=readings)
+            if stage == "live_lens_publish_after"
+        )
+        self.assertEqual(after.get("peak_container_mb_in_sweep"), 3459.1)
+        self.assertGreater(after.get("peak_sample_count") or 0, 0, "sampler must have run")
+
+    def test_the_peak_is_the_max_not_the_last_reading(self) -> None:
+        """A running max, not a final sample.
+
+        Taking the last reading would reproduce the exact bug being fixed --
+        the transient is gone by the end, which is why the endpoints missed it.
+        """
+        after = next(
+            kw for stage, kw in _run_one_cycle(in_sweep_mb=[900.0, 2500.0, 950.0])
+            if stage == "live_lens_publish_after"
+        )
+        self.assertEqual(after.get("peak_container_mb_in_sweep"), 2500.0)
+
+    def test_an_unreadable_cgroup_leaves_the_peak_absent_not_zero(self) -> None:
+        """Off-container (no /sys/fs/cgroup) the reader returns None.
+
+        Recording 0.0 would say "the sweep peaked at nothing", which is a
+        measurement. None says "not measured". Those must not render the same.
+        """
+        after = next(
+            kw for stage, kw in _run_one_cycle(in_sweep_mb=[])
+            if stage == "live_lens_publish_after"
+        )
+        self.assertIsNone(after.get("peak_container_mb_in_sweep"))
+
+    def test_the_sweep_signature_is_untouched(self) -> None:
+        """The sampler must NOT require cooperation from the sweep.
+
+        An earlier version threaded an `on_artifact` callback through
+        `sweep_changed_hot_artifacts`. That broke three tests in
+        test_live_lens_loop_publish_watermark whose `_publish(since)` double
+        takes one positional argument -- the SECOND time this change disturbed
+        that file. A test double is a signature contract. Sampling from a
+        thread needs no such change, so this pins the signature to one
+        parameter and stops the callback design coming back.
+        """
+        import inspect
+
+        # Inspected through the reference live_lens_loop already holds, rather
+        # than importing artifact_publisher here: a fresh import of that module
+        # inside the test session pulls in the publish app config and leaves
+        # ADMIN_TOKEN in os.environ, which turns a later
+        # test_artifact_publisher expectation of 503 into 401.
+        signature = inspect.signature(live_lens_loop.sweep_changed_hot_artifacts)
+        self.assertEqual(
+            list(signature.parameters), ["since_epoch_seconds"],
+            "sweep_changed_hot_artifacts gained a parameter -- existing test doubles will break",
+        )
 
 
 if __name__ == "__main__":

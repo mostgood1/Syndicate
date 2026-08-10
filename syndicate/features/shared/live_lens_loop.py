@@ -29,6 +29,7 @@ from syndicate.features.nfl.sources import preseason_target_week as _nfl_preseas
 # watched. `append_to_ring=False` keeps their ~6.6/min out of the time series
 # (which would rotate it below the 11-42 min excursion gap) while still
 # recording each stage's high-water mark.
+from syndicate.features.shared.memory_observability import container_memory_current_mb
 from syndicate.features.shared.memory_observability import log_and_persist_process_memory
 from syndicate.features.shared.memory_observability import memory_headroom_snapshot
 from syndicate.features.shared.refresh_state_store import read_json_file
@@ -70,6 +71,12 @@ _LIVE_LENS_LOOP_THREAD: threading.Thread | None = None
 _LIVE_LENS_LOOP_LOCK = threading.Lock()
 _LIVE_LENS_LOOP_STOP = threading.Event()
 _LIVE_LENS_PROCESS_LOCK_HANDLE: Any | None = None
+
+# #327 in-sweep sampler cadence. Module-level so a test can shorten it:
+# the measured excursion held ~30s inside a 53.6s sweep, so 2s cannot miss
+# it in production, but a unit test must not have to sleep for seconds to
+# observe a spike.
+_PUBLISH_SAMPLER_INTERVAL_SECONDS = 2.0
 
 
 def _mlb_build_wrapper(date_str: str) -> dict[str, Any]:
@@ -686,7 +693,50 @@ def _live_lens_background_loop() -> None:
 			# been eliminated. This is the largest unlit region adjacent to
 			# them, which makes it the right place to look and not an answer.
 			sweep_published = sweep_failed = publish_elapsed = None
+			# #327, IN-SWEEP SAMPLING. The before/after pair below is blind to a
+			# transient allocated and released INSIDE the sweep -- measured
+			# 2026-08-10, a 94-artifact 53.6s sweep whose endpoints read +152MB
+			# while a mid-sweep sample caught +970MB and container 3459.1MB
+			# (84% of cap). I eliminated the publish path on those endpoints and
+			# had to retract it.
+			#
+			# ONE cgroup file read per artifact, not a process walk: the walk is
+			# what makes log_and_persist_process_memory too expensive to call in
+			# here, and container_memory_mb is the figure the OOM killer acts on
+			# anyway. Peak and the artifact index it landed on ride out on the
+			# existing after-sample -- no new log lines, no ring cost.
+			# A TIMER THREAD, not a per-artifact callback. Two reasons, and the
+			# second is why this shape was chosen over threading a hook through
+			# sweep_changed_hot_artifacts:
+			#
+			# 1. It samples on WALL CLOCK, so it also sees time spent inside a
+			#    single large artifact's POST -- a per-artifact callback only
+			#    fires between files and is blind to a spike within one.
+			# 2. It requires NO signature change to the sweep. Adding an
+			#    optional kwarg there broke three tests in
+			#    test_live_lens_loop_publish_watermark, whose `_publish(since)`
+			#    double takes one positional arg -- the second time this change
+			#    disturbed that file. A test double is a signature contract, and
+			#    instrumentation is not worth changing one.
+			sweep_peak: dict[str, float | None] = {"peak_mb": None, "samples": 0}
+			sweep_sampler_stop = threading.Event()
+
+			def _sample_during_sweep() -> None:
+				while not sweep_sampler_stop.is_set():
+					current = container_memory_current_mb()
+					if current is not None:
+						sweep_peak["samples"] = int(sweep_peak["samples"] or 0) + 1
+						if sweep_peak["peak_mb"] is None or current > float(sweep_peak["peak_mb"]):
+							sweep_peak["peak_mb"] = current
+					# One cgroup file read per interval is negligible next to the
+					# sweep's own work; see the constant for why 2s is safe.
+					sweep_sampler_stop.wait(_PUBLISH_SAMPLER_INTERVAL_SECONDS)
+
+			sweep_sampler = threading.Thread(
+				target=_sample_during_sweep, name="live-lens-publish-sampler", daemon=True
+			)
 			log_and_persist_process_memory("live_lens_publish_before", append_to_ring=False, date=cycle_date)
+			sweep_sampler.start()
 			try:
 				# sweep_changed_hot_artifacts, NOT the publish_changed_hot_artifacts
 				# wrapper. `publish_hot_artifact` NEVER RAISES -- a network blip or
@@ -724,6 +774,12 @@ def _live_lens_background_loop() -> None:
 					last_publish_epoch = publish_started_epoch
 			except Exception as exc:
 				print(f"[live_lens_loop] publish_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
+			# Stop the sampler before sampling: it must not still be running
+			# while the after-sample is taken, and it must stop even if the
+			# sweep raised -- a daemon thread left spinning would outlive the
+			# cycle and keep reading the cgroup forever.
+			sweep_sampler_stop.set()
+			sweep_sampler.join(timeout=5.0)
 			# Outside the try, so a sweep that raised is still measured. It
 			# carries the sweep's own counts: a peak of N megabytes means
 			# something different at 5 artifacts than at 103, and reading that
@@ -735,6 +791,8 @@ def _live_lens_background_loop() -> None:
 				published_count=sweep_published,
 				failed_count=sweep_failed,
 				elapsed_seconds=publish_elapsed,
+				peak_container_mb_in_sweep=sweep_peak["peak_mb"],
+				peak_sample_count=sweep_peak["samples"],
 			)
 		write_json_file(
 			status_path,
