@@ -339,8 +339,33 @@
       // on the opposite side would attach a real number to the bet nobody
       // modelled, which is the single most misleading thing this board could do.
       var onProj = (side === pSide);
-      var edge = onProj ? p.edge_vs_market_pct : null;
+      // TWO EDGE CONTRACTS, AND THEY ARE NOT THE SAME QUANTITY.
+      //
+      // MLB/soccer emit `edge_vs_market_pct` -- a percentage against the no-vig
+      // market price. WNBA emits `edge_vs_line` -- projected minus the line, in
+      // STAT UNITS (projected 3.69 against a 3.5 line is +0.19 rebounds), and
+      // leaves the probability fields null because, in its own words, "model
+      // ships means, not a distribution".
+      //
+      // Reading only the first blanked the Edge column on all 199 WNBA rows
+      // that HAVE an edge. Reading the second through the same percent
+      // formatter would be worse: it would print "+0.2%" for +0.19 rebounds --
+      // a fabricated number in the wrong unit, which is the failure mode this
+      // board is least allowed to have.
+      var edge = null, edgeUnit = "";
+      if (onProj) {
+        if (p.edge_vs_market_pct !== null && p.edge_vs_market_pct !== undefined) {
+          edge = p.edge_vs_market_pct; edgeUnit = "pct";
+        } else if (p.edge_vs_line !== null && p.edge_vs_line !== undefined) {
+          edge = p.edge_vs_line; edgeUnit = "line";
+        }
+      }
       var edgeCls = edge === null || edge === undefined ? "" : (edge > 0 ? "l1-edge-pos" : "l1-edge-neg");
+      var edgeTxt = edge === null || edge === undefined ? "·"
+        : (edgeUnit === "pct" ? pct(edge)
+           : (edge > 0 ? "+" : "") + Number(edge).toFixed(2) + " vs line");
+      var edgeTitle = (edgeUnit === "line" && p.probability_unavailable_reason)
+        ? ' title="' + esc(p.probability_unavailable_reason) + '"' : "";
       var name = r.player_name || (g.matchup || "");
       var priced = best.price !== null && best.price !== undefined;
 
@@ -351,7 +376,7 @@
       }
       cells += '<td class="l1-side">' + esc(side) + "</td>"
         + "<td>" + (onProj && p.projected !== null && p.projected !== undefined ? Number(p.projected).toFixed(2) : "·") + "</td>"
-        + '<td class="' + edgeCls + '">' + (edge === null || edge === undefined ? "·" : pct(edge)) + "</td>"
+        + '<td class="' + edgeCls + '"' + edgeTitle + '>' + edgeTxt + "</td>"
         + '<td class="l1-price l1-best">' + odds(best.price) + "</td>"
         + '<td class="l1-side">' + esc(best.bookmaker || "") + "</td>"
         + '<td class="l1-price"' + (fairModelled ? ' title="' + esc(mf.note || "modelled from the book's measured hold") + '"' : '') + '>'
