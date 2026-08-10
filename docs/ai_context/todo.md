@@ -772,7 +772,7 @@ damage and does not remove it**. Possibly also behind `#318`'s five concurrent
 publishers — unverified, and worth checking before assuming the publish endpoint
 is the right place to fix that.
 
-### #312 — SWEPT AND MEASURED, tool shipped. The hazard is REAL and LATENT: a sync would revert **0** values today, and 30 kill switches are one env-API call away from being reverted
+### #312 — ON `main` AS `f1bba90c`, LIVE ON NOTHING (its only deploy was cancelled). Audit tool shipped and running. 8 switches protected, 22 still pinned, and the sync mechanism itself remains UNTESTED
 
 `render.yaml:532-533` hardcodes `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN: "true"`,
 so disabling it through the single-key env endpoint is not durable — the next
@@ -892,20 +892,90 @@ They keep their literals.
 blueprint stays the authority on WHO RUNS WHAT; it stops being the authority on
 WHAT IS SWITCHED OFF.**
 
-#### Where it lives, and how to ship it
+#### Where it lives — SHIPPED TO `main` AS `f1bba90c`, AND LIVE ON NOTHING
 
-Held on branch **`hold/312-sync-false`**; `main` is left at `origin/main`.
-**An unpushed commit on `main` in this shared checkout is not held** — several
-lanes run `git push HEAD:main` continuously, and for `render.yaml` that push
-*is* the sync. To ship: `git cherry-pick hold/312-sync-false`, then push.
+Pushed 2026-08-10T15:54:54Z, 8 seconds after a clean audit run. **But the only
+deploy that carried it was cancelled**, so the protection exists in `main` and
+in no running service:
 
-**Re-run `scripts/audit_blueprint_drift.py` in the same minute as the push.**
-The 0-drift reading is a snapshot; one env-API call in between makes the push
-non-neutral.
+```
+refresh-worker   canceled  15:58:43Z  f1bba90c    <- the only deploy carrying it
+refresh-worker   live      15:42:48Z  87cdd3e1
+web              live      15:43:16Z  87cdd3e1
+live-odds-worker live      15:20:06Z  5ea6aabd
+
+real sync:false keys   87cdd3e1 (live) = 1   (just the pre-existing ANTHROPIC_API_KEY)
+                       f1bba90c        = 9   (the 8 + that one)
+```
+
+**Anyone reading "`#312` shipped" should read this instead.** The next
+uncancelled worker deploy carries it incidentally; nobody needs to do anything.
+
+**Re-run `scripts/audit_blueprint_drift.py` in the same minute as any future
+`render.yaml` push.** The 0-drift reading is a snapshot; one env-API call in
+between makes the push non-neutral.
 
 **Verification gotcha:** `grep -c "sync: false" render.yaml` gives the WRONG
 answer — each converted key's comment contains the literal `` `sync: false` ``
 in backticks, so every key matches twice. Parse the YAML instead.
+
+#### A CANCELLED DEPLOY STILL RESTARTS THE PROCESS — AND RESTARTS IT ONTO THE OLD COMMIT
+
+Found by the oversight lane on pid markers, 2026-08-10:
+
+```
+15:55:09Z  deploy f1bba90c starts
+15:58:43Z  deploy CANCELLED
+15:59:12Z  worker process pid 39 -> 38        <- a full restart
+```
+
+**Neither the events API nor the deploys API says this happened.** Only the pid
+does. So:
+
+- **"Cancel the deploy" is not a way to back out a `render.yaml` push.** The
+  commit still reaches `main`, the service still reboots, and only the blueprint
+  sync is uncertain. It is the obvious thing to try in a hurry and it does not
+  do what it looks like.
+- **The reboot lands on the PREVIOUS commit.** refresh-worker is running 15:42
+  code after a 15:55 deploy attempt. From both APIs the state reads as "nothing
+  happened"; in fact the service lost every in-process thing it held and came
+  back on stale code. That is the half most likely to mislead someone
+  mid-incident.
+- **It creates a measurement boundary invisible to both APIs.** Already cost
+  one reading: the `#285` lane's window spanned 15:59:12Z, its anchor
+  re-verification explicitly exempted cancelled deploys, and it reported CLEAN
+  while the pid said REBOOT. That reading was discarded and re-queued anchored
+  on the pid marker instead. **Anchor uptime and memory baselines on the pid,
+  not on the deploy record.** [[worker memory is boot-confounded]]
+
+#### THE SYNC WAS NEVER TESTED — this is a KNOWN-MISSING EXPERIMENT, not a null result
+
+I watched for a `blueprint_sync` after the push and reported "none observed in
+35 minutes" across two channels (deploys API, plus env key counts and the 8
+converted keys on all three services). **Then the cancellation above came to
+light and that reading collapsed.**
+
+**It is not weak evidence. It is the wrong experiment** — a cancelled deploy
+means the mechanism was never offered its input. Reporting it as "no sync in 35
+minutes" invites the next reader to treat it as a rate, which is exactly the
+error this file keeps paying for. [[absence in a window isn't absence]]
+
+**Retracted along with it:** my own argument that a continued null would qualify
+`CLAUDE.md`'s bolded "pushing `render.yaml` applies to production" rule. That
+argument required an uncancelled push and never had one. **The rule stands
+unqualified**, still resting on its single 2026-08-08 measurement.
+
+**What would actually test it:** a `render.yaml` push whose deploy is allowed to
+complete. Recorded as a known-missing experiment rather than a to-do —
+**running it deliberately is the production event the rule exists to warn
+about**, so it needs an owner's decision, and the cheap version is to wait for
+one to happen for an unrelated reason and watch.
+
+**The process error worth keeping:** I reported a null about a deployed change
+without first checking what was deployed. Same shape I had caught twice earlier
+the same day — verifying an outcome before confirming the mechanism ran — and it
+still got past me. It surfaced only because another lane sent an unrelated pid
+observation and I followed it. [[confirm the code ran]]
 
 ### 2026-08-09 (21:1xZ) — `pool=0` WHILE `shortlist rows=155` IS `#290`, not a new defect. `#319` closed as a duplicate before it was opened
 
