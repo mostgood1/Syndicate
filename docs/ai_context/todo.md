@@ -85,7 +85,7 @@ the stage that matters is the one the instrument cannot see.
 - **Not** related to `#331`. That fix is verified and its artifact is healthy;
   Layer 2's 6,072 considered is partly evidence of it working.
 
-## TWO CHEAP CAUSES ALREADY EXCLUDED -- do not re-test these
+## RETRACTED -- THIS SECTION WAS WRONG. IT *IS* MEMORY. Read the correction below before the text that follows it
 
 Both are the obvious first guesses and both are measured negative over the
 18:45Z-20:00Z window on `c7946247`:
@@ -156,6 +156,57 @@ attributing a fourth is strong.
 
 **And the cross-disk artifact pull is succeeding**, so the build is not reading
 an empty local disk.
+
+### THE RETRACTION, IN FULL
+
+**Everything above about the memory guard is FALSE and I wrote it emphatically.**
+`_build_candidate_pool` never prints `MEMORY_GUARD_ABORT` on the path that
+actually fails. The guard that fires lives in `syndicate/features/intelligence.py`
+and emits a DIFFERENT token:
+
+```
+OVERVIEW_STOPPED_FOR_MEMORY   55 hits / 105 min   next_sport=mlb sports_done=0 sports_total=8
+MEMORY_GUARD_ABORT             0 hits             <- the token I checked
+```
+
+Verified independently on refresh-worker `c7946247`, 20:31:47Z:
+
+```
+_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000.0 MB    intelligence.py:2551
+measured headroom_mb              = 2256.2 MB    (current 2699.1 of 4096.0)
+deficit                             743.8 MB     -> abort before sport 1 of 8
+```
+
+**The chain:** worker at ~2.7GB (`#285`'s ratchet) -> headroom under the floor ->
+overview aborts at `sports_done=0` -> `_collect_candidates` reads
+`dashboard_games`/`home_rails` off an empty overview -> pool 0 -> the serve
+correctly refuses to overwrite -> `cc=150` frozen since 18:49:58Z.
+
+**`LAYER2_SHORTLIST considered=6072` is the tell, not the contradiction.** The
+shortlist reads persisted artifacts and never touches the overview, so it is the
+one population this guard cannot starve. Two numbers, two sources, exactly one
+gated -- which is why they disagreed so loudly.
+
+**So `#336` IS `#285` seen from the board side**, and the guard is working as
+designed: its own comment records that MLB alone costs +2.9GB in 73 seconds and
+took the container to 95.8% before a SIGKILL, and calls skipping the pass "a real
+reduction in board coverage, and it is the correct trade". This should close as a
+DUPLICATE of `#285` when the ratchet is addressed -- **not** as a fifth memory
+item on this worker.
+
+### WHY I GOT IT WRONG, because the shape recurs
+
+I grepped for a token, got zero, and concluded the mechanism was absent. **A zero
+from a grep is a fact about the EMITTER, never about the path** -- `#285`'s lane
+wrote that rule tonight and I broke it within the hour, in the canonical file, in
+bold. The same session also produced: a commit range read as a call path, two
+emitters where there were three, three decorators that were not the reader, and a
+symbol grep that missed a helper one frame away. **Five shapes, one root:
+checking for presence instead of reachability.**
+
+The specific guard against it: before writing "X is not happening" because a
+token is absent, find the `print` that would emit it and confirm it is on the
+path in question. Here it was in a different module.
 
 So the pool build runs to completion, over artifacts that pulled cleanly, with
 adequate memory, and finds nothing. **The remaining candidates are all inside
