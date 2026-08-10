@@ -1,9 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
-### #337 — FIXED, NOT DEPLOYED. `candidate_count` reported the request CAP as the true pool, because `#317`'s aliasing turned `by_sport`'s lists into dicts. **My regression, and it re-created a bug this function's own comment already documents.**
+### #337 — DEPLOYED AND INERT. The fix is real, the path is wrong, and this is the FIFTH time tonight. `candidate_count` reported the request CAP as the true pool, because `#317`'s aliasing turned `by_sport`'s lists into dicts. **My regression, and it re-created a bug this function's own comment already documents.**
 
 **This is the "persist residual" the `#336` work kept tripping over — the board
 was not stale and the persist was not dropping data.**
+
+#### DEPLOYED 21:30:22Z AND IT DID NOT WORK
+
+```
+21:39:18  pool=239   persist=[]
+21:42:34  pool=239   persist=150      <- still exactly the cap
+21:52:43  pool=239,239  persist=150,150
+instrument(ovr/raw)=3/2               <- new code IS live, so this is not a deploy failure
+```
+
+**`write_latest_intelligence_state` never calls the function I fixed:**
+
+```
+2619:  candidate_count = int(normalized.get("candidate_count") or 0)
+```
+
+It READS the field. `_intelligence_state_candidate_count` is called at `:1277`,
+`:5921` and `:5953` — none of them on the path that emits
+`STATE_PERSIST_BEGIN`. **Same presence-vs-reachability error as `#331`, `#327`
+and `#334`'s three attempts: I fixed a real function on a path this observation
+does not take.** The local repro was honest and proved only that the resolver
+was broken, not that the resolver was the source.
+
+**The fix still stands on its own merits** — an aliased `by_sport` really did
+score zero there, and `:1277`/`:5921`/`:5953` really were returning the cap.
+It is a correct fix to a second instance of the bug, not the one being measured.
+
+#### NEXT CANDIDATE, EXPLICITLY NOT VERIFIED — do not fix this blind
+
+`:5299` sets `response_candidate_count = len(candidates)` and `:5303` writes it
+into the response that is eventually persisted. **That is correct if
+`candidates` is the pre-slice pool and wrong if it has already been capped**,
+and I have not traced which. Determine that before touching it.
+
+**I stopped here deliberately.** Five inert fixes in one session is enough
+evidence that my hit rate on "which path actually runs" is poor at this hour,
+and a sixth guess costs another deploy and another 20-minute verification
+window. The trace is cheap for whoever picks it up with a clear head: confirm
+whether `candidates` at `:5299` is sliced, and if so take the length before the
+slice.
 
 #### The measurement
 
