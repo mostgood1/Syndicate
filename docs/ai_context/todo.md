@@ -315,6 +315,46 @@ I triggered `f1bba90c` at 15:54:50Z. Two errors:
    (`ALL_PROCESS_MEMORY` already lists every child with its cmdline) instead of
    probing for the hazards you happen to remember.
 
+#### DURABLE THROUGH T+35, and the regression risk is cleared
+
+The change re-routes read/write for **every** path on the service that writes
+`board_snapshot`, so the failure I was actually watching for was mine: a dark
+board on a freshly booted worker, which would look exactly like `#285`'s starved
+pool. Eight samples, 15:55–16:31Z, on `87cdd3e1`:
+
+```
+15:55  used=40.11M  evicted=38865  migration_runs=2.82MB/60  board_cc=150
+16:31  used=39.87M  evicted=38865  migration_runs=2.82MB/60  board_cc=150
+```
+
+`evicted_keys` frozen across all eight, bucket flat, and **`board_cc=150` on
+every sample with no gap** — so `_keyvalue_backed()` did not break the board.
+
+#### The zombie the pre-flight found, and why it is a footnote not an item
+
+`pid 1457` (ppid 38) sat in **108 of 342** `ALL_PROCESS_MEMORY` samples across 15
+minutes. Confirmed defunct rather than unreadable, from fields already in the
+payload: `name='python'` (so `/proc/<pid>/status` parsed), `rss_mb=None` (no
+`VmRSS:`, i.e. no memory maps), `cmdline=''`, and `PROCESS_ENUM_DEBUG` reporting
+only `psutil_unavailable` with no procfs failure. Readable status + no maps + no
+cmdline is state Z.
+
+**Low severity, measured:** 32 distinct children of pid 38 over 15:43–16:40Z
+produced 2 lasting zombies; every other no-cmdline pid appeared in 1–12 samples
+and was a spawn/exit sampling race. Cost is a PID slot and a task_struct.
+
+**The real damage was to `deploy_preflight.py`** — a permanent zombie pinned it
+at exit 2 forever, i.e. the tool was useless on the one service it was built
+for. A zombie is already dead and a deploy cannot kill it, so it is now reported
+and does not block. The relaxation is narrow on purpose: a process with **no
+readable name** still blocks, because that one might be live work.
+
+**Not root-caused, and I am saying so rather than guessing.** The spawn sites
+(`run_refresh_worker.py:1951`, `:2057`) keep only `process.pid` and drop the
+`Popen` handle — normally harmless, since CPython reaps abandoned handles via
+`subprocess._cleanup()` on the next `Popen`, which is why 30 of 32 cleared. Why
+these two did not is unresolved, and that file belongs to `#285`/`#311`.
+
 #### A long observation window must RE-VERIFY its anchor, not just set it
 
 The `#285` lane retracted their closure on this: their T+55 memory reading was a
