@@ -3243,6 +3243,82 @@ it now has a date.
 **`#310` closes.** The remaining work — why boxscore ingestion stopped on
 2026-05-24 — is `#314`'s question and needs its own owner.
 
+### #285 — HANDOFF FROM `#336`: THE RATCHET IS NOW THE ONLY BLOCKER ON THE BOARD, AND THE TARGET IS ~725MB
+
+**Written into this entry rather than sent as a message: that lane's session is
+archived. Whoever picks `#285` up next needs this and it must not depend on a
+live session.**
+
+#### Everything else in the chain closed 2026-08-10
+
+Transport (`#317`, 31.4MB -> 812KB), the state cache (`#322`), keyvalue
+residency (`#324`, 96.1% -> ~15% with evictions frozen) and freshness reporting
+(`#334`) are all closed and verified in production. **A zero board now has
+exactly one cause and it is this item** — a cleaner attribution than existed
+eight hours ago, and it means the next measurement here is not competing with
+three other suspects.
+
+#### The board's dependency on this item, measured
+
+```
+_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000.0 MB    intelligence.py:2551
+measured headroom_mb              = 2275.5 MB    (current 2676.4 of 4096.0)
+deficit                             724.5 MB     -> abort before sport 1 of 8
+```
+
+Ratchet pushes the worker up -> headroom under the floor ->
+`build_intelligence_overview` aborts at `sports_done=0 sports_total=8` ->
+`_collect_candidates` reads `dashboard_games`/`home_rails` off an empty overview
+-> pool 0 -> board freezes. Confirmed by the 20:33:10Z reboot: RSS 1748 ->
+474MB, guard quiet, all 8 sports in 21s, `CANDIDATE_POOL_READY count=187`.
+
+**Units matter here and I have not confirmed the composition.** `headroom_mb` is
+NOT `max - current` (that would be 1419.6, not 2275.5), so a reclaimable /
+file-cache term is inside it — meaning this floor is measured against the
+anon-ish figure this lane already tracks, not against `memory.current`. Treat
+**724.5MB as the gap** and the formula as yours to verify.
+
+#### A `#251` deadlock that looks like a board bug and is a memory lever
+
+`_HYDRATED_OVERVIEW_MIN_REBUILD_INTERVAL_SEC = 300.0` (`home.py:88`) exists to
+stop MLB's hydrated overview rebuilding every ~90s. It is live — env override
+`SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC` **absent** on refresh-worker, 95
+vars enumerated. Yet `OVERVIEW_REBUILD_RATE_LIMITED` had **0 hits in 40
+minutes**:
+
+```
+guard aborts before MLB  ->  no hydrated build completes
+                         ->  no cache entry written
+                         ->  `if cached and force_refresh and ...` cannot fire
+                         ->  full rebuild attempted next cycle -> guard aborts
+```
+
+**The rate limit that exists to reduce memory pressure is disabled by the memory
+pressure it exists to relieve.** Only a reboot breaks it, which is a large part
+of why "every good board today was built in the first 15 minutes of a boot" has
+held all week. **Breaking the deadlock may be cheaper than winning back 725MB** —
+a cache entry written on the aborted path, or a floor that admits MLB-only,
+would let the 300s limit start working. Not attempted; it is this lane's file.
+
+#### Dead ends, so nobody re-walks them
+
+- **`force_refresh=False` is inert.** `_HOME_OVERVIEW_TTL_SEC` is 10s against a
+  ~90s loop, so the cached branch can never be taken whatever the flag says —
+  `home.py:6654` states this outright.
+- **`skip_game_hydration=True` is worse than inert here.** The docstring forbids
+  it for any overview feeding candidate collection; it would give 8 sports,
+  empty rails, pool 0 — same symptom with the guard no longer implicated.
+
+#### Also now available to this lane
+
+`#327`'s `high_water` table is live: `post_mlb_sim_tick` recorded **2846.5MB
+container**, the highest figure anywhere tonight and above the 2792.7 measured
+from logs. The stage that was structurally invisible to this lane's ring buffer
+is now the peak entry in it.
+
+**Not claimed:** one reboot and one recovery say the guard is the gate. They say
+nothing about the ~9.5-11 MB/min rate, which is still this item's open question.
+
 ### #285 — VERIFIED CLEAN WINDOW, n=2: the ratchet is REAL at ~9.5 MB/min and the arena cap did NOT change it. But 0 guard latches and 5/5 boards across 42 minutes — the level, not the rate, is what gates the board
 
 **The reading the retraction below asked for. First window all night that passed
