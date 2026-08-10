@@ -1,5 +1,82 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#285` — EVIDENCE, from the `#329` lane: the plateau's biggest peak is the OVERVIEW BUILD AND THE LIVE-LENS TICK RUNNING CONCURRENTLY. And 2,884MB is where this worker lives, not a spike anyone introduced
+
+**Handed here at the oversight lane's request rather than left in a message.**
+Measured 2026-08-10 on refresh-worker either side of a 20:32:47Z reboot.
+
+**First, the thing that stops a wrong lead: THE PEAK IS NOT NEW.** Peak
+`container_memory_mb` per 10-minute bucket:
+
+```
+PRE  19:20-19:30   peak 3,112   median 2,493
+PRE  19:40-19:50   peak 2,682   median 2,603
+PRE  20:00-20:10   peak 2,839   median 2,730
+PRE  20:20-20:30   peak 2,945   median 2,871
+POST 20:40-20:50   peak 2,884   median 2,110
+POST 21:00-21:10   peak 2,229   median 2,168
+```
+
+The 2,884MB peak that prompted this is **below** the pre-deploy high of 3,112.
+What a deploy changes is the MEDIAN (2,871 → 2,168), because it reboots. Anyone
+who reads a post-deploy peak as an excursion will chase a change that did not
+happen.
+
+**THE LEAD — the two loops overlap.** Stage sequence through the peak,
+20:49:05–20:49:30Z, with `board_contract_*` interleaved between live-lens sport
+stages:
+
+```
+build_live_lines_payload_local_return    2,523
+board_contract_begin wnba                2,495   <- OVERVIEW
+live_lens_tick_after_wnba                2,547   <- LIVE-LENS
+live_lens_tick_before_soccer             2,549
+live_lens_tick_after_build_soccer        2,858
+live_lens_tick_before_nfl                2,884   <- peak
+live_lens_tick_after_build_nfl           2,391   <- released
+```
+
+**This exact hazard is already recorded in `build_mlb_market_board`'s docstring**
+(`syndicate/features/mlb/cards.py`): the live-refresh tick reaching a full board
+assembly concurrently with the pipeline's candidate-pool build in a background
+thread, where *"the two together exceeded the container"*. Same shape, different
+entry point — so the fix that worked there (cache the gate's board assembly) is
+the first thing to price here.
+
+**WHY THE FLOOR OSCILLATES, which is the `#336` symptom.** The guard's input is
+NOT `container_memory_headroom_mb` — `memory_headroom_snapshot` adds reclaimable
+page cache back (`#79 step 2`), because cgroup v2's `memory.current` counts
+evictable file cache the kernel drops rather than OOM-killing over:
+
+```
+at current 2,263MB   raw 1,833 + reclaimable 1,242 = 3,075  vs floor 3,000  PASSES by 75MB
+at current 2,884MB   raw 1,212 + reclaimable ~1,242 = ~2,454 vs floor 3,000  ABORTS
+```
+
+So the floor is crossed and uncrossed **by the plateau itself**, and the plateau
+is a function of time-since-restart. 55-aborts-in-105-minutes and 0-in-29 are
+both true readings of the same knife edge, taken at different points on the
+curve.
+
+**FALSIFIABLE PREDICTION, left deliberately so this can be checked rather than
+believed: floor aborts reappear once median `container_memory_mb` clears
+~2,700.** If they reappear well below that, the model here is wrong and the
+plateau is not what gates the board.
+
+**Two method notes, because both errors were made and self-caught in this one
+measurement and both are cheap to repeat:**
+
+- **`container_memory_mb` is the wrong series for this question** — it is ~55%
+  evictable cache (`anon` 1,011MB of `current` 2,263MB at 21:05Z). It answers
+  "did this change make it worse" against a like-for-like baseline and nothing
+  else. Size the floor from `anon`.
+- **Do not difference two samples on a rising curve and call it a step.** This
+  lane first read the sequence above as "+309MB on the soccer build". Measured
+  per-stage across two pre-deploy windows, `before_soccer → after_build_soccer`
+  is **-4MB and +6MB** — soccer's build costs nothing. Same trend-as-event error
+  as reading a post-boot slope as a ratchet, which this lane also did an hour
+  earlier.
+
 ### `#336` — OWNED. ROOT-CAUSED, AND IT IS `#285`: the 3000MB overview headroom floor is firing on every cycle. NOT an independent defect, and the "not a memory problem" exclusion used a token this path never emits. THE BOARD HAS NOT REBUILT IN 68 MINUTES. `_build_candidate_pool` returns 0 while the Layer 2 shortlist has 6,072 — and the board you are looking at is a preserved corpse, not a live one
 
 **This is upstream of `#308` and is NOT the same defect.** `#308` is 156 merged
