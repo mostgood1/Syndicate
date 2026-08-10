@@ -646,16 +646,89 @@ damage and does not remove it**. Possibly also behind `#318`'s five concurrent
 publishers — unverified, and worth checking before assuming the publish endpoint
 is the right place to fix that.
 
-### #312 — OPEN, UNOWNED. A flag disabled via the env API is re-enabled by the next blueprint sync. Write this as a class, not a soccer bug
+### #312 — SWEPT AND MEASURED, tool shipped. The hazard is REAL and LATENT: a sync would revert **0** values today, and 30 kill switches are one env-API call away from being reverted
 
-`render.yaml:532-533` hardcodes `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN: "true"`.
-So turning it off with the single-key env endpoint is **not durable** — the next
-`render.yaml` push from any lane silently turns it back on, via `blueprint_sync`,
-with no deploy anyone ordered (see `#284`).
+`render.yaml:532-533` hardcodes `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN: "true"`,
+so disabling it through the single-key env endpoint is not durable — the next
+`render.yaml` push from any lane turns it back on via `blueprint_sync`, with no
+deploy anyone ordered (`#284`).
 
-**The general form:** any flag an operator might reasonably disable at runtime,
-while the blueprint hardcodes a literal, is a flag that re-enables itself. Needs
-a sweep of `render.yaml` for that pattern, not a one-line soccer fix.
+The entry asked for a sweep rather than a one-line soccer fix. Here it is,
+plus the thing that makes it repeatable:
+**`scripts/audit_blueprint_drift.py`** (`--json`, exit 1 on any drift).
+CLAUDE.md has said "enumerate before pushing `render.yaml`" for weeks; that
+advice was never *runnable*, which is why nobody ran it. **Run it immediately
+before any `render.yaml` push.**
+
+#### THE SEMANTICS ARE NARROWER THAN THE WARNING SAYS, and the difference decides the blast radius
+
+"A sync writes the WHOLE env block" reads as *everything gets rewritten*. The
+measured behaviour is an **upsert of declared keys**, not a replace:
+
+```
+2026-08-08 sync   refresh-worker   92 -> 93 keys      blueprint declares 83
+```
+
+A replace would have driven it **down to 83**. It went up. So **live-only keys
+are not deleted** — and there are 32 of them across the three services
+(`SYNDICATE_BOARD_L2A_ENABLED`, `SYNDICATE_ACTIVE_SPORTS`,
+`SEASON_PROJECTION_*`, …). Operators have effectively been relying on
+"undeclared ⇒ durable" without anyone writing that down.
+
+The hazard is therefore precise: **a DECLARED key whose live value was changed
+at runtime silently reverts to the literal in the file.**
+
+#### Current exposure, measured 2026-08-10
+
+```
+service            blueprint  live  would revert  live-only  kill switches on a literal
+syndicate                 64    72        0            9              6
+refresh-worker            83    95        0           12             14
+live-odds-worker          74    85        0           11             10
+                                          ─                           ──
+                                          0                           30
+```
+
+**Zero.** Every declared key's live value currently equals its blueprint
+literal, so **a `render.yaml` push right now is value-neutral on declared keys**
+— which also makes now the cheapest moment there will ever be to change that
+file. That is a genuinely reassuring result and it is *not* what anyone
+expected, including me.
+
+**But read the zero correctly.** It does not mean the hazard is theoretical. It
+means **nobody has used the env API on a declared key yet.** The instant someone
+disables one of those 30 kill switches in an incident — precisely when they are
+least likely to also edit `render.yaml` — that zero becomes a one, and the next
+unrelated blueprint push re-arms the thing they just turned off.
+[[absence in a window isn't absence]]
+
+**This is exactly what happened to soccer**, and it is why `#282` was briefed on
+a false premise: `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN` reads `'true'`
+in the blueprint **and** `'true'` live. The intent to disable never reached
+either one.
+
+#### The proposed fix, NOT APPLIED — it needs an owner's decision because applying it *is* a sync
+
+Put **`sync: false`** on kill switches, so the blueprint declares the key exists
+but stops overwriting its value; the live value then survives a sync. The
+precedent is already in the file at `render.yaml:43` (`ANTHROPIC_API_KEY`).
+
+**Deliberately NOT on `*_TICK_OWNER` routing keys.** Those must stay consistent
+*across* services — drift between them is a bug, not an operator action, and
+`#278` is the incident where both workers believed they owned the MLB tick. The
+blueprint is the right place to pin those. The audit script encodes this split
+(`KILL_SWITCH_RE` minus `OWNERSHIP_RE`), so the recommendation is executable
+rather than a description.
+
+**Cost, stated plainly:** `sync: false` means the blueprint no longer records
+the intended value, so the file stops describing production for those keys.
+Mitigate by keeping the intended default in a comment above each — the pattern
+this file already uses heavily.
+
+**Why I did not just do it:** editing `render.yaml` is only deliverable by
+pushing it, and that push *is* the production event. Committing is safe; pushing
+is the change. Needs an explicit decision, and the audit re-run in the same
+minute.
 
 ### 2026-08-09 (21:1xZ) — `pool=0` WHILE `shortlist rows=155` IS `#290`, not a new defect. `#319` closed as a duplicate before it was opened
 
