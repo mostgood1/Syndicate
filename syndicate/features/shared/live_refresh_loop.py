@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -165,22 +166,50 @@ def _live_refresh_loop_adaptive_enabled() -> bool:
 	return _env_bool("SYNDICATE_LIVE_ODDS_REFRESH_ADAPTIVE", default=True)
 
 
-def _mlb_has_live_game_via_report(date_str: str) -> bool:
+def _mlb_live_game_via_report_probe(date_str: str) -> tuple[bool, str]:
+	"""(is_live, reason). The reason is the whole point -- see `_mlb_has_live_game`.
+
+	Every branch that returns False names itself. `no_payload` in particular is
+	NOT the same fact as `live=0`: the first means this service could not read
+	the report at all (absent on its own disk, or a keyvalue-backed
+	`read_json_file` that never sees a disk-only artifact), the second means it
+	read it and there are genuinely no live games. They have opposite fixes and
+	were previously indistinguishable.
+	"""
 	path = data_root() / "mlb_source" / "source_artifacts" / "data" / "live_lens" / f"live_lens_report_{date_str.replace('-', '_')}.json"
 	payload = read_json_file(path)
-	counts = payload.get("counts") if isinstance(payload, dict) else None
+	if payload is None:
+		return False, "no_payload"
+	if not isinstance(payload, dict):
+		return False, f"payload_type:{type(payload).__name__}"
+	counts = payload.get("counts")
 	if not isinstance(counts, dict):
-		return False
+		return False, "no_counts"
+	raw = counts.get("live")
 	try:
-		return int(counts.get("live") or 0) > 0
+		live = int(raw or 0)
 	except (TypeError, ValueError):
-		return False
+		return False, f"live_unparsable:{raw!r}"
+	return live > 0, f"live={live}"
 
 
-def _mlb_has_live_game_via_schedule(date_str: str, *, timeout_s: float = 15.0) -> bool:
+def _mlb_has_live_game_via_report(date_str: str) -> bool:
+	return _mlb_live_game_via_report_probe(date_str)[0]
+
+
+def _mlb_live_game_via_schedule_probe(date_str: str, *, timeout_s: float = 15.0) -> tuple[bool, str]:
+	"""(is_live, reason). Authoritative source, and it had SIX silent failures.
+
+	A bare `except Exception` previously collapsed a subprocess TIMEOUT, a
+	missing interpreter and a crashed helper into the same `False` that a
+	genuinely empty slate produces. A timeout is the one that matters most here:
+	this shells out to a network call on a 15s budget, so a slow StatsAPI reads
+	as "no games are live" and silently drops the loop to the 2-hour pregame
+	cadence mid-slate.
+	"""
 	helper = REPO_ROOT / "scripts" / "fetch_mlb_live_game_pks_for_date.py"
 	if not helper.exists():
-		return False
+		return False, "helper_missing"
 	python_exe = sys.executable if (sys.executable and Path(sys.executable).exists()) else "python"
 	try:
 		result = subprocess.run(
@@ -190,13 +219,51 @@ def _mlb_has_live_game_via_schedule(date_str: str, *, timeout_s: float = 15.0) -
 			text=True,
 			timeout=timeout_s,
 		)
-		if result.returncode != 0:
-			return False
+	except subprocess.TimeoutExpired:
+		# Called out separately because it is the failure that looks most like
+		# a healthy negative and is the likeliest on a live slate.
+		return False, f"timeout:{timeout_s}s"
+	except Exception as exc:
+		return False, f"launch_failed:{type(exc).__name__}"
+	if result.returncode != 0:
+		detail = (result.stderr or "").strip().replace("\n", " ")[:80]
+		return False, f"exit={result.returncode}:{detail}"
+	try:
 		payload = json.loads(result.stdout or "{}")
-		live_game_pks = payload.get("live_game_pks") if isinstance(payload, dict) else None
-		return isinstance(live_game_pks, list) and len(live_game_pks) > 0
 	except Exception:
-		return False
+		return False, f"bad_json:{(result.stdout or '').strip()[:60]!r}"
+	if not isinstance(payload, dict):
+		return False, f"payload_type:{type(payload).__name__}"
+	live_game_pks = payload.get("live_game_pks")
+	if not isinstance(live_game_pks, list):
+		return False, "no_live_game_pks_key"
+	return len(live_game_pks) > 0, f"pks={len(live_game_pks)}"
+
+
+def _mlb_has_live_game_via_schedule(date_str: str, *, timeout_s: float = 15.0) -> bool:
+	return _mlb_live_game_via_schedule_probe(date_str, timeout_s=timeout_s)[0]
+
+
+# Log state for the probe below. Transitions ALWAYS log; a steady state logs at
+# most once per interval, so the line is useful during an incident without
+# adding a per-tick line to a channel that already carries ~125/minute.
+_MLB_LIVE_PROBE_LOG: dict[str, Any] = {"decision": None, "at": 0.0}
+_MLB_LIVE_PROBE_LOG_MIN_INTERVAL_S = 300.0
+
+
+def _log_mlb_live_probe(decision: bool, report_reason: str, schedule_reason: str) -> None:
+	now = time.time()
+	changed = _MLB_LIVE_PROBE_LOG.get("decision") != decision
+	if not changed and (now - float(_MLB_LIVE_PROBE_LOG.get("at") or 0.0)) < _MLB_LIVE_PROBE_LOG_MIN_INTERVAL_S:
+		return
+	_MLB_LIVE_PROBE_LOG["decision"] = decision
+	_MLB_LIVE_PROBE_LOG["at"] = now
+	print(
+		f"[live_refresh_loop] MLB_LIVE_PROBE live={decision} "
+		f"report={report_reason} schedule={schedule_reason}"
+		f"{' CHANGED' if changed else ''}",
+		flush=True,
+	)
 
 
 def _mlb_has_live_game(date_str: str) -> bool:
@@ -208,9 +275,25 @@ def _mlb_has_live_game(date_str: str) -> bool:
 	# itself showing counts.live>0 moments earlier. The schedule-status check
 	# is authoritative and decoupled from that report's own timing, so either
 	# source saying "live" is enough.
-	if _mlb_has_live_game_via_report(date_str):
+	#
+	# RECURRED 2026-08-10, and the reason it took 90 minutes to diagnose is that
+	# BOTH sources returned a bare False. MLB sat on the 2-hour pregame sweep
+	# interval from first pitch (BOS @ TOR live at 22:5xZ) until ~23:01Z, so the
+	# shard took no writes for 91 minutes and F1/F3/F5 plus every `*_alt` market
+	# were absent from the board -- those are fetched only on the per-event path
+	# this gate skips.
+	#
+	# Both inputs were CORRECT when checked by hand at the time: the report read
+	# `counts.live=2` and the helper returned two live game pks. So the failure
+	# was in this evaluation, not in the data, and nothing recorded which of the
+	# eight paths to False was taken. That is what the probes now emit.
+	report_live, report_reason = _mlb_live_game_via_report_probe(date_str)
+	if report_live:
+		_log_mlb_live_probe(True, report_reason, "not_consulted")
 		return True
-	return _mlb_has_live_game_via_schedule(date_str)
+	schedule_live, schedule_reason = _mlb_live_game_via_schedule_probe(date_str)
+	_log_mlb_live_probe(schedule_live, report_reason, schedule_reason)
+	return schedule_live
 
 
 def _espn_has_live_game(sport: str, date_str: str, *, timeout_s: float = 12.0) -> bool:

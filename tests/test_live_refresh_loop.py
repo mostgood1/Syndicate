@@ -3634,3 +3634,124 @@ class TWindowSweepSchedulerTests(unittest.TestCase):
 # per-game hot/cold decision. See fetch_mlb_oddsapi.py's and
 # live_refresh_loop.py's own comments at the removal site for the full
 # chain of evidence.
+
+
+class MlbLiveProbeReasonTests(unittest.TestCase):
+    """The liveness gate returned a bare False from EIGHT distinct paths.
+
+    Twice now that has dropped MLB to the 2-hour pregame sweep interval during
+    a live game (2026-07-17, and again 2026-08-10 for 91 minutes) with nothing
+    recording which path was taken. Both inputs were correct by hand each time,
+    so the value of these tests is that every failure is now NAMED and, in
+    particular, that a subprocess timeout cannot be mistaken for an empty slate.
+    """
+
+    def test_report_probe_distinguishes_unreadable_from_no_live_games(self):
+        # The pair that matters: "this service cannot read the report" and
+        # "the report says nothing is live" have opposite fixes.
+        with patch.object(live_refresh_loop, "read_json_file", return_value=None):
+            unreadable = live_refresh_loop._mlb_live_game_via_report_probe("2026-08-10")
+        with patch.object(live_refresh_loop, "read_json_file", return_value={"counts": {"live": 0}}):
+            no_games = live_refresh_loop._mlb_live_game_via_report_probe("2026-08-10")
+        self.assertEqual(unreadable, (False, "no_payload"))
+        self.assertEqual(no_games, (False, "live=0"))
+        self.assertNotEqual(unreadable[1], no_games[1])
+
+    def test_report_probe_reports_live_count(self):
+        with patch.object(live_refresh_loop, "read_json_file", return_value={"counts": {"live": 2}}):
+            self.assertEqual(
+                live_refresh_loop._mlb_live_game_via_report_probe("2026-08-10"),
+                (True, "live=2"),
+            )
+
+    def test_report_probe_names_a_malformed_counts_block(self):
+        for payload, expected in (
+            ("nope", "payload_type:str"),
+            ({}, "no_counts"),
+            ({"counts": {"live": "x"}}, "live_unparsable:'x'"),
+        ):
+            with self.subTest(payload=payload):
+                with patch.object(live_refresh_loop, "read_json_file", return_value=payload):
+                    live, reason = live_refresh_loop._mlb_live_game_via_report_probe("2026-08-10")
+                self.assertFalse(live)
+                self.assertEqual(reason, expected)
+
+    def test_schedule_probe_timeout_is_not_an_empty_slate(self):
+        # THE REGRESSION THIS FILE EXISTS FOR. A bare `except Exception` made a
+        # 15s network timeout indistinguishable from "no games are live", which
+        # is precisely how a live slate silently gets the pregame cadence.
+        import subprocess as _sp
+
+        def _timeout(*_a, **_k):
+            raise _sp.TimeoutExpired(cmd="helper", timeout=15.0)
+
+        with patch.object(live_refresh_loop.subprocess, "run", side_effect=_timeout):
+            timed_out = live_refresh_loop._mlb_live_game_via_schedule_probe("2026-08-10")
+
+        class _Result:
+            returncode, stdout, stderr = 0, '{"live_game_pks": []}', ""
+
+        with patch.object(live_refresh_loop.subprocess, "run", return_value=_Result()):
+            empty = live_refresh_loop._mlb_live_game_via_schedule_probe("2026-08-10")
+
+        self.assertEqual(timed_out, (False, "timeout:15.0s"))
+        self.assertEqual(empty, (False, "pks=0"))
+        self.assertNotEqual(timed_out[1], empty[1])
+
+    def test_schedule_probe_surfaces_a_crashed_helper(self):
+        class _Result:
+            returncode, stdout, stderr = 1, "", "Traceback: boom"
+
+        with patch.object(live_refresh_loop.subprocess, "run", return_value=_Result()):
+            live, reason = live_refresh_loop._mlb_live_game_via_schedule_probe("2026-08-10")
+        self.assertFalse(live)
+        self.assertTrue(reason.startswith("exit=1:"), reason)
+        self.assertIn("boom", reason)
+
+    def test_schedule_probe_reports_live_pk_count(self):
+        class _Result:
+            returncode, stdout, stderr = 0, '{"live_game_pks": [822780, 824887]}', ""
+
+        with patch.object(live_refresh_loop.subprocess, "run", return_value=_Result()):
+            self.assertEqual(
+                live_refresh_loop._mlb_live_game_via_schedule_probe("2026-08-10"),
+                (True, "pks=2"),
+            )
+
+    def test_public_bool_wrappers_are_unchanged(self):
+        # _LIVE_STATUS_CHECKERS and existing callers take bools; the probes must
+        # not change that contract.
+        with patch.object(live_refresh_loop, "read_json_file", return_value={"counts": {"live": 1}}):
+            self.assertIs(live_refresh_loop._mlb_has_live_game_via_report("2026-08-10"), True)
+        with patch.object(live_refresh_loop, "read_json_file", return_value={"counts": {"live": 0}}):
+            self.assertIs(live_refresh_loop._mlb_has_live_game_via_report("2026-08-10"), False)
+
+    def test_schedule_is_consulted_when_the_report_says_not_live(self):
+        # The 2026-07-17 fix: either source saying live is enough. Asserts the
+        # fallback still runs rather than being short-circuited by the logging.
+        live_refresh_loop._MLB_LIVE_PROBE_LOG["decision"] = None
+        with patch.object(live_refresh_loop, "read_json_file", return_value={"counts": {"live": 0}}):
+            with patch.object(
+                live_refresh_loop,
+                "_mlb_live_game_via_schedule_probe",
+                return_value=(True, "pks=2"),
+            ) as schedule_probe:
+                self.assertIs(live_refresh_loop._mlb_has_live_game("2026-08-10"), True)
+        schedule_probe.assert_called_once()
+
+    def test_a_decision_change_always_logs_even_inside_the_throttle(self):
+        # A steady state is throttled; a TRANSITION must never be suppressed,
+        # because the transition is the event an incident turns on.
+        import io
+        from contextlib import redirect_stdout
+
+        live_refresh_loop._MLB_LIVE_PROBE_LOG["decision"] = False
+        live_refresh_loop._MLB_LIVE_PROBE_LOG["at"] = live_refresh_loop.time.time()
+        buffer = io.StringIO()
+        with redirect_stdout(buffer):
+            live_refresh_loop._log_mlb_live_probe(False, "live=0", "pks=0")  # throttled
+            live_refresh_loop._log_mlb_live_probe(True, "live=2", "not_consulted")  # change
+        output = buffer.getvalue()
+        self.assertEqual(output.count("MLB_LIVE_PROBE"), 1)
+        self.assertIn("live=True", output)
+        self.assertIn("CHANGED", output)
