@@ -2146,28 +2146,57 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     from syndicate.features.shared.odds_book_quotes import book_quotes_path
 
     selected_date = central_today_iso()
+    # #322 follow-up. Building ONLY today froze every finished slate at whatever
+    # the shard held when the Central date rolled. Measured 2026-08-10: the
+    # 2026-08-09 artifact was last written ~04:5xZ and served 807 rows all
+    # segment=full, while that day's completed shard pivots to 5,547 rows
+    # including 1,251 segment rows. A reader looking back at a finished slate
+    # saw a partial board with nothing saying it was partial.
+    #
+    # Yesterday is rebuilt ONCE PER DAY, not every tick: its shard stops growing
+    # after rollover, so re-pivoting a 207MB file every 10 minutes forever would
+    # be pure cost for a byte-identical result. #241 is the standing reminder
+    # that periodic worker work is never free.
+    previous_date = (date.fromisoformat(selected_date) - timedelta(days=1)).isoformat()
+    rebuild_previous = _BOOK_GRID_LAST_RUN.get("previous_date") != previous_date
+    dates = [selected_date] + ([previous_date] if rebuild_previous else [])
+
     written: list[str] = []
     skipped: list[str] = []
-    for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
-        try:
-            if not book_quotes_path(sport, selected_date).is_file():
-                skipped.append(sport)
-                continue
-            payload = build_book_grid_artifact(sport, selected_date)
-            if not payload:
-                skipped.append(sport)
-                continue
-            path = write_book_grid_artifact(sport, selected_date, payload)
-            written.append(f"{sport}:{payload.get('rows_total')}")
+    for build_date in dates:
+        for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
             try:
-                publish_hot_artifact(path)
+                if not book_quotes_path(sport, build_date).is_file():
+                    if build_date == selected_date:
+                        skipped.append(sport)
+                    continue
+                payload = build_book_grid_artifact(sport, build_date)
+                if not payload:
+                    if build_date == selected_date:
+                        skipped.append(sport)
+                    continue
+                path = write_book_grid_artifact(sport, build_date, payload)
+                label = f"{sport}:{payload.get('rows_total')}"
+                written.append(label if build_date == selected_date else f"{label}@{build_date}")
+                try:
+                    publish_hot_artifact(path)
+                except Exception as exc:
+                    print(f"[refresh_worker] BOOK_GRID_PUBLISH_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
             except Exception as exc:
-                print(f"[refresh_worker] BOOK_GRID_PUBLISH_ERROR sport={sport} {type(exc).__name__}: {exc}", flush=True)
-        except Exception as exc:
-            print(f"[refresh_worker] BOOK_GRID_BUILD_ERROR sport={sport} {type(exc).__name__}: {exc}", flush=True)
+                print(f"[refresh_worker] BOOK_GRID_BUILD_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
+    # Marked only after the pass, so a crash mid-rebuild retries next tick
+    # rather than marking the day done and leaving it frozen for good.
+    if rebuild_previous:
+        _BOOK_GRID_LAST_RUN["previous_date"] = previous_date
+
     if not written and not skipped:
         return None
-    return {"date": selected_date, "written": written, "skipped_no_shard": skipped}
+    return {
+        "date": selected_date,
+        "written": written,
+        "skipped_no_shard": skipped,
+        "rebuilt_previous": previous_date if rebuild_previous else None,
+    }
 
 
 def main() -> int:

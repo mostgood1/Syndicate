@@ -47,9 +47,35 @@ from syndicate.features.shared.refresh_state_store import data_root
 
 # Bounded on purpose. The endpoint's own max is 2000 and its default is 300, so
 # this carries more than any single request can show while staying a file a
-# service boundary will actually move. Measured shape: ~9 KB per grid row, so
-# 1500 rows is ~13 MB.
-BOOK_GRID_ARTIFACT_MAX_ROWS = 1500
+# service boundary will actually move.
+#
+# RAISED 1500 -> 6000 on 2026-08-10, because the original figure came from a
+# guess and the guess was 3.4x wrong. It assumed ~9 KB per grid row. Measured by
+# building this artifact from the complete production shard for 2026-08-09
+# (478,782 quote rows, a 15-game MLB slate at 44 books):
+#
+#   full grid   5,547 rows   14,494,552 bytes   ->  2,613 bytes/row
+#     cap 1500    6.68 MB   keeps  27.0%   <- what shipped, discarding 4,047 rows
+#     cap 3000    9.83 MB   keeps  54.1%
+#     cap 6000   13.82 MB   keeps 100.0%
+#
+# So the deployed bound was throwing away 73% of a real day's board while
+# reporting `rows_truncated` correctly and nobody reading it. The slice is at
+# least PROPORTIONAL -- it kept 336 of 1,251 segment rows (26.9%) against
+# 1500/5547 (27.0%) -- so it was not silently dropping whole categories, which
+# is the failure this could have been and was not.
+#
+# 6000 is sized to hold a complete day of the largest slate measured, with the
+# truncation signal left intact rather than raised until it can never fire: a
+# busier day SHOULD still report `rows_truncated` rather than pretend.
+#
+# Safe at this size on both transports, checked rather than assumed:
+#   - written with os.replace to disk, NOT through write_json_file, so the
+#     8,388,608-byte keyvalue ceiling does not apply to it
+#   - 13.8 MB is above _PUBLISH_STREAM_MIN_BYTES (4 MB), so it crosses on the
+#     streamed publish path and never takes ops.py's three-resident-copy JSON
+#     envelope
+BOOK_GRID_ARTIFACT_MAX_ROWS = 6000
 
 BOOK_GRID_ARTIFACT_VERSION = 1
 
