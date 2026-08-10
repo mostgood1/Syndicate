@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from syndicate.blueprints.layer1_page import render_layer1_board
 from flask import Blueprint, jsonify, render_template, request
 
 from syndicate.features.ncaab.cards import build_cards_page_context
@@ -69,6 +70,16 @@ def hub():
 @ncaab_bp.get("")
 def root_cards():
     return cards()
+
+
+@ncaab_bp.get("/market-board")
+def market_board():
+    """`#329`. This route did not exist: /ncaab/market-board returned 404 on
+    production 2026-08-10 while /api/board/book-grid served ncaab by
+    parameter. Out of season it renders an empty board that says WHY (`#296`),
+    which is a different and more useful answer than "no such page".
+    """
+    return render_layer1_board("ncaab")
 
 
 @ncaab_bp.get("/cards")

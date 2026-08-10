@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from syndicate.blueprints.layer1_page import render_layer1_board
 from flask import Blueprint, jsonify, redirect, render_template, request
 
 from syndicate.features.soccer.archive import build_archive_api_payload
@@ -108,6 +109,20 @@ def api_cards(league: str):
     week = _selected_week(league, season)
     context = build_cards_page_context(league, week, season)
     return jsonify(build_game_board_api_payload(context))
+
+
+@soccer_bp.get("/market-board")
+def market_board_all_leagues():
+    """`#329`. Soccer's ONLY board was per-league, so there was no way to see
+    the whole competition set at once -- and until `#330` the pivot dropped
+    `league` entirely, so a combined board could not have labelled its own
+    rows anyway. The shared board names each competition and filters by it,
+    which is what makes one page across ten leagues readable.
+
+    The per-league route below is kept: it is linked from the soccer hub and
+    is the right entry point when you already know which league you want.
+    """
+    return render_layer1_board("soccer")
 
 
 @soccer_bp.get("/<league>/market-board")

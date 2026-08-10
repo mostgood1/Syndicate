@@ -1,0 +1,290 @@
+{% extends "shared/base.html" %}
+
+{#
+  L1: the per-sport Layer 1 board, ONE template for all eight sports (`#329`).
+
+  Replaces the page half of the per-sport market boards. Those were six bespoke
+  builders and two sports with no page at all -- NHL and NCAAB returned 404 on
+  production 2026-08-10 while the grid served them by parameter.
+
+  WHAT THIS TAKES FROM `book_grid.html` AND WHY. The row model is the grid's:
+  one row per market INSTANCE carrying every side, so a total is "over 8.5 -101 /
+  under 8.5 -119, six books" on one line instead of two rows the reader has to
+  pair up by eye. Proj/Edge/Fair/Consensus read the same fields off the same
+  enriched row (`#328`), deliberately -- two surfaces computing "the best price"
+  two ways is how they drift.
+
+  WHAT IT ADDS. Games, not a flat list: `/api/board/layer1` groups rows into
+  cards, so the board reads as a slate. Plus the pregame/live split, which is
+  the thing a flat grid cannot express -- a game that goes live must LEAVE the
+  pregame board in the same instant it joins the live one, and both views come
+  from ONE fetch so they cannot disagree across the transition.
+#}
+
+{% block title %}Syndicate | {{ sport|upper }} Market Board{% endblock %}
+{% block page_title %}{{ sport|upper }} Market Board{% endblock %}
+
+{% block extra_head %}
+<style>
+  .l1-wrap { padding: 0 12px 40px; }
+  .l1-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
+  .l1-controls select, .l1-controls input {
+    background: #131a24; color: #e8eef7; border: 1px solid #26313f;
+    border-radius: 6px; padding: 6px 9px; font-size: 13px;
+  }
+  .l1-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+  .l1-tab {
+    padding: 5px 11px; border-radius: 999px; cursor: pointer; font-size: 12px;
+    background: #141b25; color: #9fb0c6; border: 1px solid #26313f; white-space: nowrap;
+  }
+  .l1-tab--on { background: #1d4ed8; color: #fff; border-color: #2563eb; }
+  .l1-tab--live.l1-tab--on { background: #b91c1c; border-color: #dc2626; }
+
+  .l1-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #9fb0c6; margin-bottom: 12px; }
+  .l1-meta b { color: #e8eef7; }
+  .l1-warn { color: #f0b429; }
+
+  /* Compact game cards. The slate at a glance, then the markets under it. */
+  .l1-card {
+    border: 1px solid #1e2733; border-radius: 8px; margin-bottom: 14px;
+    background: #0f151d; overflow: hidden;
+  }
+  .l1-card__head {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline;
+    padding: 9px 12px; background: #121a24; border-bottom: 1px solid #1a2230;
+  }
+  .l1-card__match { font-size: 14px; font-weight: 700; color: #e8eef7; }
+  .l1-card__bits { font-size: 11px; color: #8fa2b8; display: flex; gap: 12px; flex-wrap: wrap; }
+  .l1-state {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .04em;
+    padding: 2px 7px; border-radius: 999px; border: 1px solid #26313f; color: #9fb0c6;
+  }
+  .l1-state--live { background: #7f1d1d; border-color: #b91c1c; color: #fecaca; }
+  .l1-state--pregame { background: #1e3a8a; border-color: #2563eb; color: #dbeafe; }
+  .l1-state--final { background: #1f2937; color: #9ca3af; }
+  /* Unknown is styled to look UNRESOLVED, not neutral: it means the game-state
+     join failed, and a settled market must not read as a bettable pregame. */
+  .l1-state--unknown { background: #422006; border-color: #b45309; color: #fed7aa; }
+
+  .l1-scroll { overflow-x: auto; }
+  table.l1 { border-collapse: collapse; width: 100%; font-size: 12px; }
+  table.l1 th, table.l1 td { padding: 5px 8px; border-bottom: 1px solid #1a2230; text-align: right; white-space: nowrap; }
+  table.l1 th { background: #0f151d; color: #8fa2b8; font-weight: 600; font-size: 11px; }
+  table.l1 td.l1-mkt, table.l1 th.l1-mkt { text-align: left; }
+  table.l1 tr:hover td { background: #121a24; }
+  .l1-side { color: #8fa2b8; font-size: 11px; }
+  .l1-price { font-variant-numeric: tabular-nums; }
+  .l1-best { color: #34d399; font-weight: 700; }
+  .l1-edge-pos { color: #34d399; }
+  .l1-edge-neg { color: #f87171; }
+  .l1-gap { color: #f0b429; font-size: 11px; cursor: help; }
+  .l1-empty { padding: 26px 12px; color: #8fa2b8; font-size: 13px; }
+  .l1-empty code { color: #f0b429; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="l1-wrap">
+  <div class="l1-controls">
+    <label>Sport
+      <select id="l1-sport">
+        {% for s in sports %}<option value="{{ s }}" {% if s == sport %}selected{% endif %}>{{ s|upper }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Date <input type="date" id="l1-date" value="{{ selected_date }}"></label>
+    <label>Window
+      <select id="l1-window">
+        <option value="day">Day</option>
+        <option value="slate" selected>Slate</option>
+      </select>
+    </label>
+    <button id="l1-refresh" class="l1-tab">Refresh</button>
+    <a class="l1-tab" href="/market-board/books?sport={{ sport }}&date={{ selected_date }}">Book grid →</a>
+  </div>
+
+  <div class="l1-tabs" id="l1-views"></div>
+  <div class="l1-tabs" id="l1-leagues"></div>
+  <div class="l1-meta" id="l1-meta"></div>
+  <div id="l1-body"></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  var state = { sport: "{{ sport }}", date: "{{ selected_date }}", window: "slate", view: "all", league: "", board: null };
+
+  function q(id) { return document.getElementById(id); }
+  function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+  function pct(v) { return (v === null || v === undefined) ? "" : (v > 0 ? "+" : "") + Number(v).toFixed(1) + "%"; }
+  function odds(v) { return (v === null || v === undefined) ? "·" : (v > 0 ? "+" + v : String(v)); }
+
+  // The side the PROJECTION describes, not the first side. Mirrors book_grid's
+  // rule exactly -- rendering Proj/Edge against the wrong side is how a board
+  // shows a real number attached to the bet nobody modelled.
+  function projSide(r) {
+    var p = r.projection || {};
+    return p.side || (r.sides || [])[0];
+  }
+
+  function fetchBoard() {
+    var url = "/api/board/layer1?sport=" + encodeURIComponent(state.sport)
+            + "&date=" + encodeURIComponent(state.date)
+            + "&window=" + encodeURIComponent(state.window)
+            + "&view=" + encodeURIComponent(state.view)
+            + (state.league ? "&league=" + encodeURIComponent(state.league) : "");
+    q("l1-body").innerHTML = '<div class="l1-empty">Loading…</div>';
+    fetch(url, { headers: { "Accept": "application/json" } })
+      .then(function (r) { return r.json(); })
+      .then(function (b) { state.board = b; render(); })
+      .catch(function (e) {
+        q("l1-body").innerHTML = '<div class="l1-empty">Board request failed: ' + esc(e && e.message) + "</div>";
+      });
+  }
+
+  function renderViews() {
+    var b = state.board || {}, c = (b.counts || {}).by_state || {};
+    // Counts on the tabs, because "Live" with no number cannot be told from
+    // "Live (0)" -- and an empty live board during a live slate is a defect
+    // worth seeing, not a blank tab.
+    var views = [
+      ["all", "All", (b.counts || {}).games],
+      ["pregame", "Pregame", c.pregame],
+      ["live", "Live", c.live],
+      ["final", "Final", c.final],
+      ["unknown", "Unresolved", c.unknown]
+    ];
+    q("l1-views").innerHTML = views.map(function (v) {
+      // The unresolved tab only appears when there ARE unresolved games. It is
+      // a diagnostic, not a permanent fixture.
+      if (v[0] === "unknown" && !v[2]) { return ""; }
+      var on = state.view === v[0] ? " l1-tab--on" : "";
+      var live = v[0] === "live" ? " l1-tab--live" : "";
+      return '<span class="l1-tab' + live + on + '" data-view="' + v[0] + '">' + v[1]
+           + (v[2] === undefined || v[2] === null ? "" : " " + v[2]) + "</span>";
+    }).join("");
+    Array.prototype.forEach.call(q("l1-views").querySelectorAll("[data-view]"), function (el) {
+      el.onclick = function () { state.view = el.getAttribute("data-view"); fetchBoard(); };
+    });
+  }
+
+  function renderLeagues() {
+    var b = state.board || {}, leagues = b.leagues || {};
+    var keys = Object.keys(leagues);
+    // Absent for single-competition sports rather than echoing the sport slug,
+    // which would put a pointless one-item tab strip on seven boards.
+    if (!keys.length) { q("l1-leagues").innerHTML = ""; return; }
+    var html = ['<span class="l1-tab' + (state.league ? "" : " l1-tab--on") + '" data-league="">All leagues</span>'];
+    keys.forEach(function (k) {
+      var on = state.league === k ? " l1-tab--on" : "";
+      html.push('<span class="l1-tab' + on + '" data-league="' + esc(k) + '">' + esc(k) + " " + leagues[k] + "</span>");
+    });
+    q("l1-leagues").innerHTML = html.join("");
+    Array.prototype.forEach.call(q("l1-leagues").querySelectorAll("[data-league]"), function (el) {
+      el.onclick = function () { state.league = el.getAttribute("data-league"); fetchBoard(); };
+    });
+  }
+
+  function renderMeta() {
+    var b = state.board || {}, c = b.counts || {};
+    var bits = [
+      "<span><b>" + (c.games || 0) + "</b> games</span>",
+      "<span><b>" + (c.rows || 0) + "</b> markets</span>",
+      "<span><b>" + (c.rows_with_projection || 0) + "</b> with a projection</span>"
+    ];
+    // PROVENANCE, not decoration. `#331` is the standing reason: the grid was
+    // once built from 1.7% of the day's odds and every count downstream looked
+    // entirely real. A thin board must be attributable to the artifact.
+    if (b.generated_at) { bits.push("<span>built " + esc(String(b.generated_at).slice(11, 19)) + "Z</span>"); }
+    if (b.enrichment && b.enrichment !== "enriched") {
+      bits.push('<span class="l1-warn">' + esc(b.enrichment) + "</span>");
+    }
+    // A partial window says so. Silent truncation reads as "that is all there
+    // is", which is the failure this whole lane keeps meeting.
+    if (b.window_partial) {
+      bits.push('<span class="l1-warn">partial window — no artifact for '
+        + esc((b.window_dates_missing_artifact || []).join(", ")) + "</span>");
+    }
+    q("l1-meta").innerHTML = bits.join("");
+  }
+
+  function rowHtml(r) {
+    var side = projSide(r);
+    var p = r.projection || {};
+    var best = (r.best || {})[side] || {};
+    var cons = (r.consensus || {})[side];
+    var fair = ((r.modelled_fair || {})[side] || {}).fair_price;
+    var label = r.player_name ? esc(r.player_name) : esc(r.market);
+    var seg = (r.segment && r.segment !== "full") ? ' <span class="l1-side">' + esc(r.segment) + "</span>" : "";
+    var line = (r.line === null || r.line === undefined) ? "" : " " + r.line;
+    var edge = p.edge_vs_market_pct;
+    var edgeCls = edge === null || edge === undefined ? "" : (edge > 0 ? "l1-edge-pos" : "l1-edge-neg");
+    var gaps = (r.gaps || []).length
+      ? ' <span class="l1-gap" title="' + esc((r.gaps || []).join(" · ")) + '">⚠</span>' : "";
+    return "<tr>"
+      + '<td class="l1-mkt">' + label + line + seg + gaps
+        + (r.player_name ? ' <span class="l1-side">' + esc(r.market) + "</span>" : "") + "</td>"
+      + '<td class="l1-side">' + esc(side || "") + "</td>"
+      + "<td>" + (p.projected === null || p.projected === undefined ? "·" : Number(p.projected).toFixed(2)) + "</td>"
+      + '<td class="' + edgeCls + '">' + (edge === null || edge === undefined ? "·" : pct(edge)) + "</td>"
+      + '<td class="l1-price l1-best">' + odds(best.price) + "</td>"
+      + '<td class="l1-side">' + esc(best.book || "") + "</td>"
+      + '<td class="l1-price">' + odds(fair) + "</td>"
+      + '<td class="l1-price">' + odds(cons) + "</td>"
+      + "<td>" + (r.books_quoting || 0) + "</td>"
+      + "</tr>";
+  }
+
+  function cardHtml(g) {
+    var st = String(g.state || "unknown");
+    var when = g.start_time_utc ? String(g.start_time_utc).slice(11, 16) + "Z" : "";
+    var score = (g.away_score !== null && g.away_score !== undefined)
+      ? " " + g.away_score + "–" + g.home_score : "";
+    var rows = (g.rows || []).map(rowHtml).join("");
+    return '<div class="l1-card">'
+      + '<div class="l1-card__head">'
+      +   '<span class="l1-card__match">' + esc(g.matchup || "—") + esc(score) + "</span>"
+      +   '<span class="l1-state l1-state--' + esc(st) + '">' + esc(st) + "</span>"
+      +   '<span class="l1-card__bits">'
+      +     (when ? "<span>" + esc(when) + "</span>" : "")
+      +     (g.league ? "<span>" + esc(g.league) + "</span>" : "")
+      +     "<span>" + (g.game_market_count || 0) + " game · " + (g.prop_market_count || 0) + " prop</span>"
+      +     "<span>" + (g.rows_with_projection || 0) + " projected</span>"
+      +   "</span>"
+      + "</div>"
+      + '<div class="l1-scroll"><table class="l1"><thead><tr>'
+      +   '<th class="l1-mkt">Market</th><th>Side</th><th>Proj</th><th>Edge</th>'
+      +   "<th>Best</th><th>Book</th><th>Fair</th><th>Consensus</th><th>Books</th>"
+      + "</tr></thead><tbody>" + rows + "</tbody></table></div>"
+      + "</div>";
+  }
+
+  function render() {
+    var b = state.board || {};
+    renderViews(); renderLeagues(); renderMeta();
+    var games = b.games || [];
+    if (!games.length) {
+      // NEVER a bare empty state. `#296`: a sport with no quotes must say WHY,
+      // not vanish -- out of season, no shard captured and "the join dropped
+      // everything" are three different facts that render identically otherwise.
+      var why = b.empty_reason || "no rows for this sport and date";
+      q("l1-body").innerHTML = '<div class="l1-empty">No games on this board. Reason: <code>'
+        + esc(why) + "</code>"
+        + (b.counts && b.counts.rows_other_dates
+            ? "<br>" + b.counts.rows_other_dates + " market rows in this artifact belong to other dates."
+            : "")
+        + "</div>";
+      return;
+    }
+    q("l1-body").innerHTML = games.map(cardHtml).join("");
+  }
+
+  q("l1-sport").onchange = function () { state.sport = this.value; state.league = ""; window.location.href = "/" + state.sport + "/market-board?date=" + state.date; };
+  q("l1-date").onchange = function () { state.date = this.value; fetchBoard(); };
+  q("l1-window").onchange = function () { state.window = this.value; fetchBoard(); };
+  q("l1-refresh").onclick = fetchBoard;
+
+  fetchBoard();
+})();
+</script>
+{% endblock %}
