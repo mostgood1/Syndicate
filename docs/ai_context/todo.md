@@ -1139,7 +1139,126 @@ it now has a date.
 **`#310` closes.** The remaining work — why boxscore ingestion stopped on
 2026-05-24 — is `#314`'s question and needs its own owner.
 
-### #285 — `malloc_trim(0)` SHIPPED, NOT DEPLOYED. And the target is 465MB, not 900MB: the exact worker RSS that produced the day's one good board is measured
+### #285 — RESULT, 46-minute window: `malloc_trim` returned **1109.6MB** and `gc.collect()` returned **−104.3MB**. Hypothesis (1) settled. The ratchet is HALVED, not stopped — still OPEN at +11 MB/min
+
+**Deployed `e3b378de`, refresh-worker, live 23:11:48Z. Measured to T+46. Read the
+ladder, not a verdict — three of four rungs moved and the fourth moved once.**
+
+```
+rung                                        result
+1  the ctypes binding bound                 CLEARED   available:true, libc.so.6, pid 38
+2  allocator retention is real              CLEARED   decisively, see below
+3  the ratchet stops latching               PARTIAL   +24 -> +11 MB/min, slowed not stopped
+4  a board builds past the boot window      ONCE      T+38, count=69
+```
+
+#### Rung 2 — this is the finding, and it is not close
+
+24 trim calls across the window:
+
+```
+anon returned to the kernel BY TRIM :  1109.6 MB
+anon returned to the kernel BY GC   :  - 104.3 MB    (gc released >0.05MB on 2 of 24)
+```
+
+**The collection returned NEGATIVE memory**: across 24 measurements anon rose
+during `gc.collect()` more often than it fell. `malloc_trim` returned 1.1GB over
+the same calls. `#285`'s two hypotheses were never exclusive and hypothesis (1)
+was the larger part of it — the retention was allocator-held, and no amount of
+collecting was ever going to touch it. That is the 01:03/01:05 sample pair
+generalised from n=1 to n=24.
+
+The cleanest single line, right after the hydrated overview at T+1:
+
+```
+anon 782.383 -> 782.383 -> 696.730     gc released 0.0MB, trim released 85.7MB
+```
+
+#### Rung 3 — slowed to 45%, and the residual is a DIFFERENT mechanism
+
+```
+pid-38 RSS at post_pool_assembled          failing boot, for comparison
+T+26   877.9                               best reading all evening   1034.1  (T+15)
+T+28   867.0                               plateau                    1494 - 1577
+T+31   906.2
+T+34  1007.4        full-window slope +11.00 MB/min
+T+38  1120.9        failing boot's post-boot ratchet was ~+24 MB/min
+T+43  1045.3
+T+46  1057.4
+```
+
+**The trim releases everything already free, three times per cycle, and RSS
+still climbs 11MB/min.** That residual therefore cannot be free-but-unreturned
+memory — it is either live objects accumulating or free memory too fragmented
+for `malloc_trim` to hand back whole pages. Neither responds to more trimming.
+
+**So the next probe is `mallopt(M_ARENA_MAX, 2)` and the reason is now specific
+rather than generic: it attacks fragmentation ACROSS arenas, which is the one
+remaining mechanism consistent with these numbers.** It is code-only via
+`ctypes` — the recorded objection that arena_max means a blueprint sync applies
+to the env var, not to `mallopt`.
+
+#### Rung 4 — the honest version
+
+```
+12 cycles, 2 non-zero:   T+10  count=259   (boot window, worthless as evidence)
+                         T+38  count=69    (past the boot window)
+```
+
+**The failing boot produced ZERO non-zero pools after its T+15 build, across
+3+ hours.** One at T+38 is a real difference and it marginally satisfies the
+brief's "at least once per 30 minutes" — on a sample of exactly one interval,
+which is not enough to call it sustained.
+
+#### WHY THE BOARD STILL DOES NOT APPEAR — and it is no longer this item
+
+The guard fired on 10 of 12 cycles, headroom 2241–2874 against the 3000 floor.
+`headroom ≈ 4096 − anon − active_file`, so clearing it needs
+`anon + active_file ≤ 1096`. **Post-trim anon alone is 1129–1374.** Even at zero
+page cache the floor is unreachable, because the worker's ordinary working set
+now exceeds what the floor permits.
+
+That is a different problem from the ratchet `#285` describes.
+
+#### THE QUESTION THIS OPENS, stated with its caveat because it is dangerous
+
+The full **eight-sport** hydrated overview cost **+684MB** on this boot — anon
+98.1 → 782.1 across 23:12:17 → 23:12:57, guard not firing, measured end to end.
+MLB alone was +677MB.
+
+**The 3000MB floor was sized off a 2026-08-07 measurement of +2531MB for MLB
+alone. Tonight's number is 3.7x smaller, and the floor is 4.4x the measured cost
+of the stage it guards.**
+
+**DO NOT act on this yet.** It is one sample; it contradicts the measurement the
+floor was built on; `#290` was explicit that lowering the floor converts "board
+empty" into "worker OOM-killed", which is strictly worse; and two confounders
+have to be separated first — tonight's slate size, and the soccer per-league
+split in `fd119e17` that shipped in this same commit. But it is now the largest
+single thing between this pipeline and a board, and it deserves a deliberate
+measurement rather than inheriting a constant from a night with different
+conditions. That is `#290`'s own step-1 method: measure the guarded stage's cost
+independently of the guard.
+
+#### METHOD — I called rung 3 wrong at T+30 and the shape is worth keeping
+
+At T+30 I reported "twelve minutes, no upward trend" off six points reading
+783–878. The seventh point was 1007.4 and the fitted slope was +11 MB/min all
+along. **I judged a plateau on a window shorter than the one the failing boot
+needed to reveal its own ratchet — which took 23 minutes.** Six noisy points
+inside a 95MB band looked flat because a 12-minute window cannot resolve an
+11MB/min slope against that much noise.
+
+Then at T+36 a single anon reading came back DOWN (1288.9 → 1178.8) and I nearly
+swung back. **Two opposite calls off short windows is worse than one wrong one**,
+and the fix was to stop calling and let three more cycles land — after which the
++11.00 MB/min slope reproduced exactly on an independent 20-minute window.
+
+The rule: **when the quantity oscillates, the minimum window is set by the
+signal you are trying to exclude, not by how long you have been watching.**
+[[worker memory is boot-confounded]]
+
+### #285 — earlier framing: `malloc_trim(0)` shipped, and the target is 465MB, not 900MB
 
 **The discriminator from this item's own "options" list is now code, committed,
 awaiting a deploy the user performs.** Three calls to a new
