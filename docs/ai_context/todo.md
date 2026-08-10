@@ -353,6 +353,22 @@ match, so:
 So: **trust absence, verify presence.** Which is the opposite of the usual
 warning about log queries, and is why it is worth writing down.
 
+**Third hazard on the same API, and the worst of the three because it is
+silent: `direction=backward` returns the page OLDEST-FIRST.** `rows[0]` is not
+the most recent line — it is the *oldest of the newest N*. Measured:
+
+```
+SOCCER_UNIT_LAUNCHED, limit=20, direction=backward
+  as-returned:  23:12:18, 00:12:33, 01:27:01, 02:27:21, 03:28:00 ...
+  sorted:       ... 04:28:06, 08:28:17, 12:28:30   <- actual latest
+```
+
+I used `rows[0]` as "last soccer launch" in a deploy guard and it reported
+**08:28** when the true latest was **12:28** — a four-hour error, in the
+direction that says "nothing running lately, safe to deploy". **Always sort by
+timestamp yourself, and for an in-flight check assert recency against a window
+(`is the newest hit within N minutes`) rather than reading any index.**
+
 Incidentally the line above is direct evidence for something I had only argued
 from code: refresh-worker really does write this bucket, via
 `--run-summary-path` on a subprocess it spawned at 15:04Z.
