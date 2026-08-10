@@ -16,6 +16,435 @@ work takes the next free number (see the counter at the top of `todo.md`).
 
 ---
 
+## Closed 2026-08-10 — the memory excursion whose stage name was a bystander, and the instrument that could not see it (`#327`)
+
+
+**Status: measured on production 2026-08-10, re-derived independently from the
+raw logs rather than inherited. Not fixed. Filed at the `#285` lane's suggestion
+after their verification; the instrument half is sharpened here.**
+
+#### The excursion
+
+refresh-worker `87cdd3e1`, pid 38 (started 15:59:12Z). Three consecutive
+`post_mlb_sim_tick` samples:
+
+```
+16:32:36   pid38 1050.6   container 1923.9   accounted 1106.0
+16:33:14   pid38 1867.4   container 2709.9   accounted 1896.4   <-- +816.7 / +786.0 / +790.5
+16:33:48   pid38 1079.9   container 1928.4   accounted 1135.1
+```
+
+**All three metrics move together, which is the check that matters.** A `/proc`
+artifact moves `rss_mb` alone; `container_memory_mb` comes from a different
+source entirely (cgroup), so a lockstep +786MB there makes this real memory
+rather than a bad read. Back to baseline within 72 seconds.
+
+#### Why it deserves an ID separate from `#285`
+
+`#285` owns a **ratchet** — ~11 MB/min, sustained, with or without the arena
+cap. This is a **spike**: 817MB up and back in ~72s. Different shape, different
+place (`post_mlb_sim_tick`, not the overview build everyone has been blaming),
+and it does not move `#285`'s rate one way or the other.
+
+**Headroom is the reason to care.** 1867MB process / 2710MB container leaves
+~1.4GB. A hydrated overview measured at ~+700MB tonight, landing on the same
+cycle, puts the container near **3.4GB against a 4GB cap**. Nobody has been
+looking here.
+
+#### The instrument gap, and it is worse than "a stage logs to stderr"
+
+The `#285` lane found their RSS series was blind to this: **172 pid-38 samples
+in the logs against 39 in the ring buffer at
+`/api/ops/intelligence/memory-diagnostics` — they had been reading 23%.** And
+the missing 77% is not a random sample; it carries the highest values:
+
+```
+post_mlb_sim_tick                n=34  max=1867.4  median=959.6   <- invisible
+live_lens_tick_after_build_mlb   n= 9  max=1118.7  median=985.4   <- invisible
+post_pool_assembled                    max=1044.1                 <- all they saw
+```
+
+**The sharpened mechanism, verified from the code here:** it is NOT that the sim
+tick calls a different, humbler logger. **There are TWO functions with the SAME
+NAME and only one of them persists:**
+
+| | writes stderr | writes ring buffer |
+|---|---|---|
+| `pipeline/intelligence_state.py:2649` `_diag_log_all_process_memory` | yes | **yes** (`_diag_dump_checkpoint_to_disk`) |
+| `scripts/run_refresh_worker.py:2086` `_diag_log_all_process_memory` | yes | **no** |
+
+`run_refresh_worker.py:2306` calls `_diag_log_all_process_memory("post_mlb_sim_tick")`
+— which reads, at the call site, exactly like the one that persists. **A reader
+checking "is this stage instrumented?" sees the right function name and stops.**
+
+This is the same shape as `#317`'s two board-snapshot write sites and `#105`
+before it: a near-duplicate helper where only one copy receives the fix. The
+repo keeps producing them. **Fix by extracting ONE helper, not by adding the
+missing line to the second copy** — that is the lesson `#317` had to learn twice.
+
+#### UPDATE 2026-08-10 — IT RECURS, IT IS EXCLUSIVELY `post_mlb_sim_tick`, AND IT IS NOT A CADENCE
+
+Owned by the soccer-concurrency lane after `#282`/`#311` closed. **The
+instrument fix `3e1096fb` is committed and NOT DEPLOYED**, so none of this came
+from the ring buffer — it is all from the log channel, which was never blind.
+
+**First attempt was worthless and the reason is reusable.** I compared every
+sample against a fixed 1500MB threshold and got **1733 of 2967 samples over it
+(58%)**. That measures the baseline, not an excursion, and it spanned four boots
+whose baselines differ. **A threshold test cannot find a spike in a series whose
+floor moves.**
+
+The entry's own evidence was never a threshold — it was a *three-sample shape*
+(1050.6 → 1867.4 → 1079.9). So the right test is local and boot-relative: how
+far does a sample sit above the mean of its two immediate neighbours, never
+measured across a restart. Over 5 hours, 3,914 samples, 5 boot segments:
+
+```
+15:32:27Z  post_mlb_sim_tick    933.2 -> 1586.7  (+653.5)  container 2296.9
+16:14:53Z  post_mlb_sim_tick    937.4 -> 1430.9  (+493.6)  container 2347.3   +42.4 min
+16:33:14Z  post_mlb_sim_tick   1120.5 -> 1896.4  (+775.9)  container 2709.9   +18.3 min
+16:44:18Z  post_mlb_sim_tick   1160.6 -> 2030.8  (+870.2)  container 2792.7   +11.1 min
+```
+
+**1. It recurs.** `n=4` in 5 hours, not the `n=1` this entry recorded. The
+16:33:14Z event is the one already filed here (1896.4 accounted vs the 1867.4
+pid-38 RSS quoted above — different fields, same event).
+
+**2. Exclusively `post_mlb_sim_tick`, and that is threshold-robust.** At a
+400MB bar, **4 of 4**. Dropping the bar to 250MB gives 8, of which 5 are this
+stage and the three others are all `live_lens_tick_*` at 287–380MB — **every
+excursion above ~490MB is `post_mlb_sim_tick` and nothing else is close.**
+Checking two thresholds matters because `n` is otherwise an artefact of the bar
+I happened to pick.
+
+**3. It is NOT a cadence, and this entry's caution was right.** Gaps are 42.4,
+18.3 and 11.1 minutes — scattered, not periodic. Do not build a "spikes every N
+minutes" claim; that remains unsupported with the sample size larger, not
+smaller.
+
+**4. THE APPARENT GROWTH IS NOT A TREND CLAIM.** Both the excursion size
+(+653 → +494 → +776 → +870) and the floor it launches from (933 → 937 → 1121 →
+1161) look like they are climbing, and container peak went 2297 → 2793. **That
+is four points, and this file records the same error at least three times** —
+the "accelerating OOM loop" from three boot gaps, the 5-sample live-lens median,
+the n=7 memory peak. **I am explicitly not claiming a trend.** It is worth
+re-measuring over a longer window; it is not worth acting on. [[a rate, not a count]]
+
+**Headroom, stated as the reason to care:** peak container 2792.7MB against the
+4096MB cap — **68%**, from a stage nobody was watching, with the hydrated
+overview (~+700MB) able to land on the same cycle.
+
+#### ATTRIBUTION 2026-08-10: `post_mlb_sim_tick` IS A BYSTANDER. FIVE causes eliminated (the fifth retracted, then RESTORED on a direct test), none confirmed
+
+**The stage in the name did not allocate the memory.** At every one of the four
+excursions the tick's own `MLB_SIM_TICK` meta reports **every sub-feature
+gated**:
+
+```
+lookAhead            launched=false  within_check_interval
+lookAheadDay2        launched=false  within_check_interval
+mlbDailySim          launched=false  intelligence_pipeline_busy
+mlbEveningNextDaySim launched=false  before_evening_window
+mlbStatcastRefresh   launched=false  within_check_interval
+```
+
+**The tick launched nothing and did a handful of gate checks.** It cannot be
+holding 817MB. `post_mlb_sim_tick` is simply the stage whose sample lands where
+the memory already is — **the label marks the OBSERVER, not the ALLOCATOR**, and
+anyone optimising the sim tick on the strength of this stage name will be
+working on the wrong code. That is the single most useful thing in this entry.
+
+#### Eliminated, each with its own evidence
+
+**1. NOT a child process.** `accounted_rss_mb` sums every process in the
+container, so a sim subprocess would look identical. It is not one — the growth
+is inside the long-lived worker:
+
+```
+15:32:27  pid 39  +681.1MB of +655.2 total   (104% in-process)
+16:14:53  pid 38  +503.5MB of +503.5 total   (100%)
+16:33:14  pid 38  +816.7MB of +790.5 total   (103%)
+16:44:18  pid 38  +878.5MB of +878.5 total   (100%)
+```
+
+**No new processes at any peak.** (>100% because one other process exited in the
+same interval.)
+
+**2. NOT the intelligence overview thread.** refresh-worker is one multithreaded
+process, so a background thread could hold it and no per-process metric could
+tell. Tested rather than assumed: `build_candidate_pool_start` /
+`OVERVIEW_SPORT_BEGIN` follow each peak by **+83s, +88s, +75s, +72s** and read
+**949.8 / 957.2 / 1121.4 / 1181.3 MB** — baseline. The overview builds *after*
+the excursion has already drained.
+
+**3. NOT a large artifact read.** The whole keyvalue store is **37.04MB**, largest
+single key **8.39MB**. No parse of that can reach 800MB.
+
+**4. NOT the `#322` book-grid tick** — the most attractive candidate, since it
+reads the 207MB MLB `book_quotes` shard uninstrumented between samples.
+**Correlation is suggestive and the mechanism does not survive:** every peak
+follows a `BOOK_GRID_TICK` by **2.5 / 4.9 / 3.2 / 3.8 min**, but samples are
+~30s apart, so a direct allocation would surface at the *next* sample, not five
+minutes later. Decisively, there are **13 book-grid ticks against 4 peaks** in
+the same window — if it were the cause it would fire three times as often as it
+does. **A correlation that requires the effect to arrive 5 minutes late and skip
+two thirds of its causes is not a mechanism.**
+
+#### What that leaves, stated as a search space rather than a suspicion
+
+In-process, in the long-lived worker, 493–878MB, released within ~72s, **not
+aligned with any instrumented stage**. Every named stage around the peaks reads
+baseline. So the allocator is in an **uninstrumented gap** — and one is already
+visible: the live-lens loop's last stage sample (`live_lens_tick_after_nfl`)
+precedes its own `TICK_COMPLETE` by ~18s, with the publish sweep inside that
+window.
+
+**Not claimed:** that the live-lens publish sweep is the cause. It is the
+largest unlit gap adjacent to the peaks, which makes it where to point the next
+instrument, not an answer. **That instrument was then built and it eliminated
+the candidate — see below.**
+
+**The method note.** Every elimination above came from a field already in the
+payload — process tables, tick meta, stage timings. None needed new code.
+[[read the field you already have]]
+
+#### REGIME BOUNDARY — EVERY MEASUREMENT IN THIS ENTRY PREDATES 2026-08-10 21:56Z
+
+`SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC=900` was set at **21:56Z** and
+verified firing at 22:08:27Z across all 8 sports (board still built,
+`count=239`, on cached overviews). **The hydrated MLB pass — measured at +2.9GB
+in 73s — now runs at roughly half its previous frequency.**
+
+Everything below was measured **before** that: the `n=4` excursion table
+(15:32–16:44Z), the 15-cycle publish-sweep table (20:33–21:07Z), the
+`container_peak` climb 1155 → 2230MB, and the 21:16:54Z mid-sweep catch. **They
+describe a noisier background than the one that exists now and are not directly
+comparable with anything sampled after 21:56Z.**
+
+Two consequences, and the second is easy to get backwards:
+
+- **Excursions should be EASIER to isolate now.** A quieter baseline means a
+  493–878MB in-process allocation stands out further from it.
+- **The `container_peak` series is regime-split.** A "the baseline climbs
+  1155 → 2230MB" claim is about the old regime. Re-derive it before reusing it —
+  and note the same trap the entry already records: **a fixed threshold over a
+  moving baseline measures the population, not the exception**, and the baseline
+  just moved for a new reason.
+
+#### 5. RESTORED, on the test the first version was never held to. The publish sweep is NOT the allocator
+
+**Read this before the retraction below, which it supersedes.** The retraction
+was right to make — the instrument really was blind — but the inference drawn
+from it was weaker than I presented, and the direct test now says so.
+
+**THE DECIDING OBSERVATION, 2026-08-10 22:40:42Z:**
+
+```
+excursion  rss 1389.0MB  container 2546.9MB  +529.5MB above neighbours
+           NOT inside any publish sweep window
+           nearest sweep 22:42:50-22:42:52, 127s away
+```
+
+**+529.5MB is squarely in the 493–878MB `#327` class, and no sweep was
+running.** An excursion of the same magnitude occurs without the publish path,
+so **the sweep is not necessary for it.** That is a direct exclusion, not a
+magnitude argument.
+
+#### THE NUMBER THAT SHOULD HAVE TEMPERED MY RETRACTION: a 20% base rate
+
+Measured over 2,012s: **14 completed sweeps, 403s of total sweep time — a 20.0%
+duty cycle.** So a randomly-timed excursion lands inside a sweep **one time in
+five.**
+
+**The 21:16:54Z coincidence I overturned an elimination on was a 1-in-5 event.**
+I reported it as though it implicated the publish path. It did not: it was the
+expected outcome a fifth of the time, and I never computed the prior before
+acting on it. Coincidence with a process that is running 20% of the time is
+close to no evidence at all.
+
+**This is the same defect as the one it replaced, pointed the other way.** The
+first elimination came from an instrument that could not see the event; the
+retraction came from a coincidence whose base rate I did not check. Both were
+confident, both were about the publish path, and both were wrong for reasons
+available at the time. [[a rate, not a count]]
+
+#### Three independent grounds now, which is why this one should hold
+
+1. **Necessity fails.** A +529.5MB excursion with no sweep running (above).
+2. **In-sweep sampling finds nothing.** Five sweeps of 47–55 artifacts,
+   up to 43.3s and 22 polls, **max lift +14.5MB** above their own endpoints —
+   on an instrument that reads the same cgroup counter as the excursion and
+   therefore *cannot* miss a real spike in its own window.
+3. **The one coincidence was expected.** 20% duty cycle, n=1.
+
+**Still not claimed:** what *does* allocate it. This restores an elimination; it
+does not identify a cause. Five eliminations, cause unattributed.
+
+**Method note, and it is the reusable part.** The question that resolved this
+was not "how big can the sweep get" — sweep size was always a proxy, and my own
+`LARGE_SWEEP=60` threshold turned out to be unreachable (sizes plateaued at 47,
+having plateaued at 34 earlier; the 73–103 in the loop's comment may describe a
+configuration that no longer exists). **The question that resolved it was
+whether the excursion needs the sweep at all.** Necessity is cheaper to test
+than magnitude and it does not depend on catching the biggest case.
+
+#### 5-superseded. RETRACTED — the publish sweep is BACK, and my instrument's blind spot is why I got it wrong
+
+**READ THIS BEFORE THE ELIMINATION BELOW. I retract it.** The excursion was
+caught happening *inside* a publish sweep, and my `before`/`after` pair is
+structurally incapable of seeing it.
+
+```
+21:16:18  live_lens_publish_before   rss=1081.5   container=2470.5
+21:16:54  post_mlb_sim_tick          rss=2051.7   container=3459.1   <-- +970MB, MID-SWEEP
+21:17:11  live_lens_publish_after    rss=1233.9   container=2628.9   published=94 elapsed=53.6
+```
+
+**A 94-artifact, 53.6-second sweep. Thirty-six seconds in, RSS was +970MB above
+the sweep's own `before` sample — and back down before its `after` sample.** The
+endpoints report a +152MB delta across an event whose peak was +970MB.
+`container` hit **3459.1MB, 84% of the 4096 cap** — the highest reading recorded
+tonight.
+
+**A BEFORE/AFTER PAIR CANNOT MEASURE A TRANSIENT ALLOCATED AND RELEASED BETWEEN
+ITS ENDPOINTS.** I designed the instrument, argued an elimination from it, and
+the elimination was an artifact of the instrument's blind spot. Same class as
+every other failure in this file — an instrument answering rather than erring —
+except this one is mine, built *after* writing that lesson down twice.
+[[instrument blindness]]
+
+**And the sample that produced the elimination was the wrong population.**
+Sweeps of 15–34 artifacts have small deltas because they are small sweeps. The
+73–103 range the loop's comment cites **does occur** — 94 and 99 artifacts,
+observed 21:15–21:17Z — I simply had not caught one in the first 36 minutes and
+generalised from the small ones. The caveat I attached ("max observed 34, a
+non-linear blow-up is not formally excluded") was pointing exactly at what then
+happened, which is an argument for weighting one's own caveats more heavily
+than one's conclusion.
+
+**Correction to a number I published:** `b9b77eaf` says the sweep accounted for
+**−8%** of the excursion. That came from my watcher pairing `befores[0]` with
+`afters[-1]` across a ±120s window spanning **three** cycles. The correct
+within-cycle delta is **+152.4MB**, and the mid-sweep peak is **+970MB**. The
+−8% figure is void.
+
+#### What is now claimed, and what still is not
+
+**Claimed:** the excursion is coincident with a large publish sweep, and the
+publish path is a live candidate again. One observation.
+
+**NOT claimed:** that the sweep causes it. Coincidence with a 53.6s window that
+covers a large share of the cycle is weak on its own, and the four other
+eliminations are unaffected. **What would settle it:** sampling *inside* the
+sweep — per-artifact or on a timer — rather than at its boundaries. That is the
+next instrument, and the reason to build it is that the current one has now
+demonstrably failed at exactly the case it was built for.
+
+#### The superseded elimination, kept because the data is real and the reasoning is instructive
+
+`489ddbb5` lit the gap (`live_lens_publish_before` → `after`, plus the pull at
+cycle start). Live on refresh-worker from **20:32:47Z**. **15 paired cycles**:
+
+```
+published  elapsed_s   d_container    d_rss      container_peak
+   15          3.4        +43.3        +9.4         1155.5
+   23          7.1       +199.7       +78.0         1570.0   <- outlier, see below
+   15          8.2        +18.8        +0.0         1670.6
+   15          5.1        -13.7       -26.3         1686.5
+   15          1.8         -0.5        +0.0         2039.5
+   15         35.3        -41.2       -41.7         2049.2
+   15         12.9         -0.5        +0.0         2077.9
+   15          7.7         +0.3        +0.0         2099.4
+   15          2.3         -7.3        -0.3         2357.3
+   15          4.7        +15.8       +16.2         2166.8
+   15          4.9         +3.4        +3.2         2208.0
+   17          5.6         -8.0        -1.0         2202.6
+   30         13.8         +2.6        +0.0         2230.3
+   32          3.7         -0.4        +0.0         2240.5
+   34         47.3        +12.9       +12.9         2209.9
+```
+
+**Two independent reasons this is not the 493–878MB allocator:**
+
+1. **Wrong magnitude by one to two orders.** Excluding the outlier, every cycle
+   sits within ±44MB and most within ±20MB. **Many are NEGATIVE**, which is what
+   a sweep whose allocations are freed before the after-sample looks like
+   against a drifting baseline.
+2. **No scaling with sweep size, which is the load-bearing test.** The *largest*
+   sweep (34 artifacts) cost **+12.9MB**; a 15-artifact sweep cost **+43.3MB**.
+   Marginal cost across the observed range is **−1.60 MB per artifact** —
+   negative, i.e. no relationship at all. A linear model predicting ~500MB at
+   103 artifacts is not merely unsupported, it is contradicted in sign.
+
+**The `elapsed_seconds` check closes the obvious objection.** The loop's own
+comment cites sweeps of "48–74s per cycle at 73–103 artifacts", so the natural
+rebuttal is that only small fast sweeps were observed. **A 47.3-second sweep was
+observed and cost +12.9MB** — squarely inside the cited duration band. Duration
+does not buy memory here either.
+
+#### The caveat that keeps this at "eliminated", not "excluded"
+
+**Max observed sweep is 34 artifacts against the 73–103 the comment cites.** The
+flat-to-negative slope from 15→34 makes a *linear* blow-up at 103 untenable, but
+a **non-linear** one is not formally excluded. Steady state is ~15/cycle rising
+to ~34 as the worker warms, so a 73–103 sweep likely needs a batch write and may
+be rare. A watcher is running for one.
+
+**And one point is unexplained: 23 artifacts → +199.7MB**, larger than every
+bigger sweep in the table. Whatever produced it, **it was not sweep size** —
+which makes it interesting rather than dismissible: it may be the same
+uninstrumented something the excursions are, caught in passing.
+
+#### A thing visible only because the deltas are near zero
+
+`container_peak` climbs **1155 → 2230MB across 25 minutes** while the publish
+deltas hover around nothing. That is `#285`'s ratchet accumulating underneath,
+entirely independent of this path — and a standing reminder that **the baseline
+moves on its own while you are measuring deltas against it.** A fixed threshold
+over this series would have flagged the tail and called it an excursion.
+
+#### A correction to my own instrumentation claim
+
+I wrote that the sample "carries `published_count`/`failed_count`/
+`elapsed_seconds`, so one line beats correlating two log streams". **True of
+stderr, FALSE of the web-visible record.** `update_process_memory_high_water`
+persists a fixed subset — `stage`, `peak_mb`, `container_memory_mb`,
+`accounted_rss_mb`, `pct_of_max`, `observed_at`, `pid`, `processes` — and drops
+arbitrary `**extra`. So `high_water` shows `published_count=None`.
+
+**I nearly reported that `None` as evidence the sweep had crashed**, since my
+own code sets those fields to `None` only on the exception path. It is the
+schema, not a crash. Checking the emitter before interpreting the absence is the
+only reason a false finding did not go out. [[absent signal is about the emitter]]
+
+Small gap worth closing when something else deploys: **a peak without its
+artifact count is a number without its denominator**, and the peak is exactly
+where that denominator is wanted.
+
+#### What is NOT claimed
+
+- **Not accumulation.** It returns in 72s. `#285`'s ratchet is unaffected.
+- ~~**Not recurring.** This is **n=1 in a 39-minute window**.~~ **SUPERSEDED —
+  it DOES recur: `n=4` in 5 hours (see the 2026-08-10 update above).** The
+  original was correct for the window it had; a 39-minute window simply could
+  not see a ~75-minute inter-arrival gap. **The half of this bullet that
+  SURVIVED is the important one: it is still NOT a cadence** — gaps of 42.4,
+  18.3 and 11.1 minutes are scattered, and "spikes every N minutes" remains
+  unsupported with the sample four times larger.
+- **Not attributed to a cause.** Nothing here says what allocates the 817MB.
+- **Not `_keyvalue_backed` (`#324`).** That change only re-routes which transport
+  a write takes, the spike is inside the sim tick, and the trim/gc figures on
+  this boot match the previous one.
+
+#### Where it came from, because the path matters
+
+I found the 1867.4 reading incidentally while sampling process lists for an
+unrelated zombie question (`#324`), and handed it over rather than sitting on it
+because it fell outside the range the `#285` lane was reasoning about. They
+verified it, and it exposed a blind spot in their own instrument that they could
+not have found from inside it. **Both halves needed the handoff** — the number
+was useless to me and the instrument gap was invisible to them.
+
 ## Closed 2026-08-10 — the board that computed and never landed, and the OOM nobody could diagnose (`#317`, `#318`)
 
 | # | What shipped |
