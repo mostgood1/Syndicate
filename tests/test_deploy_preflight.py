@@ -19,8 +19,8 @@ deploy_preflight = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(deploy_preflight)
 
 
-def _p(pid, ppid, cmdline, rss=10.0):
-    return {"pid": pid, "ppid": ppid, "cmdline": cmdline, "rss_mb": rss}
+def _p(pid, ppid, cmdline, rss=10.0, name="python"):
+    return {"pid": pid, "ppid": ppid, "cmdline": cmdline, "rss_mb": rss, "name": name}
 
 
 WORKER_SHELL = _p(1, 0, ["bash", "/home/render/graceful-shell-command.sh", "python", "scripts/run_refresh_worker.py"])
@@ -33,29 +33,44 @@ NFL_CHILD = _p(1693, 38, ["/opt/render/project/src/.venv/bin/python",
 class ClassifyTests(unittest.TestCase):
     def test_the_real_15_54_topology_is_a_hold(self) -> None:
         # Exactly the process list that was live when the old check said CLEAR.
-        infra, jobs, unknown = deploy_preflight.classify([WORKER_SHELL, WORKER_MAIN, NFL_CHILD])
+        infra, jobs, defunct, unknown = deploy_preflight.classify([WORKER_SHELL, WORKER_MAIN, NFL_CHILD])
         self.assertEqual({p["pid"] for p in infra}, {1, 38})
         self.assertEqual([p["pid"] for p in jobs], [1693])
         self.assertEqual(unknown, [])
 
     def test_idle_worker_is_clear(self) -> None:
-        infra, jobs, unknown = deploy_preflight.classify([WORKER_SHELL, WORKER_MAIN])
+        infra, jobs, defunct, unknown = deploy_preflight.classify([WORKER_SHELL, WORKER_MAIN])
         self.assertEqual(len(infra), 2)
         self.assertFalse(jobs)
         self.assertFalse(unknown)
 
-    def test_child_with_no_cmdline_is_unknown_not_clear(self) -> None:
-        # A zombie, or a process that exited mid-enumeration. It is not nothing,
-        # and "unknown" must not fall through to the permissive branch.
-        infra, jobs, unknown = deploy_preflight.classify([WORKER_SHELL, WORKER_MAIN, _p(1457, 38, [], None)])
-        self.assertEqual([p["pid"] for p in unknown], [1457])
+    def test_a_zombie_is_reported_but_does_not_block(self) -> None:
+        # #324, measured: pid 1457 sat in 108/342 samples over 15 minutes. Under
+        # the first version this returned UNKNOWN forever, which would have made
+        # the check useless on the one service it was built for. A zombie is
+        # already dead -- a deploy cannot kill it.
+        # name readable + no VmRSS + no cmdline == state Z.
+        infra, jobs, defunct, unknown = deploy_preflight.classify(
+            [WORKER_SHELL, WORKER_MAIN, _p(1457, 38, [], None, name="python")]
+        )
+        self.assertEqual([p["pid"] for p in defunct], [1457])
         self.assertFalse(jobs)
+        self.assertFalse(unknown)
+
+    def test_a_process_we_cannot_read_at_all_still_blocks(self) -> None:
+        # No name either -> we genuinely do not know what it is, so it might be
+        # live work. This is the case that must NOT be relaxed by the zombie fix.
+        infra, jobs, defunct, unknown = deploy_preflight.classify(
+            [WORKER_SHELL, WORKER_MAIN, _p(1457, 38, [], None, name="")]
+        )
+        self.assertEqual([p["pid"] for p in unknown], [1457])
+        self.assertFalse(defunct)
 
     def test_an_unrecognised_process_blocks_rather_than_passes(self) -> None:
         # THE load-bearing property. The old design could only find hazards it
         # already knew the name of; this one must treat a never-before-seen
         # child as work. Being wrong here costs a spurious HOLD, not a dead job.
-        infra, jobs, unknown = deploy_preflight.classify(
+        infra, jobs, defunct, unknown = deploy_preflight.classify(
             [WORKER_SHELL, WORKER_MAIN, _p(999, 38, ["python", "scripts/some_job_invented_next_year.py"])]
         )
         self.assertEqual([p["pid"] for p in jobs], [999])
@@ -64,7 +79,7 @@ class ClassifyTests(unittest.TestCase):
         # Web forks its workers from the gunicorn MASTER, not from the shell, so
         # a purely topological rule marks them as jobs and web can never deploy.
         gunicorn = ["/opt/render/project/src/.venv/bin/python3.11", "/opt/render/project/src/.venv/bin/gunicorn", "wsgi:app"]
-        infra, jobs, unknown = deploy_preflight.classify([
+        infra, jobs, defunct, unknown = deploy_preflight.classify([
             _p(1, 0, ["bash", "/home/render/graceful-shell-command.sh", "sh", "-c", "exec gunicorn wsgi:app"]),
             _p(62, 1, gunicorn), _p(79, 62, gunicorn), _p(80, 62, gunicorn),
         ])
@@ -73,7 +88,7 @@ class ClassifyTests(unittest.TestCase):
 
     def test_a_job_on_web_is_still_caught(self) -> None:
         gunicorn = ["/opt/render/project/src/.venv/bin/python3.11", "/opt/render/project/src/.venv/bin/gunicorn", "wsgi:app"]
-        infra, jobs, unknown = deploy_preflight.classify([
+        infra, jobs, defunct, unknown = deploy_preflight.classify([
             _p(1, 0, ["bash", "/home/render/graceful-shell-command.sh"]),
             _p(62, 1, gunicorn), _p(79, 62, gunicorn),
             _p(500, 79, ["python", "scripts/daily_update.py", "--sport", "mlb"]),

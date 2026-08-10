@@ -152,8 +152,32 @@ INFRASTRUCTURE_CMDLINE_MARKERS = (
 )
 
 
-def classify(processes: list[dict]) -> tuple[list[dict], list[dict], list[dict]]:
-    """Split into (infrastructure, job children, unidentifiable).
+def is_defunct(proc: dict) -> bool:
+    """A reaped-pending (zombie) child, which a deploy cannot harm -- it is already dead.
+
+    `#324`. Measured on refresh-worker 2026-08-10: pid 1457 sat in 108 of 342
+    samples across 15 minutes and made this script return UNKNOWN forever,
+    which would have made the whole check useless on the one service it was
+    built for. Diagnosed from fields the payload already carries:
+
+        name='python'   -> /proc/<pid>/status IS readable (Name:, PPid: parsed)
+        rss_mb=None     -> no VmRSS: line, i.e. no memory maps
+        cmdline=''      -> /proc/<pid>/cmdline is empty
+        PROCESS_ENUM_DEBUG errors: only `psutil_unavailable`, no procfs failure
+
+    Readable status + no maps + no cmdline is state Z and nothing else. The
+    distinction that matters: a process we cannot read AT ALL (no name either)
+    is genuinely unknown and must still block, because it might be live work.
+    """
+    return (
+        not (proc.get("cmdline") or [])
+        and proc.get("rss_mb") is None
+        and bool(str(proc.get("name") or "").strip())
+    )
+
+
+def classify(processes: list[dict]) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    """Split into (infrastructure, job children, defunct, unidentifiable).
 
     Infrastructure is the container shell (ppid 0), whatever it started directly
     -- on the workers that is `graceful-shell-command.sh` and the long-lived
@@ -167,7 +191,7 @@ def classify(processes: list[dict]) -> tuple[list[dict], list[dict], list[dict]]
     # Fall back to init-parented when no explicit shell is present, so a service
     # without the wrapper still classifies rather than calling everything a job.
     infra_parents = shell_pids or {1}
-    infra, jobs, unknown = [], [], []
+    infra, jobs, defunct, unknown = [], [], [], []
     for proc in by_pid.values():
         cmdline = " ".join(proc.get("cmdline") or []).strip()
         is_server = any(marker in cmdline for marker in INFRASTRUCTURE_CMDLINE_MARKERS)
@@ -175,12 +199,15 @@ def classify(processes: list[dict]) -> tuple[list[dict], list[dict], list[dict]]
             infra.append(proc)
         elif cmdline:
             jobs.append(proc)
+        elif is_defunct(proc):
+            # Already dead, awaiting reap. Reported so it stays visible, but it
+            # cannot be "killed by a deploy" and must not block one.
+            defunct.append(proc)
         else:
-            # A child with no readable cmdline: a zombie, or a process that
-            # exited mid-enumeration. It is NOT nothing, and it must not be
-            # silently dropped into the clear branch.
+            # Nothing readable at all -- not even a name. Could be live work, so
+            # it must not be silently dropped into the clear branch.
             unknown.append(proc)
-    return infra, jobs, unknown
+    return infra, jobs, defunct, unknown
 
 
 def live_deploy(service_id: str, key: str) -> dict:
@@ -240,9 +267,10 @@ def main() -> int:
 
     infra: list[dict] = []
     jobs: list[dict] = []
+    defunct: list[dict] = []
     unidentifiable: list[dict] = []
     if parsed:
-        infra, jobs, unidentifiable = classify(parsed.get("processes") or [])
+        infra, jobs, defunct, unidentifiable = classify(parsed.get("processes") or [])
     report["process_count"] = (parsed or {}).get("process_count")
     fmt = lambda p: {
         "pid": p.get("pid"), "ppid": p.get("ppid"), "rss_mb": p.get("rss_mb"),
@@ -250,6 +278,7 @@ def main() -> int:
     }
     report["infrastructure"] = [fmt(p) for p in infra]
     report["jobs_in_flight"] = [fmt(p) for p in jobs]
+    report["defunct"] = [fmt(p) for p in defunct]
     report["unidentifiable"] = [fmt(p) for p in unidentifiable]
 
     stale = age is None or age > args.max_sample_age_seconds
@@ -267,7 +296,9 @@ def main() -> int:
         reason = f"{args.target_commit[:8]} is already contained in live {live_commit[:8]} -- the deploy is redundant"
     else:
         verdict, code = "CLEAR", EXIT_CLEAR
-        reason = "only infrastructure processes running"
+        reason = "only infrastructure processes running" + (
+            f" ({len(defunct)} defunct child(ren) awaiting reap -- already dead, cannot be killed by a deploy)" if defunct else ""
+        )
     report["verdict"] = verdict
     report["reason"] = reason
 
@@ -285,12 +316,12 @@ def main() -> int:
     # The enumeration is the point. Print it ALWAYS, including on CLEAR --
     # a verdict with no list is what made the original check misleading.
     print(f"\nprocesses ({report['process_count']} reported):")
-    for label, group in (("infra", infra), ("JOB", jobs), ("UNKNOWN", unidentifiable)):
+    for label, group in (("infra", infra), ("JOB", jobs), ("defunct", defunct), ("UNKNOWN", unidentifiable)):
         for proc in group:
             cmd = " ".join(proc.get("cmdline") or []) or "<no cmdline>"
             print(f"  [{label:7s}] pid {str(proc.get('pid')):>6s}  ppid {str(proc.get('ppid')):>6s}  "
                   f"rss {str(proc.get('rss_mb')):>8s}  {cmd[:96]}")
-    if not (infra or jobs or unidentifiable):
+    if not (infra or jobs or defunct or unidentifiable):
         print("  <none enumerated>")
     print(f"\n{verdict}: {reason}")
     return code
