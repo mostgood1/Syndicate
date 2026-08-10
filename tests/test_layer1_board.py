@@ -230,3 +230,36 @@ def test_a_board_emptied_by_scoping_says_so_not_no_quotes():
         selected_date="2026-08-10",
     )
     assert board["empty_reason"] == "grid_rows_all_for_other_dates"
+
+
+def test_soccer_leagues_are_named_not_merged_into_one_sport():
+    # Ten leagues share the `soccer` slug and the soccer_source tree, so `sport`
+    # cannot say which competition a row belongs to. append_book_quotes stamps
+    # `league` on every soccer quote; the pivot used to drop it, so all 922 rows
+    # on 2026-08-16 read league=None and the board could only offer one generic
+    # soccer tab.
+    board = build_layer1_board(
+        [
+            _row(event_id="epl-1", league="epl"),
+            _row(event_id="epl-1", market="totals", league="epl"),
+            _row(event_id="mls-1", league="mls"),
+            _row(event_id="bund-1", league="bundesliga"),
+        ],
+        sport="soccer",
+        selected_date="2026-08-10",
+    )
+    # Per GAME, not per row: epl has two markets on one fixture, not two games.
+    assert board["leagues"] == {"bundesliga": 1, "epl": 1, "mls": 1}
+    assert {g["event_id"]: g["league"] for g in board["games"]} == {
+        "epl-1": "epl",
+        "mls-1": "mls",
+        "bund-1": "bundesliga",
+    }
+
+
+def test_single_competition_sports_report_no_leagues():
+    # MLB's competition IS its sport. Echoing the slug back as a league would
+    # invent a dimension that does not exist and put a pointless tab on 7 boards.
+    board = build_layer1_board([_row()], sport="mlb", selected_date="2026-08-10")
+    assert board["leagues"] == {}
+    assert board["games"][0]["league"] is None

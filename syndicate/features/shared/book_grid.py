@@ -483,6 +483,22 @@ def build_book_grid(
                     "home_team": first.get("home_team"),
                     "away_team": first.get("away_team"),
                     "commence_time": first.get("commence_time"),
+                    # LEAGUE, carried rather than keyed (`#330`). All ten soccer
+                    # leagues share the `soccer` sport slug and the
+                    # `soccer_source` tree, so `sport` cannot express which
+                    # competition a row belongs to. `append_book_quotes` already
+                    # stamps it -- `extra={"league": ...}` in
+                    # fetch_soccer_oddsapi_odds_local -- and this pivot dropped
+                    # it, so every soccer row on Layer 1 read `league: None`
+                    # (measured 2026-08-10: 7/7 rows on 08-10, 922/922 on 08-16).
+                    #
+                    # Deliberately NOT added to `_INSTANCE_FIELDS`. That tuple
+                    # must mirror `market_sides_for_quote`'s base exactly or
+                    # sides land in different rows and the grid under-reports
+                    # book coverage -- its own comment says so. `event_id` is
+                    # already globally unique, so league adds no disambiguation
+                    # to the key and only risk. Carried like the team names are.
+                    "league": first.get("league"),
                     "sides": side_names,
                     "books": books,
                     "books_quoting": len(books),

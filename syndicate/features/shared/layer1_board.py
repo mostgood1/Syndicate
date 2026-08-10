@@ -120,6 +120,9 @@ def _card_for(row: Mapping[str, Any]) -> dict[str, Any]:
         "event_id": str(row.get("event_id") or "") or None,
         "away_team": row.get("away_team"),
         "home_team": row.get("home_team"),
+        # `sport` is not the competition for soccer: ten leagues share the slug.
+        # None for every other sport, where the sport IS the competition.
+        "league": row.get("league"),
         "matchup": game.get("matchup") or _fallback_matchup(row),
         "state": _row_state(row),
         "start_time_utc": game.get("start_time_utc") or row.get("commence_time"),
@@ -225,8 +228,15 @@ def build_layer1_board(
         if _row_is_enriched(row):
             enriched_rows += 1
 
+    league_counts: dict[str, int] = {}
     for key, card in cards.items():
         state_counts[card["state"]] += 1
+        # Counted per GAME, not per row: 166 prop markets on one fixture is one
+        # fixture, and counting rows would make the league with the deepest prop
+        # coverage look like it had the most matches.
+        league = card.get("league")
+        if league:
+            league_counts[str(league)] = league_counts.get(str(league), 0) + 1
 
     games = [
         {**card, "rows": rows_by_game[key]}
@@ -271,6 +281,17 @@ def build_layer1_board(
             "rows_other_dates": sum(other_dates.values()),
             "rows_undated": undated_rows,
         },
+        # Which competitions are on this board, and how many fixtures each has.
+        # For soccer this is the dimension the board is actually organised by --
+        # "10 games" across EPL, MLS and the Bundesliga is three slates, not one
+        # -- and a board that cannot name them can only offer a generic soccer
+        # tab. Empty for single-competition sports rather than echoing the slug.
+        "leagues": dict(
+            sorted(
+                ((league, count) for league, count in league_counts.items() if league),
+                key=lambda kv: (-kv[1], kv[0]),
+            )
+        ),
         "date_scope": {
             "timezone": _BOARD_TZ,
             # Top few, so "which day did they belong to" is answerable without
