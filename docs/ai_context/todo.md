@@ -2104,7 +2104,74 @@ it now has a date.
 **`#310` closes.** The remaining work — why boxscore ingestion stopped on
 2026-05-24 — is `#314`'s question and needs its own owner.
 
-### #285 — CLOSED at T+55: 7/7 boards, 0 guard latches, and the ratchet is a BOUNDED OSCILLATION (627–910MB) rather than a slower climb
+### #285 — RETRACTED, NOT CLOSED. My "55-minute single-boot window" was THREE boots, and the one fact the closure rested on was a 5-minute-old process
+
+**I closed this item on a reading that does not exist. Retracting in full; the
+trim/gc result below survives, the arena-cap conclusion does not.**
+
+Two `trigger=api` deploys landed on refresh-worker INSIDE the window I was
+calling one boot:
+
+```
+14:53:17  cb3946a2   <- my anchor
+15:08:47  6010b99e   <- reboot, T+15 on my anchor, never noticed
+15:42:48  87cdd3e1   <- reboot, T+49 on my anchor, never noticed
+```
+
+Re-mapped to their real boots, the samples say the opposite of what I reported:
+
+```
+wall      boot        age     pid RSS
+15:05:21  cb3946a2   12.1m     707.1
+15:14:14  6010b99e    5.5m     627.2   <- reboot
+15:21:54  6010b99e   13.1m     810.5
+15:30:12  6010b99e   21.4m     828.4
+15:38:28  6010b99e   29.7m     910.2   <- monotonic climb, ENDS AT ITS MAX
+15:48:18  87cdd3e1    5.5m     728.4   <- reboot. NOT "below mid-window"
+15:56:01  87cdd3e1   13.2m     836.1   <- climbing again, same shape
+```
+
+**`6010b99e` is the one clean boot with enough samples: 627.2 → 910.2 over 24
+minutes, +11.7 MB/min, ending at its maximum. That is statistically identical to
+the trim-only boot's +11.00.** The arena cap did not change the rate. What I
+called a bounded oscillation was three overlaid boot honeymoons.
+
+#### What actually survives
+
+- **Rungs 1 and 2 are untouched.** `malloc_trim` vs `gc.collect()` reproduced on
+  two independent boots with different allocator configurations: 1109.6 / −104.3
+  and 1475.9 / 59.4 MB. Hypothesis (1) remains settled. Those measurements are
+  per-call deltas and do not depend on boot attribution.
+- **One real, weaker observation:** `6010b99e` ran ~34 minutes with **0 guard
+  latches and 4/4 non-zero pools**, at RSS up to 910. The trim-only boot latched
+  at T+15. That is a genuine difference on a single clean boot — but 34 minutes
+  is inside the range where the trim-only boot also produced a board (T+38), so
+  it is suggestive and not sufficient.
+- **`#285` is OPEN.** The ratchet is ~11 MB/min with the trim, with or without
+  the arena cap.
+
+#### METHOD — this is the same trap the entry below warns about, entered from a new door
+
+The entry below records me correcting another lane for anchoring T+30 on a
+deploy's `startedAt` instead of its `finishedAt`, and then correcting myself for
+calling a plateau on a window too short for its own noise. **This is worse than
+either. I got T0 right and never asked whether T0 was still true.**
+
+The standing note says *every deploy reboots and every fix looks good for five
+minutes*. I quoted it at two other lanes tonight. The failure was not ignorance
+of the rule — it was never re-checking a fact I had established correctly once
+and then treated as permanent for an hour.
+
+**THE RULE: a long observation window must re-verify its own anchor, not just
+set it.** One `deploys?limit=5` call at the END of the window would have caught
+this; I made that exact call at the START and never repeated it. For anything
+spanning more than a few minutes on this platform, poll the deploy list
+alongside the metric and stamp every sample with the boot it belongs to —
+`ALL_PROCESS_MEMORY` already carries the pid, and a pid change is a reboot.
+
+[[worker memory is boot-confounded]] [[confirm the code ran]]
+
+### #285 — superseded closure text, kept because the retraction above is only legible next to it: "CLOSED at T+55, bounded oscillation"
 
 **The plateau-vs-later-crossing question this entry left open at T+29 is
 answered. It plateaus.** Measured to T+55 on the arena-capped boot
