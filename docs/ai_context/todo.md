@@ -1,5 +1,97 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#331` — IN PROGRESS. The book grid is built from **1.7%** of the odds, and that is why `/market-board/books` lost its F1/F3/F5 filters
+
+**The user's report was "we lost the F1/F3/F5/Game Total filters on game lines".
+It is not the UI, not the filters, and not `_event_wants_full_game_markets`'s
+T-window rule. The grid is pivoted from a shard that is 1.7% of the real one.**
+
+Measured 2026-08-10 against 2026-08-09 — a **completed** slate, so none of this
+is a time-of-day artifact:
+
+| | rows | bytes | segment rows |
+|---|---|---|---|
+| canonical shard (web) | 478,782 | 217,439,783 | 100,639 |
+| what refresh-worker pivoted | 7,987 | 3,627,504 | **0** |
+| grid served to the user | 807 | — | **0** |
+| grid the full shard produces | 5,547 | — | **1,251** |
+
+**7,987 is exactly the shard's cumulative state at ~06:00Z** (3,677 through
+04:00Z + 4,310 through 06:00Z) — the hour refresh-worker first pulled it. The
+number is not approximately the early-morning total, it *is* the early-morning
+total, which is what identifies the mechanism rather than merely suggesting it.
+
+#### Why it can never self-correct
+
+refresh-worker is **not** the service that captures odds. live-odds-worker is,
+and it publishes the shard whole-file to web, which makes **web canonical**.
+Two independent paths should reconcile refresh-worker and neither can:
+
+- **the repair pass** iterates `_missing_required_artifact_relative_paths()` —
+  files missing **outright**. Its own comment states the property that makes it
+  useless here: *"Costs nothing on a healthy worker: the list is empty once the
+  files exist."* A shard pulled once at date-rollover is never looked at again.
+- **the incremental `/export` pull** cannot carry the file at all. `#233` already
+  records that book_quotes shards came back `PULL_FAILED / written=0` at 52MB
+  against a 2GB web instance. This one is 207MB.
+
+Evidence, four hours of refresh-worker logs: for `mlb_source/tracking/book_quotes`
+the ONLY repair attempts are `2026-08-11/12/13` — dates that do not exist yet.
+Today and yesterday are never requested.
+
+**There is no publish race.** Only live-odds-worker publishes that path; I
+checked before filing one. refresh-worker's copy is inert, not competing.
+
+#### This is `#323`'s defect, and how it passed validation
+
+`#323` moved the pivot off web correctly — web genuinely cannot read a 207MB
+shard on 2GB. It put it on the 4GB worker **without establishing that the 4GB
+worker had the data**, and was then validated with `rows_truncated=0`, which
+only ever meant "the grid was smaller than the cap". The code comment written
+at the time predicts 5,547 rows; production produced 807; nobody compared them.
+**A prediction written into a comment is not a check until something reads it.**
+
+#### The fix is TWO parts and shipping either half alone is worse than shipping neither
+
+1. **tail-pull the canonical shard** before building. `#248` already implemented
+   Range-based append-only tail fetching (`STREAM_TAIL_OK`, 416 = already
+   current); nothing ever calls it for a file that exists.
+2. **stream and reduce the pivot.** `freshest_rows_for_grid` collapses the
+   change log to the rows the pivot can still use.
+
+**(1) without (2) is `#241` again**: it hands the worker the real 217MB shard and
+the old whole-read path — a **1,216MB** spike against ~1.3GB headroom, every 10
+minutes. Held deliberately rather than pushed as "the safe-looking half".
+
+```
+whole-shard pivot   478,782 rows   1,216MB peak   14.3s
+streamed + reduced   41,233 rows     155MB peak    7.6s   grid byte-identical
+end-to-end builder                   211MB peak   18.0s   (incl. #328 enrichment)
+```
+
+#### THE PART WORTH REMEMBERING — two wrong reductions, both invisible to every check that was not a comparison
+
+`build_book_grid`'s output **depends on row order**, which is nowhere stated at
+the call site. It anchors on the FIRST row in a group carrying a given canonical
+line, and `market_sides_for_quote` then gathers the market using **that anchor's
+own line and selection**. So the anchor does not merely start the row, it decides
+which rows count as sides.
+
+- returning kept rows in **first-seen order instead of file order** permuted
+  **2,006 of 5,547** rows — at *identical total byte length*;
+- keeping only the freshest row per cell **re-anchored 972** rows, because the
+  freshest row for a cell is usually not the row that established the line.
+
+Both produced the right row count, the right byte size, and the right summary.
+**Only a full grid-to-grid comparison caught either.** The equivalence tests
+assert grid equality for exactly this reason — a count assertion would have
+passed on both bugs. Anyone optimising this pivot again: compare grids.
+
+**Landed:** `b458fb49` (reduction + tests, additive and inert).
+**Held:** `book_grid_artifact.py` + `run_refresh_worker.py`, coupled, pending the
+`#328` lane committing its enrichment out of the shared working tree.
+
+
 ### 2026-08-10 — LANE CLOSED: soccer sim concurrency (`#282`, `#311`, `#312`). Read the residual before assuming this is finished
 
 Three items, all committed and pushed. **What is verified and what is merely
