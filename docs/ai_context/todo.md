@@ -245,6 +245,53 @@ Covers the nested `response.*` blocks too, which is where the `status.*` copies
 come from — all six, verified. 11 tests, plus 62 passing across the `#317`/`#322`
 suites since `_expand_persisted_state` is their choke point as well.
 
+#### FOURTH ATTEMPT. Three correct fixes, three paths the status route does not take
+
+```
+bfda258c  _decorate_response_with_state_meta   a decorator this route never calls
+dec70d40  _expand_persisted_state              the SNAPSHOT path's choke point --
+                                               but the snapshot reader is only a
+                                               FALLBACK, skipped entirely while
+                                               candidate_count > 0 (it is 150)
+```
+
+Traced by oversight against deployed code:
+
+```
+/api/intelligence/status
+  -> read_latest_intelligence_state              blueprints/intelligence.py:1526
+  -> read_latest_intelligence_state_response     intelligence_state.py:5549
+  -> _INTELLIGENCE_STATE_SERVICE.read_latest_response
+  -> _promote_board_contract_cards
+```
+
+**FOUR readers of the same state, and the serving one was in none of the sets I
+patched.** Measured after `dec70d40` went live: board **3601.8s stale — a full
+hour — reporting `fresh`** against a 60s SLA, with the three microsecond-apart
+sub-values (`...3852 / ...3900 / ...3933`) that are the agreed signature of a
+persisted write-time verdict.
+
+**Fixed in `_promote_board_contract_cards`** — the one function all **eight**
+response-returning paths pass through, chosen **by enumerating the readers**
+rather than by picking the next plausible candidate. That is `#327`'s lesson
+(*enumerate the producers*) applied to the read side, and it is the only reason
+this attempt differs in kind from the previous three.
+
+Placed at the TOP of the function: there is an early `return current` when a
+payload has no cards, and a stale board with no cards is exactly the case that
+most needs an honest verdict. The loop itself is now `_apply_freshness_recompute`,
+with the two earlier inlined copies collapsed onto it — written as a helper only
+on the third occurrence, which is later than it should have been.
+
+Verified on the exact failing shape: six blocks all `stale`, and **distinct age
+values 3 -> 1**, which is oversight's discriminator satisfied. Card promotion
+still runs. 16 tests, plus 35 across the `#317`/`#322` suites.
+
+**The codebase property worth recording, because it is not a diagnostic
+failure:** this endpoint has four readers and the next person will assume one of
+them is *the* reader. None of the three earlier fixes was wrong; they were
+coverage of paths nobody was taking.
+
 #### Why this is the same item three times over
 
 **An instrument that ANSWERS rather than errs.** `#327`: the ring buffer could

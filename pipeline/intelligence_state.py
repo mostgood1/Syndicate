@@ -997,8 +997,69 @@ def _board_contract_cards(state: dict[str, Any] | None) -> list[dict[str, Any]]:
     return [dict(item) for item in dedupe_recommendation_items(sources)]
 
 
+def _apply_freshness_recompute(container: dict[str, Any]) -> dict[str, Any]:
+    """Rebuild every freshness verdict in `container`, top level and nested. `#334`.
+
+    Written third-time-lucky as a helper because I had already inlined this loop
+    twice (in `_decorate_response_with_state_meta` and `_expand_persisted_state`)
+    and both were on paths the status route does not take.
+
+    Six blocks in the served payload: `state_meta`, `freshness`,
+    `state_freshness`, plus the `status.*` copies that come from the nested
+    `response`. Idempotent, so it is safe where several of these run in sequence.
+    """
+    for key in ("state_meta", "freshness", "state_freshness"):
+        block = container.get(key)
+        if isinstance(block, dict) and block.get("computed_at"):
+            container[key] = _recomputed_freshness_block(block)
+    nested = container.get("response")
+    if isinstance(nested, dict):
+        updated = dict(nested)
+        changed = False
+        for key in ("state_meta", "freshness", "state_freshness"):
+            block = updated.get(key)
+            if isinstance(block, dict) and block.get("computed_at"):
+                updated[key] = _recomputed_freshness_block(block)
+                changed = True
+        if changed:
+            container["response"] = updated
+    return container
+
+
 def _promote_board_contract_cards(state: dict[str, Any] | None) -> dict[str, Any]:
     current = dict(state or {})
+    # #334, FOURTH ATTEMPT, and the last three failed the same way: each fixed a
+    # real path that the status route does not take.
+    #
+    #   bfda258c  _decorate_response_with_state_meta   -- a decorator this route
+    #                                                     never calls
+    #   dec70d40  _expand_persisted_state              -- the SNAPSHOT path's
+    #                                                     choke point; the board
+    #                                                     snapshot reader is only
+    #                                                     a FALLBACK and is skipped
+    #                                                     entirely while
+    #                                                     candidate_count > 0
+    #
+    # Traced by the oversight lane against the deployed code: `/api/intelligence/status`
+    # -> `read_latest_intelligence_state` -> `read_latest_intelligence_state_response`
+    # (`:5549`) -> the service -> `_promote_board_contract_cards`. That is FOUR
+    # readers of the same state, and the one actually serving was in none of the
+    # sets I patched.
+    #
+    # **So this goes in the only function ALL of them pass through.** Eight call
+    # sites, every response-returning path, verified by enumeration rather than
+    # by picking the next plausible one -- which is the `#327` lesson (enumerate
+    # the producers) applied to readers instead.
+    #
+    # At the TOP, deliberately: there is an early `return current` two lines
+    # below when a payload carries no cards, and a stale board with no cards is
+    # exactly the case that most needs an honest verdict.
+    #
+    # The name does not advertise this. That is a real cost and I am taking it
+    # knowingly: renaming would mean touching eight call sites, and missing one
+    # is precisely the failure being fixed. The alternative -- one more
+    # plausible-looking patch -- has now been wrong three times.
+    current = _apply_freshness_recompute(current)
     cards = _board_contract_cards(current)
     if not cards:
         return current
@@ -1315,10 +1376,7 @@ def _decorate_response_with_state_meta(response: dict[str, Any] | None, snapshot
     # from several sources keeps each part's real age rather than inheriting
     # one. Non-time fields (`source_fingerprint`, `run_key`, `computed_at`)
     # are preserved untouched: only the derived verdict is rebuilt.
-    for _freshness_key in ("state_meta", "freshness", "state_freshness"):
-        _block = current.get(_freshness_key)
-        if isinstance(_block, dict) and _block.get("computed_at"):
-            current[_freshness_key] = _recomputed_freshness_block(_block, sla_seconds=sla_seconds)
+    current = _apply_freshness_recompute(current)
     current.setdefault("state_last_updated", str(current.get("state_last_updated") or current.get("last_updated") or current.get("updated_at") or (snapshot.computed_at if snapshot else "")).strip() or None)
     current.setdefault("source_fingerprint", snapshot.source_fingerprint if snapshot is not None else current.get("source_fingerprint"))
     return current
@@ -2303,21 +2361,7 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     # call it), rather than in whichever decorator a given route happens to use.
     # The `_decorate_response_with_state_meta` fix stays -- the recompute is
     # idempotent, and it still covers responses built without a persisted read.
-    for _freshness_key in ("state_meta", "freshness", "state_freshness"):
-        _block = expanded.get(_freshness_key)
-        if isinstance(_block, dict) and _block.get("computed_at"):
-            expanded[_freshness_key] = _recomputed_freshness_block(_block)
-    _nested = expanded.get("response")
-    if isinstance(_nested, dict):
-        _restored_nested = dict(_nested)
-        _changed = False
-        for _freshness_key in ("state_meta", "freshness", "state_freshness"):
-            _block = _restored_nested.get(_freshness_key)
-            if isinstance(_block, dict) and _block.get("computed_at"):
-                _restored_nested[_freshness_key] = _recomputed_freshness_block(_block)
-                _changed = True
-        if _changed:
-            expanded["response"] = _restored_nested
+    expanded = _apply_freshness_recompute(expanded)
 
     return expanded
 

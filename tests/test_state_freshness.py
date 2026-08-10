@@ -176,3 +176,86 @@ class TheReadPathThatActuallyServesStatusTests(unittest.TestCase):
         self.assertEqual(intelligence_state._expand_persisted_state(dict(plain)), plain)
 if __name__ == "__main__":
     unittest.main()
+
+
+class TheRouteStatusActuallyTakesTests(unittest.TestCase):
+    """#334 fourth attempt. Three correct fixes on three paths the status route
+    does not take.
+
+        bfda258c  _decorate_response_with_state_meta  -- a decorator it never calls
+        dec70d40  _expand_persisted_state             -- the SNAPSHOT path, which is
+                                                         only a FALLBACK and is
+                                                         skipped while candidate_count > 0
+
+    Traced against deployed code: /api/intelligence/status ->
+    read_latest_intelligence_state -> read_latest_intelligence_state_response ->
+    the service -> `_promote_board_contract_cards`. Four readers of the same
+    state; the serving one was in none of the patched sets. The recompute now
+    lives in the single function all eight response-returning paths pass
+    through, chosen by enumeration rather than by picking the next plausible
+    candidate.
+    """
+
+    def _served(self, age_seconds: float, with_cards: bool = True) -> dict:
+        block = {
+            "computed_at": _iso(age_seconds),
+            "age_seconds": 0.3753852,
+            "freshness_sla_seconds": 60,
+            "freshness_status": "fresh",
+            "is_fresh": True,
+            "source_fingerprint": "fp",
+        }
+        payload = {
+            "candidate_count": 150,
+            "state_meta": dict(block),
+            "freshness": dict(block),
+            "state_freshness": dict(block),
+            "response": {
+                "state_meta": dict(block),
+                "freshness": dict(block),
+                "state_freshness": dict(block),
+            },
+        }
+        if with_cards:
+            payload["board_contract"] = {"cards": [{"card_id": "c1", "is_live": False}]}
+        return payload
+
+    def test_the_hour_stale_board_reports_stale(self) -> None:
+        # The measured production case: 3601.8s against a 60s SLA, "fresh".
+        out = intelligence_state._promote_board_contract_cards(self._served(3601.8))
+        for container, label in ((out, "top"), (out["response"], "status")):
+            for key in ("state_meta", "freshness", "state_freshness"):
+                block = container[key]
+                self.assertGreater(block["age_seconds"], 3000, f"{label}.{key}")
+                self.assertEqual(block["freshness_status"], "stale", f"{label}.{key}")
+                self.assertFalse(block["is_fresh"], f"{label}.{key}")
+
+    def test_the_three_subvalues_collapse_to_one(self) -> None:
+        # Oversight's discriminator: three microsecond-apart ages means three
+        # persisted write-time computations, i.e. the recompute is not running.
+        out = intelligence_state._promote_board_contract_cards(self._served(3601.8))
+        ages = {
+            round(container[key]["age_seconds"], 1)
+            for container in (out, out["response"])
+            for key in ("state_meta", "freshness", "state_freshness")
+        }
+        self.assertEqual(len(ages), 1, "all six blocks must report one consistent age")
+
+    def test_a_payload_with_no_cards_still_gets_an_honest_verdict(self) -> None:
+        # _promote_board_contract_cards returns early when there are no cards,
+        # so the recompute runs BEFORE that -- and a stale board with no cards
+        # is exactly the case that most needs the truth.
+        out = intelligence_state._promote_board_contract_cards(self._served(3601.8, with_cards=False))
+        self.assertEqual(out["state_meta"]["freshness_status"], "stale")
+
+    def test_a_fresh_board_is_untouched(self) -> None:
+        out = intelligence_state._promote_board_contract_cards(self._served(4))
+        self.assertEqual(out["state_meta"]["freshness_status"], "fresh")
+        self.assertTrue(out["response"]["state_meta"]["is_fresh"])
+
+    def test_cards_are_still_promoted(self) -> None:
+        # The function's actual job must survive the addition.
+        out = intelligence_state._promote_board_contract_cards(self._served(10))
+        self.assertTrue(out.get("recommendations"), "card promotion must still run")
+if __name__ == "__main__":
+    unittest.main()
