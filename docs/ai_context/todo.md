@@ -1,5 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#333` — OPEN. The publish size gate and the direct publish disagree, and `#331` is what makes it bite
+
+**Found by the `#328` lane, who correctly said "nothing bites today". It bites
+the moment `#331` lands.** Filed separately rather than fixed inside `#331`,
+because raising a shared constant that three lanes are reasoning about is a
+decision, not a detail.
+
+Two paths publish the same artifact and only one has a size gate:
+
+| path | gate | behaviour on a 15.7MB book grid |
+|---|---|---|
+| `publish_hot_artifact` (the tick calls this) | **none** | publishes |
+| `sweep_changed_hot_artifacts` -> `_publish_skip_reason` | `_PUBLISH_MAX_BYTES` = 12MB | refuses, `too_large:{size}` |
+
+```
+today, starved shard    ~2.2 MB    both paths agree, nothing bites
+after #331 reconciles   15.68 MB   measured: 5,547 rows + #328's enrichment
+```
+
+So once the shard is real, the book grid publishes **only** via the tick's
+direct call, and the sweep that exists to repair a missed publish silently
+refuses it. A single network blip then leaves a stale board behind a
+`too_large` line in a log nobody reads.
+
+**A second divergence underneath it, found while taking the first:** the tick
+called `publish_hot_artifact` with the **default 10-second timeout**. Adequate
+for 2.2MB, not for 15.7MB — a fix that makes the board correct and then cannot
+ship it.
+
+**Mitigated in `#331`, not resolved:** the tick now uses a 120s timeout and
+CHECKS the return value, emitting `BOOK_GRID_PUBLISH_FAILED` with the byte size
+and an explicit note that the sweep will not repair it. That converts a silent
+gap into a loud one. **The constants still disagree.**
+
+**The decision this needs.** `_PUBLISH_MAX_BYTES` carries an explicit
+instruction — *"Raise it only with a measured reason and its own verification"*
+— and the reason it exists is to keep 51MB `odds_history` shards out of the
+sweep. A raise to ~20MB would admit the book grid and still exclude those, but
+it widens the sweep for **every** family, and nobody has enumerated what else
+sits between 12 and 20MB. The alternative is a per-family gate, which is more
+code and more honest.
+
+**The pattern, which is the reusable part:** a constant sized for the small
+version of a thing, correct for its whole life, and wrong the moment the thing
+becomes real. Same shape as `BOOK_GRID_ARTIFACT_MAX_ROWS` (1500, guessed at
+~9KB/row against a measured 2,613, discarding 73% of a real day) and as the
+ring buffer's 60-record cap. **When a fix makes a payload bigger, enumerate the
+constants on its path before shipping it** — all three of these were found
+after the fact, and two of them by someone other than the person who moved the
+payload.
+
+
 ### `#331` — IN PROGRESS. The book grid is built from **1.7%** of the odds, and that is why `/market-board/books` lost its F1/F3/F5 filters
 
 **The user's report was "we lost the F1/F3/F5/Game Total filters on game lines".
