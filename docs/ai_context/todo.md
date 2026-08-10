@@ -1,5 +1,106 @@
 # Syndicate TODO — canonical cross-session list
 
+### #332 — OPEN. A once-a-day job runs every ~5 minutes, forever: refresh-worker had **ZERO deployable windows in 23 minutes** because the staleness guard looks on the mounted disk while the script writes to the repo checkout
+
+**Status: root-caused on production 2026-08-10, not fixed. Filed at the
+oversight lane's direction; the file belongs to `#285`/`#311`.**
+
+#### The measurement that earns the ID
+
+I built `scripts/deploy_preflight.py` (`#324`), pointed it at refresh-worker,
+and it said HOLD every time. So I measured whether it ever would not:
+
+```
+16:53:55-17:16:58Z   200 ALL_PROCESS_MEMORY samples
+  a job child running   199/200 = 100%
+  deployable (idle)       1/200 =   0%   (a single 0-second sample)
+
+job-child mix:  196  generate_smartsim2_nfl_projections.py
+                157  generate_smartsim2_nfl_preseason_projections.py
+```
+
+**Not fail-fast, and not merely slow — I checked which**, because "many short
+children" and "few long children" mean opposite things: 7 distinct children in
+20 minutes, observed lifetimes 93–139s (median ~110s). So a **~2-minute job
+relaunching every ~5 minutes, continuously.**
+
+`SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` is **unset on the worker**, so the
+default applies: **86400 seconds. One day.** The intended cadence is once daily
+and the actual cadence is ~288x that.
+
+#### Root cause: MISPLACED, not missing. Proven, not inferred
+
+The oversight lane specifically flagged that "the artifact is never written" and
+"the artifact is written where the guard does not look" have different fixes and
+that my inference was the load-bearing step. It is the second:
+
+```
+guard checks    /opt/render/project/data/nfl_source/smartsim2_preseason_projections_2026_wk2.csv
+script writes   /opt/render/project/src/data/nfl_source/smartsim2_preseason_projections_2026_wk2.csv
+                                     ^^^^
+```
+
+- `SYNDICATE_DATA_ROOT = /opt/render/project/data` — read from the Render
+  env-vars API, not assumed.
+- The written path is the worker's own log line, 17:16:48Z.
+- **The filename matches.** `_preseason_projection_artifact_path` correctly
+  includes the `preseason_` prefix. Only the ROOT differs: `data_root()` is the
+  mounted disk, and the generation script writes under `REPO_ROOT/data`.
+
+The regular NFL job has the same split (`smartsim2_projections_2026_wk1.csv`
+logged under `/src/data` at 17:18:20Z), which is why both loop.
+
+**Same family as `#309`** — "WNBA graded 0 rows because the grader read a
+different root than the producer writes." That one is closed; this is the same
+fault in a different pair.
+
+#### TWO independent defects, and fixing only the obvious one leaves the trap
+
+**1. The root mismatch** above.
+
+**2. The guard is permissive on absent** (`run_refresh_worker.py:1946`):
+
+```python
+age_seconds = _file_age_seconds(artifact_path)          # None when the file does not exist
+if age_seconds is not None and age_seconds < interval:  # a MISSING artifact never skips
+    continue
+```
+
+`_file_age_seconds` returns `None` on any `stat()` failure. "I cannot tell how
+old it is" maps onto "therefore run it", every tick, emitting no reason. That is
+`feedback_unknown_must_not_default_permissive` exactly, and it is why a path bug
+presents as an infinite loop rather than as an error.
+
+**Fixing the path alone stops today's loop and leaves the guard armed for the
+next missing artifact.** Both need doing, and the guard is the one that makes
+the next occurrence visible instead of silent.
+
+#### Why other lanes need this
+
+Three lanes have been reasoning about refresh-worker memory over a window in
+which a subprocess pair ran **100% of the time**, and no open item accounts for
+it. Over that same window **pid 38 RSS was 1123–1989MB** — above `#327`'s
+1867.4MB excursion and far above the 910.2MB `#285` was working from, but
+sustained rather than a 72-second spike.
+
+**NOT CLAIMED, and the distinction is the point:** this is a **plausible
+confound sitting underneath `#285` and `#327`**, not a cause of either. I have
+not measured what the job costs in memory, and `rss_mb` per child is only ~26MB
+— the interesting question is what the PARENT does while supervising one every
+five minutes, and I did not answer it.
+
+Also not claimed: that the job fails. It runs ~2 minutes and writes its file.
+It is a correct job with an unreachable output.
+
+#### Second-order: it makes `#324`'s pre-flight useless on this service
+
+`deploy_preflight.py` correctly reports HOLD, and correctly refuses to guess —
+but if the service is never idle, "correct" means "blocks forever". Today the
+practical answer is that killing one of these costs ~2 minutes of work that is
+being discarded anyway. **That reasoning stops being true the moment `#332` is
+fixed**, so it is written here rather than into the tool.
+
+
 ### `#333` — OPEN. The publish size gate and the direct publish disagree, and `#331` is what makes it bite
 
 **Found by the `#328` lane, who correctly said "nothing bites today". It bites
