@@ -40,7 +40,7 @@ def _selected_date() -> str:
     return raw
 
 
-def render_layer1_board(sport: str):
+def render_layer1_board(sport: str, league: str | None = None):
     """Render the shared Layer 1 board for one sport.
 
     Rows are fetched client-side from `/api/board/layer1`, so this handler does
@@ -58,5 +58,6 @@ def render_layer1_board(sport: str):
         selected_date=selected,
         prev_date=(parsed - timedelta(days=1)).isoformat(),
         next_date=(parsed + timedelta(days=1)).isoformat(),
+        initial_league=str(league or "").strip().lower(),
         nav_path=request.path,
     )

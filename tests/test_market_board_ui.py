@@ -17,59 +17,60 @@ class MarketBoardUiParityTests(unittest.TestCase):
         app.testing = True
         self.client = app.test_client()
 
-    def test_mlb_market_board_page_uses_shared_template_and_correct_endpoint(self) -> None:
-        response = self.client.get("/mlb/market-board?date=2026-07-23")
-        self.assertEqual(response.status_code, 200)
-        html = response.get_data(as_text=True)
-        self.assertIn("shared/board_cards.css", html)
-        self.assertIn("shared/bet_slip.js", html)
-        self.assertIn('data-api-endpoint="/mlb/api/market-board?date=2026-07-23"', html)
-        self.assertIn('data-sport-slug="mlb"', html)
-        self.assertIn('data-selected-date="2026-07-23"', html)
-        self.assertIn('id="bet-slip-panel"', html)
-        self.assertIn('id="board-game-groups"', html)
+    # REWRITTEN 2026-08-10 for `#329`. These asserted the LEGACY page's contract
+    # -- `data-api-endpoint="/<sport>/api/market-board"`, the board-*-tabs ids,
+    # `board-game-groups`. All eight sports now render the shared Layer 1 board.
+    #
+    # The old assertions are not merely stale: an earlier attempt at this swap
+    # was REVERTED because these very tests caught that it removed the bet slip
+    # from six sports. So the replacements below assert the thing that actually
+    # mattered -- the slip survives -- rather than the markup that carried it.
 
-    def test_mlb_market_board_page_carries_the_full_toolbar(self) -> None:
-        # Nav/filter parity pass 2026-07-24: same upper toolbar (sport/state/
-        # market/view tabs, prop-type multiselect) and mini game-card strip
-        # as the curated Layer 2 board, not just the same card styling.
-        response = self.client.get("/mlb/market-board?date=2026-07-23")
-        html = response.get_data(as_text=True)
-        for element_id in (
-            "board-sport-tabs",
-            "board-state-tabs",
-            "board-market-tabs",
-            "board-view-tabs",
-            "board-prop-type-tabs",
-            "board-game-cards",
-            "board-summary-strip",
-        ):
+    SWAPPED_SPORTS = ("mlb", "nba", "wnba", "nfl", "ncaaf", "nhl", "ncaab", "soccer")
+
+    def test_every_sport_market_board_renders_the_shared_layer1_board(self) -> None:
+        for slug in self.SWAPPED_SPORTS:
+            with self.subTest(sport=slug):
+                response = self.client.get(f"/{slug}/market-board?date=2026-07-23")
+                self.assertEqual(response.status_code, 200)
+                html = response.get_data(as_text=True)
+                self.assertIn("/api/board/layer1", html)
+                self.assertIn('id="l1-body"', html)
+
+    def test_nhl_and_ncaab_have_a_board_at_all(self) -> None:
+        # Both returned 404 on production 2026-08-10 while /api/board/book-grid
+        # served them by parameter. Out of season the board renders empty WITH A
+        # REASON (`#296`), which is a different answer from "no such page".
+        for slug in ("nhl", "ncaab"):
+            with self.subTest(sport=slug):
+                self.assertEqual(self.client.get(f"/{slug}/market-board").status_code, 200)
+
+    def test_the_bet_slip_survived_the_swap(self) -> None:
+        # THE REGRESSION THIS FILE ALREADY CAUGHT ONCE. The first swap attempt
+        # dropped the slip; it was reverted rather than shipped. A board you can
+        # only read is not parity with a board you can stage a pick from.
+        for slug in self.SWAPPED_SPORTS:
+            with self.subTest(sport=slug):
+                html = self.client.get(f"/{slug}/market-board?date=2026-07-23").get_data(as_text=True)
+                self.assertIn('id="bet-slip-panel"', html, f"{slug} lost the bet-slip panel")
+                self.assertIn("shared/bet_slip.js", html, f"{slug} lost the bet-slip script")
+                self.assertIn("wireSlipButtons", html, f"{slug} never re-wires slip buttons after render")
+
+    def test_the_board_keeps_its_filter_toolbar(self) -> None:
+        html = self.client.get("/mlb/market-board?date=2026-07-23").get_data(as_text=True)
+        for element_id in ("l1-views", "l1-markets", "l1-leagues", "l1-sport", "l1-date", "l1-window"):
             self.assertIn(f'id="{element_id}"', html, element_id)
+        # Date navigation and the route back to cards were on the legacy toolbar
+        # and are load-bearing, not decoration.
+        self.assertIn("Back to Cards", html)
 
-    def test_nba_market_board_page_uses_shared_template_and_correct_endpoint(self) -> None:
-        response = self.client.get("/nba/market-board?date=2026-07-23")
-        self.assertEqual(response.status_code, 200)
-        html = response.get_data(as_text=True)
-        self.assertIn('data-api-endpoint="/nba/api/market-board?date=2026-07-23"', html)
-        self.assertIn('data-sport-slug="nba"', html)
-
-    def test_wnba_market_board_page_uses_shared_template_and_correct_endpoint(self) -> None:
-        response = self.client.get("/wnba/market-board?date=2026-07-23")
-        self.assertEqual(response.status_code, 200)
-        html = response.get_data(as_text=True)
-        self.assertIn('data-api-endpoint="/wnba/api/market-board?date=2026-07-23"', html)
-        self.assertIn('data-sport-slug="wnba"', html)
-
-    def test_soccer_mls_market_board_page_uses_shared_template_and_correct_endpoint(self) -> None:
-        # Soccer's route is league-scoped (/soccer/<league>/market-board),
-        # not a top-level /soccer/market-board like the other sports -- MLS
-        # prioritized first since it has games sooner than WNBA.
-        response = self.client.get("/soccer/mls/market-board?date=2026-07-23")
-        self.assertEqual(response.status_code, 200)
-        html = response.get_data(as_text=True)
-        self.assertIn('data-api-endpoint="/soccer/mls/api/market-board?date=2026-07-23"', html)
-        self.assertIn('data-sport-slug="mls"', html)
-        self.assertIn('data-selected-date="2026-07-23"', html)
+    def test_soccer_per_league_board_preselects_its_league(self) -> None:
+        # The per-league URL is linked from the soccer hub. It now renders the
+        # shared board filtered rather than a seventh bespoke builder -- possible
+        # only because `#330` made the pivot carry `league` at all.
+        html = self.client.get("/soccer/mls/market-board?date=2026-07-23").get_data(as_text=True)
+        self.assertIn("/api/board/layer1", html)
+        self.assertIn('league: "mls"', html)
 
     def test_soccer_mls_api_market_board_returns_json(self) -> None:
         response = self.client.get("/soccer/mls/api/market-board?date=2026-07-23")

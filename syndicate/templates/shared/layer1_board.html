@@ -80,6 +80,24 @@
   .l1-gap { color: #f0b429; font-size: 11px; cursor: help; }
   .l1-empty { padding: 26px 12px; color: #8fa2b8; font-size: 13px; }
   .l1-empty code { color: #f0b429; }
+
+  /* Bet slip rail. The board and the slip side by side, same as the legacy
+     board -- a pick you cannot stage is a board you can only read. */
+  .l1-layout { display: flex; gap: 16px; align-items: flex-start; }
+  .l1-main { flex: 1 1 auto; min-width: 0; }
+  .l1-rail { flex: 0 0 300px; position: sticky; top: 10px; }
+  .l1-rail h2 { font-size: 13px; color: #8fa2b8; margin: 0 0 8px; }
+  @media (max-width: 1100px) { .l1-layout { display: block; } .l1-rail { width: 100%; margin-top: 16px; position: static; } }
+
+  .l1-slip-btn {
+    background: #14532d; color: #bbf7d0; border: 1px solid #166534;
+    border-radius: 5px; padding: 2px 7px; font-size: 11px; cursor: pointer;
+  }
+  .l1-slip-btn[data-slip-in="true"] { background: #166534; color: #fff; }
+  /* A side with no price cannot be staged. Disabled rather than hidden, so the
+     row still shows the market has that side and the book simply is not
+     quoting it -- absence with a reason, same rule as everywhere else here. */
+  .l1-slip-btn:disabled { background: #1a2230; color: #47526180; border-color: #26313f; cursor: not-allowed; }
 </style>
 {% endblock %}
 
@@ -98,21 +116,33 @@
         <option value="slate" selected>Slate</option>
       </select>
     </label>
+    <a class="l1-tab" href="?date={{ prev_date }}">&larr; {{ prev_date }}</a>
+    <a class="l1-tab" href="?date={{ next_date }}">{{ next_date }} &rarr;</a>
     <button id="l1-refresh" class="l1-tab">Refresh</button>
+    <a class="l1-tab" href="/{{ sport }}/cards?date={{ selected_date }}">Back to Cards</a>
     <a class="l1-tab" href="/market-board/books?sport={{ sport }}&date={{ selected_date }}">Book grid →</a>
   </div>
 
   <div class="l1-tabs" id="l1-views"></div>
+  <div class="l1-tabs" id="l1-markets"></div>
   <div class="l1-tabs" id="l1-leagues"></div>
   <div class="l1-meta" id="l1-meta"></div>
-  <div id="l1-body"></div>
+
+  <div class="l1-layout">
+    <div class="l1-main"><div id="l1-body"></div></div>
+    <aside class="l1-rail">
+      <h2>Bet slip</h2>
+      <div id="bet-slip-panel"></div>
+    </aside>
+  </div>
 </div>
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="{{ url_for('static', filename='shared/bet_slip.js') }}"></script>
 <script>
 (function () {
-  var state = { sport: "{{ sport }}", date: "{{ selected_date }}", window: "slate", view: "all", league: "", board: null };
+  var state = { sport: "{{ sport }}", date: "{{ selected_date }}", window: "slate", view: "all", league: "{{ initial_league or '' }}", market: "", board: null };
 
   function q(id) { return document.getElementById(id); }
   function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
@@ -185,6 +215,32 @@
     });
   }
 
+  function renderMarkets() {
+    var b = state.board || {}, counts = {};
+    (b.games || []).forEach(function (g) {
+      (g.rows || []).forEach(function (r) {
+        var m = String(r.market || "");
+        if (m) { counts[m] = (counts[m] || 0) + 1; }
+      });
+    });
+    var keys = Object.keys(counts).sort(function (a, c) { return counts[c] - counts[a] || a.localeCompare(c); });
+    if (!keys.length) { q("l1-markets").innerHTML = ""; return; }
+    // Derived from the rows ON THIS BOARD, not from a served taxonomy: the tab
+    // strip must describe what is actually here, or selecting a market empties
+    // the selector that got you there.
+    var html = ['<span class="l1-tab' + (state.market ? "" : " l1-tab--on") + '" data-market="">All markets</span>'];
+    keys.forEach(function (k) {
+      var on = state.market === k ? " l1-tab--on" : "";
+      html.push('<span class="l1-tab' + on + '" data-market="' + esc(k) + '">' + esc(k) + " " + counts[k] + "</span>");
+    });
+    q("l1-markets").innerHTML = html.join("");
+    Array.prototype.forEach.call(q("l1-markets").querySelectorAll("[data-market]"), function (el) {
+      // Client-side: the rows are already here, so refetching to filter would
+      // be a round trip to hide data the page is holding.
+      el.onclick = function () { state.market = el.getAttribute("data-market"); render(); };
+    });
+  }
+
   function renderMeta() {
     var b = state.board || {}, c = b.counts || {};
     var bits = [
@@ -208,31 +264,75 @@
     q("l1-meta").innerHTML = bits.join("");
   }
 
-  function rowHtml(r) {
-    var side = projSide(r);
+  // ONE <tr> PER SIDE, grouped under one market label by rowspan.
+  //
+  // This is what the merged row model buys. The legacy board emitted a total as
+  // two independent rows both stamped `model_side: "over"`; the grid gives one
+  // market instance carrying every side, so the board can show over and under
+  // together AND still stage each one separately -- a slip leg is a SIDE, never
+  // a market. Rendering the pair as one row with a single button would have
+  // made the under unbettable.
+  function rowHtml(r, g) {
     var p = r.projection || {};
-    var best = (r.best || {})[side] || {};
-    var cons = (r.consensus || {})[side];
-    var fair = ((r.modelled_fair || {})[side] || {}).fair_price;
+    var pSide = projSide(r);
+    var sides = (r.sides && r.sides.length) ? r.sides : [pSide];
     var label = r.player_name ? esc(r.player_name) : esc(r.market);
     var seg = (r.segment && r.segment !== "full") ? ' <span class="l1-side">' + esc(r.segment) + "</span>" : "";
     var line = (r.line === null || r.line === undefined) ? "" : " " + r.line;
-    var edge = p.edge_vs_market_pct;
-    var edgeCls = edge === null || edge === undefined ? "" : (edge > 0 ? "l1-edge-pos" : "l1-edge-neg");
     var gaps = (r.gaps || []).length
       ? ' <span class="l1-gap" title="' + esc((r.gaps || []).join(" · ")) + '">⚠</span>' : "";
-    return "<tr>"
-      + '<td class="l1-mkt">' + label + line + seg + gaps
-        + (r.player_name ? ' <span class="l1-side">' + esc(r.market) + "</span>" : "") + "</td>"
-      + '<td class="l1-side">' + esc(side || "") + "</td>"
-      + "<td>" + (p.projected === null || p.projected === undefined ? "·" : Number(p.projected).toFixed(2)) + "</td>"
-      + '<td class="' + edgeCls + '">' + (edge === null || edge === undefined ? "·" : pct(edge)) + "</td>"
-      + '<td class="l1-price l1-best">' + odds(best.price) + "</td>"
-      + '<td class="l1-side">' + esc(best.book || "") + "</td>"
-      + '<td class="l1-price">' + odds(fair) + "</td>"
-      + '<td class="l1-price">' + odds(cons) + "</td>"
-      + "<td>" + (r.books_quoting || 0) + "</td>"
-      + "</tr>";
+
+    return sides.map(function (side, i) {
+      var best = (r.best || {})[side] || {};
+      var cons = (r.consensus || {})[side];
+      var fair = ((r.modelled_fair || {})[side] || {}).fair_price;
+      // Proj/Edge belong to the side the projection DESCRIBES. Repeating them
+      // on the opposite side would attach a real number to the bet nobody
+      // modelled, which is the single most misleading thing this board could do.
+      var onProj = (side === pSide);
+      var edge = onProj ? p.edge_vs_market_pct : null;
+      var edgeCls = edge === null || edge === undefined ? "" : (edge > 0 ? "l1-edge-pos" : "l1-edge-neg");
+      var name = r.player_name || (g.matchup || "");
+      var priced = best.price !== null && best.price !== undefined;
+
+      var cells = "";
+      if (i === 0) {
+        cells += '<td class="l1-mkt" rowspan="' + sides.length + '">' + label + line + seg + gaps
+          + (r.player_name ? ' <span class="l1-side">' + esc(r.market) + "</span>" : "") + "</td>";
+      }
+      cells += '<td class="l1-side">' + esc(side) + "</td>"
+        + "<td>" + (onProj && p.projected !== null && p.projected !== undefined ? Number(p.projected).toFixed(2) : "·") + "</td>"
+        + '<td class="' + edgeCls + '">' + (edge === null || edge === undefined ? "·" : pct(edge)) + "</td>"
+        + '<td class="l1-price l1-best">' + odds(best.price) + "</td>"
+        + '<td class="l1-side">' + esc(best.book || "") + "</td>"
+        + '<td class="l1-price">' + odds(fair) + "</td>"
+        + '<td class="l1-price">' + odds(cons) + "</td>"
+        + "<td>" + (r.books_quoting || 0) + "</td>"
+        + "<td>" + slipButton(r, g, side, best, priced) + "</td>";
+      return "<tr>" + cells + "</tr>";
+    }).join("");
+  }
+
+  // The slip is entirely generic -- it reads `data-syndicate-*` off whatever
+  // element carries the toggle -- so this stages a leg with no changes to
+  // bet_slip.js at all. `selection` is the SIDE, which is the field the ledger
+  // needs to grade a settled prop: it can know the final total and the line,
+  // but not which side was bet.
+  function slipButton(r, g, side, best, priced) {
+    if (!priced) {
+      return '<button class="l1-slip-btn" disabled title="No book is quoting this side">Slip</button>';
+    }
+    var name = r.player_name || g.matchup || "";
+    return '<button class="l1-slip-btn" data-slip-action="toggle"'
+      + ' data-syndicate-name="' + esc(name) + '"'
+      + ' data-syndicate-market="' + esc(r.market) + '"'
+      + ' data-syndicate-selection="' + esc(side) + '"'
+      + ' data-syndicate-prop-line="' + esc(r.line === null || r.line === undefined ? "" : r.line) + '"'
+      + ' data-syndicate-odds="' + esc(best.price) + '"'
+      + ' data-syndicate-sport="' + esc(state.sport) + '"'
+      + ' data-syndicate-event-id="' + esc(r.event_id || "") + '"'
+      + ' data-syndicate-game-date="' + esc(state.date) + '"'
+      + ">Slip</button>";
   }
 
   function cardHtml(g) {
@@ -240,7 +340,11 @@
     var when = g.start_time_utc ? String(g.start_time_utc).slice(11, 16) + "Z" : "";
     var score = (g.away_score !== null && g.away_score !== undefined)
       ? " " + g.away_score + "–" + g.home_score : "";
-    var rows = (g.rows || []).map(rowHtml).join("");
+    var visible = (g.rows || []).filter(function (r) {
+      return !state.market || String(r.market) === state.market;
+    });
+    if (!visible.length) { return ""; }
+    var rows = visible.map(function (r) { return rowHtml(r, g); }).join("");
     return '<div class="l1-card">'
       + '<div class="l1-card__head">'
       +   '<span class="l1-card__match">' + esc(g.matchup || "—") + esc(score) + "</span>"
@@ -254,14 +358,14 @@
       + "</div>"
       + '<div class="l1-scroll"><table class="l1"><thead><tr>'
       +   '<th class="l1-mkt">Market</th><th>Side</th><th>Proj</th><th>Edge</th>'
-      +   "<th>Best</th><th>Book</th><th>Fair</th><th>Consensus</th><th>Books</th>"
+      +   "<th>Best</th><th>Book</th><th>Fair</th><th>Consensus</th><th>Books</th><th></th>"
       + "</tr></thead><tbody>" + rows + "</tbody></table></div>"
       + "</div>";
   }
 
   function render() {
     var b = state.board || {};
-    renderViews(); renderLeagues(); renderMeta();
+    renderViews(); renderMarkets(); renderLeagues(); renderMeta();
     var games = b.games || [];
     if (!games.length) {
       // NEVER a bare empty state. `#296`: a sport with no quotes must say WHY,
@@ -277,6 +381,13 @@
       return;
     }
     q("l1-body").innerHTML = games.map(cardHtml).join("");
+    // Re-wire after every render: the buttons are new DOM each time, and a slip
+    // whose buttons are wired once at load silently stops staging the moment a
+    // tab is clicked.
+    if (window.SyndicateBetSlip) {
+      window.SyndicateBetSlip.wireSlipButtons(q("l1-body"));
+      window.SyndicateBetSlip.syncSlipButtonStates();
+    }
   }
 
   q("l1-sport").onchange = function () { state.sport = this.value; state.league = ""; window.location.href = "/" + state.sport + "/market-board?date=" + state.date; };
@@ -284,6 +395,7 @@
   q("l1-window").onchange = function () { state.window = this.value; fetchBoard(); };
   q("l1-refresh").onclick = fetchBoard;
 
+  if (window.SyndicateBetSlip) { window.SyndicateBetSlip.init(); }
   fetchBoard();
 })();
 </script>

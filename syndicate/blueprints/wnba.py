@@ -12,6 +12,7 @@ from urllib.error import URLError
 from urllib.request import Request
 from urllib.request import urlopen
 
+from syndicate.blueprints.layer1_page import render_layer1_board
 from flask import Blueprint, Response, jsonify, redirect, render_template, request, url_for
 
 from syndicate.features.shared.game_board_contract import build_game_board_api_payload
@@ -348,25 +349,19 @@ def cards():
 
 @wnba_bp.get("/market-board")
 def market_board():
-    # Layer 1 (see ~/.claude/plans/expressive-wiggling-engelbart.md, Phase
-    # 3b): every quoted moneyline/spread/total/prop line per game, not just
-    # the ones the recommendation engine chose to surface. UI-parity pass
-    # 2026-07-24: shared card/bet-slip template (shared/market_board.html)
-    # instead of the bespoke basketball-only page -- row data is fetched
-    # client-side from /wnba/api/market-board.
-    selected_date = _selected_date()
-    parsed_date = date.fromisoformat(selected_date)
-    return render_template(
-        "shared/market_board.html",
-        sport_label="WNBA",
-        sport_slug="wnba",
-        api_endpoint=f"/wnba/api/market-board?date={selected_date}",
-        selected_date=selected_date,
-        prev_date=(parsed_date - timedelta(days=1)).isoformat(),
-        next_date=(parsed_date + timedelta(days=1)).isoformat(),
-        cards_href=f"/wnba/cards?date={selected_date}",
-    )
+    """`#329`: the shared Layer 1 board.
 
+    Swapped only AFTER the bet slip reached parity. The first attempt at this
+    swap was reverted because tests/test_market_board_ui.py caught that it
+    would have removed a working bet slip from six sports to gain sim
+    enrichment -- a downgrade wearing an upgrade's name. The board now carries
+    the slip, and stages a leg PER SIDE, which the merged over/under row makes
+    possible and the old one-row-per-side board could not do.
+
+    The old builder stays on /api/market-board: home.py and the live-refresh
+    resim gates still import it.
+    """
+    return render_layer1_board("wnba")
 
 @wnba_bp.get("/api/market-board")
 def api_market_board():

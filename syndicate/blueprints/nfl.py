@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from syndicate.blueprints.layer1_page import render_layer1_board
 from flask import Blueprint, jsonify, render_template, request
 
 from syndicate.features.nfl.archive import build_archive_api_payload
@@ -215,22 +216,19 @@ def _selected_market_board_week(season: int) -> int:
 
 @nfl_bp.get("/market-board")
 def market_board():
-    season = _selected_season()
-    selected_week = _selected_market_board_week(season)
-    weeks = nfl_projection_available_weeks(season)
-    prev_week, next_week = neighboring_values(weeks, selected_week, fallback=selected_week)
-    return render_template(
-        "nfl/market_board.html",
-        sport_label="NFL",
-        sport_slug="nfl",
-        api_endpoint=f"/nfl/api/market-board?season={season}&week={selected_week}",
-        season=season,
-        selected_week=selected_week,
-        prev_week=prev_week,
-        next_week=next_week,
-        cards_href=f"/nfl/cards?season={season}&week={selected_week}",
-    )
+    """`#329`: the shared Layer 1 board.
 
+    Swapped only AFTER the bet slip reached parity. The first attempt at this
+    swap was reverted because tests/test_market_board_ui.py caught that it
+    would have removed a working bet slip from six sports to gain sim
+    enrichment -- a downgrade wearing an upgrade's name. The board now carries
+    the slip, and stages a leg PER SIDE, which the merged over/under row makes
+    possible and the old one-row-per-side board could not do.
+
+    The old builder stays on /api/market-board: home.py and the live-refresh
+    resim gates still import it.
+    """
+    return render_layer1_board("nfl")
 
 @nfl_bp.get("/api/market-board")
 def api_market_board():

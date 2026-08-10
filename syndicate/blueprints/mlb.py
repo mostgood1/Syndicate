@@ -4,6 +4,7 @@ from datetime import date
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from syndicate.blueprints.layer1_page import render_layer1_board
 from flask import Blueprint, Response, jsonify, render_template, request
 
 from syndicate.features.shared.asset_version import cards_source_asset_version
@@ -311,26 +312,19 @@ def cards():
 
 @mlb_bp.get("/market-board")
 def market_board():
-    # Layer 1 (see ~/.claude/plans/expressive-wiggling-engelbart.md): every
-    # quoted moneyline/total/prop line per game, not just the ones the
-    # recommendation engine chose to surface -- sportsbook-style, with a
-    # "Model view" badge where a projection exists to compare against.
-    # UI-parity pass 2026-07-24: same shared card/bet-slip template NBA/WNBA
-    # use (shared/market_board.html) instead of a bespoke MLB-only page --
-    # row data is fetched client-side from /mlb/api/market-board.
-    selected_date = _iso_or_today(request.args.get("date")) if request.args.get("date") else central_today_iso()
-    parsed_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
-    return render_template(
-        "shared/market_board.html",
-        sport_label="MLB",
-        sport_slug="mlb",
-        api_endpoint=f"/mlb/api/market-board?date={selected_date}",
-        selected_date=selected_date,
-        prev_date=(parsed_date - timedelta(days=1)).isoformat(),
-        next_date=(parsed_date + timedelta(days=1)).isoformat(),
-        cards_href=f"/mlb/cards?date={selected_date}",
-    )
+    """`#329`: the shared Layer 1 board.
 
+    Swapped only AFTER the bet slip reached parity. The first attempt at this
+    swap was reverted because tests/test_market_board_ui.py caught that it
+    would have removed a working bet slip from six sports to gain sim
+    enrichment -- a downgrade wearing an upgrade's name. The board now carries
+    the slip, and stages a leg PER SIDE, which the merged over/under row makes
+    possible and the old one-row-per-side board could not do.
+
+    The old builder stays on /api/market-board: home.py and the live-refresh
+    resim gates still import it.
+    """
+    return render_layer1_board("mlb")
 
 @mlb_bp.get("/api/market-board")
 def api_market_board():

@@ -127,25 +127,15 @@ def market_board_all_leagues():
 
 @soccer_bp.get("/<league>/market-board")
 def market_board(league: str):
-    # Layer 1 (see ~/.claude/plans/expressive-wiggling-engelbart.md): every
-    # quoted moneyline/total/spread/prop line for this league's slate on a
-    # given date, joined against SoccerSim's projections where coverage
-    # exists -- same shared card/bet-slip template MLB/NBA/WNBA use, with
-    # row data fetched client-side from /soccer/<league>/api/market-board.
-    league = normalize_league(league)
-    selected_date = (request.args.get("date") or "").strip() or central_today_iso()
-    parsed_date = datetime.strptime(selected_date, "%Y-%m-%d").date()
-    return render_template(
-        "shared/market_board.html",
-        sport_label=league_display_name(league),
-        sport_slug=league,
-        api_endpoint=f"/soccer/{league}/api/market-board?date={selected_date}",
-        selected_date=selected_date,
-        prev_date=(parsed_date - timedelta(days=1)).isoformat(),
-        next_date=(parsed_date + timedelta(days=1)).isoformat(),
-        cards_href=f"/soccer/{league}/cards",
-    )
+    """`#329`: the shared Layer 1 board, with this league preselected.
 
+    The per-league entry point is kept because the soccer hub links it and it
+    is the right URL when you already know the competition -- but it now
+    renders the same board as everything else, filtered, instead of a seventh
+    bespoke builder. `#330` is what made that possible: until the pivot carried
+    `league`, a shared board could not have filtered to one competition.
+    """
+    return render_layer1_board("soccer", league=league)
 
 @soccer_bp.get("/<league>/api/market-board")
 def api_market_board(league: str):
