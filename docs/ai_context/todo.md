@@ -85,6 +85,32 @@ the stage that matters is the one the instrument cannot see.
 - **Not** related to `#331`. That fix is verified and its artifact is healthy;
   Layer 2's 6,072 considered is partly evidence of it working.
 
+## TWO CHEAP CAUSES ALREADY EXCLUDED -- do not re-test these
+
+Both are the obvious first guesses and both are measured negative over the
+18:45Z-20:00Z window on `c7946247`:
+
+```
+MEMORY_GUARD_ABORT          0 lines
+MEMORY_GUARD_CHECK_FAILED   0 lines
+PULL_HOT_ARTIFACTS_FAILED   0 lines
+```
+
+**The memory guard is NOT aborting the build.** `_abort_build_candidate_pool_if_memory_critical`
+returns `_empty_candidate_pool(...)` on trip, which would produce exactly this
+signature, and it is the natural suspect given `#285`'s ratchet and the worker
+sitting at 2,640MB of 4,096 (64.5%). It prints `MEMORY_GUARD_ABORT` on every
+trip and has printed none. **`#336` is not a memory problem** -- worth stating
+flatly, because three open items on this worker are, and the pull toward
+attributing a fourth is strong.
+
+**And the cross-disk artifact pull is succeeding**, so the build is not reading
+an empty local disk.
+
+So the pool build runs to completion, over artifacts that pulled cleanly, with
+adequate memory, and finds nothing. **The remaining candidates are all inside
+the collect/merge step, which is exactly the part with no usable logging.**
+
 ### `#329` — IN PROGRESS. Layer 1 was eight sports, six bespoke builders and two 404s. One implementation now, and the date scope was wrong on every one of them
 
 Measured on production 2026-08-10, `/<sport>/api/market-board` vs
