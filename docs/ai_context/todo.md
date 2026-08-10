@@ -272,6 +272,33 @@ would still have gone green — via disk.
 **The existing backlog drains on its own** (every key carries the 2-day TTL), or
 immediately via `POST /api/ops/keyvalue/expire-run-artifacts?dry_run=0`.
 
+#### A long observation window must RE-VERIFY its anchor, not just set it
+
+The `#285` lane retracted their closure on this: their T+55 memory reading was a
+**5.5-minute-old process**, because two `trigger=api` deploys (`6010b99e`
+15:08:47Z, `87cdd3e1` 15:42:48Z) rebooted the worker inside what they were
+treating as one boot. Three overlaid boot honeymoons read as a bounded
+oscillation. **Consequence for every other lane: `#285` is OPEN, the ratchet is
+~11 MB/min with or without the arena cap, and a zero board is a co-suspect
+again — do not carry "the pool is cleared" into `#317`/`#322` reasoning.**
+
+**So I applied their rule to my own two validation windows, and they survive:**
+
+```
+#317 T+35  02:20:35..02:56:05Z   live deploys inside: 0
+#322 T+36  03:32:31..04:08:38Z   live deploys inside: 0
+                                 live deploys 02:00-05:00Z at all: none
+```
+
+**Checked the instrument before believing the zero**, which is the step that
+makes it worth anything: `deploys?limit=30` would have returned the same `0`
+while only reaching back to ~14:00Z — absence from a truncated scan, the trap
+already recorded in this file. Paginated to **400 deploys reaching 2026-07-26**
+and confirmed the list genuinely covers 02:20Z before reading the count.
+
+`ALL_PROCESS_MEMORY` carries the pid in every sample, so a pid change *is* the
+reboot signal, available for free in data both lanes had already pulled.
+
 #### VALIDATED — the reclaim landed and evictions stopped
 
 `/api/ops/keyvalue/diagnostics` + `/usage`, straddling the
@@ -354,7 +381,23 @@ So: **trust absence, verify presence.** Which is the opposite of the usual
 warning about log queries, and is why it is worth writing down.
 
 **Third hazard on the same API, and the worst of the three because it is
-silent: `direction=backward` returns the page OLDEST-FIRST.** `rows[0]` is not
+silent: results come back OLDEST-FIRST, whatever you pass.**
+
+> **CORRECTED by the `#285` lane, and the correction matters more than the
+> original note.** I first wrote this as "`direction=backward` returns the page
+> oldest-first", which reads as *avoid that parameter*. They pass **no
+> `direction` at all** and still get oldest-first. **Re-derived here rather than
+> taken on trust**, `limit=5` on refresh-worker:
+>
+> ```
+> no direction    : 16:01:55 16:01:55 16:01:56 16:01:57 16:02:00  -> ASCENDING
+> direction=back  : 16:01:55 16:01:55 16:01:56 16:01:57 16:02:00  -> ASCENDING
+> ```
+>
+> **It is the default, not something you opt into**, so anyone who read my
+> version as "don't use `direction=backward`" is still exposed. `limit=1` is
+> safe for a trivial reason: with N=1 the oldest of the newest one is the
+> newest. `rows[0]` is not
 the most recent line — it is the *oldest of the newest N*. Measured:
 
 ```
