@@ -272,14 +272,49 @@ would still have gone green — via disk.
 **The existing backlog drains on its own** (every key carries the 2-day TTL), or
 immediately via `POST /api/ops/keyvalue/expire-run-artifacts?dry_run=0`.
 
-#### Instrument caveat found while doing this
+#### RETRACTED: my "the Render logs `text` filter is unreliable" caveat was wrong
 
-**The Render logs API `text` filter is not a reliable substring match.** A query
-for `SIM_` returned `ALL_PROCESS_MEMORY` and `CONTAINER_MEMORY` lines that do
-not contain that string, and a query for `migration_runs` returned the same
-unrelated lines. It was about to tell me which service writes this bucket.
-Determine that kind of thing from the code (`launch_refresh_run`'s callers), not
-from a filtered log query.
+**I wrote that the filter returns lines not containing the search string. It
+does not. The filter is a correct, case-insensitive substring match over the
+WHOLE line, and I judged absence from a 150-char truncation of a 1500-char
+one.**
+
+The `ALL_PROCESS_MEMORY` lines a `migration_runs` query returned genuinely
+contain `migration_runs` — at character **1477**, inside subprocess argv:
+
+```
+"--run-summary-path", "/opt/render/project/data/reports/migration_runs/2026-08-11/odds_refresh_20260810_150413/refre...
+```
+
+Same for `CONTAINER_MEMORY`, which matches `container_memory_headroom_mb`
+case-insensitively, and for `SIM_`, which matches process cmdlines. Every
+"unrelated" line was a real hit I could not see because my printer sliced the
+message at 150 characters.
+
+Controlled test, refresh-worker, 2026-08-10 ~15:3xZ:
+
+| query | returned | actually contain |
+|---|---|---|
+| `ZZQQ_NOT_A_REAL_TOKEN_9931` | **0** | 0 |
+| `migration_runs` | 8 | 8 |
+| `SOCCER_UNIT_LAUNCHED` | 8 | 8 |
+| `CONTAINER_MEMORY` | 8 | 4 (other 4 hold `container_memory_*`) |
+
+**A nonsense token returns zero, so a zero from this API means zero.** I had
+told the `#282` lane the opposite, and two of their conclusions — `STEP_END=0`
+and `CONTRACT_CLAIMED=0`, the latter already acted on by the `#319` lane — rest
+partly on such zeros. Those zeros are not impeached; if anything this
+strengthens them. **Retracting a caveat matters as much as retracting a
+finding: a false warning about an instrument silently devalues every correct
+reading anyone takes with it.**
+
+The reusable lesson is the one already in this file under a different name —
+*read the field you already have.* My printer, not the API, was the broken
+instrument, and I blamed the API because I never widened the window.
+
+Incidentally the line above is direct evidence for something I had only argued
+from code: refresh-worker really does write this bucket, via
+`--run-summary-path` on a subprocess it spawned at 15:04Z.
 
 #### Loose end found while measuring, unrelated and small
 
@@ -1888,7 +1923,33 @@ it now has a date.
 **`#310` closes.** The remaining work — why boxscore ingestion stopped on
 2026-05-24 — is `#314`'s question and needs its own owner.
 
-### #285 — RESULT, 46-minute window: `malloc_trim` returned **1109.6MB** and `gc.collect()` returned **−104.3MB**. Hypothesis (1) settled. The ratchet is HALVED, not stopped — still OPEN at +11 MB/min
+### #285 — ARENA CAP MET THE SUCCESS TEST at T+29 (4/4 boards, 0 guard latches). Trim-only result below; the open question is now plateau-vs-later-crossing
+
+**`cb3946a2` (`mallopt(M_ARENA_MAX, 2)`) live on refresh-worker 2026-08-10T14:53:17Z,
+verified applied: `MALLOC_ARENA_INIT {"applied": true, "rc": 1, "max_arenas": 2,
+"cpu_count": 16}` in pid 39 — glibc default ceiling was 8x16 = 128 arenas.**
+
+```
+                    trim-only boot (08-09 23:11Z)   arena-capped boot (08-10 14:53Z)
+guard latches       10 of 12 cycles                 0 of 4 cycles, through T+29
+non-zero pools      2 of 12 (T+10 boot, T+38)       4 of 4  (203, 203, 208, 208)
+pid RSS at T+29     ~1007                           810.5
+trim vs gc          1109.6 / -104.3 MB              657.4 / 31.6 MB
+```
+
+**This is the first time today the success test has been met** — non-zero pools
+on healthy-shortlist cycles, sustained past the boot window.
+
+**THREE THINGS NOT CLAIMED.** (1) The slope: 566.4 -> 707.1 -> 627.2 -> 810.5 is
+four points with a 140MB swing between adjacent samples; the fitted +7.98 MB/min
+is not resolvable against that noise, and RSS did rise ~10 MB/min overall —
+consistent with the ratchet being unchanged in RATE and merely lower in LEVEL.
+(2) Attribution: different day and slate (08-10, ~205 candidates), workload not
+matched. (3) Closure: at ~10 MB/min from 810MB the working set reaches last
+night's latching level around T+60-70, so plateau-vs-later-crossing is open and
+needs a reading past T+60 before this closes.
+
+#### Trim-only result, 46-minute window: `malloc_trim` returned **1109.6MB** and `gc.collect()` returned **−104.3MB**. Hypothesis (1) settled. The ratchet is HALVED, not stopped — still OPEN at +11 MB/min
 
 **Deployed `e3b378de`, refresh-worker, live 23:11:48Z. Measured to T+46. Read the
 ladder, not a verdict — three of four rungs moved and the fourth moved once.**
