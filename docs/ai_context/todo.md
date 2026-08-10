@@ -684,6 +684,15 @@ if it did.
 
 **Status: FIXED, DEPLOYED (`ef3f6a2b`, both services), AND VALIDATED ON PRODUCTION.**
 
+> **ID COLLISION — `#322` IS IN USE BY TWO LANES AND THIS IS THE ONLY ENTRY.**
+> Commits `419f2348` ("precompute the book grid on the worker") and `d25b1aaa`
+> ("the worker tick that actually produces the book grid") carry a `#322:`
+> prefix for **book-grid precompute**, which is unrelated to this item and
+> belongs to `#318`'s family. This entry (`863ecd59`, query_state_cache) was
+> committed first and is the only `### #322` header in this file, but **do not
+> read `git log --grep '#322'` as one thread — it is two.** Needs an owner
+> decision; nothing here renumbers another lane's pushed commits.
+
 Anchored on the worker's `deploys/dep-d9skatqjnfac739l305g.finishedAt`
 = 03:32:31Z, first **populated** `_persist_locked` (`snapshot_count=1`) at
 03:40:51Z:
