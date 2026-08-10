@@ -171,6 +171,50 @@ _KEYVALUE_DATE_SCOPED_TTL_SECONDS = 10 * 24 * 60 * 60  # 10 days
 _KEYVALUE_RUN_SCOPED_PATH_MARKERS = ("refresh_status/", "migration_runs/", "live_refresh_loop/")
 _KEYVALUE_RUN_SCOPED_TTL_SECONDS = 2 * 24 * 60 * 60  # 2 days
 
+# #324. Paths that never belong in the keyvalue store at all, whatever the
+# backend says.
+#
+# The 2-day TTL above LANDED AND WORKS -- 6,992 of 7,058 keys carried one when
+# this was measured (2026-08-10), and `avg_ttl` sat at 24.74h against a 48h TTL,
+# i.e. TTL/2 to within 3%, which is exactly the signature of a uniformly
+# arriving population in steady state. That is the finding: **a TTL bounds AGE,
+# not SIZE.** With nothing left to age out, `migration_runs/**` had settled at a
+# FLOOR of 211.41MB across 5,293 keys -- 86% of a 256MB instance running
+# allkeys-lru at 96.1% with 38,865 keys already evicted. It had GROWN from
+# 185.71MB/2,549 on 2026-08-03 because the run rate roughly doubled.
+#
+# So the store was spending 86% of a fixed, un-upgradeable coordination budget
+# on write-once diagnostics that nothing reads twice, while `reports/intelligence`
+# -- the actual board -- held 11.96MB and competed with them for residency under
+# LRU. #317 and #322 spent a night making the board payloads FIT under the
+# per-key ceiling; leaving this in place meant a payload that wrote successfully
+# could still be silently EVICTED, which is the same zero board by a third route.
+#
+# Confirmed with the user 2026-08-10: the ops-jobs UI is not used, and
+# cross-service visibility of these runs is the only thing the keyvalue copy
+# bought. Same-service read-back (the job runner reading its own artifacts)
+# works on disk, which is where they were already being written in parallel.
+#
+# DELIBERATELY only `migration_runs/`, not the whole run-scoped tuple above:
+# `refresh_status/latest/` IS read cross-service (see record_known_refresh_lane,
+# which exists precisely so lane discovery works on the keyvalue backend), and
+# refresh_status + live_refresh_loop together were 4.4MB -- they are not the
+# problem and removing them would break a working path.
+_KEYVALUE_EXCLUDED_PATH_MARKERS = ("migration_runs/",)
+
+
+def _keyvalue_backed(path: Path) -> bool:
+    """Whether THIS path's IO goes through the keyvalue store. `#324`.
+
+    Read and write both route through here so they cannot disagree -- a split
+    would send writes to disk and reads to Redis, which reads as "the artifact
+    vanished" rather than as a bug.
+    """
+    if _state_backend_kind() != "keyvalue":
+        return False
+    normalized = _normalize_state_path(path)
+    return not any(marker in normalized for marker in _KEYVALUE_EXCLUDED_PATH_MARKERS)
+
 
 def _default_keyvalue_ttl_seconds(path: Path) -> int | None:
     normalized = _normalize_state_path(path)
@@ -394,7 +438,7 @@ def read_json_file_result(path: Path) -> tuple[dict[str, Any] | None, bool]:
     # hiccup must not be treated the same as "nothing is running." The second
     # element is False only when the read could not be completed/trusted
     # (backend error, malformed JSON) -- never for a confirmed-absent key.
-    if _state_backend_kind() == "keyvalue":
+    if _keyvalue_backed(path):
         try:
             payload_text = _execute_keyvalue_operation(lambda client: client.get(_state_key_for_path(path)))
         except Exception:
@@ -433,7 +477,7 @@ def read_text_file_result(path: Path) -> tuple[str | None, bool]:
     # (no exception surfaced, no distinguishing signal), which is exactly
     # what made this take real log archaeology to trace instead of being
     # obvious from the first failure.
-    if _state_backend_kind() == "keyvalue":
+    if _keyvalue_backed(path):
         try:
             payload_text = _execute_keyvalue_operation(lambda client: client.get(_state_key_for_path(path)))
         except Exception:
@@ -577,7 +621,7 @@ def _guard_keyvalue_payload_size(path: Path, serialized: str, payload: Any = Non
 
 def write_json_file(path: Path, payload: dict[str, Any]) -> None:
     normalized_payload = normalize_timestamped_payload(payload)
-    if _state_backend_kind() == "keyvalue":
+    if _keyvalue_backed(path):
         # #43: no human reads the keyvalue value, so indent=2 was spending a
         # third of a ceiling-constrained budget on whitespace. The rejected
         # production payload was 26,397,826 bytes indented against an 8MB
@@ -597,7 +641,7 @@ def write_json_file(path: Path, payload: dict[str, Any]) -> None:
 
 
 def write_text_file(path: Path, payload: str) -> None:
-    if _state_backend_kind() == "keyvalue":
+    if _keyvalue_backed(path):
         serialized = str(payload or "")
         _guard_keyvalue_payload_size(path, serialized)
         ttl_seconds = _default_keyvalue_ttl_seconds(path)
@@ -616,7 +660,7 @@ def delete_text_file(path: Path) -> None:
     # filesystem file was correctly cleared, but the served board kept
     # showing the same stale slate because the read path resolves through
     # the keyvalue store first.
-    if _state_backend_kind() == "keyvalue":
+    if _keyvalue_backed(path):
         try:
             _execute_keyvalue_operation(lambda client: client.delete(_state_key_for_path(path)))
         except Exception:
@@ -630,7 +674,7 @@ def delete_text_file(path: Path) -> None:
 
 
 def path_exists(path: Path) -> bool:
-    if _state_backend_kind() == "keyvalue":
+    if _keyvalue_backed(path):
         try:
             return bool(_execute_keyvalue_operation(lambda client: client.exists(_state_key_for_path(path))))
         except Exception:
@@ -1031,7 +1075,7 @@ def keyvalue_sweep_apply(*, stale_after_days: int = 2, grace_period_seconds: int
 
 
 def path_size(path: Path) -> int:
-    if _state_backend_kind() == "keyvalue":
+    if _keyvalue_backed(path):
         try:
             payload_text = _execute_keyvalue_operation(lambda client: client.get(_state_key_for_path(path)))
         except Exception:

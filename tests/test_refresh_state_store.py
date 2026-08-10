@@ -180,7 +180,12 @@ class RefreshStateStoreTests(unittest.TestCase):
             clear=False,
         ), patch("syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client):
             manifest_path = Path(tmp_dir) / "reports" / "refresh_status" / "latest" / "refresh_status_latest.json"
-            stderr_path = Path(tmp_dir) / "reports" / "migration_runs" / "x" / "odds_refresh.stderr.txt"
+            # #324: deliberately NOT a migration_runs path. That prefix is now
+            # excluded from the keyvalue store, so this test would still have
+            # passed -- via disk -- while claiming to prove a keyvalue
+            # round-trip. A test that passes for the wrong reason is worse than
+            # one that fails.
+            stderr_path = Path(tmp_dir) / "reports" / "live_refresh_loop" / "x" / "odds_refresh.stderr.txt"
 
             refresh_state_store.write_json_file(manifest_path, {"state": "pending_external", "date": "2026-05-22"})
             refresh_state_store.write_text_file(stderr_path, "worker stderr")
@@ -810,3 +815,80 @@ class KeyValuePayloadCeilingTests(unittest.TestCase):
             with patch.object(refresh_state_store, "_state_backend_kind", return_value="filesystem"):
                 refresh_state_store.write_json_file(target, {"blob": "x" * (9 * 1024 * 1024)})
             self.assertTrue(target.exists())
+
+
+class MigrationRunsAreNotKeyvalueBackedTests(unittest.TestCase):
+    """#324. Run diagnostics must never reach the keyvalue store.
+
+    Measured on production 2026-08-10: `migration_runs/**` held 211.41MB across
+    5,293 keys -- 86% of a 256MB instance at 96.1% under allkeys-lru, with
+    38,865 keys already evicted, while `reports/intelligence` (the actual board)
+    held 11.96MB and competed with it for residency.
+
+    The 2-day TTL was NOT the failure. It was applied to 6,992 of 7,058 keys and
+    `avg_ttl` sat at 24.74h against a 48h TTL -- TTL/2 to within 3%, the
+    signature of uniform steady state. A TTL bounds age, not size.
+    """
+
+    def _env(self):
+        return patch.dict(
+            os.environ,
+            {"SYNDICATE_REFRESH_STATE_BACKEND": "keyvalue", "SYNDICATE_REFRESH_STATE_URL": "redis://example"},
+            clear=False,
+        )
+
+    def test_migration_runs_never_touches_the_store(self) -> None:
+        fake_client = _FakeKeyValueClient()
+        with TemporaryDirectory() as tmp_dir, self._env(), patch(
+            "syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client
+        ):
+            path = Path(tmp_dir) / "reports" / "migration_runs" / "2026-08-10" / "odds_refresh_1" / "odds_refresh.json"
+            refresh_state_store.write_json_file(path, {"ok": True, "candidates": 150})
+
+            self.assertEqual(fake_client.store, {}, "nothing may be written to the keyvalue store")
+            self.assertTrue(path.is_file(), "it must land on disk instead")
+            # Read must agree with write, or the artifact reads as vanished.
+            self.assertEqual(refresh_state_store.read_json_file(path), {"ok": True, "candidates": 150})
+            self.assertTrue(refresh_state_store.path_exists(path))
+            self.assertGreater(refresh_state_store.path_size(path), 0)
+
+    def test_text_artifacts_are_excluded_too(self) -> None:
+        fake_client = _FakeKeyValueClient()
+        with TemporaryDirectory() as tmp_dir, self._env(), patch(
+            "syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client
+        ):
+            path = Path(tmp_dir) / "reports" / "migration_runs" / "2026-08-10" / "r" / "odds_refresh.stderr.txt"
+            refresh_state_store.write_text_file(path, "worker stderr")
+            self.assertEqual(fake_client.store, {})
+            self.assertEqual(refresh_state_store.read_text_file(path), "worker stderr")
+
+    def test_refresh_status_latest_is_still_keyvalue_backed(self) -> None:
+        # The half that would break a working path if I over-reached.
+        # refresh_status/latest IS read cross-service (record_known_refresh_lane
+        # exists precisely for that), and refresh_status + live_refresh_loop
+        # together were 4.4MB -- they are not the problem.
+        fake_client = _FakeKeyValueClient()
+        with TemporaryDirectory() as tmp_dir, self._env(), patch(
+            "syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client
+        ):
+            path = Path(tmp_dir) / "reports" / "refresh_status" / "latest" / "refresh_worker_status.json"
+            refresh_state_store.write_json_file(path, {"lane": "worker"})
+            self.assertTrue(fake_client.store, "refresh_status/latest must still cross services")
+
+    def test_intelligence_board_state_is_still_keyvalue_backed(self) -> None:
+        # #317/#322 depend on this one entirely.
+        fake_client = _FakeKeyValueClient()
+        with TemporaryDirectory() as tmp_dir, self._env(), patch(
+            "syndicate.features.shared.refresh_state_store._get_keyvalue_client", return_value=fake_client
+        ):
+            path = Path(tmp_dir) / "reports" / "intelligence" / "board_snapshot.json"
+            refresh_state_store.write_json_file(path, {"candidate_count": 150})
+            self.assertTrue(fake_client.store, "the board must still cross services")
+
+    def test_exclusion_is_backend_agnostic_on_filesystem(self) -> None:
+        with TemporaryDirectory() as tmp_dir, patch.dict(
+            os.environ, {"SYNDICATE_REFRESH_STATE_BACKEND": "filesystem"}, clear=False
+        ):
+            path = Path(tmp_dir) / "reports" / "migration_runs" / "2026-08-10" / "r" / "odds_refresh.json"
+            refresh_state_store.write_json_file(path, {"ok": True})
+            self.assertEqual(refresh_state_store.read_json_file(path), {"ok": True})
