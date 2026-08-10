@@ -229,6 +229,55 @@ measurement and both are cheap to repeat:**
   as reading a post-boot slope as a ratchet, which this lane also did an hour
   earlier.
 
+### `#336` — LEVER PULLED AND VERIFIED. `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC=900` on web + refresh-worker. The rate limit fired for the FIRST TIME IN THIS SYSTEM'S HISTORY
+
+User decision, 2026-08-10. Set via the single-key env endpoint on both services,
+refresh-worker redeployed to inject it (`f4d50c83`, live 21:56:59Z). **A restart
+does not re-inject env vars; the deploy is what makes it real.**
+
+```
+21:57:42  NOT_LIMITED   sport=mlb cached=NO interval_sec=900.0     <- injection confirmed
+22:08:27  RATE_LIMITED  mlb 635.2s  nba 631.3  wnba 629.6  nfl 626.9
+                        ncaaf 626.6 ncaab 626.6 nhl 625.6 soccer 624.7
+22:14:34  CANDIDATE_POOL_READY date=2026-08-10 count=239           <- built on CACHED overviews
+OVERVIEW_STOPPED_FOR_MEMORY  0 hits
+```
+
+**`interval_sec=900.0` in the diagnostic is the injection proof** -- asserting the
+branch rather than the outcome, because a set-but-not-deployed env var reads
+exactly like a working one from the API.
+
+**The safety result is the one that matters: `count=239` both before and after.**
+All eight sports served from cache, and candidate generation is unchanged. So the
++2.9GB-in-73s hydrated MLB pass is skipped on limited cycles at zero cost in board
+content. Ages 624-635s against the old 300s threshold show exactly why it never
+bound before.
+
+## WHY 900 WORKS, and the trap if anyone tunes it
+
+Retention is `ttl=max(_HOME_OVERVIEW_TTL_SEC, interval)`, so raising the interval
+raises the threshold AND the survival time together. At 300 the entry was pruned
+at ~300s and the next hydrated pass arrived at ~612s, missing every time. **Both
+halves had to move, and they only move together because of that `max(...)`.**
+Pinned with a comment at the line in `f4d50c83`.
+
+## THE DURABILITY HAZARD -- this key is NOT in `render.yaml`
+
+It was set through the API. **`render.yaml` does not contain it, and a
+`blueprint_sync` writes the WHOLE env block** (`#284`), so the next `render.yaml`
+push silently reverts this to the 300s default and the limiter stops binding with
+no signal. That is `#312`'s hazard exactly.
+
+Adding it to `render.yaml` would fix the durability and IS ITSELF a production
+event -- deliberately not done tonight. **Whoever next edits `render.yaml` should
+carry this key in the same commit.**
+
+## Cost accepted
+
+Board game data may now be up to 900s stale rather than up to 300s. That was the
+user's call, made explicitly, against a board that was previously freezing for
+68+ minutes at a time when the memory floor bit.
+
 ### `#336` — OWNED. ROOT-CAUSED, AND IT IS `#285`: the 3000MB overview headroom floor is firing on every cycle. NOT an independent defect, and the "not a memory problem" exclusion used a token this path never emits. THE BOARD HAS NOT REBUILT IN 68 MINUTES. `_build_candidate_pool` returns 0 while the Layer 2 shortlist has 6,072 — and the board you are looking at is a preserved corpse, not a live one
 
 **This is upstream of `#308` and is NOT the same defect.** `#308` is 156 merged
