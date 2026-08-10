@@ -630,28 +630,70 @@ permanently.** `#290`'s answer travels with it unchanged — *do not lower the
 floor; the fix is to need less, not to permit more.*
 ### #282 — SHIPPED AND VERIFIED IN PRODUCTION. Soccer sim split into per-league-date jobs. And the premise the brief was written on was false: soccer sims were never off
 
-**VERIFIED 2026-08-10 on refresh-worker, deploy `d25b1aaa` (boot 03:46:11Z).**
-The split does what it was built to do, one league and one date per job:
+**VERIFIED 2026-08-10 on refresh-worker. The round-robin completes a full
+rotation and then repeats — every unit ran, none starved:**
 
 ```
-04:28:06Z  SOCCER_UNIT_LAUNCHED league=primeira_liga unit_date=2026-08-09 scope_kind=league_date unit=1/4 due=1 spacing_seconds=3600
-08:28:17Z  SOCCER_UNIT_LAUNCHED league=primeira_liga unit_date=2026-08-10 scope_kind=league_date unit=1/1 due=1 spacing_seconds=14400
+2026-08-09 23:12:18Z  eredivisie          08-09   unit=1/4  due=4   spacing 3600
+2026-08-10 00:12:33Z  primeira_liga       08-09   unit=1/4  due=3   spacing 3600
+2026-08-10 01:27:01Z  primeira_liga       08-10   unit=1/4  due=2   spacing 3600
+2026-08-10 02:27:21Z  belgian_pro_league  08-09   unit=1/4  due=1   spacing 3600  <- rotation complete
+2026-08-10 03:28:00Z  eredivisie          08-09   unit=1/4  due=1   spacing 3600  <- second cycle
+2026-08-10 04:28:06Z  primeira_liga       08-09   unit=1/4  due=1   spacing 3600
+2026-08-10 08:28:17Z  primeira_liga       08-10   unit=1/1  due=1   spacing 14400 <- date rolled, 1 unit
+2026-08-10 12:28:30Z  primeira_liga       08-10   unit=1/1  due=1   spacing 14400
 ```
 
-**And the first verification attempt got it wrong, which is the part to keep.**
-I watched for 15 minutes after boot, saw nothing, and could not tell why —
-because the three gates that decline in steady state (spacing, active job,
-nothing due) all returned a bare `False`. The real launch came at **04:28,
-42 minutes in**: the spacing gate was holding, exactly as designed.
+`due` counts **4 → 3 → 2 → 1** as each unit is stamped, then units age past the
+4h interval and the cycle repeats. All four units the resolver predicted locally
+ran in production, and the observed spacing (~1h with 4 units, 4h with 1) is
+`interval // unit_count` exactly. **One league, one date, per job — eight times.**
+Under the old code those eight would have been eight whole-sport jobs of 10–20
+minutes each.
 
-So the window was too short — **but "the window was too short" is also precisely
-what an inert deploy looks like from outside**, and I had no way to tell those
-apart. I had applied "a zero must be attributable" to the empty-unit case and
-left the three gates that actually fire silent. Fixed by
+#### THREE separate people read this wrong, all by choosing a start time
+
+This is the reusable part, and it cost more than the feature did.
+
+- **Me, first:** watched 15 minutes from the 03:46:11Z boot, saw nothing,
+  and began building instrumentation for a silent-gate hypothesis.
+- **Me, second:** anchored a probe on that same 03:46 boot — but `fd119e17` was
+  already live on `ef3f6a2b` (03:32Z) and had been *running since 23:12Z the
+  previous evening*. The probe could not see five of the eight launches.
+- **The `#319` lane:** searched from the deploy and concluded "all three
+  launches are `primeira_liga`", reasonably suspecting the scheduler only ever
+  picked one league. Their window opened *after* the first rotation had already
+  covered all four.
+
+Every one of those readings was internally consistent and wrong, for the same
+reason: **a log window that starts after the interesting part renders "it only
+does X" and "it does nothing" identically to "it already did everything".** The
+fix is not a better instrument, it is anchoring the window on **when the code
+could first have run** — `git log -1 --format=%cI <commit>` — not on the deploy
+you happen to be watching. `fd119e17` was committed 21:20Z; every window that
+started later was guessing.
+
+**Corollary, since I nearly shipped a fix for a non-bug:** `due=1` on an
+early launch looked anomalous against a 4-unit list and was the tail of a
+countdown. Had I not widened the window, I would have "fixed" a working
+scheduler.
+
+#### The instrumentation gap is real, but it was NOT this
+
+Three of the autorun's return paths (spacing, active job, nothing due) emitted
+nothing, so from outside I could not distinguish them. That is a genuine hole
+and it is closed —
 `SOCCER_AUTORUN_SKIPPED reason=<spacing_gate|active_job|no_unit_due>`, printed
-**on reason CHANGE, not per tick** — the detail string carries counters that
-move every cycle, so keying the dedup on reason+detail would print every 30s
-forever. That bug was written and caught before it shipped.
+**on reason CHANGE, not per tick** (the detail carries counters that move every
+cycle, so keying dedup on reason+detail would print every 30s forever; written
+and caught before shipping).
+
+But it is closed **on its own merits, not as a fix for this**, because this was
+never a silent-gate failure. `"the window was too short" is also what an inert
+deploy looks like` remains a sound rule — what it needed was not more logging
+but the discriminator already in the payload: **`spacing_seconds=14400` names
+the cadence, so the required window was knowable in advance.**
+[[read the field you already have]]
 
 > **ATTRIBUTION CORRECTION + AN ORPHANED FINDING, added by the coordinator
 > 2026-08-09 ~21:3xZ.** I credited `de1a6906` and `50afe2ae` to the `#282` lane.
