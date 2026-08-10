@@ -1,9 +1,26 @@
 # Syndicate TODO — canonical cross-session list
 
-### #311 — FIX COMMITTED, NOT DEPLOYED, **TESTS WRITTEN BUT NOT RUN**. The refresh-worker's concurrency cap is inert, for two independent reasons, and the second one is the interesting one
+### #311 — FIX COMMITTED AND TESTED, NOT DEPLOYED. The refresh-worker's concurrency cap is inert, for two independent reasons, and the second one is the interesting one
 
 **STATUS 2026-08-09, owned and fixed by the `#282` lane.** Both halves are
-addressed in one commit; read the caveat before deploying.
+addressed in `235a868b`.
+
+**Tests now RUN — gate met.** `pytest tests/test_refresh_worker.py -k "311"` →
+**5 passed, 44 deselected**; the whole file → **49 passed**. Run by the
+oversight lane after this entry first went in saying they had not been.
+
+**How that gate was met is the part worth keeping.** The oversight lane had
+already run the full file before committing and reported "49 worker tests pass"
+*without checking whether these five were among them*. They were, and they
+pass — **but the gate was met by accident**, and a passing aggregate that
+happens to contain your tests is not evidence that your tests ran. Stating it as
+blocking is what turned an accident into a check. [[a rate, not a count]]
+
+**THE REMAINING CAUTION IS NOT A TEST CAUTION, AND PASSING TESTS DO NOT
+DISCHARGE IT.** This cap has never once fired in production. **The pre-fix cap
+passed tests too** — it was inert for reasons no unit test was looking at.
+Judge it on real `JOB_CAP_THROTTLED` / `JOB_COUNT_DISAGREEMENT` lines after a
+deploy, not on a green suite.
 
 - **Half one — the cap was computed and then ignored.** It was a bare `if`
   followed by a separate `if _has_pending_external_contract(...)`, and the
