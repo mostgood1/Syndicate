@@ -193,6 +193,24 @@ memory-constrained worker.
 feel would have been `#333` in miniature, and I had already moved this cap once
 tonight (60 -> 300).
 
+#### The window arithmetic, now MEASURED rather than estimated (40 min post-deploy)
+
+The `append_to_ring=False` decision was made on an estimate. The sustained rate
+is now measured, and it confirms the decision with a wider margin than I had:
+
+```
+                        rate        300 records covers
+pre-extraction        1.66/min       (60 records = 36.1 min, measured)
+post-extraction       2.40/min       125 min
++ live_lens (~6.6)    9.00/min        33 min      vs a 42.4 min max gap
+```
+
+Ring grew 60 -> 156 records / 154KB over 40 minutes, `post_mlb_sim_tick` 1 -> 51,
+distinct stages steady at 13. **So the current window is ~125 minutes, not the
+~36 I assumed, and routing `live_lens` into the ring would still have cut it to
+33 -- below the 42.4-minute gap.** The high-water design was right for the right
+reason; I was just pessimistic about the baseline.
+
 #### RESOLVED: a per-stage high-water record, which is O(STAGES) not O(SAMPLES)
 
 The tension only exists because the ring is a **time series** — its cost scales
