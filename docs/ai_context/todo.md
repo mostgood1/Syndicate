@@ -1,5 +1,109 @@
 # Syndicate TODO — canonical cross-session list
 
+### #324 — OPEN. The keyvalue instance is 96.1% full and evicting, and 86% of it is write-once run diagnostics. The 2-day TTL LANDED AND WORKS — it is a bound on AGE, and the problem is SIZE
+
+**Status: measured on production 2026-08-10 ~04:2xZ. Not fixed. This is the
+completion of `#317`/`#322`, not a separate concern — see "why this matters
+tonight" below.**
+
+> **Claimed as `#324`, not `#323` as I was asked.** `#323` was issued to the
+> book-grid precompute four commits ago (`9fa7ea6c`) to resolve the earlier
+> `#322` collision, and it is DONE. IDs are stable and never reused, so reusing
+> it would have overwritten a shipped item's record.
+
+#### The measurement
+
+`/api/ops/keyvalue/diagnostics` and `/api/ops/keyvalue/usage?top_keys=25`:
+
+```
+used_memory      257,945,728  (246.00M)  of maxmemory 268,435,456 (256.00M)  = 96.1%
+maxmemory_policy allkeys-lru
+evicted_keys     38,865
+keys 7,058 | expires 6,992 | avg_ttl 89,070,983ms
+```
+
+| bucket | MB | keys |
+|---|---|---|
+| **`reports/migration_runs/<date>`** | **211.41** | **5,293** |
+| `reports/intelligence` | 11.96 | 20 |
+| `reports/odds_control_plane` | 8.85 | 6 |
+| `reports/refresh_status/<date>` | 3.46 | 1,333 |
+| everything else combined | ~10 | ~400 |
+
+**86% of the instance is one bucket of write-once, never-reused run artifacts.**
+
+#### The part that is easy to get wrong, and I nearly did
+
+The obvious read is "the TTL isn't being applied". **It is, and it works.**
+`_KEYVALUE_RUN_SCOPED_TTL_SECONDS` (2 days, `refresh_state_store.py:172`) covers
+`migration_runs/`, and 6,992 of 7,058 keys carry a TTL. The proof it is uniform
+steady state rather than a decaying backlog is `avg_ttl`:
+
+```
+avg_ttl 24.74h  vs  TTL/2 = 24.00h    ratio 1.031
+```
+
+A uniformly-arriving population under a fixed TTL sits at exactly TTL/2 of
+remaining life. It does. **So there is no pre-truncation backlog left to age
+out — 211.41MB is the FLOOR, regenerated every two days at ~110 keys/hour.**
+
+#### Which makes the shipped verifier's premise wrong
+
+`scripts/verify_recent_shipped_work.py::check_keyvalue_usage` says
+*"migration_runs should fall sharply as pre-truncation keys age out (commit
+`44b0f247`). Measured at 185.71MB / 2,549 keys on 2026-08-03."*
+
+Seven days and ~3.5 TTL generations later it has **grown to 211.41MB / 5,293
+keys** — +25.7MB and +2,744 keys. That check would return **FAIL** ("No
+reduction yet", threshold `mb >= 185.0`) and nobody has run it. A TTL bounds how
+LONG a key lives; it bounds size only if the write rate is constant, and the
+write rate roughly doubled.
+
+#### Why this matters tonight specifically
+
+`#317` and `#322` spent the night making the board payloads FIT under the
+8,388,608 per-key ceiling — 31.4MB → 812KB, and 33MB of `snapshots` → under the
+cap. **A payload that now writes successfully can still be silently deleted**,
+because the policy is `allkeys-lru` at 96.1% with 38,865 evictions already
+recorded, and `reports/intelligence` is 11.96MB competing against 211.41MB of
+diagnostics that nothing will ever read again. Fixing the write side without
+fixing the residency side leaves the same user-visible symptom — a zero board —
+reachable by a third, entirely different route.
+
+**This gives `#285`/`#317`/`#322`'s "a zero board has N causes" list a fourth
+member: evicted.** The discriminator is `evicted_keys` climbing across the
+window plus a `board_snapshot` read miss on a cycle whose write logged no
+rejection.
+
+#### The fix, and the one decision it needs
+
+Freeing this bucket takes the instance from 246MB to ~35MB — 7x headroom, and it
+is the difference between LRU never firing and LRU firing constantly.
+
+Three options, in the order I'd argue for them:
+
+1. **Stop routing run artifacts to the keyvalue store at all.** These are
+   write-once diagnostics whose only reader is the ops-jobs UI. The
+   architecture rule already says bulk goes worker-writes-artifact →
+   web-reads-artifact; a coordination store is not an artifact store. **Needs a
+   decision first:** whether the ops-jobs UI must still show runs from a
+   *different* service (that is the only thing keyvalue buys here).
+2. **A much shorter run-scoped TTL** (2 days → ~6h). One constant, and it would
+   cut the bucket ~8x. Still no size bound — it re-breaches the moment the run
+   rate doubles again, exactly as it just did.
+3. **A per-bucket size cap.** Correct in principle, most code, and nothing else
+   in the store works this way today.
+
+**Do not "fix" this by raising `maxmemory`** — the instance size is fixed and
+upgrading was already ruled out when this bucket was first measured on
+2026-08-03.
+
+#### Loose end found while measuring, unrelated and small
+
+`odds_control_plane/odds_history/soccer/2026-08-02.json` is **8,388,768 bytes**
+— 160 bytes over the 8,388,608 ceiling it could never have been written through.
+Either it predates the guard or a path writes without it. Worth one look.
+
 ### ID COLLISION RESOLVED 2026-08-10 — `#322` was issued twice. Book-grid precompute is now `#323`
 
 **My error, and the resolution is not symmetric.** I allocated `#322` to a lane
