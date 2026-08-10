@@ -301,6 +301,37 @@
     if (b.enrichment && b.enrichment !== "enriched") {
       bits.push('<span class="l1-warn">' + esc(b.enrichment) + "</span>");
     }
+    // SAY WHY THE SEGMENT AND ALT MARKETS ARE ABSENT, rather than omitting them
+    // silently. This is the exact question the board provoked in review: "I do
+    // not see F1/F3/F5 chips for alt lines" -- correct observation, and the
+    // board gave no way to tell "not captured yet" from "broken".
+    //
+    // Measured on MLB 2026-08-09, a slate WITH segment capture:
+    //
+    //   totals_alt   first5 276  first3 81  first1 31   <- and ZERO full
+    //   spreads_alt  first5 217  first3 108 first1 60   <- zero full
+    //   h2h_3_way    first1 15   first5 15  first3 15   <- zero full
+    //   h2h          full 15     first5 15  first3 15   first1 15
+    //
+    // ALTERNATE MARKETS ARE SEGMENT-ONLY. There is no full-game `totals_alt` at
+    // all, so "alt lines with no F1/F3/F5 chip" is not a state that can exist --
+    // when alts appear they always carry a segment. Both are fetched only while
+    // a game is live or inside its T-window (`#16`/`#17` cost control), so a
+    // pregame board legitimately has neither.
+    var segs = {}, hasAlt = false;
+    (b.games || []).forEach(function (g) {
+      (g.rows || []).forEach(function (r) {
+        segs[segOf(r)] = true;
+        if (String(r.market || "").indexOf("_alt") >= 0) { hasAlt = true; }
+      });
+    });
+    if ((b.counts || {}).rows && Object.keys(segs).length < 2 && !hasAlt) {
+      bits.push('<span class="l1-warn" title="F1/F3/F5 and alternate lines are only fetched'
+        + ' while a game is live or inside its T-window (#16/#17 cost control). Alternate'
+        + ' markets are segment-only -- there is no full-game totals_alt -- so both appear'
+        + ' together, or not at all.">Full game only — segments and alt lines populate in-window</span>');
+    }
+
     // A partial window says so. Silent truncation reads as "that is all there
     // is", which is the failure this whole lane keeps meeting.
     if (b.window_partial) {
@@ -339,18 +370,73 @@
     if (!p || p <= 0 || p >= 1) { return null; }
     return p >= 0.5 ? Math.round(-100 * p / (1 - p)) : Math.round(100 * (1 - p) / p);
   }
-  function noVigFair(r, side) {
-    var sides = r.sides || [];
-    if (sides.length < 2) { return null; }
-    var consensus = r.consensus || {};
+  // ANCHOR ON PINNACLE WHERE IT QUOTES, CONSENSUS WHERE IT DOES NOT.
+  //
+  // `opportunity_signals` says in its own docstring that it de-vigs a consensus
+  // median because "we capture none of" the sharp books -- "no Pinnacle, Circa
+  // or exchange in our feed". THAT IS NO LONGER TRUE. The capture went from 11
+  // books to 37 and pinnacle is one of them, alongside betfair_ex_eu, matchbook,
+  // prophetx, novig, kalshi and polymarket. `book_grid_artifact` records the
+  // reason for the expansion as "Pinnacle for de-vigging" -- the books arrived
+  // and nothing downstream started using them.
+  //
+  // Measured before choosing, because Pinnacle's coverage is NOT uniform:
+  //
+  //   2026-08-10  two-sided 1320   pinnacle both sides    38 (2.9%)  h2h 10/10, NO props
+  //   2026-08-09  two-sided 4640   pinnacle both sides   635 (13.7%) totals 170, totals_alt 144
+  //
+  // So Pinnacle covers the GAME markets well and props not at all. Anchoring on
+  // it unconditionally would blank fair value on every prop; ignoring it throws
+  // away the sharpest price on exactly the markets people bet most. Hence: prefer
+  // Pinnacle when it prices every side, fall back to the consensus median
+  // otherwise, and LABEL which anchor produced the number -- a sharp-anchored
+  // fair and a 37-book-median fair are different claims and must not read alike.
+  var SHARP_ANCHOR = "pinnacle";
+  function devigFrom(priceBySide, sides, side) {
     var total = 0, probs = {};
     for (var i = 0; i < sides.length; i++) {
-      var pr = impliedProb(consensus[sides[i]]);
+      var pr = impliedProb(priceBySide[sides[i]]);
       if (pr === null) { return null; }
       probs[sides[i]] = pr; total += pr;
     }
     if (total <= 0) { return null; }
     return americanFromProb(probs[side] / total);
+  }
+  function noVigFair(r, side) {
+    var sides = r.sides || [];
+    if (sides.length < 2) { return null; }
+    var cells = r.cells || {};
+    var sharp = cells[SHARP_ANCHOR];
+    if (sharp) {
+      var sharpPrices = {}, ok = true;
+      for (var i = 0; i < sides.length; i++) {
+        var c = sharp[sides[i]];
+        if (!c || c.price === null || c.price === undefined) { ok = false; break; }
+        sharpPrices[sides[i]] = c.price;
+      }
+      if (ok) {
+        var v = devigFrom(sharpPrices, sides, side);
+        if (v !== null) { return { price: v, anchor: SHARP_ANCHOR }; }
+      }
+    }
+    var v2 = devigFrom(r.consensus || {}, sides, side);
+    return v2 === null ? null : { price: v2, anchor: "consensus" };
+  }
+
+  // The anchor is shown, not implied. "Fair" from Pinnacle's own two-sided
+  // price, from a 37-book median, and from a modelled hold are three different
+  // confidence levels; rendering them identically is the failure this board has
+  // already made twice tonight.
+  function fairAnchorMark(a) {
+    if (a === "pinnacle") { return '<span class="l1-best">P</span>'; }
+    if (a === "book_margin_model") { return '<span class="l1-side">~</span>'; }
+    return "";
+  }
+  function fairAnchorNote(a, mf) {
+    if (a === "pinnacle") { return "no-vig from Pinnacle's own two-sided price (sharp anchor)"; }
+    if (a === "book_margin_model") { return (mf && mf.note) || "modelled from the book's measured hold"; }
+    if (a === "consensus") { return "no-vig from the consensus median -- Pinnacle does not price both sides of this market"; }
+    return "no fair value available";
   }
 
   function rowHtml(r, g) {
@@ -381,7 +467,11 @@
       var mf = (r.modelled_fair || {})[side] || {};
       var fair = mf.fair_price;
       var fairModelled = fair !== null && fair !== undefined;
-      if (!fairModelled) { fair = noVigFair(r, side); }
+      var fairAnchor = fairModelled ? "book_margin_model" : null;
+      if (!fairModelled) {
+        var nv = noVigFair(r, side);
+        if (nv) { fair = nv.price; fairAnchor = nv.anchor; } else { fair = null; }
+      }
       // Proj/Edge belong to the side the projection DESCRIBES. Repeating them
       // on the opposite side would attach a real number to the bet nobody
       // modelled, which is the single most misleading thing this board could do.
@@ -426,8 +516,8 @@
         + '<td class="' + edgeCls + '"' + edgeTitle + '>' + edgeTxt + "</td>"
         + '<td class="l1-price l1-best">' + odds(best.price) + "</td>"
         + '<td class="l1-side">' + esc(best.bookmaker || "") + "</td>"
-        + '<td class="l1-price"' + (fairModelled ? ' title="' + esc(mf.note || "modelled from the book's measured hold") + '"' : '') + '>'
-          + odds(fair) + (fairModelled ? '<span class="l1-side">~</span>' : '') + "</td>"
+        + '<td class="l1-price" title="' + esc(fairAnchorNote(fairAnchor, mf)) + '">'
+          + odds(fair) + fairAnchorMark(fairAnchor) + "</td>"
         + '<td class="l1-price">' + odds(cons) + "</td>"
         + "<td>" + (r.books_quoting || 0) + "</td>"
         + "<td>" + slipButton(r, g, side, best, priced) + "</td>";
