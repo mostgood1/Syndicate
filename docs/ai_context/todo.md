@@ -1,5 +1,78 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-10 — LANE CLOSED: soccer sim concurrency (`#282`, `#311`, `#312`). Read the residual before assuming this is finished
+
+Three items, all committed and pushed. **What is verified and what is merely
+believed differ per item and the difference is the point.**
+
+| item | state | verified how |
+|---|---|---|
+| `#282` per-league-date soccer jobs | **deployed, verified** | 8 launches, full 4-unit rotation, `due` counting 4→3→2→1; plus a predicted launch at 16:28:31Z that landed 16:28:35Z |
+| `#311` concurrency cap | **deployed, verified** | cap fired 16:06:31Z `source=process_and_manifest` with a real job running — the first time it has ever fired |
+| `#312` `sync: false` on 8 kill switches | **on `main`, live on NOTHING** | its only deploy was cancelled; the sync mechanism remains **untested** |
+
+#### THE RESIDUAL — none of this removes the defect
+
+**`#282` bounds the blast radius ~2.8x. `#311` is the actual bound. Neither
+removes the underlying fault:** `_has_pending_external_contract` still re-claims
+a wedged manifest on every poll tick, and the only thing stopping unbounded
+growth is a cap of **1**.
+
+**That cap is `SYNDICATE_REFRESH_WORKER_MAX_ACTIVE_JOBS`, which is UNSET on both
+workers and therefore defaults to 1.** Anyone who raises it — reasonably, to get
+throughput — weakens the bound proportionally, and nothing in the code says so
+at the point of change. That is the next thing to break here.
+
+**`#312`'s protection is inert.** The 8 keys are protected in `main` and in no
+running service; the next uncancelled worker deploy picks it up incidentally.
+22 kill switches remain pinned to literals. `scripts/audit_blueprint_drift.py`
+reports the current exposure on demand.
+
+#### THE METHOD ERROR THAT RECURRED FOUR TIMES IN ONE LANE
+
+Every wrong reading in this lane had one shape: **treating a null as a result
+without first establishing what would have made it non-null.**
+
+1. **`#282` looked inert** — 15 minutes of no launches. The launcher was on a 4h
+   spacing gate. The discriminator (`spacing_s`, `since_last_launch_s`) was
+   already in the payload.
+2. **A probe anchored on the wrong boot** missed five of eight launches, because
+   the code had been live since the *previous evening*, not since the deploy
+   being watched.
+3. **A third lane read "only `primeira_liga` ever launches"** from a window that
+   opened after the first rotation had already covered all four units.
+4. **`#312`'s "no `blueprint_sync` in 35 minutes"** was measured against a deploy
+   that had been cancelled — the mechanism was never offered its input.
+
+Three different people, four readings, all internally consistent and all wrong.
+**A log window that starts after the interesting part renders "it only does X",
+"it does nothing", and "it already did everything" identically.**
+
+The two habits that actually fixed it, in order of value:
+
+- **Anchor the window on when the code could FIRST have run** —
+  `git log -1 --format=%cI <commit>` — not on the deploy you happen to be
+  watching, and not on the current boot.
+- **When a decision has a threshold, emit the distance to the threshold, not the
+  decision.** `SOCCER_AUTORUN_SKIPPED reason=spacing_gate ... since_last_launch_s=12653`
+  answered in one line what cadence-extrapolation got wrong twice. This is a
+  different thing from verbose logging.
+
+Corollary, learned the expensive way: **verifying an outcome before confirming
+the mechanism ran** produced two of the four. Check what is deployed before
+reporting a null about a deployment.
+
+#### Two operational facts this lane established that outlive it
+
+- **A cancelled deploy still restarts the process, onto the PREVIOUS commit**,
+  and neither the events nor the deploys API shows it — only the pid. It already
+  cost the `#285` lane a measurement. Anchor uptime and memory baselines on the
+  pid.
+- **A blueprint sync UPSERTS declared keys rather than replacing the block**
+  (2026-08-08: 92 → 93 keys against a blueprint declaring 83). Live-only keys are
+  not deleted, so the hazard is narrower than `#284`'s wording implies: only a
+  *declared* key whose live value was changed at runtime reverts.
+
 ### #327 — OPEN, UNOWNED. An 817MB memory excursion at `post_mlb_sim_tick` takes the container to 2.71GB of 4GB, and the ring buffer everyone has been reading CANNOT SEE THE STAGE IT HAPPENS IN
 
 **Status: measured on production 2026-08-10, re-derived independently from the
