@@ -24256,6 +24256,75 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 
 ## Operational notes worth not rediscovering
 
+- **EDITING `todo.md` WHILE OTHER LANES ARE WRITING IT. The full recipe, because
+  the short version has now failed twice and the three-line version I circulated
+  on 2026-08-10 was missing two steps that each have their own prior incident.**
+
+  This is the highest-contention file in the repo. On this box `git add -p` and
+  `git add -i` are unavailable (non-interactive shell), and **patch-filtering is
+  retired**: `git diff -U0` → filter hunks → `git apply --cached` lost twice in
+  one night, once to CRLF normalisation (`patch does not apply`, which reads
+  exactly like a content conflict and is not one — you need `newline=""` on BOTH
+  read and write) and once to the file changing *between* generating and
+  applying, so hunk line numbers shifted underneath every retry.
+
+  **Step 1 — edit the WORKING TREE as normal.** Do not edit `git show HEAD:`'s
+  copy and skip the tree. Blob-staging never writes the tree, so a lane that
+  edits only the blob ends every commit with the shared tree **behind `HEAD` by
+  exactly its own edit**. Nothing looks wrong at commit time; the damage lands
+  later on a *different* lane and presents as **them reverting you**.
+
+  **Step 2 — rebuild against `HEAD` for the INDEX ONLY**, so the staged content
+  cannot contain another lane's uncommitted work:
+
+      git show HEAD:docs/ai_context/todo.md > base.md     # apply your edit to a copy of THIS
+      BLOB=$(git hash-object -w --path=docs/ai_context/todo.md rebuilt.md)
+
+  **Step 3 — stage through a SCRATCH index, never the shared one.**
+  `git update-index --cacheinfo` on the shared index leaves a stale blob staged
+  after `HEAD` moves, and **the next `git commit` silently deletes whatever
+  landed in between** — caught live twice on 2026-08-08 from two different
+  routes (65 deletions; 69 insertions/16 deletions), both on purely *additive*
+  edits with an ordinary-looking file list:
+
+      GIT_INDEX_FILE=/tmp/idx git read-tree HEAD
+      GIT_INDEX_FILE=/tmp/idx git update-index --cacheinfo 100644,$BLOB,docs/ai_context/todo.md
+      TREE=$(GIT_INDEX_FILE=/tmp/idx git write-tree)
+      git commit-tree $TREE -p HEAD -m "..."      # then git update-ref
+
+  **Step 4 — reconcile all three.** `commit-tree` + `update-ref` moves `HEAD` and
+  updates **neither** the index nor the working tree, so the safest-at-commit-time
+  form leaves *two* things behind. Grep a distinctive string from your edit in
+  each of `git show HEAD:<file>`, the file on disk, and `git show :<file>`, then
+  bring the index back with a **path-scoped** `git reset -- <your paths>` so
+  another lane's staged work survives. If a lane uses the shared index anyway,
+  `git reset -- <file>` immediately after committing, every time.
+
+  **Always: `git diff --cached --numstat` before committing, and treat any
+  DELETIONS you did not author as a stop.** It caught 223 staged deletions
+  against 202 authored on 2026-08-10.
+
+  **Never `git pull --rebase` on a dirty shared tree.** It refuses, and its
+  autostash puts *another lane's* uncommitted work into a stash they do not know
+  exists. Rebase in a throwaway worktree instead — `git worktree add --detach
+  <plain-path> origin/main`, cherry-pick, `push origin HEAD:main`. Use a plain
+  path: `git worktree add` fails on 8.3 short names (`C:/Users/TEMPAD~1/...` →
+  `fatal: cannot change to`).
+
+  **A rebase conflict where YOUR side reads as empty, on a commit you know is
+  purely `+N/-0`, is a MIS-ALIGNMENT, not a deletion.** Git aligned a +64/−0
+  addition as if it deleted 657 and 227 lines; resolving those markers naively
+  would have dropped most of the file, and one automated pass did exactly that
+  before being aborted. Check `git show <sha> --numstat` before trusting the
+  markers.
+
+  **The reason this is written out in full:** the lane that hit these had both
+  in its own notes from earlier incidents and still did not follow either one —
+  it did the safe thing on step 1 for unrelated reasons and the unsafe thing on
+  step 3 without noticing. A recipe that only works when you already know the
+  unwritten steps is the same class of problem as the patch-filtering one it
+  replaced.
+
 - **UNOWNED RESIDUAL from `#318` (closed 2026-08-10). Web holds ~1GB of
   ANONYMOUS memory and nobody has attributed it to a code path.** The OOMs
   stopped, so the item closed; the gigabyte did not. Measured on web
