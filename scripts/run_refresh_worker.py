@@ -2157,8 +2157,12 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         build_book_grid_artifact,
         write_book_grid_artifact,
     )
-    from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+    from syndicate.features.shared.artifact_publisher import (
+        publish_hot_artifact,
+        pull_streamed_artifact,
+    )
     from syndicate.features.shared.odds_book_quotes import book_quotes_path
+    from syndicate.features.shared.refresh_state_store import data_root
 
     selected_date = central_today_iso()
     # #322 follow-up. Building ONLY today froze every finished slate at whatever
@@ -2181,7 +2185,42 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     for build_date in dates:
         for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
             try:
-                if not book_quotes_path(sport, build_date).is_file():
+                # RECONCILE THE SHARD FIRST (`#331`). This worker is not the
+                # service that captures odds -- live-odds-worker is, and it
+                # publishes the shard to web, which makes WEB canonical. The
+                # existing repair pass only fetches artifacts this worker is
+                # missing OUTRIGHT ("the list is empty once the files exist"),
+                # so once a shard is pulled at date-rollover it is never
+                # refreshed again.
+                #
+                # Measured 2026-08-10: the 2026-08-09 MLB artifact was built
+                # from 7,987 quote rows against web's 478,782 -- 1.7% -- which
+                # is exactly the shard's state at ~06:00Z, the hour it was
+                # first pulled. The board served 807 rows instead of 5,547 and
+                # ZERO segment rows instead of 1,251, which is the user-visible
+                # "we lost the F1/F3/F5 filters" on /market-board/books.
+                #
+                # `pull_streamed_artifact` already tails append-only families by
+                # HTTP Range (`#248`), so steady state is the few KB appended
+                # since the last tick, not a re-fetch. A 416 means we already
+                # hold everything. Failure is deliberately NOT fatal: a stale
+                # shard still builds a board, and the row counts in the artifact
+                # say how stale rather than leaving it to look complete.
+                shard_path = book_quotes_path(sport, build_date)
+                try:
+                    relative = shard_path.relative_to(data_root()).as_posix()
+                except ValueError:
+                    relative = ""
+                if relative:
+                    try:
+                        pull_streamed_artifact(relative, timeout_seconds=300)
+                    except Exception as exc:
+                        print(
+                            f"[refresh_worker] BOOK_GRID_SHARD_PULL_ERROR sport={sport} "
+                            f"date={build_date} {type(exc).__name__}: {exc}",
+                            flush=True,
+                        )
+                if not shard_path.is_file():
                     if build_date == selected_date:
                         skipped.append(sport)
                     continue
@@ -2194,7 +2233,26 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                 label = f"{sport}:{payload.get('rows_total')}"
                 written.append(label if build_date == selected_date else f"{label}@{build_date}")
                 try:
-                    publish_hot_artifact(path)
+                    # Timeout raised from the 10s default ON PURPOSE (`#331`).
+                    # Reconciling the shard grows this artifact by an order of
+                    # magnitude: measured 2026-08-09, a full 5,547-row day with
+                    # `#328`'s enrichment serialises to 15.7MB against the ~2.2MB
+                    # a starved shard produces today. 10 seconds was sized for
+                    # the small file and would start failing on the real one --
+                    # a fix that makes the board correct and then cannot ship it.
+                    #
+                    # The result is CHECKED rather than fired and forgotten: the
+                    # sweep that would otherwise repair a missed publish refuses
+                    # this file at `_PUBLISH_MAX_BYTES` (12MB) once it is real, so
+                    # a failure here is not backstopped by anything and must not
+                    # be silent. See `#333`.
+                    if not publish_hot_artifact(path, timeout_seconds=120):
+                        print(
+                            f"[refresh_worker] BOOK_GRID_PUBLISH_FAILED sport={sport} "
+                            f"date={build_date} bytes={path.stat().st_size} "
+                            f"(sweep will NOT repair this above 12MB -- see #333)",
+                            flush=True,
+                        )
                 except Exception as exc:
                     print(f"[refresh_worker] BOOK_GRID_PUBLISH_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
             except Exception as exc:
