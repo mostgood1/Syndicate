@@ -13,7 +13,9 @@ oversized payload is trimmed deterministically rather than dropped.
 
 from __future__ import annotations
 
+import base64
 import json
+import random
 import unittest
 from collections import OrderedDict
 from unittest.mock import patch
@@ -88,6 +90,21 @@ class BudgetedSnapshotsPayloadTests(unittest.TestCase):
         )
 
 
+def _incompressible(n_bytes: int, seed: int) -> str:
+    """Deterministic, effectively incompressible filler.
+
+    #322 changed what "oversized" means. These tests pin the property that an
+    oversized payload is TRIMMED rather than dropped, and the fixture used to
+    be `"x" * 1_500_000` -- which zlib collapses roughly a thousandfold, so
+    once compression landed the payload sailed under the ceiling, the trim
+    never fired, and the test failed asserting on a trim that correctly had not
+    happened. Filling with base64 of a seeded PRNG keeps the payload genuinely
+    over the ceiling AFTER compression, so the guard is still exercised for
+    real rather than being deleted or asserted away.
+    """
+    return base64.b64encode(random.Random(seed).randbytes(n_bytes)).decode("ascii")
+
+
 class PersistNeverKillsTheCallerTests(unittest.TestCase):
     def _service_with_big_board(self) -> IntelligenceStateService:
         service = IntelligenceStateService()
@@ -97,7 +114,7 @@ class PersistNeverKillsTheCallerTests(unittest.TestCase):
             service._snapshots[key] = IntelligenceSnapshot(
                 key=key,
                 payload={"date": "2026-07-26", "sport": "all"},
-                response={"ok": True, "candidate_count": 27, "bulk": "x" * 1_500_000},
+                response={"ok": True, "candidate_count": 27, "bulk": _incompressible(1_500_000, i)},
                 computed_at="2026-07-27T01:04:00Z",
                 source_fingerprint="fp",
             )
@@ -119,7 +136,8 @@ class PersistNeverKillsTheCallerTests(unittest.TestCase):
 
         state_writes = [p for path, p in writes if "snapshots" in p]
         self.assertEqual(len(state_writes), 1, "the trimmed retry must succeed")
-        trimmed = state_writes[0]["snapshots"]
+        # #322: the write is compressed, so inspect it the way a reader does.
+        trimmed = intelligence_state._decompress_oversized_values(state_writes[0])["snapshots"]
         self.assertIsInstance(trimmed["key6"]["response"], dict, "latest survives")
         self.assertTrue(any(e.get("response") is None for e in trimmed.values()))
 
@@ -183,6 +201,154 @@ class GuardReleaseTests(unittest.TestCase):
             "the guard must be released by the finally even though the thread died -- "
             "a held guard starves the MLB sim forever (#81's observed harm)",
         )
+
+class QueryStateCacheCompressionTests(unittest.TestCase):
+    """#322. `query_state_cache.json` was the LAST write still refused every
+    cycle after `#317` fixed board_snapshot.
+
+    Measured on the refresh-worker 2026-08-10T01:25:26Z:
+    `snapshots=33,017,421` against an 8,388,608 ceiling, with a single snapshot
+    (`399c2dc4...`) holding 33,017,351 of it. Because it was refused every
+    cycle, `_budgeted_snapshots_payload` was running constantly -- and every
+    entry that trim strips is a key that must be RECOMPUTED after a reboot. So
+    this was not a cosmetic rejection; it was a standing cost.
+
+    The trim is kept. Compression is the first line, the trim the second:
+    compression buys ~17x, not infinity.
+    """
+
+    _CAP = 8_388_608
+
+    @staticmethod
+    def _realistic_entry(key: str, candidates: int) -> dict:
+        # NOT `"x" * n`. zlib collapses a repeated character ~1000x, which would
+        # make "it fits now" pass for a reason production will never enjoy.
+        # These are candidate-shaped records with a shared key vocabulary and
+        # varying values -- the thing that actually measured ~17.7x on the real
+        # 2026-08-09 board.
+        return {
+            "key": key,
+            "payload": {"date": "2026-08-09", "sport": "all"},
+            "response": {
+                "ok": True,
+                "candidate_count": candidates,
+                "recommendations": [
+                    {
+                        "candidate_id": f"{key}-{i}",
+                        "sport": ["mlb", "nba", "nhl", "nfl"][i % 4],
+                        "edge": 0.05 + (i % 97) / 1000,
+                        "features": {f"f_{n}": (n * i) % 89 / 7 for n in range(120)},
+                        "simulation": {"runs": 20000, "dist": [(n * i) % 53 for n in range(100)]},
+                    }
+                    for i in range(candidates)
+                ],
+            },
+            "computed_at": "2026-08-10T02:27:00Z",
+            "source_fingerprint": "fp",
+        }
+
+    def _payload(self, snapshot_count: int = 6, candidates: int = 500) -> dict:
+        # Shaped exactly as _persist_locked builds it. 6x500 is ~10.6MB raw --
+        # comfortably over the 8,388,608 ceiling, and small next to the 33MB
+        # production was actually refusing. These synthetic candidates only
+        # reach ~5.6x compression where the real 2026-08-09 board measured
+        # 17.7x, so the fixture UNDERSTATES the headroom rather than flattering
+        # it, which is the direction a fixture should err.
+        return {
+            "latest_key": "key0",
+            "updated_at": "2026-08-10T02:27:48Z",
+            "watched_payloads": {"k": {"question": "top edges today", "sport": "all"}},
+            "pending_keys": {"k2": {"date": "2026-08-09"}},
+            "watched_board_dates": {"2026-08-09": "2026-08-10T02:27:00Z"},
+            "snapshots": {
+                f"key{i}": self._realistic_entry(f"key{i}", candidates) for i in range(snapshot_count)
+            },
+        }
+
+    def test_the_uncompressed_payload_really_does_breach_the_cap(self) -> None:
+        # The premise. If this stops holding, everything below measures nothing.
+        self.assertGreater(len(json.dumps(self._payload(), default=str)), self._CAP)
+
+    def test_compressed_payload_fits(self) -> None:
+        packed = intelligence_state._compress_oversized_values(self._payload())
+        self.assertLess(len(json.dumps(packed, default=str)), self._CAP)
+
+    def test_round_trip_is_lossless(self) -> None:
+        original = self._payload()
+        packed = intelligence_state._compress_oversized_values(original)
+        with patch.object(intelligence_state, "read_json_file", return_value=packed):
+            restored = intelligence_state._read_query_state_payload()
+        self.assertEqual(restored, original)
+
+    def test_queue_sync_never_inflates_the_snapshots_blob(self) -> None:
+        # The whole point of include_snapshots=False: _sync_persisted_queue_locked
+        # reads three small dicts and nothing else, and `snapshots` is 33MB.
+        packed = intelligence_state._compress_oversized_values(self._payload())
+        with patch.object(intelligence_state, "read_json_file", return_value=packed):
+            queue_only = intelligence_state._read_query_state_payload(include_snapshots=False)
+        self.assertNotIn("snapshots", queue_only)
+        self.assertEqual(queue_only["pending_keys"], {"k2": {"date": "2026-08-09"}})
+        self.assertEqual(queue_only["latest_key"], "key0")
+
+    def test_queue_fields_are_never_compressed(self) -> None:
+        # They are small, and _sync_persisted_queue_locked must be able to read
+        # them with no decode step at all.
+        packed = intelligence_state._compress_oversized_values(self._payload())
+        self.assertEqual(packed["pending_keys"], {"k2": {"date": "2026-08-09"}})
+        self.assertEqual(packed["latest_key"], "key0")
+        self.assertIn(intelligence_state._COMPRESSED_VALUE_KEY, packed["snapshots"])
+
+    def test_compression_fires_before_the_trim_not_instead_of_it(self) -> None:
+        # A payload that fits once compressed must NOT be trimmed -- every
+        # trimmed entry is a key recomputed after a reboot.
+        service = IntelligenceStateService()
+        service._snapshots = OrderedDict(
+            (f"key{i}", IntelligenceSnapshot(
+                key=f"key{i}",
+                payload={"date": "2026-08-09"},
+                response={"ok": True, "candidate_count": 150, "bulk": "x" * 3_000_000},
+                computed_at="2026-08-10T02:27:00Z",
+                source_fingerprint="fp",
+            )) for i in range(6)
+        )
+        service._latest_key = "key5"
+        service._watched_payloads = OrderedDict()
+        service._pending_keys = OrderedDict()
+        service._watched_board_dates = OrderedDict()
+
+        written: list[dict] = []
+
+        def _store(path, payload):
+            # A real ceiling, so the test exercises the actual guard.
+            if len(json.dumps(payload, default=str)) > self._CAP:
+                raise KeyValuePayloadTooLarge("too big")
+            written.append(payload)
+
+        with patch.object(intelligence_state, "write_json_file", side_effect=_store):
+            with patch.object(intelligence_state, "_write_state_payload"):
+                service._persist_locked()
+
+        state_writes = [p for p in written if "snapshots" in p]
+        self.assertTrue(state_writes, "the state write must have succeeded")
+        packed = state_writes[0]
+        self.assertIn(intelligence_state._COMPRESSED_VALUE_KEY, packed["snapshots"])
+        restored = intelligence_state._decompress_oversized_values(packed)
+        self.assertEqual(len(restored["snapshots"]), 6, "nothing should have been trimmed")
+        self.assertTrue(
+            all(isinstance(e.get("response"), dict) for e in restored["snapshots"].values()),
+            "every response must survive full -- a stripped one is a recompute after reboot",
+        )
+
+    def test_unknown_codec_is_refused_rather_than_half_understood(self) -> None:
+        poisoned = {"snapshots": {intelligence_state._COMPRESSED_VALUE_KEY: "zstd-v9", "data": "x"}}
+        with patch.object(intelligence_state, "read_json_file", return_value=poisoned):
+            self.assertIsNone(intelligence_state._read_query_state_payload())
+
+    def test_legacy_uncompressed_state_still_reads(self) -> None:
+        legacy = self._payload(snapshot_count=1, candidates=1)
+        with patch.object(intelligence_state, "read_json_file", return_value=legacy):
+            self.assertEqual(intelligence_state._read_query_state_payload(), legacy)
+
 
 if __name__ == "__main__":
     unittest.main()

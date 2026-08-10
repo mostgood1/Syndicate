@@ -2230,6 +2230,38 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     return expanded
 
 
+def _read_query_state_payload(*, include_snapshots: bool = True) -> dict[str, Any] | None:
+    """Read `STATE_PATH` (query_state_cache.json), undoing `#322`'s compression.
+
+    `include_snapshots=False` drops the `snapshots` key BEFORE decompressing it,
+    which is the point of the flag rather than a micro-optimisation:
+    `_sync_persisted_queue_locked` wants three small queue dicts and nothing
+    else, and `snapshots` is 33MB of every snapshot's full response. Inflating
+    and parsing that to read `pending_keys` would be a self-inflicted cost on a
+    hot path -- and note it is a cost the code paid BEFORE this change too, by
+    parsing the full 33MB JSON on every queue sync.
+    """
+    payload = read_json_file(STATE_PATH)
+    if not isinstance(payload, dict):
+        return payload
+    if not include_snapshots:
+        payload = {key: value for key, value in payload.items() if key != "snapshots"}
+    return _decompress_oversized_values(payload)
+
+
+def _write_query_state_payload(payload: dict[str, Any]) -> None:
+    """Write `STATE_PATH` compressed. `#322`.
+
+    Deliberately lets `KeyValuePayloadTooLarge` propagate: `_persist_locked`
+    catches it to fall back to `_budgeted_snapshots_payload`, and that fallback
+    stays. Compression is the first line, the deterministic trim is the second.
+    Measured pre-change on the refresh-worker 2026-08-10T01:25:26Z:
+    `snapshots=33,017,421` against an 8,388,608 ceiling, with a single snapshot
+    (`399c2dc4...`) holding 33,017,351 of it.
+    """
+    write_json_file(STATE_PATH, _compress_oversized_values(payload))
+
+
 def expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | None:
     """Public entry point for `_expand_persisted_state`.
 
@@ -5172,7 +5204,7 @@ class IntelligenceStateService:
             self._watched_payloads.clear()
             self._pending_keys.clear()
             self._watched_board_dates.clear()
-        payload = read_json_file(STATE_PATH)
+        payload = _read_query_state_payload()
         self._loaded_from_disk = True
         if not isinstance(payload, dict):
             return
@@ -5214,7 +5246,8 @@ class IntelligenceStateService:
         self._latest_key = str(payload.get("latest_key") or "").strip() or (next(reversed(self._snapshots)) if self._snapshots else None)
 
     def _sync_persisted_queue_locked(self) -> None:
-        payload = read_json_file(STATE_PATH)
+        # #322: queue fields only. `snapshots` is 33MB and nothing below reads it.
+        payload = _read_query_state_payload(include_snapshots=False)
         if not isinstance(payload, dict):
             return
         watched_payloads = payload.get("watched_payloads")
@@ -5270,7 +5303,13 @@ class IntelligenceStateService:
             # Preserve whatever the shared store currently has instead of
             # regressing it to empty; the queue-related fields below still
             # get written from this process's own state either way.
-            existing = read_json_file(STATE_PATH)
+            # #322: must decompress. A raw read here would see the envelope
+            # instead of a snapshots dict, fail the isinstance check below, and
+            # write this booting process's EMPTY snapshots over a sibling's good
+            # board -- precisely the regression the comment above exists to
+            # prevent. `_read_query_state_payload` returns None rather than a
+            # half-understood payload, which fails the same check safely.
+            existing = _read_query_state_payload()
             existing_snapshots = existing.get("snapshots") if isinstance(existing, dict) else None
             if isinstance(existing_snapshots, dict) and existing_snapshots:
                 snapshots_payload = existing_snapshots
@@ -5318,12 +5357,20 @@ class IntelligenceStateService:
         #   already skips entries whose response is not a dict, so a stripped
         #   entry degrades to "recompute that key after a reboot", nothing
         #   else changes.
+        #
+        # #322: compression is now the FIRST line and the trim is the second.
+        # Measured 2026-08-10T01:25:26Z, this write was refused every cycle at
+        # snapshots=33,017,421 against 8,388,608, so the trim below was running
+        # constantly and every trimmed entry is a key that must be recomputed
+        # after a reboot. Compressing first means the trim fires only when a
+        # state is genuinely enormous rather than merely rich. It is KEPT, not
+        # replaced -- compression buys ~17x, not infinity.
         try:
-            write_json_file(STATE_PATH, payload)
+            _write_query_state_payload(payload)
         except KeyValuePayloadTooLarge:
             payload["snapshots"] = _budgeted_snapshots_payload(snapshots_payload, latest_key_to_write)
             try:
-                write_json_file(STATE_PATH, payload)
+                _write_query_state_payload(payload)
                 print(
                     f"[intelligence_state] STATE_PERSIST_TRIMMED latest_key={latest_key_to_write} "
                     f"kept_full={sum(1 for entry in payload['snapshots'].values() if isinstance(entry.get('response'), dict))} "

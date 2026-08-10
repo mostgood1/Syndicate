@@ -578,6 +578,22 @@ if it did.
 > exactly as `_persist_locked` wraps it**, per the trap that caused the four
 > inert commits. Doing that is what surfaced `#320` below.
 >
+> **VALIDATED ON PRODUCTION, T+35, anchored on `deploys/…finishedAt` (02:20:35Z),
+> never `startedAt`.** Four persist cycles, `board_snapshot` rejections **0**
+> throughout, `snapshot_generated_at` advancing every cycle:
+>
+> ```
+> 02:28  persist=1 [150]           bs_kvrej=0  served=150  gen=02:25:18
+> 02:37  persist=2 [150,150]       bs_kvrej=0  served=None gen=—        <- web OOM (#318), recovered
+> 02:49  persist=3 [150,150,150]   bs_kvrej=0  served=150  gen=02:43:45
+> 02:56  persist=4 [150,150,150,0] bs_kvrej=0  served=150  gen=02:43:45
+> ```
+>
+> `persist>0` alongside `kvrej=0` is the pair that matters — `kvrej=0` with
+> `persist=0` means nothing was attempted, and the first post-deploy window read
+> exactly that way before a cycle completed. The 02:37 `None` is web dying on its
+> own OOM cadence (`#318`), not the payload; it recovered by 02:40.
+>
 > **`KEYVALUE_WRITE_REJECTED` DOES NOT STOP ENTIRELY, AND THAT IS EXPECTED —
 > read the key before concluding anything.** A second, unrelated write is still
 > refused every cycle:
@@ -587,21 +603,68 @@ if it did.
 > .../intelligence/query_state_cache.json   <- NOT this lane. Still rejected.
 > ```
 >
-> `query_state_cache.json` is `STATE_PATH`, written by `_persist_locked` through
-> a raw `write_json_file` (`:5322`), and its bulk is `snapshots=33,017,421` —
-> every snapshot's full response, not the board. It is **deliberately not fixed
-> here**: its three readers (`:5175`, `:5217`, `:5273`) all use raw
-> `read_json_file` and none go through `_expand_persisted_state`, so compressing
-> it means changing the readers too, and it already has a working deterministic
-> trim (`_budgeted_snapshots_payload` → `STATE_PERSIST_TRIMMED`). Worth doing;
-> it is a separate change with its own blast radius. **Filter
-> `KEYVALUE_WRITE_REJECTED` by key or you will conclude this item is unfixed.**
+> `query_state_cache.json` is `STATE_PATH`. **Now fixed under `#322` below.**
+> **Filter `KEYVALUE_WRITE_REJECTED` by key regardless — the two writes are
+> independent and one being healthy says nothing about the other.**
 >
 > **NOT YET VALIDATED IN PRODUCTION**, and note the sequencing that still holds:
 > `#285` gates whether any board reaches the transport at all, so the success
 > test here remains narrow — `KEYVALUE_WRITE_REJECTED` stops while
 > `STATE_PERSIST_BEGIN` keeps firing. `kvrej=0` with `persist=0` means nothing
 > was attempted, not that it succeeded.
+
+### #322 — `query_state_cache.json`: the last write still refused every cycle. 33MB of snapshots against the same 8.39MB ceiling, so the deterministic trim was running CONSTANTLY — and every trimmed entry is a key recomputed after reboot
+
+**Status: fixed, tests green, NOT YET VALIDATED ON PRODUCTION.**
+
+The sibling of `#317`, and the reason it matters is not the rejection line.
+Measured on the refresh-worker 2026-08-10T01:25:26Z:
+
+```
+query_state_cache.json  snapshots=33,017,421  against max_bytes=8,388,608
+  under=snapshots  399c2dc4…=33,017,351      <- ONE snapshot is the whole thing
+```
+
+Because the write was refused **every cycle**, `_budgeted_snapshots_payload`
+was firing every cycle too. That trim is correct and stays — but it works by
+stripping older snapshots' `response` to metadata, and a stripped entry means
+**that key must be recomputed after a reboot**. So this was not a cosmetic
+rejection; it was a standing cost paid on every cycle.
+
+**Fix:** the same compression as `#317`, through a symmetric pair —
+`_write_query_state_payload` / `_read_query_state_payload` — with all **five**
+call sites routed through them (writes `:5322`/`:5326`, reads `:5175`/`:5217`/
+`:5273`). One place, deliberately: this file's entire history is a fix landing
+on one site and missing its twin.
+
+**Compression is the FIRST line, the trim is the SECOND.** Both are kept —
+compression buys ~17× on real board data, not infinity. The trim now fires only
+when a state is genuinely enormous rather than merely rich.
+
+**`include_snapshots=False`, and it is not a micro-optimisation.**
+`_sync_persisted_queue_locked` reads three small queue dicts and nothing else,
+so it drops `snapshots` *before* decompressing. Note it is a cost the code paid
+before this change too — it parsed the full 33MB JSON on every queue sync.
+
+**`:5273` had to decompress or it would have caused the exact wipe its own
+comment exists to prevent:** a raw read there sees the envelope, fails the
+`isinstance(existing_snapshots, dict)` check, and writes this booting process's
+**empty** snapshots over a sibling's good board.
+
+#### A test that was passing for a reason that had stopped being true
+
+`test_oversized_state_write_is_retried_trimmed_not_raised` filled its fixture
+with `"x" * 1_500_000`. zlib collapses a repeated character roughly a
+thousandfold, so once compression landed the payload sailed under the ceiling,
+the trim correctly never fired, and the test failed asserting on a trim that
+had not happened. **Fixed by making the filler genuinely incompressible
+(base64 of a seeded PRNG) so the guard is still exercised for real** — not by
+deleting the assertion or patching compression out, either of which would have
+left the trim untested while looking green.
+
+The new fixtures are candidate-shaped rather than `"x" * n` for the same
+reason: they reach ~5.6× where the real 2026-08-09 board measured 17.7×, so
+they **understate** the headroom. A fixture should err in that direction.
 
 ### #320 — The board snapshot is a CROSS-SERVICE WIRE FORMAT and the two services deploy independently. Worker has been writing a format web cannot read since 00:16Z, silently, with no signal on either side
 
