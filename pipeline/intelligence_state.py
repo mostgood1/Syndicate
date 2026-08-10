@@ -1204,6 +1204,38 @@ def _freshness_status_from_age(age_seconds: float | None, sla_seconds: int) -> s
     return "fresh" if age_seconds <= float(sla_seconds) else "stale"
 
 
+def _recomputed_freshness_block(block: dict[str, Any], *, sla_seconds: int | None = None) -> dict[str, Any]:
+    """Rebuild the time-derived verdict of a freshness block from its own `computed_at`. `#334`.
+
+    A freshness verdict is only meaningful at the moment it is read. This one
+    was computed at write time and persisted with the payload, so it reported
+    `age_seconds: 0.14` on a board 2,679 seconds old.
+
+    Only `age_seconds`/`freshness_status`/`is_fresh` are rebuilt. `computed_at`,
+    `source_fingerprint` and `run_key` describe the snapshot and are preserved:
+    the aim is to stop the verdict lying, not to relabel the data.
+    """
+    computed_at = block.get("computed_at")
+    sla = block.get("freshness_sla_seconds")
+    try:
+        sla = int(sla)
+    except (TypeError, ValueError):
+        sla = None
+    if not sla:
+        sla = int(sla_seconds if sla_seconds is not None else _env_int("SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS", 30))
+    age_seconds = _timestamp_age_seconds(computed_at)
+    status = _freshness_status_from_age(age_seconds, sla)
+    return {
+        **block,
+        "age_seconds": age_seconds,
+        "freshness_sla_seconds": sla,
+        "freshness_status": status,
+        # `unknown` must not read as healthy -- an unparseable timestamp gives
+        # age None, and False is the honest answer there.
+        "is_fresh": status == "fresh",
+    }
+
+
 def _snapshot_state_meta(snapshot: "IntelligenceSnapshot | None", *, source: str | None = None, run_key: str | None = None, sla_seconds: int | None = None) -> dict[str, Any]:
     if snapshot is None:
         return {
@@ -1261,6 +1293,32 @@ def _decorate_response_with_state_meta(response: dict[str, Any] | None, snapshot
     current.setdefault("state_meta", state_meta)
     current.setdefault("freshness", dict(current.get("state_meta") or {}))
     current.setdefault("state_freshness", dict(current.get("state_meta") or {}))
+    # #334. THE SETDEFAULTS ABOVE ARE WHY A 44-MINUTE-STALE BOARD REPORTED
+    # `fresh`. `state_meta` is persisted INTO the snapshot payload (see
+    # `_intelligence_board_snapshot_payload`, which copies it), so on every
+    # subsequent read `setdefault` finds the stored block already present,
+    # keeps it, and discards the one just computed. The verdict is therefore
+    # frozen at the instant the snapshot was built and can never age.
+    #
+    # Measured on production 2026-08-10T17:31:44Z:
+    #
+    #     snapshot_generated_at  16:47:05Z     TRUE age 2679s (44.7 min)
+    #     freshness.age_seconds  0.142836...   <- the time the block took to build
+    #     freshness_sla_seconds  60            freshness_status "fresh"
+    #
+    # 44x over its own SLA and self-reporting healthy, replicated across all
+    # three blocks and their `status.*` copies. An instrument that ANSWERS
+    # rather than errs -- the same class as `#327`'s invisible stage and
+    # `#324`'s `unknown`-reads-as-clear, and the third such find tonight.
+    #
+    # Recomputed from each block's OWN `computed_at`, so a payload assembled
+    # from several sources keeps each part's real age rather than inheriting
+    # one. Non-time fields (`source_fingerprint`, `run_key`, `computed_at`)
+    # are preserved untouched: only the derived verdict is rebuilt.
+    for _freshness_key in ("state_meta", "freshness", "state_freshness"):
+        _block = current.get(_freshness_key)
+        if isinstance(_block, dict) and _block.get("computed_at"):
+            current[_freshness_key] = _recomputed_freshness_block(_block, sla_seconds=sla_seconds)
     current.setdefault("state_last_updated", str(current.get("state_last_updated") or current.get("last_updated") or current.get("updated_at") or (snapshot.computed_at if snapshot else "")).strip() or None)
     current.setdefault("source_fingerprint", snapshot.source_fingerprint if snapshot is not None else current.get("source_fingerprint"))
     return current

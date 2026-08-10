@@ -1,5 +1,78 @@
 # Syndicate TODO — canonical cross-session list
 
+### #334 — FIXED, NOT DEPLOYED. A 44-minute-stale board reported `fresh` against a 60-second SLA, because the freshness verdict is computed at WRITE time and persisted with the payload
+
+**Status: found by the oversight lane while checking `board_cc=23`, re-derived
+and root-caused here, fixed in `pipeline/intelligence_state.py`. Not deployed.**
+
+#### The reading
+
+Production `/api/intelligence/status`, 2026-08-10T17:31:44Z:
+
+```
+snapshot_generated_at   2026-08-10T16:47:05Z    TRUE age 2679s (44.7 min)
+freshness.age_seconds   0.142836332321167
+freshness_sla_seconds   60
+freshness_status        "fresh"        is_fresh  true
+```
+
+**44x over its own SLA and self-reporting healthy.** Replicated across five
+blocks — `freshness`, `state_freshness`, `state_meta` and their `status.*`
+copies — all carrying the identical `0.142836...`, which is not an age at all
+but the time the freshness computation itself took.
+
+#### Cause: `setdefault` over a persisted block
+
+`_snapshot_state_meta` computes the age correctly. The defect is downstream, in
+`_decorate_response_with_state_meta`:
+
+```python
+current.setdefault("state_meta", state_meta)      # <-- keeps the STORED one
+```
+
+`state_meta` is persisted **into** the snapshot payload (`_intelligence_board_snapshot_payload`
+copies it), so on every subsequent read `setdefault` finds it already present,
+keeps the stored copy, and discards the one just computed. **The verdict is
+frozen at the instant the snapshot was built and can never age**, by
+construction, no matter how long the board sits.
+
+#### The fix
+
+`_recomputed_freshness_block()` rebuilds `age_seconds` / `freshness_status` /
+`is_fresh` from each block's **own** `computed_at` at read time.
+`computed_at`, `source_fingerprint` and `run_key` are preserved untouched — the
+aim is to stop the verdict lying, not to relabel the data.
+
+Verified against the exact production shape: `age 0.14s / fresh` becomes
+`age 2782s / stale`. A genuinely fresh board still reads `fresh`, so the fix is
+not "mark everything stale", which would be a differently-broken instrument with
+the same confidence. An unparseable timestamp reads `unknown` with
+`is_fresh: false` rather than landing on the healthy branch.
+
+7 tests in `tests/test_state_freshness.py`, including one that each block ages
+from its own `computed_at` so a payload assembled from several sources cannot
+inherit one age.
+
+#### Why this is the same item three times over
+
+**An instrument that ANSWERS rather than errs.** `#327`: the ring buffer could
+not see the stage carrying the highest memory. `#324`/`#332`: a guard whose
+absent-input branch is its permissive branch. This: a verdict that reports
+health from a value it cannot have measured.
+
+**It also cost real diagnostic time tonight.** While tracing `board_cc=23` I read
+a `CONTAINER_MEMORY` line at 1152.8MB / 28.1% and was one step from reporting
+"memory is fine, this is a third unknown cause" — the guard was in fact firing
+at **2247.2MB** with `sports_done=0 sports_total=8`. Two instruments in the same
+investigation, both answering confidently about a moment they were not sampling.
+
+#### Not claimed
+
+This does not explain the 150 → 23 candidate drop at 16:47:05Z. It explains why
+nothing **reported** the resulting staleness. The drop itself is unowned — see
+the `OVERVIEW_STOPPED_FOR_MEMORY` note under `#285`.
+
+
 ### `#328` — COMMITTED, NOT DEPLOYED. The precomputed book grid was serving a board with no sim on it, because the artifact path skipped all three enrichment steps
 
 `#323` moved the L1-A pivot to the worker and taught web to prefer the artifact.
