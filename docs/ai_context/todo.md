@@ -2222,6 +2222,59 @@ minutes, +11.7 MB/min, ending at its maximum. That is statistically identical to
 the trim-only boot's +11.00.** The arena cap did not change the rate. What I
 called a bounded oscillation was three overlaid boot honeymoons.
 
+#### A CANCELLED RENDER DEPLOY STILL RESTARTS THE PROCESS — and no API says so
+
+**This cost a second window after the retraction above, and two lanes believed
+the opposite.** Proven from the once-per-process init markers, which turn out to
+be a process-start census nobody designed them to be:
+
+```
+15:55:10  deploy_started    f1bba90c
+15:57:50  build_ended       succeeded
+15:58:43  deploy_ended      CANCELED
+15:59:12  MALLOC_ARENA_INIT pid 38     <- 29 SECONDS LATER. New process.
+```
+
+```
+14:53:42  pid 39   cb3946a2
+15:09:12  pid 39   6010b99e
+15:43:16  pid 39   87cdd3e1
+15:59:12  pid 38   <- the cancelled one
+```
+
+**pid 39 → 38 is a NEW CONTAINER, not a respawn inside the old one** (a respawn
+takes a higher pid). The events API shows no `oomKilled` and no restart event;
+the deploys API shows no succeeded deploy after 15:42:48. **Nothing in either
+API says "restart" — only the pid does.**
+
+**Consequences, all three load-bearing:**
+- A cancelled deploy kills in-flight sims exactly like a successful one. Any
+  pre-flight sim check must run before a cancel too. "I cancelled it" is not an
+  abort.
+- **Cancelling is not a safe way to back out a `render.yaml` push** (`#312`):
+  that commit reached `main`, its deploy was cancelled, no `blueprint_sync`
+  fired — and the worker rebooted anyway.
+- Deploy-count corrections must be re-derived, not accepted when favourable. I
+  told the oversight lane their deploys had reset my window "twice, not three
+  times" because one was cancelled. It was three, and they accepted the kinder
+  number without checking. [[re-derive cross-lane numbers]]
+
+##### The instrument caught its own author's bug, which is why the reading never shipped
+
+The re-anchored reading carried three overlapping checks. Check 2 (anchor
+re-verification) **explicitly skipped cancelled deploys** — I coded the belief
+both lanes held — and reported `CLEAN`. Check 3 (pid continuity across every
+sample) reported `REBOOT INSIDE THE WINDOW`. The pid was right.
+
+**Check 2 encoded an assumption about how contamination arrives; check 3 read
+what actually happened.** [[gate on the output, not the input]] landing inside
+my own tooling within an hour of my writing it down. It is also the argument for
+three overlapping checks rather than one good one: check 2 alone would have
+passed a contaminated window through as clean.
+
+The exemption is removed. **Never exempt a deploy status from an anchor check —
+assert the pid.**
+
 #### What actually survives
 
 - **Rungs 1 and 2 are untouched.** `malloc_trim` vs `gc.collect()` reproduced on
