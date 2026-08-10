@@ -2285,6 +2285,40 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
         )}
         expanded["response"] = restored
 
+    # #334, SECOND ATTEMPT. The first fix went into
+    # `_decorate_response_with_state_meta` and shipped INERT, because the route
+    # that serves `/api/intelligence/status` does not call it -- it calls
+    # `_decorate_intelligence_board_snapshot_response`, a different decorator,
+    # and hands back the persisted blocks untouched. Measured on the deployed
+    # web at 18:2xZ: a board 436.4 seconds old reporting `fresh` on all six
+    # blocks, with three sub-values microseconds apart (0.071745 / 0.071749 /
+    # 0.071753) -- the signature of one write-time computation persisted, not
+    # of a read-time one failing.
+    #
+    # **I fixed a decorator instead of the read path, which is the third time
+    # tonight the error was "the code is present somewhere" rather than "the
+    # path producing the observation is complete".** So this goes HERE, in the
+    # one function every persisted read already funnels through (established
+    # for `#317`/`#322`: board_snapshot, state, and the ops diagnostics all
+    # call it), rather than in whichever decorator a given route happens to use.
+    # The `_decorate_response_with_state_meta` fix stays -- the recompute is
+    # idempotent, and it still covers responses built without a persisted read.
+    for _freshness_key in ("state_meta", "freshness", "state_freshness"):
+        _block = expanded.get(_freshness_key)
+        if isinstance(_block, dict) and _block.get("computed_at"):
+            expanded[_freshness_key] = _recomputed_freshness_block(_block)
+    _nested = expanded.get("response")
+    if isinstance(_nested, dict):
+        _restored_nested = dict(_nested)
+        _changed = False
+        for _freshness_key in ("state_meta", "freshness", "state_freshness"):
+            _block = _restored_nested.get(_freshness_key)
+            if isinstance(_block, dict) and _block.get("computed_at"):
+                _restored_nested[_freshness_key] = _recomputed_freshness_block(_block)
+                _changed = True
+        if _changed:
+            expanded["response"] = _restored_nested
+
     return expanded
 
 

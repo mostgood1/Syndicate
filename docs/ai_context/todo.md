@@ -120,6 +120,46 @@ the same confidence. An unparseable timestamp reads `unknown` with
 from its own `computed_at` so a payload assembled from several sources cannot
 inherit one age.
 
+#### SHIPPED INERT, AND THE SECOND ATTEMPT IS THE INTERESTING ONE
+
+`bfda258c` deployed to web (`bb515134`, 18:26:07Z) and **changed nothing.**
+Oversight measured it immediately:
+
+```
+block                    reported    TRUE     status
+state_meta               0.071745    436.4    fresh
+freshness                0.071749    436.4    fresh
+state_freshness          0.071753    436.4    fresh
+status.*  (x3)           same         436.4    fresh
+```
+
+A board 7.3 minutes old, 60-second SLA, `fresh` on all six. The three sub-values
+microseconds apart (`...745 / ...749 / ...753`) are three sequential **write-time**
+computations persisted together — so the read-time recompute was not running at
+all, rather than running and failing.
+
+**Cause: I fixed a decorator, not the read path.** The route serving
+`/api/intelligence/status` calls `_decorate_intelligence_board_snapshot_response`
+(`:5865`), a DIFFERENT function from the `_decorate_response_with_state_meta` I
+patched, and it passes the persisted blocks through untouched.
+
+**That is the third time tonight the error was "the code is present somewhere"
+rather than "the path that produces the observation is complete"** — after
+reading a commit range and calling `#331`'s reduction landed, and after
+unifying two emitters when there were three. Same mistake, three shapes, one
+session.
+
+Fixed by moving the recompute into **`_expand_persisted_state`** — the one
+function every persisted read already funnels through (established for
+`#317`/`#322`: board_snapshot, state, and the ops diagnostics all call it),
+rather than into whichever decorator a route happens to use. The decorator fix
+stays: the recompute is idempotent and still covers responses built without a
+persisted read.
+
+Covers the nested `response.*` blocks too, which is where the `status.*` copies
+come from — all six, verified. 11 tests, plus 62 passing across the `#317`/`#322`
+suites since `_expand_persisted_state` is their choke point as well.
+
 #### Why this is the same item three times over
 
 **An instrument that ANSWERS rather than errs.** `#327`: the ring buffer could

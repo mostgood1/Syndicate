@@ -113,5 +113,66 @@ class RecomputedFreshnessBlockTests(unittest.TestCase):
         self.assertEqual(out["freshness"]["freshness_status"], "fresh")
 
 
+class TheReadPathThatActuallyServesStatusTests(unittest.TestCase):
+    """#334 second attempt. The first fix went into
+    `_decorate_response_with_state_meta` and shipped INERT: the route serving
+    `/api/intelligence/status` calls `_decorate_intelligence_board_snapshot_response`
+    instead and hands back the persisted blocks untouched.
+
+    Measured on deployed web: a board 436.4s old reporting `fresh` on all six
+    blocks, with sub-values 0.071745 / 0.071749 / 0.071753 -- three sequential
+    write-time computations microseconds apart, persisted. So the recompute now
+    lives in `_expand_persisted_state`, the one function every persisted read
+    funnels through, rather than in whichever decorator a route happens to use.
+    """
+
+    def _persisted(self, age_seconds: float) -> dict:
+        block = {
+            "computed_at": _iso(age_seconds),
+            "age_seconds": 0.071745,
+            "freshness_sla_seconds": 60,
+            "freshness_status": "fresh",
+            "is_fresh": True,
+            "source_fingerprint": "fp",
+        }
+        return {
+            "candidate_count": 150,
+            "state_meta": dict(block),
+            "freshness": dict(block),
+            "state_freshness": dict(block),
+            "response": {
+                "recommendations": [{"a": 1}],
+                "state_meta": dict(block),
+                "freshness": dict(block),
+                "state_freshness": dict(block),
+            },
+        }
+
+    def test_expand_recomputes_all_six_blocks(self) -> None:
+        # Six is the number oversight measured: three blocks plus their
+        # `status.*` copies, which come from the nested `response`.
+        out = intelligence_state._expand_persisted_state(self._persisted(436.4))
+        for container, label in ((out, "top"), (out["response"], "response")):
+            for key in ("state_meta", "freshness", "state_freshness"):
+                block = container[key]
+                self.assertGreater(block["age_seconds"], 400, f"{label}.{key}")
+                self.assertEqual(block["freshness_status"], "stale", f"{label}.{key}")
+                self.assertFalse(block["is_fresh"], f"{label}.{key}")
+
+    def test_it_does_not_disturb_the_board_payload(self) -> None:
+        # _expand_persisted_state is #317/#322's alias/compression choke point.
+        # Touching it must not perturb what it was already doing.
+        out = intelligence_state._expand_persisted_state(self._persisted(436.4))
+        self.assertEqual(out["response"]["recommendations"], [{"a": 1}])
+        self.assertEqual(out["candidate_count"], 150)
+
+    def test_a_fresh_persisted_board_still_reads_fresh(self) -> None:
+        out = intelligence_state._expand_persisted_state(self._persisted(3))
+        self.assertEqual(out["state_meta"]["freshness_status"], "fresh")
+        self.assertEqual(out["response"]["state_meta"]["freshness_status"], "fresh")
+
+    def test_payloads_without_freshness_blocks_are_untouched(self) -> None:
+        plain = {"candidate_count": 5, "response": {"recommendations": []}}
+        self.assertEqual(intelligence_state._expand_persisted_state(dict(plain)), plain)
 if __name__ == "__main__":
     unittest.main()
