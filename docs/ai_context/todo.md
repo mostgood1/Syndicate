@@ -66,6 +66,45 @@ a `CONTAINER_MEMORY` line at 1152.8MB / 28.1% and was one step from reporting
 at **2247.2MB** with `sports_done=0 sports_total=8`. Two instruments in the same
 investigation, both answering confidently about a moment they were not sampling.
 
+#### FOLLOW-UP ON MY OWN `#327` FIX: I unified two emitters and there were THREE
+
+Found by the `#282` lane, who observed `live_lens_tick_after_build_mlb` still
+absent from the ring buffer after my extraction deployed and carefully declined
+to call it a null on a 5-minute window. **The null is real and it is mine.**
+
+```
+syndicate/features/shared/live_lens_loop.py:433  log_all_process_memory(f"live_lens_tick_before_{sport}", ...)
+                                          :481  log_all_process_memory(f"live_lens_tick_after_build_{sport}", ...)
+                                          :519  log_all_process_memory(f"live_lens_tick_after_{sport}", ...)
+```
+
+Direct calls to the **stderr-only** logger, so my extraction cannot reach them.
+`live_lens_tick_*` is still structurally invisible and will read zero however
+long anyone watches.
+
+**Committed by the person who filed `#327`, one commit after writing "extract
+ONE helper, not patch the second copy."** I unified the two functions that
+shared a NAME and never asked how many emitters existed. The right question was
+never "are these two the same?" but "who writes into this instrument at all?" --
+a name is not a census.
+
+Consequence for readers: **`live_lens_tick_after_build_mlb` reading zero is not
+evidence about the stage.** `run_refresh_worker.py:2314` records it at
+**+1,445MB**, larger than any excursion in the `n=4` table above.
+
+**NOT fixed yet, deliberately.** The routing is two lines; the sizing is not.
+Ring is 300 records (~1,233 bytes each) at ~8/min ≈ 36 min of history.
+`live_lens` adds ~6.6/min, taking 300 records to **~20-23 minutes** — and the
+measured inter-arrival gaps are **42.4 / 18.3 / 11.1 min**, so that window would
+miss the long ones. Fixing the blind spot would shrink the buffer below the
+thing it must observe. Spanning the gaps wants ~900 records (~1.1MB, 13% of the
+keyvalue ceiling) but that is a 1.1MB read-modify-write ~15x/min on the
+memory-constrained worker.
+
+**So this wants a design decision — sampling, or a high-water record per stage —
+not a bigger constant.** Choosing 900 by feel would be `#333` in miniature, and
+I already moved this cap once tonight (60 -> 300).
+
 #### Not claimed
 
 This does not explain the 150 → 23 candidate drop at 16:47:05Z. It explains why
