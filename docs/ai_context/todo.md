@@ -239,6 +239,41 @@ trip and has printed none. > ## ROOT CAUSE, measured 2026-08-10 20:2xZ. **THE AB
 > the 2026-08-07 measurement, because tonight's MLB slate has not started. So
 > the cache is now populated and the 300s limit should engage on its own.
 >
+> ## The post-reboot limiter silence is STILL UNEXPLAINED, and the eviction
+> hypothesis is not supported by what I can measure
+>
+> Oversight measured that my abort-deadlock explanation covers only the
+> PRE-reboot window. After 20:33: 11 full passes, **0 guard aborts**, so builds
+> complete and entries are written — yet `OVERVIEW_REBUILD_RATE_LIMITED` still
+> fires **0 times**, with mlb gaps of 7s / 245s / 248s / 251s, all inside the
+> 300s window.
+>
+> Their candidate was `_HOME_CACHE_MAX_ENTRIES = 32` being sized for one date
+> while the worker builds two. **Checked, and it does not hold in this window:**
+>
+> ```
+> distinct board dates since the 20:33 reboot   1  (2026-08-10)
+> keys = 1 date x 8 sports x 2 variants        16
+> ceiling                                      32
+> evicts when len > 32                         NO
+> ```
+>
+> **Sample stated: 8 log lines carrying `date=`, which is thin**, and PRE-reboot
+> both 2026-08-10 and 2026-08-11 were being built. The cache also persists
+> across cycles within the process, so an 08-11 key built early post-reboot
+> would still be resident and unsampled. So this **weakens** the eviction
+> hypothesis in the current window rather than killing it.
+>
+> Also checked: the cache write at `home.py:7117` is **unconditional** at the end
+> of a successful build, so a completed hydrated pass does leave an entry.
+> `_prune_home_cache` retains at `ttl=max(10, 300)` per `#255`, verified in the
+> deployed commit.
+>
+> **So: entries are written, retained for 300s, not evicted, and the rebuild
+> gaps are inside 300s — and the limiter still never fires. I have not found the
+> mechanism.** Recording the three excluded branches so the next person starts
+> where I stopped rather than re-walking them.
+
 > **The instrument is landed and NOT deployed.** Its author landed it in
 > `c2f0434e` (`BOARD_OVERVIEW_READY`, `BOARD_RAW_CANDIDATES`) and said plainly
 > that it "lost the race" — the root cause was found by another route first, so
