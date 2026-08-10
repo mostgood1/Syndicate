@@ -307,6 +307,76 @@ measurement and both are cheap to repeat:**
   as reading a post-boot slope as a ratchet, which this lane also did an hour
   earlier.
 
+### ID COLLISION 2026-08-10 — `#338` was issued twice. The MLB liveness gate is `#339`
+
+**My error, made after spending the evening telling other lanes to check first.**
+I used `#338` in `879afbfd` without grepping `origin/main`, where `c193c498` had
+already claimed it for `#337`'s write-path verification.
+
+**`#338` stays with `c193c498`** — committed first, and renumbering a landed entry
+is worse than recording a mapping. IDs are stable and never reused.
+
+**`879afbfd`'s commit message says `#338` and means `#339`.** Pushed history is not
+rewritten on a branch six lanes are committing to.
+
+Fourth allocation problem tonight. The check that would have caught all four:
+`git log --oneline --grep '#NNN' origin/main` **before** writing the number — not
+grepping the todo heading, which lags the commit that claims it.
+
+### `#339` — COMMITTED, NOT DEPLOYED. The MLB liveness gate returns a bare False from EIGHT paths, and it has cost a live slate twice
+
+`879afbfd` (message says `#338`; see collision note above).
+
+**Measured 2026-08-10.** BOS @ TOR went live and MLB stayed on the **2-hour
+pregame sweep interval** for 91 minutes:
+
+```
+shard   17,779,953 bytes, unchanged across 90 minutes
+quotes  newest 21:29:31Z while the game was in TOP 1
+board   zero segment rows, zero alt markets at 22:54Z
+```
+
+F1/F3/F5 and every `*_alt` market are fetched **only** on the per-event path this
+gate skips, so their absence was a symptom rather than a separate defect.
+Recovered unaided at ~23:01Z (`first5 103, first3 45, first1 28` by 23:03Z).
+
+**BOTH INPUTS WERE CORRECT THROUGHOUT** — checked by hand during the incident:
+report `counts.live=2`, helper `{"live_game_pks": [822780, 824887]}`. The data was
+right, the evaluation was wrong, and **nothing recorded which of eight paths to
+False was taken.**
+
+**RECURRENCE.** `_mlb_has_live_game`'s own comment records the identical failure on
+2026-07-17 — *"stuck reporting anyLive=false through an entire live game"* — and
+the schedule fallback was added then so either source saying live would suffice.
+Both returned False anyway, silently. The second diagnosis cost 90 minutes for the
+same reason as the first.
+
+**DIAGNOSIS ONLY.** Probes return `(bool, reason)`; the branch taken is unchanged.
+The pairs that were indistinguishable and have opposite fixes:
+
+```
+no_payload     vs  live=0     cannot READ the report  vs  read it, nothing live
+timeout:15.0s  vs  pks=0      subprocess died         vs  genuinely empty slate
+```
+
+**Expect `timeout`.** A bare `except Exception` collapsed `subprocess.TimeoutExpired`
+into the same False an empty slate produces, on a path that shells out to a network
+call with a **15s budget** — a slow StatsAPI reads as "nothing is live".
+
+`MLB_LIVE_PROBE` logs the decision with both reasons. Transitions always log; steady
+state throttled to one line per 300s. Public bool wrappers unchanged.
+
+**NOT DEPLOYED, deliberately.** A restart re-evaluates this gate cold in exactly the
+state that produced the failure, with eight first pitches still to come. Downside is
+another 90-minute stall across more games than the first; upside is a diagnostic
+that keeps until morning. **Ship with the next change that service needs, then read
+`MLB_LIVE_PROBE` at the next first pitch.**
+
+The two answers cost very differently: `timeout` is a budget or a cached result;
+`no_payload` is the cross-disk artifact problem again (`#331`'s shape).
+
+Tests: 9 + 3 subtests; 213 in `test_live_refresh_loop.py`, 124 in `test_ops.py`.
+
 ### `#336` — LEVER PULLED AND VERIFIED. `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC=900` on web + refresh-worker. The rate limit fired for the FIRST TIME IN THIS SYSTEM'S HISTORY
 
 User decision, 2026-08-10. Set via the single-key env endpoint on both services,
@@ -1628,8 +1698,63 @@ none identifies a cause.
   bar flagged **1,733 of 2,967 samples**. Use a local test: a sample against the
   mean of its two neighbours.
 - **Check the base rate before believing a coincidence.** The publish sweep runs
-  **20% of the time**, so one excursion landing inside one is a 1-in-5 event. It
+  **16–20% of the time**, so one excursion landing inside one is a 1-in-5 event. It
   cost this lane a retracted elimination.
+- **SEGMENT ON BOOT BEFORE APPLYING THE LOCAL TEST.** A neighbour-mean that
+  straddles a process restart turns an ordinary sample on a rising baseline into
+  a large fake excursion. See the correction immediately below — this one cost a
+  published finding.
+
+#### CORRECTION 2026-08-11: the `+529.5MB` excursion was an ARTIFACT OF MY OWN DETECTOR, and the fifth elimination's headline evidence was void
+
+The archived entry restores the publish-sweep elimination on a
+**"+529.5MB excursion at 22:40:42Z with no sweep running"**. **That excursion
+does not exist.** Reproduced exactly:
+
+```
+post_mlb_sim_tick series -- the only series the detector saw
+  22:40:00  rss 1326.2
+  22:40:42  rss 1389.0     <- flagged
+  22:42:43  rss  392.9     <- POST-REBOOT (worker booted 22:42:33)
+
+lift = 1389.0 - (1326.2 + 392.9)/2 = +529.5MB
+```
+
+**The forward neighbour was a fresh process.** 22:40:42 is an ordinary sample on
+a monotonic climb — container went 2181 → 2585MB over 2.5 minutes and then the
+worker restarted. Bracketing it against all ~25 instrumented stages shows a
+plateau, not a spike.
+
+**The bug is mine and it is a regression.** The original `n=4` analysis was
+boot-segmented (`5 boot segments`, recorded in the archived entry). When I
+rewrote the detector as a live watcher I dropped the segmentation, and nothing
+in the output said so — a fake excursion looks exactly like a real one.
+
+#### The conclusion survives, on different and better evidence
+
+Re-run with boot segmentation over 20:30–23:20Z (2,021 samples, 262
+`post_mlb_sim_tick`, 13 usable segments), **3 real excursions**:
+
+```
+22:54:25  rss 1673.2  +319.6   OUTSIDE any sweep (nearest 16s)
+23:02:18  rss 2042.5  +302.0   INSIDE  sweep 23:01:50-23:02:21, pub=61
+23:13:47  rss 2221.4  +322.4   OUTSIDE any sweep (nearest 19s)
+```
+
+**2 of 3 occur with no sweep running — necessity fails, which is what the
+elimination needs.** And 1 of 3 inside is exactly what a **16.1% duty cycle**
+predicts (expected 0.48; P(≥1 of 3) ≈ 41%). So the coincidence is unremarkable
+in both directions.
+
+**What is weaker than the archived version claims:** these are **300–322MB**,
+below the 493–878MB class the item is named for. Necessity is demonstrated for
+the smaller family; the large one has been seen exactly twice, once inside a
+sweep and once as this artifact. **Treat the elimination as supported, not
+settled.**
+
+**One live thread the sampler handed over:** the 23:02:18 sweep reports
+`peak_container_mb_in_sweep = 3096.9MB` on 61 artifacts. That is the in-sweep
+instrument doing its job and it has not been analysed.
 
 **Regime note:** every number above predates
 `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC=900` (set 21:56Z 2026-08-10), which
@@ -2168,6 +2293,89 @@ block.
 `odds_control_plane/odds_history/soccer/2026-08-02.json` is **8,388,768 bytes**
 — 160 bytes over the 8,388,608 ceiling it could never have been written through.
 Either it predates the guard or a path writes without it. Worth one look.
+
+### ID COLLISION 2026-08-10 — `#338` was issued twice. The MLB liveness gate is `#339`
+
+**My error, and I made it after spending the evening telling other lanes to check
+first.** I used `#338` in `879afbfd` without grepping `origin/main`, where
+`c193c498` had already claimed it for `#337`'s write-path verification.
+
+**`#338` stays with `c193c498`** (write path verified / serve reports the cap /
+diagnostic broken). It was committed first, and renumbering a landed entry is
+worse than recording a mapping. IDs are stable and never reused.
+
+**One commit says `#338` and means `#339`.** Pushed history is not rewritten on a
+branch six lanes are committing to:
+
+| commit | subject |真 ID |
+|---|---|---|
+| `879afbfd` | the MLB liveness gate returned a bare False from eight paths | **`#339`** |
+| `c193c498` | `#337`'s write path is verified, the serve still reports the cap | `#338` (correct) |
+
+Fourth allocation problem tonight, and the cheap check that would have caught
+every one of them is `git log --oneline --grep '#NNN' origin/main` before
+writing the number — **not** grepping the todo heading, which lags the commit.
+
+### `#339` — COMMITTED, NOT DEPLOYED. The MLB liveness gate returns a bare False from EIGHT paths, and it has now cost a live slate twice
+
+`879afbfd` (commit message says `#338`; see the collision note above).
+
+**Measured 2026-08-10.** BOS @ TOR went live at 23:07Z and MLB stayed on the
+**2-hour pregame sweep interval** for 91 minutes:
+
+```
+shard   17,779,953 bytes, unchanged across 90 minutes
+quotes  newest 21:29:31Z while the game was in TOP 1
+board   zero segment rows, zero alt markets at 22:54Z
+```
+
+F1/F3/F5 and every `*_alt` market are fetched **only** on the per-event path the
+cadence gate skips, so their absence was a symptom of this rather than a separate
+defect. Recovered on its own at ~23:01Z (`first5 103, first3 45, first1 28` by
+23:03Z, shard growing every read).
+
+**BOTH INPUTS WERE CORRECT THROUGHOUT.** Checked by hand during the incident: the
+report read `counts.live=2`, and `fetch_mlb_live_game_pks_for_date.py` returned
+`{"live_game_pks": [822780, 824887]}`. The data was right, the evaluation was
+wrong, and **nothing recorded which of eight paths to False was taken.**
+
+**It is a RECURRENCE.** `_mlb_has_live_game`'s own comment records the identical
+failure on 2026-07-17 — *"stuck reporting anyLive=false through an entire live
+game"* — and the schedule fallback was added then precisely so either source
+saying live would be enough. Both returned False anyway, silently, and the second
+diagnosis cost 90 minutes for the same reason the first did.
+
+**What shipped is DIAGNOSIS ONLY.** Each probe returns `(bool, reason)`; the
+branch taken is not changed. The two pairs that were indistinguishable and have
+opposite fixes:
+
+```
+no_payload     vs  live=0     cannot READ the report  vs  read it, nothing live
+timeout:15.0s  vs  pks=0      subprocess died         vs  genuinely empty slate
+```
+
+**The timeout is the one to expect.** A bare `except Exception` collapsed
+`subprocess.TimeoutExpired` into the same False an empty slate produces, on a path
+that shells out to a **network call with a 15s budget** — a slow StatsAPI reads as
+"nothing is live" and drops a live slate to the 2-hour cadence.
+
+`MLB_LIVE_PROBE` logs the decision with both reasons. **Transitions always log;
+steady state is throttled to one line per 300s**, so it is useful during an
+incident without adding a per-tick line to a channel already carrying ~125/min.
+Public bool wrappers unchanged, so `_LIVE_STATUS_CHECKERS` keeps its contract.
+
+**NOT DEPLOYED, deliberately.** Deploying restarts live-odds-worker, forcing this
+gate to re-evaluate cold in exactly the state that produced the failure, with
+eight first pitches still to come. **The downside is another 90-minute stall
+across more games than the first one hit; the upside is a diagnostic that keeps
+until morning.** Ship it with the next change that service needs, then read
+`MLB_LIVE_PROBE` at the next first pitch.
+
+**The two answers have very different costs** — `timeout` is a budget or a cached
+result; `no_payload` is the cross-disk artifact problem again (`#331`'s shape).
+Nobody can tell which until this runs.
+
+Tests: 9 + 3 subtests; 213 in `test_live_refresh_loop.py`, 124 in `test_ops.py`.
 
 ### ID COLLISION RESOLVED 2026-08-10 — `#322` was issued twice. Book-grid precompute is now `#323`
 
