@@ -2214,6 +2214,25 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                 if relative:
                     try:
                         pull_streamed_artifact(relative, timeout_seconds=300)
+                        # The `.state.json` sidecar too, and it is NOT optional.
+                        # It backs `read_quote_last_seen`, which is the only
+                        # thing separating "this market has not moved" from "we
+                        # stopped looking at it" -- `seen_age_seconds`. A
+                        # reconciled shard with a stale sidecar gives the board
+                        # real prices and wrong ages, which is worse than the
+                        # starvation it replaces because it looks correct.
+                        #
+                        # Whole-file, not tail: this one is rewritten on every
+                        # flush. `_is_append_only` now requires `.jsonl` for
+                        # exactly that reason -- before `#331` it matched this
+                        # path too, and pulling it here would have appended a
+                        # second JSON document onto the first.
+                        pull_streamed_artifact(
+                            relative[: -len(".jsonl")] + ".state.json"
+                            if relative.endswith(".jsonl")
+                            else relative,
+                            timeout_seconds=120,
+                        )
                     except Exception as exc:
                         print(
                             f"[refresh_worker] BOOK_GRID_SHARD_PULL_ERROR sport={sport} "

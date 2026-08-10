@@ -1416,8 +1416,24 @@ def _is_append_only(relative_path: str) -> bool:
     silently concatenate two versions into corruption, and the whole point of
     this module is that a wrong transfer is worse than a slow one. `book_quotes`
     is written exclusively by `append_book_quotes`.
+
+    `.jsonl` IS REQUIRED, not decoration (`#331`). The directory test alone also
+    matched `book_quotes/<date>.state.json`, which sits in the same directory and
+    is the one file here that is REWRITTEN WHOLE on every flush -- it is a dict
+    of quote-key -> [line, price, last_seen]. Tail-appending to that produces a
+    second JSON document glued onto the first: not a parse error the caller
+    handles, but a file `read_quote_last_seen` silently returns `{}` for, which
+    turns `seen_age_seconds` into "unknown" for every market on the board.
+    Exactly the "looks fixed, reads wrong" failure the 11.9h-stale investigation
+    ended on.
+
+    It was latent rather than live -- the repair pass only fetched files missing
+    outright, where the offset is 0 and the fetch is whole anyway -- so nothing
+    had corrupted yet. `#331` reconciles the state file deliberately, which is
+    what would have made it fire.
     """
-    return "/book_quotes/" in str(relative_path or "")
+    text = str(relative_path or "")
+    return "/book_quotes/" in text and text.endswith(".jsonl")
 
 
 def pull_streamed_artifact(relative_path: str, *, timeout_seconds: int = 120) -> tuple[bool, int]:

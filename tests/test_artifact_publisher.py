@@ -15,6 +15,7 @@ from urllib.error import HTTPError
 from urllib.error import URLError
 
 from syndicate.app import create_app
+from syndicate.features.shared.artifact_publisher import _is_append_only
 from syndicate.features.shared.artifact_publisher import is_hot_artifact_relative_path
 from syndicate.features.shared.artifact_publisher import publish_hot_artifact
 from syndicate.features.shared.artifact_publisher import publish_changed_hot_artifacts
@@ -2139,3 +2140,35 @@ class ArtifactExportNamesOnlyTests(unittest.TestCase):
                 headers={"Authorization": "Bearer wrong-token"},
             )
         self.assertEqual(response.status_code, 401)
+
+
+class IsAppendOnlyTest(unittest.TestCase):
+    """`#331`. The tail-fetch predicate decides whether a pull APPENDS or replaces.
+
+    Getting it wrong in the permissive direction does not raise: it glues a
+    second JSON document onto the first, and `read_quote_last_seen` then returns
+    `{}` for a file that parses as nothing. The board keeps rendering, with
+    `seen_age_seconds` unknown on every market -- a corruption that reads as an
+    absence of data rather than as an error.
+    """
+
+    def test_the_jsonl_shard_is_append_only(self):
+        self.assertTrue(
+            _is_append_only("mlb_source/tracking/book_quotes/2026-08-10.jsonl")
+        )
+
+    def test_the_state_sidecar_is_NOT_append_only(self):
+        # Lives in the same directory as the shard and is rewritten whole on
+        # every flush. A directory-only test matched it, which is the bug.
+        self.assertFalse(
+            _is_append_only("mlb_source/tracking/book_quotes/2026-08-10.state.json")
+        )
+
+    def test_other_families_are_not_append_only(self):
+        for path in (
+            "mlb_source/tracking/odds_history/2026-08-10.json",
+            "mlb_source/data/book_grid/book_grid_2026-08-10.json",
+            "data/live/mlb_live_lens.json",
+        ):
+            with self.subTest(path=path):
+                self.assertFalse(_is_append_only(path))
