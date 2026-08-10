@@ -1768,6 +1768,26 @@ def _compact_member_lists(
     return out
 
 
+def _compact_member_lists_in_place(
+    container: dict[str, Any], source_blobs: dict[str, int], keys: tuple[str, ...], *, min_bytes: int
+) -> dict[str, Any]:
+    """Member-alias BARE LISTS held directly on `container`.
+
+    `_compact_member_lists` handles a dict-of-lists (`by_sport`). This handles
+    the sibling shape -- a list sitting on the container itself, like
+    `top_live_opportunities`. Same guards: only collapses when every element is
+    found, and leaves anything below _ALIAS_MIN_BYTES alone.
+    """
+    wrapped = _compact_member_lists(
+        {key: container[key] for key in keys if key in container},
+        source_blobs,
+        min_bytes=min_bytes,
+    )
+    if not wrapped:
+        return container
+    return {**container, **wrapped}
+
+
 def _expand_member_lists(container: Mapping[str, Any], recommendations: Any) -> dict[str, Any]:
     """Inverse of `_compact_member_lists`. Tolerates un-aliased payloads."""
     source = recommendations if isinstance(recommendations, list) else []
@@ -1943,15 +1963,26 @@ def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
             json.dumps(item, sort_keys=True, default=str): position
             for position, item in enumerate(source_list)
         }
+        # #317. `by_sport` is a dict-of-lists; `top_live_opportunities` is a
+        # bare list of the same members. Measured 2026-08-10 01:18:31Z with the
+        # equality aliases finally firing: top_opportunities 8,019,382 -> 35 and
+        # board_contract gone, but top_live_opportunities still 5,924,760 --
+        # it is a SUBSET of recommendations, so byte-equality can never collapse
+        # it and only member-aliasing can.
         for holder_key in ("by_sport",):
             holder = compact.get(holder_key)
             if isinstance(holder, Mapping):
                 compact[holder_key] = _compact_member_lists(holder, source_blobs, min_bytes=_ALIAS_MIN_BYTES)
+        compact = _compact_member_lists_in_place(compact, source_blobs, ("top_live_opportunities",), min_bytes=_ALIAS_MIN_BYTES)
         nested = compact.get("response")
-        if isinstance(nested, Mapping) and isinstance(nested.get("by_sport"), Mapping):
+        if isinstance(nested, Mapping):
             updated_nested = dict(nested)
-            updated_nested["by_sport"] = _compact_member_lists(
-                nested["by_sport"], source_blobs, min_bytes=_ALIAS_MIN_BYTES
+            if isinstance(nested.get("by_sport"), Mapping):
+                updated_nested["by_sport"] = _compact_member_lists(
+                    nested["by_sport"], source_blobs, min_bytes=_ALIAS_MIN_BYTES
+                )
+            updated_nested = _compact_member_lists_in_place(
+                updated_nested, source_blobs, ("top_live_opportunities",), min_bytes=_ALIAS_MIN_BYTES
             )
             compact["response"] = updated_nested
 
@@ -1998,6 +2029,9 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     # already-restored `recommendations`.
     if isinstance(expanded.get("by_sport"), Mapping):
         expanded["by_sport"] = _expand_member_lists(expanded["by_sport"], recommendations)
+    expanded = {**expanded, **_expand_member_lists(
+        {k: expanded[k] for k in ("top_live_opportunities",) if k in expanded}, recommendations
+    )}
 
     response = expanded.get("response")
     if isinstance(response, dict):
@@ -2015,6 +2049,9 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
             restored["board_contract"] = expanded.get("board_contract")
         if isinstance(restored.get("by_sport"), Mapping):
             restored["by_sport"] = _expand_member_lists(restored["by_sport"], recommendations)
+        restored = {**restored, **_expand_member_lists(
+            {k: restored[k] for k in ("top_live_opportunities",) if k in restored}, recommendations
+        )}
         expanded["response"] = restored
 
     return expanded
