@@ -726,8 +726,13 @@ def api_ops_board_snapshot_inspect() -> Any:
     # any) plus a candidate_type/market breakdown of its recommendations,
     # so this can be answered directly instead of guessed at again.
     from pipeline.intelligence_state import BOARD_SNAPSHOT_PATH
+    from pipeline.intelligence_state import expand_persisted_state
 
-    snapshot = read_json_file(BOARD_SNAPSHOT_PATH)
+    # #317/#320. The persisted payload is aliased AND compressed, so a raw read
+    # sees `response = {"__compressed__": ...}` and counts zero recommendations
+    # for a perfectly healthy board -- measured 2026-08-10T02:10Z, this endpoint
+    # said 0 while /api/intelligence/status said 150 for the same snapshot.
+    snapshot = expand_persisted_state(read_json_file(BOARD_SNAPSHOT_PATH))
     if not isinstance(snapshot, dict):
         return jsonify({"ok": True, "path": str(BOARD_SNAPSHOT_PATH), "exists": False})
 
@@ -2092,7 +2097,11 @@ def api_ops_intelligence_candidate_trace() -> Any:
             read_only_trace["state_path_redis_key"] = _state_key_for_path(_STATE_PATH)
             read_only_trace["board_snapshot_path_redis_key"] = _state_key_for_path(_BOARD_SNAPSHOT_PATH)
 
-            board_snapshot_raw = _read_json_file(_BOARD_SNAPSHOT_PATH)
+            # #317/#320: expanded, or this trace counts zero candidates on a
+            # healthy board -- the payload is aliased and compressed on the wire.
+            from pipeline.intelligence_state import expand_persisted_state as _expand_persisted_state_public
+
+            board_snapshot_raw = _expand_persisted_state_public(_read_json_file(_BOARD_SNAPSHOT_PATH))
             read_only_trace["board_snapshot_read_is_dict"] = isinstance(board_snapshot_raw, dict)
             if isinstance(board_snapshot_raw, dict):
                 read_only_trace["board_snapshot_read_keys"] = list(board_snapshot_raw.keys())
@@ -2267,7 +2276,10 @@ def api_ops_intelligence_candidate_trace() -> Any:
         read_path_trace["state_path_redis_key"] = _state_key_for_path(_STATE_PATH)
         read_path_trace["board_snapshot_path_redis_key"] = _state_key_for_path(_BOARD_SNAPSHOT_PATH)
 
-        board_snapshot_raw = _read_json_file(_BOARD_SNAPSHOT_PATH)
+        # #317/#320: expanded, for the same reason as the sibling trace above.
+        from pipeline.intelligence_state import expand_persisted_state as _expand_persisted_state_public
+
+        board_snapshot_raw = _expand_persisted_state_public(_read_json_file(_BOARD_SNAPSHOT_PATH))
         read_path_trace["board_snapshot_read_is_dict"] = isinstance(board_snapshot_raw, dict)
         if isinstance(board_snapshot_raw, dict):
             read_path_trace["board_snapshot_read_keys"] = list(board_snapshot_raw.keys())

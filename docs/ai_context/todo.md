@@ -634,6 +634,29 @@ format is a change to a contract between two independently-deployed services.*
 Deploy **web and refresh-worker together**, worker last. The codec tag only
 helps the NEXT skew — it cannot retrofit a reader already in production.
 
+#### Third defect, found by the fix's own verification: the triage endpoint lied
+
+Both services deployed at `9e66e87a` (web 01:56:37Z, worker 02:00:29Z). Read at
+02:10Z, same instant, same snapshot:
+
+```
+/api/intelligence/status         candidate_count: 150   snapshot_generated_at: 02:05:50Z
+/api/ops/board-snapshot/inspect  recommendation_count: 0
+```
+
+Three ops diagnostics did a **raw** `read_json_file(BOARD_SNAPSHOT_PATH)` with
+no expansion (`ops.py` 730 / 2095 / 2270), so they saw
+`response = {"__compressed__": ...}` and counted zero. **A triage endpoint that
+reports 0 for a healthy board is worse than no endpoint** — it would have sent
+the next session hunting a transport bug that had just been fixed, which is
+precisely this item's own history. Note it was already partly blind before
+compression: the alias markers alone would have made it undercount.
+
+Fixed in the commit titled *"#320: the triage endpoint reported 0 candidates
+for a 150-candidate board"* by routing all three through a new public
+`expand_persisted_state()`. Exported rather than inlined so there is ONE
+expansion implementation; a second copy in the blueprint would drift.
+
 **Status: root-caused and evidenced on production, not fixed. Read-only lane.**
 
 **The premise this lane was given was wrong, and the wrong premise is the

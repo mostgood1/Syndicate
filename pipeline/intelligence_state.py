@@ -2230,6 +2230,26 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     return expanded
 
 
+def expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Public entry point for `_expand_persisted_state`.
+
+    #317/#320. A persisted board state is compacted (aliases) and compressed on
+    the way out, so a raw `read_json_file(BOARD_SNAPSHOT_PATH)` no longer
+    resembles a board -- and three ops diagnostics were doing exactly that.
+    Measured on production 2026-08-10T02:10Z, minutes after the fix landed:
+    `/api/ops/board-snapshot/inspect` reported `recommendation_count: 0` for the
+    same board `/api/intelligence/status` reported as 150.
+
+    That is worse than no diagnostic. This lane's whole history is people
+    reading a number off an instrument that could not see the thing it was
+    pointed at, and a triage endpoint that reports 0 for a healthy board would
+    have sent the next session hunting a transport bug that had just been fixed.
+    Exported rather than inlined so there is one expansion implementation, not a
+    second one in the blueprint that can drift from this one.
+    """
+    return _expand_persisted_state(state)
+
+
 def _state_payload_timestamp(payload: Any) -> str:
     if not isinstance(payload, dict):
         return ""
