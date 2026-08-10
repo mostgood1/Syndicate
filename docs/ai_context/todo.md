@@ -337,6 +337,22 @@ The reusable lesson is the one already in this file under a different name —
 *read the field you already have.* My printer, not the API, was the broken
 instrument, and I blamed the API because I never widened the window.
 
+**The complete rule is narrower than either of my two positions, and the `#285`
+lane supplied the missing half.** "The filter is broken" was wrong; "the filter
+is correct, so its output is fine" would also be wrong. It is a *substring*
+match, so:
+
+- **A zero is trustworthy.** A nonsense token returns 0 (control above). If you
+  get nothing, nothing matched.
+- **A non-zero COUNT can be inflated**, because any longer token containing
+  yours is a genuine substring hit. Their case: `text=MALLOC_TRIM` also matches
+  `MALLOC_TRIM_INIT`, so a raw `n=4` is off by one unless you filter the boot
+  line out in parsing. Mine: `CONTAINER_MEMORY` matches
+  `container_memory_headroom_mb`.
+
+So: **trust absence, verify presence.** Which is the opposite of the usual
+warning about log queries, and is why it is worth writing down.
+
 Incidentally the line above is direct evidence for something I had only argued
 from code: refresh-worker really does write this bucket, via
 `--run-summary-path` on a subprocess it spawned at 15:04Z.
