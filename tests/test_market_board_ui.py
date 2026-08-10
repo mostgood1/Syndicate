@@ -94,6 +94,24 @@ class MarketBoardUiParityTests(unittest.TestCase):
             response = self.client.get(f"/static/shared/{asset}")
             self.assertEqual(response.status_code, 200, asset)
 
+    def test_the_board_exposes_segment_as_its_own_dimension(self) -> None:
+        # F1/F3/F5/Full for h2h and totals. Measured on the 2026-08-09 MLB slate:
+        # h2h is 15 full + 15 first5 + 15 first3 + 15 first1, so a single "h2h"
+        # tab was three-quarters a different bet wearing the same label.
+        # book_grid.html already treats segment as its own group for this reason.
+        html = self.client.get("/mlb/market-board?date=2026-08-09").get_data(as_text=True)
+        self.assertIn('id="l1-segments"', html)
+        self.assertIn("renderSegments", html)
+        # The friendly labels, so a row reads F5 rather than the raw `first5`.
+        for token in ("Full game", "F1", "F3", "F5"):
+            self.assertIn(token, html, token)
+
+    def test_segment_filter_is_hidden_when_there_is_only_one(self) -> None:
+        # A pregame board carries Full only for most of the day -- F1/F3/F5 are
+        # fetched inside the T-window (#16/#17 cost control). One segment is not
+        # a choice, so the strip must collapse rather than show a dead tab.
+        html = self.client.get("/mlb/market-board?date=2026-08-10").get_data(as_text=True)
+        self.assertIn("if (keys.length < 2)", html)
 
 if __name__ == "__main__":
     unittest.main()
