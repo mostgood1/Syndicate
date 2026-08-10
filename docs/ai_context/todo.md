@@ -168,9 +168,49 @@ thing it must observe. Spanning the gaps wants ~900 records (~1.1MB, 13% of the
 keyvalue ceiling) but that is a 1.1MB read-modify-write ~15x/min on the
 memory-constrained worker.
 
-**So this wants a design decision — sampling, or a high-water record per stage —
-not a bigger constant.** Choosing 900 by feel would be `#333` in miniature, and
-I already moved this cap once tonight (60 -> 300).
+**So this wanted a design decision, not a bigger constant.** Choosing 900 by
+feel would have been `#333` in miniature, and I had already moved this cap once
+tonight (60 -> 300).
+
+#### RESOLVED: a per-stage high-water record, which is O(STAGES) not O(SAMPLES)
+
+The tension only exists because the ring is a **time series** — its cost scales
+with sample rate and its coverage shrinks as you instrument more stages. A
+high-water mark has neither property. It never rotates, so a once-per-75-minutes
+excursion cannot be lost, and adding stages costs a few hundred bytes each
+rather than window.
+
+Shipped in `memory_observability`:
+
+- `update_process_memory_high_water(stage, payload)` — **writes ONLY on a new
+  peak.** That is the property making it affordable from a 6.6/min loop:
+  measured 2 writes across 4 samples, and the steady state is one read and no
+  write at all.
+- Ranked on `container_memory_mb`, falling back to `accounted_rss_mb`. The
+  cgroup figure is what the OOM killer acts on, and **the two diverged by
+  ~800MB during the excursion** (2709.9 container vs 1896.4 accounted).
+- A **separate artifact** from the ring, so a high-rate write never rewrites the
+  ring's ~370KB.
+- Bounded at 200 stages, dropping the lowest peak — stage names embed the sport,
+  so cardinality grows with the sport list.
+- **Not reset on boot**, deliberately: surviving long enough to catch a rare
+  event is the whole point. `pid` and `observed_at` are stored so staleness
+  stays visible rather than being silently discarded.
+
+`log_and_persist_process_memory(stage, *, append_to_ring=False, **extra)` gives
+the three `live_lens_loop.py` emitters high-water visibility while keeping their
+samples out of the ring. **A stage's FIRST sample always peaks**, so every
+instrumented stage gets a record immediately — which alone answers "is this
+stage reaching the instrument at all?", the question `#327` existed to ask and
+could not.
+
+Surfaced at `/api/ops/intelligence/memory-diagnostics` as `high_water`, sorted
+worst-first. 15 tests.
+
+**Still not deployed**, and the check is now two things: `post_mlb_sim_tick` in
+`records` (already verified), and `live_lens_tick_after_build_mlb` appearing in
+`high_water` — which `run_refresh_worker.py:2314` records at +1,445MB and which
+has never once reached this instrument.
 
 #### Not claimed
 

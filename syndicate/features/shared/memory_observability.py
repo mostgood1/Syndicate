@@ -655,16 +655,124 @@ def dump_process_memory_checkpoint(stage: str, payload: dict[str, Any]) -> None:
         print(f"[memory_observability] DIAG_MEMORY_DUMP_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
 
 
-def log_and_persist_process_memory(stage: str) -> dict[str, Any] | None:
-    """Log a process-memory sample to stderr AND persist it to the ring buffer.
+# #327. The per-stage high-water mark, and WHY it exists rather than a bigger ring.
+#
+# The ring is a time series, so its cost scales with the SAMPLE RATE and its
+# coverage shrinks as you instrument more stages. Wiring `live_lens_tick_*` in
+# adds ~6.6 samples/min, which takes 300 records from ~36 minutes of history to
+# ~20-23 -- while the excursions being hunted arrive 11-42 minutes apart
+# (measured, n=4). Instrumenting more would have shrunk the window below the
+# thing it must observe. Buying the window back means ~900 records (~1.1MB)
+# rewritten ~15x/min on a memory-constrained worker.
+#
+# A high-water record is O(DISTINCT STAGES), not O(samples). It never ages out,
+# so a once-per-75-minutes excursion cannot be lost to rotation, and it costs
+# nothing to keep more of. Different question, and the right one for `#327`:
+# the ring answers "what happened lately", this answers "what is the worst this
+# stage has ever been".
+#
+# Separate artifact from the ring ON PURPOSE: a write here must not rewrite the
+# ring's ~370KB, and the common path writes NOTHING AT ALL -- see below.
+PROCESS_MEMORY_HIGH_WATER_MAX_STAGES = 200
 
-    The one entry point. Every caller that wants a stage to be visible from web
-    must use THIS -- `log_all_process_memory` alone writes stderr only, which is
-    exactly the gap `#327` records.
+
+def process_memory_high_water_path() -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root() / "live_refresh_loop" / "memory_high_water.json"
+
+
+def _high_water_metric(payload: dict[str, Any]) -> float | None:
+    """Rank by what actually kills the container, falling back to process RSS.
+
+    `container_memory_mb` is the cgroup figure the OOM killer acts on;
+    `accounted_rss_mb` is the sum this process can see. Preferring the former
+    matters because the two diverged by ~800MB during the `#327` excursion.
+    """
+    for key in ("container_memory_mb", "accounted_rss_mb"):
+        value = payload.get(key)
+        if isinstance(value, (int, float)):
+            return float(value)
+    return None
+
+
+def update_process_memory_high_water(stage: str, payload: dict[str, Any]) -> bool:
+    """Record this sample if it is the worst yet for `stage`. Returns True if written.
+
+    **Writes only on a new peak.** Most samples are not peaks, so the steady
+    state is one read and no write -- which is what makes it affordable to call
+    from a high-rate loop the ring cannot absorb. A stage's FIRST sample always
+    peaks, so every instrumented stage gets a record immediately: that alone
+    answers "is this stage reaching the instrument at all?", which is the
+    question `#327` existed to ask and could not.
+
+    Deliberately NOT reset on boot. The point is to survive long enough to
+    catch a rare event, so `pid` and `observed_at` are stored and staleness is
+    left visible to the reader rather than silently discarded.
+    """
+    metric = _high_water_metric(payload)
+    if metric is None:
+        return False
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+
+        path = process_memory_high_water_path()
+        existing = read_json_file(path)
+        stages = dict(existing.get("stages") or {}) if isinstance(existing, dict) else {}
+        previous = stages.get(stage)
+        if isinstance(previous, dict):
+            try:
+                if float(previous.get("peak_mb")) >= metric:
+                    return False
+            except (TypeError, ValueError):
+                pass
+        if stage not in stages and len(stages) >= PROCESS_MEMORY_HIGH_WATER_MAX_STAGES:
+            # Bounded against unbounded stage cardinality (stage names embed the
+            # sport, so the set grows with the sport list). Dropping the lowest
+            # peak keeps the interesting end.
+            def _peak(item: Any) -> float:
+                try:
+                    return float(item.get("peak_mb"))
+                except (TypeError, ValueError, AttributeError):
+                    return -1.0
+            lowest = min(stages, key=lambda k: _peak(stages[k]))
+            stages.pop(lowest, None)
+        stages[stage] = {
+            "stage": stage,
+            "peak_mb": metric,
+            "container_memory_mb": payload.get("container_memory_mb"),
+            "accounted_rss_mb": payload.get("accounted_rss_mb"),
+            "container_memory_pct_of_max": payload.get("container_memory_pct_of_max"),
+            "observed_at": time.time(),
+            "pid": os.getpid(),
+            "processes": payload.get("processes"),
+        }
+        write_json_file(path, {"stages": stages})
+        return True
+    except Exception as exc:  # noqa: BLE001
+        print(f"[memory_observability] HIGH_WATER_UPDATE_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+        return False
+
+
+def log_and_persist_process_memory(stage: str, *, append_to_ring: bool = True, **extra: Any) -> dict[str, Any] | None:
+    """Log a process-memory sample to stderr, and persist it so web can read it.
+
+    The one entry point. Every caller that wants a stage visible from web must
+    use THIS -- `log_all_process_memory` alone writes stderr only, which is
+    exactly the gap `#327` records. **And a name is not a census: three
+    emitters existed when I unified the two that shared a name.**
+
+    `append_to_ring=False` records the high-water mark but keeps the sample out
+    of the time-series ring. That is for high-rate loops (`live_lens_tick_*`,
+    ~6.6/min) whose samples would rotate the ring below the 11-42 minute
+    inter-arrival gap of the excursions being hunted. Those stages become
+    VISIBLE without making the ring blind.
     """
     try:
-        payload = log_all_process_memory(stage)
-        dump_process_memory_checkpoint(stage, payload)
+        payload = log_all_process_memory(stage, **extra)
+        if append_to_ring:
+            dump_process_memory_checkpoint(stage, payload)
+        update_process_memory_high_water(stage, payload)
         return payload
     except Exception as exc:  # noqa: BLE001
         print(f"[memory_observability] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)

@@ -710,7 +710,30 @@ def api_ops_intelligence_memory_diagnostics() -> Any:
 
     payload = read_json_file(_diag_memory_dump_path())
     records = list(payload.get("records") or []) if isinstance(payload, dict) else []
-    return jsonify({"ok": True, "record_count": len(records), "records": records})
+
+    # #327. The ring is a time series and rotates; a stage that spikes once per
+    # 75 minutes can age out of it entirely. The high-water marks are
+    # O(distinct stages) rather than O(samples), never rotate, and are the only
+    # place a rare excursion is guaranteed to still be visible. Sorted worst
+    # first, because "which stage is the OOM risk" is the question being asked.
+    from syndicate.features.shared.memory_observability import process_memory_high_water_path
+
+    high_water_payload = read_json_file(process_memory_high_water_path())
+    stages = (high_water_payload or {}).get("stages") if isinstance(high_water_payload, dict) else None
+    high_water = sorted(
+        (dict(v) for v in (stages or {}).values() if isinstance(v, dict)),
+        key=lambda item: item.get("peak_mb") if isinstance(item.get("peak_mb"), (int, float)) else -1.0,
+        reverse=True,
+    )
+    return jsonify(
+        {
+            "ok": True,
+            "record_count": len(records),
+            "records": records,
+            "high_water_stage_count": len(high_water),
+            "high_water": high_water,
+        }
+    )
 
 
 @ops_bp.get("/api/ops/board-snapshot/inspect")

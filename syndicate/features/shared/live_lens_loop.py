@@ -22,7 +22,14 @@ from syndicate.features.nfl.live_lens import validate_live_lens_snapshot as _nfl
 from syndicate.features.nfl.sources import default_week as _nfl_default_week
 from syndicate.features.nfl.sources import latest_season as _nfl_latest_season
 from syndicate.features.nfl.sources import preseason_target_week as _nfl_preseason_target_week
-from syndicate.features.shared.memory_observability import log_all_process_memory
+# #327: log_and_persist, not log_all_process_memory. These three call sites were
+# the THIRD emitter -- after the two identically-named `_diag_log_all_process_memory`
+# helpers were unified, these still wrote stderr only, so `live_lens_tick_*`
+# stayed invisible to the ring buffer and read as zero however long anyone
+# watched. `append_to_ring=False` keeps their ~6.6/min out of the time series
+# (which would rotate it below the 11-42 min excursion gap) while still
+# recording each stage's high-water mark.
+from syndicate.features.shared.memory_observability import log_and_persist_process_memory
 from syndicate.features.shared.memory_observability import memory_headroom_snapshot
 from syndicate.features.shared.refresh_state_store import read_json_file
 from syndicate.features.shared.refresh_state_store import reports_root
@@ -430,7 +437,7 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 	# restarts roughly once per cycle with nothing visible in between; this is
 	# the leading remaining candidate for where that gap is going.
 	try:
-		log_all_process_memory(f"live_lens_tick_before_{sport}", sport=sport, date=date_str)
+		log_and_persist_process_memory(f"live_lens_tick_before_{sport}", append_to_ring=False, sport=sport, date=date_str)
 		if sport == "mlb":
 			headroom_snapshot = _mlb_live_lens_headroom_snapshot()
 			if headroom_snapshot is not None and not headroom_snapshot["sufficient"]:
@@ -478,7 +485,7 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 		validator = _LIVE_LENS_VALIDATORS[sport]
 		path_fn = _LIVE_LENS_SNAPSHOT_PATHS[sport]
 		snapshot = builder(date_str)
-		log_all_process_memory(f"live_lens_tick_after_build_{sport}", sport=sport, date=date_str)
+		log_and_persist_process_memory(f"live_lens_tick_after_build_{sport}", append_to_ring=False, sport=sport, date=date_str)
 		if not validator(snapshot):
 			meta["ok"] = False
 			meta["skipped"] = True
@@ -516,7 +523,7 @@ def _run_live_lens_tick_for_sport(sport: str, date_str: str) -> dict[str, Any]:
 			)
 	finally:
 		meta["finishedAt"] = _utc_now()
-		log_all_process_memory(f"live_lens_tick_after_{sport}", sport=sport, date=date_str, ok=bool(meta.get("ok")))
+		log_and_persist_process_memory(f"live_lens_tick_after_{sport}", append_to_ring=False, sport=sport, date=date_str, ok=bool(meta.get("ok")))
 	return meta
 
 
