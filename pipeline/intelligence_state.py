@@ -1722,6 +1722,70 @@ def _alias_marker(target: str) -> dict[str, str]:
 _CANDIDATE_ALIAS_TOP_LEVEL = ("top_live_opportunities",)
 _CANDIDATE_ALIAS_RESPONSE = ("top_opportunities", "top_live_opportunities", "recommendations")
 
+_MEMBER_ALIAS_KEY = "__alias_members_of__"
+_MEMBER_ALIAS_INDICES = "__indices__"
+
+
+def _member_alias(target: str, indices: list[int]) -> dict[str, Any]:
+    """A list whose every element is an element of `target`, stored as positions.
+
+    The equality aliases above collapse a list that IS another list. `by_sport`
+    is the other shape: each sport holds a SUBSET of `recommendations`, so it
+    never matches byte-for-byte and the existing rules correctly skip it -- and
+    it was the single largest thing left in the payload at 5,606,951 bytes of
+    the 12.1MB that survived them (measured 2026-08-09 23:29:11Z).
+
+    Positions rather than ids because `recommendations` is an ordered list the
+    reader already holds in full, so an index is exact and needs no key to be
+    stable. Falls back to storing the list verbatim the moment any element is
+    not found -- a wrong board beats a small one, the same rule as everywhere
+    else in this function.
+    """
+    return {_MEMBER_ALIAS_KEY: target, _MEMBER_ALIAS_INDICES: indices}
+
+
+def _compact_member_lists(
+    container: Mapping[str, Any], source_blobs: dict[str, int], *, min_bytes: int
+) -> dict[str, Any]:
+    """Replace each list-of-members with its index list, where every element matches."""
+    out: dict[str, Any] = {}
+    for key, value in container.items():
+        if not isinstance(value, list) or not value:
+            out[key] = value
+            continue
+        blob = json.dumps(value, sort_keys=True, default=str)
+        if len(blob) < min_bytes:
+            out[key] = value
+            continue
+        indices: list[int] = []
+        for item in value:
+            position = source_blobs.get(json.dumps(item, sort_keys=True, default=str))
+            if position is None:
+                indices = []
+                break
+            indices.append(position)
+        out[key] = _member_alias("recommendations", indices) if indices else value
+    return out
+
+
+def _expand_member_lists(container: Mapping[str, Any], recommendations: Any) -> dict[str, Any]:
+    """Inverse of `_compact_member_lists`. Tolerates un-aliased payloads."""
+    source = recommendations if isinstance(recommendations, list) else []
+    out: dict[str, Any] = {}
+    for key, value in container.items():
+        if isinstance(value, Mapping) and value.get(_MEMBER_ALIAS_KEY) == "recommendations":
+            indices = value.get(_MEMBER_ALIAS_INDICES)
+            if isinstance(indices, list) and all(isinstance(i, int) and 0 <= i < len(source) for i in indices):
+                out[key] = [source[i] for i in indices]
+                continue
+            # Indices we cannot honour: hand back an empty list rather than the
+            # marker, so a consumer sees "no rows" instead of a dict where it
+            # expects a list. Should be unreachable -- both sides ship together.
+            out[key] = []
+            continue
+        out[key] = value
+    return out
+
 
 def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
     """Shrink the state before it crosses the keyvalue boundary.
@@ -1825,6 +1889,26 @@ def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
     # in, the nested one is a duplicate; the reader restores it from whatever
     # the top-level copy expands to.
     original_response = state.get("response") if isinstance(state, dict) else None
+    # #317. by_sport, the largest object the equality rules cannot reach.
+    # Built once and reused for both the top-level and nested copies.
+    source_list = state.get("recommendations")
+    if isinstance(source_list, list) and len(recommendations_blob) >= _ALIAS_MIN_BYTES:
+        source_blobs = {
+            json.dumps(item, sort_keys=True, default=str): position
+            for position, item in enumerate(source_list)
+        }
+        for holder_key in ("by_sport",):
+            holder = compact.get(holder_key)
+            if isinstance(holder, Mapping):
+                compact[holder_key] = _compact_member_lists(holder, source_blobs, min_bytes=_ALIAS_MIN_BYTES)
+        nested = compact.get("response")
+        if isinstance(nested, Mapping) and isinstance(nested.get("by_sport"), Mapping):
+            updated_nested = dict(nested)
+            updated_nested["by_sport"] = _compact_member_lists(
+                nested["by_sport"], source_blobs, min_bytes=_ALIAS_MIN_BYTES
+            )
+            compact["response"] = updated_nested
+
     nested_response = compact.get("response")
     if isinstance(nested_response, dict) and isinstance(original_response, dict) and "board_contract" in original_response:
         top_blob = json.dumps(state.get("board_contract"), sort_keys=True, default=str)
@@ -1859,6 +1943,12 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     if isinstance(board_contract, dict) and board_contract.get("cards") == marker:
         expanded["board_contract"] = {**board_contract, "cards": recommendations}
 
+    # #317. Rebuild by_sport's member lists from their stored positions. Runs
+    # BEFORE the response block below so both copies resolve against the same
+    # already-restored `recommendations`.
+    if isinstance(expanded.get("by_sport"), Mapping):
+        expanded["by_sport"] = _expand_member_lists(expanded["by_sport"], recommendations)
+
     response = expanded.get("response")
     if isinstance(response, dict):
         restored = dict(response)
@@ -1873,6 +1963,8 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
         # unresolved marker where a reader expects the card list.
         if restored.get("board_contract") == _alias_marker("board_contract"):
             restored["board_contract"] = expanded.get("board_contract")
+        if isinstance(restored.get("by_sport"), Mapping):
+            restored["by_sport"] = _expand_member_lists(restored["by_sport"], recommendations)
         expanded["response"] = restored
 
     return expanded
