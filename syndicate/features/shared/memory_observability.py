@@ -727,6 +727,116 @@ def log_runtime_memory(stage: str, **extra: Any) -> None:
 # is true, and a null result from it would be uninformative rather than
 # exculpating -- it never tests (2). It is the correct follow-on once this has
 # said which world we are in, not the first move.
+#
+# UPDATE 2026-08-10 -- THAT FOLLOW-ON IS NOW EARNED, and the sequencing above
+# is why it is worth doing rather than a guess. The trim ran 24 times in a
+# 46-minute window and answered:
+#
+#   returned to the kernel BY TRIM :  1109.6 MB
+#   returned to the kernel BY GC   :  - 104.3 MB   (gc released >0.05MB on 2/24)
+#
+# The collection returned NEGATIVE memory -- anon rose during `gc.collect()`
+# more often than it fell. Hypothesis (1) is confirmed and is not a hypothesis.
+#
+# But it is only about half the problem. Measured at T+27..T+40 on the
+# 2026-08-10 03:46:11Z boot, with the trim live:
+#
+#   anon at guard   1108-1263    (failing boot: 1477-1525)
+#   pid RSS         1119-1126    (failing boot plateau: 1494-1577)
+#   ratchet         ~+11 MB/min  (was ~+24)
+#
+# Slowed, not stopped -- and by the time the guard fires, `by_trim` is down to
+# 0.0-2.9MB. There is nothing left to hand back. The trim releases everything
+# already free three times a cycle and RSS still climbs, so the residual CANNOT
+# be free-but-unreturned memory. It is live objects, or free memory too
+# fragmented for `malloc_trim` to return whole pages -- and only the second of
+# those responds to capping arenas.
+#
+# So `mallopt(M_ARENA_MAX, 2)` is a probe for ONE named mechanism, not a
+# generic knob: glibc gives each thread its own arena (up to 8x cores), each
+# grows independently, and free space in one is unusable by another. Fewer
+# arenas means less stranded-but-free space. If anon still climbs after this,
+# fragmentation is excluded too and the remaining explanation is live
+# retention -- which is when the root-walking sizer becomes the work.
+#
+# Via ctypes rather than the env var deliberately: the env var needs a config
+# change to take effect, and `render.yaml` is the one file whose push applies
+# to production (`#284`). This is code, so it ships on the deploy that carries
+# it and cannot be silently undone by a blueprint sync (`#312`).
+_MALLOC_ARENA_STATE: dict[str, Any] = {"resolved": False, "applied": False, "reason": ""}
+
+# glibc `malloc.h`: M_ARENA_MAX is -8. Not exposed by Python anywhere, so the
+# literal is the interface.
+_M_ARENA_MAX = -8
+
+
+def configure_malloc_arenas(max_arenas: int = 2) -> bool:
+    """Cap glibc's per-thread arenas. Once per process, as early as possible.
+
+    MUST be called before the workload spawns threads. `mallopt` only governs
+    arenas created AFTER it returns -- arenas that already exist are untouched,
+    so calling this late caps nothing that matters. That is also why it is worth
+    calling even though Python has already allocated at import time: the growth
+    this targets happens during the sim/overview work, long after startup.
+
+    Returns True only if glibc accepted it. Never raises: on every non-glibc
+    machine in this repo -- Windows, no WSL -- this takes the unavailable branch
+    on every call, exactly as `_resolve_malloc_trim` does.
+
+    THE `MALLOC_ARENA_INIT` LINE IS THE POINT, for the same reason the trim's
+    is. `mallopt` returns 1 for success and 0 for failure and glibc will happily
+    return 0 without explanation; a rejected call and a call that worked but did
+    not help are both silence from outside. Six fixes shipped deployed-and-inert
+    on 2026-08-09/10 with passing tests. Grep `MALLOC_ARENA_INIT` after the
+    deploy and the branch is named rather than inferred from a better number.
+    """
+    if _MALLOC_ARENA_STATE["resolved"]:
+        return bool(_MALLOC_ARENA_STATE["applied"])
+    _MALLOC_ARENA_STATE["resolved"] = True
+    rc: int | None = None
+    if not sys.platform.startswith("linux"):
+        _MALLOC_ARENA_STATE["reason"] = f"platform={sys.platform}"
+    else:
+        try:
+            import ctypes
+            import ctypes.util
+
+            for candidate in ("libc.so.6", ctypes.util.find_library("c"), None):
+                try:
+                    libc = ctypes.CDLL(candidate, use_errno=True)
+                except Exception:
+                    continue
+                mallopt = getattr(libc, "mallopt", None)
+                if mallopt is None:
+                    continue
+                mallopt.argtypes = [ctypes.c_int, ctypes.c_int]
+                mallopt.restype = ctypes.c_int
+                rc = int(mallopt(_M_ARENA_MAX, int(max_arenas)))
+                # 1 = accepted, 0 = refused. Hold the CDLL for the same
+                # lifetime reason the trim does.
+                _MALLOC_ARENA_STATE["applied"] = rc == 1
+                _MALLOC_ARENA_STATE["libc"] = libc
+                if rc != 1:
+                    _MALLOC_ARENA_STATE["reason"] = f"mallopt_returned_{rc}"
+                break
+            else:
+                _MALLOC_ARENA_STATE["reason"] = "symbol_not_found"
+        except Exception as exc:  # pragma: no cover - defensive, must never raise
+            _MALLOC_ARENA_STATE["reason"] = f"{type(exc).__name__}: {exc}"
+    payload = {
+        "applied": bool(_MALLOC_ARENA_STATE["applied"]),
+        "max_arenas": int(max_arenas),
+        "rc": rc,
+        "platform": sys.platform,
+        "pid": os.getpid(),
+        # Reported because glibc's DEFAULT is 8x cores -- naming what we moved
+        # away from is what makes the number interpretable later.
+        "cpu_count": os.cpu_count(),
+        "env_malloc_arena_max": os.environ.get("MALLOC_ARENA_MAX"),
+        "unavailable_reason": _MALLOC_ARENA_STATE["reason"] or None,
+    }
+    print(f"MALLOC_ARENA_INIT {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
+    return bool(_MALLOC_ARENA_STATE["applied"])
 _MALLOC_TRIM_STATE: dict[str, Any] = {"resolved": False, "fn": None, "libc": None, "unavailable_reason": ""}
 
 

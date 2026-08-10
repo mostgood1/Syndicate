@@ -2103,6 +2103,22 @@ def main() -> int:
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
     read_json_file = store["read_json_file"]
     print("[refresh_worker] BOOTED", flush=True)
+    # #285. Cap glibc arenas BEFORE the loops spawn threads -- `mallopt` only
+    # governs arenas created after it returns, so this is worthless if it moves
+    # later in main(). The trim proved allocator retention is real (1109.6MB
+    # returned by trim vs -104.3MB by gc across 24 calls) and only halved the
+    # ratchet; by the time the guard fires there is nothing left to hand back,
+    # so the residual is fragmentation or live retention. This tests the first.
+    # Imported at the call site, matching _diag_log_all_process_memory's own
+    # pattern in this file: memory_observability pulls in psutil-adjacent paths
+    # and a module-level import here would fail the whole worker on a machine
+    # where that is unavailable, rather than degrading one diagnostic.
+    try:
+        from syndicate.features.shared.memory_observability import configure_malloc_arenas
+
+        configure_malloc_arenas(2)
+    except Exception as exc:  # noqa: BLE001 - a memory hint must never stop boot
+        print(f"[refresh_worker] MALLOC_ARENA_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     _diag_log_all_process_memory("boot")
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     _bootstrap_soccer_player_seed_files()
