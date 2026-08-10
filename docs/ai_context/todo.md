@@ -142,6 +142,37 @@ trip and has printed none. > ## ROOT CAUSE, measured 2026-08-10 20:2xZ. **THE AB
 > and it closes as a duplicate the moment the ratchet is addressed.** Do not
 > open a fifth memory item for it.
 >
+> ## ROOT CAUSE CONFIRMED by the 20:33 reboot, which ran the experiment for free
+>
+> The prediction was stated before the evidence arrived: guard quiet + overview
+> complete -> pool non-zero, **or the root cause is wrong**.
+>
+> ```
+> 20:33:10  MALLOC_ARENA_INIT           reboot, RSS 1748 -> 474MB
+> 20:33:24  OVERVIEW_SPORT_BEGIN mlb    force_refresh=True skip_game_hydration=False
+> 20:33:45  ...all 8 sports done, 21s total
+> 20:36:50  pool_readings=[]            guard_fires=0
+> 20:38:08  CANDIDATE_POOL_READY count=187      <- NON-ZERO, first cycle
+> 20:40:43  STATE_PERSIST_BEGIN candidate_count=187
+> ```
+>
+> **Guard fires -> empty overview -> pool 0. Guard quiet -> complete overview ->
+> pool 187.** The 106-minute freeze broke: `snapshot_generated_at` moved
+> 18:49:58Z -> 20:38:08Z. `#336` is confirmed as `#285` observed from the board
+> side, and there is nothing to fix in the board path.
+>
+> **RESIDUAL, flagged not explained:** three reads over 100s (20:41-20:43) show
+> `snapshot_generated_at=20:38:08` with `candidate_count=150` — the timestamp
+> advanced while the count did not, and 187 was what the persist carried. Either
+> the board_snapshot write trails the state write, or the served count comes
+> from the retained board while the timestamp comes from the newer state. **Not
+> chased.** It is a different question from `#336` and it should not be folded in
+> to make the closure look tidier than it is.
+>
+> **Second prediction NOT yet confirmed:** `OVERVIEW_REBUILD_RATE_LIMITED` still
+> 0 since the reboot. Expected once a rebuild is attempted inside 300s of the
+> 20:33 build; too early to call either way, and it is *pending*, not falsified.
+
 > ## THE `force_refresh` LEVER IS INERT. Do not pull it. **I repeated the guard
 > comment's suggestion without checking it, which is tonight's error again.**
 >
