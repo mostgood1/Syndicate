@@ -1310,6 +1310,27 @@ Incidentally the line above is direct evidence for something I had only argued
 from code: refresh-worker really does write this bucket, via
 `--run-summary-path` on a subprocess it spawned at 15:04Z.
 
+#### INSTRUMENT NOTE: `/api/ops/keyvalue/usage` reports ALLOCATOR bytes, quantised
+
+`keyvalue_usage_by_prefix` sizes each key with `client.memory_usage(key)` —
+Redis `MEMORY USAGE`, which returns **allocated** memory (jemalloc size classes)
+rather than the value's logical length. The `#282` lane measured the
+consequence directly: a bucket delta of **exactly −4,096**, one 4KB block.
+
+**For this item that is the RIGHT unit and the numbers stand.** "Is the instance
+full", "what is evicting", "86% of a 256MB cap" are all questions about
+allocated memory, which is precisely what fills `maxmemory`. Sizing on logical
+length would have *understated* the problem.
+
+**Where it does NOT hold:** any inference about how large a particular payload
+is, or any delta quoted to more precision than a block. My
+`+24,880 unaccounted on +1 key` reasoning for `#327`'s high-water file is
+sound in direction — right bucket, right count, ~25 stages x ~1.2KB ≈ 30KB
+predicted — but **carries ±4KB per file and must not be quoted to five
+significant figures**, which is how I first wrote it. It also explains why the
+ring's ~1.2KB-per-append growth reads as flat for minutes and then jumps a
+block.
+
 #### Loose end found while measuring, unrelated and small
 
 `odds_control_plane/odds_history/soccer/2026-08-02.json` is **8,388,768 bytes**
