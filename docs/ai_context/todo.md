@@ -1,5 +1,69 @@
 # Syndicate TODO — canonical cross-session list
 
+### #337 — FIXED, NOT DEPLOYED. `candidate_count` reported the request CAP as the true pool, because `#317`'s aliasing turned `by_sport`'s lists into dicts. **My regression, and it re-created a bug this function's own comment already documents.**
+
+**This is the "persist residual" the `#336` work kept tripping over — the board
+was not stale and the persist was not dropping data.**
+
+#### The measurement
+
+```
+20:38:08  CANDIDATE_POOL_READY count=187  ->  20:40:43  STATE_PERSIST_BEGIN candidate_count=187   ok
+20:46:35  pool 187                        ->  20:49:20  persist 187                              ok
+20:55:21  pool 187                        ->  20:57:44  persist 187                              ok
+21:03:42  pool 203                        ->  21:06:38  persist 150                              WRONG
+```
+
+**150 is exactly `_default_candidate_cap()`** (`SYNDICATE_INTELLIGENCE_DEFAULT_CANDIDATE_CAP`,
+default 150, absent on refresh-worker). `board_snapshot`'s
+`recommendation_count=150` is CORRECT — the cap bounds what gets serialized.
+`candidate_count` is documented at `:232-238` to report *"the TRUE total pool
+size (len(candidates), never capped)"* and it reported the cap.
+
+#### Cause, reproduced locally
+
+`_intelligence_state_candidate_count` prefers `by_sport`'s total because it is
+built before any per-request slice. `#317`'s `_compact_member_lists` replaces
+those lists with `{"__alias_members_of__": ..., "__indices__": [...]}` —
+**dicts** — and the sum was `if isinstance(items, list)`, so it scored **zero**
+and dropped through to the capped `top_opportunities`.
+
+```
+before compaction: 203
+after  compaction: 150     by_sport value types={'mlb': 'dict', 'wnba': 'dict'}
+after  expansion : 203
+```
+
+**Why it survived review:** `_compact_member_lists` keeps the verbatim list
+whenever any element is not byte-identical to a `recommendations` member, so a
+187 pool aliased on some cycles and not others. The count was right three times
+and wrong once — an intermittent wrong number is much harder to notice than a
+constant one.
+
+**This function's own comment describes the same bug from 2026-07-21** — a
+snapshot with `by_sport.mlb` at 181 reporting 10, *"the actual mechanism behind
+the 'stuck at 10' board"*. The guard written to prevent it was defeated by a
+type change I made, from a different file, four months later. **The comment
+warned about trusting a request-scoped slice; it could not warn about
+`by_sport` ceasing to be a list.**
+
+#### Fix
+
+Count the stored indices when the value is an alias marker. Positional and
+exact — one index is one member — so it needs no expansion and cannot disagree
+with what expansion would produce. 6 tests, including one asserting the fixture
+**actually aliases** (otherwise the suite passes by measuring nothing, which is
+the inert-fixture trap `#317` hit), and one that a malformed marker does not
+inflate the count.
+
+#### Not claimed
+
+This does not explain the board freeze — that was `#336`/`#285`. It explains why
+the recovered board *looked* stuck at 150 afterwards, and why `#336`'s residual
+survived a rebuild: the number was being recomputed wrongly each cycle rather
+than retained.
+
+
 ### `#285` — EVIDENCE, from the `#329` lane: the plateau's biggest peak is the OVERVIEW BUILD AND THE LIVE-LENS TICK RUNNING CONCURRENTLY. And 2,884MB is where this worker lives, not a spike anyone introduced
 
 **Handed here at the oversight lane's request rather than left in a message.**

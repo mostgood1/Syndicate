@@ -1124,7 +1124,34 @@ def _intelligence_state_candidate_count(state: dict[str, Any] | None) -> int:
     by_sport_total = 0
     by_sport = current.get("by_sport")
     if isinstance(by_sport, Mapping) and by_sport:
-        by_sport_total = sum(len(items) for items in by_sport.values() if isinstance(items, list))
+        # #337. A MEMBER-ALIASED by_sport is a dict, not a list, and the old
+        # `isinstance(items, list)` sum scored it ZERO -- which drops straight
+        # through to the `top_opportunities` fallback below and returns the
+        # REQUEST-CAPPED display count as if it were the true pool. That is the
+        # 2026-07-21 "stuck at 10" bug described above, reintroduced by #317's
+        # compaction at a different scale, by me.
+        #
+        # Measured on production 2026-08-10:
+        #   21:03:42  CANDIDATE_POOL_READY count=203
+        #   21:06:38  STATE_PERSIST_BEGIN candidate_count=150   <- _default_candidate_cap()
+        # and reproduced locally: 203 before compaction, 150 after, 203 after
+        # expansion.
+        #
+        # Intermittent, which is why it survived review: `_compact_member_lists`
+        # keeps the verbatim list whenever any element is not byte-identical to
+        # a `recommendations` member, so a pool of 187 aliased on some cycles
+        # and not others -- the count was right three times and wrong once.
+        #
+        # Counting the stored indices is exact: the alias is positional and one
+        # index is one member, so this needs no expansion and cannot disagree
+        # with what expansion would produce.
+        for items in by_sport.values():
+            if isinstance(items, list):
+                by_sport_total += len(items)
+            elif isinstance(items, Mapping) and items.get(_MEMBER_ALIAS_KEY):
+                indices = items.get(_MEMBER_ALIAS_INDICES)
+                if isinstance(indices, list):
+                    by_sport_total += len(indices)
     opportunities = current.get("top_opportunities")
     opportunities_total = len([item for item in opportunities if isinstance(item, Mapping)]) if isinstance(opportunities, list) else 0
     # Take whichever is larger rather than strictly preferring by_sport: in

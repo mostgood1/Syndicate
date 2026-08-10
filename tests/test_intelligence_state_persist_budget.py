@@ -350,5 +350,68 @@ class QueryStateCacheCompressionTests(unittest.TestCase):
             self.assertEqual(intelligence_state._read_query_state_payload(), legacy)
 
 
+class AliasedBySportMustNotCollapseTheCandidateCountTests(unittest.TestCase):
+    """#337. `#317`'s member-aliasing silently reintroduced the 2026-07-21
+    "stuck at 10" bug at a different scale.
+
+    `_intelligence_state_candidate_count` prefers `by_sport`'s total because it
+    is built before any per-request cap. Aliasing replaces those lists with
+    marker DICTS, the old `isinstance(items, list)` sum scored them zero, and
+    the function dropped through to `top_opportunities` -- returning the
+    request-capped display count as the true pool.
+
+    Measured on production 2026-08-10:
+        21:03:42  CANDIDATE_POOL_READY count=203
+        21:06:38  STATE_PERSIST_BEGIN candidate_count=150   <- _default_candidate_cap()
+
+    Intermittent, which is why it survived: `_compact_member_lists` keeps the
+    verbatim list when any element is not byte-identical to a `recommendations`
+    member, so a 187 pool aliased on some cycles and not others.
+    """
+
+    def _state(self, pool: int, cap: int) -> dict:
+        recs = [{"candidate_id": f"c{i}", "sport": ["mlb", "wnba"][i % 2], "blob": "x" * 80} for i in range(pool)]
+        by_sport: dict[str, list] = {}
+        for item in recs:
+            by_sport.setdefault(item["sport"], []).append(item)
+        return {"recommendations": recs, "top_opportunities": recs[:cap], "by_sport": by_sport}
+
+    def test_the_production_case_203_reported_as_150(self) -> None:
+        state = self._state(203, 150)
+        compact = intelligence_state._compact_state_for_persist(dict(state))
+        self.assertEqual(intelligence_state._intelligence_state_candidate_count(state), 203)
+        self.assertEqual(
+            intelligence_state._intelligence_state_candidate_count(compact), 203,
+            "a compacted payload must still report the TRUE pool, not the cap",
+        )
+
+    def test_the_alias_is_actually_present_in_the_fixture(self) -> None:
+        # Otherwise this suite would pass by measuring nothing -- the same
+        # inert-fixture trap #317 hit.
+        compact = intelligence_state._compact_state_for_persist(dict(self._state(203, 150)))
+        marker_values = [v for v in compact["by_sport"].values()
+                         if isinstance(v, dict) and v.get(intelligence_state._MEMBER_ALIAS_KEY)]
+        self.assertTrue(marker_values, "fixture must actually alias by_sport or this proves nothing")
+
+    def test_expansion_agrees_with_the_compacted_count(self) -> None:
+        compact = intelligence_state._compact_state_for_persist(dict(self._state(203, 150)))
+        expanded = intelligence_state._expand_persisted_state(compact)
+        self.assertEqual(
+            intelligence_state._intelligence_state_candidate_count(compact),
+            intelligence_state._intelligence_state_candidate_count(expanded),
+        )
+
+    def test_unaliased_and_legacy_shapes_are_unchanged(self) -> None:
+        self.assertEqual(intelligence_state._intelligence_state_candidate_count(
+            {"by_sport": {"mlb": [{"a": 1}] * 7}}), 7)
+        self.assertEqual(intelligence_state._intelligence_state_candidate_count(
+            {"top_opportunities": [{"a": 1}] * 12}), 12)
+        self.assertEqual(intelligence_state._intelligence_state_candidate_count({}), 0)
+
+    def test_a_malformed_marker_does_not_inflate_the_count(self) -> None:
+        # Unknown must not become a bigger number than the evidence supports.
+        self.assertEqual(intelligence_state._intelligence_state_candidate_count(
+            {"by_sport": {"mlb": {intelligence_state._MEMBER_ALIAS_KEY: "recommendations", "__indices__": "nope"}},
+             "top_opportunities": [{"a": 1}] * 5}), 5)
 if __name__ == "__main__":
     unittest.main()
