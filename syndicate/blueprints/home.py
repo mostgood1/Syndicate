@@ -7169,6 +7169,28 @@ def _build_sport_overview(
     # Retention takes the max of the two. Cheap: 8 sports x 2 hydration
     # variants is 16 live keys against a 32 ceiling, so the count bound still
     # bites first and nothing becomes unbounded.
+    # DO NOT DECOUPLE THIS `max(...)` FROM THE REBUILD INTERVAL (`#336`).
+    #
+    # The rate limit above and this retention are ONE mechanism with two halves.
+    # Splitting them looks reasonable in isolation -- "retention is a cache
+    # concern, the interval is a cost concern" -- and it silently disarms the
+    # limiter, because an entry pruned before the next forced caller arrives can
+    # never refuse anything. `#255` fixed exactly that, and the failure mode left
+    # no error: the board just gets slower and the memory cost comes back.
+    #
+    # Measured on refresh-worker 2026-08-10, and it is the reason this comment
+    # exists rather than a note in `todo.md`:
+    #
+    #     hydrated MLB rebuild cadence   506-758 s   (8 passes over 2 hours)
+    #     interval AND retention         300 s
+    #     -> entry pruned ~300s in, lookup misses at ~612s, EVERY time
+    #     -> OVERVIEW_REBUILD_RATE_LIMITED fired 0 times in production
+    #
+    # So the limit is currently set BELOW the natural cadence and cannot bind.
+    # Raising `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC` above the observed
+    # cadence makes it bind ONLY BECAUSE retention rises with it through this
+    # line. The two effects are not independent, and a future change that pins
+    # retention to a constant would undo the raise without touching it.
     _prune_home_cache(
         _HOME_OVERVIEW_CACHE,
         now=stamped_at,
