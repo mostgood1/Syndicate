@@ -139,11 +139,12 @@ Related but NOT the same defect: soccer's grid is the thinnest on the platform
 (13.2% three-book, 10.3% two-sided), which is a *capture* property. This is a
 *normalisation* one.
 
-### #324 — OPEN. The keyvalue instance is 96.1% full and evicting, and 86% of it is write-once run diagnostics. The 2-day TTL LANDED AND WORKS — it is a bound on AGE, and the problem is SIZE
+### #324 — The keyvalue instance is 96.1% full and evicting, and 86% of it is write-once run diagnostics. The 2-day TTL LANDED AND WORKS — it is a bound on AGE, and the problem is SIZE
 
-**Status: measured on production 2026-08-10 ~04:2xZ. Not fixed. This is the
-completion of `#317`/`#322`, not a separate concern — see "why this matters
-tonight" below.**
+**Status: measured on production 2026-08-10 ~04:2xZ. Option 1 chosen by the user
+(the ops-jobs UI is not used) and IMPLEMENTED in `aa13805d`, live on
+live-odds-worker via `5ea6aabd`. See "what shipped" below. This is the
+completion of `#317`/`#322`, not a separate concern.**
 
 > **Claimed as `#324`, not `#323` as I was asked.** `#323` was issued to the
 > book-grid precompute four commits ago (`9fa7ea6c`) to resolve the earlier
@@ -236,6 +237,49 @@ Three options, in the order I'd argue for them:
 **Do not "fix" this by raising `maxmemory`** — the instance size is fixed and
 upgrading was already ruled out when this bucket was first measured on
 2026-08-03.
+
+#### What shipped — `aa13805d`
+
+`_keyvalue_backed(path)` in `refresh_state_store.py`: one predicate that all
+seven path-scoped IO functions now route through (`read_json_file_result`,
+`read_text_file_result`, `write_json_file`, `write_text_file`,
+`delete_text_file`, `path_exists`, `path_size`). **Read and write share it
+deliberately — a split would send writes to disk and reads to Redis, which
+presents as "the artifact vanished" rather than as a bug.**
+
+`_KEYVALUE_EXCLUDED_PATH_MARKERS = ("migration_runs/",)` — **only that prefix,
+not the whole run-scoped tuple.** `refresh_status/latest/` IS read
+cross-service (`record_known_refresh_lane` exists precisely so lane discovery
+works on the keyvalue backend), and `refresh_status` + `live_refresh_loop`
+together were 4.4MB. Excluding them would have broken a working path to save
+1.8% of the instance.
+
+**All three services write this bucket** — `launch_refresh_run` is called from
+`run_refresh_worker.py`, `run_live_odds_refresh_worker.py` AND `ops.py`. So the
+reclaim only completes once each writer is deployed; live-odds-worker (its own
+frequent cadence) is the dominant producer of the ~110 keys/hour.
+
+Five tests in `tests/test_refresh_state_store.py::MigrationRunsAreNotKeyvalueBackedTests`
+pin BOTH halves — excluded paths never touch the store and still round-trip via
+disk, and `refresh_status/latest` + `reports/intelligence` are STILL
+keyvalue-backed. That second half is what catches an over-reach.
+
+Also fixed a test that would have passed for the wrong reason:
+`test_keyvalue_backend_round_trips_json_and_text_by_path` used a
+`migration_runs` path to prove a *keyvalue* round-trip, and after this change it
+would still have gone green — via disk.
+
+**The existing backlog drains on its own** (every key carries the 2-day TTL), or
+immediately via `POST /api/ops/keyvalue/expire-run-artifacts?dry_run=0`.
+
+#### Instrument caveat found while doing this
+
+**The Render logs API `text` filter is not a reliable substring match.** A query
+for `SIM_` returned `ALL_PROCESS_MEMORY` and `CONTAINER_MEMORY` lines that do
+not contain that string, and a query for `migration_runs` returned the same
+unrelated lines. It was about to tell me which service writes this bucket.
+Determine that kind of thing from the code (`launch_refresh_run`'s callers), not
+from a filtered log query.
 
 #### Loose end found while measuring, unrelated and small
 
