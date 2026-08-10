@@ -2104,7 +2104,67 @@ it now has a date.
 **`#310` closes.** The remaining work — why boxscore ingestion stopped on
 2026-05-24 — is `#314`'s question and needs its own owner.
 
-### #285 — ARENA CAP MET THE SUCCESS TEST at T+29 (4/4 boards, 0 guard latches). Trim-only result below; the open question is now plateau-vs-later-crossing
+### #285 — CLOSED at T+55: 7/7 boards, 0 guard latches, and the ratchet is a BOUNDED OSCILLATION (627–910MB) rather than a slower climb
+
+**The plateau-vs-later-crossing question this entry left open at T+29 is
+answered. It plateaus.** Measured to T+55 on the arena-capped boot
+(`cb3946a2`, live 2026-08-10T14:53:17Z):
+
+```
+pid-39 RSS at post_pool_assembled
+T+12  707.1   T+21  627.2   T+29  810.5   T+37  828.4   T+45  910.2   T+55  728.4
+guard latches   0 across 55 minutes
+pools           7 of 7 non-zero -- 203 203 208 208 208 208 205
+trim            24 calls, 1475.9MB by trim, 59.4MB by gc
+```
+
+**The T+55 reading is BELOW T+29's and 182MB below the T+45 peak.** That is the
+discriminator: a slower ratchet ends at its maximum, a bounded process does not.
+
+```
+                 trajectory                          boards
+pre-fix          85 -> 1477 by T+23, plateau 1494-1577    1 of 25 cycles
+trim only        877.9 -> 1057.4, ended at its MAX        2 of 12 cycles
+arena-capped     627-910 band, ends below mid-window      7 of 7 cycles
+```
+
+**DO NOT quote the +3.10 MB/min fit as a rate.** Six points swinging 280MB
+cannot resolve one, and quoting a fit off a window too short for its own noise
+is the exact error this entry records me making at T+30 the night before. What
+IS resolvable and is the claim: **the process has not exceeded 910.2MB in 55
+minutes, against 1477MB by T+23 pre-fix.**
+
+`gc.collect()` remains ~4% of the trim (59.4 vs 1475.9MB) — the n=24 result
+from the previous boot reproduces on an independent boot with a different
+allocator configuration.
+
+#### The residual caveat, which is real and small
+
+**One boot, one slate** (2026-08-10, ~205 candidates). The trim-only boot ran a
+different day's workload, so the two are not matched, and neither is the
+pre-fix comparison. What makes this callable anyway is that the three
+trajectories differ in KIND — ends-at-max versus ends-below-mid-window is not a
+magnitude judgement — and that 55 minutes is more than twice the 23 minutes the
+pre-fix boot needed to reveal its own ratchet.
+
+**Both mechanisms verified applied in production, in pid 39, not inferred:**
+
+```
+14:53:42  MALLOC_ARENA_INIT {"applied": true, "rc": 1, "max_arenas": 2, "cpu_count": 16}
+14:53:48  MALLOC_TRIM_INIT  {"available": true, "library": "libc.so.6"}
+```
+
+`cpu_count: 16` means glibc's default ceiling was 8x16 = **128 arenas**, capped
+to 2. That is the fragmentation-across-arenas mechanism the trim-only result
+named as its residual, and capping it is what converted a climb into a band.
+
+#### Superseded framing (kept: it was right at the time and wrong by T+55)
+
+At T+29 this entry read `ARENA CAP MET THE SUCCESS TEST ... the open question is
+now plateau-vs-later-crossing`, and listed as caveat (3): *at ~10 MB/min from
+810MB the working set reaches last night's latching level around T+60-70.* **It
+did not** — T+55 came in at 728.4. The caveat was the correct thing to write on
+four points and the correct thing to retire on seven.
 
 > **Provenance:** this entry was written by the `#285` lane but landed on
 > `origin/main` inside `#324`'s commit `3f9cf183` — another instance of the
