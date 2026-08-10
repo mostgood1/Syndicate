@@ -415,6 +415,55 @@ trip and has printed none. > ## ROOT CAUSE, measured 2026-08-10 20:2xZ. **THE AB
 > mechanism.** Recording the three excluded branches so the next person starts
 > where I stopped rather than re-walking them.
 
+> ## RETRACTED 21:45Z — `#251`'s RATE LIMIT IS NOT INERT. THERE IS NO DEFECT HERE.
+>
+> **I claimed `#251` and `#255` were 'two memory fixes, deployed, doing nothing'
+> and that making the limiter fire was a cheaper target than `#285`'s ~725MB.
+> Both statements are FALSE.** Settled by deploying the diagnostic (`874c4c59`)
+> and reading one line.
+>
+> ```
+> mlb HYDRATED rebuild gaps (force_refresh=True skip_game_hydration=False):
+>   513  517  506  533  628  758  612   seconds
+> _HYDRATED_OVERVIEW_MIN_REBUILD_INTERVAL_SEC = 300
+> ```
+>
+> **Every gap exceeds the interval**, so the entry is always older than 300s when
+> the next hydrated pass arrives, and the limiter correctly declines to fire. The
+> diagnostic said so directly: `cached=NO age_sec=n/a cache_entries=8
+> key=mlb:2026-08-10` -- the previous hydrated entry was 758s old and had been
+> pruned at `ttl=max(10, 300)`, exactly as `#255` intends.
+>
+> ### The error, because it is the same one twice in one evening
+>
+> My 'gaps of 7s / 245s / 248s / 251s, all inside the 300s window' **mixed two
+> different passes**. `OVERVIEW_SPORT_BEGIN` is emitted for BOTH the hydrated
+> build and the `skip_game_hydration=True` fingerprint pass, which run seconds
+> apart and key into **different cache entries** (`mlb:<date>` vs
+> `mlb:<date>:skip_hydration`). They never compete. Split by type over the same
+> two hours: **8 hydrated passes against 74 fingerprint passes.** The 7-second
+> 'pairs' were one of each.
+>
+> I found a zero (`OVERVIEW_REBUILD_RATE_LIMITED` never fires), did not establish
+> what would make it non-zero (hydrated rebuilds closer together than 300s), and
+> filed it as a defect -- **the identical mistake as `#335` earlier the same
+> evening**, where a 2-hour odds gap was called an incident without checking
+> whether a game was in progress. The discriminating field was present in the
+> log line I was already reading: `force_refresh=` and `skip_game_hydration=`.
+>
+> ### WHAT IS ACTUALLY ACTIONABLE, and it is the lever that was being looked for
+>
+> **The interval is set BELOW the natural rebuild cadence, so it can never bind.**
+> 300s against an observed 506-758s. Raising
+> `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC` above ~760s would make the limit
+> start binding and cut hydrated MLB rebuilds -- the +2.9GB-in-73s pass the 3000MB
+> floor is sized against -- roughly in half.
+>
+> **That is an env var, no code change, and it is a PRODUCT decision**: the board's
+> game data would be up to the new interval stale. It is the real form of the
+> `force_refresh` lever everyone has been reaching for, and unlike that one it is
+> not a regression. Not pulled -- it needs the owner's call on staleness.
+
 > ## THE STRUCTURAL NUMBER behind all of the above, and it reframes `#285`
 >
 > ```
