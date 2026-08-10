@@ -178,7 +178,7 @@ kind, so "sim mapped for all sports" means PRODUCING sims, not joining them.
 Tracked here so nobody reads an honest empty column as a board defect.
 
 
-### #334 — FIXED, NOT DEPLOYED. A 44-minute-stale board reported `fresh` against a 60-second SLA, because the freshness verdict is computed at WRITE time and persisted with the payload
+### #334 — CLOSED AND VERIFIED IN PRODUCTION (`a64348d2`, web 2026-08-10). A 44-minute-stale board reported `fresh` against a 60-second SLA, because the freshness verdict is computed at WRITE time and persisted with the payload
 
 **Status: found by the oversight lane while checking `board_cc=23`, re-derived
 and root-caused here, fixed in `pipeline/intelligence_state.py`. Not deployed.**
@@ -270,6 +270,28 @@ persisted read.
 Covers the nested `response.*` blocks too, which is where the `status.*` copies
 come from — all six, verified. 11 tests, plus 62 passing across the `#317`/`#322`
 suites since `_expand_persisted_state` is their choke point as well.
+
+#### VERIFIED CLOSED — one age value, not three
+
+Oversight, on the deployed `a64348d2`, first read:
+
+```
+block                    reported     TRUE      status
+state_meta               4916.8275    4919.6    stale
+freshness                4916.8276    4919.6    stale
+state_freshness          4916.8276    4919.6    stale
+status.*  (x3)           same         4919.6    stale
+
+distinct age values: 1
+```
+
+**All six `stale`, one consistent age.** The 2.8s residual is the gap between
+the server computing it and the reader measuring it — correct, not error.
+
+The agreed discriminator was the sub-value count: three microsecond-apart
+figures meant a persisted write-time verdict, one means the read-time recompute
+is running. It reads 1 on the first attempt after the enumerated fix, having
+read 3 after each of the three targeted ones.
 
 #### FOURTH ATTEMPT. Three correct fixes, three paths the status route does not take
 
