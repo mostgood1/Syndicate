@@ -140,8 +140,13 @@ def test_enrichment_state_distinguishes_unenriched_from_no_opinion():
     # The three cases must not render identically. A pre-#328 artifact (no
     # `game` key at all) is not the same fact as an enriched grid whose sim has
     # no opinion on this slate, and neither is the same as a working board.
+    #
+    # `grid_not_enriched` was the old name AND the old inference -- decided from
+    # the absence of a `game` key, which mislabelled a correct NFL run. The
+    # state survives under a name that says what it is a fact about (the
+    # artifact), and is now only claimed when the rows carry no evidence either.
     unenriched = build_layer1_board([_row(state=None)], sport="mlb", selected_date="2026-08-10")
-    assert unenriched["enrichment"] == "grid_not_enriched"
+    assert unenriched["enrichment"] == "artifact_predates_enrichment"
 
     no_projection = build_layer1_board([_row(state="pregame")], sport="mlb", selected_date="2026-08-10")
     assert no_projection["enrichment"] == "enriched_no_projections"
@@ -324,3 +329,60 @@ def test_league_filter_never_admits_an_unlabelled_row():
     )
     assert board["counts"]["games"] == 0
     assert board["empty_reason"] == "no_rows_for_league:epl"
+
+
+def test_enrichment_is_read_from_coverage_not_inferred_from_rows():
+    # THE BUG THIS REPLACES. NFL reported `grid_not_enriched` on production
+    # 2026-08-10 while its enrichment had run correctly and matched nothing:
+    # zero chips because the slate is in September, and no projection source
+    # wired at all. `attach_game_state` only stamps `game` on rows it MATCHES,
+    # so a correct run over a sport with no fixtures leaves every row bare --
+    # indistinguishable, from the rows alone, from a pre-#328 artifact.
+    nfl_coverage = {
+        "game_state": {"chips": 0, "reason": "no_chips_for_date", "rows_matched": 0},
+        "projections": {"supported": False, "reason": "no projection source wired for nfl"},
+    }
+    board = build_layer1_board(
+        [_row(state=None)], sport="nfl", selected_date="2026-08-10", coverage=nfl_coverage
+    )
+    # An unwired sport must not read as a broken join: the fix is producing a
+    # sim, not repairing one, and the two send the work to different places.
+    assert board["enrichment"] == "no_projection_source_for_sport"
+    assert board["enrichment_detail"]["projection_reason"] == "no projection source wired for nfl"
+    assert board["enrichment_detail"]["game_state_reason"] == "no_chips_for_date"
+
+
+def test_absent_coverage_is_the_only_thing_meaning_not_enriched():
+    # And it is a fact about the ARTIFACT, not about the rows.
+    board = build_layer1_board([_row(state=None)], sport="mlb", selected_date="2026-08-10")
+    assert board["enrichment"] == "artifact_predates_enrichment"
+
+
+def test_enrichment_ran_and_matched_nothing_is_its_own_state():
+    board = build_layer1_board(
+        [_row(state=None)],
+        sport="mlb",
+        selected_date="2026-08-10",
+        coverage={"game_state": {"chips": 4, "rows_matched": 0}, "projections": {"supported": True}},
+    )
+    assert board["enrichment"] == "enriched_no_matches"
+
+
+def test_a_working_board_still_reads_enriched():
+    board = build_layer1_board(
+        [_row(state="pregame", projection={"projected": 0.61})],
+        sport="mlb",
+        selected_date="2026-08-10",
+        coverage={"game_state": {"chips": 10, "rows_matched": 1}, "projections": {"supported": True}},
+    )
+    assert board["enrichment"] == "enriched"
+
+
+def test_worker_forward_days_track_the_boards_own_window_table():
+    # A producer that builds four days while the board asks for seven is exactly
+    # the drift this module exists to remove, so the worker derives its forward
+    # build count from THIS table rather than restating it.
+    from syndicate.features.shared.layer1_board import max_slate_window_days, slate_window_days
+
+    assert max_slate_window_days() == max(slate_window_days(s) for s in ("mlb", "nfl", "ncaaf", "soccer"))
+    assert max_slate_window_days() == slate_window_days("soccer") == 7

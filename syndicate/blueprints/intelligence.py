@@ -2529,6 +2529,15 @@ def board_layer1_api():
         grid_absent_reason=absent_reason,
         window_dates=window_dates,
         league=league,
+        # The enrichment's OWN report, threaded through rather than re-inferred
+        # from the rows. `#328` persists these three on the artifact for exactly
+        # this purpose; inferring from row keys made NFL read `grid_not_enriched`
+        # while its enrichment had run correctly and matched nothing.
+        coverage={
+            key: (precomputed or {}).get(key)
+            for key in ("game_state", "projections", "margin_model")
+            if isinstance((precomputed or {}).get(key), dict)
+        },
     )
     # Which days of the window had no artifact. A five-day NFL window built from
     # three artifacts is a partial board, and saying so is the difference between
@@ -2543,6 +2552,20 @@ def board_layer1_api():
     board["rows_truncated"] = (precomputed or {}).get("rows_truncated")
     board["source_quote_rows"] = (precomputed or {}).get("source_quote_rows")
     board["source_shard_bytes"] = (precomputed or {}).get("source_shard_bytes")
+
+    # A PARTIAL WINDOW MUST SAY SO — and `window_dates_missing_artifact` above
+    # only says which days were absent, which a reader has to diff against the
+    # window to interpret. These two make it answerable directly.
+    #
+    # Measured 2026-08-10: soccer's 7-day window resolved 08-10..08-16 correctly
+    # and served 7 rows, while 08-15 alone pivots to 690 — because the worker
+    # builds artifacts for today and yesterday only, so every forward date in a
+    # slate window is absent by construction. The window logic is right; the
+    # data it needs is not produced yet. A board that cannot say that reads as a
+    # thin slate, which is the failure `rows_truncated` stops one layer down.
+    board["window_dates_read"] = [d for d in window_dates if d not in set(missing_dates)]
+    if missing_dates and len(missing_dates) < len(window_dates):
+        board["window_partial"] = True
 
     if view != "all":
         try:

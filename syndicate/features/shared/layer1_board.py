@@ -119,6 +119,17 @@ _SLATE_WINDOW_DAYS = {
 _DEFAULT_SLATE_WINDOW_DAYS = 1
 
 
+def max_slate_window_days() -> int:
+    """The widest window any sport asks for.
+
+    Public so the worker can size its forward artifact builds from the SAME
+    table the board reads, rather than restating the number. A producer that
+    builds four days while the consumer asks for seven is the drift this module
+    exists to remove, and it would reappear here first.
+    """
+    return max(_SLATE_WINDOW_DAYS.values())
+
+
 def slate_window_days(sport: str) -> int:
     return _SLATE_WINDOW_DAYS.get(str(sport or "").strip().lower(), _DEFAULT_SLATE_WINDOW_DAYS)
 
@@ -240,6 +251,81 @@ def _fallback_matchup(row: Mapping[str, Any]) -> str | None:
     return None
 
 
+def _classify_enrichment(
+    *,
+    coverage: Mapping[str, Any] | None,
+    rows: int,
+    enriched_rows: int,
+    projected_rows: int,
+) -> tuple[str, dict[str, Any]]:
+    """What the enrichment actually did — READ FROM THE COVERAGE, not inferred.
+
+    THIS FUNCTION EXISTS BECAUSE THE INFERENCE WAS WRONG, and wrong in the exact
+    way `#328` was written to prevent. The first version decided "not enriched"
+    from the absence of a `game` key on the rows. Measured on production
+    2026-08-10, NFL reported `grid_not_enriched` — and the enrichment had run
+    perfectly:
+
+        game_state    {"chips": 0, "reason": "no_chips_for_date", "rows_matched": 0}
+        projections   {"supported": false, "reason": "no projection source wired for nfl"}
+
+    Zero chips because NFL's slate is in September. `attach_game_state` only
+    stamps `game` on a row it MATCHES, so a correct run over a sport with no
+    fixtures today leaves every row bare — indistinguishable, from the rows
+    alone, from an artifact written before the enrichment existed.
+
+    That is the same defect `#328`'s commit message names: "written before
+    anything joined" and "joined, found nothing" must not serialize identically.
+    I asserted the rule for the artifact and then broke it one layer up, by
+    inferring from a payload instead of reading the report that was sitting
+    right there.
+
+    So: the coverage dicts decide. Their ABSENCE is the only thing that means
+    "not enriched", and that is a fact about the artifact, not about the rows.
+    """
+    detail: dict[str, Any] = {}
+    if rows == 0:
+        return "no_rows", detail
+
+    if not isinstance(coverage, Mapping) or not coverage:
+        # No coverage report. Only claim "predates" when the ROWS agree there is
+        # no evidence either way -- an enriched row is proof the enrichment ran,
+        # whatever the caller did or did not thread through, and reporting
+        # "predates enrichment" over rows that visibly carry `game` would be the
+        # same over-claim in the opposite direction.
+        if enriched_rows == 0:
+            return "artifact_predates_enrichment", detail
+        detail["coverage"] = "absent_inferred_from_rows"
+        return ("enriched" if projected_rows > 0 else "enriched_no_projections"), detail
+
+    game_state = coverage.get("game_state") if isinstance(coverage.get("game_state"), Mapping) else {}
+    projections = coverage.get("projections") if isinstance(coverage.get("projections"), Mapping) else {}
+    margin = coverage.get("margin_model") if isinstance(coverage.get("margin_model"), Mapping) else {}
+
+    if game_state.get("reason"):
+        detail["game_state_reason"] = game_state.get("reason")
+    if projections.get("reason"):
+        detail["projection_reason"] = projections.get("reason")
+    detail["rows_matched_game_state"] = game_state.get("rows_matched")
+    detail["rows_modelled_fair"] = margin.get("rows_modelled")
+
+    # An unwired sport is NOT a failure and must not read as one. NFL has no
+    # predictions artifacts of any kind in production -- fixing it means
+    # producing a sim, not repairing a join -- and a board that says "no
+    # projection source wired" sends that work to the right place, while
+    # "enriched_no_projections" sends someone to debug a join that is fine.
+    if projections.get("supported") is False:
+        return "no_projection_source_for_sport", detail
+
+    if projected_rows > 0:
+        return "enriched", detail
+    if enriched_rows > 0:
+        return "enriched_no_projections", detail
+    # Enrichment ran, matched nothing at all. Real, and different from both
+    # "never ran" and "ran and found some": usually a slate that is not today's.
+    return "enriched_no_matches", detail
+
+
 def build_layer1_board(
     grid: Iterable[Mapping[str, Any]],
     *,
@@ -248,6 +334,7 @@ def build_layer1_board(
     grid_absent_reason: str | None = None,
     window_dates: Iterable[str] | None = None,
     league: str | None = None,
+    coverage: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Group an enriched grid into per-game cards, partitioned by game state.
 
@@ -342,14 +429,12 @@ def build_layer1_board(
     # attributable. `#328` made the grid carry projections; a grid that arrives
     # without them means the artifact predates that or the join found nothing,
     # and those must not render identically.
-    if not rows:
-        enrichment = "no_rows"
-    elif enriched_rows == 0:
-        enrichment = "grid_not_enriched"
-    elif projected_rows == 0:
-        enrichment = "enriched_no_projections"
-    else:
-        enrichment = "enriched"
+    enrichment, enrichment_detail = _classify_enrichment(
+        coverage=coverage,
+        rows=len(rows),
+        enriched_rows=enriched_rows,
+        projected_rows=projected_rows,
+    )
 
     payload: dict[str, Any] = {
         "sport": str(sport or "").strip().lower(),
@@ -392,6 +477,7 @@ def build_layer1_board(
             "other_dates": dict(sorted(other_dates.items(), key=lambda kv: (-kv[1], kv[0]))[:7]),
         },
         "enrichment": enrichment,
+        "enrichment_detail": enrichment_detail,
     }
     if not rows:
         # Never an empty list with no explanation. `#296`: a sport with no quotes

@@ -2132,6 +2132,35 @@ def _book_grid_refresh_interval_seconds() -> int:
         return 600
 
 
+# How much slower forward dates rebuild than today. 6x the main interval: a
+# fixture four days out is not repriced on a ten-minute timescale, and today's
+# board -- the one anyone is actually betting -- keeps the fast cadence.
+_BOOK_GRID_FORWARD_INTERVAL_MULTIPLE = 6
+
+
+def _book_grid_forward_days() -> int:
+    """How many days past today to build, covering the widest slate window.
+
+    Derived from `layer1_board`'s own window table rather than restated here, so
+    the worker cannot build four days while the board asks for seven. A constant
+    duplicated across a producer and a consumer is the drift `#329` exists to
+    remove -- and this is exactly where it would reappear.
+    """
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_FORWARD_DAYS") or "").strip()
+    if raw:
+        try:
+            return max(0, min(14, int(raw)))
+        except ValueError:
+            pass
+    try:
+        from syndicate.features.shared.layer1_board import max_slate_window_days
+
+        # -1 because a window of N days is today plus N-1 forward.
+        return max(0, max_slate_window_days() - 1)
+    except Exception:
+        return 0
+
+
 def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     """#322: pivot the book_quotes shard HERE so web never has to.
 
@@ -2179,6 +2208,40 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
     previous_date = (date.fromisoformat(selected_date) - timedelta(days=1)).isoformat()
     rebuild_previous = _BOOK_GRID_LAST_RUN.get("previous_date") != previous_date
     dates = [selected_date] + ([previous_date] if rebuild_previous else [])
+
+    # FORWARD DATES, so a slate window has something to read (`#329`).
+    #
+    # Building today and yesterday only made the multi-day window structurally
+    # empty for every sport whose slate spans days. Measured 2026-08-10: soccer's
+    # 7-day window resolved 08-10..08-16 and served 7 rows, because 6 of the 7
+    # artifacts do not exist -- while /api/board/book-grid for 08-15 alone
+    # returns 690 rows by falling through to a LIVE PIVOT ON WEB, which is the
+    # thing `#323` moved off web for OOM-killing it.
+    #
+    # Soccer already shards quotes by the event's own KICKOFF date, so these
+    # forward shards are real files with real fixtures in them, not empty
+    # placeholders.
+    #
+    # ON A SLOWER CADENCE THAN TODAY, and that is `#241` applied rather than
+    # quoted: a forward shard grows as books quote a fixture days out, so it
+    # does need rebuilding, but nothing about a fixture four days away changes
+    # in ten minutes. Absent shards cost a stat() and are skipped below.
+    #
+    # COST NOT YET MEASURED, and said plainly rather than assumed: I tried to
+    # size the forward shards on 2026-08-10 and web was mid-deploy, so the
+    # numbers are not in hand. The interval is the mitigation -- and
+    # BOOK_GRID_TICK already logs what it built, so the first ticks after this
+    # ships are the measurement.
+    forward_days = _book_grid_forward_days()
+    if forward_days > 0:
+        interval_forward = interval * _BOOK_GRID_FORWARD_INTERVAL_MULTIPLE
+        if now - _BOOK_GRID_LAST_RUN.get("forward", 0.0) >= interval_forward:
+            _BOOK_GRID_LAST_RUN["forward"] = now
+            anchor = date.fromisoformat(selected_date)
+            dates.extend(
+                (anchor + timedelta(days=offset)).isoformat()
+                for offset in range(1, forward_days + 1)
+            )
 
     written: list[str] = []
     skipped: list[str] = []
