@@ -578,6 +578,25 @@ if it did.
 > exactly as `_persist_locked` wraps it**, per the trap that caused the four
 > inert commits. Doing that is what surfaced `#320` below.
 >
+> **`KEYVALUE_WRITE_REJECTED` DOES NOT STOP ENTIRELY, AND THAT IS EXPECTED —
+> read the key before concluding anything.** A second, unrelated write is still
+> refused every cycle:
+>
+> ```
+> .../intelligence/board_snapshot.json      <- THIS lane. Now 0 rejections.
+> .../intelligence/query_state_cache.json   <- NOT this lane. Still rejected.
+> ```
+>
+> `query_state_cache.json` is `STATE_PATH`, written by `_persist_locked` through
+> a raw `write_json_file` (`:5322`), and its bulk is `snapshots=33,017,421` —
+> every snapshot's full response, not the board. It is **deliberately not fixed
+> here**: its three readers (`:5175`, `:5217`, `:5273`) all use raw
+> `read_json_file` and none go through `_expand_persisted_state`, so compressing
+> it means changing the readers too, and it already has a working deterministic
+> trim (`_budgeted_snapshots_payload` → `STATE_PERSIST_TRIMMED`). Worth doing;
+> it is a separate change with its own blast radius. **Filter
+> `KEYVALUE_WRITE_REJECTED` by key or you will conclude this item is unfixed.**
+>
 > **NOT YET VALIDATED IN PRODUCTION**, and note the sequencing that still holds:
 > `#285` gates whether any board reaches the transport at all, so the success
 > test here remains narrow — `KEYVALUE_WRITE_REJECTED` stops while

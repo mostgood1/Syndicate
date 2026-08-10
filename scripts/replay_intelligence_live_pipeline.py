@@ -33,7 +33,13 @@ def main() -> int:
     args = parser.parse_args()
 
     state_path = Path(str(args.state_path)).expanduser().resolve()
-    payload = read_json_file(state_path)
+    # #317/#320: the persisted payload is aliased and compressed, so a raw read
+    # yields `response = {"__compressed__": ...}` and this would print an empty
+    # live_pipeline for a perfectly good state -- silently, which is the whole
+    # failure mode this pair of items is about.
+    from pipeline.intelligence_state import expand_persisted_state
+
+    payload = expand_persisted_state(read_json_file(state_path))
     if not isinstance(payload, dict):
         raise SystemExit(f"No intelligence snapshot found at {state_path}")
 
