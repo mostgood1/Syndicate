@@ -1669,6 +1669,41 @@ remaining mechanism consistent with these numbers.** It is code-only via
 `ctypes` — the recorded objection that arena_max means a blueprint sync applies
 to the env var, not to `mallopt`.
 
+#### The recovery is RECURRING, not a one-shot reclaim — and the third trim's small number is the check PASSING
+
+Measured at T+43/T+45, i.e. long past any boot-window effect:
+
+```
+23:54:20  pre_build_candidate_pool_start  anon 1473.4 -> 1360.4   by_trim 113.0   rss  992.3
+23:54:31  pre_overview_headroom           anon 1424.5 -> 1357.6   by_trim  67.2   rss  989.5
+23:54:32  post_build_overview             anon 1360.4 -> 1356.3   by_trim   4.1   rss  988.2
+23:57:06  pre_build_candidate_pool_start  anon 1500.7 -> 1382.3   by_trim 118.5   rss 1016.0
+23:57:16  pre_overview_headroom           anon 1404.1 -> 1373.6   by_trim  30.5   rss 1007.4
+23:57:17  post_build_overview             anon 1376.5 -> 1374.4   by_trim   2.1   rss 1008.7
+```
+
+**113–118MB every cycle at T+45.** Against a ~350MB rise per 30 minutes that is
+real time bought even without clearing the floor.
+
+**THE THIRD TRIM'S 2.1MB IS THE MECHANISM CHECK PASSING, NOT A REGRESSION.** It
+is the third call of a cycle whose overview the guard had already blocked, so
+there is no hydration scratch to release — the first two took 118.5 and 30.5
+immediately before it. The same call read **85.7MB** at T+1 on a cycle where the
+overview did run. **Two careful readers nearly filed this as "trim yield
+collapsed" on separate occasions**, which is a signal about the field name
+rather than about either reader: `anon_released_by_trim_mb` does not carry
+whether there was anything to release. If a third person trips on it, add the
+guard's outcome to the line rather than explaining it a third time.
+
+Note also what the pre-trim column says: anon reaches **1473–1500 before each
+trim**, which is the failing boot's plateau. The accumulation still gets there —
+it just now takes ~45 minutes instead of ~23, and the trim skims ~115MB off it
+every cycle. *Same level, twice the elapsed time* is the +11 vs +24 MB/min
+result seen from another angle, NOT evidence that accumulation is unchanged.
+Pre-trim anon is in any case not a clean rate measure: it is "anon without THIS
+cycle's trim but with every previous cycle's already applied", so it is partly a
+function of the fix.
+
 #### Rung 4 — the honest version
 
 ```
