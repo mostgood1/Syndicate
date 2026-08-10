@@ -1,5 +1,68 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#328` — COMMITTED, NOT DEPLOYED. The precomputed book grid was serving a board with no sim on it, because the artifact path skipped all three enrichment steps
+
+`#323` moved the L1-A pivot to the worker and taught web to prefer the artifact.
+Neither side ran `board_enrichment`: the builder never called it, and web's
+artifact branch returns **before** the three `_attach_*` calls the live-pivot
+path still makes. Nothing raised.
+
+Measured on production 2026-08-10 16:5xZ — a served MLB row's complete key set:
+
+```
+age_seconds away_team best books books_quoting cells commence_time complete
+consensus event_id gaps home_team kind line market player_name segment sides
+sport updated_at
+```
+
+**No `game`. No `projection`. No `modelled_fair`.** That is Proj, Edge, Date and
+Game blank on every row of `/market-board/books`, and Fair blank on the 441
+one-sided rows the margin model exists for — it falls back to two-sided no-vig
+consensus, which by definition cannot cover them. `market_kinds` was absent too,
+so the client's kind selector fell back to an empty map and **both** tabs claimed
+all 14 markets.
+
+**This is `board_enrichment`'s own defect, recurring one layer over.** Its module
+docstring records instance one verbatim — `layer2_shortlist` built a grid with
+`read_book_quotes` → `build_book_grid` and called none of them — and states the
+rule meant to prevent instance two: *"one rule, one place: both the endpoint and
+the worker now call these."* A THIRD grid producer appeared and inherited
+neither the calls nor the rule. The rule now lives in the file that builds the
+grid, which is the only place a fourth producer will read it.
+
+**Fixed:** builder calls all three on the FULL grid pre-bound (`build_margin_profile`
+measures this slate's holds, so profiling the truncated slice would fit the model
+to whatever survived the cut), persists the three coverage dicts + `market_kinds`,
+and web serves them. `BOOK_GRID_ARTIFACT_VERSION` 1 → 2.
+
+**`enriched` is decided from the coverage KEYS, not the version int.** A version
+number is a claim about a payload; the keys are the payload. A future writer that
+bumps the version and forgets the enrichment would otherwise report
+`enriched: true` over blank columns — the same bug wearing a version number. A
+v1 artifact serves `projections: null` with
+`enrichment_state: "artifact_predates_enrichment"`, never `{}`: "written before
+anything joined" and "joined, found nothing" must not serialize identically.
+That window is real, not hypothetical — web can ship before refresh-worker, and
+per `#312` a **cancelled** worker deploy silently keeps the old commit running.
+
+**Cost, measured by the `#331` lane on the complete 217MB shard, with this
+enrichment in the tree: +56MB and +10s, against `#331`'s 1,153MB saving.**
+Builder end-to-end 211.5MB peak / 18.0s. Per-sport sequential, so peak is
+per-sport not cumulative across the 8. `#241` says periodic worker work is never
+free; this was checked rather than assumed, and it is affordable.
+
+**READ THIS BEFORE TREATING ITS COVERAGE NUMBERS AS A BASELINE.** Until `#331`
+lands, this enrichment profiles a **1.7% slate** — 807 rows of a 5,547-row day,
+weighted toward whatever quoted before ~06:00Z. It is running pre-*reconciliation*,
+a bigger distortion than truncation ever was. Every coverage figure it emits will
+move substantially once the shard is real.
+
+Tests: `tests/test_book_grid_artifact_enrichment.py`. The load-bearing one
+asserts the builder **reached** `board_enrichment` via spies, not that rows look
+populated — a fixture can produce plausible rows down a path that called nothing,
+and that failure would look like a pass. A second asserts each step was handed
+the full grid, not the bounded slice.
+
 ### #332 — OPEN. A once-a-day job runs every ~5 minutes, forever: refresh-worker had **ZERO deployable windows in 23 minutes** because the staleness guard looks on the mounted disk while the script writes to the repo checkout
 
 **Status: root-caused on production 2026-08-10, not fixed. Filed at the

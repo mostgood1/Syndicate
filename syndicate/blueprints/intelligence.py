@@ -2256,22 +2256,55 @@ def board_book_grid_api():
         if market_filter:
             grid = [row for row in grid if str(row.get("market") or "").lower() == market_filter]
         markets = sorted({str(row.get("market") or "") for row in grid if row.get("market")})
+
+        # #328: the enrichment comes UP from the artifact, it is not recomputed
+        # here. This branch used to return before the three `_attach_*` calls
+        # below, which is how the served board lost Proj/Edge/Date/Game and
+        # one-sided Fair the moment the artifact started being preferred.
+        #
+        # Decided on the DATA, not on the version number. A version int is a
+        # claim about a payload; the coverage keys are the payload. If a future
+        # writer bumps the version and forgets the enrichment, reading the label
+        # would report `enriched: true` over blank columns -- which is precisely
+        # the failure being fixed, wearing a version number.
+        has_enrichment = "projections" in precomputed and "game_state" in precomputed
+
+        # ABSENT IS NOT EMPTY, and the two must not serialize the same way.
+        # `{"rows_with_projection": 0}` means "we joined and found nothing";
+        # `null` here means "this artifact was written before anything joined".
+        # Handing back an empty dict would let a pre-#328 artifact render as a
+        # slate with no model opinion, which is the exact misreading that let
+        # this sit unnoticed. Web can ship before refresh-worker -- and after a
+        # CANCELLED worker deploy it silently keeps running the old commit --
+        # so this window is real and self-healing, not hypothetical.
+        enrichment_state = "from_artifact" if has_enrichment else "artifact_predates_enrichment"
         return _no_cache_response(
             jsonify(
                 {
                     "ok": True,
                     "source": "precomputed_artifact",
                     "generated_at": precomputed.get("generated_at"),
+                    "artifact_version": precomputed.get("version"),
+                    "enriched": has_enrichment,
+                    "enrichment_state": enrichment_state,
                     "sport": sport,
                     "date": selected_date,
                     "summary": precomputed.get("summary"),
                     "markets": markets,
+                    # Pre-filter, from the artifact: it must describe the slate
+                    # rather than the current view, or selecting one market
+                    # would empty the selector that got you there.
+                    "market_kinds": precomputed.get("market_kinds") if has_enrichment else None,
+                    "game_state": precomputed.get("game_state") if has_enrichment else None,
+                    "projections": precomputed.get("projections") if has_enrichment else None,
+                    "margin_model": precomputed.get("margin_model") if has_enrichment else None,
                     # rows_total/rows_truncated come from the artifact so a bounded
                     # grid is attributable rather than reading as "that is all there is".
                     "total_rows": precomputed.get("rows_total"),
                     "rows_truncated": precomputed.get("rows_truncated"),
                     "returned": min(len(grid), limit),
                     "rows": grid[:limit],
+                    "server_time": _server_timestamp(),
                 }
             )
         )

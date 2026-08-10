@@ -27,6 +27,21 @@ a service boundary and an unbounded one reintroduces the problem one layer over
 `rows_total` and `rows_truncated` say when that happened, so a thin board is
 attributable rather than mysterious. A silent truncation would read as "the
 grid only has this much", which is the failure this whole file exists to stop.
+
+ENRICHMENT IS PART OF THE ARTIFACT, NOT OF THE VIEW (`#328`)
+------------------------------------------------------------
+A raw grid is prices with nothing to judge them against. The three
+`board_enrichment` steps -- game state, projections, margin model -- are what
+make it a board, and this builder runs all three.
+
+It did not, when it shipped. `#323` moved the pivot here and web began serving
+the artifact from an early branch that skipped the `_attach_*` calls the
+live-pivot path still made, so the board silently lost Proj, Edge, Date, Game
+and one-sided Fair. Nothing failed; the columns were simply never populated, and
+a blank column reads as "the model has no opinion" rather than "nobody asked
+it". The cost of getting this wrong is not an error, it is a board that looks
+complete and is not -- which is the same shape as the truncation problem above,
+and the reason both are handled in this file rather than at the view.
 """
 
 from __future__ import annotations
@@ -37,10 +52,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from syndicate.features.shared.book_grid import book_grid_summary, build_book_grid
+from syndicate.features.shared.book_grid import (
+    book_grid_summary,
+    build_book_grid,
+    freshest_rows_for_grid,
+)
 from syndicate.features.shared.odds_book_quotes import (
     book_quotes_path,
-    read_book_quotes,
+    iter_book_quotes,
     read_quote_last_seen,
 )
 from syndicate.features.shared.refresh_state_store import data_root
@@ -77,7 +96,22 @@ from syndicate.features.shared.refresh_state_store import data_root
 #     envelope
 BOOK_GRID_ARTIFACT_MAX_ROWS = 6000
 
-BOOK_GRID_ARTIFACT_VERSION = 1
+# 1 -> 2 (#328): rows now carry `game`/`projection`/`modelled_fair`, and the
+# payload carries the three coverage dicts plus `market_kinds`.
+#
+# THE VERSION IS LOAD-BEARING BECAUSE THE TWO SERVICES DEPLOY INDEPENDENTLY.
+# `#320` is the standing lesson: the worker wrote a board-snapshot format web
+# could not read, from 00:16Z, silently, with no signal on either side. Here the
+# window is smaller but real -- web ships the new reader while refresh-worker is
+# still writing v1 for up to one build interval (600s), and on a cancelled
+# worker deploy it can be much longer, since a cancelled deploy restarts the
+# worker onto the OLD commit and neither the deploys API nor the events API says
+# so.
+#
+# So web must not read "v1" as "this slate has no projections". A missing
+# enrichment and an absent one are different facts and must not render the same
+# way -- see `enriched` / `enrichment_state` in the endpoint.
+BOOK_GRID_ARTIFACT_VERSION = 2
 
 
 def book_grid_artifact_path(sport: str, date_str: str) -> Path:
@@ -108,7 +142,32 @@ def build_book_grid_artifact(
     except OSError:
         shard_bytes = 0
 
-    rows = read_book_quotes(sport, date_str)
+    # STREAMED AND REDUCED, not read whole (`#331`). `read_book_quotes` returns
+    # and caches every parsed row: measured 2026-08-09, that is 478,782 dicts
+    # and a 1,216MB peak for the MLB shard. This worker plateaus at 2.65-2.70GB
+    # of 4GB, so the whole-shard pivot does not fit in its headroom -- and this
+    # tick runs every 10 minutes.
+    #
+    # `freshest_rows_for_grid` collapses the change log to the rows the pivot can
+    # still use, which is PROVEN byte-identical against the full path on the
+    # complete 217MB production shard (tests/test_book_grid.py). 155MB peak,
+    # 41,233 rows kept of 478,782.
+    #
+    # The equivalence tests are not ceremony: two earlier attempts at this
+    # reduction permuted 2,006 of 5,547 rows and re-anchored 972, at IDENTICAL
+    # total byte length, and neither was visible in any count, size or summary
+    # check. `build_book_grid` anchors on the first row carrying a given
+    # canonical line, so the pivot's output depends on row ORDER -- anything
+    # that touches it must be compared grid-to-grid, not by totals.
+    raw_quote_rows = 0
+
+    def _counted() -> Any:
+        nonlocal raw_quote_rows
+        for row in iter_book_quotes(sport, date_str):
+            raw_quote_rows += 1
+            yield row
+
+    rows = freshest_rows_for_grid(_counted())
     if not rows:
         return None
     try:
@@ -117,6 +176,54 @@ def build_book_grid_artifact(
         last_seen = {}
 
     grid = build_book_grid(rows, last_seen=last_seen)
+
+    # ENRICHMENT, and the reason it is HERE rather than at serve time (#328).
+    #
+    # `#323` moved the pivot to this worker and web now returns the artifact from
+    # an early branch, BEFORE the three `_attach_*` calls the live-pivot path
+    # still makes. So the moment the artifact existed, the served board lost
+    # every field these produce -- measured on production 2026-08-10 16:5xZ, a
+    # served MLB row carried no `game`, no `projection` and no `modelled_fair`,
+    # which is Proj, Edge, Date, Game blank on every row of `/market-board/books`
+    # and Fair blank on the 441 one-sided rows the margin model exists for.
+    #
+    # This is `board_enrichment`'s own defect recurring one layer over. Its
+    # module docstring records the first instance verbatim -- `layer2_shortlist`
+    # built a grid with `read_book_quotes` -> `build_book_grid` and called none
+    # of them -- and states the rule that was supposed to prevent the second:
+    # "one rule, one place: both the endpoint and the worker now call these". A
+    # THIRD producer of grids appeared and inherited neither the calls nor the
+    # rule. Any future grid producer must call these three; there is no cheaper
+    # way to say it than in the file that builds the grid.
+    #
+    # Run against the FULL grid, before the bound, for the same reason `summary`
+    # is: `build_margin_profile` measures this slate's holds from its two-sided
+    # markets, so profiling the truncated slice would fit the model to whatever
+    # happened to survive the cut.
+    from syndicate.features.shared.board_enrichment import (
+        attach_game_state,
+        attach_margin_model,
+        attach_projections,
+    )
+
+    # Same order as the serve-time path, deliberately: projections read rows that
+    # game state has already stamped, and the margin model must run last so it
+    # only fills rows that still have no fair value.
+    game_state_coverage = attach_game_state(grid, sport=sport, selected_date=date_str)
+    projection_coverage = attach_projections(grid, sport=sport, selected_date=date_str)
+    margin_coverage = attach_margin_model(grid)
+
+    # Market taxonomy, served rather than re-derived on the client -- the serve
+    # path computes this and the artifact path did not, so the board's kind
+    # selector fell back to an empty map and BOTH tabs claimed all 14 markets.
+    # Computed here, pre-bound, for the same reason as everything else above.
+    market_kinds: dict[str, str] = {}
+    for row in grid:
+        market_name = str(row.get("market") or "")
+        row_kind = str(row.get("kind") or "")
+        if market_name and row_kind:
+            market_kinds.setdefault(market_name, row_kind)
+
     # Summary BEFORE the bound: coverage must describe the real surface, not the
     # slice that happened to fit.
     summary = book_grid_summary(grid)
@@ -129,10 +236,23 @@ def build_book_grid_artifact(
         "date": str(date_str or "").strip(),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source_shard_bytes": shard_bytes,
-        "source_quote_rows": len(rows),
+        # RAW rows in the shard, unchanged in meaning by the `#331` reduction --
+        # this field is how a partial shard is spotted, so it must keep counting
+        # what the shard holds rather than what the pivot kept. `source_rows_kept`
+        # is the reduced figure; the two together say how compressible the day was.
+        "source_quote_rows": raw_quote_rows,
+        "source_rows_kept": len(rows),
         "rows_total": total,
         "rows_truncated": max(0, total - len(bounded)),
         "summary": summary,
+        # The three coverage payloads, persisted rather than recomputed. Each one
+        # is how a blank column becomes attributable -- `no_chips_for_date` and
+        # "the alias join failed" render identically without them, which is the
+        # degraded-looks-legitimate trap `attach_game_state` documents at length.
+        "game_state": game_state_coverage,
+        "projections": projection_coverage,
+        "margin_model": margin_coverage,
+        "market_kinds": market_kinds,
         "rows": bounded,
     }
 
