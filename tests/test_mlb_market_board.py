@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from syndicate.features.mlb import cards
 from syndicate.features.mlb.cards import _enrich_games_with_tracked_market_lines
 from syndicate.features.mlb.cards import _mlb_headshot_url
 from syndicate.features.mlb.cards import _mlb_hydrate_market_board_line_movement
@@ -1457,3 +1458,91 @@ class LoadOddsapiGameLinesDocTests(unittest.TestCase):
         frozen = {"games": [{"markets": {}}]}
         merged = self._run(live, frozen)
         self.assertIs(merged, live)
+
+
+class ScheduleReconciliationTests(unittest.TestCase):
+    """`#321`. The daily_summary artifact is not the slate.
+
+    Nothing in this repo writes `daily_summary` -- `refresh_mlb_oddsapi.py`
+    only mirrors it out of `source_artifacts`, the pre-migration source app's
+    tree. So a game the upstream producer drops is invisible to every consumer
+    here. Measured on production 2026-08-10: StatsAPI listed 15 games for
+    2026-08-09, the board showed 14, and the missing one (pk 823268, HOU @ SD)
+    was STILL IN PROGRESS.
+    """
+
+    @staticmethod
+    def _schedule(include_late: bool = True):
+        rows = [
+            {
+                "gamePk": 800000 + i,
+                "officialDate": "2026-08-09",
+                "gameDate": f"2026-08-09T1{i % 9}:35:00Z",
+                "gameType": "R",
+                "status": {"detailedState": "Final"},
+                "teams": {
+                    "away": {"team": {"abbreviation": f"A{i}"}},
+                    "home": {"team": {"abbreviation": f"H{i}"}},
+                },
+            }
+            for i in range(14)
+        ]
+        if include_late:
+            rows.append(
+                {
+                    "gamePk": 823268,
+                    "officialDate": "2026-08-09",
+                    # 19:20 Central == the NEXT UTC day. This is the shape that
+                    # loses late West Coast games.
+                    "gameDate": "2026-08-10T00:20:00Z",
+                    "gameType": "R",
+                    "status": {"detailedState": "In Progress"},
+                    "teams": {
+                        "away": {"team": {"abbreviation": "HOU"}},
+                        "home": {"team": {"abbreviation": "SD"}},
+                    },
+                }
+            )
+        return rows
+
+    @staticmethod
+    def _summary_games():
+        return [{"gamePk": 800000 + i, "gameDate": f"2026-08-09T1{i % 9}:35:00Z"} for i in range(14)]
+
+    def test_a_scheduled_game_missing_from_the_summary_is_restored(self):
+        with patch.object(cards, "_schedule_raw_games", return_value=self._schedule()):
+            games = cards._reconcile_games_against_schedule(self._summary_games(), "2026-08-09")
+        self.assertEqual(len(games), 15)
+        self.assertIn(823268, [g["gamePk"] for g in games])
+
+    def test_the_restored_game_keeps_statsapi_status_not_a_guess(self):
+        # The board rendered every game as final while this one was live. The
+        # status has to come from the schedule capture, not be defaulted.
+        with patch.object(cards, "_schedule_raw_games", return_value=self._schedule()):
+            games = cards._reconcile_games_against_schedule(self._summary_games(), "2026-08-09")
+        restored = next(g for g in games if g["gamePk"] == 823268)
+        self.assertEqual(restored["status"], "In Progress")
+        self.assertEqual(restored["officialDate"], "2026-08-09")
+
+    def test_the_restored_game_fabricates_no_analysis(self):
+        # It has no summary row, so it has no projections, markets or picks.
+        # Inventing them would make an absent game look analysed.
+        with patch.object(cards, "_schedule_raw_games", return_value=self._schedule()):
+            games = cards._reconcile_games_against_schedule(self._summary_games(), "2026-08-09")
+        restored = next(g for g in games if g["gamePk"] == 823268)
+        self.assertEqual(restored["markets"], {})
+        self.assertIsNone(restored["predictions"])
+        self.assertEqual(restored["run_projection_rows"], [])
+        self.assertTrue(restored["reconciled_from_schedule"])
+
+    def test_it_is_a_no_op_when_the_summary_already_has_every_game(self):
+        with patch.object(cards, "_schedule_raw_games", return_value=self._schedule(include_late=False)):
+            games = cards._reconcile_games_against_schedule(self._summary_games(), "2026-08-09")
+        self.assertEqual(len(games), 14)
+        self.assertFalse(any(g.get("reconciled_from_schedule") for g in games))
+
+    def test_a_missing_schedule_artifact_leaves_the_board_untouched(self):
+        # No schedule capture is not a licence to invent a slate.
+        with patch.object(cards, "_schedule_raw_games", return_value=[]):
+            games = cards._reconcile_games_against_schedule(self._summary_games(), "2026-08-09")
+        self.assertEqual(len(games), 14)

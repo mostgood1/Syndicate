@@ -44,6 +44,7 @@ from syndicate.features.mlb.sources import daily_ops_report_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_game_lines_path, load_oddsapi_game_lines_doc
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_hitter_props_path
 from syndicate.features.mlb.sources import daily_snapshot_oddsapi_pitcher_props_path
+from syndicate.features.mlb.sources import daily_snapshot_file_path
 from syndicate.features.mlb.sources import daily_snapshot_lineups_path
 from syndicate.features.mlb.sources import live_lens_report_path
 from syndicate.features.mlb.sources import live_prop_registry_path
@@ -5079,6 +5080,132 @@ def _games_from_daily_summary(summary: dict[str, Any], *, betting_games: dict[in
     return games
 
 
+def _reconcile_games_against_schedule(
+    games: list[dict[str, Any]], selected_date: str
+) -> list[dict[str, Any]]:
+    """Add back any scheduled game `daily_summary` left out (`#321`).
+
+    THE BOARD'S GAME LIST IS NOT OURS. It comes entirely from
+    `summary["outputs"]`, and NOTHING IN THIS REPO WRITES `daily_summary` --
+    `refresh_mlb_oddsapi.py`'s FILE_TEMPLATES only mirrors it out of
+    `source_artifacts`, the pre-migration source app's tree. So a game the
+    upstream producer drops is invisible to every consumer here, and no fix in
+    `syndicate/` can put it back.
+
+    Measured on production 2026-08-10, reported by the user as a missing game:
+
+        StatsAPI  schedule?sportId=1&date=2026-08-09  ->  15 games
+        board                                        ->  14 games
+        missing: pk 823268 Houston Astros @ San Diego Padres
+                 officialDate 2026-08-09
+                 gameDate     2026-08-10T00:20:00Z   (next UTC day)
+                 status       In Progress            (STILL LIVE)
+
+    Any first pitch at or after 19:00 Central is the next UTC day, so the games
+    lost this way are exactly the late West Coast ones -- still live when the
+    rest of the slate has finished, and the ones the board is worth most for.
+
+    WHY RECONCILE HERE RATHER THAN JUST RENDERING WHAT WE WERE GIVEN.
+    `schedule_raw.json` is StatsAPI's own response, already written per date and
+    already published to web, and it carries `officialDate` -- the authoritative
+    slate date. It costs no fetch on the request path (which `CLAUDE.md` forbids)
+    because the artifact is already local.
+
+    AND IT IS LOUD ON PURPOSE. A silent union would fix the board and hide the
+    defect, which is the same trap as a guard mapping unknown onto its
+    permissive branch: the game would render while staying unsimulated,
+    unpriced and ungraded everywhere else, because those consumers read
+    `daily_summary` too. The recovered game is marked
+    `reconciled_from_schedule: True` and the gap is logged, so "the board shows
+    it" can never be mistaken for "the pipeline has it".
+    """
+    scheduled = _schedule_raw_games(selected_date)
+    if not scheduled:
+        return games
+
+    known = {int(game.get("gamePk") or 0) for game in games}
+    recovered: list[dict[str, Any]] = []
+    for entry in scheduled:
+        game_pk = int(entry.get("gamePk") or 0)
+        if not game_pk or game_pk in known:
+            continue
+        teams = entry.get("teams") if isinstance(entry.get("teams"), dict) else {}
+        away_abbr = str((((teams.get("away") or {}).get("team") or {}).get("abbreviation")) or "AWY").strip()
+        home_abbr = str((((teams.get("home") or {}).get("team") or {}).get("abbreviation")) or "HME").strip()
+        status_block = entry.get("status") if isinstance(entry.get("status"), dict) else {}
+        recovered.append(
+            {
+                "gamePk": game_pk,
+                "card_variant": "mlb_main",
+                "gameType": str(entry.get("gameType") or "R"),
+                "away": _team_display(away_abbr),
+                "home": _team_display(home_abbr),
+                "status": str(status_block.get("detailedState") or "Scheduled"),
+                "detail": str(status_block.get("detailedState") or "Scheduled"),
+                "detail_label": "First pitch",
+                "startTime": _format_start_time(entry.get("gameDate")),
+                "gameDate": str(entry.get("gameDate") or ""),
+                "officialDate": str(entry.get("officialDate") or selected_date),
+                # Deliberately empty rather than fabricated. This game has no
+                # summary row, so it has no projections, markets or picks --
+                # saying so is the point.
+                "summary": "Scheduled -- not in the daily summary artifact",
+                "probable": None,
+                "predictions": None,
+                "markets": {},
+                "first1BetSignal": None,
+                "run_projection_rows": [],
+                "segment_overview_cards": [],
+                "reconciled_from_schedule": True,
+            }
+        )
+
+    if not recovered:
+        return games
+
+    print(
+        f"[mlb_cards] SCHEDULE_RECONCILE date={selected_date} "
+        f"summary_games={len(games)} scheduled_games={len(scheduled)} "
+        f"recovered={[g['gamePk'] for g in recovered]}",
+        flush=True,
+    )
+    merged = [*games, *recovered]
+    merged.sort(key=lambda game: str(game.get("gameDate") or ""))
+    return merged
+
+
+def _schedule_raw_games(selected_date: str) -> list[dict[str, Any]]:
+    """StatsAPI's own slate for a date, as captured by the refresh.
+
+    Tolerates both shapes seen on disk: the bare list the daily snapshot
+    writes, and the `{"dates": [{"games": [...]}]}` envelope StatsAPI returns.
+    """
+    try:
+        payload = load_json_file(daily_snapshot_file_path(selected_date, "schedule_raw.json"))
+    except Exception:
+        return []
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict):
+        out: list[dict[str, Any]] = []
+        for block in payload.get("dates") or []:
+            if isinstance(block, dict):
+                out.extend([row for row in (block.get("games") or []) if isinstance(row, dict)])
+        return out
+    return []
+
+
+def _format_start_time(game_date: Any) -> str:
+    stamp = _parse_iso_datetime_or_none(game_date)
+    if stamp is None:
+        return "-"
+    try:
+        return stamp.astimezone(CENTRAL_TIMEZONE).strftime("%-I:%M %p")
+    except ValueError:
+        # Windows strftime has no %-I.
+        return stamp.astimezone(CENTRAL_TIMEZONE).strftime("%I:%M %p").lstrip("0")
+
+
 def build_cards_page_context(selected_date: str) -> dict[str, Any]:
     available_dates = available_daily_summary_dates()
     resolved_date = selected_date if not available_dates or selected_date in available_dates else selected_date
@@ -5146,6 +5273,9 @@ def build_cards_page_context(selected_date: str) -> dict[str, Any]:
         actual_games=actual_games,
         first1_signals_by_game=_rfi_targets_signal_index(rfi_targets),
     ) if summary else []
+    # #321. The summary artifact is not the slate. Reconcile against StatsAPI's
+    # own capture before anything downstream treats this list as complete.
+    games = _reconcile_games_against_schedule(games, resolved_date)
     _log_cards_context_memory("games_built", game_count=len(games))
 
     if not games:
