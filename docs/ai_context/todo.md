@@ -1670,6 +1670,29 @@ the candidate — see below.**
 payload — process tables, tick meta, stage timings. None needed new code.
 [[read the field you already have]]
 
+#### REGIME BOUNDARY — EVERY MEASUREMENT IN THIS ENTRY PREDATES 2026-08-10 21:56Z
+
+`SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC=900` was set at **21:56Z** and
+verified firing at 22:08:27Z across all 8 sports (board still built,
+`count=239`, on cached overviews). **The hydrated MLB pass — measured at +2.9GB
+in 73s — now runs at roughly half its previous frequency.**
+
+Everything below was measured **before** that: the `n=4` excursion table
+(15:32–16:44Z), the 15-cycle publish-sweep table (20:33–21:07Z), the
+`container_peak` climb 1155 → 2230MB, and the 21:16:54Z mid-sweep catch. **They
+describe a noisier background than the one that exists now and are not directly
+comparable with anything sampled after 21:56Z.**
+
+Two consequences, and the second is easy to get backwards:
+
+- **Excursions should be EASIER to isolate now.** A quieter baseline means a
+  493–878MB in-process allocation stands out further from it.
+- **The `container_peak` series is regime-split.** A "the baseline climbs
+  1155 → 2230MB" claim is about the old regime. Re-derive it before reusing it —
+  and note the same trap the entry already records: **a fixed threshold over a
+  moving baseline measures the population, not the exception**, and the baseline
+  just moved for a new reason.
+
 #### 5. RETRACTED — the publish sweep is BACK, and my instrument's blind spot is why I got it wrong
 
 **READ THIS BEFORE THE ELIMINATION BELOW. I retract it.** The excursion was
