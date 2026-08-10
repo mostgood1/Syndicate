@@ -41,6 +41,8 @@ import re
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from syndicate.features.shared.timezone import central_date_from_iso
+
 _QUOTE_CACHE_KEY = "_quote_rows_cache"
 
 # "Chelsea Gray OVER 1.5 3PM" -> "Chelsea Gray". Full words only: a bare O/U
@@ -156,15 +158,51 @@ def _game_date(game: Mapping[str, Any]) -> str | None:
     selected_date/start_date/commence_time -- so this returned None, enrichment
     returned early, and every candidate came back with quote: null while the
     lookup itself worked perfectly against the same data offline.
+
+    A SLATE DATE IS NOT A UTC DATE, and the first version of this fix conflated
+    them. `gameDate` was checked BEFORE `officialDate` and the value was sliced
+    `[:10]`, so a UTC instant won over the authoritative slate date. Measured on
+    production 2026-08-10:
+
+        pk 823268  Houston Astros @ San Diego Padres
+          gameDate     = 2026-08-10T00:20:00Z   -> this returned "2026-08-10"
+          officialDate = 2026-08-09             <- StatsAPI's own slate date
+          status       = In Progress
+
+    StatsAPI listed 15 games for 2026-08-09; the board showed 14 and dropped
+    this one, while also rendering every remaining game as final with a live
+    game missing. Any first-pitch at or after 19:00 Central is the NEXT UTC day,
+    so this silently loses exactly the late West Coast games -- the ones still
+    live when the rest of the slate has finished.
+
+    `central_date_from_iso`'s own docstring already warned about this ("use this
+    for any 'which slate day does this game belong to' comparison instead of
+    string prefixes"), from the identical bug in WNBA on 2026-07-21. The helper
+    existed; this function did not use it.
+
+    So: AUTHORITATIVE DATE-ONLY fields first, then timestamps converted to the
+    Central calendar day. `startTime` is deliberately excluded -- board game
+    dicts carry it as a display string ("7:20 PM"), which is not a date at all
+    and only ever passed the old `len >= 10` check by accident.
     """
-    for key in (
-        "game_date", "date", "selected_date", "start_date", "commence_time",
-        # camelCase variants -- what the board's own game dicts really use.
-        "gameDate", "officialDate", "startTime", "commenceTime", "start_time",
-    ):
+    for key in ("game_date", "date", "selected_date", "start_date", "officialDate"):
         value = str(game.get(key) or "").strip()
+        # Date-only fields may still arrive as full timestamps; if so they are
+        # a slate date already stated in local terms, so the prefix IS correct.
         if len(value) >= 10:
             return value[:10]
+
+    for key in ("commence_time", "gameDate", "commenceTime", "start_time"):
+        value = str(game.get(key) or "").strip()
+        if len(value) < 10:
+            continue
+        resolved = central_date_from_iso(value)
+        if resolved is not None:
+            return resolved.isoformat()
+        # Unparseable but date-shaped: fall back to the prefix rather than
+        # returning None. A slightly wrong date beats enrichment returning
+        # early and every candidate coming back with quote: null (2026-08-06).
+        return value[:10]
     return None
 
 

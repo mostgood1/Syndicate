@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 from syndicate.features.shared import odds_book_quotes as quotes_module
 from syndicate.features.shared.odds_book_quotes import append_book_quotes
-from syndicate.features.shared.quote_enrichment import enrich_recommendation_rows
+from syndicate.features.shared.quote_enrichment import _game_date, enrich_recommendation_rows
 
 DATE = "2026-08-06"
 NOW = datetime(2026, 8, 6, 22, 0, 0, tzinfo=timezone.utc)
@@ -198,3 +198,45 @@ class ProductionGameShapeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GameDateIsASlateDateNotAUtcDateTests(unittest.TestCase):
+    """`#321`. A late West Coast game vanished from its own slate.
+
+    Measured on production 2026-08-10: StatsAPI listed 15 games for
+    2026-08-09 and the board showed 14, dropping pk 823268 (Houston Astros @
+    San Diego Padres) while also rendering every remaining game as final --
+    that game was still In Progress.
+
+    Any first pitch at or after 19:00 Central is the NEXT UTC day, so reading
+    `gameDate` before `officialDate` and slicing `[:10]` loses exactly the
+    late games: the ones still live when the rest of the slate has finished,
+    and the ones the board is worth most for.
+    """
+
+    def test_official_date_beats_the_utc_gamedate_it_used_to_lose_to(self):
+        self.assertEqual(
+            _game_date({"gameDate": "2026-08-10T00:20:00Z", "officialDate": "2026-08-09"}),
+            "2026-08-09",
+        )
+
+    def test_a_utc_timestamp_alone_resolves_to_its_central_calendar_day(self):
+        # No officialDate to fall back on: the conversion itself must be right,
+        # not merely preferred against a better field.
+        self.assertEqual(_game_date({"gameDate": "2026-08-10T00:20:00Z"}), "2026-08-09")
+        self.assertEqual(_game_date({"commence_time": "2026-08-10T02:20:00Z"}), "2026-08-09")
+
+    def test_an_afternoon_game_is_unaffected(self):
+        # The regression this guards is one-directional; day games never
+        # crossed the boundary and must not start moving now.
+        self.assertEqual(_game_date({"gameDate": "2026-08-09T16:35:00Z"}), "2026-08-09")
+
+    def test_start_time_is_a_display_string_and_not_a_date(self):
+        # Board game dicts carry startTime as "7:20 PM". It only ever passed
+        # the old `len >= 10` check by accident.
+        self.assertIsNone(_game_date({"startTime": "7:20 PM"}))
+
+    def test_an_unparseable_but_date_shaped_value_still_returns_something(self):
+        # Enrichment returning early makes every candidate come back with
+        # quote: null (2026-08-06). A slightly wrong date beats that.
+        self.assertEqual(_game_date({"gameDate": "2026-13-99T99:99:99Z"}), "2026-13-99")
