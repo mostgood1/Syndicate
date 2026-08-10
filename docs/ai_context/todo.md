@@ -223,11 +223,30 @@ trip and has printed none. > ## ROOT CAUSE, measured 2026-08-10 20:2xZ. **THE AB
 > successful hydrated build populates the cache — which needs memory low enough
 > for the guard to pass, which is what the rate limit was meant to deliver.
 >
-> A reboot breaks the deadlock. One happened at **20:33:10Z**
-> (`MALLOC_ARENA_INIT`, RSS 1748 -> 474MB): the guard went quiet, and the
+> A reboot breaks the deadlock. **CORRECTION on how the one at 20:33:10Z
+> happened: it was not spontaneous, it was a DEPLOY** — `8fa376ca` finished at
+> **20:32:47.657Z** and `MALLOC_ARENA_INIT` fired **23 seconds later**. I
+> described it as an experiment that ran "for free", which understated it: the
+> trigger was a deploy of my own docs-only commit, and after a session spent
+> insisting that memory baselines be anchored on the pid rather than the deploy
+> record, I should have checked which one caused this. The finding is unchanged
+> — a reset breaks the deadlock either way — but the **mechanism is
+> operational, not incidental: deploying refresh-worker is currently the only
+> thing that restores the board**, which is also the plainest statement of why
+> "every good board is built in the first 15 minutes of a boot" has held all
+> week. (`MALLOC_ARENA_INIT`, RSS 1748 -> 474MB): the guard went quiet, and the
 > hydrated pass completed **all 8 sports in 21 seconds** — not the 73s/+2.9GB of
 > the 2026-08-07 measurement, because tonight's MLB slate has not started. So
 > the cache is now populated and the 300s limit should engage on its own.
+>
+> **The instrument is landed and NOT deployed.** Its author landed it in
+> `c2f0434e` (`BOARD_OVERVIEW_READY`, `BOARD_RAW_CANDIDATES`) and said plainly
+> that it "lost the race" — the root cause was found by another route first, so
+> it ships on residual value rather than original. That residual is real:
+> `BOARD_OVERVIEW_READY` still separates "8 sports with empty rails" from "0
+> sports", which `sports_done` cannot, and `BOARD_RAW_CANDIDATES` (returned vs
+> kept across the Mapping filter) has no other witness at all. refresh-worker is
+> on `8fa376ca`; `c2f0434e` is committed and awaiting a deploy.
 >
 > **Prediction, falsifiable, being watched:** the pool returns non-zero and
 > `OVERVIEW_REBUILD_RATE_LIMITED` starts appearing. If the pool stays 0 with the
