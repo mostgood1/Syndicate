@@ -5207,8 +5207,23 @@ def _schedule_raw_games(selected_date: str) -> list[dict[str, Any]]:
     Tolerates both shapes seen on disk: the bare list the daily snapshot
     writes, and the `{"dates": [{"games": [...]}]}` envelope StatsAPI returns.
     """
+    # NOT load_json_file. That helper ends `return payload if isinstance(
+    # payload, dict) else None`, so a JSON ARRAY is parsed successfully and then
+    # discarded -- and schedule_raw.json is a bare list of games. Measured on
+    # production 2026-08-10 with the file plainly present:
+    #
+    #   SCHEDULE_RECONCILE_CHECK date=2026-08-09 summary_games=14
+    #     scheduled_games=0
+    #     path=.../snapshots/2026-08-09/schedule_raw.json|exists=True
+    #
+    # exists=True and zero games in the same line: found, opened, parsed, then
+    # thrown away by a type guard one layer below the caller. A loader whose
+    # contract silently narrows to dicts cannot be used for list artifacts, and
+    # nothing about its name says so.
     try:
-        payload = load_json_file(daily_snapshot_file_path(selected_date, "schedule_raw.json"))
+        path = daily_snapshot_file_path(selected_date, "schedule_raw.json")
+        with path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
     except Exception:
         return []
     if isinstance(payload, list):
