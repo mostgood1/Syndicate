@@ -1,6 +1,56 @@
 # Syndicate TODO — canonical cross-session list
 
-### #311 — OPEN, UNOWNED. The refresh-worker's concurrency cap is inert, for two independent reasons, and the second one is the interesting one
+### #311 — FIX COMMITTED, NOT DEPLOYED, **TESTS WRITTEN BUT NOT RUN**. The refresh-worker's concurrency cap is inert, for two independent reasons, and the second one is the interesting one
+
+**STATUS 2026-08-09, owned and fixed by the `#282` lane.** Both halves are
+addressed in one commit; read the caveat before deploying.
+
+- **Half one — the cap was computed and then ignored.** It was a bare `if`
+  followed by a separate `if _has_pending_external_contract(...)`, and the
+  throttle branch `return`ed only under `--run-once`. Fixed by making the cap
+  the **leading branch of the existing `if/elif` chain**, so at cap nothing else
+  in the cycle runs and control reaches the poll sleep. **Note for anyone
+  reading the diff: this is NOT a `+continue`.** The five `+continue` lines in
+  that diff are loop control inside the new process enumerator. Judging the
+  behaviour change by grepping for `continue` will find the wrong lines.
+- **Half two — the cap could not have fired anyway.** New
+  `_running_job_process_count()` counts live `run_queued_refresh_job.py`
+  processes (one per claim, so counting processes counts running claims), and
+  `_resolve_active_job_count()` returns `(count, source)` taking the **maximum**
+  of the process and manifest counts. Max, not replacement, because the two
+  fail in opposite directions: the manifest misses a job whose pid it never
+  recorded, enumeration misses a job claimed but not yet spawned. Either alone
+  reads low, and low is the direction that spawns.
+- **Unknown is not zero.** Enumeration failure returns `None`, and the resolver
+  reports `source="manifest_only_process_enum_unavailable"` rather than
+  presenting the manifest's zero as verified. [[unknown must not default permissive]]
+- A persistent manifest/process disagreement now emits `JOB_COUNT_DISAGREEMENT`
+  — that disagreement *is* the wedged-manifest signature, and it was previously
+  invisible.
+
+**THE CAVEAT, AND IT IS THE REASON THIS SAYS "NOT RUN".** The five pytest tests
+added alongside this have **not been executed** — the user declined the test
+runs and I did not force them. What *was* run is a direct four-call functional
+check of the new functions, and it passed:
+
+```
+_running_job_process_count() -> 0 (int)
+wedged manifest: _current_active_job_count=0  _has_pending_external_contract=True
+JOB_COUNT_DISAGREEMENT manifest=0 processes=3 using=3
+_resolve_active_job_count -> count=3 source='process_and_manifest'
+enumeration unavailable -> count=0 source='manifest_only_process_enum_unavailable'
+```
+
+That confirms the resolver behaves correctly on the exact wedged-manifest state
+that caused the incident. It does **not** cover the `main()` loop restructure,
+which is the half that changes worker behaviour on the next deploy. **Run
+`pytest tests/test_refresh_worker.py -k "311"` before deploying refresh-worker.**
+
+**This cap changes behaviour on the next worker deploy**, and
+`SYNDICATE_REFRESH_WORKER_MAX_ACTIVE_JOBS` is unset on both workers, so it
+defaults to **1**. A cap of 1 that now actually fires means a second concurrent
+job is refused where previously it was spawned. That is the intent, but it
+should be judged on a real cycle rather than on tests.
 
 **Coordinator's failure first, because it is the reusable part.** I told the
 `#282` lane that `#311` and `#312` were "written up and unowned". They were not.

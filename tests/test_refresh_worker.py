@@ -1465,3 +1465,183 @@ def test_soccer_autorun_status_write_count_is_one_per_launch(tmp_path, monkeypat
     assert _run_soccer_autorun(rrw, tmp_path) is True
     # One autorun-status write plus one worker-status write.
     assert store.write_count - before == 2
+
+
+# ---------------------------------------------------------------------------
+# #311 -- the active-jobs cap could not fire, for two independent reasons.
+#
+#   1. `run_refresh_worker.py` computed `active_jobs >= max_active_jobs`, wrote
+#      a `throttled` worker status, and then `return`ed only under --run-once.
+#      The long-running loop fell through and spawned anyway.
+#   2. `_current_active_job_count` returns 0 when the manifest is `running`
+#      with no live pid -- exactly the condition `_has_pending_external_contract`
+#      requires to re-claim. Mutually exclusive predicates: the cap read zero
+#      precisely when the runaway was running.
+#
+# Fixing only (1) yields a cap that is still structurally unable to fire, which
+# would look like a fix and be inert.
+# ---------------------------------------------------------------------------
+
+
+WEDGED_MANIFEST = {
+    # The 2026-08-08 signature: claimed, the pid never recorded, contract still
+    # queued. `_has_pending_external_contract` says "re-claim me" and
+    # `_current_active_job_count` says "nothing is running".
+    "state": "running",
+    "externalRunner": {
+        "kind": "external_runner",
+        "queue_state": "queued",
+        "runStamp": "20260808_235200",
+        "command": ["python", "-c", "pass"],
+    },
+}
+
+
+def _run_main_once(rrw, tmp_path, monkeypatch, *, env=None):
+    reports_root = tmp_path / "reports"
+    latest = reports_root / "refresh_status" / "latest" / "refresh_status_latest.json"
+    worker_status = reports_root / "refresh_status" / "latest" / "refresh_worker_status.json"
+    latest.parent.mkdir(parents=True, exist_ok=True)
+    latest.write_text(json.dumps(WEDGED_MANIFEST), encoding="utf-8")
+
+    for key, value in {"SYNDICATE_REPORTS_ROOT": str(reports_root), **(env or {})}.items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_refresh_worker.py",
+            "--latest-manifest", str(latest),
+            "--worker-status", str(worker_status),
+            "--run-once",
+        ],
+    )
+    spawned: list = []
+    monkeypatch.setattr(rrw.subprocess, "Popen", lambda *a, **k: spawned.append(a) or _FakePopen())
+    monkeypatch.setattr(rrw, "_run_mlb_sim_tick", lambda: None)
+    monkeypatch.setattr(rrw, "_run_mlb_actuals_writer_tick", lambda: None)
+    monkeypatch.setattr(rrw, "_run_mlb_betting_day_backfill_tick", lambda: None)
+    monkeypatch.setattr(rrw, "_diag_log_all_process_memory", lambda _stage: None)
+    exit_code = rrw.main()
+    status = json.loads(worker_status.read_text(encoding="utf-8")) if worker_status.exists() else {}
+    return exit_code, spawned, status
+
+
+class _FakePopen:
+    pid = 4242
+
+
+def test_311_cap_blocks_the_reclaim_when_a_job_process_is_already_running(tmp_path, monkeypatch):
+    """The regression test for the actual defect.
+
+    Manifest says nothing is running (state=running, no pid) AND says
+    "re-claim me" (queue_state=queued). One job runner is genuinely alive.
+    Pre-fix, `_current_active_job_count` returned 0, the cap was skipped, and
+    the worker spawned a SECOND job -- every tick, forever. That is how the
+    process count reached 79.
+    """
+    rrw = _load_rrw("rrw_311_a")
+    monkeypatch.setattr(rrw, "_running_job_process_count", lambda: 1)
+
+    exit_code, spawned, status = _run_main_once(
+        rrw, tmp_path, monkeypatch, env={"SYNDICATE_REFRESH_WORKER_MAX_ACTIVE_JOBS": "1"}
+    )
+
+    assert exit_code == 0
+    assert spawned == [], "at cap, the worker must not spawn another job runner"
+    assert status.get("state") == "throttled"
+    assert status.get("refreshCycle", {}).get("skipped_due_to_cap") == 1
+
+
+def test_311_manifest_alone_still_reads_zero_on_a_wedged_contract(tmp_path, monkeypatch):
+    """Pins the defect itself, so the fix cannot be silently undone.
+
+    If someone reverts `_resolve_active_job_count` to the manifest view, this
+    is the assertion that explains why the cap stops working.
+    """
+    rrw = _load_rrw("rrw_311_b")
+    latest = tmp_path / "latest.json"
+    latest.write_text(json.dumps(WEDGED_MANIFEST), encoding="utf-8")
+    monkeypatch.setattr(rrw, "_refresh_state_store", lambda: {
+        "read_json_file": lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        "write_json_file": lambda path, payload: None,
+        "reports_root": lambda: tmp_path,
+        "data_root": lambda: tmp_path,
+        "assert_refresh_state_backend_ready": lambda **_k: None,
+    })
+
+    # The two predicates are mutually exclusive -- that IS the bug.
+    assert rrw._current_active_job_count(latest) == 0
+    assert rrw._has_pending_external_contract(latest) is True
+
+    # And the resolver is what breaks the tie, using the process count.
+    monkeypatch.setattr(rrw, "_running_job_process_count", lambda: 2)
+    count, source = rrw._resolve_active_job_count(latest)
+    assert count == 2
+    assert source == "process_and_manifest"
+
+
+def test_311_unknown_process_count_is_labelled_not_silently_zero(tmp_path, monkeypatch):
+    """Unknown must not render as a verified zero.
+
+    A container we cannot enumerate is exactly the case where handing the
+    permissive branch to the unknown is how the cap failed originally. The
+    count may fall back to the manifest, but the SOURCE must say so.
+    """
+    rrw = _load_rrw("rrw_311_c")
+    latest = tmp_path / "latest.json"
+    latest.write_text(json.dumps({"state": "idle"}), encoding="utf-8")
+    monkeypatch.setattr(rrw, "_refresh_state_store", lambda: {
+        "read_json_file": lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        "write_json_file": lambda path, payload: None,
+        "reports_root": lambda: tmp_path,
+        "data_root": lambda: tmp_path,
+        "assert_refresh_state_backend_ready": lambda **_k: None,
+    })
+    monkeypatch.setattr(rrw, "_running_job_process_count", lambda: None)
+
+    count, source = rrw._resolve_active_job_count(latest)
+    assert source == "manifest_only_process_enum_unavailable"
+    assert count == 0  # the manifest's answer, but never presented as verified
+
+
+def test_311_resolver_takes_the_max_because_both_instruments_read_low(tmp_path, monkeypatch):
+    """Manifest misses a job whose pid it never recorded; process enumeration
+    misses a job claimed but not yet spawned. Either alone reads low, and low
+    is the direction that spawns."""
+    rrw = _load_rrw("rrw_311_d")
+    latest = tmp_path / "latest.json"
+    latest.write_text(
+        json.dumps({"state": "running", "pid": os.getpid(), "externalRunner": {"kind": "external_runner"}}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(rrw, "_refresh_state_store", lambda: {
+        "read_json_file": lambda path: json.loads(Path(path).read_text(encoding="utf-8")),
+        "write_json_file": lambda path, payload: None,
+        "reports_root": lambda: tmp_path,
+        "data_root": lambda: tmp_path,
+        "assert_refresh_state_backend_ready": lambda **_k: None,
+    })
+
+    # Manifest sees 1 (live pid), processes see 0 (not spawned / not visible).
+    monkeypatch.setattr(rrw, "_running_job_process_count", lambda: 0)
+    assert rrw._resolve_active_job_count(latest)[0] == 1
+
+
+def test_311_process_counter_returns_none_rather_than_zero_when_blind(monkeypatch):
+    """`None` is the contract for "could not enumerate". Returning 0 here would
+    push the permissive answer up into the cap."""
+    rrw = _load_rrw("rrw_311_e")
+    monkeypatch.setattr(rrw, "Path", _NoProcPath)
+    monkeypatch.setitem(sys.modules, "psutil", None)
+
+    assert rrw._running_job_process_count() is None
+
+
+class _NoProcPath(Path):
+    """A Path whose /proc does not exist, to simulate a non-Linux container."""
+
+    _flavour = getattr(Path(), "_flavour", None)
+
+    def is_dir(self):  # type: ignore[override]
+        return False

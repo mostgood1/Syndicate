@@ -1485,6 +1485,91 @@ def _current_active_job_count(latest_manifest_path: Path) -> int:
     return 0
 
 
+# #311. The job runner this counts is what `_spawn_pending_job` starts, one per
+# claim, so counting these processes counts claims that are actually running.
+_JOB_PROCESS_MARKER = "run_queued_refresh_job.py"
+
+
+def _running_job_process_count() -> int | None:
+    """Live job-runner processes, or None when that cannot be determined.
+
+    WHY THIS EXISTS RATHER THAN REUSING `_current_active_job_count`. That
+    function reads the manifest, and the manifest is the thing that lies. It
+    returns 0 whenever the state is `running` with no live pid -- which is
+    EXACTLY the condition `_has_pending_external_contract` requires in order to
+    re-claim. The two predicates are mutually exclusive by construction, so the
+    manifest-derived cap reads zero precisely when the runaway it is supposed to
+    bound is running. On 2026-08-08 that let the process count reach 79.
+
+    None means "could not enumerate", and callers MUST NOT treat that as zero.
+    """
+    try:
+        proc_root = Path("/proc")
+        if proc_root.is_dir():
+            count = 0
+            enumerated = 0
+            for entry in proc_root.iterdir():
+                if not entry.name.isdigit():
+                    continue
+                try:
+                    cmdline = (entry / "cmdline").read_bytes().replace(b"\x00", b" ").decode("utf-8", "replace")
+                except (OSError, PermissionError):
+                    # A pid that exited mid-walk is normal and not a failure to
+                    # enumerate; keep going.
+                    continue
+                enumerated += 1
+                if _JOB_PROCESS_MARKER in cmdline:
+                    count += 1
+            if enumerated:
+                return count
+            return None
+    except Exception:
+        pass
+    try:
+        import psutil  # type: ignore
+
+        count = 0
+        for process in psutil.process_iter(attrs=["cmdline"]):
+            try:
+                parts = process.info.get("cmdline") or []
+            except Exception:
+                continue
+            if any(_JOB_PROCESS_MARKER in str(part) for part in parts):
+                count += 1
+        return count
+    except Exception:
+        return None
+
+
+def _resolve_active_job_count(latest_manifest_path: Path) -> tuple[int, str]:
+    """How many refresh jobs are running, and which instrument said so.
+
+    Takes the MAXIMUM of the process count and the manifest count rather than
+    replacing one with the other: they fail in opposite directions. The
+    manifest misses a job whose pid it never recorded; process enumeration
+    misses a job that has been claimed but has not spawned yet. Either alone
+    reads low, and reading low is the direction that spawns.
+    """
+    manifest_jobs = _current_active_job_count(latest_manifest_path)
+    process_jobs = _running_job_process_count()
+    if process_jobs is None:
+        # UNKNOWN MUST NOT MEAN ZERO. Treating an un-enumerable container as
+        # "no jobs running" hands the permissive branch to exactly the case we
+        # cannot see, which is how the cap failed in the first place. Report
+        # the manifest count but label the source, so a reader can tell a
+        # verified zero from an unverifiable one.
+        return manifest_jobs, "manifest_only_process_enum_unavailable"
+    if process_jobs != manifest_jobs:
+        # Worth a line: a persistent disagreement here IS the wedged-manifest
+        # signature, and it was previously invisible.
+        print(
+            f"[refresh_worker] JOB_COUNT_DISAGREEMENT manifest={manifest_jobs} processes={process_jobs} "
+            f"using={max(manifest_jobs, process_jobs)}",
+            flush=True,
+        )
+    return max(manifest_jobs, process_jobs), "process_and_manifest"
+
+
 def _recover_stuck_claim(latest_manifest_path: Path, *, timeout_minutes: int) -> bool:
     payload = _latest_manifest_payload(latest_manifest_path)
     if str(payload.get("state") or "").strip().lower() != "claimed":
@@ -2080,7 +2165,15 @@ def main() -> int:
                 refresh_cycle=refresh_cycle,
             )
 
-        active_jobs = _current_active_job_count(latest_manifest_path)
+        # #311. This was a bare `if` followed by a separate `if
+        # _has_pending_external_contract(...)`, and the throttle branch
+        # `return`ed only under --run-once. In the long-running loop it fell
+        # straight through and spawned anyway -- the cap was computed, reported
+        # in the worker status as `throttled`, and then ignored. Making it the
+        # leading branch of the existing chain is what actually enforces it:
+        # at cap, nothing else in the cycle runs and control reaches the
+        # poll sleep at the bottom.
+        active_jobs, active_jobs_source = _resolve_active_job_count(latest_manifest_path)
         if active_jobs >= max_active_jobs:
             refresh_cycle["skipped_due_to_cap"] = 1
             _mark_throttled_worker_status(
@@ -2089,10 +2182,14 @@ def main() -> int:
                 active_jobs=active_jobs,
                 max_active_jobs=max_active_jobs,
             )
+            print(
+                f"[refresh_worker] JOB_CAP_THROTTLED active={active_jobs} max={max_active_jobs} "
+                f"source={active_jobs_source}",
+                flush=True,
+            )
             if args.run_once:
                 return 0
-
-        if _has_pending_external_contract(latest_manifest_path):
+        elif _has_pending_external_contract(latest_manifest_path):
             refresh_cycle["claimed_count"] = 1
             _mark_claimed_external_contract(latest_manifest_path)
             _write_worker_status(
