@@ -52,7 +52,7 @@ a board that says so rather than one that looks sim-less.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Mapping
 from zoneinfo import ZoneInfo
 
@@ -71,6 +71,77 @@ from zoneinfo import ZoneInfo
 # that quietly discards rows and a board whose sport genuinely has no slate are
 # the same empty board otherwise.
 _BOARD_TZ = os.environ.get("SYNDICATE_BOARD_TZ", "America/Chicago")
+
+# SCHEDULING CADENCE, DECLARED — and the honest note about why it is declared.
+#
+# I set out to derive the window from the fixture calendar and could not, which
+# is worth recording so nobody spends the afternoon I did. Every clustering rule
+# fails on one sport or the other:
+#
+#   maximal run of consecutive game days   MLB plays daily, so the run is the
+#                                          whole season
+#   block bounded by a day with no games   splits NFL's own week: Thu has games,
+#                                          Fri and Sat do not, Sun does
+#   gap <= median inter-fixture gap        same two failures, one parameter later
+#
+# The reason is that MLB's window is one day because that is the useful unit,
+# not because the schedule says so -- part of this is a product decision wearing
+# a scheduling question's clothes, and inferring it would be arbitrary dressed as
+# principled. A schedule-week field WOULD settle it, but neither the grid rows
+# nor `build_game_chips` carries one; only the per-sport schedule artifacts do,
+# which is the per-sport plumbing this module exists to remove.
+#
+# So the widths are declared, and MEASURED rather than guessed: taken from the
+# fixture dates actually present in production grids on 2026-08-10. What is NOT
+# declared is any week NUMBER -- the window is anchored on a date and counted in
+# days, so nothing here reads `current_week.json`, which the NFL refresh runner
+# rewrites and which `#274` (NFL three weeks from vanishing) and the "week
+# self-pins to 1" finding both trace back to.
+#
+# Overridable per request. A wrong width here shows the wrong days, which is
+# visible and cheap; a wrong week number shows an empty board, which is not.
+_SLATE_WINDOW_DAYS = {
+    "mlb": 1,
+    "nba": 1,
+    "wnba": 1,
+    "nhl": 1,
+    # Thu through Mon. Measured: NFL's grid fixture dates cluster Thu/Sun/Mon.
+    "nfl": 5,
+    # Thu through Sat.
+    "ncaaf": 3,
+    "ncaab": 1,
+    # Soccer's own board has been week-scoped since 2026-07-24 for a reason its
+    # module records: the odds feed is a single rolling file covering every
+    # upcoming fixture days ahead of kickoff, and one date's recommendations
+    # snapshot can be empty while the adjacent one covers both days.
+    "soccer": 7,
+}
+_DEFAULT_SLATE_WINDOW_DAYS = 1
+
+
+def slate_window_days(sport: str) -> int:
+    return _SLATE_WINDOW_DAYS.get(str(sport or "").strip().lower(), _DEFAULT_SLATE_WINDOW_DAYS)
+
+
+def resolve_window_dates(sport: str, anchor_date: str, *, window: str | int = "day") -> list[str]:
+    """The dates this board covers, forward from the anchor.
+
+    FORWARD ONLY, deliberately. A board is what you can still bet; yesterday's
+    fixtures belong to the archive, and a symmetric window would put settled
+    games on the pregame board of a sport whose slate spans days.
+    """
+    try:
+        start = datetime.strptime(str(anchor_date).strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return [str(anchor_date).strip()]
+
+    if isinstance(window, int) or str(window).isdigit():
+        span = max(1, int(window))
+    elif str(window).strip().lower() == "slate":
+        span = slate_window_days(sport)
+    else:
+        span = 1
+    return [(start + timedelta(days=offset)).isoformat() for offset in range(span)]
 
 # The three states a game can be in, plus the one that matters most here.
 #
@@ -175,6 +246,8 @@ def build_layer1_board(
     sport: str,
     selected_date: str,
     grid_absent_reason: str | None = None,
+    window_dates: Iterable[str] | None = None,
+    league: str | None = None,
 ) -> dict[str, Any]:
     """Group an enriched grid into per-game cards, partitioned by game state.
 
@@ -187,10 +260,14 @@ def build_layer1_board(
 
     # Date scoping, before anything else. See `_BOARD_TZ` -- the shard is keyed
     # by capture date, so "every row in today's shard" is not "today's slate".
-    wanted_date = str(selected_date or "").strip()
+    wanted_dates = [str(d).strip() for d in (window_dates or [selected_date]) if str(d).strip()]
+    wanted = set(wanted_dates)
+    wanted_league = str(league or "").strip().lower() or None
+
     rows: list[Mapping[str, Any]] = []
     other_dates: dict[str, int] = {}
     undated_rows = 0
+    filtered_by_league = 0
     for row in all_rows:
         row_date = _row_local_date(row, _BOARD_TZ)
         if row_date is None:
@@ -198,9 +275,18 @@ def build_layer1_board(
             # dated would otherwise appear on every date's board at once.
             undated_rows += 1
             continue
-        if wanted_date and row_date != wanted_date:
+        if wanted and row_date not in wanted:
             other_dates[row_date] = other_dates.get(row_date, 0) + 1
             continue
+        if wanted_league is not None:
+            # A row with NO league cannot satisfy a league filter. Letting it
+            # through would make "EPL" quietly mean "EPL plus everything we
+            # failed to label", which is the permissive-on-unknown trap -- and
+            # soccer rows were unlabelled entirely until `#330`, so this is the
+            # exact case that would have slipped through.
+            if str(row.get("league") or "").strip().lower() != wanted_league:
+                filtered_by_league += 1
+                continue
         rows.append(row)
 
     cards: dict[str, dict[str, Any]] = {}
@@ -280,7 +366,9 @@ def build_layer1_board(
             "rows_in_grid": len(all_rows),
             "rows_other_dates": sum(other_dates.values()),
             "rows_undated": undated_rows,
+            "rows_other_leagues": filtered_by_league,
         },
+        "league_filter": wanted_league,
         # Which competitions are on this board, and how many fixtures each has.
         # For soccer this is the dimension the board is actually organised by --
         # "10 games" across EPL, MLS and the Bundesliga is three slates, not one
@@ -288,12 +376,17 @@ def build_layer1_board(
         # tab. Empty for single-competition sports rather than echoing the slug.
         "leagues": dict(
             sorted(
-                ((league, count) for league, count in league_counts.items() if league),
+                ((name, count) for name, count in league_counts.items() if name),
                 key=lambda kv: (-kv[1], kv[0]),
             )
         ),
         "date_scope": {
             "timezone": _BOARD_TZ,
+            # The window this board covers, listed rather than described: "5
+            # days from the 10th" is a rule the reader has to apply, and the
+            # dates are what they actually want to check a fixture against.
+            "dates": wanted_dates,
+            "window_days": len(wanted_dates),
             # Top few, so "which day did they belong to" is answerable without
             # dumping the whole distribution onto every response.
             "other_dates": dict(sorted(other_dates.items(), key=lambda kv: (-kv[1], kv[0]))[:7]),
@@ -306,7 +399,12 @@ def build_layer1_board(
         # of other days" are different facts with different fixes -- the first is
         # a capture question, the second is a scoping one -- so they get
         # different reasons even though both render as an empty board.
-        if all_rows and not undated_rows:
+        if filtered_by_league and wanted_league:
+            # A league filter that empties the board is a DIFFERENT fact from a
+            # league with no fixtures: the first says this competition is not on
+            # today's slate, the second says we have no odds for it at all.
+            payload["empty_reason"] = f"no_rows_for_league:{wanted_league}"
+        elif all_rows and not undated_rows:
             payload["empty_reason"] = "grid_rows_all_for_other_dates"
         elif all_rows:
             payload["empty_reason"] = "grid_rows_undated_or_other_dates"

@@ -2458,26 +2458,82 @@ def board_layer1_api():
     that transition and show the game on both boards or neither.
     """
     from syndicate.features.shared.book_grid_artifact import read_book_grid_artifact
-    from syndicate.features.shared.layer1_board import build_layer1_board, partition_board_by_state
+    from syndicate.features.shared.layer1_board import (
+        build_layer1_board,
+        partition_board_by_state,
+        resolve_window_dates,
+    )
 
     sport = str(request.args.get("sport") or "mlb").strip().lower()
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     view = str(request.args.get("view") or "all").strip().lower()
+    league = str(request.args.get("league") or "").strip().lower() or None
+    # `window=slate` gives the sport its own scheduling width; `window=<n>` is an
+    # explicit day count. Anchored on a DATE and counted in DAYS -- never a week
+    # NUMBER, which is what `current_week.json` supplies and what `#274` (NFL
+    # three weeks from vanishing) and the "week self-pins to 1" finding both
+    # trace back to. A wrong width shows the wrong days and is visible; a wrong
+    # week number shows an empty board and is not.
+    window = str(request.args.get("window") or "day").strip().lower()
+    window_dates = resolve_window_dates(sport, selected_date, window=window)
 
-    precomputed = read_book_grid_artifact(sport, selected_date)
+    # THE ARTIFACT IS KEYED BY CAPTURE DATE FOR MOST SPORTS, so reading only the
+    # window's own dates finds nothing for a future fixture. Measured 2026-08-10:
+    # NFL's 2026-09-13 fixtures (77 grid rows) live in the 2026-08-10 artifact,
+    # because that is the day they were quoted. Soccer is the exception -- it
+    # shards by the event's own kickoff date -- which is why a 7-day soccer
+    # window worked on the first try and NFL returned zero.
+    #
+    # So the read set is the window PLUS today: whichever artifact happens to
+    # hold a fixture, the game-date filter downstream is what decides whether it
+    # belongs on this board. Extra reads only widen the candidate pool; they
+    # cannot admit an off-window fixture.
+    #
+    # The durable fix is to key the artifact by game date everywhere, as soccer's
+    # capture already does. That is worker-side and not this lane's.
+    read_dates = list(dict.fromkeys([*window_dates, central_today_iso()]))
+
     rows: list = []
+    precomputed: dict | None = None
+    missing_dates: list[str] = []
+    for window_date in read_dates:
+        day_artifact = read_book_grid_artifact(sport, window_date)
+        if not isinstance(day_artifact, dict) or not isinstance(day_artifact.get("rows"), list):
+            # Only the window's own dates count as "missing": today's artifact is
+            # read opportunistically for capture-date-keyed sports, and reporting
+            # its absence would put a day the caller never asked about into the
+            # gap list.
+            if window_date in set(window_dates):
+                missing_dates.append(window_date)
+            continue
+        if precomputed is None or window_date == selected_date:
+            # Provenance comes from the ANCHOR date's artifact where it exists,
+            # so `generated_at` describes the day the caller asked about rather
+            # than whichever day happened to be read last.
+            precomputed = day_artifact
+        rows.extend(day_artifact.get("rows") or [])
+
     absent_reason: str | None = None
     if not isinstance(precomputed, dict):
         # No artifact is NOT an empty slate. The worker writes None rather than
         # an empty grid for exactly this reason, and collapsing the two here
         # would undo that one layer up.
         absent_reason = "no_precomputed_grid_artifact"
-    else:
-        rows = list(precomputed.get("rows") or [])
-        if not rows:
-            absent_reason = "grid_artifact_present_but_empty"
+    elif not rows:
+        absent_reason = "grid_artifact_present_but_empty"
 
-    board = build_layer1_board(rows, sport=sport, selected_date=selected_date, grid_absent_reason=absent_reason)
+    board = build_layer1_board(
+        rows,
+        sport=sport,
+        selected_date=selected_date,
+        grid_absent_reason=absent_reason,
+        window_dates=window_dates,
+        league=league,
+    )
+    # Which days of the window had no artifact. A five-day NFL window built from
+    # three artifacts is a partial board, and saying so is the difference between
+    # "those days have no games" and "we have not built them yet".
+    board["window_dates_missing_artifact"] = missing_dates
     # Provenance, so a thin board is attributable to the ARTIFACT rather than
     # read as the slate. `#331` is the standing reason this matters: the grid was
     # built from 1.7% of the day's odds and every count downstream looked real.

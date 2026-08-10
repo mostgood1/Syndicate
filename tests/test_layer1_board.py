@@ -263,3 +263,64 @@ def test_single_competition_sports_report_no_leagues():
     board = build_layer1_board([_row()], sport="mlb", selected_date="2026-08-10")
     assert board["leagues"] == {}
     assert board["games"][0]["league"] is None
+
+
+def test_slate_window_is_forward_only_and_per_sport():
+    from syndicate.features.shared.layer1_board import resolve_window_dates, slate_window_days
+
+    # Forward only: a board is what you can still bet. A symmetric window would
+    # put yesterday's settled games on a pregame board for any sport whose slate
+    # spans days.
+    assert resolve_window_dates("mlb", "2026-08-10", window="slate") == ["2026-08-10"]
+    assert resolve_window_dates("nfl", "2026-08-10", window="slate") == [
+        "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14",
+    ]
+    assert resolve_window_dates("ncaaf", "2026-08-10", window="slate") == [
+        "2026-08-10", "2026-08-11", "2026-08-12",
+    ]
+    assert len(resolve_window_dates("soccer", "2026-08-10", window="slate")) == 7
+    # Explicit day counts override, and an unknown sport gets the safe single day.
+    assert resolve_window_dates("nfl", "2026-08-10", window=2) == ["2026-08-10", "2026-08-11"]
+    assert resolve_window_dates("kabaddi", "2026-08-10", window="slate") == ["2026-08-10"]
+    assert slate_window_days("nfl") == 5
+
+
+def test_a_window_keeps_fixtures_across_its_whole_span():
+    board = build_layer1_board(
+        [
+            _row(event_id="thu", commence_time="2026-08-13T23:00:00Z"),
+            _row(event_id="sun", commence_time="2026-08-16T17:00:00Z"),
+        ],
+        sport="nfl",
+        selected_date="2026-08-13",
+        window_dates=["2026-08-13", "2026-08-14", "2026-08-15", "2026-08-16", "2026-08-17"],
+    )
+    assert board["counts"]["games"] == 2
+    assert board["date_scope"]["window_days"] == 5
+    assert board["date_scope"]["dates"][0] == "2026-08-13"
+
+
+def test_league_filter_excludes_and_counts_other_leagues():
+    board = build_layer1_board(
+        [_row(event_id="e1", league="epl"), _row(event_id="m1", league="mls")],
+        sport="soccer",
+        selected_date="2026-08-10",
+        league="epl",
+    )
+    assert board["league_filter"] == "epl"
+    assert [g["event_id"] for g in board["games"]] == ["e1"]
+    assert board["counts"]["rows_other_leagues"] == 1
+
+
+def test_league_filter_never_admits_an_unlabelled_row():
+    # "EPL" must not quietly mean "EPL plus everything we failed to label".
+    # Soccer rows carried no league at all until #330, so this is the exact case
+    # that would have slipped through a permissive-on-unknown filter.
+    board = build_layer1_board(
+        [_row(event_id="unlabelled", league=None)],
+        sport="soccer",
+        selected_date="2026-08-10",
+        league="epl",
+    )
+    assert board["counts"]["games"] == 0
+    assert board["empty_reason"] == "no_rows_for_league:epl"
