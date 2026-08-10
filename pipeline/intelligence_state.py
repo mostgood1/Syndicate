@@ -3783,6 +3783,41 @@ class IntelligenceStateService:
             overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
             if not isinstance(overview, list):
                 overview = []
+        # `#336`. INSTRUMENT, NOT A FIX. The board stopped rebuilding for 68+
+        # minutes with `CANDIDATE_POOL_READY count=0` while `LAYER2_SHORTLIST`
+        # reported `considered=6072` in the same second, and nothing between
+        # those two lines said which population died.
+        #
+        # `print`, not `logger.info`, and that is load-bearing rather than
+        # style: this function's own comment at the `CANDIDATE_POOL_READY` site
+        # records, measured, that `logger.info`/`_log_stage_timing` never reach
+        # Render's log collector from this process. Everything inside this build
+        # was traced that way, which is exactly why the stage that matters has
+        # been unreadable all evening.
+        #
+        # `dashboard_games` and `home_rails` specifically because
+        # `_collect_candidates` reads those two keys off each sport dict --
+        # see `build_intelligence_overview`'s own `skip_game_hydration`
+        # warning. An overview with 4 sports and empty rails is a DIFFERENT
+        # fault from an overview with 0 sports, and the count alone cannot
+        # tell them apart.
+        try:
+            _sport_summary = " ".join(
+                f"{_row.get('slug')}:g={len(_row.get('dashboard_games') or [])},r={len(_row.get('home_rails') or [])}"
+                for _row in (overview or [])
+                if isinstance(_row, Mapping)
+            )
+            print(
+                f"[intelligence_state] BOARD_OVERVIEW_READY date={selected_date} "
+                f"sports={len(overview or [])} {_sport_summary}",
+                flush=True,
+            )
+        except Exception as _summary_exc:
+            # Never let an instrument take down the build it is measuring.
+            print(
+                f"[intelligence_state] BOARD_OVERVIEW_SUMMARY_FAILED {type(_summary_exc).__name__}: {_summary_exc}",
+                flush=True,
+            )
         _diag_log_all_process_memory("post_build_overview")
         # #285, third trim -- the one that matters on a cycle that SUCCEEDS.
         # MLB's hydrated overview costs +2531MB anon (this file's own 2026-08-07
@@ -3826,7 +3861,23 @@ class IntelligenceStateService:
         if _abort_build_candidate_pool_if_memory_critical("post_collect_candidates_with_fallback_merge"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
 
+        # `#336`, second half of the split. With BOARD_OVERVIEW_READY above,
+        # these two numbers localise the zero to one of three places:
+        #   overview empty          -> ingestion, upstream of this function
+        #   overview full, raw 0    -> collect_candidates_with_fallback_merge
+        #   raw > 0, kept 0         -> the Mapping filter, i.e. a shape change
+        # The third is reported separately because a silent type mismatch here
+        # would otherwise look identical to the collector returning nothing.
+        try:
+            _raw_count = len(raw_candidates) if isinstance(raw_candidates, list) else -1
+        except Exception:
+            _raw_count = -1
         raw_candidates = [candidate for candidate in raw_candidates if isinstance(candidate, Mapping)]
+        print(
+            f"[intelligence_state] BOARD_RAW_CANDIDATES date={selected_date} "
+            f"returned={_raw_count} kept={len(raw_candidates)}",
+            flush=True,
+        )
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
