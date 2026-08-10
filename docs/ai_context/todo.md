@@ -395,7 +395,7 @@ after the fact, and two of them by someone other than the person who moved the
 payload.
 
 
-### `#331` — IN PROGRESS. The book grid is built from **1.7%** of the odds, and that is why `/market-board/books` lost its F1/F3/F5 filters
+### `#331` — DONE AND VERIFIED IN PRODUCTION. The book grid was built from **1.7%** of the odds, and that is why `/market-board/books` lost its F1/F3/F5 filters
 
 **The user's report was "we lost the F1/F3/F5/Game Total filters on game lines".
 It is not the UI, not the filters, and not `_event_wants_full_game_markets`'s
@@ -482,9 +482,33 @@ Both produced the right row count, the right byte size, and the right summary.
 assert grid equality for exactly this reason — a count assertion would have
 passed on both bugs. Anyone optimising this pivot again: compare grids.
 
-**Landed:** `b458fb49` (reduction + tests, additive and inert).
-**Held:** `book_grid_artifact.py` + `run_refresh_worker.py`, coupled, pending the
-`#328` lane committing its enrichment out of the shared working tree.
+**VERIFIED IN PRODUCTION 2026-08-10 17:39:21Z**, deploy `e2b04e88` to
+refresh-worker. The 2026-08-09 artifact re-pivoted from a reconciled shard on
+the first tick after boot, and every predicted number landed:
+
+| 2026-08-09 | before | after |
+|---|---|---|
+| shard bytes | 3,627,504 | **217,439,783** |
+| raw quote rows | 7,987 | **478,782** |
+| rows kept (reduction) | — | **41,233** |
+| grid rows | 807 | **5,547** |
+| **segment rows** | **0** | **1,251** |
+
+Served: `source=precomputed_artifact`, `total_rows=5547`, `rows_truncated=0`,
+markets 14 -> 18, and F1/F3/F5 present in the payload again. **Worker container
+1707-1744MB of 4096 across the pivot** -- no spike, and lower than the
+2709-2792MB `post_mlb_sim_tick` excursions measured the same evening, so the
+reduction carried the 217MB shard without touching the headroom `#285` owns.
+
+Today (2026-08-10) still reports 0 segments and that is CORRECT, not a residual
+failure: `_event_wants_full_game_markets` fetches F1/F3/F5 only once a game is
+live or inside its T-window (deliberate `#16`/`#17` cost control), so segments
+populate in the evening. Its rows went 839 -> 1,702 on the same tick.
+
+**Commits:** `b458fb49` (reduction + equivalence tests), `80342a94` (call site,
+landed by the `#328` lane with these hunks in it), `0d354928` (tail-pull, publish
+timeout 10s -> 120s, publish result checked).
+
 
 
 ### 2026-08-10 — LANE CLOSED: soccer sim concurrency (`#282`, `#311`, `#312`). Read the residual before assuming this is finished
