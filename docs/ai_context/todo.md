@@ -682,7 +682,45 @@ if it did.
 
 ### #322 — `query_state_cache.json`: the last write still refused every cycle. 33MB of snapshots against the same 8.39MB ceiling, so the deterministic trim was running CONSTANTLY — and every trimmed entry is a key recomputed after reboot
 
-**Status: fixed, tests green, NOT YET VALIDATED ON PRODUCTION.**
+**Status: FIXED, DEPLOYED (`ef3f6a2b`, both services), AND VALIDATED ON PRODUCTION.**
+
+Anchored on the worker's `deploys/dep-d9skatqjnfac739l305g.finishedAt`
+= 03:32:31Z, first **populated** `_persist_locked` (`snapshot_count=1`) at
+03:40:51Z:
+
+| signal | before | after |
+|---|---|---|
+| `query_state_cache` rejections | every cycle | **0** |
+| `board_snapshot` rejections | every cycle | **0** |
+| `STATE_PERSIST_TRIMMED` | every ~1 min, `kept_full=0 of=2` | **0** |
+
+**`populated>0` is the half that matters.** For the first 8 minutes after the
+deploy every `_persist_locked` carried `snapshot_count=0`, and `TRIMMED=0`
+against that is the same nothing-was-attempted reading as `kvrej=0` with
+`persist=0`. Wait for a populated persist before believing any of these zeros.
+
+Positive confirmation from the store itself (`/api/ops/keyvalue/usage`), which
+is stronger than an absent rejection line:
+
+```
+board_snapshot.json               917,616   (was 31,433,352 -- 34x)
+intelligence_state.json         1,310,848   (was 27,638,247 -- 21x)
+board_snapshot_2026_08_04.json  6,291,616   <- pre-fix, uncompressed, the contrast
+```
+
+#### Two things found in the same dump that are NOT this lane's, recorded so they are not lost
+
+1. **A stored key is 160 bytes OVER the ceiling that is supposed to be
+   impossible.** `odds_control_plane/odds_history/soccer/2026-08-02.json` =
+   **8,388,768** against `max_bytes` 8,388,608. Either it was written through a
+   path that bypasses `#60`'s size guard, or the usage estimate pads. Same class
+   of bug as `#317`; worth whoever owns odds looking at it.
+2. **The keyvalue instance is at 246.4MB of a 256MB ceiling** with
+   `allkeys-lru` already evicting — the `/api/ops/keyvalue/usage` docstring
+   records 230MB on 2026-08-03, so it is still climbing. `#317`/`#322` cut
+   ~56MB off it (board_snapshot + intelligence_state, live and dated copies,
+   ~58MB → ~2.2MB), which buys room but does not fix the trend. **An eviction
+   here silently deletes a board**, so this deserves its own item.
 
 The sibling of `#317`, and the reason it matters is not the rejection line.
 Measured on the refresh-worker 2026-08-10T01:25:26Z:
