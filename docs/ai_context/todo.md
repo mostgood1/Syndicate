@@ -230,6 +230,58 @@ before it: a near-duplicate helper where only one copy receives the fix. The
 repo keeps producing them. **Fix by extracting ONE helper, not by adding the
 missing line to the second copy** — that is the lesson `#317` had to learn twice.
 
+#### UPDATE 2026-08-10 — IT RECURS, IT IS EXCLUSIVELY `post_mlb_sim_tick`, AND IT IS NOT A CADENCE
+
+Owned by the soccer-concurrency lane after `#282`/`#311` closed. **The
+instrument fix `3e1096fb` is committed and NOT DEPLOYED**, so none of this came
+from the ring buffer — it is all from the log channel, which was never blind.
+
+**First attempt was worthless and the reason is reusable.** I compared every
+sample against a fixed 1500MB threshold and got **1733 of 2967 samples over it
+(58%)**. That measures the baseline, not an excursion, and it spanned four boots
+whose baselines differ. **A threshold test cannot find a spike in a series whose
+floor moves.**
+
+The entry's own evidence was never a threshold — it was a *three-sample shape*
+(1050.6 → 1867.4 → 1079.9). So the right test is local and boot-relative: how
+far does a sample sit above the mean of its two immediate neighbours, never
+measured across a restart. Over 5 hours, 3,914 samples, 5 boot segments:
+
+```
+15:32:27Z  post_mlb_sim_tick    933.2 -> 1586.7  (+653.5)  container 2296.9
+16:14:53Z  post_mlb_sim_tick    937.4 -> 1430.9  (+493.6)  container 2347.3   +42.4 min
+16:33:14Z  post_mlb_sim_tick   1120.5 -> 1896.4  (+775.9)  container 2709.9   +18.3 min
+16:44:18Z  post_mlb_sim_tick   1160.6 -> 2030.8  (+870.2)  container 2792.7   +11.1 min
+```
+
+**1. It recurs.** `n=4` in 5 hours, not the `n=1` this entry recorded. The
+16:33:14Z event is the one already filed here (1896.4 accounted vs the 1867.4
+pid-38 RSS quoted above — different fields, same event).
+
+**2. Exclusively `post_mlb_sim_tick`, and that is threshold-robust.** At a
+400MB bar, **4 of 4**. Dropping the bar to 250MB gives 8, of which 5 are this
+stage and the three others are all `live_lens_tick_*` at 287–380MB — **every
+excursion above ~490MB is `post_mlb_sim_tick` and nothing else is close.**
+Checking two thresholds matters because `n` is otherwise an artefact of the bar
+I happened to pick.
+
+**3. It is NOT a cadence, and this entry's caution was right.** Gaps are 42.4,
+18.3 and 11.1 minutes — scattered, not periodic. Do not build a "spikes every N
+minutes" claim; that remains unsupported with the sample size larger, not
+smaller.
+
+**4. THE APPARENT GROWTH IS NOT A TREND CLAIM.** Both the excursion size
+(+653 → +494 → +776 → +870) and the floor it launches from (933 → 937 → 1121 →
+1161) look like they are climbing, and container peak went 2297 → 2793. **That
+is four points, and this file records the same error at least three times** —
+the "accelerating OOM loop" from three boot gaps, the 5-sample live-lens median,
+the n=7 memory peak. **I am explicitly not claiming a trend.** It is worth
+re-measuring over a longer window; it is not worth acting on. [[a rate, not a count]]
+
+**Headroom, stated as the reason to care:** peak container 2792.7MB against the
+4096MB cap — **68%**, from a stage nobody was watching, with the hydrated
+overview (~+700MB) able to land on the same cycle.
+
 #### What is NOT claimed
 
 - **Not accumulation.** It returns in 72s. `#285`'s ratchet is unaffected.
