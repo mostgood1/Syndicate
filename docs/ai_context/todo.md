@@ -272,6 +272,49 @@ would still have gone green — via disk.
 **The existing backlog drains on its own** (every key carries the 2-day TTL), or
 immediately via `POST /api/ops/keyvalue/expire-run-artifacts?dry_run=0`.
 
+#### EXERCISED ON REFRESH-WORKER — the last claim I had not earned
+
+`87cdd3e1` (15:42:48Z) already carried the fix, so my own `f1bba90c` deploy was
+redundant and I canceled it (below). But for 20 minutes after that boot the fix
+was live and **UNEXERCISED**: no odds job had run, so a flat bucket only proved
+live-odds-worker. "Flat" was not yet evidence.
+
+First post-fix job on refresh-worker, 16:04:33Z:
+
+```
+job built the path:  "--run-summary-path", "/opt/render/project/data/reports/
+                      migration_runs/2026-08-11/odds_refresh_20260810_160433/
+                      refresh_and_gate_run.json"
+keyvalue bucket:     2.82MB / 60 keys   ->   2.82MB / 60 keys   (baseline)
+total keyvalue:      39.21MB
+```
+
+**Asserted the branch, not just the outcome.** `60 -> 60` on its own is equally
+consistent with "the job never reached the write" — the failure that looks like
+a pass. The argv line proves it reached the write and chose disk.
+
+#### The deploy I should not have made, and the pre-flight that read as coverage
+
+I triggered `f1bba90c` at 15:54:50Z. Two errors:
+
+1. **I did not re-read the live commit first.** I read it at 15:11Z
+   (`6010b99e`) and acted 43 minutes later; it had moved to `87cdd3e1` at
+   15:42:48Z, which already contained the fix. The deploy was pure churn. This
+   file already says *read the live commit on EVERY service before trusting any
+   number* — I applied it to diagnosis all session and skipped it on the one
+   action that mutates production.
+2. **My pre-flight checked three tokens and printed a global verdict.**
+   `build_soccer_artifacts`, `SOCCER_UNIT_LAUNCHED`, `run_refresh_odds_job` ->
+   "PREFLIGHT: CLEAR TO DEPLOY". It was not clear: an NFL child
+   (`generate_smartsim2_nfl_preseason_projections.py --season 2026 --week 2`,
+   pid 427) had started at 15:53:49Z, **61 seconds before I triggered**, and the
+   `#285` lane had explicitly named MLB `daily_update.py` and NFL smartsim as
+   kill-risk. Canceled mid-`update_in_progress` at 15:58:43Z; the child
+   survived. **A checklist that reports one verdict over a partial list is worse
+   than no checklist — it reads as coverage.** Enumerate the running processes
+   (`ALL_PROCESS_MEMORY` already lists every child with its cmdline) instead of
+   probing for the hazards you happen to remember.
+
 #### A long observation window must RE-VERIFY its anchor, not just set it
 
 The `#285` lane retracted their closure on this: their T+55 memory reading was a
