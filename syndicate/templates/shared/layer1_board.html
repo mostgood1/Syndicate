@@ -297,7 +297,18 @@
     // PROVENANCE, not decoration. `#331` is the standing reason: the grid was
     // once built from 1.7% of the day's odds and every count downstream looked
     // entirely real. A thin board must be attributable to the artifact.
-    if (b.generated_at) { bits.push("<span>built " + esc(String(b.generated_at).slice(11, 19)) + "Z</span>"); }
+    if (b.generated_at) {
+      // AGE, not just a timestamp. The artifact rebuilds on the worker's own
+      // interval (600s by default), so a board can be minutes behind the market
+      // through no fault of this page -- and a reader cannot tell that from a
+      // build time alone without doing the subtraction themselves.
+      var ageMin = null;
+      try { ageMin = (Date.now() - Date.parse(b.generated_at)) / 60000; } catch (e) { ageMin = null; }
+      var ageTxt = (ageMin === null || !isFinite(ageMin)) ? "" : " (" + Math.max(0, Math.round(ageMin)) + "m old)";
+      var stale = ageMin !== null && ageMin >= 11;
+      bits.push('<span' + (stale ? ' class="l1-warn"' : '') + '>built '
+        + esc(String(b.generated_at).slice(11, 19)) + "Z" + ageTxt + "</span>");
+    }
     if (b.enrichment && b.enrichment !== "enriched") {
       bits.push('<span class="l1-warn">' + esc(b.enrichment) + "</span>");
     }
@@ -608,6 +619,26 @@
   q("l1-date").onchange = function () { state.date = this.value; fetchBoard(); };
   q("l1-window").onchange = function () { state.window = this.value; fetchBoard(); };
   q("l1-refresh").onclick = fetchBoard;
+
+  // AUTO-REFRESH. The board this replaced polled every 60s
+  // (`market_board.js`: setInterval(loadGameChips, 60000)) and the swap dropped
+  // it -- so a live board sat frozen from the moment it was opened until someone
+  // pressed Refresh. On a pregame board that is merely stale; on a live one it
+  // is wrong, because the whole point of the pregame/live split is that a game
+  // MOVES between views while you are watching.
+  //
+  // Only when visible, matching the old board's `!document.hidden` guard: a
+  // backgrounded tab polling all night is load nobody is reading.
+  //
+  // State (view, market, segment, league) survives a refresh because render()
+  // reads it back out of `state` -- the tabs do not reset under the user.
+  var REFRESH_MS = 60000;
+  setInterval(function () { if (!document.hidden) { fetchBoard(); } }, REFRESH_MS);
+  // And refetch the moment the tab is looked at again, rather than making the
+  // user wait out the remainder of an interval that ran while they were away.
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) { fetchBoard(); }
+  });
 
   if (window.SyndicateBetSlip) { window.SyndicateBetSlip.init(); }
   fetchBoard();

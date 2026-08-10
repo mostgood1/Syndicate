@@ -113,5 +113,21 @@ class MarketBoardUiParityTests(unittest.TestCase):
         html = self.client.get("/mlb/market-board?date=2026-08-10").get_data(as_text=True)
         self.assertIn("if (keys.length < 2)", html)
 
+    def test_the_board_refreshes_itself(self) -> None:
+        # A REGRESSION THIS SUITE MISSED ONCE. The legacy board polled every 60s
+        # (market_board.js: setInterval(loadGameChips, 60000)); the swap to the
+        # shared board dropped it, so a live board sat frozen until someone
+        # pressed Refresh. On a live board that is not staleness, it is wrong --
+        # the pregame/live split exists precisely because games MOVE between
+        # views while you are watching.
+        html = self.client.get("/mlb/market-board?date=2026-08-10").get_data(as_text=True)
+        self.assertIn("setInterval", html)
+        self.assertIn("REFRESH_MS", html)
+        # Only while visible, matching the old board's guard -- a backgrounded
+        # tab polling all night is load nobody reads.
+        self.assertIn("document.hidden", html)
+        self.assertIn("visibilitychange", html)
+
+
 if __name__ == "__main__":
     unittest.main()
