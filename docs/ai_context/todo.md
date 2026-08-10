@@ -756,7 +756,37 @@ namespace.
 safe in a value-intersection join; `h2h` is shared by every row of that type, so
 a record would match a graded row for a **different game**.
 
-### #318 — OPEN. Web OOMs every ~14 min and **nothing on the service can say why**: `CONTAINER_MEMORY` reports 91.7% next to a 189MB process and cannot split the two. Instrument fixed (`7cceb781`), NOT DEPLOYED
+### #318 — RESOLVED 2026-08-10, and **not by this lane**. Instrument `7cceb781` DEPLOYED in `d25b1aaa` and emitting; the OOM stopped. Web OOMed every ~14 min and nothing on the service could say why: `CONTAINER_MEMORY` reported 91.7% next to a 189MB process and could not split the two
+
+**Post-deploy readings, web `d25b1aaa` (deployed 2026-08-10T03:46:49Z), taken 14:50Z:**
+
+```
+server_failed since deploy : 0     (was: every ~14 min)
+oomKilled since deploy     : 0
+instance -rszpz            : 661 consecutive minute-samples, one instance, no restart
+anon high-water            : 995 MiB of 2048 (49%)
+```
+
+The instrument now answers the question it was written for — the split that
+`memory_pct_of_max` alone could never give:
+
+```
+CONTAINER_MEMORY  memory_current_mb 1227.9  = memory_anon_mb 936.5
+                                            + memory_inactive_file_mb 239.5 (reclaimable 287.3)
+```
+
+**Do not read this as "`7cceb781` fixed the OOM." It cannot have.** It is an
+observability change with no behaviour change, and it shipped inside
+`d25b1aaa` alongside several lanes' work — `cb3946a2` (`#285`, cap glibc
+arenas) is an anon-ratchet fix and is the far likelier cause. Attributing the
+recovery here would be banking a success against the wrong cause. What this
+entry can claim is narrow and real: **the split now exists, so the next
+regression is diagnosable instead of guessable.**
+
+**Residual, not closed:** `/api/home` still takes ~40s to return its 1.45MB.
+Peak anon is 995 MiB against a 2048 limit — the margin is real but it is
+headroom, not immunity, and `#319` measured a board/home render preceding a
+memory spike 2/2.
 
 **The measurement that stops the guessing.** Web, 2026-08-09T21:00:47Z, seconds
 before an `oomKilled` at a 2GiB limit:
@@ -1258,7 +1288,28 @@ non-zero count followed by a `PUBLISH_OK` rather than a 502. For `#318` it is
 "web stops dying every 14 minutes", which is user-visible on its own and
 independent of whether any board ever renders.
 
-### #319 — The publish flood is not merely "retracted", it is MEASURED INNOCENT: 141–168 publishes/min sat FLAT, while a board/home render preceded a spike 2/2. Envelope receive hardened anyway (`ops.py`), NOT DEPLOYED and NOT AN OOM FIX
+### #319 — CLOSED 2026-08-10. The publish flood is not merely "retracted", it is MEASURED INNOCENT: 141–168 publishes/min sat FLAT, while a board/home render preceded a spike 2/2. Envelope receive hardened anyway (`ops.py`) — `9583e9bd` now DEPLOYED in `d25b1aaa`, and it is still NOT THE OOM FIX
+
+**Success test, re-run on production 14:50Z against web `d25b1aaa` /
+refresh-worker, window 04:00–14:50Z:**
+
+| check | before | now |
+|---|---|---|
+| `PUBLISH_FAILED ... HTTP Error 502` | 37 refusals in 18 min | **0 in 10h50m** |
+| `STATE_ARTIFACT_FALLBACK_REFUSED` | every cycle | **0** |
+| `KEYVALUE_WRITE_REJECTED` | 27.6MB vs 8.39MB ceiling | **0** |
+| `/api/home` | 502 after 94s | **200, 1,451,280 bytes** |
+| `candidate_count` | 0 | **150** |
+
+The board lands. **`9583e9bd` is not why** — it is a 3.76× → 2.63× reduction on
+a path this entry measured at ~5% of the limit, and it was labelled "not an OOM
+fix" before deploy precisely so this moment could not be misread. The payload
+half was `95e56fa5`/`#317` and the memory half was almost certainly `#285`.
+
+**What this lane actually contributed was a negative result**: it took the
+publish flood off the table with a measurement (busiest second of the evening,
+11 publishes/s, sat in a minute at 441 MiB), which stopped three sessions
+converging on the wrong subsystem. A ruled-out cause is a deliverable.
 
 **Status: measured, arrived at independently and in parallel with `#318`'s
 retraction of the same claim. `#318` owns the web OOM. This item owns the
