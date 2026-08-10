@@ -23727,16 +23727,53 @@ converged ~1,800-2,000 baseline). **This is now over target, not under it.**
   **17.6%**. Monotonic in the same direction across three consecutive
   readings spanning 4+ days — the "one-off evening slate" explanation
   offered last time doesn't fit a trend this persistent and directional.
-- **Not diagnosed here — this needs the next session's actual investigation,
-  not another reading.** Leading candidate given the shape shift: something
-  is keeping more MLB games tiered "full" (segment+alternate markets) for
-  longer than #106's event-scoping live/near-live window intends — either
-  more games are genuinely staying near-live longer (real, deeper-season
-  effect: doubleheaders, longer games, more games per slate) or the scoping
-  itself has regressed. Start there: pull `/api/ops/odds-refresh/status`'s
-  soccer/MLB step timings during a live evening window and compare full-tier
-  vs reduced-tier game counts against the actual slate, the same method
-  #106's original verification used.
+✅ **ROOT-CAUSED same session — not a bug, not #106 regressing. A deliberate,
+already-planned feature (S0b, `docs/ai_context/plan_layer2_north_star.md`)
+is live and behaving close to its own documented cost projection.**
+
+`S0b: make "eu and us_ex on GAME LINES only" expressible` (`1fa0a6d3`,
+2026-08-07) added `_game_line_regions()` — an EXTRAS list (`eu,us_ex`) that
+widens region coverage for the game-line call (full_game + segment +
+alternate) specifically, leaving props on the base region. Deliberately
+scoped that way: applying the same widening to props (billed per-event, not
+per-request) would cost ~1M/mo extra on props alone vs ~30K/mo on game
+lines — the plan document works this out explicitly and calls it "the
+~1M/month mistake."
+
+**Confirmed live via the Render API (not render.yaml, which doesn't have
+it at all):** `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS=eu,us_ex` is set on
+all three services right now. `SYNDICATE_LIVE_ODDS_REFRESH_REGIONS` is
+still `us` (not `us,us2` as the plan's activation instructions specify) —
+only half the documented two-var activation actually happened.
+
+**This fully explains the shape shift.** Widening only the game-line
+family's regions (props untouched) is exactly a mechanism that grows
+segment/alternate/full_game credits while leaving props flat — which is
+precisely the "props share shrinks, segment+alternate share grows"
+pattern observed across three readings. Math is directionally consistent
+with a ~3x regional multiplier (base `us` + 2 extras) on that family alone.
+
+**And the plan's own number lines up with what got measured.** The plan
+projected activating this at **~4.13M/mo (79-82.6% of the 5M cap)** — my
+first elevated reading (08-08T17:32Z) was **3.96M/79.3%**, right on that
+estimate. **So this was known, priced in advance, and roughly on-plan —
+not a leak.**
+
+⚠️ **What's still actually open:** the *latest* reading (5.03M/100.7%) is
+running ~18-21 points hotter than even the plan's own ceiling estimate
+(82.6%). That gap — why actual burn overshot the documented projection,
+not whether the feature itself is a bug — is the one real unresolved
+thread. Also worth fixing regardless of the above: **render.yaml has zero
+record of `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS`** — a live-vs-IaC drift
+of exactly the kind CLAUDE.md's own standing warning describes (checked:
+this wasn't from a `blueprint_sync` reflecting a since-reverted render.yaml
+version I could find in deploy history — most likely a direct
+dashboard/API env-var edit, consistent with how S0b's own activation
+instructions describe turning it on). Whoever owns the S0b plan should
+either commit the two vars to render.yaml (so IaC matches reality) or
+decide, now that it's confirmed running over budget, whether to keep it as
+is, finish the second half of the activation, or dial it back — a product
+call, not something to unilaterally revert here.
 
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
