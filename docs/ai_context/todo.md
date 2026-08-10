@@ -1410,7 +1410,7 @@ re-measuring over a longer window; it is not worth acting on. [[a rate, not a co
 4096MB cap — **68%**, from a stage nobody was watching, with the hydrated
 overview (~+700MB) able to land on the same cycle.
 
-#### ATTRIBUTION 2026-08-10: `post_mlb_sim_tick` IS A BYSTANDER. FIVE causes eliminated, none confirmed
+#### ATTRIBUTION 2026-08-10: `post_mlb_sim_tick` IS A BYSTANDER. FOUR causes eliminated (a fifth was claimed and RETRACTED), none confirmed
 
 **The stage in the name did not allocate the memory.** At every one of the four
 excursions the tick's own `MLB_SIM_TICK` meta reports **every sub-feature
@@ -1484,7 +1484,59 @@ the candidate — see below.**
 payload — process tables, tick meta, stage timings. None needed new code.
 [[read the field you already have]]
 
-#### 5. NOT the live-lens publish sweep — the candidate I instrumented, then eliminated
+#### 5. RETRACTED — the publish sweep is BACK, and my instrument's blind spot is why I got it wrong
+
+**READ THIS BEFORE THE ELIMINATION BELOW. I retract it.** The excursion was
+caught happening *inside* a publish sweep, and my `before`/`after` pair is
+structurally incapable of seeing it.
+
+```
+21:16:18  live_lens_publish_before   rss=1081.5   container=2470.5
+21:16:54  post_mlb_sim_tick          rss=2051.7   container=3459.1   <-- +970MB, MID-SWEEP
+21:17:11  live_lens_publish_after    rss=1233.9   container=2628.9   published=94 elapsed=53.6
+```
+
+**A 94-artifact, 53.6-second sweep. Thirty-six seconds in, RSS was +970MB above
+the sweep's own `before` sample — and back down before its `after` sample.** The
+endpoints report a +152MB delta across an event whose peak was +970MB.
+`container` hit **3459.1MB, 84% of the 4096 cap** — the highest reading recorded
+tonight.
+
+**A BEFORE/AFTER PAIR CANNOT MEASURE A TRANSIENT ALLOCATED AND RELEASED BETWEEN
+ITS ENDPOINTS.** I designed the instrument, argued an elimination from it, and
+the elimination was an artifact of the instrument's blind spot. Same class as
+every other failure in this file — an instrument answering rather than erring —
+except this one is mine, built *after* writing that lesson down twice.
+[[instrument blindness]]
+
+**And the sample that produced the elimination was the wrong population.**
+Sweeps of 15–34 artifacts have small deltas because they are small sweeps. The
+73–103 range the loop's comment cites **does occur** — 94 and 99 artifacts,
+observed 21:15–21:17Z — I simply had not caught one in the first 36 minutes and
+generalised from the small ones. The caveat I attached ("max observed 34, a
+non-linear blow-up is not formally excluded") was pointing exactly at what then
+happened, which is an argument for weighting one's own caveats more heavily
+than one's conclusion.
+
+**Correction to a number I published:** `b9b77eaf` says the sweep accounted for
+**−8%** of the excursion. That came from my watcher pairing `befores[0]` with
+`afters[-1]` across a ±120s window spanning **three** cycles. The correct
+within-cycle delta is **+152.4MB**, and the mid-sweep peak is **+970MB**. The
+−8% figure is void.
+
+#### What is now claimed, and what still is not
+
+**Claimed:** the excursion is coincident with a large publish sweep, and the
+publish path is a live candidate again. One observation.
+
+**NOT claimed:** that the sweep causes it. Coincidence with a 53.6s window that
+covers a large share of the cycle is weak on its own, and the four other
+eliminations are unaffected. **What would settle it:** sampling *inside* the
+sweep — per-artifact or on a timer — rather than at its boundaries. That is the
+next instrument, and the reason to build it is that the current one has now
+demonstrably failed at exactly the case it was built for.
+
+#### The superseded elimination, kept because the data is real and the reasoning is instructive
 
 `489ddbb5` lit the gap (`live_lens_publish_before` → `after`, plus the pull at
 cycle start). Live on refresh-worker from **20:32:47Z**. **15 paired cycles**:
