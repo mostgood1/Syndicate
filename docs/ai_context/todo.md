@@ -820,6 +820,79 @@ re-measuring over a longer window; it is not worth acting on. [[a rate, not a co
 4096MB cap — **68%**, from a stage nobody was watching, with the hydrated
 overview (~+700MB) able to land on the same cycle.
 
+#### ATTRIBUTION 2026-08-10: `post_mlb_sim_tick` IS A BYSTANDER. Four causes eliminated, none confirmed
+
+**The stage in the name did not allocate the memory.** At every one of the four
+excursions the tick's own `MLB_SIM_TICK` meta reports **every sub-feature
+gated**:
+
+```
+lookAhead            launched=false  within_check_interval
+lookAheadDay2        launched=false  within_check_interval
+mlbDailySim          launched=false  intelligence_pipeline_busy
+mlbEveningNextDaySim launched=false  before_evening_window
+mlbStatcastRefresh   launched=false  within_check_interval
+```
+
+**The tick launched nothing and did a handful of gate checks.** It cannot be
+holding 817MB. `post_mlb_sim_tick` is simply the stage whose sample lands where
+the memory already is — **the label marks the OBSERVER, not the ALLOCATOR**, and
+anyone optimising the sim tick on the strength of this stage name will be
+working on the wrong code. That is the single most useful thing in this entry.
+
+#### Eliminated, each with its own evidence
+
+**1. NOT a child process.** `accounted_rss_mb` sums every process in the
+container, so a sim subprocess would look identical. It is not one — the growth
+is inside the long-lived worker:
+
+```
+15:32:27  pid 39  +681.1MB of +655.2 total   (104% in-process)
+16:14:53  pid 38  +503.5MB of +503.5 total   (100%)
+16:33:14  pid 38  +816.7MB of +790.5 total   (103%)
+16:44:18  pid 38  +878.5MB of +878.5 total   (100%)
+```
+
+**No new processes at any peak.** (>100% because one other process exited in the
+same interval.)
+
+**2. NOT the intelligence overview thread.** refresh-worker is one multithreaded
+process, so a background thread could hold it and no per-process metric could
+tell. Tested rather than assumed: `build_candidate_pool_start` /
+`OVERVIEW_SPORT_BEGIN` follow each peak by **+83s, +88s, +75s, +72s** and read
+**949.8 / 957.2 / 1121.4 / 1181.3 MB** — baseline. The overview builds *after*
+the excursion has already drained.
+
+**3. NOT a large artifact read.** The whole keyvalue store is **37.04MB**, largest
+single key **8.39MB**. No parse of that can reach 800MB.
+
+**4. NOT the `#322` book-grid tick** — the most attractive candidate, since it
+reads the 207MB MLB `book_quotes` shard uninstrumented between samples.
+**Correlation is suggestive and the mechanism does not survive:** every peak
+follows a `BOOK_GRID_TICK` by **2.5 / 4.9 / 3.2 / 3.8 min**, but samples are
+~30s apart, so a direct allocation would surface at the *next* sample, not five
+minutes later. Decisively, there are **13 book-grid ticks against 4 peaks** in
+the same window — if it were the cause it would fire three times as often as it
+does. **A correlation that requires the effect to arrive 5 minutes late and skip
+two thirds of its causes is not a mechanism.**
+
+#### What that leaves, stated as a search space rather than a suspicion
+
+In-process, in the long-lived worker, 493–878MB, released within ~72s, **not
+aligned with any instrumented stage**. Every named stage around the peaks reads
+baseline. So the allocator is in an **uninstrumented gap** — and one is already
+visible: the live-lens loop's last stage sample (`live_lens_tick_after_nfl`)
+precedes its own `TICK_COMPLETE` by ~18s, with the publish sweep inside that
+window.
+
+**Not claimed:** that the live-lens publish sweep is the cause. It is the
+largest unlit gap adjacent to the peaks, which makes it where to point the next
+instrument, not an answer.
+
+**The method note.** Every elimination above came from a field already in the
+payload — process tables, tick meta, stage timings. None needed new code.
+[[read the field you already have]]
+
 #### What is NOT claimed
 
 - **Not accumulation.** It returns in 72s. `#285`'s ratchet is unaffected.
