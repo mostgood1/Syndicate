@@ -1160,8 +1160,47 @@ def _intelligence_state_candidate_count(state: dict[str, Any] | None) -> int:
     # falling back to max() here also tolerates hand-built/legacy state
     # shapes where that invariant doesn't hold, without reintroducing the
     # original bug of trusting a request-scoped slice as the true total.
-    if by_sport_total > 0 or opportunities_total > 0:
-        return max(by_sport_total, opportunities_total)
+    # #337, second cause. THE FIELD ALREADY ON THE PAYLOAD IS A SOURCE TOO, and
+    # ignoring it is how a CORRECT count gets replaced by a wrong one.
+    #
+    # `_normalize_intelligence_state_payload:1277` calls this and then assigns
+    # the result unconditionally, so whatever this returns overwrites
+    # `candidate_count` on every read AND write. The board publication path had
+    # already computed the right answer -- traced statically and confirmed live:
+    #
+    #   21:37:15  CANDIDATE_POOL_READY   count=239
+    #   21:37:15  CANDIDATES_SERIALIZED  count=239 unpriced=16   <- len(candidates), :4908
+    #   21:42:34  STATE_PERSIST_BEGIN    candidate_count=150     <- after this function
+    #
+    # `candidates` is NOT sliced at `:4901`/`:5207` (the `[:opportunity_limit]`
+    # slice applies to `sport_scoped_candidates`, a different variable), so
+    # `response_candidate_count = len(candidates)` is the true pool and the
+    # response carried 239. This function then recomputed from
+    # `max(by_sport, top_opportunities)`, never looked at the 239 sitting beside
+    # it, and returned the request-capped 150.
+    #
+    # **The resolver is a FALLBACK being used as an AUTHORITY.** Trusting the
+    # field instead would reintroduce 2026-07-21 (field said 10, by_sport said
+    # 181), so the safe move is the SAME max() this function already applies
+    # between its two internal sources, extended to the field:
+    #
+    #   2026-07-21:  field 10  vs resolved 181  -> 181   (still fixed)
+    #   2026-08-10:  field 239 vs resolved 150  -> 239   (fixed)
+    #
+    # Monotone, so it cannot make either case worse. It is deliberately NOT a
+    # blanket "trust the field": a stale or hand-built payload carrying an
+    # inflated count would still be capped by... nothing, which is the one
+    # direction this does not protect. Accepted knowingly -- an over-count from
+    # a payload that also carries fewer candidates is not a shape anything in
+    # this pipeline produces, and the alternative has now broken the board twice.
+    existing_field = current.get("candidate_count")
+    try:
+        existing_total = int(existing_field) if existing_field is not None else 0
+    except (TypeError, ValueError):
+        existing_total = 0
+    existing_total = max(0, existing_total)
+    if by_sport_total > 0 or opportunities_total > 0 or existing_total > 0:
+        return max(by_sport_total, opportunities_total, existing_total)
     recommendations = current.get("recommendations")
     if isinstance(recommendations, list) and recommendations:
         return len([item for item in recommendations if isinstance(item, Mapping)])

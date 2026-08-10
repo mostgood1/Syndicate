@@ -415,3 +415,79 @@ class AliasedBySportMustNotCollapseTheCandidateCountTests(unittest.TestCase):
              "top_opportunities": [{"a": 1}] * 5}), 5)
 if __name__ == "__main__":
     unittest.main()
+
+
+class TheResolverMustNotOverwriteACorrectCountTests(unittest.TestCase):
+    """#337, second cause. `_normalize_intelligence_state_payload:1277` assigns
+    this resolver's output UNCONDITIONALLY, so it overwrites `candidate_count`
+    on every read and write -- including when the value already there is right.
+
+    Traced and confirmed live 2026-08-10:
+
+        21:37:15  CANDIDATE_POOL_READY   count=239
+        21:37:15  CANDIDATES_SERIALIZED  count=239 unpriced=16
+        21:42:34  STATE_PERSIST_BEGIN    candidate_count=150   <- after the resolver
+
+    `candidates` is not sliced at `:4901`, so the board response carried a
+    correct 239; the resolver recomputed from `max(by_sport, top_opportunities)`
+    and returned the request-capped 150. The resolver is a FALLBACK that was
+    being used as an AUTHORITY.
+
+    The fix extends the max() to the existing field. Both historical directions
+    are pinned below, because trusting the field instead would reintroduce the
+    2026-07-21 bug this resolver was written for.
+    """
+
+    def test_a_correct_field_survives_a_capped_top_opportunities(self) -> None:
+        # 2026-08-10. The field is right and everything else is display-capped.
+        state = {"candidate_count": 239, "top_opportunities": [{"a": i} for i in range(150)]}
+        self.assertEqual(intelligence_state._intelligence_state_candidate_count(state), 239)
+
+    def test_the_2026_07_21_direction_still_works(self) -> None:
+        # The bug this resolver EXISTS for: the field said 10, by_sport said 181.
+        # A blanket "trust the field" would reintroduce it, so this is the guard
+        # on the fix rather than on the original defect.
+        state = {
+            "candidate_count": 10,
+            "by_sport": {"mlb": [{"a": i} for i in range(181)]},
+            "top_opportunities": [{"a": i} for i in range(10)],
+        }
+        self.assertEqual(intelligence_state._intelligence_state_candidate_count(state), 181)
+
+    def test_an_aliased_by_sport_still_beats_the_field(self) -> None:
+        # #337's FIRST cause composed with its second: compaction turns by_sport
+        # into index markers, and the field carries the already-collapsed 150.
+        state = {
+            "candidate_count": 150,
+            "by_sport": {"mlb": {
+                intelligence_state._MEMBER_ALIAS_KEY: "recommendations",
+                intelligence_state._MEMBER_ALIAS_INDICES: list(range(203)),
+            }},
+            "top_opportunities": [{"a": i} for i in range(150)],
+        }
+        self.assertEqual(intelligence_state._intelligence_state_candidate_count(state), 203)
+
+    def test_an_empty_board_is_still_zero(self) -> None:
+        # The empty-over-good guard depends on a genuine 0 staying 0.
+        self.assertEqual(
+            intelligence_state._intelligence_state_candidate_count({"candidate_count": 0, "top_opportunities": []}), 0
+        )
+
+    def test_an_unparseable_or_negative_field_cannot_drag_the_count(self) -> None:
+        self.assertEqual(
+            intelligence_state._intelligence_state_candidate_count(
+                {"candidate_count": "abc", "top_opportunities": [{"a": 1}]}), 1)
+        self.assertEqual(
+            intelligence_state._intelligence_state_candidate_count(
+                {"candidate_count": -5, "top_opportunities": [{"a": i} for i in range(7)]}), 7)
+
+    def test_the_overwrite_site_end_to_end(self) -> None:
+        # The property that actually matters: the value that reaches the persist.
+        normalized = intelligence_state._normalize_intelligence_state_payload({
+            "candidate_count": 239,
+            "top_opportunities": [{"a": i} for i in range(150)],
+            "recommendations": [{"a": i} for i in range(150)],
+        })
+        self.assertEqual(normalized["candidate_count"], 239, "was 150 before the fix")
+if __name__ == "__main__":
+    unittest.main()
