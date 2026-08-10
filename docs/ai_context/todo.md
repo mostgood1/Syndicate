@@ -26366,6 +26366,43 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 
 ## Operational notes worth not rediscovering
 
+### Preflight for in-flight MEASUREMENTS, not just in-flight jobs (2026-08-10)
+
+`scripts/deploy_preflight.py` answers "will this kill a running job". **It does
+not answer "will this invalidate something someone is currently reading", and
+that is the more common harm.** Two instances in one hour, by two different
+people, both self-caught:
+
+- I set `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC=900` at 21:56Z, 26 minutes
+  into another lane's 66-minute run measuring what drives the memory plateau.
+  **The hydrated rebuild I halved IS that driver.** A null from their trial would
+  have been unattributable between "the model is wrong" and "he removed the
+  driver mid-run" -- and a null read as falsification retires a correct model.
+  I checked for in-flight jobs and not for in-flight measurements.
+- That lane deployed web three times in the same window for two column fixes,
+  flagged the first and not the other two, on the same reasoning: "small fix to
+  my own surface" rather than "intervention".
+
+**An env var, a config change and a two-line template fix are all interventions.**
+The question is not *is this small* but **could this move something someone is
+currently reading**. Their phrasing, and it is better than the job-centric rule
+the preflight tool encodes.
+
+Corollary for the tool: a HOLD on jobs is necessary and not sufficient. Ask the
+lanes before a config change the same way you would before a deploy.
+
+### A log window ahead of the log stream reads as a dead service (2026-08-10)
+
+Queried Render logs with `startTime=22:26:00Z` while the stream had only reached
+`22:25:15`. Result: **0 lines, on a healthy worker emitting ~125 lines/minute**,
+which reads exactly like a crashed process. Confirmed alive by dropping the time
+filter entirely and checking `suspended` plus the events API.
+
+**Before concluding a service is silent, verify the stream has REACHED your
+window.** Same family as *absence of signal is a fact about the emitter*: here
+the emitter was fine and the window was in the future.
+
+
 - **EDITING `todo.md` WHILE OTHER LANES ARE WRITING IT. The full recipe, because
   the short version has now failed twice and the three-line version I circulated
   on 2026-08-10 was missing two steps that each have their own prior incident.**
