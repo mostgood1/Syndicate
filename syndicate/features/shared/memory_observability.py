@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -592,6 +593,82 @@ def log_container_memory(stage: str, **extra: Any) -> dict[str, Any]:
     payload.update(extra)
     print(f"CONTAINER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
     return payload
+
+
+# #327. The ring buffer behind /api/ops/intelligence/memory-diagnostics.
+#
+# THIS LIVES HERE, ONCE, ON PURPOSE. There used to be two functions named
+# `_diag_log_all_process_memory` -- `pipeline/intelligence_state.py` (which
+# logged AND persisted) and `scripts/run_refresh_worker.py` (which only
+# logged). The call site `_diag_log_all_process_memory("post_mlb_sim_tick")`
+# read exactly like the one that persists, so nobody checking "is this stage
+# instrumented?" had reason to look twice.
+#
+# The cost was measured, not hypothetical: over 15:59-16:38Z there were 172
+# pid-38 samples in the logs and 39 in the ring buffer -- a lane had been
+# reading 23% of them, and the missing 77% carried the highest values
+# (`post_mlb_sim_tick` max 1867.4MB against `post_pool_assembled` max 1044.1).
+# The single largest memory excursion on the service was invisible to the
+# instrument built to find memory excursions.
+#
+# Same shape as `#317`'s two board-snapshot write sites and `#105` before it,
+# and `#317` had to learn it twice: when a near-duplicate helper means only one
+# copy gets the fix, EXTRACT rather than patch the second copy.
+PROCESS_MEMORY_CHECKPOINT_MAX_RECORDS = 300
+
+
+def process_memory_checkpoint_path() -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root() / "live_refresh_loop" / "memory_diagnostics.json"
+
+
+def dump_process_memory_checkpoint(stage: str, payload: dict[str, Any]) -> None:
+    """Append one sample to the bounded ring buffer.
+
+    Confirmed live: this background thread's stderr does not reliably reach
+    Render's log collector before a SIGKILL once memory pressure is severe --
+    checkpoints that provably executed (container-level memory deltas between
+    them) never appeared in the platform logs. Routes through
+    write_json_file/read_json_file so it is readable from the WEB service:
+    refresh-worker has no HTTP server of its own.
+
+    THE CAP IS SIZED, NOT GUESSED. Measured 2026-08-10 before this extraction:
+    60 records at 1,233 bytes each = 74KB, covering 36.1 minutes at
+    `intelligence_state`'s ~9 stages per cycle. Wiring the worker's stages in
+    multiplies the write rate roughly 6x (26 `live_lens_tick_*` and 6
+    `post_mlb_sim_tick` per 5 minutes), which at 60 records would have collapsed
+    the window to ~6 minutes -- fixing the blind spot while quietly destroying
+    the history that made it findable. 300 records restores ~30 minutes at
+    ~370KB, which is 4.4% of the 8,388,608 keyvalue ceiling.
+    """
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file, write_json_file
+
+        path = process_memory_checkpoint_path()
+        existing = read_json_file(path)
+        records = list(existing.get("records") or []) if isinstance(existing, dict) else []
+        records.append({"stage": stage, "wall_clock": time.time(), "pid": os.getpid(), **payload})
+        records = records[-PROCESS_MEMORY_CHECKPOINT_MAX_RECORDS:]
+        write_json_file(path, {"records": records})
+    except Exception as exc:  # noqa: BLE001
+        print(f"[memory_observability] DIAG_MEMORY_DUMP_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+
+
+def log_and_persist_process_memory(stage: str) -> dict[str, Any] | None:
+    """Log a process-memory sample to stderr AND persist it to the ring buffer.
+
+    The one entry point. Every caller that wants a stage to be visible from web
+    must use THIS -- `log_all_process_memory` alone writes stderr only, which is
+    exactly the gap `#327` records.
+    """
+    try:
+        payload = log_all_process_memory(stage)
+        dump_process_memory_checkpoint(stage, payload)
+        return payload
+    except Exception as exc:  # noqa: BLE001
+        print(f"[memory_observability] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+        return None
 
 
 def log_all_process_memory(stage: str, **extra: Any) -> dict[str, Any]:

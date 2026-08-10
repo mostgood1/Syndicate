@@ -2093,10 +2093,25 @@ def _diag_log_all_process_memory(stage: str) -> None:
     # process's own memory. log_all_process_memory enumerates every process
     # in the container (via /proc, falling back to psutil) with RSS, so this
     # settles it directly instead of guessing further. Remove once resolved.
+    #
+    # #327. THIS FUNCTION USED TO CALL `log_all_process_memory`, WHICH WRITES
+    # STDERR ONLY. Its identically-named twin in pipeline/intelligence_state.py
+    # also persisted to the ring buffer behind
+    # /api/ops/intelligence/memory-diagnostics, and nothing at either call site
+    # showed the difference. Measured 2026-08-10, 15:59-16:38Z: 172 pid-38
+    # samples in the logs against 39 in the ring buffer, and the missing 77%
+    # carried the highest values -- `post_mlb_sim_tick` (called at :2306 below)
+    # peaked at 1867.4MB where the visible stages topped out at 1044.1MB. The
+    # single largest memory excursion on this service was invisible to the
+    # instrument built to find memory excursions.
+    #
+    # Both are now one implementation in memory_observability. Anything that
+    # must be readable from WEB has to go through `log_and_persist_process_memory`
+    # -- refresh-worker has no HTTP server of its own.
     try:
-        from syndicate.features.shared.memory_observability import log_all_process_memory
+        from syndicate.features.shared.memory_observability import log_and_persist_process_memory
 
-        log_all_process_memory(stage)
+        log_and_persist_process_memory(stage)
     except Exception as exc:
         print(f"[refresh_worker] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
 

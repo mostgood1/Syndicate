@@ -2616,50 +2616,31 @@ def _log_stage_timing(stage_name: str, duration_ms: float) -> None:
     logger.info(json.dumps({"stage": stage_name, "duration_ms": round(duration_ms, 3)}, sort_keys=True, default=str))
 
 
-_DIAG_MEMORY_DUMP_MAX_RECORDS = 60
+# #327. These three were the ORIGINAL of a pair, and the copy in
+# scripts/run_refresh_worker.py silently lacked the persist half -- so the
+# highest-memory stage on the service (`post_mlb_sim_tick`, max 1867.4MB) never
+# reached the ring buffer that exists to catch exactly that. Extracted into
+# syndicate/features/shared/memory_observability.py so there is one
+# implementation; these remain as thin shims because `syndicate/blueprints/ops.py`
+# imports `_diag_memory_dump_path` from this module by name.
 
 
 def _diag_memory_dump_path() -> Path:
-    return reports_root() / "live_refresh_loop" / "memory_diagnostics.json"
+    from syndicate.features.shared.memory_observability import process_memory_checkpoint_path
+
+    return process_memory_checkpoint_path()
 
 
 def _diag_dump_checkpoint_to_disk(stage: str, payload: dict[str, Any]) -> None:
-    # Confirmed live: this background thread's print/stderr output does not
-    # reliably reach Render's log collector before a SIGKILL once memory
-    # pressure gets severe -- checkpoints that definitely executed (proven by
-    # the container-level memory delta between them) never showed up in the
-    # platform logs. Routes through write_json_file/read_json_file (the same
-    # SYNDICATE_REFRESH_STATE_BACKEND=keyvalue-routed helpers every other
-    # cross-service artifact in this file already uses) instead of the local
-    # filesystem specifically so this is readable from the web service too,
-    # via a dedicated ops endpoint -- refresh-worker has no HTTP server of
-    # its own to expose it directly. Bounded ring buffer (last N records);
-    # remove this whole mechanism once resolved.
-    try:
-        path = _diag_memory_dump_path()
-        existing = read_json_file(path)
-        records = list(existing.get("records") or []) if isinstance(existing, dict) else []
-        records.append({"stage": stage, "wall_clock": time.time(), "pid": os.getpid(), **payload})
-        records = records[-_DIAG_MEMORY_DUMP_MAX_RECORDS:]
-        write_json_file(path, {"records": records})
-    except Exception as exc:
-        print(f"[intelligence_state] DIAG_MEMORY_DUMP_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+    from syndicate.features.shared.memory_observability import dump_process_memory_checkpoint
+
+    dump_process_memory_checkpoint(stage, payload)
 
 
 def _diag_log_all_process_memory(stage: str) -> None:
-    # Temporary boot-crash diagnostic (see matching helper in
-    # scripts/run_refresh_worker.py): confirmed the refresh-worker's OOM
-    # crashes happen inside this background thread's own candidate-collection
-    # work, not the main tick loop -- that thread's own diagnostic samples
-    # stayed flat (~150-235MB) right up to each crash, meaning the spike
-    # happens somewhere in _build_candidate_pool. Remove once resolved.
-    try:
-        from syndicate.features.shared.memory_observability import log_all_process_memory
+    from syndicate.features.shared.memory_observability import log_and_persist_process_memory
 
-        payload = log_all_process_memory(stage)
-        _diag_dump_checkpoint_to_disk(stage, payload)
-    except Exception as exc:
-        print(f"[intelligence_state] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+    log_and_persist_process_memory(stage)
 
 
 # Treat this as a circuit breaker: check real, cheap (single cgroup file read,
