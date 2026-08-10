@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#336` — OPEN, UNOWNED. THE BOARD HAS NOT REBUILT IN 68 MINUTES. `_build_candidate_pool` returns 0 while the Layer 2 shortlist has 6,072 — and the board you are looking at is a preserved corpse, not a live one
+### `#336` — OWNED. ROOT-CAUSED, AND IT IS `#285`: the 3000MB overview headroom floor is firing on every cycle. NOT an independent defect, and the "not a memory problem" exclusion used a token this path never emits. THE BOARD HAS NOT REBUILT IN 68 MINUTES. `_build_candidate_pool` returns 0 while the Layer 2 shortlist has 6,072 — and the board you are looking at is a preserved corpse, not a live one
 
 **This is upstream of `#308` and is NOT the same defect.** `#308` is 156 merged
 candidates becoming 0 promoted cards. Here there are no candidates AT ALL: the
@@ -100,7 +100,57 @@ PULL_HOT_ARTIFACTS_FAILED   0 lines
 returns `_empty_candidate_pool(...)` on trip, which would produce exactly this
 signature, and it is the natural suspect given `#285`'s ratchet and the worker
 sitting at 2,640MB of 4,096 (64.5%). It prints `MEMORY_GUARD_ABORT` on every
-trip and has printed none. **`#336` is not a memory problem** -- worth stating
+trip and has printed none. > ## ROOT CAUSE, measured 2026-08-10 20:2xZ. **THE ABOVE EXCLUSION IS WRONG.**
+>
+> `MEMORY_GUARD_ABORT` returning 0 lines is a fact about the **emitter**, not
+> about memory: `_build_candidate_pool` never prints that token. The guard that
+> actually fires on this path is in `syndicate/features/intelligence.py`:
+>
+> ```
+> OVERVIEW_STOPPED_FOR_MEMORY   17 hits in 30 min   next_sport=mlb sports_done=0 sports_total=8
+> MEMORY_GUARD_ABORT             0 hits             <- the token that was checked
+> ```
+>
+> **The arithmetic, and it is not close:**
+>
+> ```
+> _OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000.0 MB    (intelligence.py:2551)
+> measured headroom_mb              = 2275.5 MB    (current 2676.4 of 4096.0)
+> deficit                             724.5 MB short -> abort before sport 1 of 8
+> ```
+>
+> **Causal chain, end to end:** the worker sits at ~2.68GB (`#285`'s ratchet) →
+> headroom 2275MB is below the 3000MB floor → `build_intelligence_overview`
+> aborts with `sports_done=0` → `_collect_candidates` reads `dashboard_games` /
+> `home_rails` off an empty overview → `CANDIDATE_POOL_READY count=0` → the
+> serve correctly refuses to overwrite a good board → `cc=150` frozen since
+> 18:49:58Z.
+>
+> **`LAYER2_SHORTLIST` disagreeing (6,072 / 430 considered) is not a
+> contradiction — it is the tell.** The shortlist reads persisted artifacts and
+> never touches the overview, so it is the one population the guard cannot
+> starve. Two numbers from two different sources, exactly one of which is gated.
+>
+> **This is the guard WORKING AS DESIGNED, and its own comment predicted this
+> outcome in advance:** *"on a ratcheted cycle (container 3179MB) the whole pass
+> is skipped and the process survives. That is a real reduction in board
+> coverage, and it is the correct trade."* The alternative is measured too —
+> MLB alone costs +2.9GB in 73s and took the container to 95.8% before a
+> SIGKILL.
+>
+> **So `#336` is not a defect to fix; it is `#285` observed from the board side,
+> and it closes as a duplicate the moment the ratchet is addressed.** Do not
+> open a fifth memory item for it.
+>
+> **The lever the code already names**, if the board is wanted before `#285`
+> lands: `build_intelligence_overview` is called with **`force_refresh=True`**
+> at `intelligence_state.py:3766` and `:3783`, defeating the overview cache on
+> every cycle — while the same file's `:2992` call passes `force_refresh=False,
+> skip_game_hydration=True`. The guard comment calls that "the obvious next
+> lever" and it has not been pulled. **Not attempted here:** it changes what the
+> board contains, which is a product decision, not a hygiene fix.
+
+**`#336` is not a memory problem** -- worth stating
 flatly, because three open items on this worker are, and the pull toward
 attributing a fourth is strong.
 
