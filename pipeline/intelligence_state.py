@@ -1787,6 +1787,41 @@ def _expand_member_lists(container: Mapping[str, Any], recommendations: Any) -> 
     return out
 
 
+def _alias_source_recommendations(state: Mapping[str, Any]) -> Any:
+    """The candidate list every alias in this module resolves against.
+
+    TWO PAYLOAD SHAPES REACH HERE AND ONLY ONE HAS A TOP-LEVEL
+    `recommendations`:
+
+      intelligence_state.json   {recommendations: [...], response: {...}, ...}
+      board_snapshot.json       {response: {recommendations: [...]}, ...}
+                                  ^ built by _intelligence_board_snapshot_payload,
+                                    which nests the whole state under `response`
+                                    and emits NO top-level recommendations
+
+    Measured on production 2026-08-10 00:28:03Z: the board snapshot was
+    23,217,383 bytes with `top_opportunities=4708684 recommendations=4708684
+    board_contract=4708370 by_sport=4427991` -- every object still FULL SIZE.
+    `state.get("recommendations")` was None, so `recommendations_blob` was the
+    4-byte string "null", which is below _ALIAS_MIN_BYTES, so every alias in
+    this function was skipped. Three separate compaction commits, all correct,
+    all inert on this payload.
+
+    The unit tests did not catch it because the fixtures were written with a
+    top-level `recommendations` -- the shape the code wanted rather than the
+    shape production emits.
+    """
+    top_level = state.get("recommendations")
+    if isinstance(top_level, list) and top_level:
+        return top_level
+    response = state.get("response")
+    if isinstance(response, Mapping):
+        nested = response.get("recommendations")
+        if isinstance(nested, list) and nested:
+            return nested
+    return top_level
+
+
 def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
     """Shrink the state before it crosses the keyvalue boundary.
 
@@ -1838,7 +1873,8 @@ def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
 
     # #43/#66: collapse the duplicate candidate lists. Same equality guard as
     # above -- alias only what provably matches, byte for byte.
-    recommendations_blob = json.dumps(state.get("recommendations"), sort_keys=True, default=str)
+    alias_source = _alias_source_recommendations(state)
+    recommendations_blob = json.dumps(alias_source, sort_keys=True, default=str)
 
     # An alias marker is ~26 bytes, so aliasing a small or empty list makes the
     # payload BIGGER. Measured: every quiet-slate payload on disk grew by 33
@@ -1859,7 +1895,17 @@ def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
     nested = compact.get("response")
     if isinstance(nested, dict):
         updated = dict(nested)
+        # #317. THE SOURCE MUST SURVIVE. On the board-snapshot shape the alias
+        # source IS `response["recommendations"]` (there is no top-level one),
+        # and that key is in _CANDIDATE_ALIAS_RESPONSE -- so aliasing it would
+        # replace the very list every other alias resolves against, and
+        # expansion would restore all of them from a marker. Measured: every
+        # field round-tripped to a wrong value while leaving no marker behind,
+        # which is the failure mode that looks like success.
+        source_is_nested = not (isinstance(state.get("recommendations"), list) and state.get("recommendations"))
         for key in _CANDIDATE_ALIAS_RESPONSE:
+            if source_is_nested and key == "recommendations":
+                continue
             if key in updated and _matches_recommendations(updated.get(key)):
                 updated[key] = _alias_marker("recommendations")
         compact["response"] = updated
@@ -1891,7 +1937,7 @@ def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
     original_response = state.get("response") if isinstance(state, dict) else None
     # #317. by_sport, the largest object the equality rules cannot reach.
     # Built once and reused for both the top-level and nested copies.
-    source_list = state.get("recommendations")
+    source_list = alias_source
     if isinstance(source_list, list) and len(recommendations_blob) >= _ALIAS_MIN_BYTES:
         source_blobs = {
             json.dumps(item, sort_keys=True, default=str): position
@@ -1932,7 +1978,11 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     if not isinstance(state, dict):
         return state
     expanded = dict(state)
-    recommendations = expanded.get("recommendations")
+    # #317. Must mirror _compact_state_for_persist EXACTLY: the board snapshot
+    # payload has no top-level `recommendations`, so resolving only there would
+    # restore every alias to None -- silently emptying a board that had just
+    # been written correctly.
+    recommendations = _alias_source_recommendations(expanded)
     marker = _alias_marker("recommendations")
 
     for key in _CANDIDATE_ALIAS_TOP_LEVEL:
