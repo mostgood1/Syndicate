@@ -142,13 +142,66 @@ trip and has printed none. > ## ROOT CAUSE, measured 2026-08-10 20:2xZ. **THE AB
 > and it closes as a duplicate the moment the ratchet is addressed.** Do not
 > open a fifth memory item for it.
 >
-> **The lever the code already names**, if the board is wanted before `#285`
-> lands: `build_intelligence_overview` is called with **`force_refresh=True`**
-> at `intelligence_state.py:3766` and `:3783`, defeating the overview cache on
-> every cycle — while the same file's `:2992` call passes `force_refresh=False,
-> skip_game_hydration=True`. The guard comment calls that "the obvious next
-> lever" and it has not been pulled. **Not attempted here:** it changes what the
-> board contains, which is a product decision, not a hygiene fix.
+> ## THE `force_refresh` LEVER IS INERT. Do not pull it. **I repeated the guard
+> comment's suggestion without checking it, which is tonight's error again.**
+>
+> Asked to pull it, I read the code first and it cannot work:
+>
+> ```
+> _HOME_OVERVIEW_TTL_SEC = 10.0          home.py:72
+> board loop interval    ~90s
+> ```
+>
+> A cache entry is 90 seconds old by the time the next cycle asks for it, so the
+> `if cached and not force_refresh and (now - cached[0]) < TTL` branch can never
+> be taken **whatever `force_refresh` is set to**. `home.py:6654` says so in as
+> many words: *"the TTL could never produce a hit there even without
+> force_refresh."* Flipping the flag would have been a fifth inert fix.
+>
+> **`skip_game_hydration=True` is not available either** and this one would have
+> been worse than inert: `build_intelligence_overview`'s own docstring says
+> *"never pass True for any overview that feeds candidate collection"* —
+> `_collect_candidates` reads `dashboard_games`/`home_rails` off exactly those
+> dicts. It would have produced 8 sports with empty rails and a pool of 0, i.e.
+> the same symptom with the guard no longer implicated.
+>
+> ## The lever that IS real already exists, is active, and cannot currently engage
+>
+> `#251` added a rate limit on the hydrated rebuild that **is honoured under
+> `force_refresh`** — a separate branch from the TTL:
+>
+> ```
+> _HYDRATED_OVERVIEW_MIN_REBUILD_INTERVAL_SEC = 300.0   home.py:88
+> env override SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC : ABSENT on
+>   refresh-worker (95 vars enumerated), so the 300s default is live
+> ```
+>
+> **But `OVERVIEW_REBUILD_RATE_LIMITED` has 0 hits in 40 minutes, and the reason
+> is a deadlock worth naming:**
+>
+> ```
+> guard aborts before MLB  ->  no hydrated build completes
+>                          ->  no cache entry is written
+>                          ->  `if cached and force_refresh and ...` cannot fire
+>                          ->  next cycle attempts a full rebuild
+>                          ->  guard aborts before MLB
+> ```
+>
+> **The rate limit that exists to reduce memory pressure is disabled by the
+> memory pressure it exists to relieve.** It can only start working after one
+> successful hydrated build populates the cache — which needs memory low enough
+> for the guard to pass, which is what the rate limit was meant to deliver.
+>
+> A reboot breaks the deadlock. One happened at **20:33:10Z**
+> (`MALLOC_ARENA_INIT`, RSS 1748 -> 474MB): the guard went quiet, and the
+> hydrated pass completed **all 8 sports in 21 seconds** — not the 73s/+2.9GB of
+> the 2026-08-07 measurement, because tonight's MLB slate has not started. So
+> the cache is now populated and the 300s limit should engage on its own.
+>
+> **Prediction, falsifiable, being watched:** the pool returns non-zero and
+> `OVERVIEW_REBUILD_RATE_LIMITED` starts appearing. If the pool stays 0 with the
+> guard quiet and the overview complete, **the empty-overview root cause above is
+> wrong** and the zero is somewhere in collect/merge instead.
 
 **`#336` is not a memory problem** -- worth stating
 flatly, because three open items on this worker are, and the pull toward
