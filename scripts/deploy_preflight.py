@@ -11,8 +11,23 @@ probed three tokens in the logs -- `build_soccer_artifacts`,
 It was not clear. `generate_smartsim2_nfl_preseason_projections.py --season 2026
 --week 2` (pid 427) had started at 15:53:49Z, **61 seconds earlier**, and a
 sibling lane had explicitly named NFL smartsim and MLB `daily_update.py` as
-kill-risk. I caught it after triggering and canceled mid-`update_in_progress`;
-the child survived on timing, not on process.
+kill-risk. I caught it after triggering and canceled mid-`update_in_progress`.
+
+**The cancel did NOT save the child, and believing it did was a second error.**
+Measured afterwards: cancelling a deploy that has already passed `build_ended`
+and entered the update phase does not avoid a restart -- it CAUSES one.
+
+    15:43:16  MALLOC_ARENA_INIT pid=39      <- the 87cdd3e1 boot
+    15:55:10  deploy_started
+    15:57:50  build_ended (succeeded)
+    15:58:43  deploy_ended (canceled)       <- my cancel
+    15:59:12  MALLOC_ARENA_INIT pid=38      <- a SECOND process start, 29s later
+
+Child pids reset from ~297 to ~75 across that boundary, so the pid namespace
+changed: a container restart. The NFL child died anyway; the one I saw a minute
+later and called a survivor was a fresh launch. **There is no safe abort once
+the update phase starts -- the only cheap moment is BEFORE triggering, which is
+what this script is for.**
 
 **The bug was not the missing token. It was the shape of the check.** A probe
 list can only find hazards you already remembered, and printing a single global

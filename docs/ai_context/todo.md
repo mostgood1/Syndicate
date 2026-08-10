@@ -309,8 +309,14 @@ I triggered `f1bba90c` at 15:54:50Z. Two errors:
    (`generate_smartsim2_nfl_preseason_projections.py --season 2026 --week 2`,
    pid 427) had started at 15:53:49Z, **61 seconds before I triggered**, and the
    `#285` lane had explicitly named MLB `daily_update.py` and NFL smartsim as
-   kill-risk. Canceled mid-`update_in_progress` at 15:58:43Z; the child
-   survived. **A checklist that reports one verdict over a partial list is worse
+   kill-risk. Canceled at 15:58:43Z -- **and the cancel did not save it, which
+   was a second error on top of the first.** `MALLOC_ARENA_INIT` fires once per
+   process start: `15:43:16 pid=39` (the `87cdd3e1` boot) and then
+   `15:59:12 pid=38`, 29 seconds after my cancel. Child pids reset ~297 -> ~75,
+   so the pid namespace changed: a container restart. **Cancelling after
+   `build_ended`, once the update phase has begun, CAUSES a restart rather than
+   avoiding one.** The child I saw a minute later and called a survivor was a
+   fresh launch. There is no cheap abort after triggering. **A checklist that reports one verdict over a partial list is worse
    than no checklist — it reads as coverage.** Enumerate the running processes
    (`ALL_PROCESS_MEMORY` already lists every child with its cmdline) instead of
    probing for the hazards you happen to remember.
