@@ -6681,6 +6681,39 @@ def _build_sport_overview(
             flush=True,
         )
         return dict(cached[1])
+    # `#336`. WHY THE LIMIT DID NOT APPLY. `#251` added this rate limit and
+    # `#255` fixed the pruner that was deleting the entries it needed -- and
+    # measured on refresh-worker `8fa376ca` over the 29 minutes after a boot,
+    # with the memory guard quiet and 11 full 8-sport passes completing,
+    # `OVERVIEW_REBUILD_RATE_LIMITED` fired ZERO times. mlb rebuild gaps in that
+    # window were 7s / 245s / 248s / 251s, all inside the 300s interval.
+    #
+    # Three branches are already excluded: the cache write at the end of this
+    # function is unconditional on a completed build, `_prune_home_cache`
+    # retains at `max(10, 300)` since `#255`, and only one board date was in
+    # play so the 32-entry ceiling never evicted. So entries should be present
+    # and fresh, and the limit should fire on nearly every pass.
+    #
+    # THE CONDITION IS A CONJUNCTION OF FOUR TERMS AND THE LOG SAYS ONLY THAT
+    # IT WAS FALSE. That is the whole problem: "it did not fire" is compatible
+    # with a missing entry, a stale one, or a flag being other than assumed,
+    # and those have different fixes. Emitting the distance to the threshold
+    # rather than the verdict is the practice that settled `#282` and `#311`.
+    #
+    # MLB ONLY, deliberately. This runs 8x per pass on a log channel that
+    # already carries ~125 lines/minute, and MLB is the sport the 3000MB floor
+    # is sized against (+2.9GB in 73s, measured). One line per pass buys the
+    # discriminator without adding eight.
+    if slug == "mlb" and force_refresh and not skip_game_hydration:
+        print(
+            f"[home] OVERVIEW_REBUILD_NOT_LIMITED sport={slug} "
+            f"cached={'yes' if cached else 'NO'} "
+            f"age_sec={round(now - cached[0], 1) if cached else 'n/a'} "
+            f"interval_sec={_hydrated_overview_min_rebuild_interval_sec()} "
+            f"cache_entries={len(_HOME_OVERVIEW_CACHE)} "
+            f"key={cache_key}",
+            flush=True,
+        )
 
     links: list[dict[str, Any]] = []
     context_label = today_value
