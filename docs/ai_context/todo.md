@@ -1,5 +1,90 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#336` — OPEN, UNOWNED. THE BOARD HAS NOT REBUILT IN 68 MINUTES. `_build_candidate_pool` returns 0 while the Layer 2 shortlist has 6,072 — and the board you are looking at is a preserved corpse, not a live one
+
+**This is upstream of `#308` and is NOT the same defect.** `#308` is 156 merged
+candidates becoming 0 promoted cards. Here there are no candidates AT ALL: the
+pool itself is empty, so `#308`'s drop never gets the chance to happen.
+
+Measured on refresh-worker `c7946247`, one complete cycle, 2026-08-10 19:57Z:
+
+```
+19:57:29  MANIFEST_GATE_SKIPPED_SPORTS  skipped=nba,ncaab,ncaaf,nhl kept=mlb,wnba,nfl,soccer
+19:57:37  LAYER2_SHORTLIST     date=2026-08-10 rows=200 considered=6072 sports=[mlb,soccer,wnba]
+19:57:38  CANDIDATE_POOL_READY date=2026-08-10 count=0        <-- FIRST ZERO
+19:57:38  CANDIDATES_SERIALIZED count=0 unpriced=0
+19:57:38  CANDIDATES_RANKED    count=0
+19:57:38  BOARD_PUBLICATION_RESPONSE_READY candidate_count=0
+19:58:03  BOARD_STATE_LEDGER_SKIPPED_EMPTY (not stamping -- will retry next cycle)
+19:58:03  SNAPSHOT_UPDATE_SKIPPED_AFTER_FAILURE kept_candidate_count=150 new_snapshot_count=0
+```
+
+**Layer 2 considered 6,072 opportunities in the same second the pool produced
+zero.** Whatever is broken is specific to `_build_candidate_pool`; the data it
+should be drawing on demonstrably exists.
+
+## The board is frozen, and the freeze is the SAFETY BEHAVIOUR working
+
+Four reads 60s apart, `/api/intelligence/status`:
+
+```
+19:53:51  computed_at=18:49:58Z  age=3833.7s  cc=150
+19:54:55  computed_at=18:49:58Z  age=3897.8s  cc=150
+19:55:59  computed_at=18:49:58Z  age=3961.8s  cc=150
+19:57:03  computed_at=18:49:58Z  age=4025.7s  cc=150
+```
+
+`computed_at` pinned, age climbing linearly. **`SNAPSHOT_UPDATE_SKIPPED_AFTER_FAILURE`
+is deliberately refusing to overwrite a 150-candidate board with an empty one**,
+which is correct and is why the user sees a populated board rather than a blank
+one. The cost is that the failure is invisible from the surface: the board looks
+fine and is over an hour stale.
+
+**`cc=150` is therefore NOT evidence of health.** It is the same number every
+time because it is the same frozen snapshot every time. Anyone re-measuring this
+must read `computed_at`, not `candidate_count`.
+
+## The 2026-08-11 builds are a CONSEQUENCE, not a look-ahead
+
+```
+19:55:45  CANDIDATE_POOL_READY date=2026-08-11 count=0
+19:40-19:56  LATEST_KEY_PROMOTION_SKIPPED_NON_TODAY date=2026-08-11  (x5)
+```
+
+`intelligence_state.py:4775` rolls forward to `_next_supported_intelligence_date`
+when today's pool is empty. Tomorrow is empty too, and promotion then correctly
+refuses it for being non-today. **Do not chase the rollover or the promotion
+skip — both are behaving correctly in response to the empty pool.** Two of the
+three most eye-catching log lines in this incident are downstream symptoms.
+
+## Why nobody can see inside it, which is the thing to fix first
+
+`_build_candidate_pool`'s internals are traced with `logger.info` and
+`_log_stage_timing`. **`logger.info` does not reach Render's log collector from
+this process** -- the file's own comment at `:4765` records that, measured, as
+the reason the plain `print()` checkpoints were added around it. So the four
+ring-buffer stages (`build_candidate_pool_start`, `post_candidate_building`,
+`post_collect_candidates_with_fallback_merge`, `post_pool_assembled`) tell you
+it ran and how much memory it used, and **nothing tells you how many candidates
+each sport contributed.** Searched: `CANDIDATE_MERGE`, `COLLECT_CANDIDATES`,
+`CANDIDATE_BUILD`, `SPORT_CANDIDATES` -- 0 lines each.
+
+**First action is a per-sport `print()` inside the collect/merge step**, not a
+fix. The pool is a merge over per-sport sources and the population that dies is
+unknown; a fix written now would be a guess. This is the same shape as `#327`:
+the stage that matters is the one the instrument cannot see.
+
+## Not claimed
+
+- **Not** that it started at 18:49:58Z. That is when the last SUCCESSFUL build
+  landed; the first failure is somewhere in the following ~5 minutes and was not
+  bisected. The `150 -> 23` reading at 16:47Z suggests degradation began earlier
+  and this is its endpoint, but 23 and 0 have not been linked.
+- **Not** that `MANIFEST_GATE_SKIPPED_SPORTS` is implicated. It kept
+  mlb/wnba/nfl/soccer, which is four sports that should each yield candidates.
+- **Not** related to `#331`. That fix is verified and its artifact is healthy;
+  Layer 2's 6,072 considered is partly evidence of it working.
+
 ### `#329` — IN PROGRESS. Layer 1 was eight sports, six bespoke builders and two 404s. One implementation now, and the date scope was wrong on every one of them
 
 Measured on production 2026-08-10, `/<sport>/api/market-board` vs
