@@ -501,9 +501,13 @@ overview (~+700MB) able to land on the same cycle.
 #### What is NOT claimed
 
 - **Not accumulation.** It returns in 72s. `#285`'s ratchet is unaffected.
-- **Not recurring.** This is **n=1 in a 39-minute window**. The stage's max is
-  1867.4 and its median is 959.6, so it is one event, not a cadence. Do not
-  build a "spikes every N minutes" claim on it.
+- ~~**Not recurring.** This is **n=1 in a 39-minute window**.~~ **SUPERSEDED —
+  it DOES recur: `n=4` in 5 hours (see the 2026-08-10 update above).** The
+  original was correct for the window it had; a 39-minute window simply could
+  not see a ~75-minute inter-arrival gap. **The half of this bullet that
+  SURVIVED is the important one: it is still NOT a cadence** — gaps of 42.4,
+  18.3 and 11.1 minutes are scattered, and "spikes every N minutes" remains
+  unsupported with the sample four times larger.
 - **Not attributed to a cause.** Nothing here says what allocates the 817MB.
 - **Not `_keyvalue_backed` (`#324`).** That change only re-routes which transport
   a write takes, the spike is inside the sim tick, and the trim/gc figures on
