@@ -184,7 +184,10 @@ services:
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
-        value: "false"
+        # #312: blueprint default was "false". `sync: false` so a runtime
+        # disable via the env API is NOT reverted by the next blueprint sync.
+        # Verify with scripts/audit_blueprint_drift.py before pushing this file.
+        sync: false
       - key: MLB_ENABLE_REFRESH_WORKER_AUTORUN
         value: "true"
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
@@ -282,7 +285,10 @@ services:
       # todo.md) -- MLB predictions will keep reading "pending" until that's
       # built separately; this flag alone does not fix MLB.
       - key: RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN
-        value: "true"
+        # #312: blueprint default was "true". `sync: false` so a runtime
+        # disable via the env API is NOT reverted by the next blueprint sync.
+        # Verify with scripts/audit_blueprint_drift.py before pushing this file.
+        sync: false
       - key: RECONCILIATION_REFRESH_INTERVAL_SECONDS
         value: "86400"
       # MLB's own actuals writer (scripts/build_mlb_actuals.py) -- the "MLB
@@ -294,7 +300,10 @@ services:
       # reconciliation autorun's -- both must be true for MLB predictions to
       # actually settle.
       - key: RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER
-        value: "true"
+        # #312: blueprint default was "true". `sync: false` so a runtime
+        # disable via the env API is NOT reverted by the next blueprint sync.
+        # Verify with scripts/audit_blueprint_drift.py before pushing this file.
+        sync: false
       - key: RECONCILIATION_MLB_ACTUALS_WRITER_INTERVAL_SECONDS
         value: "3600"
       # Evaluation-ledger settlement autorun (evaluation_settlement.py,
@@ -336,7 +345,10 @@ services:
       # default was written for a grading backfill and is the reason a single
       # run touches every large chunk.
       - key: EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN
-        value: "false"
+        # #312: blueprint default was "false". `sync: false` so a runtime
+        # disable via the env API is NOT reverted by the next blueprint sync.
+        # Verify with scripts/audit_blueprint_drift.py before pushing this file.
+        sync: false
       # DELIBERATELY NOT SET, and this is not an oversight -- do not restore it.
       #
       # Setting this key AT ALL overrides _evaluation_settlement_should_run_now's
@@ -484,7 +496,10 @@ services:
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
-        value: "false"
+        # #312: blueprint default was "false". `sync: false` so a runtime
+        # disable via the env API is NOT reverted by the next blueprint sync.
+        # Verify with scripts/audit_blueprint_drift.py before pushing this file.
+        sync: false
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
@@ -562,7 +577,10 @@ services:
       # worker's block below). This autorun keeps only the sim
       # (soccer_{league}_artifacts, phases=("pregame","live")) and live_state.
       - key: SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN
-        value: "true"
+        # #312: blueprint default was "true". `sync: false` so a runtime
+        # disable via the env API is NOT reverted by the next blueprint sync.
+        # Verify with scripts/audit_blueprint_drift.py before pushing this file.
+        sync: false
       - key: SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS
         value: "14400"
       # Same ownership-split pattern as SYNDICATE_MLB_REFRESH_TICK_OWNER below
@@ -854,7 +872,10 @@ services:
       # only service that should ever call OddsAPI), while refresh-worker's
       # autorun is now scoped to phase="live" (the sim only).
       - key: SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN
-        value: "true"
+        # #312: blueprint default was "true". `sync: false` so a runtime
+        # disable via the env API is NOT reverted by the next blueprint sync.
+        # Verify with scripts/audit_blueprint_drift.py before pushing this file.
+        sync: false
       - key: SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS
         value: "14400"
       - key: SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
@@ -909,7 +930,10 @@ services:
         # process (see docs/fix_notes_log.md / commit 9307fb80) -- disabling
         # just this flag stops that race while leaving this loop's other job
         # (_warm_cards_api_cache) running untouched.
-        value: "false"
+        # #312: blueprint default was "false". `sync: false` so a runtime
+        # disable via the env API is NOT reverted by the next blueprint sync.
+        # Verify with scripts/audit_blueprint_drift.py before pushing this file.
+        sync: false
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS

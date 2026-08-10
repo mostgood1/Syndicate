@@ -707,28 +707,79 @@ a false premise: `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN` reads `'true'`
 in the blueprint **and** `'true'` live. The intent to disable never reached
 either one.
 
-#### The proposed fix, NOT APPLIED — it needs an owner's decision because applying it *is* a sync
+#### THE FIX IS APPLIED — held on a branch, **NOT pushed and NOT on `main`**
 
-Put **`sync: false`** on kill switches, so the blueprint declares the key exists
-but stops overwriting its value; the live value then survives a sync. The
-precedent is already in the file at `render.yaml:43` (`ANTHROPIC_API_KEY`).
+**8 conversions to `sync: false`**, narrowed on the owner's decision to exclude
+every flag that doubles as **service-role assignment**:
 
-**Deliberately NOT on `*_TICK_OWNER` routing keys.** Those must stay consistent
-*across* services — drift between them is a bug, not an operator action, and
-`#278` is the incident where both workers believed they owned the MLB tick. The
-blueprint is the right place to pin those. The audit script encodes this split
-(`KILL_SWITCH_RE` minus `OWNERSHIP_RE`), so the recommendation is executable
-rather than a description.
+```
+syndicate          MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS              was "false"
+refresh-worker     RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN         was "true"
+refresh-worker     RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER             was "true"
+refresh-worker     EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN  was "false"
+refresh-worker     MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS              was "false"
+refresh-worker     SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN       was "true"
+live-odds-worker   SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN      was "true"
+live-odds-worker   MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS              was "false"
+```
 
-**Cost, stated plainly:** `sync: false` means the blueprint no longer records
-the intended value, so the file stops describing production for those keys.
-Mitigate by keeping the intended default in a comment above each — the pattern
-this file already uses heavily.
+Each keeps its former literal in a comment, because `sync: false` means the
+blueprint stops describing production for that key. **Both soccer autoruns are
+in the kept set** — the case that motivated this item is covered, which is the
+test of whether the narrowing threw the point away.
 
-**Why I did not just do it:** editing `render.yaml` is only deliverable by
-pushing it, and that push *is* the production event. Committing is safe; pushing
-is the change. Needs an explicit decision, and the audit re-run in the same
-minute.
+#### AN ARITHMETIC ERROR OF MINE, recorded because the shape recurs
+
+I offered "narrowing to the **~21** non-ownership switches" as the alternative.
+**The real number is 8.** I computed `30 − 9` — subtracting nine *distinct key
+names* from thirty *key-service occurrences*. Those nine names recur across
+services and account for **22 occurrences**, not 9.
+
+Two quantities in different units, differenced as if they were the same. It
+survived review because 21 is a plausible-looking number and nothing in the
+sentence forced the units to be checked. [[a rate, not a count]]
+
+#### Why these eight and not the other 22
+
+The excluded flags are set `true` on exactly one service and `false` on the
+others — they **are** ownership, just spelled `ENABLE_*` rather than `*_OWNER`,
+which is precisely why the audit script's `OWNERSHIP_RE` does not catch them:
+
+```
+SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP              live-odds=true,  others false
+SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP  refresh=true,    others false
+MLB_ENABLE_LIVE_LENS_LOOP / SYNDICATE_ENABLE_LIVE_LENS_LOOP    live-odds=true
+SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER               refresh=true,  live-odds false
+SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER        refresh=true,  live-odds false
+SYNDICATE_LOOK_AHEAD_ENABLED                         refresh=true,  live-odds false
+SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED           refresh=true,  live-odds false
+MLB_ENABLE_REFRESH_WORKER_AUTORUN                    web=true,      refresh false
+WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN          refresh=true,  web false
+```
+
+`sync: false` on those would buy a durable emergency disable **at the cost of
+the blueprint's auto-correction of a cross-service misconfiguration** — exactly
+the property `#278` needed when both workers believed they owned the MLB tick.
+They keep their literals.
+
+**The rule this settles on, and it is cleaner than the one I first applied: the
+blueprint stays the authority on WHO RUNS WHAT; it stops being the authority on
+WHAT IS SWITCHED OFF.**
+
+#### Where it lives, and how to ship it
+
+Held on branch **`hold/312-sync-false`**; `main` is left at `origin/main`.
+**An unpushed commit on `main` in this shared checkout is not held** — several
+lanes run `git push HEAD:main` continuously, and for `render.yaml` that push
+*is* the sync. To ship: `git cherry-pick hold/312-sync-false`, then push.
+
+**Re-run `scripts/audit_blueprint_drift.py` in the same minute as the push.**
+The 0-drift reading is a snapshot; one env-API call in between makes the push
+non-neutral.
+
+**Verification gotcha:** `grep -c "sync: false" render.yaml` gives the WRONG
+answer — each converted key's comment contains the literal `` `sync: false` ``
+in backticks, so every key matches twice. Parse the YAML instead.
 
 ### 2026-08-09 (21:1xZ) — `pool=0` WHILE `shortlist rows=155` IS `#290`, not a new defect. `#319` closed as a duplicate before it was opened
 
