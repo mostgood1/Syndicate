@@ -31,7 +31,55 @@ was broken, not that the resolver was the source.
 score zero there, and `:1277`/`:5921`/`:5953` really were returning the cap.
 It is a correct fix to a second instance of the bug, not the one being measured.
 
-#### NEXT CANDIDATE, EXPLICITLY NOT VERIFIED — do not fix this blind
+#### TRACED. `:5299` IS CLEARED. The real site is `_normalize_intelligence_state_payload:1277`
+
+**`candidates` is NOT sliced**, in either the request path (`:5207`) or the
+board path (`:4901`). Both build it from `candidate_pool["candidates"]` and
+never reassign it; the `[:opportunity_limit]` slice at `:4956`/`:5240` applies
+to `sport_scoped_candidates`, a **different variable**.
+
+Confirmed empirically as well as statically — the board path logs its own length:
+
+```
+21:37:15  CANDIDATE_POOL_READY   count=239
+21:37:15  CANDIDATES_SERIALIZED  count=239 unpriced=16     <- len(candidates) at :4908
+```
+
+So `response_candidate_count = len(candidates)` at `:4960` is **239**, and the
+board publication response carries `candidate_count: 239`. Correct at the source.
+
+**The collapse is downstream, and it is an unconditional overwrite:**
+
+```python
+1277:    candidate_count = _intelligence_state_candidate_count(current)
+1278:    current["candidate_count"] = candidate_count
+```
+
+`_normalize_intelligence_state_payload` **discards the correct upstream 239** and
+recomputes from `max(by_sport_total, opportunities_total)` — a computation that
+**never looks at the existing `candidate_count` field**. With
+`top_opportunities` capped to 150 and `by_sport` not exceeding it, the answer is
+150, and a right number is replaced by a wrong one on every persist.
+
+**The resolver is a FALLBACK being used as an AUTHORITY.** It was written for
+the opposite failure (2026-07-21: the field said 10 and `by_sport` said 181), so
+trusting the field blindly would reintroduce that bug.
+
+**The fix that is safe in both directions is `max(existing_field, resolved)`** —
+monotone, and exactly the reasoning the function already applies between
+`by_sport_total` and `opportunities_total` ("take whichever is larger rather
+than strictly preferring by_sport"). 2026-07-21: field 10 vs resolved 181 -> 181,
+still fixed. Today: field 239 vs resolved 150 -> 239, fixed. **Not implemented —
+the trace was the ask, and this should be a deliberate change rather than the
+sixth thing I ship tonight.**
+
+One thing still unexplained and worth a moment before the fix: *why* the
+resolver returns 150 rather than a by_sport total near 239. Either `by_sport` is
+absent from the normalized payload or its total genuinely is ~150. The `max()`
+fix works either way, but the answer would say whether there is a second defect
+underneath.
+
+#### SUPERSEDED — the earlier guess, kept because the correction is the point
 
 `:5299` sets `response_candidate_count = len(candidates)` and `:5303` writes it
 into the response that is eventually persisted. **That is correct if
