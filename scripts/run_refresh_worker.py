@@ -2029,6 +2029,75 @@ def _diag_log_all_process_memory(stage: str) -> None:
         print(f"[refresh_worker] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
 
 
+_BOOK_GRID_LAST_RUN: dict[str, float] = {}
+
+
+def _book_grid_refresh_interval_seconds() -> int:
+    raw_value = str(os.environ.get("SYNDICATE_BOOK_GRID_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        return max(60, int(raw_value))
+    except ValueError:
+        # 10 minutes. The shard is a per-day accumulator (measured 2026-08-09:
+        # 0.9MB a few hours in, 207MB by end of day) and the grid is a research
+        # surface, not a live-price feed -- rebuilding it every tick would be
+        # the "worker periodic work is never free" mistake (#241 caused a
+        # production restart loop that way).
+        return 600
+
+
+def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
+    """#322: pivot the book_quotes shard HERE so web never has to.
+
+    Web cannot do this pivot. Measured 2026-08-09: the MLB shard is 207MB and
+    costs ~6.3x resident, so one read is ~1.3GB against a 2GB container -- it
+    OOM-killed web twice on 2026-08-10. This worker has 4GB and already holds
+    shards for other work.
+
+    Deliberately does NOT run for every sport every tick. It walks sports that
+    actually have a shard today, which is the same set the odds sweep wrote,
+    and skips the rest -- an absent shard is not an empty grid and writing one
+    would make those indistinguishable downstream.
+    """
+    if str(os.environ.get("SYNDICATE_ENABLE_BOOK_GRID_ARTIFACT") or "true").strip().lower() in {"0", "false", "no", "off"}:
+        return None
+    interval = _book_grid_refresh_interval_seconds()
+    now = time.time()
+    if now - _BOOK_GRID_LAST_RUN.get("all", 0.0) < interval:
+        return None
+    _BOOK_GRID_LAST_RUN["all"] = now
+
+    from syndicate.features.shared.book_grid_artifact import (
+        build_book_grid_artifact,
+        write_book_grid_artifact,
+    )
+    from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+    from syndicate.features.shared.odds_book_quotes import book_quotes_path
+
+    selected_date = central_today_iso()
+    written: list[str] = []
+    skipped: list[str] = []
+    for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
+        try:
+            if not book_quotes_path(sport, selected_date).is_file():
+                skipped.append(sport)
+                continue
+            payload = build_book_grid_artifact(sport, selected_date)
+            if not payload:
+                skipped.append(sport)
+                continue
+            path = write_book_grid_artifact(sport, selected_date, payload)
+            written.append(f"{sport}:{payload.get('rows_total')}")
+            try:
+                publish_hot_artifact(path)
+            except Exception as exc:
+                print(f"[refresh_worker] BOOK_GRID_PUBLISH_ERROR sport={sport} {type(exc).__name__}: {exc}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] BOOK_GRID_BUILD_ERROR sport={sport} {type(exc).__name__}: {exc}", flush=True)
+    if not written and not skipped:
+        return None
+    return {"date": selected_date, "written": written, "skipped_no_shard": skipped}
+
+
 def main() -> int:
     store = _refresh_state_store()
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
@@ -2128,6 +2197,16 @@ def main() -> int:
                 print(f"[refresh_worker] MLB_ACTUALS_TICK {json.dumps(mlb_actuals_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_ACTUALS_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
+
+        # #322: the Layer 1 book grid. Unconditional for the same reason as the
+        # ticks above -- web physically cannot pivot the shard, so this is the
+        # only thing that makes that surface exist.
+        try:
+            book_grid_meta = _run_book_grid_artifact_tick()
+            if book_grid_meta:
+                print(f"[refresh_worker] BOOK_GRID_TICK {json.dumps(book_grid_meta, sort_keys=True, default=str)}", flush=True)
+        except Exception as exc:
+            print(f"[refresh_worker] BOOK_GRID_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
 
         # Unconditional, same reasoning as the actuals-writer tick above --
         # a one-off, self-disabling backfill (see
