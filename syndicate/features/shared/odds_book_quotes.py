@@ -496,6 +496,69 @@ _BOOK_QUOTES_RSS_PER_FILE_BYTE = 6.3
 _BOOK_QUOTES_CACHE_MAX_RSS_BYTES = 500 * 1024 * 1024
 
 
+def book_quotes_read_affordable(sport: str, date_str: str) -> tuple[bool, dict[str, Any]]:
+    """Can THIS process afford to read this shard, or must the caller degrade?
+
+    Measured 2026-08-10. `/api/board/book-grid` took 22.2s and returned 2.69MB,
+    and web OOM-killed twice within ~60s of a call -- once on the user's own
+    session, once on mine. The arithmetic is not close:
+
+        web container                 2Gi
+        WEB_CONCURRENCY               2 gunicorn workers, EACH with its own cache
+        production MLB shard          ~90MB on disk
+        resident cost                 x6.3 = ~570MB, never returned to the OS
+        two workers holding one each  ~1.14GB
+        + web baseline                ~426MB
+                                      ~1.57GB   vs lethal ~1.55GB
+
+    The existing 500MB budget is correct and was reasoned for live-odds-worker,
+    which runs ONE process. Web runs `WEB_CONCURRENCY` of them, so the effective
+    ceiling per process is that budget divided by the worker count -- and the
+    eviction loop keeps `len > 1`, so one shard stays resident BETWEEN requests
+    and the second caller lands on an already-loaded box.
+
+    Returns (affordable, facts). `facts` is what the caller shows the user
+    instead of dying: a degraded board that explains itself beats a 24-second
+    outage every time someone opens the page. That is `CLAUDE.md`'s rule -- if
+    data is missing at request time the correct behaviour is a degraded state,
+    not an on-request backfill -- applied to "too expensive" as well as
+    "absent".
+    """
+    path = book_quotes_path(sport, date_str)
+    try:
+        file_bytes = path.stat().st_size if path.is_file() else 0
+    except OSError:
+        file_bytes = 0
+    try:
+        workers = max(1, int(str(os.environ.get("WEB_CONCURRENCY") or "1").strip() or "1"))
+    except ValueError:
+        workers = 1
+    per_process_budget = int(_BOOK_QUOTES_CACHE_MAX_RSS_BYTES / workers)
+    projected = int(file_bytes * _BOOK_QUOTES_RSS_PER_FILE_BYTE)
+    facts = {
+        "shard_bytes": file_bytes,
+        "projected_resident_bytes": projected,
+        "per_process_budget_bytes": per_process_budget,
+        "web_concurrency": workers,
+        "multiplier": _BOOK_QUOTES_RSS_PER_FILE_BYTE,
+    }
+    # A shard already in cache costs nothing more to read -- refusing then would
+    # degrade the board for no memory saved.
+    cache_key = _book_quotes_cache_key(path)
+    if cache_key is not None and cache_key in _BOOK_QUOTES_CACHE:
+        facts["already_cached"] = True
+        return True, facts
+    affordable = projected <= per_process_budget
+    if not affordable:
+        print(
+            f"[odds_book_quotes] BOOK_QUOTES_READ_REFUSED sport={sport} date={date_str} "
+            f"shard_mb={file_bytes / (1024 * 1024):.1f} projected_mb={projected / (1024 * 1024):.1f} "
+            f"budget_mb={per_process_budget / (1024 * 1024):.1f} web_concurrency={workers}",
+            flush=True,
+        )
+    return affordable, facts
+
+
 def _book_quotes_cache_estimated_bytes() -> int:
     """Estimated resident cost of everything currently cached.
 

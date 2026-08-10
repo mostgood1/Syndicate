@@ -2231,7 +2231,7 @@ def board_book_grid_api():
     capture is not.
     """
     from syndicate.features.shared.book_grid import book_grid_summary, build_book_grid
-    from syndicate.features.shared.odds_book_quotes import read_book_quotes, read_quote_last_seen
+    from syndicate.features.shared.odds_book_quotes import book_quotes_read_affordable, read_book_quotes, read_quote_last_seen
 
     sport = str(request.args.get("sport") or "mlb").strip().lower()
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
@@ -2240,6 +2240,39 @@ def board_book_grid_api():
         limit = max(1, min(2000, int(str(request.args.get("limit") or "300").strip())))
     except ValueError:
         limit = 300
+
+    # MEMORY GUARD, before the read rather than after the OOM. This endpoint
+    # took web down twice on 2026-08-10, once on the user's session. The shard
+    # costs ~6.3x its file size resident and is never returned to the OS, so on
+    # a 2Gi box running WEB_CONCURRENCY=2 gunicorn workers a ~90MB MLB shard is
+    # ~570MB per worker, ~1.14GB across both, against a measured lethal ~1.55GB.
+    #
+    # Degrading is the documented behaviour for data that cannot be served at
+    # request time, and a board that explains why it is thin beats a 24-second
+    # outage every time the page is opened.
+    affordable, budget_facts = book_quotes_read_affordable(sport, selected_date)
+    if not affordable:
+        return _no_cache_response(
+            jsonify(
+                {
+                    "ok": True,
+                    "degraded": True,
+                    "degraded_reason": "book_quotes_shard_exceeds_process_memory_budget",
+                    "detail": (
+                        "This sport/date's quote shard is too large to pivot inside this web "
+                        "process without risking the container. The data exists; serving it "
+                        "here does not. The durable fix is to precompute this grid on "
+                        "refresh-worker and read the result (see #322)."
+                    ),
+                    "budget": budget_facts,
+                    "sport": sport,
+                    "date": selected_date,
+                    "rows": [],
+                    "returned": 0,
+                    "total_rows": 0,
+                }
+            )
+        )
 
     try:
         rows = read_book_quotes(sport, selected_date)
@@ -2259,7 +2292,12 @@ def board_book_grid_api():
         last_seen = {}
 
     try:
-        grid = build_book_grid(rows, last_seen=last_seen)
+        # max_rows exists on this signature and was never passed, so the pivot
+        # built EVERY market before `grid[:limit]` threw most of them away --
+        # the limit bounded the response and not the work. Bounded generously
+        # (the summary below is deliberately computed pre-filter, so this must
+        # not be the display limit) purely to cap the pivot's own allocation.
+        grid = build_book_grid(rows, last_seen=last_seen, max_rows=max(limit * 4, 2000))
     except Exception:
         _LOGGER.exception("BOARD_BOOK_GRID_BUILD_FAILURE sport=%s date=%s", sport, selected_date)
         grid = []
