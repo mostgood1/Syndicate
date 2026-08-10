@@ -4448,6 +4448,167 @@ class CompactStateForPersistTests(unittest.TestCase):
         self.assertEqual(compact["candidate_count"], 222)
 
 
+def _realistic_candidate(index: int) -> dict:
+    """A candidate shaped like production's, sized like production's.
+
+    Field names and relative weights taken from a real full-slate snapshot
+    (reports/intelligence/board_snapshot_2026_07_08.json, 6 candidates at 14,922
+    bytes each; the 2026-08-09 one measured 12,965). ~13KB here, so a 700-item
+    pool is ~9MB -- i.e. over the 8,388,608 ceiling on that object alone, which
+    is the condition this whole item exists for.
+    """
+    return {
+        "candidate_id": f"cand-{index}",
+        "sport": ["mlb", "nba", "nhl", "nfl"][index % 4],
+        "market": "total",
+        "edge": 0.05 + (index % 17) / 1000,
+        "precomputed_features": {f"feature_{n}": (n * index) % 97 / 7 for n in range(150)},
+        "sport_manifest_metadata": {f"artifact_{n}": f"data/{index}/path/{n}.json" for n in range(30)},
+        "market_features": {f"mf_{n}": n + index for n in range(40)},
+        "advanced_context": {f"ac_{n}": f"value-{n}-{index}" for n in range(35)},
+        "simulation": {"runs": 20000, "distribution": [(n * index) % 53 for n in range(120)]},
+        "raw_inputs": {f"ri_{n}": n for n in range(25)},
+    }
+
+
+class BoardSnapshotCompressionTests(unittest.TestCase):
+    """#317. The structural fix, and the reason the fixtures below are built by
+    the PRODUCTION builder rather than by hand.
+
+    Four commits of alias work shipped and were inert because the unit fixtures
+    carried a top-level `recommendations` -- the shape the code wanted, not the
+    shape `_intelligence_board_snapshot_payload` emits (it nests everything
+    under `response` and emits no top-level candidate list). Building the
+    fixture through the real function immediately exposed a second defect the
+    invented one structurally could not: on the nested shape the alias SOURCE is
+    itself in `_CANDIDATE_ALIAS_RESPONSE`, so aliasing it made every other alias
+    resolve from a marker.
+
+    So: every payload in this class comes from
+    `_board_snapshot_persist_payload`, wrapped exactly as `_persist_locked`
+    wraps it.
+    """
+
+    _CAP = 8_388_608  # the keyvalue ceiling; cannot be raised (~9MB closes the connection)
+
+    def _snapshot_state(self, count: int = 700) -> dict:
+        recommendations = [_realistic_candidate(i) for i in range(count)]
+        by_sport: dict[str, list] = {}
+        for item in recommendations:
+            by_sport.setdefault(item["sport"], []).append(item)
+        return {
+            "selected_date": "2026-08-09",
+            "candidate_count": count,
+            "state_last_updated": "2026-08-09T01:25:29Z",
+            "recommendations": recommendations,
+            "top_opportunities": list(recommendations),
+            "top_live_opportunities": recommendations[: count // 2],
+            "by_sport": by_sport,
+            "board_contract": {
+                "schema": "intelligence_board_v1",
+                "cards": [{"card_id": f"c{i}", "detail": _realistic_candidate(i)} for i in range(count)],
+            },
+            "state_meta": {"computed_at": "2026-08-09T01:25:00Z"},
+        }
+
+    def _persisted(self, count: int = 700) -> dict:
+        # Exactly what _persist_locked builds and hands to _write_state_payload.
+        compacted = intelligence_state_module._board_snapshot_persist_payload(
+            self._snapshot_state(count), selected_date="2026-08-09", latest_key="key-1"
+        )
+        return intelligence_state_module._compress_oversized_values(compacted)
+
+    def test_uncompacted_payload_really_does_breach_the_cap(self) -> None:
+        # The premise. If this ever stops holding the fixture has drifted away
+        # from production and every assertion below is measuring nothing.
+        raw = intelligence_state_module._intelligence_board_snapshot_payload(
+            self._snapshot_state(), selected_date="2026-08-09"
+        )
+        self.assertGreater(len(json.dumps(raw, default=str)), self._CAP)
+
+    def test_payload_fits_under_the_keyvalue_ceiling(self) -> None:
+        self.assertLess(len(json.dumps(self._persisted(), default=str)), self._CAP)
+
+    def test_round_trip_is_lossless(self) -> None:
+        state = self._snapshot_state()
+        expanded = intelligence_state_module._expand_persisted_state(self._persisted())
+        response = expanded["response"]
+        self.assertEqual(response["recommendations"], state["recommendations"])
+        self.assertEqual(response["top_opportunities"], state["top_opportunities"])
+        self.assertEqual(response["top_live_opportunities"], state["top_live_opportunities"])
+        self.assertEqual(response["by_sport"], state["by_sport"])
+        self.assertEqual(expanded["board_contract"], state["board_contract"])
+        self.assertEqual(expanded["latest_key"], "key-1")
+
+    def test_no_alias_marker_survives_expansion(self) -> None:
+        # Trap 3's failure mode leaves no marker behind -- it round-trips every
+        # field to a WRONG value. So assert on the values above AND on the
+        # absence of markers here; neither check alone catches both shapes.
+        blob = json.dumps(intelligence_state_module._expand_persisted_state(self._persisted()), default=str)
+        self.assertNotIn(intelligence_state_module._MEMBER_ALIAS_KEY, blob)
+        self.assertNotIn(intelligence_state_module._COMPRESSED_VALUE_KEY, blob)
+        self.assertNotIn("__alias_of__", blob)
+
+    def test_freshness_scalars_stay_readable_without_decompressing(self) -> None:
+        # _read_state_payload picks keyvalue-vs-artifact by comparing these on
+        # the RAW payload. Compressing the whole thing would blind that.
+        persisted = self._persisted()
+        self.assertTrue(intelligence_state_module._state_payload_timestamp(persisted))
+        self.assertEqual(persisted["selected_date"], "2026-08-09")
+        self.assertEqual(persisted["candidate_count"], 700)
+
+    def test_small_payloads_are_left_alone(self) -> None:
+        small = {"selected_date": "2026-08-09", "response": {"recommendations": [{"a": 1}]}}
+        self.assertEqual(intelligence_state_module._compress_oversized_values(small), small)
+
+    def test_unknown_codec_is_refused_not_guessed(self) -> None:
+        # #320. A reader that hands back the envelope where a candidate list
+        # belongs gives every consumer a board-shaped object full of nulls.
+        poisoned = {
+            "response": {
+                intelligence_state_module._COMPRESSED_VALUE_KEY: "zstd-b64-v9",
+                "data": "not-ours",
+            }
+        }
+        self.assertIsNone(intelligence_state_module._expand_persisted_state(poisoned))
+
+    def test_corrupt_blob_is_refused_not_guessed(self) -> None:
+        corrupt = {
+            "response": {
+                intelligence_state_module._COMPRESSED_VALUE_KEY: intelligence_state_module._COMPRESSED_VALUE_CODEC,
+                "data": "!!!not-base64!!!",
+            }
+        }
+        self.assertIsNone(intelligence_state_module._expand_persisted_state(corrupt))
+
+    def test_uncompressed_payloads_still_expand(self) -> None:
+        # Every board written before this shipped, plus every quiet slate that
+        # stays under the threshold forever.
+        legacy = {"analysis": {"a": 1}, "response": {"analysis": {"a": 1}}}
+        self.assertEqual(intelligence_state_module._expand_persisted_state(legacy), legacy)
+
+
+class BoardSnapshotWriteSiteParityTests(unittest.TestCase):
+    """#317. Both write sites must build the payload through the same function.
+
+    The item's whole history is one fix landing on `write_latest_intelligence_
+    state` and never on `_persist_locked`, which is the site the live background
+    loop actually uses: `#105`'s size fallback, then four separate compaction
+    commits. This test fails if either site grows its own payload construction
+    again.
+    """
+
+    def test_neither_write_site_builds_its_own_payload(self) -> None:
+        import inspect
+
+        source = inspect.getsource(intelligence_state_module)
+        builder = "_intelligence_board_snapshot_payload("
+        # One definition, one call -- the call being the one inside
+        # _board_snapshot_persist_payload.
+        self.assertEqual(source.count(f"def {builder}"), 1)
+        self.assertEqual(source.count(builder), 2, "a write site is building the snapshot payload itself again")
+
+
 class FutureDatedPayloadEvictionTests(unittest.TestCase):
     """#65 -> #64. Future-dated payloads were originally kept on the reasoning
     that one is "a real look-ahead request". That only holds when look-ahead is

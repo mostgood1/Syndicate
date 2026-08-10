@@ -522,6 +522,118 @@ if it did.
 
 ### #317 — ROOT CAUSE, the board that computes and never lands: the persist RUNS, and **both** of its transports fail — keyvalue on size, the artifact fallback on a web service that is OOM-cycling (`#318`)
 
+> **UPDATE 2026-08-10 ~01:40Z — SIZE SIDE FIXED STRUCTURALLY. Aliasing was
+> played out; the payload is now compressed. 14,286,066 → 811,656 bytes at
+> tonight's 313 candidates, measured, a 10.3× margin under the ceiling.**
+>
+> Five commits of alias work took the snapshot 31.4MB → ~13MB and then ran out
+> of things to dedupe, because **what remained was not duplicated.** Worker
+> composition at 2026-08-10T01:25:29Z, one deploy after the last alias landed:
+>
+> ```
+> board_snapshot.json  response=13,176,875  board_contract=7,101,446
+>   under response:    recommendations=7,028,263  top_live_opportunities=5,950,386
+>                      by_sport=185,633  top_opportunities=35
+> ```
+>
+> `recommendations` (7.03MB) is the SOURCE every alias resolves against, so it
+> can never itself be aliased. The **top-level** `board_contract` (7.10MB) holds
+> `cards`, a different shape from a candidate, so byte-equality can never
+> collapse it — note the brief's "board_contract → gone" was the *nested* copy
+> only. Two irreducible ~7MB objects against an 8,388,608 ceiling.
+>
+> **The fix is `_compress_oversized_values` (zlib+base64, level 6) applied in
+> `_write_state_payload`** — the single choke point, so both the keyvalue and
+> artifact transports carry the same bytes. Measured on real payloads:
+>
+> | candidates | raw | after aliases | + compression | headroom vs cap |
+> |---|---|---|---|---|
+> | 313 (tonight) | 14,286,066 | 5,203,823 | **811,656** | **10.3×** |
+> | 700 | 32,046,016 | 11,666,643 | 1,811,364 | 4.6× |
+> | 1500 | 69,023,804 | 25,136,347 | 3,877,571 | 2.2× |
+>
+> Ratio is a flat ~17.7× because candidates are homogeneous records with a
+> shared key vocabulary — the most compressible thing JSON produces. **This is
+> why it is durable where aliasing was not: it scales with the slate.** The
+> aliases are kept and still do real work (14.3MB → 5.2MB before compression);
+> compression composes with them rather than replacing them. Cost: 236ms
+> compress / 88ms expand at 313 candidates, on a ~4-minute cycle. Level 6 over 9
+> deliberately — 9 costs 4× the CPU for 6% more ratio.
+>
+> **Only individually-large TOP-LEVEL values are compressed, and that is
+> load-bearing, not tidiness.** `_read_state_payload` chooses keyvalue-vs-artifact
+> by comparing `_state_payload_timestamp` on the RAW payload; compressing the
+> whole thing would blind that comparison and it would silently start preferring
+> the wrong transport. `KEYVALUE_PAYLOAD_COMPOSITION` also stays legible — it
+> keeps naming the same objects, now at on-wire size.
+>
+> **The two write sites are now ONE function** (`_board_snapshot_persist_payload`).
+> The comment at `_persist_locked` asked in as many words that a third fix
+> extract the pair instead of patching the site again; this was the third
+> (`#105`'s size fallback, then four inert compaction commits, then this).
+> `BoardSnapshotWriteSiteParityTests` fails if either site grows its own payload
+> construction back.
+>
+> **Fixtures are built by `_intelligence_board_snapshot_payload` and wrapped
+> exactly as `_persist_locked` wraps it**, per the trap that caused the four
+> inert commits. Doing that is what surfaced `#320` below.
+>
+> **NOT YET VALIDATED IN PRODUCTION**, and note the sequencing that still holds:
+> `#285` gates whether any board reaches the transport at all, so the success
+> test here remains narrow — `KEYVALUE_WRITE_REJECTED` stops while
+> `STATE_PERSIST_BEGIN` keeps firing. `kvrej=0` with `persist=0` means nothing
+> was attempted, not that it succeeded.
+
+### #320 — The board snapshot is a CROSS-SERVICE WIRE FORMAT and the two services deploy independently. Worker has been writing a format web cannot read since 00:16Z, silently, with no signal on either side
+
+**Status: measured and fixed in code (codec tag + refusal). The operational half
+— deploy web WITH the worker — is the part that must not be forgotten.**
+
+Found while building `#317`'s fixtures. `_compact_state_for_persist` and
+`_expand_persisted_state` live in one file but run on **two services deployed
+separately**, so they are a wire contract, not a pair of local helpers. Live
+commits at 2026-08-10T01:27Z:
+
+```
+refresh-worker  3c178403  (01:26:38Z)  writer
+web             e3b378de  (23:10:18Z)  reader  -- predates ALL FIVE compaction commits
+```
+
+Ran web's live expander (verbatim from `git show e3b378de`) against the payload
+the worker writes today:
+
+| field | web @ `e3b378de` (LIVE) | worker intent |
+|---|---|---|
+| `recommendations` | list[313] | list[313] |
+| `top_opportunities` | **None** | list[313] |
+| `top_live_opportunities` | **unexpanded alias marker** | list[156] |
+| `by_sport` | **dict of marker dicts** | dict[4] |
+
+Two independent reasons: the old expander resolves markers against
+`expanded.get("recommendations")` (top-level, which the snapshot shape does not
+have — the same trap `_alias_source_recommendations` was written for), and it
+predates `_expand_member_lists` entirely.
+
+**The consequence for `#317` is the important part: even a payload that fit
+under the ceiling would have rendered an empty/broken board tonight, and it
+would have read as "the size fix didn't work".** A third cause for a zero board,
+alongside the two the `#317` brief lists (starved pool = `#285`, refused write =
+`#317`). Discriminator: **read the live commit on BOTH services before drawing
+any conclusion from a board.**
+
+**Fix, code half:** the compressed envelope is self-identifying
+(`__compressed__: "zlib-b64-v1"`), and `_decompress_oversized_values` returns
+**None** on an unknown codec or a corrupt blob rather than handing back the
+envelope. Refusing produces an empty board — the documented-correct degraded
+state — plus one `STATE_FORMAT_UNSUPPORTED` line naming both versions. Handing
+the envelope back would give every consumer a board-shaped object full of nulls,
+which is the failure-that-looks-like-success this file has now hit twice.
+
+**Fix, operational half, and it has no code:** *a change to the compaction
+format is a change to a contract between two independently-deployed services.*
+Deploy **web and refresh-worker together**, worker last. The codec tag only
+helps the NEXT skew — it cannot retrofit a reader already in production.
+
 **Status: root-caused and evidenced on production, not fixed. Read-only lane.**
 
 **The premise this lane was given was wrong, and the wrong premise is the

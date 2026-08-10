@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import calendar
 import hashlib
 import json
@@ -7,6 +8,7 @@ import logging
 import os
 import threading
 import time
+import zlib
 from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime
@@ -2001,6 +2003,171 @@ def _compact_state_for_persist(state: dict[str, Any]) -> dict[str, Any]:
     return compact
 
 
+_COMPRESSED_VALUE_KEY = "__compressed__"
+_COMPRESSED_VALUE_CODEC = "zlib-b64-v1"
+_COMPRESSED_VALUE_DATA = "data"
+_COMPRESSED_VALUE_BYTES = "raw_bytes"
+
+# Below this, the ~120-byte envelope plus base64's 33% expansion is not worth
+# paying, and small payloads were never the problem. The same reasoning as
+# _ALIAS_MIN_BYTES, one order of magnitude up.
+_COMPRESS_MIN_BYTES = 262_144
+# Measured on reports/intelligence/board_snapshot_2026_07_08.json (18,593,396
+# bytes, a real full-slate snapshot):
+#   level 1  ->  2,091,338  ( 8.9x)   98ms compress   37ms decompress
+#   level 3  ->  1,795,518  (10.4x)  104ms            34ms
+#   level 6  ->  1,323,380  (14.0x)  214ms            31ms
+#   level 9  ->  1,243,760  (14.9x)  825ms            32ms
+# 6 is the knee: 9 costs 4x the CPU for 6% more ratio. 214ms on a ~4-minute
+# cycle is not a cost worth optimising against; headroom is.
+_COMPRESS_LEVEL = 6
+
+
+def _compress_oversized_values(payload: dict[str, Any]) -> dict[str, Any]:
+    """Deflate the individually-large top-level values. THE structural fix for #317.
+
+    Every previous cut at this was an alias: find two objects that are the same
+    object and store one. That worked -- 31.4MB -> ~13MB across five commits --
+    and then ran out of things to dedupe, because what remains is not duplicated.
+    Measured on the refresh-worker at 2026-08-10T01:25:29Z, one deploy short of
+    the last alias landing:
+
+        board_snapshot.json  response=13,176,875  board_contract=7,101,446
+          under response:    recommendations=7,028,263  top_live_opportunities=5,950,386
+                             by_sport=185,633  top_opportunities=35
+
+    `recommendations` is 7.03MB and is the SOURCE every alias resolves against,
+    so it can never itself be aliased; the top-level `board_contract` holds
+    `cards`, which is a different shape from a candidate and so never matches
+    byte-for-byte. Two irreducible ~7MB objects against an 8,388,608 ceiling
+    that CANNOT be raised (~9MB closes the Redis connection). Aliasing harder
+    has nothing left to bite on, and a richer slate breaches the cap on
+    `recommendations` alone.
+
+    So stop arguing with the size and change what crosses the wire. These are
+    thousands of homogeneous records with a shared key vocabulary -- the single
+    most compressible thing JSON produces. Measured 14.0x on a real snapshot,
+    20.6x on a smaller one. The 14.35MB projected payload lands at ~1.0MB, which
+    leaves room for a 6x richer slate rather than the 1.2x the last alias bought.
+
+    Lossless, and that matters more than the ratio: "a wrong board beats a small
+    one" is the rule the rest of this module is built on, and every alias rule
+    had to reason about whether two objects were provably identical before it
+    could fire. Compression needs no such proof.
+
+    Top-level values only, and only the big ones, DELIBERATELY:
+      * `_state_payload_timestamp` reads `state_last_updated`/`last_updated`/
+        `snapshot_generated_at` off the top level, and `_read_state_payload`
+        picks keyvalue-vs-artifact by comparing them. Compressing the whole
+        payload would blind that freshness comparison and it would silently
+        start preferring the wrong transport.
+      * `KEYVALUE_PAYLOAD_COMPOSITION` stays legible -- it keeps naming the same
+        objects, now at their on-wire size, which is the line this lane has used
+        as its discriminator throughout.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    out: dict[str, Any] = {}
+    for key, value in payload.items():
+        if not isinstance(value, (dict, list)) or not value:
+            out[key] = value
+            continue
+        blob = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+        if len(blob) < _COMPRESS_MIN_BYTES:
+            out[key] = value
+            continue
+        try:
+            packed = base64.b64encode(zlib.compress(blob.encode("utf-8"), _COMPRESS_LEVEL)).decode("ascii")
+        except Exception as exc:  # noqa: BLE001
+            # A codec failure must never cost a board. Keep the real value and
+            # let the size guard do whatever it would have done anyway.
+            print(f"[intelligence_state] STATE_COMPRESS_FAILED key={key} {type(exc).__name__}: {exc}", flush=True)
+            out[key] = value
+            continue
+        out[key] = {
+            _COMPRESSED_VALUE_KEY: _COMPRESSED_VALUE_CODEC,
+            _COMPRESSED_VALUE_BYTES: len(blob),
+            _COMPRESSED_VALUE_DATA: packed,
+        }
+    return out
+
+
+def _decompress_oversized_values(payload: dict[str, Any]) -> dict[str, Any] | None:
+    """Inverse of `_compress_oversized_values`. Returns None if it cannot honour
+    the payload, which is the whole point of the codec tag.
+
+    An UNKNOWN codec must produce NOTHING, not a best effort. A reader that
+    hands back the envelope dict where a list of candidates belongs gives every
+    downstream consumer a board-shaped object full of nulls -- the failure mode
+    that looks like success, which this lane has now hit twice (once inside
+    `_compact_state_for_persist`, once across services; see `#320`). An empty
+    board is the documented-correct degraded state and is visible in one line.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    out: dict[str, Any] = {}
+    for key, value in payload.items():
+        if not (isinstance(value, Mapping) and _COMPRESSED_VALUE_KEY in value):
+            out[key] = value
+            continue
+        codec = value.get(_COMPRESSED_VALUE_KEY)
+        if codec != _COMPRESSED_VALUE_CODEC:
+            print(
+                f"[intelligence_state] STATE_FORMAT_UNSUPPORTED key={key} codec={codec!r} "
+                f"reader_supports={_COMPRESSED_VALUE_CODEC!r} effect=payload_refused",
+                flush=True,
+            )
+            return None
+        try:
+            raw = zlib.decompress(base64.b64decode(value.get(_COMPRESSED_VALUE_DATA) or ""))
+            out[key] = json.loads(raw.decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            print(
+                f"[intelligence_state] STATE_DECOMPRESS_FAILED key={key} {type(exc).__name__}: {exc} "
+                f"effect=payload_refused",
+                flush=True,
+            )
+            return None
+    return out
+
+
+def _board_snapshot_persist_payload(
+    state: dict[str, Any],
+    *,
+    selected_date: str | None = None,
+    latest_key: str | None = None,
+) -> dict[str, Any]:
+    """Build AND compact the board-snapshot payload. The one place that does it.
+
+    #317, and this extraction is the item's real deliverable. There are two
+    board-snapshot write sites -- `write_latest_intelligence_state` and the
+    background loop's `_persist_locked` -- and the live loop reaches
+    board_snapshot through the second one. Every fix to this payload has had to
+    be made twice, each time discovered only after a production deploy proved
+    the first one inert:
+
+      * `#105` gave `_write_state_payload`'s size fallback to the first site;
+        the second kept calling `write_json_file` raw until 2026-07-27.
+      * `#317` gave `_compact_state_for_persist` to the first site in FOUR
+        commits, all of which shipped and all of which changed nothing, because
+        the loop never runs that function. The tell was in
+        `KEYVALUE_PAYLOAD_COMPOSITION`: `top_opportunities` and
+        `recommendations` byte-identical in size and neither aliased is the
+        signature of compaction never having RUN, not of it running and failing.
+
+    The comment at the second site asked, in as many words, that a third fix
+    extract the pair instead of patching the site again. This is the third fix.
+
+    `latest_key` is threaded through because `_persist_locked` wraps the payload
+    with it and `write_latest_intelligence_state` does not -- the only
+    difference between the two sites, and now the only argument.
+    """
+    payload = _intelligence_board_snapshot_payload(state, selected_date=selected_date)
+    if latest_key is not None:
+        payload = {"latest_key": latest_key, **payload}
+    return _compact_state_for_persist(payload)
+
+
 def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | None:
     """Restore response.analysis from its alias marker. Inverse of
     _compact_state_for_persist, so every existing consumer is unaffected.
@@ -2008,6 +2175,12 @@ def _expand_persisted_state(state: dict[str, Any] | None) -> dict[str, Any] | No
     """
     if not isinstance(state, dict):
         return state
+    # #317. Decompress FIRST: the alias markers this function resolves live
+    # inside the values `_compress_oversized_values` packed, so every rule below
+    # would find nothing to do on a compressed payload and return it untouched.
+    state = _decompress_oversized_values(state)
+    if not isinstance(state, dict):
+        return None
     expanded = dict(state)
     # #317. Must mirror _compact_state_for_persist EXACTLY: the board snapshot
     # payload has no top-level `recommendations`, so resolving only there would
@@ -2141,7 +2314,15 @@ def _write_state_payload(path: Path, persisted: dict[str, Any]) -> None:
 
     The keyvalue write is still attempted first, so every payload small enough
     keeps its existing, faster path and nothing changes for quiet slates.
+
+    #317. Compression happens HERE and only here, so both transports carry the
+    same bytes and `_read_state_payload`'s keyvalue-vs-artifact freshness
+    comparison keeps working (it reads top-level timestamp scalars, which
+    `_compress_oversized_values` deliberately leaves in the clear). Doing it at
+    the two call sites instead would have been the third time a fix had to be
+    applied twice in this file -- see `_board_snapshot_persist_payload`.
     """
+    persisted = _compress_oversized_values(persisted)
     try:
         write_json_file(path, persisted)
         return
@@ -2283,7 +2464,7 @@ def write_latest_intelligence_state(state: Any) -> dict[str, Any] | None:
     # Note this is additive to the sibling write's compaction, not a substitute:
     # they are different payloads (`_intelligence_board_snapshot_payload` reshapes
     # `normalized`), so each needs its own pass.
-    board_snapshot_payload = _compact_state_for_persist(_intelligence_board_snapshot_payload(normalized))
+    board_snapshot_payload = _board_snapshot_persist_payload(normalized)
     # #43: shrink before crossing the keyvalue boundary. Redis closed the
     # connection on the full ~8.9MB payload, discarding a correctly computed
     # board every cycle. See _compact_state_for_persist.
@@ -5146,10 +5327,6 @@ class IntelligenceStateService:
                 latest_snapshot_date = str(latest_snapshot.payload.get("date") or latest_snapshot.payload.get("selected_date") or "").strip() or None
                 daily_paths = _intelligence_state_daily_paths(latest_snapshot_date)
                 latest_response = dict(latest_snapshot.response or {}) if isinstance(latest_snapshot.response, dict) else {}
-                board_snapshot_payload = _intelligence_board_snapshot_payload(
-                    latest_response,
-                    selected_date=latest_snapshot_date,
-                )
                 # _write_state_payload, not a raw write_json_file: this write
                 # had no size fallback at all until now -- every cycle where
                 # the real board_snapshot payload (measured 10.47MB on a full
@@ -5181,11 +5358,15 @@ class IntelligenceStateService:
                 # here separately after being applied at :2249 first. If a third
                 # is ever needed, extract the pair into one helper rather than
                 # patching this site again.
-                compacted_board_snapshot = _compact_state_for_persist(
-                    {
-                        "latest_key": latest_snapshot.key,
-                        **board_snapshot_payload,
-                    }
+                #
+                # A third was needed (compression, #317). Extracted, as asked --
+                # this site and its sibling now build the payload through the
+                # SAME function, so the next fix cannot land on one and miss the
+                # other. See `_board_snapshot_persist_payload`.
+                compacted_board_snapshot = _board_snapshot_persist_payload(
+                    latest_response,
+                    selected_date=latest_snapshot_date,
+                    latest_key=latest_snapshot.key,
                 )
                 _write_state_payload(BOARD_SNAPSHOT_PATH, compacted_board_snapshot)
                 _write_state_payload(daily_paths["board_snapshot"], compacted_board_snapshot)
