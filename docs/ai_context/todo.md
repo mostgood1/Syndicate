@@ -2306,6 +2306,102 @@ it now has a date.
 **`#310` closes.** The remaining work — why boxscore ingestion stopped on
 2026-05-24 — is `#314`'s question and needs its own owner.
 
+### #285 — VERIFIED CLEAN WINDOW, n=2: the ratchet is REAL at ~9.5 MB/min and the arena cap did NOT change it. But 0 guard latches and 5/5 boards across 42 minutes — the level, not the rate, is what gates the board
+
+**The reading the retraction below asked for. First window all night that passed
+both contamination checks.** pid 38, process start 15:59:12Z, 42 minutes:
+
+```
+ANCHOR RE-VERIFICATION   CLEAN -- no deploy of ANY status finished after 15:59:12Z
+PID CONTINUITY           [38] -- single process, no hidden reboot
+
+T+ 5.0   715.9      T+22.0   976.4      T+42.2  1088.2
+T+13.4   899.5      T+31.4  1044.1      monotonic, ENDS AT ITS MAX
+                                        fitted +9.47 MB/min
+15 trim calls   by_trim 1425.8MB   by_gc 26.8MB
+guard latches   0
+pools           5 of 5 non-zero -- 205 195 195 195 195
+```
+
+#### The arena cap is measured ineffective ON THE RATCHET, now at n=2
+
+```
+trim only        +11.00 MB/min    ends at max
+arena  6010b99e  +11.70 MB/min    ends at max
+arena  pid 38    + 9.47 MB/min    ends at max   <- this window, verified clean
+```
+
+Three boots, two allocator configurations, same shape and the same order of
+magnitude. **`mallopt(M_ARENA_MAX, 2)` did not change the rate.** Since it caps
+the arena COUNT, what this excludes is **retention driven by arena
+proliferation** — not fragmentation as a class. Two candidates survive:
+
+1. live `str`/`bytes`/`ndarray` the census cannot enumerate (the root-walking
+   sizer tests this)
+2. **intra-arena** fragmentation — free memory interleaved with live
+   allocations so `malloc_trim` cannot return whole pages. Note the cap may have
+   made this *more* likely, not less: 16 threads now interleave into 2 arenas
+   instead of spreading across many.
+
+**If the sizer walks the roots and does NOT find ~900MB of live objects, that is
+not a broken instrument — it is evidence for (2).** Written here because a null
+that reads as instrument failure gets debugged instead of interpreted.
+
+#### And yet the board built on every cycle. That dissociation is the useful part
+
+```
+                 guard latches      non-zero pools
+trim only        10 of 12           2 of 12   (latched at T+15)
+this window       0 of  5           5 of  5   (through T+42)
+```
+
+**The ratchet and the board are gated by different quantities.** The ratchet is a
+RATE (~9.5 MB/min, unchanged). The board is gated by a LEVEL — whether
+`anon + active_file` is under the floor's 1096MB at the moment the guard reads.
+This boot spent 42 minutes below it; the trim-only boot crossed at T+15.
+
+**Projection, stated so it is not mistaken for a fix:** at +9.47 MB/min from
+1088MB at T+42, this process crosses the trim-only boot's latching level around
+**T+85**. So the honest claim is *~40 more minutes of boards*, not *boards
+permanently* — which is close to the `#286` "one good build per 30 minutes"
+target being met for roughly an hour per boot, not indefinitely.
+
+#### THE INSTRUMENT CAVEAT THAT INVALIDATES EVERY "MAX" IN THIS ITEM
+
+**`max = 1088.2` above is a max over the CHEAPEST stages of the cycle.** The
+ring buffer at `/api/ops/intelligence/memory-diagnostics` is written only by
+`_diag_log_all_process_memory` inside `intelligence_state`. The MLB sim tick,
+the live-lens loop and the odds loop call `log_all_process_memory` too, but those
+go to **stderr only and never enter the ring buffer**. Over 15:59–16:38 the logs
+carried **172** pid-38 samples and the ring buffer **39**. Every RSS series in
+this item reads 23% of the samples.
+
+The missing 77% is not a random sample — it is where the big numbers are:
+
+```
+post_mlb_sim_tick                n=34  max=1867.4  median=959.6   <- invisible to the ring buffer
+live_lens_tick_after_build_mlb   n= 9  max=1118.7  median=985.4   <- invisible
+post_pool_assembled              ...   max=1044.1                 <- the only stage being read
+```
+
+**Verified real, not a `/proc` artifact — the container moved in lockstep:**
+
+```
+16:32:36  post_mlb_sim_tick  pid38 1050.6  cont 1923.9
+16:33:14  post_mlb_sim_tick  pid38 1867.4  cont 2709.9   <- +817MB process, +786MB container
+16:33:48  post_mlb_sim_tick  pid38 1079.9  cont 1928.4
+```
+
+Found by the `#324` lane while sampling process lists for an unrelated zombie
+question, and handed over rather than sat on. **It is ONE event in 172 samples**
+— singular, not recurring, and no story should be built on n=1. It returns in 72
+seconds, so it is not the ratchet.
+
+**What it does change is the OOM surface, and it points somewhere nobody has
+been looking:** 1867MB process / 2710MB container, plus a hydrated overview at
+the ~+700MB measured tonight, is ~3.4GB against a 4GB cap — **and it is in the
+MLB sim tick, not the overview everyone has been blaming.** Worth its own ID.
+
 ### #285 — RETRACTED, NOT CLOSED. My "55-minute single-boot window" was THREE boots, and the one fact the closure rested on was a 5-minute-old process
 
 **I closed this item on a reading that does not exist. Retracting in full; the
