@@ -23631,6 +23631,39 @@ were resolved and nine already-closed rows removed from the open tables.
 > rather than reverting toward the ~1,800-2,000/hr baseline, that's the
 > signal to actually investigate rather than assume evening-slate load.**
 
+**#325** — 🔴 **The trigger condition from the note above just fired: burn did
+NOT revert, it climbed further and has now crossed the 5M target for the
+first time.** 2026-08-10T14:06Z, same baseline (08-08T00:03Z, 62h window
+prior → now 62,944s more, ~2.58 days total):
+
+| Window | Burned | /hour | Projected 30d | vs 5M target |
+|---|---|---|---|---|
+| 223,340s (62h, 165,558 obs) | 433,686 | **6,990.5** | **5.03M** | **100.7%** |
+
+/hour climbed again (5,505.2 → 6,990.5, third consecutive rise from the
+converged ~1,800-2,000 baseline). **This is now over target, not under it.**
+
+- **Almost entirely MLB.** By-sport delta since the last reading (08-08T17:32
+  → now, ~44.5h): mlb +316,433cr (~7,111/hr on its own — essentially the
+  whole rate), soccer +6,216cr (~140/hr), nfl +138cr, wnba +841cr — all
+  three non-MLB sports still trivial.
+- **`by_market_family` shape shift is now a 2-reading trend, not a blip.**
+  props 61-64% (converged baseline) → 52.2% (last reading) → **43.6%
+  (now)**; segment 22-23% → 29.3% → **35.2%**; alternate 11-12% → 14.6% →
+  **17.6%**. Monotonic in the same direction across three consecutive
+  readings spanning 4+ days — the "one-off evening slate" explanation
+  offered last time doesn't fit a trend this persistent and directional.
+- **Not diagnosed here — this needs the next session's actual investigation,
+  not another reading.** Leading candidate given the shape shift: something
+  is keeping more MLB games tiered "full" (segment+alternate markets) for
+  longer than #106's event-scoping live/near-live window intends — either
+  more games are genuinely staying near-live longer (real, deeper-season
+  effect: doubleheaders, longer games, more games per slate) or the scoping
+  itself has regressed. Start there: pull `/api/ops/odds-refresh/status`'s
+  soccer/MLB step timings during a live evening window and compare full-tier
+  vs reduced-tier game counts against the actual slate, the same method
+  #106's original verification used.
+
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
