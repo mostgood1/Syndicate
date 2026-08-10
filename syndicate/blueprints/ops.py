@@ -2129,11 +2129,61 @@ def api_ops_intelligence_candidate_trace() -> Any:
             if isinstance(board_snapshot_raw, dict):
                 read_only_trace["board_snapshot_read_keys"] = list(board_snapshot_raw.keys())
                 read_only_trace["board_snapshot_read_latest_key"] = board_snapshot_raw.get("latest_key")
-                candidates_field = board_snapshot_raw.get("candidates") or board_snapshot_raw.get("top_opportunities")
-                read_only_trace["board_snapshot_read_candidate_count"] = len(candidates_field) if isinstance(candidates_field, list) else None
+                # #338. THIS LOOKED IN THE WRONG PLACE AND REPORTED `None` FOR A
+                # HEALTHY BOARD. The snapshot's top level is
+                # {board_contract, candidate_count, latest_key, response,
+                #  selected_date, snapshot_generated_at, state_meta, updated_at}
+                # -- there is no top-level `candidates` and no top-level
+                # `top_opportunities`; both live under `response`
+                # (`_intelligence_board_snapshot_payload` nests the whole state
+                # there). So both `.get()`s missed, and the `else None` reported
+                # "absent" for a field that was present and correct one level
+                # down -- while ignoring the literal `candidate_count` int
+                # sitting at the top level.
+                #
+                # Measured 2026-08-10 23:2xZ: reported `None` while the board
+                # served 150 and the pool was 220. An instrument that answers
+                # `None` when it means "I looked in the wrong place" is the same
+                # class as `#334`'s stale-but-`fresh` and `#327`'s invisible
+                # stage -- it ANSWERS rather than errs.
+                #
+                # Reports all three now, because they are three different
+                # numbers and `#338` is precisely about them disagreeing: the
+                # stored count, the serialized list length (capped at 150 by
+                # `_default_unbounded_candidate_cap` BY DESIGN), and the
+                # by_sport total.
+                snapshot_response = board_snapshot_raw.get("response") if isinstance(board_snapshot_raw.get("response"), dict) else {}
+                stored_count = board_snapshot_raw.get("candidate_count")
+                read_only_trace["board_snapshot_read_candidate_count"] = int(stored_count) if isinstance(stored_count, (int, float)) else None
+                for _field in ("top_opportunities", "recommendations", "candidates"):
+                    _value = snapshot_response.get(_field)
+                    if _value is None:
+                        _value = board_snapshot_raw.get(_field)
+                    read_only_trace[f"board_snapshot_read_{_field}_len"] = len(_value) if isinstance(_value, list) else None
+                _by_sport = snapshot_response.get("by_sport") or board_snapshot_raw.get("by_sport")
+                if isinstance(_by_sport, dict):
+                    read_only_trace["board_snapshot_read_by_sport_sports"] = sorted(_by_sport)
+                    read_only_trace["board_snapshot_read_by_sport_total"] = sum(
+                        len(_items) for _items in _by_sport.values() if isinstance(_items, list)
+                    )
                 read_only_trace["board_snapshot_read_updated_at"] = board_snapshot_raw.get("updated_at") or board_snapshot_raw.get("generated_at")
 
-            state_raw = _read_json_file(_STATE_PATH)
+            # #338, and this one is MY regression. `#322` compresses
+            # `query_state_cache.json`'s `snapshots` (33MB against an 8.39MB
+            # ceiling), so a RAW read hands back
+            # {"__compressed__": ..., "raw_bytes": ..., "data": "<base64>"}
+            # where this code expects a dict of snapshot keys. `isinstance(...,
+            # dict)` is then TRUE for the envelope, so `list(snapshots.keys())`
+            # would have reported `['__compressed__', 'raw_bytes', 'data']` as
+            # if those were snapshot ids, and the `latest_key in snapshots`
+            # lookup silently missed.
+            #
+            # `expand_persisted_state` decompresses before it de-aliases, so it
+            # is the correct reader for BOTH paths. The board-snapshot read
+            # above already used it (`#320`); this one was missed because
+            # `#322` landed after that fix and nobody re-checked the sibling
+            # read four lines down.
+            state_raw = _expand_persisted_state_public(_read_json_file(_STATE_PATH))
             read_only_trace["state_read_is_dict"] = isinstance(state_raw, dict)
             if isinstance(state_raw, dict):
                 read_only_trace["state_read_latest_key"] = state_raw.get("latest_key")
