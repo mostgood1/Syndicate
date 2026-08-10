@@ -2231,6 +2231,7 @@ def board_book_grid_api():
     capture is not.
     """
     from syndicate.features.shared.book_grid import book_grid_summary, build_book_grid
+    from syndicate.features.shared.book_grid_artifact import read_book_grid_artifact
     from syndicate.features.shared.odds_book_quotes import book_quotes_read_affordable, read_book_quotes, read_quote_last_seen
 
     sport = str(request.args.get("sport") or "mlb").strip().lower()
@@ -2240,6 +2241,40 @@ def board_book_grid_api():
         limit = max(1, min(2000, int(str(request.args.get("limit") or "300").strip())))
     except ValueError:
         limit = 300
+
+    # #322: PREFER THE PRECOMPUTED ARTIFACT. refresh-worker pivots the shard and
+    # writes a bounded grid; web reads it. That is the architecture rule ("workers
+    # compute, web reads artifacts") and it is the only way this endpoint can serve
+    # MLB at all -- one shard read is ~1.3GB resident against a 2GB container.
+    #
+    # Falls through to the live pivot when the artifact is absent, because small
+    # sports genuinely fit and degrading them would be a regression. The guard
+    # below is what keeps that fallback honest.
+    precomputed = read_book_grid_artifact(sport, selected_date)
+    if isinstance(precomputed, dict) and isinstance(precomputed.get("rows"), list):
+        grid = list(precomputed.get("rows") or [])
+        if market_filter:
+            grid = [row for row in grid if str(row.get("market") or "").lower() == market_filter]
+        markets = sorted({str(row.get("market") or "") for row in grid if row.get("market")})
+        return _no_cache_response(
+            jsonify(
+                {
+                    "ok": True,
+                    "source": "precomputed_artifact",
+                    "generated_at": precomputed.get("generated_at"),
+                    "sport": sport,
+                    "date": selected_date,
+                    "summary": precomputed.get("summary"),
+                    "markets": markets,
+                    # rows_total/rows_truncated come from the artifact so a bounded
+                    # grid is attributable rather than reading as "that is all there is".
+                    "total_rows": precomputed.get("rows_total"),
+                    "rows_truncated": precomputed.get("rows_truncated"),
+                    "returned": min(len(grid), limit),
+                    "rows": grid[:limit],
+                }
+            )
+        )
 
     # MEMORY GUARD, before the read rather than after the OOM. This endpoint
     # took web down twice on 2026-08-10, once on the user's session. The shard

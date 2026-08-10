@@ -47,6 +47,12 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # visible from web, which is the only place they can be inspected. #208's
     # lesson applies exactly: allowlisting permits a transfer, it does not make
     # one happen.
+    # #322: the precomputed Layer 1 book grid. refresh-worker pivots the
+    # 207MB book_quotes shard (measured 2026-08-09) and web reads the bounded
+    # result -- web cannot do that pivot, one read is ~1.3GB resident on a 2GB
+    # container. Allowlisting PERMITS the transfer; the worker autorun is what
+    # makes one happen (#208).
+    "*_source/data/book_grid/book_grid_*.json",
     "settlement_inputs/closing_lines_*.csv",
     "settlement_inputs/finals_*.json",
     "*_source/source_artifacts/data/live_lens/live_lens_report_*.json",
