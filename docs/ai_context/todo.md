@@ -1,5 +1,132 @@
 # Syndicate TODO — canonical cross-session list
 
+### ID COLLISION RESOLVED 2026-08-10 — `#322` was issued twice. Book-grid precompute is now `#323`
+
+**My error, and the resolution is not symmetric.** I allocated `#322` to a lane
+for the book-grid precompute from memory, without checking it against a tree —
+the exact ID discipline I had been enforcing on every other lane that night.
+The `query_state_cache` lane had already taken it.
+
+**`#322` stays with `query_state_cache`.** It was committed first (`863ecd59`),
+it holds the only `### #322` header in this file, and renumbering a lane's
+already-pushed work to make room for mine would be the wrong way round.
+
+**COMMITS THAT SAY `#322` BUT MEAN `#323`.** Pushed history is not rewritten, so
+`git log --grep '#322'` reads as one thread and is two. The mapping:
+
+| commit | says | is |
+|---|---|---|
+| `ef3f6a2b` | book grid: refuse before the OOM | **`#323`** |
+| `419f2348` | precompute the book grid on the worker | **`#323`** |
+| `d25b1aaa` | the worker tick that produces it | **`#323`** |
+| `863ecd59` | `query_state_cache` compression | `#322` (correct) |
+| `157c4819` | validated: 0 rejections on a populated persist | `#322` (correct) |
+
+The lane recorded the collision rather than resolving it (`0bb2c8a7`) on the
+grounds that renumbering another lane's pushed commits is an owner decision.
+That was right.
+
+### #323 — DONE AND VERIFIED IN PRODUCTION. The book grid is precomputed on the worker, because web cannot pivot the shard
+
+`/api/board/book-grid` pivoted the raw `book_quotes` shard on the request path
+and took web down twice on 2026-08-10 — once on the user's own session, once on
+a diagnostic of mine. Measured via a Range request against production, and far
+worse than the ~90MB the old comments recorded:
+
+```
+MLB book_quotes shard 2026-08-09   217,439,783 bytes  (207 MB)
+resident cost                      x6.3 = ~1,300 MB, never returned to the OS
+web container                      2,048 MB, ~426 MB baseline -> ~1,726 MB
+measured lethal                                                  ~1,548 MB
+```
+
+**One read is fatal.** I had assumed it needed two concurrent gunicorn workers;
+it does not, which is why a single call killed web.
+
+**THE CAUSE IS A GOOD CHANGE.** The shard more than doubled because book coverage
+went from ~11 to 44 (Pinnacle for de-vigging, plus exchanges like Kalshi and
+Polymarket). Price shopping is worth a measured **+2.79 ROI points** — the books
+must stay. What had to move was the pivot, which `CLAUDE.md` always said belonged
+on a worker.
+
+**Verified in production 2026-08-10 03:47Z**, all four sports with a shard:
+
+```
+BOOK_GRID_TICK  written: mlb:807  wnba:690  nfl:1360  soccer:565
+                skipped_no_shard: nba, nhl, ncaaf, ncaab
+
+endpoint: source=precomputed_artifact, truncated=0, every sport
+          22.2s  ->  0.39s          (~57x)
+```
+
+Design points worth keeping:
+
+- **`summary` is computed over the WHOLE grid before bounding**, so coverage
+  describes the real surface rather than the slice that fit.
+- **`rows_total` / `rows_truncated` are emitted**, so a thin board is
+  attributable instead of reading as "that is all there is". The 1500-row bound
+  turned out comfortable — nothing truncated — but silent truncation would have
+  been indistinguishable from a small slate.
+- **An absent shard returns `None`, never an empty grid.** Writing one would make
+  "no shard" and "no markets" identical to every reader downstream.
+- **Sports skipped for having no shard are named individually** in the tick log,
+  so a partial run cannot be mistaken for a failed one.
+
+The serve-time guard from `ef3f6a2b` stays as a backstop: if the artifact is ever
+absent, the endpoint degrades with the budget arithmetic attached rather than
+OOM-ing the container.
+
+### #321 — DONE. A live MLB game vanished off the board, and the cause was a loader that discards JSON arrays
+
+Reported by the user: `HOU @ SD` missing from the MLB board. StatsAPI disagreed:
+
+```
+date 2026-08-09  totalGames: 15        board showed 14
+pk 823268  Houston Astros @ San Diego Padres
+  gameDate     = 2026-08-10T00:20:00Z   (next UTC day)
+  officialDate = 2026-08-09
+  status       = In Progress            (STILL LIVE)
+```
+
+**Root cause, after three wrong attempts:**
+
+```python
+def load_json_file(path) -> dict[str, Any] | None:
+    ...
+    return payload if isinstance(payload, dict) else None
+```
+
+`schedule_raw.json` is a bare JSON **array**, so the loader parsed it
+successfully and threw it away. The instrumentation that found it printed
+`exists=True` and `scheduled_games=0` on the same line — found, opened, parsed,
+discarded by a type guard one layer below the caller.
+
+**A loader whose contract silently narrows to dicts cannot be used for list
+artifacts, and nothing in its name says so.**
+
+**Swept**: first non-whitespace byte of all **35,769** JSON files under `data/`
+and `reports/`. Only two families are top-level arrays — `schedule_raw.json`
+(fixed) and `cfbd_lines_*.json` (all four readers already use raw `json.load`,
+so safe). No other exposure.
+
+Three things this took that are worth carrying:
+
+1. **`_game_date` preferred `gameDate` over `officialDate` and sliced `[:10]`** —
+   a real bug, fixed in `1cbcbc2e`, and **not this one**. Any first pitch at or
+   after 19:00 Central is the next UTC day.
+2. **The board's game list is NOT ours.** It comes from `summary["outputs"]`, and
+   nothing in this repo writes `daily_summary` — `refresh_mlb_oddsapi.py` only
+   mirrors it out of `source_artifacts`. `CLAUDE.md` records MLB as "phase-1
+   complete, no source-app fallback"; **that is not true of the game list.**
+3. **The reconcile in `8d4af076` is a dormant safety net, not the fix.** It marks
+   recovered games `reconciled_from_schedule` and logs `SCHEDULE_RECONCILE`,
+   because the game would still be missing from sims, candidates, settlement and
+   grading — all of which read `daily_summary`. If it ever fires, that gap is
+   real and ongoing.
+
+Board verified: **15 games, `HOU @ SD` present, `reconciled=None`** — it came back
+through the normal path, so the net is dormant rather than load-bearing.
+
 ### #311 — FIX COMMITTED AND TESTED, NOT DEPLOYED. The refresh-worker's concurrency cap is inert, for two independent reasons, and the second one is the interesting one
 
 **STATUS 2026-08-09, owned and fixed by the `#282` lane.** Both halves are
