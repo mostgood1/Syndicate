@@ -1,5 +1,144 @@
 # Syndicate TODO — canonical cross-session list
 
+### 2026-08-09 — `#305` IS DOUBLE-USED, and three findings never reached this file at all. `#326` claimed for the one that lost its number
+
+**The `#71` check failing, caught by asking whether a session was ready to
+archive.** Six IDs (`#300`–`#305`) were allocated to the betting-contract
+lifecycle lane. Against `origin/main` when this was written:
+
+```
+#300  entry present, and a fix SHIPPED (0071dbf9)
+#303  entry present
+#302  ONE passing parenthetical at :1641 -- no entry
+#301  zero mentions
+#304  zero mentions
+#305  heading present, DESCRIBING THE WRONG WORK
+```
+
+**`#305`'s heading reads "SHIPPED `802b36a4` … Corrections from coordination,
+incl. the `#299` reframing".** `802b36a4` is that lane's *corrections* commit.
+A list audit appears to have assigned the ID by scanning commit subjects — the
+commit's own message names `#300`–`#305` collectively, so a scan attaches the
+highest. **The soccer finding `#305` was actually allocated for was left with no
+entry and no number.**
+
+**Not amending that heading**, per the standing no-rewrite rule and because
+another lane's audit produced it and may key off it. **`#326` is claimed below
+for the soccer finding.** `#305` stays spent on the corrections commit.
+
+> **The mechanism, because it is new.** The previous nine collisions came from a
+> stale *read* — grep, ask the lead, read `main`. **This one came from a WRITE
+> that inferred an ID rather than being told one.** An audit that recovers
+> entries from commit history assigns numbers by pattern-match, and a commit
+> that legitimately mentions a *range* of IDs gets filed under one of them. A
+> recovery pass is a writer, and writers need the same discipline as claimants:
+> **recover the entry, but do not invent the mapping — if a commit names several
+> IDs, the audit cannot know which one it IS.**
+
+**Staleness warning on everything below.** All figures were measured
+**2026-08-09 03:37Z–04:06Z** on web commit `b6ef6512`, and this file has since
+moved past `#324`. The structural findings (`#304`) do not decay; the live-state
+ones (`#301`, `#302`, `#326`) should be re-measured before anyone acts on the
+numbers rather than the mechanism. Full trace:
+`docs/ai_context/betting_contract_lifecycle.md`.
+
+### OPEN 2026-08-09 — `#301` `/api/board/game-chips` IGNORES ITS `sport` PARAMETER. The endpoint you would reach for to diagnose `#300`
+
+Measured on production web, 03:46Z. **All eight sports plus the no-argument case
+return a byte-identical 65-chip list** — same SHA-1 over the matchup sequence.
+The list mixes MLB finals, MLS fixtures dated Aug 1–2, and NCAAF out to Aug 28.
+
+**The enrichment is NOT at fault and this is the part to carry:**
+`attach_game_state` is correctly sport-aware — `mlb 5 / soccer 61 / wnba 1 /
+nfl 0` on the same date. **It is the debug endpoint's parameter that is inert,
+not the join.** Stated explicitly so nobody re-derives it.
+
+**Severity is contextual, not intrinsic.** On its own this is a cosmetic
+parameter bug. But it is the surface someone would use to diagnose `#300`
+(absent chips → `pregame` → 24 h staleness ceiling), and it would make an
+**MLB-shaped defect look sport-wide** — sending the work to the wrong place.
+
+### OPEN 2026-08-09 — `#302` THE L1-A SERVE-TIME PIVOT HAS NO PAYLOAD CEILING, and web OOMs at 2Gi
+
+**Reproducible trigger:** `GET /api/board/book-grid?sport=mlb&limit=2000` **502s
+every time**; `limit=600` with a `market=` filter is fine. Characterised on three
+attempts and deliberately not probed further — a fourth costs the service and
+buys nothing.
+
+**Render events API, `oomKilled {memoryLimit: 2Gi}`:** `2026-08-09T03:35:33Z`,
+`2026-08-08T23:44:04Z`, `2026-08-08T23:38:37Z`.
+
+The North Star calls this pivot *"the largest visible win available"* and notes
+it costs the worker nothing — true, and it is **not free on web**. The endpoint
+accepts `limit` up to 2000 and builds the full grid before slicing.
+**It ships with a cap or it ships an outage.**
+
+Related, already noted at `:1641`: a wildcard artifact pull would compound this.
+
+### OPEN 2026-08-09 — `#304` TWO BET LEDGERS ON TWO DISKS. Bets are logged on web; both settlement autoruns run on refresh-worker
+
+**`[structural]` — proven from code and `render.yaml`, NOT observed end to end.**
+Labelled that way deliberately: the structural half proves the path cannot work;
+only a live write would catch a *second* failure on top of it.
+
+| | **Ledger A — portfolio** | **Ledger B — evaluation** |
+|---|---|---|
+| written by | `POST /api/portfolio/bets` (`bet_slip.js:206`) | `POST /api/intelligence/portfolio-event`, **and** `maybe_record_board_state_to_evaluation_ledger` |
+| file | `data_root()/prediction_ledger.json` | `reports_root()/intelligence/evaluation_ledger_chunks/<date>.jsonl` |
+| IO | `read_text` / `write_text` | `open("a")` — **neither uses the keyvalue store** |
+| read by | `/portfolio` | **never by `/portfolio`** |
+
+Both logging routes run on **web**. Both settlement autoruns are read only in
+`scripts/run_refresh_worker.py` (`:532`, `:820`) — i.e. inside **refresh-worker**.
+And `render.yaml` mounts **three separate 50 GB disks at the identical path**:
+
+```
+web              syndicate-data-web              /opt/render/project/data
+refresh-worker   syndicate-data-refresh-worker   /opt/render/project/data
+live-odds-worker syndicate-data-live-odds-worker /opt/render/project/data
+```
+
+**Same path string, different disk — which is why it reads as correct in both
+processes. Compare the DISK, not the path.**
+
+Same-instant corroboration, 03:54:10–03:54:11Z: web's `/api/portfolio/summary`
+and `/intelligence/api/opportunity-board` both report **0**, while
+refresh-worker's own view holds **8,276** recommendation records. Those 8,276 are
+**worker-written** board-state records, on the settler's own disk, and are
+settleable in principle. It is the **web-logged** bet whose path is unproven.
+
+**This reorders `#297`.** If a web-logged bet never reaches the settler's disk,
+the key mismatch is the **second** thing that would stop it, and a mapping that
+makes keys intersect on a record that never arrives fixes nothing.
+
+**The experiment, specified so anyone can run it (one production write):** log a
+bet via `POST /api/intelligence/portfolio-event`, then read
+`chunk_diagnostics.<date>.line_count` from
+`/api/ops/evaluation-settlement/status` before and after. **If it does not move,
+the split is confirmed by measurement.** Not run — that lane was read-only.
+
+### OPEN 2026-08-09 — `#326` (was mis-filed as `#305`) SOCCER `prop_source_in`: 162 OF 162 ROWS MISSING `market_key`
+
+From `opportunity_contract_metrics_v1`, `service_role refresh-worker-4tx2`,
+generated **2026-08-09T03:55:54Z**, read through the keyvalue store:
+
+```
+sport   date        stage            rows  complete  miss_event  miss_market_key
+soccer  2026-08-08  prop_source_in    162         0           0              162
+```
+
+**Every soccer prop source row fails the contract at the market-key check —
+100%, not a tail.** `complete` is 0. **NOT JOINED at the source**, distinct from
+"no producer": the rows exist and carry event identity.
+
+For contrast, on the same sweep: `missing_event_identity` is **0 across every
+sport and every stage**, and MLB's `prop_source_in` is 46/46 complete. So this is
+soccer-specific and market-key-specific, not a general contract failure.
+
+Related but NOT the same defect: soccer's grid is the thinnest on the platform
+(13.2% three-book, 10.3% two-sided), which is a *capture* property. This is a
+*normalisation* one.
+
 ### #324 — OPEN. The keyvalue instance is 96.1% full and evicting, and 86% of it is write-once run diagnostics. The 2-day TTL LANDED AND WORKS — it is a bound on AGE, and the problem is SIZE
 
 **Status: measured on production 2026-08-10 ~04:2xZ. Not fixed. This is the
