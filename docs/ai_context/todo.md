@@ -1185,7 +1185,7 @@ re-measuring over a longer window; it is not worth acting on. [[a rate, not a co
 4096MB cap — **68%**, from a stage nobody was watching, with the hydrated
 overview (~+700MB) able to land on the same cycle.
 
-#### ATTRIBUTION 2026-08-10: `post_mlb_sim_tick` IS A BYSTANDER. Four causes eliminated, none confirmed
+#### ATTRIBUTION 2026-08-10: `post_mlb_sim_tick` IS A BYSTANDER. FIVE causes eliminated, none confirmed
 
 **The stage in the name did not allocate the memory.** At every one of the four
 excursions the tick's own `MLB_SIM_TICK` meta reports **every sub-feature
@@ -1252,11 +1252,93 @@ window.
 
 **Not claimed:** that the live-lens publish sweep is the cause. It is the
 largest unlit gap adjacent to the peaks, which makes it where to point the next
-instrument, not an answer.
+instrument, not an answer. **That instrument was then built and it eliminated
+the candidate — see below.**
 
 **The method note.** Every elimination above came from a field already in the
 payload — process tables, tick meta, stage timings. None needed new code.
 [[read the field you already have]]
+
+#### 5. NOT the live-lens publish sweep — the candidate I instrumented, then eliminated
+
+`489ddbb5` lit the gap (`live_lens_publish_before` → `after`, plus the pull at
+cycle start). Live on refresh-worker from **20:32:47Z**. **15 paired cycles**:
+
+```
+published  elapsed_s   d_container    d_rss      container_peak
+   15          3.4        +43.3        +9.4         1155.5
+   23          7.1       +199.7       +78.0         1570.0   <- outlier, see below
+   15          8.2        +18.8        +0.0         1670.6
+   15          5.1        -13.7       -26.3         1686.5
+   15          1.8         -0.5        +0.0         2039.5
+   15         35.3        -41.2       -41.7         2049.2
+   15         12.9         -0.5        +0.0         2077.9
+   15          7.7         +0.3        +0.0         2099.4
+   15          2.3         -7.3        -0.3         2357.3
+   15          4.7        +15.8       +16.2         2166.8
+   15          4.9         +3.4        +3.2         2208.0
+   17          5.6         -8.0        -1.0         2202.6
+   30         13.8         +2.6        +0.0         2230.3
+   32          3.7         -0.4        +0.0         2240.5
+   34         47.3        +12.9       +12.9         2209.9
+```
+
+**Two independent reasons this is not the 493–878MB allocator:**
+
+1. **Wrong magnitude by one to two orders.** Excluding the outlier, every cycle
+   sits within ±44MB and most within ±20MB. **Many are NEGATIVE**, which is what
+   a sweep whose allocations are freed before the after-sample looks like
+   against a drifting baseline.
+2. **No scaling with sweep size, which is the load-bearing test.** The *largest*
+   sweep (34 artifacts) cost **+12.9MB**; a 15-artifact sweep cost **+43.3MB**.
+   Marginal cost across the observed range is **−1.60 MB per artifact** —
+   negative, i.e. no relationship at all. A linear model predicting ~500MB at
+   103 artifacts is not merely unsupported, it is contradicted in sign.
+
+**The `elapsed_seconds` check closes the obvious objection.** The loop's own
+comment cites sweeps of "48–74s per cycle at 73–103 artifacts", so the natural
+rebuttal is that only small fast sweeps were observed. **A 47.3-second sweep was
+observed and cost +12.9MB** — squarely inside the cited duration band. Duration
+does not buy memory here either.
+
+#### The caveat that keeps this at "eliminated", not "excluded"
+
+**Max observed sweep is 34 artifacts against the 73–103 the comment cites.** The
+flat-to-negative slope from 15→34 makes a *linear* blow-up at 103 untenable, but
+a **non-linear** one is not formally excluded. Steady state is ~15/cycle rising
+to ~34 as the worker warms, so a 73–103 sweep likely needs a batch write and may
+be rare. A watcher is running for one.
+
+**And one point is unexplained: 23 artifacts → +199.7MB**, larger than every
+bigger sweep in the table. Whatever produced it, **it was not sweep size** —
+which makes it interesting rather than dismissible: it may be the same
+uninstrumented something the excursions are, caught in passing.
+
+#### A thing visible only because the deltas are near zero
+
+`container_peak` climbs **1155 → 2230MB across 25 minutes** while the publish
+deltas hover around nothing. That is `#285`'s ratchet accumulating underneath,
+entirely independent of this path — and a standing reminder that **the baseline
+moves on its own while you are measuring deltas against it.** A fixed threshold
+over this series would have flagged the tail and called it an excursion.
+
+#### A correction to my own instrumentation claim
+
+I wrote that the sample "carries `published_count`/`failed_count`/
+`elapsed_seconds`, so one line beats correlating two log streams". **True of
+stderr, FALSE of the web-visible record.** `update_process_memory_high_water`
+persists a fixed subset — `stage`, `peak_mb`, `container_memory_mb`,
+`accounted_rss_mb`, `pct_of_max`, `observed_at`, `pid`, `processes` — and drops
+arbitrary `**extra`. So `high_water` shows `published_count=None`.
+
+**I nearly reported that `None` as evidence the sweep had crashed**, since my
+own code sets those fields to `None` only on the exception path. It is the
+schema, not a crash. Checking the emitter before interpreting the absence is the
+only reason a false finding did not go out. [[absent signal is about the emitter]]
+
+Small gap worth closing when something else deploys: **a peak without its
+artifact count is a number without its denominator**, and the peak is exactly
+where that denominator is wanted.
 
 #### What is NOT claimed
 
