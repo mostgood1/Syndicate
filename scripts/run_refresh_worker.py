@@ -548,6 +548,37 @@ def _soccer_unit_key(unit: dict[str, str]) -> str:
     return f"{unit.get('league') or ''}|{unit.get('date') or ''}"
 
 
+# Last skip reason printed, so steady state does not reprint every 30s tick.
+_SOCCER_SKIP_REASON_LAST: dict[str, str] = {}
+
+
+def _soccer_autorun_skipped(reason: str, detail: str) -> bool:
+    """Say why the soccer autorun declined, exactly once per reason change.
+
+    WHY THIS EXISTS. The first #282 deploy produced no `SOCCER_UNIT_LAUNCHED`
+    and no `SOCCER_UNITS_EMPTY` for 15 minutes, and from outside the container
+    there was no way to tell which of three gates had stopped it -- spacing,
+    an active job, or nothing due. All three returned a bare `False`.
+
+    That is the same defect this item was written to fix, in my own code: I made
+    the empty-unit zero attributable and left the three that actually fire in
+    steady state silent. A gate that declines without saying so is
+    indistinguishable from a gate that is broken.
+
+    Printed on CHANGE rather than every tick: at a 30s poll a per-tick line
+    would be ~2900 lines a day saying nothing new, on a service whose log and
+    write volume is already load-bearing. A transition is the informative event;
+    the steady state is not.
+    """
+    # Dedup on the REASON only. `detail` carries counters that tick every cycle
+    # (`since_last_launch_s`, `next_due_in_s`), so keying on reason+detail would
+    # differ every time and print every time -- the exact spam this is avoiding.
+    if _SOCCER_SKIP_REASON_LAST.get("reason") != reason:
+        _SOCCER_SKIP_REASON_LAST["reason"] = reason
+        print(f"[refresh_worker] SOCCER_AUTORUN_SKIPPED reason={reason} {detail}", flush=True)
+    return False
+
+
 def _soccer_unit_launch_spacing_seconds(unit_count: int) -> int:
     """How long to wait between two per-league launches.
 
@@ -604,19 +635,30 @@ def _launch_autorun_soccer_weekly_refresh(
     # WHETHER a unit is due, this one decides whether it is this tick's turn.
     last_launch_epoch = float(last_status.get("lastLaunchEpoch") or last_status.get("epoch") or 0.0)
     if last_launch_epoch > 0.0 and (now - last_launch_epoch) < spacing_seconds:
-        return False
+        return _soccer_autorun_skipped(
+            "spacing_gate",
+            f"units={len(units)} spacing_s={int(spacing_seconds)} since_last_launch_s={int(now - last_launch_epoch)}",
+        )
 
     # Never stack a soccer job on top of a live one. launch_refresh_run's own
     # _assert_no_active_refresh_run would raise here, which is caught below and
     # written out as an `error` status -- true but misleading, since declining
     # to start a second job is correct behaviour, not a failure.
-    if _current_active_job_count(latest_manifest_path) > 0:
-        return False
+    active_jobs_now = _current_active_job_count(latest_manifest_path)
+    if active_jobs_now > 0:
+        return _soccer_autorun_skipped("active_job", f"active_jobs={active_jobs_now}")
 
     unit_epochs = last_status.get("unitEpochs") if isinstance(last_status.get("unitEpochs"), dict) else {}
     due = [unit for unit in units if (now - float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0)) >= interval_seconds]
     if not due:
-        return False
+        soonest = min(
+            (interval_seconds - (now - float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0)) for unit in units),
+            default=0.0,
+        )
+        return _soccer_autorun_skipped(
+            "no_unit_due",
+            f"units={len(units)} interval_s={int(interval_seconds)} next_due_in_s={int(max(0.0, soonest))}",
+        )
     # Stalest first, so a unit can never be starved by ordering.
     due.sort(key=lambda unit: float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0))
     unit = due[0]
@@ -688,6 +730,9 @@ def _launch_autorun_soccer_weekly_refresh(
         return False
 
     launched_epoch = time.time()
+    # A launch ends the current skip regime, so the next skip -- even for the
+    # same reason -- is a new transition and should print.
+    _SOCCER_SKIP_REASON_LAST.pop("reason", None)
     _refresh_state_store()["write_json_file"](
         status_path,
         {
@@ -1485,13 +1530,40 @@ def _current_active_job_count(latest_manifest_path: Path) -> int:
     return 0
 
 
-# #311. The job runner this counts is what `_spawn_pending_job` starts, one per
-# claim, so counting these processes counts claims that are actually running.
-_JOB_PROCESS_MARKER = "run_queued_refresh_job.py"
+# #311. Count `run_refresh_odds_job.py`, because it is the ONE process both
+# launch paths have in common, exactly once per running job:
+#
+#   queued-contract path   _spawn_pending_job -> run_queued_refresh_job.py
+#                          -> run_refresh_odds_job.py        <- counted here
+#   autorun path           launch_refresh_run(launch_mode="web_process")
+#                          -> run_refresh_odds_job.py        <- counted here
+#
+# CORRECTED 2026-08-10 after the first deploy. This was
+# `run_queued_refresh_job.py`, which only the queued path uses, so it read 0
+# during every autorun-launched job. Measured on refresh-worker, 1.5h window:
+#
+#   run_queued_refresh_job.py    0 samples >0
+#   run_refresh_odds_job.py     33 samples >0  (max concurrent 1)
+#
+# Two consequences, and the second is the one that mattered:
+#   - the cap fell back to the manifest for the COMMON case, leaving the hole
+#     this item exists to close still open on the autorun path;
+#   - `JOB_COUNT_DISAGREEMENT` fired on every ordinary autorun job
+#     (`manifest=1 processes=0`), so a marker documented as "the wedged-manifest
+#     signature" was in fact mostly noise. A signal that cries wolf during
+#     normal operation is worse than no signal, because it is indistinguishable
+#     from the real thing at the moment you need it.
+#
+# NOT `refresh_odds_sources.py`: `run_refresh_odds_job.py` carries it as a
+# trailing argument, so that string matches twice per job.
+_JOB_PROCESS_MARKER = "run_refresh_odds_job.py"
 
 
 def _running_job_process_count() -> int | None:
-    """Live job-runner processes, or None when that cannot be determined.
+    """Live refresh-job processes, or None when that cannot be determined.
+
+    Counts `run_refresh_odds_job.py` -- see `_JOB_PROCESS_MARKER` for why that
+    specific process and not the one this originally counted.
 
     WHY THIS EXISTS RATHER THAN REUSING `_current_active_job_count`. That
     function reads the manifest, and the manifest is the thing that lies. It

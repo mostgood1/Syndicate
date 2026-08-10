@@ -272,9 +272,51 @@ deploy, not on a green suite.
 - **Unknown is not zero.** Enumeration failure returns `None`, and the resolver
   reports `source="manifest_only_process_enum_unavailable"` rather than
   presenting the manifest's zero as verified. [[unknown must not default permissive]]
-- A persistent manifest/process disagreement now emits `JOB_COUNT_DISAGREEMENT`
-  — that disagreement *is* the wedged-manifest signature, and it was previously
-  invisible.
+- A persistent manifest/process disagreement now emits `JOB_COUNT_DISAGREEMENT`,
+  which was previously invisible. **See the correction below before trusting
+  that marker — as first shipped it was mostly noise.**
+
+#### CORRECTION 2026-08-10, found by watching the deploy rather than by review
+
+**Both halves of `#311` work, and the cap fired for the first time in this
+system's history** — `JOB_CAP_THROTTLED active=1 max=1 source=process_and_manifest`,
+14:03:42Z, correctly, with a real job running. But the process counter was
+**counting the wrong process**, and that had one benign consequence and one
+that would have cost an incident.
+
+It counted `run_queued_refresh_job.py`. Only the **queued-contract** path uses
+that; the **autorun** path (`launch_refresh_run(launch_mode="web_process")`)
+spawns `run_refresh_odds_job.py` directly. Measured on refresh-worker over 1.5h:
+
+```
+run_queued_refresh_job.py     0 samples with >=1
+run_refresh_odds_job.py      33 samples with >=1   (max concurrent 1)
+14:03:46Z peak sample: queued=0  odds_job=1  refresh_odds_sources=2
+```
+
+- **Benign:** the cap was still *correct*, because `max(process, manifest)` fell
+  back to the manifest and the manifest happened to be right. The design
+  survived the bug — which is the argument for `max()` rather than replacement,
+  now demonstrated rather than asserted.
+- **NOT benign:** `JOB_COUNT_DISAGREEMENT manifest=1 processes=0` fired on
+  **every ordinary autorun job.** A marker this entry documented as "the
+  wedged-manifest signature" was firing constantly during healthy operation.
+  **A signal that cries wolf in normal operation is worse than no signal**,
+  because at the moment you need it, it is indistinguishable from the noise it
+  has been making all day. I introduced that.
+- **Also not benign:** for the autorun path — the *common* path on this worker —
+  the cap was still manifest-only, so the hole `#311` exists to close was open
+  for the majority of jobs. It was closed only for the queued path, which is
+  the one `#279`'s runaway actually used.
+
+Fixed by counting `run_refresh_odds_job.py`, the one process both launch paths
+have in common, **exactly once per job**. Not `refresh_odds_sources.py`:
+`run_refresh_odds_job.py` carries it as a trailing argument, so that string
+matches twice per job.
+
+**The method note.** This was not findable by re-reading the diff — the code
+does exactly what it says. It took watching production and asking why a marker
+was firing when nothing was wrong. [[test the fix's predicate]]
 
 **THE CAVEAT, AND IT IS THE REASON THIS SAYS "NOT RUN".** The five pytest tests
 added alongside this have **not been executed** — the user declined the test
@@ -403,7 +445,30 @@ Target for `#285`, stated as the acceptance bar: **one good build per 30 minutes
 `#286` bridges the gaps between them, so at that rate the board stays populated
 permanently.** `#290`'s answer travels with it unchanged — *do not lower the
 floor; the fix is to need less, not to permit more.*
-### #282 — SHIPPED (committed, NOT deployed). Soccer sim split into per-league-date jobs. And the premise the brief was written on was false: soccer sims were never off
+### #282 — SHIPPED AND VERIFIED IN PRODUCTION. Soccer sim split into per-league-date jobs. And the premise the brief was written on was false: soccer sims were never off
+
+**VERIFIED 2026-08-10 on refresh-worker, deploy `d25b1aaa` (boot 03:46:11Z).**
+The split does what it was built to do, one league and one date per job:
+
+```
+04:28:06Z  SOCCER_UNIT_LAUNCHED league=primeira_liga unit_date=2026-08-09 scope_kind=league_date unit=1/4 due=1 spacing_seconds=3600
+08:28:17Z  SOCCER_UNIT_LAUNCHED league=primeira_liga unit_date=2026-08-10 scope_kind=league_date unit=1/1 due=1 spacing_seconds=14400
+```
+
+**And the first verification attempt got it wrong, which is the part to keep.**
+I watched for 15 minutes after boot, saw nothing, and could not tell why —
+because the three gates that decline in steady state (spacing, active job,
+nothing due) all returned a bare `False`. The real launch came at **04:28,
+42 minutes in**: the spacing gate was holding, exactly as designed.
+
+So the window was too short — **but "the window was too short" is also precisely
+what an inert deploy looks like from outside**, and I had no way to tell those
+apart. I had applied "a zero must be attributable" to the empty-unit case and
+left the three gates that actually fire silent. Fixed by
+`SOCCER_AUTORUN_SKIPPED reason=<spacing_gate|active_job|no_unit_due>`, printed
+**on reason CHANGE, not per tick** — the detail string carries counters that
+move every cycle, so keying the dedup on reason+detail would print every 30s
+forever. That bug was written and caught before it shipped.
 
 > **ATTRIBUTION CORRECTION + AN ORPHANED FINDING, added by the coordinator
 > 2026-08-09 ~21:3xZ.** I credited `de1a6906` and `50afe2ae` to the `#282` lane.
@@ -1319,6 +1384,15 @@ refresh-worker, window 04:00–14:50Z:**
 | `KEYVALUE_WRITE_REJECTED` | 27.6MB vs 8.39MB ceiling | **0** |
 | `/api/home` | 502 after 94s | **200, 1,451,280 bytes** |
 | `candidate_count` | 0 | **150** |
+
+**That window is not artificially quiet, which was the obvious objection.** The
+`#282` lane flagged that its per-league soccer sim groups might have been inert
+post-deploy, which would have made this a reading under light load.
+`SOCCER_UNIT_LAUNCHED` fired at 04:28:06, 08:28:17 and 12:28:30 —
+**all three inside 04:00–14:50Z** — so the publish path absorbed real soccer sim
+traffic across the whole clean window. (`SOCCER_UNITS_EMPTY` = 0 on both
+workers; the lane's own 15-minute check had simply landed 26 minutes before the
+first launch of a `spacing_seconds=14400` cadence.)
 
 The board lands. **`9583e9bd` is not why** — it is a 3.76× → 2.63× reduction on
 a path this entry measured at ~5% of the limit, and it was labelled "not an OOM

@@ -1450,6 +1450,43 @@ def test_soccer_autorun_reports_an_empty_unit_list_rather_than_returning_a_bare_
     assert "SOCCER_UNITS_EMPTY" in capsys.readouterr().out
 
 
+def test_soccer_autorun_says_which_gate_declined_and_says_it_once(tmp_path, monkeypatch, capsys):
+    """The first #282 deploy produced 15 minutes of silence.
+
+    No SOCCER_UNIT_LAUNCHED, no SOCCER_UNITS_EMPTY, and from outside the
+    container no way to tell which of three gates had stopped it -- spacing, an
+    active job, or nothing due. All three returned a bare False. A gate that
+    declines without saying so is indistinguishable from one that is broken.
+
+    Second half of this test is the anti-spam property, and it is not
+    incidental: the detail string carries counters that change every tick, so
+    keying the dedup on reason+detail prints every 30s forever. That bug was
+    written and caught before it shipped; this pins it.
+    """
+    units = [{"league": "eredivisie", "date": "2026-08-09"}]
+    rrw, _store, calls = _soccer_launch_harness(tmp_path, monkeypatch, units=units)
+    monkeypatch.setattr(rrw, "_current_active_job_count", lambda _path: 1)
+
+    assert _run_soccer_autorun(rrw, tmp_path) is False
+    first = capsys.readouterr().out
+    assert "SOCCER_AUTORUN_SKIPPED reason=active_job" in first
+
+    # Same reason on the next tick -> silent, even though the detail counters
+    # would have moved.
+    assert _run_soccer_autorun(rrw, tmp_path) is False
+    assert "SOCCER_AUTORUN_SKIPPED" not in capsys.readouterr().out
+
+    # A DIFFERENT reason is a transition and must print.
+    monkeypatch.setattr(rrw, "_current_active_job_count", lambda _path: 0)
+    monkeypatch.setattr(rrw, "_soccer_unit_launch_spacing_seconds", lambda _n: 10**9)
+    rrw._refresh_state_store()["write_json_file"](
+        rrw._soccer_weekly_autorun_status_path(), {"lastLaunchEpoch": time.time()}
+    )
+    assert _run_soccer_autorun(rrw, tmp_path) is False
+    assert "SOCCER_AUTORUN_SKIPPED reason=spacing_gate" in capsys.readouterr().out
+    assert calls == []
+
+
 def test_soccer_autorun_status_write_count_is_one_per_launch(tmp_path, monkeypatch):
     """More jobs must not mean more writes PER job.
 
