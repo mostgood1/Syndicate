@@ -26448,6 +26448,33 @@ the preflight tool encodes.
 Corollary for the tool: a HOLD on jobs is necessary and not sufficient. Ask the
 lanes before a config change the same way you would before a deploy.
 
+### Test NECESSITY, not magnitude, when a candidate is hard to catch at scale (2026-08-10)
+
+`#327` eliminated the publish sweep, retracted the elimination, then restored it,
+in one evening. **Only the restoration rested on a test the other two were not
+held to**, and the difference is the method:
+
+- **Elimination v1** used before/after sampling around the sweep. Blind to a
+  transient allocated and released between its endpoints -- and a +970MB one was
+  later caught mid-sweep.
+- **The retraction** rested on one excursion landing inside a sweep. **Sweep duty
+  cycle is 20%**, so that coincidence is the expected outcome one time in five.
+  The base rate was computable at the time and was not computed.
+- **Elimination v2** found a +529.5MB excursion -- squarely in the 493-878MB
+  class -- with **no sweep running**. The effect occurs without the candidate, so
+  the candidate is not necessary for it.
+
+**The chase for magnitude was unwinnable and nobody noticed.** The criterion was
+"catch a 73-103 artifact sweep"; observed sizes plateaued at 34, then 47, against
+a `LARGE_SWEEP=60` threshold that was **never reachable**. The 73-103 figure in
+the loop's comment may describe a configuration that no longer exists. Waiting
+for it would have blocked indefinitely on an unsatisfiable condition.
+
+**When a candidate is hard to catch at full scale, ask whether the effect happens
+WITHOUT it.** Necessity is cheaper to test than magnitude and does not depend on
+catching the biggest case. Pairs with *a rate, not a count*: before treating a
+coincidence as evidence, compute how often it would happen by chance.
+
 ### A log window ahead of the log stream reads as a dead service (2026-08-10)
 
 Queried Render logs with `startTime=22:26:00Z` while the stream had only reached
