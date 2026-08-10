@@ -46,6 +46,7 @@ from scripts._pipeline_diag import (  # noqa: E402
     log_window,
     matches,
     oom_events,
+    freshness_note,
     render_owner_id,
     service_commits,
     utcnow,
@@ -419,6 +420,18 @@ def main() -> int:
         return 0
 
     print(banner(f"BETTING PIPELINE - {date}   (worker log window {first} -> {last}, {minutes:.0f} min)"))
+    # Every number below comes from PRODUCTION. The local mirror state is
+    # printed anyway, because the failure this guards against is someone
+    # cross-checking a production number against a stale local file and
+    # trusting the wrong one -- which is how a five-day-old shard got
+    # reported as current on 2026-08-10.
+    print("  READS PRODUCTION ONLY. Local mirror, for contrast:")
+    for pattern in (
+        "data/mlb_source/tracking/book_quotes/*.jsonl",
+        "data/mlb_source/**/daily/snapshots/*/schedule_raw.json",
+        "reports/intelligence/layer2_shortlist_*.json",
+    ):
+        print(f"    {freshness_note(pattern)}")
     if log_error:
         print(f"  !! LOG FETCH FAILED: {log_error}")
         print("     Every log-derived stage below is UNMEASURED, not zero. Fix this first.")

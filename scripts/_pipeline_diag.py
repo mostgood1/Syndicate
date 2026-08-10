@@ -307,3 +307,79 @@ def first_broken(stages: list[Stage]) -> Stage | None:
 
 def banner(title: str) -> str:
     return f"\n{'=' * 78}\n{title}\n{'=' * 78}"
+
+
+# --------------------------------------------------------------------------
+# STALENESS GUARD
+#
+# Reading local `data/**` is not the mistake. Reading it WITHOUT KNOWING ITS
+# AGE is, and no warning prevents that -- `CLAUDE.md` has carried one for
+# months and on 2026-08-10 a five-day-old book-quotes shard was still profiled
+# and reported as current, with the contradicting evidence in hand (production
+# said 122k rows, the file had 34k) and explained away as "today's shard is
+# bigger".
+#
+# So these make the age unavoidable rather than remembered: `require_fresh`
+# returns False and says why, and `freshness_note` is what a report prints
+# above any number that came off local disk.
+# --------------------------------------------------------------------------
+
+_DATE_IN_NAME = re.compile(r"(20\d{2})[-_](\d{2})[-_](\d{2})")
+
+
+def local_artifact_freshness(pattern: str) -> tuple[str | None, float | None, int]:
+    """(newest date in the filenames, age in days, file count) for a glob.
+
+    Dates come from the FILENAME, not mtime: a mirror refresh rewrites mtimes
+    wholesale, so mtime says when the copy happened and the filename says which
+    slate the data is actually about. Only the second one matters for whether a
+    conclusion is safe.
+    """
+    dates: set[str] = set()
+    count = 0
+    for path in REPO_ROOT.glob(pattern):
+        count += 1
+        found = _DATE_IN_NAME.search(path.name)
+        if found:
+            dates.add(f"{found.group(1)}-{found.group(2)}-{found.group(3)}")
+    if not dates:
+        return None, None, count
+    newest = max(dates)
+    try:
+        parsed = datetime.strptime(newest, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return newest, None, count
+    return newest, (utcnow() - parsed).total_seconds() / 86400.0, count
+
+
+def require_fresh(pattern: str, *, max_age_days: float = 1.0, purpose: str = "this analysis") -> bool:
+    """False (loudly) when local data is too old to support a conclusion.
+
+    Call this BEFORE reading local artifacts, and stop if it returns False.
+    It deliberately does not raise -- a diagnostic that dies on a stale mirror
+    is less useful than one that reports the staleness as its finding.
+    """
+    newest, age, count = local_artifact_freshness(pattern)
+    if count == 0:
+        print(f"  !! NO LOCAL FILES match {pattern}")
+        print(f"     {purpose} cannot use local data. Read production, or pull with scripts/mirror_pull.py.")
+        return False
+    if age is None:
+        print(f"  !! {count} local file(s) for {pattern} carry no parseable date -- age UNKNOWN, not fresh.")
+        return False
+    if age > max_age_days:
+        print(f"  !! LOCAL DATA IS {age:.1f} DAYS OLD (newest {newest}, {count} files) for {pattern}")
+        print(f"     {purpose} must not rest on this. `py -3 scripts/mirror_pull.py --family ... --date ...`")
+        print("     Shape is still safe to read from a stale mirror; dates, counts and coverage are NOT.")
+        return False
+    return True
+
+
+def freshness_note(pattern: str) -> str:
+    """One line describing what a local read is actually resting on."""
+    newest, age, count = local_artifact_freshness(pattern)
+    if count == 0:
+        return f"local: NO FILES for {pattern}"
+    if age is None:
+        return f"local: {count} files, newest date UNKNOWN"
+    return f"local: {count} files, newest {newest} ({age:.1f}d old)"
