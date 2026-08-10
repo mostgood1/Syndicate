@@ -1596,7 +1596,7 @@ re-measuring over a longer window; it is not worth acting on. [[a rate, not a co
 4096MB cap — **68%**, from a stage nobody was watching, with the hydrated
 overview (~+700MB) able to land on the same cycle.
 
-#### ATTRIBUTION 2026-08-10: `post_mlb_sim_tick` IS A BYSTANDER. FOUR causes eliminated (a fifth was claimed and RETRACTED), none confirmed
+#### ATTRIBUTION 2026-08-10: `post_mlb_sim_tick` IS A BYSTANDER. FIVE causes eliminated (the fifth retracted, then RESTORED on a direct test), none confirmed
 
 **The stage in the name did not allocate the memory.** At every one of the four
 excursions the tick's own `MLB_SIM_TICK` meta reports **every sub-feature
@@ -1693,7 +1693,64 @@ Two consequences, and the second is easy to get backwards:
   moving baseline measures the population, not the exception**, and the baseline
   just moved for a new reason.
 
-#### 5. RETRACTED — the publish sweep is BACK, and my instrument's blind spot is why I got it wrong
+#### 5. RESTORED, on the test the first version was never held to. The publish sweep is NOT the allocator
+
+**Read this before the retraction below, which it supersedes.** The retraction
+was right to make — the instrument really was blind — but the inference drawn
+from it was weaker than I presented, and the direct test now says so.
+
+**THE DECIDING OBSERVATION, 2026-08-10 22:40:42Z:**
+
+```
+excursion  rss 1389.0MB  container 2546.9MB  +529.5MB above neighbours
+           NOT inside any publish sweep window
+           nearest sweep 22:42:50-22:42:52, 127s away
+```
+
+**+529.5MB is squarely in the 493–878MB `#327` class, and no sweep was
+running.** An excursion of the same magnitude occurs without the publish path,
+so **the sweep is not necessary for it.** That is a direct exclusion, not a
+magnitude argument.
+
+#### THE NUMBER THAT SHOULD HAVE TEMPERED MY RETRACTION: a 20% base rate
+
+Measured over 2,012s: **14 completed sweeps, 403s of total sweep time — a 20.0%
+duty cycle.** So a randomly-timed excursion lands inside a sweep **one time in
+five.**
+
+**The 21:16:54Z coincidence I overturned an elimination on was a 1-in-5 event.**
+I reported it as though it implicated the publish path. It did not: it was the
+expected outcome a fifth of the time, and I never computed the prior before
+acting on it. Coincidence with a process that is running 20% of the time is
+close to no evidence at all.
+
+**This is the same defect as the one it replaced, pointed the other way.** The
+first elimination came from an instrument that could not see the event; the
+retraction came from a coincidence whose base rate I did not check. Both were
+confident, both were about the publish path, and both were wrong for reasons
+available at the time. [[a rate, not a count]]
+
+#### Three independent grounds now, which is why this one should hold
+
+1. **Necessity fails.** A +529.5MB excursion with no sweep running (above).
+2. **In-sweep sampling finds nothing.** Five sweeps of 47–55 artifacts,
+   up to 43.3s and 22 polls, **max lift +14.5MB** above their own endpoints —
+   on an instrument that reads the same cgroup counter as the excursion and
+   therefore *cannot* miss a real spike in its own window.
+3. **The one coincidence was expected.** 20% duty cycle, n=1.
+
+**Still not claimed:** what *does* allocate it. This restores an elimination; it
+does not identify a cause. Five eliminations, cause unattributed.
+
+**Method note, and it is the reusable part.** The question that resolved this
+was not "how big can the sweep get" — sweep size was always a proxy, and my own
+`LARGE_SWEEP=60` threshold turned out to be unreachable (sizes plateaued at 47,
+having plateaued at 34 earlier; the 73–103 in the loop's comment may describe a
+configuration that no longer exists). **The question that resolved it was
+whether the excursion needs the sweep at all.** Necessity is cheaper to test
+than magnitude and it does not depend on catching the biggest case.
+
+#### 5-superseded. RETRACTED — the publish sweep is BACK, and my instrument's blind spot is why I got it wrong
 
 **READ THIS BEFORE THE ELIMINATION BELOW. I retract it.** The excursion was
 caught happening *inside* a publish sweep, and my `before`/`after` pair is
