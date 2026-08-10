@@ -272,6 +272,41 @@
   // together AND still stage each one separately -- a slip leg is a SIDE, never
   // a market. Rendering the pair as one row with a single button would have
   // made the under unbettable.
+  // NO-VIG FAIR for two-sided markets, computed here rather than borrowed.
+  //
+  // The first fix for the blank Fair column fell back to `consensus`, which made
+  // Fair and Consensus render the SAME NUMBER on every two-sided row -- two
+  // columns, one value, no information. Consensus is the market's mean price
+  // WITH the vig in it; fair is that price with the vig removed. They are
+  // different quantities and the board has room for both only if it shows both.
+  //
+  // Standard de-vig: implied probabilities across all sides, normalised to sum
+  // to 1, back to American. Needs every side priced -- a one-sided market cannot
+  // be de-vigged at all, which is precisely why `modelled_fair` exists and is
+  // preferred above.
+  function impliedProb(american) {
+    if (american === null || american === undefined) { return null; }
+    var a = Number(american);
+    return a >= 0 ? 100 / (a + 100) : (-a) / ((-a) + 100);
+  }
+  function americanFromProb(p) {
+    if (!p || p <= 0 || p >= 1) { return null; }
+    return p >= 0.5 ? Math.round(-100 * p / (1 - p)) : Math.round(100 * (1 - p) / p);
+  }
+  function noVigFair(r, side) {
+    var sides = r.sides || [];
+    if (sides.length < 2) { return null; }
+    var consensus = r.consensus || {};
+    var total = 0, probs = {};
+    for (var i = 0; i < sides.length; i++) {
+      var pr = impliedProb(consensus[sides[i]]);
+      if (pr === null) { return null; }
+      probs[sides[i]] = pr; total += pr;
+    }
+    if (total <= 0) { return null; }
+    return americanFromProb(probs[side] / total);
+  }
+
   function rowHtml(r, g) {
     var p = r.projection || {};
     var pSide = projSide(r);
@@ -299,7 +334,7 @@
       var mf = (r.modelled_fair || {})[side] || {};
       var fair = mf.fair_price;
       var fairModelled = fair !== null && fair !== undefined;
-      if (!fairModelled) { fair = cons; }
+      if (!fairModelled) { fair = noVigFair(r, side); }
       // Proj/Edge belong to the side the projection DESCRIBES. Repeating them
       // on the opposite side would attach a real number to the bet nobody
       // modelled, which is the single most misleading thing this board could do.
