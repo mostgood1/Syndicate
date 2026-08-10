@@ -1479,6 +1479,41 @@ reporting a null about a deployment.
   not deleted, so the hazard is narrower than `#284`'s wording implies: only a
   *declared* key whose live value was changed at runtime reverts.
 
+### `#327` — THIRD LEG UNDER THE PUBLISH-SWEEP ELIMINATION, contributed by the `#329` lane
+
+**A necessity test I ran for a different reason and filed under the wrong
+question.** I was re-measuring my own `#329` forward-date book-grid builds after
+the publish path was (briefly) restored as a candidate, using mid-sweep sampling
+rather than the before/after pair that had just been shown blind.
+
+Measured 2026-08-10, refresh-worker, window 21:32:30–21:36:00Z — a book-grid tick
+that wrote today + yesterday + five forward artifacts, i.e. one of the larger
+sweeps of the evening:
+
+```
+publish lines in window     71
+memory samples in window    78
+during the sweep            FLAT at ~1,421MB -- no excursion
+tick total                  1,421 -> 1,667MB  (+245MB, the BUILDS)
+#327 excursion class        493-878MB
+```
+
+**A 71-line sweep with 78 samples across it and no excursion is evidence about
+the CANDIDATE, not about my change.** I reported it as "my forward builds do not
+show the signature" and stopped, because I was asking whether I had made things
+worse rather than whether the publish path does anything at all.
+
+Sits alongside the direct exclusion (`22:40:42`, +529.5MB with no sweep within
+127s) and the 20% duty-cycle base rate that killed the coincidence argument.
+Three independent legs, one of which was sitting unrecognised in another lane's
+notes for two hours.
+
+**The generalisation, which is the durable part:** *when a candidate is hard to
+catch at full scale, ask whether the effect happens without it.* Necessity is
+cheaper to test than magnitude and does not depend on catching the biggest case
+— and a magnitude chase can be unsatisfiable without anyone noticing, as the
+`LARGE_SWEEP=60` threshold against observed sizes plateauing at 34–47 was.
+
 ### #327 — OPEN, UNOWNED. An 817MB memory excursion at `post_mlb_sim_tick` takes the container to 2.71GB of 4GB, and the ring buffer everyone has been reading CANNOT SEE THE STAGE IT HAPPENS IN
 
 **Status: measured on production 2026-08-10, re-derived independently from the
