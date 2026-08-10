@@ -835,6 +835,19 @@ deploy every `_persist_locked` carried `snapshot_count=0`, and `TRIMMED=0`
 against that is the same nothing-was-attempted reading as `kvrej=0` with
 `persist=0`. Wait for a populated persist before believing any of these zeros.
 
+**Durable through T+36 (03:32:31Z → 04:08:38Z), 12 populated persists:**
+
+```
+03:41  populated=1    qsc_kvrej=0  bs_kvrej=0  TRIMMED=0  served=150
+03:48  populated=6    qsc_kvrej=0  bs_kvrej=0  TRIMMED=0  served=150
+03:58  populated=9    qsc_kvrej=0  bs_kvrej=0  TRIMMED=0  served=150
+04:08  populated=12   qsc_kvrej=0  bs_kvrej=0  TRIMMED=0  served=150
+```
+
+`served=150` on every one of eleven samples with no gap — note the `#317`
+window at 02:37 had a `None` where web died on its own OOM cadence, so a clean
+run here is a real reading rather than an absent instrument.
+
 Positive confirmation from the store itself (`/api/ops/keyvalue/usage`), which
 is stronger than an absent rejection line:
 
