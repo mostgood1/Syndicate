@@ -285,7 +285,21 @@
     return sides.map(function (side, i) {
       var best = (r.best || {})[side] || {};
       var cons = (r.consensus || {})[side];
-      var fair = ((r.modelled_fair || {})[side] || {}).fair_price;
+      // FAIR: modelled first, consensus second, and the distinction is the
+      // point. `modelled_fair` only ever fills ONE-SIDED rows -- 522 of 1842 on
+      // MLB 2026-08-10 -- because de-vigging needs both sides; a two-sided row
+      // already has a real no-vig number in `consensus`. Reading only
+      // `modelled_fair`, as this did on first deploy, left Fair blank on every
+      // two-sided market on the board.
+      //
+      // Labelled, not silently merged: a modelled fair is an ESTIMATE from the
+      // book's own measured hold, and presenting it identically to a measured
+      // no-vig price is exactly the "degraded looks legitimate" trap. The title
+      // carries the model's own note.
+      var mf = (r.modelled_fair || {})[side] || {};
+      var fair = mf.fair_price;
+      var fairModelled = fair !== null && fair !== undefined;
+      if (!fairModelled) { fair = cons; }
       // Proj/Edge belong to the side the projection DESCRIBES. Repeating them
       // on the opposite side would attach a real number to the bet nobody
       // modelled, which is the single most misleading thing this board could do.
@@ -304,8 +318,9 @@
         + "<td>" + (onProj && p.projected !== null && p.projected !== undefined ? Number(p.projected).toFixed(2) : "·") + "</td>"
         + '<td class="' + edgeCls + '">' + (edge === null || edge === undefined ? "·" : pct(edge)) + "</td>"
         + '<td class="l1-price l1-best">' + odds(best.price) + "</td>"
-        + '<td class="l1-side">' + esc(best.book || "") + "</td>"
-        + '<td class="l1-price">' + odds(fair) + "</td>"
+        + '<td class="l1-side">' + esc(best.bookmaker || "") + "</td>"
+        + '<td class="l1-price"' + (fairModelled ? ' title="' + esc(mf.note || "modelled from the book's measured hold") + '"' : '') + '>'
+          + odds(fair) + (fairModelled ? '<span class="l1-side">~</span>' : '') + "</td>"
         + '<td class="l1-price">' + odds(cons) + "</td>"
         + "<td>" + (r.books_quoting || 0) + "</td>"
         + "<td>" + slipButton(r, g, side, best, priced) + "</td>";
