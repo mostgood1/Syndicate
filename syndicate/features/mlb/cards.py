@@ -5120,6 +5120,19 @@ def _reconcile_games_against_schedule(
     it" can never be mistaken for "the pipeline has it".
     """
     scheduled = _schedule_raw_games(selected_date)
+    # ALWAYS log, including the no-op cases. The first version only logged when
+    # it recovered something, and when the board stayed at 14 that silence was
+    # ambiguous between three very different causes: the artifact is absent on
+    # this service, the artifact is present but also short the game, or the path
+    # did not resolve. One deploy was spent not being able to tell them apart.
+    # An instrument whose null reading has three explanations is not an
+    # instrument.
+    print(
+        f"[mlb_cards] SCHEDULE_RECONCILE_CHECK date={selected_date} "
+        f"summary_games={len(games)} scheduled_games={len(scheduled)} "
+        f"path={_schedule_raw_path_text(selected_date)}",
+        flush=True,
+    )
     if not scheduled:
         return games
 
@@ -5172,6 +5185,20 @@ def _reconcile_games_against_schedule(
     merged = [*games, *recovered]
     merged.sort(key=lambda game: str(game.get("gameDate") or ""))
     return merged
+
+
+def _schedule_raw_path_text(selected_date: str) -> str:
+    """The resolved path plus whether it exists, for the log above.
+
+    Reported rather than assumed: `_resolve_data_path` picks roots[0] and this
+    file lives under two candidate roots, so "which one did it choose and is
+    the file there" is exactly the question a null result raises.
+    """
+    try:
+        path = daily_snapshot_file_path(selected_date, "schedule_raw.json")
+        return f"{path}|exists={path.is_file()}"
+    except Exception as exc:  # noqa: BLE001 - diagnostics must not raise
+        return f"UNRESOLVED:{type(exc).__name__}"
 
 
 def _schedule_raw_games(selected_date: str) -> list[dict[str, Any]]:
