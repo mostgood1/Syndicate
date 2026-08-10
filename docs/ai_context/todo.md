@@ -1,5 +1,91 @@
 # Syndicate TODO — canonical cross-session list
 
+### #327 — OPEN, UNOWNED. An 817MB memory excursion at `post_mlb_sim_tick` takes the container to 2.71GB of 4GB, and the ring buffer everyone has been reading CANNOT SEE THE STAGE IT HAPPENS IN
+
+**Status: measured on production 2026-08-10, re-derived independently from the
+raw logs rather than inherited. Not fixed. Filed at the `#285` lane's suggestion
+after their verification; the instrument half is sharpened here.**
+
+#### The excursion
+
+refresh-worker `87cdd3e1`, pid 38 (started 15:59:12Z). Three consecutive
+`post_mlb_sim_tick` samples:
+
+```
+16:32:36   pid38 1050.6   container 1923.9   accounted 1106.0
+16:33:14   pid38 1867.4   container 2709.9   accounted 1896.4   <-- +816.7 / +786.0 / +790.5
+16:33:48   pid38 1079.9   container 1928.4   accounted 1135.1
+```
+
+**All three metrics move together, which is the check that matters.** A `/proc`
+artifact moves `rss_mb` alone; `container_memory_mb` comes from a different
+source entirely (cgroup), so a lockstep +786MB there makes this real memory
+rather than a bad read. Back to baseline within 72 seconds.
+
+#### Why it deserves an ID separate from `#285`
+
+`#285` owns a **ratchet** — ~11 MB/min, sustained, with or without the arena
+cap. This is a **spike**: 817MB up and back in ~72s. Different shape, different
+place (`post_mlb_sim_tick`, not the overview build everyone has been blaming),
+and it does not move `#285`'s rate one way or the other.
+
+**Headroom is the reason to care.** 1867MB process / 2710MB container leaves
+~1.4GB. A hydrated overview measured at ~+700MB tonight, landing on the same
+cycle, puts the container near **3.4GB against a 4GB cap**. Nobody has been
+looking here.
+
+#### The instrument gap, and it is worse than "a stage logs to stderr"
+
+The `#285` lane found their RSS series was blind to this: **172 pid-38 samples
+in the logs against 39 in the ring buffer at
+`/api/ops/intelligence/memory-diagnostics` — they had been reading 23%.** And
+the missing 77% is not a random sample; it carries the highest values:
+
+```
+post_mlb_sim_tick                n=34  max=1867.4  median=959.6   <- invisible
+live_lens_tick_after_build_mlb   n= 9  max=1118.7  median=985.4   <- invisible
+post_pool_assembled                    max=1044.1                 <- all they saw
+```
+
+**The sharpened mechanism, verified from the code here:** it is NOT that the sim
+tick calls a different, humbler logger. **There are TWO functions with the SAME
+NAME and only one of them persists:**
+
+| | writes stderr | writes ring buffer |
+|---|---|---|
+| `pipeline/intelligence_state.py:2649` `_diag_log_all_process_memory` | yes | **yes** (`_diag_dump_checkpoint_to_disk`) |
+| `scripts/run_refresh_worker.py:2086` `_diag_log_all_process_memory` | yes | **no** |
+
+`run_refresh_worker.py:2306` calls `_diag_log_all_process_memory("post_mlb_sim_tick")`
+— which reads, at the call site, exactly like the one that persists. **A reader
+checking "is this stage instrumented?" sees the right function name and stops.**
+
+This is the same shape as `#317`'s two board-snapshot write sites and `#105`
+before it: a near-duplicate helper where only one copy receives the fix. The
+repo keeps producing them. **Fix by extracting ONE helper, not by adding the
+missing line to the second copy** — that is the lesson `#317` had to learn twice.
+
+#### What is NOT claimed
+
+- **Not accumulation.** It returns in 72s. `#285`'s ratchet is unaffected.
+- **Not recurring.** This is **n=1 in a 39-minute window**. The stage's max is
+  1867.4 and its median is 959.6, so it is one event, not a cadence. Do not
+  build a "spikes every N minutes" claim on it.
+- **Not attributed to a cause.** Nothing here says what allocates the 817MB.
+- **Not `_keyvalue_backed` (`#324`).** That change only re-routes which transport
+  a write takes, the spike is inside the sim tick, and the trim/gc figures on
+  this boot match the previous one.
+
+#### Where it came from, because the path matters
+
+I found the 1867.4 reading incidentally while sampling process lists for an
+unrelated zombie question (`#324`), and handed it over rather than sitting on it
+because it fell outside the range the `#285` lane was reasoning about. They
+verified it, and it exposed a blind spot in their own instrument that they could
+not have found from inside it. **Both halves needed the handoff** — the number
+was useless to me and the instrument gap was invisible to them.
+
+
 ### 2026-08-09 — `#305` IS DOUBLE-USED, and three findings never reached this file at all. `#326` claimed for the one that lost its number
 
 **The `#71` check failing, caught by asking whether a session was ready to
