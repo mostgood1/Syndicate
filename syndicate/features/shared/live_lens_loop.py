@@ -636,16 +636,57 @@ def _live_lens_background_loop() -> None:
 	while not _LIVE_LENS_LOOP_STOP.is_set():
 		started_at = _utc_now()
 		started_epoch = time.time()
+		# Resolved ONCE per cycle and reused by the #327 samples below. The
+		# per-sport `live_lens_tick_*` sites take `date_str` from
+		# _run_live_lens_tick's own scope; this loop has no such binding, so
+		# referencing that name here is a NameError -- and the first sample sits
+		# outside the pull's try/except, which would have killed the loop thread
+		# rather than just losing a sample.
+		cycle_date = central_today_iso()
 		if _live_lens_pull_enabled():
+			# #327. One of the TWO uninstrumented gaps in this loop. Everything
+			# between the per-sport `live_lens_tick_*` samples was covered; the
+			# artifact pull at cycle start and the publish sweep below were not,
+			# and both move real bytes through this process.
+			#
+			# append_to_ring=False throughout, matching the per-sport sites: the
+			# ring is a time series whose coverage shrinks with sample rate, and
+			# the excursions being hunted arrive 11-42 minutes apart. Adding ~4
+			# samples/cycle to the ring would buy instrumentation by spending
+			# the window the instrument exists to observe. High-water still
+			# records, so these stages are visible from web.
+			log_and_persist_process_memory("live_lens_pull_before", append_to_ring=False, date=cycle_date)
 			try:
 				pulled_count = pull_hot_artifacts(date_str=central_today_iso())
 				if pulled_count:
 					print(f"[live_lens_loop] pulled_hot_artifacts count={pulled_count}", flush=True)
 			except Exception as exc:
 				print(f"[live_lens_loop] pull_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
+				pulled_count = None
+			# AFTER the except, so a failed pull still reports what it left
+			# behind -- a pull that raises partway through has still allocated.
+			log_and_persist_process_memory(
+				"live_lens_pull_after",
+				append_to_ring=False,
+				date=cycle_date,
+				pulled_count=pulled_count if isinstance(pulled_count, int) else None,
+			)
 		meta = _run_live_lens_tick()
 		if _live_lens_publish_enabled():
 			publish_started_epoch = time.time()
+			# #327. THE GAP THIS ITEM POINTED AT. The last per-sport sample
+			# (`live_lens_tick_after_<last sport>`) precedes TICK_COMPLETE by
+			# ~18s, and this sweep is what runs inside that window -- measured
+			# by this file's own comment at 48-74s per cycle across 73-103
+			# artifacts. Every one is read into memory to be POSTed, and none of
+			# it was visible to any instrument.
+			#
+			# Recorded as a candidate, NOT a cause: the #327 excursions are
+			# in-process, 493-878MB, and four other explanations have already
+			# been eliminated. This is the largest unlit region adjacent to
+			# them, which makes it the right place to look and not an answer.
+			sweep_published = sweep_failed = publish_elapsed = None
+			log_and_persist_process_memory("live_lens_publish_before", append_to_ring=False, date=cycle_date)
 			try:
 				# sweep_changed_hot_artifacts, NOT the publish_changed_hot_artifacts
 				# wrapper. `publish_hot_artifact` NEVER RAISES -- a network blip or
@@ -658,12 +699,21 @@ def _live_lens_background_loop() -> None:
 				# permanently skip a file that failed for a transient reason".
 				# That was still true here after the watermark fix above.
 				sweep = sweep_changed_hot_artifacts(last_publish_epoch)
+				sweep_published = int(sweep.published_count or 0)
+				sweep_failed = len(sweep.failed_paths or ())
+				# Read the clock ONCE and share it with the sample below. Taking
+				# a second reading there would be free in production and is not
+				# free in test: test_live_lens_loop_publish_watermark drives a
+				# fake clock that ticks +1 per call and asserts the resulting
+				# watermark sequence, so an extra read shifts [1,3,6] to [1,3,7]
+				# and fails a test whose subject this change does not touch.
+				publish_elapsed = round(time.time() - publish_started_epoch, 1)
 				if sweep.published_count or sweep.failed_paths:
 					print(
 						f"[live_lens_loop] published_hot_artifacts count={sweep.published_count} "
 						f"failed={len(sweep.failed_paths)} "
 						f"window_seconds={round(publish_started_epoch - last_publish_epoch, 1)} "
-						f"elapsed_seconds={round(time.time() - publish_started_epoch, 1)}",
+						f"elapsed_seconds={publish_elapsed}",
 						flush=True,
 					)
 				# Advance ONLY past a window every candidate in which is confirmed
@@ -674,6 +724,18 @@ def _live_lens_background_loop() -> None:
 					last_publish_epoch = publish_started_epoch
 			except Exception as exc:
 				print(f"[live_lens_loop] publish_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
+			# Outside the try, so a sweep that raised is still measured. It
+			# carries the sweep's own counts: a peak of N megabytes means
+			# something different at 5 artifacts than at 103, and reading that
+			# off one line beats correlating two log streams by timestamp.
+			log_and_persist_process_memory(
+				"live_lens_publish_after",
+				append_to_ring=False,
+				date=cycle_date,
+				published_count=sweep_published,
+				failed_count=sweep_failed,
+				elapsed_seconds=publish_elapsed,
+			)
 		write_json_file(
 			status_path,
 			{
