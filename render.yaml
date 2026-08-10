@@ -145,6 +145,22 @@ services:
         value: "full"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
         value: us
+      # S0b (1fa0a6d3, 2026-08-07): widens region coverage for the GAME-LINE
+      # call only (full_game + segment + alternate) via _game_line_regions()
+      # in fetch_mlb_oddsapi_local.py -- props stay on the base region above,
+      # deliberately, since props bill per-event and the same widening there
+      # would cost ~1M/mo vs ~30K/mo on game lines (the plan's own math, see
+      # docs/ai_context/plan_layer2_north_star.md). Confirmed live on all
+      # three services via the Render API 2026-08-10 but absent from this
+      # file until now -- a real live/IaC drift, not a new activation; #325
+      # traced the resulting OddsAPI burn increase to this setting and found
+      # it roughly on the plan's own projected cost (~4.13M/mo, 79-82.6% of
+      # the 5M cap), so this is documentation catching up to production, not
+      # a behavior change. Only half the plan's activation is live --
+      # SYNDICATE_LIVE_ODDS_REFRESH_REGIONS above is still `us`, not the
+      # `us,us2` the plan's instructions call for.
+      - key: SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS
+        value: "eu,us_ex"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       - key: MLB_BETTING_DATA_ROOT
@@ -431,6 +447,22 @@ services:
         value: "true"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
         value: us
+      # S0b (1fa0a6d3, 2026-08-07): widens region coverage for the GAME-LINE
+      # call only (full_game + segment + alternate) via _game_line_regions()
+      # in fetch_mlb_oddsapi_local.py -- props stay on the base region above,
+      # deliberately, since props bill per-event and the same widening there
+      # would cost ~1M/mo vs ~30K/mo on game lines (the plan's own math, see
+      # docs/ai_context/plan_layer2_north_star.md). Confirmed live on all
+      # three services via the Render API 2026-08-10 but absent from this
+      # file until now -- a real live/IaC drift, not a new activation; #325
+      # traced the resulting OddsAPI burn increase to this setting and found
+      # it roughly on the plan's own projected cost (~4.13M/mo, 79-82.6% of
+      # the 5M cap), so this is documentation catching up to production, not
+      # a behavior change. Only half the plan's activation is live --
+      # SYNDICATE_LIVE_ODDS_REFRESH_REGIONS above is still `us`, not the
+      # `us,us2` the plan's instructions call for.
+      - key: SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS
+        value: "eu,us_ex"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       - key: MLB_BETTING_DATA_ROOT
@@ -765,6 +797,22 @@ services:
         value: "full"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
         value: us
+      # S0b (1fa0a6d3, 2026-08-07): widens region coverage for the GAME-LINE
+      # call only (full_game + segment + alternate) via _game_line_regions()
+      # in fetch_mlb_oddsapi_local.py -- props stay on the base region above,
+      # deliberately, since props bill per-event and the same widening there
+      # would cost ~1M/mo vs ~30K/mo on game lines (the plan's own math, see
+      # docs/ai_context/plan_layer2_north_star.md). Confirmed live on all
+      # three services via the Render API 2026-08-10 but absent from this
+      # file until now -- a real live/IaC drift, not a new activation; #325
+      # traced the resulting OddsAPI burn increase to this setting and found
+      # it roughly on the plan's own projected cost (~4.13M/mo, 79-82.6% of
+      # the 5M cap), so this is documentation catching up to production, not
+      # a behavior change. Only half the plan's activation is live --
+      # SYNDICATE_LIVE_ODDS_REFRESH_REGIONS above is still `us`, not the
+      # `us,us2` the plan's instructions call for.
+      - key: SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS
+        value: "eu,us_ex"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       # MLB daily sim / look-ahead / evening-next-day sim ownership moved to
