@@ -156,8 +156,29 @@ never "are these two the same?" but "who writes into this instrument at all?" --
 a name is not a census.
 
 Consequence for readers: **`live_lens_tick_after_build_mlb` reading zero is not
-evidence about the stage.** `run_refresh_worker.py:2314` records it at
-**+1,445MB**, larger than any excursion in the `n=4` table above.
+evidence about the stage.** `run_refresh_worker.py:2311-2314` records a
+before→after_build delta of **+1,445MB** for it (295.5 → 1740.8, 13 MLB games
+live, 2026-08-08).
+
+> **Do NOT rank that against the `n=4` excursion table**, and the `#282` lane was
+> right to stop me doing it. The unit checks out — both are deltas — but that
+> measurement sits on a **295.5MB floor**, where their 5-hour profile puts the
+> `live_lens_tick_*` family at medians of **1,760–1,998MB**. Same stage, floor
+> ~6x apart: 2026-08-08 on a 2Gi service versus tonight on 4Gi with the ratchet
+> underneath. Comparing "1,445 > 870" across those is comparing deltas from
+> different worlds. What survives is narrower and sufficient: **the stage is
+> capable of a >1.4GB build-step delta on some baseline, and it has never once
+> reached this instrument.** That argues for instrumenting it, not for ranking it.
+
+#### The generalisation, in the `#282` lane's words
+
+> A 39-minute window cannot see a 75-minute gap, and a 23-minute process sample
+> cannot see a stage it never emits into. Same error, different axis.
+
+Paired with the version that would actually have caught this one:
+**enumerate the producers, not the duplicates.** "Are these two the same?" was
+the wrong question; **"who emits into this instrument at all?"** was the right
+one, and only the second finds a third.
 
 **NOT fixed yet, deliberately.** The routing is two lines; the sizing is not.
 Ring is 300 records (~1,233 bytes each) at ~8/min ≈ 36 min of history.
