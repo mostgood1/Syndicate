@@ -2437,6 +2437,70 @@ def board_book_grid_api():
     )
 
 
+@intelligence_bp.get("/api/board/layer1")
+def board_layer1_api():
+    """L1: the per-sport board, ONE implementation for all eight sports (`#329`).
+
+    Replaces the per-sport `/<sport>/api/market-board` family, which was six
+    bespoke builders and two sports with no route at all -- NHL and NCAAB
+    returned 404 on production 2026-08-10 while the grid served them by
+    parameter. Measured that day, board rows vs grid rows on the same date:
+    nfl 84 vs 1,381, ncaaf 0 vs 0 on a 16-game slate, mlb 531 vs 839.
+
+    A PURE READ of the precomputed grid. It deliberately does NOT fall back to a
+    live pivot when the artifact is absent: that pivot is what OOM-killed web
+    twice (`#323`), and a board that explains its own absence beats a container
+    kill. `empty_reason` is what the caller renders.
+
+    `view` gives the pregame and live boards from ONE build rather than two
+    fetches, because a game going live must leave the pregame board in the same
+    instant it joins the live one -- two independent queries disagree across
+    that transition and show the game on both boards or neither.
+    """
+    from syndicate.features.shared.book_grid_artifact import read_book_grid_artifact
+    from syndicate.features.shared.layer1_board import build_layer1_board, partition_board_by_state
+
+    sport = str(request.args.get("sport") or "mlb").strip().lower()
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    view = str(request.args.get("view") or "all").strip().lower()
+
+    precomputed = read_book_grid_artifact(sport, selected_date)
+    rows: list = []
+    absent_reason: str | None = None
+    if not isinstance(precomputed, dict):
+        # No artifact is NOT an empty slate. The worker writes None rather than
+        # an empty grid for exactly this reason, and collapsing the two here
+        # would undo that one layer up.
+        absent_reason = "no_precomputed_grid_artifact"
+    else:
+        rows = list(precomputed.get("rows") or [])
+        if not rows:
+            absent_reason = "grid_artifact_present_but_empty"
+
+    board = build_layer1_board(rows, sport=sport, selected_date=selected_date, grid_absent_reason=absent_reason)
+    # Provenance, so a thin board is attributable to the ARTIFACT rather than
+    # read as the slate. `#331` is the standing reason this matters: the grid was
+    # built from 1.7% of the day's odds and every count downstream looked real.
+    board["generated_at"] = (precomputed or {}).get("generated_at")
+    board["artifact_version"] = (precomputed or {}).get("version")
+    board["rows_total"] = (precomputed or {}).get("rows_total")
+    board["rows_truncated"] = (precomputed or {}).get("rows_truncated")
+    board["source_quote_rows"] = (precomputed or {}).get("source_quote_rows")
+    board["source_shard_bytes"] = (precomputed or {}).get("source_shard_bytes")
+
+    if view != "all":
+        try:
+            board = partition_board_by_state(board, view)
+        except ValueError:
+            return _no_cache_response(
+                jsonify({"ok": False, "error": f"unknown view {view!r}; expected all, pregame, live or final."})
+            ), 400
+
+    board["ok"] = True
+    board["server_time"] = _server_timestamp()
+    return _no_cache_response(jsonify(board))
+
+
 @intelligence_bp.get("/api/board/layer2-shortlist")
 def board_layer2_shortlist_api():
     """L2-A: the ranked shortlist, READ from the artifact the worker built.

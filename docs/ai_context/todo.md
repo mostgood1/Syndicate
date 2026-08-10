@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#329` — IN PROGRESS. Layer 1 was eight sports, six bespoke builders and two 404s. One implementation now, and the date scope was wrong on every one of them
+
+Measured on production 2026-08-10, `/<sport>/api/market-board` vs
+`/api/board/book-grid` on the same date:
+
+```
+sport    page  api    games  board rows   grid rows
+mlb       200  200       10         531         839
+nba       200  200        0           0           0   out of season
+wnba      200  200        2         228         202
+nhl       404  404        -           -           0   NO ROUTE AT ALL
+nfl       200  200       16          84       1,381   16x gap
+ncaaf     200  200       16           0           0   games, zero rows
+ncaab     404  404        -           -           0   NO ROUTE AT ALL
+soccer    200  200        1           1           7
+```
+
+**The grid was already sport-generic and `layer2_board.build_layer2_rows`
+already consumed it**, so the grid is Layer 1's row contract in fact and the
+per-sport boards were a *view* of it written six times. `layer1_board.py` is
+that view written once; `/api/board/layer1?sport=&date=&view=` serves all eight.
+NHL and NCAAB stop 404ing structurally rather than by adding builders seven and
+eight.
+
+**THE SHARD IS KEYED BY CAPTURE DATE, NOT GAME DATE — and this was live.**
+Found by running the new builder over real production payloads rather than
+fixtures. `book_quotes/<date>.jsonl` holds every quote OBSERVED that day,
+including fixtures weeks out, so a grid built from it is "what we saw today",
+not "today's slate":
+
+```
+nfl   1,381 rows -> 288 "games" before scoping
+      after scoping: 0 on 2026-08-10, and the rows belong to
+      2026-09-13 (77), 2026-09-27 (65), 2026-10-04 (65), 2026-09-20 (64),
+      2026-11-08 (63), 2027-01-03 (63), 2026-10-11 (61) ...
+```
+
+**MLB hid it.** MLB captures today's slate and little else, so the reference
+sport grouped correctly (10 games) while the next sport over was fabricating
+288. Rows off-date are excluded and COUNTED (`rows_other_dates`,
+`date_scope.other_dates`), never silently dropped — a board thinned by scoping
+and a sport with no slate are otherwise the same empty board.
+
+**NFL and NCAAF are WEEK-scoped, not date-scoped.** Their existing routes take
+`?season=&week=`, and the date-scoped view correctly reports they have nothing
+on a Monday in August. Not yet handled: the Layer 1 contract needs a scope
+concept per sport. **Open, and the next thing in this lane.**
+
+Also landed: `unknown` game state is its own bucket and never folds into
+`pregame` (`#298`/`#300`'s rule applied to routing — a settled market whose
+state failed to join would otherwise sit on the pregame board looking
+bettable), and pregame/live are two views of ONE build so a game leaving one
+joins the other atomically. Two independent queries disagree across that
+transition and show a game on both boards or neither.
+
+**Blocked behind `#328`/`#331` for data, not for shape:** as of 17:4xZ the
+enrichment is live on refresh-worker (`e2b04e88`) and MLB reads `enriched`, but
+WNBA still reads `grid_not_enriched` and web is on `87cdd3e1` (pre-`#328`), so
+the coverage dicts are not served yet.
+
+**What board work CANNOT fix:** `attach_projections` wires mlb, wnba and soccer
+only. NFL/NCAAF/NBA/NHL/NCAAB have no sim to join — and for NFL
+`board_enrichment` records that production holds no predictions/edges of any
+kind, so "sim mapped for all sports" means PRODUCING sims, not joining them.
+Tracked here so nobody reads an honest empty column as a board defect.
+
+
 ### #334 — FIXED, NOT DEPLOYED. A 44-minute-stale board reported `fresh` against a 60-second SLA, because the freshness verdict is computed at WRITE time and persisted with the payload
 
 **Status: found by the oversight lane while checking `board_cc=23`, re-derived
