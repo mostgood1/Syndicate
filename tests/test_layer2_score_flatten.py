@@ -265,3 +265,95 @@ def test_the_read_time_backfill_never_overwrites_the_producer():
     once = dict(card)
     _backfill_layer2_board_columns(card)
     assert card == once, "backfill is not idempotent"
+
+
+CHIP_LIVE = {"sport": "mlb", "state": "live",
+             "away": {"name": "Boston Red Sox", "score": 2},
+             "home": {"name": "Toronto Blue Jays", "score": 5}}
+
+
+def _card(**over):
+    base = {"sport": "mlb", "away_team": "Boston Red Sox", "home_team": "Toronto Blue Jays",
+            "kind": "game", "market": "totals", "is_live": False, "lane": "pregame",
+            "market_state": "pregame"}
+    base.update(over)
+    return base
+
+
+def test_a_live_game_restates_a_frozen_pregame_card(monkeypatch):
+    """`#367`. `is_live`/`lane`/`market_state` are stamped when the worker writes
+    the shortlist and never move. Measured 2026-08-11 23:41Z: all 258 cards said
+    `is_live: false, lane: pregame` while five MLB games were past the third
+    inning, because the artifact was written at 22:38Z. The State column is gated
+    on that field, so it could not show a live game at any hour."""
+    import syndicate.features.shared.game_chip_scoreboard as gcs
+    from pipeline.intelligence_state import _refresh_layer2_live_state
+
+    monkeypatch.setattr(gcs, "build_game_chips", lambda date, sports: [CHIP_LIVE])
+    cards = [_card()]
+    assert _refresh_layer2_live_state(cards, ["2026-08-11"]) == 1
+    assert cards[0]["is_live"] is True
+    assert cards[0]["lane"] == "live" and cards[0]["market_state"] == "live"
+
+
+def test_the_join_is_on_names_because_ids_do_not_overlap(monkeypatch):
+    """Chips carry statsapi ids, L2-A rows carry OddsAPI event ids -- measured
+    overlap 0 of 27. The full-name pair matched 18 of 18, so that is the key."""
+    import syndicate.features.shared.game_chip_scoreboard as gcs
+    from pipeline.intelligence_state import _refresh_layer2_live_state
+
+    monkeypatch.setattr(gcs, "build_game_chips", lambda date, sports: [CHIP_LIVE])
+    mismatched = [_card(away_team="Someone Else")]
+    assert _refresh_layer2_live_state(mismatched, ["2026-08-11"]) == 0
+    assert mismatched[0]["is_live"] is False, "a non-matching game must not be re-stated"
+
+
+def test_actual_is_derived_only_where_the_mapping_is_unambiguous(monkeypatch):
+    """A totals bet settles on the combined score and a spread on the margin, so
+    both are derivations. h2h has no numeric actual and a prop settles on a player
+    stat the scoreboard does not carry -- giving those a number would mean
+    something else entirely."""
+    from pipeline.intelligence_state import _attach_layer2_live_actual
+
+    totals = _card(market="totals")
+    _attach_layer2_live_actual(totals, CHIP_LIVE)
+    assert totals["actual"] == 7.0
+
+    spread = _card(market="spreads")
+    _attach_layer2_live_actual(spread, CHIP_LIVE)
+    assert spread["actual"] == 3.0
+
+    for market in ("h2h", "h2h_3_way"):
+        row = _card(market=market)
+        _attach_layer2_live_actual(row, CHIP_LIVE)
+        assert row.get("actual") is None, f"{market} was given a meaningless actual"
+
+    prop = _card(kind="prop", market="batter_hits")
+    _attach_layer2_live_actual(prop, CHIP_LIVE)
+    assert prop.get("actual") is None
+
+
+def test_a_scoreless_chip_leaves_actual_alone(monkeypatch):
+    """A game that has started but has no score yet must render blank, not 0.0."""
+    from pipeline.intelligence_state import _attach_layer2_live_actual
+
+    row = _card(market="totals")
+    _attach_layer2_live_actual(row, {"sport": "mlb", "state": "live",
+                                     "away": {"name": "Boston Red Sox", "score": None},
+                                     "home": {"name": "Toronto Blue Jays", "score": None}})
+    assert row.get("actual") is None
+
+
+def test_a_scoreboard_failure_leaves_the_board_stale_not_empty(monkeypatch):
+    """This runs on the serving path. A scoreboard blip must cost accuracy of the
+    State column, never the board itself."""
+    import syndicate.features.shared.game_chip_scoreboard as gcs
+    from pipeline.intelligence_state import _refresh_layer2_live_state
+
+    def _boom(date, sports):
+        raise RuntimeError("scoreboard unavailable")
+
+    monkeypatch.setattr(gcs, "build_game_chips", _boom)
+    cards = [_card()]
+    assert _refresh_layer2_live_state(cards, ["2026-08-11"]) == 0
+    assert cards[0]["lane"] == "pregame"

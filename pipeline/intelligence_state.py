@@ -1558,7 +1558,129 @@ def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dic
             _normalize_card_edge_units(tagged)
             _backfill_layer2_board_columns(tagged)
             cards.append(tagged)
+    # `#367`: after the per-card work, because it needs the whole list to build
+    # one scoreboard index instead of one lookup per card. Never raises -- a
+    # scoreboard blip must leave the board stale, not empty.
+    try:
+        restated = _refresh_layer2_live_state(cards, requested_dates)
+        if restated:
+            print(f"[intelligence_state] LAYER2_LIVE_RESTATED cards={restated} of {len(cards)}", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[intelligence_state] LAYER2_LIVE_RESTATE_FAILED {type(exc).__name__}: {exc}", flush=True)
     return cards
+
+
+def _refresh_layer2_live_state(cards: list[dict[str, Any]], requested_dates: Sequence[str]) -> int:
+    """Re-state L2-A cards against the CURRENT scoreboard (`#367`).
+
+    `is_live`, `lane` and `market_state` are stamped when the worker writes the
+    shortlist and never move again. Measured 2026-08-11 23:41Z: all 258 cards
+    said `is_live: false, lane: pregame` while five MLB games were in the third
+    inning or later, because the artifact was written at 22:38Z when they were
+    all still pregame. The board's State column is gated on that field, so it
+    could not show a live game at any hour.
+
+    Joined on the SPORT + FULL-NAME PAIR, which is the same key `#365` measured
+    at 18 of 18 -- and deliberately not on ids, which overlap 0 of 27 because
+    chips carry statsapi ids while L2-A rows carry OddsAPI event ids.
+
+    `build_game_chips` is the same call `/api/board/game-chips` serves and it
+    holds its own TTL cache, so this is a dict lookup per card after the first
+    hit rather than fresh IO per request.
+
+    WHAT THIS CANNOT FILL, so nobody reads a still-blank column as a failure of
+    this function: the LIVE column renders `item.live_projection`, which L2-A
+    rows do not carry at all -- that is live-aware projection work, not state.
+    Fixing state alone would have left that column blank, which is exactly the
+    kind of half-fix that reads as "shipped and didn't work".
+
+    Returns the number of cards actually re-stated, so a zero is visible rather
+    than silent.
+    """
+    if not cards:
+        return 0
+    try:
+        from syndicate.features.shared.game_chip_scoreboard import build_game_chips
+    except Exception:
+        return 0
+
+    sports = sorted({str(card.get("sport") or card.get("sport_slug") or "").strip().lower() for card in cards} - {""})
+    if not sports:
+        return 0
+
+    index: dict[tuple[str, str, str], dict[str, Any]] = {}
+    for requested_date in requested_dates or ():
+        try:
+            for chip in build_game_chips(str(requested_date), list(sports)) or []:
+                sport = str(chip.get("sport") or "").strip().lower()
+                away = str((chip.get("away") or {}).get("name") or "").strip().lower()
+                home = str((chip.get("home") or {}).get("name") or "").strip().lower()
+                if sport and away and home:
+                    index.setdefault((sport, away, home), chip)
+        except Exception:
+            continue
+    if not index:
+        return 0
+
+    restated = 0
+    for card in cards:
+        sport = str(card.get("sport") or card.get("sport_slug") or "").strip().lower()
+        away = str(card.get("away_team") or "").strip().lower()
+        home = str(card.get("home_team") or "").strip().lower()
+        chip = index.get((sport, away, home))
+        if not chip:
+            continue
+        state = str(chip.get("state") or "").strip().lower()
+        if state == "live":
+            card["is_live"] = True
+            card["lane"] = "live"
+            card["market_state"] = "live"
+            restated += 1
+        elif state in {"final", "post", "completed"}:
+            card["is_live"] = False
+            card["lane"] = "final"
+            card["market_state"] = "final"
+            restated += 1
+        _attach_layer2_live_actual(card, chip)
+    return restated
+
+
+def _attach_layer2_live_actual(card: dict[str, Any], chip: Mapping[str, Any]) -> None:
+    """The ACTUAL column, derived from the live score (`#367`).
+
+    `displayLiveActual` reads `item.actual`, which no L2-A row carries. The chip
+    does carry both sides' scores, and for a game market the actual outcome IS a
+    function of them -- so this is a derivation, not an invention.
+
+    Only for markets where the mapping is unambiguous:
+      totals   -> combined score
+      spreads  -> home margin, which is the quantity a spread is settled on
+    h2h has no numeric actual to show, and props are settled on a player stat the
+    scoreboard does not carry, so both are left alone rather than given a number
+    that means something else.
+    """
+    if str(card.get("kind") or "").strip().lower() != "game":
+        return
+    if card.get("actual") is not None:
+        return
+
+    def _score(side: str) -> float | None:
+        raw = (chip.get(side) or {}).get("score")
+        if raw is None or isinstance(raw, bool):
+            return None
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
+    away, home = _score("away"), _score("home")
+    if away is None or home is None:
+        return
+    market = str(card.get("market") or "").strip().lower()
+    if market.startswith("totals"):
+        card["actual"] = away + home
+    elif market.startswith("spreads"):
+        card["actual"] = home - away
 
 
 def _backfill_layer2_board_columns(card: dict[str, Any]) -> None:
