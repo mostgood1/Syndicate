@@ -1,5 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#363` — SHIPPED. Layer 2 IS the board now; it is no longer a fallback that only fires when the legacy pool fails
+
+**User direction, 2026-08-11 (verbatim):** *"layer 2 page is the main page
+replacement but ultimately I want to keep the main page just replace the board
+(keep the compact scoreboard in tact as well as the selectors)."*
+
+So this is deliberately NOT a new page. `/intelligence` keeps its compact
+scoreboard and its selectors — `renderGameCards` and `renderFilterTabs`
+(`intelligence.html:1971-1976`) read the same date-filtered item list they always
+did and were not touched. Only the row SOURCE changed.
+
+**The change is one condition.** `_layer2_fallback_recommendations` was gated on
+`if not (combined.get("top_opportunities") or [])` — merge L2-A only when the
+board a user sees is empty. It is now `if board_l2a_fallback_enabled():`, so L2-A
+merges on every request. Rows still route through
+`build_intelligence_board_contract`, which is what keeps ranking, dedupe and the
+card contract owned by the normaliser: a legacy pool that recovers MERGES with
+L2-A rather than racing it, and neither has to be rewritten to fit the other.
+
+**No env change, therefore no `blueprint_sync` risk.** The flag was already on in
+production — the lane measured `layer2_fallback_rows: 300` and
+`source: combined_board_window+layer2_fallback` before this shipped.
+
+**WHAT IT COSTS, stated because the flag's own docstring called it a product
+decision and this is the moment it got made:** *"the board template reads 70
+fields per row and ~40 of them have no source on an L2-A row, so a card built
+from one renders leaner than a legacy card."* Leaner cards are now the default
+board. That is the accepted trade, not an oversight — if the board looks sparser
+than it used to, this is why, and the fix is to enrich L2-A rows rather than to
+revert the gate.
+
+**`#308` stays independently diagnosable.** `candidate_count` is stamped AFTER
+the merge, so with L2-A merging every request it would report a healthy number
+while the legacy pool sat at zero — which is precisely how `#308`'s own monitor
+came to mislead (the lane found `candidate_count: 300` against
+`by_date[*].candidate_count: 0`). `legacy_candidate_count` is now captured BEFORE
+the merge and always emitted, alongside `layer2_is_primary`. A test pins the
+capture order, since capturing it after the merge would measure nothing.
+
+The guard-shape test has now been rewritten twice and the history is the lesson:
+it first pinned `if not merged_recommendations`, and **passed for exactly as long
+as that guard was wrong**. It is now pinned negatively as well as positively, so
+a re-introduced emptiness condition fails it rather than sliding in beside it.
+
+Tests: `tests/test_board_l2a_fallback.py` (13). 104 pass across the board and
+pipeline suites.
+
+**Not done, and the real remaining work:** the ~40 unsourced fields. That is
+`#362` (WNBA game-market join) plus whatever the equivalent is for MLB rows.
+
 ### `#361` — FIXED, pending web deploy. Layer 2's score breakdown 500'd the intelligence endpoint, and silently flattened the board's ranking to zero
 
 `layer2_board.py:688` carries `"score": dict(score)` deliberately, so the board

@@ -5929,11 +5929,38 @@ def read_combined_intelligence_response(
     # guard whose trigger encodes an assumption about the failure mode is only
     # as good as that assumption.
     #
-    # Still ADDITIVE and never a replacement, and still self-retiring: a board
-    # that promotes even one card leaves the fallback dormant, so fixing #308
-    # switches this off without a revert. What changed is only WHICH emptiness
-    # is asked about -- the one the user actually sees.
-    if not (combined.get("top_opportunities") or []) and board_l2a_fallback_enabled():
+    # `#363`: L2-A IS THE BOARD NOW, NOT A FALLBACK. User direction, 2026-08-11:
+    # "layer 2 page is the main page replacement but ultimately I want to keep
+    # the main page just replace the board (keep the compact scoreboard in tact
+    # as well as the selectors)."
+    #
+    # So the gate below is no longer "is the legacy board empty". It is "does
+    # L2-A have rows", and they are merged on every request. The scoreboard and
+    # the selectors are untouched by this: `renderGameCards` and
+    # `renderFilterTabs` read the same date-filtered item list they always did
+    # (`intelligence.html:1971-1976`), so they keep working off whatever the
+    # board carries.
+    #
+    # WHAT THIS COSTS, stated because `board_l2a_fallback_enabled`'s own
+    # docstring calls it a product decision and this is the moment it gets made:
+    # "the board template reads 70 fields per row and ~40 of them have no source
+    # on an L2-A row, so a card built from one renders leaner than a legacy
+    # card." Leaner cards are now the default board, deliberately.
+    #
+    # Still routed through `build_intelligence_board_contract` rather than
+    # appended to the output, which is what keeps ranking, dedupe and the card
+    # shape owned by the normaliser -- so a legacy pool that recovers merges with
+    # L2-A instead of racing it, and neither one has to be rewritten to fit the
+    # other. The empty-board condition it used to carry is gone, not inverted:
+    # `#308` (legacy pool at zero) is now a separate question from what the
+    # board shows, which is the point of the change.
+    # Captured BEFORE the merge below, and this is load-bearing for `#308`.
+    # `candidate_count` is stamped after the extend, so once L2-A merges on every
+    # request it can never again say anything about the legacy pool -- it would
+    # report a healthy number while the pool sat at zero. That is the exact trap
+    # `#308`'s own monitor fell into. This keeps the pool independently readable.
+    legacy_candidate_count = len(merged_recommendations)
+    if board_l2a_fallback_enabled():
         fallback_cards = _layer2_fallback_recommendations(requested_dates)
         if fallback_cards:
             # Re-promote through the SAME contract rather than appending to the
@@ -5959,6 +5986,11 @@ def read_combined_intelligence_response(
         "age_seconds": 0.0,
         "is_fresh": True,
     }
+    # `#363`: the legacy pool's own size, independent of what the board shows.
+    # Always emitted, so "is `#308` still live" stays a one-field question now
+    # that `candidate_count` includes L2-A on every request.
+    combined["legacy_candidate_count"] = legacy_candidate_count
+    combined["layer2_is_primary"] = bool(board_l2a_fallback_enabled())
     # Named, so a board filled from L2-A is never mistaken for the legacy pool
     # having recovered. Absent when the fallback did not fire, which keeps the
     # payload byte-identical with the flag off.

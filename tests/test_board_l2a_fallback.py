@@ -122,24 +122,58 @@ class PrecedenceTests(unittest.TestCase):
         having recovered."""
         self.assertIn("layer2_fallback", "combined_board_window+layer2_fallback")
 
-    def test_the_fallback_is_gated_on_the_PROMOTED_board_not_the_merged_pool(self) -> None:
-        """#308. This test previously pinned the literal source of the OLD gate,
-        `if not merged_recommendations and board_l2a_fallback_enabled():`, and
-        it passed for exactly as long as the guard was wrong.
+    def test_l2a_is_the_board_and_is_no_longer_gated_on_emptiness(self) -> None:
+        """`#363`. L2-A IS the board now; it is not a fallback.
 
-        The guard encoded an assumption about HOW the legacy pool fails -- by
-        producing nothing. It does not. Measured on production: candidate_count
-        156, recommendations [], fallback never fired. The pool was full, the
-        board was empty, and the guard stood down.
+        This assertion has been rewritten twice, and the history is the point.
+        It first pinned `if not merged_recommendations and ...`, and passed for
+        exactly as long as that guard was WRONG -- the guard encoded an
+        assumption about how the legacy pool fails (by producing nothing), the
+        pool instead failed full-but-unpromoted (`candidate_count` 156,
+        `recommendations` []), and the test defended the bug. `#308` then moved
+        it to the promoted board.
 
-        So the rule being pinned is now the one that matters: the fallback asks
-        whether the board a user SEES is empty, not whether the pool that feeds
-        it is. Still self-retiring -- one promoted card leaves it dormant.
+        User direction 2026-08-11 removes the condition entirely: the main page
+        keeps its compact scoreboard and selectors, and the BOARD becomes L2-A.
+        So there is no emptiness question left to encode -- which is the only
+        state in which this class of guard cannot be wrong about a failure mode.
+
+        Pinned negatively as well as positively: a re-introduced emptiness
+        condition is the specific regression, and asserting only the new line
+        would not catch one added beside it.
         """
         import inspect
 
         source = inspect.getsource(state)
-        self.assertIn('if not (combined.get("top_opportunities") or []) and board_l2a_fallback_enabled():', source)
+        self.assertIn("if board_l2a_fallback_enabled():", source)
+        self.assertNotIn(
+            'if not (combined.get("top_opportunities") or []) and board_l2a_fallback_enabled():',
+            source,
+            "the board is gated on emptiness again -- L2-A is meant to be the board, not a fallback",
+        )
+        self.assertNotIn(
+            "if not merged_recommendations and board_l2a_fallback_enabled():",
+            source,
+            "the #308 guard is back: it asks about the pool, not what the user sees",
+        )
+
+    def test_the_legacy_pool_size_stays_independently_readable(self) -> None:
+        """`#308` must remain a one-field question. `candidate_count` is stamped
+        AFTER the merge, so once L2-A merges on every request it reports a
+        healthy number while the legacy pool sits at zero -- which is how #308's
+        own monitor came to mislead. `legacy_candidate_count` is captured before
+        the merge for exactly this."""
+        import inspect
+
+        source = inspect.getsource(state)
+        self.assertIn("legacy_candidate_count = len(merged_recommendations)", source)
+        self.assertIn('combined["legacy_candidate_count"] = legacy_candidate_count', source)
+        # Captured before the merge, or it measures the same thing candidate_count does.
+        self.assertLess(
+            source.index("legacy_candidate_count = len(merged_recommendations)"),
+            source.index("merged_recommendations.extend(fallback_cards)"),
+            "legacy_candidate_count is captured after the merge and therefore measures nothing",
+        )
         self.assertNotIn(
             "if not merged_recommendations and board_l2a_fallback_enabled():",
             source,
