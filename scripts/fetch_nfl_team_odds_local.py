@@ -282,7 +282,7 @@ def _append_nfl_team_book_quotes(events: list[dict[str, Any]]) -> None:
         from syndicate.features.shared.odds_book_quotes import append_book_quotes, quote_rows_from_oddsapi_events
 
         now = datetime.now(tz=timezone.utc)
-        rows = quote_rows_from_oddsapi_events(events)
+        rows = quote_rows_from_oddsapi_events(events, market_map=_nfl_segment_market_map())
         append_book_quotes(
             sport="nfl",
             date_str=now.date().isoformat(),
@@ -291,6 +291,14 @@ def _append_nfl_team_book_quotes(events: list[dict[str, Any]]) -> None:
         )
     except Exception as exc:
         print(f"[odds_book_quotes] nfl team odds append FAILED {type(exc).__name__}: {exc}")
+
+
+def _nfl_segment_market_map() -> dict[str, tuple[str, str]]:
+    """`#343`: full-game + Q1-Q4/H1-H2 from the shared vocabulary, used both to
+    REQUEST the keys and to TAG the returned quotes so the two cannot drift."""
+    from syndicate.features.shared.market_segments import full_game_market_keys, segment_market_keys
+
+    return {**full_game_market_keys(), **segment_market_keys("nfl")}
 
 
 def main(*, data_dir: Path | None = None) -> Path:

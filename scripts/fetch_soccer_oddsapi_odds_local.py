@@ -71,11 +71,27 @@ def _preferred_books() -> list[str]:
     return [book.strip().lower() for book in raw.split(",") if book.strip()]
 
 
+def _segment_market_map() -> dict[str, tuple[str, str]]:
+    """`#343`: full-game + half markets, from the ONE shared vocabulary.
+
+    Soccer plays halves, so `h1`/`h2` -- not quarters. The same dict is used to
+    REQUEST the keys and to TAG the returned quotes, which is what stops a
+    fetcher asking for `totals_h1` and then writing it under `full`.
+    """
+    from syndicate.features.shared.market_segments import full_game_market_keys, segment_market_keys
+
+    return {**full_game_market_keys(), **segment_market_keys("soccer")}
+
+
 def _game_markets() -> list[str]:
     raw = os.environ.get("ODDS_API_SOCCER_GAME_MARKETS")
     if raw:
         return [market.strip() for market in raw.split(",") if market.strip()]
-    return list(DEFAULT_GAME_MARKETS)
+    # Segment keys appended rather than replacing the default: an env override
+    # still wins outright, so an operator capping cost keeps that control.
+    markets = list(DEFAULT_GAME_MARKETS)
+    markets.extend(key for key in _segment_market_map() if key not in markets)
+    return markets
 
 
 def _write_text_atomic(path: Path, text: str) -> None:
@@ -210,7 +226,7 @@ def _append_soccer_book_quotes(*, league: str, events: list[dict[str, Any]]) -> 
         from syndicate.features.shared.odds_book_quotes import append_book_quotes
         from syndicate.features.shared.odds_book_quotes import quote_rows_from_oddsapi_events
 
-        rows = quote_rows_from_oddsapi_events(events)
+        rows = quote_rows_from_oddsapi_events(events, market_map=_segment_market_map())
         if not rows:
             return
         now = dt.datetime.now(dt.timezone.utc)

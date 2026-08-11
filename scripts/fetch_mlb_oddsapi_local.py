@@ -392,7 +392,13 @@ def _extract_player_props(markets: Any, *, key_map: dict[str, str]) -> dict[str,
 
 
 def _extract_game_lines(markets: Any, *, home_team: str, away_team: str) -> dict[str, Any]:
-    segment_market_map = {
+    # `#343`: DERIVED from the shared vocabulary, not restated here.
+    #
+    # The literal below is retained as the parity fixture
+    # `tests/test_market_segments.py` diffs against -- it is what proved the
+    # shared map reproduces MLB's working capture 18/18, and it caught 3 missing
+    # `h2h_3_way_*` keys when it did. It is no longer what runs.
+    _legacy_segment_market_map = {
         "h2h": ("full", "h2h"),
         "spreads": ("full", "spreads"),
         "totals": ("full", "totals"),
@@ -415,6 +421,9 @@ def _extract_game_lines(markets: Any, *, home_team: str, away_team: str) -> dict
         "totals_1st_5_innings": ("first5", "totals"),
         "alternate_totals_1st_5_innings": ("first5", "totals_alt"),
     }
+    from syndicate.features.shared.market_segments import full_game_market_keys, segment_market_keys
+
+    segment_market_map = {**full_game_market_keys(), **segment_market_keys("mlb")}
     out: dict[str, Any] = {
         "h2h": None,
         "spreads": None,

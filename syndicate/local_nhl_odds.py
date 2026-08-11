@@ -378,6 +378,12 @@ def collect_oddsapi_team_odds(date: str, *, markets: Optional[Iterable[str]] = N
     day = datetime.strptime(date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     start_utc, end_utc = _date_range_utc(day)
     market_list = list(markets) if markets is not None else [m.strip() for m in os.getenv("TEAM_ODDS_MARKETS", "h2h,spreads,totals").split(",") if m.strip()]
+    # `#343`: hockey plays THREE periods, so p1/p2/p3 -- not quarters or halves.
+    # Appended rather than replacing, so an env override still caps cost.
+    if markets is None:
+        from syndicate.features.shared.market_segments import segment_market_keys
+
+        market_list.extend(key for key in segment_market_keys("nhl") if key not in market_list)
     events, _ = client.list_events(
         "icehockey_nhl",
         commence_from_iso=start_utc.isoformat().replace("+00:00", "Z"),
@@ -824,6 +830,21 @@ def write_props(df: pd.DataFrame, *, artifact_root: Path, date: str, source: str
     return str(parquet_path if parquet_path.exists() else csv_path)
 
 
+def _nhl_segment_of(raw_market: object) -> tuple[str, str]:
+    """`#343`: (segment, canonical market) for an NHL market key.
+
+    Hockey plays three PERIODS -- p1/p2/p3. Both values come from one map so a
+    key this module requested cannot be written under the wrong interval: a
+    `totals_p2` tagged `full` would show a second-period total as a full-game
+    line, which is worse than never asking for it.
+    """
+    from syndicate.features.shared.market_segments import full_game_market_keys, segment_market_keys
+
+    key = str(raw_market or "")
+    mapped = {**full_game_market_keys(), **segment_market_keys("nhl")}.get(key)
+    return mapped if mapped else ("full", key)
+
+
 def _append_nhl_book_quotes(frame, *, date: str, kind: str) -> None:
     """Route NHL's already-multi-book frames into the shared quote log.
 
@@ -856,8 +877,8 @@ def _append_nhl_book_quotes(frame, *, date: str, kind: str) -> None:
                         "home_team": record.get("home_team"),
                         "away_team": record.get("away_team"),
                         "bookmaker": record.get("book"),
-                        "market": record.get("market"),
-                        "segment": "full",
+                        "market": _nhl_segment_of(record.get("market"))[1],
+                        "segment": _nhl_segment_of(record.get("market"))[0],
                         "selection": side or None,
                         "player_name": record.get("player"),
                         "line": record.get("line"),
@@ -888,8 +909,8 @@ def _append_nhl_book_quotes(frame, *, date: str, kind: str) -> None:
                         "home_team": home,
                         "away_team": away,
                         "bookmaker": record.get("bookmaker_key") or record.get("bookmaker"),
-                        "market": record.get("market"),
-                        "segment": "full",
+                        "market": _nhl_segment_of(record.get("market"))[1],
+                        "segment": _nhl_segment_of(record.get("market"))[0],
                         "selection": selection,
                         "player_name": None,
                         "line": record.get("outcome_point") if record.get("outcome_point") is not None else record.get("line"),
