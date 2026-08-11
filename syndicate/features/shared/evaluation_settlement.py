@@ -32,6 +32,8 @@ from syndicate.features.shared.intelligence_evaluation import _ledger_chunk_path
 from syndicate.features.shared.intelligence_evaluation import _ledger_record_chunk_name
 from syndicate.features.shared.intelligence_evaluation import _record_sport
 from syndicate.features.shared.intelligence_evaluation import settle_result
+import functools
+from syndicate.features.shared.intelligence_evaluation import ledger_index_session
 
 
 # "Supported" now means "has a registered grader in graded_outcomes.py",
@@ -414,6 +416,42 @@ def _pnl_for_settlement(row: Mapping[str, Any], result: str) -> float:
     return profit if result == "win" else -1.0
 
 
+def _with_ledger_index_session(fn):
+    """Parse the 10.63MB chunk index ONCE for the whole settlement pass (`#275`).
+
+    A decorator rather than a `with` around the loop, deliberately: the loop body
+    is ~100 lines and re-indenting it would bury a one-line semantic change in a
+    hundred-line diff on the function that `#256` already had to fix once.
+
+    Why it matters, measured on this module's own diagnostic: the index is
+    re-read AND fully re-serialised (`indent=2, sort_keys=True`) once per settled
+    record, at **27.4 MB RSS and 0.616 s each**. A ~150-record night is ~3.2 GB
+    of IO and 150 repeated 27 MB allocations on a 4 GB worker -- which is `#256`'s
+    110 OOM kills over eleven hours. `#256` stopped the loop from repeating; it
+    did not remove the cost, and that cost is why this autorun is still off.
+
+    Benchmarked on a 5.98 MB index (production is 10.63 MB, so this understates
+    it): 50 records went from **50 reads / 50 writes / 17.15 s** to
+    **1 read / 1 write / 0.40 s**.
+
+    A dry run costs nothing here: it never persists, so the session is never
+    marked dirty and no write happens on exit.
+    """
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        ledger_path = kwargs.get("ledger_path")
+        # Resolved exactly as the function body resolves `target_ledger_path`,
+        # because the session is keyed on the index path and a mismatch would
+        # silently fall back to per-record IO rather than fail.
+        target = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
+        with ledger_index_session(target):
+            return fn(*args, **kwargs)
+
+    return wrapper
+
+
+@_with_ledger_index_session
 def settle_ledger_for_date(
     date_value: str,
     *,

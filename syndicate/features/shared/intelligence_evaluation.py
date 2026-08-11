@@ -29,6 +29,7 @@ from syndicate.features.shared.model_version import code_version
 from syndicate.features.shared.odds_lifecycle import market_feature_summary
 from syndicate.features.shared.refresh_state_store import reports_root
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
+from contextlib import contextmanager
 
 
 SCHEMA_VERSION = 1
@@ -206,7 +207,64 @@ def _ledger_record_identity(record: Mapping[str, Any]) -> str | None:
     return None
 
 
-def _load_chunk_index(path: Path | str | None = None) -> dict[str, dict[str, Any]]:
+# `#275` HOIST. The chunk index is read AND rewritten once per settled record by
+# `_update_evaluation_ledger_record`, and it is 10.63 MB in production
+# (2026-08-11, growing ~3 MB/day). Measured cost from this module's own
+# diagnostic: **27.4 MB RSS and 0.616 s per settled record**, because each record
+# pays a full parse plus a full `json.dumps(..., indent=2, sort_keys=True)`.
+#
+# At ~150 records a night that is ~3.2 GB of IO and 150 repeated 27 MB
+# allocations on a 4 GB worker. `#256` records the consequence: **110 OOM kills
+# over eleven hours**, a boot-settle-die-repeat loop. `#256` fixed the loop (the
+# run is claimed before the work) but not the cost that caused it, which is why
+# this autorun is still disabled in production.
+#
+# The session below makes the hoist TRANSPARENT: `_load_chunk_index` and
+# `_write_chunk_index` keep their signatures and every existing call site is
+# unchanged. Inside a session the index is parsed once, mutated in memory, and
+# written once on exit. Outside a session behaviour is exactly as before, so
+# nothing that does a single settle is affected.
+_LEDGER_INDEX_SESSION: dict[str, Any] = {"active": False, "key": None, "index": None, "dirty": False}
+
+
+def _index_session_key(path: Path | str | None) -> str:
+    return str(_ledger_index_path(path))
+
+
+@contextmanager
+def ledger_index_session(path: Path | str | None = None) -> Iterator[None]:
+    """Parse the chunk index once for a batch of settlements, write once at exit.
+
+    Reentrant-safe by refusing to nest: an inner session is a no-op and the
+    outer one owns the flush, so a caller cannot accidentally write a partially
+    mutated index halfway through the batch.
+
+    The flush is in `finally` deliberately. A batch that raises has still
+    mutated chunk FILES on disk, and an index that does not describe them is
+    worse than one written after a partial run -- the safety net in
+    `_update_evaluation_ledger_record` re-appends anything the index has lost,
+    but only if the index is coherent.
+    """
+    if _LEDGER_INDEX_SESSION.get("active"):
+        yield
+        return
+    key = _index_session_key(path)
+    _LEDGER_INDEX_SESSION.update(
+        {"active": True, "key": key, "index": _read_chunk_index_from_disk(path), "dirty": False}
+    )
+    try:
+        yield
+    finally:
+        try:
+            if _LEDGER_INDEX_SESSION.get("dirty"):
+                index = _LEDGER_INDEX_SESSION.get("index")
+                if isinstance(index, dict):
+                    _write_chunk_index_to_disk(path, index)
+        finally:
+            _LEDGER_INDEX_SESSION.update({"active": False, "key": None, "index": None, "dirty": False})
+
+
+def _read_chunk_index_from_disk(path: Path | str | None = None) -> dict[str, dict[str, Any]]:
     index_path = _ledger_index_path(path)
     if not index_path.exists():
         return {}
@@ -221,10 +279,29 @@ def _load_chunk_index(path: Path | str | None = None) -> dict[str, dict[str, Any
     return {}
 
 
-def _write_chunk_index(path: Path | str | None, index: dict[str, dict[str, Any]]) -> None:
+def _write_chunk_index_to_disk(path: Path | str | None, index: dict[str, dict[str, Any]]) -> None:
     index_path = _ledger_index_path(path)
     _ensure_parent(index_path)
     index_path.write_text(json.dumps({"records": index, "updated_at": _utc_now()}, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _load_chunk_index(path: Path | str | None = None) -> dict[str, dict[str, Any]]:
+    if _LEDGER_INDEX_SESSION.get("active") and _LEDGER_INDEX_SESSION.get("key") == _index_session_key(path):
+        index = _LEDGER_INDEX_SESSION.get("index")
+        if isinstance(index, dict):
+            # The SAME object, not a copy: callers mutate what they get back and
+            # then call _write_chunk_index, so a copy here would silently drop
+            # every mutation made during the batch.
+            return index
+    return _read_chunk_index_from_disk(path)
+
+
+def _write_chunk_index(path: Path | str | None, index: dict[str, dict[str, Any]]) -> None:
+    if _LEDGER_INDEX_SESSION.get("active") and _LEDGER_INDEX_SESSION.get("key") == _index_session_key(path):
+        _LEDGER_INDEX_SESSION["index"] = index
+        _LEDGER_INDEX_SESSION["dirty"] = True
+        return
+    _write_chunk_index_to_disk(path, index)
 
 
 def _write_chunk_manifest(path: Path | str | None, *, chunk_name: str, record_count: int) -> None:
