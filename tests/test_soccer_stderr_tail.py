@@ -99,3 +99,43 @@ def test_empty_and_all_noise_do_not_crash():
     # "no recognised error" must not render as "no output".
     plain = _stderr_failure_tail("\n".join(["step one", "step two", "step three"]))
     assert "step three" in plain
+
+
+def test_orphaned_heartbeat_fragment_is_not_reported_as_the_cause():
+    """`#358` follow-up. The window is sliced by CHARACTERS, so the first line is
+    a fragment whose leading marker was cut off -- and `_is_stderr_noise` keys on
+    that marker, so the orphan survives the filter and is emitted as if it were
+    signal.
+
+    Measured both ways, which is why this is a real case and not a hypothetical:
+    on the refresh-worker a heartbeat line is 800-2,572 chars so the orphan is one
+    line among 15, but on a dev box with 300 processes a SINGLE ALL_PROCESS_MEMORY
+    line exceeded the entire 40KB window and the emitted tail was pure garbage --
+    no cause, no recognisable field, just a mid-JSON fragment.
+    """
+    import importlib.util
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    spec = importlib.util.spec_from_file_location(
+        "rw_tail_under_test", _Path(__file__).resolve().parents[1] / "scripts" / "run_refresh_worker.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    _sys.modules["rw_tail_under_test"] = module
+    spec.loader.exec_module(module)
+
+    orphan = '"rss_mb": 1757.672}, {"cmdline": ["/usr/bin/python3", "-c", "import sys"], "name": "python3"}]}'
+    text = "\n".join([orphan, "SystemExit: no team history under /opt/render/project/data/soccer_source/la_liga/team_history"])
+
+    assert "ALL_PROCESS_MEMORY" not in orphan, "fixture must reproduce the marker actually being cut away"
+    assert not module._is_stderr_noise(orphan), (
+        "fixture no longer reproduces the defect -- the orphan is being caught as noise, so this proves nothing"
+    )
+
+    kept = module._stderr_failure_tail(text, head_may_be_partial=True)
+    assert "no team history under" in kept, "the real cause was dropped"
+    assert "rss_mb" not in kept, "the orphaned heartbeat fragment was reported as if it were the cause"
+
+    # And the flag must not eat a legitimate first line when nothing was truncated.
+    intact = module._stderr_failure_tail(text, head_may_be_partial=False)
+    assert "rss_mb" in intact

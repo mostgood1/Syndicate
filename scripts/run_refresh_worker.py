@@ -712,7 +712,9 @@ def _is_stderr_noise(line: str) -> bool:
     return line.startswith(_STDERR_NOISE_PREFIXES)
 
 
-def _stderr_failure_tail(text: str, *, limit: int = 15, max_chars: int = 2400) -> str:
+def _stderr_failure_tail(
+    text: str, *, limit: int = 15, max_chars: int = 2400, head_may_be_partial: bool = False
+) -> str:
     """The lines that explain the exit, not merely the last lines written.
 
     A blocklist alone is whack-a-mole: every new heartbeat marker refills the
@@ -723,6 +725,15 @@ def _stderr_failure_tail(text: str, *, limit: int = 15, max_chars: int = 2400) -
     Output stays in file order, because a stack trace read bottom-up is worse
     than useless when the point is to hand someone a cause at a glance.
     """
+    if head_may_be_partial:
+        # The caller slices the file by CHARACTERS, so the first line is a
+        # fragment whose leading marker was cut away -- and the noise test keys
+        # on that marker, so an orphaned heartbeat tail reads as signal and gets
+        # emitted as the cause. Measured on the worker its heartbeat lines are
+        # 800-2,572 chars (15+ per 40KB window), so this drops at most one line;
+        # measured on a dev box with 300 processes a SINGLE such line exceeded
+        # the whole window and the emitted "tail" was pure garbage.
+        text = text.split("\n", 1)[1] if "\n" in text else ""
     lines = [line.strip() for line in text.splitlines() if line.strip() and not _is_stderr_noise(line.strip())]
     if not lines:
         return ""
@@ -776,8 +787,8 @@ def _report_soccer_unit_failure(latest_manifest_path: Path) -> None:
     tail = ""
     if stderr_path:
         try:
-            text = Path(stderr_path).read_text(encoding="utf-8", errors="replace")[-40000:]
-            tail = _stderr_failure_tail(text)
+            raw = Path(stderr_path).read_text(encoding="utf-8", errors="replace")
+            tail = _stderr_failure_tail(raw[-40000:], head_may_be_partial=len(raw) > 40000)
         except Exception as exc:  # noqa: BLE001
             tail = f"<unreadable: {type(exc).__name__}: {exc}>"
     print(
