@@ -1,5 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#341` — CORRECTION TO MY OWN ENTRY BELOW: the chain position was NOT the blocker. Reconciliation is REACHED and declines on its own gate
+
+**Refuted by the oversight lane within the hour, and the disproof is cheap and
+sound.** `_launch_autorun_evaluation_settlement` (branch 7) calls
+`_report_evaluation_ledger_index_size()` at line 1251, **before** its enabled
+check at 1252 — verified in code, not taken on report. So every
+`LEDGER_INDEX_SIZE` emission proves branch 7 was reached, which proves branches
+1–6 **all declined** that tick, which proves branch 6 (reconciliation) was
+reached and said no **on its own gate**.
+
+It was never being beaten by `mlb_refresh`.
+
+**What I got right and what I got wrong.** The structural observation — an
+exclusive `if/elif` chain means a low-priority daily job depends on every branch
+above it declining — is correct and worth keeping. **The consequence I drew from
+it was not**, and I drew it without checking whether the branch was reached, when
+a probe for exactly that was already emitting in the function immediately below
+the one I was reading.
+
+**The reordering stays**, on much weaker grounds than I claimed: it removes a
+latent starvation risk for a job that is daily-gated and inline, and costs
+`mlb_refresh` at most one tick a day. It is defensible; it is not the fix.
+
+**THE SECOND FIX IN THAT COMMIT IS PROBABLY THE REAL ONE.** The status epoch is
+written on the **error** path, so a run that fails still marks the day done. That
+produces exactly the observed behaviour: reached every tick, declines every tick,
+emits nothing, for 24h at a time, repeatedly — with no file and no alarm. The
+one-hour backoff addresses that directly.
+
+**Unverified, and stated as such:** I could not read the status file to confirm a
+stored `error`, because it lives in the keyvalue store and `/api/ops/artifacts/
+stream` 403s on it. The deployed `RECONCILIATION_AUTORUN_GATED` line prints
+`age/interval/next_in` and will answer it in one tick.
+
+**Two measurement notes, because both bit me here:**
+- My independent count of `LEDGER_INDEX_SIZE` returned **1** with a `text=`
+  filter and **0** without it over the same nominal window. The un-filtered pull
+  paginates BACKWARD from now, so 6,250 lines never reached the start time I
+  asked for. Neither number refutes the oversight lane's 30 over ~13h; **I
+  cannot confirm or deny their count and should not pretend to.** The mechanism
+  is what settles it, and the mechanism is in code.
+- This is the second time tonight that a pagination direction turned a real
+  window into a much shorter one without saying so.
+
 ### `#341` — COMMITTED, NOT DEPLOYED. The settlement autorun was ENABLED, correctly configured, and structurally unable to run: 6th in an exclusive `if/elif` chain behind three high-frequency branches
 
 **`/api/portfolio/summary` has read `settled_count: 0, avg_clv: null` for weeks,
