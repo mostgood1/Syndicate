@@ -64,6 +64,17 @@ def _json_ready(value):
     return value
 
 
+def _wnba_refresh_decision_path(date_str: str) -> Path:
+    """Where the per-date refresh decision is recorded so WEB can read it.
+
+    Under `reports/` rather than beside the log file, because the log file lives
+    on the worker's disk and the whole point is that web could not see it.
+    """
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    return reports_root() / "refresh_status" / "latest" / f"wnba_refresh_decision_{date_str}.json"
+
+
 def _refresh_state_scope_path(path: Path | None) -> str:
     if path is None:
         return ""
@@ -5511,6 +5522,7 @@ def main() -> int:
             do_export=bool(args.do_export),
             artifact_root=artifact_root_path,
         )
+        _reuse_source = None
         if source_root is not None and not bool(args.force_refresh):
             state = _existing_refresh_state(
                 source_root=source_root,
@@ -5520,6 +5532,7 @@ def main() -> int:
                 started_at=started_at,
                 input_hash=refresh_input_hash,
             )
+            _reuse_source = state is not None
         if state is None and artifact_root and not bool(args.force_refresh):
             state = _existing_artifact_bundle_state(
                 artifact_root=artifact_root_path,
@@ -5529,6 +5542,52 @@ def main() -> int:
                 started_at=started_at,
                 input_hash=refresh_input_hash,
             )
+        # `#344`: SAY WHICH BRANCH SERVED, and put it somewhere readable.
+        #
+        # WNBA made ZERO OddsAPI calls for 45+ minutes on a live slate
+        # (wnba_calls pinned at 1158 while MLB climbed 135,645 -> 135,714) and
+        # nothing anywhere said why. The parent process ran every tick -- 6 of
+        # 250 process samples caught it -- while the child that actually fetches
+        # and writes book_quotes never spawned once. The reuse guards above
+        # returned a cached state and the fetch was skipped silently.
+        #
+        # This is the FOURTH silent conjunction tonight, after #336's rate
+        # limiter, #339's liveness gate and #341's autorun. Same shape every
+        # time: an enabled path that declines without naming the term that
+        # denied it.
+        #
+        # PRINTED **AND** PERSISTED, because a print here is invisible. This
+        # script's stdout is captured to `--log-file` on the worker's disk, and
+        # every route to that disk from web is blocked: run artifacts 403, and
+        # /api/ops/odds-refresh/status reads WEB's disk (the #304 split). The
+        # only reason the skip was diagnosable at all is that a MEMORY
+        # instrument happens to log process cmdlines -- an accident, not a
+        # design. So the decision goes into the refresh state store, which web
+        # can actually read.
+        _decision = (
+            "reused_source_root_state" if state is not None and _reuse_source is True
+            else "reused_artifact_bundle" if state is not None
+            else "will_fetch"
+        )
+        try:
+            _keyvalue_write_json_file(
+                _wnba_refresh_decision_path(target_date),
+                {
+                    "date": str(target_date),
+                    "decision": _decision,
+                    "input_hash": str(refresh_input_hash),
+                    "force_refresh": bool(args.force_refresh),
+                    "recorded_at": dt.datetime.utcnow().isoformat() + "Z",
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"[wnba_refresh] decision persist FAILED {type(exc).__name__}: {exc}", flush=True)
+        print(
+            f"[wnba_refresh] DECISION={_decision} date={target_date} "
+            f"input_hash={str(refresh_input_hash)[:12]} force={bool(args.force_refresh)}",
+            flush=True,
+        )
+
         if state is None:
             if source_root is None:
                 state = {

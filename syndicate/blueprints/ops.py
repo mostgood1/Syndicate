@@ -241,6 +241,45 @@ def _require_admin_token() -> Any:
     return None
 
 
+@ops_bp.get("/api/ops/wnba/refresh-decision")
+def api_ops_wnba_refresh_decision() -> Any:
+    """`#344`: WHY the WNBA odds refresh did or did not fetch.
+
+    WNBA made zero OddsAPI calls for 45+ minutes on a live slate -- `wnba_calls`
+    pinned at 1158 while MLB climbed 135,645 -> 135,714 -- and nothing readable
+    said why. The parent ran every tick while the child that fetches and writes
+    `book_quotes` never spawned, because a reuse guard returned a cached state.
+
+    Every route to that answer was blocked: the script's stdout goes to a log
+    file on the WORKER's disk, run artifacts return 403, and
+    `/api/ops/odds-refresh/status` reads WEB's disk (the `#304` split). The skip
+    was only diagnosable because a memory instrument happens to log process
+    cmdlines -- an accident. This endpoint exists so the next person does not
+    need that accident.
+
+    Reads the keyvalue store, which crosses the service boundary, rather than a
+    path on whichever disk happens to be mounted.
+    """
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    try:
+        from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
+
+        path = reports_root() / "refresh_status" / "latest" / f"wnba_refresh_decision_{selected_date}.json"
+        payload = read_json_file(path)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
+    if not payload:
+        # Absent is a REAL answer here and must not read as "it fetched": it
+        # means no tick has recorded a decision for this date yet.
+        return jsonify({
+            "ok": True,
+            "date": selected_date,
+            "decision": None,
+            "reason": "no_decision_recorded_for_date",
+        })
+    return jsonify({"ok": True, "date": selected_date, **payload})
+
+
 @ops_bp.get("/api/ops/odds-refresh/status")
 def api_ops_odds_refresh_status() -> Any:
     return jsonify({"ok": True, "status": normalize_timestamped_payload(load_latest_refresh_status())})
