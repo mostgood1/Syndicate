@@ -600,6 +600,38 @@ def _soccer_unit_launch_spacing_seconds(unit_count: int) -> int:
     return max(60, interval // max(1, int(unit_count)))
 
 
+def _soccer_unit_wrote_since(unit_key: str, launched_epoch: float) -> tuple[bool | None, str, float]:
+    """Did this unit's recommendations file land AFTER its launch? (`#353`)
+
+    Returns (wrote, path, mtime). `wrote is None` means unknowable -- an
+    unparseable key or an IO error -- and callers must treat that as "do not
+    conclude", never as failure. Marking a unit failed because we could not
+    look would retry it forever.
+
+    One definition of "wrote", shared by the diagnostic and the scheduler, so
+    the line an operator reads and the decision the worker makes can never
+    disagree.
+    """
+    key = str(unit_key or "").strip()
+    league, sep, unit_date = key.partition("|")
+    if not sep or not league or not unit_date or launched_epoch <= 0.0:
+        return None, "", 0.0
+    try:
+        from syndicate.features.shared.refresh_state_store import data_root
+
+        rec_path = (
+            data_root() / "soccer_source" / league / "api" / "recommendations"
+            / f"recommendations_{unit_date}.json"
+        )
+        if not rec_path.is_file():
+            return False, str(rec_path), 0.0
+        mtime = rec_path.stat().st_mtime
+    except Exception:
+        return None, "", 0.0
+    # 5s slack for clock skew between the launch stamp and the file write.
+    return bool(mtime >= launched_epoch - 5.0), str(rec_path), mtime
+
+
 def _report_soccer_unit_outcome(last_status: dict) -> None:
     """Did the PREVIOUS soccer unit actually write its artifact? (`#352`)
 
@@ -677,6 +709,43 @@ def _launch_autorun_soccer_weekly_refresh(
     status_path = _soccer_weekly_autorun_status_path()
     last_status = _refresh_state_store()["read_json_file"](status_path) or {}
 
+    # `#353`: CONFIRM THE PREVIOUS UNIT BEFORE DECIDING WHAT IS DUE.
+    #
+    # `unitEpochs` was stamped at LAUNCH, before the subprocess had done
+    # anything -- so a unit that failed marked itself satisfied for the full
+    # 4-hour interval, exactly as if it had succeeded. Measured 2026-08-11:
+    # la_liga launched at 15:36, 16:13 and 16:46, wrote nothing at any of its
+    # three dates, and at 18:36 the autorun reported
+    # `no_unit_due units=8 next_due_in_s=3612` while five other leagues had
+    # refreshed. Its files stayed on `generated_at: 2026-07-20` -- 22 days --
+    # and would have stayed there indefinitely, because each retry re-stamps on
+    # launch and sleeps again.
+    #
+    # Same shape as `#347`, where the reuse recorder fired after a REUSE and the
+    # guard agreed with itself forever. Here the scheduler agrees with itself.
+    #
+    # So the success epoch is now written only once the file is verified on
+    # disk. A launch records an ATTEMPT; only a write records a refresh.
+    unit_epochs_state = last_status.get("unitEpochs") if isinstance(last_status.get("unitEpochs"), dict) else {}
+    pending_key = str(last_status.get("lastUnit") or "").strip()
+    pending_epoch = float(last_status.get("lastLaunchEpoch") or 0.0)
+    if pending_key and pending_epoch > 0.0:
+        wrote, _path, mtime = _soccer_unit_wrote_since(pending_key, pending_epoch)
+        if wrote is True and float(unit_epochs_state.get(pending_key) or 0.0) < mtime:
+            unit_epochs_state = {**unit_epochs_state, pending_key: mtime}
+            _refresh_state_store()["write_json_file"](
+                status_path, {**last_status, "unitEpochs": unit_epochs_state}
+            )
+            last_status = {**last_status, "unitEpochs": unit_epochs_state}
+            print(
+                f"[refresh_worker] SOCCER_UNIT_CONFIRMED unit={pending_key} "
+                f"wrote_at={int(mtime)} launched_at={int(pending_epoch)}",
+                flush=True,
+            )
+        # `wrote is None` is deliberately NOT a failure: unknowable means do not
+        # conclude. Marking a unit failed because we could not look would retry
+        # it forever.
+
     # `#352`: report what the PREVIOUS unit produced, before queuing the next.
     # Placed here so it runs on every tick regardless of which gate stops this
     # one -- an outcome that only prints when a new launch happens would go
@@ -717,7 +786,32 @@ def _launch_autorun_soccer_weekly_refresh(
         return _soccer_autorun_skipped("active_job", f"active_jobs={active_jobs_now}")
 
     unit_epochs = last_status.get("unitEpochs") if isinstance(last_status.get("unitEpochs"), dict) else {}
-    due = [unit for unit in units if (now - float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0)) >= interval_seconds]
+    last_attempts = last_status.get("lastAttemptEpochs") if isinstance(last_status.get("lastAttemptEpochs"), dict) else {}
+
+    # `#353`: two clocks, because a refresh and an attempt are different events.
+    #
+    # `unitEpochs` is the last VERIFIED write and gates the normal 4h cadence.
+    # `lastAttemptEpochs` is the last launch and paces RETRIES, so a unit that
+    # fails comes back in minutes instead of sleeping four hours pretending it
+    # succeeded -- while still not hammering: a permanently broken league
+    # retries on this backoff, not on every spacing window.
+    #
+    # 600s chosen against the measured unit cost (~105MB, 41-66s observed), so
+    # a league failing all day costs ~6 attempts an hour rather than 12, and
+    # recovers within ten minutes of whatever was wrong being fixed.
+    retry_backoff_seconds = max(600.0, float(spacing_seconds))
+
+    def _unit_due(unit: dict[str, str]) -> bool:
+        key = _soccer_unit_key(unit)
+        since_success = now - float(unit_epochs.get(key) or 0.0)
+        if since_success < interval_seconds:
+            return False
+        # Never verified, or verified long ago -- but do not retry faster than
+        # the backoff allows.
+        since_attempt = now - float(last_attempts.get(key) or 0.0)
+        return since_attempt >= retry_backoff_seconds
+
+    due = [unit for unit in units if _unit_due(unit)]
     if not due:
         soonest = min(
             (interval_seconds - (now - float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0)) for unit in units),
@@ -809,7 +903,12 @@ def _launch_autorun_soccer_weekly_refresh(
             "lastLaunchEpoch": launched_epoch,
             "sports": "soccer",
             "date": selected_date,
-            "unitEpochs": {**unit_epochs, _soccer_unit_key(unit): launched_epoch},
+            # `#353`: NOT stamped here. `unitEpochs` now means "last verified
+            # write", confirmed against the file on a later tick. Stamping on
+            # launch is what let three failed la_liga units sleep four hours
+            # each while reporting themselves done.
+            "unitEpochs": unit_epochs,
+            "lastAttemptEpochs": {**last_attempts, _soccer_unit_key(unit): launched_epoch},
             "lastUnit": _soccer_unit_key(unit),
             "scopeKind": scope_kind,
             "unitCount": len(units),
