@@ -1,5 +1,63 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#338` LOCALISED — the board snapshot stores the CORRECT 220. The serve reads a DIFFERENT artifact, and `by_sport` is partial because of `#285`
+
+**The instrument fix (`60c485c4`) paid for itself on its first run.** Live trace,
+2026-08-11T00:2xZ, web on `60c485c4`:
+
+```
+board_snapshot_read_candidate_count        220    <- CORRECT. write path is fine
+board_snapshot_read_top_opportunities_len  150    <- the cap, by design
+board_snapshot_read_recommendations_len    150    <- the cap, by design
+board_snapshot_read_by_sport_sports        ['mls', 'nfl', 'serie a', 'wnba']
+board_snapshot_read_by_sport_total          94    <- FOUR sports, not eight
+state_read_latest_snapshot_candidate_count 150    <- what the SERVE reads
+SERVED cc=150
+```
+
+#### Three things this settles
+
+1. **`#337` is fully fixed on the write path.** `board_snapshot.json` stores
+   **220**, the true pool. Both causes (alias-blind `by_sport` counting, and the
+   resolver overwriting a correct field) are closed, end-to-end, in the artifact.
+
+2. **The serve does not read that artifact.** It serves from the
+   `query_state_cache.json` snapshot, which carries **150**. So the remaining
+   defect is not a computation error anywhere -- it is **two artifacts holding
+   different counts and the serve preferring the stale one**. That is a
+   different defect from `#337` and should not be chased as more of it.
+
+3. **`by_sport` holds FOUR sports totalling 94 against a pool of 220** --
+   `mls, nfl, serie a, wnba`, with mlb absent. That is the
+   `OVERVIEW_STOPPED_FOR_MEMORY sports_done=0 sports_total=8` fingerprint in a
+   second artifact, and it is why the resolver cannot recover 220 from
+   `by_sport` alone: `max(94, 150, field)` needs the field. **`#338` is
+   downstream of `#285`.**
+
+#### What is NOT yet known, stated so nobody assumes it
+
+Why the query_state_cache snapshot carries 150 when the board publication
+response computed 220. `state_read_latest_snapshot_computed_at` is **22:53:56Z**
+while the served `snapshot_generated_at` is **22:49:57Z** -- two different
+cycles, so the served snapshot may simply predate the fix landing rather than
+being freshly wrong. **That is the next measurement and it is cheap:** re-read
+after a cycle that both starts and finishes on `a7216ca9`, and compare the two
+artifacts' counts at the same instant.
+
+#### The instrument itself: fixed, and it took three attempts
+
+`9921d70a` fixed one of TWO copy-pasted read blocks; the `None` came from the
+other. `60c485c4` extracted `_board_snapshot_read_summary()` -- 1 definition, 2
+call sites, zero remaining wrong-place lookups -- so a third fix cannot land on
+one and miss the other. Both blocks also now expand `STATE_PATH` before reading
+`snapshots` (a `#322` regression: the compressed envelope still passes
+`isinstance(dict)`, so `latest_key in snapshots` missed silently).
+
+**And the last `None` was my own printer**, not the endpoint: my reporting script
+skipped dict-valued keys, and `read_only_trace` is a dict. Three layers of the
+same mistake in one investigation -- fix, sibling block, and the tool reading it.
+
+
 ### `#340` — COMMITTED, **NOT DEPLOYED ON PURPOSE**. The book-grid rebuild now speeds to 120s while a game is live — and the worker is at 3,211MB of 4,096, so it is waiting for headroom
 
 **The 600s artifact rebuild was the binding constraint on live freshness.**
