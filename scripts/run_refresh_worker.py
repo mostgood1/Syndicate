@@ -59,23 +59,46 @@ def _bootstrap_soccer_seed_files(*, relative_subdir: str, glob_pattern: str) -> 
         return []
     source_root = REPO_ROOT / "data" / "soccer_source"
     if not source_root.is_dir():
+        # `#362`: was a silent `return []`. Copying nothing because everything is
+        # already present and copying nothing because the source tree is not
+        # THERE are opposite facts that rendered identically -- and the caller
+        # only printed on a non-empty result, so both looked like a healthy boot.
+        print(
+            f"[refresh_worker] SOCCER_SEED_CENSUS subdir={relative_subdir} source_root_missing={source_root}",
+            flush=True,
+        )
         return []
     seeded_leagues: list[str] = []
+    already_present: list[str] = []
+    no_source: list[str] = []
     for league_dir in sorted(source_root.iterdir()):
         if not league_dir.is_dir():
             continue
         source_dir = league_dir / relative_subdir
         source_files = sorted(source_dir.glob(glob_pattern)) if source_dir.is_dir() else []
         if not source_files:
+            no_source.append(league_dir.name)
             continue
         dest_dir = data_root / "soccer_source" / league_dir.name / relative_subdir
         existing = list(dest_dir.glob(glob_pattern)) if dest_dir.is_dir() else []
         if existing:
+            already_present.append(league_dir.name)
             continue
         dest_dir.mkdir(parents=True, exist_ok=True)
         for src_file in source_files:
             shutil.copy2(src_file, dest_dir / src_file.name)
         seeded_leagues.append(league_dir.name)
+    # Printed UNCONDITIONALLY and on every boot. A seeder that speaks only when it
+    # copies cannot answer "is this league's input on the disk?", which is the
+    # only question anyone ever asks it -- and answering it previously required a
+    # deploy, because refresh-worker serves no HTTP and its disk is unreadable
+    # from anywhere else.
+    print(
+        f"[refresh_worker] SOCCER_SEED_CENSUS subdir={relative_subdir} "
+        f"seeded={sorted(seeded_leagues)} already_present={sorted(already_present)} "
+        f"no_source_in_checkout={sorted(no_source)}",
+        flush=True,
+    )
     return seeded_leagues
 
 

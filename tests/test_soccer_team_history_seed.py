@@ -124,3 +124,44 @@ def test_the_seeder_is_actually_called_at_boot():
     source = (_REPO / "scripts" / "run_refresh_worker.py").read_text(encoding="utf-8")
     assert "_bootstrap_soccer_history_seed_files()" in source
     assert 'relative_subdir="team_history"' in source
+
+
+def test_the_census_distinguishes_present_from_missing_source(monkeypatch, tmp_path, capsys):
+    """`#362` -- silence used to mean two opposite things.
+
+    `_bootstrap_soccer_seed_files` printed only when it COPIED, and returned a
+    silent `[]` when the source tree was absent. So "every league already has its
+    input" and "the checkout isn't there at all" produced identical output: none.
+    Verifying which one held required a deploy, because refresh-worker serves no
+    HTTP and its disk cannot be read from anywhere else.
+    """
+    module = _load_worker_module()
+    _seed_repo(tmp_path)
+    data_root = tmp_path / "runtime"
+    # la_liga already has its input; the other four Understat leagues do not.
+    live = data_root / "soccer_source" / "la_liga" / "team_history"
+    live.mkdir(parents=True, exist_ok=True)
+    (live / "teams_2025.csv").write_text("LIVE", encoding="utf-8")
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path / "repo", raising=False)
+    monkeypatch.setattr(module, "_refresh_state_store", lambda: {"data_root": lambda: data_root}, raising=False)
+
+    module._bootstrap_soccer_history_seed_files()
+    out = capsys.readouterr().out
+    census = [ln for ln in out.splitlines() if "SOCCER_SEED_CENSUS" in ln and "team_history" in ln]
+    assert census, "the census must print on every boot, not only when something is copied"
+    line = census[0]
+    assert "already_present=['la_liga']" in line
+    for league in ("bundesliga", "epl", "ligue_1", "serie_a"):
+        assert league in line.split("seeded=")[1].split("already_present=")[0], f"{league} should report as seeded"
+    assert "mls" in line.split("no_source_in_checkout=")[1]
+
+
+def test_a_missing_source_tree_says_so(monkeypatch, tmp_path, capsys):
+    module = _load_worker_module()
+    monkeypatch.setattr(module, "REPO_ROOT", tmp_path / "nonexistent", raising=False)
+    monkeypatch.setattr(module, "_refresh_state_store", lambda: {"data_root": lambda: tmp_path / "rt"}, raising=False)
+    module._bootstrap_soccer_history_seed_files()
+    out = capsys.readouterr().out
+    assert "source_root_missing=" in out, (
+        "a missing checkout must be distinguishable from a fully-seeded disk"
+    )
