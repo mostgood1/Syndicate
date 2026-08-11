@@ -507,6 +507,33 @@ def build_book_grid(
                     "consensus": consensus,
                     "updated_at": newest,
                     "age_seconds": _age_seconds(newest or "", now=now),
+                    # THE SECOND CLOCK, AT ROW LEVEL (`#366`).
+                    #
+                    # This module has computed `seen_age_seconds` per CELL since
+                    # the day it documented why the distinction matters -- and
+                    # never summarised it to the row. The board renders rows, so
+                    # every consumer above this line could see only
+                    # `age_seconds`: time since the price last MOVED.
+                    #
+                    # `book_quotes` is a change log, so a motionless market looks
+                    # ancient. Measured on the served board 2026-08-11, NFL rows
+                    # showed a median 424 minutes and soccer 786 -- read as a
+                    # capture outage, actually normal pregame markets nobody had
+                    # repriced. The same confusion this docstring warns about at
+                    # length was live on the board the whole time, because the
+                    # answer stopped one level short of where it was needed.
+                    #
+                    # MIN, matching `freshest_row_age` above: the row's freshest
+                    # observation, not an average that no book actually offers.
+                    "seen_age_seconds": min(
+                        (
+                            cells[b][s]["seen_age_seconds"]
+                            for b in cells
+                            for s in cells[b]
+                            if cells[b][s].get("seen_age_seconds") is not None
+                        ),
+                        default=None,
+                    ),
                     "gaps": gaps,
                     "complete": not gaps,
                 }
