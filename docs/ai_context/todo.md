@@ -1,5 +1,50 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#359` — OPEN, UNOWNED. A fresh artifact that lands outside the publish sweep's window is never published — the sim writes and the board never sees it
+
+`#357` got la_liga simulating again. It did not get la_liga onto the board, and
+the gap is **per-DATE, not per-league** — which is what makes it findable:
+
+| la_liga date | written (worker) | published | what web serves |
+|---|---|---|---|
+| 2026-08-16 | 21:43:56Z | **21:44:16Z** (+20s) | **FRESH** |
+| 2026-08-15 | 21:54:14Z | **never**, 19.7 min later | **STALE — byte-identical to the 07-20 git file** |
+
+Same league, same code path, same day, twenty minutes apart. Measured by
+comparing served projections against the git-tracked file rather than by reading
+a timestamp: `Getafe @ Alavés` serves `(0.9933, 1.5533)`, exactly the 07-20
+values, while `Villarreal @ Racing Santander` serves `(1.6025, 1.1575)` against
+git's `(1.6533, 1.22)`.
+
+**The mechanism to check first.** `soccer_source/*/api/recommendations/recommendations_*.json`
+IS in `HOT_ARTIFACT_PATTERNS` (`artifact_publisher.py:305`), so the push is
+PERMITTED — and allowlisting only permits, something has to make it. The sweep in
+`live_lens_loop.py:763` logs `window_seconds=` computed as
+`publish_started_epoch - last_publish_epoch`, i.e. it publishes what changed
+since the last sweep. **A file whose mtime falls outside that window is not
+merely delayed — it is never republished**, because every later sweep's window
+starts later still. 08-16 was written 20s before a sweep and made it; 08-15 was
+not and is stranded permanently.
+
+**Why this class is expensive:** it produces a board that is *partly* current, and
+the fresh rows vouch for the stale ones. A whole-league outage gets noticed; one
+date silently serving three-week-old projections next to correct ones does not.
+Same family as `#331` — presence is not currency.
+
+**A parallel session eliminated two hypotheses here, both correctly** — worth not
+repeating: it is NOT checkout shadowing (with `SYNDICATE_SOCCER_SOURCE_ROOT`
+absent, `preferred_source_roots` puts `SYNDICATE_DATA_ROOT` first at
+`source_roots.py:44` and the repo mirror second at :47, so the runtime disk wins
+whenever it has the file). It is also not a *general* board-read failure — the
+board reads those files correctly, which the 08-16 row proves. Their broader
+framing ("the board is not reading those files") does not survive the per-date
+split.
+
+**Do not fix by widening the window alone** — that just makes the race rarer. The
+sweep needs to publish on the basis of "changed since last successful publish OF
+THIS PATH", not "changed in the last N seconds".
+
+
 ### `#357` — FIXED AND VERIFIED IN PRODUCTION (`3bc0dbb2`, refresh-worker 21:37:38Z). la_liga could not build because `team_history` was absent from the worker disk
 
 **RESOLVED BY CONTROL, not by coincidence.** The worker had already rebooted
