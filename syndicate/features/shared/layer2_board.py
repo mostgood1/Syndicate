@@ -710,9 +710,96 @@ def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[s
                 "model_edge_pct": row.get("model_edge_pct"),
                 "surface_key": "layer2",
                 "source": "layer2_shortlist",
+                **_layer2_board_columns(row, quote, score),
             }
         )
     return cards
+
+
+def _american_from_probability(probability: Any) -> float | None:
+    """Fair American price from a no-vig probability. Mirrors
+    `wnba/cards.py::_american_from_prob` rather than inventing a second
+    convention, including its 2%-98% clamp."""
+    prob = _as_float(probability)
+    if prob is None:
+        return None
+    prob = max(0.02, min(0.98, prob))
+    if prob >= 0.5:
+        return round(-100.0 * prob / max(0.001, 1.0 - prob), 0)
+    return round(100.0 * (1.0 - prob) / max(0.001, prob), 0)
+
+
+def _layer2_board_columns(
+    row: Mapping[str, Any], quote: Mapping[str, Any], score: Mapping[str, Any]
+) -> dict[str, Any]:
+    """The board columns that rendered blank on every L2-A card (`#366`).
+
+    `#363` made L2-A the board and the user's first look showed FAIR, EV,
+    PROJECTED, CONFIDENCE and SCORE empty across all 258 rows. **The data was
+    never missing** -- it was one level down, in `row["quote"]`,
+    `row["projection"]` and `row["score"]`, under names the card contract does
+    not read. So this is a naming gap, not a modelling one.
+
+    Mapped against what the template ACTUALLY reads, verified in
+    `intelligence.html` rather than guessed, because populating a field nothing
+    reads is the inert fix this repo keeps paying for:
+
+        Fair        fairPriceValue   -> item.fair_price | quote.fair_price   :1600
+        EV          evVsFairValue    -> item.ev_vs_fair_pct | quote.ev_pct   :1605
+        Projected   displayProjection-> item.sim_projection | .projected     :580
+        Confidence  confidenceValue  -> item.confidence                      :292
+        Score       boardScoreValue  -> item.board_score (+ _components)     :1978
+
+    `ev_vs_fair_pct` gets `ev_pct` DELIBERATELY, and only because this is an
+    L2-A row. `evVsFairValue`'s own comment warns "NOT item.ev_pct -- that is
+    the legacy field computed against a VIGGED price" (`#238`), which is true of
+    legacy candidates and false here: the shortlist's `ev_pct` is measured
+    against the consensus no-vig line, which is exactly what that column wants.
+    Same name, different provenance -- so the mapping is made here, on the rows
+    where it holds, and not by widening the accessor for everyone.
+
+    Only `projection` is genuinely sparse: 70 of 200 rows carry one (mlb 53,
+    wnba 17), so PROJECTED stays blank on the rest. That is a real COVERAGE gap,
+    not a plumbing one -- a parallel session is closing the WNBA game-line half
+    of it -- and it must keep rendering blank rather than as a fabricated zero.
+    An invented projection on a betting board is worse than an empty cell.
+    """
+    projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+    columns: dict[str, Any] = {}
+
+    fair_price = _american_from_probability(quote.get("fair_probability"))
+    if fair_price is not None:
+        columns["fair_price"] = fair_price
+
+    ev_pct = _as_float(row.get("ev_pct"))
+    if ev_pct is not None:
+        columns["ev_vs_fair_pct"] = ev_pct
+
+    projected = _as_float(projection.get("projected"))
+    if projected is not None:
+        columns["projected"] = projected
+        columns["sim_projection"] = projected
+
+    model_prob = _as_float(projection.get("model_prob_over"))
+    if model_prob is not None:
+        columns["model_probability"] = model_prob
+
+    confidence = _as_float(score.get("book_confidence"))
+    if confidence is not None:
+        columns["confidence"] = confidence
+
+    composite = _as_float(score.get("score"))
+    if composite is not None:
+        columns["board_score"] = composite
+        # The tooltip takes the number apart; carrying the components means a
+        # reader can see WHY a row scores what it does, which is the whole
+        # reason the breakdown is persisted.
+        columns["board_score_components"] = dict(score)
+
+    book_age = _as_float(quote.get("book_age_seconds"))
+    if book_age is not None:
+        columns["book_age_seconds"] = book_age
+    return columns
 
 
 def _within_horizon(row: Mapping[str, Any], now: datetime, horizon_days: int | None) -> bool:

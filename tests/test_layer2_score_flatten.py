@@ -195,3 +195,73 @@ def test_the_repair_is_idempotent_and_narrow():
     negative = {"edge": -7.25, "ev_pct": -7.25}
     _normalize_card_edge_units(negative)
     assert abs(negative["edge"] + 0.0725) < 1e-9
+
+
+def test_the_board_columns_are_populated_from_the_row(monkeypatch):
+    """`#366`. FAIR, EV, PROJECTED, CONFIDENCE and SCORE rendered blank on every
+    L2-A card once `#363` made Layer 2 the board. The data was never missing --
+    it sat one level down in `quote`, `projection` and `score`, under names the
+    card contract does not read. A naming gap, not a modelling one.
+
+    Field names verified against `intelligence.html`, not guessed, because
+    populating something nothing reads is the inert fix this repo keeps paying
+    for: fairPriceValue:1600, evVsFairValue:1605, displayProjection:580,
+    confidenceValue:292, boardScoreValue:1978.
+    """
+    from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards
+
+    row = {
+        "event_id": "e1", "sport": "mlb", "market": "spreads", "side": "away", "kind": "game",
+        "ev_pct": 1.6332, "home_team": "Toronto Blue Jays", "away_team": "Boston Red Sox",
+        "quote": {"price": -178, "bookmaker": "novig", "fair_probability": 0.6507449935928038,
+                  "book_age_seconds": 101.1},
+        "projection": {"projected": -0.672, "model_prob_over": 0.3144},
+        "score": {"score": 1.3882, "book_confidence": 0.85, "freshness_factor": 1.0},
+    }
+    card = layer2_rows_to_board_cards([row])[0]
+
+    # 0.6507 fair probability -> -186 American. The book price is -178, i.e.
+    # BETTER than fair, which is what a +1.63% EV means. The two must agree.
+    assert card["fair_price"] == -186.0
+    assert card["ev_vs_fair_pct"] == 1.6332
+    assert card["projected"] == -0.672 and card["sim_projection"] == -0.672
+    assert card["confidence"] == 0.85
+    assert card["board_score"] == 1.3882
+    assert card["board_score_components"]["freshness_factor"] == 1.0
+    assert card["book_age_seconds"] == 101.1
+
+
+def test_a_row_without_a_projection_leaves_projected_blank():
+    """70 of 200 rows carry a projection. The rest must render an empty cell, not
+    a fabricated 0.0 -- a made-up projection is worse than an absent one."""
+    from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards
+
+    row = {
+        "event_id": "e2", "sport": "wnba", "market": "h2h", "side": "home", "kind": "game",
+        "ev_pct": 0.8, "home_team": "A", "away_team": "B",
+        "quote": {"price": -110, "fair_probability": 0.5}, "score": {"score": 0.2},
+    }
+    card = layer2_rows_to_board_cards([row])[0]
+    assert "projected" not in card or card["projected"] is None
+    assert card["fair_price"] is not None, "fair should still resolve without a projection"
+
+
+def test_the_read_time_backfill_never_overwrites_the_producer():
+    """The producer is the authority; the backfill only fills gaps in artifacts
+    written before `#366`. Overwriting would let a re-derivation silently
+    disagree with what the worker computed and persisted."""
+    from pipeline.intelligence_state import _backfill_layer2_board_columns
+
+    card = {"fair_price": -999.0, "ev_pct": 1.0, "confidence": 0.11,
+            "quote": {"fair_probability": 0.65, "book_age_seconds": 5.0},
+            "score": {"book_confidence": 0.9, "score": 7.0}}
+    _backfill_layer2_board_columns(card)
+    assert card["fair_price"] == -999.0
+    assert card["confidence"] == 0.11
+    # ...but genuinely absent ones are filled.
+    assert card["board_score"] == 7.0
+    assert card["book_age_seconds"] == 5.0
+
+    once = dict(card)
+    _backfill_layer2_board_columns(card)
+    assert card == once, "backfill is not idempotent"

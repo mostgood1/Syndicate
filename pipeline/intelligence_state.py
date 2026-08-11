@@ -1556,8 +1556,64 @@ def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dic
             tagged["source_board_date"] = requested_date
             tagged.setdefault("sport", tagged.get("sport_slug"))
             _normalize_card_edge_units(tagged)
+            _backfill_layer2_board_columns(tagged)
             cards.append(tagged)
     return cards
+
+
+def _backfill_layer2_board_columns(card: dict[str, Any]) -> None:
+    """Fill the board columns from a card written before `#366` shipped.
+
+    Same lesson as `#364` part two, one hour later: fixing the producer does not
+    repair the artifact already on disk, and the worker rebuilds the shortlist
+    roughly every 25 minutes. Without this the columns stay blank until then.
+
+    `setdefault` throughout, so a card built by the FIXED producer is never
+    overwritten by a re-derivation here -- the producer is the authority and this
+    is only a backfill.
+
+    Limited on purpose to what a persisted card actually carries. `quote` and
+    `score` are on the card, so Fair/EV/Confidence/Score/Age can all be
+    recovered. `projection` is NOT -- it lives on the shortlist row and never
+    made it onto the card -- so PROJECTED stays blank here and returns only when
+    the worker rebuilds. Deriving it from something else would be inventing a
+    number, which is worse than an empty cell.
+    """
+    quote = card.get("quote") if isinstance(card.get("quote"), Mapping) else {}
+    score = card.get("score_breakdown") if isinstance(card.get("score_breakdown"), Mapping) else {}
+    if not isinstance(score, Mapping) or not score:
+        score = card.get("score") if isinstance(card.get("score"), Mapping) else {}
+
+    def _num(value: Any) -> float | None:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return None
+        return float(value)
+
+    fair_probability = _num(quote.get("fair_probability"))
+    if fair_probability is not None and card.get("fair_price") is None:
+        prob = max(0.02, min(0.98, fair_probability))
+        card["fair_price"] = (
+            round(-100.0 * prob / max(0.001, 1.0 - prob), 0)
+            if prob >= 0.5
+            else round(100.0 * (1.0 - prob) / max(0.001, prob), 0)
+        )
+
+    ev_pct = _num(card.get("ev_pct"))
+    if ev_pct is not None:
+        card.setdefault("ev_vs_fair_pct", ev_pct)
+
+    confidence = _num(score.get("book_confidence"))
+    if confidence is not None:
+        card.setdefault("confidence", confidence)
+
+    composite = _num(score.get("score"))
+    if composite is not None:
+        card.setdefault("board_score", composite)
+        card.setdefault("board_score_components", dict(score))
+
+    book_age = _num(quote.get("book_age_seconds"))
+    if book_age is not None:
+        card.setdefault("book_age_seconds", book_age)
 
 
 def _normalize_card_edge_units(card: dict[str, Any]) -> None:
