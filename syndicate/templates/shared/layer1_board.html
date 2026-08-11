@@ -533,7 +533,10 @@
           + (r.player_name ? ' <span class="l1-side">' + esc(r.market) + "</span>" : "") + "</td>";
       }
       cells += '<td class="l1-side">' + esc(side) + "</td>"
-        + "<td>" + (onProj && p.projected !== null && p.projected !== undefined ? Number(p.projected).toFixed(2) : "·") + "</td>"
+        + '<td' + (projAge !== null ? ' title="model output is ' + Math.round(projAge) + 'h old"' : "")
+                 + (projStale ? ' class="l1-warn"' : "") + '>'
+          + (onProj && p.projected !== null && p.projected !== undefined ? Number(p.projected).toFixed(2) : "·")
+          + (projStale ? " *" : "") + "</td>"
         + '<td class="' + edgeCls + '"' + edgeTitle + '>' + edgeTxt + "</td>"
         + '<td class="l1-price l1-best">' + odds(best.price) + "</td>"
         + '<td class="l1-side">' + esc(best.bookmaker || "") + "</td>"

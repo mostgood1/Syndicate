@@ -67,6 +67,13 @@ class SoccerProjectionIndex:
     leagues: list[str] = field(default_factory=list)
     matches: int = 0
     source_paths: list[str] = field(default_factory=list)
+    # `#350`: when each league's simulation was produced. A projection has an
+    # age and the board never showed it -- measured 2026-08-11, la_liga's
+    # 2026-08-15 recommendations carried `generated_at: 2026-07-20`, so the
+    # board was pairing a 22-DAY-OLD sim with odds quoted minutes earlier and
+    # rendering it identically to a fresh one. Prices carry `age_seconds`;
+    # projections carried nothing.
+    generated_at_by_league: dict[str, str] = field(default_factory=dict)
 
     def match_for(self, row: Mapping[str, Any]) -> dict[str, Any] | None:
         """Find this row's projection: event id, exact names, then aliases.
@@ -122,6 +129,9 @@ def _load_one(path: Path, index: SoccerProjectionIndex) -> None:
     league = str(payload.get("league") or "")
     if league:
         index.leagues.append(league)
+        generated_at = str(payload.get("generated_at") or "").strip()
+        if generated_at:
+            index.generated_at_by_league[league] = generated_at
     index.source_paths.append(str(path))
 
     for match in payload.get("matches") or []:
@@ -263,6 +273,26 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
     projection["edge_vs_market_pct"] = round((float(model_prob) - float(fair)) * 100.0, 2)
 
 
+def _age_hours(generated_at: str) -> float | None:
+    """Hours since a simulation was produced, or None if unparseable.
+
+    None rather than 0 on a parse failure: an unknown age must not read as a
+    fresh one, which is the same rule this whole field exists to enforce.
+    """
+    from datetime import datetime, timezone
+
+    raw = str(generated_at or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return round((datetime.now(timezone.utc) - parsed).total_seconds() / 3600.0, 1)
+
+
 def attach_soccer_projections(
     grid: Iterable[Mapping[str, Any]], index: SoccerProjectionIndex
 ) -> dict[str, Any]:
@@ -335,6 +365,25 @@ def attach_soccer_projections(
         # cannot rank anything.
         _price_against_market(row, projection)
         row["projection"] = projection  # type: ignore[index]
+        # `#350`: STAMP THE SIM'S AGE ONTO THE ROW.
+        #
+        # A projection is a claim about a fixture made at a moment, and the
+        # board rendered a 22-day-old one exactly like a fresh one -- measured
+        # 2026-08-11, la_liga's 2026-08-15 file carried
+        # `generated_at: 2026-07-20`. Prices already show `age_seconds`; the
+        # model behind them showed nothing, so "the sim likes this" could mean
+        # "as of three weeks ago" with no way to tell.
+        #
+        # Taken from the LEAGUE that produced this match, not a global value:
+        # leagues simulate on their own units, so one stale league must not make
+        # the others look stale, or the reverse.
+        source_league = str(match.get("league") or "").strip()
+        generated_at = index.generated_at_by_league.get(source_league)
+        if generated_at:
+            projection["generated_at"] = generated_at
+            age = _age_hours(generated_at)
+            if age is not None:
+                projection["age_hours"] = age
         projected += 1
         if projection.get("model_prob_over") is not None:
             with_probability += 1
@@ -352,4 +401,11 @@ def attach_soccer_projections(
         "pct_projected": round(100.0 * projected / considered, 1) if considered else 0.0,
         "note": "probability only where the source has one; totals answer P(over) at 2.5 only",
         "source_artifacts": index.source_paths,
+        # The coverage report is what an operator reads first, so the staleness
+        # belongs here too -- not only on individual rows.
+        "generated_at_by_league": dict(index.generated_at_by_league),
+        "oldest_sim_age_hours": max(
+            (a for a in (_age_hours(v) for v in index.generated_at_by_league.values()) if a is not None),
+            default=None,
+        ),
     }
