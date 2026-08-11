@@ -275,13 +275,36 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=soccer date=%s", selected_date)
             return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
 
+    if sport == "nfl":
+        # `#365`. The note that stood here said NFL had "NOTHING TO WIRE" -- that
+        # production held four NFL artifacts and no predictions of any kind,
+        # audited 2026-08-07. That is now out of date: 52 SmartSim2 projection
+        # files are git-tracked (15 of them preseason) alongside 5 schedules, and
+        # they carry means AND dispersion. Re-measured 2026-08-11, tracked count
+        # equals on-disk count, so none of it is untracked mirror output.
+        #
+        # `load_nfl_game_projections` iterates EVERY source root rather than the
+        # first, so it resolves whether a given service serves these from its
+        # runtime disk or from the git checkout.
+        try:
+            from syndicate.features.shared.nfl_game_projections import (
+                attach_nfl_game_projections,
+                load_nfl_game_projections,
+            )
+
+            index = load_nfl_game_projections(selected_date)
+            if not index.games:
+                return {
+                    "supported": True,
+                    "rows_with_projection": 0,
+                    "reason": "no NFL SmartSim2 projections for this season",
+                }
+            return attach_nfl_game_projections(grid, index)
+        except Exception:
+            _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=nfl date=%s", selected_date)
+            return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
+
     if sport != "mlb":
-        # NFL is unwired because there is NOTHING TO WIRE, which is a different
-        # statement from "not done yet" and worth keeping distinct: production
-        # holds exactly 4 NFL artifacts (two book_quotes shards and two
-        # current_week.json), with no predictions/edges/recommendations of any
-        # kind. Audited 2026-08-07. Fixing NFL means producing a sim, not
-        # joining one.
         return {"supported": False, "reason": f"no projection source wired for {sport}"}
     try:
         from syndicate.features.mlb.sources import daily_artifact_path
