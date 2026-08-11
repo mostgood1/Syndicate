@@ -361,6 +361,18 @@ def quote_rows_from_oddsapi_events(
 
     `market_map` restricts and renames markets (the caller's own canonical
     names); omit it to keep every market under its raw OddsAPI key.
+
+    A market_map VALUE MAY BE `(segment, market_name)` INSTEAD OF A STRING
+    (`#343`). That is how every sport other than MLB gets interval capture: the
+    OddsAPI key already says which interval it is -- `totals_q1`, `h2h_1st_5_innings`
+    -- so the segment is derivable per market rather than fixed per call, and
+    `market_segments.segment_market_keys()` hands the caller exactly this shape.
+
+    The `segment=` argument stays as the default for string-valued entries, so
+    existing callers are unaffected. It is deliberately NOT the fallback for a
+    tuple entry: a caller that requests `totals_q1` and then tags it `full`
+    would show a first-quarter total as a full-game line, which is worse than
+    never asking.
     """
     rows: list[dict[str, Any]] = []
     for event in events or ():
@@ -380,10 +392,16 @@ def quote_rows_from_oddsapi_events(
                 if not isinstance(market, Mapping):
                     continue
                 raw_key = str(market.get("key") or "").strip()
+                row_segment = segment
                 if market_map is not None:
                     if raw_key not in market_map:
                         continue
-                    market_name = str(market_map[raw_key])
+                    mapped = market_map[raw_key]
+                    if isinstance(mapped, (tuple, list)) and len(mapped) == 2:
+                        row_segment = str(mapped[0] or "full")
+                        market_name = str(mapped[1])
+                    else:
+                        market_name = str(mapped)
                 else:
                     market_name = raw_key
                 if not market_name:
@@ -417,7 +435,7 @@ def quote_rows_from_oddsapi_events(
                             "away_team": away_team or None,
                             "bookmaker": book_key,
                             "market": market_name,
-                            "segment": segment,
+                            "segment": row_segment,
                             "selection": selection,
                             "player_name": player or None,
                             "line": outcome.get("point"),

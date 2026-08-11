@@ -17,6 +17,12 @@ from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
 
 
 API_BASE = "https://api.the-odds-api.com/v4"
+from syndicate.features.shared.market_segments import (  # noqa: E402
+    full_game_market_keys,
+    normalize_segment,
+    segment_market_keys,
+)
+
 DEFAULT_MARKETS = [
     "player_points",
     "player_rebounds",
@@ -204,6 +210,23 @@ def fetch_player_props_current(*, api_key: str, league: str, date_str: str, regi
     sport_key = SPORT_KEYS[str(league).strip().lower()]
     target_date = pd.to_datetime(date_str).date()
     desired_markets = list(markets or DEFAULT_MARKETS)
+    # `#343`: GAME AND INTERVAL MARKETS FROM THE CENTRAL VOCABULARY.
+    #
+    # This fetcher wrote every quote with a hardcoded `segment: "full"`, so
+    # WNBA/NBA had no interval capture at all -- measured on production
+    # 2026-08-11, wnba carried 395 rows and one segment while MLB carried four.
+    # The live lens got Q1-Q4/H1/H2 from a SEPARATE Bovada scrape into
+    # `period_lines_<date>.csv`, which the board, Layer 2 and CLV never saw.
+    # One record, one route: the intervals come from the same paid call as
+    # everything else and land in `book_quotes` like every other price.
+    #
+    # NO WASTED CALLS. `discovered` below is what OddsAPI reports this event
+    # actually offers, and `requested` is the INTERSECTION -- so a key that does
+    # not exist for a fixture is never asked for. That is also why NCAAB's
+    # halves-only vocabulary matters: asking a college game for q1 would be a
+    # credit spent to be told nothing exists.
+    _segment_map = {**full_game_market_keys(), **segment_market_keys(league)}
+    desired_markets.extend(key for key in _segment_map if key not in desired_markets)
 
     try:
         response = _get(f"{API_BASE}/sports/{sport_key}/events", {"apiKey": api_key})
@@ -348,8 +371,13 @@ def _append_basketball_book_quotes(*, league: str, date_str: str, df) -> None:
                     "home_team": record.get("home_team"),
                     "away_team": record.get("away_team"),
                     "bookmaker": record.get("bookmaker"),
-                    "market": record.get("market"),
-                    "segment": "full",
+                    # Segment and canonical name come from ONE map, so a key
+                    # this fetcher asked for cannot be written under the wrong
+                    # interval. A `totals_q1` tagged `full` would show a
+                    # first-quarter total as a full-game line -- worse than
+                    # never asking for it.
+                    "market": _canonical_market(record.get("market"), league),
+                    "segment": _segment_for_market(record.get("market"), league),
                     "selection": selection,
                     "player_name": player or None,
                     "line": record.get("point"),
@@ -365,6 +393,21 @@ def _append_basketball_book_quotes(*, league: str, date_str: str, df) -> None:
         )
     except Exception as exc:
         print(f"[odds_book_quotes] basketball append FAILED {type(exc).__name__}: {exc}")
+
+
+def _market_segment_lookup(league: str) -> dict[str, tuple[str, str]]:
+    return {**full_game_market_keys(), **segment_market_keys(league)}
+
+
+def _segment_for_market(raw_key: object, league: str = "") -> str:
+    """`full` only when the key genuinely carries no interval suffix."""
+    mapped = _market_segment_lookup(league).get(str(raw_key or ""))
+    return mapped[0] if mapped else normalize_segment(None)
+
+
+def _canonical_market(raw_key: object, league: str = "") -> str:
+    mapped = _market_segment_lookup(league).get(str(raw_key or ""))
+    return mapped[1] if mapped else str(raw_key or "")
 
 
 def main(argv: list[str] | None = None) -> int:
