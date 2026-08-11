@@ -509,11 +509,21 @@
         }
       }
       var edgeCls = edge === null || edge === undefined ? "" : (edge > 0 ? "l1-edge-pos" : "l1-edge-neg");
-      var edgeTxt = edge === null || edge === undefined ? "·"
+      var edgeTxt = edge === null || edge === undefined ? (edgeWhy ? "·*" : "·")
         : (edgeUnit === "pct" ? pct(edge)
            : (edge > 0 ? "+" : "") + Number(edge).toFixed(2) + " vs line");
-      var edgeTitle = (edgeUnit === "line" && p.probability_unavailable_reason)
-        ? ' title="' + esc(p.probability_unavailable_reason) + '"' : "";
+      // WHY a dash is a dash. An edge suppressed because the game is LIVE is a
+      // different fact from no projection at all, and both render as "·".
+      // `edge_unavailable_reason` is the incoming contract for the first (the
+      // live-edge policy sets it while leaving `projected`/`side` intact);
+      // `probability_unavailable_reason` already explains why a mean-based
+      // model cannot express its edge as a percentage. Read defensively so this
+      // works before and after that change ships.
+      var edgeWhy = p.edge_unavailable_reason
+        || (edge === null ? p.probability_unavailable_reason : "")
+        || (edgeUnit === "line" ? p.probability_unavailable_reason : "")
+        || "";
+      var edgeTitle = edgeWhy ? ' title="' + esc(edgeWhy) + '"' : "";
       var name = r.player_name || (g.matchup || "");
       var priced = best.price !== null && best.price !== undefined;
 

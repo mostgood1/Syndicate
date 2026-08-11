@@ -129,5 +129,35 @@ class MarketBoardUiParityTests(unittest.TestCase):
         self.assertIn("visibilitychange", html)
 
 
+    def test_the_edge_column_handles_both_projection_contracts(self) -> None:
+        # MLB emits `edge_vs_market_pct` (a percentage against no-vig fair).
+        # WNBA emits `edge_vs_line` (distance from the line in the MARKET'S OWN
+        # units -- 0.19 rebounds, not 0.19%), because its model ships means and
+        # not a distribution. board_enrichment documents the split as deliberate.
+        #
+        # Measured on production 2026-08-11: edge_vs_market_pct was null on
+        # 267/267 WNBA projections while edge_vs_line was populated on all 267.
+        # This column read only the former, so every WNBA edge rendered as a dash
+        # on a board whose projections were entirely present.
+        html = self.client.get("/wnba/market-board?date=2026-08-10").get_data(as_text=True)
+        self.assertIn("edge_vs_market_pct", html)
+        self.assertIn("edge_vs_line", html)
+
+    def test_the_two_edge_units_are_never_conflated(self) -> None:
+        # Rendering the points value with a % suffix would be worse than the
+        # dash it replaced: a wrong number that looks right.
+        html = self.client.get("/mlb/market-board?date=2026-08-10").get_data(as_text=True)
+        self.assertIn('edgeUnit = "pct"', html)
+        self.assertIn('edgeUnit = "line"', html)
+        self.assertIn("vs line", html)
+
+    def test_an_explained_dash_is_distinguishable_from_an_absent_one(self) -> None:
+        # An edge suppressed because the game is live is a different fact from
+        # no projection at all. edge_unavailable_reason carries the first.
+        html = self.client.get("/mlb/market-board?date=2026-08-10").get_data(as_text=True)
+        self.assertIn("edge_unavailable_reason", html)
+        self.assertIn("probability_unavailable_reason", html)
+
+
 if __name__ == "__main__":
     unittest.main()
