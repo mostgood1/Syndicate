@@ -1,6 +1,44 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#357` — OPEN. The soccer leagues whose ratings come from `team_history` cannot build; the other five are fine
+### `#357` — FIXED AND VERIFIED IN PRODUCTION (`3bc0dbb2`, refresh-worker 21:37:38Z). la_liga could not build because `team_history` was absent from the worker disk
+
+**RESOLVED BY CONTROL, not by coincidence.** The worker had already rebooted
+twice (20:10:01Z, 20:35:53Z) and la_liga failed after both:
+
+| window | la_liga launches | verified writes |
+|---|---|---|
+| after the 20:35:53 **reboot**, before the deploy | **8** | **0** |
+| after the 21:37:38 **deploy** | 2 | **2** |
+
+A reboot does not fix it. The only behavioural change at 21:37:38 was the
+conditional history step — the `SOCCER_RUN_FAILED` diagnostic shipped alongside
+it is read-only. So the step fetched a `team_history` that genuinely was not
+there, and `la_liga|2026-08-16` (21:44:25Z) and `la_liga|2026-08-15` (21:54:14Z)
+both wrote, against a baseline of 44 launches and zero writes. `08-17` had not
+cycled at time of writing.
+
+**And the objection that made me retract the diagnosis was answerable in the
+code all along.** I retracted on "bootstrap should have seeded it" —
+`SYNDICATE_BOOTSTRAP_ON_START=1`, `_sync_tree` copies recursively. But
+`_sync_bootstrap_roots`' OWN comment documents this exact failure: *"confirmed
+live 2026-08-01: soccer_source (listed last among the per-sport roots) was never
+reaching web's disk"*. Bootstrap being enabled never meant soccer_source arrived.
+I had read that function and used it to argue against myself without reading its
+comment.
+
+> **THE PROCESS LESSON, which cost more than the bug.** I held this diagnosis
+> three times: asserted it on a bad repro (deleting the whole source tree and
+> matching an *outcome*, not confirming a *branch*), retracted it on an objection
+> I could have checked, then re-established it on a clean control. The first
+> position was right by luck and the retraction was wrong on the merits — being
+> correct at the end does not redeem either. What finally settled it was a
+> **control** (does a reboot alone fix it?), which was available the entire time
+> and which neither the assertion nor the retraction had bothered to run.
+
+**Residual, still open:** why the bootstrap sync drops `soccer_source`. The fix
+makes the pipeline self-healing, so this is no longer load-bearing for soccer —
+but the same gap presumably still costs other sports their seeds. Worth its own
+item.
 
 > **TWO CORRECTIONS, same session, both to claims I made.**
 >
