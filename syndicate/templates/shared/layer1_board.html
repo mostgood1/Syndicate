@@ -682,7 +682,7 @@
       +   '<span class="l1-state l1-state--' + esc(st) + '">' + esc(st) + "</span>"
       +   '<span class="l1-card__bits">'
       +     (when ? "<span>" + esc(when) + "</span>" : "")
-      +     (g.league ? "<span>" + esc(g.league) + "</span>" : "")
+      +     (g.league ? "<span>" + esc(leagueLabel(g.league)) + "</span>" : "")
       +     "<span>" + (g.game_market_count || 0) + " game · " + (g.prop_market_count || 0) + " prop</span>"
       +     "<span>" + (g.rows_with_projection || 0) + " projected</span>"
       +   "</span>"
