@@ -119,13 +119,20 @@ class SoccerProjectionIndex:
         return hits[0] if len(hits) == 1 else None
 
 
-def _load_one(path: Path, index: SoccerProjectionIndex) -> None:
+def _load_one(path: Path, index: SoccerProjectionIndex) -> bool:
+    """Merge one league-date file. Returns whether a payload was actually read.
+
+    The return value is what lets `load_soccer_projections` implement
+    first-root-wins: a file that could not be parsed must NOT count as having
+    supplied its league, or an unreadable copy on the runtime disk would
+    suppress a perfectly good one in the repo mirror.
+    """
     try:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return
+        return False
     if not isinstance(payload, Mapping):
-        return
+        return False
     league = str(payload.get("league") or "")
     if league:
         index.leagues.append(league)
@@ -158,23 +165,66 @@ def _load_one(path: Path, index: SoccerProjectionIndex) -> None:
             continue
         index.players_by_match.setdefault(match_id, {})[name] = dict(entry)
 
+    # A payload was read. Without this the function falls off the end returning
+    # None, no league is ever claimed, and precedence silently degrades to the
+    # last-root-wins behaviour this change exists to remove.
+    return True
+
 
 def load_soccer_projections(roots: Iterable[Path], selected_date: str) -> SoccerProjectionIndex:
-    """Merge every league's recommendations file for this date."""
+    """Merge each league's recommendations file, taking the FIRST root that has it.
+
+    `#360`. This used to load every matching file from every root, and `_load_one`
+    assigns rather than merges -- `generated_at_by_league[league]`, `by_event[id]`
+    and `by_teams[(home, away)]` are all plain writes. So when two roots carried the
+    same league-date, the LAST root silently won.
+
+    `preferred_source_roots` orders the runtime disk first and the git repo mirror
+    second, and the mirror is a cold-start safety net of unknown vintage. The result
+    was that a freshly simulated league was overwritten by a git artifact:
+
+        board built 2026-08-11T22:01:15Z, seven minutes AFTER the sim wrote
+          la_liga   projections stamped 2026-07-20T21:32:50   (528.5h stale)
+          mls       projections stamped 2026-08-11T21:27:18   (0.6h)
+
+    and the split is the proof. The checkout tracks
+    `la_liga/api/recommendations/recommendations_2026-08-15.json` -- exactly the
+    simulated date -- so la_liga was overwritten; the checkout's newest mls file is
+    from July, so nothing overwrote mls and it rendered fresh. Same code path, same
+    board, opposite outcome, decided entirely by which stale files git happens to
+    carry.
+
+    First-root-wins matches what `sources._api_read_path` already documents ("the
+    first root that actually HAS it"), so the two readers now agree. The mirror
+    still serves any league the runtime disk lacks, which is the fallback's whole
+    purpose -- it just can no longer overwrite live data.
+    """
     index = SoccerProjectionIndex()
     file_name = f"recommendations_{selected_date}.json"
     seen: set[str] = set()
+    loaded_leagues: set[str] = set()
     for root in roots:
         try:
             candidates = sorted(Path(root).glob(f"*/api/recommendations/{file_name}"))
         except OSError:
             continue
         for candidate in candidates:
+            # <root>/<league>/api/recommendations/<file>. Taken from the PATH, not
+            # the payload, so a league is claimed without reading the loser's file.
+            try:
+                league_dir = candidate.parents[2].name
+            except IndexError:
+                league_dir = ""
+            if league_dir and league_dir in loaded_leagues:
+                continue
             key = str(candidate.resolve()) if candidate.exists() else str(candidate)
             if key in seen:
                 continue
             seen.add(key)
-            _load_one(candidate, index)
+            # Only a file that actually parsed claims its league -- an unreadable
+            # copy on the runtime disk must not suppress a good one in the mirror.
+            if _load_one(candidate, index) and league_dir:
+                loaded_leagues.add(league_dir)
     return index
 
 
