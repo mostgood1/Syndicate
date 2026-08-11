@@ -1,5 +1,72 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#357` — OPEN, ROOT-CAUSED, UNOWNED. No soccer sim has run in production since 2026-07-20; every simulated match on the board is a git-shipped artifact
+
+`#356` explained which unit won the slot. This is why winning it never produced
+anything. **Every soccer autorun launch fails in 9–14 seconds with exit 1**, and
+has done so long enough that the newest live-computed soccer artifact is 22 days
+old.
+
+**The chain, measured 2026-08-11 — each link has its own evidence:**
+
+1. The autorun launches `refresh_odds_sources.py ... --phase live --skip-mirror
+   --soccer-leagues la_liga --soccer-date 2026-08-15`, taken verbatim from the
+   shared run manifest (`externalRunner.command`).
+2. That manifest says `exitCode: 1`, `elapsed_seconds: 9–14`, `state: failed`, on
+   every soccer run in `history`. **The failure was never hidden — it was written
+   down and nobody read it.**
+3. Reproduced locally: the run exits 0 against `data/soccer_source`, and exits 1
+   against a root without the source bundle. Isolating the failing step gives the
+   message verbatim:
+
+       no team history under <root>/la_liga/team_history;
+       run fetch_soccer_history_local.py --kind teams first        (exit 1)
+
+4. **`fetch_soccer_history_local.py` appears NOWHERE in `refresh_odds_sources.py`.**
+   No step in the pipeline can ever create the thing the pipeline requires.
+5. `team_history` ships in git for 5 of 10 leagues (bundesliga, epl, la_liga,
+   ligue_1, serie_a) under `<REPO>/data/soccer_source/`. The builder is handed
+   `--source-root <RENDER DISK>` explicitly, so it never consults the repo
+   fallback that `_api_read_path` gives every web-side reader — and `--skip-mirror`
+   means nothing ever copies it across. Soccer is the only sport of eight whose
+   `mirror_refresh_latest.json` does not exist.
+6. **The proof that the disk is empty and the board is served from git:** the
+   worker prints `SOCCER_UNIT_OUTCOME unit=la_liga|2026-08-15 exists=False
+   file_age_s=-1`, while web serves that exact fixture fully simulated. The
+   git-tracked `recommendations_2026-08-15.json` carries
+   `generated_at: 2026-07-20T21:32`. All 10 leagues render 100% simulated off
+   files of that vintage.
+
+**Why it stayed invisible for 22 days — three instruments, all structurally blind:**
+
+- The launcher is fire-and-forget; a unit that dies in 9s and one that simulates a
+  slate both emit `SOCCER_UNIT_LAUNCHED` and nothing else.
+- Subprocess stderr goes to `odds_refresh.stderr.txt` on the **worker's** disk.
+  `stderr_preview` is computed read-side, so on web it is `""` **always** — not
+  "no error", but "wrong disk". A field that cannot ever be non-empty reads as
+  reassurance.
+- `SOCCER_UNIT_OUTCOME` reports `exists=False`, which is true and useless: it
+  says the file is absent, never that the producer exited 1 with a message.
+
+**The class: a health signal that renders from a fallback.** The board looked
+perfect — 10/10 leagues, every match simulated — because the git mirror was
+serving. Freshness was never on the surface, so "the sims work" survived three
+weeks of them not running. Compare `#331`: presence is not currency.
+
+**Fix — three options, decide before building:**
+
+- (a) Seed `team_history` onto the worker disk and keep it there. Smallest change,
+  but 5 leagues have no history in git at all, so it fixes half the board.
+- (b) Add a history step to `refresh_odds_sources.py` so the pipeline creates its
+  own prerequisite. Correct, and the only option that covers all 10 leagues.
+- (c) Let `build_soccer_artifacts.py` fall back to the repo root when the disk
+  lacks history, mirroring `_api_read_path`. Cheapest, but re-creates the
+  "renders from a fallback" trap this item is about.
+
+**Whatever is chosen, the failure must become loud**: surface `exitCode` from the
+run manifest into the worker log at the point of the outcome check. The manifest
+already had `exitCode: 1` recorded on every run — the gap was that nothing read it.
+
 ### `#356` — FIXED AND SHIPPED (`195f82d8`, refresh-worker deploy 20:35:53Z). One league that could launch but not write took every soccer slot
 
 **ID NOTE — the commit message says `#355`, which is wrong.** Two sessions
