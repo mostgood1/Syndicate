@@ -1803,9 +1803,81 @@ the smaller family; the large one has been seen exactly twice, once inside a
 sweep and once as this artifact. **Treat the elimination as supported, not
 settled.**
 
-**One live thread the sampler handed over:** the 23:02:18 sweep reports
-`peak_container_mb_in_sweep = 3096.9MB` on 61 artifacts. That is the in-sweep
-instrument doing its job and it has not been analysed.
+#### THE STRONGEST LEAD SO FAR: both hot-artifact operations allocate hundreds of MB while transferring NOTHING, and their counters measure the wrong quantity
+
+Pulled on the `peak_container_mb_in_sweep = 3096.9MB` handover. **61 sweeps now
+carry an in-sweep peak. Five hide a ≥300MB transient their own endpoints never
+saw:**
+
+```
+   lift      time  pub   before    after     PEAK  elapsed  polls
+ +642.6  23:36:17   85   3000.7   3201.8   3844.3     38.3     17
+ +610.2  22:55:54   66   2438.0   2891.6   3501.8     33.7     14
+ +488.6  23:38:22    0   3057.8   3499.2   3987.8     35.8     17   <-- pub=0
+ +364.6  23:00:26   57   3094.0   2835.3   3458.6     21.2     10
+ +301.5  23:09:44   49   3308.2   3147.0   3609.7     26.6     12
+        median lift +0.4   max +642.6   5 of 61 ≥ 300MB
+```
+
+**`+642.6MB` is inside the 493–878MB class this item is named for**, and
+`3987.8MB` is **97.4% of the 4096MB cap.**
+
+#### The fact that identifies the mechanism: ZERO transfers, full cost
+
+**`pub=0` still cost +488.6MB.** The same holds on the other side —
+`pull_hot_artifacts`, instrumented in the same commit:
+
+```
+23:13:51   3082.3 -> 3799.0   +716.7MB   pulled=48
+22:53:26   2643.5 -> 3219.2   +575.7MB   pulled=0    <-- ZERO
+22:59:36   2565.4 -> 3052.0   +486.6MB   pulled=0    <-- ZERO
+22:16:06   2338.1 -> 2657.7   +319.6MB   pulled=0    <-- ZERO
+```
+
+**Three of the top five pull rises transferred nothing at all.** So the memory
+is not in moving files.
+
+**`pulled_count` counts files WRITTEN; `published_count` counts files PUBLISHED.
+Neither counts bytes held.** The pull downloads a JSON export response
+containing file *contents* — `pull_hot_artifacts`'s own docstring records "two
+8.6MB/28.9MB responses every cycle" — and a response can be fetched and parsed
+in full while writing zero files. **That is why the counters and the memory
+disagree, and why `−1.60 MB per artifact` was meaningless: it was a rate against
+a denominator that does not measure the cost.** [[a rate, not a count]]
+
+#### Where the excursions actually fall
+
+Of the 3 boot-segmented real excursions, **2 land inside a hot-artifact
+operation**:
+
+```
+23:13:47  +322.4   INSIDE the pull that rose +716.7MB
+23:02:18  +302.0   INSIDE a sweep, in-sweep peak 3096.9MB
+22:54:25  +319.6   outside both (nearest pull 44s, nearest sweep 16s)
+```
+
+Combined duty cycle is **24.1%** (sweep 16.1% + pull 8.0%), so 2-of-3 is
+suggestive rather than decisive on its own — **the load-bearing evidence is the
+zero-transfer spikes, not the coincidence.** That is the lesson from the
+retraction applied to my own new finding.
+
+#### What this changes, stated carefully
+
+**The fifth elimination is now WRONG in its framing.** "The publish sweep is not
+the allocator" was answered against `published_count`, which does not measure
+what the sweep costs. The sweep *does* hide transients up to +642.6MB. What was
+correctly eliminated is *publishing artifacts*; what was never tested is *the
+export/enumeration payload both operations hold*.
+
+**NOT claimed:** that this is `#327`'s cause. One excursion falls outside both
+windows, and no bytes figure has been measured yet — only counts, which is the
+whole problem.
+
+**NEXT INSTRUMENT, and it is small:** record **bytes** on both paths — response
+size on the pull, total file bytes read on the sweep — and put them on the
+existing samples beside the counts. Every number in this section is a count or
+a container reading; nobody has yet measured the quantity the hypothesis is
+about.
 
 **Regime note:** every number above predates
 `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC=900` (set 21:56Z 2026-08-10), which
