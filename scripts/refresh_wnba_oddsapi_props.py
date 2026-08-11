@@ -385,6 +385,44 @@ def _load_game_odds_rows_by_matchup(*, source_root: Path, processed_root: Path, 
 
 
 def _load_period_lines_rows_by_matchup(*, source_root: Path, processed_root: Path, date_str: str) -> dict[tuple[str, str], dict[str, dict[str, float | None]]]:
+    """Period lines from the CENTRAL quote log (`#343`).
+
+    These used to come from `period_lines_<date>.csv`, written by a Bovada
+    scrape that ran alongside the real odds capture -- single-book, invisible to
+    the board, Layer 2 and CLV, and maintained separately from every other price
+    in the system. Since `#343` the same intervals arrive through the paid
+    OddsAPI call and land in `book_quotes`; confirmed in production 2026-08-11,
+    212 interval rows one tick after deploy (q1 42, q2 17, q3 17, q4 55, h1 44,
+    h2 37) across 3-7 books.
+
+    The CSV is still read as a FALLBACK, and only that. It is the last consumer
+    of the Bovada route, so leaving it costs nothing while the central path is
+    young and removes the one scenario -- central path empty for a date -- where
+    dropping it outright would take working period lines off the live lens.
+    """
+    try:
+        from syndicate.features.shared.period_lines import period_lines_from_quote_log
+
+        central = period_lines_from_quote_log("wnba", str(date_str))
+        if central:
+            out_central: dict[tuple[str, str], dict[str, dict[str, float | None]]] = {}
+            for (home_name, away_name), entry in central.items():
+                home_tri = _canonical_wnba_tri(_to_tricode_local(str(home_name)))
+                away_tri = _canonical_wnba_tri(_to_tricode_local(str(away_name)))
+                if not home_tri or not away_tri:
+                    continue
+                out_central[(home_tri, away_tri)] = entry
+            if out_central:
+                print(
+                    f"[period_lines] SOURCE=book_quotes date={date_str} matchups={len(out_central)}",
+                    flush=True,
+                )
+                return out_central
+    except Exception as exc:  # noqa: BLE001
+        # Never fatal: a reduction failure must degrade to the old file, not
+        # take period lines off the live lens entirely.
+        print(f"[period_lines] central read FAILED {type(exc).__name__}: {exc}", flush=True)
+
     candidates = [
         source_root / "data" / "processed" / f"period_lines_{date_str}.csv",
         processed_root / f"period_lines_{date_str}.csv",
@@ -392,6 +430,10 @@ def _load_period_lines_rows_by_matchup(*, source_root: Path, processed_root: Pat
     period_path = next((path for path in candidates if path.exists() and path.is_file() and _count_csv_rows_quick(path) > 0), None)
     if period_path is None:
         return {}
+    # Says which route served, so "the central path is working" is observable
+    # rather than assumed -- the whole point of #343 is that this line stops
+    # appearing.
+    print(f"[period_lines] SOURCE=bovada_csv_fallback date={date_str} path={period_path.name}", flush=True)
     out: dict[tuple[str, str], dict[str, dict[str, float | None]]] = {}
     try:
         with period_path.open("r", encoding="utf-8", newline="") as handle:
