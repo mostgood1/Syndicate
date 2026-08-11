@@ -149,3 +149,49 @@ def test_a_missing_ev_pct_does_not_become_zero_edge():
     cards = layer2_rows_to_board_cards([row])
     if cards:
         assert cards[0]["edge"] is None
+
+
+def test_a_stale_artifact_is_repaired_at_read_time():
+    """`#364` part two. Fixing the producer was NOT enough: the cards are baked
+    into the shortlist artifact by the worker, so every card written before the
+    fix keeps its percent-unit `edge` until the next rebuild.
+
+    Measured 2026-08-11: the producer fix went live at 23:06:59Z and the served
+    artifact was still the 22:38:33Z one, so the board kept rendering "163.3%"
+    for a 1.63% edge with the corrected code already deployed. A producer-side
+    fix does not repair data already on disk.
+    """
+    from pipeline.intelligence_state import _normalize_card_edge_units
+
+    stale = {"edge": 1.6332, "ev_pct": 1.6332}
+    _normalize_card_edge_units(stale)
+    assert abs(stale["edge"] - 0.016332) < 1e-9
+
+
+def test_the_repair_is_idempotent_and_narrow():
+    """It has to run alongside the producer fix, so it must not double-convert.
+    The discriminator is `edge == ev_pct` -- the signature of the copy-across.
+    A card already carrying a fraction satisfies `edge * 100 == ev_pct` and is
+    left alone. Anything it does not recognise is passed through untouched,
+    because an unfamiliar shape is not a licence to rewrite someone's number."""
+    from pipeline.intelligence_state import _normalize_card_edge_units
+
+    already = {"edge": 0.016332, "ev_pct": 1.6332}
+    _normalize_card_edge_units(already)
+    assert abs(already["edge"] - 0.016332) < 1e-9
+
+    twice = {"edge": 1.6332, "ev_pct": 1.6332}
+    _normalize_card_edge_units(twice)
+    once = twice["edge"]
+    _normalize_card_edge_units(twice)
+    assert twice["edge"] == once, "double conversion"
+
+    for untouched in ({"edge": 0.5, "ev_pct": 9.9}, {"edge": None, "ev_pct": 1.6},
+                      {"edge": 0.0, "ev_pct": 0.0}, {"edge": True, "ev_pct": 1.0}):
+        before = dict(untouched)
+        _normalize_card_edge_units(untouched)
+        assert untouched == before, f"rewrote a shape it should not touch: {before}"
+
+    negative = {"edge": -7.25, "ev_pct": -7.25}
+    _normalize_card_edge_units(negative)
+    assert abs(negative["edge"] + 0.0725) < 1e-9

@@ -1555,8 +1555,46 @@ def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dic
             tagged["game_date"] = resolve_candidate_game_date(tagged, fallback=requested_date)
             tagged["source_board_date"] = requested_date
             tagged.setdefault("sport", tagged.get("sport_slug"))
+            _normalize_card_edge_units(tagged)
             cards.append(tagged)
     return cards
+
+
+def _normalize_card_edge_units(card: dict[str, Any]) -> None:
+    """Force `edge` to a FRACTION, whatever the artifact happens to hold (`#364`).
+
+    `#364` fixed the producer, and that was not enough: these cards are BAKED
+    into the shortlist artifact by the worker, so every card written before the
+    fix keeps its percent-unit `edge` until the worker next rebuilds. Measured
+    2026-08-11 — the fix went live at 23:06:59Z and the served artifact was still
+    the 22:38:33Z one, so the board kept rendering "163.3%" for a 1.63% edge with
+    the corrected code already deployed. **A producer-side fix does not repair
+    data already on disk.**
+
+    IDEMPOTENT, which is what makes it safe to run alongside the producer fix:
+    the discriminator is `edge == ev_pct`, i.e. the two fields agree in
+    magnitude, which only happens when the percent value was copied across. A
+    card already carrying a fraction has `edge * 100 == ev_pct` and is left
+    alone, so this cannot double-convert once the worker catches up.
+
+    Only touches rows that HAVE both fields and disagree in the specific way the
+    defect produces. Anything else is passed through untouched, because an
+    unrecognised shape is not a licence to rewrite someone's number.
+    """
+    edge = card.get("edge")
+    ev_pct = card.get("ev_pct")
+    if not isinstance(edge, (int, float)) or isinstance(edge, bool):
+        return
+    if not isinstance(ev_pct, (int, float)) or isinstance(ev_pct, bool):
+        return
+    if ev_pct == 0:
+        return
+    # Already a fraction (producer-side fix applied): leave it.
+    if abs(edge * 100.0 - ev_pct) < 1e-6:
+        return
+    # The defect's signature: edge was assigned ev_pct verbatim.
+    if abs(edge - ev_pct) < 1e-9:
+        card["edge"] = ev_pct / 100.0
 
 
 def canonical_board_state_shadow_compare_enabled() -> bool:
