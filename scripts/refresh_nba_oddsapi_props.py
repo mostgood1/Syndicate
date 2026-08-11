@@ -662,6 +662,40 @@ def _games_history_is_stale(path: Path, *, date_str: str, stale_days: int = 30) 
     return (target - newest).days > int(stale_days)
 
 
+def _features_are_behind_history(
+    feature_candidates: tuple[Path, ...], raw_candidates: tuple[Path, ...]
+) -> bool:
+    """True when the derived features are older than the history they derive from.
+
+    THE WNBA TWIN OF THIS GATE SHIPPED THE DEFECT (`#351`). It asked
+    `not any(path.exists() and size > 0)` -- "is there a features file" -- so a
+    features file built from ONE season kept the rebuild from ever running while
+    a full 10-season history sat underneath it. The model reads the FEATURES, so
+    the fetch could succeed perfectly and the model still train on 2017, with
+    nothing anywhere reporting a problem.
+
+    NBA is NOT currently affected -- raw and features both end 2026-04-12,
+    measured 2026-08-11 -- precisely because its season is over and neither side
+    is moving. The gate becomes wrong the moment the raw history advances, which
+    is every day of a live season. Fixed here rather than after it bites.
+
+    Fails CLOSED: an unreadable date on either side returns False and leaves the
+    old behaviour, because a rebuild is ~20 minutes of subprocess time and must
+    not fire on every tick.
+    """
+    features_max = next(
+        (_games_history_max_date(path) for path in feature_candidates if _games_history_max_date(path)),
+        None,
+    )
+    history_max = next(
+        (_games_history_max_date(path) for path in raw_candidates if _games_history_max_date(path)),
+        None,
+    )
+    if not features_max or not history_max:
+        return False
+    return features_max < history_max
+
+
 def _games_history_fetch_years_needed(path: Path, *, bootstrap_years: int = 10, incremental_years: int = 1) -> int:
     """Decide how many seasons `fetch --years N` needs to re-walk.
 
@@ -2266,7 +2300,18 @@ def _ensure_source_game_inputs(
         )
 
     rc_build_features = 0
-    if not any(path.exists() and path.is_file() and path.stat().st_size > 0 for path in feature_candidates):
+    features_missing = not any(
+        path.exists() and path.is_file() and path.stat().st_size > 0 for path in feature_candidates
+    )
+    features_stale = _features_are_behind_history(feature_candidates, raw_candidates)
+    if features_missing or features_stale:
+        # Which of the two fired, because they mean different things: missing is
+        # a cold start, stale is the `#351` case where the history moved and the
+        # derived features silently did not.
+        print(
+            f"[nba] BUILD_FEATURES_TRIGGERED missing={features_missing} stale_vs_history={features_stale}",
+            flush=True,
+        )
         rc_build_features = _run_source_subprocess_cli_command(
             source_root=source_root,
             package_name=package_name,

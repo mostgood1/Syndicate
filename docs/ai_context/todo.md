@@ -1,5 +1,82 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#351` — PARTLY FIXED. The 10-season history landed, and the audit found the gate one layer down was the real hole
+
+**The history is committed** (`82ba1318`): 196 rows / 1 season -> 2,388 rows /
+10 seasons, 2017-05-02 -> 2026-08-10, zero null scores. Per-season counts
+sanity-check as WNBA rather than as a row total (196 in 2017 rising to 322 in
+2025 with expansion; 2020 at 147 for the COVID bubble). Git-tracked, so it ships
+to every service's own disk at deploy -- no allowlist, no publish, no cross-disk
+pull -- and it lands where `_seed_games_history_from_checkout_if_fresher` looks.
+
+**AND IT WOULD HAVE CHANGED NOTHING ON ITS OWN.** The model does not read the raw
+history; it reads the DERIVED features. Measured immediately after the commit:
+
+```
+data/raw/games_nba_api.csv        2,388 rows  10 seasons  2017 -> 2026   <- fixed
+data/processed/features.csv         196 rows   1 season   2017 only      <- what the model reads
+```
+
+The rebuild gate was `not any(path.exists() and size > 0)` — **"is there a
+features file", never "is it built from current data"**. A one-season features
+file exists and is non-empty, so the rebuild could never fire no matter how much
+history arrived underneath it. The fetch could succeed perfectly and the model
+would still train on 2017, with nothing reporting a problem.
+
+**Fixed in both twins** by comparing max dates instead of presence, and emitting
+which condition fired (`BUILD_FEATURES_TRIGGERED missing=.. stale_vs_history=..`)
+because a cold start and a stale derivative want different responses:
+
+```
+WNBA  features 2017-10-04  history 2026-08-10  -> rebuild TRUE   (9 years behind)
+NBA   features 2026-04-12  history 2026-04-12  -> rebuild FALSE  (correctly quiet)
+unreadable dates                               -> FALSE, fails closed
+```
+
+**NBA is not affected TODAY and gets the fix anyway**, because it is only safe
+while its season is over and neither side moves. The gate becomes wrong the first
+day the raw history advances.
+
+## The audit that found it: vendored data has no freshness owner
+
+409 tracked files under `vendor/**/data`. Last content change by directory:
+
+```
+2026-05-25   202  _espn_cache (nba + wnba)
+2026-05-28     5  nba_betting_repo/data/raw
+2026-05-30   174  nba_betting_repo/data/processed
+2026-06-02    25  nhl_betting_repo/nhl_betting/data
+2026-07-27   169  wnba_betting_repo/data/processed
+2026-08-01     9  mlb_bettingv2/sim_engine/data
+```
+
+- **WNBA `boxscores_history.csv` ends 2026-05-24** while the season is live and
+  playing tonight — ~2.5 months stale in-season.
+- **NHL processed files are 0 ROWS, not absent** (injuries, props_projections,
+  props_recommendations, shifts). Any `exists and size > 0` check reads them as
+  present. Off-season, so not urgent — but it is the same gate shape as above.
+- **NBA is the healthy reference**: 11,969 rows / 10 seasons through season end,
+  because it has a bulk `LeagueGameLog` endpoint and never walks day-by-day.
+
+**The structural point, and it is the user's:** a *code* checkout is carrying
+314KB of *data* whose freshness is nobody's job. The docstring claims it is "kept
+current by dev/GHA runs" and nothing has kept it current since 2017. Data that
+must stay fresh belongs in the artifact system with an owner and a staleness
+signal — which is exactly what MLB's statcast path does (`--max-age-days 7`,
+`--skip-existing on`). Repairing the vendored file was the right fix for today's
+loop and the wrong shape long-term.
+
+## Still open
+
+- **The timing claim is unverified on Render.** Local measurement was 25.7 min for
+  10 seasons against a docstring claiming ~80. My network is not the worker's, and
+  the script describes a day-by-day ESPN walk while the CLI calls the NBA Stats
+  API per season — possibly not even the same code path.
+- **The daily path can still select a multi-season backfill.** The durable fix is
+  that a daily refresh should fetch the current season or raise, never wander into
+  a bootstrap.
+- **`features.csv` is still 2017 until a refresh runs** with the new gate.
+
 ### `#351` — OPEN, UNOWNED. The WNBA history fetch asks for 10 seasons, cannot finish 10 seasons, and its designed escape hatch is seeded from a file that guarantees it asks for 10 seasons
 
 **A self-sustaining loop that burns ~45 minutes of refresh-worker time and a
