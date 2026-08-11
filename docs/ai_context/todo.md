@@ -1,6 +1,52 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#355` — FIXED, NOT YET DEPLOYED. The soccer team directory was exact-match, so a club spelled without its accent did not exist — and the miss invented a tri-code
+### `#356` — FIXED AND SHIPPED (`195f82d8`, refresh-worker deploy 20:35:53Z). One league that could launch but not write took every soccer slot
+
+**ID NOTE — the commit message says `#355`, which is wrong.** Two sessions
+allocated `#355` within the same hour: `956b3da0` (soccer team directory, below)
+and `195f82d8` (this). `956b3da0` pushed first and keeps `#355`; this item was
+renumbered to `#356` in code, tests and here. **Searching the log for `#356`
+finds nothing — `git show 195f82d8` is the commit.** Both took the number without
+running `git log --grep '#NNN' origin/main` first, which is now the fourth such
+collision.
+
+`due.sort()` keyed on `unit_epochs` — the last VERIFIED write. `#353` had
+deliberately stopped stamping that at launch ("a launch records an ATTEMPT; only
+a write records a refresh"), which is right, but it means a unit that launches
+cleanly and writes nothing keeps its ancient success epoch forever, is
+permanently the stalest, and wins `due[0]` every retry window. The old comment on
+that very line read "a unit can never be starved by ordering." Measured:
+
+    before #353 (17:30-19:07)  belgian 35 · eredivisie 32 · mls 25 · champ 7 · primeira 1
+    after  #353 (19:07-20:10)  la_liga 44 · belgian 27 · everyone else 0
+
+Fix: sort on `max(success_epoch, attempt_epoch)`, so a unit that just tried goes
+to the BACK and a broken league costs one slot per backoff instead of every slot.
+
+**The class is `#347` again — a component agreeing with itself.** There the reuse
+recorder fired after a reuse; here the scheduler's staleness measure is blind to
+the event that actually consumed the slot.
+
+**Residual, NOT fixed by `195f82d8`:**
+
+- **The write failure itself is untouched.** la_liga launched cleanly 44 times and
+  produced no artifact 44 times. This change stops it starving the other nine
+  leagues; it does not make it write. The subprocess's stdout does not reach the
+  worker log, so nothing says why. Rotation will now spread the failure across
+  leagues, which is what tells us whether the fault is la_liga-specific.
+- **`next_due_in_s` is measured against the wrong clock.** `soonest` derives from
+  `unit_epochs` alone while the attempt backoff is what actually gates, so the
+  line prints `no_unit_due ... next_due_in_s=0` — "nothing is due, and the next is
+  due in zero seconds." That contradiction is exactly why the ~610s cadence looked
+  unexplained from outside; the 610 is just `retry_backoff_seconds =
+  max(600.0, spacing_seconds)` plus one tick.
+
+### `#355` — FIXED AND SHIPPED (`956b3da0`, carried to prod inside `14afe6a8`; web + refresh-worker deploys 20:10Z). The soccer team directory was exact-match, so a club spelled without its accent did not exist — and the miss invented a tri-code
+
+Verified on the live board after deploy: `CF Montréal` → `MTL`, `Alavés` → `ALA`,
+`Atlético Madrid` → `ATM`, and every code served across mls/epl/la_liga is
+upper-case — which is now the discriminator, since a directory miss returns
+Title-Case. Zero `TEAM_NOT_IN_BRANDING` while exercising three leagues' cards.
 
 Reported off the board as a stray `LEE` on a non-EPL row. Two defects, one chain.
 

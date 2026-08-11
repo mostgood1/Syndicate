@@ -556,7 +556,7 @@ def _soccer_unit_last_touched(
     """When this unit last consumed a slot -- by succeeding OR by trying.
 
     The soccer autorun picks `due[0]` after sorting on this, so it decides which
-    league runs. `#355`: it used to sort on the success epoch alone, which starves
+    league runs. `#356`: it used to sort on the success epoch alone, which starves
     the queue the moment a unit can launch but not write -- that unit's success
     epoch never advances, so it is permanently the stalest and wins every round.
 
@@ -861,7 +861,7 @@ def _launch_autorun_soccer_weekly_refresh(
         )
     # LEAST-RECENTLY-TOUCHED FIRST, where "touched" is a success OR an attempt.
     #
-    # `#355`. This used to sort on `unit_epochs` alone -- last VERIFIED write --
+    # `#356`. This used to sort on `unit_epochs` alone -- last VERIFIED write --
     # and the comment claimed "a unit can never be starved by ordering", which was
     # true right up until `#353` stopped stamping that field on launch. After
     # `#353` a unit that launches cleanly and writes nothing keeps its ancient
@@ -979,7 +979,7 @@ def _launch_autorun_soccer_weekly_refresh(
     print(
         f"[refresh_worker] SOCCER_UNIT_LAUNCHED league={unit_league} unit_date={unit_date or 'week_scope'} "
         f"scope_kind={scope_kind} unit={due.index(unit) + 1}/{len(units)} due={len(due)} "
-        # `#355`: WHY this unit won. The starvation ran for an hour undetected
+        # `#356`: WHY this unit won. The starvation ran for an hour undetected
         # because the launch line named the winner and never the queue -- 44
         # identical la_liga launches read as "the autorun is working". Printing
         # the runners-up makes one league monopolizing the slot visible in a

@@ -1,4 +1,4 @@
-"""`#355` -- one league that launches cleanly and writes nothing must not starve the queue.
+"""`#356` -- one league that launches cleanly and writes nothing must not starve the queue.
 
 MEASURED, NOT HYPOTHETICAL. On 2026-08-11 `la_liga|2026-08-15` launched cleanly
 44 times in an hour, wrote its recommendations file zero times, and took the
@@ -66,7 +66,7 @@ def test_the_measured_starvation_does_not_recur():
     # The old rule, asserted directly so the regression is unmistakable: sorting
     # on the success epoch alone puts the broken unit first, every time.
     old = [u["league"] for u in sorted(units, key=lambda u: unit_epochs[_soccer_unit_key(u)])]
-    assert old[0] == "la_liga", "the pre-#355 ordering no longer reproduces -- this test proves nothing"
+    assert old[0] == "la_liga", "the pre-#356 ordering no longer reproduces -- this test proves nothing"
 
 
 def test_stalest_first_still_holds_for_healthy_units():
