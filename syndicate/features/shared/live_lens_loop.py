@@ -178,6 +178,66 @@ def _utc_now() -> str:
 	return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+# `#359`. How far back a resumed sweep will reach. Without a ceiling, a worker
+# that was down overnight would wake up and try to publish every artifact touched
+# since -- the unbounded-window OOM that `_MAX_PULL_WINDOW_SECONDS` exists to stop
+# on the pull side, which production actually hit on 2026-07-25. A bounded resume
+# that succeeds beats an unbounded one that takes the worker down.
+_MAX_LIVE_LENS_PUBLISH_WINDOW_SECONDS = 2 * 3600
+
+
+def _live_lens_publish_watermark_path() -> Path:
+	from syndicate.features.shared.refresh_state_store import reports_root
+
+	return reports_root() / "refresh_status" / "latest" / "live_lens_publish_watermark.json"
+
+
+def _live_lens_publish_since_epoch(*, loop_started_epoch: float) -> float:
+	"""Where this loop's publish sweep resumes from after a restart (`#359`).
+
+	Absent watermark returns `loop_started_epoch` -- start tracking from now
+	rather than sweeping the whole artifact history on a cold start. That is the
+	same choice `_hot_artifact_publish_since_epoch` makes, and for the same
+	reason: a first tick that tries to publish everything is how the 2026-07-25
+	OOM began.
+	"""
+	from syndicate.features.shared.refresh_state_store import read_json_file
+
+	floor = float(loop_started_epoch) - _MAX_LIVE_LENS_PUBLISH_WINDOW_SECONDS
+	try:
+		payload = read_json_file(_live_lens_publish_watermark_path())
+	except Exception:
+		# UNREADABLE IS NOT ABSENT, and the two must not share a branch. Absent
+		# means "nothing was ever published, start from now"; unreadable means
+		# "something probably was, and we cannot see how far" -- collapsing the
+		# second onto the first silently strands whatever the last run had not
+		# yet pushed, which is the exact defect this function exists to fix.
+		# Resuming from the bounded floor costs at most one idempotent window.
+		return floor
+	try:
+		stored = float(payload.get("epoch")) if isinstance(payload, dict) and payload.get("epoch") is not None else None
+	except (TypeError, ValueError):
+		# A present-but-malformed stamp is closer to unreadable than to absent,
+		# for the same reason.
+		return floor
+	if stored is None or stored <= 0.0:
+		return float(loop_started_epoch)
+	return max(stored, floor)
+
+
+def _record_live_lens_publish_watermark(epoch: float) -> None:
+	from syndicate.features.shared.refresh_state_store import write_json_file
+
+	try:
+		write_json_file(_live_lens_publish_watermark_path(), {"epoch": float(epoch), "recordedAt": _utc_now()})
+	except Exception:
+		# Must never take the loop down. Worst case the watermark does not
+		# advance and the next sweep re-publishes a window it already sent,
+		# which is idempotent -- the failure mode this replaces was the
+		# opposite, and permanent.
+		pass
+
+
 def _env_bool(name: str, *, default: bool = False) -> bool:
 	raw = str(os.environ.get(name) or "").strip().lower()
 	if not raw:
@@ -639,7 +699,26 @@ def _live_lens_background_loop() -> None:
 	# a dropped file. There is no threshold here and nothing to tune; a guessed
 	# interval on this call is exactly the kind of number that silently disables
 	# the stage it guards.
-	last_publish_epoch = time.time()
+	# `#359`: PERSISTED, not in-process. This was `time.time()`, which made the
+	# watermark reset to boot time on every restart -- so every artifact written
+	# before a deploy became permanently unpublishable, since each later sweep's
+	# floor is later still. Measured 2026-08-11: la_liga's 08-16 recommendations
+	# were written at 21:43:56Z and published 20s later, while 08-15 was written
+	# at 21:54:14Z, missed its sweep, and was still serving the 2026-07-20
+	# projections 20 minutes and two reboots later. Same league, same code path.
+	#
+	# `live_refresh_loop._hot_artifact_publish_since_epoch` fixed exactly this on
+	# the OTHER publish path, for this same artifact family, and its docstring
+	# says so: "the file can permanently never satisfy `mtime >= since_epoch_seconds`
+	# again ... recommendations_2026-07-18.csv existed on the worker's disk from a
+	# clean, completed refresh run but never reached the web service." This loop
+	# was written afterwards and reintroduced the bug it had already solved.
+	#
+	# Its OWN watermark file, deliberately not the one live_refresh_loop keeps:
+	# both loops run on refresh-worker and sweep the same allowlist, so a shared
+	# floor would let whichever swept first advance past files the other had not
+	# published yet -- reintroducing the same permanent skip through a side door.
+	last_publish_epoch = _live_lens_publish_since_epoch(loop_started_epoch=time.time())
 	while not _LIVE_LENS_LOOP_STOP.is_set():
 		started_at = _utc_now()
 		started_epoch = time.time()
@@ -772,6 +851,12 @@ def _live_lens_background_loop() -> None:
 				# own persisted watermark.
 				if sweep.all_succeeded:
 					last_publish_epoch = publish_started_epoch
+					# `#359`: persist it, so a restart resumes from here instead
+					# of from boot time. Written only on the all-succeeded branch,
+					# preserving the retry behaviour the in-process version
+					# already had -- this changes how far the watermark SURVIVES,
+					# not when it advances.
+					_record_live_lens_publish_watermark(publish_started_epoch)
 			except Exception as exc:
 				print(f"[live_lens_loop] publish_hot_artifacts_failed error={type(exc).__name__}: {exc}", flush=True)
 			# Stop the sampler before sampling: it must not still be running

@@ -1,6 +1,41 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#359` — OPEN, UNOWNED. A fresh artifact that lands outside the publish sweep's window is never published — the sim writes and the board never sees it
+### `#359` — FIXED, pending deploy. A fresh artifact that lands outside the publish sweep's window is never published — the sim writes and the board never sees it
+
+**Fix:** the live-lens publish watermark is now persisted
+(`live_lens_publish_watermark.json`) instead of living in a local initialised to
+`time.time()`. That local was the mechanism that made a missed sweep PERMANENT:
+every restart reset the floor to boot time, and each later sweep's floor is later
+still, so a file that missed its window could never satisfy
+`mtime >= floor` again.
+
+**This bug was already solved once, on the other publish path, for this same
+artifact family.** `live_refresh_loop._hot_artifact_publish_since_epoch` says so
+in its own docstring — *"the file can permanently never satisfy `mtime >=
+since_epoch_seconds` again ... recommendations_2026-07-18.csv existed on the
+worker's disk from a clean, completed refresh run but never reached the web
+service."* The live-lens loop was written afterwards and reintroduced it. **The
+lesson is not "persist watermarks", it is that a fix living in one loop does not
+protect the next loop somebody writes.**
+
+Deliberately its OWN watermark file, not the one `live_refresh_loop` keeps: both
+loops run on refresh-worker and sweep the same allowlist, so a shared floor would
+let whichever swept first advance past files the other had not yet published —
+the same permanent skip through a side door. Asserted in the tests.
+
+Bounded by a 2h ceiling on resume, because the unbounded version is the
+2026-07-25 OOM (`_MAX_PULL_WINDOW_SECONDS` exists for exactly that).
+
+**One bug found in my own fix, by my own comment.** The first implementation
+collapsed *unreadable* onto *absent* in the `except`, so a keyvalue error resumed
+from `now` — reintroducing the permanent skip through the error path — while the
+comment directly above claimed it fell through to the bounded floor. Absent means
+"nothing was ever published"; unreadable means "something probably was and we
+cannot see how far". Same trap as [[feedback_unknown_must_not_default_permissive]].
+Tests cover both.
+
+Tests: `tests/test_live_lens_publish_watermark.py` (7). 129 pass across the
+live-lens loop and publisher suites.
 
 `#357` got la_liga simulating again. It did not get la_liga onto the board, and
 the gap is **per-DATE, not per-league** — which is what makes it findable:
