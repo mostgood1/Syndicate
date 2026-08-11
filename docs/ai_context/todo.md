@@ -1,5 +1,70 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#342` — DONE AND VERIFIED IN PRODUCTION. WNBA served 128 live edges while MLB suppressed 862: one rule, two copies, one sport missing
+
+**`72c36d03` says `#340` and means `#342`.** `#340` was already `9b88d858`
+(board rebuild cadence) and `#341` was already `3df5bb25` — both landed before my
+renumber message arrived. Third collision of the night; mapping recorded rather
+than history rewritten.
+
+## The defect, measured on the served board 2026-08-10
+
+```
+WNBA  TOR @ ATL  LIVE   128/128 projected rows carried edge_vs_line
+MLB   4 live games        0/862 projected rows carried an edge
+```
+
+Two sports, opposite answers to the same question, on the same board. **It does
+not merely display wrong — it RANKS**: a board built to surface the biggest edges
+sorts a fabricated live edge to the top.
+
+MLB's answer is the right one, and its own comment carries the 2026-07-12
+measurement: an event with commence 16:07 carried betmgm quotes at 17:35
+(away -500) while the sim still said 0.495 — a **+23-point edge on a coin-flip
+game**, with game-market edges spreading **-55 to +54** on moneylines.
+
+## Cause and fix
+
+The rule was a copy in `prop_projections.py` and a second copy in
+`soccer_projections.py`. WNBA never got one. **A rule that must be remembered in
+each sport's join will be missed by the next sport added**, and was. Now in
+`live_edge_policy.py`; a test asserts the sentence appears in exactly ONE file.
+
+**A second instance found while fixing the first:** soccer's `_mean_projection`
+sets `edge_vs_line` unconditionally and `_price_against_market` only nulled
+`edge_vs_market_pct`, so every mean-based soccer row carried a live edge too —
+in the file that already knew the rule.
+
+## VERIFIED on the served payload, web `3df5bb25`, 01:40:39Z
+
+```
+TOR @ ATL  live      projected=162  edge_vs_line=0    suppressed=162
+CHI @ SEA  pregame   projected=105  edge_vs_line=105  suppressed=0
+
+sample: {"projected": 3.69, "side": "over", "edge_vs_line": null,
+         "edge_unavailable_reason": "game is live: a pregame projection ..."}
+```
+
+Live edges gone, pregame untouched, **the projection itself preserved** —
+comparing a pregame model against a live line stays available; only the edge
+NUMBER is withheld.
+
+**Unknown game state still ALLOWS an edge, deliberately.** Suppressing it would
+blank the edge column on exactly the days the game-state join degrades, turning
+an enrichment gap into a total loss of the board's purpose. The failure guarded
+against is a live game ranking, and liveness is something the board positively
+knows.
+
+**Consumer note:** a suppressed edge and an absent projection both render as a
+blank today. The `#329` lane is surfacing `edge_unavailable_reason` as a tooltip
+so the two stop looking identical — the same distinction this file insists on
+everywhere else.
+
+**How it was found:** I first measured WNBA with MLB's field name
+(`edge_vs_market_pct`) and reported "WNBA has zero edges". WNBA deliberately
+emits `edge_vs_line`, populated 212/212. **The real defect was the opposite of
+the one I reported — not too few edges, too many.**
+
 ### `#341` — CORRECTION TO MY OWN ENTRY BELOW: the chain position was NOT the blocker. Reconciliation is REACHED and declines on its own gate
 
 **Refuted by the oversight lane within the hour, and the disproof is cheap and
