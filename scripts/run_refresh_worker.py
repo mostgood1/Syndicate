@@ -2119,9 +2119,40 @@ def _diag_log_all_process_memory(stage: str) -> None:
 _BOOK_GRID_LAST_RUN: dict[str, float] = {}
 
 
+def _book_grid_live_refresh_interval_seconds() -> int:
+    """Rebuild cadence while a game is actually live.
+
+    120s, and ADAPTIVE rather than standing, which is the whole point. The board
+    was rebuilding every 600s, so a live board could be nine minutes behind the
+    market no matter how fast capture ran or how often the page polled -- this
+    interval was the binding constraint on live freshness, sitting between a 60s
+    capture and a 60s page poll and throwing most of both away.
+
+    NOT applied all day. Measured 2026-08-11 00:0xZ, refresh-worker sat at
+    **3,211MB of 4,096** -- 885MB raw headroom, the highest reading of the night
+    and above the ~2,884MB plateau. A standing 5x increase in periodic work at
+    that level is `#241` exactly: that lane caused a production restart loop by
+    adding worker work that looked affordable. Tying the fast cadence to live
+    games bounds the extra cost to the window where it buys something, and the
+    slate is the thing that ends it.
+
+    Costs, from tonight rather than from assumption: the MLB builder alone peaks
+    211.5MB / 18.0s on the full shard, and a whole tick measured +245MB.
+    """
+    raw = str(os.environ.get("SYNDICATE_BOOK_GRID_LIVE_REFRESH_INTERVAL_SECONDS") or "").strip()
+    try:
+        return max(60, int(raw))
+    except ValueError:
+        return 120
+
+
 def _book_grid_refresh_interval_seconds() -> int:
     raw_value = str(os.environ.get("SYNDICATE_BOOK_GRID_REFRESH_INTERVAL_SECONDS") or "").strip()
     try:
+        # An explicit override wins and DISABLES the adaptive path entirely --
+        # someone pinning this value is answering the cadence question by hand,
+        # and having the worker quietly speed up underneath that would make the
+        # setting a lie.
         return max(60, int(raw_value))
     except ValueError:
         # 10 minutes. The shard is a per-day accumulator (measured 2026-08-09:
@@ -2129,6 +2160,14 @@ def _book_grid_refresh_interval_seconds() -> int:
         # surface, not a live-price feed -- rebuilding it every tick would be
         # the "worker periodic work is never free" mistake (#241 caused a
         # production restart loop that way).
+        #
+        # ...except while a game is live, where a 10-minute-old board is wrong
+        # rather than merely stale. The flag is set by the PREVIOUS tick from the
+        # grid it just built, so this needs no extra probe and cannot be fooled
+        # by the liveness gate that spent 91 minutes returning False tonight
+        # (`#339`). If the last tick saw a live game, run fast.
+        if _BOOK_GRID_LAST_RUN.get("any_live"):
+            return _book_grid_live_refresh_interval_seconds()
         return 600
 
 
@@ -2245,6 +2284,7 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
 
     written: list[str] = []
     skipped: list[str] = []
+    any_live_today = False
     for build_date in dates:
         for sport in ("mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"):
             try:
@@ -2311,6 +2351,12 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     if build_date == selected_date:
                         skipped.append(sport)
                     continue
+                if build_date == selected_date and not any_live_today:
+                    for _row in (payload.get("rows") or []):
+                        _g = _row.get("game")
+                        if isinstance(_g, dict) and str(_g.get("state") or "").lower() == "live":
+                            any_live_today = True
+                            break
                 path = write_book_grid_artifact(sport, build_date, payload)
                 label = f"{sport}:{payload.get('rows_total')}"
                 written.append(label if build_date == selected_date else f"{label}@{build_date}")
@@ -2339,6 +2385,19 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
                     print(f"[refresh_worker] BOOK_GRID_PUBLISH_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
             except Exception as exc:
                 print(f"[refresh_worker] BOOK_GRID_BUILD_ERROR sport={sport} date={build_date} {type(exc).__name__}: {exc}", flush=True)
+    # LIVENESS, READ OFF THE GRID WE JUST BUILT rather than probed for.
+    #
+    # `#328` stamps `game.state` on every row, so the tick already holds the
+    # answer and a second source would be a second thing to disagree. It also
+    # sidesteps `_mlb_has_live_game()`, which returned False through an entire
+    # live game tonight for reasons still unknown (`#339`) -- a cadence that
+    # depended on it would inherit that failure.
+    #
+    # Only TODAY's build counts: yesterday's artifact is full of finals and a
+    # forward date cannot have a live game, so including them would latch the
+    # fast cadence on permanently.
+    _BOOK_GRID_LAST_RUN["any_live"] = bool(any_live_today)
+
     # Marked only after the pass, so a crash mid-rebuild retries next tick
     # rather than marking the day done and leaving it frozen for good.
     if rebuild_previous:
@@ -2351,6 +2410,11 @@ def _run_book_grid_artifact_tick() -> dict[str, Any] | None:
         "written": written,
         "skipped_no_shard": skipped,
         "rebuilt_previous": previous_date if rebuild_previous else None,
+        # Which cadence the NEXT tick will use, and why. A board rebuilding every
+        # 10 minutes during a live slate looks identical to one rebuilding every
+        # 2 unless the tick says which it chose.
+        "any_live": bool(any_live_today),
+        "next_interval_seconds": _book_grid_refresh_interval_seconds(),
     }
 
 

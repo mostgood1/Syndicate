@@ -1,5 +1,56 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#340` — COMMITTED, **NOT DEPLOYED ON PURPOSE**. The book-grid rebuild now speeds to 120s while a game is live — and the worker is at 3,211MB of 4,096, so it is waiting for headroom
+
+**The 600s artifact rebuild was the binding constraint on live freshness.**
+Capture runs at 60s and the board page polls at 60s (`#329`), and a 10-minute
+artifact sitting between them threw away nearly all of both: a live board could
+be **nine minutes behind the market** with every other component healthy.
+Verified by state rather than logs, since the tick's log line went missing again:
+artifacts at `23:35:14Z` and `23:45:38Z`, 624s apart.
+
+**ADAPTIVE, NOT A STANDING 5x — and that distinction is the whole entry.**
+Measured 2026-08-11 00:0xZ, immediately before writing this:
+
+```
+refresh-worker   container_memory_mb   3,211 of 4,096   (78%, 885MB raw headroom)
+                 highest reading of the night, ABOVE the ~2,884 plateau (`#285`)
+tick cost        MLB builder alone     211.5MB peak / 18.0s on the full shard
+                 whole tick, measured  +245MB
+```
+
+A standing 5x increase in periodic work at that level is `#241` restated — that
+lane caused a production restart loop by adding worker work that looked
+affordable. Tying the fast cadence to live games bounds the extra cost to the
+window where it buys something, and the slate is what ends it.
+
+**Liveness is read off the grid the tick JUST BUILT, not probed for.** `#328`
+stamps `game.state` on every row, so the answer is already in hand and a second
+source would be a second thing to disagree. It also sidesteps
+`_mlb_has_live_game()`, which returned False through an entire live game tonight
+for reasons still unknown (`#339`) — a cadence depending on it would inherit
+that failure. Only *today's* build counts: yesterday's artifact is all finals and
+a forward date cannot be live, so including either would latch the fast cadence
+on permanently.
+
+**An explicit `SYNDICATE_BOOK_GRID_REFRESH_INTERVAL_SECONDS` disables the
+adaptive path entirely.** Someone pinning that value is answering the cadence
+question by hand, and speeding up underneath them would make the setting a lie.
+`SYNDICATE_BOOK_GRID_LIVE_REFRESH_INTERVAL_SECONDS` tunes the fast value without
+a deploy.
+
+**Absent flag means NOT live.** A fresh process has never built a grid so it
+cannot know, and the conservative direction is the slow cadence: the cost of
+being wrong is one late board, not a restart loop on a worker already at 3.2GB.
+
+**WHY IT IS NOT DEPLOYED.** It needs a refresh-worker deploy, and that service is
+at 78% with a live slate running and eight first pitches behind it. The user
+asked for 2 minutes and this delivers it; what it is waiting on is a headroom
+read, not a decision. `#285`'s plateau and `#336`'s floor both live on that
+service and both get worse under more frequent periodic work.
+
+Tests: `tests/test_book_grid_live_cadence.py` (5).
+
 ### #338 — OPEN. `#337`'s write path is FIXED and VERIFIED (persist 220), but the SERVE still reports the 150 cap. Third site, NOT localised, and the diagnostic for it is itself unreliable
 
 **Status: measured 2026-08-10 ~23:2xZ, both services carrying `a7216ca9`. I did
