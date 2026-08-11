@@ -32,6 +32,12 @@ from pathlib import Path
 
 _LOGGER = logging.getLogger(__name__)
 
+# How many EXTRA dates beyond the artifact's own to ask the scoreboard about.
+# 7 covers NFL's Thu-Mon slate and soccer's week with room to spare, while
+# keeping the worst case at 8 scoreboard calls per sport per build rather than
+# one per distinct fixture date in a shard that may hold a month of futures.
+_MAX_GAME_STATE_DATES = 7
+
 
 def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
     """Stamp start time (pregame) or live status (in-progress) onto grid rows.
@@ -60,7 +66,45 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
         from syndicate.features.shared.game_chip_scoreboard import build_game_chips
         from syndicate.features.shared.team_aliases import teams_match
 
-        chips = build_game_chips(selected_date, [sport]) or []
+        # CHIPS FOR THE DATES THE ROWS ACTUALLY SPAN, not just this artifact's
+        # date (`#348`).
+        #
+        # The shard is keyed by CAPTURE date, so a Thursday fixture quoted on
+        # Tuesday lands in Tuesday's artifact -- and asking the scoreboard for
+        # Tuesday can never resolve it. Measured 2026-08-11: all 16 NFL preseason
+        # fixtures (kickoffs 08-13/08-14, quoted on 08-11) reported
+        # `chips: 0, reason: no_chips_for_date` and every one rendered `unknown`.
+        #
+        # `#329` made the BOARD span multiple days and left this join
+        # single-date, so the two disagreed by construction. It bites hardest on
+        # NFL and NCAAF, whose slates always span days, and never on MLB, whose
+        # fixtures are quoted and played the same day -- which is why it went
+        # unnoticed on the reference sport.
+        #
+        # Dates come from the rows themselves rather than a window parameter, so
+        # this cannot drift from whatever scope the caller actually holds.
+        row_dates: set[str] = set()
+        for row in grid:
+            raw = str((row.get("commence_time") or "")).strip()
+            if len(raw) >= 10:
+                row_dates.add(raw[:10])
+        # BOUNDED, and the bound is stated rather than implicit: each date is a
+        # scoreboard call, and an artifact can carry weeks of forward fixtures
+        # (1,246 NFL rows across many dates, measured the same day). Nearest
+        # dates first -- a board is read forward from today, and the far ones are
+        # the least likely to be looked at.
+        ordered = sorted(row_dates)
+        if selected_date in ordered:
+            ordered.remove(selected_date)
+        query_dates = [selected_date] + ordered[:_MAX_GAME_STATE_DATES]
+
+        chips = []
+        for query_date in query_dates:
+            try:
+                chips.extend(build_game_chips(query_date, [sport]) or [])
+            except Exception:
+                # One bad date must not cost the others their state.
+                _LOGGER.exception("BOOK_GRID_GAME_STATE_DATE_FAILURE sport=%s date=%s", sport, query_date)
     except Exception:
         _LOGGER.exception("BOOK_GRID_GAME_STATE_FAILURE sport=%s date=%s", sport, selected_date)
         return {"chips": 0, "rows_matched": 0}

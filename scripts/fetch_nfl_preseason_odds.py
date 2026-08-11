@@ -34,6 +34,8 @@ from __future__ import annotations
 
 import argparse
 import csv
+import os
+import datetime as dt
 import sys
 from datetime import date
 from datetime import datetime
@@ -45,6 +47,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import requests  # noqa: E402
+
+from scripts.fetch_nfl_team_odds_local import get_base_url  # noqa: E402
+from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota  # noqa: E402
 from scripts.fetch_nfl_preseason_schedule import preseason_schedule_path
 from scripts.fetch_nfl_team_odds_local import _env
 from scripts.fetch_nfl_team_odds_local import choose_bookmaker
@@ -260,6 +266,88 @@ def _append_nfl_preseason_book_quotes(events: list[dict[str, Any]]) -> None:
         print(f"[odds_book_quotes] nfl preseason append FAILED {type(exc).__name__}: {exc}")
 
 
+def _preseason_segment_window_seconds() -> int:
+    """How far before kickoff to start paying for interval markets.
+
+    Default 4 hours, matching the value set for MLB on 2026-08-10 after the same
+    tradeoff was made there. Env-tunable so the cost can be moved without a
+    deploy.
+    """
+    raw = str(os.environ.get("SYNDICATE_NFL_PRESEASON_SEGMENT_WINDOW_SECONDS") or "").strip()
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return 4 * 3600
+
+
+def _fetch_preseason_event_segments(api_key: str, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Per-event interval markets (Q1-Q4/H1-H2) for kickoffs inside the window.
+
+    WHY PER-EVENT AT ALL (`#349`). The slate endpoint this script already calls
+    serves the core three only; MLB's fetcher documents the same split and pays
+    for segments on `/events/{id}/odds`. So requesting `totals_q1` on the slate
+    call cannot work, and the interval vocabulary `_nfl_segment_market_map()`
+    already builds had nothing feeding it -- measured 2026-08-11, all 121 NFL
+    preseason rows were `segment: full`.
+
+    WHY WINDOWED. This is `#16`/`#17`'s tradeoff restated: one slate call covers
+    every game, while segments cost one call PER EVENT. At 16 preseason
+    fixtures that is 16 credits per sweep against 1, so it is spent only on
+    games about to kick off. A fixture two days out gets the core three and
+    nothing else, which is what it had before this.
+
+    Failure is per-event and non-fatal: a segment fetch that 404s or times out
+    must not cost the slate its prices.
+    """
+    window = _preseason_segment_window_seconds()
+    if window <= 0 or not events:
+        return []
+    now = dt.datetime.now(dt.timezone.utc)
+    seg_keys = [key for key, spec in _nfl_segment_market_map().items() if spec[0] != "full"]
+    if not seg_keys:
+        return []
+    enriched: list[dict[str, Any]] = []
+    for event in events:
+        event_id = str(event.get("id") or "").strip()
+        raw_commence = str(event.get("commence_time") or "").strip()
+        if not event_id or not raw_commence:
+            continue
+        try:
+            kickoff = dt.datetime.fromisoformat(raw_commence.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        until = (kickoff - now).total_seconds()
+        # Inside the window, and not long finished. A negative `until` is a live
+        # or recent game, which is exactly when interval lines matter most.
+        if until > window or until < -6 * 3600:
+            continue
+        try:
+            response = requests.get(
+                f"{get_base_url()}/sports/{PRESEASON_SPORT_KEY}/events/{event_id}/odds",
+                params={
+                    "apiKey": api_key,
+                    "regions": "us",
+                    "markets": ",".join(seg_keys),
+                    "oddsFormat": "american",
+                },
+                timeout=20,
+            )
+            record_oddsapi_quota(response.headers, sport="nfl", endpoint=response.url)
+            if response.status_code != 200:
+                continue
+            payload = response.json()
+        except Exception as exc:  # noqa: BLE001
+            print(f"[nfl_preseason] segment fetch failed event={event_id} {type(exc).__name__}: {exc}", flush=True)
+            continue
+        if isinstance(payload, dict) and payload.get("bookmakers"):
+            enriched.append(payload)
+    print(
+        f"[nfl_preseason] SEGMENT_FETCH window_s={window} events_in_window={len(enriched)} of {len(events)}",
+        flush=True,
+    )
+    return enriched
+
+
 def _nfl_segment_market_map() -> dict[str, tuple[str, str]]:
     """`#343`: full-game + Q1-Q4/H1-H2, from the shared vocabulary."""
     from syndicate.features.shared.market_segments import full_game_market_keys, segment_market_keys
@@ -281,7 +369,11 @@ def main() -> None:
     # cannot match against schedule_preseason_{season}.csv, and the quote log
     # should keep every price this response was paid for even when the schedule
     # mirror is stale -- which, measured 2026-08-07, it is.
-    _append_nfl_preseason_book_quotes(events)
+    # Interval markets come from the per-event endpoint (`#349`); the slate call
+    # above cannot serve them. Appended alongside the slate events so both land
+    # in the same quote-log write, tagged by the shared vocabulary.
+    segment_events = _fetch_preseason_event_segments(api_key, events)
+    _append_nfl_preseason_book_quotes(events + segment_events)
     schedule_lookup = load_schedule_lookup(args.season)
     rows = build_odds_rows(events, schedule_lookup, args.season)
 
