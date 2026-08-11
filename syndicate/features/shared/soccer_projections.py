@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.prop_projections import _norm_name
+from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 
 # Player-prop market -> field on the player_props entry, and whether that field
 # is a PROBABILITY or a MEAN. Getting this wrong in either direction is the
@@ -198,12 +199,21 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
         projection["edge_unavailable_reason"] = "3-way market: two-leg de-vig would drop the draw"
         return
 
-    state = str(((row.get("game") or {}).get("state") or "")).strip().lower()
-    if state in _LIVE_OR_DONE:
+    # `#340`: shared with MLB and WNBA via `live_edge_policy` rather than kept
+    # per-sport. This file and `prop_projections` had matching copies; WNBA had
+    # none and shipped 128 live edges on 2026-08-10 as a result.
+    live_reason = live_edge_unavailable_reason(row)
+    if live_reason:
         projection["edge_vs_market_pct"] = None
-        projection["edge_unavailable_reason"] = (
-            f"game is {state}: a pregame projection cannot be priced against a live market"
-        )
+        projection["edge_unavailable_reason"] = live_reason
+        # BOTH edge contracts, not just the probability one. `_mean_projection`
+        # sets `edge_vs_line` unconditionally, so suppressing only
+        # `edge_vs_market_pct` here left every mean-based soccer row carrying a
+        # live edge -- the identical defect WNBA had, in the same file that
+        # already knew the rule. Checked rather than assumed: this runs for
+        # every row, mean-based and probability-based alike.
+        if projection.get("edge_vs_line") is not None:
+            projection["edge_vs_line"] = None
         return
 
     from syndicate.features.shared.prop_projections import _no_vig_over_probability

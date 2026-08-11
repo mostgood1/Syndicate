@@ -30,6 +30,7 @@ import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
+from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 
 # market (as it appears in book_quotes) -> the pitcher distribution that scores it
 _PITCHER_DISTS: dict[str, tuple[str, str]] = {
@@ -696,13 +697,15 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
         # pregame model against a live line is a legitimate thing to want --
         # but it is not given an edge number, because that number would be
         # meaningless and would rank.
-        state = str(((row.get("game") or {}).get("state") or "")).strip().lower()
-        live_or_done = state in {"live", "in_progress", "final", "completed"}
-        if live_or_done:
+        # `#340`: the rule now lives in `live_edge_policy` because it was
+        # duplicated here and in `soccer_projections`, and WNBA -- which never
+        # got a copy -- shipped 128 live edges on 2026-08-10 while this suppressed
+        # 862. A rule that has to be remembered in each sport's join will be
+        # missed by the next sport added.
+        live_reason = live_edge_unavailable_reason(row)
+        if live_reason:
             projection["edge_vs_market_pct"] = None
-            projection["edge_unavailable_reason"] = (
-                f"game is {state}: a pregame projection cannot be priced against a live market"
-            )
+            projection["edge_unavailable_reason"] = live_reason
         else:
             projection["edge_vs_market_pct"] = (
                 round((float(model_prob) - float(fair)) * 100.0, 2)

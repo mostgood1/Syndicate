@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.prop_projections import _norm_name
+from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 
 # Board market key -> key inside the CSV's `model` dict.
 #
@@ -159,8 +160,25 @@ def attach_wnba_projections(grid: Iterable[Mapping[str, Any]], index: WnbaProjec
         }
         if line_value is not None:
             edge = round(mean - line_value, 3)
-            projection["edge_vs_line"] = edge
-            projection["side"] = "over" if edge > 0 else "under"
+            # `#340`. WNBA was the ONLY sport not applying this: measured
+            # 2026-08-10, a live game served 128 of 128 projected rows with an
+            # `edge_vs_line` while MLB suppressed all 862 of its live rows for
+            # the same reason. The model's mean is pregame; once the game
+            # starts the line has moved on the score and the difference is the
+            # score, not an edge. Worse, it RANKS -- a board that sorts by edge
+            # puts those rows on top.
+            #
+            # `projected` and `side` stay: they are the model's opinion and are
+            # legitimate to show against a live line. Only the edge number goes,
+            # which mirrors what MLB does with `edge_vs_market_pct`.
+            reason = live_edge_unavailable_reason(row)
+            if reason:
+                projection["edge_vs_line"] = None
+                projection["edge_unavailable_reason"] = reason
+                projection["side"] = "over" if edge > 0 else "under"
+            else:
+                projection["edge_vs_line"] = edge
+                projection["side"] = "over" if edge > 0 else "under"
         row["projection"] = projection  # type: ignore[index]
         rows_with_projection += 1
 
