@@ -1,21 +1,53 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#357` — OPEN. No soccer sim has run in production since 2026-07-20; every simulated match on the board is a git-shipped artifact
+### `#357` — OPEN. The soccer leagues whose ratings come from `team_history` cannot build; the other five are fine
 
-> **RETRACTION, same session.** This item first said the root cause was a missing
-> `team_history` directory on the worker disk. **That is not established.** I
-> reproduced `exit 1` by deleting the entire source tree and matched it against
-> production's `exit 1` — matching an OUTCOME, not confirming the BRANCH. Against
-> it: `bootstrap_data_root._sync_tree` copies `data/soccer_source` recursively,
-> `data/soccer_source` is in `BOOTSTRAP_ROOTS`, and `SYNDICATE_BOOTSTRAP_ON_START=1`
-> on the refresh-worker, which rebooted twice that day. History is probably ON the
-> disk and the real cause is something else. The confirmed facts below still hold;
-> the diagnosis does not.
+> **TWO CORRECTIONS, same session, both to claims I made.**
+>
+> **(1) "No soccer sim has run in production since 2026-07-20" was FALSE** — it was
+> this item's original title. A parallel session challenged it with one
+> `belgian_pro_league ... exists=True wrote_since_launch=True` line; re-derived
+> independently over 8h of logs (API walked backward in 1h slices, since it caps at
+> 1000 and returns oldest-first), **five leagues are writing**:
+>
+>     mls|2026-08-15    34 (latest 21:27:28Z, file_age_s=10)   belgian|08-14  62
+>     eredivisie|08-14  32     championship|08-14  7           primeira|08-14  1
+>
+> The error was **scope**: I measured la_liga, saw the board served from a
+> 2026-07-20 git artifact, and generalised one unit to a whole sport. One
+> counter-example from another lane was enough to break it — the claim was never
+> supported by the evidence I had.
+>
+> **(2) The `team_history` diagnosis, retracted, is now back — but as a HYPOTHESIS.**
+> I first "confirmed" it by deleting the entire source tree and matching the
+> resulting `exit 1` against production's: matching an OUTCOME, not confirming a
+> BRANCH. Then I retracted it on the grounds that bootstrap should have seeded the
+> disk. The per-league split (below) now supports it again. **Do not treat the
+> original repro as evidence for it** — the support is the split, and it is n=1.
 
-`#356` explained which unit won the slot. This is why winning it never produced
-anything. **Every soccer autorun launch fails in 9–14 seconds with exit 1**, and
-has done so long enough that the newest live-computed soccer artifact is 22 days
-old.
+**The split is exactly `_load_team_ratings`' three branches:**
+
+| leagues | ratings source | outcome |
+|---|---|---|
+| mls | live ASA fetch, nothing on disk | **writes** |
+| eredivisie, primeira_liga, championship, belgian_pro_league | `<league>/history/matches_*.csv` | **writes** |
+| epl, la_liga, bundesliga, serie_a, ligue_1 | `<league>/team_history/teams_*.csv` | **la_liga fails, all 3 dates** |
+
+Everything that writes is on a branch that never reads `team_history`. The only
+queued unit that does is la_liga. epl/bundesliga/serie_a/ligue_1 are not exercised
+at all — their seasons open 08-21/08-22/08-28, outside the 7-day sim horizon — so
+**la_liga is the sole Understat unit and the hypothesis rests on one league.**
+
+Against it, and unresolved: `bootstrap_data_root._sync_tree` copies
+`data/soccer_source` recursively, it is in `BOOTSTRAP_ROOTS`,
+`SYNDICATE_BOOTSTRAP_ON_START=1` on refresh-worker, and that service rebooted
+twice on 2026-08-11. `team_history` *should* be on the disk.
+
+`#356` explained which unit won the slot. This is why la_liga winning it never
+produced anything. **Every la_liga launch fails in 9–14 seconds with exit 1** —
+44 clean launches, zero writes — while its board fixtures are served from git
+artifacts stamped 2026-07-20. The other five active leagues launch and write
+normally, which is what makes this a branch problem rather than a soccer problem.
 
 **The chain, measured 2026-08-11 — each link has its own evidence:**
 
@@ -40,12 +72,14 @@ old.
    fallback that `_api_read_path` gives every web-side reader — and `--skip-mirror`
    means nothing ever copies it across. Soccer is the only sport of eight whose
    `mirror_refresh_latest.json` does not exist.
-6. **The proof that the disk is empty and the board is served from git:** the
+6. **La_liga's board fixtures are served from git, not from a live sim:** the
    worker prints `SOCCER_UNIT_OUTCOME unit=la_liga|2026-08-15 exists=False
    file_age_s=-1`, while web serves that exact fixture fully simulated. The
    git-tracked `recommendations_2026-08-15.json` carries
-   `generated_at: 2026-07-20T21:32`. All 10 leagues render 100% simulated off
-   files of that vintage.
+   `generated_at: 2026-07-20T21:32`. Every league renders 100% simulated on the
+   board — **which is why nothing looked wrong.** That reading says nothing about
+   freshness, and reading it as health is the mistake that hid this (and that
+   produced the retracted "no soccer sim since 07-20" claim above).
 
 **Why it stayed invisible for 22 days — three instruments, all structurally blind:**
 
