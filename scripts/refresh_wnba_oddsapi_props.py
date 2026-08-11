@@ -4239,7 +4239,32 @@ def _run_refresh_via_cli(
     return state
 
 
-def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None) -> dict[str, object] | None:
+def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None, step_key: str | None = None) -> dict[str, object] | None:
+    """Reusable prior outputs, or None if this step must actually run.
+
+    `#345`: THE `input_hash` ARGUMENT WAS ACCEPTED AND NEVER READ. Reuse was
+    decided purely by "do these CSV files exist and have content", and those
+    files exist from any earlier run -- so this returned "reusable" forever.
+    Measured on production 2026-08-11: WNBA made ZERO OddsAPI calls across a
+    45-minute live slate (`wnba_calls` pinned at 1158 while MLB climbed
+    135,645 -> 135,714), while the caller computed a fresh hash every tick and
+    handed it in. Confirmed by the `#344` diagnostic: `input_hash` changed
+    (5a845929 -> 23c96420) and the decision stayed `reused_source_root_state`.
+
+    The function's own comment already records the SAME defect from 2026-07-19 --
+    "once the older CSV artifacts existed from any earlier run, this reported
+    'reusable' forever" -- fixed then by appending one more file to
+    `required_paths`. That treats the symptom: existence-based reuse cannot
+    express "the inputs changed", so every fix is another required file until
+    the next input moves without deleting one.
+
+    Now it consults `should_recompute`, against the hash `record_refresh_state`
+    already persists after every successful run. Both halves of that machinery
+    existed; only the read was missing.
+
+    Existence is still checked FIRST and still wins: a matching hash cannot make
+    absent outputs reusable.
+    """
     raw_root = source_root / "data" / "raw"
     processed_root = source_root / "data" / "processed"
     snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
@@ -4276,6 +4301,12 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     if any(not _path_has_meaningful_content(path) for path in required_paths):
         return None
 
+    # The inputs moved -> the outputs on disk are stale no matter how complete
+    # they look. Absent a recorded hash `should_recompute` returns True, so a
+    # first run always fetches rather than trusting leftovers.
+    if step_key and input_hash and should_recompute(str(step_key), str(input_hash)):
+        return None
+
     started = str(started_at or "") or str(dt.datetime.utcnow().isoformat())
     ended = str(dt.datetime.utcnow().isoformat())
     return {
@@ -4309,7 +4340,11 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     }
 
 
-def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None) -> dict[str, object] | None:
+def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None, step_key: str | None = None) -> dict[str, object] | None:
+    """`#345`: same fix as `_existing_refresh_state` -- it took `input_hash` and
+    never read it either. Fixed together because leaving one existence-only
+    guard behind the other just moves the permanent-reuse to the second branch.
+    """
     raw_root = artifact_root / "data" / "raw"
     processed_root = artifact_root / "data" / "processed"
     snapshot_path = raw_root / f"odds_wnba_player_props_{date_str}.csv"
@@ -5522,6 +5557,14 @@ def main() -> int:
             do_export=bool(args.do_export),
             artifact_root=artifact_root_path,
         )
+        # THE SAME KEY `record_refresh_state` writes below (`#345`). Derived once
+        # so the read and the write cannot drift: a guard consulting a different
+        # key than the recorder is indistinguishable from no guard at all, and
+        # would restore the permanent reuse this fixes.
+        _reuse_step_key = (
+            f"wnba_artifact_bundle:{_refresh_state_scope_path(artifact_root_path)}:"
+            f"{target_date}:{int(bool(args.do_edges))}:{int(bool(args.do_export))}"
+        )
         _reuse_source = None
         if source_root is not None and not bool(args.force_refresh):
             state = _existing_refresh_state(
@@ -5531,6 +5574,7 @@ def main() -> int:
                 do_export=bool(args.do_export),
                 started_at=started_at,
                 input_hash=refresh_input_hash,
+                step_key=_reuse_step_key,
             )
             _reuse_source = state is not None
         if state is None and artifact_root and not bool(args.force_refresh):
@@ -5541,6 +5585,7 @@ def main() -> int:
                 do_export=bool(args.do_export),
                 started_at=started_at,
                 input_hash=refresh_input_hash,
+                step_key=_reuse_step_key,
             )
         # `#344`: SAY WHICH BRANCH SERVED, and put it somewhere readable.
         #
@@ -5576,6 +5621,7 @@ def main() -> int:
                     "date": str(target_date),
                     "decision": _decision,
                     "input_hash": str(refresh_input_hash),
+                    "step_key": _reuse_step_key,
                     "force_refresh": bool(args.force_refresh),
                     "recorded_at": dt.datetime.utcnow().isoformat() + "Z",
                 },
