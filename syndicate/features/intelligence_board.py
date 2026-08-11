@@ -151,8 +151,45 @@ def _recommendation_lane(item: Mapping[str, Any]) -> str:
     return "pregame"
 
 
+def _flatten_layer2_score(card: dict[str, Any]) -> None:
+    """Reduce Layer 2's `score` BREAKDOWN to the number, keeping the breakdown.
+
+    `#361`. `layer2_board.py:688` carries `"score": dict(score)` deliberately, so
+    the board can show WHY a row ranks. Two consumers then read that key as a
+    scalar, and both failed differently on the same value:
+
+    LOUD -- `intelligence._normalize_opportunity_item:188` does
+    `if score in {None, ""}`, a set-membership test, which raises
+    `TypeError: unhashable type: 'dict'`. Measured in production 2026-08-11:
+    `/api/intelligence/query` returned HTTP 500 on 2/2 requests with the page's
+    own payload. `intelligence.html:2196` turns that into a permanent "Refresh
+    failed", so the board paints once from server-embedded state and never
+    updates again.
+
+    SILENT, AND WORSE -- `_number()` returns None for a dict and the sort key
+    wraps it `or 0.0`, so the ranking never crashed; it just discarded Layer 2's
+    composite for all 259 rendered cards and fell through to `simulated_edge`.
+    The board was ordering on raw EV, and demonstrably promoting staler quotes:
+    a card scoring 0.9724 rendered third, below two cards at 0.7276 whose
+    `freshness_factor` was 0.25 against its 0.5.
+
+    Fixed HERE rather than at either consumer because this is the one place every
+    board card is built, and a guard added at the crash site would have fixed the
+    500 while leaving the ranking silently inert -- the more expensive half.
+    """
+    score = card.get("score")
+    if not isinstance(score, Mapping):
+        return
+    card.setdefault("score_breakdown", dict(score))
+    # `.get("score")`, not a truthiness fallback: a genuine 0.0 composite is a
+    # real ranking, and coercing it to None would hand this row back to the same
+    # `or 0.0` path the breakdown was being lost to.
+    card["score"] = score.get("score")
+
+
 def _recommendation_card(item: Mapping[str, Any]) -> dict[str, Any]:
     card = _copy_mapping(item)
+    _flatten_layer2_score(card)
     if card.get("artifact_features") or card.get("feature_coverage"):
         card["artifact_features"] = dict(card.get("artifact_features") or {})
         card["feature_coverage"] = dict(card.get("feature_coverage") or card.get("artifact_features", {}).get("feature_coverage") or {})

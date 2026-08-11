@@ -1,5 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#361` — FIXED, pending web deploy. Layer 2's score breakdown 500'd the intelligence endpoint, and silently flattened the board's ranking to zero
+
+`layer2_board.py:688` carries `"score": dict(score)` deliberately, so the board
+can show WHY a row ranks. Two consumers read that key as a scalar and both broke
+on it — in opposite ways, which is why only one was ever noticed.
+
+**LOUD.** `intelligence._normalize_opportunity_item` used `if score in {None, ""}`.
+That is a SET-MEMBERSHIP test: it hashes its operand and raises
+`TypeError: unhashable type: 'dict'`. It reads like a null check and is not one.
+Reproduced in production 2026-08-11, 2/2, with the page's own payload
+(`question: "top edges today"`): **`/api/intelligence/query` → HTTP 500.**
+`intelligence.html:2196` turns a non-ok response into `setRefreshStatus("Refresh
+failed")`, and the 60s poll at `:2261` fails forever after. So the board paints
+once from server-embedded state, reads "Refresh failed", and never updates. That
+is the thing the user could not use.
+
+**SILENT, AND THE MORE EXPENSIVE HALF.** `_number()` returns `None` for a
+Mapping, and the sort key wraps it `or 0.0` — so it never crashed, it just threw
+the composite away. **All 259 rendered cards ranked at 0.0**, and the board fell
+through to `simulated_edge`, i.e. it ordered on raw EV. Concretely: a card with
+composite `0.9724` rendered THIRD, below two cards at `0.7276` whose
+`freshness_factor` was `0.25` against its `0.5`. **The board was promoting staler
+quotes over fresher ones, and nothing anywhere said so.**
+
+**Fixed in `intelligence_board._flatten_layer2_score`** — the one place every card
+is built — which reduces `score` to its number and keeps the breakdown as
+`score_breakdown`. Deliberately NOT fixed only at the crash site: a guard there
+restores the endpoint and leaves the ranking inert, closing the symptom that
+shouts and keeping the one that costs money.
+
+The crash-site comparison is still hardened as belt-and-braces, because **the
+hazard is the comparison, not the field that tripped it** — `x in {None, ""}`
+raises for any unhashable value on any key. Replaced with `is None or == ""` on
+`edge`, `score` and `normalized_edge`.
+
+Tests: `tests/test_layer2_score_flatten.py` (7), incl. that a genuine `0.0`
+composite survives (a truthiness fallback would hand it straight back to the
+`or 0.0` path this exists to escape). 81 pass across the layer2/board suites.
+
+**Credit:** found by the Layer 1/Layer 2 lane, which also killed my own lead —
+I flagged WNBA's `rows_modelled_fair` 88-vs-729 as the likely Layer 1 defect and
+it is not a coverage metric at all (it counts one-sided rows filled; MLB and WNBA
+are both at 100%). See `#362` for the real WNBA gap.
+
 ### `#359` — FIXED, pending deploy. A fresh artifact that lands outside the publish sweep's window is never published — the sim writes and the board never sees it
 
 **Fix:** the live-lens publish watermark is now persisted

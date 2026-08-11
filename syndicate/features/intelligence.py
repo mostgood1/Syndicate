@@ -181,11 +181,22 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
         selection = payload.get("selection") or payload.get("pick") or payload.get("name") or payload.get("label")
         market = payload.get("market") or payload.get("market_label") or payload.get("market_key")
         sport_slug = payload.get("sport_slug") or payload.get("sport")
+        # `#361`: `x in {None, ""}` is a SET-MEMBERSHIP test, so it hashes `x` and
+        # raises `TypeError: unhashable type: 'dict'` on any dict/list value. It
+        # reads like a null check and is not one. Layer 2 legitimately carries a
+        # `score` BREAKDOWN dict here, and this line returned HTTP 500 on every
+        # `/api/intelligence/query` request until it was flattened upstream in
+        # `intelligence_board._flatten_layer2_score`.
+        #
+        # Kept as belt-and-braces after that fix, because the hazard is the
+        # comparison, not the one field that happened to trip it: any future
+        # unhashable value on ANY of these keys crashes the endpoint the same way,
+        # and `is None or == ""` costs nothing and cannot raise.
         edge = payload.get("edge")
-        if edge in {None, ""}:
+        if edge is None or edge == "":
             edge = payload.get("normalized_edge")
         score = payload.get("score")
-        if score in {None, ""}:
+        if score is None or score == "":
             score = payload.get("adjusted_score") or payload.get("expected_value") or payload.get("ev_current") or 0.0
         payload["selection"] = selection
         # Do NOT overwrite an existing name with the selection. This helper adds
@@ -204,7 +215,8 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
         payload["score"] = score
         payload["sport_slug"] = str(sport_slug or "").strip().lower() or None
         payload["edge"] = edge
-        if payload.get("normalized_edge") in {None, ""} and edge not in {None, ""}:
+        normalized_edge = payload.get("normalized_edge")
+        if (normalized_edge is None or normalized_edge == "") and not (edge is None or edge == ""):
             payload["normalized_edge"] = edge
         # Consumers read american_odds off these items (price displays, the
         # plus-money contract); only pool-serialized candidates carried it,
