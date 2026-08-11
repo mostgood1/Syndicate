@@ -3755,3 +3755,78 @@ class MlbLiveProbeReasonTests(unittest.TestCase):
         self.assertEqual(output.count("MLB_LIVE_PROBE"), 1)
         self.assertIn("live=True", output)
         self.assertIn("CHANGED", output)
+
+
+class MlbLiveHysteresisTests(unittest.TestCase):
+    """`#339` fix: a leg that CANNOT answer must not read as "nothing is live".
+
+    Measured 2026-08-11: `report=no_payload` on every evaluation on
+    live-odds-worker (that path is keyvalue-backed; the report is on disk), so
+    the 2026-07-17 "either source is enough" redundancy runs on ONE leg. A single
+    15s subprocess timeout then flips a live slate to the 2-hour pregame
+    interval -- sufficient to explain a 91-minute capture stall the same evening.
+    """
+
+    def setUp(self):
+        live_refresh_loop._MLB_LIVE_PROBE_LOG["decision"] = None
+        live_refresh_loop._MLB_LIVE_PROBE_LOG["at"] = 0.0
+
+    def _probes(self, report, schedule):
+        return (
+            patch.object(live_refresh_loop, "_mlb_live_game_via_report_probe", return_value=report),
+            patch.object(live_refresh_loop, "_mlb_live_game_via_schedule_probe", return_value=schedule),
+        )
+
+    def test_a_timeout_right_after_a_live_observation_holds_live(self):
+        live_refresh_loop._MLB_LIVE_LAST_TRUE["at"] = live_refresh_loop.time.time() - 60
+        rep, sch = self._probes((False, "no_payload"), (False, "timeout:15.0s"))
+        with rep, sch:
+            self.assertTrue(live_refresh_loop._mlb_has_live_game("2026-08-10"))
+
+    def test_a_definitive_no_releases_immediately(self):
+        # THE property that keeps hysteresis honest. A slate really does end, and
+        # `pks=0` is the source answering, not failing.
+        live_refresh_loop._MLB_LIVE_LAST_TRUE["at"] = live_refresh_loop.time.time() - 60
+        rep, sch = self._probes((False, "no_payload"), (False, "pks=0"))
+        with rep, sch:
+            self.assertFalse(live_refresh_loop._mlb_has_live_game("2026-08-10"))
+
+    def test_the_hold_is_bounded(self):
+        live_refresh_loop._MLB_LIVE_LAST_TRUE["at"] = (
+            live_refresh_loop.time.time() - live_refresh_loop._MLB_LIVE_HYSTERESIS_SECONDS - 60
+        )
+        rep, sch = self._probes((False, "no_payload"), (False, "timeout:15.0s"))
+        with rep, sch:
+            self.assertFalse(live_refresh_loop._mlb_has_live_game("2026-08-10"))
+
+    def test_no_hold_without_a_prior_live_observation(self):
+        # A cold process that has never seen a live game must not invent one.
+        live_refresh_loop._MLB_LIVE_LAST_TRUE["at"] = 0.0
+        rep, sch = self._probes((False, "no_payload"), (False, "timeout:15.0s"))
+        with rep, sch:
+            self.assertFalse(live_refresh_loop._mlb_has_live_game("2026-08-10"))
+
+    def test_a_positive_from_either_leg_refreshes_the_anchor(self):
+        live_refresh_loop._MLB_LIVE_LAST_TRUE["at"] = 0.0
+        rep, sch = self._probes((False, "no_payload"), (True, "pks=4"))
+        with rep, sch:
+            self.assertTrue(live_refresh_loop._mlb_has_live_game("2026-08-10"))
+        self.assertGreater(live_refresh_loop._MLB_LIVE_LAST_TRUE["at"], 0.0)
+
+    def test_definitive_reason_classification(self):
+        for reason, indeterminate in (
+            ("live=0", False),
+            ("live=2", False),
+            ("pks=0", False),
+            ("pks=4", False),
+            ("no_payload", True),
+            ("timeout:15.0s", True),
+            ("exit=1:boom", True),
+            ("bad_json:'x'", True),
+            ("helper_missing", True),
+            ("launch_failed:OSError", True),
+        ):
+            with self.subTest(reason=reason):
+                self.assertIs(
+                    live_refresh_loop._probe_reason_is_indeterminate(reason), indeterminate
+                )

@@ -250,6 +250,22 @@ def _mlb_has_live_game_via_schedule(date_str: str, *, timeout_s: float = 15.0) -
 _MLB_LIVE_PROBE_LOG: dict[str, Any] = {"decision": None, "at": 0.0}
 _MLB_LIVE_PROBE_LOG_MIN_INTERVAL_S = 300.0
 
+# Last time either leg positively said "a game is live". Used only to ride out a
+# leg that could not answer -- never to override one that answered "no".
+_MLB_LIVE_LAST_TRUE: dict[str, float] = {"at": 0.0}
+_MLB_LIVE_HYSTERESIS_SECONDS = 600.0
+
+# A probe reason is DEFINITIVE when the source answered the question. `live=0`
+# and `pks=0` mean "I looked, nothing is live" -- a slate genuinely ending, which
+# must take effect immediately. Everything else (`timeout:`, `exit=`,
+# `no_payload`, `bad_json:`, `helper_missing`, `launch_failed:`) means the
+# source could not answer, which is not evidence that nothing is live.
+_DEFINITIVE_PROBE_PREFIXES = ("live=", "pks=")
+
+
+def _probe_reason_is_indeterminate(reason: str) -> bool:
+    return not str(reason or "").startswith(_DEFINITIVE_PROBE_PREFIXES)
+
 
 def _log_mlb_live_probe(decision: bool, report_reason: str, schedule_reason: str) -> None:
 	now = time.time()
@@ -289,11 +305,49 @@ def _mlb_has_live_game(date_str: str) -> bool:
 	# eight paths to False was taken. That is what the probes now emit.
 	report_live, report_reason = _mlb_live_game_via_report_probe(date_str)
 	if report_live:
+		_MLB_LIVE_LAST_TRUE["at"] = time.time()
 		_log_mlb_live_probe(True, report_reason, "not_consulted")
 		return True
 	schedule_live, schedule_reason = _mlb_live_game_via_schedule_probe(date_str)
-	_log_mlb_live_probe(schedule_live, report_reason, schedule_reason)
-	return schedule_live
+	if schedule_live:
+		_MLB_LIVE_LAST_TRUE["at"] = time.time()
+		_log_mlb_live_probe(True, report_reason, schedule_reason)
+		return True
+
+	# HYSTERESIS, and it is the fix rather than the diagnostic (`#339`).
+	#
+	# Measured 2026-08-11: `report=no_payload` on EVERY evaluation on
+	# live-odds-worker, because that path is keyvalue-backed while the report is
+	# written to disk (`project_keyvalue_artifact_split_blinds_guards`). So the
+	# "either source is enough" redundancy added on 2026-07-17 has been running
+	# on ONE leg, and a single 15s subprocess timeout flips a live slate to the
+	# 2-hour pregame interval. That is a sufficient mechanism for the 91-minute
+	# capture stall the same evening.
+	#
+	# The distinction that makes this safe is the one the probes now emit: a leg
+	# that ANSWERED "nothing is live" (`pks=0`, `live=0`) is a definitive
+	# negative and must be honoured immediately -- a slate really does end. A leg
+	# that could not answer (`timeout`, `exit=`, `no_payload`, `bad_json`) is not
+	# evidence of anything, and treating it as "not live" is the bug.
+	#
+	# So: only when NO leg gave a definitive negative do we hold the last known
+	# TRUE, and only briefly. Bounded at 10 minutes because the cost of holding
+	# too long is sweeping a finished slate at live cadence for a few extra
+	# ticks, while the cost of releasing too early is what happened tonight.
+	definitive_negative = not _probe_reason_is_indeterminate(report_reason) or not _probe_reason_is_indeterminate(schedule_reason)
+	if not definitive_negative:
+		since = time.time() - float(_MLB_LIVE_LAST_TRUE.get("at") or 0.0)
+		if 0 < since < _MLB_LIVE_HYSTERESIS_SECONDS:
+			print(
+				f"[live_refresh_loop] MLB_LIVE_PROBE_HELD live=True(held) "
+				f"report={report_reason} schedule={schedule_reason} "
+				f"since_last_true_s={round(since, 1)} bound_s={_MLB_LIVE_HYSTERESIS_SECONDS}",
+				flush=True,
+			)
+			return True
+
+	_log_mlb_live_probe(False, report_reason, schedule_reason)
+	return False
 
 
 def _espn_has_live_game(sport: str, date_str: str, *, timeout_s: float = 12.0) -> bool:
