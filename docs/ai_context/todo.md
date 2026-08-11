@@ -1,5 +1,54 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#354` — FIXED AND SHIPPED (`f79c46a1`, web deploy). The Layer 1 board printed a UTC clock and stacked a week of fixtures in one column
+
+Three defects reported off the soccer board by the user. All view-layer, all in
+`syndicate/templates/shared/layer1_board.html`.
+
+**Times.** `start_time_utc.slice(11,16) + "Z"`. A Championship match kicking off
+at 12:30 BST read `11:30Z`; an MLS game at 7:30pm ET read `23:30Z`. Every sport
+was affected — soccer worst, because its fixtures span the most zones. Now
+rendered in the viewer's own zone, with the zone named in the meta line.
+
+**THE PARSE IS THE PART THAT BITES.** The payload mixes three timestamp formats
+in the same response — naive (`2026-08-15T17:30:00`), Z-suffixed, and `+00:00`
+offset — and per ES2015 an offset-less date-**time** parses as **local**. So the
+obvious `new Date(raw)` shifts every kickoff by the viewer's offset and produces
+times that look entirely plausible: that La Liga match reads 5:30pm to a Chicago
+viewer instead of 12:30pm. Silent, directional, and invisible to any test that
+only checks a time was rendered. `parseUtc` forces the zone and honours an
+explicit offset rather than overwriting it.
+
+**Dates.** Soccer defaults to a 7-day slate window (`#329`), so the board merged
+08-11..08-17 into one flat list grouped by *game* and never by *date*. Each
+fixture was filed correctly — what was missing was any way to see that, which is
+why it was reported as "does not file under correct game dates". Date headers
+now appear only when a board actually spans more than one local day: MLB, NBA,
+NHL, WNBA and NCAAB are untouched; NFL (5d) and NCAAF (3d) get the same fix.
+
+Bucketing is on the **local** calendar day, not `start_time_utc.slice(0,10)`.
+An MLS kickoff at `2026-08-16T00:30Z` is a Saturday-night game to everyone
+watching it, and the UTC date filed it under Sunday.
+
+**League filter.** Existed since `#329` and was still reported as missing —
+fairly. It rendered as a third unlabelled strip of grey chips directly under the
+market and segment strips, carrying raw slugs (`la_liga 2`). Now prefixed
+`League` and named (`La Liga 2`). *A control nobody can pick out of three
+identical rows is functionally not there* — worth remembering before closing any
+future item on the grounds that the code exists.
+
+**The test executes the JavaScript under node; it does not grep for it**
+(`tests/test_layer1_board_local_time.py`). `#350` is the standing reason: a
+template that used `projAge`/`projStale` without declaring them passed every
+substring assertion and would have thrown `ReferenceError` on first paint. TZ is
+pinned per case and the pin was verified to bite (`Asia/Tokyo` moves the
+assertion), so it is not a no-op on a Central-time dev box.
+
+Verified against the **live production payload**, not a fixture: 4 soccer
+fixtures across 3 local days rendered as `Fri 8/14` / `Sat 8/15` / `Sun 8/16`,
+with `18:00Z -> 1:00p`, `11:30Z -> 6:30a`, and `2026-08-16T00:30Z -> 7:30p`
+filed under `Sat 8/15`.
+
 ### `#351` — PARTLY FIXED. The 10-season history landed, and the audit found the gate one layer down was the real hole
 
 **The history is committed** (`82ba1318`): 196 rows / 1 season -> 2,388 rows /
