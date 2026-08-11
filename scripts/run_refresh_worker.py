@@ -152,9 +152,35 @@ def _bootstrap_soccer_history_seed_files() -> None:
     # schedule read (which had pinned every league to `--week 1`), and the run
     # then got one step further and died here instead. Both had to be fixed;
     # neither alone produces a sim.
+    # BOTH ratings inputs, because `_load_team_ratings` has TWO disk branches and
+    # seeding one of them is what left this half-fixed for a further session
+    # (`#361`):
+    #
+    #   mls                                    live ASA fetch, nothing on disk
+    #   eredivisie/primeira/championship/       <league>/history/matches_*.csv
+    #     belgian_pro_league                      -- seeded since the comment above
+    #   epl/la_liga/bundesliga/serie_a/ligue_1  <league>/team_history/teams_*.csv
+    #                                             -- NOT seeded until now
+    #
+    # Both raise `SystemExit` on an empty glob, so both exit ~10s before writing
+    # anything. Measured 2026-08-11: after the `history` seeding landed, the four
+    # goals-based leagues began writing and la_liga did not -- 44 launches, 0
+    # writes -- and the split read as a per-league data problem rather than as a
+    # per-BRANCH one for most of a session.
+    #
+    # This is latent for four more leagues, not just a la_liga fix. epl,
+    # bundesliga, serie_a and ligue_1 take the same Understat branch and open on
+    # 08-21/08-22/08-28, so they sit outside the 7-day sim horizon today and would
+    # each have failed identically on entering it.
     seeded_leagues = _bootstrap_soccer_seed_files(relative_subdir="history", glob_pattern="*.csv")
     if seeded_leagues:
         print(f"[refresh_worker] SOCCER_HISTORY_SEED_BOOTSTRAPPED leagues={seeded_leagues}", flush=True)
+    seeded_team_history = _bootstrap_soccer_seed_files(relative_subdir="team_history", glob_pattern="teams_*.csv")
+    if seeded_team_history:
+        print(
+            f"[refresh_worker] SOCCER_TEAM_HISTORY_SEED_BOOTSTRAPPED leagues={seeded_team_history}",
+            flush=True,
+        )
 
 
 def _default_latest_manifest_path() -> Path:
