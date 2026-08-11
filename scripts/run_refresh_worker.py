@@ -625,10 +625,18 @@ def _report_soccer_unit_outcome(last_status: dict) -> None:
     launched = float(last_status.get("lastLaunchEpoch") or 0.0)
     if not unit_key or launched <= 0.0:
         return
-    # `lastUnit` is "<league>:<date>" (see `_soccer_unit_key`); a week-scope unit
-    # has no date and cannot be checked this way.
-    league, _, unit_date = unit_key.partition(":")
-    if not league or not unit_date:
+    # `lastUnit` is "<league>|<date>" -- see `_soccer_unit_key`, which uses a
+    # PIPE. I first wrote this parsing on ":" without reading that function, so
+    # the split produced no date, the guard below returned early, and the
+    # diagnostic printed NOTHING on every tick. An instrument that declines
+    # silently is the exact defect it was built to expose, so it now says so.
+    league, sep, unit_date = unit_key.partition("|")
+    if not sep or not league or not unit_date:
+        print(
+            f"[refresh_worker] SOCCER_UNIT_OUTCOME_UNPARSED unit={unit_key!r} "
+            "expected=<league>|<date>",
+            flush=True,
+        )
         return
     try:
         from syndicate.features.shared.refresh_state_store import data_root

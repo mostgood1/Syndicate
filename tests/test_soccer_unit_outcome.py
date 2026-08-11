@@ -45,7 +45,7 @@ def test_a_unit_that_left_a_stale_file_reads_as_not_written(worker, tmp_path, mo
     import syndicate.features.shared.refresh_state_store as store
     monkeypatch.setattr(store, "data_root", lambda: tmp_path)
     _make(tmp_path, "la_liga", "2026-08-15", mtime=time.time() - 22 * 86400)
-    worker._report_soccer_unit_outcome({"lastUnit": "la_liga:2026-08-15", "lastLaunchEpoch": time.time() - 60})
+    worker._report_soccer_unit_outcome({"lastUnit": "la_liga|2026-08-15", "lastLaunchEpoch": time.time() - 60})
     out = capsys.readouterr().out
     assert "SOCCER_UNIT_OUTCOME" in out
     assert "exists=True" in out
@@ -56,7 +56,7 @@ def test_a_unit_that_wrote_reads_as_written(worker, tmp_path, monkeypatch, capsy
     import syndicate.features.shared.refresh_state_store as store
     monkeypatch.setattr(store, "data_root", lambda: tmp_path)
     _make(tmp_path, "mls", "2026-08-15", mtime=time.time())
-    worker._report_soccer_unit_outcome({"lastUnit": "mls:2026-08-15", "lastLaunchEpoch": time.time() - 60})
+    worker._report_soccer_unit_outcome({"lastUnit": "mls|2026-08-15", "lastLaunchEpoch": time.time() - 60})
     out = capsys.readouterr().out
     assert "wrote_since_launch=True" in out
 
@@ -66,7 +66,7 @@ def test_an_absent_file_is_distinct_from_a_stale_one(worker, tmp_path, monkeypat
     # render the same way -- absent means the unit produced nothing at all.
     import syndicate.features.shared.refresh_state_store as store
     monkeypatch.setattr(store, "data_root", lambda: tmp_path)
-    worker._report_soccer_unit_outcome({"lastUnit": "eredivisie:2026-08-14", "lastLaunchEpoch": time.time() - 60})
+    worker._report_soccer_unit_outcome({"lastUnit": "eredivisie|2026-08-14", "lastLaunchEpoch": time.time() - 60})
     out = capsys.readouterr().out
     assert "exists=False" in out
     assert "file_age_s=-1" in out
@@ -84,3 +84,21 @@ def test_it_runs_before_the_gates_so_it_cannot_go_silent(worker):
     call = src.index("_report_soccer_unit_outcome(last_status)")
     units = src.index("units, scope_kind = _soccer_refresh_units(selected_date)")
     assert call < units, "the outcome report must run before the unit gates"
+
+
+def test_the_key_separator_matches_soccer_unit_key(worker):
+    """The bug this shipped with: I parsed `lastUnit` on ":" without reading
+    `_soccer_unit_key`, which joins on "|". The split yielded no date, the guard
+    returned early, and the diagnostic printed nothing on EVERY tick -- an
+    instrument declining silently, which is the exact defect it exists to
+    expose.
+    """
+    key = worker._soccer_unit_key({"league": "la_liga", "date": "2026-08-15"})
+    assert key == "la_liga|2026-08-15"
+    league, sep, date = key.partition("|")
+    assert sep and league == "la_liga" and date == "2026-08-15"
+
+
+def test_an_unparseable_key_says_so_rather_than_returning_silently(worker, capsys):
+    worker._report_soccer_unit_outcome({"lastUnit": "nonsense", "lastLaunchEpoch": 1.0})
+    assert "SOCCER_UNIT_OUTCOME_UNPARSED" in capsys.readouterr().out
