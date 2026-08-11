@@ -670,6 +670,64 @@ def _soccer_unit_wrote_since(unit_key: str, launched_epoch: float) -> tuple[bool
     return bool(mtime >= launched_epoch - 5.0), str(rec_path), mtime
 
 
+def _report_soccer_unit_failure(latest_manifest_path: Path) -> None:
+    """Say WHY the last soccer run failed, in the worker's own log (`#357`).
+
+    THE FAILURE WAS NEVER HIDDEN -- IT WAS WRITTEN DOWN AND NOTHING READ IT.
+    Every soccer run on 2026-08-11 recorded `exitCode: 1` with a 9-14s runtime in
+    the shared manifest, while the board showed ten leagues fully simulated off
+    git artifacts stamped 2026-07-20. Three instruments were each blind in a
+    different way: the launcher is fire-and-forget, `SOCCER_UNIT_OUTCOME` reports
+    only that the file is absent, and `stderr_preview` is computed READ-SIDE
+    against a path on the other service's disk -- so on web it is `""` always,
+    which is not "no error" but "wrong disk".
+
+    The asymmetry this exploits: **the worker CAN read its own stderr file.** The
+    bytes were on local disk the whole time; only the reader was on the wrong
+    service. So the tail goes to stdout, which Render's collector does receive.
+
+    Deliberately reports FAILURES only, and only the tail. A per-tick dump of a
+    healthy run would be the log spam `_soccer_autorun_skipped` already avoids.
+    """
+    try:
+        manifest = _refresh_state_store()["read_json_file"](latest_manifest_path) or {}
+    except Exception:
+        return
+    if str(manifest.get("oddsSports") or "").strip().lower() != "soccer":
+        return
+    exit_code = manifest.get("exitCode")
+    if exit_code in (None, 0):
+        return
+    run_stamp = str(manifest.get("runStamp") or "")
+    stderr_path = str(((manifest.get("externalRunner") or {}).get("stderrPath")) or "")
+    tail = ""
+    if stderr_path:
+        try:
+            # The interesting lines are the last ones; a failed soccer run also
+            # emits megabytes of ALL_PROCESS_MEMORY, so read the end and drop the
+            # heartbeat noise rather than printing whatever happens to be there.
+            text = Path(stderr_path).read_text(encoding="utf-8", errors="replace")[-20000:]
+            lines = [
+                line
+                for line in text.splitlines()
+                if line.strip()
+                and "ALL_PROCESS_MEMORY" not in line
+                and "PROCESS_TREE_MEMORY" not in line
+                and "PROCESS_ENUM_DEBUG" not in line
+                and "CONTAINER_MEMORY" not in line
+                and not line.startswith("[refresh_odds_sources] THREADS")
+                and not line.startswith("[refresh_odds_sources] RUNTIME_SNAPSHOT")
+            ]
+            tail = " | ".join(lines[-6:])[:1200]
+        except Exception as exc:  # noqa: BLE001
+            tail = f"<unreadable: {type(exc).__name__}: {exc}>"
+    print(
+        f"[refresh_worker] SOCCER_RUN_FAILED exit_code={exit_code} run_stamp={run_stamp} "
+        f"stderr_path={stderr_path or '<none>'} tail={tail or '<empty>'}",
+        flush=True,
+    )
+
+
 def _report_soccer_unit_outcome(last_status: dict) -> None:
     """Did the PREVIOUS soccer unit actually write its artifact? (`#352`)
 
@@ -789,6 +847,10 @@ def _launch_autorun_soccer_weekly_refresh(
     # one -- an outcome that only prints when a new launch happens would go
     # silent exactly when the units stop working.
     _report_soccer_unit_outcome(last_status)
+    # `#357`: and WHY, if the run that produced that outcome failed. Same
+    # placement and same reason -- the cause must print on the tick where the
+    # outcome does, not only when a new launch happens.
+    _report_soccer_unit_failure(latest_manifest_path)
 
     # #282: one job per league-date instead of one job for all ten leagues.
     units, scope_kind = _soccer_refresh_units(selected_date)

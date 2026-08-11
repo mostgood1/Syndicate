@@ -1078,6 +1078,93 @@ def _soccer_artifact_scope_args(league: str, fallback_date: str, *, pinned_date:
     return ("--date", fallback_date)
 
 
+# `#357`. build_soccer_artifacts.py hard-requires a per-league ratings history and
+# EXITS 1 when it is absent, but nothing in this orchestrator has ever created one
+# -- `fetch_soccer_history_local.py` appeared nowhere in this file. A pipeline that
+# requires an input no step produces cannot recover from ever losing it, and the
+# loss is silent: the launcher is fire-and-forget and the subprocess's stderr goes
+# to a file on the worker's disk that web structurally cannot read.
+#
+# Three strategies, because `_load_team_ratings` has three branches and only the
+# middle one matches the error message most people would grep for:
+#
+#   mls                                    live ASA fetch, needs nothing on disk
+#   eredivisie/primeira_liga/championship/  <league>/history/matches_*.csv
+#     belgian_pro_league                        -> --kind matches
+#   epl/la_liga/bundesliga/serie_a/ligue_1  <league>/team_history/teams_*.csv
+#                                             -> --kind teams (Understat-only)
+_SOCCER_GOALS_BASED_RATING_LEAGUES = {"eredivisie", "primeira_liga", "championship", "belgian_pro_league"}
+_SOCCER_HISTORY_SEASON_DEPTH = {"matches": 3, "teams": 2}
+
+
+def _soccer_history_step(league: str, soccer_root: Path, python_exe: str) -> RefreshStep | None:
+    """Fetch this league's ratings history, but ONLY when it is missing.
+
+    Returns None when the files are already there, so this is not a per-tick
+    network fetch and is a strict no-op on a healthy disk -- the bootstrap sync
+    seeds `data/soccer_source` from the repo on every service start, so in the
+    normal case this step never materialises at all.
+
+    That "no-op when healthy" property is deliberate and worth stating: it means
+    shipping this CANNOT be confirmed by watching production go green. If the
+    disk already has history, nothing changes and the real failure is elsewhere.
+    The step is here so the pipeline can heal a genuinely bare disk, not as
+    evidence about what today's failure was.
+    """
+    if league == "mls":
+        return None
+    if league in _SOCCER_GOALS_BASED_RATING_LEAGUES:
+        kind, subdir, pattern = "matches", "history", "matches_*.csv"
+    else:
+        kind, subdir, pattern = "teams", "team_history", "teams_*.csv"
+    target_dir = soccer_root / league / subdir
+    try:
+        if any(target_dir.glob(pattern)):
+            return None
+    except Exception:
+        # Unreadable is not empty. Refetching over a directory we merely failed to
+        # stat would turn a transient IO error into a network call every tick.
+        return None
+    try:
+        season = int(soccer_default_season(league))
+    except Exception:
+        return None
+    # Completed seasons only: the current one is partial (or, in August, empty),
+    # and Understat/football-data publish it as it goes. Matches the season set
+    # already committed under data/soccer_source.
+    depth = _SOCCER_HISTORY_SEASON_DEPTH[kind]
+    seasons = ",".join(str(season - offset) for offset in range(depth, 0, -1))
+    print(
+        f"SOCCER_HISTORY_MISSING league={league} kind={kind} dir={target_dir} "
+        f"seasons={seasons} (adding a fetch step; the sim would otherwise exit 1)",
+        file=sys.stderr,
+        flush=True,
+    )
+    return RefreshStep(
+        name=f"soccer_{league}_history",
+        # Both phases, and FIRST in the step list: the autorun launches with
+        # --phase live, under which only `_artifacts` and `_live_state` run. A
+        # pregame-only prerequisite would never execute on the path that needs it.
+        phases=("pregame", "live"),
+        cwd=REPO_ROOT,
+        command=(
+            python_exe,
+            "scripts/fetch_soccer_history_local.py",
+            "--league",
+            league,
+            "--kind",
+            kind,
+            "--seasons",
+            seasons,
+            # Explicit: the fetcher defaults --out-dir to the REPO tree, which on
+            # Render is not the root the sim reads.
+            "--out-dir",
+            str(target_dir),
+        ),
+        description=f"Seed {league}'s {kind} history so the sim has ratings input.",
+    )
+
+
 def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
     python_exe = _venv_python(REPO_ROOT)
     soccer_root = _local_source_bundle_root("soccer")
@@ -1134,6 +1221,10 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
 
     pinned_date = str(getattr(args, "soccer_date", "") or "").strip()
     steps: list[RefreshStep] = []
+    for league in league_slugs:
+        history_step = _soccer_history_step(league, soccer_root, python_exe)
+        if history_step is not None:
+            steps.append(history_step)
     for league in league_slugs:
         steps.append(
             RefreshStep(

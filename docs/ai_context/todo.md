@@ -1,6 +1,16 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#357` — OPEN, ROOT-CAUSED, UNOWNED. No soccer sim has run in production since 2026-07-20; every simulated match on the board is a git-shipped artifact
+### `#357` — OPEN. No soccer sim has run in production since 2026-07-20; every simulated match on the board is a git-shipped artifact
+
+> **RETRACTION, same session.** This item first said the root cause was a missing
+> `team_history` directory on the worker disk. **That is not established.** I
+> reproduced `exit 1` by deleting the entire source tree and matched it against
+> production's `exit 1` — matching an OUTCOME, not confirming the BRANCH. Against
+> it: `bootstrap_data_root._sync_tree` copies `data/soccer_source` recursively,
+> `data/soccer_source` is in `BOOTSTRAP_ROOTS`, and `SYNDICATE_BOOTSTRAP_ON_START=1`
+> on the refresh-worker, which rebooted twice that day. History is probably ON the
+> disk and the real cause is something else. The confirmed facts below still hold;
+> the diagnosis does not.
 
 `#356` explained which unit won the slot. This is why winning it never produced
 anything. **Every soccer autorun launch fails in 9–14 seconds with exit 1**, and
@@ -53,19 +63,33 @@ perfect — 10/10 leagues, every match simulated — because the git mirror was
 serving. Freshness was never on the surface, so "the sims work" survived three
 weeks of them not running. Compare `#331`: presence is not currency.
 
-**Fix — three options, decide before building:**
+**SHIPPED so far — neither of these is claimed to fix the outage:**
 
-- (a) Seed `team_history` onto the worker disk and keep it there. Smallest change,
-  but 5 leagues have no history in git at all, so it fixes half the board.
-- (b) Add a history step to `refresh_odds_sources.py` so the pipeline creates its
-  own prerequisite. Correct, and the only option that covers all 10 leagues.
-- (c) Let `build_soccer_artifacts.py` fall back to the repo root when the disk
-  lacks history, mirroring `_api_read_path`. Cheapest, but re-creates the
-  "renders from a fallback" trap this item is about.
+**(b) A conditional history step** (`_soccer_history_step`). `fetch_soccer_history_local.py`
+appeared nowhere in `refresh_odds_sources.py`, so a disk that ever lost history
+could never recover. It now can. `_load_team_ratings` has three branches and the
+step matches all of them — mls fetches ratings live and needs nothing on disk,
+four goals-based leagues need `history/matches_*.csv` (`--kind matches`), the
+Understat five need `team_history/teams_*.csv` (`--kind teams`). It runs in the
+`live` phase (the autorun's phase) and is ordered ahead of the sim.
 
-**Whatever is chosen, the failure must become loud**: surface `exitCode` from the
-run manifest into the worker log at the point of the outcome check. The manifest
-already had `exitCode: 1` recorded on every run — the gap was that nothing read it.
+**It is a strict no-op when history is present, which means production going
+green would NOT be evidence it worked.** `tests/test_soccer_history_step.py` is
+the only thing that says it does; it asserts both directions.
+
+**The diagnostic that should actually settle this** (`SOCCER_RUN_FAILED`). The
+asymmetry nobody had exploited: **the worker CAN read its own stderr file** — the
+bytes were on local disk the whole time, only the reader was on the wrong
+service. The outcome check now reads the failed run's manifest, tails
+`odds_refresh.stderr.txt` past the memory-heartbeat noise, and prints exit code +
+tail to stdout, which Render's collector does receive.
+
+**Still open:** the actual cause, which the next failed tick should now state in
+its own words. Option (a) — seeding history from git — is HELD until that line
+proves something is missing, precisely because it would otherwise be an inert
+change that looks like a fix. Option (c) (let the builder fall back to the repo
+root) remains rejected: it re-creates the render-from-a-fallback trap that made
+this invisible for 22 days.
 
 ### `#356` — FIXED AND SHIPPED (`195f82d8`, refresh-worker deploy 20:35:53Z). One league that could launch but not write took every soccer slot
 
