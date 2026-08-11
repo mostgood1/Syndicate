@@ -77,7 +77,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from syndicate.features.shared.odds_book_quotes import closing_quotes  # noqa: E402
-from syndicate.features.shared.odds_book_quotes import read_book_quotes  # noqa: E402
+from syndicate.features.shared.odds_book_quotes import iter_book_quotes  # noqa: E402
 from syndicate.features.shared.refresh_state_store import data_root  # noqa: E402
 
 # Free, no OddsAPI credits. Only MLB is wired today; the others need their own
@@ -196,10 +196,21 @@ def _closing_rows(sport: str, date_str: str) -> list[dict[str, Any]]:
     identical bet set. Settling against a single book's close would rebuild the
     same bias on the settlement side.
     """
-    rows = read_book_quotes(sport, date_str)
-    if not rows:
+    # STREAMED, not whole-read (`#331`). `read_book_quotes` returns AND CACHES
+    # the entire shard: 478,782 parsed dicts is ~1.37GB resident for MLB, and
+    # this job would run daily on a worker measured at 3,211MB of 4,096 (885MB
+    # headroom). `closing_quotes` consumes an iterable and retains only one
+    # quote per market key, so the peak is bounded by market count rather than
+    # by quote-event count.
+    #
+    # Safe because `rows` is consumed EXACTLY ONCE here -- a generator passed to
+    # two consumers would silently give the second an exhausted iterator, which
+    # is the failure this swap could have introduced and does not.
+    closing = closing_quotes(iter_book_quotes(sport, date_str))
+    if not closing:
+        # Was `if not rows` -- which a generator makes vacuously true, so the
+        # emptiness check has to move here or it stops being one.
         return []
-    closing = closing_quotes(rows)
 
     best_by_market: dict[tuple, dict[str, Any]] = {}
     for quote in closing.values():
