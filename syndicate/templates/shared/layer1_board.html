@@ -39,6 +39,20 @@
   }
   .l1-tab--on { background: #1d4ed8; color: #fff; border-color: #2563eb; }
   .l1-tab--live.l1-tab--on { background: #b91c1c; border-color: #dc2626; }
+  /* Names the strip so the league filter is not a third anonymous row of chips. */
+  .l1-tabs__label {
+    align-self: center; font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
+    color: #6b7d94; padding-right: 2px;
+  }
+
+  /* Date separators on multi-day boards (soccer 7d, NFL 5d, NCAAF 3d). */
+  .l1-day {
+    display: flex; align-items: baseline; gap: 10px; margin: 18px 0 8px;
+    padding-bottom: 6px; border-bottom: 1px solid #1e2733;
+  }
+  .l1-day:first-child { margin-top: 0; }
+  .l1-day__name { font-size: 13px; font-weight: 600; color: #e8eef7; letter-spacing: .02em; }
+  .l1-day__count { font-size: 11px; color: #6b7d94; }
 
   .l1-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #9fb0c6; margin-bottom: 12px; }
   .l1-meta b { color: #e8eef7; }
@@ -150,6 +164,50 @@
   function pct(v) { return (v === null || v === undefined) ? "" : (v > 0 ? "+" : "") + Number(v).toFixed(1) + "%"; }
   function odds(v) { return (v === null || v === undefined) ? "·" : (v > 0 ? "+" + v : String(v)); }
 
+  // KICKOFF TIMES ARE RENDERED IN THE VIEWER'S OWN ZONE (`#354`).
+  //
+  // The board used to print `start_time_utc.slice(11,16) + "Z"`, so a Championship
+  // match kicking off at 12:30 BST read "11:30Z" and an MLS game at 7:30pm ET read
+  // "23:30Z". Soccer was worst because its fixtures span the most zones, but every
+  // sport was affected -- and a UTC clock is exactly the mistake I was corrected on
+  // earlier today when I called 8:20pm Pacific games "over".
+  //
+  // THE PARSE IS THE DANGEROUS PART. The payload carries NAIVE timestamps --
+  // "2026-08-15T17:30:00", no trailing Z, no offset -- and per ES2015 an
+  // offset-less date-TIME is parsed as LOCAL, not UTC. `new Date(raw)` would
+  // therefore shift every kickoff by the viewer's offset and produce times that
+  // look completely plausible: a 17:30Z La Liga match would read 5:30pm to a
+  // Chicago viewer instead of 12:30pm. Silent, directional, and invisible to any
+  // test that only checks a time was rendered. So the zone is forced explicitly.
+  function parseUtc(iso) {
+    if (!iso) { return null; }
+    var s = String(iso).trim().replace(" ", "T");
+    if (!/(Z|[+-]\d{2}:?\d{2})$/.test(s)) { s += "Z"; }
+    var d = new Date(s);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  function timeLabel(d) {
+    if (!d) { return ""; }
+    var h = d.getHours(), m = d.getMinutes(), ap = h >= 12 ? "p" : "a", h12 = h % 12;
+    return (h12 === 0 ? 12 : h12) + ":" + (m < 10 ? "0" : "") + m + ap;
+  }
+  function dayLabel(d) {
+    if (!d) { return ""; }
+    return DAYS[d.getDay()] + " " + (d.getMonth() + 1) + "/" + d.getDate();
+  }
+  // Local calendar day, NOT `start_time_utc.slice(0,10)`. An MLS kickoff at
+  // 2026-08-16T02:30Z is a Friday-night game to everyone watching it; bucketing on
+  // the UTC date would file it under Saturday.
+  function localDateKey(d) {
+    if (!d) { return ""; }
+    var m = d.getMonth() + 1, day = d.getDate();
+    return d.getFullYear() + "-" + (m < 10 ? "0" : "") + m + "-" + (day < 10 ? "0" : "") + day;
+  }
+  function viewerZone() {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; }
+  }
+
   // The side the PROJECTION describes, not the first side. Mirrors book_grid's
   // rule exactly -- rendering Proj/Edge against the wrong side is how a board
   // shows a real number attached to the bet nobody modelled.
@@ -199,16 +257,35 @@
     });
   }
 
+  var LEAGUE_LABELS = {
+    epl: "Premier League", la_liga: "La Liga", serie_a: "Serie A", bundesliga: "Bundesliga",
+    ligue_1: "Ligue 1", eredivisie: "Eredivisie", primeira_liga: "Primeira Liga",
+    belgian_pro_league: "Belgian Pro", championship: "Championship", mls: "MLS"
+  };
+  function leagueLabel(k) {
+    if (LEAGUE_LABELS[k]) { return LEAGUE_LABELS[k]; }
+    return String(k).split("_").map(function (w) {
+      return w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+    }).join(" ");
+  }
+
   function renderLeagues() {
     var b = state.board || {}, leagues = b.leagues || {};
     var keys = Object.keys(leagues);
     // Absent for single-competition sports rather than echoing the sport slug,
     // which would put a pointless one-item tab strip on seven boards.
     if (!keys.length) { q("l1-leagues").innerHTML = ""; return; }
-    var html = ['<span class="l1-tab' + (state.league ? "" : " l1-tab--on") + '" data-league="">All leagues</span>'];
+    keys.sort();
+    // Named and label-prefixed (`#354`). The filter has existed since `#329`, but
+    // it rendered as a third unlabelled strip of grey chips directly under the
+    // market and segment strips, carrying raw slugs ("la_liga 2"). It was reported
+    // as missing -- a control nobody can pick out of three identical rows is,
+    // functionally, not there.
+    var html = ['<span class="l1-tabs__label">League</span>',
+      '<span class="l1-tab' + (state.league ? "" : " l1-tab--on") + '" data-league="">All</span>'];
     keys.forEach(function (k) {
       var on = state.league === k ? " l1-tab--on" : "";
-      html.push('<span class="l1-tab' + on + '" data-league="' + esc(k) + '">' + esc(k) + " " + leagues[k] + "</span>");
+      html.push('<span class="l1-tab' + on + '" data-league="' + esc(k) + '">' + esc(leagueLabel(k)) + " " + leagues[k] + "</span>");
     });
     q("l1-leagues").innerHTML = html.join("");
     Array.prototype.forEach.call(q("l1-leagues").querySelectorAll("[data-league]"), function (el) {
@@ -294,6 +371,10 @@
       "<span><b>" + (c.rows || 0) + "</b> markets</span>",
       "<span><b>" + (c.rows_with_projection || 0) + "</b> with a projection</span>"
     ];
+    // Say WHICH clock. Kickoffs render in the viewer's own zone now, and an
+    // unlabelled time is how the previous UTC rendering went unnoticed.
+    var tz = viewerZone();
+    if (tz) { bits.push("<span>times in " + esc(tz) + "</span>"); }
     // PROVENANCE, not decoration. `#331` is the standing reason: the grid was
     // once built from 1.7% of the day's odds and every count downstream looked
     // entirely real. A thin board must be attributable to the artifact.
@@ -585,7 +666,7 @@
 
   function cardHtml(g) {
     var st = String(g.state || "unknown");
-    var when = g.start_time_utc ? String(g.start_time_utc).slice(11, 16) + "Z" : "";
+    var when = timeLabel(parseUtc(g.start_time_utc));
     var score = (g.away_score !== null && g.away_score !== undefined)
       ? " " + g.away_score + "–" + g.home_score : "";
     var visible = (g.rows || []).filter(function (r) {
@@ -613,6 +694,44 @@
       + "</div>";
   }
 
+  // MULTI-DAY BOARDS MUST SHOW THE DAY (`#354`).
+  //
+  // Soccer defaults to a 7-day slate window, so `/soccer/market-board` merged
+  // 08-11 through 08-17 into one flat list of cards grouped by GAME and never by
+  // DATE. Each fixture was filed correctly -- every card on the 08-15 board really
+  // did carry an 08-15 kickoff -- but a week of fixtures rendered as one
+  // undifferentiated column reads as though the dates are wrong, which is what was
+  // reported. NFL (5) and NCAAF (3) have the same window and the same symptom.
+  //
+  // Headers appear only when the board actually spans more than one local day, so
+  // the single-day sports (MLB, NBA, NHL, WNBA, NCAAB) are untouched.
+  function groupedHtml(games) {
+    var order = [], byDay = {};
+    games.forEach(function (g) {
+      var d = parseUtc(g.start_time_utc);
+      var key = localDateKey(d) || "unscheduled";
+      if (!byDay[key]) { byDay[key] = { label: d ? dayLabel(d) : "Time TBD", cards: [] }; order.push(key); }
+      byDay[key].cards.push(g);
+    });
+    order.sort();
+    var multi = order.length > 1;
+    var out = [];
+    order.forEach(function (key) {
+      var day = byDay[key];
+      // Cards can render empty when a market/segment filter excludes every row;
+      // building the header from the SURVIVING html, not the card count, keeps a
+      // date heading from sitting alone over nothing.
+      var cards = day.cards.map(cardHtml).filter(function (h) { return h; });
+      if (!cards.length) { return; }
+      if (multi) {
+        out.push('<div class="l1-day"><span class="l1-day__name">' + esc(day.label) + "</span>"
+          + '<span class="l1-day__count">' + cards.length + (cards.length === 1 ? " game" : " games") + "</span></div>");
+      }
+      out.push(cards.join(""));
+    });
+    return out.join("");
+  }
+
   function render() {
     var b = state.board || {};
     renderViews(); renderMarkets(); renderSegments(); renderLeagues(); renderMeta();
@@ -630,7 +749,7 @@
         + "</div>";
       return;
     }
-    q("l1-body").innerHTML = games.map(cardHtml).join("");
+    q("l1-body").innerHTML = groupedHtml(games);
     // Re-wire after every render: the buttons are new DOM each time, and a slip
     // whose buttons are wired once at load silently stops staging the moment a
     // tab is clicked.
