@@ -26415,6 +26415,38 @@ decide, now that it's confirmed running over budget, whether to keep it as
 is, finish the second half of the activation, or dial it back — a product
 call, not something to unilaterally revert here.
 
+✅ **`render.yaml` drift fixed same session** (`d9108f61`): added
+`SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS=eu,us_ex` to all three service
+blocks, matching what was already live — verified via the Render API
+before AND after push that env-var counts were unchanged (72/95/85) and
+`ADMIN_TOKEN` survived, since the pushed value already matched production
+(nothing for a sync to actually change). Scoped narrowly per user
+direction: only this one var, not the other ~35 live-only vars found in
+the same diff (two of which are secrets — `ADMIN_TOKEN`,
+`SYNDICATE_REFRESH_STATE_URL` — correctly never committed).
+
+> **Follow-up reading, 2026-08-11T15:15Z (same baseline, 87.2h window
+> total):**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 313,886s (87.2h, 176,432 obs) | 522,284 | 5,990.1 | **4.31M** | **86.3%** |
+>
+> **The 100.7% peak was itself transient — burn has come back down**, and
+> the whole-window average (86.3%) is now within ~4% of the S0b plan's own
+> ~4.13M/82.6% projection (the "why did it overshoot" question from the
+> last reading is largely answered: it didn't overshoot on a sustained
+> basis, that reading caught a temporary peak). **Marginal rate over just
+> this newest ~25.15h (isolating it from the whole-window blend): (522,284
+> − 433,686) / 25.15h ≈ 3,523cr/hour → ~2.54M/mo (50.7%)** — comfortably
+> back under target, lower than even the converged pre-S0b baseline
+> briefly. `by_market_family` shape has **stabilized, not kept trending**:
+> props 42.5% (was 43.6%), segment 35.9% (was 35.2%), alternate 18.0% (was
+> 17.6%) — essentially flat vs the prior reading, confirming this is a new
+> steady-state from S0b, not an ongoing drift. **Bottom line: root cause
+> confirmed correct, situation is stable and currently comfortable on the
+> marginal trend.**
+
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
