@@ -417,6 +417,30 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     "live/mlb_live_lens.json",
     "live/nba_live_lens.json",
     "live/wnba_live_lens.json",
+    # The LOCKED CARD -- the day's actual recommendations, and the one input a
+    # betting-day payload cannot be rebuilt without. `season_betting_day_*.json`
+    # already crosses and names this file in its own `summary.card_path`, so the
+    # payload has been referring to something no other service could open.
+    #
+    # WHY IT MATTERS NOW. The pregame game-line freeze was unreachable until
+    # 2026-08-08, so the live game-lines file collapsed overnight to whatever
+    # was still in progress and the payload builder dropped every game it could
+    # no longer match -- 07-20 graded 1 of 14, 08-07 3 of 16. `book_quotes` can
+    # rebuild the missing lines (it is append-only and kept them), but a rebuild
+    # also needs the recommendations, and those live only here.
+    #
+    # DIAGNOSED THROUGH A MISREAD, recorded so the next person does not repeat
+    # it: probing this path returned no content for EVERY date including one
+    # with a known-good 10-game payload, which reads as "the cards are gone".
+    # They are not -- `/api/ops/artifacts/stream` was returning **403 not
+    # allowlisted**, and a check that collapses 403 onto 404 turns "I am not
+    # permitted to look" into "it does not exist". Those have opposite fixes.
+    #
+    # Cost, measured not assumed: 7,115 bytes for a real card, and the sweep
+    # only republishes files touched since its watermark, so this is ~7KB on the
+    # day a card is written. Narrow on purpose, matching the sidecar entry
+    # above: this one directory under `eval/seasons/*/`, not `eval/**`.
+    "*_source/source_artifacts/data/eval/seasons/*/locked_cards_retuned/*.json",
 )
 
 
