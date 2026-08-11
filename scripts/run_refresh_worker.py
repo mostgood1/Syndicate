@@ -600,6 +600,60 @@ def _soccer_unit_launch_spacing_seconds(unit_count: int) -> int:
     return max(60, interval // max(1, int(unit_count)))
 
 
+def _report_soccer_unit_outcome(last_status: dict) -> None:
+    """Did the PREVIOUS soccer unit actually write its artifact? (`#352`)
+
+    The launch is fire-and-forget: the worker records a pid and returns without
+    ever checking what the subprocess did. So a unit that dies in two seconds
+    and one that simulates a full slate are indistinguishable from outside --
+    both produce a `SOCCER_UNIT_LAUNCHED` line, both decrement `due`, neither
+    reports an outcome.
+
+    Measured 2026-08-11: units ran at 15:36 (la_liga 08-15) and 16:13 (la_liga
+    08-16), `due` fell 8 -> 7, and BOTH target files still carried
+    `generated_at: 2026-07-20T21:32` -- 22 days old. The subprocess emitted none
+    of its own prints either, not even the unconditional "wrote empty artifact"
+    on its no-fixtures path, because its stdout does not reach this log.
+
+    VERIFIES BY STATE, NOT BY LOG. The file is the outcome; a captured stdout we
+    cannot read is not. This is the same approach that settled `#344` -- one
+    tick converts "the units do nothing" from an inference into a fact, and
+    distinguishes the three live hypotheses: wrote nothing (died early), wrote
+    elsewhere (wrong root), or wrote correctly (the join is at fault after all).
+    """
+    unit_key = str(last_status.get("lastUnit") or "").strip()
+    launched = float(last_status.get("lastLaunchEpoch") or 0.0)
+    if not unit_key or launched <= 0.0:
+        return
+    # `lastUnit` is "<league>:<date>" (see `_soccer_unit_key`); a week-scope unit
+    # has no date and cannot be checked this way.
+    league, _, unit_date = unit_key.partition(":")
+    if not league or not unit_date:
+        return
+    try:
+        from syndicate.features.shared.refresh_state_store import data_root
+
+        rec_path = (
+            data_root() / "soccer_source" / league / "api" / "recommendations"
+            / f"recommendations_{unit_date}.json"
+        )
+        exists = rec_path.is_file()
+        mtime = rec_path.stat().st_mtime if exists else 0.0
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] SOCCER_UNIT_OUTCOME_ERROR unit={unit_key} {type(exc).__name__}: {exc}", flush=True)
+        return
+    # Written AFTER the launch is the only thing that proves this run produced
+    # it. An older file means the unit ran and left it untouched, which is the
+    # failure being chased -- and is NOT the same as the file being absent.
+    wrote = bool(exists and mtime >= launched - 5.0)
+    print(
+        f"[refresh_worker] SOCCER_UNIT_OUTCOME unit={unit_key} exists={exists} "
+        f"wrote_since_launch={wrote} file_age_s={int(time.time() - mtime) if exists else -1} "
+        f"since_launch_s={int(time.time() - launched)} path={rec_path}",
+        flush=True,
+    )
+
+
 def _launch_autorun_soccer_weekly_refresh(
     *,
     latest_manifest_path: Path,
@@ -614,6 +668,12 @@ def _launch_autorun_soccer_weekly_refresh(
 
     status_path = _soccer_weekly_autorun_status_path()
     last_status = _refresh_state_store()["read_json_file"](status_path) or {}
+
+    # `#352`: report what the PREVIOUS unit produced, before queuing the next.
+    # Placed here so it runs on every tick regardless of which gate stops this
+    # one -- an outcome that only prints when a new launch happens would go
+    # silent exactly when the units stop working.
+    _report_soccer_unit_outcome(last_status)
 
     # #282: one job per league-date instead of one job for all ten leagues.
     units, scope_kind = _soccer_refresh_units(selected_date)
