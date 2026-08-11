@@ -202,6 +202,7 @@ def build_book_grid_artifact(
     # happened to survive the cut.
     from syndicate.features.shared.board_enrichment import (
         attach_game_state,
+        attach_live_projections_for_sport,
         attach_margin_model,
         attach_projections,
     )
@@ -211,6 +212,23 @@ def build_book_grid_artifact(
     # only fills rows that still have no fair value.
     game_state_coverage = attach_game_state(grid, sport=sport, selected_date=date_str)
     projection_coverage = attach_projections(grid, sport=sport, selected_date=date_str)
+    # LIVE TIER, AFTER the pregame one and deliberately not instead of it
+    # (`#350`). `attach_projections` reads the pregame `daily_summary`, so every
+    # row on an in-progress game carried a model that does not know the score --
+    # and `live_edge_policy` therefore withheld its edge. Measured 2026-08-10: 4
+    # live MLB games, 862 projected rows, ZERO with an edge, while MLB's live
+    # re-sim was producing `liveProjection` for those same games on
+    # live-odds-worker. The board read one artifact and the sim wrote another.
+    #
+    # This overlays the live number ONLY on rows whose game the board says is
+    # live, marks them `live_aware`, and the policy then allows their edge. A
+    # pregame row is untouched, and a row the join misses keeps its suppression
+    # rather than silently gaining a pregame-derived edge.
+    #
+    # Reads the PUBLISHED snapshot and never triggers the re-sim -- that is
+    # `refuse_if_compute_in_request_path` territory and belongs on the live
+    # worker's tick.
+    live_projection_coverage = attach_live_projections_for_sport(grid, sport=sport, selected_date=date_str)
     margin_coverage = attach_margin_model(grid)
 
     # Market taxonomy, served rather than re-derived on the client -- the serve
@@ -251,6 +269,7 @@ def build_book_grid_artifact(
         # degraded-looks-legitimate trap `attach_game_state` documents at length.
         "game_state": game_state_coverage,
         "projections": projection_coverage,
+        "live_projections": live_projection_coverage,
         "margin_model": margin_coverage,
         "market_kinds": market_kinds,
         "rows": bounded,

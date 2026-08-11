@@ -268,6 +268,44 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
         return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
 
 
+def attach_live_projections_for_sport(grid: list, *, sport: str, selected_date: str) -> dict:
+    """Overlay the live re-sim's projections on live rows (`#350`).
+
+    MLB ONLY, and that is a fact about which sport HAS a live re-sim rather than
+    a shortcut. The 120-sim-per-live-game Monte Carlo is MLB's; WNBA ships means
+    without a distribution and has no live tier at all. An unwired sport returns
+    a stated reason, matching `attach_projections` above, so a blank live column
+    is attributable rather than mysterious.
+
+    Reads the PUBLISHED `live/<sport>_live_lens.json` snapshot. Never triggers
+    the re-sim: that path is `refuse_if_compute_in_request_path` and belongs on
+    live-odds-worker's tick.
+    """
+    if sport != "mlb":
+        return {"supported": False, "reason": f"no live re-sim wired for {sport}", "rows_live_projected": 0}
+    try:
+        from syndicate.features.shared.live_projection_join import (
+            attach_live_projections,
+            build_live_prop_index,
+        )
+        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+        snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
+        if not isinstance(snapshot, dict):
+            # An absent snapshot is the normal state outside a live slate. Say
+            # which it is rather than reporting zero coverage as if the join
+            # ran and found nothing -- those have different fixes.
+            return {
+                "supported": True,
+                "reason": "no published live-lens snapshot",
+                "rows_live_projected": 0,
+            }
+        return attach_live_projections(grid, build_live_prop_index(snapshot))
+    except Exception:
+        _LOGGER.exception("BOOK_GRID_LIVE_PROJECTION_FAILURE sport=%s date=%s", sport, selected_date)
+        return {"supported": True, "error": "live projection join failed", "rows_live_projected": 0}
+
+
 def attach_margin_model(grid: list) -> dict:
     """Fill fair value on one-sided rows from each book's measured margin (S4).
 

@@ -44,8 +44,37 @@ def game_state_of(row: Mapping[str, Any]) -> str:
     return str(game.get("state") or "").strip().lower()
 
 
+def projection_is_live_aware(row: Mapping[str, Any]) -> bool:
+    """True when this row's projection knows the current game state.
+
+    Set by `live_projection_join` when the live re-sim's number is overlaid.
+    Read here rather than inferred, because "the model is live" is a fact about
+    the PROJECTION and not about the game -- the same live game carries both
+    kinds of row while the join is partial.
+    """
+    projection = row.get("projection")
+    if not isinstance(projection, Mapping):
+        return False
+    return bool(projection.get("live_aware"))
+
+
 def live_edge_unavailable_reason(row: Mapping[str, Any]) -> str | None:
     """Why this row must not carry an edge, or None when an edge is allowed.
+
+    THE PREDICATE IS THE PROJECTION'S BASIS, NOT THE GAME'S STATE. That
+    distinction is the whole point: what makes a live edge meaningless is that
+    the MODEL is pregame while the market has re-priced. A projection that
+    itself knows the score -- MLB's live re-sim, joined by
+    `live_projection_join` -- priced against a live market is not the failure
+    this guards against; it is precisely the thing worth ranking, and refusing
+    it would discard the only genuinely live signal on the board.
+
+    Originally this keyed on game state alone. That was right while nothing
+    joined a live model, and it silently became wrong the moment one did.
+
+    FINAL/COMPLETED STILL REFUSE, even live-aware. A settled or pulled market
+    has no price to beat; an edge against it is worse than a live one, not
+    better, and no amount of model freshness rescues it.
 
     UNKNOWN STATE ALLOWS THE EDGE, deliberately. A row whose game state cannot be
     resolved is overwhelmingly a pregame row on a board whose game-state join has
@@ -55,6 +84,10 @@ def live_edge_unavailable_reason(row: Mapping[str, Any]) -> str | None:
     ranking, and a live game is something the board positively knows.
     """
     state = game_state_of(row)
-    if state in LIVE_OR_DONE_STATES:
-        return f"game is {state}: a pregame projection cannot be priced against a live market"
-    return None
+    if state not in LIVE_OR_DONE_STATES:
+        return None
+    if state in {"final", "completed"}:
+        return f"game is {state}: the market is settled, so there is no price to beat"
+    if projection_is_live_aware(row):
+        return None
+    return f"game is {state}: a pregame projection cannot be priced against a live market"
