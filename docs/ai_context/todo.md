@@ -1,5 +1,77 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#351` — OPEN, UNOWNED. The WNBA history fetch asks for 10 seasons, cannot finish 10 seasons, and its designed escape hatch is seeded from a file that guarantees it asks for 10 seasons
+
+**A self-sustaining loop that burns ~45 minutes of refresh-worker time and a
+season's worth of ESPN requests per attempt, and can never make progress.**
+
+Spotted by the user on a preflight process list, not by any alarm:
+
+```
+run_refresh_odds_job.py
+  -> refresh_odds_sources.py
+    -> refresh_wnba_oddsapi_props.py --date 2026-08-13
+      -> wnba_betting.cli fetch --years 10        <- why 10, on a daily refresh?
+```
+
+## The cycle, established from code and the committed file
+
+`_games_history_fetch_years_needed` (`scripts/refresh_wnba_oddsapi_props.py:1171`)
+returns `bootstrap_years=10` when the history has **fewer than 3 distinct
+seasons**, and `incremental_years=1` otherwise. The function's own docstring
+states the 10-season path cannot complete:
+
+> ~8 minutes/season at measured per-request timing; **10 seasons is ~80 minutes
+> against a 45-minute subprocess timeout -- always dies partway through the
+> first season on a cold/stale start**
+
+```
+history has 1 season  ->  choose --years 10  ->  ~80 min needed vs 45 min cap
+     ^                                                      |
+     +--------------  killed partway, still 1 season  <------+
+```
+
+## Why the escape hatch cannot fire
+
+`_seed_games_history_from_checkout_if_fresher` exists for exactly this, and
+describes its source as *"a committed full-history `games_nba_api.csv` that is
+kept current by dev/GHA runs, so it is a reliable offline fallback"*. Measured:
+
+```
+vendor/wnba_betting_repo/data/raw/games_nba_api.csv
+  20,692 bytes   196 rows   distinct seasons = [2017]      -> ONE season
+  git history: only ever ~20,495 bytes (d9461e87), never larger
+```
+
+**The fallback meant to break the loop is seeded from a file that satisfies the
+loop's entry condition.** It was never a full history, so this has not
+regressed -- it has never worked.
+
+## Two fixes, either sufficient
+
+- **Commit a genuine multi-season history** to the vendored checkout, so the
+  seed path lifts the file past 3 seasons and the fetch drops to `--years 1`.
+- **Lower `bootstrap_years` to what fits inside the timeout** (~4-5 seasons at
+  the docstring's own ~8 min/season) and let successive runs accumulate. The
+  current value is all-or-nothing and the "all" branch is unreachable.
+
+The second is the smaller change and does not depend on sourcing data.
+
+## What is NOT established
+
+**The loop's frequency in production.** A log filter on `years` returned 1,000
+contaminated lines -- `ALL_PROCESS_MEMORY` carries process cmdlines, so every
+memory sample matched -- and the years-value counter came back empty. So the
+cadence is unmeasured; what is certain is that the inputs guarantee this outcome
+on every run that reaches the fetch.
+
+Observed once directly: the chain was resident at 15:24Z on 2026-08-11 and was
+killed by a deploy at ~15:36Z, which cost nothing it would not have lost anyway.
+
+**Adjacent, same family:** `#332` (a once-daily job relaunching every ~5 minutes
+because its guard reads a different root than the script writes). Both are
+unproductive work that looks like activity, and neither emits anything saying so.
+
 ### `#342` — DONE AND VERIFIED IN PRODUCTION. WNBA served 128 live edges while MLB suppressed 862: one rule, two copies, one sport missing
 
 **`72c36d03` says `#340` and means `#342`.** `#340` was already `9b88d858`
