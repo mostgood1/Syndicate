@@ -670,6 +670,79 @@ def _soccer_unit_wrote_since(unit_key: str, launched_epoch: float) -> tuple[bool
     return bool(mtime >= launched_epoch - 5.0), str(rec_path), mtime
 
 
+# Diagnostics that fire on EVERY run, success or failure, and are written LAST.
+# A plain tail therefore shows only these. Measured 2026-08-11: the first real
+# `SOCCER_RUN_FAILED` (run_stamp=20260811_213249, exit 1 in 10s) reported three
+# MAIN_THREAD_STACK/MAIN_RETURN frames and not one word about the cause -- the
+# instrumentation worked and still could not answer the question it was built for.
+_STDERR_NOISE_SUBSTRINGS = (
+    "ALL_PROCESS_MEMORY",
+    "PROCESS_TREE_MEMORY",
+    "PROCESS_ENUM_DEBUG",
+    "CONTAINER_MEMORY",
+    "MAIN_THREAD_STACK",
+    "MAIN_RETURN",
+)
+_STDERR_NOISE_PREFIXES = (
+    "[refresh_odds_sources] THREADS",
+    "[refresh_odds_sources] RUNTIME_SNAPSHOT",
+    "[refresh_odds_sources] CHILD_PROCESSES",
+)
+# Lines that actually explain an exit. `_load_team_ratings` and `_load_player_rows`
+# both `raise SystemExit(f"no ... under {dir}")`, which names the exact directory
+# that was empty -- the single most useful line in the file, and the one a tail
+# was dropping.
+_STDERR_CAUSAL_SUBSTRINGS = (
+    "Traceback",
+    "SystemExit",
+    "Error",
+    "error=",
+    "STEP_FAIL",
+    "MISSING",
+    "no team history under",
+    "no match history under",
+    "no dates found for",
+    "no fixtures",
+)
+
+
+def _is_stderr_noise(line: str) -> bool:
+    if any(marker in line for marker in _STDERR_NOISE_SUBSTRINGS):
+        return True
+    return line.startswith(_STDERR_NOISE_PREFIXES)
+
+
+def _stderr_failure_tail(text: str, *, limit: int = 15, max_chars: int = 2400) -> str:
+    """The lines that explain the exit, not merely the last lines written.
+
+    A blocklist alone is whack-a-mole: every new heartbeat marker refills the
+    window and pushes the cause back out, and the next person only finds out
+    during an incident. So causal lines are pulled in FIRST regardless of how
+    far back they sit, and the remaining slots are filled from the tail.
+
+    Output stays in file order, because a stack trace read bottom-up is worse
+    than useless when the point is to hand someone a cause at a glance.
+    """
+    lines = [line.strip() for line in text.splitlines() if line.strip() and not _is_stderr_noise(line.strip())]
+    if not lines:
+        return ""
+    position = {}
+    for index, line in enumerate(lines):
+        position.setdefault(line, index)
+    causal = [line for line in lines if any(marker in line for marker in _STDERR_CAUSAL_SUBSTRINGS)]
+    picked: list[str] = []
+    for line in causal[-6:]:
+        if line not in picked:
+            picked.append(line)
+    for line in reversed(lines):
+        if len(picked) >= limit:
+            break
+        if line not in picked:
+            picked.append(line)
+    picked.sort(key=lambda line: position.get(line, 0))
+    return " | ".join(picked)[:max_chars]
+
+
 def _report_soccer_unit_failure(latest_manifest_path: Path) -> None:
     """Say WHY the last soccer run failed, in the worker's own log (`#357`).
 
@@ -703,22 +776,8 @@ def _report_soccer_unit_failure(latest_manifest_path: Path) -> None:
     tail = ""
     if stderr_path:
         try:
-            # The interesting lines are the last ones; a failed soccer run also
-            # emits megabytes of ALL_PROCESS_MEMORY, so read the end and drop the
-            # heartbeat noise rather than printing whatever happens to be there.
-            text = Path(stderr_path).read_text(encoding="utf-8", errors="replace")[-20000:]
-            lines = [
-                line
-                for line in text.splitlines()
-                if line.strip()
-                and "ALL_PROCESS_MEMORY" not in line
-                and "PROCESS_TREE_MEMORY" not in line
-                and "PROCESS_ENUM_DEBUG" not in line
-                and "CONTAINER_MEMORY" not in line
-                and not line.startswith("[refresh_odds_sources] THREADS")
-                and not line.startswith("[refresh_odds_sources] RUNTIME_SNAPSHOT")
-            ]
-            tail = " | ".join(lines[-6:])[:1200]
+            text = Path(stderr_path).read_text(encoding="utf-8", errors="replace")[-40000:]
+            tail = _stderr_failure_tail(text)
         except Exception as exc:  # noqa: BLE001
             tail = f"<unreadable: {type(exc).__name__}: {exc}>"
     print(
