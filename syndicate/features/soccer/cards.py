@@ -47,16 +47,40 @@ def _team_roster_href(team: str, league: str) -> str | None:
     return f"/soccer/{league}/team/{team_id}/roster" if team_id else None
 
 
+_ABBR_MISSES_LOGGED: set[tuple[str, str]] = set()
+
+
 def _abbr(team: str, league: str) -> str:
+    """The club's directory tri-code, or a readable label that is NOT one.
+
+    The old fallback built an all-caps initialism from the club name, which is
+    indistinguishable from a directory-sourced tri-code -- and soccer tri-codes
+    already collide across leagues, which `game_chip_scoreboard._side_name`
+    documents ("`STL` is both Standard Liege and St. Louis CITY SC"). Measured
+    2026-08-11: `_abbr('Leeds', 'mls')` returned `LEE`, and `LEE` appears in
+    exactly one file in the repo -- `epl_team_branding.csv`, as Leeds United.
+    Nothing downstream could tell an invented `LEE` from the real one, and
+    `abbr` is the chip join's documented last-resort key.
+
+    So a directory miss now yields a Title-Case short name. It cannot be
+    mistaken for a tri-code by a reader or by a join, and the miss is logged
+    once per club so the branding-CSV gap is findable rather than papered over.
+    `_team_key_variants` (`#355`) removed the common cause of a miss -- accent
+    and club-prefix spellings -- leaving this path for clubs genuinely absent
+    from the league's branding snapshot.
+    """
     directory_team = team_by_name(league, team)
     if directory_team and str(directory_team.get("abbreviation") or "").strip():
         return str(directory_team["abbreviation"]).strip().upper()
     tokens = [token for token in str(team or "").replace("&", " ").split() if token]
     if not tokens:
         return "TBD"
-    if len(tokens) == 1:
-        return tokens[0][:3].upper()
-    return "".join(token[0] for token in tokens[:3]).upper()
+    key = (str(league or ""), " ".join(tokens))
+    if key not in _ABBR_MISSES_LOGGED:
+        _ABBR_MISSES_LOGGED.add(key)
+        print(f"[soccer_cards] TEAM_NOT_IN_BRANDING league={league} team={' '.join(tokens)}", flush=True)
+    longest = max(tokens, key=len)
+    return longest[:8].title()
 
 
 def _team_logo_url(team: str, league: str) -> str | None:

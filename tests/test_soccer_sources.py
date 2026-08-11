@@ -303,3 +303,41 @@ def test_week_dates_within_horizon_defaults_to_the_whole_week():
     assert soccer_sources.week_dates_within_horizon(
         "eredivisie", 2026, 2
     ) == soccer_sources.week_date_list("eredivisie", 2026, 2)
+
+
+def test_team_lookup_folds_accents_and_club_prefixes():
+    """`#355`. The directory lookup casefolded and nothing else, so a club whose
+    name a provider spelled differently from ESPN simply did not exist.
+
+    Measured before the fix (mls): 'CF Montréal' HIT -> MTL, but 'CF Montreal',
+    'Montréal' and 'Montreal' all MISSED. `team_aliases` already warned about
+    exactly this ("OddsAPI routinely does not" spell the diacritics) and named
+    this club; the folding lived one module over and was never called here.
+    """
+    from syndicate.features.soccer import sources as soccer_sources
+
+    for spelling in ("CF Montréal", "CF Montreal", "Montréal", "Montreal"):
+        team = soccer_sources.team_by_name("mls", spelling)
+        assert team is not None, f"{spelling!r} did not resolve"
+        assert team.get("abbreviation") == "MTL", f"{spelling!r} resolved to the wrong club"
+
+    for spelling in ("Alavés", "Alaves"):
+        assert (soccer_sources.team_by_name("la_liga", spelling) or {}).get("abbreviation") == "ALA"
+
+
+def test_exact_names_beat_another_clubs_stripped_form():
+    """Dropping FC/CF/SC widens reach; it must not do so by displacing an exact
+    name. Every club's exact spellings are registered before any loose one, so a
+    club named exactly X always wins the key X."""
+    from syndicate.features.soccer import sources as soccer_sources
+
+    for league in ("mls", "epl", "la_liga"):
+        for team in soccer_sources.all_teams(league):
+            name = str(team.get("name") or "").strip()
+            if not name:
+                continue
+            resolved = soccer_sources.team_by_name(league, name)
+            assert resolved is not None, f"{league} {name!r} cannot find itself"
+            assert resolved.get("team_id") == team.get("team_id"), (
+                f"{league} {name!r} resolved to {resolved.get('name')!r} -- a loose form squatted an exact key"
+            )

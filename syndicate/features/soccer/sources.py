@@ -254,6 +254,56 @@ def _normalize_team_key(value: str) -> str:
     return str(value or "").strip().lower()
 
 
+def _team_key_variants(value: Any, *, loose: bool = True) -> tuple[str, ...]:
+    """Every spelling a provider might send for one club, most specific first.
+
+    THE LOOKUP WAS EXACT-MATCH ON THE FULL DISPLAY NAME, and that is a silent
+    join failure (`#355`). Measured 2026-08-11:
+
+        team_by_name('mls', 'CF Montréal')  -> HIT,  abbr MTL
+        team_by_name('mls', 'CF Montreal')  -> MISS  (accent dropped)
+        team_by_name('mls', 'Montréal')     -> MISS  (club prefix dropped)
+
+    `team_aliases` already documents exactly this hazard and names this club:
+    "ESPN spells clubs with their real diacritics ('Alavés', 'CF Montréal',
+    'Union St.-Gilloise'); OddsAPI routinely does not. A join that only
+    casefolds treats those as different clubs." The folding existed one module
+    over and this directory never called it.
+
+    What the miss COST is the point: it is not just a blank crest. `cards._abbr`
+    fell back to inventing an abbreviation from the name, so `CF Montreal`
+    became `CM` and `Montreal` became `MON` -- neither of which is `MTL` -- and
+    `_abbr('Leeds', 'mls')` produced `LEE`, which in this repo exists in exactly
+    one place: `epl_team_branding.csv`, as Leeds United. The miss also drops the
+    crest, colours and roster href, all of which read off the same lookup.
+
+    `loose=False` returns only the exact forms (casefolded, accent-folded).
+    `_team_index` registers those for EVERY club before it registers any
+    club-token-stripped form, so a generic spelling can never squat the key
+    another club spells out in full -- dropping `FC`/`CF`/`SC` widens reach,
+    and it must not do so by displacing an exact name.
+    """
+    from syndicate.features.shared.team_aliases import _CLUB_TYPE_TOKENS, fold_accents
+
+    raw = str(value or "").strip()
+    if not raw:
+        return ()
+    variants: list[str] = []
+
+    def _add(candidate: str) -> None:
+        if candidate and candidate not in variants:
+            variants.append(candidate)
+
+    _add(_normalize_team_key(raw))
+    folded = fold_accents(raw)
+    _add(folded)
+    if loose:
+        tokens = [token for token in folded.split() if token not in _CLUB_TYPE_TOKENS]
+        if tokens:
+            _add(" ".join(tokens))
+    return tuple(variants)
+
+
 def team_branding_path(league: str) -> Path:
     """The league's branding CSV, from the first root that actually HAS it.
 
@@ -337,12 +387,18 @@ def _team_dict(row: Any, league: str) -> dict[str, Any]:
 @lru_cache(maxsize=32)
 def _team_index(league: str) -> dict[str, dict[str, Any]]:
     index: dict[str, dict[str, Any]] = {}
-    for row in _team_branding_rows(league):
-        team = _team_dict(row, league)
-        for key in (team.get("name"), team.get("abbreviation"), team.get("short_name")):
-            normalized = _normalize_team_key(key)
-            if normalized:
-                index.setdefault(normalized, team)
+    entries = [
+        (team, (team.get("name"), team.get("abbreviation"), team.get("short_name")))
+        for team in (_team_dict(row, league) for row in _team_branding_rows(league))
+    ]
+    # Exact spellings for every club first, loose ones only after -- see
+    # `_team_key_variants`. One pass would let an early club's stripped form
+    # claim a key a later club spells exactly.
+    for loose in (False, True):
+        for team, keys in entries:
+            for key in keys:
+                for variant in _team_key_variants(key, loose=loose):
+                    index.setdefault(variant, team)
     return index
 
 
@@ -354,7 +410,12 @@ def team_by_id(league: str, team_id: str) -> dict[str, Any] | None:
 
 
 def team_by_name(league: str, team_name: str) -> dict[str, Any] | None:
-    return _team_index(league).get(_normalize_team_key(team_name))
+    index = _team_index(league)
+    for variant in _team_key_variants(team_name):
+        team = index.get(variant)
+        if team is not None:
+            return team
+    return None
 
 
 def all_teams(league: str) -> list[dict[str, Any]]:

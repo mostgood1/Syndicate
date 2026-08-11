@@ -164,3 +164,27 @@ class WeekGamesMergeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AbbreviationFallbackTests(unittest.TestCase):
+    """`#355`. A directory miss used to emit an all-caps initialism that no
+    reader and no join could tell from a real tri-code -- and soccer tri-codes
+    already collide across leagues, which `game_chip_scoreboard._side_name`
+    documents. `_abbr('Leeds', 'mls')` returned 'LEE'; 'LEE' appears in exactly
+    one file in this repo, `epl_team_branding.csv`, as Leeds United.
+    """
+
+    def test_directory_hit_still_returns_the_real_tricode(self) -> None:
+        self.assertEqual(cards._abbr("CF Montréal", "mls"), "MTL")
+        self.assertEqual(cards._abbr("Leeds United", "epl"), "LEE")
+
+    def test_directory_miss_does_not_emit_a_tricode_shaped_label(self) -> None:
+        label = cards._abbr("Leeds", "mls")
+        self.assertNotEqual(label, "LEE")
+        self.assertFalse(
+            label.isupper() and len(label) <= 3,
+            f"{label!r} is shaped like a directory tri-code but was invented from the name",
+        )
+
+    def test_empty_team_is_still_tbd(self) -> None:
+        self.assertEqual(cards._abbr("", "mls"), "TBD")

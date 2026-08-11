@@ -1,5 +1,56 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#355` — FIXED, NOT YET DEPLOYED. The soccer team directory was exact-match, so a club spelled without its accent did not exist — and the miss invented a tri-code
+
+Reported off the board as a stray `LEE` on a non-EPL row. Two defects, one chain.
+
+**The lookup.** `soccer/sources.py:_normalize_team_key` was `.strip().lower()` and
+nothing more, and `team_by_name` did a single dict `.get` with it. Measured
+2026-08-11:
+
+| league | spelling | before | after |
+|---|---|---|---|
+| mls | `CF Montréal` | HIT → `MTL` | HIT → `MTL` |
+| mls | `CF Montreal` | **MISS** | HIT → `MTL` |
+| mls | `Montréal` | **MISS** | HIT → `MTL` |
+| mls | `Montreal` | **MISS** | HIT → `MTL` |
+| la_liga | `Alaves` | **MISS** | HIT → `ALA` |
+
+`shared/team_aliases.py` already documented this exact hazard and named this exact
+club — "ESPN spells clubs with their real diacritics ('Alavés', 'CF Montréal');
+OddsAPI routinely does not" — and shipped `fold_accents` + `_CLUB_TYPE_TOKENS` to
+handle it. The soccer directory never called either. **The folding existed one
+module over for months and this lookup was written as if it didn't.**
+
+`_team_key_variants` now registers casefolded, accent-folded, and
+club-token-stripped keys. Registration is two passes — every club's exact forms
+before any loose one — so dropping `FC`/`CF`/`SC` cannot let one club's generic
+spelling squat a key another club spells out in full. A test asserts every club
+in mls/epl/la_liga still resolves to *itself* by its exact name.
+
+**What the miss cost.** Not a blank crest — a wrong identity. `cards._abbr` fell
+back to building an all-caps initialism from the name, so `CF Montreal` → `CM`,
+`Montréal` → `MON`, and `_abbr('Leeds', 'mls')` → `LEE`. `LEE` appears in exactly
+one file in this repo: `epl_team_branding.csv`, as Leeds United. Nothing
+downstream could distinguish an invented tri-code from a directory one, and
+`game_chip_scoreboard._side_label` uses `abbr` as the join's last-resort key —
+the same module that already documents soccer tri-codes colliding across leagues
+(`STL` is both Standard Liege and St. Louis CITY SC). A miss now yields a
+Title-Case short name plus a one-shot `TEAM_NOT_IN_BRANDING` log, so the
+branding-CSV gap is findable instead of silently papered over with a plausible lie.
+
+**The class:** *a fallback that is indistinguishable from success.* Same shape as
+`exists and size>0`. Note the ordering — fixing only `_abbr` would have left the
+Montreal rows crestless, and fixing only the lookup would have left the invented
+codes live for genuinely-absent clubs. Both, or neither.
+
+Bare `Leeds` still misses in EPL by design: that league's branding rows carry
+`short_name = "Leeds United"`, not the city, and a prefix-match rule would have
+to guess between Manchester City and Manchester United. Honest miss over a coin flip.
+
+Tests: `tests/test_soccer_sources.py`, `tests/test_soccer_cards.py`. 168 soccer
+tests pass.
+
 ### `#354` — FIXED AND SHIPPED (`f79c46a1`, web deploy). The Layer 1 board printed a UTC clock and stacked a week of fixtures in one column
 
 Three defects reported off the soccer board by the user. All view-layer, all in
