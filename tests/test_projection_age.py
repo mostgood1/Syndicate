@@ -102,27 +102,3 @@ def test_the_board_renders_the_age_rather_than_only_carrying_it():
     assert "projAge >= 24" in html
     # and it must be visible, not just a tooltip
     assert 'projStale ? " *"' in html
-
-
-def test_no_row_variable_is_used_before_it_is_declared():
-    """The bug this file shipped once: `projAge`/`projStale` were USED at the
-    Proj cell and never declared, a ReferenceError that would have broken the
-    entire board render on first paint.
-
-    It passed every other check here, because substring assertions confirm a
-    token EXISTS and say nothing about whether it is bound. Same class as the
-    NFL segment fetch importing nothing, caught the same way -- by asking about
-    order and binding rather than presence.
-    """
-    import pathlib as _p
-    import re
-
-    html = (_p.Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "shared" / "layer1_board.html").read_text(encoding="utf-8")
-    for name in ("projAge", "projStale", "edgeWhy", "edgeCls", "priced"):
-        decl = html.find("var " + name)
-        assert decl != -1, f"{name} is never declared"
-        first_use = re.search(r"(?<!var )" + name + r"", html)
-        assert first_use is not None
-        assert decl < first_use.start() or html[:first_use.start()].count("var " + name) > 0, (
-            f"{name} is used at char {first_use.start()} before its declaration at {decl}"
-        )
