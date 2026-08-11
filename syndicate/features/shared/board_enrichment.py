@@ -202,15 +202,50 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
                     if candidate.exists():
                         source_path = candidate
                         break
+            # GAME LINES FIRST, and independently of the prop join (`#364`).
+            # Measured 2026-08-11: WNBA ran at 36.4% coverage with 0.0% of it on
+            # game rows -- every projection was a prop, because
+            # `attach_wnba_projections` skips anything whose `kind` is not
+            # "prop". These are two different artifacts (game_cards vs
+            # props_recommendations) and either can be present without the
+            # other, so a missing props file must not suppress game lines.
+            game_coverage: dict[str, Any] = {"supported": True, "rows_with_projection": 0}
+            try:
+                from syndicate.features.shared.wnba_game_projections import (
+                    attach_wnba_game_projections,
+                    load_wnba_game_projections,
+                )
+
+                game_index = load_wnba_game_projections(selected_date)
+                if game_index.games:
+                    game_coverage = attach_wnba_game_projections(grid, game_index)
+                else:
+                    game_coverage = {
+                        "supported": True,
+                        "rows_with_projection": 0,
+                        "reason": "no WNBA game_cards rows for this date",
+                    }
+            except Exception:
+                _LOGGER.exception("BOOK_GRID_GAME_PROJECTION_FAILURE sport=wnba date=%s", selected_date)
+                game_coverage = {"supported": True, "error": "game projection join failed", "rows_with_projection": 0}
+
             index = load_wnba_projections(source_path)
             if not index.players:
-                return {
+                prop_coverage = {
                     "supported": True,
                     "rows_with_projection": 0,
                     "reason": "no WNBA model rows for this date",
                     "source_artifact": str(source_path),
                 }
-            return attach_wnba_projections(grid, index)
+            else:
+                prop_coverage = attach_wnba_projections(grid, index)
+            return {
+                **prop_coverage,
+                "rows_with_projection": int(prop_coverage.get("rows_with_projection") or 0)
+                + int(game_coverage.get("rows_with_projection") or 0),
+                "prop_coverage": prop_coverage,
+                "game_coverage": game_coverage,
+            }
         except Exception:
             _LOGGER.exception("BOOK_GRID_PROJECTION_FAILURE sport=wnba date=%s", selected_date)
             return {"supported": True, "error": "projection join failed", "rows_with_projection": 0}
