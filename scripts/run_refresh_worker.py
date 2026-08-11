@@ -11,7 +11,7 @@ import time
 import traceback
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
@@ -548,6 +548,44 @@ def _soccer_unit_key(unit: dict[str, str]) -> str:
     return f"{unit.get('league') or ''}|{unit.get('date') or ''}"
 
 
+def _soccer_unit_last_touched(
+    key: str,
+    unit_epochs: Mapping[str, Any] | None,
+    last_attempts: Mapping[str, Any] | None,
+) -> float:
+    """When this unit last consumed a slot -- by succeeding OR by trying.
+
+    The soccer autorun picks `due[0]` after sorting on this, so it decides which
+    league runs. `#355`: it used to sort on the success epoch alone, which starves
+    the queue the moment a unit can launch but not write -- that unit's success
+    epoch never advances, so it is permanently the stalest and wins every round.
+
+    `max()` and not `min()`, and not the attempt epoch alone:
+
+      - a unit that just attempted goes to the BACK, so a broken league costs one
+        slot per backoff instead of every slot;
+      - a unit that has not attempted recently has an attempt epoch older than its
+        success epoch, so `max()` collapses to the success epoch and genuine
+        stalest-first ordering is preserved for every healthy unit;
+      - a never-seen unit scores 0.0 and sorts first, which is what a cold start
+        should do.
+    """
+    return max(
+        _coerce_epoch((unit_epochs or {}).get(key)),
+        _coerce_epoch((last_attempts or {}).get(key)),
+    )
+
+
+def _coerce_epoch(value: Any) -> float:
+    # State comes back through the keyvalue store as JSON, so a stamp can arrive
+    # as a string or as null. A raw float() would raise on either and take the
+    # whole autorun down rather than treating an unreadable stamp as "never".
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 # Last skip reason printed, so steady state does not reprint every 30s tick.
 _SOCCER_SKIP_REASON_LAST: dict[str, str] = {}
 
@@ -821,8 +859,30 @@ def _launch_autorun_soccer_weekly_refresh(
             "no_unit_due",
             f"units={len(units)} interval_s={int(interval_seconds)} next_due_in_s={int(max(0.0, soonest))}",
         )
-    # Stalest first, so a unit can never be starved by ordering.
-    due.sort(key=lambda unit: float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0))
+    # LEAST-RECENTLY-TOUCHED FIRST, where "touched" is a success OR an attempt.
+    #
+    # `#355`. This used to sort on `unit_epochs` alone -- last VERIFIED write --
+    # and the comment claimed "a unit can never be starved by ordering", which was
+    # true right up until `#353` stopped stamping that field on launch. After
+    # `#353` a unit that launches cleanly and writes nothing keeps its ancient
+    # success epoch forever, so it is permanently the stalest unit, wins `due[0]`
+    # every retry window, and starves every other league. Measured on 2026-08-11:
+    #
+    #   before #353 (17:30-19:07)  belgian 35 · eredivisie 32 · mls 25 · champ 7 · primeira 1
+    #   after  #353 (19:07-20:10)  la_liga 44 · belgian 27
+    #
+    # la_liga|2026-08-15 launched cleanly 44 times, wrote nothing 44 times, and
+    # took the slot every ten minutes. `run_refresh_worker.py` already warns about
+    # exactly this starvation mode on the launch-exception path below -- `#353`
+    # opened the same door on the success path.
+    #
+    # Sorting on max(success, attempt) fixes it without giving back what `#353`
+    # bought: `unitEpochs` still means "last verified write" and still gates the
+    # 4h cadence, so nothing pretends to be fresh. A unit that just burned a slot
+    # simply goes to the back of the queue. Among units that have NOT attempted
+    # recently the attempt epoch is older than the success epoch, so `max()`
+    # collapses to the success epoch and genuine stalest-first is preserved.
+    due.sort(key=lambda unit: _soccer_unit_last_touched(_soccer_unit_key(unit), unit_epochs, last_attempts))
     unit = due[0]
     unit_league = str(unit.get("league") or "")
     unit_date = str(unit.get("date") or "")
@@ -919,6 +979,14 @@ def _launch_autorun_soccer_weekly_refresh(
     print(
         f"[refresh_worker] SOCCER_UNIT_LAUNCHED league={unit_league} unit_date={unit_date or 'week_scope'} "
         f"scope_kind={scope_kind} unit={due.index(unit) + 1}/{len(units)} due={len(due)} "
+        # `#355`: WHY this unit won. The starvation ran for an hour undetected
+        # because the launch line named the winner and never the queue -- 44
+        # identical la_liga launches read as "the autorun is working". Printing
+        # the runners-up makes one league monopolizing the slot visible in a
+        # single line instead of requiring a unit histogram over the log window.
+        f"queue={','.join(_soccer_unit_key(u) for u in due[:4])}{'...' if len(due) > 4 else ''} "
+        f"last_success_age_s={int(now - float(unit_epochs.get(_soccer_unit_key(unit)) or 0.0))} "
+        f"last_attempt_age_s={int(now - float(last_attempts.get(_soccer_unit_key(unit)) or 0.0))} "
         f"spacing_seconds={int(spacing_seconds)} pid={int(result.get('pid') or 0)}",
         flush=True,
     )
