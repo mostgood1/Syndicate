@@ -52,6 +52,9 @@ _PLAYER_FIELDS: dict[str, tuple[str, str]] = {
 _TOTALS_EXACT_PROB_LINE = 2.5
 
 
+from syndicate.features.shared.team_aliases import teams_match  # noqa: E402
+
+
 def _norm_team(value: Any) -> str:
     return _norm_name(value)
 
@@ -66,14 +69,47 @@ class SoccerProjectionIndex:
     source_paths: list[str] = field(default_factory=list)
 
     def match_for(self, row: Mapping[str, Any]) -> dict[str, Any] | None:
+        """Find this row's projection: event id, exact names, then aliases.
+
+        `#346`: THE EVENT IDS CANNOT JOIN AND THE NAMES OFTEN DO NOT MATCH
+        EXACTLY. Measured on production 2026-08-11, primeira_liga:
+
+            source  event_id '401885486'   (ESPN)     home 'Santa Clara'  away 'C.D. Nacional'
+            board   event_id 'abbf3c5f…'   (OddsAPI)  home 'Santa Clara'  away 'Nacional'
+
+        Two different id schemes, so the `by_event` lookup can never hit across
+        these two feeds; and the exact tuple lookup missed on `nacional` vs
+        `c d nacional`. Result: `unmatched_match_rows: 9` of 9 -- the sim had a
+        projection for the only fixture on the board and none of it was shown.
+
+        The alias fallback uses `teams_match`, which already resolves the club
+        prefixes soccer feeds disagree on (`C.D.`, `FC`, `S.L.`). Verified on
+        the real variants: nacional/c.d. nacional, porto/fc porto,
+        benfica/s.l. benfica all match; `sporting cp`/`sporting` does NOT, and
+        that is correct -- several clubs are called Sporting and guessing would
+        attach one club's projection to another's price.
+
+        BOTH SIDES MUST MATCH, AND AMBIGUITY RETURNS NOTHING. If two indexed
+        fixtures both alias-match this row, the join cannot know which, and a
+        wrong projection is far worse than a blank one -- it puts a real number
+        next to the wrong bet.
+        """
         event_id = str(row.get("event_id") or "").strip()
         if event_id and event_id in self.by_event:
             return self.by_event[event_id]
         home = _norm_team(row.get("home_team"))
         away = _norm_team(row.get("away_team"))
-        if home and away:
-            return self.by_teams.get((home, away))
-        return None
+        if not (home and away):
+            return None
+        exact = self.by_teams.get((home, away))
+        if exact is not None:
+            return exact
+        hits = [
+            match
+            for (index_home, index_away), match in self.by_teams.items()
+            if teams_match("soccer", home, index_home) and teams_match("soccer", away, index_away)
+        ]
+        return hits[0] if len(hits) == 1 else None
 
 
 def _load_one(path: Path, index: SoccerProjectionIndex) -> None:
