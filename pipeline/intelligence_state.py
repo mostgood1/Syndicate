@@ -3944,6 +3944,51 @@ class IntelligenceStateService:
             f"returned={_raw_count} kept={len(raw_candidates)}",
             flush=True,
         )
+
+        # LAYER 2 IS TODAY ONLY (`#353`), and this is the BOARD path -- which is
+        # why the filter lives here and not in
+        # `collect_candidates_with_fallback_merge`.
+        #
+        # I put it in that shared collector first, and a `run_intelligence_query`
+        # test found the mistake: the collector also serves ad-hoc questions, and
+        # "best MLS bets this weekend" must NOT be filtered to today. The
+        # today-only rule is a property of the BOARD, not of candidate
+        # collection. Same code, one layer too low, and the failing test was
+        # telling me exactly that rather than being an inconvenience.
+        #
+        # Measured on the served board 2026-08-11 before this: 123 candidates,
+        # 91 for fixtures 4-13 days out, 32 with no date at all, ZERO for that
+        # day. `selected_date` was already threaded through and never applied,
+        # because no candidate carried a field it could be applied to.
+        if selected_date:
+            try:
+                from syndicate.features.shared.candidate_slate_filter import (
+                    stamp_and_filter_candidates_to_slate,
+                )
+
+                slated, slate_coverage = stamp_and_filter_candidates_to_slate(
+                    raw_candidates, selected_date=selected_date
+                )
+                _dropped = slate_coverage.get("dropped") or {}
+                print(
+                    f"[intelligence_state] CANDIDATE_SLATE_FILTER date={selected_date} "
+                    f"considered={slate_coverage.get('considered')} kept={slate_coverage.get('kept')} "
+                    f"no_slate={_dropped.get('no_slate_for_sport')} "
+                    f"not_today={_dropped.get('joined_not_today')} "
+                    f"no_match={_dropped.get('chips_present_no_match')}"
+                    + (f" unfiltered={slate_coverage.get('unfiltered_reason')}" if slate_coverage.get("unfiltered_reason") else ""),
+                    flush=True,
+                )
+                raw_candidates = slated
+            except Exception:
+                # NEVER let the filter empty the board on its own failure. A
+                # crash here would be indistinguishable from "no games today",
+                # which is the confusion this whole change exists to end.
+                print(
+                    "[intelligence_state] CANDIDATE_SLATE_FILTER_FAILED "
+                    f"date={selected_date} -- keeping candidates unfiltered",
+                    flush=True,
+                )
         candidate_build_started_at = time.perf_counter()
         candidate_entries: list[dict[str, Any]] = []
         for candidate in raw_candidates:
