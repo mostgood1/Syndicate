@@ -671,7 +671,23 @@ def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[s
                 "market_key": row.get("market"),
                 "line": row.get("line"),
                 "odds": quote.get("price"),
-                "edge": row.get("ev_pct"),
+                # `#364`: A FRACTION, because that is what the card contract means
+                # by `edge`. `ev_pct` is in PERCENT units (1.6332 == 1.63%), and
+                # the board renders this field as `(edge * 100).toFixed(1)`
+                # (`intelligence.html:1115`, `:1497`, `:1840`), so assigning the
+                # percent value straight across multiplied every edge on the board
+                # by 100. Measured live 2026-08-11: 245 cards rendered a
+                # percentage, 123 of them ABOVE 100%, ranging -725% to +163.3%,
+                # for rows whose true edges are ~1.6%.
+                #
+                # `edgeValue(item) * 100 < state.minEdge` at `:944` confirms the
+                # unit from the other side -- the min-edge selector is in percent
+                # and its operand is a fraction.
+                #
+                # `ev_pct` below stays in percent: the name says so, and the
+                # shortlist's own floors (`min_value_pct`) are expressed against
+                # it. Only the alias that feeds the card is converted.
+                "edge": (_as_float(row.get("ev_pct")) / 100.0) if _as_float(row.get("ev_pct")) is not None else None,
                 "team": home if str(row.get("side") or "").lower() == "home" else away,
                 "home_team": home,
                 "away_team": away,
