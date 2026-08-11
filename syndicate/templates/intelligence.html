@@ -1182,6 +1182,21 @@
         if (key) byId.set(`${sport}|${key}`, chip);
         const matchup = String(chip.matchup || "").trim().toLowerCase();
         if (matchup) byMatchup.set(`${sport}|${matchup}`, chip);
+        // #365: ALSO index by FULL NAMES, because chip.matchup is built from
+        // ABBREVIATIONS ("CLE @ DET") while a Layer 2 board row's matchup is
+        // built from full names ("Cleveland Guardians @ Detroit Tigers"). Both
+        // join paths were therefore missing at once and the mini cards never
+        // received a chip: measured 2026-08-11, id overlap 0 of 27 (chips carry
+        // statsapi ids like 824240, L2-A rows carry OddsAPI event ids like
+        // 9c82c4f0...), and the matchup fallback compared abbreviations against
+        // full names. Name pairs matched 18 of 18.
+        //
+        // The visible cost was the whole point of the strip: every game read
+        // "PREGAME" with no clock and no score while 7 of 18 were live, because
+        // status/score/start time all live on the chip, not on the board row.
+        const awayName = String((chip.away || {}).name || "").trim().toLowerCase();
+        const homeName = String((chip.home || {}).name || "").trim().toLowerCase();
+        if (awayName && homeName) byMatchup.set(`${sport}|${awayName} @ ${homeName}`, chip);
       }
       gameChipsById = byId;
       gameChipsByMatchup = byMatchup;
