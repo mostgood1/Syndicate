@@ -432,6 +432,56 @@ Fourth allocation problem tonight. The check that would have caught all four:
 `git log --oneline --grep '#NNN' origin/main` **before** writing the number — not
 grepping the todo heading, which lags the commit that claims it.
 
+### `#339` — DEPLOYED AND IT ANSWERED IMMEDIATELY: the report path is DEAD on live-odds-worker, so "either source is enough" is running on ONE source
+
+Deployed to live-odds-worker 2026-08-11 00:14Z at the user's instruction. **The
+probe fired twice and said the same thing both times:**
+
+```
+00:16:05  MLB_LIVE_PROBE live=True report=no_payload schedule=pks=4 CHANGED
+00:21:26  MLB_LIVE_PROBE live=True report=no_payload schedule=pks=4
+```
+
+**`report=no_payload`, NOT `live=0`.** That distinction is the entire reason the
+probe was built: the service cannot READ the live-lens report, as opposed to
+reading it and finding nothing live. `read_json_file` returns None for it on that
+service every time.
+
+## Why this is the bigger of the two answers
+
+`_mlb_has_live_game`'s design is **report OR schedule**, added 2026-07-17 as
+REDUNDANCY after the gate stuck at `anyLive=false` through a live game. Measured
+now: **the report leg contributes nothing on this service and never has.** MLB
+liveness rests entirely on `_mlb_live_game_via_schedule_probe`, a subprocess that
+shells out to StatsAPI on a 15s budget.
+
+**So there is no redundancy — the two-source design is running on one source, and
+a single subprocess timeout drops a live slate to the 2-hour pregame interval.**
+That is a sufficient mechanism for the 91-minute stall on 2026-08-10 and for the
+2026-07-17 recurrence, and it explains why adding the fallback did not prevent the
+second one: the fallback IS the only leg.
+
+## What is NOT yet established
+
+**Why** `read_json_file` returns None there. Most likely the keyvalue/artifact
+split (`project_keyvalue_artifact_split_blinds_guards`): with
+`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` that reader consults keyvalue only,
+and the live-lens report is written to DISK by refresh-worker. Same family as
+`#331` — a guard reading a store that never contains the artifact it guards on.
+**Not measured. Do not fix it on this paragraph.**
+
+## The fix worth making, and the one that is cheap
+
+The valuable repair is not "make the report readable" — it is that **a leg of an
+OR that can never contribute should say so loudly**, because a redundant design
+silently running single-legged is worse than an honest single-source one. A
+startup assertion, or a `REDUNDANCY_DEGRADED` line when a leg returns
+`no_payload` N times consecutively, would have surfaced this months ago.
+
+Capture health across the deploy, for the record: newest quote **9.4 min old
+immediately before**, **0.5–0.7 min after** — the restart improved it, and the gate
+re-evaluated cold with four games live and returned True.
+
 ### `#339` — COMMITTED, NOT DEPLOYED. The MLB liveness gate returns a bare False from EIGHT paths, and it has cost a live slate twice
 
 `879afbfd` (message says `#338`; see collision note above).
