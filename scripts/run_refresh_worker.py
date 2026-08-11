@@ -966,8 +966,36 @@ def _launch_autorun_reconciliation(
     status_path = _reconciliation_autorun_status_path()
     last_status = _refresh_state_store()["read_json_file"](status_path) or {}
     last_epoch = float((last_status or {}).get("epoch") or 0.0)
-    if last_epoch > 0.0 and (time.time() - last_epoch) < float(_reconciliation_interval_seconds()):
+    age = time.time() - last_epoch if last_epoch > 0.0 else None
+    interval = float(_reconciliation_interval_seconds())
+    # A FAILED RUN MUST NOT CONSUME THE WHOLE DAY. The status epoch is written
+    # on the error path too, so before this a single transient failure -- a
+    # results API timeout, a half-written shard -- blocked every retry for 24
+    # hours and produced nothing, silently. That is the same "enabled but mute"
+    # outcome as the ordering bug, reached by a different route, so fixing one
+    # without the other would leave the loop just as easy to stall.
+    #
+    # Backs off an hour rather than retrying immediately: a persistent failure
+    # should not become a hot loop on a worker that has been at 2.6GB RSS.
+    if str((last_status or {}).get("error") or "").strip():
+        interval = min(interval, 3600.0)
+    if age is not None and age < interval:
+        # SAY WHY. Silence here is what made `#341` invisible: an enabled job
+        # that declines every tick and an enabled job that never gets a tick
+        # look identical from outside, and neither emits anything. Printed
+        # rather than logger.info -- logger.info does not reach Render's
+        # collector.
+        print(
+            f"[refresh_worker] RECONCILIATION_AUTORUN_GATED age_sec={age:.0f} "
+            f"interval_sec={interval:.0f} next_in_sec={interval - age:.0f}",
+            flush=True,
+        )
         return False
+    print(
+        f"[refresh_worker] RECONCILIATION_AUTORUN_RUNNING last_epoch_age_sec="
+        f"{'never' if age is None else f'{age:.0f}'}",
+        flush=True,
+    )
 
     from syndicate.features.prediction_reconciliation import pending_prediction_dates
     from syndicate.features.prediction_reconciliation import reconcile_prediction_results_for_date
@@ -2629,6 +2657,31 @@ def main() -> int:
             )
             if args.run_once:
                 return 0
+        # `#341`: RECONCILIATION RUNS BEFORE THE REFRESH AUTORUNS, not after.
+        #
+        # It used to sit 6th in this exclusive chain, behind mlb_refresh,
+        # weekly_sports and soccer_weekly. Every branch here is `elif`, so it
+        # only got a turn on a tick where all three declined -- and during a
+        # slate mlb_refresh keeps winning. The result: an autorun that is
+        # ENABLED and correctly configured (RECONCILIATION_ENABLE_REFRESH_WORKER_
+        # AUTORUN=true, interval 86400) emitted nothing for weeks.
+        # `chunk_diagnostics` shows exists=false for 2026-07-17..08-04 and true
+        # for 08-05 -- the signature of a job that gets a free tick occasionally
+        # and is otherwise starved. `/api/portfolio/summary` read settled_count
+        # 0 and avg_clv null the entire time.
+        #
+        # Safe to put first, and this is why rather than a hope: it is DAILY
+        # GATED, so it wins at most one tick per 24h, and it runs INLINE rather
+        # than launching a job -- it never held a job slot the refresh branches
+        # were waiting for. Costing mlb_refresh one tick a day is not a
+        # trade-off worth protecting; being mute for three weeks is.
+        elif _launch_autorun_reconciliation(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
         elif _launch_autorun_mlb_refresh(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
@@ -2644,13 +2697,6 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_soccer_weekly_refresh(
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_reconciliation(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,

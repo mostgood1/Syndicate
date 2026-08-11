@@ -1,5 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#341` — COMMITTED, NOT DEPLOYED. The settlement autorun was ENABLED, correctly configured, and structurally unable to run: 6th in an exclusive `if/elif` chain behind three high-frequency branches
+
+**`/api/portfolio/summary` has read `settled_count: 0, avg_clv: null` for weeks,
+and the cause is not settlement, capture, or the emitter. All three work.**
+`_launch_autorun_reconciliation` — which emits `closing_lines_{date}.csv` and
+then reconciles — sat 6th here:
+
+```
+1 _recover_dead_active_contract
+2 _has_pending_external_contract
+3 _launch_autorun_mlb_refresh              <- wins nearly every tick during a slate
+4 _launch_autorun_weekly_sports_refresh
+5 _launch_autorun_soccer_weekly_refresh
+6 _launch_autorun_reconciliation           <- only runs if 1-5 ALL decline
+7 _launch_autorun_evaluation_settlement
+```
+
+Every branch is `elif`. Config was correct the whole time
+(`RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN=true`, interval `86400`), and
+`chunk_diagnostics` shows `exists=false` for `2026-07-17..08-04` and `true` for
+`08-05` — the signature of a job that gets a free tick occasionally and is
+otherwise starved.
+
+**Safe to move first, for two reasons that are properties rather than hopes:**
+it is **daily-gated**, so it can win at most one tick per 24h; and it runs
+**INLINE**, not as a launched job, so it never held a job slot the refresh
+branches were waiting for. Costing `mlb_refresh` one tick a day is not a
+trade-off worth protecting against being mute for three weeks.
+
+**A SECOND STARVATION PATH IN THE SAME FUNCTION, fixed with it.** The status
+epoch is written on the **error** path too, so one transient failure — a results
+API timeout, a half-written shard — blocked every retry for 24 hours and
+produced nothing. Same "enabled but mute" outcome by a different route; fixing
+only the ordering would have left the loop just as easy to stall. Now backs off
+one hour rather than a day, and an hour rather than immediately because a
+persistent failure must not become a hot loop on a worker measured at 2.6GB RSS.
+
+**Both failures were invisible for the same reason, which is the durable
+lesson:** nothing logged *"reconciliation skipped because mlb_refresh won this
+tick"*. An enabled job that declines every tick and an enabled job that never
+gets a tick look identical from outside — neither emits anything. Now prints
+`RECONCILIATION_AUTORUN_GATED age/interval/next_in` and
+`RECONCILIATION_AUTORUN_RUNNING`. This is the third silent conjunction tonight,
+after `#336`'s rate limiter and `#339`'s liveness gate.
+
+**NOT DEPLOYED:** refresh-worker was at 2,621MB RSS / 4,069MB container when
+this was written, with `#340` already held for the same reason.
+
+Tests: `tests/test_reconciliation_autorun_ordering.py` (3), asserting the ORDER
+rather than the behaviour — the defect is positional, so a behavioural test
+would pass on the broken arrangement.
+
 ### `#338` LOCALISED — the board snapshot stores the CORRECT 220. The serve reads a DIFFERENT artifact, and `by_sport` is partial because of `#285`
 
 **The instrument fix (`60c485c4`) paid for itself on its first run.** Live trace,
