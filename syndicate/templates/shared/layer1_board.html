@@ -527,6 +527,18 @@
       var name = r.player_name || (g.matchup || "");
       var priced = best.price !== null && best.price !== undefined;
 
+      // `#350`: A STALE SIM MUST LOOK STALE. Measured 2026-08-11, soccer served
+      // projections generated 22 days earlier against odds quoted minutes
+      // before, rendered identically to a fresh one. Prices show their age; the
+      // model behind them showed nothing.
+      //
+      // 24h rather than tighter: sims legitimately run on multi-hour cadences
+      // (4h for soccer units), so a shorter bound would cry wolf every cycle. A
+      // day old is where "the model likes this" stops being a claim about today.
+      var projAge = (onProj && p.age_hours !== null && p.age_hours !== undefined)
+        ? Number(p.age_hours) : null;
+      var projStale = projAge !== null && projAge >= 24;
+
       var cells = "";
       if (i === 0) {
         cells += '<td class="l1-mkt" rowspan="' + sides.length + '">' + label + line + seg + gaps
