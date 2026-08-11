@@ -5738,7 +5738,29 @@ def main() -> int:
             if copied:
                 state["artifact_bundle_root"] = str(artifact_root_path)
                 state["artifact_bundle_files"] = copied
-        if state and not state.get("error"):
+        # `#347`: RECORD ONLY AFTER REAL WORK, never after a reuse.
+        #
+        # A reused state has no error, so this recorded the CURRENT hash as
+        # "done" without having fetched anything -- and the metadata below even
+        # computes `reused: True` while doing it. That closes a self-
+        # perpetuating loop: reuse -> record current hash -> next tick's
+        # should_recompute sees a match -> reuse again. `#345` gave the guard a
+        # hash to compare; this was handing it a hash that always agreed.
+        #
+        # Measured after #345 deployed: the decision moved from
+        # `reused_source_root_state` to `reused_artifact_bundle` and WNBA calls
+        # stayed pinned at 1161 for 23 minutes. The first guard began declining
+        # correctly; the second kept reusing because the recorded hash had been
+        # refreshed by the previous tick's no-op.
+        #
+        # A recorded hash must mean "these inputs have actually been processed".
+        # Anything else makes the guard agree with itself forever.
+        _did_real_work = bool(
+            state
+            and not state.get("reused_existing_outputs")
+            and not state.get("reused_existing_artifact_bundle")
+        )
+        if state and not state.get("error") and _did_real_work:
             record_refresh_state(
                 f"wnba_artifact_bundle:{_refresh_state_scope_path(artifact_root_path)}:{target_date}:{int(bool(args.do_edges))}:{int(bool(args.do_export))}",
                 refresh_input_hash,

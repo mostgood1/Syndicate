@@ -88,3 +88,32 @@ def test_read_and_write_use_the_same_step_key():
     assert src.count("step_key=_reuse_step_key") == 2
     assert "_reuse_step_key = (" in src
     assert 'f"wnba_artifact_bundle:{_refresh_state_scope_path(artifact_root_path)}:"' in src
+
+
+def test_the_recorder_only_fires_after_real_work():
+    """`#347` — recording a hash after a REUSE closes a self-perpetuating loop.
+
+    A reused state has no error, so the recorder wrote the CURRENT hash as
+    "done" without having fetched anything. Next tick's should_recompute then
+    sees a match and reuses again: reuse -> record -> reuse. #345 gave the guard
+    a hash to compare; this handed it a hash that always agreed.
+
+    Measured after #345 deployed: the decision moved from
+    `reused_source_root_state` to `reused_artifact_bundle` and WNBA calls stayed
+    pinned at 1161 for 23 minutes.
+    """
+    src = (pathlib.Path(__file__).resolve().parents[1] / "scripts" / "refresh_wnba_oddsapi_props.py").read_text(encoding="utf-8")
+    assert "_did_real_work = bool(" in src
+    assert 'and not state.get("reused_existing_outputs")' in src
+    assert 'and not state.get("reused_existing_artifact_bundle")' in src
+    # and the guard on the record call itself
+    assert 'if state and not state.get("error") and _did_real_work:' in src
+
+
+def test_a_recorded_hash_means_the_inputs_were_actually_processed():
+    # The invariant the loop violated: a recorded hash must mean work happened,
+    # otherwise the guard agrees with itself forever.
+    src = (pathlib.Path(__file__).resolve().parents[1] / "scripts" / "refresh_wnba_oddsapi_props.py").read_text(encoding="utf-8")
+    record_idx = src.index("record_refresh_state(")
+    window = src[max(0, record_idx - 1200):record_idx]
+    assert "_did_real_work" in window, "record_refresh_state is reachable without a real-work guard"
