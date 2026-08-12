@@ -1084,7 +1084,43 @@ def _layer2_board_columns(
     return columns
 
 
+def _sport_horizon_days(row: Mapping[str, Any], horizon_days: int | None) -> int | None:
+    """This sport's slate window, not one global number (`#380`).
+
+    A single `horizon_days=1` is correct only for sports whose slate IS one day.
+    Measured live 2026-08-12, immediately after `#379` widened the READ window:
+    soccer landed 16,065 quote rows and 2,359 opportunities in the pool, and the
+    1-day horizon then discarded every one of them -- its fixtures were 08-14
+    (4), 08-15 (25), 08-16 (24) and 08-17 (5), all 2-5 days out. `#379` fixed
+    which dates were READ and left which dates were KEPT at one day, so the
+    counter simply moved: `rows_beyond_horizon` went 2,670 -> 5,029.
+
+    Reuses `slate_window_days` -- the same table Layer 1 boards by and `#379`
+    reads by (soccer 7, nfl 5, ncaaf 3, everything else 1). A third independent
+    notion of "which dates count" is what produced this bug in the first place.
+
+    An explicit caller override still wins: a caller that asks for a specific
+    horizon means it.
+    """
+    if horizon_days is None:
+        return None
+    sport = str(row.get("sport") or "").strip().lower()
+    if not sport:
+        return horizon_days
+    try:
+        from syndicate.features.shared.layer1_board import slate_window_days
+
+        # `slate_window_days` counts DATES INCLUSIVE of the anchor (soccer 7 =
+        # today plus six), while this compares a day DELTA -- so 7 dates is a
+        # delta of 6. Off by one here would silently drop each sport's last day.
+        window = int(slate_window_days(sport))
+    except Exception:
+        return horizon_days
+    return max(int(horizon_days), window - 1)
+
+
 def _within_horizon(row: Mapping[str, Any], now: datetime, horizon_days: int | None) -> bool:
+    horizon_days = _sport_horizon_days(row, horizon_days)
     if horizon_days is None:
         return True
     raw = row.get("commence_time")
