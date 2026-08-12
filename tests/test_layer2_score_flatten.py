@@ -447,3 +447,33 @@ def test_an_impossible_book_is_rejected_not_ranked_first():
     # Unknown is not rejected: absent ev_pct must not be treated as impossible.
     assert _implied_book_total_pct(None) is None
     assert _implied_book_total_pct("nonsense") is None
+
+
+def test_the_history_shard_key_uses_the_central_game_date():
+    """`#370`. `#368` sharded on `commence_time[:10]` -- the UTC date -- which is
+    wrong for exactly the games this board is about.
+
+    A US evening game kicks off at 2026-08-12T00:08Z. Before midnight UTC it
+    sharded to 08-11 and worked; after midnight the SAME game sharded to 08-12
+    while its history sits under 08-11. Measured at 00:27Z: 146 rows correctly
+    labelled "not tracked" and ZERO carrying movement, against 16 before
+    midnight. A bug invisible for eighteen hours a day and total for six is worse
+    than one that never works, because the earlier measurement "proved" it.
+    """
+    from syndicate.features.shared.layer2_board import _movement_shard_keys
+
+    # THE BROKEN CASE: Central date must be tried FIRST.
+    assert _movement_shard_keys("2026-08-12T00:08:00Z")[0] == "2026-08-11"
+    assert _movement_shard_keys("2026-08-12T00:08:00+00:00")[0] == "2026-08-11"
+
+    # Same slate before the rollover -- one key, unchanged behaviour.
+    assert _movement_shard_keys("2026-08-11T23:08:00Z") == ("2026-08-11",)
+    # An afternoon game does not roll over at all.
+    assert _movement_shard_keys("2026-08-12T17:10:00Z") == ("2026-08-12",)
+
+    # A bare date is ALREADY a game date; converting it would shift it a day
+    # backwards -- the same off-by-one in the opposite direction.
+    assert _movement_shard_keys("2026-08-12") == ("2026-08-12",)
+
+    for empty in ("", None):
+        assert _movement_shard_keys(empty) == ()

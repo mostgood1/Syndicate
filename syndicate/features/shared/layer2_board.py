@@ -732,21 +732,24 @@ def _layer2_movement_columns(row: Mapping[str, Any], cache: dict[tuple[str, str]
     if not _movement_is_tracked(row.get("market")):
         return {}
     sport = str(row.get("sport") or "").strip().lower()
-    shard = str(row.get("commence_time") or "")[:10]
-    if not sport or not shard:
+    if not sport:
         return {}
-    key = (sport, shard)
-    if key not in cache:
-        try:
-            from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+    movement = None
+    for shard in _movement_shard_keys(row.get("commence_time")):
+        key = (sport, shard)
+        if key not in cache:
+            try:
+                from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
 
-            cache[key] = load_odds_history_payload_for_sport(sport, shard)
-        except Exception:
-            # Unreadable history must not take the shortlist build down. The row
-            # simply carries no movement, which renders as the same dash it does
-            # today -- a strictly-no-worse failure.
-            cache[key] = None
-    movement = _line_movement_for_row(row, cache.get(key))
+                cache[key] = load_odds_history_payload_for_sport(sport, shard)
+            except Exception:
+                # Unreadable history must not take the shortlist build down. The
+                # row simply carries no movement, which renders as the same dash
+                # it does today -- a strictly-no-worse failure.
+                cache[key] = None
+        movement = _line_movement_for_row(row, cache.get(key))
+        if movement:
+            break
     return {"line_odds_movement": movement} if movement else {}
 
 
@@ -768,6 +771,50 @@ def _movement_is_tracked(market: Any) -> bool:
     # name and are NOT tracked, so `startswith` here would relabel eleven of them
     # as "has history" and put the column straight back to looking broken.
     return str(market or "").strip().lower() in _MOVEMENT_TRACKED_MARKETS
+
+
+def _movement_shard_keys(commence_time: Any) -> tuple[str, ...]:
+    """Odds-history shard keys to try for a row, CENTRAL DATE FIRST (`#370`).
+
+    `#368` sharded on `commence_time[:10]`, which is the UTC date, and that is
+    wrong for exactly the games this board is about. A US evening game kicks off
+    at `2026-08-12T00:08Z` -- so before midnight UTC it sharded to `08-11` and
+    worked, and after midnight the SAME game sharded to `08-12` while its history
+    sits under `08-11`. Measured at 00:27Z, four hours after I read this repo's
+    own warning about it: 146 rows labelled "not tracked" correctly and **zero**
+    rows carried movement, against 16 measured before midnight.
+
+    A bug that is invisible for eighteen hours a day and total for six is worse
+    than one that never works, because the pre-midnight measurement "proved" it.
+
+    Central first because that is how the rest of the repo shards a slate
+    (`central_today_iso`, `#331`'s capture-date-vs-game-date rule). UTC is kept
+    as a second attempt rather than dropped: this is a LOOKUP, not a guard, so
+    trying both costs one dict miss and covers a shard written under either
+    convention. A guard would have to pick one.
+    """
+    text = str(commence_time or "").strip()
+    if not text:
+        return ()
+    # A bare date is ALREADY a game date, not an instant. Converting it would
+    # read it as midnight UTC and shift it a day backwards -- the same
+    # off-by-one this function exists to fix, in the opposite direction.
+    if "T" not in text and " " not in text:
+        return (text[:10],)
+    keys: list[str] = []
+    try:
+        from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
+
+        stamp = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if stamp.tzinfo is None:
+            stamp = stamp.replace(tzinfo=timezone.utc)
+        keys.append(stamp.astimezone(CENTRAL_TIMEZONE).date().isoformat())
+    except Exception:
+        pass
+    utc_key = text[:10]
+    if utc_key and utc_key not in keys:
+        keys.append(utc_key)
+    return tuple(keys)
 
 
 def _line_movement_for_row(row: Mapping[str, Any], history: Mapping[str, Any] | None) -> dict[str, Any] | None:
