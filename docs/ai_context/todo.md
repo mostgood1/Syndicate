@@ -1,49 +1,45 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#379` — OPEN, UNOWNED, THE BOARD IS EMPTY. ~5,900 qualifying opportunities select ZERO rows, and every rejection counter reads zero
+### `#379` — CORRECTED AND DOWNGRADED. The board was empty for ONE rebuild and recovered. My "every counter reads zero" claim was wrong: I read three of five counters
 
-**The board went from 33 cards to 0 at the 2026-08-12T15:14:03Z rebuild.** Ingest
-is healthy; selection produces nothing.
+**Filed 2026-08-12 claiming an unattributable zero. That claim was false.** The
+board read 0 rows at the 15:14:03Z rebuild and **128 rows at 15:20:26Z**, with no
+intervention. Current: `mlb` 100 selected of 4,452 available, `nfl` 28 of 28.
 
-| sport | opportunities IN | scheduled games | SELECTED |
-|---|---|---|---|
-| mlb | 4,387 | 24 | **{}** |
-| nfl | 2,694 | 30 | **{}** |
-| wnba | 1,506 | 6 | **{}** |
-| soccer | 0 | 56 | — |
-| | **8,587** = `considered` exactly | | |
+**The error:** I reported "EVERY FILTER REPORTS IT DROPPED NOTHING" after reading
+`rows_beyond_horizon`, `rows_below_value_floor`, and `rows_implausible_book`. The
+endpoint publishes **five** rejection counters. I never read
+`rows_beyond_quote_age` or `rows_stale_kickoff`. On the healthy build:
 
-    rows_beyond_horizon     2,660   -> ~5,927 should have survived
-    rows_below_value_floor      0
-    rows_implausible_book       0
-    rows                        0
-    active_sports              []
-    per_sport                  {}
-    date 2026-08-12  horizon_days 1  per_sport_limit 100  kind_floor 30
+    rows_beyond_horizon      2,670    horizon_days                 1
+    rows_beyond_quote_age    1,850    max_quote_age_seconds   3600.0   <- NEVER READ
+    rows_stale_kickoff           0    stale_kickoff_seconds   7200.0   <- NEVER READ
+    rows_below_value_floor       0    min_value_pct             -2.0
+    rows_implausible_book        0    min_implied_book_total  95.0
 
-**EVERY FILTER REPORTS IT DROPPED NOTHING, AND NOTHING CAME OUT.** That is the
-whole finding. Three sports with real slates and thousands of priced
-opportunities each select zero, with no attributable rejection anywhere.
+`rows_beyond_quote_age` rejects **1,850 of 9,000 (21%)** in normal operation. It
+was overwhelmingly the largest un-inspected term, and it is the one filter whose
+rejection count moves with *elapsed time since the last odds write* rather than
+with the slate. So the empty build has a plausible mechanism that needs no new
+defect: a rebuild landing when every quote on disk was older than the ceiling.
 
-**NOT `#377`.** That fix only sets `projection.projected` to `None`; it cannot
-remove rows, and MLB/WNBA never touch NFL projection code. Ruled out by
-construction, not by timing.
+**`max_quote_age_seconds` is 3600 now; it read 86400 last night.** A 24× tighter
+ceiling, unexplained — that is the one thing here still worth tracing. Whoever
+picks this up: find what sets it (env vs. code default) and whether the change
+was deliberate. A 1-hour ceiling makes the board's population depend on odds
+refresh cadence, which is exactly the coupling that would produce a single empty
+rebuild.
 
-**SAME SHAPE AS `#308`** — "156 merged candidates → 0 promoted cards", still open
-on this list. A full pool, empty output, no counter fires. Check whether this is
-that defect resurfacing at a larger scale before treating it as new.
+**NOT the `#308` shape.** I asserted that on the strength of the false "no
+counter fires" reading. `#308` is a full pool with no attributable rejection;
+this is a pool where 50% of rejections were attributable and I did not look at
+them. Do not treat these as the same defect.
 
-**WHERE TO START:** `select_layer2_shortlist_rows`, between the horizon filter and
-the per-sport bucketing. The two places that can drop everything silently are the
-`by_sport` grouping (a sport key that no longer matches drops its whole bucket)
-and the floor-then-merit seating. **Instrument before theorising** — `#376` took
-six passes precisely because every rejection was counted except the one that was
-happening, and this has the identical signature.
-
-**A ZERO THAT IS NOT ATTRIBUTABLE IS THE BUG,** independent of the cause. Every
-selection rule here already reports what it rejected (`#373` added the newest);
-whatever is consuming these ~5,900 rows reports nothing at all, so no operator
-could tell an empty slate from a broken join.
+**The lesson is the one already on this list, again:** *read the field you
+already have.* Both missing counters were in the payload I had fetched, in the
+same object I quoted from. This is the second filing in this session where a
+"nothing explains it" conclusion came from an incomplete read of a response that
+did explain it, and the first one (`#376`) cost six passes.
 
 ### `#377` — OPEN, UNOWNED, SERIOUS. PROJECTED is a CONSTANT, not a projection — two values across the entire board
 
