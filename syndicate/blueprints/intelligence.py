@@ -2734,6 +2734,18 @@ def board_layer2_shortlist_api():
                 # them would report a broken feed as a tuning choice.
                 "min_implied_book_total_pct": shortlist.get("min_implied_book_total_pct"),
                 "rows_implausible_book": shortlist.get("rows_implausible_book"),
+                # `#397`. `#391`'s per-game cap and its counters existed in
+                # `select_shortlist`'s return and never reached the wire, because
+                # this endpoint hand-builds its payload from an explicit key
+                # list. The cap was demonstrably working -- concentration went
+                # 26/19/14 to a hard 6/6/6 -- and was unreadable from the API,
+                # which is the exact failure `#373` fixed for
+                # `rows_implausible_book` and `#381` fixed for
+                # `value_floor_by_sport`. THIRD TIME. Any new field added to
+                # `select_shortlist` must be added HERE in the same commit, or
+                # it is invisible no matter how well it works.
+                "rows_beyond_game_cap": shortlist.get("rows_beyond_game_cap"),
+                "rows_per_game": shortlist.get("rows_per_game"),
                 "max_quote_age_seconds": shortlist.get("max_quote_age_seconds"),
                 "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
                 "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),
