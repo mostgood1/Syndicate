@@ -2203,8 +2203,28 @@ def _retire_stale_active_pointer(meta: dict[str, Any], *, state: str, detail: st
 	"""Record the outcome, THEN clear the pointer. `#388`.
 
 	Order matters: clearing first loses the run identity the finalize needs.
+
+	**ONLY THE SIM-TICK OWNER MAY WRITE A DEATH CERTIFICATE.** Measured in
+	production 2026-08-12 20:34:43Z, within two minutes of `#388` going live:
+	live-odds-worker stamped run 20260812_203340 `died_untracked` with
+	"pid 110 no longer exists" while pid 110 was alive and working on
+	refresh-worker, climbing 1014MB -> 2251MB. The active pointer is SHARED
+	state (keyvalue, cross-service) but `_process_exists` is a LOCAL probe, so
+	a non-owner asking 'is pid 110 here?' always gets no -- it is answering a
+	different question than the one the pointer poses.
+
+	`_mlb_sim_tick_owner_here` already encodes this and is already `false` on
+	live-odds-worker; the defect was that the finalize did not consult it. Its
+	own docstring says a non-owner should 'just observe' -- observing must not
+	mean recording someone else's run as dead.
+
+	The clear below is deliberately NOT gated: that is pre-existing behaviour
+	for non-owners and narrowing it here would be a second, unmeasured change
+	on top of an incident. This restores exactly the old semantics for
+	non-owners while keeping the new record for the owner.
 	"""
-	_finalize_orphaned_sim_run(meta, state=state, detail=detail)
+	if _mlb_sim_tick_owner_here():
+		_finalize_orphaned_sim_run(meta, state=state, detail=detail)
 	_clear_active_pointer(expected_pid=meta.get("pid"))
 
 

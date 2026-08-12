@@ -199,6 +199,67 @@ class MlbSimRunReconcileTests(unittest.TestCase):
         self.assertTrue(json.loads((self.sim_dir / "_active.json").read_text(encoding="utf-8")))
 
 
+class MlbSimNonOwnerTests(unittest.TestCase):
+    """A non-owner must not record someone else's run as dead. `#388`.
+
+    MEASURED IN PRODUCTION 2026-08-12 20:34:43Z, two minutes after `#388` went
+    live: live-odds-worker stamped run 20260812_203340 `died_untracked` with
+    "pid 110 no longer exists" -- while pid 110 was alive on refresh-worker and
+    climbing 1014MB -> 2251MB. The active pointer is SHARED cross-service state;
+    `_process_exists` is a LOCAL probe. A non-owner asking "is pid 110 here?" is
+    answering a different question than the pointer poses, and always gets no.
+
+    This is the false positive the whole ticket warns about, arriving by a route
+    the original tests did not model: they all ran as the owner.
+    """
+
+    DATE = "2026-08-12"
+    STAMP = "20260812_203340"
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.reports_root = Path(self._tmp.name)
+        self.sim_dir = self.reports_root / "live_refresh_loop" / "mlb_sim_runs"
+        self.sim_dir.mkdir(parents=True, exist_ok=True)
+        patcher = patch.object(live_refresh_loop, "reports_root", return_value=self.reports_root)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.addCleanup(self._tmp.cleanup)
+        self.status_path = self.sim_dir / f"{self.DATE}_{self.STAMP}_status.json"
+        self.meta = {
+            "date": self.DATE, "run_stamp": self.STAMP, "pid": 110,
+            "reason": "fingerprint_change", "command": ["python", "run_mlb_daily_sim_job.py"],
+            # AFTER _PROCESS_STARTED_AT, or the restart branch claims it before
+            # the pid branch these tests are about ever runs.
+            "started_at": _iso(live_refresh_loop._PROCESS_STARTED_AT + timedelta(seconds=1)),
+        }
+        (self.sim_dir / "_active.json").write_text(json.dumps(self.meta), encoding="utf-8")
+        self.status_path.write_text(json.dumps({**self.meta, "state": "running"}), encoding="utf-8")
+
+    def _run_as(self, *, owner: bool) -> dict:
+        with patch.object(live_refresh_loop, "_mlb_sim_tick_owner_here", return_value=owner),                 patch.object(live_refresh_loop, "_mlb_sim_progress_is_stalled", return_value=False),                 patch.object(live_refresh_loop, "_process_exists", return_value=False):
+            live_refresh_loop._shared_mlb_sim_still_running()
+        return json.loads(self.status_path.read_text(encoding="utf-8"))
+
+    def test_non_owner_does_not_write_a_death_certificate(self) -> None:
+        """The production incident, reproduced."""
+        status = self._run_as(owner=False)
+        self.assertEqual(status["state"], "running")
+        self.assertNotIn("finalized_by", status)
+
+    def test_owner_still_records_it(self) -> None:
+        """And the fix must not silence the owner too."""
+        status = self._run_as(owner=True)
+        self.assertEqual(status["state"], "died_untracked")
+        self.assertEqual(status["finalized_by"], "orphan_reconcile")
+
+    def test_non_owner_still_clears_the_pointer(self) -> None:
+        """Pre-existing behaviour, deliberately unchanged -- narrowing it here
+        would be a second unmeasured change on top of an incident."""
+        self._run_as(owner=False)
+        self.assertFalse(json.loads((self.sim_dir / "_active.json").read_text(encoding="utf-8")))
+
+
 class MlbSimFinalizeMergeTests(unittest.TestCase):
     """`#388` second defect: two writers, one path, last writer wins.
 
