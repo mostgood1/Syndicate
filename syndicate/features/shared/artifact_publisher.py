@@ -1002,7 +1002,7 @@ def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepR
     failed: list[Path] = []
     today = date.today()
     skipped: dict[str, int] = {}
-    # `#400`: WHICH files, not just how many. The counter below has always said
+    # `#402`: WHICH files, not just how many. The counter below has always said
     # a class was skipped and never which artifact, and that gap cost real time:
     # `{'too_large': 2}` was read across three sessions as "book_grid is being
     # refused at the ceiling", which is false -- book_grid exceeds

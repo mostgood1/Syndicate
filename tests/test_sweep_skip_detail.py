@@ -1,4 +1,11 @@
-"""`#400` -- the sweep said a class was skipped and never which artifact.
+"""`#402` -- the sweep said a class was skipped and never which artifact.
+
+RENUMBERED FROM `#400`, which collided with a renumber commit that was itself
+fixing an earlier collision (`0f9c77c5`). Third ID collision of the day, and the
+second the oversight lane was on both sides of. The commit that shipped this
+(`03937acb`) still says `#400` on the record -- a deploy is not worth unwinding
+over a number, and the pattern here is to correct the references and leave the
+message wrong rather than rewrite history.
 
 WHAT THE GAP COST. `SWEEP_SKIPPED {'too_large': 2}` was read across THREE
 sessions as "book_grid is being refused at the publish ceiling", and a
