@@ -1596,7 +1596,30 @@ def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None 
         {"label": "Final", "value": str(page_context["counts"].get("final") or 0)},
         {"label": "Props", "value": str(page_context["counts"].get("props") or 0)},
     ]
-    api_payload = _snapshot_api_payload(selected_date, season=season, snapshot={"games": games, "page_context": page_context})
+    # `#371`: NOT STORED. `api_payload` is a pure projection of `games` +
+    # `page_context`, both of which are already in this snapshot, so persisting
+    # it wrote the ~3.2MB `games` list a THIRD time (once here, once under
+    # `page_context`, once at top level) and pushed the keyvalue payload past
+    # its 8MB ceiling mid-slate:
+    #
+    #     KeyValuePayloadTooLarge: 8,705,605 bytes exceeds 8,388,608
+    #     page_context=3,270,243  api_payload=3,264,871  (+ top-level games)
+    #
+    # MLB's live-lens tick failed on every cycle from ~00:39Z, so live data
+    # stopped updating entirely. The triple-store is also the amplifier: `games`
+    # grows ~20KB/min during live play, and three copies made that ~60KB/min.
+    #
+    # SAFE BECAUSE THE READER ALREADY REBUILDS IT. `read_latest_live_lens_api_payload`
+    # treats a missing `api_payload` as its `None` branch and calls
+    # `_snapshot_api_payload(snapshot=snapshot)`, which reconstructs `games` via
+    # `_snapshot_games` under the same `[:50]` cap -- so the served payload is
+    # identical, field for field.
+    #
+    # AND NOT BY STRIPPING `games` FROM IT, which was the first plan and was
+    # wrong: `payload.setdefault("games", [])` fills an ABSENT key with `[]` and
+    # returns it, so that version would have served a 200 with zero games during
+    # a live slate -- reading as "no games tonight" rather than as an error.
+    # Deleting the whole key is what reaches the rebuild branch.
     snapshot = {
         "ok": True,
         "date": page_context.get("date") or selected_date,
@@ -1605,7 +1628,6 @@ def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None 
         "odds_refreshed_at": page_context.get("odds_refreshed_at") or page_context.get("oddsRefreshedAt"),
         "source_path": page_context.get("source_path") or str(live_lens_snapshot_path()),
         "page_context": page_context,
-        "api_payload": api_payload,
         "games": games,
         "scoreboard_items": [dict(item) for item in (page_context.get("scoreboard_items") if isinstance(page_context.get("scoreboard_items"), list) else []) if isinstance(item, dict)][:50],
         "counts": dict(page_context.get("counts") or {}),
