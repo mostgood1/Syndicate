@@ -84,14 +84,76 @@ an **upper bound** — the run died when the container did, and we only notice o
 the next tick, so the gap includes the restart. The test asserts a bound, not an
 equality, so the field's meaning is written down.
 
-**PUSHED (`93dfbd8d`) AND NOT DEPLOYED — so it is INERT.** refresh-worker is
-live on `c07b6441` (deployed 19:48:06Z, live 19:51:42Z, `trigger: api`), which
-does **not** contain `93dfbd8d`. Deploying kills in-flight sims, the very thing
-this measures, so it wants a deliberate window.
+**DEPLOYED 20:32:22Z on `239b5eba` — and it immediately wrote FALSE records.
+Fixed by `f6c0525f`. Read the regression below before trusting any run record
+written between 20:32Z and the `f6c0525f` deploy.**
 
-**Do not assume someone else's deploy will carry it** — see the pinned-commit
-note in Operational notes. It goes live only when a deploy *names a commit that
-contains it*.
+### The regression: a non-owner stamped LIVE sims dead, at a 100% rate
+
+**MEASURED since 20:32Z: 3 of 3 MLB sim launches (100%) falsely recorded**
+`died_untracked` by **live-odds-worker**, ~60s after launch, while each sim ran
+normally on refresh-worker. refresh-worker itself wrote **0** false records.
+First instance, 20:34:43Z:
+
+    state        died_untracked
+    detail       pid 110 no longer exists
+    finalized_by orphan_reconcile
+
+pid 110 was alive on refresh-worker throughout, climbing 1014MB -> 2251MB.
+
+**CAUSE.** The active pointer is **shared** state — keyvalue-backed,
+deliberately cross-service so any worker can see whether a sim is running.
+`_process_exists` is a **local** probe. A non-owner asking "is pid 110 here?" is
+answering a different question than the pointer poses, and always gets no.
+
+The pre-existing code had the same asymmetry but only **cleared** the pointer on
+it. `#388` added a **write**, so a silent wrong guard became a **recorded wrong
+fact** — worse than the gap it replaced, in the one ledger whose entire purpose
+is to be trustworthy.
+
+**`_mlb_sim_tick_owner_here` already encoded this and is already `false` on
+live-odds-worker.** Its own docstring says a non-owner should "just observe".
+The information was present and unconsulted — the same shape as the inert fixes
+on this list.
+
+**HOW IT PASSED 8 TESTS: every one ran implicitly as the OWNER.** The single
+axis that mattered was the one nothing varied. `f6c0525f` adds three tests that
+parameterise ownership; `test_non_owner_does_not_write_a_death_certificate`
+reproduces the incident against the deployed commit with the identical log line.
+
+The pointer-**clear** is deliberately left ungated: that is pre-existing
+behaviour for non-owners, and narrowing it would be a second unmeasured change
+stacked on an incident.
+
+**Deploy state, verified 21:44:13Z:**
+
+    refresh-worker    239b5eba   gate INERT (deliberate)
+    live-odds-worker  f6c0525f   gate LIVE
+
+`f6c0525f` went to **live-odds-worker only** — the only service writing bad
+records. refresh-worker is deliberately left on `239b5eba`: its records are
+correct, it is the service whose restart kills sims, and it had already taken
+five restarts that day. It can pick up the gate on its next deploy for any
+other reason; there is no urgency, because the corruption only ever came from
+the non-owner.
+
+**NOT CONFIRMED AT THE TIME OF WRITING.** The deploy is live and the gate is in
+the deployed blob, but *deployed is not working* — which is the entire subject
+of this ticket. The real test is the next MLB sim launch: if no
+`MLB_DAILY_SIM_ORPHANED` follows it from live-odds-worker, the fix holds.
+Before/after boundary for whoever checks:
+
+    21:20:39  LAUNCH (refresh-worker)    run_stamp=20260812_212039
+    21:21:46  FALSE  (live-odds-worker)  died_untracked "pid 108 no longer exists"
+    21:44:13  gate live on live-odds-worker
+
+Every launch before that boundary was falsely stamped — 3 for 3.
+
+**Not retracted by the fix:** the 3 false records already written, and the
+pre-existing orphan `20260812_195218` (game 823263, killed by the 20:05Z
+suspension) which stays `state: running` forever — its pointer was already
+cleared by the old code, so there is nothing left to reconcile from. **`#388`
+records forward, never retroactively.**
 
 **A production record in the exact shape of this fix's worst false positive
 appeared within the hour, and the guard handles it.** Run `20260812_193455`
@@ -156,7 +218,7 @@ correct only if parsed tz-aware. Emit `duration_seconds` explicitly.
 **7 days of Render logs across both workers contain 189 `TRIGGERED` lines and 0
 `START`, 0 `END`, 0 `TIMEOUT`.** You can see every sim start and no sim finish.
 
-### `#389` — FIXED AND PUSHED, NOT YET DEPLOYED. NFL SmartSim2 runs ~90×/day against a 24-hour TTL, because a missing artifact reads as "not stale"
+### `#389` — FIXED, DEPLOYED, AND CONFIRMED WORKING IN PRODUCTION. NFL SmartSim2 ran ~90×/day against a 24-hour TTL, because a missing artifact read as "not stale"
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §4.
 
@@ -219,8 +281,36 @@ is now diagnosable instead of silent.
 
 Separately, still true: the season script is pinned to `--week 1` in mid-August.
 
-**Not deployed** — see the pinned-commit note; a deploy names one commit and
-nothing is carried automatically.
+**DEPLOYED AND CONFIRMED WORKING IN PRODUCTION** — refresh-worker went live on
+`239b5eba` at 20:32:22Z. The mechanism is visible, not just the outcome:
+
+    20:57:17  SEASON_PROJECTION_LAUNCHING sport=nfl  reason=artifact_missing_no_prior_launch
+    20:59:10  SEASON_PROJECTION_LAUNCHING sport=nfl_preseason  reason=artifact_missing_no_prior_launch
+    21:01:21  SEASON_PROJECTION_ARTIFACT_MISSING sport=nfl  since_launch_seconds=244  interval=86400
+    21:03:38  SEASON_PROJECTION_ARTIFACT_MISSING sport=nfl_preseason  since_launch_seconds=268
+    21:13:44  SEASON_PROJECTION_ARTIFACT_MISSING sport=nfl  since_launch_seconds=987
+
+**2 launches in 62 minutes instead of ~12**, one cold start per sport then
+suppression by name. Zero `generate_smartsim2` processes across 100 process-table
+samples.
+
+**The `SEASON_PROJECTION_ARTIFACT_MISSING` line was checked deliberately, not
+the process count.** "0 launches" reads identically whether the guard suppressed
+them or NFL simply is not active — only the named reason discriminates.
+
+#### FOLLOW-UP to `#389` — OPEN, UNOWNED. The NFL projection artifacts are never written at all
+
+Now visible because `#389` made it so. The paths the guard watches are still
+absent **987 seconds after a ~3-minute run**:
+
+    /opt/render/project/data/nfl_source/smartsim2_projections_2026_wk1.csv
+    /opt/render/project/data/nfl_source/smartsim2_preseason_projections_2026_wk2.csv
+
+So the generation script runs to completion and does not write where the autorun
+looks — wrong path, wrong root, or a silent write failure. `#389` deliberately
+did not guess which; it stopped the ~90/day busy loop and named the file. This
+is the remaining half, and it is the reason the artifacts were stale in the first
+place.
 
 Observed on refresh-worker over 43.2h (process-table sampling):
 
@@ -28219,6 +28309,39 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ---
 
 ## Operational notes worth not rediscovering
+
+### PRE-FLIGHT PROCEDURE: prove the instrument is alive BEFORE you read the null (2026-08-12)
+
+Named as a procedure, not a lesson, because two separate readings today were
+wrong in the *dangerous* direction — both said "nothing is happening" when
+something was.
+
+**The procedure, before any "is X running?" check gates an action:**
+
+1. Query the instrument over a window **wide enough to contain several samples**
+   (30–60 min, not 5–10).
+2. **Assert the instrument reported at all**, and that its newest sample is
+   recent: `newest_sample_ts` vs `now`. If there are zero samples, or the newest
+   is minutes stale, **the answer is UNKNOWN — abort.** It is not "clear".
+3. Only then read the result.
+
+**What it costs to skip step 2.** Pre-flighting a deploy at 20:24Z I queried an
+8-minute window, got **0 `ALL_PROCESS_MEMORY` samples**, and nearly read it as
+"no sim running". Zero samples meant refresh-worker had been **suspended** since
+20:05Z — and the last sample before the silence showed a full MLB sim tree
+(pid 76 wrapper, 77 `daily_update.py`, 152, 305, 306). Widening to 60 minutes is
+the only reason that surfaced. Acting on the narrow read would have deployed
+onto a running sim.
+
+**A worked example of the procedure passing**, live-odds-worker at 21:37:05Z:
+
+    instrument alive? 100 samples, newest 21:36:13 (now 21:37:05Z)   <- step 2 PASSES
+    sim/build processes on this service: 0                            <- only now is this meaningful
+    VERDICT: clear to deploy
+
+Same root shape as the `child_count` error below: **a healthy reading is
+evidence only once you know what makes it read unhealthy.** Step 2 is that
+knowledge, made mechanical.
 
 ### "Is a sim running?" — use `ALL_PROCESS_MEMORY`. `child_count` and `game_count` both lie (2026-08-12)
 

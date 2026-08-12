@@ -459,6 +459,9 @@ and nothing has been deployed by this work.**
 | 2026-08-12 | Renumbered those three from `#387`–`#389` after a concurrent session pushed its own `#387` into the same gap | done |
 | 2026-08-12 | **`#388` implemented** — orphan reconcile, merge-not-clobber, `duration_seconds`, launcher-emitted `MLB_DAILY_SIM_END`. 8 new tests, 5 red without the change; `test_live_refresh_loop.py` 219 passed | **in working tree, NOT deployed** |
 | 2026-08-12 | **`#389` implemented** — one shared staleness decision for both NFL autoruns; missing artifact falls back to last-launch age instead of reading as stale. 12 tests; the wiring test fails against `HEAD` with `Popen ... Called 1 times` | **pushed, NOT deployed** |
+| 2026-08-12 | `#388`+`#389` deployed to refresh-worker (`239b5eba`, live 20:32:22Z) | **live** |
+| 2026-08-12 | `#389` **confirmed in production** — 2 launches in 62 min vs ~12, suppression named in the log; surfaced that the NFL artifacts are never written at all | **confirmed** |
+| 2026-08-12 | `#388` **regression**: live-odds-worker stamped 3 of 3 live sims `died_untracked` — shared pointer vs local `_process_exists`. Gate `f6c0525f` deployed to live-odds-worker (live 21:44:13Z) | **fix live, unconfirmed** |
 | — | `#390` (per-sport sim ledger) | **not started** |
 
 ### `#388` as implemented
