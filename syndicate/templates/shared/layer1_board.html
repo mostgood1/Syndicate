@@ -84,6 +84,13 @@
   table.l1 { border-collapse: collapse; width: 100%; font-size: 12px; }
   table.l1 th, table.l1 td { padding: 5px 8px; border-bottom: 1px solid #1a2230; text-align: right; white-space: nowrap; }
   table.l1 th { background: #0f151d; color: #8fa2b8; font-weight: 600; font-size: 11px; }
+  table.l1 th.l1-sortable { cursor: pointer; user-select: none; }
+  table.l1 th.l1-sortable:hover { color: #e8eef7; }
+  /* Book columns read as data, not as chrome: narrower, dimmer header, and the
+     price still tabular so a column scans vertically. */
+  table.l1 th.l1-book { font-weight: 500; color: #6b7d94; }
+  table.l1 td.l1-bookcell { font-variant-numeric: tabular-nums; color: #9fb0c6; }
+  table.l1 td.l1-bookcell.l1-stale { color: #6b7d94; font-style: italic; }
   table.l1 td.l1-mkt, table.l1 th.l1-mkt { text-align: left; }
   table.l1 tr:hover td { background: #121a24; }
   .l1-side { color: #8fa2b8; font-size: 11px; }
@@ -141,6 +148,7 @@
   <div class="l1-tabs" id="l1-markets"></div>
   <div class="l1-tabs" id="l1-segments"></div>
   <div class="l1-tabs" id="l1-leagues"></div>
+  <div class="l1-tabs" id="l1-games"></div>
   <div class="l1-meta" id="l1-meta"></div>
 
   <div class="l1-layout">
@@ -157,7 +165,7 @@
 <script src="{{ url_for('static', filename='shared/bet_slip.js') }}"></script>
 <script>
 (function () {
-  var state = { sport: "{{ sport }}", date: "{{ selected_date }}", window: "slate", view: "all", segment: "", league: "{{ initial_league or '' }}", market: "", board: null };
+  var state = { sport: "{{ sport }}", date: "{{ selected_date }}", window: "slate", view: "all", segment: "", league: "{{ initial_league or '' }}", market: "", game: "", sort: { key: null, dir: 1 }, board: null };
 
   function q(id) { return document.getElementById(id); }
   function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
@@ -290,6 +298,32 @@
     q("l1-leagues").innerHTML = html.join("");
     Array.prototype.forEach.call(q("l1-leagues").querySelectorAll("[data-league]"), function (el) {
       el.onclick = function () { state.league = el.getAttribute("data-league"); fetchBoard(); };
+    });
+  }
+
+  // GAME SELECTOR (`#407`). The board groups by game already; this narrows to
+  // one. Distinct from the market/segment strips above it, which filter ROWS
+  // within every game -- this filters which games render at all.
+  //
+  // Keyed on `event_id` rather than the matchup label: two games can carry the
+  // same tri-code pair across a multi-day soccer window, and a label key would
+  // silently merge them.
+  function renderGames() {
+    var b = state.board || {}, games = b.games || [];
+    if (games.length < 2) { q("l1-games").innerHTML = ""; return; }
+    var html = ['<span class="l1-tabs__label">Game</span>',
+      '<span class="l1-tab' + (state.game ? "" : " l1-tab--on") + '" data-game="">All ' + games.length + "</span>"];
+    games.forEach(function (g) {
+      var id = String(g.event_id || "");
+      if (!id) { return; }
+      var on = state.game === id ? " l1-tab--on" : "";
+      var when = timeLabel(parseUtc(g.start_time_utc));
+      html.push('<span class="l1-tab' + on + '" data-game="' + esc(id) + '">'
+        + esc(g.matchup || "?") + (when ? ' <span class="l1-side">' + esc(when) + "</span>" : "") + "</span>");
+    });
+    q("l1-games").innerHTML = html.join("");
+    Array.prototype.forEach.call(q("l1-games").querySelectorAll("[data-game]"), function (el) {
+      el.onclick = function () { state.game = el.getAttribute("data-game"); render(); };
     });
   }
 
@@ -531,7 +565,79 @@
     return "no fair value available";
   }
 
-  function rowHtml(r, g) {
+  // SORTING AND PER-BOOK COLUMNS (`#407`), carried over from `book_grid` rather
+  // than reinvented -- that page's sort rules were already correct and its
+  // reasoning is preserved below.
+  function sortValue(r, key) {
+    var p = r.projection || {};
+    // TWO DIFFERENT SIDE KEYSPACES, and conflating them silently broke sorting.
+    //
+    // `projection.side` is a LABEL -- "Dallas Wings", "over" -- while `best`,
+    // `consensus` and `modelled_fair` are keyed by the row's own side tokens
+    // (`home`/`away`/`over`/`under`). Reading the price maps with the projection's
+    // side returned undefined on every WNBA and NFL row, every price key sorted
+    // as null, nulls sort last, and the order never changed. The arrows flipped
+    // and the board did not move, which is worse than an unsortable column.
+    //
+    // Price columns therefore sort on the row's FIRST side -- the one whose value
+    // the market's first visible line shows -- and only proj/edge read the
+    // projection.
+    var priceSide = (r.sides || [])[0];
+    var best = (r.best || {})[priceSide] || {};
+    switch (key) {
+      // Segment belongs IN the key. Without it the four segments of one game
+      // sort as equal and interleave, which is what made them read as duplicate
+      // rows when a user first reported it.
+      case "mkt": return (r.player_name || String(r.market || "")) + " "
+        + (r.line === null || r.line === undefined ? "" : r.line) + " " + segOf(r);
+      case "side": return String(priceSide || "");
+      case "proj": return (p.projected === null || p.projected === undefined) ? null : p.projected;
+      case "edge":
+        if (p.edge_vs_market_pct !== null && p.edge_vs_market_pct !== undefined) return p.edge_vs_market_pct;
+        if (p.edge_vs_line !== null && p.edge_vs_line !== undefined) return p.edge_vs_line;
+        return null;
+      case "best": return (best.price === null || best.price === undefined) ? null : best.price;
+      case "fair": {
+        var mf = (r.modelled_fair || {})[priceSide] || {};
+        if (mf.fair_price !== null && mf.fair_price !== undefined) return mf.fair_price;
+        var nv = noVigFair(r, priceSide);
+        return nv && nv.price !== null && nv.price !== undefined ? nv.price : null;
+      }
+      case "cons": return (r.consensus || {})[priceSide];
+      case "seen": {
+        var s = r.seen_age_seconds;
+        return (s === null || s === undefined) ? null : s;
+      }
+      default: return null;
+    }
+  }
+
+  function sortRows(rows) {
+    if (!state.sort.key) { return rows; }
+    var k = state.sort.key, dir = state.sort.dir;
+    return rows.slice().sort(function (a, b) {
+      var av = sortValue(a, k), bv = sortValue(b, k);
+      var an = (av === null || av === undefined), bn = (bv === null || bv === undefined);
+      // NULLS LAST IN BOTH DIRECTIONS. A blank is not a small number, and
+      // flipping the arrow should not promote every row that has no value.
+      if (an && bn) { return 0; }
+      if (an) { return 1; }
+      if (bn) { return -1; }
+      if (typeof av === "number" && typeof bv === "number") { return (av - bv) * dir; }
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+  }
+
+  // The book set is computed PER CARD, from the rows actually shown. A board-wide
+  // column set would carry an empty column on every game that does not have that
+  // book, and the widest sport (MLB, 37 books) would make every card unreadable.
+  function booksFor(rows) {
+    var seen = {};
+    rows.forEach(function (r) { (r.books || []).forEach(function (b) { seen[b] = 1; }); });
+    return Object.keys(seen).sort();
+  }
+
+  function rowHtml(r, g, books) {
     var p = r.projection || {};
     var pSide = projSide(r);
     var sides = (r.sides && r.sides.length) ? r.sides : [pSide];
@@ -636,7 +742,24 @@
         + '<td class="l1-price" title="' + esc(fairAnchorNote(fairAnchor, mf)) + '">'
           + odds(fair) + fairAnchorMark(fairAnchor) + "</td>"
         + '<td class="l1-price">' + odds(cons) + "</td>"
-        + "<td>" + (r.books_quoting || 0) + "</td>"
+        // PER-BOOK COLUMNS (`#407`), replacing the bare `books_quoting` count.
+        // The count said HOW MANY books quoted; the columns say WHICH and at
+        // what price, which is the whole reason `book_grid` existed and the one
+        // thing it did better than this page.
+        //
+        // Cells are keyed (book, SIDE): a row renders one <tr> per side, so
+        // each side sees that book's price for ITS side. Reading `cells[book]`
+        // flat would print the over price on the under row.
+        + (books || []).map(function (bk) {
+            var cell = ((r.cells || {})[bk] || {})[side] || {};
+            var has = cell.price !== null && cell.price !== undefined;
+            // A stale cell is dimmed WITH its reason, never hidden: the book is
+            // quoting, the quote is just behind. `#S1b` wrote that reason; this
+            // shows it rather than re-deriving it.
+            var cls = "l1-bookcell" + (cell.stale ? " l1-stale" : "");
+            var ttl = cell.reason ? ' title="' + esc(cell.reason) + '"' : "";
+            return '<td class="' + cls + '"' + ttl + '>' + (has ? odds(cell.price) : "·") + "</td>";
+          }).join("")
         + "<td>" + slipButton(r, g, side, best, priced) + "</td>";
       return "<tr>" + cells + "</tr>";
     }).join("");
@@ -664,6 +787,20 @@
       + ">Slip</button>";
   }
 
+  var SORT_COLS = [
+    ["mkt", "Market", "l1-mkt"], ["side", "Side", ""], ["proj", "Proj", ""], ["edge", "Edge", ""],
+    ["best", "Best", ""], [null, "Book", ""], ["fair", "Fair", ""], ["cons", "Consensus", ""],
+  ];
+
+  function sortHead() {
+    return SORT_COLS.map(function (col) {
+      var key = col[0], label = col[1], cls = col[2];
+      if (!key) { return "<th class='" + cls + "'>" + label + "</th>"; }
+      var arrow = state.sort.key === key ? (state.sort.dir > 0 ? " ▲" : " ▼") : "";
+      return "<th class='" + (cls ? cls + " " : "") + "l1-sortable' data-sort='" + key + "'>" + label + arrow + "</th>";
+    }).join("");
+  }
+
   function cardHtml(g) {
     var st = String(g.state || "unknown");
     var when = timeLabel(parseUtc(g.start_time_utc));
@@ -675,7 +812,8 @@
       return true;
     });
     if (!visible.length) { return ""; }
-    var rows = visible.map(function (r) { return rowHtml(r, g); }).join("");
+    var books = booksFor(visible);
+    var rows = sortRows(visible).map(function (r) { return rowHtml(r, g, books); }).join("");
     return '<div class="l1-card">'
       + '<div class="l1-card__head">'
       +   '<span class="l1-card__match">' + esc(g.matchup || "—") + esc(score) + "</span>"
@@ -688,8 +826,13 @@
       +   "</span>"
       + "</div>"
       + '<div class="l1-scroll"><table class="l1"><thead><tr>'
-      +   '<th class="l1-mkt">Market</th><th>Side</th><th>Proj</th><th>Edge</th>'
-      +   "<th>Best</th><th>Book</th><th>Fair</th><th>Consensus</th><th>Books</th><th></th>"
+      +   sortHead()
+      // BOOK COLUMNS ARE DELIBERATELY NOT SORTABLE. Sorting the grid by one
+      // book's price reorders every row by a number most of them do not carry,
+      // which looks like a ranking and is not one. `book_grid` reasoned this
+      // out first and it is carried over unchanged.
+      +   books.map(function (b) { return '<th class="l1-book">' + esc(b) + "</th>"; }).join("")
+      +   "<th></th>"
       + "</tr></thead><tbody>" + rows + "</tbody></table></div>"
       + "</div>";
   }
@@ -707,6 +850,9 @@
   // the single-day sports (MLB, NBA, NHL, WNBA, NCAAB) are untouched.
   function groupedHtml(games) {
     var order = [], byDay = {};
+    if (state.game) {
+      games = games.filter(function (g) { return String(g.event_id || "") === state.game; });
+    }
     games.forEach(function (g) {
       var d = parseUtc(g.start_time_utc);
       var key = localDateKey(d) || "unscheduled";
@@ -734,7 +880,7 @@
 
   function render() {
     var b = state.board || {};
-    renderViews(); renderMarkets(); renderSegments(); renderLeagues(); renderMeta();
+    renderViews(); renderMarkets(); renderSegments(); renderLeagues(); renderGames(); renderMeta();
     var games = b.games || [];
     if (!games.length) {
       // NEVER a bare empty state. `#296`: a sport with no quotes must say WHY,
@@ -753,6 +899,15 @@
     // Re-wire after every render: the buttons are new DOM each time, and a slip
     // whose buttons are wired once at load silently stops staging the moment a
     // tab is clicked.
+    // Sort headers are new DOM on every render, same as the slip buttons below.
+    Array.prototype.forEach.call(q("l1-body").querySelectorAll("th[data-sort]"), function (th) {
+      th.onclick = function () {
+        var key = th.getAttribute("data-sort");
+        if (state.sort.key === key) { state.sort.dir = -state.sort.dir; }
+        else { state.sort.key = key; state.sort.dir = 1; }
+        render();
+      };
+    });
     if (window.SyndicateBetSlip) {
       window.SyndicateBetSlip.wireSlipButtons(q("l1-body"));
       window.SyndicateBetSlip.syncSlipButtonStates();
