@@ -564,13 +564,22 @@ def _soccer_refresh_units(selected_date: str) -> tuple[list[dict[str, str]], str
         try:
             season = default_season(league)
             week = default_week(league, season, reference_date=selected_date)
-            dates = week_dates_within_horizon(
-                league,
-                season,
-                week,
-                reference_date=selected_date,
-                horizon_days=horizon_days,
+            # Schedule-driven first (`#369`): every in-horizon fixture date,
+            # not just the ones inside the current matchweek. Falls back to the
+            # week-scoped view when the schedule cannot be read, so an
+            # unreadable artifact degrades to the old behaviour rather than to
+            # zero units.
+            dates = _soccer_schedule_dates_in_horizon(
+                league, season, selected_date, horizon_days
             )
+            if not dates:
+                dates = week_dates_within_horizon(
+                    league,
+                    season,
+                    week,
+                    reference_date=selected_date,
+                    horizon_days=horizon_days,
+                )
         except Exception as exc:
             # Degrade to league-only scope rather than dropping the league.
             # Dropping it would be a silent zero, and the whole point of this
@@ -591,6 +600,62 @@ def _soccer_refresh_units(selected_date: str) -> tuple[list[dict[str, str]], str
         for date_text in dates:
             units.append({"league": league, "date": str(date_text)})
     return units, scope_kind
+
+
+def _soccer_schedule_dates_in_horizon(
+    league: str, season: Any, selected_date: str, horizon_days: int
+) -> list[str]:
+    """Every SCHEDULED fixture date for this league inside the horizon (`#369`).
+
+    Replaces a week-scoped enumeration that could not see past the current
+    matchweek. `week_dates_within_horizon` resolves ONE week via `default_week`
+    and then filters that week's dates -- so a 7-day horizon could never reach a
+    fixture belonging to the following matchweek, no matter how close it was.
+
+    Measured 2026-08-11 against the real schedules, reference date 2026-08-11,
+    horizon 7:
+
+        unit-dates enumerated   8
+        fixture dates in window 20
+
+    Twelve fixture-dates could not be simulated because no unit was ever created
+    for them, and it showed on the board exactly where you would predict:
+    primeira_liga 0/27 projected game rows, championship 3/43, belgian 5/43,
+    mls 18/86 -- while la_liga ran 21/33 purely because its matchweek happened
+    to span its whole in-horizon slate.
+
+    Reads the schedule through `schedule_payload`, which resolves via
+    `_api_read_path` (repo fallback included) rather than the runtime-disk-only
+    `_api_root`.
+    """
+    from datetime import date as _date
+
+    from syndicate.features.soccer.sources import schedule_payload
+
+    try:
+        reference = _date.fromisoformat(str(selected_date)[:10])
+    except ValueError:
+        return []
+    try:
+        payload = schedule_payload(league, season) or {}
+    except Exception:
+        return []
+    matches = payload.get("matches") if isinstance(payload, Mapping) else None
+    if not isinstance(matches, list):
+        return []
+    found: set[str] = set()
+    for match in matches:
+        if not isinstance(match, Mapping):
+            continue
+        text = str(match.get("date") or "")[:10]
+        try:
+            when = _date.fromisoformat(text)
+        except ValueError:
+            continue
+        delta = (when - reference).days
+        if 0 <= delta <= max(0, int(horizon_days)):
+            found.add(text)
+    return sorted(found)
 
 
 def _soccer_unit_key(unit: dict[str, str]) -> str:
