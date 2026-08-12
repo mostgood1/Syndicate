@@ -2746,6 +2746,11 @@ def board_layer2_shortlist_api():
                 # it is invisible no matter how well it works.
                 "rows_beyond_game_cap": shortlist.get("rows_beyond_game_cap"),
                 "rows_per_game": shortlist.get("rows_per_game"),
+                # `#398`, added in the SAME commit as the rule that produces it
+                # -- that is the discipline `#397` exists to enforce after three
+                # rounds of shipping a working change with an unreadable counter.
+                "rows_excluded_market": shortlist.get("rows_excluded_market"),
+                "excluded_markets": shortlist.get("excluded_markets"),
                 "max_quote_age_seconds": shortlist.get("max_quote_age_seconds"),
                 "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
                 "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),

@@ -108,6 +108,35 @@ SHORTLIST_KIND_FLOOR = 30
 # makes a 26-row takeover impossible. 0 disables the cap.
 SHORTLIST_ROWS_PER_GAME = 6
 
+# Market substrings never seated on the shortlist. Env:
+# SYNDICATE_SHORTLIST_EXCLUDED_MARKETS (comma-separated), empty string disables.
+#
+# **GOALSCORER PROPS, and this is a product decision rather than a defect fix.**
+# Measured on the served board 2026-08-12: soccer contributed 100 of 200 sampled
+# rows -- the largest single block -- and EVERY one was
+# `player_first_goal_scorer` (45) or `player_last_goal_scorer` (55). Nothing
+# else from the sport reached the board.
+#
+# They are structurally unfit for an ACTIONABLE board, for three reasons that
+# compound:
+#   1. One-sided by construction. A book quotes "will X score first" at +7000
+#      and posts no opposing side, so there is no two-sided price to de-vig and
+#      `#384`'s consensus path cannot run. All 100 fell back to
+#      `book_margin_model` -- an ESTIMATE from a market-wide median hold.
+#   2. That hold is measured mostly on moneylines and totals. Applying it to a
+#      100:1 longshot is the least defensible use of the margin model;
+#      `book_margin_model`'s own docstring notes a 4.5% moneyline hold and 12%
+#      prop hold are both ordinary.
+#   3. Uniformly negative EV. The whole family sat at roughly -6.9 with a 1.6
+#      point spread, so it was never ranked ON merit -- it filled soccer's
+#      per-sport allocation because nothing else qualified.
+#
+# `#391` caps any one GAME at 6 rows. Nothing capped a market FAMILY, which is
+# how one prop type took half the board. Substring match, so `first`, `last` and
+# `anytime` variants are all covered by one rule.
+SHORTLIST_EXCLUDED_MARKETS = "goal_scorer"
+
+
 # Minimum value% a row must carry to be shown. Env:
 # SYNDICATE_SHORTLIST_MIN_VALUE_PCT.
 #
@@ -1397,9 +1426,18 @@ def select_shortlist(
         if rows_per_game is not None
         else int(_env_float("SYNDICATE_SHORTLIST_ROWS_PER_GAME", SHORTLIST_ROWS_PER_GAME))
     )
+    raw_excluded = os.environ.get("SYNDICATE_SHORTLIST_EXCLUDED_MARKETS")
+    excluded_markets = tuple(
+        token.strip().lower()
+        for token in (
+            SHORTLIST_EXCLUDED_MARKETS if raw_excluded is None else raw_excluded
+        ).split(",")
+        if token.strip()
+    )
     by_sport: dict[str, list[Mapping[str, Any]]] = {}
     beyond_horizon = 0
     beyond_game_cap = 0
+    excluded_market = 0
     below_value_floor = 0
     beyond_quote_age = 0
     implausible_book = 0
@@ -1447,6 +1485,14 @@ def select_shortlist(
         implied_total = _implied_book_total_pct(row.get("ev_pct"))
         if implied_total is not None and implied_total < _MIN_IMPLIED_BOOK_TOTAL_PCT:
             implausible_book += 1
+            continue
+        # `#398`: excluded market families. Applied HERE, before the per-sport
+        # bucket, so an excluded row cannot be re-seated by `kind_floor` or by
+        # `per_sport` running short -- the same ordering the value floor and the
+        # game cap already follow, and for the same reason.
+        market_text = str(row.get("market") or "").strip().lower()
+        if excluded_markets and any(token in market_text for token in excluded_markets):
+            excluded_market += 1
             continue
         sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
         by_sport.setdefault(sport, []).append(row)
@@ -1572,6 +1618,8 @@ def select_shortlist(
         # nobody can tell apart from a thin slate.
         "rows_beyond_game_cap": beyond_game_cap,
         "rows_per_game": rows_per_game,
+        "rows_excluded_market": excluded_market,
+        "excluded_markets": list(excluded_markets),
         # `#369`: named separately from the value floor, because "the book is
         # impossible" and "this row is priced below our floor" are different
         # rejections and collapsing them would hide a feed problem as taste.
