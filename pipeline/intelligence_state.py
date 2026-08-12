@@ -4113,7 +4113,50 @@ class IntelligenceStateService:
         _release_freed_memory_to_os("post_build_overview_guard")
         if _abort_build_candidate_pool_if_memory_critical("post_build_overview"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
-        preferences = _query_preferences(
+        # `#376`: THE ONLY UNOBSERVED SPAN IN THIS FUNCTION, and the build has
+        # been dying inside it since 2026-08-12 01:39:38Z.
+        #
+        # `BOARD_OVERVIEW_READY` prints above and `BOARD_RAW_CANDIDATES` below,
+        # with three calls and no instrumentation between them -- so two hours of
+        # investigation produced "it stops somewhere in here" and nothing finer.
+        # Five causes were eliminated against that silence (dead thread, import
+        # error, loop ownership, the rebuild interval, and the memory guard at
+        # :4113, which logs and never fired); none of them could be confirmed or
+        # denied from inside the span itself.
+        #
+        # ENTER/EXIT PAIRS, not a single completion line. A hang leaves the ENTER
+        # with no EXIT, which is what names the call -- a completion-only log
+        # would go silent for the whole span exactly as it does today. Elapsed on
+        # the EXIT so a SLOW call is distinguishable from a STUCK one, since the
+        # earlier reading of this build was a 77-minute cycle, not a dead one.
+        #
+        # `print`, not `logger.info`: logger.info does not reach Render's
+        # collector (CLAUDE.md), which is why every diagnostic here is a print.
+        def _span(label: str, fn, *args, **kwargs):
+            print(f"[intelligence_state] BUILD_SPAN_ENTER stage={label} date={selected_date}", flush=True)
+            started = time.time()
+            try:
+                result = fn(*args, **kwargs)
+            except BaseException as exc:  # noqa: BLE001
+                # BaseException on purpose: a hang killed by a supervisor arrives
+                # as KeyboardInterrupt/SystemExit, and those are precisely the
+                # cases this exists to catch. Re-raised untouched.
+                print(
+                    f"[intelligence_state] BUILD_SPAN_RAISED stage={label} "
+                    f"elapsed_s={round(time.time() - started, 2)} {type(exc).__name__}: {exc}",
+                    flush=True,
+                )
+                raise
+            print(
+                f"[intelligence_state] BUILD_SPAN_EXIT stage={label} "
+                f"elapsed_s={round(time.time() - started, 2)}",
+                flush=True,
+            )
+            return result
+
+        preferences = _span(
+            "query_preferences",
+            _query_preferences,
             "top edges today",
             mode="recommendation",
             sport="all",
@@ -4121,7 +4164,9 @@ class IntelligenceStateService:
             include_props=True,
             include_games=True,
         )
-        odds_history_by_sport = self._odds_history_payloads_by_sport(overview)
+        odds_history_by_sport = _span(
+            "odds_history_payloads_by_sport", self._odds_history_payloads_by_sport, overview
+        )
         # collect_candidates_with_fallback_merge (syndicate/features/intelligence.py)
         # is the shared collect-with-fallback entry point extracted from this
         # function so run_intelligence_query gets the same
@@ -4130,7 +4175,9 @@ class IntelligenceStateService:
         # this path's own SYNDICATE_BOARD_APPLY_EDGE_FILTER toggle (default
         # on) -- a kill-switch for the edge-quality gate without a code
         # revert if published-candidate volume drops more than expected.
-        raw_candidates = _profile_stage(
+        raw_candidates = _span(
+            "candidate_collection_with_fallback",
+            _profile_stage,
             "candidate_collection_with_fallback",
             collect_candidates_with_fallback_merge,
             overview,
