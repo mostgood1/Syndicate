@@ -458,7 +458,8 @@ and nothing has been deployed by this work.**
 | 2026-08-12 | Filed on `docs/ai_context/todo.md` as `#388` (deploy-killed sims / broken run ledger), `#389` (NFL TTL guard), `#390` (no sim ledger for 6 of 7 sports) | done |
 | 2026-08-12 | Renumbered those three from `#387`–`#389` after a concurrent session pushed its own `#387` into the same gap | done |
 | 2026-08-12 | **`#388` implemented** — orphan reconcile, merge-not-clobber, `duration_seconds`, launcher-emitted `MLB_DAILY_SIM_END`. 8 new tests, 5 red without the change; `test_live_refresh_loop.py` 219 passed | **in working tree, NOT deployed** |
-| — | `#389` (NFL TTL guard), `#390` (per-sport sim ledger) | **not started** |
+| 2026-08-12 | **`#389` implemented** — one shared staleness decision for both NFL autoruns; missing artifact falls back to last-launch age instead of reading as stale. 12 tests; the wiring test fails against `HEAD` with `Popen ... Called 1 times` | **pushed, NOT deployed** |
+| — | `#390` (per-sport sim ledger) | **not started** |
 
 ### `#388` as implemented
 

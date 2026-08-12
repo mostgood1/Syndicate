@@ -2409,16 +2409,130 @@ def _season_projection_process_still_running(sport: str) -> bool:
     return True
 
 
-def _record_season_projection_launch(sport: str, pid: int) -> None:
+def _record_season_projection_launch(sport: str, pid: int, *, season: int | None = None, week: int | None = None) -> None:
+    # `#389`: season/week are recorded so the missing-artifact backoff in
+    # _season_projection_should_launch can tell "we already tried THIS target"
+    # from "the marker belongs to last week's run". Without them a week
+    # rollover would be read as a recent attempt and the new week's first run
+    # would be suppressed for a full interval.
     _refresh_state_store()["write_json_file"](
         _season_projection_launch_state_path(sport),
         {
             "sport": sport,
             "pid": int(pid),
+            "season": int(season) if season is not None else None,
+            "week": int(week) if week is not None else None,
             "started_at_epoch": time.time(),
             "started_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
         },
     )
+
+
+# `#389`. Rate limit for the missing-artifact backoff line: it is evaluated on
+# every ~30s tick, and a permanently-missing artifact would otherwise emit
+# ~2,880 lines/day. Module-global on purpose -- unlike `#388`'s bookkeeping,
+# nothing depends on this surviving a restart; the worst case is one extra line
+# after a reboot.
+_SEASON_PROJECTION_MISSING_LOG_INTERVAL_SECONDS = 600
+_LAST_SEASON_PROJECTION_MISSING_LOG: dict[str, float] = {}
+
+
+def _seconds_since_season_projection_launch(sport: str, *, season: int, week: int) -> float | None:
+    """Age of the last launch WE recorded for this exact target, or None.
+
+    None means "no comparable prior attempt" -- a different week, an
+    unparseable marker, or none at all -- and must be treated as "nothing tried
+    yet", never as "tried recently".
+    """
+    payload = _refresh_state_store()["read_json_file"](_season_projection_launch_state_path(sport))
+    if not isinstance(payload, dict):
+        return None
+    recorded_season, recorded_week = payload.get("season"), payload.get("week")
+    if recorded_season is None or recorded_week is None:
+        # Written before `#389` added the fields. Not comparable to this
+        # target, so it cannot justify suppressing a launch.
+        return None
+    try:
+        if int(recorded_season) != int(season) or int(recorded_week) != int(week):
+            return None
+        started_at_epoch = float(payload.get("started_at_epoch") or 0.0)
+    except (TypeError, ValueError):
+        return None
+    if started_at_epoch <= 0.0:
+        return None
+    return max(0.0, time.time() - started_at_epoch)
+
+
+def _season_projection_should_launch(sport: str, artifact_path: Path, *, season: int, week: int) -> tuple[bool, str]:
+    """One staleness decision for BOTH the season and preseason autoruns. `#389`.
+
+    **MEASURED 2026-08-12 on refresh-worker:** `generate_smartsim2_nfl_projections.py
+    --season 2026 --week 1` ran 83 times in 43.2h and the preseason variant 72
+    times -- a median of **5 minutes** between episode starts, ~3 min each,
+    against a `SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` default of **86400**.
+    Roughly 90 launches/day and ~4.5 process-hours/day against an expectation of
+    two, on the 4GB worker that also runs MLB sims and whose memory headroom
+    gates them.
+
+    The cause was the guard reading an **unknown** as its permissive branch:
+
+        age_seconds = _file_age_seconds(artifact_path)
+        if age_seconds is not None and age_seconds < interval:
+            continue
+
+    `_file_age_seconds` returns None when `path.stat()` raises -- i.e. when the
+    artifact is MISSING. So an artifact that never appears makes the sport
+    permanently stale and relaunches it every tick, forever, throttled only by
+    the already-running check.
+
+    **The fix is not "fail closed" in the sense of never launching** -- a first
+    ever run has no artifact either, and refusing that would replace a busy loop
+    with a dead one. It is to answer a different question when the artifact
+    cannot answer it: *when did we last LAUNCH this target?* An absent artifact
+    plus a recent launch means the run is not producing the file, and relaunching
+    in 5 minutes will not change that.
+
+    Returns (should_launch, reason). The reason is logged, so the condition that
+    was previously silent now says so.
+    """
+    interval = float(_season_projection_refresh_interval_seconds())
+    age_seconds = _file_age_seconds(artifact_path)
+    if age_seconds is not None:
+        if age_seconds < interval:
+            return False, f"artifact_fresh age_seconds={int(age_seconds)} interval_seconds={int(interval)}"
+        return True, f"artifact_stale age_seconds={int(age_seconds)} interval_seconds={int(interval)}"
+
+    since_launch = _seconds_since_season_projection_launch(sport, season=season, week=week)
+    if since_launch is None:
+        return True, f"artifact_missing_no_prior_launch path={artifact_path}"
+    if since_launch < interval:
+        return False, (
+            f"artifact_missing_after_launch since_launch_seconds={int(since_launch)} "
+            f"interval_seconds={int(interval)} path={artifact_path}"
+        )
+    return True, (
+        f"artifact_missing_retry since_launch_seconds={int(since_launch)} "
+        f"interval_seconds={int(interval)} path={artifact_path}"
+    )
+
+
+def _log_season_projection_skip(sport: str, reason: str) -> None:
+    """Log a skip, rate-limited, and only for the one that means something.
+
+    `artifact_fresh` is the healthy steady state and would be pure noise every
+    tick. `artifact_missing_after_launch` means we launched and the artifact did
+    not appear -- the condition that was invisible for the entire life of this
+    bug -- so it is worth saying out loud, just not 2,880 times a day.
+    """
+    if not reason.startswith("artifact_missing_after_launch"):
+        return
+    now = time.time()
+    last = _LAST_SEASON_PROJECTION_MISSING_LOG.get(sport, 0.0)
+    if now - last < _SEASON_PROJECTION_MISSING_LOG_INTERVAL_SECONDS:
+        return
+    _LAST_SEASON_PROJECTION_MISSING_LOG[sport] = now
+    # print, not logger.info -- logger.info never reaches Render's log collector.
+    print(f"[refresh_worker] SEASON_PROJECTION_ARTIFACT_MISSING sport={sport} {reason}", flush=True)
 
 
 def _launch_autorun_season_projections(
@@ -2452,9 +2566,20 @@ def _launch_autorun_season_projections(
         if week is None:
             continue
         artifact_path = _season_projection_artifact_path(sport, season, week)
-        age_seconds = _file_age_seconds(artifact_path)
-        if age_seconds is not None and age_seconds < float(_season_projection_refresh_interval_seconds()):
+        # `#389`: shared with the preseason autorun below -- both had the same
+        # permissive-on-unknown guard, and fixing only the one you can see is
+        # how the defect survives.
+        should_launch, decision_reason = _season_projection_should_launch(
+            sport, artifact_path, season=season, week=week,
+        )
+        if not should_launch:
+            _log_season_projection_skip(sport, decision_reason)
             continue
+        print(
+            f"[refresh_worker] SEASON_PROJECTION_LAUNCHING sport={sport} season={season} "
+            f"week={week} reason={decision_reason}",
+            flush=True,
+        )
 
         try:
             process = subprocess.Popen(_season_projection_script_args(sport, season, week))
@@ -2470,7 +2595,7 @@ def _launch_autorun_season_projections(
             )
             continue
 
-        _record_season_projection_launch(sport, int(getattr(process, "pid", 0) or 0))
+        _record_season_projection_launch(sport, int(getattr(process, "pid", 0) or 0), season=season, week=week)
         refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
         _write_worker_status(
             worker_status_path=worker_status_path,
@@ -2558,9 +2683,18 @@ def _launch_autorun_preseason_projections(
         return False
 
     artifact_path = _preseason_projection_artifact_path(season, week)
-    age_seconds = _file_age_seconds(artifact_path)
-    if age_seconds is not None and age_seconds < float(_season_projection_refresh_interval_seconds()):
+    # `#389`: same decision as the regular-season autorun above.
+    should_launch, decision_reason = _season_projection_should_launch(
+        _PRESEASON_PROJECTION_SPORT_KEY, artifact_path, season=season, week=week,
+    )
+    if not should_launch:
+        _log_season_projection_skip(_PRESEASON_PROJECTION_SPORT_KEY, decision_reason)
         return False
+    print(
+        f"[refresh_worker] SEASON_PROJECTION_LAUNCHING sport={_PRESEASON_PROJECTION_SPORT_KEY} "
+        f"season={season} week={week} reason={decision_reason}",
+        flush=True,
+    )
 
     try:
         process = subprocess.Popen(_preseason_projection_script_args(season, week))
@@ -2576,7 +2710,9 @@ def _launch_autorun_preseason_projections(
         )
         return False
 
-    _record_season_projection_launch(_PRESEASON_PROJECTION_SPORT_KEY, int(getattr(process, "pid", 0) or 0))
+    _record_season_projection_launch(
+        _PRESEASON_PROJECTION_SPORT_KEY, int(getattr(process, "pid", 0) or 0), season=season, week=week,
+    )
     refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
     _write_worker_status(
         worker_status_path=worker_status_path,

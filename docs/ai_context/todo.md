@@ -156,9 +156,71 @@ correct only if parsed tz-aware. Emit `duration_seconds` explicitly.
 **7 days of Render logs across both workers contain 189 `TRIGGERED` lines and 0
 `START`, 0 `END`, 0 `TIMEOUT`.** You can see every sim start and no sim finish.
 
-### `#389` — OPEN, UNOWNED, MEASURED. NFL SmartSim2 runs ~90×/day against a 24-hour TTL, because a missing artifact reads as "not stale"
+### `#389` — FIXED AND PUSHED, NOT YET DEPLOYED. NFL SmartSim2 runs ~90×/day against a 24-hour TTL, because a missing artifact reads as "not stale"
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §4.
+
+**WHAT CHANGED** (`scripts/run_refresh_worker.py`, + `tests/test_season_projection_staleness.py`):
+
+`_season_projection_should_launch(sport, artifact_path, season=, week=)` is now
+the single staleness decision, used by **both** `_launch_autorun_season_projections`
+and `_launch_autorun_preseason_projections` — they had the identical defect, and
+fixing only the one you can see is how it survives.
+
+**The fix is NOT "fail closed" in the naive sense.** A first-ever run has no
+artifact either, so refusing on absence replaces a busy loop with a dead one.
+Instead, when the artifact cannot answer "how old is this", the guard asks a
+question that can be answered: **when did we last LAUNCH this target?**
+
+| artifact | last launch | decision |
+|---|---|---|
+| fresh | — | skip (`artifact_fresh`) |
+| stale | — | launch (`artifact_stale`) |
+| **missing** | none for this target | **launch** (`artifact_missing_no_prior_launch`) — cold start |
+| **missing** | < interval | **skip** (`artifact_missing_after_launch`) — THE BUG |
+| **missing** | ≥ interval | launch (`artifact_missing_retry`) — backoff, not abandonment |
+
+`SEASON_PROJECTION_ARTIFACT_MISSING` is logged on the third row, rate-limited to
+once per 600s per sport — the condition was silent for the whole life of the
+bug, but it is evaluated every ~30s tick and would otherwise be ~2,880
+lines/day. `artifact_fresh` is deliberately not logged; it is the healthy state
+and would drown the line that matters.
+
+**A REGRESSION THE FIX ITSELF INTRODUCED, and the reason the marker changed
+shape.** The launch marker is one file per sport, so a marker from week 1 would
+read as "already tried" for week 2 and suppress the new week's first run for a
+full 24h. `_record_season_projection_launch` now records `season`/`week`, and a
+marker for a different target — **or a pre-`#389` marker with no such fields** —
+returns `None`, i.e. "nothing tried yet". Mapping that unknown onto the
+suppressing branch would have been the same defect wearing the opposite sign.
+
+**VERIFICATION — and one honest caveat about it.** 12 tests. Ten drive
+`_season_projection_should_launch` directly and **all ten fail against `HEAD`
+merely because the function does not exist there** — that proves the helper is
+new, *not* that behaviour changed. The two that matter drive the **real**
+`_launch_autorun_season_projections` with `subprocess.Popen` patched:
+
+- `test_autorun_does_not_spawn_when_artifact_missing_after_recent_launch` fails
+  against `HEAD` with `Expected 'Popen' to not have been called. Called 1 times.`
+  — the measured bug reproduced at the call site.
+- `test_autorun_still_spawns_on_a_cold_start` passes against `HEAD` too, which is
+  correct: it is the guard against turning the busy loop into a dead one.
+
+Existing `test_run_refresh_worker_season_projections.py` + `test_nfl_preseason_calibration.py`:
+41 passed, no regressions.
+
+**STILL NOT ESTABLISHED: why the artifact is absent.** I did not read the worker
+disk. The 5-minute relaunch cadence proves only that the predicate never
+evaluated to "fresh". This fix stops the busy loop and **makes the condition
+visible** — after deploy, `SEASON_PROJECTION_ARTIFACT_MISSING` naming
+`data/nfl_source/smartsim2_projections_2026_wk1.csv` is the confirmation that
+the path is wrong or the script is not writing it. That is the follow-up, and it
+is now diagnosable instead of silent.
+
+Separately, still true: the season script is pinned to `--week 1` in mid-August.
+
+**Not deployed** — see the pinned-commit note; a deploy names one commit and
+nothing is carried automatically.
 
 Observed on refresh-worker over 43.2h (process-table sampling):
 
