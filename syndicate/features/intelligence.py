@@ -10044,9 +10044,28 @@ def collect_candidates_with_fallback_merge(
         # `collect_candidates` internally, so odds-history enrichment runs up
         # to three times over overlapping rows -- `#376`'s 163s, tripled.
         #
-        # Served-board contribution of all that work, same day:
-        # `legacy_candidate_count = 0`, `ranked_all` 127/127 from the Layer 2
-        # shortlist. Zero rows.
+        # **THE FALLBACK IS NOT FAILING -- IT RECOVERS THE WHOLE POOL, AND THEN
+        # THE SLATE FILTER DROPS IT.** Corrected from the first version of this
+        # comment, which said the work "contributes 0 rows" on the strength of
+        # `legacy_candidate_count = 0`. That count is measured AFTER the
+        # today-only filter. `BOARD_RAW_CANDIDATES`, measured upstream of it:
+        #
+        #     14:42-16:36   returned=218..222   pool healthy, fallback idle
+        #     16:38:47      returned=0          <- collect_candidates breaks
+        #     17:11:42      returned=218        <- 321s fallback RECOVERED 218
+        #     18:05:02      returned=455        <- 521s fallback RECOVERED 455
+        #     18:25:51      returned=475        <- 582s fallback RECOVERED 475
+        #
+        # So the 580s buys 475 real candidates, and `#353`'s today-only slate
+        # filter then discards every one -- the same shape that file already
+        # records: "123 candidates, 91 for fixtures 4-13 days out, 32 with no
+        # date at all, ZERO for that day."
+        #
+        # The gate is still correct on cost. The REASON is not "the fallback
+        # produces nothing"; it is "the fallback produces rows this path then
+        # throws away." If the slate filter is ever fixed to keep same-day rows
+        # the fallback becomes valuable again, and this gate must be revisited
+        # rather than inherited.
         #
         # **THIS IS A COST GATE, NOT A FIX.** The pool being empty is still a
         # live defect (same signature as `#308`) and is NOT diagnosed. This
