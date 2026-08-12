@@ -357,3 +357,59 @@ def test_a_scoreboard_failure_leaves_the_board_stale_not_empty(monkeypatch):
     cards = [_card()]
     assert _refresh_layer2_live_state(cards, ["2026-08-11"]) == 0
     assert cards[0]["lane"] == "pregame"
+
+
+def test_only_tracked_markets_are_joined_and_the_rest_are_labelled():
+    """`#368`. The odds tracker keeps history for h2h/totals/spreads only.
+    Measured on the served board: event+market overlap 11 of 73, so joining
+    everything would light up a fifth of the column and leave the rest
+    indistinguishable from a bug.
+
+    EXACT match, not prefix -- `totals_alt` and `spreads_alt` begin with a
+    tracked name and are not tracked. `startswith` here would relabel 95 of 200
+    rows as "has history" and put the column straight back to looking broken.
+    """
+    from syndicate.features.shared.layer2_board import _movement_is_tracked
+
+    for tracked in ("h2h", "totals", "spreads", "H2H", " totals "):
+        assert _movement_is_tracked(tracked) is True
+    for untracked in ("totals_alt", "spreads_alt", "h2h_lay", "h2h_3_way",
+                      "batter_hits", "player_points", "", None):
+        assert _movement_is_tracked(untracked) is False, f"{untracked!r} has no history series"
+
+
+def test_movement_is_built_from_the_history_shard():
+    """Joined on event_id + market, which works because the shard and the L2-A
+    row share the OddsAPI id space -- unlike the scoreboard chips, whose statsapi
+    ids overlap these 0 of 27."""
+    from syndicate.features.shared.layer2_board import _line_movement_for_row
+
+    history = {"markets": {
+        "event_id=abc|home_team=H|away_team=A|market=totals|bookmaker=dk": {
+            "closing_line": 9.5, "closing_price": -105.0,
+            "history_first": {"previous_line": 8.5},
+        }
+    }}
+    out = _line_movement_for_row({"event_id": "abc", "market": "totals"}, history)
+    assert out["opening_line"] == 8.5 and out["latest_line"] == 9.5
+    assert out["line_delta"] == 1.0 and out["line_direction"] == "up"
+
+    # A different event must not borrow this series.
+    assert _line_movement_for_row({"event_id": "zzz", "market": "totals"}, history) is None
+    # Nor a different market on the same event.
+    assert _line_movement_for_row({"event_id": "abc", "market": "spreads"}, history) is None
+    # Unreadable history is not a crash.
+    assert _line_movement_for_row({"event_id": "abc", "market": "totals"}, None) is None
+
+
+def test_an_untracked_row_is_labelled_even_when_history_is_unreadable():
+    """The label comes from the market name, not from a successful load, so a
+    shard outage cannot turn "not tracked" back into an unexplained dash."""
+    from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards
+
+    row = {"event_id": "e", "sport": "mlb", "market": "batter_hits", "side": "over",
+           "kind": "prop", "ev_pct": 1.0, "home_team": "H", "away_team": "A",
+           "quote": {"price": -110}, "score": {"score": 0.4}}
+    card = layer2_rows_to_board_cards([row])[0]
+    assert card["movement_not_tracked"] is True
+    assert "line_odds_movement" not in card

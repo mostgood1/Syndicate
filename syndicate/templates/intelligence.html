@@ -733,6 +733,16 @@
   function renderMovement(item) {
     const sparkline = _movementSparkline(item);
     const structured = item.line_odds_movement && typeof item.line_odds_movement === "object" ? item.line_odds_movement : null;
+    // #368: "we do not measure this" is a different answer from "it has not
+    // moved", and both used to render an identical bare dash -- which is why
+    // the whole Movement column read as broken rather than as partly unmeasured.
+    // The odds tracker keeps history for h2h/totals/spreads only; alt lines,
+    // lay markets and every prop family have no series at all. Checked BEFORE
+    // `structured`, so a row can never be labelled untracked while holding real
+    // movement.
+    if (!structured && item.movement_not_tracked) {
+      return '<span class="board-blotter__muted" title="The odds tracker keeps line history for h2h, totals and spreads only — this market has no series to move">Not tracked</span>';
+    }
     if (structured) {
       const lineDelta = numericValue(structured.line_delta);
       const priceDelta = numericValue(structured.price_delta);

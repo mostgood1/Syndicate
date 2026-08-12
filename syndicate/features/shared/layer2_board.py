@@ -646,6 +646,12 @@ def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[s
     asked to trust one opaque number.
     """
     cards: list[dict[str, Any]] = []
+    # `#368`: one odds-history shard per (sport, date), loaded lazily and only
+    # for rows whose market is actually tracked. The MLB shard is ~20MB, so
+    # loading it per row -- or for a board of nothing but props -- would be a
+    # real cost for no data. This runs worker-side inside the shortlist build,
+    # never in a request path.
+    history_cache: dict[tuple[str, str], Any] = {}
     for row in rows or ():
         if not isinstance(row, Mapping):
             continue
@@ -711,9 +717,114 @@ def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[s
                 "surface_key": "layer2",
                 "source": "layer2_shortlist",
                 **_layer2_board_columns(row, quote, score),
+                **_layer2_movement_columns(row, history_cache),
             }
         )
     return cards
+
+
+def _layer2_movement_columns(row: Mapping[str, Any], cache: dict[tuple[str, str], Any]) -> dict[str, Any]:
+    """Line/odds movement for a tracked market, or nothing (`#368`).
+
+    The untracked case is labelled in `_layer2_board_columns`, not here, so that
+    a row still gets its "not tracked" marker even when the shard is unreadable.
+    """
+    if not _movement_is_tracked(row.get("market")):
+        return {}
+    sport = str(row.get("sport") or "").strip().lower()
+    shard = str(row.get("commence_time") or "")[:10]
+    if not sport or not shard:
+        return {}
+    key = (sport, shard)
+    if key not in cache:
+        try:
+            from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
+
+            cache[key] = load_odds_history_payload_for_sport(sport, shard)
+        except Exception:
+            # Unreadable history must not take the shortlist build down. The row
+            # simply carries no movement, which renders as the same dash it does
+            # today -- a strictly-no-worse failure.
+            cache[key] = None
+    movement = _line_movement_for_row(row, cache.get(key))
+    return {"line_odds_movement": movement} if movement else {}
+
+
+# The markets `odds_control_plane` actually tracks history for. Measured against
+# the live MLB shard 2026-08-11: 3,634 market keys covering 16 events, and only
+# these three carry a per-event series (15 events each). The board's other eleven
+# market types -- `h2h_lay`, `totals_alt`, `spreads_alt` and the prop families --
+# have NO history rows at all.
+#
+# Overlap on the served board: event 10 of 19, event+market **11 of 73**. So a
+# join that simply tried every row would light up about a fifth of the column and
+# leave the rest indistinguishable from a bug. Restricting it, and SAYING SO on
+# the rows outside it, is the difference between "no data" and "not measured".
+_MOVEMENT_TRACKED_MARKETS = ("h2h", "totals", "spreads")
+
+
+def _movement_is_tracked(market: Any) -> bool:
+    # Exact match, not prefix: `totals_alt` and `spreads_alt` start with a tracked
+    # name and are NOT tracked, so `startswith` here would relabel eleven of them
+    # as "has history" and put the column straight back to looking broken.
+    return str(market or "").strip().lower() in _MOVEMENT_TRACKED_MARKETS
+
+
+def _line_movement_for_row(row: Mapping[str, Any], history: Mapping[str, Any] | None) -> dict[str, Any] | None:
+    """`line_odds_movement` for one row, from the odds-history shard (`#368`).
+
+    Keyed on `event_id` + `market`, which works because the history shard and the
+    L2-A row share the OddsAPI id space -- unlike the scoreboard chips, whose
+    statsapi ids overlap these 0 of 27 (`#365`). Bookmaker is deliberately NOT in
+    the key: the row's quote names the ONE book being recommended, while history
+    tracks every book, and pinning to one loses the move whenever the best price
+    changed hands. First matching series wins.
+
+    Shape matches `recommendation_engine._line_odds_movement_summary`, because
+    `intelligence.html:735` reads that structure and a second shape here would be
+    a parallel contract that can disagree with it.
+    """
+    if not isinstance(history, Mapping):
+        return None
+    markets = history.get("markets")
+    if not isinstance(markets, Mapping):
+        return None
+    event_id = str(row.get("event_id") or "").strip()
+    market = str(row.get("market") or "").strip().lower()
+    if not event_id or not market:
+        return None
+    for key, entry in markets.items():
+        if not isinstance(entry, Mapping):
+            continue
+        text = str(key)
+        if f"event_id={event_id}" not in text or f"|market={market}|" not in f"{text}|":
+            continue
+        first = entry.get("history_first") if isinstance(entry.get("history_first"), Mapping) else {}
+        opening_line = _as_float(first.get("previous_line"))
+        latest_line = _as_float(entry.get("closing_line"))
+        opening_price = _as_float(first.get("previous_line"))
+        latest_price = _as_float(entry.get("closing_price"))
+        line_delta = None if (opening_line is None or latest_line is None) else round(latest_line - opening_line, 4)
+        price_delta = None if (opening_price is None or latest_price is None) else round(latest_price - opening_price, 4)
+        if line_delta is None and price_delta is None:
+            continue
+
+        def _direction(delta: float | None) -> str:
+            if delta is None or abs(delta) < 1e-9:
+                return "flat"
+            return "up" if delta > 0 else "down"
+
+        return {
+            "opening_line": opening_line,
+            "latest_line": latest_line,
+            "line_delta": line_delta,
+            "line_direction": _direction(line_delta),
+            "opening_price": opening_price,
+            "latest_price": latest_price,
+            "price_delta": price_delta,
+            "price_direction": _direction(price_delta),
+        }
+    return None
 
 
 def _american_from_probability(probability: Any) -> float | None:
@@ -799,6 +910,13 @@ def _layer2_board_columns(
     book_age = _as_float(quote.get("book_age_seconds"))
     if book_age is not None:
         columns["book_age_seconds"] = book_age
+
+    # `#368`: say WHICH kind of empty this is. A market with no history and a
+    # market whose history simply has not moved both rendered a bare dash, and
+    # the first is "we do not measure this" while the second is "it is flat".
+    # Conflating them is what made the whole column read as broken.
+    if not _movement_is_tracked(row.get("market")):
+        columns["movement_not_tracked"] = True
     return columns
 
 
