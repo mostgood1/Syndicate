@@ -1,6 +1,57 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#376` — OPEN, UNOWNED. The intelligence-state build reaches `post_build_overview` and never gets to `BOARD_RAW_CANDIDATES`. Five causes eliminated, none proposed
+### `#376` — ROOT-CAUSED. Not a hang: TWO odds-enrichment calls cost 163 of 166 seconds, and during a live slate that outran the build cadence
+
+**ANSWERED. Six instrumentation passes, after six wrong inferences.** The board
+froze on the 01:39:38Z artifact and every hypothesis about *why* was wrong,
+including "it is hanging" — it was always completing, just slower than anything
+was watching for.
+
+**THE MEASUREMENT** (2026-08-12 05:05:59-05:08:46Z, one full build):
+
+| stage | rows | gap that follows |
+|---|---|---|
+| `steam_candidate_creation` | 165 | **92.8s** |
+| `_collect_candidates` | 202 | **70.3s** |
+| everything else (normalize, classify, dedupe, market filters, `UniversalCandidate.from_raw`) | 202 | **0.0005–0.005s** |
+
+**163 of 166 seconds is two calls**, both odds enrichment: the enrichment applied
+to the assembled pool, and `_enrich_candidates_with_odds_history`. Every other
+stage runs in under five milliseconds on the same 202 rows — so this is NOT
+candidate volume and NOT pipeline shape.
+
+Same artifact family that stalled the shortlist in `#372` and that `#374` sized at
+~20MB per sport shard. Third time in one night that odds history is the expensive
+thing in a path — and unlike the guesses, this one is bracketed by timestamps on
+both sides.
+
+**WHY IT PRESENTED AS A HANG:** ~200s per build during a live slate, against a
+~24-minute cadence, means every observation window closed mid-flight. `BUILD_SPAN
+EXIT` finally landed at `elapsed_s=203.76` once the slate finished and the work
+shrank.
+
+**ELIMINATED — do not re-run:** dead loop thread; `#372` import error; loop
+ownership (flag correct on both services); `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC`
+(read only in `home.py`); the memory guard at `intelligence_state.py:4113` (it
+logs `MEMORY_GUARD_ABORT`, zero occurrences, 2,834MB headroom); an unbounded
+`git ls-files` in `_tracked_repo_files` (25 process dumps: only `bash`, `python`);
+and deadlock.
+
+**THE LESSON THAT COST THE MOST:** `collect_candidates` was ALREADY instrumented
+at every stage. None of it was visible, because `_log_json_event` routes to
+`logging.INFO` and CLAUDE.md states plainly that `logger.info` never reaches
+Render's collector. Two hours of "there is no observability here" was wrong —
+there was plenty, emitted where nobody can read it. Third instance in one session,
+after `#373`'s counter written at the builder but never surfaced by the endpoint,
+and `stderr_preview` computed against the other service's disk. **An instrument
+that cannot be read is indistinguishable from one that was never built.**
+
+**NOW A PERFORMANCE QUESTION, not a defect hunt:** cache the shard per cycle,
+narrow what gets enriched, or move the join off the build path. The scaffolding
+(`BUILD_SPAN_*`, `COLLECT_SPAN_*`, `CANDIDATE_STAGE`, `SPORT_LOOP_ENTER`,
+`SPORT_PROPS_DONE`, `ENRICH_PROPS_*`, `GAME_CANDIDATES_*`) should stay until
+someone acts on this — it is the only reason any of it is visible — then come out
+together.
 
 **The board has served the same artifact since 2026-08-12 01:39:38Z.** Not the
 shortlist specifically — the whole state build stops, and the shortlist is
