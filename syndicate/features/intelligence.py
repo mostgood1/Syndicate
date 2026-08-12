@@ -9406,6 +9406,20 @@ def _sport_candidate_summary(candidates: Iterable[Mapping[str, Any]]) -> dict[st
     }
 
 
+def _stage_row_count(rows: Any) -> int:
+    """Row count for the `#376` stage line, without consuming an iterator.
+
+    `_log_candidate_stage` takes `Iterable`, and the existing summary helper
+    already walks it. Counting must not be the thing that breaks a generator or
+    -- worse on a hang investigation -- the thing that blocks: `len()` first,
+    never a fallback that iterates something lazy.
+    """
+    try:
+        return len(rows)
+    except Exception:
+        return -1
+
+
 def _log_candidate_stage(
     *,
     pipeline_name: str,
@@ -9413,6 +9427,27 @@ def _log_candidate_stage(
     before: Iterable[Mapping[str, Any]],
     after: Iterable[Mapping[str, Any]],
 ) -> None:
+    # `#376`: THIS FUNCTION WAS ALREADY INSTRUMENTED AND NONE OF IT WAS READABLE.
+    #
+    # `collect_candidates` calls this after all five of its stages, so the
+    # coverage was never missing -- but `_log_json_event(logging.INFO, ...)` goes
+    # to the logger, and CLAUDE.md states plainly that `logger.info` never reaches
+    # Render's log collector. Two hours of "there is no observability in this
+    # span" was wrong: there was plenty, emitted where nobody can see it.
+    #
+    # That is the night's recurring shape in its purest form -- `#373`'s counter
+    # written at the builder and never surfaced by the endpoint, and here a stage
+    # log written to a sink production does not collect. An instrument that
+    # cannot be read is indistinguishable from one that was never built.
+    #
+    # `print` ALONGSIDE, not instead: the structured event stays for anything that
+    # consumes it, and this adds a line that actually arrives. Five stages, one
+    # edit, because every call site already routes through here.
+    print(
+        f"[intelligence] CANDIDATE_STAGE pipeline={pipeline_name} stage={stage} "
+        f"before={_stage_row_count(before)} after={_stage_row_count(after)}",
+        flush=True,
+    )
     _log_json_event(
         logging.INFO,
         "intelligence_candidate_stage",
