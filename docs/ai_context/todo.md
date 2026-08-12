@@ -665,6 +665,64 @@ Related: the board audit (six bespoke builders, five ranking paths, four
 `build_book_grid` call sites), `#329` (which replaced the HTML page and left the
 builders live).
 
+### `#408` — OPEN, UNOWNED. 126 of 233 board rows carry NO ranking signal. `#400` changed soccer's market type and did not change its content
+
+**Measured on the served artifact 2026-08-12T23:29:41Z**, seated `ev_pct` by sport
+— these are survivors, so every one already cleared its own floor:
+
+    mlb     n=56  min -0.14  med  +3.26  max +5.25
+    wnba    n=18  min +0.45  med  +2.38  max +4.73
+    nfl     n=68  min -5.15  med  -2.48  max +2.42
+    soccer  n=58  min -6.70  med  -6.67  max -6.65   <- 0.05 spread over 58 rows
+
+**SOCCER'S 58 ROWS SIT AT -6.67 WITH A FIVE-HUNDREDTHS SPREAD.** That is the
+identical signature the goalscorer props carried before `#400` removed them
+(~-6.9, 1.6 spread). A family with no dispersion was never ranked ON MERIT — it
+filled soccer's allocation because nothing else qualified. `#400` retired
+`player_first/last_goal_scorer` and `player_shots_on_target` took the slots with
+the same pathology.
+
+**So `#400` improved the market TYPE and not the content.** It was still worth
+doing — a modelled-fair 100:1 longshot is worse than a two-sided prop, and the
+consensus share went 50% -> 71% — but anyone reading "goalscorer props removed,
+soccer promoted to real markets" as *fixed* will be wrong. I wrote that framing;
+it was half right.
+
+**The floors are NOT the problem and were checked first.** All are
+`measured_hold` off real samples (mlb player_prop n=796, wnba other n=427):
+
+    mlb     moneyline -4.99  total -4.88  spread -6.64  other -6.79  player_prop -7.75
+    nfl     moneyline -4.84  spread -5.44  total -5.62
+    wnba    moneyline -6.32  other -5.92  total -6.17  spread -7.08  player_prop -7.68
+    soccer  modelled_hold, single floor -8.35 (hold 6.677, n=155)
+
+Soccer's -6.67 clears its -8.35 floor comfortably. **The floor is a junk filter
+and these rows are not junk relative to their family** — they are normally
+priced and uniformly unprofitable, which is a different thing and the floor is
+the wrong instrument for it, by design (`SHORTLIST_MIN_VALUE_PCT`'s own comment).
+
+**THE QUESTION THIS RAISES IS A PRODUCT ONE, NOT A BUG.** 126 of 233 rows
+(soccer 58 + nfl 68) sit at a negative median on a surface whose purpose is to
+say what is actionable NOW. Options, none of them obviously right:
+
+- a per-sport EV gate — a sport with no positive-EV content seats nothing
+- rank across sports rather than allocating per-sport, so slots follow merit
+- keep them and LABEL the sport as having no edge today
+
+`per_sport` currently guarantees allocation regardless of quality, the same
+shape as `kind_floor` guaranteeing prop slots. **A guarantee is what puts
+unranked rows on the board**, and that is now true at the sport level as well as
+the kind level.
+
+**NOT a floor change.** Tightening soccer's floor to -6 would delete the sport
+rather than answer the question, and the value floor exists to stop junk, not to
+express "this sport has no edge today". Whoever takes this should decide the
+policy first.
+
+Related: `#400` (the change that surfaced it), `#407` (the consolidated board's
+requirement list — "complete data population" does not help if the rows carry no
+signal), `SHORTLIST_ROWS_PER_SPORT`, `SHORTLIST_KIND_FLOOR`.
+
 ### `#387` — OPEN, UNOWNED, THE BOARD IS STARVED BY A THRESHOLD THAT IS 2x ITS STAGE. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` demands 3,000MB for a stage measured at 1,479MB
 
 **The overview is empty on ~70% of builds since 2026-08-12 16:38:47Z**, so
