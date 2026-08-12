@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#387` — OPEN, UNOWNED, MEASURED. Half of all MLB sims are killed by deploys, and the run ledger records nothing — every completed run reads `exit_code: 0`
+### `#388` — OPEN, UNOWNED, MEASURED. Half of all MLB sims are killed by deploys, and the run ledger records nothing — every completed run reads `exit_code: 0`
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §3.
 
@@ -56,7 +56,7 @@ correct only if parsed tz-aware. Emit `duration_seconds` explicitly.
 **7 days of Render logs across both workers contain 189 `TRIGGERED` lines and 0
 `START`, 0 `END`, 0 `TIMEOUT`.** You can see every sim start and no sim finish.
 
-### `#388` — OPEN, UNOWNED, MEASURED. NFL SmartSim2 runs ~90×/day against a 24-hour TTL, because a missing artifact reads as "not stale"
+### `#389` — OPEN, UNOWNED, MEASURED. NFL SmartSim2 runs ~90×/day against a 24-hour TTL, because a missing artifact reads as "not stale"
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §4.
 
@@ -87,7 +87,7 @@ default permissive, and gate on the output rather than the input.
 
 **Cost:** ~90 launches/day × ~3 min ≈ **4.5 process-hours/day** on the 4GB worker
 that also runs MLB sims — and MLB's sim gate checks memory headroom against a
-900MB floor, so this competes directly with `#387`'s workload.
+900MB floor, so this competes directly with `#388`'s workload.
 
 **NOT YET ESTABLISHED:** *why* the artifact is absent. I did not read the worker
 disk. The 5-minute relaunch cadence proves only that the predicate never
@@ -98,7 +98,7 @@ Establish which before fixing, and **fix the guard regardless**: `None` means
 Separately: the season script is pinned to `--week 1` in mid-August (consistent
 with the "NFL week self-pins to 1" finding in the E2E assessment).
 
-### `#389` — OPEN, UNOWNED. No sport except MLB has any sim run ledger, so "when did this sim run and how long did it take" is unanswerable for 6 of 7 sports
+### `#390` — OPEN, UNOWNED. No sport except MLB has any sim run ledger, so "when did this sim run and how long did it take" is unanswerable for 6 of 7 sports
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §0, §5, §8.
 
@@ -122,7 +122,7 @@ calibrated against MLB, where a ground-truth launch count existed (38 logged vs
 
 **THE FIX:** one launch/finish record per sport — sport, trigger reason, scope,
 start, end, exit code, duration. MLB's `MLB_DAILY_SIM_TRIGGERED` line plus its
-run-status file are the right shape; fix them per `#387` first, then generalize.
+run-status file are the right shape; fix them per `#388` first, then generalize.
 Until this exists, this report is only reproducible by someone with Render API
 credentials.
 
@@ -28001,7 +28001,7 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ### "Is a sim running?" — use `ALL_PROCESS_MEMORY`. `child_count` and `game_count` both lie (2026-08-12)
 
 This is the check people run **before deploying**, and it matters because a deploy
-during a sim kills it (`#387`: 9/9 orphaned runs had one, 0/4 completions did).
+during a sim kills it (`#388`: 9/9 orphaned runs had one, 0/4 completions did).
 All three signals below were in use; only one works.
 
 **`PROCESS_TREE_MEMORY.child_count` — BROKEN. Reads 0 with three sims running.**
@@ -28036,6 +28036,59 @@ recurring "read the field you already have" failure.
 **General form:** a signal is only evidence once you know what makes it read the
 other way. Before trusting `child_count: 0`, confirm a running sim makes it
 non-zero; before trusting `game_count`, confirm what emits it.
+
+### Claiming a TODO id is a RACE, and another session can commit your uncommitted work (2026-08-12)
+
+Two things happened in one afternoon that the "check both files before taking a
+number" rule does not cover.
+
+**1. A correct id check went stale in minutes.** `git log --grep` on origin/main
+gave 386 as the highest id — true when read, because several ids existed as
+commits with no write-up yet (`#379`, `#383`–`#386`), so grepping `todo.md` alone
+would have said 382. I took 387–389. Another session pushed *its* `#387` into the
+same gap ~15 minutes later, and origin/main briefly carried **two `#387`
+headings**. Renumbered mine to 388–390.
+
+**Re-check the id immediately before you commit, not only when you draft.** With
+several sessions live, the gap between reading the max and writing it is enough.
+
+**2. My uncommitted `todo.md` edits were swept into another session's commit —
+and the sweep CREATED an id collision, not just a mislabel.** `a5a64ee4` ("#387:
+the overview guard demands 3,000MB…") is one file, +238 lines: that session's
+write-up *plus* my three entries and my operational notes, under their message.
+
+**The sweeping session did NOT use `git add -A`.** It ran
+`git add docs/ai_context/todo.md && git commit` — **one explicit path** — which
+gave zero protection, because a targeted `git add <file>` stages the **whole
+file**, including hunks another session left dirty. Do not infer "avoid
+`git add -A`" as the fix here; that rule was already being followed.
+
+The commit therefore contained **two `#387` headings** — theirs and mine —
+because I had picked 387 from `git log --grep` (true when read) and they never
+looked at what else was in their own diff. Neither side could see the collision
+from its own vantage point.
+
+**The rules that would actually have caught it**, in order of strength:
+- **`git commit -m "msg" -- <paths>`** commits only the named paths regardless of
+  the shared index. Structurally immune, not merely detectable.
+- **Never chain `add` and `commit`.** The separate `git diff --cached` call is
+  the gate; chaining removes it.
+- **Duplicate-id detector, validated against `a5a64ee4` itself:**
+
+      grep -oE '^### `#[0-9]+`' docs/ai_context/todo.md | sort | uniq -d
+
+  On `a5a64ee4` this prints `#336 #339 #341 #351 #387`; on a clean tree it prints
+  `#336 #339 #341 #351`. **Those four are known pre-existing duplicates — a fifth
+  line is the signal.** Checking only added lines
+  (`git diff --cached … | grep -oE '^\+### \`#[0-9]+\`' | sort | uniq -d`) is
+  quieter and did fire here, but it is **blind to a new id colliding with an
+  existing entry the diff does not touch** — which is the more likely shape.
+
+**The hazard runs both ways.** The known rule is "never `git add -A`, you'll
+sweep up a parallel session's work." The corollary is that **your own unstaged
+edits to a contended file are exposed to everyone else's commits** — anything you
+are not ready to publish under someone else's message should be committed
+promptly or kept out of the shared file until it is.
 
 ### Reading the sim run ledger from production (2026-08-12)
 
