@@ -1,5 +1,47 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#393` — OPEN, UNOWNED, HANDED OFF. A completed L2 build does not reach the served shortlist — three plausible causes eliminated, cause still unknown
+
+**Symptom, reported by the session that shipped `#391`/`#392`** (both live on
+`c07b6441`, both unverified): a board build ran at **19:53:28Z** with a healthy
+`sports=8` overview and raised nothing, but the **served shortlist is still the
+19:09:47Z artifact, without the new keys.** Something sits between a completed
+build and the published artifact.
+
+**This entry exists so the next person does not re-run the three checks I already
+ran.** I did not find the cause. What I did establish, with evidence:
+
+1. **NOT `#359`.** The persisted live-lens publish watermark is live:
+   `git merge-base --is-ancestor d970aec2 c07b6441` -> yes, and the deployed blob
+   contains `live_lens_publish_watermark` (6 hits). The shape matches `#359`
+   exactly — a completed build whose artifact never reaches the served path —
+   but that specific fix is running.
+2. **NOT the hot-artifact allowlist.** `reports/intelligence/layer2_shortlist_*.json`
+   matches **none of the 97 `HOT_ARTIFACT_PATTERNS`** (tested by fnmatch), which
+   looks damning and is a red herring: the shortlist does not use that path at
+   all. `write_layer2_shortlist` goes through `refresh_state_store.write_json_file`,
+   and `_keyvalue_backed` excludes only `migration_runs/`, so the artifact
+   crosses the service boundary via the keyvalue store. Read and write route
+   through the same predicate by design, so they cannot disagree.
+3. **NO oversized-payload refusal found.** `KEYVALUE_WRITE_REJECTED`,
+   `LAYER2_SHORTLIST_WRITE_FAILED` and `LAYER2_SHORTLIST_FAILED` all returned
+   zero hits on refresh-worker for 18:30Z–21:00Z. This was the best hypothesis —
+   a refused write leaves web serving the last good copy, which is exactly a
+   shortlist frozen at a timestamp.
+
+**THE CAVEAT THAT MATTERS, and the first thing to check.** Result 3 is a null on
+**refresh-worker only**, and `start_intelligence_state_background_loop` is
+started from **both** `syndicate/app.py:335` (web) and
+`run_refresh_worker.py:2958` (worker). Ownership is an env flag that moves with
+no code diff. **If web owns the loop, I searched the wrong service and result 3
+proves nothing.** Read each service's live env-vars before trusting it — and
+note the window was 2.5h, not all day.
+
+**Next cheapest step:** establish which service actually wrote the 19:09:47Z
+shortlist, then re-run check 3 against that service. A `written_at` of 19:09:47Z
+against a build at 19:53:28Z means the write either never fired or was refused;
+which of those it is decides everything downstream.
+
 ### `#388` — FIXED IN THE WORKING TREE, NOT YET DEPLOYED. Half of all MLB sims are killed by deploys, and the run ledger records nothing — every completed run reads `exit_code: 0`
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §3.
