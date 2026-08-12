@@ -1,5 +1,43 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#382` — SHIPPED AND INERT IN PRODUCTION. The modelled-hold floor cannot fire: the field it reads is dropped in the grid -> candidate fan-out
+
+`12e3d6d9`, deployed to web + refresh-worker 2026-08-12 ~11:35 CT. The logic is
+correct and unit-tested; it has **never executed on production data.**
+
+**MEASURED after three post-deploy rebuilds** (16:37:07Z, 16:39:06Z, 16:43:39Z):
+soccer still reads `{"method": "flat_default", "floor": -2.0}`. Cause, measured
+on the served rows:
+
+    rows carrying modelled_fair:  0 / 200
+    fair_method values:           {null: 200}
+    candidate row keys: away_team board_lane commence_time ev_pct event_id game
+      game_state gate home_team is_live kind line market market_state
+      model_edge_pct player_name projection quote score segment side sport
+
+`assumed_hold_pct` lives at `row["modelled_fair"][side]`, stamped by
+`apply_margin_model` onto **GRID** rows. `build_layer2_rows` fans a grid row out
+into one candidate per side and copies `_IDENTITY_FIELDS` plus a fixed set — 
+`modelled_fair` is not among them. `_measured_floor_for_pool` runs on candidates,
+so the branch sees zero modelled rows every time and falls through.
+
+**HOW THIS SHIPPED, because the test was not the weak link people will assume.**
+Four tests, two of which fail without the change — verified by stashing the fix.
+They construct rows *carrying* `modelled_fair`, so they prove the branch works
+GIVEN the input. **Nothing asserted the input arrives.** Presence on grid rows was
+verified and reachability at the call site was not, which is the same defect
+class as the four inert fixes already on this list.
+
+**THE FIX:** carry the modelled hold through the fan-out in `build_layer2_rows`
+(cheapest: copy `assumed_hold_pct` for the row's own side onto the candidate —
+one float, no payload cost, unlike carrying all of `modelled_fair`). The `#382`
+branch then fires unchanged. **Add a test that runs the REAL fan-out and asserts
+the field survives it**, not one that hand-builds the input.
+
+**Do not re-derive the diagnosis from scratch** — `value_floor_by_sport` (`#381`,
+live) reports `method` per sport, so the confirmation is one field read: soccer
+flipping `flat_default` -> `modelled_hold`.
+
 ### `#380` — SHIPPED, AWAITING VERIFY. The quote-age ceiling was set by a sport's FRESHEST quote instead of its oldest, and deleted two sports
 
 `6deaea10`, deployed to web + refresh-worker 2026-08-12 ~10:55 CT. Ceiling
