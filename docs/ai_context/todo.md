@@ -1,5 +1,73 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#399` — SHIPPED, NOT ENABLED. `book_quotes` is 38.7x compressible, so the retention question was the wrong question
+
+`65cf7a80` (its commit message says `#397` — that ID collided with `c5c382b6`
+and could not be amended on a shared branch; `daa078ef` is the mapping of
+record). Touches `odds_book_quotes.py` + `tests/test_book_quotes_compaction.py`.
+
+Measured on the real production shard, `mlb/2026-08-09`: **207.4 MB -> 5.4 MB,
+38.7x, 3.7s**. 478,782 rows round-trip with an identical content fingerprint.
+A full year of captures now costs less disk than three days does today, with
+every tick preserved.
+
+**The correction that produced it.** I first read these shards as ~159 rows per
+series and highly compactable. Wrong: I grouped on `player` and `book`, which
+are not fields in this schema (`player_name`, `bookmaker`), so distinct series
+merged silently. Real figure is ~13 rows/series and **99.5% of rows are genuine
+price changes** — the writer already dedupes unchanged prices and `_KEY_FIELDS`
+says so. There was nothing to compact away; the redundancy is in the TEXT, not
+the information. Downsampling would have freed the same space and thrown away
+real price movement to buy what compression gives free.
+
+**THE GUARD IS THE PART TO BE CAREFUL WITH IF YOU TOUCH THIS.**
+`book_quotes_read_affordable` projects RSS as `shard_bytes x 6.3` and exists
+because web OOM-killed twice in 60s reading one shard. Sized off `st_size`, a
+compressed shard presents as 5.4 MB, projects to 34 MB, and is admitted — when
+reading it actually costs ~1.3 GB. Every sizing path now uses
+`book_quotes_logical_bytes` (the gzip ISIZE trailer). A damaged trailer reads
+SMALL, the dangerous direction, so it falls back to a deliberate over-estimate.
+
+**NOT ENABLED.** Dry-run by default, wired to no loop. Today's shard is never
+touched (append-only; appending to a gzip member yields a file that
+decompresses to the first member only).
+
+**Next:** `odds_history` is the same shape and is NOT done — 105.0 MB/day, read
+whole via `read_text`, so it is a different change.
+
+### `#398` — SHIPPED, NOT ENABLED. `#396`'s tiers missed 1,960 MB, and settlement cannot be judged by age
+
+`e81b5425`. Extends `#396` rather than replacing it — its two-tier shape and its
+keep-on-unmatched default were right and both are kept.
+
+Measured against the real production inventory (6,968 files / 5.83 GB on web):
+**1,960.7 MB across 2,826 files matched no rule at all** -> now 276.1 MB.
+Added: the `artifacts/*/odds_history` twin, the second `data/daily` tree, dated
+`intelligence_state_*`, and a separate 180-day EVAL tier.
+
+**Settlement is not an age question** (owner decision 2026-08-12: keep 30 days
+after SETTLEMENT). `_settlement_state` returns True/False/**None**, and None is
+a distinct answer that KEEPS and is counted apart from unsettled. A two-valued
+resolver has to map "could not tell" onto settled or unsettled, and mapping it
+onto settled deletes evidence exactly when its own join is broken. Signal is
+`emit_settlement_inputs`' `result` column — `closing_lines_2026-07-14.csv` has
+15 columns and no `result` (a date that never graded, and exactly the file that
+must survive); 07-17 onward have 20 and do.
+
+**COMPRESSION DOES NOT RETIRE THIS, and `#396` should not be deleted** — I was
+told it was superseded and it is not. `book_quotes` is 196.4 of 593–780 MB/day:
+
+| | 14d rate | 7d rate |
+|---|---|---|
+| today | 593 -> 53 days | 780 -> 40 days |
+| after `#399` | 402 -> 78 days | 589 -> 54 days |
+| + `odds_history` (not built) | 299 -> 105 days | 486 -> 65 days |
+
+~25 days on the pessimistic rate, and the disk still fills. **Compress what
+cannot be recreated, expire what can.**
+
+**NOT ENABLED.** `SYNDICATE_ARTIFACT_RETENTION_ENABLED` unset; dry-run.
+
 ### `#393` — OPEN, UNOWNED, HANDED OFF. A completed L2 build does not reach the served shortlist — three plausible causes eliminated, cause still unknown
 
 **Symptom, reported by the session that shipped `#391`/`#392`** (both live on
@@ -137,11 +205,25 @@ five restarts that day. It can pick up the gate on its next deploy for any
 other reason; there is no urgency, because the corruption only ever came from
 the non-owner.
 
-**NOT CONFIRMED AT THE TIME OF WRITING.** The deploy is live and the gate is in
-the deployed blob, but *deployed is not working* — which is the entire subject
-of this ticket. The real test is the next MLB sim launch: if no
-`MLB_DAILY_SIM_ORPHANED` follows it from live-odds-worker, the fix holds.
-Before/after boundary for whoever checks:
+**CONFIRMED WORKING IN PRODUCTION 21:54Z**, on the first launch after the gate:
+
+    21:50:44  LAUNCH (refresh-worker)  reason=fingerprint_change  pid=604
+    21:53:xx  live-odds-worker wrote NO death certificate
+    21:54:27  record 20260812_215044 reads state=running   <- CORRECT
+
+**The null was checked for meaning before it was accepted**, per the pre-flight
+procedure in Operational notes: an absent false record proves nothing if the
+service that writes them is idle or dead.
+
+    1. live-odds-worker instrument alive : 100 samples, newest 21:54:04 (now 21:54:27)
+    2. its loop actually ticking         : 19 TICK_COMPLETE, newest 21:54:04
+    3. triggering condition present      : sim pid 604 on refresh-worker, ABSENT on live-odds-worker
+
+Condition 3 is the one that matters -- that is exactly the state which produced
+3 of 3 false positives before. live-odds-worker looked at a pointer naming a pid
+its local probe could not find, and correctly declined to declare it dead.
+
+Before/after boundary:
 
     21:20:39  LAUNCH (refresh-worker)    run_stamp=20260812_212039
     21:21:46  FALSE  (live-odds-worker)  died_untracked "pid 108 no longer exists"
@@ -28449,6 +28531,31 @@ from its own vantage point.
   (`git diff --cached … | grep -oE '^\+### \`#[0-9]+\`' | sort | uniq -d`) is
   quieter and did fire here, but it is **blind to a new id colliding with an
   existing entry the diff does not touch** — which is the more likely shape.
+
+**BOTH FILE-LEVEL FORMS SHARE A STRUCTURAL BLIND SPOT: commit-only ids.**
+Demonstrated 2026-08-12 — two sessions both used `#397`:
+
+    c5c382b6  #397: the per-game cap worked and could not be read
+    65cf7a80  #397: book_quotes is 38.7x compressible ...
+
+`grep -c '^### \`#397\`' todo.md` returns **0**. Neither had a todo entry, so
+nothing that reads the file could see either. **`git log --grep` and
+`grep todo.md` disagree by construction, and an id hides in whichever one you
+did not run** — several ids exist as commits with no write-up at any time.
+
+**Do NOT reach for `git log | grep -oE '#[0-9]+' | sort | uniq -d` as the
+counterpart.** Tried it: it returns `#379 #380 #382 #383 #384 #385 #388 #389
+#391 #392 #397` — it flags every ticket that legitimately has more than one
+commit, so the one real collision is buried in ten false alarms. A detector
+whose output is mostly noise trains you to skim past it, which is how the
+four pre-existing `#336/#339/#341/#351` duplicates became invisible.
+
+**What actually works is a single-id lookup at claim time, against both:**
+
+    ID=398; grep -c "^### .#$ID." docs/ai_context/todo.md; git log --oneline --all --grep="#$ID"
+
+Cheap, unambiguous, and re-run it immediately before committing — the gap
+between drafting and committing is enough for another session to take the id.
 
 **The hazard runs both ways.** The known rule is "never `git add -A`, you'll
 sweep up a parallel session's work." The corollary is that **your own unstaged

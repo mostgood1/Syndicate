@@ -461,7 +461,7 @@ and nothing has been deployed by this work.**
 | 2026-08-12 | **`#389` implemented** — one shared staleness decision for both NFL autoruns; missing artifact falls back to last-launch age instead of reading as stale. 12 tests; the wiring test fails against `HEAD` with `Popen ... Called 1 times` | **pushed, NOT deployed** |
 | 2026-08-12 | `#388`+`#389` deployed to refresh-worker (`239b5eba`, live 20:32:22Z) | **live** |
 | 2026-08-12 | `#389` **confirmed in production** — 2 launches in 62 min vs ~12, suppression named in the log; surfaced that the NFL artifacts are never written at all | **confirmed** |
-| 2026-08-12 | `#388` **regression**: live-odds-worker stamped 3 of 3 live sims `died_untracked` — shared pointer vs local `_process_exists`. Gate `f6c0525f` deployed to live-odds-worker (live 21:44:13Z) | **fix live, unconfirmed** |
+| 2026-08-12 | `#388` **regression**: live-odds-worker stamped 3 of 3 live sims `died_untracked` — shared pointer vs local `_process_exists`. Gate `f6c0525f` deployed to live-odds-worker (live 21:44:13Z) | **confirmed 21:54Z** — first post-gate launch clean, null verified against a live instrument |
 | — | `#390` (per-sport sim ledger) | **not started** |
 
 ### `#388` as implemented
