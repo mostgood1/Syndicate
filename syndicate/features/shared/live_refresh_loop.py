@@ -3583,6 +3583,89 @@ def _record_pregame_sport_sweep_epochs(epoch: float, sports: list[str]) -> None:
 		print(f"[live_refresh_loop] PREGAME_SWEEP_MARKER_WRITE_FAILED error={type(exc).__name__}: {exc}", flush=True)
 
 
+def _odds_sweep_outcome_path() -> Path:
+	return _meta_dir() / "last_odds_sweep_launch_by_sport.json"
+
+
+def _record_odds_sweep_launch(epoch: float, sports: list[str]) -> None:
+	"""Stamp when each sport's capture was LAUNCHED, for the next tick to judge."""
+	try:
+		payload = read_json_file(_odds_sweep_outcome_path())
+		existing = dict(payload) if isinstance(payload, dict) else {}
+		for sport in sports:
+			key = str(sport).strip().lower()
+			if key:
+				existing[key] = float(epoch)
+		write_json_file(_odds_sweep_outcome_path(), existing)
+	except Exception as exc:  # noqa: BLE001 - a diagnostic must never break the tick
+		print(f"[live_refresh_loop] ODDS_SWEEP_STAMP_FAILED error={type(exc).__name__}: {exc}", flush=True)
+
+
+def _report_odds_sweep_outcomes(date_str: str) -> None:
+	"""Did each launched sport's capture actually WRITE? (`#378`)
+
+	THE LAUNCH IS FIRE-AND-FORGET AND ITS FAILURES ARE UNREADABLE. `launch_refresh_run`
+	catches every exception into `meta["error"]`, which is written to a JSON file on
+	the worker's own disk and never printed; the per-sport steps inside it log to a
+	stderr file on that same disk. Neither reaches Render's collector, and
+	refresh-worker serves no HTTP -- so from outside, a sport that swept and wrote
+	nothing is indistinguishable from one that swept fine.
+
+	Measured 2026-08-12: WNBA was KEPT by the pregame cadence filter at 11:08 and
+	13:10 (the skip lines those ticks read `nfl,soccer` only), and MLB published its
+	sidecar at 11:09:23 and 13:12:01 off the SAME launches -- while WNBA's last
+	write stayed 07:18:51. So the board served 3 games and 848 rows priced off
+	quotes 7.6 hours old, looking entirely healthy because every artifact
+	downstream kept rebuilding on schedule.
+
+	This is `#352`'s soccer-unit outcome check applied to odds capture, and for the
+	same reason: the launch stamp says a sweep STARTED, only the artifact says it
+	FINISHED. Compares the `book_quotes` sidecar mtime against the recorded launch
+	epoch, one tick later, so the detached subprocess has had time to land.
+	"""
+	try:
+		from syndicate.features.shared.odds_book_quotes import _state_path
+	except Exception:
+		return
+	try:
+		payload = read_json_file(_odds_sweep_outcome_path())
+	except Exception:
+		return
+	if not isinstance(payload, dict) or not payload:
+		return
+	now = time.time()
+	for sport, launched in sorted(payload.items()):
+		try:
+			launched_epoch = float(launched)
+		except (TypeError, ValueError):
+			continue
+		if launched_epoch <= 0:
+			continue
+		since_launch = now - launched_epoch
+		# Give the detached subprocess a tick to finish before judging it.
+		if since_launch < 120:
+			continue
+		try:
+			path = _state_path(str(sport), date_str)
+			exists = path.is_file()
+			mtime = path.stat().st_mtime if exists else 0.0
+		except Exception as exc:  # noqa: BLE001
+			print(
+				f"[live_refresh_loop] ODDS_SWEEP_OUTCOME sport={sport} unknown=1 "
+				f"error={type(exc).__name__}: {exc}",
+				flush=True,
+			)
+			continue
+		# 5s slack for clock skew between the launch stamp and the write.
+		wrote = bool(exists and mtime >= launched_epoch - 5.0)
+		print(
+			f"[live_refresh_loop] ODDS_SWEEP_OUTCOME sport={sport} wrote={wrote} "
+			f"exists={exists} since_launch_s={int(since_launch)} "
+			f"sidecar_age_s={int(now - mtime) if mtime else -1} path={path}",
+			flush=True,
+		)
+
+
 def _apply_pregame_sport_cadence(
 	sports: list[str],
 	*,
@@ -3809,6 +3892,15 @@ def _run_mlb_sim_tick() -> dict[str, Any]:
 	adaptive_enabled = _live_refresh_loop_adaptive_enabled()
 	any_live = _any_tracked_sport_game_live() if adaptive_enabled else None
 	selected_date = central_today_iso()
+
+	# `#378`: judge the PREVIOUS tick's sweeps before starting this one. Reported
+	# here rather than after the launch because the launch is detached -- checking
+	# immediately would grade a subprocess that has not finished, which is how a
+	# stall reads as a success.
+	try:
+		_report_odds_sweep_outcomes(selected_date)
+	except Exception as exc:  # noqa: BLE001 - a diagnostic must never break the tick
+		print(f"[live_refresh_loop] ODDS_SWEEP_OUTCOME_FAILED error={type(exc).__name__}: {exc}", flush=True)
 
 	# MLB daily sim is dispatched independently of the odds-refresh call
 	# below: its cadence/gate differs from NBA/WNBA's, and the vendor
@@ -4182,6 +4274,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			# during live play just means the first post-slate pregame sweep
 			# waits one interval, with the slate-end data still fresh).
 			_record_pregame_sport_sweep_epochs(tick_started_epoch, list(launched_sports))
+			_record_odds_sweep_launch(tick_started_epoch, list(launched_sports))
 		except Exception as exc:
 			# Resolving the sport list must never be the reason a refresh
 			# doesn't launch; the WNBA marker is only a gate input.
