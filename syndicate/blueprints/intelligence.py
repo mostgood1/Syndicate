@@ -2705,6 +2705,15 @@ def board_layer2_shortlist_api():
                 # while the filter was live and dropping rows.
                 "min_value_pct": shortlist.get("min_value_pct"),
                 "rows_below_value_floor": shortlist.get("rows_below_value_floor"),
+                # `#381`. The builder has written this since the per-sport floor
+                # shipped; the endpoint's explicit key list dropped it, so the
+                # only readable number was a board-wide `rows_below_value_floor`
+                # scalar. That is the third time an instrument existed at the
+                # builder and was invisible at the endpoint (`#373` was the last),
+                # and it cost three investigations here: it names, per sport,
+                # whether the floor was MEASURED or fell back to the flat
+                # MLB-shaped default, which is the whole diagnosis for soccer.
+                "value_floor_by_sport": shortlist.get("value_floor_by_sport"),
                 # `#373`. The comment above called this exact shot and it
                 # happened again anyway: `#369`'s filter went live at 00:26Z and
                 # dropped 63 of 263 rows, and its counter was absent from this
