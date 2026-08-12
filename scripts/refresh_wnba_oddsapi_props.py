@@ -2145,6 +2145,67 @@ def _write_game_cards_csv_rows(out_path: Path, rows_out: list[dict[str, object]]
 def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path, date_str: str, log_file: Path | None = None) -> tuple[int, Path | None]:
     out_path = processed_root / f"game_cards_{date_str}.csv"
 
+    def _matchups_of(rows: object) -> object:
+        """Distinct (home, visitor) pairs in the rows a branch produced.
+
+        Derived from `rows_out`, which every write path has, rather than from a
+        per-branch grouping variable. The first cut named `rows_by_matchup`
+        directly -- it does not exist on the raw-team-odds path (that one groups
+        via a DataFrame), so the census raised UnboundLocalError and took down
+        the build it exists to explain. Five existing tests caught it.
+
+        A diagnostic must never be able to break its subject; that is worth more
+        than the marginally richer number a per-branch variable would give.
+        """
+        try:
+            return {
+                (str(r.get("home_team") or ""), str(r.get("visitor_team") or ""))
+                for r in (rows or ())
+                if isinstance(r, dict)
+            }
+        except Exception:
+            return None
+
+    def _expected_count() -> object:
+        # `expected_matchups` is assigned AFTER this helper is defined. Every
+        # call site runs after that assignment, but a guard costs nothing and a
+        # NameError inside a diagnostic would take down the build it is meant
+        # to explain.
+        try:
+            return len(expected_matchups)
+        except NameError:
+            return "unset"
+
+    def _census(source: str, *, written: int, matchups: object = None, note: str = "") -> None:
+        """What this build read and what it produced, on EVERY exit (`#375`).
+
+        Measured 2026-08-11: `game_cards_2026-08-11.csv` held 2 games for a
+        3-game slate -- Fever/Liberty was absent, so `#364`'s projection join
+        had nothing to match and 18 board rows rendered blank. Which of this
+        function's three input paths ran, and what that input contained, is
+        not recoverable from outside: the raw odds snapshots live only on the
+        worker's disk and are not published, so the export endpoint returns
+        MISS for all of them.
+
+        That made "the snapshot never had the game" and "the snapshot had it
+        and a filter dropped it" indistinguishable -- two different bugs with
+        two different fixes. This says which.
+
+        Printed, not logged: `_log` writes to a run file on the same
+        unreadable disk, which is the whole problem being solved here.
+        """
+        try:
+            count = len(matchups) if matchups is not None else -1
+        except TypeError:
+            count = -1
+        print(
+            f"[wnba_cards] GAME_CARDS_CENSUS date={date_str} source={source} "
+            f"written_rows={written} input_matchups={count} "
+            f"expected_matchups={_expected_count()}"
+            + (f" note={note}" if note else ""),
+            flush=True,
+        )
+
     def _log(message: str) -> None:
         if log_file is not None:
             _append_log(log_file, message)
@@ -2161,6 +2222,9 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         # "nothing real for today" signal as an input full of stale rows,
         # and must clear the same stale output.
         _log(reason)
+        # Every no-data branch routes through here, so one call covers all of
+        # them and carries the reason that distinguishes them.
+        _census("none", written=0, note=reason.replace(" ", "_")[:120])
         if out_path.exists() and out_path.is_file():
             out_path.unlink()
         # write_text_file (used below and in _write_game_cards_csv_rows) also
@@ -2306,6 +2370,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         )
 
                     if rows_out and (not expected_matchups or expected_matchups.issubset(snapshot_matchups)):
+                        _census("raw_player_props_snapshot", written=len(rows_out), matchups=_matchups_of(rows_out))
                         _write_game_cards_csv_rows(out_path, rows_out)
                         _log(f"Built local game_cards from raw player props snapshot fallback: {out_path} (rows={len(rows_out)})")
                         return len(rows_out), out_path
@@ -2446,6 +2511,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         if not rows_out:
             return _no_data(f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
 
+        _census("processed_game_odds", written=len(rows_out), matchups=_matchups_of(rows_out))
         _write_game_cards_csv_rows(out_path, rows_out)
         _append_log(log_file, f"Built local game_cards from game_odds fallback: {out_path} (rows={len(rows_out)})")
         return len(rows_out), out_path
@@ -2515,6 +2581,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     if not rows_out:
         return _no_data(f"Local game_cards build skipped for {date_str}: no groupable rows in raw team odds snapshot")
 
+    _census("raw_team_odds_snapshot", written=len(rows_out), matchups=_matchups_of(rows_out))
     _write_game_cards_csv_rows(out_path, rows_out)
     return len(rows_out), out_path
 
