@@ -9988,6 +9988,7 @@ def collect_candidates_with_fallback_merge(
     selected_date: str | None = None,
     apply_edge_filter: bool = True,
     apply_thin_pool_merge: bool = True,
+    apply_empty_pool_fallback: bool = True,
     advanced_by_sport: dict[str, list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     """Single collect-with-fallback entry point, extracted from
@@ -10023,7 +10024,43 @@ def collect_candidates_with_fallback_merge(
     candidates is never intentional.
     """
     raw_candidates = _collect_span("collect_candidates", collect_candidates, overview, preferences, odds_history_by_sport)
-    if not raw_candidates:
+    if not raw_candidates and not apply_empty_pool_fallback:
+        # `#385`. The empty-pool fallback exists to REFILL this pool. When
+        # Layer 2 is primary the pool is not what gets served, so refilling it
+        # buys nothing and costs everything.
+        #
+        # MEASURED on refresh-worker 2026-08-12 from the `#376` BUILD_SPAN
+        # timings -- `candidate_collection_with_fallback` was 1,425 of the
+        # 1,427 seconds attributed across all stages:
+        #
+        #     16:54-17:41   0.01s x 13 builds   (pool non-empty, fallback idle)
+        #     17:06:20      321.40s
+        #     17:56:21      521.30s
+        #     18:16:09      582.38s   <- and still growing
+        #
+        # The pool went permanently empty around 17:06 and the fallback has
+        # fired on every build since, taking board rebuild cadence from ~3
+        # minutes to ~20. `collect_all_recommendations` re-runs
+        # `collect_candidates` internally, so odds-history enrichment runs up
+        # to three times over overlapping rows -- `#376`'s 163s, tripled.
+        #
+        # Served-board contribution of all that work, same day:
+        # `legacy_candidate_count = 0`, `ranked_all` 127/127 from the Layer 2
+        # shortlist. Zero rows.
+        #
+        # **THIS IS A COST GATE, NOT A FIX.** The pool being empty is still a
+        # live defect (same signature as `#308`) and is NOT diagnosed. This
+        # stops paying 9.7 minutes a build to paper over it; it does not
+        # explain it. If Layer 2 ever stops being primary, the fallback
+        # returns and so does the cost.
+        # `print`, not `logger.info` -- logger output never reaches Render's log
+        # collector, which is how `#376` spent two hours on a false conclusion.
+        print(
+            "[intelligence] CANDIDATE_FALLBACK_SKIPPED reason=layer2_is_primary "
+            f"date={selected_date}",
+            flush=True,
+        )
+    elif not raw_candidates:
         try:
             # collect_all_recommendations() already runs _score_candidates()
             # + filter_candidates() internally, so it doesn't need the

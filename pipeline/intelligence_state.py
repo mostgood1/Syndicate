@@ -4185,6 +4185,11 @@ class IntelligenceStateService:
             odds_history_by_sport,
             selected_date=selected_date,
             apply_edge_filter=_env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True),
+            # `#385`: driven by the SAME predicate that sets
+            # `layer2_is_primary` further down, not a second flag that could
+            # drift out of step with it. When Layer 2 owns the board, refilling
+            # the legacy pool costs ~580s per build and contributes 0 rows.
+            apply_empty_pool_fallback=not board_l2a_fallback_enabled(),
         )
         _diag_log_all_process_memory("post_collect_candidates_with_fallback_merge")
         if _abort_build_candidate_pool_if_memory_critical("post_collect_candidates_with_fallback_merge"):
