@@ -168,6 +168,66 @@ the field survives it**, not one that hand-builds the input.
 live) reports `method` per sport, so the confirmation is one field read: soccer
 flipping `flat_default` -> `modelled_hold`.
 
+### `#391` — OPEN, UNOWNED. One game takes the top of the board. There is a cap per SPORT and a floor per KIND and nothing per GAME
+
+Reported from a screenshot, 2026-08-12 — the first ~14 rows visible were all
+`BALTIMORE ORIOLES @ MINNESOTA TWINS`, listed as over/under/spread/alt/prop
+until that game ran out of markets. Measured on the served board, 200 rows:
+
+    26  wnba Chicago Sky @ Golden State Valkyries
+    19  mlb  Philadelphia Phillies @ St. Louis Cardinals
+    14  mlb  Baltimore Orioles @ Minnesota Twins
+        200 rows across 36 games
+
+**THE AGGREGATE LOOKED HEALTHY AND THE PRODUCT DID NOT.** "200 rows / 36 games"
+passes any check I would have written, and I ran several. The board is sorted by
+score, so all the concentration lands at the TOP, which is the only part a person
+reads. **No endpoint check caught this in weeks; one screenshot did.** Register
+this next to `#374`: a distribution statistic cannot see a head-of-list problem.
+
+`SHORTLIST_ROWS_PER_SPORT`=100 and `SHORTLIST_KIND_FLOOR`=30 exist. There is no
+per-event cap.
+
+**SPEC IS COMMITTED AND SKIPPED: `tests/test_layer2_game_cap.py`.** Five cases,
+including the two that matter — the cap must keep a game's BEST rows, and
+`kind_floor` must not re-seat a row the cap dropped (the ordering rule the value
+floor already follows).
+
+**AN ATTEMPT WAS REVERTED, READ THIS BEFORE RETRYING.** Inserting the cap after
+`ranked = sorted(...)` in `select_shortlist` produced 6 rows per game (right
+count) that were each game's LOWEST-scored rows (wrong six), with
+`rows_beyond_game_cap` reading 0 while the trim demonstrably happened. Two
+independent symptoms of one misunderstanding I did not diagnose. Reverted rather
+than shipped. **Whatever the cause is, it is not "add a counter and slice" —
+that is what failed.**
+
+### `#392` — OPEN, UNOWNED. Live totals stay on the board after the line is decided, and BOTH sides are seated
+
+Reported 2026-08-12 with a screenshot. `BAL @ MIN`, bottom of the 5th, score
+4-5 = **9 runs already scored**, and the board was showing:
+
+    Under 10.5 totals      -120  EV +4.6%  ACTUAL 9
+    Over  14.5 totals      +120  EV +3.7%  ACTUAL 9  PROJECTED 8.8
+    Under 14.5 totals      -105  EV +3.2%  ACTUAL 9  PROJECTED 8.8
+
+`Over 14.5` needs **six more runs in four innings**; `Under 10.5` needs the game
+to score **at most one more**. Both are quoted as live opportunities at +EV.
+
+**THE BOARD ALREADY HAS THE NUMBER IT NEEDS AND DOES NOT USE IT.** `ACTUAL` reads
+9 in the rendered row — the data is joined and displayed. Nothing compares it to
+`line`. For a live total that comparison is most of the bet: `actual >= line`
+means the over has already settled.
+
+**BOTH SIDES, BOTH +EV — `#378` SURVIVED `#384`.** Measured on the served board:
+10 markets have both sides seated with both sides positive, e.g. `totals 14.5`
+at `over +3.70 / under +3.21`. `#384` stopped the fair value being a cross-book
+best-price de-vig (they are no longer *identical*, which they were), but two
+positive sides of one market is still arithmetically impossible as an edge. So
+`#384` was necessary and not sufficient, and `#378` should NOT be closed against
+it.
+
+Related: `#391` (the same screenshot), `#378` (both-sides EV), `#374`.
+
 ### `#387` — OPEN, UNOWNED, THE BOARD IS STARVED BY A THRESHOLD THAT IS 2x ITS STAGE. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` demands 3,000MB for a stage measured at 1,479MB
 
 **The overview is empty on ~70% of builds since 2026-08-12 16:38:47Z**, so
