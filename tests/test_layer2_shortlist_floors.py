@@ -383,7 +383,9 @@ class ModelledHoldFloorTests(unittest.TestCase):
         # -6.0 is normal pricing for a market holding 5.53%, and the flat -2.0
         # would reject it. 5.53 * 2.0 = -11.06, which keeps it.
         rows = [self._one_sided(ev=-6.0) for _ in range(12)]
-        out = select_shortlist(rows, now=_NOW)
+        # rows_per_game=0: these fixtures all share one implicit game, and
+        # this test is about the FLOOR, not `#391`'s per-game cap.
+        out = select_shortlist(rows, now=_NOW, rows_per_game=0)
         evidence = (out["value_floor_by_sport"] or {}).get("soccer") or {}
         self.assertEqual(evidence.get("method"), "modelled_hold")
         # 5.53 hold x 1.25 (`#383`).
@@ -402,7 +404,8 @@ class ModelledHoldFloorTests(unittest.TestCase):
         # A tiny modelled hold must not produce a floor STRICTER than -2.0 and
         # start rejecting ordinary rows -- same clamp as the two-sided path.
         rows = [self._one_sided(ev=-1.5, hold=0.1) for _ in range(12)]
-        out = select_shortlist(rows, now=_NOW)
+        # rows_per_game=0: one implicit game, and this asserts the FLOOR clamp.
+        out = select_shortlist(rows, now=_NOW, rows_per_game=0)
         evidence = (out["value_floor_by_sport"] or {}).get("soccer") or {}
         self.assertLessEqual(evidence.get("floor"), SHORTLIST_MIN_VALUE_PCT)
         self.assertEqual(len(out["rows"]), 12)
@@ -499,7 +502,9 @@ class PerFamilyFloorTests(unittest.TestCase):
     def test_each_family_is_floored_on_its_own_hold(self) -> None:
         rows = [self._row_fam(market="h2h", ev=0.35, hold=4.0) for _ in range(10)]
         rows += [self._row_fam(market="player_points", ev=-6.0, hold=12.0) for _ in range(10)]
-        out = select_shortlist(rows, now=_NOW)
+        # rows_per_game=0: these fixtures all share one implicit game, and
+        # this test is about the FLOOR, not `#391`'s per-game cap.
+        out = select_shortlist(rows, now=_NOW, rows_per_game=0)
         ev = (out["value_floor_by_sport"] or {}).get("mlb") or {}
         self.assertEqual(ev.get("method"), "per_family")
         floors = ev.get("by_family") or {}
@@ -515,7 +520,9 @@ class PerFamilyFloorTests(unittest.TestCase):
         # normally-priced props fall through it.
         rows = [self._row_fam(market="h2h", ev=0.35, hold=1.0) for _ in range(30)]
         rows += [self._row_fam(market="player_points", ev=-6.0, hold=12.0) for _ in range(10)]
-        out = select_shortlist(rows, now=_NOW)
+        # rows_per_game=0: these fixtures all share one implicit game, and
+        # this test is about the FLOOR, not `#391`'s per-game cap.
+        out = select_shortlist(rows, now=_NOW, rows_per_game=0)
         kept_props = [r for r in out["rows"] if r.get("market") == "player_points"]
         self.assertEqual(len(kept_props), 10, "props were judged on the moneyline family's hold")
 

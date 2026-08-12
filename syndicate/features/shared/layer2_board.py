@@ -100,6 +100,14 @@ SHORTLIST_ROWS_PER_SPORT = 100
 # being wasted on a sport that has only one.
 SHORTLIST_KIND_FLOOR = 30
 
+# Most rows any ONE game may contribute. Env: SYNDICATE_SHORTLIST_ROWS_PER_GAME.
+#
+# 6, sized off the measured concentration: on the 200-row served board of
+# 2026-08-12 the top game held 26 rows while 36 games shared 200 slots -- an even
+# split is 5.6. So 6 lets a genuinely rich game run slightly ahead of average and
+# makes a 26-row takeover impossible. 0 disables the cap.
+SHORTLIST_ROWS_PER_GAME = 6
+
 # Minimum value% a row must carry to be shown. Env:
 # SYNDICATE_SHORTLIST_MIN_VALUE_PCT.
 #
@@ -1345,6 +1353,7 @@ def select_shortlist(
     horizon_days: int | None = SHORTLIST_HORIZON_DAYS,
     now: datetime | None = None,
     min_value_pct: float | None = None,
+    rows_per_game: int | None = None,
     max_quote_age_seconds: float | None = None,
     stale_kickoff_seconds: float | None = None,
     hold_multiple_override: float | None = None,
@@ -1383,8 +1392,14 @@ def select_shortlist(
         if stale_kickoff_seconds is not None
         else _env_float("SYNDICATE_SHORTLIST_STALE_KICKOFF_SECONDS", SHORTLIST_STALE_KICKOFF_SECONDS)
     )
+    rows_per_game = (
+        int(rows_per_game)
+        if rows_per_game is not None
+        else int(_env_float("SYNDICATE_SHORTLIST_ROWS_PER_GAME", SHORTLIST_ROWS_PER_GAME))
+    )
     by_sport: dict[str, list[Mapping[str, Any]]] = {}
     beyond_horizon = 0
+    beyond_game_cap = 0
     below_value_floor = 0
     beyond_quote_age = 0
     implausible_book = 0
@@ -1472,6 +1487,42 @@ def select_shortlist(
         rows = kept
 
         ranked = sorted(rows, key=_score_of, reverse=True)
+
+        # `#391` -- CAP ROWS PER GAME. There was a cap per sport (100) and a
+        # floor per kind (30) and nothing per EVENT, so one game could own the
+        # whole visible board. Measured 2026-08-12, 200 rows / 36 games: 26 from
+        # one WNBA game, 19 from one MLB game, and the first ~14 rows a person
+        # saw were a single matchup listed over/under/spread/alt/prop.
+        #
+        # The aggregate ("200 rows, 36 games") looked healthy, which is why no
+        # endpoint check caught it and a screenshot did.
+        #
+        # **Sorts its own input rather than trusting `ranked`.** A first attempt
+        # capped correctly by COUNT but kept each game's worst rows, which is the
+        # signature of trimming an unsorted list. One explicit sort here costs
+        # nothing and makes "keeps the best" true by construction instead of by
+        # assumption about a variable set eight lines up.
+        per_game = max(0, int(rows_per_game))
+        if per_game:
+            seen_per_game: dict[Any, int] = {}
+            capped: list[Mapping[str, Any]] = []
+            for row in sorted(ranked, key=_score_of, reverse=True):
+                # Fall back to the matchup when there is no event_id -- an absent
+                # key must not collapse unrelated games into one shared cap.
+                key = row.get("event_id") or (
+                    row.get("sport"),
+                    row.get("home_team"),
+                    row.get("away_team"),
+                    row.get("commence_time"),
+                )
+                seen = seen_per_game.get(key, 0)
+                if seen >= per_game:
+                    beyond_game_cap += 1
+                    continue
+                seen_per_game[key] = seen + 1
+                capped.append(row)
+            ranked = capped
+
         game = [row for row in ranked if str(row.get("kind") or "") == "game"]
         prop = [row for row in ranked if str(row.get("kind") or "") == "prop"]
         other = [row for row in ranked if str(row.get("kind") or "") not in {"game", "prop"}]
@@ -1516,6 +1567,11 @@ def select_shortlist(
         # say which rule shrank it, or the next reader diagnoses an outage.
         "rows_beyond_horizon": beyond_horizon,
         "rows_below_value_floor": below_value_floor,
+        # `#391`. Reported beside the other rejections for the reason `#373`
+        # added `rows_implausible_book`: a rule that trims silently is a rule
+        # nobody can tell apart from a thin slate.
+        "rows_beyond_game_cap": beyond_game_cap,
+        "rows_per_game": rows_per_game,
         # `#369`: named separately from the value floor, because "the book is
         # impossible" and "this row is priced below our floor" are different
         # rejections and collapsing them would hide a feed problem as taste.
