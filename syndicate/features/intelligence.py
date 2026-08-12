@@ -10033,10 +10033,31 @@ def collect_candidates_with_fallback_merge(
         # timings -- `candidate_collection_with_fallback` was 1,425 of the
         # 1,427 seconds attributed across all stages:
         #
-        #     16:54-17:41   0.01s x 13 builds   (pool non-empty, fallback idle)
+        #     16:54-17:41   0.01s x 13 builds   <- BROKEN builds, see below
         #     17:06:20      321.40s
         #     17:56:21      521.30s
-        #     18:16:09      582.38s   <- and still growing
+        #     18:16:09      582.38s
+        #
+        # **THE FAST BUILDS ARE THE BROKEN ONES. Corrected -- I read this
+        # backwards first.** `BOARD_OVERVIEW_READY` on the same builds:
+        #
+        #     14:53-16:31   sports=8   healthy
+        #     16:38:47      sports=0   <- ingestion breaks here
+        #     16:38-17:03   sports=0
+        #     17:06:20      sports=8   <- the 321s build
+        #     17:14-17:41   sports=0
+        #     17:46 17:56 18:16 18:45  sports=8   <- the 521s/582s builds
+        #
+        # The 0.01s builds had an EMPTY OVERVIEW, so every stage downstream was
+        # trivially empty and the fallback had nothing to work on -- fast because
+        # broken, not fast because healthy. The slow builds are the ones with a
+        # real 8-sport overview, where `collect_candidates` returns 0 ANYWAY and
+        # the fallback then does 580s of real work to recover 218-475 rows.
+        #
+        # So there are TWO defects here, and this gate addresses neither:
+        #   1. the overview is empty on ~70% of builds since 16:38:47 (ingestion,
+        #      upstream of this function -- `#336`'s first case)
+        #   2. `collect_candidates` returns 0 even given a full overview
         #
         # The pool went permanently empty around 17:06 and the fallback has
         # fired on every build since, taking board rebuild cadence from ~3
