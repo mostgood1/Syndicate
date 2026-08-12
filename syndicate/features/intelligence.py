@@ -7413,7 +7413,20 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
                 try:
                     from syndicate.features.shared.quote_enrichment import enrich_prop_rows
 
+                    # `#376`, layer five. `SPORT_PROPS_DONE` fires and nothing
+                    # after it does, so the hang is in this block or the game
+                    # block below. This is the FIRST call past the marker and it
+                    # reads odds artifacts, so it is where to look first --
+                    # noting that the same reasoning named four wrong suspects
+                    # tonight, which is why it gets a marker rather than a fix.
+                    print(f"[intelligence] ENRICH_PROPS_ENTER sport={sport_slug or '?'} rows={len(sport_prop_candidates)}", flush=True)
+                    _enrich_started = time.time()
                     enrich_prop_rows(sport_prop_candidates, date_str=_quote_date_for_sport(sport, preferences))
+                    print(
+                        f"[intelligence] ENRICH_PROPS_EXIT sport={sport_slug or '?'} "
+                        f"elapsed_s={round(time.time() - _enrich_started, 2)}",
+                        flush=True,
+                    )
                 except Exception:
                     # A board without price context is degraded; a board that
                     # fails the whole query because an odds log was mid-write is
@@ -7441,7 +7454,16 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             except Exception:
                 pass
         if preferences.get("include_games"):
+            # `#376`: the other half of the post-props span. If ENRICH_PROPS_EXIT
+            # arrives and this ENTER has no EXIT, the hang is here instead.
+            print(f"[intelligence] GAME_CANDIDATES_ENTER sport={sport_slug or '?'}", flush=True)
+            _games_started = time.time()
             game_candidates = _game_candidates_for_sport(sport)
+            print(
+                f"[intelligence] GAME_CANDIDATES_EXIT sport={sport_slug or '?'} "
+                f"rows={len(game_candidates)} elapsed_s={round(time.time() - _games_started, 2)}",
+                flush=True,
+            )
             candidates.extend(game_candidates)
             if game_candidates:
                 _log_candidate_stage(pipeline_name="collect_candidates", stage="game_candidate_creation", before=[], after=game_candidates)
