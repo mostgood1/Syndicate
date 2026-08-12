@@ -65,7 +65,36 @@ def build_layer2_shortlist(
             from syndicate.features.shared.book_grid import build_book_grid
             from syndicate.features.shared.odds_book_quotes import read_book_quotes, read_quote_last_seen
 
-            quote_rows = read_book_quotes(sport, selected_date)
+            # WINDOW-SCOPED, NOT SINGLE-DATE (`#379`).
+            #
+            # Measured live 2026-08-12: soccer reported `quote_rows: 0` to Layer 2
+            # while its Layer 1 board served 3,298 rows with a 60-minute seen-age.
+            # Both readings were current and they contradicted each other.
+            #
+            # Soccer shards by KICKOFF date, not capture date, so today's captures
+            # land in `2026-08-15.jsonl`, `2026-08-16.jsonl` and beyond -- and
+            # `2026-08-12.jsonl` really is empty, because almost nothing kicks off
+            # today. Asking one date for a sport that does not store by that date
+            # returns nothing forever, not just on quiet days. Layer 1 has scoped
+            # by `resolve_window_dates` since `#329`; Layer 2 never did, so soccer
+            # could not reach it on ANY day.
+            #
+            # Single-date sports resolve to a one-element window, so this is a
+            # no-op for mlb/nba/wnba/nhl/ncaab and additive for nfl (5) and
+            # ncaaf (3), whose fixtures also span days.
+            from syndicate.features.shared.layer1_board import resolve_window_dates
+
+            window_dates = resolve_window_dates(sport, selected_date, window="slate") or [selected_date]
+            quote_rows = []
+            dates_with_rows: list[str] = []
+            for window_date in window_dates:
+                try:
+                    chunk = read_book_quotes(sport, window_date)
+                except Exception:
+                    continue
+                if chunk:
+                    quote_rows.extend(chunk)
+                    dates_with_rows.append(window_date)
             if not quote_rows:
                 # #296. Zero quotes means one of two things and they must not
                 # look alike: the sweep has NOT RUN YET, or it ran and the sport
@@ -94,6 +123,10 @@ def build_layer2_shortlist(
                     "grid_rows": 0,
                     "opportunities": 0,
                     "scheduled_games": scheduled,
+                    # WHICH dates were asked. A zero against a 7-day window is a
+                    # different fact from a zero against one date, and the old
+                    # payload could not tell them apart.
+                    "window_dates": list(window_dates),
                     # A zero must be attributable -- same contract as
                     # `rows_stale_kickoff` and audit_slate_coverage's THIN.
                     "sweep_state": "pending" if scheduled > 0 else "no_slate",
@@ -180,6 +213,8 @@ def build_layer2_shortlist(
                 cells_with_seen_age = -1  # walked and failed, distinct from a real 0
             per_sport_stats[sport] = {
                 "quote_rows": len(quote_rows),
+                "window_dates": list(window_dates),
+                "dates_with_rows": list(dates_with_rows),
                 "grid_rows": int(result.get("rows_in") or 0),
                 # Stated on BOTH branches on purpose: a consumer that has to
                 # infer "swept" from the absence of a key cannot tell it from a
