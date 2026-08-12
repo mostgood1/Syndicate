@@ -413,3 +413,37 @@ def test_an_untracked_row_is_labelled_even_when_history_is_unreadable():
     card = layer2_rows_to_board_cards([row])[0]
     assert card["movement_not_tracked"] is True
     assert "line_odds_movement" not in card
+
+
+def test_an_impossible_book_is_rejected_not_ranked_first():
+    """`#369`. `ev_pct` is the no-vig surplus, so implied total == 100/(1+ev/100).
+    Measured 2026-08-12 00:11Z: the #1 board row was Baltimore +107 AND Minnesota
+    +200 on the same two-way h2h -- 81.6% implied, an 18-point underround, which
+    became a 22.49% "edge" and ranked first. 20 of the top 20 were this shape,
+    and `suspect_stale` caught 1 of 63.
+
+    The threshold is a magnitude test on ev_pct and `#369` warned against those.
+    What makes this one legitimate is that it is DERIVED from a stated
+    impossibility rather than chosen to trim the board: no book prices a market
+    under 95%. A genuine cross-book arb runs 0-3%.
+    """
+    from syndicate.features.shared.layer2_board import (
+        _implied_book_total_pct,
+        _MIN_IMPLIED_BOOK_TOTAL_PCT,
+    )
+
+    assert round(_implied_book_total_pct(22.4852), 2) == 81.64
+    assert _implied_book_total_pct(22.4852) < _MIN_IMPLIED_BOOK_TOTAL_PCT
+
+    # A NORMAL market holds a margin, so its implied total is ABOVE 100 and it
+    # must never be touched by this -- rejecting normal pricing would empty the
+    # board, which is exactly how the value floor went wrong at 0.0.
+    assert _implied_book_total_pct(-1.0953) > 100.0
+    assert _implied_book_total_pct(-1.0953) > _MIN_IMPLIED_BOOK_TOTAL_PCT
+
+    # A small real arb survives.
+    assert _implied_book_total_pct(1.6332) > _MIN_IMPLIED_BOOK_TOTAL_PCT
+
+    # Unknown is not rejected: absent ev_pct must not be treated as impossible.
+    assert _implied_book_total_pct(None) is None
+    assert _implied_book_total_pct("nonsense") is None

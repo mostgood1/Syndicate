@@ -827,6 +827,34 @@ def _line_movement_for_row(row: Mapping[str, Any], history: Mapping[str, Any] | 
     return None
 
 
+# `#369`. Minimum implied book total for a market to be considered real.
+#
+# `ev_pct` is the no-vig surplus, so implied total == 100/(1+ev_pct/100). This
+# floor is therefore equivalent to `ev_pct <= 5.26`, and the equivalence is the
+# point: the number is derived from "a book cannot price a market at 95% and
+# survive", not picked to trim the board.
+#
+# Measured on the 200-row shortlist 2026-08-12: the distribution is BIMODAL --
+# p50 implies a healthy 99.26% book, p75 implies 89.19%. There is no honest
+# threshold that keeps the p75 group; an 11-point cross-book arb is a broken
+# quote, and real ones run 0-3%.
+#
+# Rejects 86 of 200 at this setting. That is a large fraction and it is the
+# finding, not a side effect: nearly half the board was priced off quotes no
+# book ever offered.
+_MIN_IMPLIED_BOOK_TOTAL_PCT = float(os.environ.get("SYNDICATE_SHORTLIST_MIN_IMPLIED_BOOK_TOTAL_PCT") or 95.0)
+
+
+def _implied_book_total_pct(ev_pct: Any) -> float | None:
+    ev = _as_float(ev_pct)
+    if ev is None:
+        return None
+    denominator = 1.0 + ev / 100.0
+    if denominator <= 0.0:
+        return None
+    return 100.0 / denominator
+
+
 def _american_from_probability(probability: Any) -> float | None:
     """Fair American price from a no-vig probability. Mirrors
     `wnba/cards.py::_american_from_prob` rather than inventing a second
@@ -989,6 +1017,7 @@ def select_shortlist(
     beyond_horizon = 0
     below_value_floor = 0
     beyond_quote_age = 0
+    implausible_book = 0
     stale_kickoff = 0
     for row in opportunities:
         if not _within_horizon(row, reference_now, horizon_days):
@@ -1010,6 +1039,29 @@ def select_shortlist(
         # of staleness; the score already discounts it.
         if age_seconds is not None and age_ceiling > 0 and age_seconds > age_ceiling:
             beyond_quote_age += 1
+            continue
+        # `#369`: an IMPOSSIBLE BOOK is a bad feed, not an opportunity.
+        #
+        # `ev_pct` is the no-vig surplus, so the market's implied total is
+        # exactly `1 / (1 + ev_pct/100)`. Measured on the served board
+        # 2026-08-12 00:11Z: the #1 row was Baltimore +107 AND Minnesota +200 on
+        # the same two-way h2h -- 48.3% + 33.3% = 81.6% implied, an 18-point
+        # UNDERROUND, which became a 22.49% "edge" and ranked first. 20 of the
+        # top 20 were this. `suspect_stale` caught 1 of 63, with quotes up to 84
+        # minutes old.
+        #
+        # THE ARITHMETIC WAS NEVER WRONG -- `edge*100 == ev_pct` on 263 of 263.
+        # The board was faithfully ranking bad prices to the top, and because
+        # score folds EV in, worse price data ranked higher.
+        #
+        # This is a magnitude test on `ev_pct` and I said in `#369` not to use
+        # one. The distinction that makes it legitimate: the threshold is
+        # DERIVED from a stated impossibility (no real book prices a market
+        # under `_MIN_IMPLIED_BOOK_TOTAL_PCT`), not chosen to trim the board.
+        # A genuine cross-book arb runs 0-3%; 18 points is a broken quote.
+        implied_total = _implied_book_total_pct(row.get("ev_pct"))
+        if implied_total is not None and implied_total < _MIN_IMPLIED_BOOK_TOTAL_PCT:
+            implausible_book += 1
             continue
         sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
         by_sport.setdefault(sport, []).append(row)
@@ -1089,6 +1141,10 @@ def select_shortlist(
         # say which rule shrank it, or the next reader diagnoses an outage.
         "rows_beyond_horizon": beyond_horizon,
         "rows_below_value_floor": below_value_floor,
+        # `#369`: named separately from the value floor, because "the book is
+        # impossible" and "this row is priced below our floor" are different
+        # rejections and collapsing them would hide a feed problem as taste.
+        "rows_implausible_book": implausible_book,
         "rows_beyond_quote_age": beyond_quote_age,
         "rows_stale_kickoff": stale_kickoff,
         "persisted_bytes": len(json.dumps(selected, default=str)),
