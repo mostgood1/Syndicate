@@ -128,11 +128,28 @@ def test_shots_markets_are_means(tmp_path):
 
 
 def test_first_goal_scorer_is_never_filled_from_anytime(tmp_path):
-    """'Anytime' is not 'first'. Reusing it would overstate every such row."""
-    grid = [_row("player_first_goal_scorer", None, player_name="Nicolo Tresoldi")]
-    coverage = attach_soccer_projections(grid, _index(tmp_path))
-    assert "projection" not in grid[0]
-    assert coverage["unsupported_market_rows"] == 1
+    """'Anytime' is not 'first' -- still true, and now enforced on a real number.
+
+    POLICY CHANGED IN `#368`, deliberately. This used to assert the row stayed
+    EMPTY, because the only way to fill it was to copy the anytime probability
+    and that overstates every row. First/last scorer are now DERIVED by a Poisson
+    race (`soccer_scorer_markets`), which is a transformation rather than a copy.
+
+    So the guarantee this test exists for is unchanged and is asserted directly:
+    the first-scorer probability must come out STRICTLY BELOW the anytime one. A
+    player cannot be likelier to score first than to score at all, and if a
+    future change ever reintroduces the copy, that inequality breaks.
+    """
+    anytime_row = _row("player_goal_scorer_anytime", None, player_name="Nicolo Tresoldi")
+    first_row = _row("player_first_goal_scorer", None, player_name="Nicolo Tresoldi")
+    attach_soccer_projections([anytime_row, first_row], _index(tmp_path))
+
+    anytime = (anytime_row.get("projection") or {}).get("model_prob_over")
+    first = (first_row.get("projection") or {}).get("model_prob_over")
+    assert anytime is not None, "fixture no longer produces an anytime probability"
+    assert first is not None, "#368 should now derive a first-scorer probability"
+    assert first < anytime, "first-scorer must never equal or exceed anytime -- that is the copy"
+    assert first_row["projection"]["basis"] == "poisson_scorer_race"
 
 
 def test_unknown_match_is_counted_not_guessed(tmp_path):

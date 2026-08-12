@@ -45,9 +45,14 @@ _PLAYER_FIELDS: dict[str, tuple[str, str]] = {
     "player_shots_on_target": ("expected_shots_on_target", "mean"),
 }
 
-# `player_first_goal_scorer` is deliberately absent: "anytime" is not "first",
-# and there is no first-scorer field. Reusing the anytime probability would
-# overstate every one of those rows.
+# `player_first_goal_scorer` / `player_last_goal_scorer` are NOT in the table
+# above because they are not a field lookup -- they are DERIVED, per match, by
+# `soccer_scorer_markets.scorer_race` (`#368`). The note that stood here said
+# reusing the anytime probability would overstate every row, which was true; a
+# Poisson race is a transformation rather than a reuse, and it is anchored on the
+# match's own expected goals so incomplete player lists leave probability
+# unallocated instead of inflating whoever happens to be listed.
+_DERIVED_SCORER_MARKETS = {"player_first_goal_scorer", "player_last_goal_scorer"}
 
 _TOTALS_EXACT_PROB_LINE = 2.5
 
@@ -343,6 +348,32 @@ def _age_hours(generated_at: str) -> float | None:
     return round((datetime.now(timezone.utc) - parsed).total_seconds() / 3600.0, 1)
 
 
+def _scorer_race_for(index: "SoccerProjectionIndex", match_id: str, match: Mapping[str, Any]) -> dict[str, Any]:
+    """Per-match scorer race, computed once. Cached because a single match can
+    carry 40+ first-scorer rows and the race is O(players) each time."""
+    cache = getattr(index, "_scorer_race_cache", None)
+    if cache is None:
+        cache = {}
+        setattr(index, "_scorer_race_cache", cache)
+    if match_id in cache:
+        return cache[match_id]
+    from syndicate.features.shared.soccer_scorer_markets import scorer_race
+
+    players = (index.players_by_match.get(match_id) or {}).values()
+    mean = (match.get("total_distribution") or {}).get("mean")
+    result = scorer_race(players, match_expected_goals=mean)
+    #  keys by the RAW player name; every lookup in this module goes
+    # through . Normalising here rather than inside the race keeps the
+    # race sport-agnostic -- and an un-normalised key silently matched NOTHING,
+    # which reads exactly like "no projection available".
+    result = {
+        **result,
+        "by_player": {_norm_name(k): v for k, v in (result.get("by_player") or {}).items()},
+    }
+    cache[match_id] = result
+    return result
+
+
 def attach_soccer_projections(
     grid: Iterable[Mapping[str, Any]], index: SoccerProjectionIndex
 ) -> dict[str, Any]:
@@ -391,6 +422,27 @@ def attach_soccer_projections(
                 margin = _as_float((match.get("team_projection") or {}).get("margin_mean"))
             if margin is not None:
                 projection = _mean_projection(margin, row.get("line"), basis="margin_mean")
+        elif market in _DERIVED_SCORER_MARKETS:
+            match_id = str(match.get("match_id") or "").strip()
+            race = _scorer_race_for(index, match_id, match)
+            name = _norm_name(row.get("player_name"))
+            prob = (race.get("by_player") or {}).get(name) if race else None
+            if prob is None:
+                unmatched_player += 1
+                continue
+            projection = _probability_projection(
+                float(prob),
+                basis="poisson_scorer_race",
+                side=str(row.get("player_name") or "").strip() or "yes",
+            )
+            # Both halves of the honesty: how much of the match's goal rate the
+            # listed players actually cover, and the time-reversal assumption the
+            # LAST-scorer number rests on.
+            projection["attributable_share"] = race.get("attributable_share")
+            if not race.get("usable"):
+                projection["low_coverage"] = True
+            if market == "player_last_goal_scorer":
+                projection["assumption"] = "last scorer equals first scorer under time-reversal symmetry"
         elif market in _PLAYER_FIELDS:
             field_name, kind = _PLAYER_FIELDS[market]
             players = index.players_by_match.get(str(match.get("match_id") or "").strip()) or {}
