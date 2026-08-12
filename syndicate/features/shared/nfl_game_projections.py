@@ -51,6 +51,11 @@ from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.team_aliases import teams_match
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.nfl_preseason_calibration import (
+    calibrated_total,
+    is_preseason_profile,
+    skill_note,
+)
 
 
 def _as_float(value: Any) -> float | None:
@@ -218,10 +223,20 @@ def attach_nfl_game_projections(
                     "source": "nfl_smartsim2",
                     "generated_at": entry.get("generated_at"),
                 }
+                note = skill_note(entry.get("profile"), "h2h")
+                if note:
+                    # `#367`: measured corr(projection, actual margin) = -0.047
+                    # over 146 preseason games. `home_win_rate` derives from that
+                    # margin model, so this probability carries no information.
+                    # Shown WITH its skill rather than silently, because a bare
+                    # 0.53 reads as a real read on the game.
+                    projection["model_skill"] = note
         elif market == "totals":
             mean = entry.get("total_mean")
             stdev = entry.get("total_stdev")
             line = _as_float(row.get("line"))
+            raw_mean = mean
+            mean = calibrated_total(mean, entry.get("profile"))
             if mean is not None:
                 projection = {
                     "projected": round(mean, 3),
@@ -231,6 +246,14 @@ def attach_nfl_game_projections(
                     "generated_at": entry.get("generated_at"),
                     "model_prob_over": None,
                 }
+                if is_preseason_profile(entry.get("profile")):
+                    # The raw model output stays visible next to the corrected
+                    # one -- a calibration that hides what it changed is
+                    # indistinguishable from a model that was always right.
+                    projection["projected_raw"] = round(float(raw_mean), 3)
+                    projection["calibrated"] = True
+                    projection["calibration_points"] = round(float(raw_mean) - float(mean), 3)
+                    projection["model_skill"] = skill_note(entry.get("profile"), "totals")
                 if line is not None:
                     projection["edge_vs_line"] = round(mean - line, 3)
                     total_edge_by_game.setdefault(
