@@ -724,32 +724,36 @@ def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[s
 
 
 def _layer2_movement_columns(row: Mapping[str, Any], cache: dict[tuple[str, str], Any]) -> dict[str, Any]:
-    """Line/odds movement for a tracked market, or nothing (`#368`).
+    """DISABLED (`#372`). Was the `#368`/`#370` odds-history join.
 
-    The untracked case is labelled in `_layer2_board_columns`, not here, so that
-    a row still gets its "not tracked" marker even when the shard is unreadable.
+    **IT STALLED THE SHORTLIST BUILD.** The join loaded
+    `load_odds_history_payload_for_sport` INSIDE the builder -- a ~20MB MLB shard
+    -- and `#370` then made it try two shard keys, so a miss on the first loaded
+    a second multi-MB payload before giving up. Measured 2026-08-12: the last
+    successful build was 00:22:21Z, minutes before `#370`; for the 70 minutes
+    after it, execution reached `EXPOSURE_BUDGETS_APPLIED` (the statement
+    immediately before the build) on every cycle and `LAYER2_SHORTLIST` never
+    printed again. Entered and never returned -- no exception, so
+    `LAYER2_SHORTLIST_FAILED` never fired either.
+
+    The cost was not the column. **Every producer-side fix queued behind that
+    build stopped shipping**, including `#369`'s plausibility filter, so the
+    board kept serving the 00:22Z artifact with implausible arbs on top.
+
+    WHAT I GOT WRONG, since the code read as careful: I measured the join's
+    CORRECTNESS against real rows and never its COST, then wrote "loaded lazily,
+    so a board of nothing but props loads nothing" as though that settled it. A
+    lazy load is still a 20MB synchronous read the first time a tracked market
+    appears, which is every MLB slate.
+
+    The "Not tracked" labelling in `_layer2_board_columns` is KEPT: it is a
+    string derived from the market name, does no IO, and is most of what made
+    the column legible (179 of 200 rows).
+
+    Re-landing this belongs where the odds tracker already holds the data, not
+    in a per-build read of a multi-megabyte artifact.
     """
-    if not _movement_is_tracked(row.get("market")):
-        return {}
-    sport = str(row.get("sport") or "").strip().lower()
-    if not sport:
-        return {}
-    movement = None
-    for shard in _movement_shard_keys(row.get("commence_time")):
-        key = (sport, shard)
-        if key not in cache:
-            try:
-                from syndicate.features.shared.odds_control_plane import load_odds_history_payload_for_sport
-
-                cache[key] = load_odds_history_payload_for_sport(sport, shard)
-            except Exception:
-                # Unreadable history must not take the shortlist build down. The
-                # row simply carries no movement, which renders as the same dash
-                # it does today -- a strictly-no-worse failure.
-                cache[key] = None
-        movement = _line_movement_for_row(row, cache.get(key))
-        if movement:
-            break
+    return {}
     return {"line_odds_movement": movement} if movement else {}
 
 
