@@ -51,6 +51,7 @@ from syndicate.features.shared import opportunity_gate
 from syndicate.features.shared.book_margin_model import market_family as _market_family
 from syndicate.features.shared.opportunity_signals import (
     blended_score,
+    consensus_fair_probability,
     devig,
     expected_value_pct,
 )
@@ -578,11 +579,67 @@ def _fair_by_side(row: Mapping[str, Any], sides: list[str]) -> tuple[dict[str, f
     mistaken for a measured consensus.
     """
     best = row.get("best") or {}
+
+    # `#384` -- DE-VIG WITHIN A BOOK, THEN TAKE THE MEDIAN ACROSS BOOKS.
+    #
+    # This used to de-vig the BEST price on each side, which routinely takes the
+    # two sides from two different books. Measured on the served board
+    # 2026-08-12: 29 of 52 two-sided groups drew their sides from different
+    # bookmakers, and `edge == ev_vs_fair_pct` on 127 of 127 rows.
+    #
+    # `opportunity_signals.fair_probability_by_book` documents exactly why that
+    # is wrong: the best over at one book and the best under at another sum to
+    # less than a real market, and normalising THAT to 1.0 "silently launders a
+    # line-shopping edge into the 'fair' price -- which then makes the edge
+    # disappear from the EV it was supposed to measure." So the board's EV was a
+    # cross-book arb surplus, identical on both sides by construction, wearing
+    # the label of an edge against fair value.
+    #
+    # `consensus_fair_probability` is the correct implementation and already
+    # existed -- it was reachable from one call site and used by neither board.
+    # It de-vigs each book against itself, then takes the MEDIAN per selection,
+    # so one stale or fat-fingered book cannot move the benchmark.
+    cells = row.get("cells")
+    if isinstance(cells, Mapping):
+        # Nesting is {book: {selection: price}} -- the same shape `cells`
+        # already has, and the shape `fair_probability_by_book` iterates. Passing
+        # it inverted returns None rather than raising, so the board would have
+        # fallen through to the modelled path everywhere and looked merely
+        # thinner rather than broken.
+        prices_by_book: dict[str, dict[str, Any]] = {}
+        for book, sides_map in cells.items():
+            if not isinstance(sides_map, Mapping):
+                continue
+            per_side = {
+                side: price
+                for side in sides
+                if isinstance(sides_map.get(side), Mapping)
+                and (price := _as_float(sides_map[side].get("price"))) is not None
+            }
+            # A book quoting only one leg has nothing to de-vig against; keeping
+            # it would let a lone longshot price normalise to a "fair" of 1.0.
+            if len(per_side) == len(sides) and len(per_side) >= 2:
+                prices_by_book[str(book)] = per_side
+        if prices_by_book:
+            consensus = consensus_fair_probability(prices_by_book)
+            if consensus and len(consensus) == len(sides):
+                return ({str(side): value for side, value in consensus.items()}, "consensus")
+
+    # SAME-BOOK fallback only. A two-sided de-vig is legitimate when both prices
+    # come from ONE book -- that is what the per-book pass above does. It is the
+    # CROSS-book case that launders, so this checks the bookmakers match rather
+    # than reinstating the old behaviour when consensus is unavailable.
     prices = [(_as_float((best.get(side) or {}).get("price")), side) for side in sides]
-    if len(prices) >= 2 and all(price is not None for price, _ in prices):
+    books_used = {str((best.get(side) or {}).get("bookmaker") or "") for side in sides}
+    if (
+        len(prices) >= 2
+        and all(price is not None for price, _ in prices)
+        and len(books_used) == 1
+        and "" not in books_used
+    ):
         probabilities = devig([price for price, _ in prices])
         if probabilities and len(probabilities) == len(prices):
-            return ({side: probabilities[i] for i, (_, side) in enumerate(prices)}, "two_sided")
+            return ({side: probabilities[i] for i, (_, side) in enumerate(prices)}, "two_sided_same_book")
 
     modelled = row.get("modelled_fair") or {}
     out: dict[str, float] = {}
