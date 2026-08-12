@@ -614,6 +614,57 @@ it.
 
 Related: `#391` (the same screenshot), `#378` (both-sides EV), `#374`.
 
+### `#407` — USER DIRECTION. ONE Layer 1 board at "Betting Board". Two templates render the same grid today and each is broken where the other works
+
+**Reported from two screenshots of the SAME WNBA slate, 2026-08-12.** This is not
+a theory about duplication; it is duplication caught producing divergent output.
+
+    book_grid.html            intelligence.py:2906   "Betting Board"   per-book columns
+    shared/layer1_board.html  layer1_page.py:55      "Market Board"    Best/Book/Fair
+    cross_book.html           intelligence.py:2935   "Arbitrage & Low Hold"
+    market_board_hub.html     home.py:7368           hub
+
+Plus the six bespoke `build_*_market_board` endpoints (see the board audit).
+
+**THE TWO PAGES DISAGREE ON THE SAME ROWS, AND NEITHER IS COMPLETE:**
+
+| | book_grid | layer1_board |
+|---|---|---|
+| Fair | **blank** | populated, `P`-marked |
+| Proj / Edge | populated | **blank** |
+| layout | per-book columns (what the user wants) | Best/Book only |
+
+**Why `book_grid`'s Fair is blank — measured, not inferred.** `book_grid.html:590`
+renders fair only from `modelled_fair`, else from `proj.market_fair_prob_over`.
+It has **no consensus-devig fallback**. `layer1_board.html:497` has three tiers:
+Pinnacle two-sided anchor, then consensus devig, then modelled, each LABELLED.
+
+WNBA rows carry `modelled_fair: null` (two-sided markets skip the margin model)
+and none of its 11 books is Pinnacle, so both of `book_grid`'s branches miss.
+Verified on `Paige Bueckers 7.5`: `sides=['over','under']`,
+`consensus={'over':108,'under':-152}` — devigs cleanly to **+125 / -125**. The
+number is right there and the page has no code to reach it.
+
+**And the tooltip lies.** `book_grid.html:542` renders `·` with the title *"no
+two-sided market, so no-vig fair value cannot be computed"* on rows that ARE
+two-sided (92.2% of the slate, per the page's own header). It names a condition
+that is not the one occurring, which is worse than a blank.
+
+**DIRECTION: one board, at Betting Board.** Keep `layer1_board`'s fair-value
+logic — it is strictly better, three anchors with the anchor labelled, and its
+`SHARP_ANCHOR` comment already reasons about why Pinnacle covers games and not
+props. Keep `book_grid`'s per-book column layout. Retire the other renderer
+rather than fixing both.
+
+**DO NOT "fix" this by porting the devig into `book_grid` and leaving both
+pages.** That is the cheap move and it makes the real problem worse: two
+implementations of one number is exactly how these two drifted apart, and a
+third divergence will be found by a user rather than a test.
+
+Related: the board audit (six bespoke builders, five ranking paths, four
+`build_book_grid` call sites), `#329` (which replaced the HTML page and left the
+builders live).
+
 ### `#387` — OPEN, UNOWNED, THE BOARD IS STARVED BY A THRESHOLD THAT IS 2x ITS STAGE. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` demands 3,000MB for a stage measured at 1,479MB
 
 **The overview is empty on ~70% of builds since 2026-08-12 16:38:47Z**, so
