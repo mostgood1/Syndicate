@@ -26,10 +26,42 @@ opposite failure: rows that DO carry one are carrying a default. Whatever suppli
 `projection.projected` is returning a league-level or fallback figure rather than
 the game's own sim.
 
-**Start at** `layer2_board._layer2_board_columns`, which maps
-`projection.projected` → `projected`/`sim_projection`, and walk back to what
-populates `projection` on the shortlist row. The question to answer first is
-whether the constant arrives from the sim or is manufactured downstream.
+**TRACED. It is not a plumbing bug — the MODEL is degenerate, and the repo already
+knew.**
+
+`nfl_game_projections.py:221` sets `"projected": entry.get("margin_mean")` for
+h2h/spreads, and `:242`/`:276` set totals from `total_mean`. Both are per-game
+lookups doing exactly what they should. `_layer2_board_columns` maps them across
+correctly. **So the constant is in the SOURCE: every NFL game's `margin_mean` is
+0.96 and every `total_mean` is 38.76.** That is what a model collapsed to the
+league average looks like.
+
+**And six lines below that assignment sits `#367`'s own measurement:**
+
+> "measured corr(projection, actual margin) = **-0.047 over 146 preseason games**.
+> `home_win_rate` derives from that margin model, so this probability carries no
+> information. Shown WITH its skill rather than silently, because a bare 0.53
+> reads as a real read on the game."
+
+So the model was already measured as having **no predictive power**, and
+`home_win_rate` was annotated with `model_skill` for exactly that reason. **Nobody
+carried the same conclusion to `projected`**, which comes from the identical
+`margin_mean` and reaches the board as a bare `1.0` with no caveat.
+
+**One consumer guarded, the other silent, from the same number.** Same shape as
+`#373`'s counter and the `logger.info` blindness that cost `#376` two hours: the
+knowledge exists, it just does not reach where it is needed.
+
+**THE DECISION, which is why this stays unowned:** given a model measured at ~zero
+correlation, rendering `1.0` in a PROJECTED column is worse than rendering nothing
+— it is `#375`'s pattern, an authoritative-looking number that means nothing.
+Either suppress `projected` when `skill_note` reports no information, or carry the
+annotation through `_layer2_board_columns` so the board shows it labelled. That is
+a product call about what a betting board may assert, not a bug fix.
+
+**Check whether other sports share it** before fixing NFL alone: the constant was
+measured on an all-NFL board, and `skill_note` is called per market, so the same
+degenerate-model-plus-unguarded-consumer pairing may exist elsewhere.
 
 ### `#378` — OPEN, UNOWNED, PRODUCT DECISION. Every market shows both sides, and EDGE duplicates EV
 
