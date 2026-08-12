@@ -2705,6 +2705,26 @@ def board_layer2_shortlist_api():
                 # while the filter was live and dropping rows.
                 "min_value_pct": shortlist.get("min_value_pct"),
                 "rows_below_value_floor": shortlist.get("rows_below_value_floor"),
+                # `#373`. The comment above called this exact shot and it
+                # happened again anyway: `#369`'s filter went live at 00:26Z and
+                # dropped 63 of 263 rows, and its counter was absent from this
+                # payload for the next 85 minutes because I added the key at the
+                # builder and not at this hop. I then read that absence as
+                # evidence the code had never deployed, and reasoned from there
+                # toward "my commits are not reaching the worker" -- an alarming
+                # conclusion drawn from a field this endpoint never emitted.
+                #
+                # The row data settled it in one query: 0 of 200 rows above the
+                # threshold, max implied book 95.22% against a 95.00% floor. The
+                # proof was in a payload already being fetched; the counter was
+                # the wrong instrument, not the missing one.
+                #
+                # Kept separate from `rows_below_value_floor` because they are
+                # different rejections: that one is "priced below our taste",
+                # this one is "the book is arithmetically impossible". Collapsing
+                # them would report a broken feed as a tuning choice.
+                "min_implied_book_total_pct": shortlist.get("min_implied_book_total_pct"),
+                "rows_implausible_book": shortlist.get("rows_implausible_book"),
                 "max_quote_age_seconds": shortlist.get("max_quote_age_seconds"),
                 "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
                 "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),

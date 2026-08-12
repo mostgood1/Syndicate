@@ -1195,6 +1195,11 @@ def select_shortlist(
         # `#369`: named separately from the value floor, because "the book is
         # impossible" and "this row is priced below our floor" are different
         # rejections and collapsing them would hide a feed problem as taste.
+        # `#373`: the THRESHOLD next to the count, matching how every other rule
+        # here reports (`min_value_pct` beside `rows_below_value_floor`). A
+        # rejection count without its threshold cannot be judged -- "86 dropped"
+        # is alarming or routine depending entirely on the floor that produced it.
+        "min_implied_book_total_pct": _MIN_IMPLIED_BOOK_TOTAL_PCT,
         "rows_implausible_book": implausible_book,
         "rows_beyond_quote_age": beyond_quote_age,
         "rows_stale_kickoff": stale_kickoff,
