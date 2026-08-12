@@ -396,8 +396,23 @@ services:
         value: /opt/render/project/data/wnba_source
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
+      # INTERNAL hostname, not the public `syndicate-an21.onrender.com`.
+      #
+      # This value was the public URL until 2026-08-12. Workers POSTed every
+      # hot artifact out to the public internet and straight back into the same
+      # Render region, and Render bills that as public egress at $0.15/GB:
+      # 1.62 TB for the month, climbing ~7.8 GB/hr, both workers suspended by
+      # hand to stop it. Same-region private traffic is not billed at all.
+      #
+      # The live services were repointed by hand that day. THIS FILE WAS NOT,
+      # which is the actual hazard: `blueprint_sync` fires on a render.yaml
+      # change and forces every key present here back to the file's value
+      # (measured: 14 syncs on live-odds-worker, 7 on refresh-worker, in the
+      # 14 days to 2026-08-12). So the public URL sitting here was a revert
+      # armed to go off on the next unrelated config push, with no diff naming
+      # it. Keep this in sync with the live value or it becomes one again.
       - key: SYNDICATE_WEB_PUBLISH_URL
-        value: https://syndicate-an21.onrender.com
+        value: http://syndicate-an21:10000
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "1"
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
@@ -736,8 +751,13 @@ services:
         value: /opt/render/project/data/wnba_source
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
+      # INTERNAL hostname -- see the identical key on refresh-worker above for
+      # the 1.62 TB public-egress incident this fixes and why leaving the
+      # public URL in this file is a revert armed to fire on the next
+      # blueprint_sync. live-odds-worker is the heavier publisher of the two
+      # (1.62 TB was this service alone), so this is the copy that mattered.
       - key: SYNDICATE_WEB_PUBLISH_URL
-        value: https://syndicate-an21.onrender.com
+        value: http://syndicate-an21:10000
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
