@@ -1002,6 +1002,24 @@ def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepR
     failed: list[Path] = []
     today = date.today()
     skipped: dict[str, int] = {}
+    # `#400`: WHICH files, not just how many. The counter below has always said
+    # a class was skipped and never which artifact, and that gap cost real time:
+    # `{'too_large': 2}` was read across three sessions as "book_grid is being
+    # refused at the ceiling", which is false -- book_grid exceeds
+    # `_PUBLISH_MAX_BYTES` and publishes anyway, because the ceiling lives in
+    # `_publish_skip_reason` (sweep-only) while the direct path streams and never
+    # consults it. Verified in production: `PUBLISH_OK ... book_grid ...
+    # transport=stream bytes=12855903` against a 12,582,912 ceiling.
+    #
+    # So the question this answers is whether those skips are the 51MB
+    # odds_history shards this bound exists to stop -- the design working -- or an
+    # artifact that genuinely needs publishing and is not covered elsewhere.
+    #
+    # BOUNDED at three per reason: a sweep can skip a whole class at once, and a
+    # log line naming hundreds of files is as unreadable as one naming none.
+    # The size detail is kept because it is the discriminator -- a 12MB grid and
+    # a 51MB shard are the same count and completely different facts.
+    skipped_examples: dict[str, list[str]] = {}
     for pattern in HOT_ARTIFACT_PATTERNS:
         for candidate in root.glob(pattern):
             try:
@@ -1014,14 +1032,34 @@ def sweep_changed_hot_artifacts(since_epoch_seconds: float) -> HotArtifactSweepR
                 # Counted and logged, never silent: a sweep that quietly stops
                 # publishing a whole class of artifact is indistinguishable from
                 # one that has nothing to publish.
-                skipped[reason.split(":", 1)[0]] = skipped.get(reason.split(":", 1)[0], 0) + 1
+                kind = reason.split(":", 1)[0]
+                skipped[kind] = skipped.get(kind, 0) + 1
+                examples = skipped_examples.setdefault(kind, [])
+                if len(examples) < 3:
+                    try:
+                        shown = str(candidate.relative_to(root))
+                    except ValueError:
+                        shown = candidate.name
+                    detail = reason.split(":", 1)[1] if ":" in reason else ""
+                    examples.append(f"{shown}({detail})" if detail else shown)
                 continue
             if publish_hot_artifact(candidate):
                 published += 1
             else:
                 failed.append(candidate)
     if skipped:
+        # The existing line is left EXACTLY as it was -- it is greppable and
+        # other things read it. The detail rides alongside, same shape as
+        # `#382`'s cadence detail next to its skip line.
         print(f"[artifact_publisher] SWEEP_SKIPPED {skipped}", flush=True)
+        print(
+            "[artifact_publisher] SWEEP_SKIPPED_DETAIL "
+            + " ".join(
+                f"{kind}=[{','.join(paths)}]"
+                for kind, paths in sorted(skipped_examples.items())
+            ),
+            flush=True,
+        )
     return HotArtifactSweepResult(published_count=published, failed_paths=tuple(failed))
 
 
