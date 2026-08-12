@@ -126,3 +126,61 @@ def test_the_reporter_cannot_break_the_tick(loop, monkeypatch, tmp_path, capsys)
     loop._record_odds_sweep_launch(time.time() - 600, ["wnba"])
     loop._report_odds_sweep_outcomes("2026-08-12")  # must not raise
     assert "unknown=1" in capsys.readouterr().out
+
+
+def test_a_single_launch_reports_once_not_every_tick(loop, monkeypatch, tmp_path, capsys):
+    """`#384` -- the unit of this report is a LAUNCH, not a tick.
+
+    `#378` printed on every tick for every sport whose launch was older than
+    120s. Measured 2026-08-12: 15 identical lines for ONE 17:22 wnba launch,
+    which reads as 15 attempts -- and I mislabelled them exactly that way in a
+    watcher an hour later. An unbounded stream of identical lines makes a log
+    unreadable at the moment someone needs it.
+    """
+    loop._ODDS_SWEEP_REPORTED.clear()
+    now = time.time()
+    loop._record_odds_sweep_launch(now - 600, ["wnba"])
+    _sidecar(loop, monkeypatch, tmp_path, sport="wnba", mtime=now - 7.6 * 3600)
+
+    for _ in range(5):
+        loop._report_odds_sweep_outcomes("2026-08-12")
+    lines = [l for l in capsys.readouterr().out.splitlines() if "ODDS_SWEEP_OUTCOME" in l]
+    assert len(lines) == 1, f"one launch produced {len(lines)} lines"
+    assert "wrote=False" in lines[0]
+
+
+def test_a_late_landing_subprocess_still_gets_reported(loop, monkeypatch, tmp_path, capsys):
+    """Reporting once ONLY would be wrong -- the subprocess is detached.
+
+    A launch judged at 120s can still be running and land later, so a single
+    early report would publish a false wrote=False and never correct it.
+    Reporting on TRANSITION keeps steady state quiet while a recovery prints.
+    """
+    loop._ODDS_SWEEP_REPORTED.clear()
+    now = time.time()
+    loop._record_odds_sweep_launch(now - 600, ["wnba"])
+    _sidecar(loop, monkeypatch, tmp_path, sport="wnba", mtime=now - 7.6 * 3600)
+    loop._report_odds_sweep_outcomes("2026-08-12")
+    first = [l for l in capsys.readouterr().out.splitlines() if "ODDS_SWEEP_OUTCOME" in l]
+    assert len(first) == 1 and "wrote=False" in first[0]
+
+    # The subprocess lands: sidecar now written after the launch.
+    _sidecar(loop, monkeypatch, tmp_path, sport="wnba", mtime=now - 60)
+    loop._report_odds_sweep_outcomes("2026-08-12")
+    second = [l for l in capsys.readouterr().out.splitlines() if "ODDS_SWEEP_OUTCOME" in l]
+    assert len(second) == 1 and "wrote=True" in second[0], "a False->True recovery must print"
+
+
+def test_a_new_launch_reports_again(loop, monkeypatch, tmp_path, capsys):
+    # Each launch is its own event; a stalled sport launching every 2h should
+    # report every 2h, which is signal rather than noise.
+    loop._ODDS_SWEEP_REPORTED.clear()
+    now = time.time()
+    _sidecar(loop, monkeypatch, tmp_path, sport="wnba", mtime=now - 7.6 * 3600)
+    loop._record_odds_sweep_launch(now - 600, ["wnba"])
+    loop._report_odds_sweep_outcomes("2026-08-12")
+    capsys.readouterr()
+    loop._record_odds_sweep_launch(now - 300, ["wnba"])  # a fresh launch
+    loop._report_odds_sweep_outcomes("2026-08-12")
+    lines = [l for l in capsys.readouterr().out.splitlines() if "ODDS_SWEEP_OUTCOME" in l]
+    assert len(lines) == 1, "a new launch must be reported"

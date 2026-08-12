@@ -3583,6 +3583,20 @@ def _record_pregame_sport_sweep_epochs(epoch: float, sports: list[str]) -> None:
 		print(f"[live_refresh_loop] PREGAME_SWEEP_MARKER_WRITE_FAILED error={type(exc).__name__}: {exc}", flush=True)
 
 
+# Last (launch_epoch, wrote) reported per sport (`#384`).
+#
+# `#378` printed on EVERY tick for every sport whose launch was older than 120s,
+# so one stalled launch produced an unbounded stream of identical lines --
+# measured 2026-08-12: 15 lines for a SINGLE 17:22 wnba launch, which reads as 15
+# attempts and is how I mislabelled them in a watcher an hour later. The unit of
+# this report is a LAUNCH, not a tick.
+#
+# In-process, deliberately: a reboot re-reporting once is useful (the state after
+# a restart is worth stating), and persisting it would put diagnostic bookkeeping
+# in the keyvalue store for no gain.
+_ODDS_SWEEP_REPORTED: dict[str, tuple[float, bool]] = {}
+
+
 def _odds_sweep_outcome_path() -> Path:
 	return _meta_dir() / "last_odds_sweep_launch_by_sport.json"
 
@@ -3658,6 +3672,15 @@ def _report_odds_sweep_outcomes(date_str: str) -> None:
 			continue
 		# 5s slack for clock skew between the launch stamp and the write.
 		wrote = bool(exists and mtime >= launched_epoch - 5.0)
+		# ONCE PER LAUNCH, PLUS ON CHANGE (`#384`). Reporting once only would be
+		# wrong: the subprocess is DETACHED, so a launch judged at 120s can still
+		# be running and land later -- a single early report would publish a
+		# false wrote=False and never correct it. Reporting on transition keeps
+		# steady state quiet while a False->True recovery still prints.
+		previous = _ODDS_SWEEP_REPORTED.get(str(sport))
+		if previous is not None and previous == (launched_epoch, wrote):
+			continue
+		_ODDS_SWEEP_REPORTED[str(sport)] = (launched_epoch, wrote)
 		print(
 			f"[live_refresh_loop] ODDS_SWEEP_OUTCOME sport={sport} wrote={wrote} "
 			f"exists={exists} since_launch_s={int(since_launch)} "
