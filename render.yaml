@@ -411,8 +411,26 @@ services:
       # 14 days to 2026-08-12). So the public URL sitting here was a revert
       # armed to go off on the next unrelated config push, with no diff naming
       # it. Keep this in sync with the live value or it becomes one again.
+      #
+      # The hostname is `syndicate-an21`, NOT `syndicate`. Plain `syndicate`
+      # fails with `Name or service not known` and costs a worker cycle to
+      # rediscover.
       - key: SYNDICATE_WEB_PUBLISH_URL
         value: http://syndicate-an21:10000
+      # `#395`'s hourly publish ceiling, raised 10x from the 2 GiB code default.
+      #
+      # Recorded here for the same reason as the key above: it was set by hand
+      # through the single-key API and lived nowhere in this file, so it was
+      # invisible to anyone reading the blueprint and would have reverted to the
+      # code default under any sync that replaces rather than upserts. Absent is
+      # NOT off for this key -- `_publish_budget_max_bytes` falls back to 2 GiB,
+      # which is a throttle that silently refuses publishes.
+      #
+      # 20 GiB/hr against ~101 MB/hr of measured real traffic (2026-08-12) is
+      # ~200x headroom, i.e. a runaway brake and nothing finer -- which is what
+      # `#395` says it is for. Do not read it as a budget.
+      - key: SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET
+        value: "21474836480"
       - key: SYNDICATE_BOOTSTRAP_ON_START
         value: "1"
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
@@ -756,8 +774,13 @@ services:
       # public URL in this file is a revert armed to fire on the next
       # blueprint_sync. live-odds-worker is the heavier publisher of the two
       # (1.62 TB was this service alone), so this is the copy that mattered.
+      # Hostname is `syndicate-an21`, not `syndicate`.
       - key: SYNDICATE_WEB_PUBLISH_URL
         value: http://syndicate-an21:10000
+      # `#395` hourly publish ceiling -- see refresh-worker above. Absent is not
+      # off: the code default is 2 GiB, which throttles rather than disables.
+      - key: SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET
+        value: "21474836480"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
         value: "false"
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
