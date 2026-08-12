@@ -302,8 +302,42 @@ def _row_value_pct(row: Mapping[str, Any]) -> float | None:
 
 
 def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:
+    """How stale is our OBSERVATION of this quote (`#370`).
+
+    This feeds the shortlist's `max_quote_age_seconds` ceiling, and that gate
+    asks "is our data too old to act on", not "has the price moved recently".
+    Those are different questions and `book_quotes` only ever answered the
+    second: it is a change log, so an unchanged price writes no row and a
+    motionless market ages without limit.
+
+    Measured on the served shortlist 2026-08-11, both clocks present on 200/200
+    rows and disagreeing by more than 5x on a whole sport:
+
+        sport   book_age median   seen_age median
+        mlb              8.9m              2.2m
+        nfl            331.6m            270.4m
+        wnba           376.2m             68.5m
+
+    WNBA prices had not moved in six hours; we had looked 68 minutes ago. Gating
+    on the first would age out markets we are actively watching.
+
+    NOT changed alongside this: `opportunity_gate`'s live/pregame lane checks
+    also read `book_age_seconds`, and they should. Those ask whether the MARKET
+    is still moving -- a book that has not touched its own timestamp during a
+    live game is plausibly suspended -- which is the question `book_age` exists
+    to answer. Same field, different question, deliberately left alone.
+
+    Falls back to `book_age_seconds` when the sidecar produced no seen-age, so a
+    source without the second clock is gated exactly as before rather than
+    passing unmeasured.
+    """
     quote = row.get("quote")
-    return _as_float(quote.get("book_age_seconds")) if isinstance(quote, Mapping) else None
+    if not isinstance(quote, Mapping):
+        return None
+    seen = _as_float(quote.get("quote_seen_age_seconds"))
+    if seen is not None:
+        return seen
+    return _as_float(quote.get("book_age_seconds"))
 
 
 # States that AFFIRMATIVELY say the game has started or finished. Only these
