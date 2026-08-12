@@ -222,3 +222,53 @@ def test_eval_output_gets_its_own_longer_window(tmp_path, monkeypatch):
     ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
     assert recent.exists(), "100d eval output deleted by the 7d derived window"
     assert not ancient.exists()
+
+
+# ---------------------------------------------------------------------------
+# The bounded walk. Measured 2026-08-12: an unbounded rglob over 65,025 files
+# took 18 MINUTES and blocked refresh-worker's main poll loop for all of it.
+# Streaming fixed the memory shape and left the wall-clock shape untouched.
+#
+# "Dry run" describes what this does not DELETE. It says nothing about what it
+# COSTS -- a read-only walk is exactly as expensive as a destructive one.
+# ---------------------------------------------------------------------------
+
+def test_a_pass_stops_at_the_file_cap_and_says_so(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", "5")
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path / "reports"))
+    for i in range(30):
+        _touch(tmp_path, "mlb_source/data/book_grid/book_grid_2020-01-%02d.json" % (i + 1))
+    out = ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert out.hit_pass_limit is True
+    assert out.scanned <= 6, out.scanned
+
+
+def test_a_truncated_pass_resumes_where_it_stopped(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", "5")
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path / "reports"))
+    for i in range(20):
+        _touch(tmp_path, "mlb_source/data/book_grid/book_grid_2020-01-%02d.json" % (i + 1))
+
+    first = ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert first.hit_pass_limit is True
+    cursor = ar._read_resume_cursor(tmp_path)
+    assert cursor, "no resume cursor written after a truncated pass"
+
+    second = ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert ar._read_resume_cursor(tmp_path) != cursor, "second pass did not advance"
+
+
+def test_a_completed_pass_clears_the_cursor_so_the_next_starts_from_the_top(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", "1000")
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path / "reports"))
+    _touch(tmp_path, "mlb_source/data/book_grid/book_grid_2020-01-01.json")
+    out = ar.sweep_expired_artifacts(today=TODAY, root=tmp_path)
+    assert out.hit_pass_limit is False
+    assert ar._read_resume_cursor(tmp_path) == ""
+
+
+def test_a_zero_cap_does_not_mean_scan_nothing(tmp_path, monkeypatch):
+    """Same rule as every other knob here: unparseable or absurd config maps to
+    the default, never to a degenerate branch."""
+    monkeypatch.setenv("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", "0")
+    assert ar._env_int("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", ar._MAX_FILES_PER_PASS) == ar._MAX_FILES_PER_PASS

@@ -108,6 +108,41 @@ _EVAL_DEFAULT_DAYS = 180
 # 2026-08-12. Not measured from the file's date -- from its settlement.
 _SETTLEMENT_GRACE_DAYS = 30
 
+# Files examined per pass. Sized so a pass is seconds, not minutes: the 18-minute
+# stall was 65,025 files, so ~8k is roughly two minutes of the same work and
+# still covers a worker disk inside a week of daily passes.
+_MAX_FILES_PER_PASS = 8000
+
+
+def _cursor_path(root: Path) -> Path:
+    from syndicate.features.shared.refresh_state_store import reports_root
+
+    slug = str(os.environ.get("SYNDICATE_REFRESH_LANE") or os.environ.get("RENDER_SERVICE_ID") or "local").strip().lower()
+    slug = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in slug) or "local"
+    return reports_root() / "refresh_status" / "latest" / f"retention_cursor_{slug}.json"
+
+
+def _read_resume_cursor(root: Path) -> str:
+    """Where the last pass stopped. Per-service for the same reason the daily
+    stamp is (`#405`) -- the state store is keyvalue-backed and shared, so one
+    path would make two workers fight over one cursor."""
+    from syndicate.features.shared.refresh_state_store import read_json_file
+
+    try:
+        payload = read_json_file(_cursor_path(root)) or {}
+        return str(payload.get("after") or "")
+    except Exception:
+        return ""
+
+
+def _write_resume_cursor(root: Path, after: str) -> None:
+    from syndicate.features.shared.refresh_state_store import write_json_file
+
+    try:
+        write_json_file(_cursor_path(root), {"after": after})
+    except Exception:
+        pass
+
 
 def _env_int(name: str, default: int) -> int:
     raw = str(os.environ.get(name) or "").strip()
@@ -150,6 +185,9 @@ class RetentionResult:
     # means the resolver is broken, which under any two-valued design would have
     # looked like successful cleanup.
     unknown_settlement: int = 0
+    # True when the pass stopped at max_files rather than finishing the disk.
+    # Surfaced so a partial sweep is never mistaken for a clean one.
+    hit_pass_limit: bool = False
 
     def as_log_line(self) -> str:
         mode = "DRY_RUN" if self.dry_run else "ENABLED"
@@ -159,7 +197,8 @@ class RetentionResult:
             f"reclaimable_mb={self.bytes_reclaimable / 1024 / 1024:.1f} "
             f"freed_mb={self.bytes_deleted / 1024 / 1024:.1f} "
             f"failures={self.failures} tiers={self.by_tier} "
-            f"unsettled_kept={self.unsettled_kept} unknown_settlement={self.unknown_settlement}"
+            f"unsettled_kept={self.unsettled_kept} unknown_settlement={self.unknown_settlement} "
+            f"hit_pass_limit={self.hit_pass_limit}"
         )
 
 
@@ -279,6 +318,32 @@ def sweep_expired_artifacts(*, today: date | None = None, root: Path | None = No
     # periodic work on these boxes costs -- it put production into a restart
     # loop. A generator keeps this O(1) in paths held at once, so the sweep's
     # cost is I/O and page cache rather than a resident list.
+    #
+    # AND BOUNDED, which streaming alone did not fix. Measured 2026-08-12: this
+    # walk took 18 MINUTES over 65,025 files on refresh-worker and blocked that
+    # worker's main poll loop for the whole of it -- no tick between 22:29:48
+    # and 22:48:23. Streaming solved the memory shape and left the wall-clock
+    # shape untouched.
+    #
+    # The module's own docstring already warned this must not be wired into a
+    # worker loop. It was wired anyway, because a docstring is read by whoever
+    # EDITS the file and not by whoever CALLS it. So the bound lives here, in
+    # the code, where it applies to every caller including the careless one.
+    #
+    # A cap plus a resume cursor makes the worst case a SLOW sweep rather than a
+    # BLOCKED loop: each pass walks at most `max_files`, and the next pass picks
+    # up after the last path examined. Full coverage still happens, just across
+    # several days instead of one stall.
+    #
+    # THE DISTINCTION THAT FAILED, and it is worth naming: this job was called
+    # safe because it is dry-run by default. Dry run describes what it does not
+    # DELETE. It says nothing about what it COSTS. A read-only walk of 65,025
+    # files is exactly as expensive as a destructive one, and "cannot do damage"
+    # is not "cannot do harm".
+    max_files = _env_int("SYNDICATE_RETENTION_MAX_FILES_PER_PASS", _MAX_FILES_PER_PASS)
+    resume_after = _read_resume_cursor(root)
+    examined = 0
+    last_path = ""
     try:
         candidates = root.rglob("*")
     except OSError:
@@ -286,14 +351,25 @@ def sweep_expired_artifacts(*, today: date | None = None, root: Path | None = No
 
     for path in candidates:
         try:
+            relative = str(path.relative_to(root)).replace(os.sep, "/")
+        except ValueError:
+            continue
+        # Resume where the last pass stopped. Lexicographic on the relative
+        # path -- rglob does not promise an order, so this is a SKIP FILTER, not
+        # a seek, and a pass may re-examine some files. That is the cheap
+        # direction: re-examining costs a stat, missing one costs coverage.
+        if resume_after and relative <= resume_after:
+            continue
+        if examined >= max_files:
+            result.hit_pass_limit = True
+            break
+        examined += 1
+        last_path = relative
+        result.scanned += 1
+        try:
             if not path.is_file():
                 continue
         except OSError:
-            continue
-        result.scanned += 1
-        try:
-            relative = str(path.relative_to(root))
-        except ValueError:
             continue
 
         # Settlement is checked FIRST: `settlement_inputs/*` must never fall
@@ -359,6 +435,9 @@ def sweep_expired_artifacts(*, today: date | None = None, root: Path | None = No
         except OSError:
             result.failures += 1
 
+    # A completed pass clears the cursor so the next one starts from the top;
+    # a truncated pass records where to resume.
+    _write_resume_cursor(root, last_path if result.hit_pass_limit else "")
     return result
 
 

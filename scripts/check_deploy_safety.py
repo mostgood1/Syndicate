@@ -135,17 +135,24 @@ def _newest_timestamp(rows: list[dict[str, Any]]) -> str:
 def _expected_build_seconds(key: str) -> float | None:
     """SLOWEST recent COLLECT_SPAN_EXIT elapsed_s, or None when unreadable.
 
-    MAX, NOT MEDIAN, and the choice is the whole point. `collect_candidates`
-    measured 804s at 19:49 and 1372s at 21:43 on the same worker -- it grows
-    through the day as the slate fills. A median over the last dozen runs
-    returned 13.4min while the most recent real build took 22.9min, and this
-    number's only job is to tell someone how long to wait. Under-predicting it
-    is how a deploy lands mid-build, which is the exact failure this guard was
-    added for.
+    MAX, NOT MEDIAN -- BECAUSE THE COST IS ASYMMETRIC, NOT BECAUSE THE SERIES
+    GROWS. The first version of this comment said `collect_candidates` "grows
+    through the day as the slate fills", from two measurements: 804s at 19:49
+    and 1372s at 21:43. A third landed at 1080.81s at 22:52, which falsifies it
+    -- the series VARIES with slate size, it does not trend.
 
-    So: err long. The cost of over-waiting is a few idle minutes; the cost of
-    under-waiting is ~23 minutes of destroyed board work and a stale board for
-    everyone verifying anything.
+    The decision does not change and the reasoning had to. Max is right because
+    the two errors cost wildly different amounts: over-waiting costs idle
+    minutes, under-waiting costs ~23 minutes of destroyed board work plus a
+    stale board for everyone verifying anything against it. A median over the
+    last dozen runs returned 13.4min against a real build of 22.9min, which is
+    exactly how the next person deploys into one.
+
+    Worth keeping the correction visible rather than quietly editing the number:
+    a right decision resting on a wrong stated reason is the more dangerous of
+    the two, because the next person to touch this will reason from the premise,
+    not the outcome -- and "it grows" invites someone to replace max with a trend
+    extrapolation, which on a varying series is worse than either.
     """
     import re
 
