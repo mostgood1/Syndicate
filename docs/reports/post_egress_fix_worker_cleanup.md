@@ -505,10 +505,44 @@ should be checked for the same treatment. That is the asymmetry worth a PR.
 ## Task 5 — The 11.6 MB artifact
 
 It is **`mlb_source/source_artifacts/data/daily/ladders/daily_ladders_<date>.json`**.
-Today's is 11.17 MB; yesterday's 11.76 MB. (Files >12 MB are refused by
-`_PUBLISH_MAX_BYTES` at [:956](syndicate/features/shared/artifact_publisher.py:956),
-so this family sits right against the ceiling — `SWEEP_SKIPPED {'too_large': N}`
-appears continuously in production logs.)
+Today's is 11.17 MB; yesterday's 11.76 MB.
+
+> **CORRECTION, 2026-08-12 22:0x — the "12 MB ceiling blocks publication" claim
+> in this report is WRONG, and it was the load-bearing argument for
+> publish-path compression.**
+>
+> I wrote that files over `_PUBLISH_MAX_BYTES` are refused, and elsewhere that
+> `book_grid` at 12.14 MB was "already being silently refused" — a present
+> outage. The market-board session challenged it and re-measured; I then
+> confirmed against the code and production logs myself:
+>
+> - `_publish_skip_reason` (`:977`) has **exactly one caller**: `:1012`, inside
+>   `sweep_changed_hot_artifacts`. `publish_hot_artifact` never consults it.
+> - So the ceiling bounds what the SWEEP ships. Any direct
+>   `publish_hot_artifact` caller streams anything over
+>   `_PUBLISH_STREAM_MIN_BYTES` and is not subject to it.
+> - `book_grid` publishes fine. Production, refresh-worker: `PUBLISH_OK
+>   path=mlb_source/data/book_grid/book_grid_2026-08-12.json` at 21:51:04,
+>   21:53:32, 21:55:28, `transport=stream`, 12,855,903 bytes — over the
+>   12,582,912 ceiling, succeeding.
+>
+> **How I got it wrong:** `SWEEP_SKIPPED {'too_large': 2}` logs a COUNT and
+> never the filenames. I saw the counter, saw that `book_grid` exceeded the
+> constant, and joined them. The count could have been the 51 MB `odds_history`
+> shards the ceiling exists for — which is the likeliest reading, and which
+> would be the ceiling working as designed. Same shape as the other four
+> failures catalogued in `todo.md`'s operational notes: a mechanism read
+> through an instrument that cannot identify what it is reporting on.
+>
+> **Consequence for the recommendation below:** publish egress is internal and
+> unbilled, the CPU/latency half of the case was asserted and never measured,
+> and the ceiling turns out not to block this artifact. **Publish-path
+> compression currently has no load-bearing justification.** The size
+> reductions in the table are still correct and still reproduce
+> (independently: 16.5x on `book_grid`, 23.2x WNBA, 19.5x NFL) — what does not
+> follow is that anything is broken today. The open question is now what those
+> 2–3 per-sweep skips actually are, which needs `SWEEP_SKIPPED` to name files
+> rather than count them.
 
 Built from the live production copy of `daily_ladders_2026_08_12.json`.
 
@@ -597,9 +631,14 @@ together they take the artifact from 11.17 MB on disk and on the wire to 6.36 MB
 on disk and **0.52 MB on the wire**. I would do those two as one PR and treat the
 schema changes as separate work behind a frontend check.
 
-**Note:** compact JSON also moves this family from ~11.7 MB to ~6.4 MB, i.e. from
-"right against the 12 MB `_PUBLISH_MAX_BYTES` ceiling" to comfortably under it —
-which incidentally fixes the `too_large` skips currently appearing in the logs.
+**Note, amended:** compact JSON moves this family from ~11.7 MB to ~6.4 MB,
+which does put it further under `_PUBLISH_MAX_BYTES`. I originally added that
+this "fixes the `too_large` skips currently appearing in the logs" — **withdrawn,
+see the correction at the top of this task.** The skips are a count with no
+filenames attached, nothing establishes that this family is among them, and the
+ceiling only ever bounded the sweep in the first place. Getting further from a
+threshold is not the same as fixing an observed failure, and I presented it as
+the latter.
 
 ---
 
