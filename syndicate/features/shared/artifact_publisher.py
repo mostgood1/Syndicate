@@ -469,6 +469,12 @@ def is_hot_artifact_relative_path(relative_path: str) -> bool:
     return any(fnmatch.fnmatch(normalized, pattern) for pattern in HOT_ARTIFACT_PATTERNS)
 
 
+# `#394`. relative_path -> sha256 of the content last successfully published
+# from THIS process. Bounded by the artifact set, which is bounded by the
+# allowlist, so it does not grow without limit.
+_LAST_PUBLISHED_CHECKSUM: dict[str, str] = {}
+
+
 def _publish_url() -> str:
     base = _env("SYNDICATE_WEB_PUBLISH_URL")
     if not base:
@@ -709,6 +715,33 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         return False
 
     checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    # `#394` -- DO NOT RE-UPLOAD AN ARTIFACT WHOSE CONTENT HAS NOT CHANGED.
+    #
+    # The checksum above was already computed and already SENT, and nothing ever
+    # compared it to anything. So every hot artifact was re-uploaded in full on
+    # every sweep whether or not a byte had moved.
+    #
+    # Measured 2026-08-12 before this: refresh-worker and live-odds-worker each
+    # published ~30-60 files/minute continuously, all day, in every window
+    # sampled from 09:00Z onward (`hasMore=True` on all of them, so those are
+    # floors). Outbound bandwidth 1.62 TB for the month and climbing ~7.8 GB/hr.
+    # Both workers were suspended to stop it.
+    #
+    # IN-PROCESS ON PURPOSE. A restart clears this and the next sweep republishes
+    # everything once, which is the correct failure direction: the risk of a
+    # persisted cache is claiming something is published when the remote lost it,
+    # and re-uploading a whole slate once per boot is cheap next to doing it every
+    # minute forever. It is a de-duplicator, not a publish ledger.
+    previous = _LAST_PUBLISHED_CHECKSUM.get(relative_path)
+    if previous == checksum:
+        print(
+            f"[artifact_publisher] PUBLISH_SKIPPED_UNCHANGED path={relative_path} "
+            f"checksum={checksum[:12]}",
+            flush=True,
+        )
+        return True
+
     body = json.dumps(
         {"relative_path": relative_path, "content": content, "checksum": checksum}
     ).encode("utf-8")
@@ -725,6 +758,9 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
     try:
         with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
             response.read()
+        # Recorded only after the upload is acknowledged -- a failed publish must
+        # be retried next sweep, not suppressed by its own attempt.
+        _LAST_PUBLISHED_CHECKSUM[relative_path] = checksum
         print(f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url}", flush=True)
         return True
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
