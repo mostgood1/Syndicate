@@ -145,7 +145,7 @@ class PreseasonScheduleRowsTests(unittest.TestCase):
                 {"game_id": "g1", "week": "1", "home_team": "ARI", "away_team": "CAR"},
                 {"game_id": "g2", "week": "2", "home_team": "CIN", "away_team": "DET"},
             ])
-            with patch.object(gen, "DATA_ROOT", Path(tmp)):
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)):
                 rows = gen.preseason_schedule_rows(2026, 1)
 
         self.assertEqual(rows, [{"game_id": "g1", "home_team": "ARI", "away_team": "CAR"}])
@@ -156,7 +156,7 @@ class PreseasonScheduleRowsTests(unittest.TestCase):
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(gen, "DATA_ROOT", Path(tmp)):
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)):
                 rows = gen.preseason_schedule_rows(2026, 1)
 
         self.assertEqual(rows, [])
@@ -185,7 +185,7 @@ class MainTests(unittest.TestCase):
             # patch both so the real production pbp_2025.csv is never
             # touched by this test (hermetic, same discipline as
             # test_generate_smartsim2_nfl_projections.py's own tests).
-            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(regular_gen, "DATA_ROOT", Path(tmp)), patch.object(
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)), patch.object(regular_gen, "DATA_ROOT", Path(tmp)), patch.object(
                 sys, "argv", ["generate_smartsim2_nfl_preseason_projections.py", "--season", "2026", "--week", "1", "--seeds", "2"],
             ):
                 gen.main()

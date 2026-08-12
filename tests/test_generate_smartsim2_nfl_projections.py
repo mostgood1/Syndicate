@@ -74,7 +74,7 @@ class WeekScheduleTests(unittest.TestCase):
                 writer.writerow({"season_type": "POST", "week": "22", "game_id": "2025_22_SEA_NE", "home_team": "NE", "away_team": "SEA"})
                 writer.writerow({"season_type": "PRE", "week": "22", "game_id": "2025_22_XX_YY", "home_team": "YY", "away_team": "XX"})
 
-            with patch.object(gen, "DATA_ROOT", Path(tmp)):
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)):
                 rows = gen.week_schedule(2025, 22, [])
 
         self.assertEqual(rows, [{"game_id": "2025_22_SEA_NE", "home_team": "NE", "away_team": "SEA"}])
@@ -104,7 +104,7 @@ class RealScheduleFallbackTests(unittest.TestCase):
                 {"game_id": "2026_01_NE_SEA", "week": "1", "home_team": "SEA", "away_team": "NE"},
                 {"game_id": "2026_02_X_Y", "week": "2", "home_team": "Y", "away_team": "X"},
             ])
-            with patch.object(gen, "DATA_ROOT", Path(tmp)):
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)):
                 rows = gen.week_schedule_from_real_schedule(2026, 1)
 
         self.assertEqual(rows, [{"game_id": "2026_01_NE_SEA", "home_team": "SEA", "away_team": "NE"}])
@@ -115,7 +115,7 @@ class RealScheduleFallbackTests(unittest.TestCase):
         from unittest.mock import patch
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(gen, "DATA_ROOT", Path(tmp)):
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)):
                 rows = gen.week_schedule_from_real_schedule(2026, 1)
 
         self.assertEqual(rows, [])
@@ -131,7 +131,7 @@ class RealScheduleFallbackTests(unittest.TestCase):
             self._write_real_schedule(tmp, 2026, [
                 {"game_id": "2026_01_NE_SEA", "week": "1", "home_team": "SEA", "away_team": "NE"},
             ])
-            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(
+            with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)), patch.object(
                 sys, "argv", ["generate_smartsim2_nfl_projections.py", "--season", "2026", "--week", "1", "--seeds", "2"],
             ):
                 gen.main()

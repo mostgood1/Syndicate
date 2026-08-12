@@ -2348,14 +2348,22 @@ def _season_projection_target_week(sport: str, season: int) -> int | None:
 
 
 def _season_projection_artifact_path(sport: str, season: int, week: int) -> Path:
-    # NFL and NCAAF's projection artifacts live at different depths under
-    # their respective source roots (confirmed: data/nfl_source/
-    # smartsim2_projections_*.csv vs data/ncaaf_source/data/
-    # smartsim2_projections_*.csv) -- not a typo, each sport's own
-    # generation script already writes to its own established location.
-    data_root = _refresh_state_store()["data_root"]()
+    # `#389` follow-up: NFL resolves through nfl_artifact_output_root(), the SAME
+    # function the generator writes with, so the guard and the writer cannot
+    # diverge again. They did: measured 2026-08-12, the generator wrote to
+    # /opt/render/project/src/data/nfl_source (the ephemeral repo checkout)
+    # while this guard read /opt/render/project/data/nfl_source (the mounted
+    # disk), so the artifact existed and was invisible here, and every deploy
+    # discarded it.
+    #
+    # NCAAF still resolves locally -- its generator has not been audited and
+    # guessing a second sport's layout from one sport's bug would be inventing
+    # a fact. Left explicit rather than silently generalised.
     if sport == "nfl":
-        return data_root / "nfl_source" / f"smartsim2_projections_{season}_wk{week}.csv"
+        from syndicate.features.nfl.sources import nfl_artifact_output_root
+        
+        return nfl_artifact_output_root() / f"smartsim2_projections_{season}_wk{week}.csv"
+    data_root = _refresh_state_store()["data_root"]()
     return data_root / "ncaaf_source" / "data" / f"smartsim2_projections_{season}_wk{week}.csv"
 
 
@@ -2684,8 +2692,11 @@ def _preseason_projection_target_week(season: int) -> int | None:
 
 
 def _preseason_projection_artifact_path(season: int, week: int) -> Path:
-    data_root = _refresh_state_store()["data_root"]()
-    return data_root / "nfl_source" / f"smartsim2_preseason_projections_{season}_wk{week}.csv"
+    # `#389` follow-up: same shared resolver as the generator. See
+    # _season_projection_artifact_path above.
+    from syndicate.features.nfl.sources import nfl_artifact_output_root
+    
+    return nfl_artifact_output_root() / f"smartsim2_preseason_projections_{season}_wk{week}.csv"
 
 
 def _preseason_projection_script_args(season: int, week: int) -> list[str]:

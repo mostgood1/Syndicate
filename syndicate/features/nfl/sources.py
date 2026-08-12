@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from pathlib import Path
 import re
 from typing import Any
@@ -39,6 +40,48 @@ def _first_existing_root(roots: list[Path]) -> Path:
 
 def default_nfl_source_root() -> Path:
     return _first_existing_root(_source_roots())
+
+
+def nfl_artifact_output_root() -> Path:
+    """Where generated NFL artifacts must be WRITTEN. `#389` follow-up.
+
+    MEASURED IN PRODUCTION 2026-08-12. The SmartSim2 generators wrote to
+
+        /opt/render/project/src/data/nfl_source/smartsim2_projections_2026_wk1.csv
+
+    while `run_refresh_worker`'s staleness guard looked at
+
+        /opt/render/project/data/nfl_source/smartsim2_projections_2026_wk1.csv
+
+    `src/data` is the REPO CHECKOUT -- ephemeral, replaced on every deploy.
+    `data` is the mounted disk. So every run wrote a real artifact to a
+    location nothing reads and every deploy discarded it, the guard never saw
+    a fresh file, and the sport stayed permanently stale (~90 relaunches/day
+    before `#389` added the backoff).
+
+    **WHY THE WRITER PICKED THE WRONG ONE.** `default_nfl_source_root()` calls
+    `_first_existing_root`, which probes each candidate for
+    `upcoming_recs_*.csv` and returns the first that HAS it. The repo mirror
+    ships that file; the mounted disk does not. So an unrelated artifact's
+    presence decided where projections were written.
+
+    That probe is right for READS -- find the root that actually holds the
+    thing you want -- and wrong for WRITES, where the answer must be "the
+    configured root", not "wherever something else happens to live".
+    `source_roots.preferred_artifact_roots` already says this in its own
+    comment: *"does this directory contain anything" is not "does it contain
+    the file you asked for"*. This is the write-side corollary.
+
+    Deliberately no filesystem probing: env var, else the shared data root.
+    `run_refresh_worker._season_projection_artifact_path` calls this same
+    function, so the writer and the guard cannot diverge again.
+    """
+    env_value = str(os.environ.get("SYNDICATE_NFL_SOURCE_ROOT") or "").strip()
+    if env_value:
+        return Path(env_value).expanduser().resolve()
+    from syndicate.features.shared.refresh_state_store import data_root
+
+    return data_root() / "nfl_source"
 
 
 def data_path(*parts: str) -> Path:

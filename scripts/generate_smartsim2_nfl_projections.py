@@ -47,6 +47,7 @@ from syndicate.features.nfl.injury_adjustment import adjust_team_rating_for_inju
 from syndicate.features.nfl.smartsim2_projection import SmartSimNflProjection
 from syndicate.features.nfl.smartsim2_projection import write_projection_artifact
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_artifact_output_root
 
 DATA_ROOT = default_nfl_source_root()
 SEEDS_PER_GAME = 300
@@ -327,7 +328,16 @@ def main() -> None:
         all_injury_diagnostics.extend(injury_diagnostics)
         log(f"PROJECTED {row['away_team']} @ {row['home_team']} -> {projection.home_score_mean:.1f}-{projection.away_score_mean:.1f}")
 
-    path = write_projection_artifact(projections, season=args.season, week=args.week, data_root=DATA_ROOT)
+    # `#389` follow-up: READS stay on DATA_ROOT (the probed root -- find the
+    # root that actually holds the input). The WRITE goes to the configured
+    # root. Measured 2026-08-12: this script wrote to
+    # /opt/render/project/src/data (the ephemeral repo checkout) while the
+    # staleness guard read /opt/render/project/data (the mounted disk), so
+    # every artifact was invisible and discarded on the next deploy.
+    # Resolved HERE, not at import, so the value follows the environment
+    # rather than freezing whatever it was when the module loaded.
+    output_root = nfl_artifact_output_root()
+    path = write_projection_artifact(projections, season=args.season, week=args.week, data_root=output_root)
     injury_notes_path = DATA_ROOT / f"smartsim2_projections_{args.season}_wk{args.week}_injury_notes.json"
     if all_injury_diagnostics:
         injury_notes_path.write_text(json.dumps(all_injury_diagnostics, indent=2), encoding="utf-8")

@@ -59,6 +59,7 @@ from syndicate.features.nfl.preseason_depth import PRESEASON_WEEK_LABELS
 from syndicate.features.nfl.preseason_projection import SmartSimNflPreseasonProjection
 from syndicate.features.nfl.preseason_projection import write_preseason_projection_artifact
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_artifact_output_root
 
 DATA_ROOT = default_nfl_source_root()
 PROFILE_NAME = "nfl_preseason_v1"
@@ -243,7 +244,16 @@ def main() -> None:
         projections.append(projection)
         log(f"PROJECTED {row['away_team']} @ {row['home_team']} -> {projection.home_score_mean:.1f}-{projection.away_score_mean:.1f} (shrinkage={projection.shrinkage_applied:.2f})")
 
-    path = write_preseason_projection_artifact(projections, season=args.season, week=args.week, data_root=DATA_ROOT)
+    # `#389` follow-up: READS stay on DATA_ROOT (the probed root -- find the
+    # root that actually holds the input). The WRITE goes to the configured
+    # root. Measured 2026-08-12: this script wrote to
+    # /opt/render/project/src/data (the ephemeral repo checkout) while the
+    # staleness guard read /opt/render/project/data (the mounted disk), so
+    # every artifact was invisible and discarded on the next deploy.
+    # Resolved HERE, not at import, so the value follows the environment
+    # rather than freezing whatever it was when the module loaded.
+    output_root = nfl_artifact_output_root()
+    path = write_preseason_projection_artifact(projections, season=args.season, week=args.week, data_root=output_root)
     elapsed = time.time() - start
 
     log(f"WRITE_DONE path={path} projections={len(projections)} elapsed={elapsed:.1f}s")
