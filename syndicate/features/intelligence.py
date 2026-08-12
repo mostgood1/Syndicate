@@ -7328,6 +7328,18 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
         sport_start_count = len(candidates)
         sport_slug = _safe_text(sport.get("slug"), "").lower()
         sport_health = _safe_text(sport.get("data_health"), "").lower()
+        # `#376`, layer four. The two CANDIDATE_STAGE lines that DO arrive
+        # (`pregame_prop_candidate_creation`, `live_prop_candidate_creation`)
+        # are per-sport, and exactly one pair appeared -- so the build hangs
+        # partway through the FIRST sport of this loop. Nothing said WHICH
+        # sport, because the existing per-sport summary is emitted at the END
+        # of an iteration that never completes.
+        #
+        # Placed after `sport_health` is assigned, not beside `sport_slug`: the
+        # first draft of this line read `sport_health` two statements early and
+        # would have raised NameError on every cycle -- turning a hang into a
+        # crash, in the diagnostic added to explain the hang.
+        print(f"[intelligence] SPORT_LOOP_ENTER sport={sport_slug or '?'} health={sport_health or '?'}", flush=True)
         dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
         home_rails = sport.get("home_rails") if isinstance(sport.get("home_rails"), dict) else {}
         # #229 step 4: same inversion as above, on the path that actually builds
@@ -7388,6 +7400,14 @@ def _collect_candidates(overview: list[dict[str, Any]], preferences: dict[str, A
             # The candidates already carry everything the join needs
             # (`player_name`, `market_key`, `line`, `odds`, `sport_slug`), so
             # this is the same call home.py makes, on the list that was missed.
+            # `#376`: the last line before the hang was `live_prop_candidate_creation`,
+            # so execution reaches here and stops somewhere below. This marker
+            # splits "still in prop creation" from "past it".
+            print(
+                f"[intelligence] SPORT_PROPS_DONE sport={sport_slug or '?'} "
+                f"pregame={len(pregame_candidates)} live={len(live_candidates)}",
+                flush=True,
+            )
             sport_prop_candidates = pregame_candidates + live_candidates
             if sport_prop_candidates:
                 try:
