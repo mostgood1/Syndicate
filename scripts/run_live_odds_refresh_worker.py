@@ -382,6 +382,19 @@ def main() -> int:
         while not _LIVE_REFRESH_LOOP_STOP.is_set():
             _log_worker_memory("loop_tick_begin", interval_seconds=interval_seconds)
             meta = _run_tick()
+            # Disk maintenance: compaction + retention, once per day, AFTER the
+            # tick rather than during it. Its own interval gate and its own
+            # enable flag make this a no-op on every call but one per day, and a
+            # no-op entirely until SYNDICATE_DISK_MAINTENANCE_ENABLED is set --
+            # so calling it unconditionally here is cheap, the same relationship
+            # as the soccer pregame autorun above. See `#241` for why periodic
+            # work on this worker is never free.
+            try:
+                from syndicate.features.shared.disk_maintenance import run_disk_maintenance
+
+                run_disk_maintenance()
+            except Exception as exc:
+                print(f"[live_odds_worker] DISK_MAINTENANCE_ERROR {type(exc).__name__}: {exc}", flush=True)
             # Use the adaptive interval (900s idle/pregame, 60s once a game is
             # actually live -- see _live_refresh_loop_interval_for_meta) rather
             # than the fixed base interval. Sleeping a fixed 60s regardless of

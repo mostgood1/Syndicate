@@ -271,12 +271,25 @@ def sweep_expired_artifacts(*, today: date | None = None, root: Path | None = No
     settlement_cache: dict[date, bool | None] = {}
     result = RetentionResult(dry_run=not enabled)
 
+    # STREAMED, not materialised. This was
+    #     candidates = [p for p in root.rglob("*") if p.is_file()]
+    # which builds a list of every Path on the disk before doing any work. Fine
+    # on the 38k-file git mirror it was written against; the production worker
+    # disks are 19.2 GB and 14.4 GB, and `#241` is the precedent for what
+    # periodic work on these boxes costs -- it put production into a restart
+    # loop. A generator keeps this O(1) in paths held at once, so the sweep's
+    # cost is I/O and page cache rather than a resident list.
     try:
-        candidates = [p for p in root.rglob("*") if p.is_file()]
+        candidates = root.rglob("*")
     except OSError:
         return result
 
     for path in candidates:
+        try:
+            if not path.is_file():
+                continue
+        except OSError:
+            continue
         result.scanned += 1
         try:
             relative = str(path.relative_to(root))

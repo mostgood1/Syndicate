@@ -1,0 +1,142 @@
+"""The runner that makes `#396`/`#398`/`#399` actually execute.
+
+Until this existed, nothing called either job, so
+`SYNDICATE_ARTIFACT_RETENTION_ENABLED=true` was read by code that never ran --
+an enable flag with no effect, which reads as success.
+
+THE TESTS THAT MATTER ARE THE GATES. `#241` put production into a restart loop
+by adding periodic work to these workers, and retention deletes files on the
+service that is the source of truth. Every default here is off.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from syndicate.features.shared import disk_maintenance as dm
+
+
+@pytest.fixture(autouse=True)
+def _clean(tmp_path, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DATA_ROOT", str(tmp_path))
+    monkeypatch.setenv("SYNDICATE_REPORTS_ROOT", str(tmp_path / "reports"))
+    for key in (
+        "SYNDICATE_DISK_MAINTENANCE_ENABLED",
+        "SYNDICATE_BOOK_QUOTES_COMPACTION_ENABLED",
+        "SYNDICATE_ARTIFACT_RETENTION_ENABLED",
+        "SYNDICATE_DISK_MAINTENANCE_INTERVAL_SECONDS",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    return tmp_path
+
+
+def test_it_does_nothing_at_all_by_default(_clean):
+    """The switch that gates every other switch."""
+    out = dm.run_disk_maintenance()
+    assert out["ran"] is False
+    assert out["reason"] == "disabled"
+
+
+def test_enabling_the_runner_alone_deletes_nothing(_clean, monkeypatch):
+    """The rung to start on: produces production numbers, touches nothing.
+
+    Every figure in the reports so far came from web's allowlisted subset or the
+    git mirror. Neither is a worker disk.
+    """
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    old = _clean / "mlb_source" / "data" / "book_grid" / "book_grid_2020-01-01.json"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text("x" * 2048, encoding="utf-8")
+
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["ran"] is True
+    assert out["retention"]["dry_run"] is True
+    assert out["retention"]["deleted"] == 0
+    assert out["retention"]["reclaimable_mb"] >= 0
+    assert out["compaction_applied"] is False
+    assert old.exists(), "dry run deleted a file"
+
+
+def test_retention_deletes_only_when_its_own_flag_is_set(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    old = _clean / "mlb_source" / "data" / "book_grid" / "book_grid_2020-01-01.json"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text("x" * 2048, encoding="utf-8")
+
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["retention"]["dry_run"] is False
+    assert out["retention"]["deleted"] >= 1
+    assert not old.exists()
+
+
+def test_the_two_apply_switches_are_independent(_clean, monkeypatch):
+    """Retention deleting must not imply compaction acting, or vice versa."""
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    shard = _clean / "mlb_source" / "tracking" / "book_quotes" / "2020-01-01.jsonl"
+    shard.parent.mkdir(parents=True, exist_ok=True)
+    shard.write_text('{"a":1}\n' * 50, encoding="utf-8")
+
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["compaction_applied"] is False
+    assert not shard.with_name(shard.name + ".gz").exists(), "compaction acted without its flag"
+
+
+def test_it_runs_once_per_day_not_once_per_tick(_clean, monkeypatch):
+    """`#241`: periodic work on these workers is never free."""
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    first = dm.run_disk_maintenance(sports=("mlb",))
+    assert first["ran"] is True
+    second = dm.run_disk_maintenance(sports=("mlb",))
+    assert second["ran"] is False
+    assert second["reason"] == "not_due"
+
+
+def test_a_zero_interval_does_not_mean_every_tick(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_INTERVAL_SECONDS", "0")
+    assert dm._interval_seconds() == dm._INTERVAL_DEFAULT_SECONDS
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_INTERVAL_SECONDS", "banana")
+    assert dm._interval_seconds() == dm._INTERVAL_DEFAULT_SECONDS
+
+
+def test_it_declines_to_run_under_memory_pressure(_clean, monkeypatch):
+    """A tidy-up job that OOMs the worker it is tidying for is worse than the
+    disk it was managing. refresh-worker peaks at 3.29 GB of 4 GiB."""
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setattr(dm, "_memory_pressure_blocks", lambda: (True, {"rss_bytes": 9, "limit_bytes": 10}))
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["ran"] is False
+    assert out["reason"] == "memory_pressure"
+
+
+def test_unmeasurable_memory_does_not_block(_clean, monkeypatch):
+    """An unmeasurable guard that refuses would disable maintenance forever, and
+    the job it guards deletes nothing by default. Unknown must not be the
+    permissive branch for DELETION -- it is not; it is only permissive for
+    whether the sweep RUNS."""
+    monkeypatch.setattr(dm, "_container_limit_bytes", lambda: 0)
+    blocked, facts = dm._memory_pressure_blocks()
+    assert blocked is False
+
+
+def test_a_failing_job_never_takes_the_worker_down(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+
+    def _boom():
+        raise RuntimeError("retention exploded")
+
+    import syndicate.features.shared.artifact_retention as ar
+
+    monkeypatch.setattr(ar, "run_retention_sweep", _boom)
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["ran"] is True
+    assert "error" in str(out["retention"])
+
+
+def test_the_daily_stamp_is_written_only_after_a_completed_pass(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    assert dm._due() is True
+    dm.run_disk_maintenance(sports=("mlb",))
+    assert dm._due() is False
