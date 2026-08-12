@@ -1565,6 +1565,10 @@ def _layer2_fallback_recommendations(requested_dates: Sequence[str]) -> list[dic
         restated = _refresh_layer2_live_state(cards, requested_dates)
         if restated:
             print(f"[intelligence_state] LAYER2_LIVE_RESTATED cards={restated} of {len(cards)}", flush=True)
+        # `#392`: inside the same guard, because pruning depends on the `actual`
+        # the restate just derived -- if the restate failed there is nothing to
+        # decide against and the board must stay stale rather than lose rows.
+        _prune_decided_layer2_cards(cards)
     except Exception as exc:  # noqa: BLE001
         print(f"[intelligence_state] LAYER2_LIVE_RESTATE_FAILED {type(exc).__name__}: {exc}", flush=True)
     return cards
@@ -1645,6 +1649,25 @@ def _refresh_layer2_live_state(cards: list[dict[str, Any]], requested_dates: Seq
     return restated
 
 
+def _prune_decided_layer2_cards(cards: list[dict[str, Any]]) -> int:
+    """Drop rows `#392` marked as already settled. Returns how many went.
+
+    Separate from the marking so the count is reportable: a board that shrinks
+    must say which rule shrank it, the same reason `#373` exposed
+    `rows_implausible_book` rather than trimming quietly.
+    """
+    decided = [card for card in cards if card.get("decided")]
+    if not decided:
+        return 0
+    cards[:] = [card for card in cards if not card.get("decided")]
+    print(
+        f"[intelligence_state] LAYER2_DECIDED_PRUNED count={len(decided)} "
+        f"example={(decided[0].get('decided_reason') or '')[:80]}",
+        flush=True,
+    )
+    return len(decided)
+
+
 def _attach_layer2_live_actual(card: dict[str, Any], chip: Mapping[str, Any]) -> None:
     """The ACTUAL column, derived from the live score (`#367`).
 
@@ -1681,6 +1704,48 @@ def _attach_layer2_live_actual(card: dict[str, Any], chip: Mapping[str, Any]) ->
         card["actual"] = away + home
     elif market.startswith("spreads"):
         card["actual"] = home - away
+    _mark_layer2_decided(card)
+
+
+# `#392` -- A TOTAL WHOSE LINE IS ALREADY PASSED IS NOT AN OPPORTUNITY.
+#
+# Reported from a screenshot 2026-08-12: `BAL @ MIN`, bottom of the 5th, 9 runs
+# already scored, and the board was quoting
+#
+#     Over  14.5 totals  +120  EV +3.7%  ACTUAL 9   (needs 6 more in 4 innings)
+#     Under 10.5 totals  -120  EV +4.6%  ACTUAL 9   (needs at most 1 more)
+#
+# **THE NUMBER WAS ALREADY ON THE ROW.** `ACTUAL` rendered 9 in the served
+# payload; the join worked. Nothing compared it to `line`, so a bet that had
+# already settled kept a +EV badge and a board slot.
+#
+# Only `over` is decidable this way. `actual >= line` means the over has WON and
+# the under has LOST -- both are settled, so the market leaves the board. The
+# converse is NOT true: `actual < line` decides nothing, because the game can
+# still go either way, and treating it as "under is winning" would be exactly
+# the kind of confident-wrong signal this is removing.
+#
+# Deliberately marks rather than deletes: the ledger still needs the row for S6,
+# and a silently vanished row is indistinguishable from one that was never
+# priced. `_prune_decided_layer2_cards` does the removal at the display edge.
+def _mark_layer2_decided(card: dict[str, Any]) -> None:
+    actual = card.get("actual")
+    line = card.get("line")
+    if actual is None or line is None:
+        return
+    if not str(card.get("market") or "").strip().lower().startswith("totals"):
+        # Spreads settle on a margin that can still swing in either direction
+        # while the game is live, so `actual` vs `line` does not decide them.
+        return
+    try:
+        actual_value, line_value = float(actual), float(line)
+    except (TypeError, ValueError):
+        return
+    if actual_value >= line_value:
+        card["decided"] = True
+        card["decided_reason"] = (
+            f"total already reached: {actual_value:g} scored vs line {line_value:g}"
+        )
 
 
 def _backfill_layer2_board_columns(card: dict[str, Any]) -> None:
