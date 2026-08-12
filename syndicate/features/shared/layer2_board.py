@@ -209,31 +209,31 @@ SHORTLIST_STALE_KICKOFF_SECONDS = 2 * 3600
 # board. NFL and WNBA have no such pool. Board landed at 128 of 200 slots, which
 # is the falsification condition the 1h note itself named.
 #
-# 14h is set by WNBA's MAXIMUM, not its minimum, and that distinction is the
-# whole reason this value is not 12h. A ceiling admits a sport only if it clears
-# that sport's OLDEST quote; clearing the freshest one just means the sport is
-# partially deleted. WNBA spans 12.47h..13.00h, so:
+# **14h IS PINNED TO A BROKEN CAPTURE, NOT TO A PROPERTY OF WNBA.** Read this
+# before treating it as a considered value.
 #
-#     ceiling   MLB (11.46h)   WNBA (12.47-13.00h)   soccer tail (22.20h)
-#      6h         gone              gone                  gone
-#     12h         kept          STILL GONE (13.00 > 12)   gone
-#     14h         kept              kept                  gone
+# Measured directly 2026-08-12 16:10Z off the served shortlist, single fetch:
 #
-# 12h was the first value proposed here and it would have left WNBA at zero for
-# the second time in a day, from an off-by-one-hour comparison against the wrong
-# end of the range. The corroborating number was already in the 200-row
-# measurement: "<=12h keeps 142" = 100 MLB + ~42 soccer + ZERO WNBA.
+#     wnba   SEEN n=94  min=9.12  med=9.12  max=9.12   <- min == med == max
+#     wnba   BOOK n=94  min=9.12  med=9.63  max=9.66
+#     mlb    SEEN n=100 min=0.96  med=0.96  max=7.08
 #
-# 14h gives one hour of headroom over WNBA's oldest, and still bites -- it
-# excludes the 22.20h soccer tail and anything genuinely dead.
+# 94 WNBA rows do not independently reach the same age to two decimals. That is
+# ONE capture event, ~9.1h stale -- and 16:10Z minus 9.12h is ~07:00Z, which
+# matches a WNBA odds sidecar last written 07:18:51Z while MLB published off the
+# same launches. WNBA sweeps are selected, run, and write nothing; see the
+# `ODDS_SWEEP_OUTCOME` instrumentation on live-odds-worker.
 #
-# **THIS IS A BACKSTOP, NOT THE FIX FOR STALENESS.** The uniform-lag finding
-# above still stands unexplained -- 100 MLB quotes inside a 1.2-minute spread is
-# one capture event ~11.5h old, not 100 stable markets. `_freshness_factor`
-# discounts age multiplicatively in the score, which is the right shape while the
-# cause is unknown. Tighten this only after that question is answered, and if you
-# do, check per-sport survival BEFORE shipping -- the failure mode here was not a
-# wrong number, it was a whole-board average hiding two sports going to zero.
+# **When that capture is fixed, WNBA's quotes go to minutes and this ceiling is
+# ~14x looser than it needs to be.** Revisit it then rather than inheriting it.
+#
+# CORRECTION, recorded because it changed a decision: the value was first argued
+# from a wnba span of 12.47h..13.00h, which was read off the measurement block
+# ABOVE rather than measured -- those are older figures for a different capture.
+# The real span was 9.12h..9.66h, so 12h would have cleared WNBA too and the
+# extra 2h buys nothing. **A number in a comment is evidence about the day it was
+# taken, not about today.** 14h is kept only because it is measured-safe and
+# still cuts the 22.20h dead tail; it is not a tuned value.
 #
 # Deliberately a code constant rather than an env var: no
 # SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS is set on any service or in

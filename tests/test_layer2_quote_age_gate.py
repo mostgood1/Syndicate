@@ -93,10 +93,11 @@ def test_the_ceiling_fires_without_deleting_a_sport():
     assert _row_quote_age_seconds(_row(book=22572.0, seen=79920.0)) > SHORTLIST_MAX_QUOTE_AGE_SECONDS
     # And one observed a minute ago must survive, however long since it moved.
     assert _row_quote_age_seconds(_row(book=25200.0, seen=60.0)) < SHORTLIST_MAX_QUOTE_AGE_SECONDS
-    # #380: the ceiling must admit WNBA's OLDEST measured quote (13.00h), not
-    # merely its freshest (12.47h). A ceiling between the two -- 12h was proposed
-    # and would have done this -- leaves the sport at zero rows with no counter
-    # naming it. Both ends are asserted because checking only the fresh end is
-    # the exact mistake that produced the 12h proposal.
-    assert _row_quote_age_seconds(_row(book=25200.0, seen=44892.0)) < SHORTLIST_MAX_QUOTE_AGE_SECONDS
-    assert _row_quote_age_seconds(_row(book=25200.0, seen=46800.0)) < SHORTLIST_MAX_QUOTE_AGE_SECONDS
+    # #380: the ceiling must admit WNBA's OLDEST quote. MEASURED 16:10Z, not
+    # quoted from a comment: seen 9.12h flat across 94 rows, book max 9.66h.
+    # (An earlier 12.47h..13.00h span was read off a stale comment block and
+    # wrongly used to argue 14h over 12h -- both clear the real span.)
+    assert _row_quote_age_seconds(_row(book=34776.0, seen=32832.0)) < SHORTLIST_MAX_QUOTE_AGE_SECONDS
+    # The sport is stalled at one capture event, so the ceiling is a workaround
+    # for that, not a property of WNBA. If the capture is fixed and this test is
+    # still the reason the ceiling is 14h, the ceiling is stale -- not the test.
