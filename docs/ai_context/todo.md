@@ -42,8 +42,25 @@ an **upper bound** — the run died when the container did, and we only notice o
 the next tick, so the gap includes the restart. The test asserts a bound, not an
 equality, so the field's meaning is written down.
 
-**Not deployed.** Deploying kills in-flight sims, which is the very thing this
-measures; needs a deliberate window.
+**PUSHED (`93dfbd8d`) AND NOT DEPLOYED — so it is INERT.** refresh-worker is
+live on `c07b6441` (deployed 19:48:06Z, live 19:51:42Z, `trigger: api`), which
+does **not** contain `93dfbd8d`. Deploying kills in-flight sims, the very thing
+this measures, so it wants a deliberate window.
+
+**Do not assume someone else's deploy will carry it** — see the pinned-commit
+note in Operational notes. It goes live only when a deploy *names a commit that
+contains it*.
+
+**A production record in the exact shape of this fix's worst false positive
+appeared within the hour, and the guard handles it.** Run `20260812_193455`
+finished at 19:48:35Z — 187 seconds before the `c07b6441` restart — so the
+wrapper wrote its payload and the container was replaced before the launcher
+could overwrite it. The surviving record is pure camelCase with **no `state`
+key**: `{ok: true, returnCode: 0, publishedArtifacts: 123, finishedAt: ...}`.
+A `state != "running"` check reads that as unfinalized. `_sim_run_already_finalized`
+returns True on `finishedAt`, so the fix leaves it alone — but that is one real
+successful run that would otherwise have been stamped `killed_by_restart`,
+manufacturing evidence for the very thing this ticket measures.
 
 **MEASURED 2026-08-12 on production.** Of 41 MLB sim runs that still had a status
 record, **21 (51%) are stuck at `state: "running"`** — one of them 40.7h old.
@@ -28137,6 +28154,27 @@ recurring "read the field you already have" failure.
 **General form:** a signal is only evidence once you know what makes it read the
 other way. Before trusting `child_count: 0`, confirm a running sim makes it
 non-zero; before trusting `game_count`, confirm what emits it.
+
+### A deploy names ONE commit — a later push does not ride along (2026-08-12)
+
+`CLAUDE.md` records that `autoDeploy = no`, so pushing `.py` ships nothing. The
+corollary that is easy to get wrong, and that I got wrong: **every deploy here
+is someone naming a specific commit via the API** (`trigger: api`, with a pinned
+`commitId`). Confirmed on refresh-worker's deploy history — five consecutive
+deploys, each carrying a different named commit.
+
+So "I pushed a fix; it will go live with whoever deploys next" is **false**. A
+deploy of `c07b6441` carries `c07b6441` and nothing pushed after it. Your change
+goes live only when a deploy names a commit that *contains* it.
+
+**How to check, rather than assume:**
+
+    git merge-base --is-ancestor <your-sha> <deployed-sha> && echo live || echo INERT
+
+Get `<deployed-sha>` from `/v1/services/<id>/deploys` -> `deploy.commit.id`,
+filtering to `status: "live"`. This is the same "presence is not reachability"
+shape as the inert fixes already on this list: pushed, merged, and on `main` are
+three things, and none of them is *running*.
 
 ### Claiming a TODO id is a RACE, and another session can commit your uncommitted work (2026-08-12)
 
