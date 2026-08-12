@@ -293,6 +293,9 @@ def _measured_floor_for_pool(rows: Iterable[Mapping[str, Any]], *, multiple: flo
     """
     from syndicate.features.shared.opportunity_signals import hold_pct
 
+    # Materialised: the `#382` modelled-hold branch walks the pool a second
+    # time, and the annotation says Iterable -- a generator would arrive empty.
+    rows = list(rows)
     markets: dict[tuple[Any, ...], dict[str, Any]] = {}
     for row in rows:
         quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
@@ -309,6 +312,53 @@ def _measured_floor_for_pool(rows: Iterable[Mapping[str, Any]], *, multiple: flo
         value = hold_pct(list(sides.values()))
         if value is not None:
             holds.append(float(value))
+
+    if len(holds) < SHORTLIST_HOLD_MIN_MARKETS and multiple > 0:
+        # `#382` -- SECOND ESTIMATOR, for sports whose pool is one-sided BY
+        # CONSTRUCTION. The two-sided regrouping above needs both legs of a
+        # market inside the POOL; soccer is 3-way and the draw leg is gated, so
+        # the pool keeps ~1.1 sides per row and this measured exactly ZERO
+        # markets for soccer on 2026-08-12 (mlb 1,986, wnba 722, nfl 107).
+        # Soccer was then judged at the flat -2.0 while every other sport got a
+        # floor 4-6x looser, and seated 0 of 2,359 opportunities.
+        #
+        # `assumed_hold_pct` is a real measurement of the same quantity, taken
+        # where it IS measurable: `build_margin_profile` runs on the GRID, which
+        # still holds every leg, and stamps the book's median hold onto each
+        # one-sided row. So the rows this branch exists for are precisely the
+        # rows that carry it.
+        #
+        # NOT a fallback constant and not an average of other sports -- it is
+        # this sport's own hold, from this slate, via a different estimator.
+        # Labelled `modelled_hold` so a floor derived this way can never be
+        # mistaken for the two-sided one, per the same rule the margin model
+        # follows for fair value itself.
+        modelled = [
+            value
+            for row in rows
+            for side in (row.get("modelled_fair") or {}).values()
+            if isinstance(side, Mapping)
+            and (value := _as_float(side.get("assumed_hold_pct"))) is not None
+        ]
+        if len(modelled) >= SHORTLIST_HOLD_MIN_MARKETS:
+            modelled.sort()
+            mid = len(modelled) // 2
+            median_modelled = (
+                modelled[mid] if len(modelled) % 2 else (modelled[mid - 1] + modelled[mid]) / 2.0
+            )
+            derived_modelled = -abs(median_modelled) * float(multiple)
+            # Same clamp as the two-sided path: the floor may loosen from the
+            # flat default but never tighten past it.
+            floor_modelled = min(fallback, derived_modelled)
+            return floor_modelled, {
+                "method": "modelled_hold",
+                "markets_measured": len(holds),
+                "rows_modelled": len(modelled),
+                "median_hold_pct": round(median_modelled, 4),
+                "multiple": float(multiple),
+                "derived_floor": round(derived_modelled, 4),
+                "floor": round(floor_modelled, 4),
+            }
 
     if len(holds) < SHORTLIST_HOLD_MIN_MARKETS or multiple <= 0:
         return fallback, {

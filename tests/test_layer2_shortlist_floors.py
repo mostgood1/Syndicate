@@ -351,3 +351,62 @@ class PerSportMeasuredFloorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ModelledHoldFloorTests(unittest.TestCase):
+    """`#382` -- a sport whose pool is one-sided by construction got MLB's floor.
+
+    `_measured_floor_for_pool` regroups the pool into two-sided markets to
+    measure a sport's own hold. Soccer's markets are 3-way and the draw leg is
+    gated, so the pool keeps ~1.1 sides per row. Measured on production
+    2026-08-12 via `value_floor_by_sport`:
+
+        mlb    markets_measured 1986  median_hold 5.99%  floor -11.98
+        wnba   markets_measured  722  median_hold 5.26%  floor -10.53
+        nfl    markets_measured  107  median_hold 3.89%  floor  -7.78
+        soccer markets_measured    0                     floor  -2.00  <- flat
+
+    Zero, not "too few". Soccer was judged at a constant calibrated on 2-way
+    markets and seated 0 of 2,359 opportunities.
+    """
+
+    @staticmethod
+    def _one_sided(*, ev, hold=5.53, sport="soccer"):
+        row = _row(sport=sport, ev=ev)
+        row["modelled_fair"] = {"home": {"assumed_hold_pct": hold, "fair_method": "book_margin_model"}}
+        return row
+
+    def test_a_one_sided_sport_is_floored_on_its_own_modelled_hold(self) -> None:
+        # -6.0 is normal pricing for a market holding 5.53%, and the flat -2.0
+        # would reject it. 5.53 * 2.0 = -11.06, which keeps it.
+        rows = [self._one_sided(ev=-6.0) for _ in range(12)]
+        out = select_shortlist(rows, now=_NOW)
+        evidence = (out["value_floor_by_sport"] or {}).get("soccer") or {}
+        self.assertEqual(evidence.get("method"), "modelled_hold")
+        self.assertAlmostEqual(evidence.get("floor"), -11.06, places=2)
+        self.assertEqual(len(out["rows"]), 12, "soccer was deleted by an MLB-shaped floor")
+        self.assertEqual(out["rows_below_value_floor"], 0)
+
+    def test_the_modelled_floor_still_cuts_genuine_junk(self) -> None:
+        # Looser is not absent. A row far below what the measured hold explains
+        # must still go, or this becomes "no floor" wearing a measurement's name.
+        rows = [self._one_sided(ev=-6.0) for _ in range(12)] + [self._one_sided(ev=-40.0)]
+        out = select_shortlist(rows, now=_NOW)
+        self.assertEqual(out["rows_below_value_floor"], 1)
+
+    def test_it_never_tightens_past_the_flat_default(self) -> None:
+        # A tiny modelled hold must not produce a floor STRICTER than -2.0 and
+        # start rejecting ordinary rows -- same clamp as the two-sided path.
+        rows = [self._one_sided(ev=-1.5, hold=0.1) for _ in range(12)]
+        out = select_shortlist(rows, now=_NOW)
+        evidence = (out["value_floor_by_sport"] or {}).get("soccer") or {}
+        self.assertLessEqual(evidence.get("floor"), SHORTLIST_MIN_VALUE_PCT)
+        self.assertEqual(len(out["rows"]), 12)
+
+    def test_too_few_modelled_rows_still_falls_back_to_flat(self) -> None:
+        # The second estimator needs evidence too. Below the threshold it must
+        # not invent a floor from a handful of rows.
+        rows = [self._one_sided(ev=-6.0) for _ in range(3)]
+        out = select_shortlist(rows, now=_NOW)
+        evidence = (out["value_floor_by_sport"] or {}).get("soccer") or {}
+        self.assertEqual(evidence.get("method"), "flat_default")
