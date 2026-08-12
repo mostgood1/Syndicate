@@ -50,6 +50,7 @@ mistake this module exists to avoid.
 
 from __future__ import annotations
 
+import gzip
 import json
 import os
 from collections import OrderedDict
@@ -125,12 +126,94 @@ _KEY_FIELDS: tuple[str, ...] = (
 
 
 def book_quotes_path(sport: str, date_str: str) -> Path:
+    """The WRITE path for a shard. Always the plain `.jsonl`.
+
+    Deliberately not gzip-aware: `append_book_quotes` opens this in "a" mode and
+    an append to a gzip member would produce a file that decompresses to the
+    first member only. Compression happens to CLOSED shards (see
+    `compress_closed_shards`); today's shard is always plain text.
+    """
     slug = str(sport or "").strip().lower()
     return data_root() / f"{slug}_source" / "tracking" / "book_quotes" / f"{str(date_str).strip()}.jsonl"
 
 
+def resolve_book_quotes_path(sport: str, date_str: str) -> Path:
+    """The READ path: the plain shard if present, else its compressed form.
+
+    Plain wins when both exist, which is the state during a compaction that has
+    written the `.gz` but not yet removed the original. Reading the plain file
+    there is not just a tiebreak -- it is the only one of the two guaranteed
+    complete at that instant.
+    """
+    plain = book_quotes_path(sport, date_str)
+    if plain.is_file():
+        return plain
+    packed = plain.with_name(plain.name + ".gz")
+    if packed.is_file():
+        return packed
+    # Neither exists. Return the plain path so callers' `.is_file()` checks read
+    # False against the name they expect in logs.
+    return plain
+
+
 def _state_path(sport: str, date_str: str) -> Path:
     return book_quotes_path(sport, date_str).with_suffix(".state.json")
+
+
+def _open_book_quotes_text(path: Path):
+    """Text-mode handle for a shard, transparently decompressing `.gz`.
+
+    Streaming in both cases -- `gzip.open` inflates lazily, so a 5MB `.gz`
+    holding 207MB of text still costs one buffer at a time, which is what makes
+    `iter_book_quotes`' memory contract survive compression.
+    """
+    if path.suffix == ".gz":
+        return gzip.open(path, "rt", encoding="utf-8")
+    return path.open("r", encoding="utf-8")
+
+
+def book_quotes_logical_bytes(path: Path) -> int:
+    """UNCOMPRESSED size of a shard, in bytes.
+
+    THIS IS A MEMORY GUARD INPUT, NOT A DISK FIGURE, and the distinction is the
+    whole point. `book_quotes_read_affordable` multiplies shard size by 6.3 to
+    project resident cost. Feeding it `st_size` for a compressed shard would
+    under-report by the compression ratio -- measured 38.7x on
+    mlb/2026-08-09 (207.4MB -> 5.4MB) -- so a shard that costs ~1.3GB resident
+    would look like a 34MB one and sail through a guard built to stop exactly
+    that. The guard would still be there, still be logging, and be blind in the
+    one case that matters.
+
+    gzip stores the uncompressed length in the last 4 bytes of the file (ISIZE),
+    modulo 2^32. Shards are ~200MB so the modulo never bites, but a wrapped
+    value would read as absurdly small -- the dangerous direction -- so it is
+    sanity-checked against the compressed size and falls back to a conservative
+    over-estimate rather than a permissive under-estimate.
+    """
+    try:
+        stat = path.stat()
+    except OSError:
+        return 0
+    if path.suffix != ".gz":
+        return int(stat.st_size)
+    try:
+        with path.open("rb") as handle:
+            handle.seek(-4, os.SEEK_END)
+            isize = int.from_bytes(handle.read(4), "little")
+    except Exception:
+        isize = 0
+    # A gzip member never expands, so uncompressed < compressed means ISIZE
+    # wrapped (or the file is not what we think). Assume the worst plausible
+    # ratio instead of trusting the small number.
+    if isize < stat.st_size:
+        return int(stat.st_size * _ASSUMED_GZIP_RATIO)
+    return isize
+
+
+# Only used when a gzip trailer cannot be trusted. Set well ABOVE the measured
+# 38.7x so the fallback errs toward refusing a read, never toward admitting one
+# that will not fit.
+_ASSUMED_GZIP_RATIO = 50
 
 
 def _coerce_price(value: Any) -> int | None:
@@ -542,11 +625,11 @@ def book_quotes_read_affordable(sport: str, date_str: str) -> tuple[bool, dict[s
     not an on-request backfill -- applied to "too expensive" as well as
     "absent".
     """
-    path = book_quotes_path(sport, date_str)
-    try:
-        file_bytes = path.stat().st_size if path.is_file() else 0
-    except OSError:
-        file_bytes = 0
+    path = resolve_book_quotes_path(sport, date_str)
+    # LOGICAL, not on-disk. A compressed shard costs its UNCOMPRESSED size in
+    # this projection -- see book_quotes_logical_bytes for why using st_size
+    # here would silently disarm this guard.
+    file_bytes = book_quotes_logical_bytes(path) if path.is_file() else 0
     try:
         workers = max(1, int(str(os.environ.get("WEB_CONCURRENCY") or "1").strip() or "1"))
     except ValueError:
@@ -612,11 +695,23 @@ def _evict_book_quotes_over_budget() -> None:
 
 
 def _book_quotes_cache_key(path: Path) -> tuple[str, int, int] | None:
+    """(path, mtime_ns, LOGICAL bytes).
+
+    The third element is consumed by `_book_quotes_cache_estimated_bytes` as a
+    resident-cost proxy, so it has to be the uncompressed size for the same
+    reason the affordability guard does -- a `.gz` entry keyed by its on-disk
+    size would let the cache hold ~39x what its budget believes, and the
+    eviction loop would never fire.
+
+    Identity is still (path, mtime, size): a `.gz` and its plain original are
+    different paths, so a compaction can never serve a stale entry under the
+    new name.
+    """
     try:
         stat = path.stat()
     except Exception:
         return None
-    return (str(path), stat.st_mtime_ns, stat.st_size)
+    return (str(path), stat.st_mtime_ns, book_quotes_logical_bytes(path))
 
 
 def iter_book_quotes(sport: str, date_str: str) -> Iterator[dict[str, Any]]:
@@ -638,10 +733,10 @@ def iter_book_quotes(sport: str, date_str: str) -> Iterator[dict[str, Any]]:
     quiet one -- the same failure `read_book_quotes` avoids by not caching a
     partial result.
     """
-    path = book_quotes_path(sport, date_str)
+    path = resolve_book_quotes_path(sport, date_str)
     if not path.is_file():
         return
-    with path.open("r", encoding="utf-8") as handle:
+    with _open_book_quotes_text(path) as handle:
         for line in handle:
             line = line.strip()
             if not line:
@@ -663,7 +758,7 @@ def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
     and `dict(...)` the few they keep), which is the contract that makes that
     safe -- do not mutate the returned rows in place.
     """
-    path = book_quotes_path(sport, date_str)
+    path = resolve_book_quotes_path(sport, date_str)
     cache_key = _book_quotes_cache_key(path)
     if cache_key is not None:
         cached = _BOOK_QUOTES_CACHE.get(cache_key)
@@ -675,7 +770,7 @@ def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
     try:
         if not path.is_file():
             return rows
-        with path.open("r", encoding="utf-8") as handle:
+        with _open_book_quotes_text(path) as handle:
             for line in handle:
                 line = line.strip()
                 if not line:
@@ -1255,3 +1350,176 @@ def quotes_by_market(rows: Iterable[Mapping[str, Any]]) -> dict[str, list[dict[s
     for (market, _book), row in latest.items():
         grouped.setdefault(market, []).append(row)
     return grouped
+
+
+# ---------------------------------------------------------------------------
+# Compaction: gzip CLOSED shards in place.
+#
+# WHY COMPRESS RATHER THAN DELETE OR DOWNSAMPLE. `book_quotes` is the largest
+# family on every disk (1.3GB on web, 196.4 MB/day of new data measured
+# 2026-08-12) and it is also the one family that genuinely cannot be
+# regenerated -- a price at a moment is gone once it is gone, and settlement and
+# CLV both read the history. That tension is what made retention hard.
+#
+# It dissolves on measurement. These shards are dense in INFORMATION and highly
+# redundant in TEXT: 99.5% of rows carry a genuine price change (the writer
+# already dedupes unchanged prices -- see `_KEY_FIELDS`), but every line repeats
+# the same 17 keys, the same team names and near-identical timestamps. Measured
+# on mlb/2026-08-09:
+#
+#     raw 207.4 MB  ->  gzip -6  5.4 MB   (38.7x, 4.9s single pass)
+#
+#     book_quotes steady state at 196.4 MB/day
+#        30d     raw   5.8 GB      gzipped   0.1 GB
+#       120d     raw  23.0 GB      gzipped   0.6 GB
+#       365d     raw  70.0 GB      gzipped   1.8 GB
+#
+# So a FULL YEAR of captures costs less disk than three days does today, with
+# every tick preserved exactly. Downsampling (keep open/close + N ticks) would
+# also have worked and was the obvious move before this was measured -- it is
+# strictly worse, because it throws away real price movement to buy space that
+# compression gives for free.
+#
+# NOT APPLIED TO TODAY'S SHARD. It is append-only and still being written;
+# appending to a gzip member yields a file that decompresses to the first member
+# only. `book_quotes_path` therefore stays plain-text and this only ever touches
+# dates strictly before today.
+# ---------------------------------------------------------------------------
+
+_COMPRESS_CHUNK_BYTES = 8 * 1024 * 1024
+
+
+def _shard_date(path: Path) -> str:
+    return path.name.split(".", 1)[0]
+
+
+def compress_closed_shards(
+    *,
+    sport: str,
+    today: str,
+    apply: bool = False,
+    min_age_days: int = 1,
+) -> dict[str, Any]:
+    """Gzip every `book_quotes` shard older than `min_age_days`.
+
+    DRY RUN BY DEFAULT. `apply=False` reports what it would do and touches
+    nothing.
+
+    The original is removed only after the compressed copy has been read back
+    and confirmed to hold the same number of lines. That verification is not
+    ceremony: Render is the source of truth and the git tree is a lossy mirror,
+    so for these files the copy on this disk may be the only one in existence.
+    A compaction that half-worked and then deleted its input would be
+    indistinguishable from a capture outage weeks later, when someone tries to
+    settle against it.
+    """
+    from datetime import date as _date
+
+    root = book_quotes_path(sport, today).parent
+    result: dict[str, Any] = {
+        "sport": sport,
+        "apply": bool(apply),
+        "compressed": [],
+        "skipped": {},
+        "bytes_before": 0,
+        "bytes_after": 0,
+    }
+    if not root.is_dir():
+        result["skipped"]["no_directory"] = 1
+        return result
+
+    def _skip(reason: str) -> None:
+        result["skipped"][reason] = int(result["skipped"].get(reason, 0)) + 1
+
+    try:
+        today_date = _date.fromisoformat(str(today).strip())
+    except ValueError:
+        result["skipped"]["bad_today"] = 1
+        return result
+
+    for path in sorted(root.glob("*.jsonl")):
+        try:
+            shard_date = _date.fromisoformat(_shard_date(path))
+        except ValueError:
+            # Undated or oddly-named: never guess. An unrecognised name is not
+            # evidence the file is disposable.
+            _skip("undated")
+            continue
+        if (today_date - shard_date).days < max(1, int(min_age_days)):
+            _skip("too_recent")
+            continue
+        packed = path.with_name(path.name + ".gz")
+        if packed.exists():
+            _skip("already_compressed")
+            continue
+
+        raw_bytes = path.stat().st_size
+        result["bytes_before"] += raw_bytes
+        if not apply:
+            result["compressed"].append({"path": str(path), "bytes_before": raw_bytes, "dry_run": True})
+            continue
+
+        tmp = packed.with_name(packed.name + ".tmp")
+        try:
+            source_lines = 0
+            with path.open("rb") as src, gzip.open(tmp, "wb", compresslevel=6) as dst:
+                while True:
+                    chunk = src.read(_COMPRESS_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    source_lines += chunk.count(b"\n")
+                    dst.write(chunk)
+            # Read the compressed copy back before trusting it.
+            packed_lines = 0
+            with gzip.open(tmp, "rb") as check:
+                while True:
+                    chunk = check.read(_COMPRESS_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    packed_lines += chunk.count(b"\n")
+            if packed_lines != source_lines:
+                tmp.unlink(missing_ok=True)
+                _skip("verify_line_count_mismatch")
+                print(
+                    f"[odds_book_quotes] COMPACT_VERIFY_FAILED path={path} "
+                    f"source_lines={source_lines} packed_lines={packed_lines} -- ORIGINAL KEPT",
+                    flush=True,
+                )
+                continue
+            os.replace(tmp, packed)
+            path.unlink()
+        except Exception as exc:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            _skip(f"error:{type(exc).__name__}")
+            print(f"[odds_book_quotes] COMPACT_FAILED path={path} error={type(exc).__name__}: {exc}", flush=True)
+            continue
+
+        after = packed.stat().st_size
+        result["bytes_after"] += after
+        result["compressed"].append(
+            {"path": str(packed), "bytes_before": raw_bytes, "bytes_after": after, "lines": source_lines}
+        )
+
+    if not apply:
+        result["bytes_after"] = 0
+    saved = result["bytes_before"] - result["bytes_after"]
+    result["bytes_saved"] = saved if apply else None
+    print(
+        "[odds_book_quotes] COMPACT "
+        + json.dumps(
+            {
+                "sport": sport,
+                "apply": bool(apply),
+                "files": len(result["compressed"]),
+                "mb_before": round(result["bytes_before"] / (1024 * 1024), 1),
+                "mb_after": round(result["bytes_after"] / (1024 * 1024), 1),
+                "skipped": result["skipped"],
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+    return result
