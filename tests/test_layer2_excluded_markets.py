@@ -1,4 +1,4 @@
-"""`#398` -- one prop family took half the board.
+"""`#400` -- one prop family took half the board.
 
 Measured on the served board 2026-08-12: soccer contributed 100 of 200 sampled
 rows and EVERY one was `player_first_goal_scorer` (45) or

@@ -1486,7 +1486,7 @@ def select_shortlist(
         if implied_total is not None and implied_total < _MIN_IMPLIED_BOOK_TOTAL_PCT:
             implausible_book += 1
             continue
-        # `#398`: excluded market families. Applied HERE, before the per-sport
+        # `#400`: excluded market families. Applied HERE, before the per-sport
         # bucket, so an excluded row cannot be re-seated by `kind_floor` or by
         # `per_sport` running short -- the same ordering the value floor and the
         # game cap already follow, and for the same reason.
