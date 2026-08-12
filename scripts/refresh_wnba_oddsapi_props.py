@@ -4459,6 +4459,58 @@ def _existing_refresh_state(*, source_root: Path, date_str: str, do_edges: bool,
     }
 
 
+def _reuse_max_age_seconds(sport: str = "wnba") -> float:
+    """How stale a bundle may be and still be reused (`#383`).
+
+    TIED TO THE SWEEP INTERVAL BY CONFIGURATION, not by import. Reads the same
+    env vars `live_refresh_loop._pregame_sweep_interval_seconds` reads, with the
+    same 2h fallback, so the two move together from one knob. An import would
+    couple a standalone refresh script to the loop module for one integer.
+
+    WHY A BOUND AT ALL. Measured 2026-08-12: WNBA's board served quotes 10.1h
+    old while every artifact downstream rebuilt on schedule. `#378` showed the
+    sweep ran and wrote nothing (`wrote=False exists=True sidecar_age_s=36537`
+    against NFL's 169s from the same loop), and `/api/ops/wnba/refresh-decision`
+    named the branch: `reused_artifact_bundle`.
+
+    The guard was doing its job. It validated that every required file EXISTS
+    and has content, and nothing about WHEN it was written -- and `input_hash`
+    is computed from the INPUTS, so if those do not change the hash does not
+    change and the bundle stays reusable forever. A fixpoint: reuse the bundle,
+    therefore do not fetch, therefore the inputs do not change, therefore reuse
+    the bundle. That is `#344`'s documented failure recurring, and `#344`
+    persisted the decision to the keyvalue store precisely so the next person
+    could see it.
+
+    The sweep interval is the right bound because it is the cadence that CALLS
+    this: if a sweep is due, a bundle written before that sweep is by definition
+    not what the sweep was for. Tighter would re-fetch inside a single cadence
+    window and spend OddsAPI credits the `#344` family exists to protect;
+    looser reopens this bug.
+    """
+    for name in (
+        f"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_{str(sport).strip().upper()}",
+        "SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS",
+        "SYNDICATE_WNBA_REUSE_MAX_AGE_SECONDS",
+    ):
+        raw = str(os.environ.get(name) or "").strip()
+        if raw:
+            try:
+                value = float(raw)
+            except ValueError:
+                continue
+            if value > 0:
+                return value
+    return 2 * 3600.0
+
+
+def _bundle_age_seconds(path: Path) -> float | None:
+    try:
+        return max(0.0, time.time() - path.stat().st_mtime)
+    except OSError:
+        return None
+
+
 def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_edges: bool, do_export: bool, started_at: str | None = None, input_hash: str | None = None, step_key: str | None = None) -> dict[str, object] | None:
     """`#345`: same fix as `_existing_refresh_state` -- it took `input_hash` and
     never read it either. Fixed together because leaving one existence-only
@@ -4502,6 +4554,21 @@ def _existing_artifact_bundle_state(*, artifact_root: Path, date_str: str, do_ed
         # out of this required list deliberately.
         required_paths.append(recommendations_slate_path)
     if any(not _path_has_meaningful_content(path) for path in required_paths):
+        return None
+
+    # `#383`: EXISTS is not FRESH. The snapshot is what the fetch writes, so its
+    # age is the honest measure of when this bundle was actually captured.
+    # Declining here falls through to the real fetch rather than raising -- the
+    # bundle is not corrupt, just too old to stand in for a due sweep.
+    max_age = _reuse_max_age_seconds("wnba")
+    snapshot_age = _bundle_age_seconds(snapshot_path)
+    if snapshot_age is not None and max_age > 0 and snapshot_age > max_age:
+        print(
+            f"[wnba_refresh] BUNDLE_REUSE_DECLINED date={date_str} "
+            f"snapshot_age_s={int(snapshot_age)} max_age_s={int(max_age)} "
+            f"path={snapshot_path}",
+            flush=True,
+        )
         return None
 
     game_cards_rows = int(_count_csv_rows_quick(game_cards_path))
