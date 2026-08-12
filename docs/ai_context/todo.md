@@ -28522,6 +28522,53 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 
 ## Operational notes worth not rediscovering
 
+### The mirror is lossy for MEASUREMENT, not just for DATA (2026-08-12)
+
+CLAUDE.md warns that `data/**` in git is a lossy mirror and that ANALYSIS built
+on it silently collapses to whatever coverage exists. The cleanup lane found the
+sharper version: **it is equally lossy as a place to size a production guard.**
+
+They benchmarked a retention sweep at 15.6s against the local mirror's **38,736
+files**. The live disk holds **117,377**. The same sweep stalled refresh-worker's
+main poll loop for 10+ minutes in production (`#404`) -- and it was invisible
+from outside: the live-lens loop and artifact publisher kept logging, memory had
+1751MB headroom so the memory guard correctly did not fire. It was guarding the
+wrong resource. Wall-clock in an `rglob`, not pressure.
+
+**How to apply:** any number you take off the local tree -- file counts, sweep
+durations, coverage denominators, "how long does X take over N items" -- is
+scaled by whatever fraction of the real tree your mirror holds, **and that
+fraction differs per artifact family**. Before a local measurement becomes a
+production threshold or a load-bearing premise, get the production count.
+
+**Worked counter-example, so the rule is not read as broader than it is:** the
+sim execution report (`docs/reports/sim_execution_observability_report.md`) is
+unaffected -- every number in it came from the Render logs API, the Render
+events API, or `/api/ops/...`, and it says so in its own header. The one
+`data/nfl_source/...` path it cites is quoted FROM a production log line, not
+read locally. Checking which of the two you did is a one-command question and
+worth answering before accepting or dismissing this warning.
+
+### `#404`: the confirming signal is the SKIP, not the completion (2026-08-12)
+
+I proposed verifying `#404` (retention sweep stalls the main loop) by watching
+for a `RETENTION_SWEEP` completing with `MLB_SIM_TICK` continuing across it.
+**That observation cannot occur.** With `#404` live the sweep is skipped
+entirely -- that IS the fix -- so `RETENTION_SWEEP` should never appear again.
+Waiting for one to complete safely is waiting for the thing the fix prevents,
+and the resulting null is **indistinguishable from the job never running at
+all**.
+
+The confirming line is a `DISK_MAINTENANCE` entry reading:
+
+    retention: {"skipped": "not_enabled_and_not_observing"}
+
+**General form, and the reason this keeps recurring:** when a fix works by NOT
+doing something, the absence of the old symptom is not evidence -- it is the
+same reading you get from a broken scheduler, a dead worker, or a guard that
+never ran. **Verify a suppression by its own positive emission, never by the
+silence it creates.**
+
 ### PRE-FLIGHT PROCEDURE: prove the instrument is alive BEFORE you read the null (2026-08-12)
 
 Named as a procedure, not a lesson, because two separate readings today were
