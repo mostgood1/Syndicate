@@ -24,6 +24,7 @@ def _clean(tmp_path, monkeypatch):
         "SYNDICATE_DISK_MAINTENANCE_ENABLED",
         "SYNDICATE_BOOK_QUOTES_COMPACTION_ENABLED",
         "SYNDICATE_ARTIFACT_RETENTION_ENABLED",
+        "SYNDICATE_ARTIFACT_RETENTION_OBSERVE",
         "SYNDICATE_DISK_MAINTENANCE_INTERVAL_SECONDS",
     ):
         monkeypatch.delenv(key, raising=False)
@@ -38,12 +39,13 @@ def test_it_does_nothing_at_all_by_default(_clean):
 
 
 def test_enabling_the_runner_alone_deletes_nothing(_clean, monkeypatch):
-    """The rung to start on: produces production numbers, touches nothing.
+    """The observation rung: produces production numbers, touches nothing.
 
-    Every figure in the reports so far came from web's allowlisted subset or the
-    git mirror. Neither is a worker disk.
+    Needs SYNDICATE_ARTIFACT_RETENTION_OBSERVE since the sweep stopped being
+    free -- see test_retention_sweep_is_skipped_unless_asked_for.
     """
     monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_OBSERVE", "true")
     old = _clean / "mlb_source" / "data" / "book_grid" / "book_grid_2020-01-01.json"
     old.parent.mkdir(parents=True, exist_ok=True)
     old.write_text("x" * 2048, encoding="utf-8")
@@ -123,6 +125,7 @@ def test_unmeasurable_memory_does_not_block(_clean, monkeypatch):
 
 def test_a_failing_job_never_takes_the_worker_down(_clean, monkeypatch):
     monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_OBSERVE", "true")
 
     def _boom():
         raise RuntimeError("retention exploded")
@@ -140,3 +143,68 @@ def test_the_daily_stamp_is_written_only_after_a_completed_pass(_clean, monkeypa
     assert dm._due() is True
     dm.run_disk_maintenance(sports=("mlb",))
     assert dm._due() is False
+
+
+def test_retention_sweep_is_skipped_unless_asked_for(_clean, monkeypatch):
+    """Measured in production 2026-08-12: the dry-run sweep blocked
+    refresh-worker's main poll loop for >10 minutes (rglob over 14.2 GB,
+    117,377 files, on a box already at 100% CPU). Benchmarked at 15.6s against a
+    38k-file local mirror -- the mirror was a third of the real disk.
+
+    An observation pass that costs a stalled loop is not free, so it needs its
+    own opt-in. Compaction is unaffected."""
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    called = {"n": 0}
+
+    import syndicate.features.shared.artifact_retention as ar
+
+    def _tracked(*a, **k):
+        called["n"] += 1
+        raise AssertionError("retention swept without opt-in")
+
+    monkeypatch.setattr(ar, "run_retention_sweep", _tracked)
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["ran"] is True
+    assert called["n"] == 0
+    assert out["retention"] == {"skipped": "not_enabled_and_not_observing"}
+
+
+def test_observe_flag_runs_the_sweep_without_deleting(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_OBSERVE", "true")
+    old = _clean / "mlb_source" / "data" / "book_grid" / "book_grid_2020-01-01.json"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text("x" * 2048, encoding="utf-8")
+
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["retention"]["dry_run"] is True
+    assert out["retention"]["deleted"] == 0
+    assert old.exists()
+
+
+def test_enabling_deletion_still_implies_running_the_sweep(_clean, monkeypatch):
+    """The observe flag must not become a second thing to remember before
+    deletion works."""
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_ARTIFACT_RETENTION_ENABLED", "true")
+    monkeypatch.delenv("SYNDICATE_ARTIFACT_RETENTION_OBSERVE", raising=False)
+    old = _clean / "mlb_source" / "data" / "book_grid" / "book_grid_2020-01-01.json"
+    old.parent.mkdir(parents=True, exist_ok=True)
+    old.write_text("x" * 2048, encoding="utf-8")
+
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["retention"]["deleted"] >= 1
+    assert not old.exists()
+
+
+def test_compaction_still_runs_when_retention_is_skipped(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+    monkeypatch.setenv("SYNDICATE_BOOK_QUOTES_COMPACTION_ENABLED", "true")
+    shard = _clean / "mlb_source" / "tracking" / "book_quotes" / "2020-01-01.jsonl"
+    shard.parent.mkdir(parents=True, exist_ok=True)
+    shard.write_text('{"a":1}\n' * 200, encoding="utf-8")
+
+    out = dm.run_disk_maintenance(sports=("mlb",))
+    assert out["compaction_applied"] is True
+    assert shard.with_name(shard.name + ".gz").exists()
+    assert out["retention"] == {"skipped": "not_enabled_and_not_observing"}

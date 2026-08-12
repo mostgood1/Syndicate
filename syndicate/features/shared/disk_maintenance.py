@@ -179,7 +179,54 @@ def run_disk_maintenance(*, sports: tuple[str, ...] = ("mlb", "wnba", "nba", "nh
         except Exception as exc:
             summary["compaction"] = f"error {type(exc).__name__}: {exc}"
 
-        # --- 2. retention (deletes; gated by its own flag, dry run by default)
+        # --- 2. retention
+        #
+        # SKIPPED ENTIRELY UNLESS ASKED FOR, and this is a correction, not a
+        # precaution. The first production run measured the cost I had assumed
+        # away: on refresh-worker the dry-run sweep blocked the MAIN POLL LOOP
+        # for over ten minutes.
+        #
+        #     22:28:51  deploy
+        #     22:29:48  MLB_SIM_TICK          <- last main-loop tick
+        #     22:30:11  compaction starts
+        #     22:30:16  compaction done (658.6 MB reclaimed)
+        #     22:40+    retention sweep STILL RUNNING, no summary emitted
+        #
+        # Other threads (live-lens, publisher) kept logging, so the worker
+        # looked healthy from outside while its poll loop was stalled. The
+        # sweep is an rglob over 14.2 GB on a box measured at 100% of its
+        # 2-core limit in 72% of 5-minute buckets, and I had benchmarked it at
+        # 15.6s against a 38k-file local mirror -- the real disk holds 117,377.
+        # That is `#241` exactly: periodic work on this worker is never free,
+        # and I added some.
+        #
+        # Worse than a one-off: the completion stamp is only written after the
+        # sweep finishes, so a restart before then means it re-runs on the NEXT
+        # boot. With tonight's deploy cadence that is a stall per deploy, not
+        # per day.
+        #
+        # So the observation pass now needs an explicit opt-in of its own.
+        # Compaction is unaffected -- it is bounded by shard count, finished in
+        # 5 seconds, and is the job actually wanted here.
+        retention_wanted = _flag("SYNDICATE_ARTIFACT_RETENTION_ENABLED") or _flag(
+            "SYNDICATE_ARTIFACT_RETENTION_OBSERVE"
+        )
+        if not retention_wanted:
+            summary["retention"] = {"skipped": "not_enabled_and_not_observing"}
+            summary["seconds"] = round(time.time() - started, 1)
+            summary["compaction_applied"] = compaction_applies
+            try:
+                from syndicate.features.shared.refresh_state_store import write_json_file
+
+                write_json_file(_status_path(), {"epoch": time.time(), "summary": summary})
+            except Exception:
+                pass
+            print(
+                f"[disk_maintenance] DISK_MAINTENANCE {json.dumps(summary, sort_keys=True, default=str)}",
+                flush=True,
+            )
+            return summary
+
         try:
             from syndicate.features.shared.artifact_retention import run_retention_sweep
 
