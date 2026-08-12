@@ -1,5 +1,56 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#374` — OPEN, UNOWNED, NOT URGENT. `gameMarkets.extraHitterProps` is 68% of the MLB live-lens payload, at 117 keys per record
+
+Sized while chasing `#371`'s 8MB ceiling breach. Measured 2026-08-11 21:16 CT,
+one fetch (see the retraction below on why that matters):
+
+| key | bytes | share |
+|---|---|---|
+| `gameMarkets` | 1,084,217 | **68%** |
+| `liveProps` / `props` / `trackedProps` | 131,285 **each** | 8% each |
+| `archivedLiveProps` | 30 | 0% |
+| **games total** | **~1.5MB** | |
+
+`gameMarkets` is 99.99% `extraHitterProps` — 176 records across 15 games, ~5.8KB
+each. **And there is no fat field to cut:** each record has **117 keys**, the
+largest (`reasons`) is 520 bytes / 16%, and the top four combined are ~31%. It is
+wide, not deep.
+
+**The design question, which is the actual item:** this is written every ~60s to a
+keyvalue store with an 8MB ceiling. A 117-key record carrying prose diagnostics
+(`reasons`, `reason_summary`, `explanation_diagnostic`, `baseball_reasons`) reads
+like a DETAIL-VIEW artifact riding in a SCOREBOARD-REFRESH payload. The options —
+prune the explanation fields (~21% of `games`), project a narrow shape into the
+live snapshot and keep the wide one in the detail artifact, or leave it — differ
+in product terms, not engineering ones.
+
+**Also here: `liveProps == props == trackedProps`, byte-identical in 15 of 15
+games.** 16% of `games` is two redundant copies. Same triple-store shape as
+`#371`'s `api_payload`, one level deeper. Cheap to remove, but it needs the
+consumer trace `#371` needed — where stripping the contents instead of the key
+would have served an empty board.
+
+> **RETRACTION — the growth story I told the user was wrong.** I reported
+> `archivedLiveProps` as the growth driver "heading for the ceiling at ~20KB/min".
+> It was 639,500 bytes / 366 items at 20:45 CT and **30 bytes / 0 items at 21:10**:
+> it inflates during a live slate and drains as games finalise. A SAWTOOTH, not a
+> ratchet. `games` itself went 2.9MB → 1.5MB unattended in ~25 minutes.
+>
+> I also compared two figures for the same field (367,559 vs 131,285) taken from
+> two fetches ~20 minutes apart and called it an unreconcilable measurement error.
+> Re-run as a SINGLE fetch, both methods agree exactly. The rule I broke is my own:
+> measure same-instant when the thing measured is live.
+>
+> **Consequence: tonight's ceiling breach was `#371`'s triple-store amplifying a
+> normal live peak, not unbounded growth.** With `#371` fixed there is no
+> demonstrated growth problem at rest, so everything above is an OPTIMISATION
+> against a payload that currently fits — do it deliberately, not as an incident.
+
+**Unmeasured and the real open question:** whether `gameMarkets` grows ACROSS
+days. Nobody has looked, and at 68% it is the only part of this payload where the
+answer would matter.
+
 ### `#369` — OPEN, UNOWNED, HIGHEST VALUE ON THE BOARD. The top 20 rows are implausible arbs from stale prices, and the staleness guard catches 1 of 63
 
 Everything else fixed on 2026-08-11 was about columns RENDERING correctly. This
