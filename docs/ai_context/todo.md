@@ -1,5 +1,63 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#377` — OPEN, UNOWNED, SERIOUS. PROJECTED is a CONSTANT, not a projection — two values across the entire board
+
+Reported off the board by the user. Measured on the served payload, 34 NFL cards,
+and re-measured hours later with identical results:
+
+    projected distinct values across ALL 34 cards:
+        0.96   on all 20 spreads + h2h rows
+        38.76  on all 14 totals rows
+
+**That is one number per market family, not a per-game projection.** Colts/Patriots,
+Lions/Bengals and Packers/Steelers all carry `0.96` — three different matchups,
+one value. The board renders it `1.0` and `38.8`, which reads as a real model
+output.
+
+**Why this is worse than a blank cell:** a projection that varies plausibly but is
+actually a constant cannot be spotted by looking at any single row. It is only
+visible by comparing rows, which is exactly what nobody does when reading a board.
+Same family as `#375`'s lay pricing — a number that looks authoritative and means
+nothing.
+
+**Not the same as the coverage gap.** `#366` established that only ~35% of rows
+carry a projection at all, and that the rest correctly render blank. This is the
+opposite failure: rows that DO carry one are carrying a default. Whatever supplies
+`projection.projected` is returning a league-level or fallback figure rather than
+the game's own sim.
+
+**Start at** `layer2_board._layer2_board_columns`, which maps
+`projection.projected` → `projected`/`sim_projection`, and walk back to what
+populates `projection` on the shortlist row. The question to answer first is
+whether the constant arrives from the sim or is manufactured downstream.
+
+### `#378` — OPEN, UNOWNED, PRODUCT DECISION. Every market shows both sides, and EDGE duplicates EV
+
+Two display problems on the same board, measured on the served payload:
+
+    markets appearing with >1 side : 17 of 17   (34 of 34 cards)
+    rows where EDGE == EV          : 34 of 34
+
+**Both sides, 17 of 17.** Colts −3 AND Patriots −3, Over AND Under, Packers AND
+Steelers. This is STRUCTURALLY CORRECT and must not be "fixed" carelessly:
+`ev_pct` is a cross-book arb surplus, identical on both sides by construction
+(verified arithmetically in `#361`), and taking it requires both legs. But on a
+board headed "Best opportunities" it halves the real content — 17 markets
+presented as 34 opportunities.
+
+**The decision is a product one**, which is why this is filed rather than fixed:
+collapse to one row per market carrying both prices, or keep both legs and label
+them visibly as a pair. Silently dropping one side would delete half of a
+two-legged play and make the remaining row's EV a lie.
+
+**EDGE == EV on every row** is simpler: `edge` is `ev_vs_fair_pct / 100` by
+construction since `#364`, so the board spends two columns on one number. One
+should show something else or go.
+
+**Context:** the board has also been stuck on the same 34 cards across a long
+window, which is `#376` (candidate collection costing ~163s of odds enrichment)
+rather than anything here.
+
 ### `#376` — ROOT-CAUSED. Not a hang: TWO odds-enrichment calls cost 163 of 166 seconds, and during a live slate that outran the build cadence
 
 **ANSWERED. Six instrumentation passes, after six wrong inferences.** The board
