@@ -1,5 +1,135 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#387` — OPEN, UNOWNED, MEASURED. Half of all MLB sims are killed by deploys, and the run ledger records nothing — every completed run reads `exit_code: 0`
+
+Full evidence: `docs/reports/sim_execution_observability_report.md` §3.
+
+**MEASURED 2026-08-12 on production.** Of 41 MLB sim runs that still had a status
+record, **21 (51%) are stuck at `state: "running"`** — one of them 40.7h old.
+Every run that *did* finish exited 0. **There is not a single recorded failure,
+because the failure mode cannot be recorded.**
+
+Correlated against the Render events API for refresh-worker:
+
+    a deploy/restart during the run:   orphaned 9/9      completed 0/4
+
+Perfect separation. **25 deploys hit refresh-worker in 17.8h on 08-12 alone.**
+
+**MECHANISM.** `_persist_finished_mlb_sim_run` (`live_refresh_loop.py:2159`) is
+the only writer that finalizes a run record, and it reads the module-global
+`_MLB_SIM_RUN_META`. A container restart kills the sim subprocess **and** clears
+that global, so the finalize can never run and `*_status.json` stays `"running"`
+forever.
+
+**The concurrency guard is NOT the bug** — it correctly clears the active pointer
+when `started_dt < _PROCESS_STARTED_AT` (`:2124-2131`), so a restart does not
+wedge future sims. It simply never writes the death certificate. Don't "fix" the
+guard.
+
+**Every trigger predicate is durable** (`daily_summary_<date>.json`,
+`last_mlb_sim_check.json`, `mlb_tip_off_simmed.json`); only the completion
+bookkeeping is in-memory. So a killed sim's re-run reappears as a legitimate
+`first_appearance` / `fingerprint_change` — **a deploy is an unlogged re-sim
+trigger**, and a meaningful share of the measured 27 launches/day is deploy
+churn rather than new information. Corroborating: 12 `first_appearance` + 9
+`evening_next_day_sim` launches for 7 slates, which have one first sim each.
+
+**THE FIX:** reconcile on the decision tick — any record with `state: "running"`
+whose `started_at < _PROCESS_STARTED_AT` becomes `state: "killed_by_restart"`.
+That comparison is *already computed and already used* to clear the active
+pointer, so this is cheap. **Assert the reconciliation ran against a real
+restart, not that the field can be set** — the four inert fixes already on this
+list all had tests that hand-built their input.
+
+**SECOND DEFECT, same file.** Two writers clobber the same path with different
+schemas: `run_mlb_daily_sim_job.py:394` writes camelCase (`ok`, `returnCode`,
+`timedOut`, `startedAt`, `finishedAt`, `publishedArtifacts`, `sims`, `workers`)
+and `live_refresh_loop.py:2189` writes snake_case (`state`, `exit_code`,
+`started_at`, `finished_at`, `pid`, `reason`). Last writer wins and the launcher
+usually writes last: **40 of 41 records carry the launcher schema**, so
+`publishedArtifacts` and `timedOut` are destroyed in 98% of runs. Also, within
+one record `started_at` is UTC and `finished_at` is Central — durations are
+correct only if parsed tz-aware. Emit `duration_seconds` explicitly.
+
+**THIRD DEFECT.** `MLB_DAILY_SIM_START` / `_END` / `_TIMEOUT` are printed with
+`flush=True` but the launcher redirects the child's stdout to a worker-disk file:
+**7 days of Render logs across both workers contain 189 `TRIGGERED` lines and 0
+`START`, 0 `END`, 0 `TIMEOUT`.** You can see every sim start and no sim finish.
+
+### `#388` — OPEN, UNOWNED, MEASURED. NFL SmartSim2 runs ~90×/day against a 24-hour TTL, because a missing artifact reads as "not stale"
+
+Full evidence: `docs/reports/sim_execution_observability_report.md` §4.
+
+Observed on refresh-worker over 43.2h (process-table sampling):
+
+    generate_smartsim2_nfl_projections.py --season 2026 --week 1        83 episodes  ~46/day  p50 173s
+    generate_smartsim2_nfl_preseason_projections.py --season 2026 --week 2  72 episodes  ~40/day  p50 183s
+
+Median gap between episode **starts: 5 minutes**. Episodes are sequential, not
+overlapping. `SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` defaults to **86400** —
+expected 1 run/day/sport, actual ~46.
+
+**CAUSE** (`scripts/run_refresh_worker.py:2455-2458`):
+
+    age_seconds = _file_age_seconds(artifact_path)
+    if age_seconds is not None and age_seconds < float(_season_projection_refresh_interval_seconds()):
+        continue
+
+`_file_age_seconds` returns `None` when `path.stat()` raises — i.e. **when the
+artifact is missing** (`:261-266`). The guard maps that unknown onto its
+permissive branch, so an artifact that never appears at
+`data/nfl_source/smartsim2_projections_2026_wk1.csv` makes the sport permanently
+stale and relaunches it every tick forever, throttled only by
+`_season_projection_process_still_running`.
+
+This is the **exact shape already recorded on this list**: unknown must not
+default permissive, and gate on the output rather than the input.
+
+**Cost:** ~90 launches/day × ~3 min ≈ **4.5 process-hours/day** on the 4GB worker
+that also runs MLB sims — and MLB's sim gate checks memory headroom against a
+900MB floor, so this competes directly with `#387`'s workload.
+
+**NOT YET ESTABLISHED:** *why* the artifact is absent. I did not read the worker
+disk. The 5-minute relaunch cadence proves only that the predicate never
+evaluates to "fresh" — either the file is missing or it is always >24h old.
+Establish which before fixing, and **fix the guard regardless**: `None` means
+"we don't know", which should emit a reason and back off, not relaunch.
+
+Separately: the season script is pinned to `--week 1` in mid-August (consistent
+with the "NFL week self-pins to 1" finding in the E2E assessment).
+
+### `#389` — OPEN, UNOWNED. No sport except MLB has any sim run ledger, so "when did this sim run and how long did it take" is unanswerable for 6 of 7 sports
+
+Full evidence: `docs/reports/sim_execution_observability_report.md` §0, §5, §8.
+
+NBA / WNBA / NHL / soccer / NCAAF sims run **inside** the odds refresh, not as
+their own job: no launch line, no run stamp, no status record, no duration. The
+only reason this report could quantify them at all is that
+`ALL_PROCESS_MEMORY` — a *memory* diagnostic — happens to print child
+`cmdline`s. Measuring sim cost via the memory instrument is an accident, not a
+capability.
+
+What that accident yielded over 43.2h, and its limits:
+
+    soccer  build_soccer_artifacts.py       15 episodes  ~8/day   p50  24s  max 374s
+    wnba    refresh_wnba_oddsapi_props.py    2 episodes  ~1/day   p50 131s  max 261s
+    nba, nhl, ncaaf, ncaab                    0 episodes
+
+**The zero is a 43-hour August window, not evidence those pipelines work.**
+Sampling is bursty, so counts are ±20% and durations are **lower bounds** —
+calibrated against MLB, where a ground-truth launch count existed (38 logged vs
+46 sampled episodes in the same window).
+
+**THE FIX:** one launch/finish record per sport — sport, trigger reason, scope,
+start, end, exit code, duration. MLB's `MLB_DAILY_SIM_TRIGGERED` line plus its
+run-status file are the right shape; fix them per `#387` first, then generalize.
+Until this exists, this report is only reproducible by someone with Render API
+credentials.
+
+**Related, and worth folding in:** `SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER`
+defaults **off** and is not set in `render.yaml`, so soccer's join-mismatch
+re-sim path is dark in production.
+
 ### `#382` — SHIPPED AND INERT IN PRODUCTION. The modelled-hold floor cannot fire: the field it reads is dropped in the grid -> candidate fan-out
 
 `12e3d6d9`, deployed to web + refresh-worker 2026-08-12 ~11:35 CT. The logic is
@@ -37,6 +167,58 @@ the field survives it**, not one that hand-builds the input.
 **Do not re-derive the diagnosis from scratch** — `value_floor_by_sport` (`#381`,
 live) reports `method` per sport, so the confirmation is one field read: soccer
 flipping `flat_default` -> `modelled_hold`.
+
+### `#387` — OPEN, UNOWNED, THE BOARD IS STARVED BY A THRESHOLD THAT IS 2x ITS STAGE. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` demands 3,000MB for a stage measured at 1,479MB
+
+**The overview is empty on ~70% of builds since 2026-08-12 16:38:47Z**, so
+`collect_candidates` gets nothing and the board rebuilds from a fallback that
+costs ~580s. Measured, `syndicate/features/intelligence.py`:
+
+             headroom_mb   min_required   sufficient   stat.anon
+    17:28:57    2295.1        3000.0        False        1785.4
+    17:41:34    2054.7        3000.0        False        2026.3
+    19:09:06    2288.1        3000.0        False        1585.6
+
+`OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb sports_done=0 sports_total=8` — it
+refuses on the FIRST sport, so one threshold kills all eight.
+
+**THE CALCULATION IS FINE; THE CONSTANT IS STALE.** `#79` already fixed headroom
+to credit reclaimable page cache and it is doing that correctly (crediting
+525-1116MB). The failure is `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000 * 1024 *
+1024` against a container of 4,096MB — the process must sit under ~1,096MB to
+hydrate anything.
+
+**Its own comment names the stage cost: "idling ~700MB, spiking past 1479MB."**
+3,000 traces to a 2026-07-26 reading of the same call at ~3.7GB. `#285` and
+others trimmed the stage; the guard never came down with it. Same class as the
+900MB floor guarding an 1873MB stage — **suspect a stale constant before new
+code**, and check a guard's threshold against its stage's MEASURED cost.
+
+**WHY IT LOOKS LIKE SOMETHING ELSE.** Every healthy build is 1-2 minutes after a
+deploy, because only a freshly booted worker is under 1,096MB:
+
+    deploy 16:30:36 -> 16:31:32 sports=8    deploy 17:44:49 -> 17:46:07 sports=8
+    deploy 17:05:26 -> 17:06:20 sports=8    deploy 18:44:31 -> 18:45:45 sports=8
+
+That correlation reads as "deploys fix the board" and is really "only a cold
+process clears the bar." It also means **every measurement of this taken shortly
+after a deploy is confounded** — the board looks healthy for one cycle, then
+starves for twenty.
+
+**NOT A CODE CHANGE, AND NOT A LEAK.** Bisected: `12e3d6d9` went live 16:30:36,
+the 16:36:37 build returned 218 rows on it, and 16:38:47 returned 0 on identical
+code with no deploy between. `stat.anon` is 1,585-2,026MB, not runaway.
+
+**BEFORE CHANGING THE NUMBER, MEASURE THE STAGE.** I did not, and 1,479MB is
+read off a comment rather than observed — the same mistake `#380` records. The
+right sequence: instrument peak RSS across one successful `build_intelligence_
+overview` (the post-deploy cycles are the only ones that complete, so they are
+the sample), then size the threshold on that with margin. **This guard exists
+because of `#279`'s 8 OOM kills in 82 minutes; lowering it on an unverified
+figure trades a starved board for a dead worker.**
+
+Interacts with `#385`: that gate stops paying 580s for the fallback this
+starvation triggers. Fixing `#387` removes the need for the fallback at all.
 
 ### `#380` — SHIPPED, AWAITING VERIFY. The quote-age ceiling was set by a sport's FRESHEST quote instead of its oldest, and deleted two sports
 
@@ -27815,6 +27997,62 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ---
 
 ## Operational notes worth not rediscovering
+
+### "Is a sim running?" — use `ALL_PROCESS_MEMORY`. `child_count` and `game_count` both lie (2026-08-12)
+
+This is the check people run **before deploying**, and it matters because a deploy
+during a sim kills it (`#387`: 9/9 orphaned runs had one, 0/4 completions did).
+All three signals below were in use; only one works.
+
+**`PROCESS_TREE_MEMORY.child_count` — BROKEN. Reads 0 with three sims running.**
+Measured on refresh-worker, overlapping windows on 2026-08-12:
+
+    PROCESS_TREE_MEMORY  18:30-19:10Z   child_count == 0  on  55 / 55 lines
+    ALL_PROCESS_MEMORY   18:35-18:44Z   sim visible      on  99 / 99 lines
+
+It comes from `psutil.Process().children(recursive=True)`
+(`memory_observability.py:412`) — children of *whatever process emits the line*,
+which is not the worker main. Mechanism not established; the measurement is.
+
+**I initially wrote the opposite in this note**, reasoning that sims are
+`Popen` children of the worker main (true — `ALL_PROCESS_MEMORY` shows pid 692
+`ppid=38`, pid 693 `ppid=692`, pid 696 `ppid=693`) and concluding a child counter
+must therefore see them. **Validating the concept is not validating the
+instrument.** The ppid relationship is real and `child_count` still reads 0.
+
+**`ALL_PROCESS_MEMORY` — VALID, use this.** Container-wide `psutil.process_iter`,
+independent of the emitter's position in the tree, and it carries full `cmdline`s
+so it says *which* sim. Every non-MLB measurement in the sim report rests on it.
+
+**`CONTAINER_MEMORY.game_count` — NOT a sim signal.** It comes only from
+`apply_game_board_contract` (`game_board_contract.py:594,596`) as
+`game_count=len(games)` — the size of a **board-contract build**. 100 live
+`board_contract_begin` lines show it swinging 1 → 9 → 11 → 31 → 1 *within one
+second*, cycling across sports and soccer leagues. A descending run like
+15 → 9 → 3 → 1 is four board builds for different sports, not a sim draining a
+slate. **The field that disambiguates it, `sport`, is in the same payload** — the
+recurring "read the field you already have" failure.
+
+**General form:** a signal is only evidence once you know what makes it read the
+other way. Before trusting `child_count: 0`, confirm a running sim makes it
+non-zero; before trusting `game_count`, confirm what emits it.
+
+### Reading the sim run ledger from production (2026-08-12)
+
+- Ops admin token goes in `X-Admin-Token` or `?admin_token=` — **not** `?token=`,
+  which 401s (`ops.py:198-205`).
+- `/api/ops/live-refresh/state?sim_run=<stamp>&sim_date=<date>` resolves historical
+  MLB runs, but retention is ~2 days: 41 of 189 launches over 7 days still had a
+  record. Get the stamps from `MLB_DAILY_SIM_TRIGGERED` in the Render logs API.
+- `/api/ops/refresh/status` does **not** exist (404). Use
+  `/api/ops/odds-refresh/status`.
+- The Render logs `text=` filter is **fuzzy, not substring** — a query for
+  `MLB_DAILY_SIM` returned 3,924 `ALL_PROCESS_MEMORY` lines and 38 real hits.
+  Always filter client-side, and chunk the time window or the noise silently
+  truncates your range. `limit` > 100 returns HTTP 400.
+- Per-step `runtime_seconds` for the non-MLB sims lives in
+  `reports/migration_runs/.../odds_refresh.json` on the **worker** disk — it does
+  not exist on web, so `/api/ops/odds-refresh/status` cannot show it.
 
 ### Preflight for in-flight MEASUREMENTS, not just in-flight jobs (2026-08-10)
 
