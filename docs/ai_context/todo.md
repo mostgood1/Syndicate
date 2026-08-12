@@ -12956,6 +12956,66 @@ above, closer to the season); NFL preseason props (no real prop-odds
 source exists at all, correctly never attempted).
 
 **Operational notes:**
+- **THE STATE STORE IS SHARED BETWEEN SERVICES, AND THAT IS INVISIBLE AT THE
+  CALL SITE.** `refresh_state_store._keyvalue_backed` routes every path except
+  `migration_runs/` through the keyvalue store when the backend is keyvalue --
+  it is, on both workers -- and both point at the SAME Redis
+  (`SYNDICATE_REFRESH_STATE_URL` is byte-identical). So **any per-service flag,
+  counter, stamp or cursor written through `write_json_file` silently becomes
+  GLOBAL.** `#324`'s comment guarantees that read and write agree; it does not
+  guarantee that two SERVICES do, because they share the key.
+  - Cost, measured 2026-08-12 (`#405`): `#401`'s "once per day" maintenance
+    gate was once per day *across both workers*. Whichever ran first stamped the
+    shared key and stood the other down for 24h. Both ran on night one only
+    because refresh-worker cleared the gate **26 seconds** before live-odds-worker
+    wrote the stamp. From day two exactly one worker would have run, and the
+    winner's log line would have said everything was fine.
+  - **What to do:** put the service into the path
+    (`SYNDICATE_REFRESH_LANE` → `RENDER_SERVICE_NAME` → `RENDER_SERVICE_ID` →
+    `"local"`), and let an unidentifiable service get its OWN key rather than
+    falling back to a shared one.
+  - **How it was found, which is the transferable part:** by *executing*
+    `_keyvalue_backed` against the real path, not by reading the routing and
+    reasoning about it. Same class as `#388`'s shared pointer — shared state
+    plus a local question equals a wrong answer.
+- **VERIFY A SUPPRESSION BY ITS OWN POSITIVE EMISSION, NEVER BY THE SILENCE IT
+  CREATES.** When a fix works by NOT doing something, absence of the old symptom
+  is not evidence — it is the same reading you get from a broken scheduler, a
+  dead worker, or a guard that never ran. `#404` skips the retention sweep, so
+  watching for a clean `RETENTION_SWEEP` was waiting for the very thing the fix
+  prevents: a test that can never pass once the fix is live, reading as
+  "unconfirmed" forever and indistinguishable from failure. The observable line
+  is `retention: {"skipped": "not_enabled_and_not_observing"}`.
+  **Redefining a criterion so the success case is observable is a separate skill
+  from fixing the bug.**
+- **THE GIT MIRROR IS LOSSY FOR MEASUREMENT, NOT ONLY FOR DATA.** CLAUDE.md
+  warns that `data/**` is a lossy mirror of production. The same applies to
+  anything you *time* or *count* against it. `#401`'s retention sweep was
+  benchmarked at 15.6s over the mirror's 38,736 files; the live disks hold
+  65,025 (refresh-worker) and 117,377 (live-odds-worker), and the real sweep took
+  **18 minutes and blocked refresh-worker's main poll loop for all of it**.
+  A production guard sized on a third of the real disk.
+  - The useful form is **"check which of the two you did"**, not "distrust
+    everything local": grepping the source for code is fine, counting or timing
+    artifacts is not. The sim lane checked their own report against this and it
+    held — every figure came from the logs/events/ops APIs.
+- **"Dry run" describes what a job does not DELETE. It says nothing about what
+  it COSTS.** A read-only walk of 65,025 files is exactly as expensive as a
+  destructive one. `#396` was called safe on this basis and repeated to three
+  sessions; the 18-minute stall is the difference between "cannot do damage" and
+  "cannot do harm".
+- **A warning in a docstring does not bind the caller.** `#396`'s docstring said
+  in terms that it must not be wired into a worker loop. It was wired anyway,
+  because a docstring is read by whoever EDITS a file and not by whoever CALLS
+  it. Bounds belong in the code (`#406`: a file cap plus a resume cursor), where
+  they apply to every caller including the careless one.
+- **"My change is safe" is a claim about a diff; "my deploy is safe" is a claim
+  about an ANCESTRY** — and only the second is checkable. Deploys here are
+  pinned-commitId, so a deploy of "your" commit carries every unshipped commit
+  beneath it. On 2026-08-12 one lane shipped another's disk-jobs runner without
+  reviewing it, purely as an ancestor. Run
+  `git log --oneline <live-sha>..<your-sha>` before deploying and read what else
+  is in it.
 - **"The mechanism is present and the connection is not." Five instances,
   four subsystems, one shape** — agreed with the oversight session
   2026-08-12. Not carelessness; a structural trap that recurs because each
