@@ -432,7 +432,59 @@ Establish which before fixing, and **fix the guard regardless**: `None` means
 Separately: the season script is pinned to `--week 1` in mid-August (consistent
 with the "NFL week self-pins to 1" finding in the E2E assessment).
 
-### `#390` — OPEN, UNOWNED. No sport except MLB has any sim run ledger, so "when did this sim run and how long did it take" is unanswerable for 6 of 7 sports
+### `#390` — BUILT AND PUSHED (`2411d748`), NOT DEPLOYED. No sport except MLB had any sim run ledger, so "when did this sim run and how long did it take" was unanswerable for 6 of 7 sports
+
+**WHAT SHIPPED** — `syndicate/features/shared/sim_run_ledger.py`, wired at the
+choke points every sim already passes through rather than at each sim:
+
+    refresh_odds_sources._run_command             soccer, nba, wnba, nhl
+    run_refresh_worker season-projection autorun  nfl, ncaaf
+    live_refresh_loop._launch_mlb_daily_sim       mlb (launch mirror only)
+
+Instrumenting each sim individually is how this ends up half-done and silently
+missing whichever sport was added last — the same shape as the guards on this
+list that were correct and unreached. NCAAB is **correctly absent**: it has no
+sim step at all, only an odds snapshot.
+
+MLB keeps its own richer record as the authority on how a run ended; the mirror
+is **launch-only**, because duplicating the finaliser would create two writers
+for one fact — the exact defect `#388` had to unpick.
+
+**CLASSIFIED ON THE COMMAND, NOT THE STEP NAME.** A name allowlist goes stale
+the moment a sport is added. Pattern order is load-bearing and tested:
+`generate_smartsim2_nfl` is a prefix of the preseason script, and those are two
+distinct jobs at ~46 and ~40 runs/day.
+
+**A SIM-SHAPED STEP THAT MATCHES NO PATTERN IS LOGGED, NOT DROPPED**
+(`SIM_LEDGER_UNCLASSIFIED`). An instrument that cannot record its own blind
+spot is indistinguishable from one that has none — which is the recurring
+finding of this whole investigation.
+
+**The summary reports a DENOMINATOR, not a bare count:** runs / ok / failed /
+**unfinished**. Ten runs that all failed must not read as a healthy ten, and a
+launch-time record with no completion is neither ok nor failed — conflating
+those is precisely how `#388` produced zero recorded failures.
+
+**READ PATH:** `GET /api/ops/sims/ledger?date=YYYY-MM-DD` — per-sport counts,
+p50/max/total duration, and the runs. Reads the shared keyvalue store, so it
+answers for runs recorded on either worker; a plain file read from web sees
+only what web wrote, which is nothing (`#304` split). `index_present`
+distinguishes *no runs recorded* from *the ledger is not reachable from here* —
+a bare empty list reads as the former when it may be the latter.
+
+**VERIFICATION.** 11 ledger tests. The ones that carry weight drive the **real**
+`_run_command`: a soccer sim step reaches the ledger, a non-sim step does not,
+and an unclassified sim-shaped step is logged. A ledger that is correct and
+never called is the defect class this repo keeps rediscovering. Regression: 88
+passed across the odds-refresh and season-projection suites; 34 passed
+including `test_mlb_sim_run_reconcile` after the MLB mirror.
+
+**NOT DEPLOYED, AND THEREFORE UNPROVEN.** Every claim above rests on tests. The
+first real check is `/api/ops/sims/ledger?date=` returning a non-empty
+`by_sport` for soccer/nba/wnba/nhl after a refresh cycle, and
+`SIM_LEDGER_UNCLASSIFIED` being absent — if it appears, a sim step exists that
+this classifier does not know about, which is the ledger telling you its own
+coverage gap.
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §0, §5, §8.
 

@@ -10,6 +10,12 @@ local `data/**` mirror.
 
 **Only MLB has a sim run ledger, and half its entries are wrong.**
 
+> **Update, same day.** All three defects below were fixed. `#388` (half the
+> entries wrong) and `#389` (NFL busy loop) are **deployed and confirmed in
+> production**; `#390` — a ledger for the other six sports — is **built and
+> pushed but not deployed**, so the table below still describes production
+> until it lands. See §9.
+
 | question | MLB | NFL / NCAAF | soccer | NBA / WNBA / NHL | NCAAB |
 |---|---|---|---|---|---|
 | launches recorded? | yes (`MLB_DAILY_SIM_TRIGGERED`) | no | no | no | n/a (no sim step) |
@@ -462,7 +468,7 @@ and nothing has been deployed by this work.**
 | 2026-08-12 | `#388`+`#389` deployed to refresh-worker (`239b5eba`, live 20:32:22Z) | **live** |
 | 2026-08-12 | `#389` **confirmed in production** — 2 launches in 62 min vs ~12, suppression named in the log; surfaced that the NFL artifacts are never written at all | **confirmed** |
 | 2026-08-12 | `#388` **regression**: live-odds-worker stamped 3 of 3 live sims `died_untracked` — shared pointer vs local `_process_exists`. Gate `f6c0525f` deployed to live-odds-worker (live 21:44:13Z) | **confirmed 21:54Z** — first post-gate launch clean, null verified against a live instrument |
-| — | `#390` (per-sport sim ledger) | **not started** |
+| 2026-08-12 | **`#390` built** (`2411d748`) — `sim_run_ledger` wired at `_run_command` (soccer/nba/wnba/nhl), the season-projection autorun (nfl/ncaaf) and the MLB launcher; read via `/api/ops/sims/ledger?date=`. 11 tests, incl. wiring against the real step runner | **pushed, NOT deployed** |
 
 ### `#388` as implemented
 
