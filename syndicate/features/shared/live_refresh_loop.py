@@ -3690,6 +3690,7 @@ def _apply_pregame_sport_cadence(
 	markers = _read_pregame_sport_sweep_epochs()
 	kept: list[str] = []
 	skipped: list[str] = []
+	skip_detail: dict[str, tuple[float, float]] = {}
 	for sport in sports:
 		normalized = str(sport).strip().lower()
 		if not normalized:
@@ -3718,6 +3719,34 @@ def _apply_pregame_sport_cadence(
 			kept.append(normalized)
 			continue
 		skipped.append(normalized)
+		skip_detail[normalized] = (now_epoch - last_epoch, float(interval))
+	if skip_detail:
+		# WHAT THE FILTER READ, not just what it decided (`#382`).
+		#
+		# `#378` established that WNBA never launches -- it produces no
+		# ODDS_SWEEP_OUTCOME line at all, because a sport is only graded once it
+		# has been stamped as launched. That ruled out "runs and writes nothing"
+		# and left "is skipped", but not WHY.
+		#
+		# A sport reaches this branch only when 0 < (now - marker) < interval, so
+		# the marker is the whole decision. WNBA's real capture last wrote at
+		# 07:18:51Z -- 9h before this was added, against a 2h interval -- so its
+		# marker must be advancing without a capture behind it.
+		#
+		# That is consistent by construction: markers are recorded BEFORE the
+		# launch (`#25`, so a launch that dies costs one missed window rather
+		# than a duplicate sweep). If the launch dies EVERY time, the marker
+		# advances forever and the sport is skipped forever -- a permanent stall,
+		# not the single missed window that rule anticipates. Printing the marker
+		# age turns that from an inference into a reading.
+		print(
+			"[live_refresh_loop] PREGAME_CADENCE_DETAIL "
+			+ " ".join(
+				f"{sport}:marker_age_s={int(age)}/interval_s={int(iv)}"
+				for sport, (age, iv) in sorted(skip_detail.items())
+			),
+			flush=True,
+		)
 	return kept, skipped
 
 
