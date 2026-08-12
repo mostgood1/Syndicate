@@ -48,6 +48,7 @@ from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared import opportunity_gate
+from syndicate.features.shared.book_margin_model import market_family as _market_family
 from syndicate.features.shared.opportunity_signals import (
     blended_score,
     devig,
@@ -265,10 +266,33 @@ SHORTLIST_MAX_QUOTE_AGE_SECONDS = 14 * 3600
 # numbers rots exactly the way the migration gate's hand-written per-sport
 # blocks did; a formula with its measurement attached does not.
 #
-# 2.0 = "a market may hold up to twice what this sport typically holds". Below
-# that it is normal pricing; beyond it the price is materially worse than the
-# sport's own market structure explains.
-SHORTLIST_HOLD_MULTIPLE = 2.0
+# 1.25 = "a market may hold up to a quarter more than its FAMILY typically
+# holds". Below that it is normal pricing; beyond it the price is materially
+# worse than that family's own market structure explains.
+#
+# **WAS 2.0, AND 2.0 REJECTED NOTHING ANYWHERE** -- measured on the served board
+# 2026-08-12: floors of mlb -12.02, soccer -13.35, wnba -10.53, nfl -8.27 with
+# `rows_below_value_floor = 0` board-wide. A junk filter that has never fired is
+# indistinguishable from no filter.
+#
+# 1.25 is set off the per-family EV spread, not guessed (`#383`), n=200 served:
+#
+#     family        ev_med          within-family spread
+#     moneyline     +0.35 / -0.11   tight
+#     spread        +0.78 /  0.00
+#     total         +0.46
+#     player_prop   -6.00 mlb / -6.85 soccer / -6.78 wnba   -7.87..-6.28
+#
+# Against each family's own anchor, x1.0 cuts ~half of EVERY family (that is
+# rejecting normal pricing, not junk) and x1.5 and x2.0 cut nothing. 1.25 is the
+# tightest value that does not cut normally-priced rows.
+#
+# **HONEST LIMIT:** on today's pool 1.25 also rejects nothing, because nothing in
+# the pool is junk RELATIVE TO ITS FAMILY. That is the filter working as
+# specified -- it is a junk filter, not a value gate. It is NOT the instrument
+# that will keep -6.5% props off the board; see `SHORTLIST_KIND_FLOOR`, which
+# guarantees 30 prop slots per sport whether or not anything deserves them.
+SHORTLIST_HOLD_MULTIPLE = 1.25
 
 # Fewest two-sided markets needed before a sport's measured hold is trusted.
 # Under this the flat default is used, because a median over three markets is
@@ -276,7 +300,13 @@ SHORTLIST_HOLD_MULTIPLE = 2.0
 SHORTLIST_HOLD_MIN_MARKETS = 8
 
 
-def _measured_floor_for_pool(rows: Iterable[Mapping[str, Any]], *, multiple: float, fallback: float) -> tuple[float, dict[str, Any]]:
+def _measured_floor_for_pool(
+    rows: Iterable[Mapping[str, Any]],
+    *,
+    multiple: float,
+    fallback: float,
+    _split: bool = True,
+) -> tuple[float, dict[str, Any]]:
     """A sport's value floor, derived from its own measured hold.
 
     Regroups the pool's one-side-per-row candidates back into markets, takes
@@ -291,11 +321,54 @@ def _measured_floor_for_pool(rows: Iterable[Mapping[str, Any]], *, multiple: flo
     most soccer markets, which is why measuring here rather than downstream
     matters.
     """
+    from syndicate.features.shared.book_margin_model import market_family
     from syndicate.features.shared.opportunity_signals import hold_pct
 
     # Materialised: the `#382` modelled-hold branch walks the pool a second
     # time, and the annotation says Iterable -- a generator would arrive empty.
     rows = list(rows)
+
+    # `#383` -- SPLIT BY FAMILY BEFORE MEASURING ANYTHING.
+    #
+    # One floor per sport blends market structures that are 7 EV points apart.
+    # Measured on the served board 2026-08-12, n=200:
+    #
+    #     moneyline +0.35   spread +0.78   total +0.46   player_prop -6.50
+    #
+    # A prop and a moneyline are not the same bet priced differently; books
+    # charge a different margin for each, which is the exact distinction
+    # `market_family` exists to draw and which the sport-wide median erased. The
+    # blended floor then judged MLB's +0.35 moneylines and its -6.00 props by one
+    # number, so it could only ever be too loose for one and too tight for the
+    # other.
+    #
+    # Recursion is one level deep and cannot repeat: the recursive call passes a
+    # single family's rows, so `by_family` below has one key and the branch is
+    # skipped. Guarded on `_split` rather than on len() so that stays true if a
+    # family ever measures empty.
+    if _split:
+        by_family: dict[str, list[Mapping[str, Any]]] = {}
+        for row in rows:
+            by_family.setdefault(market_family(row.get("market")), []).append(row)
+        if len(by_family) > 1:
+            per_family: dict[str, float] = {}
+            evidence_by_family: dict[str, Any] = {}
+            for family, family_rows in by_family.items():
+                family_floor, family_evidence = _measured_floor_for_pool(
+                    family_rows, multiple=multiple, fallback=fallback, _split=False
+                )
+                per_family[family] = family_floor
+                evidence_by_family[family] = family_evidence
+            # The scalar return stays the LOOSEST family floor so any caller that
+            # ignores `by_family` cannot silently tighten a family it never
+            # measured -- an unknown family must not land on a stricter rule than
+            # the one it would have earned.
+            return min(per_family.values()), {
+                "method": "per_family",
+                "by_family": per_family,
+                "evidence_by_family": evidence_by_family,
+            }
+
     markets: dict[tuple[Any, ...], dict[str, Any]] = {}
     for row in rows:
         quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
@@ -1327,10 +1400,15 @@ def select_shortlist(
             rows, multiple=hold_multiple, fallback=value_floor
         )
         floor_report[sport] = floor_evidence
+        # `#383`: judge each row against ITS OWN family's floor. `sport_floor` is
+        # the loosest family and is used only for a family we did not measure --
+        # never tighten a row on a rule derived from a different market type.
+        family_floors = floor_evidence.get("by_family") or {}
         kept: list[Mapping[str, Any]] = []
         for row in rows:
             value_pct = _row_value_pct(row)
-            if value_pct is not None and value_pct < sport_floor:
+            row_floor = family_floors.get(_market_family(row.get("market")), sport_floor)
+            if value_pct is not None and value_pct < row_floor:
                 below_value_floor += 1
                 continue
             kept.append(row)

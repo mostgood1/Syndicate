@@ -297,7 +297,8 @@ class PerSportMeasuredFloorTests(unittest.TestCase):
         self.assertEqual(ev["method"], "measured_hold")
         self.assertEqual(ev["markets_measured"], 12)
         self.assertAlmostEqual(ev["median_hold_pct"], 4.5455, places=3)
-        self.assertAlmostEqual(ev["floor"], -9.0909, places=3)
+        # 4.5455 hold x 1.25 (`#383`; was x2.0 and rejected nothing anywhere).
+        self.assertAlmostEqual(ev["floor"], -5.6819, places=3)
 
     def test_too_few_markets_falls_back_to_the_flat_default(self) -> None:
         """A median over three markets is not a market-structure measurement,
@@ -385,7 +386,8 @@ class ModelledHoldFloorTests(unittest.TestCase):
         out = select_shortlist(rows, now=_NOW)
         evidence = (out["value_floor_by_sport"] or {}).get("soccer") or {}
         self.assertEqual(evidence.get("method"), "modelled_hold")
-        self.assertAlmostEqual(evidence.get("floor"), -11.06, places=2)
+        # 5.53 hold x 1.25 (`#383`).
+        self.assertAlmostEqual(evidence.get("floor"), -6.9125, places=3)
         self.assertEqual(len(out["rows"]), 12, "soccer was deleted by an MLB-shaped floor")
         self.assertEqual(out["rows_below_value_floor"], 0)
 
@@ -472,3 +474,58 @@ class ModelledHoldReachesTheFloorTests(unittest.TestCase):
             "the margin model's hold did not survive grid -> candidate; the "
             "modelled-hold floor is inert again",
         )
+
+
+class PerFamilyFloorTests(unittest.TestCase):
+    """`#383` -- one floor per sport blended market structures 7 EV points apart.
+
+    Measured on the served board 2026-08-12, n=200 rows:
+
+        moneyline +0.35   spread +0.78   total +0.46   player_prop -6.50
+
+    A blended sport floor judges MLB's +0.35 moneylines and its -6.00 props by
+    one number, so it is necessarily too loose for one and too tight for the
+    other. Books charge different margins per family; that is what
+    `market_family` is for.
+    """
+
+    @staticmethod
+    def _row_fam(*, market, ev, hold, sport="mlb"):
+        row = _row(sport=sport, ev=ev)
+        row["market"] = market
+        row["quote"]["assumed_hold_pct"] = hold
+        return row
+
+    def test_each_family_is_floored_on_its_own_hold(self) -> None:
+        rows = [self._row_fam(market="h2h", ev=0.35, hold=4.0) for _ in range(10)]
+        rows += [self._row_fam(market="player_points", ev=-6.0, hold=12.0) for _ in range(10)]
+        out = select_shortlist(rows, now=_NOW)
+        ev = (out["value_floor_by_sport"] or {}).get("mlb") or {}
+        self.assertEqual(ev.get("method"), "per_family")
+        floors = ev.get("by_family") or {}
+        self.assertIn("player_prop", floors)
+        self.assertIn("moneyline", floors)
+        # The prop family holds 3x what the moneyline family does, so its floor
+        # must be materially looser -- that is the whole point of the split.
+        self.assertLess(floors["player_prop"], floors["moneyline"])
+        self.assertEqual(len(out["rows"]), 20, "a family was cut by another family's floor")
+
+    def test_a_prop_is_not_judged_by_the_moneyline_floor(self) -> None:
+        # The regression: 30 tight moneylines drag a blended floor up until the
+        # normally-priced props fall through it.
+        rows = [self._row_fam(market="h2h", ev=0.35, hold=1.0) for _ in range(30)]
+        rows += [self._row_fam(market="player_points", ev=-6.0, hold=12.0) for _ in range(10)]
+        out = select_shortlist(rows, now=_NOW)
+        kept_props = [r for r in out["rows"] if r.get("market") == "player_points"]
+        self.assertEqual(len(kept_props), 10, "props were judged on the moneyline family's hold")
+
+    def test_the_scalar_floor_is_the_loosest_family(self) -> None:
+        # An unmeasured family falls back to the scalar. It must never be
+        # stricter than a family we did measure, or an unknown market type gets
+        # a harsher rule than any known one.
+        rows = [self._row_fam(market="h2h", ev=0.35, hold=1.0) for _ in range(10)]
+        rows += [self._row_fam(market="player_points", ev=-6.0, hold=12.0) for _ in range(10)]
+        out = select_shortlist(rows, now=_NOW)
+        ev = (out["value_floor_by_sport"] or {}).get("mlb") or {}
+        self.assertEqual(ev.get("floor", None) if "floor" in ev else min((ev.get("by_family") or {}).values()),
+                         min((ev.get("by_family") or {}).values()))
