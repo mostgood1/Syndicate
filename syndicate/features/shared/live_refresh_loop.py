@@ -2089,6 +2089,125 @@ def _clear_active_pointer(expected_pid: Any = None) -> None:
 		pass
 
 
+def _sim_run_duration_seconds(started_at: Any, finished_at: Any = None) -> int | None:
+	"""`#388`. Duration as a FIELD, not something every reader re-derives.
+
+	The two timestamps in a run record are not in the same zone -- the launcher
+	stamps `started_at` in UTC (`_utc_now`) and `run_mlb_daily_sim_job.py`
+	stamps its `finishedAt` in Central. Both parse correctly tz-aware, so the
+	arithmetic is right and eyeballing the two strings is wrong. Emitting the
+	number removes the trap.
+	"""
+	try:
+		start_raw = str(started_at or "").strip()
+		if not start_raw:
+			return None
+		start_dt = datetime.fromisoformat(start_raw.replace("Z", "+00:00"))
+		if start_dt.tzinfo is None:
+			start_dt = start_dt.replace(tzinfo=timezone.utc)
+		end_raw = str(finished_at or "").strip()
+		if end_raw:
+			end_dt = datetime.fromisoformat(end_raw.replace("Z", "+00:00"))
+			if end_dt.tzinfo is None:
+				end_dt = end_dt.replace(tzinfo=timezone.utc)
+		else:
+			end_dt = datetime.now(timezone.utc)
+		return max(0, int((end_dt - start_dt).total_seconds()))
+	except Exception:
+		return None
+
+
+def _sim_run_already_finalized(record: Any) -> bool:
+	"""Whether a stored run record already carries an outcome. `#388`.
+
+	**Must tolerate BOTH schemas.** `run_mlb_daily_sim_job.py:394` writes
+	camelCase (`ok`/`returnCode`/`startedAt`/`finishedAt`) and
+	`_persist_finished_mlb_sim_run` writes snake_case (`state`/`exit_code`/
+	`finished_at`). A wrapper-written record has **no `state` key at all**, so
+	a check of `state != "running"` alone reads it as unfinalized and would
+	overwrite a genuinely completed run with a death certificate.
+	"""
+	if not isinstance(record, dict):
+		return False
+	if record.get("finished_at") or record.get("finishedAt"):
+		return True
+	state = str(record.get("state") or "").strip().lower()
+	return bool(state) and state != "running"
+
+
+def _finalize_orphaned_sim_run(meta: dict[str, Any], *, state: str, detail: str) -> None:
+	"""Write the death certificate for a run that ended without its launcher
+	observing it. `#388`.
+
+	**MEASURED 2026-08-12 on production:** 21 of 41 MLB runs that still had a
+	status record sat at `state: "running"` forever -- one of them 40.7h old --
+	while every run that DID finish read `exit_code: 0`. **There was not a
+	single recorded failure, because the failure mode could not be recorded.**
+	Correlated against the Render events API: a deploy during the run on 9/9
+	orphans and 0/4 completions, with 25 deploys to refresh-worker in 17.8h.
+
+	`_persist_finished_mlb_sim_run` is the only writer that can record an
+	outcome and it reads the module-global `_MLB_SIM_RUN_META`, which the
+	container restart that kills the sim also clears -- so the finalize can
+	never run for exactly the runs that died.
+
+	The active pointer is the durable half: it survives the restart the globals
+	do not, and already carries date/run_stamp/pid/started_at. That makes the
+	run's identity recoverable at precisely the moment `_shared_mlb_sim_still_running`
+	decides the pointer is stale -- turning a silent clear into a recorded
+	outcome, with no new state and no extra IO on the happy path.
+
+	Consequence beyond bookkeeping: a killed run's artifact never lands, so the
+	next tick re-derives `first_appearance`/`fingerprint_change` and relaunches.
+	**A deploy is an unlogged re-sim trigger**, and it stays unlogged until
+	these records say so.
+	"""
+	if not isinstance(meta, dict):
+		return
+	date_str = str(meta.get("date") or "").strip()
+	run_stamp = str(meta.get("run_stamp") or "").strip()
+	if not date_str or not run_stamp:
+		return
+	status_path = _mlb_sim_runs_state_dir() / f"{date_str}_{run_stamp}_status.json"
+	try:
+		existing = read_json_file(status_path)
+	except Exception:
+		existing = None
+	if _sim_run_already_finalized(existing):
+		return
+	payload = dict(existing) if isinstance(existing, dict) and existing else dict(meta)
+	payload.setdefault("date", date_str)
+	payload.setdefault("run_stamp", run_stamp)
+	started_at = payload.get("started_at") or payload.get("startedAt") or meta.get("started_at")
+	payload["state"] = state
+	payload["detail"] = detail
+	payload["finished_at"] = _utc_now()
+	payload["finalized_by"] = "orphan_reconcile"
+	payload.setdefault("exit_code", None)
+	duration_seconds = _sim_run_duration_seconds(started_at)
+	if duration_seconds is not None:
+		payload["duration_seconds"] = duration_seconds
+	try:
+		write_json_file(status_path, payload)
+	except Exception:
+		return
+	# print, not logger.info -- logger.info never reaches Render's log collector.
+	print(
+		f"[live_refresh_loop] MLB_DAILY_SIM_ORPHANED date={date_str} run_stamp={run_stamp} "
+		f"state={state} detail={detail} pid={meta.get('pid')} duration_seconds={duration_seconds}",
+		flush=True,
+	)
+
+
+def _retire_stale_active_pointer(meta: dict[str, Any], *, state: str, detail: str) -> None:
+	"""Record the outcome, THEN clear the pointer. `#388`.
+
+	Order matters: clearing first loses the run identity the finalize needs.
+	"""
+	_finalize_orphaned_sim_run(meta, state=state, detail=detail)
+	_clear_active_pointer(expected_pid=meta.get("pid"))
+
+
 def _shared_mlb_sim_still_running() -> bool:
 	"""Cross-worker, restart-safe check: is there a genuinely live sim
 	process behind the shared active-run pointer? Falls back to False (safe
@@ -2112,14 +2231,26 @@ def _shared_mlb_sim_still_running() -> bool:
 	if started_dt is not None:
 		age_seconds = (datetime.now(timezone.utc) - started_dt).total_seconds()
 		if age_seconds > _MLB_SIM_MAX_RUNTIME_SECONDS:
-			_clear_active_pointer(expected_pid=pid)
+			# `#388`: each of these five branches is a decision that a run is
+			# over. Recording WHICH one fired is the whole point -- an
+			# undifferentiated "not running" is what made 51% of runs
+			# indistinguishable from runs that never ended.
+			_retire_stale_active_pointer(
+				meta,
+				state="killed_runtime_ceiling",
+				detail=f"age_seconds={int(age_seconds)} exceeded _MLB_SIM_MAX_RUNTIME_SECONDS={_MLB_SIM_MAX_RUNTIME_SECONDS}",
+			)
 			return False
 		# Same reasoning as the runtime ceiling above, but reacting to the run
 		# having stopped ADVANCING rather than merely having lived a long
 		# time -- the cross-container path is the one that wedged production
 		# on 2026-08-04.
 		if _mlb_sim_progress_is_stalled(meta):
-			_clear_active_pointer(expected_pid=pid)
+			_retire_stale_active_pointer(
+				meta,
+				state="killed_stalled",
+				detail="progress snapshot stopped advancing",
+			)
 			return False
 		# A pointer recorded before this very process started can only belong
 		# to a previous, now-dead container (single-instance service -- see
@@ -2128,13 +2259,27 @@ def _shared_mlb_sim_still_running() -> bool:
 		# whose /proc/<pid>/cmdline happens to be unreadable during the new
 		# container's own early boot.
 		if started_dt < _PROCESS_STARTED_AT:
-			_clear_active_pointer(expected_pid=pid)
+			# `#388`: THE measured case -- 9/9 orphaned runs had a deploy
+			# during the run, 0/4 completions did.
+			_retire_stale_active_pointer(
+				meta,
+				state="killed_by_restart",
+				detail=f"run started {started_at}, before this process started at {_PROCESS_STARTED_AT.isoformat()}",
+			)
 			return False
 	if not _process_exists(pid):
-		_clear_active_pointer(expected_pid=pid)
+		_retire_stale_active_pointer(
+			meta,
+			state="died_untracked",
+			detail=f"pid {pid} no longer exists",
+		)
 		return False
 	if not _process_matches_lock(pid, meta.get("command")):
-		_clear_active_pointer(expected_pid=pid)
+		_retire_stale_active_pointer(
+			meta,
+			state="died_untracked",
+			detail=f"pid {pid} cmdline no longer matches the launched command",
+		)
 		return False
 	return True
 
@@ -2185,10 +2330,45 @@ def _persist_finished_mlb_sim_run(*, state: str = "finished") -> None:
 		if log_text:
 			write_text_file(sim_base / f"{date_str}_{run_stamp}.log", log_text[-40000:])
 		returncode = _MLB_SIM_PROCESS.returncode if _MLB_SIM_PROCESS is not None else None
-		status_payload = dict(meta)
+		# `#388`: MERGE, don't replace. Two writers target this exact path with
+		# different schemas -- run_mlb_daily_sim_job.py:394 writes camelCase
+		# (ok/returnCode/timedOut/publishedArtifacts/sims/workers) and this one
+		# writes snake_case. Last writer won and this one usually writes last:
+		# MEASURED 2026-08-12, 40 of 41 records carried the launcher schema, so
+		# the wrapper's own outcome fields -- publishedArtifacts and timedOut
+		# among them -- were destroyed in 98% of runs. Reading first preserves
+		# whatever the wrapper recorded before it exited.
+		existing_status = None
+		try:
+			existing_status = read_json_file(sim_base / f"{date_str}_{run_stamp}_status.json")
+		except Exception:
+			existing_status = None
+		status_payload = dict(existing_status) if isinstance(existing_status, dict) and existing_status else {}
+		status_payload.update(meta)
 		status_payload["state"] = state
 		status_payload["exit_code"] = returncode
 		status_payload["finished_at"] = _utc_now()
+		duration_seconds = _sim_run_duration_seconds(
+			status_payload.get("started_at") or status_payload.get("startedAt"),
+		)
+		if duration_seconds is not None:
+			status_payload["duration_seconds"] = duration_seconds
+		# `#388` third defect: the wrapper prints MLB_DAILY_SIM_START/_END with
+		# flush=True, but _launch_mlb_daily_sim redirects its stdout to a file on
+		# the worker disk -- so across 7 days of Render logs for both workers
+		# there were 189 TRIGGERED lines and 0 START, 0 END, 0 TIMEOUT. Every sim
+		# start was visible and no sim finish was. Emitting the completion from
+		# the LAUNCHER (which already emits TRIGGERED and is not redirected)
+		# closes the pair without fighting the redirect the log tail depends on.
+		# Emitted BEFORE the write on purpose: the state-store write is the
+		# half that can fail silently (it is what failed for every orphaned
+		# run), so the log line has to be the one that survives it.
+		print(
+			f"[live_refresh_loop] MLB_DAILY_SIM_END date={date_str} run_stamp={run_stamp} "
+			f"state={state} exit_code={returncode} duration_seconds={duration_seconds} "
+			f"reason={meta.get('reason')} pid={meta.get('pid')}",
+			flush=True,
+		)
 		write_json_file(sim_base / f"{date_str}_{run_stamp}_status.json", status_payload)
 		_clear_active_pointer(expected_pid=meta.get("pid"))
 	except Exception:

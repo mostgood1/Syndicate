@@ -1,8 +1,49 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#388` — OPEN, UNOWNED, MEASURED. Half of all MLB sims are killed by deploys, and the run ledger records nothing — every completed run reads `exit_code: 0`
+### `#388` — FIXED IN THE WORKING TREE, NOT YET DEPLOYED. Half of all MLB sims are killed by deploys, and the run ledger records nothing — every completed run reads `exit_code: 0`
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §3.
+
+**WHAT CHANGED** (`live_refresh_loop.py`, + `tests/test_mlb_sim_run_reconcile.py`):
+
+1. `_finalize_orphaned_sim_run` + `_retire_stale_active_pointer` — all five
+   branches of `_shared_mlb_sim_still_running` that decide a run is over now
+   write a death certificate before clearing the pointer, with the cause named:
+   `killed_by_restart` / `killed_runtime_ceiling` / `killed_stalled` /
+   `died_untracked`. No new state: the active pointer already carried
+   date/run_stamp/pid/started_at and already survived the restart the module
+   globals do not.
+2. `_persist_finished_mlb_sim_run` **merges** instead of replacing, so the
+   wrapper's `publishedArtifacts`/`timedOut`/`ok`/`sims`/`workers` stop being
+   destroyed (they were, in 40 of 41 records).
+3. `duration_seconds` is emitted as a field, so no reader has to diff a UTC
+   `started_at` against a Central `finished_at`.
+4. The launcher emits `MLB_DAILY_SIM_END` itself. The wrapper's own START/END
+   go to a worker-disk file and reached Render **0 times in 7 days**; the
+   launcher is not redirected. Emitted *before* the state-store write on
+   purpose — the write is the half that fails silently.
+
+**VERIFICATION.** 8 tests, run against a real state directory on disk driving
+the **real** `_shared_mlb_sim_still_running` — not the helper with a hand-built
+payload, because "the branch works given the input, and nothing asserted the
+input arrives" is the exact defect class this fix belongs to. **5 of the 8 fail
+without the change** (verified by reverting the file to `HEAD` and re-running).
+The 3 that pass either way are the false-positive guards, which old code passes
+by doing nothing.
+
+**The subtle one worth keeping:** the "already finalized?" check must tolerate
+BOTH schemas. A wrapper-written record has **no `state` key at all**, so a
+`state != "running"` test reads a genuinely completed run as unfinalized and
+stamps it killed. `test_wrapper_written_completion_is_never_overwritten` exists
+for that and is the most dangerous false positive in the fix.
+
+**Known limit, stated rather than hidden:** for an orphan, `duration_seconds` is
+an **upper bound** — the run died when the container did, and we only notice on
+the next tick, so the gap includes the restart. The test asserts a bound, not an
+equality, so the field's meaning is written down.
+
+**Not deployed.** Deploying kills in-flight sims, which is the very thing this
+measures; needs a deliberate window.
 
 **MEASURED 2026-08-12 on production.** Of 41 MLB sim runs that still had a status
 record, **21 (51%) are stuck at `state: "running"`** — one of them 40.7h old.

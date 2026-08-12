@@ -457,7 +457,44 @@ and nothing has been deployed by this work.**
 | 2026-08-12 | **Retracted** an earlier claim in this report that `child_count` was valid; measured it reading 0 with three sims running (§8) | done |
 | 2026-08-12 | Filed on `docs/ai_context/todo.md` as `#388` (deploy-killed sims / broken run ledger), `#389` (NFL TTL guard), `#390` (no sim ledger for 6 of 7 sports) | done |
 | 2026-08-12 | Renumbered those three from `#387`–`#389` after a concurrent session pushed its own `#387` into the same gap | done |
-| — | Fixes in §7 | **not started** |
+| 2026-08-12 | **`#388` implemented** — orphan reconcile, merge-not-clobber, `duration_seconds`, launcher-emitted `MLB_DAILY_SIM_END`. 8 new tests, 5 red without the change; `test_live_refresh_loop.py` 219 passed | **in working tree, NOT deployed** |
+| — | `#389` (NFL TTL guard), `#390` (per-sport sim ledger) | **not started** |
+
+### `#388` as implemented
+
+Four changes in `syndicate/features/shared/live_refresh_loop.py`, plus
+`tests/test_mlb_sim_run_reconcile.py`:
+
+1. **Orphan reconcile.** All five branches of `_shared_mlb_sim_still_running`
+   that decide a run is over now record *why* before clearing the pointer:
+   `killed_by_restart`, `killed_runtime_ceiling`, `killed_stalled`,
+   `died_untracked`. No new state — the active pointer already carried the run
+   identity and already outlived the restart that clears the module globals.
+2. **Merge, not replace,** in `_persist_finished_mlb_sim_run`, so the wrapper's
+   `publishedArtifacts`/`timedOut`/`ok`/`sims`/`workers` survive.
+3. **`duration_seconds` as a field**, so nobody diffs a UTC `started_at` against
+   a Central `finished_at` by eye.
+4. **`MLB_DAILY_SIM_END` emitted by the launcher**, which is not redirected —
+   closing the pair that was 189 starts to 0 finishes. Emitted *before* the
+   state-store write deliberately: the write is the half that fails silently.
+
+**Two things the implementation had to get right that the report's §3 didn't
+anticipate:**
+
+- The "already finalized?" check **must tolerate both schemas**. A
+  wrapper-written record has *no `state` key at all*, so a `state != "running"`
+  test reads a completed run as unfinalized and stamps it killed. That is the
+  most dangerous false positive available here, and it exists only because of
+  the two-writer split in §3.
+- For an orphan, `duration_seconds` is an **upper bound**, not a duration: the
+  run died when the container did and we only notice on the next tick, so the
+  gap includes the restart. The test asserts a bound rather than an equality so
+  the field's meaning is recorded rather than implied.
+
+Verified by reverting the file to `HEAD` and re-running: **5 of 8 tests fail
+without the change.** The 3 that pass either way are the false-positive guards,
+which old code passes by doing nothing — worth knowing, since "the test passes"
+would otherwise have been misread as coverage.
 
 ### Coordination
 
