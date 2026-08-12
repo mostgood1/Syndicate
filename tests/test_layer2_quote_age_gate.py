@@ -74,7 +74,7 @@ def test_unparseable_values_do_not_crash_the_gate():
     assert _row_quote_age_seconds({"quote": {"quote_seen_age_seconds": None, "book_age_seconds": None}}) is None
 
 
-def test_the_ceiling_is_one_hour_and_actually_fires():
+def test_the_ceiling_fires_without_deleting_a_sport():
     """`#371` -- the gate was 24h and excluded nothing.
 
     Measured on the served shortlist immediately before the change: seen-age
@@ -88,8 +88,15 @@ def test_the_ceiling_is_one_hour_and_actually_fires():
     """
     from syndicate.features.shared.layer2_board import SHORTLIST_MAX_QUOTE_AGE_SECONDS
 
-    assert SHORTLIST_MAX_QUOTE_AGE_SECONDS == 3600
-    # A row observed 68 minutes ago -- the measured median -- must now be excluded.
-    assert _row_quote_age_seconds(_row(book=22572.0, seen=4110.0)) > SHORTLIST_MAX_QUOTE_AGE_SECONDS
+    assert SHORTLIST_MAX_QUOTE_AGE_SECONDS == 14 * 3600
+    # A quote observed 22.2h ago -- the soccer tail -- is dead and must be excluded.
+    assert _row_quote_age_seconds(_row(book=22572.0, seen=79920.0)) > SHORTLIST_MAX_QUOTE_AGE_SECONDS
     # And one observed a minute ago must survive, however long since it moved.
     assert _row_quote_age_seconds(_row(book=25200.0, seen=60.0)) < SHORTLIST_MAX_QUOTE_AGE_SECONDS
+    # #380: the ceiling must admit WNBA's OLDEST measured quote (13.00h), not
+    # merely its freshest (12.47h). A ceiling between the two -- 12h was proposed
+    # and would have done this -- leaves the sport at zero rows with no counter
+    # naming it. Both ends are asserted because checking only the fresh end is
+    # the exact mistake that produced the 12h proposal.
+    assert _row_quote_age_seconds(_row(book=25200.0, seen=44892.0)) < SHORTLIST_MAX_QUOTE_AGE_SECONDS
+    assert _row_quote_age_seconds(_row(book=25200.0, seen=46800.0)) < SHORTLIST_MAX_QUOTE_AGE_SECONDS

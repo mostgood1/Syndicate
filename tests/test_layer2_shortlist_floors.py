@@ -109,18 +109,32 @@ class QuoteAgeCeilingTests(unittest.TestCase):
         out = select_shortlist([row], now=_NOW)
         self.assertEqual(len(out["rows"]), 1)
 
-    def test_default_ceiling_does_not_delete_todays_board(self) -> None:
-        """The measured clusters -- mlb 11.46h, wnba 13.0h, soccer up to 22.2h --
-        must all survive the DEFAULT. A ceiling that silently emptied the board
-        would look identical to an outage."""
+    def test_default_ceiling_does_not_delete_a_whole_sport(self) -> None:
+        """No sport may go to ZERO rows under the default ceiling (`#380`).
+
+        This is the invariant, not "nothing is excluded" -- the 22.2h soccer tail
+        SHOULD be cut, and this test asserted otherwise until 2026-08-12, which is
+        why it failed silently through the 1h change rather than blocking it.
+
+        Each sport is given its measured span, so a ceiling landing anywhere
+        inside a sport's range still leaves that sport represented. The 1h value
+        took wnba and soccer to zero; 12h took wnba to zero, because wnba's range
+        is 12.47h..13.00h and only its FRESHEST end is below 12h.
+        """
         rows = [
             _row(sport="mlb", age=11.46 * 3600),
-            _row(sport="wnba", age=13.0 * 3600),
+            _row(sport="wnba", age=12.47 * 3600),
+            _row(sport="wnba", age=13.00 * 3600),
+            _row(sport="soccer", age=1.85 * 3600),
             _row(sport="soccer", age=22.2 * 3600),
         ]
         out = select_shortlist(rows, now=_NOW)
-        self.assertEqual(len(out["rows"]), 3, "default ceiling must not gut the live board")
-        self.assertEqual(out["rows_beyond_quote_age"], 0)
+        seated = {r.get("sport") for r in out["rows"]}
+        self.assertEqual(
+            seated, {"mlb", "wnba", "soccer"}, "default ceiling took a sport to zero rows"
+        )
+        # The dead 22.2h soccer quote is excluded -- the gate must still bite.
+        self.assertEqual(out["rows_beyond_quote_age"], 1)
 
     def test_ceiling_is_env_tunable(self) -> None:
         with patch.dict(os.environ, {"SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS": "21600"}, clear=False):

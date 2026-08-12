@@ -189,28 +189,58 @@ SHORTLIST_STALE_KICKOFF_SECONDS = 2 * 3600
 # multiplicatively in the score, which is the right shape while the cause is
 # unknown. Tighten it only after the uniform-lag question is answered. Cost of
 # each value, measured: <=12h keeps 142, <=6h keeps 37, <=4h keeps 13.
-# One hour (`#371`). Was 24h, which excluded 0 of 200 served rows on either
-# clock -- a gate that never fired. `#370` made it read the right clock (time
-# since we LOOKED, not since the price MOVED); this makes it actually bite.
+# FOURTEEN HOURS. Was 24h (a gate that never fired), then 1h for ~18 hours
+# (`#371`), now 14h (`#380`, user decision).
 #
-# Measured on the served shortlist immediately before the change: seen-age
-# median 68.5m, p90 375.8m, and 104 of 200 rows older than an hour. So this is
-# not a cosmetic tightening -- roughly half the board was built on observations
-# over an hour old, on a surface whose whole purpose is to say what is actionable
-# NOW.
+# **THE 1h CEILING DELETED WHOLE SPORTS, AND THE TABLE ABOVE PREDICTED IT.**
+# Read the per-sport minima again: mlb 11.46h, wnba 12.47h, soccer 1.85h. Those
+# are MINIMA. Every sport's FRESHEST quote already exceeded a 1-hour ceiling, so
+# for any sport whose capture cadence is slower than an hour the gate is not a
+# filter, it is a delete. Measured on the served board at 15:20Z:
 #
-# Board SIZE should hold: 3,101 candidates were considered for 200 slots against
-# a per-sport limit of 100, so excluded rows backfill from fresher candidates.
-# What changes is composition, not volume. If the board shrinks materially
-# instead, that means the fresh candidate pool is thinner than the gate assumes
-# and the ceiling -- not the pool -- should be revisited.
+#     sport   ingested   available at selection   selected
+#     mlb        4,790          4,452              100  (capped)
+#     nfl        2,704             28               28  (99% eliminated)
+#     wnba       1,506              0               --  (100% eliminated)
+#
+# The 1h rationale argued board size would hold because "excluded rows backfill
+# from fresher candidates." That is true of MLB alone -- it has a 4,452-row pool
+# holding captures fresher than the 100 sampled -- and was generalised to the
+# board. NFL and WNBA have no such pool. Board landed at 128 of 200 slots, which
+# is the falsification condition the 1h note itself named.
+#
+# 14h is set by WNBA's MAXIMUM, not its minimum, and that distinction is the
+# whole reason this value is not 12h. A ceiling admits a sport only if it clears
+# that sport's OLDEST quote; clearing the freshest one just means the sport is
+# partially deleted. WNBA spans 12.47h..13.00h, so:
+#
+#     ceiling   MLB (11.46h)   WNBA (12.47-13.00h)   soccer tail (22.20h)
+#      6h         gone              gone                  gone
+#     12h         kept          STILL GONE (13.00 > 12)   gone
+#     14h         kept              kept                  gone
+#
+# 12h was the first value proposed here and it would have left WNBA at zero for
+# the second time in a day, from an off-by-one-hour comparison against the wrong
+# end of the range. The corroborating number was already in the 200-row
+# measurement: "<=12h keeps 142" = 100 MLB + ~42 soccer + ZERO WNBA.
+#
+# 14h gives one hour of headroom over WNBA's oldest, and still bites -- it
+# excludes the 22.20h soccer tail and anything genuinely dead.
+#
+# **THIS IS A BACKSTOP, NOT THE FIX FOR STALENESS.** The uniform-lag finding
+# above still stands unexplained -- 100 MLB quotes inside a 1.2-minute spread is
+# one capture event ~11.5h old, not 100 stable markets. `_freshness_factor`
+# discounts age multiplicatively in the score, which is the right shape while the
+# cause is unknown. Tighten this only after that question is answered, and if you
+# do, check per-sport survival BEFORE shipping -- the failure mode here was not a
+# wrong number, it was a whole-board average hiding two sports going to zero.
 #
 # Deliberately a code constant rather than an env var: no
 # SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS is set on any service or in
-# render.yaml (checked), so the default IS the live value, and a render.yaml
-# edit would be a blueprint_sync production event for a number that belongs in
-# review.
-SHORTLIST_MAX_QUOTE_AGE_SECONDS = 3600
+# render.yaml (re-checked 2026-08-12 against all three services' live env), so
+# the default IS the live value, and a render.yaml edit would be a
+# blueprint_sync production event for a number that belongs in review.
+SHORTLIST_MAX_QUOTE_AGE_SECONDS = 14 * 3600
 
 
 # How many times a sport's OWN typical hold a row may be worse before it is
