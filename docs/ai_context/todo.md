@@ -1,5 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#376` — OPEN, UNOWNED. The intelligence-state build reaches `post_build_overview` and never gets to `BOARD_RAW_CANDIDATES`. Five causes eliminated, none proposed
+
+**The board has served the same artifact since 2026-08-12 01:39:38Z.** Not the
+shortlist specifically — the whole state build stops, and the shortlist is
+downstream of it. `LAYER2_SHORTLIST` and `BOARD_RAW_CANDIDATES` are both silent.
+
+**ESTABLISHED, measured 2026-08-11 21:45-22:00 CT:**
+
+- The loop is ALIVE. 26 `intelligence_state` lines after a worker restart,
+  `BOARD_OVERVIEW_READY` at 02:45:37Z.
+- Execution reaches `post_build_overview` (`intelligence_state.py:4113`) —
+  `ALL_PROCESS_MEMORY` and `MALLOC_TRIM` both fire there.
+- **Memory is healthy**: 2,834MB headroom of 4,096MB; `MALLOC_TRIM` freed anon
+  804MB → 680MB.
+- No exception, no traceback, no abort marker, on any cycle.
+- **It survives a full worker restart.** Restarted 21:43:59 CT; the loop came
+  back and the build stopped in the identical place.
+
+**ELIMINATED — do not re-run these:**
+
+| hypothesis | killed by |
+|---|---|
+| loop thread dead | 26 log lines after restart; overview completes |
+| `#372` import error | an import error kills the module; the overview stage completes cleanly |
+| loop on the wrong service | `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` = true on refresh-worker, false on web. Correct. |
+| `SYNDICATE_HYDRATED_OVERVIEW_MIN_REBUILD_SEC` (900) | read ONLY at `home.py:92`. Zero references in `intelligence_state.py` — wrong module entirely |
+| the memory guard at `:4113` | `_abort_build_candidate_pool_if_memory_critical` DOES log (`MEMORY_GUARD_ABORT`). **Zero occurrences.** Guard evaluated and passed |
+
+**THE REMAINING WINDOW is three calls**, `intelligence_state.py:4114-4137`, after
+the guard and before `BOARD_RAW_CANDIDATES`:
+
+    _query_preferences(...)
+    self._odds_history_payloads_by_sport(overview)
+    _profile_stage("candidate_collection_with_fallback", collect_candidates_with_fallback_merge, ...)
+
+No log line covers that span, which is why two hours produced no evidence. It is a
+HANG, not a failure — the process is alive and doing other work throughout.
+
+**NO CAUSE PROPOSED, deliberately.** I offered four in sequence tonight — a
+live-lens exception starving the loop, a dead thread, the rebuild interval, the
+memory guard — and measurement killed every one. The pattern was reasoning from an
+absent signal toward a mechanism, then testing the mechanism instead of the
+absence. `_odds_history_payloads_by_sport` reads the same multi-megabyte artifact
+family that stalled the shortlist in `#372`, which makes it *interesting*, not
+indicated.
+
+**Start by instrumenting those three calls or attaching to the live process.**
+Anything else is guessing at a span with no observability.
+
+
 ### `#375` — OPEN, UNOWNED. `h2h_lay` is de-vigged as if it were a back price, and every lay row on the board shows positive EV
 
 **The tell, measured 2026-08-11 21:35 CT on the served shortlist: 11 of 11 lay
