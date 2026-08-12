@@ -59,9 +59,37 @@ Either suppress `projected` when `skill_note` reports no information, or carry t
 annotation through `_layer2_board_columns` so the board shows it labelled. That is
 a product call about what a betting board may assert, not a bug fix.
 
-**Check whether other sports share it** before fixing NFL alone: the constant was
-measured on an all-NFL board, and `skill_note` is called per market, so the same
-degenerate-model-plus-unguarded-consumer pairing may exist elsewhere.
+**CHECKED — THE CONSTANT IS NFL-ONLY.** Distinct `projected` values per
+sport/market, from the persisted shortlists across 2026-08-11..13:
+
+| sport | market | distinct | sample |
+|---|---|---|---|
+| mlb | spreads | 4 | -4.097, -3.018, -2.429, -0.606 |
+| mlb | totals | 4 | 9.25, 11.642, 11.819, 11.845 |
+| mlb | batter_home_runs | 16 | 0.004 … 0.045 |
+| nfl | h2h / spreads | **1** | **0.96** |
+| nfl | totals | **1** | **38.76** |
+
+MLB varies properly per game and per player, so this is an NFL MODEL problem and
+the other sports' pipelines need no change. Scope the fix to NFL.
+
+**THE SYSTEMIC EXPOSURE IS THE GUARD, NOT THE MODEL.** `skill_note` is called in
+**exactly one of seven** projection builders — only `nfl_game_projections`.
+`soccer_projections`, `wnba_game_projections`, `wnba_projections`,
+`prop_projections`, `live_projection_join` and `game_board_contract` have none.
+
+That does not mean those models are degenerate — MLB's spread demonstrates at
+least one is not. **It means that if any of them collapsed, nothing would say so.**
+NFL's constant was catchable only because someone measured the correlation and
+wrote `#367` into a comment beside the code; the other six have no equivalent, so
+the same failure would render as confident numbers indefinitely. A skill check
+that covers one of seven producers is a check that will be absent the next time it
+matters.
+
+**UNRESOLVED, flagged rather than guessed:** `mlb batter_hits_runs_rbis` shows
+`distinct=1, value 0.0`. That may be a single row rather than a constant — the
+sample is too small to call, and it should be re-measured on a fuller slate before
+anyone treats it as either.
 
 ### `#378` — OPEN, UNOWNED, PRODUCT DECISION. Every market shows both sides, and EDGE duplicates EV
 
