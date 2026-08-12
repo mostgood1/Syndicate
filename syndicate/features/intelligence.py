@@ -9851,6 +9851,58 @@ def candidate_identity_key(candidate: dict[str, Any]) -> str:
 _THIN_CANDIDATE_POOL_THRESHOLD = 20
 
 
+def _collect_span(label: str, fn, *args, **kwargs):
+    """`#376` diagnostic. Which call inside this function is hanging?
+
+    `intelligence_state.py`'s span instrumentation narrowed the stalled build to
+    `collect_candidates_with_fallback_merge` -- ENTER at 03:34:33Z, no EXIT, no
+    exception, reproducing every cycle since 2026-08-12 01:39:38Z. This is the
+    same technique one level down, because inference has failed repeatedly here:
+    FIVE causes were proposed from reading code (a live-lens exception starving
+    the loop, a dead thread, the rebuild interval, the memory guard, and an
+    unbounded `git ls-files` in `_tracked_repo_files`) and measurement killed
+    every one. The instrumentation is the only thing that has located anything.
+
+    THREE calls are wrapped, not the two originally suspected: `collect_candidates`
+    runs FIRST and UNCONDITIONALLY, while both `collect_all_recommendations` calls
+    are conditional -- so the primary path was the likelier culprit and was not on
+    the list until the call site was read properly.
+
+    ENTER/EXIT pairs for the same reason as the caller's: a hang leaves an ENTER
+    with no EXIT, which is what names it. A completion-only line goes silent
+    across the whole span, which is the condition being diagnosed. `elapsed_s` on
+    the EXIT separates SLOW from STUCK -- this build was once observed taking 77
+    minutes rather than dying, and those need different fixes.
+
+    `print`, not `logger.info`, because logger.info does not reach Render's log
+    collector (CLAUDE.md). Remove with the rest of `#376`'s scaffolding.
+    """
+    print(f"[intelligence] COLLECT_SPAN_ENTER stage={label}", flush=True)
+    started = time.time()
+    try:
+        result = fn(*args, **kwargs)
+    except BaseException as exc:  # noqa: BLE001
+        # BaseException, not Exception: a hang killed by a supervisor arrives as
+        # KeyboardInterrupt or SystemExit. Re-raised untouched -- note the
+        # `except TypeError` at two call sites depends on this not swallowing.
+        print(
+            f"[intelligence] COLLECT_SPAN_RAISED stage={label} "
+            f"elapsed_s={round(time.time() - started, 2)} {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        raise
+    try:
+        size = len(result)
+    except Exception:
+        size = -1
+    print(
+        f"[intelligence] COLLECT_SPAN_EXIT stage={label} "
+        f"elapsed_s={round(time.time() - started, 2)} rows={size}",
+        flush=True,
+    )
+    return result
+
+
 def collect_candidates_with_fallback_merge(
     overview: list[dict[str, Any]],
     preferences: dict[str, Any],
@@ -9893,13 +9945,15 @@ def collect_candidates_with_fallback_merge(
     fallback above still applies for these callers -- a pool with zero
     candidates is never intentional.
     """
-    raw_candidates = collect_candidates(overview, preferences, odds_history_by_sport)
+    raw_candidates = _collect_span("collect_candidates", collect_candidates, overview, preferences, odds_history_by_sport)
     if not raw_candidates:
         try:
             # collect_all_recommendations() already runs _score_candidates()
             # + filter_candidates() internally, so it doesn't need the
             # explicit scoring/filtering step below applied a second time.
-            raw_candidates = collect_all_recommendations(
+            raw_candidates = _collect_span(
+                "collect_all_recommendations:empty_fallback",
+                collect_all_recommendations,
                 selected_date=selected_date,
                 force_refresh=True,
                 log_pipeline=False,
@@ -9920,7 +9974,9 @@ def collect_candidates_with_fallback_merge(
 
     if apply_thin_pool_merge and 0 < len(raw_candidates) < _THIN_CANDIDATE_POOL_THRESHOLD:
         try:
-            richer_candidates = collect_all_recommendations(
+            richer_candidates = _collect_span(
+                "collect_all_recommendations:thin_pool_merge",
+                collect_all_recommendations,
                 selected_date=selected_date,
                 force_refresh=True,
                 log_pipeline=False,
