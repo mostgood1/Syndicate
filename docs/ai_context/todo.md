@@ -1,5 +1,48 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#380` — SHIPPED, AWAITING VERIFY. The quote-age ceiling was set by a sport's FRESHEST quote instead of its oldest, and deleted two sports
+
+`6deaea10`, deployed to web + refresh-worker 2026-08-12 ~10:55 CT. Ceiling
+`SHORTLIST_MAX_QUOTE_AGE_SECONDS` 1h -> **14h** (`layer2_board.py:243`).
+
+**What 1h did**, measured on the served board at 15:20Z — not composition, deletion:
+
+    sport   ingested   available at selection   selected
+    mlb        4,790          4,452             100  (capped)
+    nfl        2,704             28              28  (99% eliminated)
+    wnba       1,506              0              --  (100% eliminated)
+
+The 1h rationale predicted size would hold because "excluded rows backfill from
+fresher candidates." True of MLB alone — it has a 4,452-row pool. NFL and WNBA
+have no such pool. Board landed at 128 of 200 slots, the falsification condition
+that same note named.
+
+**A ceiling admits a sport only if it clears that sport's OLDEST quote.** WNBA
+spans 12.47h..13.00h. I first proposed 12h on the strength of the 12.47h
+*minimum* and stated it readmitted WNBA "by 32 minutes" — it excludes WNBA by 28.
+12h would have taken the sport to zero for the second time in a day. The
+disconfirming number was already in the note that set 1h: `<=12h keeps 142` is
+100 mlb + ~42 soccer + **zero** wnba. 14h clears 13.00h with an hour of headroom
+and still cuts the 22.20h soccer tail.
+
+**A TEST WAS ALREADY ASSERTING THIS AND FAILING SILENTLY.**
+`test_default_ceiling_does_not_delete_todays_board` (written 08-08) required mlb
+11.46h, wnba 13.0h and soccer 22.2h to all survive the default. The 1h change
+shipped with it red. It was also over-specified — it asserted *nothing* is
+excluded, so it would break on any real ceiling and could only ever be "fixed" by
+weakening it. Rewritten to the actual invariant: **no sport goes to zero**, with
+the 22.2h tail still required to be cut.
+
+**THE GENERAL RULE, worth more than the number:** a per-row threshold validated
+on a whole-board average hides sports going to zero. Both the 1h note and my 12h
+proposal reasoned from pooled percentiles (`<=12h keeps 142 of 200`) and neither
+noticed a sport at 0. **Check per-sport survival before shipping any threshold
+change**, and read the range, not one end of it.
+
+Related: no counter names the sport it emptied — `rows_beyond_quote_age` is a
+board-wide scalar. A per-sport rejection breakdown would have made both the 1h
+regression and `#379` self-diagnosing. Unowned.
+
 ### `#379` — CORRECTED AND DOWNGRADED. The board was empty for ONE rebuild and recovered. My "every counter reads zero" claim was wrong: I read three of five counters
 
 **Filed 2026-08-12 claiming an unattributable zero. That claim was false.** The
