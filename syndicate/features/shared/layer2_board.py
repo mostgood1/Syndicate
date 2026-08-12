@@ -333,12 +333,15 @@ def _measured_floor_for_pool(rows: Iterable[Mapping[str, Any]], *, multiple: flo
         # Labelled `modelled_hold` so a floor derived this way can never be
         # mistaken for the two-sided one, per the same rule the margin model
         # follows for fair value itself.
+        # Read from the CANDIDATE's own quote, which is where the fan-out now
+        # carries it. It was first written against `modelled_fair`, the shape on
+        # the GRID row -- correct logic, wrong side of a boundary, and it read
+        # zero rows in production for two hours while its tests passed.
         modelled = [
             value
             for row in rows
-            for side in (row.get("modelled_fair") or {}).values()
-            if isinstance(side, Mapping)
-            and (value := _as_float(side.get("assumed_hold_pct"))) is not None
+            if isinstance(row.get("quote"), Mapping)
+            and (value := _as_float(row["quote"].get("assumed_hold_pct"))) is not None
         ]
         if len(modelled) >= SHORTLIST_HOLD_MIN_MARKETS:
             modelled.sort()
@@ -620,6 +623,21 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                 "books_quoting": side_best.get("books_quoting"),
                 "fair_probability": fair,
                 "fair_method": fair_method if fair is not None else None,
+                # `#382`. The margin model measures each book's hold on the GRID
+                # (which still holds every leg) and stamps it at
+                # `modelled_fair[side].assumed_hold_pct`. This fan-out copies a
+                # fixed field list, so that measurement died here -- and
+                # `_measured_floor_for_pool` runs on candidates, which is why the
+                # modelled-hold floor read 0 rows in production while its unit
+                # tests passed on hand-built input.
+                #
+                # Carried as ONE FLOAT on the side's own quote rather than the
+                # whole `modelled_fair` dict: the floor needs the number, and the
+                # dict would put a fair price and a prose note on every row of a
+                # payload that is already 68% market data.
+                "assumed_hold_pct": _as_float(
+                    ((row.get("modelled_fair") or {}).get(side) or {}).get("assumed_hold_pct")
+                ),
                 "suspect_stale": bool(side_best.get("suspect_stale")),
             }
 

@@ -373,7 +373,9 @@ class ModelledHoldFloorTests(unittest.TestCase):
     @staticmethod
     def _one_sided(*, ev, hold=5.53, sport="soccer"):
         row = _row(sport=sport, ev=ev)
-        row["modelled_fair"] = {"home": {"assumed_hold_pct": hold, "fair_method": "book_margin_model"}}
+        # Mirrors what the fan-out produces (see the survives_the_fan_out test
+        # below, which asserts this shape against the real builder).
+        row["quote"]["assumed_hold_pct"] = hold
         return row
 
     def test_a_one_sided_sport_is_floored_on_its_own_modelled_hold(self) -> None:
@@ -410,3 +412,63 @@ class ModelledHoldFloorTests(unittest.TestCase):
         out = select_shortlist(rows, now=_NOW)
         evidence = (out["value_floor_by_sport"] or {}).get("soccer") or {}
         self.assertEqual(evidence.get("method"), "flat_default")
+
+
+class ModelledHoldReachesTheFloorTests(unittest.TestCase):
+    """`#382` -- the floor logic was right and read a field that never arrived.
+
+    `assumed_hold_pct` is stamped at `modelled_fair[side]` on the GRID row.
+    `build_layer2_rows` fans a grid row into one candidate per side by copying a
+    fixed field list, and did not carry it. `_measured_floor_for_pool` runs on
+    candidates, so the modelled-hold branch read 0 rows on production for two
+    hours while four unit tests passed -- they hand-built candidates ALREADY
+    carrying the field, proving the branch works given its input and never that
+    the input arrives.
+
+    So this test drives the REAL builder. A test that constructs the row it is
+    testing cannot fail for this reason, which is the whole lesson.
+    """
+
+    def test_the_modelled_hold_survives_the_real_fan_out(self) -> None:
+        from syndicate.features.shared.layer2_board import build_layer2_rows
+
+        grid = [
+            {
+                "sport": "soccer",
+                "event_id": "evt-1",
+                "kind": "game",
+                "market": "h2h",
+                "sides": ["home"],
+                "commence_time": (_NOW + timedelta(hours=3)).isoformat().replace("+00:00", "Z"),
+                "best": {
+                    "home": {
+                        "price": -140,
+                        "bookmaker": "pinnacle",
+                        "books_quoting": 3,
+                        "book_age_seconds": 120.0,
+                    }
+                },
+                "game": {"state": "pre", "start_time": (_NOW + timedelta(hours=3)).isoformat().replace("+00:00", "Z")},
+                # One-sided market filled by the margin model -- the exact shape
+                # `apply_margin_model` writes, and the only source of a soccer hold.
+                "modelled_fair": {
+                    "home": {
+                        "fair_probability": 0.55,
+                        "assumed_hold_pct": 5.53,
+                        "fair_method": "book_margin_model",
+                    }
+                },
+            }
+        ]
+        # `build_layer2_rows` returns STATS plus the candidate list under
+        # `opportunities` -- it does not return a bare list of rows.
+        result = build_layer2_rows(grid)
+        rows = result.get("opportunities") or []
+        self.assertTrue(rows, "the fan-out produced no gated candidate at all")
+        quote = rows[0].get("quote") or {}
+        self.assertEqual(
+            quote.get("assumed_hold_pct"),
+            5.53,
+            "the margin model's hold did not survive grid -> candidate; the "
+            "modelled-hold floor is inert again",
+        )
