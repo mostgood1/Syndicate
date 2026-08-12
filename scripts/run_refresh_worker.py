@@ -2409,6 +2409,39 @@ def _season_projection_process_still_running(sport: str) -> bool:
     return True
 
 
+def _record_season_projection_in_sim_ledger(
+    sport: str, *, season: int, week: int, started_at: str, pid: int,
+) -> None:
+    """`#390`. NFL/NCAAF sims are spawned here and nowhere else, so this is the
+    choke point for them -- the counterpart to `_run_command` in
+    refresh_odds_sources for the sims that live inside the odds refresh.
+    
+    Recorded at LAUNCH with state='running', not at completion: this autorun does
+    not wait for the child, so a completion-only record would miss every run that
+    dies -- exactly the hole `#388` measured on MLB, where 21 of 41 runs left no
+    recordable outcome. A run marked running that nobody finalizes still beats a
+    run with no trace at all.
+    """
+    try:
+        from syndicate.features.shared.sim_run_ledger import record_sim_run
+        is_pre = sport == _PRESEASON_PROJECTION_SPORT_KEY
+        record_sim_run(
+            sport='nfl' if is_pre else sport,
+            kind='smartsim2_preseason' if is_pre else 'smartsim2_season',
+            date=central_today_iso(),
+            run_stamp=f"{sport}_{season}_wk{week}_{started_at}".replace(":", "").replace("-", ""),
+            started_at=started_at,
+            finished_at=None,
+            state='running',
+            trigger='season_projection_autorun',
+            scope=f'season={season} week={week}',
+            service=str(os.environ.get('RENDER_SERVICE_NAME') or '') or None,
+            detail=f'pid={pid}',
+        )
+    except Exception:
+        return
+
+
 def _record_season_projection_launch(sport: str, pid: int, *, season: int | None = None, week: int | None = None) -> None:
     # `#389`: season/week are recorded so the missing-artifact backoff in
     # _season_projection_should_launch can tell "we already tried THIS target"
@@ -2596,6 +2629,11 @@ def _launch_autorun_season_projections(
             continue
 
         _record_season_projection_launch(sport, int(getattr(process, "pid", 0) or 0), season=season, week=week)
+        _record_season_projection_in_sim_ledger(
+            sport, season=season, week=week,
+            started_at=datetime.utcnow().isoformat(timespec='seconds') + 'Z',
+            pid=int(getattr(process, "pid", 0) or 0),
+        )
         refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
         _write_worker_status(
             worker_status_path=worker_status_path,
@@ -2712,6 +2750,11 @@ def _launch_autorun_preseason_projections(
 
     _record_season_projection_launch(
         _PRESEASON_PROJECTION_SPORT_KEY, int(getattr(process, "pid", 0) or 0), season=season, week=week,
+    )
+    _record_season_projection_in_sim_ledger(
+        _PRESEASON_PROJECTION_SPORT_KEY, season=season, week=week,
+        started_at=datetime.utcnow().isoformat(timespec='seconds') + 'Z',
+        pid=int(getattr(process, "pid", 0) or 0),
     )
     refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
     _write_worker_status(
@@ -3168,6 +3211,22 @@ def main() -> int:
         except Exception as exc:
             print(f"[refresh_worker] MLB_SIM_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
         _diag_log_all_process_memory("post_mlb_sim_tick")
+
+        # Disk maintenance: compaction + retention, once per day. Same
+        # relationship as the MLB sim tick above -- its own interval gate and its
+        # own enable flag make all but one call a day a no-op, and every call a
+        # no-op until SYNDICATE_DISK_MAINTENANCE_ENABLED is set. Placed AFTER the
+        # sim tick deliberately: this worker peaks at 3.29 GB of its 4 GiB during
+        # a sim (measured 2026-08-12, 125 OOM kills in 14 days), and the sweep
+        # declines to run at all above 75% of the container limit rather than
+        # competing with it. `#241` is the precedent for what periodic work costs
+        # on this box.
+        try:
+            from syndicate.features.shared.disk_maintenance import run_disk_maintenance
+
+            run_disk_maintenance()
+        except Exception as exc:
+            print(f"[refresh_worker] DISK_MAINTENANCE_ERROR {type(exc).__name__}: {exc}", flush=True)
 
         # Unconditional (not part of the claimed_count/elif chain below) so a
         # cycle that also claims a reconciliation-autorun turn still gets a

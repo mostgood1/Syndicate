@@ -2626,6 +2626,28 @@ def _launch_mlb_daily_sim(date_str: str, decision: dict[str, Any]) -> dict[str, 
 		# late-scratch check for games that were never actually simmed.
 		if str(decision.get("reason") or "") == "tip_off_window":
 			_record_mlb_tip_off_simmed(date_str, decision.get("game_pks"))
+		# `#390`: mirror MLB into the unified per-sport ledger. MLB keeps its own
+		# richer record (mlb_sim_runs/, see `#388`) -- this is additive, so one
+		# reader can answer the question for all sports instead of MLB needing a
+		# different endpoint from everything else. Best-effort: a ledger write must
+		# never be able to fail a sim launch.
+		try:
+			from syndicate.features.shared.sim_run_ledger import record_sim_run
+			record_sim_run(
+				sport="mlb",
+				kind="daily_sim",
+				date=date_str,
+				run_stamp=run_stamp,
+				started_at=_MLB_SIM_RUN_META.get("started_at") or _utc_now(),
+				finished_at=None,
+				state="running",
+				trigger=str(decision.get("reason") or "") or None,
+				scope=decision.get("game_pks"),
+				service=str(os.environ.get("RENDER_SERVICE_NAME") or "") or None,
+				detail=f"pid={process.pid}",
+			)
+		except Exception:
+			pass
 		print(f"[live_refresh_loop] MLB_DAILY_SIM_TRIGGERED date={date_str} reason={decision.get('reason')} pid={process.pid} run_stamp={run_stamp}", flush=True)
 		return {"ok": True, "pid": process.pid, "command": command, "reason": decision.get("reason"), "run_stamp": run_stamp}
 	except Exception as exc:

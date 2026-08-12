@@ -1663,6 +1663,40 @@ def api_ops_live_refresh_force_mlb_resim() -> Any:
     })
 
 
+@ops_bp.get("/api/ops/sims/ledger")
+def api_ops_sim_run_ledger() -> Any:
+    """`#390`. The per-sport sim run ledger -- the answer to "when did each
+    sport sim, how long did it take, and did it work".
+    
+    Before this, MLB was the only sport with any run record; the other six were
+    measurable only by sampling child cmdlines out of a MEMORY diagnostic, which
+    gives lower bounds rather than facts and requires Render API credentials.
+    
+    Reads the shared (keyvalue-backed) store, so it answers for runs recorded on
+    either worker -- the `#304` web/worker disk split means a plain file read
+    here would see only what web itself wrote, which is nothing.
+    """
+    date = str(request.args.get("date") or "").strip()
+    if not date:
+        return jsonify({"ok": False, "error": "date parameter required (YYYY-MM-DD)"}), 400
+    try:
+        from syndicate.features.shared.sim_run_ledger import read_sim_run_index
+        from syndicate.features.shared.sim_run_ledger import summarize_by_sport
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"ImportError: {type(exc).__name__}: {exc}"}), 500
+    index = read_sim_run_index(date)
+    return jsonify({
+        "ok": True,
+        "date": date,
+        # Explicitly distinguishes "no runs recorded" from "the ledger is not
+        # reachable from here". A bare empty list would read as the former when
+        # it could be the latter -- the failure this whole ticket is about.
+        "index_present": index is not None,
+        "summary": summarize_by_sport(date),
+        "runs": (index or {}).get("runs") or [],
+    })
+
+
 @ops_bp.get("/api/ops/mlb/sims-list")
 def api_ops_mlb_sims_list() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)

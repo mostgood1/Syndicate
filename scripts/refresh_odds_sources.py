@@ -1533,6 +1533,57 @@ def _refresh_step_timeout_seconds() -> int:
     return _DEFAULT_REFRESH_STEP_TIMEOUT_SECONDS
 
 
+# `#390`. The refresh date, for the sim ledger. A module global because
+# RefreshStep is frozen and does not carry the date, and threading it through
+# every step builder would be a far larger change than the ledger warrants.
+# Absent means the ledger records under 'unknown' rather than guessing a date.
+_LEDGER_DATE: str = ""
+
+
+def _record_step_in_sim_ledger(step: RefreshStep, *, started: str, finished: str, return_code: int) -> None:
+    """`#390`. Every non-MLB sim runs inside an odds-refresh step, so this is
+    the one place that can see soccer / NBA / WNBA / NHL sims start and finish.
+    
+    Best-effort by construction: a ledger that can break a refresh is worse than
+    no ledger. Every failure path here is swallowed except the blind-spot log.
+    """
+    try:
+        from syndicate.features.shared.sim_run_ledger import classify_step
+        from syndicate.features.shared.sim_run_ledger import record_sim_run
+        from syndicate.features.shared.sim_run_ledger import step_looks_sim_shaped
+    except Exception:
+        return
+    try:
+        classified = classify_step(step.name, list(step.command))
+        if classified is None:
+            # Not silently dropped: a step that LOOKS like a sim but matched no
+            # command pattern is exactly how a newly added sport would go
+            # unrecorded, which is the gap `#390` exists to close.
+            if step_looks_sim_shaped(step.name):
+                print(
+                    f"[refresh_odds_sources] SIM_LEDGER_UNCLASSIFIED step={step.name} "
+                    f"command={json.dumps(list(step.command))[:200]}",
+                    flush=True,
+                )
+            return
+        sport, kind = classified
+        record_sim_run(
+            sport=sport,
+            kind=kind,
+            date=str(_LEDGER_DATE or ''),
+            run_stamp=f"{step.name}__{started.replace(':', '').replace('-', '')}",
+            started_at=started,
+            finished_at=finished,
+            exit_code=int(return_code),
+            state="finished",
+            trigger="odds_refresh_step",
+            scope=step.name,
+            service=str(os.environ.get('RENDER_SERVICE_NAME') or '') or None,
+        )
+    except Exception:
+        return
+
+
 def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
     env = os.environ.copy()
     if step.env_updates:
@@ -1643,6 +1694,7 @@ def _run_command(step: RefreshStep, *, dry_run: bool = False) -> dict[str, Any]:
         rows_loaded=_rows_loaded_total(row_counts),
     )
     _dump_child_runtime_state(label=f"step_end:{step.name}:rc={result.returncode}")
+    _record_step_in_sim_ledger(step, started=started, finished=finished, return_code=int(result.returncode))
     return {
         "name": step.name,
         "description": step.description,
@@ -2783,6 +2835,8 @@ def main() -> int:
     parser.add_argument("--json", action="store_true", help="Print machine-readable JSON output.")
     parser.add_argument("--list", action="store_true", help="List supported sports and exit.")
     args = parser.parse_args()
+    global _LEDGER_DATE
+    _LEDGER_DATE = str(getattr(args, 'date', '') or '')
 
     if args.list:
         payload = {
