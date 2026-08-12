@@ -208,3 +208,41 @@ def test_compaction_still_runs_when_retention_is_skipped(_clean, monkeypatch):
     assert out["compaction_applied"] is True
     assert shard.with_name(shard.name + ".gz").exists()
     assert out["retention"] == {"skipped": "not_enabled_and_not_observing"}
+
+
+def test_the_daily_stamp_is_PER_SERVICE_not_shared(_clean, monkeypatch):
+    """Found in production within an hour of shipping the runner.
+
+    The stamp path is keyvalue-backed (`_keyvalue_backed` excludes only
+    `migration_runs/`) and both workers share one Redis, so a single shared path
+    made the daily gate global: whichever worker ran first stood the other down
+    for 24 hours. Both compacted on night one only by race -- refresh-worker
+    passed the check ~26s before live-odds-worker wrote the stamp.
+    """
+    monkeypatch.setenv("SYNDICATE_REFRESH_LANE", "refresh-worker")
+    a = dm._status_path()
+    monkeypatch.setenv("SYNDICATE_REFRESH_LANE", "live-odds-worker")
+    b = dm._status_path()
+    assert a != b, "both workers would share one daily gate"
+    assert "refresh-worker" in a.name and "live-odds-worker" in b.name
+
+
+def test_one_workers_run_does_not_stand_the_other_down(_clean, monkeypatch):
+    monkeypatch.setenv("SYNDICATE_DISK_MAINTENANCE_ENABLED", "true")
+
+    monkeypatch.setenv("SYNDICATE_REFRESH_LANE", "refresh-worker")
+    first = dm.run_disk_maintenance(sports=("mlb",))
+    assert first["ran"] is True
+    assert dm._due() is False, "same worker should now be stood down"
+
+    monkeypatch.setenv("SYNDICATE_REFRESH_LANE", "live-odds-worker")
+    assert dm._due() is True, "the OTHER worker was stood down by its peer"
+    second = dm.run_disk_maintenance(sports=("mlb",))
+    assert second["ran"] is True
+
+
+def test_an_unidentifiable_service_still_gets_a_stamp(_clean, monkeypatch):
+    for key in ("SYNDICATE_REFRESH_LANE", "RENDER_SERVICE_NAME", "RENDER_SERVICE_ID"):
+        monkeypatch.delenv(key, raising=False)
+    assert dm._service_slug() == "local"
+    assert dm._status_path().name.endswith("_local.json")

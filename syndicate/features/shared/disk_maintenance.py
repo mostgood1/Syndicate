@@ -68,10 +68,42 @@ def _interval_seconds() -> int:
     return value if value > 0 else _INTERVAL_DEFAULT_SECONDS
 
 
+def _service_slug() -> str:
+    """Which service is asking. Used to keep the daily stamp per-worker."""
+    for name in ("SYNDICATE_REFRESH_LANE", "RENDER_SERVICE_NAME", "RENDER_SERVICE_ID"):
+        value = str(os.environ.get(name) or "").strip().lower()
+        if value:
+            return "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in value)
+    return "local"
+
+
 def _status_path() -> Path:
+    """Per-service, and that is load-bearing rather than tidy.
+
+    THE BUG THIS FIXES, found 2026-08-12 within an hour of shipping the runner.
+    This was one shared path. `refresh_state_store._keyvalue_backed` routes
+    everything except `migration_runs/` through the keyvalue store when the
+    backend is keyvalue -- which it is on both workers -- and both workers point
+    at the SAME Redis (`SYNDICATE_REFRESH_STATE_URL` is identical on each). So
+    the "once per day" gate was once per day ACROSS BOTH SERVICES: whichever
+    worker ran first stamped the shared key, and the other read it and stood
+    down for 24 hours.
+
+    Both workers did compact on the first night, which is what made it look
+    correct -- but only by a race. refresh-worker passed `_due()` at ~22:30:11
+    before live-odds-worker wrote the stamp at 22:30:37. From the next day
+    onward exactly one of them would have run, and the other's shards would have
+    accumulated silently while the log line on the winner said everything was
+    fine.
+
+    That is this repo's own recurring shape: a mechanism present, its connection
+    to the second service absent, and the failure visible only as an absence.
+    Verified by executing `_keyvalue_backed` against this path rather than
+    reading it -- it returns True.
+    """
     from syndicate.features.shared.refresh_state_store import reports_root
 
-    return reports_root() / "refresh_status" / "latest" / "disk_maintenance_status.json"
+    return reports_root() / "refresh_status" / "latest" / f"disk_maintenance_status_{_service_slug()}.json"
 
 
 def _due() -> bool:
