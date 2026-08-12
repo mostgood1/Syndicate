@@ -178,6 +178,26 @@ _SOCCER_VENDOR_NAME_ALIASES: dict[str, str] = {
     "sporting lisbon": "sporting cp",
     "union saint gilloise": "union st.-gilloise",
     "vitoria sc": "vitória de guimaraes",
+    # `#374`. Five clubs the ODDS FEED names differently from the team artifacts,
+    # each verified against a real 0-projection fixture on the served board where
+    # the sim HAD the match under its own name. Not a sweep of every unresolved
+    # club: 23 board clubs miss this map and most join anyway, because the index
+    # also matches on the normalised name directly. Only a name the sim spells
+    # differently actually costs a fixture.
+    #
+    # `SK Beveren` is the cleanest proof of the class -- on 2026-08-16 three of
+    # four belgian fixtures projected and this one did not, same league, same
+    # date, same sim file, differing only in that the club was renamed from
+    # Waasland-Beveren in 2022 and the artifacts still carry the old name.
+    "sk beveren": "waasland-beveren",
+    "fc twente enschede": "fc twente",
+    "fc zwolle": "pec zwolle",
+    "real racing club de santander": "racing santander",
+    # Word-order reversal, so string similarity scores it 0.46 -- below the bar
+    # that correctly rejected `Real Salt Lake`/`Austin FC` (0.17). Kept because
+    # MLS has exactly one New York Red Bulls and the identity is not in doubt;
+    # a similarity threshold is a filter for candidates, not the decision.
+    "new york red bulls": "red bull new york",
 }
 
 
