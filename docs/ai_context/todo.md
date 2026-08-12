@@ -1,5 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#369` — OPEN, UNOWNED, HIGHEST VALUE ON THE BOARD. The top 20 rows are implausible arbs from stale prices, and the staleness guard catches 1 of 63
+
+Everything else fixed on 2026-08-11 was about columns RENDERING correctly. This
+is about the board **recommending bets that are not real**, which is worth more
+than all of it.
+
+**Measured on the served board, 2026-08-12 00:11Z (263 cards):**
+
+| | |
+|---|---|
+| rows with `ev_pct` > 10% | **63 of 263 (23%)** |
+| of the top 20 by rank | **20 of 20** |
+| flagged `quote.suspect_stale` | **1 of 63** |
+| `book_age_seconds` | median 402, **max 5070 (84 minutes)** |
+
+**The #1 row is not a market.** Baltimore `+107` AND Minnesota `+200` on the same
+two-way `h2h`: implied 48.3% + 33.3% = **81.6%**, an 18-point UNDERROUND, which
+`1/0.816 - 1` turns into the 22.49% "edge" that puts it first. Same shape on the
+`h2h_3_way` rows (Mets `+500` / Draw `+140` / Braves `+320` -> 82.2%). Both sides
+positive at those prices is a stale or erroneous quote, not an opportunity.
+
+**The arithmetic is correct and that is the trap.** `ev_pct` is the cross-book
+arb surplus and it computes exactly right on garbage input — verified 0 of 263
+rows where `edge * 100 != ev_pct`, so `#364` is holding. Nothing downstream is
+broken. **The board is faithfully ranking bad prices to the top**, and because
+score folds EV in, the worse the price data the higher it ranks.
+
+**`suspect_stale` exists and is not doing this job.** It fired on 1 of 63, with
+quotes up to 84 minutes old. Whatever its predicate is, it is not "this price is
+too old to trust" and it is certainly not "this market's implied total is
+impossible". A guard that passes the 62 worst rows on the board is worth
+measuring before it is trusted anywhere else.
+
+**Two independent defences, and the second is the cheap one:**
+
+1. **Age.** A 5070s quote should not be rankable at all. There is already a
+   `max_quote_age_seconds` on the shortlist (86400.0 — a full day, i.e. inert).
+2. **Plausibility.** An implied book total under ~95% is not a beatable market,
+   it is a bad feed. This needs no history, no timing and no per-sport tuning —
+   it is arithmetic on the row itself, and it would have removed all 63.
+
+**Do NOT "fix" this by lowering the value floor or hiding high-EV rows.** A real
++EV outlier and a stale-price artifact both present as high `ev_pct`; the
+discriminator is the overround, not the magnitude. Suppressing by magnitude would
+hide the genuine ones too.
+
+**Found by looking at the rendered board, not the payload** — the number that
+gave it away was a 22.49% edge sitting at the top, which no field-population
+check would ever have flagged.
+
 ### `#363` — SHIPPED. Layer 2 IS the board now; it is no longer a fallback that only fires when the legacy pool fails
 
 **User direction, 2026-08-11 (verbatim):** *"layer 2 page is the main page
