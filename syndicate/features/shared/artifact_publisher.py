@@ -475,6 +475,94 @@ def is_hot_artifact_relative_path(relative_path: str) -> bool:
 _LAST_PUBLISHED_CHECKSUM: dict[str, str] = {}
 
 
+# `#395` -- HOURLY EGRESS CIRCUIT BREAKER.
+#
+# `#394` stops re-uploading UNCHANGED artifacts. It does nothing for artifacts
+# that genuinely change every cycle, and odds artifacts legitimately do. So the
+# de-duplicator is not a spend ceiling and must not be mistaken for one.
+#
+# WHY A CEILING EXISTS AT ALL: on 2026-08-12 outbound bandwidth reached 1.62 TB
+# for the month climbing ~7.8 GB/hr, and both workers had to be suspended by
+# hand to stop it. There was no mechanism anywhere that could have stopped it
+# automatically -- the publisher had no notion of how much it had sent.
+#
+# 2 GB/hour is a RUNAWAY BRAKE, not a tuned quota. It sits ~4x under the
+# observed 7.8 GB/hr and well above anything a healthy sweep should need once
+# `#394` removes the unchanged re-uploads. **It is deliberately loose**: a brake
+# that trips in normal operation gets raised until it is meaningless, so this is
+# sized to catch a runaway and nothing finer.
+#
+# IT ALSO SUPPLIES THE MEASUREMENT NOBODY HAD. Artifact SIZE was the missing
+# term all day -- publish COUNTS were measurable and bytes were not, so "50/min"
+# could not be turned into GB/hr without guessing an average. Every publish now
+# adds to a rolling total that is logged, so the next person reasons from bytes.
+#
+# Rolling window, not a fixed hour: a calendar-hour reset lets a burst spend the
+# whole budget at :59 and the whole budget again at :01.
+_PUBLISH_BUDGET_WINDOW_SECONDS = 3600.0
+_PUBLISH_BUDGET_DEFAULT_BYTES = 2 * 1024 * 1024 * 1024
+_PUBLISH_BUDGET_LOG_EVERY = 25
+
+# (epoch_seconds, bytes) for uploads inside the window. In-process, like
+# `#394`'s checksum store, and cleared by a restart for the same reason: the
+# safe direction is to allow work after a reboot, not to inherit a stale
+# refusal that nothing can clear.
+_PUBLISH_BYTES: list[tuple[float, int]] = []
+_PUBLISH_BUDGET_COUNTER = [0]
+
+
+def _publish_budget_max_bytes() -> int:
+    raw = str(_env("SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET") or "").strip()
+    if raw:
+        try:
+            value = int(float(raw))
+            if value > 0:
+                return value
+        except (TypeError, ValueError):
+            pass
+    return _PUBLISH_BUDGET_DEFAULT_BYTES
+
+
+def _publish_budget_used_bytes() -> int:
+    cutoff = time.time() - _PUBLISH_BUDGET_WINDOW_SECONDS
+    while _PUBLISH_BYTES and _PUBLISH_BYTES[0][0] < cutoff:
+        _PUBLISH_BYTES.pop(0)
+    return sum(size for _, size in _PUBLISH_BYTES)
+
+
+def _publish_budget_blocks(relative_path: str, size_bytes: int) -> bool:
+    """True when sending `size_bytes` would break the hourly ceiling.
+
+    Checked BEFORE the upload, so the breaker prevents the spend rather than
+    reporting it afterwards.
+    """
+    ceiling = _publish_budget_max_bytes()
+    used = _publish_budget_used_bytes()
+    if used + max(0, int(size_bytes)) <= ceiling:
+        return False
+    print(
+        f"[artifact_publisher] PUBLISH_BUDGET_EXCEEDED path={relative_path} "
+        f"size_bytes={size_bytes} used_mb={used / 1024 / 1024:.1f} "
+        f"ceiling_mb={ceiling / 1024 / 1024:.1f} window_s={int(_PUBLISH_BUDGET_WINDOW_SECONDS)} "
+        f"-- REFUSING UPLOAD, set SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET to change",
+        flush=True,
+    )
+    return True
+
+
+def _publish_budget_record(size_bytes: int) -> None:
+    _PUBLISH_BYTES.append((time.time(), max(0, int(size_bytes))))
+    _PUBLISH_BUDGET_COUNTER[0] += 1
+    if _PUBLISH_BUDGET_COUNTER[0] % _PUBLISH_BUDGET_LOG_EVERY == 0:
+        used = _publish_budget_used_bytes()
+        print(
+            f"[artifact_publisher] PUBLISH_BUDGET uploads={len(_PUBLISH_BYTES)} "
+            f"used_mb={used / 1024 / 1024:.1f} "
+            f"ceiling_mb={_publish_budget_max_bytes() / 1024 / 1024:.1f}",
+            flush=True,
+        )
+
+
 def _publish_url() -> str:
     base = _env("SYNDICATE_WEB_PUBLISH_URL")
     if not base:
@@ -622,6 +710,20 @@ def _publish_streamed(
         print(f"[artifact_publisher] SKIP_READ_FAILED path={file_path} error={exc}", flush=True)
         return False
 
+    # `#394`/`#395` on the streamed path too. This is the path LARGE artifacts
+    # take, so leaving it unguarded would exempt exactly the uploads that cost
+    # the most -- the failure mode where a guard exists and the expensive case
+    # routes around it.
+    if _LAST_PUBLISHED_CHECKSUM.get(relative_path) == checksum:
+        print(
+            f"[artifact_publisher] PUBLISH_SKIPPED_UNCHANGED path={relative_path} "
+            f"checksum={checksum[:12]} transport=stream",
+            flush=True,
+        )
+        return True
+    if _publish_budget_blocks(relative_path, size):
+        return False
+
     try:
         with file_path.open("rb") as handle:
             request_obj = urllib_request.Request(
@@ -638,6 +740,11 @@ def _publish_streamed(
             )
             with urllib_request.urlopen(request_obj, timeout=timeout_seconds) as response:
                 response.read()
+        # Recorded only after the upload is acknowledged, same rule as the JSON
+        # path: a failed publish must retry next sweep, not be suppressed by its
+        # own attempt.
+        _LAST_PUBLISHED_CHECKSUM[relative_path] = checksum
+        _publish_budget_record(size)
         print(
             f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url} transport=stream bytes={size}",
             flush=True,
@@ -746,6 +853,11 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         {"relative_path": relative_path, "content": content, "checksum": checksum}
     ).encode("utf-8")
 
+    # `#395`: measured on the ACTUAL request body, not the file on disk -- the
+    # JSON wrapper is what crosses the wire and is what the bill counts.
+    if _publish_budget_blocks(relative_path, len(body)):
+        return False
+
     request_obj = urllib_request.Request(
         url,
         data=body,
@@ -761,7 +873,11 @@ def publish_hot_artifact(path: Path, *, timeout_seconds: int = 10) -> bool:
         # Recorded only after the upload is acknowledged -- a failed publish must
         # be retried next sweep, not suppressed by its own attempt.
         _LAST_PUBLISHED_CHECKSUM[relative_path] = checksum
-        print(f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url}", flush=True)
+        _publish_budget_record(len(body))
+        print(
+            f"[artifact_publisher] PUBLISH_OK path={relative_path} url={url} bytes={len(body)}",
+            flush=True,
+        )
         return True
     except (urllib_error.URLError, TimeoutError, OSError) as exc:
         print(f"[artifact_publisher] PUBLISH_FAILED path={relative_path} url={url} error={exc}", flush=True)
