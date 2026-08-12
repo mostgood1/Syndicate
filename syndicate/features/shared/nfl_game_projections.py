@@ -223,8 +223,19 @@ def attach_nfl_game_projections(
                     "source": "nfl_smartsim2",
                     "generated_at": entry.get("generated_at"),
                 }
+                # `#377`: same `margin_mean`, same verdict, same suppression as the
+                # spreads branch below. `#367` kept the PROBABILITY visible with
+                # its skill attached, which is right -- a probability has a
+                # natural place to carry a caveat. `projected` does not: it lands
+                # in a bare numeric board column, and it was rendering `1.0` for
+                # every NFL game. The probability stays; the projection goes.
                 note = skill_note(entry.get("profile"), "h2h")
                 if note:
+                    projection["projected"] = None
+                    projection["projection_unavailable_reason"] = (
+                        f"margin model has no measured skill "
+                        f"(corr {note.get('correlation')} over {note.get('sample_games')} games)"
+                    )
                     # `#367`: measured corr(projection, actual margin) = -0.047
                     # over 146 preseason games. `home_win_rate` derives from that
                     # margin model, so this probability carries no information.
@@ -272,8 +283,31 @@ def attach_nfl_game_projections(
             mean = entry.get("margin_mean")
             line = _as_float(row.get("line"))
             if mean is not None:
+                # `#377`: DO NOT PUBLISH A MARGIN PROJECTION WITH NO MEASURED SKILL.
+                #
+                # `MEASURED_SKILL["margins"]` is correlation **-0.047** over 146
+                # games, verdict "no measured skill". The board renders
+                # `projected` as a bare number in a column headed PROJECTED, with
+                # nowhere to show that caveat -- and `#367` already argued this
+                # exact point one branch up: "shown WITH its skill rather than
+                # silently, because a bare 0.53 reads as a real read on the game."
+                # A bare 1.0 reads the same way, so on a surface that cannot
+                # carry the annotation the only honest value is none.
+                #
+                # Reported off the live board 2026-08-12: every NFL h2h and
+                # spread row showed `0.96` -- Colts/Patriots, Lions/Bengals and
+                # Packers/Steelers alike. Not a join bug; `margin_mean` really is
+                # that number for every game, which is what a model collapsed to
+                # the league average produces.
+                #
+                # `edge_vs_line` below is DELIBERATELY still computed. It is
+                # `mean - line`, so it inherits the same worthless mean -- but it
+                # is a derived diagnostic rather than a headline projection, and
+                # dropping it silently would hide the input from anyone auditing
+                # this. It travels with `model_skill` instead.
+                margin_skill = skill_note(entry.get("profile"), "margins")
                 projection = {
-                    "projected": round(mean, 3),
+                    "projected": None if margin_skill else round(mean, 3),
                     "side": str(row.get("home_team") or "").strip(),
                     "basis": "smartsim2_margin_mean",
                     "source": "nfl_smartsim2",
@@ -285,6 +319,14 @@ def attach_nfl_game_projections(
                     # edge while looking plausible.
                     "probability_unavailable_reason": "spread row does not state which side its line belongs to",
                 }
+                if margin_skill:
+                    projection["model_skill"] = margin_skill
+                    # Named the same way the sibling `probability_unavailable_reason`
+                    # is, so an empty cell is attributable rather than mysterious.
+                    projection["projection_unavailable_reason"] = (
+                        f"margin model has no measured skill "
+                        f"(corr {margin_skill.get('correlation')} over {margin_skill.get('sample_games')} games)"
+                    )
                 if line is not None:
                     projection["edge_vs_line"] = round(mean - line, 3)
 

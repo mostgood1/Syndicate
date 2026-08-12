@@ -144,3 +144,69 @@ def test_a_missing_total_is_still_a_blank():
     row = _row("totals", line=37.5)
     attach_nfl_game_projections([row], _index(total=None))
     assert row.get("projection") is None
+
+
+def test_no_skill_margin_projection_is_suppressed_not_published():
+    """`#377`. The board rendered `1.0` in a PROJECTED column for EVERY NFL game
+    -- Colts/Patriots, Lions/Bengals, Packers/Steelers alike -- because
+    `margin_mean` really is 0.96 for all of them. That is what a model collapsed
+    to the league average produces, and `MEASURED_SKILL["margins"]` already
+    records it: correlation **-0.047** over 146 games, "no measured skill".
+
+    `#367` kept the PROBABILITY visible with its skill attached, which is right:
+    a probability has somewhere to carry a caveat. `projected` does not -- it
+    lands in a bare numeric column -- so on that surface the only honest value is
+    none.
+
+    Measured live before the fix: 13 of 33 NFL rows carried
+    `basis=smartsim2_margin_mean` with `model_skill=False`, because the SPREADS
+    branch never called `skill_note` at all. Only h2h was guarded.
+    """
+    from syndicate.features.shared.nfl_game_projections import (
+        NflGameProjectionIndex, attach_nfl_game_projections, _norm)
+
+    entry = {"margin_mean": 0.96, "total_mean": 38.76, "home_win_rate": 0.53,
+             "total_stdev": 10.0, "generated_at": "t", "profile": "nfl_preseason_v1"}
+    index = NflGameProjectionIndex(
+        by_date_teams={("2026-08-13", _norm("New England Patriots"), _norm("Indianapolis Colts")): entry},
+        games=1,
+    )
+    base = dict(kind="game", segment="full", sport="nfl", event_id="e1",
+                home_team="New England Patriots", away_team="Indianapolis Colts",
+                commence_time="2026-08-13T23:00:00Z", game_date="2026-08-13")
+    rows = [dict(base, market=m, line=l) for m, l in (("h2h", None), ("spreads", -3.0), ("totals", 39.5))]
+    attach_nfl_game_projections(rows, index)
+    by_market = {r["market"]: (r.get("projection") or {}) for r in rows}
+
+    # BOTH margin branches suppress -- h2h was already guarded, spreads was not.
+    for market in ("h2h", "spreads"):
+        assert by_market[market]["projected"] is None, f"{market} still publishes a no-skill margin"
+        assert by_market[market]["model_skill"], f"{market} suppressed without saying why"
+        assert "no measured skill" in by_market[market]["projection_unavailable_reason"]
+
+    # TOTALS is NOT suppressed: corr 0.269 and calibrated MAE 8.26 beats the
+    # 8.48 constant baseline, so it carries information the margins do not.
+    assert by_market["totals"]["projected"] is not None
+
+    # `edge_vs_line` deliberately survives -- a derived diagnostic, not a headline
+    # projection. Dropping it silently would hide the input from an auditor.
+    assert by_market["spreads"]["edge_vs_line"] is not None
+
+
+def test_regular_season_projections_are_untouched():
+    """The suppression is keyed on the PRESEASON profile whitelist. A fix that
+    blanked the regular season would be far worse than the bug."""
+    from syndicate.features.shared.nfl_game_projections import (
+        NflGameProjectionIndex, attach_nfl_game_projections, _norm)
+
+    entry = {"margin_mean": 0.96, "total_mean": 38.76, "home_win_rate": 0.53,
+             "total_stdev": 10.0, "generated_at": "t", "profile": "nfl_regular_v1"}
+    index = NflGameProjectionIndex(
+        by_date_teams={("2026-08-13", _norm("H"), _norm("A")): entry}, games=1)
+    rows = [dict(kind="game", segment="full", sport="nfl", event_id="e1",
+                 home_team="H", away_team="A", market=m, line=l,
+                 commence_time="2026-08-13T23:00:00Z", game_date="2026-08-13")
+            for m, l in (("h2h", None), ("spreads", -3.0))]
+    attach_nfl_game_projections(rows, index)
+    for r in rows:
+        assert (r.get("projection") or {}).get("projected") == 0.96
