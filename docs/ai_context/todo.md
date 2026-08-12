@@ -12853,6 +12853,33 @@ above, closer to the season); NFL preseason props (no real prop-odds
 source exists at all, correctly never attempted).
 
 **Operational notes:**
+- **"The mechanism is present and the connection is not." Five instances,
+  four subsystems, one shape** — agreed with the oversight session
+  2026-08-12. Not carelessness; a structural trap that recurs because each
+  instance looks like a different bug:
+  - `#373`/`#381`/`#391` each added a field to `select_shortlist`'s return
+    and it never reached the client, because `blueprints/intelligence.py`
+    hand-builds the payload from an explicit key list (~`:2736`). Three
+    times, same file, months apart.
+  - `#394`: the publish checksum was computed, sent, and never compared.
+  - `#399`: the OOM guard was present, logging, and sized on the wrong
+    input (`st_size` of a compressed shard, ~39x under).
+  - `#398`: the settlement resolver read `closing_lines_{date}.csv` as
+    evidence while the same sweep deleted it as a subject — outcome
+    depended on filesystem iteration order and failed silently.
+  **What to check:** when you add a value, trace it to the thing that
+  CONSUMES it, not to the thing that produces it. A test that the producer
+  emits the field passes in every case above.
+- **ID collisions are a race, and re-checking harder does not close it.**
+  Two collisions on 2026-08-12 (`#397` and `#398`, both between this
+  session and oversight). `git log --grep '#NNN' origin/main` returning
+  empty was CORRECT when run and stale by push time in both cases; the
+  file-level duplicate detector reads `todo.md` and is structurally blind
+  to commit-only IDs. With several sessions on one branch the durable
+  fixes are a per-session ID prefix or allocation at push time — not a
+  more diligent check at commit time. Also: a commit message on a shared
+  branch cannot be amended, so a renumber needs a separate record commit
+  (`daa078ef`, `0f9c77c5`).
 - Two real cross-session git incidents this same day while sharing one
   working tree with the "MLB HR/K modeling separation" session: (a) this
   session ran `git checkout --` on a file assuming it was regenerated-
