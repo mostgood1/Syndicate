@@ -72,3 +72,24 @@ def test_a_zero_seen_age_is_honoured_not_treated_as_missing():
 def test_unparseable_values_do_not_crash_the_gate():
     assert _row_quote_age_seconds({"quote": {"quote_seen_age_seconds": "nope", "book_age_seconds": 120.0}}) == 120.0
     assert _row_quote_age_seconds({"quote": {"quote_seen_age_seconds": None, "book_age_seconds": None}}) is None
+
+
+def test_the_ceiling_is_one_hour_and_actually_fires():
+    """`#371` -- the gate was 24h and excluded nothing.
+
+    Measured on the served shortlist immediately before the change: seen-age
+    median 68.5m, p90 375.8m, 104 of 200 rows older than an hour, and 0 of 200
+    excluded by the 24h ceiling on either clock. Half the board rested on
+    observations over an hour old.
+
+    Pinned as a test because the value is the whole behaviour: a ceiling that
+    does not fire is indistinguishable from no gate, and that is exactly the
+    state this replaced.
+    """
+    from syndicate.features.shared.layer2_board import SHORTLIST_MAX_QUOTE_AGE_SECONDS
+
+    assert SHORTLIST_MAX_QUOTE_AGE_SECONDS == 3600
+    # A row observed 68 minutes ago -- the measured median -- must now be excluded.
+    assert _row_quote_age_seconds(_row(book=22572.0, seen=4110.0)) > SHORTLIST_MAX_QUOTE_AGE_SECONDS
+    # And one observed a minute ago must survive, however long since it moved.
+    assert _row_quote_age_seconds(_row(book=25200.0, seen=60.0)) < SHORTLIST_MAX_QUOTE_AGE_SECONDS

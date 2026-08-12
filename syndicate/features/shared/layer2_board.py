@@ -189,7 +189,28 @@ SHORTLIST_STALE_KICKOFF_SECONDS = 2 * 3600
 # multiplicatively in the score, which is the right shape while the cause is
 # unknown. Tighten it only after the uniform-lag question is answered. Cost of
 # each value, measured: <=12h keeps 142, <=6h keeps 37, <=4h keeps 13.
-SHORTLIST_MAX_QUOTE_AGE_SECONDS = 24 * 3600
+# One hour (`#371`). Was 24h, which excluded 0 of 200 served rows on either
+# clock -- a gate that never fired. `#370` made it read the right clock (time
+# since we LOOKED, not since the price MOVED); this makes it actually bite.
+#
+# Measured on the served shortlist immediately before the change: seen-age
+# median 68.5m, p90 375.8m, and 104 of 200 rows older than an hour. So this is
+# not a cosmetic tightening -- roughly half the board was built on observations
+# over an hour old, on a surface whose whole purpose is to say what is actionable
+# NOW.
+#
+# Board SIZE should hold: 3,101 candidates were considered for 200 slots against
+# a per-sport limit of 100, so excluded rows backfill from fresher candidates.
+# What changes is composition, not volume. If the board shrinks materially
+# instead, that means the fresh candidate pool is thinner than the gate assumes
+# and the ceiling -- not the pool -- should be revisited.
+#
+# Deliberately a code constant rather than an env var: no
+# SYNDICATE_SHORTLIST_MAX_QUOTE_AGE_SECONDS is set on any service or in
+# render.yaml (checked), so the default IS the live value, and a render.yaml
+# edit would be a blueprint_sync production event for a number that belongs in
+# review.
+SHORTLIST_MAX_QUOTE_AGE_SECONDS = 3600
 
 
 # How many times a sport's OWN typical hold a row may be worse before it is
