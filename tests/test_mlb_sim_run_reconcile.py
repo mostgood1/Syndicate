@@ -253,10 +253,26 @@ class MlbSimNonOwnerTests(unittest.TestCase):
         self.assertEqual(status["state"], "died_untracked")
         self.assertEqual(status["finalized_by"], "orphan_reconcile")
 
-    def test_non_owner_still_clears_the_pointer(self) -> None:
-        """Pre-existing behaviour, deliberately unchanged -- narrowing it here
-        would be a second unmeasured change on top of an incident."""
+    def test_non_owner_does_not_clear_the_pointer_either(self) -> None:
+        """A non-owner must OBSERVE, not mutate.
+
+        MEASURED IN PRODUCTION 2026-08-12: gating only the WRITE was not enough.
+        Run 20260812_220813 was killed by a refresh-worker restart at 22:19Z and
+        still read `state: running` with no orphan line anywhere -- because
+        live-odds-worker had already cleared the shared pointer (it can never see
+        the owner's pid), so when the owner rebooted there was nothing left to
+        reconcile from. The gate stopped the false record AND removed the trace
+        the real record needed.
+        """
         self._run_as(owner=False)
+        pointer = json.loads((self.sim_dir / "_active.json").read_text(encoding="utf-8"))
+        self.assertTrue(pointer, "a non-owner erased the pointer the owner needs")
+        self.assertEqual(pointer["run_stamp"], self.STAMP)
+
+    def test_owner_still_clears_the_pointer(self) -> None:
+        """And the owner must still clear, or a dead run wedges every future
+        launch -- the failure the ungated clear existed to prevent."""
+        self._run_as(owner=True)
         self.assertFalse(json.loads((self.sim_dir / "_active.json").read_text(encoding="utf-8")))
 
 

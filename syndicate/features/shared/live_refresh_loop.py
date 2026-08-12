@@ -2223,8 +2223,25 @@ def _retire_stale_active_pointer(meta: dict[str, Any], *, state: str, detail: st
 	on top of an incident. This restores exactly the old semantics for
 	non-owners while keeping the new record for the owner.
 	"""
-	if _mlb_sim_tick_owner_here():
-		_finalize_orphaned_sim_run(meta, state=state, detail=detail)
+	# `#388`, second pass. Gating ONLY the write left the real record
+	# unrecordable. MEASURED 2026-08-12: run 20260812_220813 was killed by a
+	# refresh-worker restart at 22:19Z and still reads `state: running`, with no
+	# orphan line on either service. live-odds-worker (SIM_TICK_OWNER=false) had
+	# already CLEARED the shared pointer -- it can never see the owner's pid --
+	# so when the owner rebooted there was nothing left to reconcile from.
+	#
+	# The first pass deliberately left the clear ungated to avoid a second
+	# unmeasured change during an incident. That was the right call then and is
+	# the wrong state to stay in: a non-owner must OBSERVE, not mutate. Its own
+	# docstring already says so.
+	#
+	# Safe because the owner is the only service that launches MLB sims, and it
+	# still clears through this same path -- so a stale pointer cannot wedge the
+	# only thing the pointer gates. A non-owner still returns False and proceeds
+	# exactly as before; the only change is that it no longer writes.
+	if not _mlb_sim_tick_owner_here():
+		return
+	_finalize_orphaned_sim_run(meta, state=state, detail=detail)
 	_clear_active_pointer(expected_pid=meta.get("pid"))
 
 
