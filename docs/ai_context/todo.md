@@ -1,5 +1,46 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#375` — OPEN, UNOWNED. `h2h_lay` is de-vigged as if it were a back price, and every lay row on the board shows positive EV
+
+**The tell, measured 2026-08-11 21:35 CT on the served shortlist: 11 of 11 lay
+rows are +EV**, ev_pct 0.25% to 4.85%, every one `fair_method: two_sided`. A
+market type where *every* row is positive is systematically mispriced, not
+systematically profitable. Compare the board as a whole, where a healthy vigged
+market is NEGATIVE on both sides (`SHORTLIST_MIN_VALUE_PCT`'s own note: a
+realistic 3-book market scores -1.0953 on both sides).
+
+Sample row: `h2h_lay`, price `-1250`, `fair_probability 0.9709`, `ev_pct 4.85`.
+A `-1250` lay implies ~92.6%; the fair says 97.1%; the 4.5-point gap becomes
+"edge". **A lay quote is the opposite side of the bet from a back quote**, so
+de-vigging it against a back-derived fair compares two different things and the
+sign of the result is not meaningful.
+
+**HOW IT SURFACED, and the mistake worth recording.** The board's #1 row was an
+`h2h_lay` at a 17.79% "edge". I proposed a MINIMUM-BOOKS GUARD -- reasoning that
+`ev_pct` is a cross-book arb surplus and is undefined at `books_quoting == 1`.
+Measuring the population first killed it:
+
+    books_quoting == 1   106 of 200 rows (53%)
+      fair_method: two_sided 70 · book_margin_model 36
+      their ev_pct: -7.25 .. +1.02   (no outliers whatsoever)
+
+`two_sided` de-vigs BOTH SIDES OF ONE BOOK, which is perfectly valid at one book.
+**The guard would have deleted 53% of the board on a false premise**, and it would
+have looked decisive doing it. I had generalised from n=5 rows that shared a
+MARKET TYPE, not a book count. Today's single-book rows top out at +1.02%.
+
+**Not fixed, deliberately.** `#369`'s implied-book floor already rejects the worst
+of these, so the immediate harm is covered -- but for the wrong reason, which is
+its own hazard: it looks handled. Writing the correct rule needs someone who knows
+how exchange lay prices should be de-vigged, and guessing at that is how the
+minimum-books guard nearly shipped.
+
+**Where to start:** whether `expected_value_pct`/`devig` in
+`opportunity_signals.py` should receive a lay quote at all, or whether `_lay`
+markets need their price inverted to a back-equivalent before any fair comparison.
+11 rows today, so this is small and self-contained -- but it sits at the TOP of the
+board when it goes wrong, because a fabricated edge outranks every real one.
+
 ### `#374` — OPEN, UNOWNED, NOT URGENT. `gameMarkets.extraHitterProps` is 68% of the MLB live-lens payload, at 117 keys per record
 
 Sized while chasing `#371`'s 8MB ceiling breach. Measured 2026-08-11 21:16 CT,
