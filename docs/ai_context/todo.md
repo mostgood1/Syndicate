@@ -110,7 +110,7 @@ shortlist, then re-run check 3 against that service. A `written_at` of 19:09:47Z
 against a build at 19:53:28Z means the write either never fired or was refused;
 which of those it is decides everything downstream.
 
-### `#388` — FIXED IN THE WORKING TREE, NOT YET DEPLOYED. Half of all MLB sims are killed by deploys, and the run ledger records nothing — every completed run reads `exit_code: 0`
+### `#388` — FIXED, DEPLOYED, AND CONFIRMED IN PRODUCTION (with one regression found and fixed the same night). Half of all MLB sims were killed by deploys, and the run ledger recorded nothing — every completed run read `exit_code: 0`
 
 Full evidence: `docs/reports/sim_execution_observability_report.md` §3.
 
@@ -380,59 +380,71 @@ samples.
 the process count.** "0 launches" reads identically whether the guard suppressed
 them or NFL simply is not active — only the named reason discriminates.
 
-#### FOLLOW-UP to `#389` — OPEN, UNOWNED. The NFL projection artifacts are never written at all
+#### FOLLOW-UP to `#389` — ROOT-CAUSED AND FIXED (`2ee6a003`, refresh-worker 23:37:58Z). AWAITING FIRST RUN. An unrelated file decided where NFL projections were written, so the guard never saw them
 
-Now visible because `#389` made it so. The paths the guard watches are still
-absent **987 seconds after a ~3-minute run**:
+**MEASURED, from the generator's own log line — not inferred:**
 
-    /opt/render/project/data/nfl_source/smartsim2_projections_2026_wk1.csv
-    /opt/render/project/data/nfl_source/smartsim2_preseason_projections_2026_wk2.csv
+    script writes:  /opt/render/project/src/data/nfl_source/smartsim2_projections_2026_wk1.csv
+    guard  reads :  /opt/render/project/data/nfl_source/smartsim2_projections_2026_wk1.csv
 
-So the generation script runs to completion and does not write where the autorun
-looks — wrong path, wrong root, or a silent write failure. `#389` deliberately
-did not guess which; it stopped the ~90/day busy loop and named the file. This
-is the remaining half, and it is the reason the artifacts were stale in the first
-place.
+`src/data` is the **repo checkout** — ephemeral, replaced on every deploy.
+`data` is the **mounted disk**. So the sim ran to completion ~90×/day, wrote a
+real artifact every time, and every one was invisible to the guard and
+discarded on the next deploy. `#389` stopped the busy loop; **this is why the
+loop existed.**
 
-Observed on refresh-worker over 43.2h (process-table sampling):
+**CAUSE.** `default_nfl_source_root()` returns the first candidate root
+containing `upcoming_recs_*.csv`. The repo mirror ships that file; the mounted
+disk does not. **An unrelated artifact's presence decided where projections
+were written.** The probe is correct for READS — find the root that actually
+holds your input — and wrong for WRITES, where the answer must be the
+configured root. `source_roots.preferred_artifact_roots` already says this
+about `#310`: *"does this directory contain anything" is not "does it contain
+the file you asked for"*. This is the write-side corollary of a lesson already
+written down and not applied.
 
-    generate_smartsim2_nfl_projections.py --season 2026 --week 1        83 episodes  ~46/day  p50 173s
-    generate_smartsim2_nfl_preseason_projections.py --season 2026 --week 2  72 episodes  ~40/day  p50 183s
+**FIX.** `nfl_artifact_output_root()` — env var, else the shared data root, **no
+filesystem probing**. Both generators and **both** guard paths call it, so
+writer and reader cannot diverge again; the divergence was the whole defect and
+either half alone was defensible. Resolved at call time, not import, so it
+follows the environment instead of freezing at module load.
 
-Median gap between episode **starts: 5 minutes**. Episodes are sequential, not
-overlapping. `SEASON_PROJECTION_REFRESH_INTERVAL_SECONDS` defaults to **86400** —
-expected 1 run/day/sport, actual ~46.
+NCAAF deliberately left on its existing path — its generator has not been
+audited, and generalising one sport's bug to another sport's layout would be
+inventing a fact.
 
-**CAUSE** (`scripts/run_refresh_worker.py:2455-2458`):
+**HOW IT WAS FOUND, worth more than the fix.** The generator prints
+`artifact_path=` and the autorun does not redirect its stdout, so the answer
+was in Render logs the whole time. I had assumed the worker disk was unreadable
+and that the destination would have to be inferred. **Reading the emitter beat
+reasoning about it** — the same shape as `#388`, where the wrapper's own
+START/END lines were being redirected into a file nobody read.
 
-    age_seconds = _file_age_seconds(artifact_path)
-    if age_seconds is not None and age_seconds < float(_season_projection_refresh_interval_seconds()):
-        continue
+**TWO EXISTING TESTS CHANGED, deliberately.**
+`test_main_writes_artifact_for_real_schedule_rows` and
+`test_main_falls_back_when_no_pbp_exists_yet` redirected the WRITE by patching
+`DATA_ROOT`, the READ root. **That conflation is the defect**, so they had to
+change; they still assert the artifact is written with correct content, only
+where they point it moved. No assertion was weakened to get green.
 
-`_file_age_seconds` returns `None` when `path.stat()` raises — i.e. **when the
-artifact is missing** (`:261-266`). The guard maps that unknown onto its
-permissive branch, so an artifact that never appears at
-`data/nfl_source/smartsim2_projections_2026_wk1.csv` makes the sport permanently
-stale and relaunches it every tick forever, throttled only by
-`_season_projection_process_still_running`.
+`test_guard_and_writer_resolve_the_same_path` fails against the pre-fix guard
+with `C:/mnt/disk/nfl_source != C:/elsewhere/nfl_source`. 76 passed across the
+NFL projection, season-projection and staleness suites.
 
-This is the **exact shape already recorded on this list**: unknown must not
-default permissive, and gate on the output rather than the input.
+**NOT YET CONFIRMED, and the three zeros do not count.** As of 23:40Z:
 
-**Cost:** ~90 launches/day × ~3 min ≈ **4.5 process-hours/day** on the 4GB worker
-that also runs MLB sims — and MLB's sim gate checks memory headroom against a
-900MB floor, so this competes directly with `#388`'s workload.
+    artifact_path=                      0 since deploy
+    SEASON_PROJECTION_LAUNCHING         0 since deploy
+    SEASON_PROJECTION_ARTIFACT_MISSING  0 since deploy
 
-**NOT YET ESTABLISHED:** *why* the artifact is absent. I did not read the worker
-disk. The 5-minute relaunch cadence proves only that the predicate never
-evaluates to "fresh" — either the file is missing or it is always >24h old.
-Establish which before fixing, and **fix the guard regardless**: `None` means
-"we don't know", which should emit a reason and back off, not relaunch.
+No generator has run since the fix, because `#389`'s own backoff suppresses
+relaunches for 24h and the last runs were 20:59 / 21:01. **The confirming
+observation is a POSITIVE emission** — an `artifact_path=` line reading
+`/opt/render/project/data/...` with no `/src/` — due ~21:00 on 2026-08-13. The
+absence of `SEASON_PROJECTION_ARTIFACT_MISSING` is NOT confirmation: it is
+absent right now only because nothing ran.
 
-Separately: the season script is pinned to `--week 1` in mid-August (consistent
-with the "NFL week self-pins to 1" finding in the E2E assessment).
-
-### `#390` — BUILT AND PUSHED (`2411d748`), NOT DEPLOYED. No sport except MLB had any sim run ledger, so "when did this sim run and how long did it take" was unanswerable for 6 of 7 sports
+### `#390` — BUILT, DEPLOYED, AND CONFIRMED IN PRODUCTION (`2411d748`). No sport except MLB had any sim run ledger, so "when did this sim run and how long did it take" was unanswerable for 6 of 7 sports
 
 **WHAT SHIPPED** — `syndicate/features/shared/sim_run_ledger.py`, wired at the
 choke points every sim already passes through rather than at each sim:
@@ -479,42 +491,29 @@ never called is the defect class this repo keeps rediscovering. Regression: 88
 passed across the odds-refresh and season-projection suites; 34 passed
 including `test_mlb_sim_run_reconcile` after the MLB mirror.
 
-**NOT DEPLOYED, AND THEREFORE UNPROVEN.** Every claim above rests on tests. The
-first real check is `/api/ops/sims/ledger?date=` returning a non-empty
-`by_sport` for soccer/nba/wnba/nhl after a refresh cycle, and
-`SIM_LEDGER_UNCLASSIFIED` being absent — if it appears, a sim step exists that
-this classifier does not know about, which is the ledger telling you its own
-coverage gap.
+**CONFIRMED IN PRODUCTION 23:1xZ.** `/api/ops/sims/ledger?date=2026-08-12`:
 
-Full evidence: `docs/reports/sim_execution_observability_report.md` §0, §5, §8.
+    ok: True | index_present: True | runs: 4
+      mlb     runs=3  ok=0 failed=0 unfinished=3
+      soccer  runs=1  ok=1 failed=0 unfinished=0  p50=28  max=28
 
-NBA / WNBA / NHL / soccer / NCAAF sims run **inside** the odds refresh, not as
-their own job: no launch line, no run stamp, no status record, no duration. The
-only reason this report could quantify them at all is that
-`ALL_PROCESS_MEMORY` — a *memory* diagnostic — happens to print child
-`cmdline`s. Measuring sim cost via the memory instrument is an accident, not a
-capability.
+      soccer  soccersim_artifacts  22:52:30  dur=28  rc=0  trig=odds_refresh_step  svc=refresh-worker-4tx2
 
-What that accident yielded over 43.2h, and its limits:
+**That soccer row is the thing that never existed.** A non-MLB sim with a real
+duration, exit code, trigger and service — recorded automatically through the
+odds-refresh choke point. Before this, the only way to know soccer sims take
+~28s was to sample child `cmdline`s out of a memory diagnostic and report a
+lower bound.
 
-    soccer  build_soccer_artifacts.py       15 episodes  ~8/day   p50  24s  max 374s
-    wnba    refresh_wnba_oddsapi_props.py    2 episodes  ~1/day   p50 131s  max 261s
-    nba, nhl, ncaaf, ncaab                    0 episodes
+`SIM_LEDGER_UNCLASSIFIED` = 0 on both workers **against a real denominator** —
+a soccer sim step ran and was correctly attributed. The earlier zero, before
+any sim step had run, meant nothing.
 
-**The zero is a 43-hour August window, not evidence those pipelines work.**
-Sampling is bursty, so counts are ±20% and durations are **lower bounds** —
-calibrated against MLB, where a ground-truth launch count existed (38 logged vs
-46 sampled episodes in the same window).
-
-**THE FIX:** one launch/finish record per sport — sport, trigger reason, scope,
-start, end, exit code, duration. MLB's `MLB_DAILY_SIM_TRIGGERED` line plus its
-run-status file are the right shape; fix them per `#388` first, then generalize.
-Until this exists, this report is only reproducible by someone with Render API
-credentials.
-
-**Related, and worth folding in:** `SYNDICATE_ENABLE_SOCCER_RESIM_TRIGGER`
-defaults **off** and is not set in `render.yaml`, so soccer's join-mismatch
-re-sim path is dark in production.
+**KNOWN GAP, deliberate but real:** MLB reads `unfinished=3` permanently. The
+MLB mirror is launch-only, so **the unified ledger cannot answer "how long did
+MLB take"** — that still requires `/api/ops/live-refresh/state`. Every other
+sport gets a complete record. Either close this or the "one reader for all
+sports" claim needs qualifying.
 
 ### `#382` — SHIPPED AND INERT IN PRODUCTION. The modelled-hold floor cannot fire: the field it reads is dropped in the grid -> candidate fan-out
 
@@ -28686,6 +28685,30 @@ doing something, the absence of the old symptom is not evidence -- it is the
 same reading you get from a broken scheduler, a dead worker, or a guard that
 never ran. **Verify a suppression by its own positive emission, never by the
 silence it creates.**
+
+### Before deploying a worker, check for SOMEONE ELSE'S deploy first (2026-08-12)
+
+I fired a deploy **34 seconds into another lane's**, cancelling it. Theirs was
+`#404` — the fix for a stall that *my own* earlier deploy had caused by shipping
+`#401`'s retention sweep as an ancestor. **I shipped the cause and cancelled the
+cure**, both from wrong attribution rather than disagreement.
+
+One API call prevents it:
+
+    GET /v1/services/<id>/deploys?limit=3
+    -> any status in {created, build_in_progress, update_in_progress} means HOLD
+
+The full pre-flight for a worker deploy is now **four** checks, and the first
+three are all necessary because each is blind to what the others see:
+
+    1. instrument alive   (else every reading below is UNKNOWN, not clear)
+    2. board build idle   BUILD_SPAN_ENTER newer than LAYER2_SHORTLIST = in flight
+                          -- invisible to the sim check, the build runs IN-PROCESS
+    3. no sims running    ALL_PROCESS_MEMORY cmdlines, never child_count
+    4. no deploy in flight by anyone else
+
+Check 2 came from the market-board lane, and three separate lanes converged on
+it independently the same night — a decent sign it is the right check.
 
 ### PRE-FLIGHT PROCEDURE: prove the instrument is alive BEFORE you read the null (2026-08-12)
 

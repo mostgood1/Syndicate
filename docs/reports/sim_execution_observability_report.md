@@ -10,11 +10,13 @@ local `data/**` mirror.
 
 **Only MLB has a sim run ledger, and half its entries are wrong.**
 
-> **Update, same day.** All three defects below were fixed. `#388` (half the
-> entries wrong) and `#389` (NFL busy loop) are **deployed and confirmed in
-> production**; `#390` — a ledger for the other six sports — is **built and
-> pushed but not deployed**, so the table below still describes production
-> until it lands. See §9.
+> **Update, same day — all three fixed, deployed, and confirmed in production.**
+> The table immediately below describes the system as MEASURED that morning; it
+> is no longer true of production. `#388` (half the entries wrong), `#389` (NFL
+> busy loop) and `#390` (no ledger for six of seven sports) are live and each
+> confirmed by its own telemetry. Two follow-ups remain unconfirmed pending
+> their next scheduled run: the NFL artifact-path fix (~21:00 on 08-13) and
+> `#404` (~22:48 on 08-13). See §9.
 
 | question | MLB | NFL / NCAAF | soccer | NBA / WNBA / NHL | NCAAB |
 |---|---|---|---|---|---|
@@ -469,6 +471,11 @@ and nothing has been deployed by this work.**
 | 2026-08-12 | `#389` **confirmed in production** — 2 launches in 62 min vs ~12, suppression named in the log; surfaced that the NFL artifacts are never written at all | **confirmed** |
 | 2026-08-12 | `#388` **regression**: live-odds-worker stamped 3 of 3 live sims `died_untracked` — shared pointer vs local `_process_exists`. Gate `f6c0525f` deployed to live-odds-worker (live 21:44:13Z) | **confirmed 21:54Z** — first post-gate launch clean, null verified against a live instrument |
 | 2026-08-12 | **`#390` built** (`2411d748`) — `sim_run_ledger` wired at `_run_command` (soccer/nba/wnba/nhl), the season-projection autorun (nfl/ncaaf) and the MLB launcher; read via `/api/ops/sims/ledger?date=`. 11 tests, incl. wiring against the real step runner | **pushed, NOT deployed** |
+
+| 2026-08-12 | `#390` **confirmed** — `/api/ops/sims/ledger` returns soccer `dur=28 rc=0` via the odds-refresh choke point; `SIM_LEDGER_UNCLASSIFIED`=0 against a real denominator | **confirmed** |
+| 2026-08-12 | `#388` **confirmed** — first production `killed_by_restart` (`duration_seconds: 222`), written by the owner, non-owner silent | **confirmed** |
+| 2026-08-12 | `#388` second-pass: gating only the WRITE left the record unrecordable; the non-owner still cleared the shared pointer. Clear now gated too (`8c32c1ce`) | **confirmed** |
+| 2026-08-12 | `#389` **follow-up root-caused** (`2ee6a003`) — generator wrote to `/src/data` (ephemeral checkout), guard read `/data` (mounted disk); an unrelated file chose the root | **awaiting first run ~21:00 08-13** |
 
 ### `#388` as implemented
 
