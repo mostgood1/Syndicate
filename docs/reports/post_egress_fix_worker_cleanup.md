@@ -352,6 +352,35 @@ At those numbers the current web hot set drops from 5.83 GB to roughly
 **2.1 GB**, and — more importantly — the sweep's per-tick candidate count drops
 from 6,968 toward ~1,200, which bounds the CPU trend at its cause.
 
+### Compression does not retire retention — measured
+
+`#396`'s author suggested `#399` supersedes it. It does not, and the arithmetic
+matters because "the disk is solved" is the wrong thing to believe. Applying
+38.7x to the *whole* growth rate overstates it — `book_quotes` is only part of
+the total.
+
+Observed MB/day of new data, last 7 days, web hot set, under `#398`'s tiers:
+
+| tier | MB/day |
+|---|---|
+| source (`book_quotes` 196.4 + `odds_history` 105.0) | 324.6 |
+| derived | 30.6 |
+| unmatched | 11.9 |
+| eval | 9.6 |
+| settlement | 3.5 |
+
+Against whole-disk growth of 593 MB/day (14d) / 780 MB/day (last 7d):
+
+| | 14d rate | 7d rate |
+|---|---|---|
+| today | 593 → **53 days** | 780 → **40 days** |
+| after `#399` (`book_quotes` only — what was built) | 402 → **78 days** | 589 → **54 days** |
+| if `odds_history` compressed too (**not built**) | 299 → **105 days** | 486 → **65 days** |
+
+Compression buys ~25 days on the pessimistic rate and the disk still fills. It
+is the largest single lever and it is not sufficient. The split is clean:
+**compress what cannot be recreated, expire what can.**
+
 **Settlement question — decided 2026-08-12: keep `settlement_inputs` for 30 days
 after settlement, not 30 days after write.** The pruner must therefore join each
 `settlement_inputs/finals_*.json` / `closing_lines_*.csv` against grading state
@@ -677,6 +706,31 @@ this repo's own tooling and from parallel sessions. Every one runs
    that rate the overage is structural, not wasteful.
 
 ---
+
+## What shipped, and an ID correction
+
+| commit | item | state |
+|---|---|---|
+| `9abd4eb0` | PR-1, `render.yaml` publish URL | pushed |
+| `4970f319` | PR-1 follow-up, publish byte budget in `render.yaml` | pushed |
+| `65cf7a80` | **`#399`** — `book_quotes` compressed at rest, 38.7x | pushed |
+| `e81b5425` | `#398` — retention coverage + settlement tier | pushed |
+
+**`65cf7a80` was committed as `#397` and is renumbered to `#399`.** `#397` was
+taken concurrently by `c5c382b6` (per-game cap readability), which is earlier in
+history. `#398` was **not** available as the renumber target either — it is
+`e81b5425`, above. The commit message on `65cf7a80` cannot be amended now that
+it is on `origin/main`; no code or comment references the number, so this table
+is the mapping of record.
+
+**Why the duplicate detector could not catch it.** Both `#397`s were
+commit-only with no `todo.md` entry, and the file-level dupe check reads
+`todo.md`. `git log --grep` and `grep todo.md` disagree by design, and the ID
+lived in the one not checked. But re-checking harder does not fix this: the
+`#398` claim above was *correct when the other session ran it* and stale by the
+time it arrived, because `e81b5425` landed in between. With four sessions on one
+branch, ID selection needs a check at push time or a per-session prefix, not a
+more diligent check at commit time.
 
 ## What I would ship first, in order
 
