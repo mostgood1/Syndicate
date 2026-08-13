@@ -142,6 +142,102 @@
   falsification test holds either way — but the table is the authoritative
   per-sample record and is what the fixture uses.
 
+### mlb-props-regen — OPEN — opened 2026-08-13 — session: mlb-props-regen
+- Goal: MLB top-props/ladders rebuild automatically once prop odds land,
+  instead of serving an empty artifact written before the odds existed.
+  Testable outcome: a slate whose top-props artifact was written pre-odds
+  gets a `props_now_available` launch within one cooldown of the odds
+  landing, with no human trigger.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/live_refresh_loop.py` — all three fixes:
+    - `_mlb_oddsapi_props_snapshot_has_entries()` L1554 — the blind read.
+    - `_mlb_props_now_available_needs_regen()` L1562 — marker write moves out.
+    - the fingerprint block L1938–1957 — marker write moves in (launch path).
+    - `_sim_pipeline_deferral_reason()` L1673 /
+      `_max_consecutive_pipeline_defers()` L1650 — starvation, SEPARATE
+      COMMIT (see scope note).
+  - `tests/test_live_refresh_loop.py` — see hazard.
+- NOT touched, deliberately: `syndicate/features/shared/refresh_state_store.py`.
+  Making `read_json_file` fall back to disk globally would fix this and change
+  the semantics of every other caller in the repo at the same time. Out of
+  scope; the narrow fix goes in the odds-presence helper.
+- Hypothesis (recorded before testing — since CONFIRMED, see evidence):
+  the `props_now_available` guard has **never been able to fire in
+  production**. Its odds check reads through `read_json_file`
+  (`refresh_state_store`, imported at L25), which for any path not containing
+  `migration_runs/` goes to Redis with **no filesystem fallback** and returns
+  `(None, True)` — "confirmed absent, read succeeded" — on a missing key. The
+  snapshots it looks for are written by
+  `vendor/mlb_bettingv2/tools/oddsapi/fetch_daily_oddsapi_markets.py:_write_json`
+  (L87) as plain `tmp.write_text()` + `replace()`. **Writer is filesystem,
+  reader is Redis.** So `has_pitcher_odds`/`has_hitter_odds` are always False
+  and the guard returns "odds genuinely aren't posted yet" — silently, with no
+  log line — every time.
+- Evidence:
+  - `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` confirmed live on
+    refresh-worker via the Render env-vars API, so `_keyvalue_backed()` is
+    True for these paths. This is the load-bearing precondition.
+    `[measured 08-13]`
+  - top-props written 00:24:21 CDT with `candidateCount: 0`; prop odds landed
+    10:08 CDT (18 pitcher / 171 hitter markets); artifact still empty at
+    11:43. `[measured 08-13]`
+  - 5 of 100 sim ticks in 15:05–16:20Z reached the decision function at all
+    (83 gated `intelligence_pipeline_busy`); all 5 returned `no_change` with
+    `candidateCount = 0` and odds present. `[measured 08-13]`
+  - The odds ARE on refresh-worker's own disk: the 11:56:56 rebuild ran with
+    `--refresh-current-oddsapi off` and still produced 12 cards, so
+    `daily_update.py` (plain filesystem IO) read them fine. Same box, same
+    instant, same file — only the reader differs. `[measured 08-13]`
+  - The 2026-08-13 recovery was NOT the safety net: an unrelated 3-game
+    lineup resim (`--only-game-pks 823829,824238,824561`) happened to be in
+    flight and its top-props stage rewrites the whole artifact. The
+    `force-mlb-resim` trigger bounced off it with `previous_run_still_active`,
+    so the fix is not attributable to it either. `[measured 08-13]`
+- Falsification test: if the guard's odds check reads the snapshots from disk
+  and it STILL returns False on a replayed 08-13 state, the writer/reader
+  split is not the cause and the cooldown marker is the remaining candidate.
+- Verification (all three required):
+  1. Unit: a test that exercises the REAL `read_json_file` against a
+     keyvalue-backed path with the file present on disk and the key absent.
+     Must fail before the fix and pass after.
+  2. Liveness — the guard must still be able to return False. Construct a
+     case with genuinely no odds on disk and assert False, so "it fires now"
+     is distinguishable from "it fires always". Per `learnings.md` 2026-08-13
+     ("confirm an instrument can emit non-zero before believing its zero"),
+     inverted here: confirm it can still emit False.
+  3. Production, after deploy: on a slate whose top-props was written before
+     odds landed, a `MLB_SIM_TICK` carrying
+     `mlbDailySim.reason = props_now_available` appears within one cooldown
+     of the odds file's `retrieved_at`. This reason string has **never once
+     appeared in the logs** — absence is the current baseline, so a single
+     occurrence is a clean positive.
+- HAZARD — the entire existing test suite for this guard is blind to the bug.
+  `test_mlb_props_now_available_needs_regen_true_when_odds_landed_after_empty_write`
+  (`tests/test_live_refresh_loop.py:1492`) and its four siblings all
+  `patch.object(live_refresh_loop, "read_json_file", side_effect=_fake_read)`
+  — they replace the very function whose backend routing is the defect. They
+  pass today and would pass against the broken code forever. New tests must
+  NOT patch `read_json_file`. Do not delete the existing ones; they still
+  cover the decision logic.
+- HAZARD — three prior incidents (08-01, 08-02, 08-04) are named in this
+  guard's own docstring and were "fixed" each time. Every one of those fixes
+  refined code sitting downstream of a read that always returns None. Treat
+  any further logic-only fix here as suspect until the read is proven.
+- SCOPE NOTE — fix 3 (pipeline-defer starvation) is a SEPARATE COMMIT and
+  should be a separate deploy. 83% tick suppression is real and measured, but
+  the guard only needs to fire once per slate, and 5 opportunities in 75
+  minutes is sufficient for that. Shipping a tuning change alongside the
+  root-cause fix would make neither attributable — `learnings.md` 2026-08-12
+  ("do not batch changes during a diagnosis").
+- Interaction, not conflict: the breakthrough path in
+  `_sim_pipeline_deferral_reason` gates on
+  `_mlb_sim_memory_headroom_snapshot().sufficient`, whose meaning is being
+  changed by the `memory-guard-reclaimable` lane. That lane owns
+  `memory_observability.py`; this lane does not touch it. Expect the
+  breakthrough rate to move when their fix lands, and do not read that as a
+  result of this lane's work.
+- Blocked by: none.
+
 ## CLOSED THIS SESSION
 
 ### render-yaml-web-block-hygiene — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
