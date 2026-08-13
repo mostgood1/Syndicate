@@ -1452,6 +1452,80 @@ Related: `#400` (the change that surfaced it), `#407` (the consolidated board's
 requirement list — "complete data population" does not help if the rows carry no
 signal), `SHORTLIST_ROWS_PER_SPORT`, `SHORTLIST_KIND_FLOOR`.
 
+### `#417` — OPEN, UNOWNED. The board froze for 4h12m because the kernel MOVED page cache between two buckets. `_MIN_SAFE_MEMORY_HEADROOM_BYTES` aborts on a number that changes without memory pressure changing
+
+**Sibling of `#387`, not a duplicate — a different guard, and a different
+failure.** `#387` is `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000` in
+`syndicate/features/intelligence.py`. This is
+`_MIN_SAFE_MEMORY_HEADROOM_BYTES = 1900`
+(`pipeline/intelligence_state.py:3189`), fired from the call site at `:5266`,
+`stage=pre_source_state_fingerprint`. `#387` says *the constant is stale*. This
+one adds: **the quantity it is compared against moves by ~240MB for reasons that
+have nothing to do with memory pressure.**
+
+**Symptom.** `layer2_shortlist` artifact `written_at` stuck at
+`2026-08-13T10:56:10Z` and served to the board for **4h12m**, until an unrelated
+deploy restarted the worker at 14:56:02Z and it rebuilt at 15:08:04Z.
+
+**It aborts at the FIRST stage, before the fingerprint** — so the whole cycle
+dies. No `LAYER2_SHORTLIST` line, no `write_layer2_shortlist`, no artifact. 300
+consecutive aborts, ~65s apart, `09:29:27Z -> 14:54:44Z`, zero gaps, one stage.
+
+**THE MEASURED CAUSE — a page-cache reclassification, not a leak:**
+
+    time        anon    active_file  inactive_file   headroom   current
+    09:29:27   1659.0        553.9          735.4     1877.0     2988.6
+    10:37:27   1641.1        553.9          757.7     1895.3     2993.7   <- 4.7MB under the floor
+    --- ~11:02 ---
+    11:02:03   1648.9        797.4          218.0     1643.5     2705.3   <- never passes again
+    14:54:44   1677.9        790.7          474.7     1621.7     2988.3
+
+At ~11:02 the kernel promoted ~243MB from `inactive_file` to `active_file`.
+Total file cache **shrank** (1289 -> 1015MB) and `current_mb` **fell** (3120 ->
+2705). **Memory usage went DOWN and the guard got MORE restrictive**, because
+`memory_headroom_snapshot` credits only `inactive_file + slab_reclaimable` as
+reclaimable and counts `active_file` as used. Before the flip the worker sat at
+~1877MB against the 1900 floor — hovering, occasionally crossing, which is why
+builds landed at 08:39-08:49 and 10:56. After it, ~1621MB: never.
+
+**NOT A LEAK, AND THIS TIME THAT IS MEASURED.** `anon` over the full 300 cycles:
+first 1659.0, last 1677.9, min 1635.0, max 1951.2 — **drift +18.9MB over 5.4
+hours.** Flat. The ratchet hypothesis was checked and is false; the baseline is
+stable and simply sits below the bar.
+
+**The controlled comparison.** Restart at 14:56:02 -> `accounted_rss_mb` 1717.9
+-> 770.8, headroom 2461MB, board rebuilt within one cycle. This is exactly
+`#387`'s confound in a new instance: **only a cold process clears the bar**, so
+any measurement taken shortly after a deploy will look healthy. Expect this to
+re-freeze once the worker re-warms — it is not fixed, it was rebooted.
+
+**WHY THE THRESHOLD IS THE WRONG AXIS, NOT JUST THE WRONG VALUE.** What OOM
+actually kills over is unreclaimable memory: `anon + shmem + slab_unreclaimable`
+= 1677.9 + 0.0 + 0.6 = **1678.5MB**, leaving **2417.5MB** genuinely available.
+`active_file` is clean, evictable page cache — the kernel drops it before it
+kills anything. Guarding on `current` makes the verdict a function of kernel LRU
+bookkeeping. Candidate fix is to guard on unreclaimable rather than to nudge
+1900 down; that removes the instability instead of re-centring it.
+
+**DO NOT JUST LOWER THE NUMBER.** Same caution as `#387`: this guard exists
+because of `#279`'s 8 OOM kills in 82 minutes. The arithmetic says the build
+fits (worst observed `anon` 1951.2 + the ~1479MB stage figure = 3430MB < 4096),
+but 1479MB is still read off a comment, not observed — `#380`'s mistake. Measure
+peak RSS across one successful build before changing anything.
+
+**Second, smaller defect in the same snapshot** (`memory_observability.py:257`):
+`snapshot["headroom_including_file_cache_mb"] = raw_headroom_bytes` — that field
+holds the headroom **excluding** file cache; `headroom_mb` is the one including
+it. The name states the opposite of its value. A reader of the abort line sees
+`headroom_including_file_cache_mb: 1107.7` against `min_required 1900` and
+computes a 792MB deficit when the guard actually compared 1621.7 (deficit 278).
+
+**Instrument note.** The Render logs text search reaches back at least 6 days
+(`MEM_STEP` returns lines from 2026-08-07 and nothing newer, i.e. it genuinely
+stopped then), so "no `LAYER2_SHORTLIST` since 10:56" is a real absence and not
+a search-window artifact. Worth stating because the worker is chatty enough that
+100 unfiltered lines cover only ~20 seconds.
+
 ### `#387` — OPEN, UNOWNED, THE BOARD IS STARVED BY A THRESHOLD THAT IS 2x ITS STAGE. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` demands 3,000MB for a stage measured at 1,479MB
 
 **The overview is empty on ~70% of builds since 2026-08-12 16:38:47Z**, so
