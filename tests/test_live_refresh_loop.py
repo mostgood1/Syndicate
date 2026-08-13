@@ -3477,6 +3477,61 @@ class SimPipelineDeferralBoundTests(unittest.TestCase):
             "intelligence_pipeline_busy_and_no_headroom",
         )
 
+    def test_elapsed_bound_ends_the_wait_even_below_the_count_bound(self) -> None:
+        # #420. The count bound is not a time bound unless tick spacing is
+        # fixed, and it is not. With the count ceiling raised out of reach, a
+        # long enough wall-clock wait must still end the streak -- otherwise a
+        # slow or gate-shortcircuited tick cadence starves the decision for an
+        # unbounded stretch, which is what 83 of 100 ticks looked like on
+        # 2026-08-13.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFERS": "1000",
+                "SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFER_SECONDS": "300",
+            },
+            clear=False,
+        ):
+            self.assertEqual(self._reason(0, busy=True), "intelligence_pipeline_busy")
+            self.assertIsNone(self._reason(400, busy=True, headroom={"sufficient": True}))
+
+    def test_elapsed_bound_does_not_fire_early(self) -> None:
+        # Liveness for the bound itself: without this, "the elapsed bound
+        # works" is indistinguishable from "the gate stopped deferring at all",
+        # and an always-open gate walks straight back into #55 (two heavy
+        # pipelines in one container).
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFERS": "1000",
+                "SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFER_SECONDS": "300",
+            },
+            clear=False,
+        ):
+            self.assertEqual(self._reason(0, busy=True), "intelligence_pipeline_busy")
+            self.assertEqual(
+                self._reason(100, busy=True, headroom={"sufficient": True}),
+                "intelligence_pipeline_busy",
+            )
+
+    def test_idle_tick_resets_the_elapsed_streak(self) -> None:
+        # A reset must drop sinceEpoch, or the next streak inherits the last
+        # one's clock and breaks through immediately on its first busy tick.
+        with patch.dict(
+            os.environ,
+            {
+                "SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFERS": "1000",
+                "SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFER_SECONDS": "300",
+            },
+            clear=False,
+        ):
+            self._reason(0, busy=True)
+            self.assertIsNone(self._reason(100, busy=False))
+            self.assertEqual(
+                self._reason(500, busy=True, headroom={"sufficient": True}),
+                "intelligence_pipeline_busy",
+            )
+
     def test_unmeasurable_headroom_counts_as_insufficient(self) -> None:
         for tick in range(5):
             self._reason(tick, busy=True)
