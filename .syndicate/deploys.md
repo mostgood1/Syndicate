@@ -76,6 +76,24 @@
     reading the numbers.
   - This row still stays open until the numbers are actually written into it.
     An assigned owner is not a measurement.
+  - **SCHEDULING CONFLICT, found 2026-08-13 15:5x and handled.** A second
+    scheduled task, `deploy-419-refresh-worker`, fires every 20 minutes
+    between 00:00 and 05:00 and deploys `#419` (`d6188ca7`) to **the same
+    service**. Any deploy reboots the container and **resets the `#417`
+    re-warm clock**, which is the entire discriminating variable here — a
+    freshly booted worker looks healthy for hours either way (`#417` records
+    the pre-fix code rebuilding fine after a restart and only re-freezing
+    ~3h later). Two scheduled jobs, neither aware of the other.
+  - **Resolved by making the read robust rather than by pausing the deploy.**
+    `417-24h-read` now (a) reads the CURRENT live deploy's `finishedAt` and
+    uses it as the boundary instead of the hardcoded `18:05:38Z`, (b) asserts
+    `03073270` is still an ancestor of the live commit and treats the read as
+    VOID if it is not — a rollback would otherwise be measured as a result,
+    (c) refuses to return "holds" when the window is **< 6h**, reporting
+    INCONCLUSIVE instead, because the pre-fix code also stayed healthy ~3h
+    after a restart. Note the fix itself survives any such deploy: `03073270`
+    is an ancestor of `origin/main`, so `#419` carries it forward. Only the
+    clock resets.
 - INTERIM (T+23min, 13:28 CDT). **Positive, NOT sufficient. Row stays open.**
   - `LAYER2_SHORTLIST` x3 post-deploy — 18:19:15, 18:25:21, 18:28:30Z —
     against **0** in the 4h12m before. `MEMORY_GUARD_ABORT` post-deploy: 0,
