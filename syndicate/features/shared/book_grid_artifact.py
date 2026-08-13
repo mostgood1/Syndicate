@@ -202,6 +202,7 @@ def build_book_grid_artifact(
     # happened to survive the cut.
     from syndicate.features.shared.board_enrichment import (
         attach_game_state,
+        attach_live_game_state_from_lens,
         attach_live_projections_for_sport,
         attach_margin_model,
         attach_projections,
@@ -211,6 +212,12 @@ def build_book_grid_artifact(
     # game state has already stamped, and the margin model must run last so it
     # only fills rows that still have no fair value.
     game_state_coverage = attach_game_state(grid, sport=sport, selected_date=date_str)
+    # BEFORE the projections, and that ordering is the point (`#413`).
+    # `live_edge_policy` decides whether a row may carry an edge by reading
+    # `game.state`, so correcting the state afterwards would leave a settled
+    # game's edges standing on the board -- the correction has to land while it
+    # can still change an answer, not after.
+    lens_state_coverage = attach_live_game_state_from_lens(grid, sport=sport, selected_date=date_str)
     projection_coverage = attach_projections(grid, sport=sport, selected_date=date_str)
     # LIVE TIER, AFTER the pregame one and deliberately not instead of it
     # (`#350`). `attach_projections` reads the pregame `daily_summary`, so every
@@ -268,6 +275,7 @@ def build_book_grid_artifact(
         # "the alias join failed" render identically without them, which is the
         # degraded-looks-legitimate trap `attach_game_state` documents at length.
         "game_state": game_state_coverage,
+        "live_game_state": lens_state_coverage,
         "projections": projection_coverage,
         "live_projections": live_projection_coverage,
         "margin_model": margin_coverage,

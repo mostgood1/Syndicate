@@ -164,6 +164,170 @@ def attach_game_state(grid: list, *, sport: str, selected_date: str) -> dict:
     return coverage
 
 
+_LENS_STATE_MAX_AGE_SECONDS = 15 * 60
+
+_LENS_ABSTRACT_TO_STATE = {"live": "live", "final": "final", "preview": "pregame"}
+
+
+def _lens_generated_age_seconds(snapshot: dict) -> float | None:
+    from datetime import datetime, timezone
+
+    raw = str(snapshot.get("generatedAt") or snapshot.get("generated_at") or "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw)
+    except Exception:
+        return None
+    now = datetime.now(parsed.tzinfo) if parsed.tzinfo is not None else datetime.now()
+    return max(0.0, (now - parsed).total_seconds())
+
+
+def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: str) -> dict:
+    """Correct a FROZEN chip game state from the live lens (`#413`).
+
+    REPORTED FROM THE BOARD: "we need live state to update, we had the MIL SD
+    game still showing and its final now."
+
+    NOT ARTIFACT LAG, which is what it looks like. Measured 2026-08-13 against a
+    board artifact **5 minutes old**: MIL @ SD read `live / TOP 9` while the live
+    lens read `Final`, and CLE @ DET read `BOT 1` two hours after first pitch.
+    The artifact was fresh; its input was frozen.
+
+    THE MECHANISM is `_mlb_feed_live_payload` (blueprints/home.py): it reads the
+    cached `raw_feed_live_path` file and returns it if it EXISTS, consulting the
+    live API only when the file is absent. So whenever a game's feed was first
+    captured becomes that game's permanent state for the rest of the day -- one
+    captured in the 1st inning reads `BOT 1` forever, one captured in the 9th
+    reads `TOP 9` through the final out. Presence is being used where freshness
+    was meant, the same defect `#128` documented for mtime in this same feature.
+
+    WHY OVERLAY RATHER THAN FIX THE READER. Two consumers on the same box
+    disagree: the live lens does a real status fetch and is right, the chip reads
+    the frozen file and is wrong. The lens snapshot is already read here for the
+    prop join, so this is one more join over a payload in hand -- no extra fetch,
+    no compute in a request path. Fixing the cache reader is the deeper fix and
+    is worth doing, but it re-introduces per-game network I/O into a path that
+    already has an 8s wall-clock budget for 15 games, so it does not belong in
+    the same change as an urgent board correction.
+
+    MLB ONLY, because the live lens' status is MLB StatsAPI-derived. Other sports
+    keep the chip and get a stated reason rather than a silent no-op.
+
+    TWO GUARDS, both of which matter:
+
+    - A STALE SNAPSHOT MAY NOT OVERRIDE A FRESH CHIP. The snapshot carries its
+      own `generatedAt`; past `_LENS_STATE_MAX_AGE_SECONDS` this refuses to touch
+      anything and says why. Without it, a wedged live lens would freeze the
+      board harder than the bug being fixed.
+    - FINAL IS TERMINAL. A game the board already calls final is never moved back
+      to live, whatever the snapshot says. Final only ever becomes wrong in one
+      direction, and an un-finaled game re-opens edges on a settled market --
+      exactly what `live_edge_policy` refuses.
+    """
+    if sport != "mlb":
+        return {"supported": False, "reason": f"no live status source wired for {sport}", "rows_corrected": 0}
+    try:
+        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+        from syndicate.features.shared.team_aliases import teams_match
+
+        snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
+        if not isinstance(snapshot, dict):
+            return {"supported": True, "reason": "no published live-lens snapshot", "rows_corrected": 0}
+        page = snapshot.get("page_context") if isinstance(snapshot.get("page_context"), dict) else snapshot
+        games = page.get("games") if isinstance(page.get("games"), list) else []
+        if not games:
+            return {"supported": True, "reason": "snapshot carries no games", "rows_corrected": 0}
+
+        age_seconds = _lens_generated_age_seconds(page)
+        if age_seconds is not None and age_seconds > _LENS_STATE_MAX_AGE_SECONDS:
+            return {
+                "supported": True,
+                "reason": "live-lens snapshot is staler than the chip it would correct",
+                "snapshot_age_seconds": round(age_seconds, 1),
+                "rows_corrected": 0,
+            }
+
+        lens_games = []
+        for game in games:
+            if not isinstance(game, dict):
+                continue
+            abstract = str((game.get("status") or {}).get("abstract") or "").strip().lower()
+            state = _LENS_ABSTRACT_TO_STATE.get(abstract)
+            if not state:
+                continue
+            score = (game.get("matchup") or {}).get("score") if isinstance(game.get("matchup"), dict) else {}
+            lens_games.append(
+                {
+                    "state": state,
+                    "home": game.get("home") if isinstance(game.get("home"), dict) else {},
+                    "away": game.get("away") if isinstance(game.get("away"), dict) else {},
+                    "detailed": (game.get("status") or {}).get("detailed"),
+                    "home_score": (score or {}).get("home"),
+                    "away_score": (score or {}).get("away"),
+                }
+            )
+    except Exception:
+        _LOGGER.exception("BOOK_GRID_LENS_STATE_FAILURE sport=%s date=%s", sport, selected_date)
+        return {"supported": True, "error": "live status join failed", "rows_corrected": 0}
+
+    def _side_matches(row_team, lens_side) -> bool:
+        for key in ("name", "abbr"):
+            token = (lens_side or {}).get(key)
+            if token and teams_match(sport, row_team, token):
+                return True
+        return False
+
+    # The team-pair resolution is memoised: `teams_match` over every row against
+    # every game is the one place this could get expensive on a 3,385-row grid.
+    resolved: dict[tuple[str, str], dict | None] = {}
+    corrected = 0
+    transitions: dict[str, int] = {}
+
+    for row in grid:
+        game = row.get("game")
+        if not isinstance(game, dict):
+            continue
+        before = str(game.get("state") or "")
+        if before == "final":
+            continue
+        home, away = row.get("home_team"), row.get("away_team")
+        if not home or not away:
+            continue
+        key = (str(home), str(away))
+        if key not in resolved:
+            resolved[key] = next(
+                (g for g in lens_games if _side_matches(home, g["home"]) and _side_matches(away, g["away"])),
+                None,
+            )
+        hit = resolved[key]
+        if hit is None or hit["state"] == before:
+            continue
+        game["state"] = hit["state"]
+        # The frozen status token is wrong in exactly the way the state was --
+        # leaving "TOP 9" on a game now marked final would swap one confident
+        # wrong reading for another.
+        game["status_token"] = "FINAL" if hit["state"] == "final" else (hit.get("detailed") or game.get("status_token"))
+        if hit.get("home_score") is not None:
+            game["home_score"] = hit["home_score"]
+        if hit.get("away_score") is not None:
+            game["away_score"] = hit["away_score"]
+        game["state_source"] = "mlb_live_lens"
+        corrected += 1
+        transitions[f"{before or 'unknown'}->{hit['state']}"] = transitions.get(f"{before or 'unknown'}->{hit['state']}", 0) + 1
+
+    return {
+        "supported": True,
+        "lens_games": len(lens_games),
+        "rows_corrected": corrected,
+        "snapshot_age_seconds": round(age_seconds, 1) if age_seconds is not None else None,
+        # Named transitions, not a bare count: `live->final` is the reported bug
+        # being fixed, while a flood of `pregame->live` would mean the chip join
+        # is degrading and this is quietly carrying the whole board.
+        "transitions": transitions,
+    }
+
+
 def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
     """Stamp the sim's projection and edge onto player-prop rows (S3).
 
