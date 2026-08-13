@@ -10,11 +10,23 @@
 - Max concurrent open lanes: **3** `[policy]`
 - Repo tip: `478edd78`, `origin/main` at the same commit. Supersedes the
   `93fc7cae` line. `[from-git 08-13]`
-- Deployed SHA: **not derivable from git.** `autoDeploy = no` on all three
-  services, so the repo tip is an upper bound, not the running commit — and
-  each service can sit on a different one. Read
-  `/v1/services/<id>/deploys` per service before treating any SHA as
-  deployed. `[unverified 08-13]`
+- Deployed SHA: **three different commits, none of them the repo tip.**
+  Read from `/v1/services/<id>/deploys` at 08-13 11:13 CDT; all three
+  `status=live`, `trigger=api`, nothing in flight. `[measured 08-13]`
+  - `syndicate` (web) — `936e2b47`, live since **08-12 21:44 CDT**.
+  - `refresh-worker` — `448e1816`, live since **08-13 10:27 CDT**.
+  - `live-odds-worker` — `2caa8eac`, live since **08-12 22:21 CDT**.
+- All three are ancestors of the tip — the services lag, they have not
+  diverged. Measured against `9f0e9f8b`: web 34 commits behind (12 touching
+  `.py`), live-odds-worker 25 (6 `.py`), refresh-worker 11 (0 `.py`).
+  `[measured 08-13]`
+- **The web service is the stale one.** It has not been redeployed since
+  last night, so any web-path `.py` fix committed today is on `main` and is
+  **not running**. Do not read a web-route symptom as evidence about
+  today's code without checking `936e2b47` first. `[measured 08-13]`
+- Because `autoDeploy = no`, the repo tip is an upper bound on every
+  service and never a reading of any of them. Re-read per service; do not
+  reuse the SHAs above once a deploy fires. `[policy]`
 
 ## Keyvalue store (`#324`)
 
