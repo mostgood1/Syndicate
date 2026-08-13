@@ -197,6 +197,63 @@ def _read_container_memory_stat() -> dict[str, int]:
     return {}
 
 
+def _reclaimable_file_bytes(stat: dict[str, int]) -> int:
+    """Clean page cache the kernel drops rather than OOM-killing over.
+
+    `#417`. `active_file` is included. It was excluded until 2026-08-13 on the
+    reasoning that it is "evictable but only under real pressure", which is
+    true and is not a reason to exclude it: pressure is exactly the situation
+    the guard exists for. Excluding it made the reading swing by the size of
+    whatever the kernel had most recently touched.
+    """
+    if not stat:
+        return 0
+    return max(
+        0,
+        stat.get("inactive_file", 0) + stat.get("active_file", 0) + stat.get("slab_reclaimable", 0),
+    )
+
+
+def _unreclaimable_bytes(stat: dict[str, int], current_bytes: int | None = None) -> int | None:
+    """What an OOM kill actually responds to. Returns None when unmeasurable.
+
+    `#417`. Two independent bases, and this deliberately takes the LARGER:
+
+    - `anon + shmem + slab_unreclaimable` -- proven unreclaimable, a LOWER
+      bound. Everything it omits is treated as free.
+    - `current - reclaimable_file` -- everything not proven reclaimable, an
+      UPPER bound. This is the basis `#318` already used for the log line.
+
+    They differ by whatever `memory.stat` does not attribute (~5MB on the
+    `#417` refresh-worker samples, but there is no guarantee it stays small;
+    `#327` has an unattributed allocator open at 493-878MB by a different
+    measure). Taking the max means unaccounted memory counts against the
+    guard rather than being silently credited as available -- the difference
+    between a lower bound and an upper bound is exactly the permissive-on-
+    unknown shape this codebase keeps getting caught by.
+
+    Returns None when there is no usable breakdown, so callers degrade to the
+    older arithmetic instead of reading "nothing is unreclaimable, the
+    container is empty" off an unparseable file.
+
+    `anon` is required. `shmem` and `slab_unreclaimable` default to 0 when
+    absent; cgroup v2 emits `memory.stat` as one block, so `anon` present with
+    `shmem` missing is not a shape this file can observe, and the max() above
+    covers the gap regardless. `anon` and `shmem` do not overlap in cgroup v2
+    -- shared memory is accounted under `file` -- so this sums rather than
+    double counts. `kernel_stack` and `sock` are unreclaimable too and are not
+    named here: both are small, both are already carried in `stat_mb`, and the
+    residual basis picks them up anyway.
+    """
+    if not stat or "anon" not in stat:
+        return None
+    proven = stat.get("anon", 0) + stat.get("shmem", 0) + stat.get("slab_unreclaimable", 0)
+    if current_bytes is None:
+        return max(0, proven)
+    residual_basis = current_bytes - _reclaimable_file_bytes(stat)
+    return max(0, proven, residual_basis)
+
+
 def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
     # Shared by any caller that wants to defer heavy in-process work rather
     # than guess from elapsed time or trigger type -- originally lived only in
@@ -231,15 +288,47 @@ def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
     # leak, page cache from the 1.24GB odds-events file (#76), which is
     # exactly why tracemalloc could never see it.
     #
-    # Only inactive_file and slab_reclaimable are treated as available.
-    # active_file is reclaimable too but under more pressure, and shmem is not
-    # reclaimable at all, so both stay counted as used -- this is deliberately
-    # the conservative reading of "reclaimable", not the largest one.
     stat = _read_container_memory_stat()
-    reclaimable_bytes = 0
-    if stat:
-        reclaimable_bytes = max(0, stat.get("inactive_file", 0) + stat.get("slab_reclaimable", 0))
-    effective_headroom_bytes = raw_headroom_bytes + reclaimable_bytes
+    reclaimable_bytes = _reclaimable_file_bytes(stat)
+
+    # #417 step 3. The step-2 note below has the right idea and the wrong
+    # quantity. Crediting only `inactive_file` back was described as "the
+    # conservative reading of reclaimable" -- but excluding `active_file` is
+    # not conservative, it is UNSTABLE. Both buckets hold clean, evictable page
+    # cache; which one a page sits in is kernel LRU bookkeeping, and the kernel
+    # moves pages between them on its own.
+    #
+    # Measured on refresh-worker 2026-08-13, 300 consecutive
+    # MEMORY_GUARD_ABORT cycles that served a 4h12m-stale board:
+    #   time       anon   active_file  inactive_file  headroom  current
+    #   10:37:27  1641.1       553.9         757.7     1895.3   2993.7
+    #   11:02:03  1648.9       797.4         218.0     1643.5   2705.3
+    # At ~11:02 the kernel promoted ~243MB inactive_file -> active_file. Total
+    # file cache SHRANK (1289 -> 1015MB) and memory in use FELL (2993.7 ->
+    # 2705.3MB), yet headroom dropped 251.8MB and never recovered. `anon` moved
+    # +7.8MB. Across all 300 samples anon drifted +18.9MB total -- flat, so
+    # this was never a leak and never real pressure.
+    #
+    # The rule that follows, and the reason this is an axis change rather than
+    # a retuned constant: IF USAGE GOING DOWN CAN MAKE A GUARD STRICTER, THE
+    # GUARD IS READING THE WRONG QUANTITY. Guard on what an OOM kill responds
+    # to -- unreclaimable memory -- and the LRU shuffle stops being visible to
+    # the decision at all.
+    #
+    # This is deliberately NOT a relaxation of #75/#279's protection. Anonymous
+    # memory still counts against headroom in full; the container that is
+    # genuinely full of anon is still refused, which is what those OOM kills
+    # were about. What changes is that clean page cache stops being able to
+    # veto a build it would have been dropped for.
+    unreclaimable_bytes = _unreclaimable_bytes(stat, current_bytes)
+    if unreclaimable_bytes is None:
+        # No usable breakdown (local dev without cgroups, or an unreadable
+        # memory.stat). Degrade to the previous arithmetic rather than to
+        # anything rosier -- failing back to known-conservative behaviour is
+        # what keeps a bad read from re-opening #75.
+        effective_headroom_bytes = raw_headroom_bytes + reclaimable_bytes
+    else:
+        effective_headroom_bytes = max_bytes - unreclaimable_bytes
 
     snapshot: dict[str, Any] = {
         "current_mb": round(current_bytes / 1024 / 1024, 1),
@@ -248,13 +337,29 @@ def memory_headroom_snapshot(min_required_bytes: int) -> dict[str, Any] | None:
         "min_required_mb": round(min_required / 1024 / 1024, 1),
         "sufficient": effective_headroom_bytes >= min_required,
     }
+    # Named for what it is, and kept beside the verdict so an abort line says
+    # which basis produced it. `basis` is the discriminator to read first: a
+    # refusal on basis=reclaimable_cache means the breakdown was unreadable,
+    # not that memory was tight.
+    snapshot["basis"] = "reclaimable_cache" if unreclaimable_bytes is None else "unreclaimable"
+    if unreclaimable_bytes is not None:
+        snapshot["unreclaimable_mb"] = round(unreclaimable_bytes / 1024 / 1024, 1)
     if stat:
         # Kept so a future reader can see both numbers rather than having to
         # rediscover why they differ -- and so that if the gap ever stops
         # being file cache, that is visible in the same line.
         snapshot["stat_mb"] = {key: round(value / 1024 / 1024, 1) for key, value in sorted(stat.items())}
         snapshot["reclaimable_file_mb"] = round(reclaimable_bytes / 1024 / 1024, 1)
-        snapshot["headroom_including_file_cache_mb"] = round(raw_headroom_bytes / 1024 / 1024, 1)
+        # #417's second defect. This was `headroom_including_file_cache_mb`,
+        # which is the opposite of what it holds: raw `max - current` EXCLUDES
+        # the file cache, and `headroom_mb` is the number that accounts for it.
+        # The name cost real time during the 08-13 incident -- a reader saw
+        # `headroom_including_file_cache_mb: 1107.7` against `min_required
+        # 1900` and computed a 792MB deficit when the guard had actually
+        # compared 1621.7, a deficit of 278MB. Renamed rather than aliased:
+        # nothing outside this module's own tests reads it, and leaving the old
+        # key in place would preserve the exact misreading it caused.
+        snapshot["headroom_excluding_file_cache_mb"] = round(raw_headroom_bytes / 1024 / 1024, 1)
     return snapshot
 
 
@@ -598,12 +703,19 @@ def log_container_memory(stage: str, **extra: Any) -> dict[str, Any]:
     # unknown shape that turns a failed read into a false all-clear.
     stat = _read_container_memory_stat()
     if stat:
-        reclaimable_bytes = max(0, stat.get("inactive_file", 0) + stat.get("slab_reclaimable", 0))
+        # #417. These go through the same two helpers the GUARD uses. They were
+        # a second, independent copy of the reclaimable expression until
+        # 2026-08-13, which meant a fix to the guard would have left this line
+        # -- the one humans actually read when triaging an abort -- quietly
+        # contradicting the decision it was being read to explain.
+        reclaimable_bytes = _reclaimable_file_bytes(stat)
         payload["memory_anon_mb"] = _bytes_to_mb(stat.get("anon")) if "anon" in stat else None
         payload["memory_inactive_file_mb"] = _bytes_to_mb(stat.get("inactive_file")) if "inactive_file" in stat else None
         payload["memory_reclaimable_mb"] = _bytes_to_mb(reclaimable_bytes)
         if isinstance(memory_current_bytes, int):
-            unreclaimable_bytes = max(0, memory_current_bytes - reclaimable_bytes)
+            unreclaimable_bytes = _unreclaimable_bytes(stat, memory_current_bytes)
+            if unreclaimable_bytes is None:
+                unreclaimable_bytes = max(0, memory_current_bytes - reclaimable_bytes)
             payload["memory_unreclaimable_mb"] = _bytes_to_mb(unreclaimable_bytes)
             if isinstance(memory_max_bytes, int) and memory_max_bytes > 0:
                 payload["memory_unreclaimable_pct_of_max"] = round(100.0 * unreclaimable_bytes / memory_max_bytes, 1)
