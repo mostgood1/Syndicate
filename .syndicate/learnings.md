@@ -892,3 +892,29 @@ back **oldest-first regardless of `direction`**.
   fixed system.** If nobody writes "this was relief, expect recurrence in ~4-5
   hours on the measured trajectory", the next session sees a healthy board and
   a closed row.
+
+### 2026-08-13 — Check whether the obvious fix was already tried, BEFORE building an instrument
+- What we believed: refresh-worker's memory growth needed a flush, and the
+  absence of `malloc_trim` in `run_refresh_worker.py` was the lead. A sampler
+  was built and a lane opened on that basis.
+- What was actually true: **both flushes already existed, ran in production,
+  and had already been measured under `#285`.** `malloc_trim` returned
+  1109.6MB across 24 calls in 46 minutes (`gc.collect()` returned −104.3MB —
+  anon ROSE during collection); `configure_malloc_arenas(2)` is called at
+  `run_refresh_worker.py:3156`, deliberately before threads spawn. The trim
+  halved the ratchet and did not stop it, and by guard time returns 0.0–2.9MB.
+  The conclusion — that the residual is live-or-fragmented, not
+  free-but-unreturned — was already written in a code comment.
+- The rule going forward: **before instrumenting a known-hard problem, read
+  what the codebase already says about it.** The answer to "don't we need a
+  flush" was 50 lines of measured prose in `memory_observability.py`. An hour
+  of sampler-building preceded finding it.
+- Two search errors made it worse, both of the same family: a case-SENSITIVE
+  `grep malloc_trim` missed `MALLOC_TRIM_FAILED`, and a caller search used
+  patterns (`arena_max`, `cap_arenas`) that could not match the real name
+  `configure_malloc_arenas`. **When a search for a mechanism returns nothing,
+  suspect the pattern before concluding the mechanism is absent** — especially
+  when about to build something on that absence.
+- Cost: an hour, and a lane opened on a lead that was already closed. The
+  measurement still has value — the arena cap being live is exactly what makes
+  the floor series discriminating — but that was luck, not design.
