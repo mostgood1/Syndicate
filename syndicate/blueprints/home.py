@@ -2564,9 +2564,21 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
     # Timestamps, not a try/finally around the body: the loop has several
     # `continue` paths and wrapping it would change control flow to measure it.
     # Deltas between consecutive marks give per-row cost including the skips.
-    _row_marks: list[float] = []
-    for row in game_recs:
-        _row_marks.append(time.time())
+    #
+    # CORRECTED 2026-08-13. The first version appended ONE closing mark at the
+    # very end of the function, so the last delta ran from the final iteration's
+    # start all the way through the post-loop tail -- the gameLens loop, the MLB
+    # props loops, and enrich_candidate_rows. For a game with a single
+    # game_market_recommendations row that delta IS the whole function, which is
+    # why `rows=1 total_s=399.40 min=p50=max` looked like one pathological
+    # iteration. It was one row plus everything after it, unseparated.
+    #
+    # This is the rule already in todo.md -- a span's NAME is not its COVERAGE --
+    # broken by the instrument written to enforce it. Marks are labelled now, so
+    # the emitted segment cannot be misread as something narrower than it is.
+    _marks: list[tuple[str, float]] = [("pre_loop", time.time())]
+    for _row_index, row in enumerate(game_recs):
+        _marks.append((f"row[{_row_index}]", time.time()))
         if not isinstance(row, dict):
             continue
         row_market_text = _first_present_text(row.get("market_label"), row.get("market"), row.get("label")) or "Game bet"
@@ -2623,6 +2635,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             price_improvement_pct=row.get("price_improvement_pct"),
             market_key=canonical_market_key(sport.get("slug"), row.get("market_key"), row.get("prop"), row_market_text),
         )
+    _marks.append(("fallback_total_block", time.time()))
     if not candidates:
         game_markets = game.get("gameMarkets") if isinstance(game.get("gameMarkets"), dict) else {}
         total_market = game_markets.get("total") if isinstance(game_markets.get("total"), dict) else {}
@@ -2641,6 +2654,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 fallback_epoch=fallback_epoch,
                 live_odds_game_ids=live_odds_game_ids,
             )
+    _marks.append(("betting_block", time.time()))
     betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
     if betting:
         # Moneyline has no separate "projected line" -- the win probability
@@ -2688,6 +2702,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
     # Deleting it removes the last place this codebase infers a wager from
     # display text.
 
+    _marks.append(("gamelens_block", time.time()))
     lenses = game.get("gameLens") if isinstance(game.get("gameLens"), list) else []
     for lens in lenses:
         if not isinstance(lens, dict) or bool(lens.get("closed")):
@@ -2758,6 +2773,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
                 live_odds_game_ids=live_odds_game_ids,
                 team=_team_for_side_hint(game, market.get("selection") or pick) if market_key != "total" else None,
             )
+    _marks.append(("mlb_props_block", time.time()))
     if _safe_text(sport.get("slug"), "").lower() == "mlb":
         try:
             from syndicate.features.mlb.cards import _mlb_headshot_url
@@ -2853,6 +2869,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
         )
     except Exception:
         pass
+    _marks.append(("enrich_block", time.time()))
     try:
         from syndicate.features.shared.quote_enrichment import enrich_candidate_rows
 
@@ -2861,6 +2878,7 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
         # A board without price context is degraded; a board that 500s because
         # the odds log was mid-write is an outage.
         pass
+    _marks.append(("record_rows_block", time.time()))
     try:
         from syndicate.features.shared import opportunity_contract_metrics
 
@@ -2874,18 +2892,27 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
         )
     except Exception:
         pass
-    _row_marks.append(time.time())
+    _marks.append(("end", time.time()))
     try:
-        _durs = sorted(b - a for a, b in zip(_row_marks, _row_marks[1:]))
-        _tot = sum(_durs)
-        # ONE line per slow game, not one per row: 76 rows/build would be noise,
-        # and min/p50/max answers the only question that matters here -- whether
-        # the cost is uniform across rows or carried by one of them.
-        if _durs and _tot >= float(os.environ.get("SYNDICATE_SLOW_ROW_TOTAL_SECONDS") or 5):
+        # Named by the START mark, so every segment is labelled with the work it
+        # CONTAINS. Naming by the end mark instead charged the final iteration's
+        # body to the tail segment that followed it -- the same misattribution
+        # this rewrite exists to remove, reintroduced one level down. Caught only
+        # because a sample line read `rows_loop_end=0.46` on a game whose rows
+        # were supposedly free.
+        _segs = [(_marks[i][0], _marks[i + 1][1] - _marks[i][1]) for i in range(len(_marks) - 1)]
+        _tot = sum(d for _, d in _segs)
+        if _segs and _tot >= float(os.environ.get("SYNDICATE_SLOW_ROW_TOTAL_SECONDS") or 5):
+            _rows = [d for name, d in _segs if name.startswith("row[")]
+            _top = sorted(_segs, key=lambda item: item[1], reverse=True)[:3]
+            # The segment names ARE the finding -- an unlabelled percentile is
+            # what let the first version be read as "one pathological row" when
+            # its widest bucket silently contained the entire post-loop tail.
             print(
-                f"[home] SLOW_ROW_PROFILE sport={_safe_text(sport.get('slug'), '?')} "
-                f"rows={len(_durs)} total_s={_tot:.2f} "
-                f"min_s={_durs[0]:.3f} p50_s={_durs[len(_durs)//2]:.3f} max_s={_durs[-1]:.3f}",
+                f"[home] SLOW_SEGMENT_PROFILE sport={_safe_text(sport.get('slug'), '?')} "
+                f"total_s={_tot:.2f} rows={len(_rows)} rows_s={sum(_rows):.2f} "
+                f"tail_s={_tot - sum(_rows):.2f} "
+                + " ".join(f"{name}={dur:.2f}" for name, dur in _top),
                 flush=True,
             )
     except Exception:

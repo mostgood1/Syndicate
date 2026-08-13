@@ -212,6 +212,53 @@ single-object question rather than a systemic one.
 **Reproducible:** game_pks **823833, 824241, 822698, 823994, 823916** on
 2026-08-12, inside `home.py:_game_bet_candidates_from_game`.
 
+#### CORRECTED 2026-08-13 — "ONE PATHOLOGICAL ITERATION" IS NOT SUPPORTED. The instrument's widest bucket contained the whole post-loop tail
+
+**The fifth narrow-instrument error of this thread, and the third of mine.** The
+call-path proof above still stands — `SLOW_GAME_CANDIDATE` and `SLOW_ROW_PROFILE`
+do measure the same call. **What does not stand is the claim that the cost is in a
+loop iteration.**
+
+`SLOW_ROW_PROFILE` appended marks at the top of each iteration and **one closing
+mark at the very end of the function**, then reported deltas between consecutive
+marks. So the last delta ran from the final iteration's start through the entire
+post-loop tail: the `gameLens` loop, the MLB props loops, `UniversalCandidate`
+validation, and **`enrich_candidate_rows`**. For a game with ONE
+`game_market_recommendations` row — which is every `rows=1` line quoted above —
+that delta **is the whole function**:
+
+    rows=1 total_s=399.40 min=p50=max=399.398     <- one row PLUS everything after it
+    SLOW_GAME_CANDIDATE elapsed_s=399.40          <- the whole function
+
+Those two agreeing was read as corroboration. It is the same quantity twice.
+
+**This is `a span's NAME is not its COVERAGE` — the rule recorded earlier the same
+night — broken by the instrument written to enforce it.** `SLOW_ROW_PROFILE`
+named itself per-row and its final bucket was per-function.
+
+**FIXED**: marks are labelled and named for the work they CONTAIN, emitted as
+`SLOW_SEGMENT_PROFILE` with `rows_s` / `tail_s` split and the top three named
+segments. `tests/test_game_candidate_segment_profile.py` pins **both** attribution
+directions — a slow tail must not be charged to a row, and a slow row must still
+be charged to a row. An instrument that always blamed the tail would pass the
+first; the old one passed the second and failed the first.
+
+**A second misattribution was caught inside the fix itself.** Naming each segment
+by its ENDING mark charged the last iteration's body to the following tail
+segment. Visible only because a sample line read `rows_loop_end=0.46` on a game
+whose rows were supposedly free. Segments are named by their START mark now.
+
+**LEADING HYPOTHESIS, explicitly not yet measured:** `enrich_candidate_rows`
+(`home.py`, from `quote_enrichment`) runs over the whole assembled candidate list
+in the tail, and `#414`'s own correction found the real cost to be **a full linear
+scan of `unattributed` PER CANDIDATE** in `_candidate_odds_history_state`
+(`intelligence.py:3393`). That fits every observation at once: cost tracks
+odds-history shard size, scales with candidates emitted, and touches nothing
+inside the row loop — which is exactly why reading the loop never explained it.
+**It also means the discredited per-CANDIDATE denominator may have had the right
+shape for the wrong reason.** One build with the new line settles it; do not
+adopt it before then.
+
 **Still true:** per-SPORT and per-GAME checkpointing remain useless for the
 reasons originally measured. What changed is that a THIRD granularity exists one
 level below both, and that is where the cost lives.
