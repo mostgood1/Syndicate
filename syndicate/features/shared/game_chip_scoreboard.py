@@ -33,6 +33,19 @@ def _text(value: Any) -> str:
 
 
 def _score_value(value: Any) -> str | None:
+    # A NUMERIC ZERO IS A REAL SCORE. `_text` is `str(value or "")`, so an int
+    # 0 collapses to "" and every scoreless team lost its score on the chip --
+    # in every sport, not just the one this was found in. Found 2026-08-13
+    # while wiring NFL game state: GB @ PIT read `away 3, home None` in Q1
+    # rather than 3-0, and a 0-0 first quarter showed no score at all.
+    # Handled here rather than in `_text`, whose other callers are labels and
+    # names where the falsy-collapse is harmless and widening it is risk with
+    # no benefit.
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        number = float(value)
+        return str(int(number)) if number.is_integer() else str(value)
     text = _text(value)
     if not text or text in {"-", "None"}:
         return None

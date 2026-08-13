@@ -271,7 +271,16 @@ class BuildNflPreseasonMarketBoardTests(PreseasonCardsTestCase):
             ],
         )
 
-        board = pc.build_nfl_preseason_market_board(2026, 1)
+        # HERMETIC. `build_nfl_preseason_market_board` now consults ESPN for
+        # real game state (it was the literal string "pregame" before, so this
+        # board could never show a live or finished game). Without this patch
+        # the test reaches the live internet and 2026 preseason week 1 -- Hall
+        # of Fame weekend -- correctly comes back `final`, which is a true
+        # reading of the world and a flaky, network-dependent unit test.
+        # An empty index is the ESPN-unreachable path, which must still
+        # produce exactly the pre-fix board.
+        with patch.object(pc, "nfl_game_state_index", return_value={}):
+            board = pc.build_nfl_preseason_market_board(2026, 1)
 
         self.assertEqual(board["season"], 2026)
         self.assertEqual(board["week"], 1)

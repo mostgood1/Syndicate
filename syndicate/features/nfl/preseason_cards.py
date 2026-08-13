@@ -21,6 +21,9 @@ from syndicate.features.nfl.cards import _resolve_branding
 from syndicate.features.nfl.cards import _team_abbr
 from syndicate.features.nfl.preseason_depth import NONSTARTER_PARTICIPATION_SHARE
 from syndicate.features.nfl.preseason_depth import PRESEASON_WEEK_LABELS
+from syndicate.features.nfl.live_game_state import SEASONTYPE_PRESEASON
+from syndicate.features.nfl.live_game_state import attach_nfl_live_game_state
+from syndicate.features.nfl.live_game_state import nfl_game_state_index
 from syndicate.features.nfl.preseason_depth import likely_snap_leaders
 from syndicate.features.nfl.preseason_depth import likely_starters_sitting
 from syndicate.features.nfl.preseason_projection import preseason_seasons_and_weeks
@@ -34,6 +37,7 @@ from syndicate.features.nfl.sources import preseason_target_week
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
 from syndicate.features.shared.formatters import format_pct
+from syndicate.features.shared.book_grid_artifact import read_book_grid_artifact
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 
@@ -60,6 +64,107 @@ def _load_preseason_odds(season: int) -> dict[tuple[str, str], dict[str, Any]]:
     except (OSError, FileNotFoundError):
         return {}
     return odds
+
+
+def _grid_side_line(row: dict[str, Any], side: str) -> float | None:
+    """The line as THAT SIDE's book cells state it.
+
+    Deliberately NOT `row["line"]`. `nfl_game_projections`'s module docstring
+    records why: a spreads row carries `line: 6.5` with `sides: ["away",
+    "home"]` and nothing saying which side the 6.5 belongs to, so reading it
+    as the home line inverts the spread on half the board while looking
+    entirely plausible. The per-book `cells` DO carry a signed line per side
+    (`draftkings.away.line 6.5` / `draftkings.home.line -6.5`), so take it
+    from there and never guess a sign.
+
+    Prefers a non-stale cell; falls back to any cell rather than returning
+    nothing, since a stale line is still correctly signed.
+    """
+    cells = row.get("cells")
+    if not isinstance(cells, dict):
+        return None
+    fallback: float | None = None
+    for cell in cells.values():
+        if not isinstance(cell, dict):
+            continue
+        side_cell = cell.get(side)
+        if not isinstance(side_cell, dict):
+            continue
+        value = _preseason_market_float(side_cell.get("line"))
+        if value is None:
+            continue
+        if not side_cell.get("stale"):
+            return value
+        if fallback is None:
+            fallback = value
+    return fallback
+
+
+def _live_grid_market_index(season: int, week: int) -> dict[tuple[str, str], dict[str, Any]]:
+    """Consensus game lines for a preseason week, from the LIVE book grid.
+
+    WHY THIS EXISTS. `_load_preseason_odds` reads
+    `preseason_odds_{season}.csv`, written by a separately-scheduled
+    `fetch_nfl_preseason_odds.py` run. Measured on production 2026-08-13:
+    that file held ONE row -- week 1's CAR @ ARI, fetched 2026-08-05 -- so
+    `/nfl/preseason/market-board` returned 16 games and **0 rows** for weeks
+    2, 3 and 4, all evening, while the Layer 1 book-quotes shard for the same
+    slate carried 8,537 rows across 11 books with quotes 1.3 minutes old.
+    The join was never broken (week 1 still renders its 6 rows, which is the
+    positive control); the INPUT was a file nobody was refreshing.
+
+    So the board no longer depends on that separate fetch having run. The
+    static CSV still wins where it has a row -- it is a real single-book
+    snapshot with its own `book`/`fetched_at` provenance -- and this fills the
+    gap behind it from the same precomputed artifact Layer 1 already serves.
+
+    Returns `{}` on any miss, which leaves today's behaviour exactly.
+    """
+    index: dict[tuple[str, str], dict[str, Any]] = {}
+    try:
+        state_index = nfl_game_state_index(season, week, seasontype=SEASONTYPE_PRESEASON)
+    except Exception:
+        return index
+    dates = sorted({str(entry.get("start_time") or "")[:10] for entry in state_index.values() if entry.get("start_time")})
+    if not dates:
+        return index
+
+    for date_str in dates:
+        try:
+            payload = read_book_grid_artifact("nfl", date_str)
+        except Exception:
+            continue
+        rows = payload.get("rows") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict) or str(row.get("kind") or "") == "prop":
+                continue
+            if str(row.get("segment") or "full").strip().lower() not in {"", "full"}:
+                continue
+            market = str(row.get("market") or "").strip().lower()
+            if market not in {"h2h", "spreads", "totals"}:
+                continue
+            home_branding = _resolve_branding(str(row.get("home_team") or ""))
+            away_branding = _resolve_branding(str(row.get("away_team") or ""))
+            if home_branding is None or away_branding is None:
+                continue
+            key = (str(away_branding.abbreviation).upper(), str(home_branding.abbreviation).upper())
+            entry = index.setdefault(key, {"book": "consensus (Layer 1 book grid)", "fetched_at": payload.get("generated_at")})
+            consensus = row.get("consensus") if isinstance(row.get("consensus"), dict) else {}
+            if market == "h2h":
+                entry.setdefault("home_moneyline", consensus.get("home"))
+                entry.setdefault("away_moneyline", consensus.get("away"))
+            elif market == "spreads":
+                line = _grid_side_line(row, "home")
+                if line is not None:
+                    entry.setdefault("spread_home", line)
+            elif market == "totals":
+                line = _preseason_market_float(row.get("line"))
+                if line is not None:
+                    # Totals need no side convention -- over means total > line.
+                    entry.setdefault("total_line", line)
+    return index
 
 
 def _depth_chart_panel(team_name: str, season: int, week: int) -> dict[str, Any]:
@@ -269,6 +374,18 @@ def build_preseason_cards_page_context(selected_week: int, *, season: int | None
         _game_from_preseason_projection(projection, season, resolved_week, market=odds.get((projection.away_team, projection.home_team)))
         for projection in projections
     ]
+    # REAL GAME STATE. Without this the cards carry no live/final/score/clock
+    # of any kind, and `_NFLDataProvider.games()` feeds exactly these dicts to
+    # `build_game_chips` -- so every NFL game on every surface reported
+    # `pregame` forever. Measured 2026-08-13 on the live slate: DET @ CIN sat
+    # at `state=pregame` while carrying 117 live in-game market rows.
+    # See syndicate/features/nfl/live_game_state.py for the full trace; the
+    # stamp is a no-op when ESPN is unreachable, so a scoreboard outage
+    # degrades to today's behaviour rather than to a wrong state.
+    attach_nfl_live_game_state(
+        games,
+        nfl_game_state_index(season, resolved_week, seasontype=SEASONTYPE_PRESEASON),
+    )
 
     prev_week, next_week = neighboring_values(weeks, resolved_week, fallback=resolved_week)
     scoreboard_items = [
@@ -371,12 +488,30 @@ _DEFAULT_PRESEASON_UNCERTAINTY_NOTE = (
 )
 
 
+def _preseason_board_game_state(
+    state_index: dict[str, dict[str, Any]], game_id: str, away_abbr: str, home_abbr: str
+) -> str:
+    entry = state_index.get(str(game_id)) or state_index.get(f"{away_abbr.upper()}@{home_abbr.upper()}")
+    if not isinstance(entry, dict):
+        return "pregame"
+    if entry.get("final"):
+        return "final"
+    if entry.get("in_progress"):
+        return "live"
+    return "pregame"
+
+
 def build_nfl_preseason_market_board(season: int, week: int) -> dict[str, Any]:
     """Layer 1 market/odds inventory for NFL preseason game markets
     (moneyline, spread, total only)."""
     projections = read_preseason_projection_artifact(season=season, week=week, data_root=default_nfl_source_root())
     weeks = _available_preseason_weeks(season)
     odds = _load_preseason_odds(season)
+    # See _live_grid_market_index: the static CSV had gone unrefreshed since
+    # 2026-08-05, so this board served 0 rows on every game of weeks 2-4 while
+    # live quotes for the same fixtures sat in the Layer 1 grid.
+    live_market_index = _live_grid_market_index(season, week)
+    game_state_index = nfl_game_state_index(season, week, seasontype=SEASONTYPE_PRESEASON)
 
     board_games: list[dict[str, Any]] = []
     uncertainty_note: str | None = None
@@ -389,7 +524,11 @@ def build_nfl_preseason_market_board(season: int, week: int) -> dict[str, Any]:
         home_abbr = home_branding.abbreviation if home_branding else _team_abbr(projection.home_team)
         away_abbr = away_branding.abbreviation if away_branding else _team_abbr(projection.away_team)
 
+        # Static CSV first (a real single-book snapshot carrying its own
+        # book/fetched_at provenance), live grid consensus behind it.
         market = odds.get((projection.away_team, projection.home_team))
+        if not market:
+            market = live_market_index.get((str(away_abbr).upper(), str(home_abbr).upper()))
 
         odds_rows, sim_rows = _nfl_market_board_rows_for_game(
             game_id=projection.game_id,
@@ -416,7 +555,13 @@ def build_nfl_preseason_market_board(season: int, week: int) -> dict[str, Any]:
                 "home_abbr": home_abbr,
                 "away_logo": away_branding.logo_url if away_branding else None,
                 "home_logo": home_branding.logo_url if home_branding else None,
-                "game_state": "pregame",
+                # Was the literal "pregame", so this board could never show a
+                # live or finished game no matter what the slate was doing.
+                # Absence still resolves to "pregame" rather than to a guess:
+                # if ESPN is unreachable the board reads exactly as it did.
+                "game_state": _preseason_board_game_state(
+                    game_state_index, str(projection.game_id), str(away_abbr), str(home_abbr)
+                ),
                 "rows": inventory,
             }
         )

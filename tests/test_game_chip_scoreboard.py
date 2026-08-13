@@ -405,3 +405,62 @@ class ProviderRegistrationOnWorkerPathTests(unittest.TestCase):
         with patch.dict(sdp.SPORT_DATA_PROVIDERS, sentinel, clear=True):
             gcs._ensure_sport_data_providers()
             self.assertEqual(list(sdp.SPORT_DATA_PROVIDERS), ["sentinel"])
+
+
+class ScoreValueTests(unittest.TestCase):
+    """A NUMERIC ZERO IS A REAL SCORE, and it used to disappear.
+
+    `_score_value` ran its input through `_text`, which is `str(value or "")`,
+    so an int `0` became `""` and returned None. Every scoreless team lost its
+    score on the chip -- all sports, not just the one it was found in. Found
+    2026-08-13 wiring NFL live state: GB @ PIT rendered `away 3, home None` in
+    the first quarter instead of 3-0.
+    """
+
+    def test_integer_zero_is_preserved(self) -> None:
+        from syndicate.features.shared.game_chip_scoreboard import _score_value
+
+        self.assertEqual(_score_value(0), "0")
+        self.assertEqual(_score_value(0.0), "0")
+
+    def test_string_zero_still_works(self) -> None:
+        from syndicate.features.shared.game_chip_scoreboard import _score_value
+
+        self.assertEqual(_score_value("0"), "0")
+
+    def test_genuinely_absent_values_still_return_none(self) -> None:
+        from syndicate.features.shared.game_chip_scoreboard import _score_value
+
+        for absent in (None, "", "   ", "-", "None", "TBD"):
+            self.assertIsNone(_score_value(absent), f"{absent!r} should not be a score")
+
+    def test_booleans_are_not_scores(self) -> None:
+        # bool is a subclass of int; without an explicit guard True would
+        # render as the score "1".
+        from syndicate.features.shared.game_chip_scoreboard import _score_value
+
+        self.assertIsNone(_score_value(True))
+        self.assertIsNone(_score_value(False))
+
+    def test_a_scoreless_live_chip_shows_zero_not_blank(self) -> None:
+        chip = build_game_chip(
+            "nfl",
+            {
+                "gamePk": "401873272",
+                "away": {"abbr": "DET", "score": 0},
+                "home": {"abbr": "CIN", "score": 0},
+                "live_state": {"in_progress": True, "final": False, "period": 1, "clock": "8:05"},
+            },
+        )
+        self.assertEqual(chip["state"], "live")
+        self.assertEqual(chip["away"]["score"], "0")
+        self.assertEqual(chip["home"]["score"], "0")
+        self.assertIsNone(chip["leader"], "0-0 has no leader")
+
+    def test_pregame_zero_zero_placeholder_is_still_suppressed(self) -> None:
+        # The existing guard must survive the fix: 0-0 on a game that is
+        # neither live nor final is a schedule placeholder, not a result.
+        chip = build_game_chip("nfl", {"gamePk": "x", "away": {"abbr": "IND", "score": 0}, "home": {"abbr": "NE", "score": 0}})
+        self.assertEqual(chip["state"], "pregame")
+        self.assertIsNone(chip["away"]["score"])
+        self.assertIsNone(chip["home"]["score"])
