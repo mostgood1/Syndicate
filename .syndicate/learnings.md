@@ -562,3 +562,59 @@ back **oldest-first regardless of `direction`**.
   substring.
 - Cost: no bad edit landed. The window was open ~20 minutes and was found by
   accident, which is the part worth fixing.
+
+### 2026-08-13 — A discriminator that only emits on FAILURE cannot confirm success
+- What we believed: `#417`'s deploy could be verified by reading a `basis`
+  field added to the memory snapshot — `basis=unreclaimable` proving the new
+  code path ran, `basis=reclaimable_cache` proving it degraded. This was chosen
+  deliberately, to avoid trusting a bare zero.
+- What was actually true: the snapshot is printed only inside the abort branch
+  (`intelligence_state.py:3215`), and the other call site
+  (`_board_build_has_memory_headroom`) logs nothing at all. So `basis` is
+  emitted **only when the guard refuses** — i.e. only when the fix has failed.
+  A working fix leaves it silent forever, and its absence is a fact about the
+  emitter, not about the code.
+- The rule going forward: **when choosing a liveness signal, ask which branch
+  emits it. If the only emitter is the failure path, the signal cannot
+  distinguish "working" from "never ran" — the two produce identical silence.**
+  Put the proof on the path you expect to take, not on the one you are trying
+  to eliminate. Direct sibling of "confirm an instrument can emit non-zero
+  before believing its zero"; that entry covered a zero, this one covers a
+  total absence, which is worse because nothing appears at all.
+- Cost: none yet — caught before it was quoted as evidence. The deploy is
+  consequently unverifiable by its own designed check, and rests on the 24h
+  outcome read instead.
+
+### 2026-08-13 — A watcher's LABEL must be entailed by its exit CONDITION
+- What we believed: a background watcher reported
+  `RESULT: RE-WARMED TO PRE-FIX LEVELS AND HELD`, which was read as the deploy
+  surviving load.
+- What was actually true: its exit condition was only `peak_memory >= 3500MB`.
+  It never tested "held". Its own output line two rows down said
+  `builds after peak=0` — the label and the data contradicted each other in the
+  same four-line report.
+- The rule going forward: **the words a monitor prints are a claim; write them
+  from the condition that fired, not from the outcome you are hoping for.**
+  Before trusting a watcher's verdict, re-read the branch that produced it. Any
+  word in the label that does not correspond to a term in the predicate is
+  editorial.
+- Generalises the `SLOW_ROW_PROFILE` lesson from spans to verdicts: there the
+  instrument measured the wrong interval, here it measured the right thing and
+  then overstated what it meant. Both were believed because the headline read
+  cleanly.
+
+### 2026-08-13 — "Pushed to origin" is not "applied to production"
+- What we believed: `571f774b` recorded the render.yaml push obligation as
+  closed because "all three are on origin", and the web env-block audit
+  (62 -> 52 keys) was treated as done.
+- What was actually true: web's LIVE service carries **73** env keys while
+  `render.yaml` on origin declares **52**. `blueprint_sync` had not applied.
+  The audit is on GitHub and absent from production, and a future sync carries
+  a queued, unannounced 21-key reduction.
+- The rule going forward: **for `render.yaml`, "on origin" and "in effect" are
+  two different measurements, and only the second one matters. Read the live
+  service's `/v1/services/<id>/env-vars` and compare counts before recording a
+  config change as shipped.** The CLAUDE.md warning that a push applies to
+  production is about the *risk* that a sync fires; it is not a guarantee that
+  one *has*. Both errors are available, in opposite directions.
+- Cost: none yet. Caught while preflighting an unrelated web deploy.

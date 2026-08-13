@@ -32,6 +32,28 @@
   last night, so any web-path `.py` fix committed today is on `main` and is
   **not running**. Do not read a web-route symptom as evidence about
   today's code without checking `936e2b47` first. `[measured 08-13]`
+- **Web is 47 commits behind — do not quote that number.** Only **14** touch
+  production `.py`; the rest are ledger, docs and tests. Real delta: **7 files,
+  785 insertions**, of which `intelligence.py`, `home.py`,
+  `live_projection_join.py` and `flask_frontend.py` are web-path. See `#422`.
+  `[measured 08-13 14:44]`
+- **`blueprint_sync` has NOT applied. "On origin" is not "in production."**
+  Web's LIVE service carries **73** env vars; `render.yaml` on origin declares
+  **52**. The web env-block audit is pushed and **not in effect**, so a future
+  sync carries a queued, unannounced 21-key reduction. Read
+  `/v1/services/<id>/env-vars` before recording any config change as shipped.
+  `[measured 08-13 14:44]`
+- **Web does not run the loops that call `memory_headroom_snapshot`.** Live env:
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`,
+  `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`,
+  `MLB_ENABLE_LIVE_LENS_LOOP=false`. So the `#417` guard change is inert there —
+  which matters because web is a **2GB** container with an OOM history and the
+  new formula is more permissive. Re-raise that concern if any flag flips.
+  `[measured 08-13 14:44]`
+- **`live-odds-worker` does NOT carry the `#417` fix and DOES run the guard**
+  (odds-refresh and soccer/WNBA live-lens gates). The unstable `active_file`
+  arithmetic is still live on that service. Its own deploy, its own
+  measurement. `[measured 08-13 14:44]`
 - Because `autoDeploy = no`, the repo tip is an upper bound on every
   service and never a reading of any of them. Re-read per service; do not
   reuse the SHAs above once a deploy fires. `[policy]`
