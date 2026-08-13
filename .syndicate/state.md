@@ -8,9 +8,8 @@
 ## Config
 
 - Max concurrent open lanes: **3** `[policy]`
-- Repo tip: `3447f983`, `origin/main` at the same commit,
-  2026-08-13 10:2x -05:00, "todo: point the egress tickets at the report that
-  justifies them". `[from-git 08-13]`
+- Repo tip: `93fc7cae`, `origin/main` at the same commit, 2026-08-13 15:2x
+  -05:00, "checkpoint 2026-08-13". `[from-git 08-13]`
 - Deployed SHA: **not derivable from git.** `autoDeploy = no` on all three
   services, so the repo tip is an upper bound, not the running commit — and
   each service can sit on a different one. Read
@@ -36,6 +35,31 @@
   `[fact]`
 - Included pipeline/build minutes exceeded in Aug: 1,549 of 1,000.
   `[measured 08-12]`
+
+## Board live tier (layer1-live-tier lane)
+
+- **The live prop join was matching 0 of 1385 rows** — keyed on `market`, which
+  is a display GROUPING (`hitter_props` covered 4 markets). Fixed `#412`;
+  control on one production snapshot + board: 0 -> 41 rows. `[measured 08-13]`
+- **Board game state is stamped from the live-lens snapshot, not the cached raw
+  feed** (`#413`). `_mlb_feed_live_payload` consults the cached feed for
+  PRESENCE only, never freshness, so a game froze at whenever it was first
+  captured. Override measured `rows_corrected 210, live->final 210`.
+  `[measured 08-13]`
+- **No live GAME-LINE projection exists.** `predictions.full` in the live-lens
+  snapshot is the PREGAME sim — all 6 final games carried pregame win
+  probabilities (0.489 on a completed game). Only PROPS have a live tier.
+  `[measured 08-13]`
+- **`liveModelProbOver` reaches the published snapshot's keyspace**, value null
+  so far. Transport is not the break. `[measured 08-13]`
+- **`rows_live_edged` is 0 on every build to date**, and the flat counter cannot
+  be read while a slate is mostly final — final props come from a registry path
+  that never computes a live probability. `e054e19f` splits by game state; the
+  `live` bucket has **never been observed against a live slate**.
+  `[unverified 08-13]`
+- **Web's `/mlb/api/live-lens` cannot observe the live Monte Carlo**:
+  `simContextAvailable: False` on all games, `gameLens source: ABSENT` on all
+  lanes. Do not verify live-sim work through it. `[measured 08-13]`
 
 ## Open problems
 

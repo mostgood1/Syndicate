@@ -104,3 +104,41 @@
   path is authoritative where a tool's excerpt is not.
 - Cost: none, caught before filing. Records the near-miss because the
   next one will not announce itself.
+
+### 2026-08-13 — Confirm an instrument can emit non-zero before believing its zero
+- What we believed: `#416` was broken, because web's `/mlb/api/live-lens`
+  reported no live probability anywhere.
+- What was actually true: that endpoint reports `simContextAvailable: False`
+  on all 15 games and `gameLens source: ABSENT` on all 60 lanes — it
+  **structurally cannot run** the Monte Carlo whose output was being read. A
+  working fix was one step from being filed as broken.
+- The sharper point: **a wrong number gets caught by disagreeing with
+  something. A null agrees with everything.** A zero is evidence only once you
+  know what would make the instrument read non-zero.
+- The rule going forward: before believing a zero, produce a case that makes
+  the same instrument read non-zero — or build the reading so it carries its
+  own liveness proof. `snapshot_prop_keys` is populated before any filtering,
+  so a zero beside a non-empty key list is a *measured* zero, not a blind one.
+
+### 2026-08-13 — A pooled denominator can make a measurement unreadable
+- What we believed: `snapshot_live_prob_seen: 0 of 67` meant the writer never
+  sent the value.
+- What was actually true: 13 of 15 games were final, and final props come from
+  `_final_live_prop_rows_from_registry` — a path that never computes a live
+  probability and **correctly** emits null. Most of that denominator was rows
+  that could never have been non-zero.
+- The rule going forward: when a counter pools populations with different
+  eligibility, **split it by the thing that determines eligibility** before
+  reading it. "The mechanism failed" and "most rows were never eligible"
+  produce the identical zero. Sibling of the wrong-denominator shape recorded
+  the same night, arrived at from the other direction.
+
+### 2026-08-13 — `git log --format=%an` is zero evidence in this repo
+- What was actually true: every commit is authored `github-actions[bot]`, so
+  authorship confirms whatever hypothesis is brought to it. Three attributions
+  in one night resolved against the lane they named; `#409` was claimed by two
+  lanes and `#414` by four.
+- The rule going forward: **the only working discriminator is which FILES a
+  lane has touched.** Verify a ticket number against `origin/main` immediately
+  before pushing, not when drafting — the gap between choosing and pushing is a
+  real race.

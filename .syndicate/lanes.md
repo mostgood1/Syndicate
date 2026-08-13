@@ -10,6 +10,30 @@ _(none — see CLOSED below)_
 
 ## CLOSED THIS SESSION
 
+### layer1-live-tier — CLOSED-PENDING-MEASUREMENT 2026-08-13
+- Goal: Layer 1 board carries live projection, sim projection and actual-so-far
+  on live rows, with correct live game state; retire `book_grid`.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/live_projection_join.py`
+  - `syndicate/features/shared/board_enrichment.py`
+  - `syndicate/features/shared/book_grid.py`
+  - `syndicate/templates/shared/layer1_board.html`
+  - `syndicate/templates/book_grid.html` (deleted)
+  - `vendor/mlb_bettingv2/sim_engine/live_mc.py`
+  - `vendor/mlb_bettingv2/tools/web/flask_frontend.py`
+- SHIPPED AND VERIFIED: `#412` (prop join 0 -> 41), `#413` (live state,
+  210 rows corrected), `#415` (Betting Board), `#411` (superseded lines).
+- **OPEN AND UNVERIFIED: `#416`.** Writer emits live probabilities
+  (`priced: 71`/`74`); `rows_live_edged` is still 0 on every build. The
+  measurement is not yet READABLE — `e054e19f` splits the counter by game
+  state so the `live` bucket can be read without final-game zeros diluting it.
+- Verification still required: one build against a slate with live games, then
+  read `snapshot_by_game_state["live"]`.
+  - `{rows>0, with_live_prob>0}` -> working, edge should follow
+  - `{rows>0, with_live_prob=0, with_live_projection>0}` -> writer half failing
+  - `{rows: 0}` -> still no live slate, no verdict
+- Blocked by: nothing. Needs a live slate only.
+
 ### internal-hostname-cutover — CLOSED 2026-08-13 — verified in production
 - Verification met: every `PUBLISH_OK` line on refresh-worker at `14:54:11Z`
   carries `url=http://syndicate-an21:10000/api/ops/artifact...`, publishes
