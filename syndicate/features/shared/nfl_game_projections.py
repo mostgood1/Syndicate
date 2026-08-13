@@ -75,11 +75,48 @@ def _normal_cdf(z: float) -> float:
     return 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
 
 
+def _is_degenerate_rating_source(rating_source: Any) -> bool:
+    """True when the sim had NO ratings data for EITHER side.
+
+    `team_rating` returns `(0.0, 0.0, "neutral_no_data")` when neither the
+    current season nor the prior season has qualifying plays for a team, and
+    the generator stamps that into `rating_source` as
+    `nflverse_pbp_epa_prior_season_shrunk[<home>/<away>]`. When BOTH sides are
+    `neutral_no_data` the sim runs 300 seeds over two identical league-average
+    teams, so every game in the file gets byte-identical output.
+
+    MEASURED 2026-08-13, and this is what the check is calibrated against: the
+    board served `margin_mean 0.96`, `total_mean 44.38`, `home_win_rate 0.5267`
+    on ALL 16 preseason games across FOUR dates. Running the real generator with
+    empty `prior_season_plays` reproduces `0.960 / 44.380 / 0.5267` exactly, on
+    all four weeks. The tell that it is a data outage rather than a model that
+    merely lacks skill: the four preseason weeks carry DIFFERENT shrinkage
+    factors (0.92/0.80/0.55/0.92), and shrinking 0.0 by any of them is still
+    0.0 -- so a degenerate input silently makes the week-specific adjustment a
+    no-op and every week collapses onto one number too.
+
+    ONE side neutral is NOT degenerate: the other side's real rating still
+    differentiates the matchup, and production carries exactly that case for
+    two clubs (WSH, LAR) whose nflverse abbreviations do not resolve.
+    """
+    text = str(rating_source or "").lower()
+    if "[" not in text or "]" not in text:
+        return False
+    inside = text[text.index("[") + 1 : text.rindex("]")]
+    sides = [part.strip() for part in inside.split("/")]
+    return len(sides) == 2 and all(side == "neutral_no_data" for side in sides)
+
+
 @dataclass
 class NflGameProjectionIndex:
     by_date_teams: dict[tuple[str, str, str], dict[str, Any]] = field(default_factory=dict)
     games: int = 0
     sources: list[str] = field(default_factory=list)
+    # Reported, not silent. A board with no projection column and a board whose
+    # projections were all dropped as degenerate look identical from the
+    # outside, and they are completely different situations.
+    rows_dropped_degenerate: int = 0
+    rows_superseded_by_newer: int = 0
 
     def lookup(self, game_date: str, home: Any, away: Any) -> dict[str, Any] | None:
         date_key = str(game_date or "")[:10]
@@ -153,9 +190,31 @@ def load_nfl_game_projections(selected_date: str) -> NflGameProjectionIndex:
         )
         for pattern in patterns:
             for path_text in sorted(glob.glob(pattern)):
-                if Path(path_text).name in seen_files:
+                # DEDUPE ON THE RESOLVED PATH, NOT THE FILENAME.
+                #
+                # This used to skip any file whose NAME had been seen, so with
+                # more than one source root only the FIRST root's copy of
+                # `smartsim2_preseason_projections_2026_wk2.csv` was ever
+                # opened and the others were never read at all. That is how a
+                # degenerate copy won: the generator resolves its own read root
+                # independently (`default_nfl_source_root()` probes for
+                # `upcoming_recs_*.csv`), and `data/nfl_source/tracking/` --
+                # where the nflverse pbp lives -- is gitignored, so a run whose
+                # root landed on the repo checkout had NO play-by-play, rated
+                # every team neutral, and wrote a file of identical rows under
+                # the same name. Measured 2026-08-13: the cards surface served
+                # 16 DISTINCT totals from the healthy copy while this index
+                # served one constant from the degenerate one, same filename.
+                #
+                # Same name is not same file. Read them all and let the
+                # per-game resolution below decide.
+                try:
+                    resolved = str(Path(path_text).resolve())
+                except OSError:
+                    resolved = path_text
+                if resolved in seen_files:
                     continue
-                seen_files.add(Path(path_text).name)
+                seen_files.add(resolved)
                 for row in _read_csv_rows(Path(path_text)):
                     gid = str(row.get("game_id") or "").strip()
                     day = gameday_by_id.get(gid, "")
@@ -166,6 +225,17 @@ def load_nfl_game_projections(selected_date: str) -> NflGameProjectionIndex:
                         # teams alone can land on the wrong meeting of a pair
                         # that plays twice in a season.
                         continue
+                    rating_source = str(row.get("rating_source") or "").strip()
+                    if _is_degenerate_rating_source(rating_source):
+                        # A sim run over two league-average teams is a league
+                        # constant wearing a projection's clothes. `#377`
+                        # already settled what to do with one of those: a
+                        # number that looks authoritative and means nothing is
+                        # worse on a betting board than an empty cell, because
+                        # it can only be caught by comparing rows and nobody
+                        # reads a board that way. Dropped, and counted.
+                        index.rows_dropped_degenerate += 1
+                        continue
                     entry = {
                         "margin_mean": _as_float(row.get("margin_mean")),
                         "total_mean": _as_float(row.get("total_mean")),
@@ -174,8 +244,21 @@ def load_nfl_game_projections(selected_date: str) -> NflGameProjectionIndex:
                         "home_win_rate": _as_float(row.get("home_win_rate")),
                         "generated_at": str(row.get("generated_at") or "").strip(),
                         "profile": str(row.get("profile_name") or "").strip(),
+                        "rating_source": rating_source,
                     }
-                    index.by_date_teams[(day, home, away)] = entry
+                    key = (day, home, away)
+                    existing = index.by_date_teams.get(key)
+                    if existing is not None:
+                        # NEWEST GENERATION WINS, rather than "whichever root
+                        # the glob happened to reach last". Timestamps are ISO
+                        # 8601 from the same writer, so a string compare is a
+                        # time compare; a row with no timestamp never displaces
+                        # one that has one.
+                        if str(entry["generated_at"]) <= str(existing.get("generated_at") or ""):
+                            index.rows_superseded_by_newer += 1
+                            continue
+                        index.rows_superseded_by_newer += 1
+                    index.by_date_teams[key] = entry
                 index.sources.append(Path(path_text).name)
     index.games = len(index.by_date_teams)
     return index
@@ -343,6 +426,13 @@ def attach_nfl_game_projections(
         "non_full_segment_rows": non_full_segment,
         "games_in_index": index.games,
         "source_artifacts": index.sources[:8],
+        # Surfaced so "this sport has no projections" stays distinguishable
+        # from "every projection it had was a league constant and got
+        # dropped". Those render the same empty column and are different
+        # problems: the first is a missing model, the second is a missing
+        # nflverse pbp file on whichever root the generator resolved.
+        "rows_dropped_degenerate": index.rows_dropped_degenerate,
+        "rows_superseded_by_newer": index.rows_superseded_by_newer,
     }
     warning = _slate_bias_warning(list(total_edge_by_game.values()))
     if warning:
