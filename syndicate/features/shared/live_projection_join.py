@@ -218,6 +218,25 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
     live_games = 0
     skipped_no_live_projection = 0
     skipped_no_key = 0
+    # `#416` READER-SIDE COUNTER. The re-sim demonstrably prices props on
+    # live-odds-worker (`LIVE_MC_PRICED outcomes={'priced': 71}`) and the board
+    # still served `rows_live_edged: 0`. Between those two facts sits exactly one
+    # unobserved hop -- whether the PUBLISHED snapshot carries the field -- and
+    # it cannot be read from web, which 404s on that path (it lives in the
+    # keyvalue store) and whose own recompute is blind (`simContextAvailable:
+    # False` on every game).
+    #
+    # Two counters, because they answer different questions:
+    #   `seen`    -- rows in the snapshot carrying a non-null `liveModelProbOver`
+    #   `indexed` -- of those, how many also survived indexing
+    # `seen == 0` means the writer's value never reached the artifact.
+    # `seen > 0 and indexed == 0` means this function is dropping it.
+    rows_with_live_prob_seen = 0
+    rows_with_live_prob_indexed = 0
+    # AND WHAT THE ROW DOES CARRY, when it does not carry that. An absent field
+    # is just another null unless you can see the keyspace it is absent from --
+    # the `#412` root cause was exactly a right value under an unexpected key.
+    sample_prop_keys: list[str] = []
 
     games = (snapshot or {}).get("games") if isinstance(snapshot, Mapping) else None
     for game in games if isinstance(games, Sequence) else ():
@@ -232,6 +251,12 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
             if not isinstance(prop, Mapping):
                 continue
             rows_seen += 1
+            if not sample_prop_keys:
+                # Bounded and name-only: this is a diagnostic, not a payload dump.
+                sample_prop_keys = sorted(str(k) for k in prop.keys())[:40]
+            has_live_prob = prop.get("liveModelProbOver") is not None
+            if has_live_prob:
+                rows_with_live_prob_seen += 1
             player = _norm_name(prop.get("playerName"))
             market = _snapshot_market(prop)
             line = _as_float(prop.get("line"))
@@ -261,6 +286,8 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
                 "side": _norm_side(prop.get("selection")),
             }
             rows_indexed += 1
+            if has_live_prob:
+                rows_with_live_prob_indexed += 1
 
     return {
         "index": index,
@@ -270,6 +297,9 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         "rows_indexed": rows_indexed,
         "skipped_no_live_projection": skipped_no_live_projection,
         "skipped_no_key": skipped_no_key,
+        "rows_with_live_prob_seen": rows_with_live_prob_seen,
+        "rows_with_live_prob_indexed": rows_with_live_prob_indexed,
+        "sample_prop_keys": sample_prop_keys,
     }
 
 
@@ -486,6 +516,14 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # identical and have completely different fixes.
         "snapshot_skipped_no_live_projection": indexed.get("skipped_no_live_projection"),
         "snapshot_skipped_no_key": indexed.get("skipped_no_key"),
+        # THE ONE UNOBSERVED HOP (`#416`). `snapshot_live_prob_seen == 0` says
+        # the writer's probability never reached the published artifact;
+        # `seen > 0` with `rows_live_edged == 0` says it arrived and something
+        # here dropped it. Those have opposite fixes and, until now, looked
+        # identical from the board.
+        "snapshot_live_prob_seen": indexed.get("rows_with_live_prob_seen"),
+        "snapshot_live_prob_indexed": indexed.get("rows_with_live_prob_indexed"),
+        "snapshot_prop_keys": indexed.get("sample_prop_keys"),
         "miss_no_player": miss_no_player,
         "miss_no_market_alias": miss_no_market_alias,
         "miss_no_line": miss_no_line,

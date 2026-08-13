@@ -394,3 +394,58 @@ def test_the_live_probability_is_not_folded_into_the_pregame_fallback_chain():
     line = next(l for l in lens.splitlines() if '"liveModelProbOver"' in l)
     assert "estimatedWinProb" not in line
     assert "estimated_win_prob" not in line
+
+
+def test_the_reader_counter_separates_a_missing_field_from_a_dropped_one():
+    """`#416` reader-side counter. The two cases have OPPOSITE fixes.
+
+    The re-sim demonstrably priced props on live-odds-worker
+    (`LIVE_MC_PRICED outcomes={'priced': 71}`) while the board served
+    `rows_live_edged: 0`. Exactly one hop between those was unobserved: whether
+    the PUBLISHED snapshot carries the field. It cannot be read from web, which
+    404s on that path (it lives in the keyvalue store) and whose own recompute is
+    blind (`simContextAvailable: False` on every game).
+
+        seen == 0                     -> the writer's value never reached the artifact
+        seen > 0 and indexed == 0     -> it arrived and the join dropped it
+
+    Before this, both rendered as one blank edge column.
+    """
+    without = _prop("Aaron Judge", "hitter_props", "hits", 0.5)
+    without.pop("liveModelProbOver", None)
+    cov = attach_live_projections([], build_live_prop_index(_snapshot(without)))
+    assert cov["snapshot_live_prob_seen"] == 0
+    assert cov["snapshot_live_prob_indexed"] == 0
+
+    with_prob = _prop("Aaron Judge", "hitter_props", "hits", 0.5)
+    with_prob["liveModelProbOver"] = 0.44
+    cov = attach_live_projections([], build_live_prop_index(_snapshot(with_prob)))
+    assert cov["snapshot_live_prob_seen"] == 1
+    assert cov["snapshot_live_prob_indexed"] == 1
+
+
+def test_a_row_carrying_the_field_but_failing_to_index_is_counted_as_seen():
+    # The discriminating case: the snapshot HAS the probability and this
+    # function drops the row anyway (here, no `liveProjection`). Counting it
+    # only at index time would report `seen: 0` and blame the writer.
+    prop = _prop("Aaron Judge", "hitter_props", "hits", 0.5)
+    prop["liveModelProbOver"] = 0.44
+    prop["liveProjection"] = None
+    cov = attach_live_projections([], build_live_prop_index(_snapshot(prop)))
+    assert cov["snapshot_live_prob_seen"] == 1, "the field was present and went uncounted"
+    assert cov["snapshot_live_prob_indexed"] == 0
+
+
+def test_the_snapshot_keyspace_is_reported_when_the_field_is_absent():
+    """An absent field is just another null unless you can see what IS there.
+
+    `#412`'s root cause was a correct value under an unexpected key, found only
+    by reading the row's actual keys. This carries the names -- bounded, and
+    names only, never values.
+    """
+    prop = _prop("Aaron Judge", "hitter_props", "hits", 0.5)
+    cov = attach_live_projections([], build_live_prop_index(_snapshot(prop)))
+    keys = cov["snapshot_prop_keys"]
+    assert "liveProjection" in keys and "modelProbOver" in keys
+    assert len(keys) <= 40
+    assert all(isinstance(k, str) for k in keys), "keys only -- this must not leak values"
