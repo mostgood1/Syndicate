@@ -118,3 +118,31 @@
       appended by its owner rather than an edit here — read on its own,
       the deploy ledger currently understates what is already known.
 - [ ] `#395` rate ceiling — still `Measured: <pending>` with no follow-up row.
+- [ ] **live-odds-worker → the `#417` memory fix. `/preflight` FAILED
+      2026-08-13 15:39 CDT; HELD BY DECISION until after the 24h read.**
+      - Target when it goes: **`03073270`** — it isolates the change to
+        `memory_observability.py` + tests. `origin/main` would also drag in
+        another lane's `live_refresh_loop.py` (`#419`/`#420`), making it two
+        substantive changes.
+      - Why it failed: **no observable to move.** On
+        `srv-d91dpertqb8s73co8lt0`, `SKIPPED_FOR_MEMORY`, `MEMORY_GATE`,
+        `ODDS_REFRESH_MEMORY_HEADROOM_CHECK`, `MEMORY_GUARD_ABORT` and
+        `insufficient` are **all zero** over the API's ~6-day text reach
+        (positive control returned 30 hits, so the probe works). The bug is
+        **latent here, never once fired.** No number to state, so no reader
+        to assign.
+      - Why held rather than shipped anyway: the identical change is
+        **unverified on refresh-worker until 2026-08-14 13:00**. Shipping it
+        to a second service inside that open window is the `#394`/`#395`
+        mistake — two services changed, neither attributable.
+      - **The risk to weigh when it does go.** live-odds-worker is **2GB with
+        an OOM history**, and the fix is MORE permissive there. At
+        `current=1900, anon=1000, active_file=800, inactive=100`: old gives
+        `(2048-1900)+100 = 248MB` → refuse; new gives `2048-1000 = 1048MB` →
+        allow. The new answer is believed correct (`active_file` is evictable;
+        the kernel drops it rather than OOM-killing) but that is **thesis, not
+        measurement**, and it has never been exercised on a 2GB container.
+      - It DOES run the guard — `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP`,
+        `SYNDICATE_ENABLE_LIVE_LENS_LOOP`, `MLB_ENABLE_LIVE_LENS_LOOP` all
+        `true`, `SYNDICATE_LIVE_LENS_MIN_HEADROOM_MB=300`. So the fix is not
+        inert here, unlike on web. `[measured 08-13 15:39]`
