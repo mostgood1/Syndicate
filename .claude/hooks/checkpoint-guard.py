@@ -31,9 +31,12 @@ Non-blocking by design: exit 1, never 2. HOOKS.md is explicit that this warns
 and does not trap a session, and exit 2 on Stop would prevent stopping.
 Fails open: any error exits 0 and the session proceeds.
 """
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 
 FILE_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+SHELL_TOOLS = ("Bash", "PowerShell")
+LOG_RE = re.compile(r"^\.syndicate/log/[^/]+\.md$")
+LOG_HINT_RE = re.compile(r"\.syndicate/log/[^\s'\"]+\.md")
 MAX_LISTED = 6
 
 
@@ -49,9 +52,24 @@ def _norm(root, path):
     return rel
 
 
-def _session_files(transcript_path, root):
-    """Repo-relative paths this session wrote, from its own transcript."""
+def _scan_transcript(transcript_path, root):
+    """(paths this session wrote, whether it appended to a .syndicate/log entry).
+
+    The log flag is the second checkpoint witness. It is deliberately scoped to
+    THIS session: `.syndicate/log/<date>.md` is appended by every session, so
+    treating any recent write to it as proof would let one session's checkpoint
+    silence another's warning. In a repo with five sessions live that turns the
+    guard from always-warning into always-passing, which is the same defect
+    facing the other way.
+
+    Bash/PowerShell commands are inspected for the log path only. That is not
+    general shell parsing - it is one substring test against one known
+    filename, because `/checkpoint` step 2 is normally a `cat >>` heredoc and
+    would otherwise be invisible here (this guard's own author checkpointed
+    that way).
+    """
     touched = set()
+    wrote_log = False
     try:
         with open(transcript_path, encoding="utf-8", errors="replace") as fh:
             for line in fh:
@@ -68,17 +86,24 @@ def _session_files(transcript_path, root):
                 for block in content:
                     if not isinstance(block, dict) or block.get("type") != "tool_use":
                         continue
-                    if block.get("name") not in FILE_TOOLS:
-                        continue
-                    fp = (block.get("input") or {}).get("file_path")
-                    if not fp:
-                        continue
-                    rel = _norm(root, fp)
-                    if rel:
-                        touched.add(rel)
+                    name = block.get("name")
+                    inp = block.get("input") or {}
+                    if name in FILE_TOOLS:
+                        fp = inp.get("file_path")
+                        if not fp:
+                            continue
+                        rel = _norm(root, fp)
+                        if rel:
+                            touched.add(rel)
+                            if LOG_RE.match(rel):
+                                wrote_log = True
+                    elif name in SHELL_TOOLS:
+                        cmd = inp.get("command") or ""
+                        if isinstance(cmd, str) and LOG_HINT_RE.search(cmd.replace("\\", "/")):
+                            wrote_log = True
     except Exception:
-        return None
-    return touched
+        return None, False
+    return touched, wrote_log
 
 
 def _dirty(root):
@@ -119,7 +144,7 @@ def main():
     if not transcript or not os.path.exists(transcript):
         return 0
 
-    touched = _session_files(transcript, root)
+    touched, wrote_log = _scan_transcript(transcript, root)
     if not touched:
         return 0
 
@@ -131,13 +156,35 @@ def main():
     if not mine:
         return 0  # everything this session wrote is committed
 
+    # Baseline = the NEWER of two independent witnesses. The marker is the
+    # explicit signal; a log append by this session is the fallback, so that
+    # forgetting `/checkpoint` step 7 does not report a session that did
+    # checkpoint as having lost its work. Both absent is reported as "no
+    # baseline" rather than as a forgotten touch, because those are different
+    # facts and only one of them is the session's fault.
+    baseline = 0.0
+    witness = None
+
     marker = os.path.join(root, ".syndicate", ".last-checkpoint")
-    mark_mtime = 0.0
     if os.path.exists(marker):
         try:
-            mark_mtime = os.path.getmtime(marker)
+            baseline = os.path.getmtime(marker)
+            witness = "marker"
         except Exception:
-            mark_mtime = 0.0
+            baseline = 0.0
+
+    if wrote_log:
+        log_dir = os.path.join(root, ".syndicate", "log")
+        try:
+            for name in os.listdir(log_dir):
+                if not name.endswith(".md"):
+                    continue
+                m = os.path.getmtime(os.path.join(log_dir, name))
+                if m > baseline:
+                    baseline, witness = m, "log append"
+        except Exception:
+            pass
+    mark_mtime = baseline
 
     newest = 0.0
     newest_file = None
@@ -162,10 +209,16 @@ def main():
         sys.stderr.write("  %s\n" % rel)
     if more > 0:
         sys.stderr.write("  ... and %d more\n" % more)
-    if not mark_mtime:
-        sys.stderr.write("No .syndicate/.last-checkpoint exists - this session has never checkpointed.\n")
+    if not baseline:
+        sys.stderr.write(
+            "No baseline: no .syndicate/.last-checkpoint, and this session has not "
+            "appended to .syndicate/log/. It has never checkpointed.\n"
+        )
     elif newest_file:
-        sys.stderr.write("Newest change (%s) postdates the checkpoint marker.\n" % newest_file)
+        sys.stderr.write(
+            "Newest change (%s) postdates the last checkpoint (witness: %s).\n"
+            % (newest_file, witness)
+        )
     sys.stderr.write("Run /checkpoint before ending, or this session's findings do not survive it.\n")
     return 1
 

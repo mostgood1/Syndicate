@@ -243,6 +243,18 @@
   restoring the header (`f2ba6c1`-era working tree; backup at
   `/tmp/lanes.pre-repair.bak`). Nothing detected this; it was found by reading
   a diff. `[measured 08-13]`
+- **`checkpoint-guard.py` now takes the NEWER of two witnesses**: the
+  `.last-checkpoint` marker, or a `.syndicate/log/*.md` append **made by this
+  session**. Closes the residual `hooks-test` flagged — skipping `/checkpoint`
+  step 7 no longer reports a session that did checkpoint as having lost its
+  work. The log witness is scoped to the session's own transcript on purpose:
+  every session appends to the same daily log, so counting any recent write
+  would let one session's checkpoint silence another's warning and flip the
+  guard from always-warning to always-passing. Bash/PowerShell commands are
+  substring-tested for the log path only, because step 2 is normally a
+  `cat >>` heredoc and is otherwise invisible to a file-tool scan. Both
+  witnesses absent is now reported as "no baseline", not as a forgotten touch.
+  Verified on 8 fixture cases including the false-pass one. `[measured 08-13]`
 - **The 3-lane cap in `## Config` is policy with no enforcement.** Four OPEN
   lanes ran this session unchallenged; `/lane open` checks file collisions
   only and never counts. `[measured 08-13]`
