@@ -487,6 +487,21 @@ decompresses to the first member only).
 **Next:** `odds_history` is the same shape and is NOT done — 105.0 MB/day, read
 whole via `read_text`, so it is a different change.
 
+### Egress incident (2026-08-12) — the measurement pass behind `#394`/`#395`/`#396`/`#398` is now in the repo
+
+`docs/reports/live_odds_worker_egress_analysis.md` (`eaf7965d`). Written during
+the incident, committed only at session reconciliation the next day — the fix
+shipped while the reasoning for it sat untracked in one working tree. Pointer
+added because none of the tickets below name it.
+
+Load-bearing findings, so they are not re-derived: the bytes went **Render ->
+Render over the PUBLIC url** and were billed for leaving the network;
+`book_grid_<date>.json` (10-11.7 MB) is **53% of published bytes** and the top
+5% of artifacts carry **52.8%**; `#394` cut egress ~26-97x (7.8-29 GB/hr -> ~300
+MB/hr), proving most historic volume was unchanged re-uploads, **and it does not
+touch the whales**, which change every cycle. Internal networking is unbilled:
+**~$243/mo -> ~$0**.
+
 ### `#398` — SHIPPED, NOT ENABLED. `#396`'s tiers missed 1,960 MB, and settlement cannot be judged by age
 
 `e81b5425`. Extends `#396` rather than replacing it — its two-tier shape and its
