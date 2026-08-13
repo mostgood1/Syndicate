@@ -8,6 +8,11 @@ could not tell a dead market from a fresh one.
 
 from __future__ import annotations
 
+import contextlib
+import io
+import os
+import re
+import time
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -240,3 +245,80 @@ class GameDateIsASlateDateNotAUtcDateTests(unittest.TestCase):
         # Enrichment returning early makes every candidate come back with
         # quote: null (2026-08-06). A slightly wrong date beats that.
         self.assertEqual(_game_date({"gameDate": "2026-13-99T99:99:99Z"}), "2026-13-99")
+
+
+class SlowEnrichProfileTests(unittest.TestCase):
+    """`#414` lane `quote-join-enrich-cost`. The instrument that splits the 33s.
+
+    `SLOW_SEGMENT_PROFILE` could only say `enrich_block=33.32` of
+    `total_s=33.32`, so the cost had no owner inside `enrich_candidate_rows`.
+    These tests exist because `learnings.md` records two ways an instrument
+    lies: it never emits (and its silence reads as "nothing to see"), or its
+    span omits work and the segments quietly fail to sum.
+    """
+
+    GAME = {"event_id": "evt-1", "game_date": DATE, "home_team": "Home", "away_team": "Away"}
+
+    def _candidates(self, n):
+        return [
+            {"market": "moneyline", "pick": "Home", "line": None, "odds": -110,
+             "player_name": None, "entity": None, "model_probability": 0.55}
+            for _ in range(n)
+        ]
+
+    def _run(self, *, sleep_s, count, threshold):
+        from syndicate.features.shared import quote_enrichment
+
+        def slow_join(**_kwargs):
+            time.sleep(sleep_s)
+            return {"best_price": -110, "fair_probability": 0.5, "best_bookmaker": "fake"}
+
+        buf = io.StringIO()
+        with patch.object(quotes_module, "quote_ref_for_bet", slow_join), \
+             patch.dict(os.environ, {"SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS": str(threshold)}), \
+             contextlib.redirect_stdout(buf):
+            quote_enrichment.enrich_candidate_rows(
+                self.GAME, self._candidates(count), sport_slug="mlb"
+            )
+        return buf.getvalue()
+
+    def test_it_emits_when_the_call_is_slow_and_blames_the_join(self):
+        # The liveness half. A zero from this instrument is only evidence once
+        # a case exists that makes it read non-zero.
+        out = self._run(sleep_s=0.02, count=8, threshold=0.05)
+        self.assertIn("SLOW_ENRICH_PROFILE", out)
+        self.assertIn("join_calls=8", out)
+        # All the cost was in the join, so join_s must dominate -- if this ever
+        # fails, the segment boundaries moved and the line is mislabelling.
+        join_s = float(re.search(r"join_s=([0-9.]+)", out).group(1))
+        total_s = float(re.search(r"total_s=([0-9.]+)", out).group(1))
+        self.assertGreater(join_s, total_s * 0.7)
+
+    def test_the_segments_account_for_the_whole_call(self):
+        # The span half, and the one that matters most. `SLOW_ROW_PROFILE`
+        # failed by leaving a post-loop tail outside every mark, so the numbers
+        # were real and the attribution was wrong. `unattributed_s` is emitted
+        # precisely so that failure is visible instead of silent.
+        out = self._run(sleep_s=0.02, count=8, threshold=0.05)
+        unattributed = float(re.search(r"unattributed_s=([0-9.]+)", out).group(1))
+        total_s = float(re.search(r"total_s=([0-9.]+)", out).group(1))
+        self.assertLess(unattributed, max(0.05, total_s * 0.1))
+
+    def test_it_stays_silent_below_the_threshold(self):
+        # Otherwise a per-game line on an 8-sport board becomes the log.
+        self.assertNotIn("SLOW_ENRICH_PROFILE", self._run(sleep_s=0.0, count=4, threshold=999))
+
+    def test_a_raising_join_still_returns_candidates(self):
+        # The function's `except Exception` swallows and returns unenriched.
+        # The profiler must not turn that degraded-but-alive path into a crash.
+        from syndicate.features.shared import quote_enrichment
+
+        def boom(**_kwargs):
+            raise RuntimeError("join blew up")
+
+        with patch.object(quotes_module, "quote_ref_for_bet", boom), \
+             patch.dict(os.environ, {"SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS": "0"}):
+            rows = quote_enrichment.enrich_candidate_rows(
+                self.GAME, self._candidates(3), sport_slug="mlb"
+            )
+        self.assertEqual(len(rows), 3)
