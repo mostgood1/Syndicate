@@ -22,18 +22,24 @@ explicitly `refuse_if_compute_in_request_path` -- "the one genuinely heavy piece
 of live-lens compute" -- so this reads the PUBLISHED snapshot and nothing else.
 An absent snapshot yields zero coverage and a stated reason, never a recompute.
 
-IT DOES NOT PRODUCE AN EDGE, and that is a measured decision rather than an
-omission. The re-sim ships a live MEAN and no live probability: on 24 of 28
-live-aware rows its `modelProbOver` is bit-identical to the pregame probability
-(`0.3530785` against `0.3530785`) while `liveProjection` genuinely moves. An
-edge needs the probability, so pricing that one against a re-priced market is
-`#340` in a live label -- confirmed by three rows whose over was ALREADY WON
-still carrying P(over) near 0.65-0.75 and edges of +36.5%/+32.3%/+15.8%, more
-than twice the size of the honest ones and sorting above them.
+THE EDGE PRICES `liveModelProbOver` AND NOTHING ELSE (`#414`). The re-sim used
+to ship a live MEAN and no live probability -- `modelProbOver` beside it was
+bit-identical to the PREGAME value on 24 of 28 live rows (`0.3530785` against
+`0.3530785`) while `liveProjection` genuinely moved. Pricing that one produced
+`#340` in a live label: three props whose over was ALREADY WON still read
+0.659/0.655/0.745, giving +36.5%/+32.3%/+15.8%, more than twice the size of the
+honest numbers on a board that sorts by edge.
 
-Every live row therefore carries a projection and a NAMED blank edge. That stays
-true until the re-sim emits a live probability; deriving one from the mean is
-refused for the same reason WNBA refuses it.
+`#414` fixed the cause rather than the symptom. `estimate_live` already
+simulated the rest of the game 120 times and discarded every box score it
+produced; it now retains them as per-player remaining-stat histograms, so
+P(over) is the empirical share of simulated rest-of-games finishing above the
+line, given what is already banked. An already-decided prop falls out as exactly
+1.0.
+
+A row the re-sim cannot price keeps a NAMED blank edge. There is deliberately no
+fallback to `modelProbOver`, because that would silently restore the defect on
+exactly the rows the live model could not reach.
 
 THE JOIN IS INSTRUMENTED ON PURPOSE. Market naming differs between the board
 (OddsAPI keys: `batter_hits`) and the live lens (its own families), and an
@@ -246,6 +252,10 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
             index[(player, market, line)] = {
                 "live_projection": projection,
                 "model_prob_over": prop.get("modelProbOver"),
+                # `#414`: the re-sim's own P(over), from its rest-of-game
+                # distribution. Read from its OWN key and never from
+                # `modelProbOver`, which is the pregame number.
+                "live_prob_over": prop.get("liveModelProbOver"),
                 "actual_so_far": prop.get("actualSoFar") if prop.get("actualSoFar") is not None else prop.get("actual"),
                 "live_edge_hint": prop.get("liveEdge"),
                 "side": _norm_side(prop.get("selection")),
@@ -275,6 +285,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         return {"supported": False, "reason": "no live snapshot", "rows_live_projected": 0}
 
     matched = 0
+    edged = 0
     edge_blocked = 0
     considered = 0
     miss_no_player = 0
@@ -382,12 +393,76 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # fabricated number into EV"). The honest state is a projection with a
         # named reason for its blank edge, and it stays that way until the
         # re-sim emits a live probability.
-        projection["edge_vs_market_pct"] = None
-        projection["edge_unavailable_reason"] = (
-            "live re-sim ships a live mean but no live probability, so there is "
-            "nothing honest to price against the market"
-        )
-        edge_blocked += 1
+        # THE EDGE, and the ordering bug that made it unreachable.
+        #
+        # `attach_projections` decides the edge and consults
+        # `live_edge_unavailable_reason` BEFORE this overlay runs, so `live_aware`
+        # was always False when the policy was asked. The policy was written to
+        # permit a live-aware edge and the pipeline could never present it one.
+        #
+        # THE FIRST ATTEMPT AT THIS SHIPPED NOTHING AND WAS RIGHT TO. It priced
+        # `modelProbOver`, which measurement showed was bit-identical to the
+        # pregame probability on 24 of 28 rows -- three props whose over was
+        # already WON still read 0.659/0.655/0.745, giving +36.5%/+32.3%/+15.8%,
+        # more than twice the size of the honest numbers on a board that sorts by
+        # edge. `#414` fixed the actual cause: the re-sim now emits a real live
+        # P(over) from its own rest-of-game distribution, so an already-won prop
+        # resolves to exactly 1.0 instead of 0.66.
+        #
+        # ONLY `live_prob_over` IS ACCEPTED HERE. Falling back to
+        # `model_prob_over` would silently restore the defect on every row the
+        # re-sim could not price, which is the failure mode this whole thread has
+        # been about.
+        # AN ALREADY-DECIDED PROP IS NOT AN EDGE, it is a settled market.
+        #
+        # With 1 hit banked against a 0.5 line, `#414`'s live probability is
+        # exactly 1.0 -- correct, and against a fair value of 0.30 it computes a
+        # +70% edge. There is no bet there: the book has settled or pulled that
+        # market, and the only way the price still reads 0.30 is that the quote
+        # is stale. Left in, these would be the LARGEST edges on the board and
+        # would sort straight to the top, which is the same visible failure the
+        # pregame-probability defect produced -- reached by a different route.
+        #
+        # Same rule `live_edge_policy` already applies to a final game: "the
+        # market is settled, so there is no price to beat". A decided prop is a
+        # final game scoped to one player.
+        banked = hit.get("actual_so_far")
+        row_line = _as_float(row.get("line"))
+        if banked is not None and row_line is not None and (_as_float(banked) or 0.0) > row_line:
+            projection["edge_vs_market_pct"] = None
+            projection["edge_unavailable_reason"] = (
+                "the over is already decided, so the market is settled and there is "
+                "no price to beat"
+            )
+            edge_blocked += 1
+            continue
+
+        live_prob = hit.get("live_prob_over")
+        fair = projection.get("market_fair_prob_over")
+        if live_prob is None or fair is None:
+            projection["edge_vs_market_pct"] = None
+            projection["edge_unavailable_reason"] = (
+                "live re-sim produced no probability for this market, so there is "
+                "nothing honest to price against it"
+                if live_prob is None
+                else "no market fair value to price the live projection against"
+            )
+            edge_blocked += 1
+            continue
+        try:
+            # Same formula and inputs as `attach_projections`
+            # (`(prob_over - market_fair_prob_over) * 100`), deliberately: a second
+            # edge definition for live rows is how two implementations of one
+            # number drift apart, which is what retired `book_grid`.
+            projection["edge_vs_market_pct"] = round((float(live_prob) - float(fair)) * 100.0, 2)
+        except (TypeError, ValueError):
+            projection["edge_vs_market_pct"] = None
+            projection["edge_unavailable_reason"] = "live edge inputs were not numeric"
+            edge_blocked += 1
+            continue
+        projection["live_prob_over"] = live_prob
+        projection.pop("edge_unavailable_reason", None)
+        edged += 1
 
     return {
         "supported": True,
@@ -399,6 +474,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # alone. This counts the blank edges as a POSITIVE act with a reason
         # attached, so "we chose not to price this" never again reads the same
         # as "the join failed".
+        "rows_live_edged": edged,
         "rows_live_edge_withheld": edge_blocked,
         "live_games_in_snapshot": indexed.get("live_games"),
         "snapshot_rows_seen": indexed.get("rows_seen"),

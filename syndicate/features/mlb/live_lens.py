@@ -545,6 +545,13 @@ def _normalize_live_prop_row(row: dict[str, Any]) -> dict[str, Any] | None:
         "actualSoFar": row.get("actualSoFar") if row.get("actualSoFar") is not None else row.get("actual_so_far"),
         "actualValue": row.get("actualValue") if row.get("actualValue") is not None else row.get("actual_value"),
         "liveProjection": row.get("liveProjection") if row.get("liveProjection") is not None else row.get("live_projection") if row.get("live_projection") is not None else row.get("projection"),
+        # `#414`: P(over) from the live re-sim's OWN rest-of-game distribution.
+        # Deliberately NOT folded into `modelProbOver`'s fallback chain above --
+        # that chain reaches `estimatedWinProb`, which is the PREGAME number, and
+        # collapsing the two is exactly how a pregame probability came to be
+        # labelled live on the board. Absent stays absent, so the consumer can
+        # tell "no live probability" from "here is one".
+        "liveModelProbOver": row.get("liveModelProbOver") if row.get("liveModelProbOver") is not None else row.get("live_model_prob_over"),
         "liveEdge": row.get("liveEdge") if row.get("liveEdge") is not None else row.get("live_edge"),
         "projectionGap": row.get("projectionGap") if row.get("projectionGap") is not None else row.get("projection_gap"),
         "modelMean": row.get("modelMean") if row.get("modelMean") is not None else row.get("model_mean"),

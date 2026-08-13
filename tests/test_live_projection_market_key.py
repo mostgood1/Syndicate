@@ -215,57 +215,126 @@ def test_the_snapshot_ceiling_is_reported():
     assert coverage["snapshot_skipped_no_live_projection"] == 1
 
 
-def test_a_live_row_never_carries_a_numeric_edge():
-    """THE EDGE WAS WRITTEN AND THEN BACKED OUT, on measurement.
+def test_a_row_the_resim_could_not_price_carries_no_edge():
+    """No live probability -> no edge. There is deliberately NO fallback.
 
-    There is a real ordering bug behind it: `attach_projections` decides the
-    edge and consults `live_edge_unavailable_reason` BEFORE this overlay runs,
-    so `live_aware` is always False when the policy is asked. Fixing that is two
-    lines, and the edge it produced was `#340` wearing a live label.
-
-    An edge needs a PROBABILITY, and the re-sim does not ship one -- on 24 of 28
-    live-aware rows its `modelProbOver` is bit-identical to the pregame value
-    (`0.3530785` against `0.3530785`) while `liveProjection` genuinely moves.
-
-    THE TELL: three rows whose over was ALREADY WON (1 hit against a 0.5 line)
-    still carried P(over) of 0.659/0.655/0.745, giving +36.5%/+15.8%/+32.3%.
-    Mean |edge| on already-decided rows was 28.2% against 12.0% on undecided
-    ones -- the fabricated numbers were more than TWICE the size of the real
-    ones, on a board that sorts by edge.
+    Falling back to `modelProbOver` is what produced the original defect: it was
+    bit-identical to the pregame probability on 24 of 28 rows, and three props
+    whose over was ALREADY WON still read 0.659/0.655/0.745, giving
+    +36.5%/+32.3%/+15.8% -- more than twice the honest numbers, on a board that
+    sorts by edge. A row the live model cannot reach must stay blank.
     """
+    # UNDECIDED on purpose, so this isolates the missing-probability case rather
+    # than tripping the already-decided guard below it.
     index = build_live_prop_index(
-        _snapshot(_prop("Angel Genao", "hitter_props", "hits", 0.5, projection=1.0, actual=1.0))
+        _snapshot(_prop("Angel Genao", "hitter_props", "hits", 0.5, projection=0.7, actual=0.0))
     )
     grid = [_row("Angel Genao", "batter_hits", 0.5,
                  projection={"model_prob_over": 0.659, "market_fair_prob_over": 0.294})]
     coverage = attach_live_projections(grid, index)
     p = grid[0]["projection"]
     assert p["edge_vs_market_pct"] is None, (
-        "a pregame probability was priced against a live market -- the #340 defect"
+        "the pregame probability was priced against a live market -- the #340 defect"
     )
     assert coverage["rows_live_edge_withheld"] == 1
+    assert "no probability" in p["edge_unavailable_reason"]
 
 
-def test_the_withheld_edge_says_why():
-    # A blank edge with no reason reads as "the join failed". This one is a
-    # positive decision and has to be spelled differently from a failure.
-    index = build_live_prop_index(
-        _snapshot(_prop("Brandon Lowe", "hitter_props", "total_bases", 1.5))
-    )
-    grid = [_row("Brandon Lowe", "batter_total_bases", 1.5)]
+def test_a_live_probability_produces_a_live_edge():
+    """`#414`: the re-sim now emits P(over) from its own rest-of-game sims."""
+    prop = _prop("Brandon Lowe", "hitter_props", "total_bases", 1.5, projection=1.8, actual=1.0)
+    prop["liveModelProbOver"] = 0.62
+    index = build_live_prop_index(_snapshot(prop))
+    grid = [_row("Brandon Lowe", "batter_total_bases", 1.5,
+                 projection={"model_prob_over": 0.281, "market_fair_prob_over": 0.50})]
+    coverage = attach_live_projections(grid, index)
+    p = grid[0]["projection"]
+    assert coverage["rows_live_edged"] == 1
+    assert p["edge_vs_market_pct"] == 12.0, "(0.62 - 0.50) * 100"
+    assert p["live_prob_over"] == 0.62
+    assert "edge_unavailable_reason" not in p
+
+
+def test_the_live_probability_is_never_taken_from_the_pregame_field():
+    """The two must not share a keyspace, at either end of the join.
+
+    `modelProbOver` IS the pregame number. If it ever reaches the edge -- by
+    fallback, by rename, or by a normaliser folding the two together -- every
+    measurement in this file's docstring comes straight back.
+    """
+    prop = _prop("Mookie Betts", "hitter_props", "hits", 0.5)
+    prop["modelProbOver"] = 0.90          # pregame, and wildly favourable
+    prop.pop("liveModelProbOver", None)   # the re-sim priced nothing
+    index = build_live_prop_index(_snapshot(prop))
+    grid = [_row("Mookie Betts", "batter_hits", 0.5,
+                 projection={"market_fair_prob_over": 0.30})]
     attach_live_projections(grid, index)
-    reason = grid[0]["projection"]["edge_unavailable_reason"]
-    assert "live probability" in reason and "mean" in reason
+    assert grid[0]["projection"]["edge_vs_market_pct"] is None, (
+        "a +60-point edge was manufactured from the pregame probability"
+    )
+
+
+def test_a_missing_market_fair_is_named_separately():
+    # "the re-sim had no opinion" and "there is no market price to beat" are
+    # different facts with different fixes, and both render as a blank cell.
+    prop = _prop("Brandon Lowe", "hitter_props", "total_bases", 1.5)
+    prop["liveModelProbOver"] = 0.62
+    index = build_live_prop_index(_snapshot(prop))
+    grid = [_row("Brandon Lowe", "batter_total_bases", 1.5, projection={})]
+    attach_live_projections(grid, index)
+    assert "no market fair value" in grid[0]["projection"]["edge_unavailable_reason"]
 
 
 def test_deriving_a_probability_from_the_live_mean_is_not_attempted():
     # WNBA already refuses this: "inventing P(over) from a mean would put a
-    # fabricated number into EV". A future edit that reaches for the mean to
-    # manufacture P(over) would pass every other test in this file.
+    # fabricated number into EV". The edge must be priced from the re-sim's own
+    # probability field and never reconstructed from `live_projection`.
     import pathlib
 
     src = (pathlib.Path(__file__).resolve().parents[1]
            / "syndicate" / "features" / "shared" / "live_projection_join.py").read_text(encoding="utf-8")
-    body = src[src.index("def attach_live_projections("):]
-    assert "edge_vs_market_pct\"] = round(" not in body
-    assert "edge_vs_market_pct\"] = None" in body
+    src_body = src[src.index("def attach_live_projections("):]
+    # Scoped to the EDGE block. `model_prob_over` is legitimately carried onto
+    # the projection for display; what must never happen is it reaching the edge.
+    start = src_body.index('        live_prob = hit.get(')
+    edge_block = src_body[start:src_body.index("edged += 1", start)]
+    assert 'live_prob = hit.get("live_prob_over")' in edge_block
+    assert "model_prob_over" not in edge_block, "the pregame probability is reachable from the edge"
+    assert "live_projection" not in edge_block, "the edge is being derived from the mean"
+
+
+def test_an_already_decided_prop_is_not_an_edge():
+    """`#414` guard: a settled market has no price to beat.
+
+    With 1 hit banked against a 0.5 line the live probability is exactly 1.0 --
+    correct -- and against a fair value of 0.30 that computes a **+70% edge**.
+    There is no bet: the book has settled or pulled the market, and a price still
+    reading 0.30 is a stale quote. Left in, these are the LARGEST numbers on the
+    board and sort straight to the top -- the same visible failure the pregame
+    probability produced, reached by a different route.
+
+    Same rule `live_edge_policy` applies to a final game, scoped to one player.
+    """
+    prop = _prop("Angel Genao", "hitter_props", "hits", 0.5, projection=1.0, actual=1.0)
+    prop["liveModelProbOver"] = 1.0
+    index = build_live_prop_index(_snapshot(prop))
+    grid = [_row("Angel Genao", "batter_hits", 0.5,
+                 projection={"market_fair_prob_over": 0.30})]
+    coverage = attach_live_projections(grid, index)
+    p = grid[0]["projection"]
+    assert p["edge_vs_market_pct"] is None, "a +70% edge on a settled market"
+    assert "already decided" in p["edge_unavailable_reason"]
+    assert coverage["rows_live_edge_withheld"] == 1
+
+
+def test_an_undecided_prop_at_the_same_line_still_prices():
+    # The guard must key on the BANKED value, not on the line or the market.
+    # Withholding every 0.5-line prop would delete most of the live board.
+    prop = _prop("Angel Genao", "hitter_props", "hits", 0.5, projection=0.7, actual=0.0)
+    prop["liveModelProbOver"] = 0.48
+    index = build_live_prop_index(_snapshot(prop))
+    grid = [_row("Angel Genao", "batter_hits", 0.5,
+                 projection={"market_fair_prob_over": 0.30})]
+    coverage = attach_live_projections(grid, index)
+    assert coverage["rows_live_edged"] == 1
+    assert grid[0]["projection"]["edge_vs_market_pct"] == 18.0

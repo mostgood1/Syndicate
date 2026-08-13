@@ -50,6 +50,145 @@ class LiveMcResult:
     avg_away_runs: float
     avg_home_runs: float
     total_runs_dist: Dict[int, int]
+    # PER-PLAYER REMAINING-STAT DISTRIBUTIONS. Every sim below already produces a
+    # full box score (`GameResult.batter_stats`/`pitcher_stats`) and this used to
+    # discard all of it, keeping only the final score -- so the live prop rows
+    # downstream had a live MEAN and no live PROBABILITY, and their P(over) fell
+    # back to the PREGAME distribution. Measured on the board 2026-08-13: on 24
+    # of 28 live rows the "live" probability was bit-identical to the pregame
+    # one, and three props whose over was already WON still read 0.65-0.75,
+    # producing edges of +36.5%/+32.3%/+15.8% that sorted above every honest
+    # number on the board.
+    #
+    # Shape: {player_id: {stat: {remaining_value: sim_count}}}. These are
+    # REMAINING values, not final ones -- `simulate_game` starts each sim with a
+    # fresh `StatsTracker` from the live state, so what it counts is what is
+    # still to come. The final value is `actual_so_far + remaining`, which is
+    # what makes an already-decided prop resolve to exactly 1.0 instead of 0.66.
+    batter_stat_dist: Dict[int, Dict[str, Dict[int, int]]] = field(default_factory=dict)
+    pitcher_stat_dist: Dict[int, Dict[str, Dict[int, int]]] = field(default_factory=dict)
+    # The denominator. Every histogram above sums to exactly this, including the
+    # zeros -- see `_record_player_stats`.
+    sims_run: int = 0
+
+
+# Only the stats that back a real prop market, because the histograms are
+# retained per player per sim and there is no reason to carry the rest.
+_BATTER_TRACKED_STATS = ("H", "HR", "TB", "HRR", "RBI", "R", "BB", "SO", "SB")
+_PITCHER_TRACKED_STATS = ("OUTS", "SO", "ER", "H", "BB")
+
+
+def _batter_total_bases(row: Dict[str, int]) -> int:
+    """`TB` is not tracked by the sim, but its components are."""
+    singles = int(row.get("1B") or 0)
+    doubles = int(row.get("2B") or 0)
+    triples = int(row.get("3B") or 0)
+    homers = int(row.get("HR") or 0)
+    return singles + 2 * doubles + 3 * triples + 4 * homers
+
+
+def _batter_hits_runs_rbis(row: Dict[str, int]) -> int:
+    """H+R+RBI, DERIVED PER SIM rather than from the three marginals.
+
+    The distribution of a sum is not recoverable from the distributions of its
+    parts -- they are correlated (the same swing that produces a hit often
+    produces an RBI, and a home run produces all three at once), so combining
+    marginals would understate the joint upside badly. Summing inside each sim
+    keeps the correlation the simulation already generated.
+    """
+    return int(row.get("H") or 0) + int(row.get("R") or 0) + int(row.get("RBI") or 0)
+
+
+def _record_player_stats(
+    accumulator: Dict[int, Dict[str, Dict[int, int]]],
+    stats: Dict[int, Dict[str, object]],
+    tracked: tuple,
+    *,
+    derive_total_bases: bool = False,
+) -> None:
+    for player_id, row in (stats or {}).items():
+        if not isinstance(row, dict):
+            continue
+        try:
+            key = int(player_id)
+        except (TypeError, ValueError):
+            continue
+        player = accumulator.setdefault(key, {})
+        for stat in tracked:
+            if stat == "TB" and derive_total_bases:
+                value = _batter_total_bases(row)
+            elif stat == "HRR" and derive_total_bases:
+                value = _batter_hits_runs_rbis(row)
+            else:
+                raw = row.get(stat)
+                if raw is None:
+                    continue
+                try:
+                    value = int(round(float(raw)))
+                except (TypeError, ValueError):
+                    continue
+            bucket = player.setdefault(stat, {})
+            bucket[value] = bucket.get(value, 0) + 1
+
+
+def _backfill_absent_sims(
+    accumulator: Dict[int, Dict[str, Dict[int, int]]], sims: int
+) -> None:
+    """A player absent from a sim recorded NOTHING, which is not the same as no data.
+
+    A batter who never comes to the plate again, or a reliever who never enters,
+    simply has no row in that sim's box score. Left alone, his histogram sums to
+    fewer than `sims` and every probability computed from it is divided by the
+    wrong denominator -- inflating P(over) by exactly the fraction of sims in
+    which he had no further chance to reach the line. That is the wrong
+    direction: the player least likely to bat again would look most likely to go
+    over. Absence is a real observation of zero, so it is recorded as one.
+    """
+    for player in accumulator.values():
+        for bucket in player.values():
+            observed = sum(bucket.values())
+            missing = int(sims) - int(observed)
+            if missing > 0:
+                bucket[0] = bucket.get(0, 0) + missing
+
+
+def prob_over_line_from_remaining(
+    remaining_dist: Optional[Dict[int, int]],
+    actual_so_far: Optional[float],
+    line: Optional[float],
+) -> Optional[float]:
+    """P(final > line), where final = what already happened + what is still to come.
+
+    Empirical, not fitted: the fraction of simulated rest-of-games in which this
+    player finishes above the line. No distributional assumption is made, which
+    is the whole point -- deriving a probability from the live MEAN would be
+    inventing a shape, and this repo already refuses that elsewhere ("inventing
+    P(over) from a mean would put a fabricated number into EV").
+
+    An already-decided prop falls out for free: with 1 hit banked against a 0.5
+    line, every sim satisfies `1 + remaining > 0.5` and this returns exactly 1.0.
+    """
+    if not isinstance(remaining_dist, dict) or not remaining_dist or line is None:
+        return None
+    try:
+        line_value = float(line)
+        banked = float(actual_so_far or 0.0)
+    except (TypeError, ValueError):
+        return None
+    total = 0
+    over = 0
+    for value, count in remaining_dist.items():
+        try:
+            final_value = banked + float(value)
+            weight = int(count)
+        except (TypeError, ValueError):
+            continue
+        total += weight
+        if final_value > line_value:
+            over += weight
+    if total <= 0:
+        return None
+    return float(over) / float(total)
 
 
 def _load_json_file(path: Path) -> Dict[str, object]:
@@ -176,8 +315,16 @@ def estimate_live(
     sims: int = 300,
     seed: Optional[int] = None,
     cfg_kwargs: Optional[Dict[str, object]] = None,
+    track_player_stats: bool = True,
 ) -> LiveMcResult:
-    """Monte Carlo estimate for winner/total from the actual current game state."""
+    """Monte Carlo estimate for winner/total from the actual current game state.
+
+    `track_player_stats` retains each sim's per-player box score as remaining-stat
+    histograms, which is what gives live PROPS a real live probability rather
+    than falling back to the pregame distribution. Kept as a flag so a caller
+    that only wants the win/total numbers can opt out, but it defaults on because
+    the sims are already paying for the box score.
+    """
     rng = random.Random(seed)
     home_wins = 0
     away_wins = 0
@@ -185,12 +332,30 @@ def estimate_live(
     away_sum = 0.0
     home_sum = 0.0
     dist: Dict[int, int] = {}
+    batter_dist: Dict[int, Dict[str, Dict[int, int]]] = {}
+    pitcher_dist: Dict[int, Dict[str, Dict[int, int]]] = {}
     effective_cfg_kwargs = dict(cfg_kwargs or {})
+    sims_run = max(1, int(sims))
 
-    for i in range(max(1, int(sims))):
+    for i in range(sims_run):
         cfg = GameConfig(rng_seed=rng.randint(1, 2**31 - 1), **effective_cfg_kwargs)
         state = _build_initial_state(away, home, situation, cfg)
         res = simulate_game(away, home, cfg, initial_state=state)
+        # Retaining the box score this sim already built. MEASURED, not assumed:
+        # 120 sims on a real roster ran 1.77s/2.79s with tracking off against
+        # 1.89s/3.25s on -- **+7% to +16% CPU**, and ~72 KB of histograms per
+        # game (~1.1 MB across a 15-game slate). Not free, and small enough to be
+        # worth a real live probability; recorded here at the measured figure
+        # rather than as "negligible", which is what the first draft of this
+        # comment claimed before it was checked.
+        if track_player_stats:
+            _record_player_stats(
+                batter_dist, getattr(res, "batter_stats", None) or {},
+                _BATTER_TRACKED_STATS, derive_total_bases=True,
+            )
+            _record_player_stats(
+                pitcher_dist, getattr(res, "pitcher_stats", None) or {}, _PITCHER_TRACKED_STATS,
+            )
         away_final = max(0, int(res.away_score or 0))
         home_final = max(0, int(res.home_score or 0))
         total = int(away_final + home_final)
@@ -209,6 +374,12 @@ def estimate_live(
             away_wins += 0.5
 
     denom = float(max(1, sims))
+    if track_player_stats:
+        # AFTER the loop, never inside it: a player absent from one sim may
+        # appear in the next, so the zeros can only be counted once the total
+        # number of sims is final.
+        _backfill_absent_sims(batter_dist, sims_run)
+        _backfill_absent_sims(pitcher_dist, sims_run)
     return LiveMcResult(
         home_win_prob=float(home_wins) / denom,
         away_win_prob=float(away_wins) / denom,
@@ -216,4 +387,7 @@ def estimate_live(
         avg_away_runs=away_sum / denom,
         avg_home_runs=home_sum / denom,
         total_runs_dist=dist,
+        batter_stat_dist=batter_dist,
+        pitcher_stat_dist=pitcher_dist,
+        sims_run=sims_run,
     )

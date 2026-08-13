@@ -48,6 +48,7 @@ from sim_engine.data.roster_artifact import roster_from_dict
 from sim_engine.live_mc import LiveSituation, estimate_live
 from sim_engine.forward_tuning import should_use_forward_tuning
 from sim_engine.live_mc import LiveSituation, estimate_live, _forward_live_cfg_kwargs
+from sim_engine.live_mc import prob_over_line_from_remaining as _live_mc_prob_over_from_remaining
 from sim_engine.live_prop_ranking import predict_live_prop_win_probability
 from sim_engine.market_pitcher_props import market_side_probabilities, normalize_pitcher_name
 from tools.daily_update_multi_profile import (
@@ -14558,7 +14559,16 @@ def _current_live_prop_rows(
     *,
     write_observation_log: bool = False,
     ensure_market_fresh: bool = True,
+    live_mc_projection: Optional[Dict[str, Any]] = None,
 ) -> List[Dict[str, Any]]:
+    """`live_mc_projection` is PASSED IN, never computed here, and that is deliberate.
+
+    It is the 120-sim rest-of-game Monte Carlo -- the single heaviest piece of
+    live compute in this file, and the one the caller's memory gate exists to
+    guard. Computing it here as well would double it for every live game. The
+    caller already builds it for the game lens; this shares that one result so
+    the prop probabilities cost nothing beyond what is already being paid.
+    """
     if not isinstance(snapshot, dict):
         return []
 
@@ -14617,6 +14627,18 @@ def _current_live_prop_rows(
                 model_mean = _safe_float(model_row.get(str(cfg.get("mean_key"))))
                 model_prob_over = _prob_over_line_from_dist(model_row.get(str(cfg.get("dist_key"))) or {}, float(line_value))
                 actual_value = _live_stat_value(actual_row, {"market": "pitcher_props", "prop": prop_key})
+                # The live probability, from the same sims the game lens uses.
+                # `model_prob_over` above stays exactly as it was -- this is an
+                # ADDITIONAL field, so nothing that already reads the pregame
+                # number changes behaviour.
+                live_model_prob_over = _live_mc_prob_over(
+                    live_mc_projection,
+                    player_id=_safe_int(model_row.get("pitcher_id") or model_entry.get("pitcher_id")),
+                    prop_key=str(prop_key),
+                    kind="pitcher",
+                    actual_value=actual_value,
+                    line_value=float(line_value),
+                )
                 if _live_prop_market_resolved(actual_value, line_value):
                     continue
                 pitch_count = _safe_int(actual_row.get("P")) if isinstance(actual_row, dict) else None
@@ -14682,6 +14704,7 @@ def _current_live_prop_rows(
                         "over_odds": _safe_int(market.get("over_odds")),
                         "under_odds": _safe_int(market.get("under_odds")),
                         "model_prob_over": model_prob_over,
+                        "live_model_prob_over": live_model_prob_over,
                         "market_prob_over": side_pick.get("marketProbOver"),
                         "market_prob_under": side_pick.get("marketProbUnder"),
                         "market_prob_mode": side_pick.get("marketProbMode"),
@@ -14735,6 +14758,14 @@ def _current_live_prop_rows(
             model_mean = _safe_float(model_row.get(str(cfg.get("mean_key"))))
             model_prob_over = _prob_over_line_from_dist(model_row.get(str(cfg.get("dist_key"))) or {}, float(line_value))
             actual_value = _live_stat_value(actual_row, {"market": "hitter_props", "prop": prop_key})
+            live_model_prob_over = _live_mc_prob_over(
+                live_mc_projection,
+                player_id=_safe_int(model_row.get("batter_id")),
+                prop_key=str(prop_key),
+                kind="batter",
+                actual_value=actual_value,
+                line_value=float(line_value),
+            )
             if _live_prop_market_resolved(actual_value, line_value):
                 continue
             live_projection = _project_live_hitter_value(
@@ -14774,6 +14805,7 @@ def _current_live_prop_rows(
                 "over_odds": _safe_int(market.get("over_odds")),
                 "under_odds": _safe_int(market.get("under_odds")),
                 "model_prob_over": model_prob_over,
+                "live_model_prob_over": live_model_prob_over,
                 "market_prob_over": side_pick.get("marketProbOver"),
                 "market_prob_under": side_pick.get("marketProbUnder"),
                 "market_prob_mode": side_pick.get("marketProbMode"),
@@ -16564,10 +16596,77 @@ def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optiona
         "awayWinProb": round(float(result.away_win_prob), 4),
         "closed": False,
         "source": "live_mc",
+        # Carried so the live PROP rows can price off the same 120 sims that
+        # produced the numbers above, instead of falling back to the pregame
+        # distribution for their P(over).
+        "batterStatDist": getattr(result, "batter_stat_dist", None) or {},
+        "pitcherStatDist": getattr(result, "pitcher_stat_dist", None) or {},
+        "simsRun": int(getattr(result, "sims_run", 0) or 0),
     }
 
 
-def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], sim_context: Optional[Dict[str, Any]], market_row: Optional[Dict[str, Any]], *, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
+# Prop key -> the sim's own stat name. Explicit rather than derived: a wrong
+# mapping produces a confident probability for the wrong market, which joins
+# cleanly and is worse than no probability at all.
+_LIVE_PROP_SIM_STAT_BATTER = {
+    "hits": "H",
+    "home_runs": "HR",
+    "total_bases": "TB",
+    "hits_runs_rbis": "HRR",
+    "rbis": "RBI",
+    "runs_scored": "R",
+    "walks": "BB",
+    "strikeouts": "SO",
+    "stolen_bases": "SB",
+}
+_LIVE_PROP_SIM_STAT_PITCHER = {
+    "outs": "OUTS",
+    "strikeouts": "SO",
+    "earned_runs": "ER",
+    "hits_allowed": "H",
+    "walks_allowed": "BB",
+}
+
+
+def _live_mc_prob_over(
+    live_mc_projection: Optional[Dict[str, Any]],
+    *,
+    player_id: Optional[int],
+    prop_key: str,
+    kind: str,
+    actual_value: Optional[float],
+    line_value: Optional[float],
+) -> Optional[float]:
+    """P(over) from the live re-sim's own rest-of-game distribution.
+
+    THE NUMBER THIS REPLACES was the pregame `_prob_over_line_from_dist`, and it
+    was being labelled live downstream. Measured on the board 2026-08-13: on 24
+    of 28 live rows the "live" probability was bit-identical to the pregame one,
+    and three props whose over was ALREADY WON still read 0.659/0.655/0.745,
+    producing edges of +36.5%/+32.3%/+15.8% -- more than twice the size of the
+    honest numbers, on a board that sorts by edge.
+
+    Returns None rather than a guess whenever the sim has no distribution for
+    this player and stat, so the caller keeps its existing suppression instead of
+    inventing coverage.
+    """
+    if not isinstance(live_mc_projection, dict) or player_id is None or line_value is None:
+        return None
+    table = live_mc_projection.get("batterStatDist" if kind == "batter" else "pitcherStatDist")
+    if not isinstance(table, dict):
+        return None
+    stat = (_LIVE_PROP_SIM_STAT_BATTER if kind == "batter" else _LIVE_PROP_SIM_STAT_PITCHER).get(
+        str(prop_key or "").strip().lower()
+    )
+    if not stat:
+        return None
+    player = table.get(int(player_id)) or table.get(str(int(player_id)))
+    if not isinstance(player, dict):
+        return None
+    return _live_mc_prob_over_from_remaining(player.get(stat), actual_value, line_value)
+
+
+def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], sim_context: Optional[Dict[str, Any]], market_row: Optional[Dict[str, Any]], *, date_str: Optional[str] = None, live_mc_projection: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     status = {
         "abstract": str((((snapshot or {}).get("status") or {}).get("abstractGameState") or ((card.get("status") or {}).get("abstract") or ""))),
         "detailed": str((((snapshot or {}).get("status") or {}).get("detailedState") or ((card.get("status") or {}).get("detailed") or ""))),
@@ -16582,7 +16681,12 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
     away_score = _safe_float((((snapshot or {}).get("teams") or {}).get("away") or {}).get("totals", {}).get("R"))
     home_score = _safe_float((((snapshot or {}).get("teams") or {}).get("home") or {}).get("totals", {}).get("R"))
     progress = _live_game_progress(snapshot, card)
-    live_mc_projection = _live_mc_projection(snapshot, sim_context, date_str=date_str)
+    # Reuse the caller's if it gave us one. The 120-sim MC is the heaviest live
+    # compute here and the prop rows now price off the same result, so it must be
+    # built once per game and shared -- not once for the lens and again for the
+    # props.
+    if not isinstance(live_mc_projection, dict):
+        live_mc_projection = _live_mc_projection(snapshot, sim_context, date_str=date_str)
     predictions = card.get("predictions") or {}
     markets = (market_row or {}).get("markets") or {}
 
@@ -17031,6 +17135,13 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
         status_is_final = _status_is_final({"abstract": status_abstract, "detailed": status_detailed})
         tracked_prop_rows = _prop_lens_rows(normalized_card, snapshot, sim_context if sim_context.get("found") else None)
         prop_eval_started_at = time.perf_counter()
+        # ONE Monte Carlo per game, shared by the props below and the game lens
+        # further down. Both used to be able to trigger their own; the props now
+        # need it for their live probability, so building it here is what keeps
+        # that from doubling the heaviest live compute in this file.
+        shared_live_mc = _live_mc_projection(
+            snapshot, sim_context if sim_context.get("found") else None, date_str=str(d)
+        )
         live_prop_rows = [
             _normalize_live_lens_live_prop_row(row, snapshot, card)
             for row in _current_live_prop_rows(
@@ -17040,6 +17151,7 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
                 d,
                 write_observation_log=bool(persist),
                 ensure_market_fresh=False,
+                live_mc_projection=shared_live_mc,
             )
             if isinstance(row, dict)
         ]
@@ -17049,7 +17161,7 @@ def _live_lens_payload(d: str, *, persist: bool = False, refresh_markets: bool =
             live_prop_rows = []
         prop_eval_ms_total += (time.perf_counter() - prop_eval_started_at) * 1000.0
         game_lens_started_at = time.perf_counter()
-        game_lens = _build_game_lens(normalized_card, snapshot, sim_context if sim_context.get("found") else None, _game_line_market_for_card(normalized_card, game_line_index), date_str=str(d))
+        game_lens = _build_game_lens(normalized_card, snapshot, sim_context if sim_context.get("found") else None, _game_line_market_for_card(normalized_card, game_line_index), date_str=str(d), live_mc_projection=shared_live_mc)
         game_lens_ms_total += (time.perf_counter() - game_lens_started_at) * 1000.0
         if status_is_final:
             counts["final"] += 1
@@ -20445,12 +20557,16 @@ def _build_game_sim_payload(
             "predictions": (live_card.get("predictions") if isinstance(live_card.get("predictions"), dict) and live_card.get("predictions") else default_live_card.get("predictions") or {}),
         }
     if out.get("found"):
+        # Same single-MC rule as the snapshot builder: one rest-of-game Monte
+        # Carlo, shared by the prop probabilities and the game lens.
+        shared_live_mc = _live_mc_projection(snapshot, out, date_str=str(d))
         out["livePropRows"] = _current_live_prop_rows(
             live_card,
             snapshot,
             out,
             d,
             ensure_market_fresh=bool(ensure_market_fresh and not _is_historical_date(d)),
+            live_mc_projection=shared_live_mc,
         )
         out["gameLens"] = _enrich_game_lens_rows_with_registry(
             _build_game_lens(
@@ -20459,6 +20575,7 @@ def _build_game_sim_payload(
                 out,
                 _game_line_market_for_card(live_card, game_line_index),
                 date_str=str(d),
+                live_mc_projection=shared_live_mc,
             ),
             int(game_pk),
             d,
