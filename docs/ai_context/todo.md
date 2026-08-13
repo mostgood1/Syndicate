@@ -58,18 +58,24 @@ fact** (see the operational note). The docstring in
 this one was committed within an hour of writing that note. **A measured number
 is a timestamp — and so is the baseline you compare it against.**
 
-**The most durable finding is neither signal but the RATIO**, identical across
-both builds:
+**~~The most durable finding is the RATIO, ~8–10 s/row~~ — WITHDRAWN 2026-08-13.**
+That number divided game-elapsed by **candidates emitted**, not by loop
+iterations executed. It is not a rate of anything. I adopted it from another
+lane and promoted it to "the finding that survived everything"; it was the
+weakest thing in the entry.
 
-    build1  225/26  185/21  107/11  100/10  72/7  12/1  9/1
-    build2  229/26  196/21   99/11   95/10  73/7        9/1
-    s/row      8.8     9.3     9.9     8.6  10.5        8.8
+**What per-ITERATION timing actually shows** (`SLOW_ROW_PROFILE`, `home.py:2886`):
 
-**~8–10 seconds per ROW, near constant, measured twice independently.** That is
-the wrong shape for a once-per-build index rebuild, which would show a large
-fixed cost and cheap rows. It suggests the expensive work scales with output, so
-a per-payload memoisation may be targeting a cost that is not where the time
-goes — independently of whether the fingerprint matches.
+    rows=1  total_s=399.40  min=p50=max=399.398
+    rows=1  total_s=295.78
+    rows=2  total_s=102.70  min_s=0.000  max_s=102.700
+    rows=2  total_s= 61.68  min_s=0.000  max_s= 61.683
+
+**ONE loop iteration per game consumes the entire time; every other iteration is
+~0.000s.** Not distributed per-row work — a single pathological item. `rows=` on
+the `SLOW_GAME_CANDIDATE` line is *candidates emitted* (21, 26); `rows=` on
+`SLOW_ROW_PROFILE` is *iterations* (1, 2). Two different quantities with the same
+label, which is what made the bad division look sane.
 
 **Confound, stated rather than buried:** build 1 ran on `d88ed790`, build 2 on
 `e02ea347`, with a worker restart between them. Not a clean A/B, and that restart
