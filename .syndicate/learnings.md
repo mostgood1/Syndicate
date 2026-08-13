@@ -789,10 +789,26 @@ back **oldest-first regardless of `direction`**.
      `2e6476cd`, `ab30bcc8`, `ac67a9f1`. All are prefixed `session` in the
      text; that prefix is the only thing separating them.
   3. SHAs quoted as examples, including `f2ba6c1` inside this very entry.
-  So the clean state is **10 lines, not 0.** Compare against that list, do not
-  read a non-empty result as failure — a check whose normal output is ten
-  warnings gets scrolled past, which is how `checkpoint-guard` spent its
-  entire life warning 28 times out of 28.
+  So the clean state is **not 0.** Compare against that list, never read a
+  non-empty result as failure — a check whose normal output is ten warnings
+  gets scrolled past, which is how `checkpoint-guard` spent its entire life
+  warning 28 times out of 28.
+- **The baseline is not one number, because the check has TWO inputs**: the
+  ledger text you scan, and the `origin` you resolve against. Measured 08-13
+  within minutes of each other: **local working tree 10, origin's content
+  15.** Both correct. The extra five (054b2306, 0642cdf7, 5b2ca320, cc2e1803,
+  e8611888 — deliberately unbackticked here so this entry does not inflate the
+  count) sit in a `state.md` block that local has already superseded and
+  nobody has pushed yet. Any ledger line quoting a bare baseline number is
+  wrong somewhere; say which tree and which origin, or give the list.
+- **Scanning origin's content needs `MSYS2_ARG_CONV_EXCL='*'` on this
+  machine.** Without it Git Bash mangles `origin/main:path` into
+  `origin\main;path`, `git show` errors, and the scan returns **zero tokens**
+  — which reads as a perfectly clean ledger. That exact false all-clear
+  happened while writing this entry. Always run the control first:
+
+      # must print a large number; 0 means the scan failed, not that you are clean
+      ... | grep -ohE '`[0-9a-f]{7,40}`' | wc -l
 - Cost: nothing shipped wrong, but for most of 08-13 the ledger's evidence
   pointers did not resolve for anyone reading it from a clean checkout, which
   is the only way a reader who was not present would read it.
