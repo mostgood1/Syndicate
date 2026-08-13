@@ -136,6 +136,34 @@
       appended by its owner rather than an edit here — read on its own,
       the deploy ledger currently understates what is already known.
 - [ ] `#395` rate ceiling — still `Measured: <pending>` with no follow-up row.
+- [ ] **refresh-worker → the `#414` quote-join index. `/preflight` FAILED
+      2026-08-13 16:55 CDT; HELD BY DECISION until after the 24h read.**
+      - Target: **`9d730aec`**, which carries BOTH `#414` pieces — the index
+        (`odds_book_quotes.py`, behaviour-critical) and the instrument that
+        measures it (`quote_enrichment.py`, observability). Ship them together;
+        the index without its instrument gives no `join_s` reading at all.
+      - Failed on **three** grounds, any one sufficient: (1) against the live
+        `03073270` it also carries `#419` (`live_refresh_loop.py` +107), which
+        belongs to `mlb-props-regen` — three production changes, two of them
+        behavioural; (2) the `#417` measurement window is open until
+        2026-08-14 13:00 and a deploy reboots the worker, resetting the
+        re-warm clock that is its entire discriminating variable; (3) NOT
+        CLEAR — MLB sim running, live games in progress.
+      - **Scope shrinks on its own overnight.** If `deploy-419-refresh-worker`
+        fires (00:00–05:00) the worker lands on `d6188ca7` and `9d730aec` then
+        adds exactly the two `#414` files. Check before firing; do not assume.
+      - Expected effect, measured locally at production shard size (82,500
+        rows): **85.43 → 0.66 ms/call, 130x, identical results**. In
+        production terms MLB board-build `tail_s` falls from 21–54s to under
+        5s and `rows_walked` per call from ~83,000 to double digits.
+      - **MEASUREMENT TRAP, stated before the fact.** `SLOW_SEGMENT_PROFILE`
+        is gated at 5s, so **if the fix works the instrument proving it stops
+        firing**, and "no lines" is indistinguishable from "instrument broke"
+        or "no evening slate". Read the absence ONLY against a positive
+        control — `LAYER2_SHORTLIST` still recurring, so the board is building
+        and games are being processed — and against the pre-fix baseline of
+        **8 lines in ~4 minutes** on the 2026-08-13 evening slate.
+      - Rollback: redeploy `03073270` (or `d6188ca7` if that landed first).
 - [ ] **live-odds-worker → the `#417` memory fix. `/preflight` FAILED
       2026-08-13 15:39 CDT; HELD BY DECISION until after the 24h read.**
       - Target when it goes: **`03073270`** — it isolates the change to

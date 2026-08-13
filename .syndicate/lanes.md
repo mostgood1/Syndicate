@@ -87,6 +87,38 @@
   2026-08-14 13:00 — **do not deploy this lane's changes before that read
   lands**, or the two changes become unattributable.
 - Blocked by: none for diagnosis. Deploy blocked until the `#417` read.
+- **STATUS 2026-08-13 17:0x CDT — FIX WRITTEN, PUSHED (`9d730aec`), NOT
+  DEPLOYED. `/preflight` FAILED; held until after the `#417` read.**
+  - The join now indexes `event_id` / `player_name` / `(home,away)` to a
+    candidate union instead of scanning the shard. **Measured at production
+    shard size (82,500 rows): 85.43 -> 0.66 ms/call, 130x, identical result.**
+    Per game: 1.71s -> 0.01s at 20 calls, 5.30s -> 0.04s at 62.
+  - **Teams could be indexed safely and that was the load-bearing question.**
+    `_row_teams_match` delegates to the alias maps, so a token index would
+    silently drop matches ("chc" vs "chicago cubs" is the gap that left 0 of
+    108 candidates priced on 2026-08-06). It reads ONLY `home_team`/
+    `away_team`, so rows sharing a pair cannot disagree — grouping by pair
+    runs the fuzzy matcher once per PAIR (~15) instead of once per ROW (~83k).
+  - Equivalence PROVEN, not assumed, because this join's wrong answers are
+    silent: 30+ query shapes asserted identical to the full scan, where the
+    reference is the real old path (union forced to every row). The grid is
+    also asserted to exercise `by_event`, `by_player`,
+    `by_teams_fallthrough` AND `no_identity` — a differential test proves
+    equality, not coverage — plus index-narrows and no-stale-index tests.
+    105 passed / 30 subtests across every quote suite.
+  - **The fix will silence its own instrument.** `SLOW_SEGMENT_PROFILE` is
+    gated at 5s, so success means it stops emitting — and that zero is
+    indistinguishable from a broken instrument or an empty slate. Read it only
+    against a positive control (`LAYER2_SHORTLIST` still recurring) and the
+    pre-fix baseline of 8 lines in ~4 minutes. Same emitter trap as `basis`,
+    caught before the deploy this time rather than after.
+  - Local absolute numbers run ~19x faster per call than production's ~1.6s;
+    the RATIO is the transferable claim and is likely conservative, since the
+    indexed path does not scale with shard size while the scan does.
+  - Still unexplained and worth watching: the 18:07:20 sample at **10.53 s/M**
+    against ~18-21 for the other seven, at the largest volume. That suggests
+    an amortised per-call cost the index will not touch.
+
 - **STATUS 2026-08-13 16:4x CDT — HYPOTHESIS CONFIRMED, NOT FALSIFIED. THE
   FALSIFICATION TEST ABOVE RESTED ON MY OWN TRUNCATION ARTIFACT. Read this
   before acting on anything earlier in this lane.**
