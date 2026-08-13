@@ -177,3 +177,40 @@ def test_the_drain_deferral_is_not_subject_to_the_starvation_bounds(_root):
             ) == "deploy_drain_requested", f"drain pushed through after {defers} defers"
     finally:
         dd.clear_drain("deployer-1")
+
+
+# --- raised on review: the expiry must outlast the work it waits on ---------
+
+def test_the_default_expiry_exceeds_the_worst_observed_build(_root):
+    """Was 45 min against a build once observed at 77 min (4620s,
+    intelligence.py:9976). A drain that expires mid-wait lets the deploy land on
+    the build anyway -- reporting success while destroying what it protected,
+    and only on the slowest builds, which are the most expensive to lose."""
+    assert dd._DEFAULT_TTL_SECONDS > 4620, "drain can expire during a worst-case build"
+
+
+def test_a_drain_requested_before_this_process_booted_is_already_satisfied(_root):
+    """Nothing cleared the flag on SUCCESS. The restart IS the completion
+    signal: once the worker has restarted, the drain's purpose is served."""
+    dd.request_drain("deployer-1")
+    assert dd.drain_active() is True
+
+    # Simulate this process having booted AFTER the drain was requested, i.e.
+    # the deploy the drain was waiting for has happened.
+    real_boot = dd._PROCESS_BOOTED_AT
+    dd._PROCESS_BOOTED_AT = dd._now() + 1
+    try:
+        assert dd.drain_active() is False, "stale drain still deferring after the restart it wanted"
+    finally:
+        dd._PROCESS_BOOTED_AT = real_boot
+
+
+def test_a_drain_requested_after_boot_still_holds(_root):
+    """The self-clear must not swallow a live drain."""
+    real_boot = dd._PROCESS_BOOTED_AT
+    dd._PROCESS_BOOTED_AT = dd._now() - 600
+    try:
+        dd.request_drain("deployer-1")
+        assert dd.drain_active() is True
+    finally:
+        dd._PROCESS_BOOTED_AT = real_boot

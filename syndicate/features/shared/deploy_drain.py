@@ -1,7 +1,7 @@
 """`#409` phase 2 -- drain the PIPELINE before a deploy, not the PROCESS.
 
 THE CONSTRAINT THAT SHAPES THIS. refresh-worker runs a board build measured at
-804s / 1080s / 1372s (and 77 min once, `intelligence.py:9951`) and MLB sims with
+804s / 1080s / 1372s (and 77 min once, `intelligence.py:9976`) and MLB sims with
 no ETA. A Render deploy on a disk-attached service is stop-then-start, so every
 deploy is a hard kill. You cannot finish a 22-minute build inside a SIGTERM
 grace measured in seconds -- so classic drain is impossible here.
@@ -44,8 +44,29 @@ from typing import Any
 # A drain flag that outlives its deployer is a worker that never builds the
 # board again -- a permanent outage manufactured by a crashed deploy script. So
 # the flag carries its own expiry and is ignored past it, regardless of whether
-# anything ever clears the key. 45 min = 2x the longest observed build.
-_DEFAULT_TTL_SECONDS = 45 * 60
+# anything ever clears the key.
+#
+# THIS WAS 45 MIN AND THAT WAS TOO SHORT -- raised on review. The expiry must
+# EXCEED the longest work the drain can be waiting on, or the sequence is:
+# drain set -> long build in flight -> flag expires mid-wait -> the deployer's
+# next poll sees no drain, the worker starts fresh work, and the deploy lands on
+# it anyway. The drain reports success and destroys precisely what it was
+# protecting -- and only on the SLOWEST builds, which are the most expensive to
+# lose. A silent partial failure that looks like a working drain on every fast
+# build.
+#
+# Measured worst case: `collect_candidates` was once observed at 77 minutes
+# (4620s, `intelligence.py:9976`), against typical maxima of 1169s.
+# 2.5h clears that with headroom.
+#
+# A long expiry is only safe because it is the LAST-RESORT self-heal, not the
+# primary one: `drain_active()` also ignores any drain requested before this
+# process booted (see below), so an ordinary restart clears it in seconds.
+_DEFAULT_TTL_SECONDS = 150 * 60
+
+# When this process started. A drain requested BEFORE it is already satisfied --
+# see `drain_active`.
+_PROCESS_BOOTED_AT = time.time()
 
 # A worker's published state is only meaningful while it is still ticking. Two
 # cycles of slack; past that the deployer must treat it as UNKNOWN rather than
@@ -163,7 +184,30 @@ def drain_active() -> bool:
         payload = read_json_file(_drain_path()) or {}
         if not payload.get("owner"):
             return False
-        return _now() < float(payload.get("expires_at") or 0.0)
+        if _now() >= float(payload.get("expires_at") or 0.0):
+            return False
+        # A DRAIN REQUESTED BEFORE THIS PROCESS BOOTED IS ALREADY SATISFIED.
+        #
+        # Raised on review: nothing cleared the flag on SUCCESS. The deployer is
+        # told to run `--undrain` afterwards, but if it does not -- crash,
+        # forgotten step, someone deploying by hand -- the board stays deferred
+        # for the remainder of the TTL AFTER the restart it was waiting for has
+        # already happened. With the TTL now at 2.5h that is a long outage
+        # bought by a fix for a shorter one.
+        #
+        # The restart IS the completion signal: a drain exists to get the worker
+        # to an idle restart, so once this process has restarted, its purpose is
+        # served. Computed locally from our own boot time -- no extra
+        # coordination, no dependency on the deployer remembering.
+        #
+        # The awkward case is a drain set for a deploy that has not happened yet
+        # while the worker restarts for an unrelated reason (OOM, the 6h
+        # recycle). Then this ignores a still-wanted drain. It is not harmful:
+        # the deployer polls `read_worker_state` for idle before deploying and
+        # will simply see the new work and keep waiting. Slower, not unsafe --
+        # and the alternative failure (a stale drain silencing the board) is the
+        # one that is silent.
+        return float(payload.get("requested_at") or 0.0) >= _PROCESS_BOOTED_AT
     except Exception:
         return False
 

@@ -274,7 +274,21 @@ def _run_drain(*, owner: str, wait_seconds: int) -> int:
         print("  same values the workers use, then re-run. Refusing rather than pretending.")
         return 2
 
-    request_drain(owner, reason="check_deploy_safety --drain")
+    # TTL DERIVED FROM MEASUREMENT, NOT A CONSTANT. The expiry must exceed the
+    # longest work the drain can wait on, or it expires mid-wait and the deploy
+    # lands on the build anyway -- reporting success while destroying what it
+    # protected, and only on the slowest builds. Same COLLECT_SPAN_EXIT series
+    # `#403` already reads, same max-not-median rule, x3 headroom, floored at
+    # the module default so a missing measurement can never SHORTEN it.
+    from syndicate.features.shared.deploy_drain import _DEFAULT_TTL_SECONDS
+
+    measured = _expected_build_seconds(_load_render_key())
+    ttl = max(int(_DEFAULT_TTL_SECONDS), int((measured or 0) * 3))
+    if measured:
+        print(f"  longest recent build {measured:.0f}s -> drain expiry {ttl}s ({ttl/60:.0f} min)")
+    else:
+        print(f"  build duration unmeasurable -> drain expiry floored at {ttl}s ({ttl/60:.0f} min)")
+    request_drain(owner, ttl_seconds=ttl, reason="check_deploy_safety --drain")
     print(f"Drain requested by {owner}. Waiting up to {wait_seconds}s for refresh-worker to go idle.")
     print("  (a build already running is NOT interrupted -- drain waits for it to finish)")
     deadline = _time.time() + max(30, int(wait_seconds))
