@@ -3122,6 +3122,24 @@ def main() -> int:
     assert_refresh_state_backend_ready = store["assert_refresh_state_backend_ready"]
     read_json_file = store["read_json_file"]
     print("[refresh_worker] BOOTED", flush=True)
+    # `#409` phase 1. THIS SERVICE HAD NO SIGNAL HANDLER AT ALL, so every deploy
+    # killed it silently -- a board build 20 minutes into a 23-minute run left no
+    # line, no artifact, nothing. "The board is stale and nobody knows why" is
+    # what four lanes chased on 2026-08-12. `#388` gave sims death certificates;
+    # this gives builds one.
+    #
+    # Installed FIRST, before any loop starts, so a kill during boot is recorded
+    # too. It records and exits immediately -- it does not drain, and it must
+    # not, because a handler that returns would make this worker ignore SIGTERM
+    # until Render SIGKILLs it, which is worse than the no-handler behaviour it
+    # replaces. Draining is phase 2 and needs the deployer's cooperation.
+    try:
+        from syndicate.features.shared.worker_shutdown import install_shutdown_recorder
+
+        install_shutdown_recorder("refresh-worker")
+        print("[refresh_worker] SHUTDOWN_RECORDER_INSTALLED", flush=True)
+    except Exception as exc:
+        print(f"[refresh_worker] SHUTDOWN_RECORDER_FAILED {type(exc).__name__}: {exc}", flush=True)
     # #285. Cap glibc arenas BEFORE the loops spawn threads -- `mallopt` only
     # governs arenas created after it returns, so this is worthless if it moves
     # later in main(). The trim proved allocator retention is real (1109.6MB
