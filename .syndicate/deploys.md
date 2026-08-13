@@ -89,9 +89,21 @@
 ---
 
 ### 2026-08-13 22:55-22:59Z — all three services to `d4bb29b5` (incident + backlog)
-- Deployed: refresh-worker `dep-...` live **22:59:14Z**; live-odds-worker fired
-  22:55:27Z; web `dep-d9v4oih5efls73f3vfdg` fired 22:59:22Z. All `trigger=api`,
-  all to **`d4bb29b5`**.
+- Deployed: refresh-worker live **22:59:14Z**; web `dep-d9v4oih5efls73f3vfdg`
+  live ~23:07Z. Both `trigger=api`, both on **`d4bb29b5`**.
+- **CORRECTION 23:15Z — only TWO of the three landed.** live-odds-worker's
+  deploy was created 22:55:27Z and is STILL `build_in_progress` 20 minutes
+  later; its previous deploy took 4 minutes. **That service is still live on
+  `95effcfa` and does NOT have the `#417` memory fix.** The old instance keeps
+  serving correctly (Render does not swap until a build succeeds) and is
+  healthy — publishing normally, `TICK_COMPLETE` each 60s, 1037MB headroom of
+  2048. Three simultaneous deploys may have queued the build.
+  - Impact is low: the guard has never fired on that service (all refusal
+    tokens zero over ~6 days, measured at the 15:39 preflight), so it is not
+    missing anything it needs tonight.
+  - **But "I deployed live-odds" was believed and was false for 20 minutes.**
+    A fired deploy is not a landed deploy; check `status=live` AND the commit
+    on the service, not the POST's response.
 - **Gate was NOT CLEAR and was overridden deliberately.** An MLB sim (pid 8565)
   and an odds refresh were killed. Justification: the board had been frozen
   ~2h20m and every build cycle was aborting before the fingerprint stage, so
