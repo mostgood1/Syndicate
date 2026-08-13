@@ -177,8 +177,36 @@ services:
         value: /opt/render/project/data/wnba_source/data
       - key: WNBA_LIVE_LENS_DIR
         value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
-      - key: MLB_ENABLE_LIVE_LENS_LOOP
-        value: "false"
+      # Four MLB live-lens LOOP-CONFIG keys removed from this block (call-graph
+      # trace 2026-08-13): MLB_ENABLE_LIVE_LENS_LOOP,
+      # MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS,
+      # MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS and
+      # MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS. All four are declared on both
+      # workers and unchanged there.
+      #
+      # They are read only by the vendored MLB app's own live-lens background
+      # loop and its status payload. That loop has exactly two starters:
+      # flask_frontend.py's `if __name__ == "__main__"` block, which does not run
+      # on import, and _ensure_live_lens_background_loop_running, a route handler
+      # on the VENDOR's Flask `app` -- which never serves a request here, since
+      # Syndicate's own app does the routing. Neither is reachable from the three
+      # symbols syndicate/features/mlb/live_lens.py imports.
+      #
+      # THE CONCLUSION RESTS ON THAT IMPORT LIST: `_client`,
+      # `fetch_game_feed_live`, `_live_lens_payload`. If anything here starts
+      # importing a fourth symbol from flask_frontend, re-run the trace before
+      # trusting this note.
+      #
+      # Deliberately NOT removed alongside them:
+      #   MLB_LIVE_LENS_DIR -- read at IMPORT time. flask_frontend.py:135 is a
+      #     module-level `_LIVE_LENS_DIR = _resolve_mlb_live_lens_dir()`, so the
+      #     import alone reads it. Same for NBA_LIVE_LENS_DIR / WNBA_LIVE_LENS_DIR
+      #     above, reached one hop from _live_lens_tick_payload (and WNBA's is
+      #     also read at module level in wnba_betting/league.py).
+      #   MLB_LIVE_LENS_REPORT_MAX_AGE_SECONDS -- has a web-reachable reader.
+      #   MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS below -- unreachable too, but it
+      #     is a `sync: false` #312 annotation carrying no value, so removing it
+      #     would delete the annotation and leave the live value untouched.
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
         # #312: blueprint default was "false". `sync: false` so a runtime
         # disable via the env API is NOT reverted by the next blueprint sync.
@@ -200,13 +228,7 @@ services:
       # the live web value in place as an undeclared key; it stays unread
       # there. To drop it from the live service too, delete it via the env
       # API -- that is a separate production action.
-      - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
-        value: "30"
-      - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
-        value: "60"
       - key: MLB_LIVE_LENS_REPORT_MAX_AGE_SECONDS
-        value: "60"
-      - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "60"
       # WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN /
       # WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS removed from here, with the
