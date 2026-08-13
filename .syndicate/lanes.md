@@ -6,150 +6,6 @@
 
 ## OPEN
 
-### intelligence-state-red-baseline — CLOSED 2026-08-13 — opened 2026-08-13 — session: intel-state-baseline
-- OUTCOME: `tests/test_intelligence_state.py` goes `4 failed / 220 passed` ->
-  **`224 passed, 0 failed`**, all four repaired in the TEST with zero source
-  changes, two of them proven load-bearing by source mutation. Verification
-  items 1-3 all ran; results are in the STATUS block at the end of this lane.
-- Goal: `tests/test_intelligence_state.py` is GREEN on a clean checkout, so a
-  session working `#417`/`#338` in `pipeline/intelligence_state.py` can tell its
-  own regression from standing noise. Testable outcome: 224 passed / 0 failed
-  (baseline measured 2026-08-13: **4 failed, 220 passed, 10 subtests, 891s**).
-- Files (exclusive to this lane):
-  - `tests/test_intelligence_state.py` — **test-only lane.** All four failures
-    are defects in the TEST, not in `pipeline/intelligence_state.py`; see the
-    per-test findings below. If any of them turns out to need a source change,
-    this lane STOPS and coordinates first.
-- NOT touched, deliberately: `pipeline/intelligence_state.py`,
-  `syndicate/blueprints/intelligence.py`,
-  `syndicate/features/shared/refresh_state_store.py`. Each of the four failures
-  is a case of production code being *right* and the test having rotted around
-  it. Changing any of them to make a test green would be the exact inversion
-  this lane exists to prevent.
-- **Collision check against `memory-guard-reclaimable`: CLEAR.** That lane
-  claims `pipeline/intelligence_state.py` (L3189 constant only) and
-  `tests/test_memory_observability.py`. This lane claims neither. It does NOT
-  claim `tests/test_intelligence_state.py` — its own STATUS note records
-  running 25 memory/headroom tests from this file as a read-only consumer
-  sweep, which is a read, not a claim. Flagged anyway: if that lane's
-  `memory_headroom_snapshot` change lands while this lane is open, the
-  memory-guard tests in THIS file may move. That is their change, not this
-  lane's, and this lane must not "fix" it.
-- Hypothesis (recorded before fixing — all four now CONFIRMED by traceback):
-  each failure is an independent rot, with no common cause and nothing
-  implicating the module under test.
-  1. `test_read_latest_response_syncs_shared_backend_state` — **stale fake.**
-     Its inline `FakeClient.set` is `lambda self, key, value`, but
-     `refresh_state_store.write_json_file` has called `client.set(..., ex=ttl)`
-     since `50a093b9` (2026-07-31, keyvalue TTL). `TypeError: unexpected
-     keyword argument 'ex'`. The real fake in
-     `tests/test_refresh_state_store.py:26` already takes `ex`; this one was
-     missed. Production code is correct.
-  2. `test_background_loop_survives_board_window_watch_exception` — **premise
-     overturned.** Asserts `_latest_key == queued_key` for a payload carrying
-     `sport: "mlb"`. `intelligence_state.py:5178-5183` now deliberately
-     refuses to promote a sport-scoped payload to `_latest_key`
-     (`LATEST_KEY_PROMOTION_SKIPPED_SPORT_SCOPED`, emitted in the failing run)
-     because `_latest_key` drives the fallback-free `BOARD_SNAPSHOT_PATH`
-     write and a one-sport board must never become "the board". The new
-     behaviour already has its own test at line 1739
-     (`test_background_loop_never_promotes_a_sport_scoped_payload_to_latest_key`).
-     This test simply predates it.
-  3. `test_query_endpoint_default_unchanged_when_combined_flag_disabled` —
-     **date rot.** Fixture `selected_date` is hardcoded `2026-07-27` and the
-     request is the dateless default question, which
-     `_normalize_default_query_payload` stamps with today. 17 days apart, so
-     `_response_needs_refresh` rejects it on date mismatch and
-     `_stale_within_threshold(max_age_days=2)` refuses it as a stale fallback
-     — leaving `_empty_default_intelligence_response()`. That cascade is
-     deliberate and commented. The test passed the week it was written and
-     could not pass after 2026-07-29.
-  4. `test_build_candidate_pool_does_not_embed_full_odds_history_payload` —
-     **not hermetic; the exact `#288` defect, second instance.** It patches
-     `syndicate.features.intelligence.collect_all_recommendations`, which
-     `pipeline/intelligence_state.py` never references — so the patch is a
-     no-op and the candidates come from real git-tracked mirror data under
-     `data/mlb_source/.../2026-06-10/`. That date is now two months past, so
-     every one of the 32 scored candidates trips `_candidate_is_final` and is
-     dropped (`candidate_scoring input_count=32 output_count=0
-     final_filtered=32`), `candidate_pools` skips MLB via `if not
-     sport_candidates: continue`, and `pool["candidate_pools"]["mlb"]`
-     KeyErrors. The comment at line 3374 records that its sibling
-     `test_build_candidate_pool_skips_sports_without_manifests` was REMOVED
-     under `#288` for this identical defect; this one survived that pass.
-- Falsification test: if a failure is a real defect in
-  `pipeline/intelligence_state.py`, then the production path it exercises is
-  wrong and the fix belongs in source. Discriminator applied to each: does the
-  current source behaviour have (a) an explicit comment stating the intent,
-  and (b) a separate test pinning it? For 2 and 3 both hold. For 1 the
-  changed call is in a different module with its own correct fake. For 4 the
-  patched symbol is provably not referenced by the module under test —
-  `grep collect_all_recommendations pipeline/intelligence_state.py` is empty.
-  Nothing survived as a source defect.
-- HAZARD — test 4 must not be made green by relaxing it. Its live assertions
-  are `assertNotIn("odds_history", mlb_pool)` / `assertIn(
-  "odds_history_shard_key", mlb_pool)` — the pointer-not-payload contract that
-  was the dominant memory driver before `#288`. The `mocked_loader.call_count
-  == 2` assertion **already passes against a completely empty pool**, so it
-  proves nothing on its own. The rewrite must be verified by MUTATION:
-  re-embed `odds_history` in the pool dict and confirm the test goes red.
-  Making it pass without that check would leave a second toothless test where
-  `#288` removed the first.
-- HAZARD — the `#288` comment at line 3374 says "DO NOT restore it by updating
-  the expected constant". The same rule binds here: test 4 is repaired by
-  removing its dependence on `data/`, not by re-tuning a fixture date until
-  the mirror happens to agree.
-- Verification (all three required):
-  1. Each of the four fails before its own fix and passes after — run
-     individually, not only as part of the file.
-  2. Mutation checks against SOURCE, both required: re-embed `odds_history`
-     on the per-sport pool entry and the rewritten test 4 (the pool test) must
-     go red; remove the sport-scoped promotion skip and the rewritten test on
-     `_latest_key` must go red.
-  3. Full file green: `python -m pytest tests/test_intelligence_state.py`
-     back to 0 failed, with the passing count going 220 -> 224 and no test
-     deleted or skipped.
-- Deploy: none. Test-only change, no production behaviour touched, no
-  `render.yaml`. Nothing to gate.
-- Blocked by: none.
-- **STATUS 2026-08-13 — ALL THREE VERIFICATION ITEMS MET. Lane complete.**
-  - (1) The four run individually: `4 passed in 35.34s`, against
-    `4 failed in 44.25s` on the same four before the change.
-  - (2) MUTATION CHECKS PASSED, run in a throwaway detached worktree at HEAD
-    (`C:/tmp/isrb-mut`) so `pipeline/intelligence_state.py` was never edited in
-    the shared tree — that file is claimed by `memory-guard-reclaimable`.
-    Two source mutations applied at once (they hit different tests):
-    - re-embedded `"odds_history": {...}` beside `odds_history_shard_key` in
-      the per-sport pool dict -> `test_build_candidate_pool_does_not_embed_
-      full_odds_history_payload` FAILED with `AssertionError: 'odds_history'
-      unexpectedly found in {...}`. Right test, right reason.
-    - replaced `if effective_sport != "all":` with `if False:` ->
-      `test_background_loop_survives_board_window_watch_exception` FAILED with
-      `'e7557377...' is not None`. Right test, right reason.
-    - The mutation output ALSO settles the toothlessness worry directly: the
-      failing dict printed `'candidate_count': 1` with a fully-populated
-      `candidates` list, so the repaired test is inspecting a real pool, not
-      an empty one.
-  - (3) Full file: **`224 passed, 10 subtests passed in 901.58s`, 0 failed** —
-    against the recorded baseline `4 failed, 220 passed, 10 subtests passed in
-    891.33s`. 220 -> 224, nothing deleted, nothing skipped, no `@skip` or
-    `xfail` added.
-  - Diff is `tests/test_intelligence_state.py` ONLY. Zero source files touched.
-    Net assertion change: +4 added (`candidate_count == 1`, `"mlb" in
-    candidate_pools`, `mlb_pool["candidate_count"] == 1`, and the inverted
-    `_latest_key`), 1 inverted, 0 removed.
-  - NOTE on the full-file number's provenance: this run is against
-    `841228d9`, not the `007f75b6` the brief cited — `memory-guard-reclaimable`
-    landed `03073270` (`memory_observability.py`, the `#417` unreclaimable-memory
-    guard) in between. That is the interaction this lane flagged when it
-    opened, and it turned out benign: the memory/headroom tests in this file
-    are green on the new formula. `pipeline/intelligence_state.py` and
-    `tests/test_intelligence_state.py` are byte-identical across
-    `007f75b6..841228d9`, so the four diagnoses are unaffected by the move.
-  - Housekeeping left behind: `C:/tmp/isrb-mut` is out of `git worktree list`
-    and empty, but the directory itself would not delete (a lingering handle).
-    Harmless; delete it if it is still there next session.
-
 ### memory-guard-reclaimable — OPEN — opened 2026-08-13 — session: memory-guard
 - Goal: `memory_headroom_snapshot` decides on unreclaimable memory
   (`anon + shmem + slab_unreclaimable`), so that total memory in use FALLING
@@ -539,6 +395,151 @@
     shut all night".
 
 ## CLOSED THIS SESSION
+
+### intelligence-state-red-baseline — CLOSED 2026-08-13 — opened 2026-08-13 — session: intel-state-baseline
+- OUTCOME: `tests/test_intelligence_state.py` goes `4 failed / 220 passed` ->
+  **`224 passed, 0 failed`**, all four repaired in the TEST with zero source
+  changes, two of them proven load-bearing by source mutation. Verification
+  items 1-3 all ran; results are in the STATUS block at the end of this lane.
+- Goal: `tests/test_intelligence_state.py` is GREEN on a clean checkout, so a
+  session working `#417`/`#338` in `pipeline/intelligence_state.py` can tell its
+  own regression from standing noise. Testable outcome: 224 passed / 0 failed
+  (baseline measured 2026-08-13: **4 failed, 220 passed, 10 subtests, 891s**).
+- Files (exclusive to this lane):
+  - `tests/test_intelligence_state.py` — **test-only lane.** All four failures
+    are defects in the TEST, not in `pipeline/intelligence_state.py`; see the
+    per-test findings below. If any of them turns out to need a source change,
+    this lane STOPS and coordinates first.
+- NOT touched, deliberately: `pipeline/intelligence_state.py`,
+  `syndicate/blueprints/intelligence.py`,
+  `syndicate/features/shared/refresh_state_store.py`. Each of the four failures
+  is a case of production code being *right* and the test having rotted around
+  it. Changing any of them to make a test green would be the exact inversion
+  this lane exists to prevent.
+- **Collision check against `memory-guard-reclaimable`: CLEAR.** That lane
+  claims `pipeline/intelligence_state.py` (L3189 constant only) and
+  `tests/test_memory_observability.py`. This lane claims neither. It does NOT
+  claim `tests/test_intelligence_state.py` — its own STATUS note records
+  running 25 memory/headroom tests from this file as a read-only consumer
+  sweep, which is a read, not a claim. Flagged anyway: if that lane's
+  `memory_headroom_snapshot` change lands while this lane is open, the
+  memory-guard tests in THIS file may move. That is their change, not this
+  lane's, and this lane must not "fix" it.
+- Hypothesis (recorded before fixing — all four now CONFIRMED by traceback):
+  each failure is an independent rot, with no common cause and nothing
+  implicating the module under test.
+  1. `test_read_latest_response_syncs_shared_backend_state` — **stale fake.**
+     Its inline `FakeClient.set` is `lambda self, key, value`, but
+     `refresh_state_store.write_json_file` has called `client.set(..., ex=ttl)`
+     since `50a093b9` (2026-07-31, keyvalue TTL). `TypeError: unexpected
+     keyword argument 'ex'`. The real fake in
+     `tests/test_refresh_state_store.py:26` already takes `ex`; this one was
+     missed. Production code is correct.
+  2. `test_background_loop_survives_board_window_watch_exception` — **premise
+     overturned.** Asserts `_latest_key == queued_key` for a payload carrying
+     `sport: "mlb"`. `intelligence_state.py:5178-5183` now deliberately
+     refuses to promote a sport-scoped payload to `_latest_key`
+     (`LATEST_KEY_PROMOTION_SKIPPED_SPORT_SCOPED`, emitted in the failing run)
+     because `_latest_key` drives the fallback-free `BOARD_SNAPSHOT_PATH`
+     write and a one-sport board must never become "the board". The new
+     behaviour already has its own test at line 1739
+     (`test_background_loop_never_promotes_a_sport_scoped_payload_to_latest_key`).
+     This test simply predates it.
+  3. `test_query_endpoint_default_unchanged_when_combined_flag_disabled` —
+     **date rot.** Fixture `selected_date` is hardcoded `2026-07-27` and the
+     request is the dateless default question, which
+     `_normalize_default_query_payload` stamps with today. 17 days apart, so
+     `_response_needs_refresh` rejects it on date mismatch and
+     `_stale_within_threshold(max_age_days=2)` refuses it as a stale fallback
+     — leaving `_empty_default_intelligence_response()`. That cascade is
+     deliberate and commented. The test passed the week it was written and
+     could not pass after 2026-07-29.
+  4. `test_build_candidate_pool_does_not_embed_full_odds_history_payload` —
+     **not hermetic; the exact `#288` defect, second instance.** It patches
+     `syndicate.features.intelligence.collect_all_recommendations`, which
+     `pipeline/intelligence_state.py` never references — so the patch is a
+     no-op and the candidates come from real git-tracked mirror data under
+     `data/mlb_source/.../2026-06-10/`. That date is now two months past, so
+     every one of the 32 scored candidates trips `_candidate_is_final` and is
+     dropped (`candidate_scoring input_count=32 output_count=0
+     final_filtered=32`), `candidate_pools` skips MLB via `if not
+     sport_candidates: continue`, and `pool["candidate_pools"]["mlb"]`
+     KeyErrors. The comment at line 3374 records that its sibling
+     `test_build_candidate_pool_skips_sports_without_manifests` was REMOVED
+     under `#288` for this identical defect; this one survived that pass.
+- Falsification test: if a failure is a real defect in
+  `pipeline/intelligence_state.py`, then the production path it exercises is
+  wrong and the fix belongs in source. Discriminator applied to each: does the
+  current source behaviour have (a) an explicit comment stating the intent,
+  and (b) a separate test pinning it? For 2 and 3 both hold. For 1 the
+  changed call is in a different module with its own correct fake. For 4 the
+  patched symbol is provably not referenced by the module under test —
+  `grep collect_all_recommendations pipeline/intelligence_state.py` is empty.
+  Nothing survived as a source defect.
+- HAZARD — test 4 must not be made green by relaxing it. Its live assertions
+  are `assertNotIn("odds_history", mlb_pool)` / `assertIn(
+  "odds_history_shard_key", mlb_pool)` — the pointer-not-payload contract that
+  was the dominant memory driver before `#288`. The `mocked_loader.call_count
+  == 2` assertion **already passes against a completely empty pool**, so it
+  proves nothing on its own. The rewrite must be verified by MUTATION:
+  re-embed `odds_history` in the pool dict and confirm the test goes red.
+  Making it pass without that check would leave a second toothless test where
+  `#288` removed the first.
+- HAZARD — the `#288` comment at line 3374 says "DO NOT restore it by updating
+  the expected constant". The same rule binds here: test 4 is repaired by
+  removing its dependence on `data/`, not by re-tuning a fixture date until
+  the mirror happens to agree.
+- Verification (all three required):
+  1. Each of the four fails before its own fix and passes after — run
+     individually, not only as part of the file.
+  2. Mutation checks against SOURCE, both required: re-embed `odds_history`
+     on the per-sport pool entry and the rewritten test 4 (the pool test) must
+     go red; remove the sport-scoped promotion skip and the rewritten test on
+     `_latest_key` must go red.
+  3. Full file green: `python -m pytest tests/test_intelligence_state.py`
+     back to 0 failed, with the passing count going 220 -> 224 and no test
+     deleted or skipped.
+- Deploy: none. Test-only change, no production behaviour touched, no
+  `render.yaml`. Nothing to gate.
+- Blocked by: none.
+- **STATUS 2026-08-13 — ALL THREE VERIFICATION ITEMS MET. Lane complete.**
+  - (1) The four run individually: `4 passed in 35.34s`, against
+    `4 failed in 44.25s` on the same four before the change.
+  - (2) MUTATION CHECKS PASSED, run in a throwaway detached worktree at HEAD
+    (`C:/tmp/isrb-mut`) so `pipeline/intelligence_state.py` was never edited in
+    the shared tree — that file is claimed by `memory-guard-reclaimable`.
+    Two source mutations applied at once (they hit different tests):
+    - re-embedded `"odds_history": {...}` beside `odds_history_shard_key` in
+      the per-sport pool dict -> `test_build_candidate_pool_does_not_embed_
+      full_odds_history_payload` FAILED with `AssertionError: 'odds_history'
+      unexpectedly found in {...}`. Right test, right reason.
+    - replaced `if effective_sport != "all":` with `if False:` ->
+      `test_background_loop_survives_board_window_watch_exception` FAILED with
+      `'e7557377...' is not None`. Right test, right reason.
+    - The mutation output ALSO settles the toothlessness worry directly: the
+      failing dict printed `'candidate_count': 1` with a fully-populated
+      `candidates` list, so the repaired test is inspecting a real pool, not
+      an empty one.
+  - (3) Full file: **`224 passed, 10 subtests passed in 901.58s`, 0 failed** —
+    against the recorded baseline `4 failed, 220 passed, 10 subtests passed in
+    891.33s`. 220 -> 224, nothing deleted, nothing skipped, no `@skip` or
+    `xfail` added.
+  - Diff is `tests/test_intelligence_state.py` ONLY. Zero source files touched.
+    Net assertion change: +4 added (`candidate_count == 1`, `"mlb" in
+    candidate_pools`, `mlb_pool["candidate_count"] == 1`, and the inverted
+    `_latest_key`), 1 inverted, 0 removed.
+  - NOTE on the full-file number's provenance: this run is against
+    `841228d9`, not the `007f75b6` the brief cited — `memory-guard-reclaimable`
+    landed `03073270` (`memory_observability.py`, the `#417` unreclaimable-memory
+    guard) in between. That is the interaction this lane flagged when it
+    opened, and it turned out benign: the memory/headroom tests in this file
+    are green on the new formula. `pipeline/intelligence_state.py` and
+    `tests/test_intelligence_state.py` are byte-identical across
+    `007f75b6..841228d9`, so the four diagnoses are unaffected by the move.
+  - Housekeeping left behind: `C:/tmp/isrb-mut` is out of `git worktree list`
+    and empty, but the directory itself would not delete (a lingering handle).
+    Harmless; delete it if it is still there next session.
+
 
 ### render-yaml-web-block-hygiene — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
 - Recorded after the fact. The originating task carried an explicit "do not open

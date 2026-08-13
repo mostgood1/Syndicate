@@ -115,6 +115,30 @@
 - Included pipeline/build minutes exceeded in Aug: 1,549 of 1,000.
   `[measured 08-12]`
 
+## Test baselines
+
+- `tests/test_intelligence_state.py` is **GREEN: 224 passed, 10 subtests
+  passed, 0 failed** on `bd227fa3`. It had carried a standing
+  `4 failed, 220 passed` on a clean checkout; `#288` closed 2026-08-13, all
+  four repaired in the test with **zero source changes**. **A failure in this
+  file is now yours** — it is no longer safe to assume standing noise, which is
+  the whole point of having fixed it. `[measured 08-13]`
+- It costs **~15 minutes** (891s red, 902s green), so it is not a quick check.
+  The four historically-broken tests run alone in ~35s and are the cheap
+  smoke: `test_build_candidate_pool_does_not_embed_full_odds_history_payload`,
+  `test_query_endpoint_default_unchanged_when_combined_flag_disabled`,
+  `test_read_latest_response_syncs_shared_backend_state`,
+  `test_background_loop_survives_board_window_watch_exception`.
+  `[measured 08-13]`
+- Two of those four are pinned against SOURCE by mutation, not just by green:
+  re-embedding `odds_history` on the per-sport pool entry, or removing the
+  sport-scoped `_latest_key` promotion skip, each turns the right test red.
+  `[measured 08-13]`
+- **Green here says nothing about `tests/test_intelligence.py`.** `#288`'s
+  record notes two query failures and a blotter failure in other files; those
+  were never in its scope and were **not re-measured** on 08-13.
+  `[unverified 08-13]`
+
 ## Board live tier (layer1-live-tier lane)
 
 - **The live prop join was matching 0 of 1385 rows** — keyed on `market`, which
