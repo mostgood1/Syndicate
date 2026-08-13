@@ -27,7 +27,11 @@ Request: `$ARGUMENTS`
 - Blocked by: <lane slug or none>
 ```
 
-6. Report the lane and the first concrete step. Nothing else.
+6. Write the lane slug to `.syndicate/.current-lane` (overwrite). The
+   `lane-guard` PreToolUse hook reads this marker to tell your own lane from
+   another session's; without it the guard blocks your own edits.
+
+7. Report the lane and the first concrete step. Nothing else.
 
 ## close
 1. Confirm the verification step actually ran and state the result.
@@ -35,6 +39,7 @@ Request: `$ARGUMENTS`
 2. Flip status to CLOSED with the date and a one-line outcome.
 3. If the lane produced a wrong belief or a broken deploy, invoke
    `/postmortem <slug>` before closing.
+4. If `.syndicate/.current-lane` holds this slug, empty it.
 
 ## list
 Show OPEN lanes only, one line each: slug, goal, files, blocker.

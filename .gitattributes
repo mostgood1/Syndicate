@@ -1,0 +1,9 @@
+# Scoped deliberately to .claude/hooks/ — this repo has no line-ending policy
+# and setting one repo-wide would rewrite far more than this change warrants.
+#
+# core.autocrlf is true on the dev machine, so without this the hook scripts
+# check out with CRLF on a fresh clone and bash rejects them with a $'\r'
+# syntax error — the enforcement layer would be silently dead, which is the
+# one failure mode these scripts are written to avoid.
+.claude/hooks/*.sh text eol=lf
+.claude/hooks/*.py text eol=lf
