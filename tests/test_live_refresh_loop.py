@@ -1381,6 +1381,81 @@ class LiveRefreshLoopTests(unittest.TestCase):
         self.assertEqual(decision["props_regen_game_pks"], ["100", "200"])
         mocked_record.assert_called_once_with(2000.0, "2026-08-01", {"100": "aaa", "200": "bbb"}, launched=True)
 
+    def test_mlb_daily_sim_decision_consumes_props_regen_cooldown_only_on_launch(self) -> None:
+        # #419, second half. The cooldown marker used to be written by the
+        # predicate, so consulting it spent the hour whether or not anything
+        # launched -- a decision dropped downstream (JOB_CAP_THROTTLED) left
+        # the guard silenced for an hour having done no work. The marker is
+        # now written here, on the committed-launch path, and nowhere else.
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-08-01", "fingerprints": {"100": "aaa"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "aaa"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_mlb_props_now_available_needs_regen", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_sim_check"
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_props_regen_attempt"
+        ) as mocked_regen_marker:
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-08-01")
+
+        self.assertTrue(decision["force"])
+        mocked_regen_marker.assert_called_once_with(now_epoch=2000.0, date_str="2026-08-01")
+
+    def test_mlb_daily_sim_decision_does_not_consume_props_regen_cooldown_when_no_regen(self) -> None:
+        # Liveness half of the assertion above: the marker must NOT be written
+        # on a launch that had nothing to do with props, or an unrelated
+        # fingerprint resim would silence the props guard for an hour.
+        events = [
+            live_refresh_loop.ScheduleEvent(sport="mlb", event_id="100", home="A", away="B", start_time_utc=None),
+        ]
+        with patch.dict(os.environ, {"SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER": "true"}, clear=False), patch.object(
+            live_refresh_loop, "_mlb_daily_sim_process_still_running", return_value=False
+        ), patch.object(live_refresh_loop, "is_refresh_run_active", return_value=False), patch.object(
+            live_refresh_loop, "fetch_schedule_for_date", return_value=events
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path, patch.object(
+            live_refresh_loop, "events_starting_within", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_read_last_mlb_sim_check", return_value={"epoch": 1000.0, "date": "2026-08-01", "fingerprints": {"100": "aaa"}}
+        ), patch.object(
+            live_refresh_loop, "_fetch_mlb_injuries", return_value=True
+        ), patch.object(
+            live_refresh_loop, "_mlb_sim_input_fingerprint_by_game", return_value={"100": "zzz"}
+        ), patch.object(
+            live_refresh_loop, "_mlb_join_mismatch_game_pks", return_value=[]
+        ), patch.object(
+            live_refresh_loop, "_mlb_props_now_available_needs_regen", return_value=False
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_sim_check"
+        ), patch.object(
+            live_refresh_loop, "_record_mlb_props_regen_attempt"
+        ) as mocked_regen_marker:
+            mocked_summary_path.return_value.exists.return_value = True
+            decision = live_refresh_loop._mlb_daily_sim_decision(now_epoch=2000.0, date_str="2026-08-01")
+
+        self.assertTrue(decision["force"])
+        self.assertEqual(decision["reason"], "fingerprint_change")
+        mocked_regen_marker.assert_not_called()
+
     def test_mlb_daily_sim_decision_still_runs_props_check_when_fingerprint_already_triggers(self) -> None:
         # Inverted 2026-08-04 after this exact skip caused a live outage.
         # The old contract was "don't bother, we're launching anyway" -- but a
@@ -1504,7 +1579,13 @@ class LiveRefreshLoopTests(unittest.TestCase):
         ) as mocked_write:
             result = live_refresh_loop._mlb_props_now_available_needs_regen(now_epoch=2000.0, date_str="2026-08-01")
         self.assertTrue(result)
-        mocked_write.assert_called_once()
+        # Premise changed by #419: this used to assert_called_once(), because
+        # the predicate wrote the cooldown marker itself. It no longer does --
+        # the marker is written by _record_mlb_props_regen_attempt() on the
+        # launch path, so the hour is spent on a launch that was committed
+        # rather than on a decision that may be dropped downstream. The
+        # predicate is now pure; asserting it writes would re-fix the bug.
+        mocked_write.assert_not_called()
 
     def test_mlb_props_now_available_needs_regen_respects_cooldown(self) -> None:
         empty_top_props = {"groups": {"pitcher": {"summary": {"candidateCount": 0}}}}
@@ -1563,7 +1644,86 @@ class LiveRefreshLoopTests(unittest.TestCase):
             mocked_summary_path.return_value.exists.return_value = True
             result = live_refresh_loop._mlb_props_now_available_needs_regen(now_epoch=2000.0, date_str="2026-08-01")
         self.assertTrue(result)
-        mocked_write.assert_called_once()
+        # See the sibling assertion above: #419 moved the marker write out of
+        # the predicate and onto the launch path.
+        mocked_write.assert_not_called()
+
+    def _run_regen_against_real_reader(self, tmp: Path, *, write_pitcher_odds: bool) -> bool:
+        """Call the guard with the REAL read_json_file and a keyvalue backend.
+
+        Every other test of this guard patches `live_refresh_loop.read_json_file`,
+        which is precisely the symbol whose backend routing was the #419 defect
+        -- so all five of them passed against code that could never fire in
+        production. These two do not patch it. `_keyvalue_backed` is forced True
+        and the keyvalue GET is forced to miss, which is the exact production
+        shape: backend=keyvalue on refresh-worker, and these snapshots are never
+        written through the state store (the producer,
+        vendor/mlb_bettingv2/tools/oddsapi/fetch_daily_oddsapi_markets.py's
+        _write_json, writes plain files to the mounted disk).
+        """
+        from syndicate.features.mlb import sources as mlb_sources
+        from syndicate.features.shared import refresh_state_store
+
+        pitcher_path = tmp / "oddsapi_pitcher_props_2026_08_13.json"
+        hitter_path = tmp / "oddsapi_hitter_props_2026_08_13.json"
+        if write_pitcher_odds:
+            pitcher_path.write_text(
+                json.dumps({"date": "2026-08-13", "pitcher_props": {"kevin gausman": {"strikeouts": {"line": 5.5}}}}),
+                encoding="utf-8",
+            )
+
+        with patch.object(refresh_state_store, "_keyvalue_backed", return_value=True), patch.object(
+            refresh_state_store, "_execute_keyvalue_operation", return_value=None
+        ), patch.object(
+            mlb_sources, "daily_snapshot_oddsapi_pitcher_props_path", return_value=pitcher_path
+        ), patch.object(
+            mlb_sources, "daily_snapshot_oddsapi_hitter_props_path", return_value=hitter_path
+        ), patch.object(
+            mlb_sources, "daily_top_props_path", return_value=tmp / "daily_top_props_2026_08_13.json"
+        ), patch.object(
+            live_refresh_loop, "_mlb_props_regen_marker_path", return_value=tmp / "marker.json"
+        ), patch.object(
+            live_refresh_loop, "_mlb_daily_summary_path"
+        ) as mocked_summary_path:
+            # daily_summary present + top_props unreadable is the real 2026-08-13
+            # shape: the run reached the summary stage, and the top_props read
+            # returns None because it is keyvalue-routed too.
+            mocked_summary_path.return_value.exists.return_value = True
+            return live_refresh_loop._mlb_props_now_available_needs_regen(
+                now_epoch=2000.0, date_str="2026-08-13"
+            )
+
+    def test_props_regen_sees_odds_on_disk_when_state_backend_is_keyvalue(self) -> None:
+        # #419 regression test. Fails against the pre-fix code: the guard read
+        # the snapshot through refresh_state_store.read_json_file, which routes
+        # every path not containing "migration_runs/" to Redis with NO
+        # filesystem fallback and returns (None, True) -- "confirmed absent,
+        # read succeeded" -- on a miss. Writer filesystem, reader Redis, so
+        # has_pitcher_odds/has_hitter_odds were False on every call in
+        # production and props_now_available never once fired.
+        #
+        # Measured 2026-08-13: prop odds on refresh-worker's disk from 10:08
+        # CDT (18 pitcher / 171 hitter markets); top-props artifact written
+        # 00:24:21 with zero candidates and still empty at 11:43.
+        with TemporaryDirectory() as raw_tmp:
+            result = self._run_regen_against_real_reader(Path(raw_tmp), write_pitcher_odds=True)
+        self.assertTrue(
+            result,
+            "guard must see prop odds that are on disk even when the state backend is keyvalue",
+        )
+
+    def test_props_regen_still_declines_when_no_odds_on_disk(self) -> None:
+        # Liveness. Without this, "the guard fires now" is indistinguishable
+        # from "the guard fires always" -- and an always-on regen trigger would
+        # relaunch the full slate every cooldown for nothing. Same harness as
+        # the test above, only the disk state differs, so a pass here is a
+        # measured False rather than a blind one.
+        with TemporaryDirectory() as raw_tmp:
+            result = self._run_regen_against_real_reader(Path(raw_tmp), write_pitcher_odds=False)
+        self.assertFalse(
+            result,
+            "guard must still decline when the prop-odds snapshots are genuinely absent",
+        )
 
     def test_mlb_daily_sim_decision_tip_off_window_returns_only_starting_soon_game_pks(self) -> None:
         all_events = [
