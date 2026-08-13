@@ -6165,6 +6165,30 @@ def _is_game_level_market(market_text: Any) -> bool:
     return any(keyword in lowered for keyword in _GAME_LEVEL_MARKET_KEYWORDS)
 
 
+def _slow_game_label(game: dict[str, Any]) -> str:
+    """A human-traceable id for the SLOW_GAME_CANDIDATE line.
+
+    The first version read `game_id`/`id` and printed `game_id=?` on EVERY
+    line of the first production build -- seven lines naming nothing, so
+    "which 26-row game costs 225s" stayed unanswerable. dashboard_games do not
+    carry those keys. The conventions actually in use on these dicts are
+    `game_pk` (7 call sites), `game_id` (6), `event_id` (6) and `matchup` (3),
+    and MLB in particular keys on `game_pk`.
+
+    Identifiers first, then the team pair, which is the form a human can act
+    on. Returns "?" only when a game carries no identity at all -- and that
+    would itself be worth seeing.
+    """
+    for key in ("game_pk", "game_id", "event_id", "id", "matchup"):
+        text = _safe_text(game.get(key), "").strip()
+        if text:
+            return text.replace(" ", "_")
+    away = _safe_text(game.get("away_name") or game.get("away_tri"), "").strip()
+    home = _safe_text(game.get("home_name") or game.get("home_tri"), "").strip()
+    if away or home:
+        return (away or "?") + "@" + (home or "?")
+    return "?"
+
 def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
     # #68. The worker generated ONE candidate for all of MLB on 2026-07-26
@@ -6225,7 +6249,7 @@ def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
         if _game_elapsed >= _slow_game_threshold_s:
             print(
                 f"[intelligence] SLOW_GAME_CANDIDATE sport={_safe_text(sport.get('slug'), '?')} "
-                f"game_id={_safe_text(game.get('game_id') or game.get('id'), '?')} "
+                f"game={_slow_game_label(game)} "
                 f"elapsed_s={round(_game_elapsed, 2)} rows={len(_game_rows)} "
                 f"is_live={bool(game.get('is_live'))}",
                 flush=True,
