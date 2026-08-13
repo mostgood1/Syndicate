@@ -14584,6 +14584,27 @@ def _current_live_prop_rows(
     if ensure_market_fresh:
         _maybe_refresh_live_oddsapi_markets(d)
 
+    # WHY THE LIVE PROBABILITY IS OR IS NOT AVAILABLE, said out loud once per
+    # game. `estimate_live`'s own failures are swallowed by a bare `except` with
+    # zero logging (`live_lens_loop.py:474` documents exactly this), and
+    # `_live_mc_projection` returns None for six different reasons that are
+    # indistinguishable downstream -- sim context missing, roster snapshot
+    # missing, status not live, or the Monte Carlo raising.
+    #
+    # Measured before this existed: 49 live rows joined, 49 edges withheld, every
+    # one reading "live re-sim produced no probability". That is a true statement
+    # that names the wrong layer, and there was no way to tell from the board
+    # which of the six it was.
+    _live_mc_batters = len((live_mc_projection or {}).get("batterStatDist") or {})
+    _live_mc_pitchers = len((live_mc_projection or {}).get("pitcherStatDist") or {})
+    print(
+        f"[live_props] LIVE_MC_DIAG date={d} game={_safe_int(card.get('gamePk'))} "
+        f"passed_in={isinstance(live_mc_projection, dict)} "
+        f"sims={(live_mc_projection or {}).get('simsRun')} "
+        f"batters={_live_mc_batters} pitchers={_live_mc_pitchers}",
+        flush=True,
+    )
+
     progress_fraction = float((_live_game_progress(snapshot, card).get("fraction") or 0.0))
     actual_teams = ((snapshot or {}).get("teams") or {})
     pitcher_market_ctx = _load_pitcher_ladder_market_context(d)
@@ -16489,27 +16510,45 @@ def _roster_from_snapshot_side(doc: Optional[Dict[str, Any]]) -> Any:
         return roster_from_dict(_snapshot_side_to_roster_doc(doc))
 
 
+def _live_mc_bail(reason: str, detail: str = "") -> None:
+    """Name the bail-out. SEVEN exits returned a bare None and looked identical.
+
+    Downstream, every one of them renders as "the re-sim produced no
+    probability" -- a true sentence naming the wrong layer. Measured before this
+    existed: 49 live rows, 49 withheld edges, one reason string, and no way to
+    tell whether the sim context was missing, the rosters were unbuildable, the
+    game state was unparseable, or the Monte Carlo itself raised.
+    """
+    print(f"[live_mc] LIVE_MC_BAIL reason={reason}{(' ' + detail) if detail else ''}", flush=True)
+
+
 def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optional[Dict[str, Any]], *, date_str: Optional[str] = None) -> Optional[Dict[str, Any]]:
     if not isinstance(snapshot, dict) or not isinstance(sim_context, dict):
+        _live_mc_bail("no_snapshot_or_sim_context")
         return None
     if not sim_context.get("found"):
+        _live_mc_bail("sim_context_not_found")
         return None
     status = (snapshot.get("status") or {}) if isinstance(snapshot.get("status"), dict) else {}
     if not _status_is_live(status):
+        _live_mc_bail("status_not_live", f"abstract={status.get('abstractGameState')!r}")
         return None
 
     roster_snapshot = sim_context.get("roster_snapshot") if isinstance(sim_context.get("roster_snapshot"), dict) else None
     if not isinstance(roster_snapshot, dict):
+        _live_mc_bail("no_roster_snapshot")
         return None
     away_doc = roster_snapshot.get("away") if isinstance(roster_snapshot.get("away"), dict) else None
     home_doc = roster_snapshot.get("home") if isinstance(roster_snapshot.get("home"), dict) else None
     if not isinstance(away_doc, dict) or not isinstance(home_doc, dict):
+        _live_mc_bail("roster_snapshot_missing_a_side")
         return None
 
     try:
         away_roster = _roster_from_snapshot_side(away_doc)
         home_roster = _roster_from_snapshot_side(home_doc)
-    except Exception:
+    except Exception as exc:
+        _live_mc_bail("roster_build_failed", f"err={type(exc).__name__}:{str(exc)[:80]}")
         return None
 
     current = snapshot.get("current") if isinstance(snapshot.get("current"), dict) else {}
@@ -16517,6 +16556,7 @@ def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optiona
     half = str(current.get("halfInning") or "").strip().lower()
     outs = _safe_int(((current.get("count") or {}).get("outs")))
     if inning is None or half not in {"top", "bottom"} or outs is None:
+        _live_mc_bail("unparseable_game_state", f"inning={inning} half={half!r} outs={outs}")
         return None
 
     away_score = _safe_int((((snapshot.get("teams") or {}).get("away") or {}).get("totals") or {}).get("R"))
@@ -16584,7 +16624,12 @@ def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optiona
             seed=int(_safe_int(sim_context.get("gamePk")) or 0) or None,
             cfg_kwargs=_forward_live_cfg_kwargs(date_str),
         )
-    except Exception:
+    except Exception as exc:
+        # THE BARE EXCEPT THAT HID EVERYTHING. `live_lens_loop.py:474` already
+        # documents that this swallows `estimate_live`'s failures with zero
+        # logging; a raise inside the new per-player stat tracking would land
+        # here and be indistinguishable from "no live game".
+        _live_mc_bail("estimate_live_raised", f"err={type(exc).__name__}:{str(exc)[:120]}")
         return None
 
     return {
