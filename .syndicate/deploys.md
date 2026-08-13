@@ -58,7 +58,72 @@
   new path executed. `basis=reclaimable_cache` means it degraded to the old
   arithmetic and a zero abort count is inert-guard-shaped and means nothing.
   A zero is evidence only once the instrument is known able to read non-zero.
-- Measured: `<pending>` — 24h read due **2026-08-14 ~13:00 CDT**.
+- Measured: **CLOSED 2026-08-13 22:48Z, at T+4.71h. The fix WORKS. The board
+  froze anyway, for a different and worse reason.** The 24h read is cancelled —
+  it would have measured a rebooted container.
+  - **The code path is PROVEN to execute.** The live abort line carries
+    `'basis': 'unreclaimable'`. That field is emitted only inside the abort
+    branch, which is why it was unreadable while the fix was succeeding — the
+    moment the guard refused, it became the liveness proof this row said could
+    not be obtained.
+  - **The fix is reading the right quantity.** Same line:
+    `active_file: 891.7`, `inactive_file: 229.8` — both now credited as
+    reclaimable, which is exactly what `#417` was about. It is NOT refusing
+    over LRU bookkeeping.
+  - **It refused because the memory is genuinely gone.** `anon: 2522.7`,
+    `unreclaimable_mb: 2531.5`, `headroom 1564.5` against the 1900 floor.
+    Trajectory across the window: `anon` **1163 -> 2603MB in 4.5 hours**.
+    Compare `#417` itself: `anon` FLAT, +18.9MB over 5.4h. That one was
+    bookkeeping; this is a real leak of roughly **300MB/hour**.
+  - **Consequence, and the reason this is a good outcome rather than a failed
+    fix: the broken guard was MASKING genuine memory growth by failing for the
+    wrong reason.** Repairing it made the real problem visible for the first
+    time. Likely `#327 RESIDUAL` (the 493-878MB unattributed allocator).
+  - Cost while open: `LAYER2_SHORTLIST` last fired `20:39:21Z`; the board
+    served ~2h20m stale before the restart below.
+- Verdict: **the guard change is correct and stays.** Do not revert it, and do
+  not read the freeze as its failure. The floor (1900MB) is now the open
+  question, and only after the leak is understood — resizing it against a
+  leaking baseline would just move the freeze later.
+
+---
+
+### 2026-08-13 22:55-22:59Z — all three services to `d4bb29b5` (incident + backlog)
+- Deployed: refresh-worker `dep-...` live **22:59:14Z**; live-odds-worker fired
+  22:55:27Z; web `dep-d9v4oih5efls73f3vfdg` fired 22:59:22Z. All `trigger=api`,
+  all to **`d4bb29b5`**.
+- **Gate was NOT CLEAR and was overridden deliberately.** An MLB sim (pid 8565)
+  and an odds refresh were killed. Justification: the board had been frozen
+  ~2h20m and every build cycle was aborting before the fingerprint stage, so
+  the sim's output had nowhere to land. No live games at the time.
+- **This is SYMPTOM RELIEF, not a fix.** Measured immediately after:
+  `anon` **2603 -> 980.6MB**, available **1483 -> 3110.7MB**. The restart
+  clears the leaked memory exactly as the 14:56 and 18:05 restarts did.
+  **Expect the freeze to return on the same ~300MB/hour trajectory, i.e.
+  roughly 4-5 hours out.** If the board is fine tomorrow morning it is because
+  something restarted it, not because this was fixed.
+- **Bundled, and the bundle is recorded honestly:** `#419` (`live_refresh_loop`,
+  mlb-props-regen's), `#414` quote-join index + enrich instrument (behaviour +
+  observability), `#421` measurement scripts. Three lanes in one deploy.
+  `/preflight` FAILED this scope twice today and was overridden for the
+  incident. Attribution for anything that regresses tonight is genuinely
+  ambiguous — that was the price paid, knowingly.
+- Measured: `<pending>` for the `#414` index — first useful reading is the
+  **evening slate (20:49-00:45Z)**, since `SLOW_SEGMENT_PROFILE` only fires on
+  a game over 5s. **If the index works, that instrument goes SILENT**, so read
+  its absence only against `LAYER2_SHORTLIST` still recurring and the pre-fix
+  baseline of 8 lines in ~4 minutes.
+- Rollback: `py -3 scripts/render_deploy.py --service <name> --commit 03073270`
+  (refresh-worker) / `95effcfa` (live-odds-worker) / `936e2b47` (web).
+
+---
+
+### Tooling note — `scripts/render_deploy.py` (2026-08-13)
+Deploys now go through a script rather than raw `curl`. The API key is loaded
+inside it, so the secret never reaches argv or a permission prompt, and the
+service ids are an allowlist. It deliberately does NOT run
+`check_deploy_safety.py` for you: a deploy tool that silently refuses is one
+people learn to route around. Run the gate, read it, then deploy.
   **OWNER ASSIGNED 2026-08-13 15:3x CDT: scheduled task `417-24h-read`**, a
   one-shot at 2026-08-14 13:00 CDT
   (`C:\Users\tempadmin\.claude\scheduled-tasks\417-24h-read\SKILL.md`). It

@@ -845,3 +845,50 @@ back **oldest-first regardless of `direction`**.
   with an inverted premise. The instrument written for it is still useful, but
   as confirmation rather than discovery. Caught only because a routine status
   question prompted re-pulling the samples.
+
+### 2026-08-13 — A BROKEN GUARD CAN MASK THE REAL PROBLEM. Fixing it is how you find out
+- What we believed: `#417` was the whole story. The memory guard credited only
+  `inactive_file`, so a kernel LRU promotion moved its verdict ~243MB while
+  nothing real changed, and the board froze 4h12m. Fix the quantity, unfreeze
+  the board.
+- What was actually true: the fix is CORRECT and the board froze again 4.7
+  hours later anyway. The live abort line proves both halves at once —
+  `'basis': 'unreclaimable'` (the new path is executing), `active_file: 891.7`
+  and `inactive_file: 229.8` now credited as reclaimable (it is not refusing
+  over bookkeeping), and `anon: 2522.7` (it is refusing because the memory is
+  genuinely gone). `anon` went **1163 -> 2603MB in 4.5 hours**. In `#417`
+  itself `anon` was FLAT: +18.9MB over 5.4h.
+- **So the old guard was hiding a ~300MB/hour leak by failing for the wrong
+  reason.** Both the broken guard and the fixed guard refuse; only the fixed
+  one refuses for a true reason. A right answer reached by a wrong method
+  looked exactly like a healthy system, and the freeze it caused was blamed on
+  the method — correctly, but incompletely.
+- The rule going forward: **when a guard is found to be reading the wrong
+  quantity, do not assume the alarms it raised were all false. Re-derive what
+  the CORRECT quantity was doing over the same window.** Had `anon` been read
+  on the `#417` samples with the same care as `inactive_file`, the flat +18.9MB
+  would have been noticed as the thing that made `#417` bookkeeping — and its
+  later non-flatness would have been the leak, visible hours earlier.
+- Corollary for verification: **the liveness proof this deploy "could not have"
+  arrived exactly when the fix stopped succeeding.** `basis` is emitted only on
+  the abort branch, which was written up as an unfixable gap — a signal
+  readable only on failure is not useless, it is a signal you cannot use to
+  confirm success. State which of the two you need before calling a probe
+  inadequate.
+- Cost: none from the fix, which stays. ~2h20m of stale board while the real
+  cause was diagnosed, and a 24h measurement plan that was measuring the wrong
+  thing and had to be cancelled at T+4.71h.
+
+### 2026-08-13 — Symptom relief resets the clock that would have proved the cause
+- What was actually true: restarting refresh-worker drops `anon` 2603 -> 980MB
+  and the board rebuilds — as it did at 14:56, 18:05, and 22:59. Three
+  restarts, three recoveries, and each one destroyed the evidence window for
+  the growth that caused it.
+- The rule going forward: **before restarting to clear a symptom, capture the
+  series that proves the cause** — here, `anon` over time, which is one log
+  query. A restart is not neutral: it is the deletion of the measurement.
+  Record the pre-restart numbers in the row, not just "restarted, recovered".
+- And say so in the ledger explicitly, because **a recovered board reads as a
+  fixed system.** If nobody writes "this was relief, expect recurrence in ~4-5
+  hours on the measured trajectory", the next session sees a healthy board and
+  a closed row.
