@@ -296,6 +296,50 @@ as anyone's opinion until its author is identified.
 One build with the new line settles the rows-vs-tail split; do not adopt any of
 this before then.
 
+#### NEXT ACTION — pick this up cold, no context needed
+
+**Everything is deployed and nothing is watching.** `448e1816` went live on
+refresh-worker at `15:27:25Z` carrying both instruments. The watcher that was
+waiting for them died with its session. **Nobody is reading the evening build.**
+
+Run this (Render logs; `limit` > 100 returns HTTP 400; `text=` is fuzzy so
+filter the results again in code):
+
+```
+GET /v1/logs?ownerId=<owner>&resource=srv-d91dpertqb8s73co8ls0
+    &limit=100&startTime=<evening>&text=SLOW_SEGMENT_PROFILE
+```
+
+Expensive builds are **20:49–00:45Z** historically. Daytime is useless: the line
+is gated **per GAME** at 5s and daytime games run ~0.4s each, so its silence
+before ~20:00Z means nothing. `GAME_CANDIDATES_EXIT` is the liveness check —
+if that is present and `SLOW_SEGMENT_PROFILE` is not, the emitter is fine and
+the games are simply cheap.
+
+**One line decides it. Read the segment NAMES, not the totals:**
+
+| reading | conclusion |
+|---|---|
+| `tail_s` >> `rows_s` | cost is post-loop; the named top-3 segment identifies it (`enrich_block` is the prediction) |
+| `rows_s` >> `tail_s` | the row loop is implicated after all, and the retraction above was over-corrected |
+| `by_teams_fallthrough` ≈ `calls`, `rows_walked` large | the cheap `event_id` key never matches — the predicted mechanism, quantified |
+| `by_event` ≈ `calls` | prediction is wrong; the scan is not the cost |
+
+**Do not skip the counter half.** `SLOW_SEGMENT_PROFILE` separates tail from
+rows but cannot separate the two candidate scans from each other
+(`quote_ref_for_bet` over `book_quotes` vs `_candidate_odds_history_state` over
+`unattributed`). If `enrich_block` dominates, that is the next split to make.
+
+**Then, and only then, fix it.** The fix is not a timeout at an iteration
+boundary — that was the retracted framing. If the join is the cost, the shape is
+a `gamePk` ↔ event-hash bridge built **once per build** instead of a linear scan
+per candidate, with both sides canonicalised rather than one side expanded.
+
+**Judge any improvement against 688.7 / 719.0 / 852.5 / 1125.2 / 1157.3 s
+(1.68× spread, five builds, no code change).** Anything smaller than that spread
+is unattributable no matter how clean it looks. Four wrong claims were made
+against this exact number in one night; see the operational note.
+
 **Still true:** per-SPORT and per-GAME checkpointing remain useless for the
 reasons originally measured. What changed is that a THIRD granularity exists one
 level below both, and that is where the cost lives.
