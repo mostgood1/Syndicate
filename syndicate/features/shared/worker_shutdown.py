@@ -183,11 +183,30 @@ def install_shutdown_recorder(worker: str) -> None:
     """
 
     def _handle(signum, _frame):  # noqa: ANN001
+        # THE EXIT IS IN A `finally`, AND THAT IS THE WHOLE SAFETY ARGUMENT.
+        #
+        # Raised in review by the oversight session, and it closes the one gap
+        # the tests could not: `except Exception` does NOT catch BaseException.
+        # A KeyboardInterrupt from a second signal arriving mid-handler, a
+        # SystemExit, anything outside the Exception hierarchy -- each would
+        # escape and skip the exit, putting us back in the case this module
+        # exists to avoid: SIGTERM ignored, Render escalating to SIGKILL, a
+        # clean stop turned into a hard kill.
+        #
+        # `sys._current_frames()` inspection is the riskiest thing in here. It
+        # walks live stacks in a signal context, and if it throws something
+        # nobody anticipated the exit must STILL be reachable. `finally` is
+        # reachable from every path including the ones nobody imagined, which
+        # `except BaseException` alone is not (it does not cover a `return`).
+        #
+        # Same principle as `#406` putting the file cap at the bound rather than
+        # in a docstring: put the guarantee where control flow cannot route
+        # around it.
         try:
-            name = signal.Signals(signum).name
-        except Exception:
-            name = str(signum)
-        try:
+            try:
+                name = signal.Signals(signum).name
+            except BaseException:
+                name = str(signum)
             record = build_shutdown_record(worker, name)
             # PRINT FIRST. This is the line that survives; everything after it is
             # a bonus racing SIGKILL.
@@ -200,15 +219,13 @@ def install_shutdown_recorder(worker: str) -> None:
                     flush=True,
                 )
             _write_record(record)
-        except Exception as exc:  # pragma: no cover - never block the exit
+        except BaseException as exc:  # noqa: BLE001 - deliberate, see above
             try:
                 print(f"[worker_shutdown] WORKER_SHUTDOWN_RECORD_FAILED {type(exc).__name__}: {exc}", flush=True)
-            except Exception:
+            except BaseException:
                 pass
-        # EXIT IMMEDIATELY. See the module docstring: a handler that returns
-        # would make the worker ignore SIGTERM until Render SIGKILLs it, which is
-        # strictly worse than the no-handler behaviour this replaces.
-        os._exit(0)
+        finally:
+            os._exit(0)
 
     for sig in (signal.SIGTERM, signal.SIGINT):
         try:

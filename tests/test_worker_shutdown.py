@@ -142,3 +142,46 @@ def test_the_shutdown_line_is_parseable_json():
     line = f"[worker_shutdown] WORKER_SHUTDOWN {json.dumps(record, sort_keys=True, default=str)}"
     payload = json.loads(line.split("WORKER_SHUTDOWN", 1)[1].strip())
     assert payload["worker"] == "refresh-worker"
+
+
+def test_the_handler_exits_even_on_a_BASEexception(monkeypatch):
+    """The gap `except Exception` leaves open, raised in review by oversight.
+
+    KeyboardInterrupt from a second signal arriving mid-handler, SystemExit,
+    anything outside the Exception hierarchy -- each would escape a plain
+    `except Exception` and skip the exit, putting us back in the SIGKILL case
+    this module exists to avoid. `sys._current_frames()` inspection is the
+    riskiest thing in the handler and it runs in a signal context.
+    """
+    for blowup in (KeyboardInterrupt, SystemExit, GeneratorExit):
+        exits = []
+        monkeypatch.setattr(ws.os, "_exit", lambda code: exits.append(code))
+        monkeypatch.setattr(
+            ws, "build_shutdown_record",
+            lambda *a, **k: (_ for _ in ()).throw(blowup("mid-handler")),
+        )
+        installed = {}
+        monkeypatch.setattr(ws.signal, "signal", lambda sig, fn: installed.setdefault(sig, fn))
+        ws.install_shutdown_recorder("test-worker")
+        installed[signal.SIGTERM](int(signal.SIGTERM), None)
+        assert exits == [0], f"{blowup.__name__} escaped the handler and skipped the exit"
+
+
+def test_the_handler_exits_even_if_the_failure_print_also_fails(monkeypatch):
+    """Belt and braces: the fallback logging path must not become the thing
+    that prevents the exit."""
+    exits = []
+    monkeypatch.setattr(ws.os, "_exit", lambda code: exits.append(code))
+    monkeypatch.setattr(ws, "build_shutdown_record", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    import builtins
+
+    real_print = builtins.print
+    monkeypatch.setattr(builtins, "print", lambda *a, **k: (_ for _ in ()).throw(OSError("stdout gone")))
+    installed = {}
+    monkeypatch.setattr(ws.signal, "signal", lambda sig, fn: installed.setdefault(sig, fn))
+    try:
+        ws.install_shutdown_recorder("test-worker")
+        installed[signal.SIGTERM](int(signal.SIGTERM), None)
+    finally:
+        monkeypatch.setattr(builtins, "print", real_print)
+    assert exits == [0]
