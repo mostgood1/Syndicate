@@ -854,3 +854,36 @@ back **oldest-first regardless of `direction`**.
 - Cost: nothing shipped wrong, but for most of 08-13 the ledger's evidence
   pointers did not resolve for anyone reading it from a clean checkout, which
   is the only way a reader who was not present would read it.
+
+### 2026-08-13 — MY OWN DISPLAY TRUNCATION BECAME A FINDING, AND THEN A LANE'S PREMISE
+- What we believed: that the MLB board-build cost could NOT be the quote-join
+  scan, because two samples showed **1,718,960 rows walked in 33.32s** and
+  **1 row walked in 34.28s** — near-identical time, six orders of magnitude
+  apart in work. That paradox was written into `quote-join-enrich-cost` as its
+  falsification test, with an explicit instruction not to optimise the scan
+  until it was resolved.
+- What was actually true: the log line is **216 characters** and the printout
+  that produced it cut messages at **210**. `rows_walked=1633012` was rendered
+  as `rows_walked=1`. **The paradox never existed.** Pulled untruncated, eight
+  samples fit `total_s = 19.86 s per million rows walked` with intercept
+  −1.07s and R² = 0.918. The scan was the cause all along.
+- The sharper point: the truncation did not corrupt the number into something
+  obviously broken. It produced **a smaller, perfectly plausible integer** —
+  `1` is a legal value for `rows_walked`, and it told a *more interesting*
+  story than the truth. A mangled value that looks like data and contradicts
+  the obvious hypothesis is far more dangerous than one that looks wrong,
+  because it gets promoted to a finding on the strength of being surprising.
+- The rule going forward: **a slice width is a property of your printout, not
+  of the record. Never read a numeric field out of a truncated line.** When a
+  value is load-bearing, re-fetch it untruncated and print the field, not a
+  prefix of the message. Corollary for surprise: **the more a datum overturns
+  the expected answer, the more it must be re-read at full width before being
+  written down** — surprise is the signal to verify, not to publish.
+- Sibling of "A grep excerpt is not the file" (2026-08-13), which caught the
+  same class BEFORE a defect was filed. This one got all the way into a lane's
+  falsification test and an instrument built to resolve it. Same lesson, one
+  stage later, and it cost more.
+- Cost: a falsification test aimed at a non-existent paradox, and a lane opened
+  with an inverted premise. The instrument written for it is still useful, but
+  as confirmation rather than discovery. Caught only because a routine status
+  question prompted re-pulling the samples.
