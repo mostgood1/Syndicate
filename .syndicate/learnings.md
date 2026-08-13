@@ -960,3 +960,35 @@ back **oldest-first regardless of `direction`**.
 - Cost: an hour, and a lane opened on a lead that was already closed. The
   measurement still has value — the arena cap being live is exactly what makes
   the floor series discriminating — but that was luck, not design.
+
+### 2026-08-13 — I RETRACTED POINT-SAMPLING, THEN BUILT A HEADLINE ON IT ANYWAY
+- What we believed, and published to the ledger as measured fact: refresh-worker
+  leaks ~300MB/hour of anonymous memory, derived from `anon` 1163 → 2603MB
+  across 18:05–22:48Z.
+- What was actually true: **those were two point samples**, and `anon` is now
+  measured to swing **~1650 ↔ 3200MB within minutes** (floor 1652, p50 2518,
+  max 3203.7 in a single 5-minute window). Two readings of a quantity with a
+  1550MB oscillation cannot distinguish a ratchet from two phases of the same
+  swing. The floor series — the honest one — reads 1670 / 1652 / 1763, roughly
+  flat.
+- **The sharp part: I had retracted this exact method three hours earlier, in
+  this same lane.** The v2 sampler's `+2418 MB/hour` was thrown out precisely
+  because point-sampling a spiky process measures phase, not trend. Then the
+  headline finding — the one that closed `#417`'s row, opened a new lane, and
+  justified an incident deploy — rested on two points taken the same way.
+- The rule going forward: **when you retract a METHOD, re-audit every live
+  conclusion that used it, not just the instrument that exposed it.** A
+  retraction is not local to the tool that failed; it is a statement about a
+  class of evidence. Grep your own ledger for numbers derived the same way
+  before the retraction goes in.
+- Corollary on prediction: the falsified prediction (re-freeze at 4-5h; actual
+  34 minutes) is what forced the re-audit. **A written prediction is cheap and
+  it is the only thing that reliably catches a wrong model** — the numbers
+  themselves looked fine right up until the clock disagreed.
+- What survives, and is worth keeping: `#417`'s guard fix is still verified and
+  still correct. What it did NOT fix is that ONE READING of the right quantity
+  is still not enough when that quantity swings 1550MB. That is the real defect
+  and it was invisible until the leak framing collapsed.
+- Cost: a ledger that stated a leak as measured fact for ~45 minutes, a lane
+  opened on it, and an hour of allocator investigation aimed at a number that
+  may not describe anything.
