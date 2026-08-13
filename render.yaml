@@ -97,11 +97,27 @@ services:
         value: /opt/render/project/data/wnba_source
       - key: SYNDICATE_REPORTS_ROOT
         value: /opt/render/project/data/reports
-      - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
-        value: "false"
+      # Five worker-only keys removed from this block (audit 2026-08-13,
+      # continuing 606a2f28 / 054b2306): SYNDICATE_NBA_SOURCE_APP_FALLBACK,
+      # SYNDICATE_NHL_SOURCE_CLI_GENERATION, SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS,
+      # NHL_LIVE_LENS_DIR, REFRESH_PREDICT_PROPS_SMART_SIM_PBP. Each is read only
+      # by a scripts/ or vendor/ module that nothing web-reachable imports (the
+      # only scripts/* modules reachable from gunicorn are bootstrap_data_root,
+      # poll_soccer_live_state and refresh_mlb_statcast_features), and each was
+      # already declared on both workers -- including the S0b/#325 cost writeup
+      # that travelled with SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS, which both
+      # worker copies carry verbatim.
+      #
+      # SYNDICATE_WNBA_SOURCE_APP_FALLBACK below STAYS, and is the one key of the
+      # group that belongs here: scripts/bootstrap_data_root.py reads it and
+      # syndicate/app.py imports + calls that module under
+      # SYNDICATE_BOOTSTRAP_ON_START, which is "1" on this service. It was also
+      # declared twice in this block; the second copy is gone.
+      #
+      # Root cause for the whole family is the #96 note further down: this list
+      # is anchored &shared_render_env_vars but the alias is never referenced,
+      # so nothing was ever shared and worker-only keys accumulated here.
       - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
-        value: "false"
-      - key: SYNDICATE_NHL_SOURCE_CLI_GENERATION
         value: "false"
       - key: WEB_CONCURRENCY
         value: "2"
@@ -145,22 +161,6 @@ services:
         value: "full"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_REGIONS
         value: us
-      # S0b (1fa0a6d3, 2026-08-07): widens region coverage for the GAME-LINE
-      # call only (full_game + segment + alternate) via _game_line_regions()
-      # in fetch_mlb_oddsapi_local.py -- props stay on the base region above,
-      # deliberately, since props bill per-event and the same widening there
-      # would cost ~1M/mo vs ~30K/mo on game lines (the plan's own math, see
-      # docs/ai_context/plan_layer2_north_star.md). Confirmed live on all
-      # three services via the Render API 2026-08-10 but absent from this
-      # file until now -- a real live/IaC drift, not a new activation; #325
-      # traced the resulting OddsAPI burn increase to this setting and found
-      # it roughly on the plan's own projected cost (~4.13M/mo, 79-82.6% of
-      # the 5M cap), so this is documentation catching up to production, not
-      # a behavior change. Only half the plan's activation is live --
-      # SYNDICATE_LIVE_ODDS_REFRESH_REGIONS above is still `us`, not the
-      # `us,us2` the plan's instructions call for.
-      - key: SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS
-        value: "eu,us_ex"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       - key: MLB_BETTING_DATA_ROOT
@@ -173,14 +173,10 @@ services:
         value: /opt/render/project/data/nba_source/source_artifacts/data/live_lens
       - key: NHL_DATA_DIR
         value: ./data/nhl_source/source_artifacts/data
-      - key: NHL_LIVE_LENS_DIR
-        value: ./data/nhl_source/source_artifacts/data/live_lens
       - key: WNBA_BETTING_DATA_ROOT
         value: /opt/render/project/data/wnba_source/data
       - key: WNBA_LIVE_LENS_DIR
         value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
-      - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
-        value: "false"
       - key: MLB_ENABLE_LIVE_LENS_LOOP
         value: "false"
       - key: MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
@@ -241,14 +237,6 @@ services:
       # evaluation ledger's entire ~1350-record history is 100% `result:
       # "pending"`, proving reconciliation autorun has never actually run on
       # Render regardless of this flag's value here.
-      # Play-by-play-level smart sim re-enabled: the OOM this originally
-      # mitigated was root-caused to the live-odds-worker's fixed 60s tick
-      # relaunching the full pipeline before the previous attempt finished
-      # (since fixed with adaptive intervals, pregame relaunch cooldown, and
-      # periodic worker recycling). PBP mode drives quarter scores from
-      # possession simulation and returns real per-minute scoring buckets.
-      - key: REFRESH_PREDICT_PROPS_SMART_SIM_PBP
-        value: "true"
 
   - type: worker
     name: refresh-worker
@@ -449,8 +437,6 @@ services:
       # `#395` says it is for. Do not read it as a budget.
       - key: SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET
         value: "21474836480"
-      - key: SYNDICATE_BOOTSTRAP_ON_START
-        value: "1"
       - key: SYNDICATE_BOOTSTRAP_WNBA_TODAY
         value: "1"
       - key: SYNDICATE_NBA_SOURCE_APP_FALLBACK
@@ -993,8 +979,6 @@ services:
         value: /opt/render/project/data/wnba_source/data
       - key: WNBA_LIVE_LENS_DIR
         value: /opt/render/project/data/wnba_source/source_artifacts/data/live_lens
-      - key: SYNDICATE_WNBA_SOURCE_APP_FALLBACK
-        value: "false"
       # 2026-07-19: yesterday's smart-sim engine upgrade (25f34697) raised the
       # default 150 -> 500, benchmarked safe in isolation but not against a
       # busy live session's concurrent MLB sim/refresh memory pressure in the
