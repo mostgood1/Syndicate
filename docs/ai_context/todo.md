@@ -58,6 +58,34 @@ fact** (see the operational note). The docstring in
 this one was committed within an hour of writing that note. **A measured number
 is a timestamp — and so is the baseline you compare it against.**
 
+**WITHDRAWN 2026-08-13 — the FOURTH instance, and it is mine.** I reported the
+MLB board build as *"stable to 0.2%"* on two consecutive builds:
+
+    700.67s   rows=76
+    701.87s   rows=76     = 0.17% apart
+    986.44s   rows=76     <- the very next build, +40%
+
+Same sport, same row count, no deploy between. Two adjacent points agreeing
+closely is **not** evidence of stability — on a series with this spread it is the
+likeliest thing to happen by chance, and I read the tightness of the pair as a
+property of the system rather than of my sample. It is the same error as the
+−27% anchor and the 1.01x mid-point, arrived at from the opposite direction:
+those picked endpoints that were far apart, this picked two that were close.
+
+**Four lanes, four registers, one night**, all of them correct measurements of a
+series sampled too narrowly: the `#414` one-point baseline, the plateau
+retraction, my −27% anchor, and this. **The rule survived being written down and
+was broken by its own author within the hour.** So the operational form of it is
+not "beware baselines" — everyone already believed that. It is procedural:
+
+> **Never report a build-duration delta from fewer than ~5 builds, and always
+> print min/max of the comparison series next to the claim.** If the spread
+> exceeds the effect, say "unattributable" and stop. This applies to a pair that
+> agrees exactly as much as to a pair that disagrees.
+
+The `#414` mechanism finding (`ODDS_HISTORY_CACHE_HIT: 0`) is unaffected — a
+counter reading zero is a fact about the code path, not a sample from a series.
+
 **~~The most durable finding is the RATIO, ~8–10 s/row~~ — WITHDRAWN 2026-08-13.**
 That number divided game-elapsed by **candidates emitted**, not by loop
 iterations executed. It is not a rate of anything. I adopted it from another
@@ -29367,6 +29395,37 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ---
 
 ## Operational notes worth not rediscovering
+
+### Build-duration deltas: 4 wrong claims in one night, 4 different lanes (2026-08-13)
+
+**The single most repeated error of the sim-observability session**, and the only
+one that recurred *after* being written down. Every instance was a correct
+measurement of a series sampled too narrowly to support the claim drawn from it:
+
+| lane | claim | how it was sampled |
+|---|---|---|
+| cleanup | `#414` fix "inert", 1.01x | one mid-series point each side |
+| oversight | monotonic decline | 3 of 8 points spanning the deploy |
+| this lane | "−27% improvement" | anchored on the pre-fix **max** |
+| this lane | "stable to 0.2%" | two adjacent points; next build +40% |
+
+The MLB board build spans **1.39x–2.98x** with no code change at all. Any effect
+smaller than that is invisible in a handful of builds, in either direction —
+including the ones that flatter your own fix, which is where three of these came
+from.
+
+**The procedural rule, because "beware baselines" demonstrably does not work
+— it was in this file and broken by its author within the hour:**
+
+> Never report a build-duration delta from fewer than ~5 builds, and **print
+> min/max of the comparison series next to the claim**. If the spread exceeds the
+> effect, the answer is "unattributable" — not "inert", not "improved". A pair
+> that agrees to 0.2% needs this as much as a pair that disagrees by 27%.
+
+**Mechanism findings are exempt and are what to reach for instead.**
+`ODDS_HISTORY_CACHE_HIT: 0` settled `#414`'s cache question in one reading: a
+counter reading zero is a fact about the code path, not a sample from a series.
+When a duration comparison is unattributable, look for a counter that isn't.
 
 ### The mirror is lossy for MEASUREMENT, not just for DATA (2026-08-12)
 
