@@ -56,10 +56,14 @@ clean positive. Until then this is a code fix with no production evidence.
 `--write-season-frontend-artifacts off`, so they never rebuild it. Not
 addressed here.
 
-**Also unmeasured:** when prop odds typically first post. Today's 10:08 CDT is
-a single point, and the snapshot files are overwritten in place, so
-`retrieved_at` is the last fetch and not the first. A morning-window schedule
-change needs that distribution first — do not pick an hour from one day.
+**Odds-posting distribution now MEASURED — see `#421`.** And it corrects this
+entry's own timeline: prop odds for the 08-13 slate were being captured from
+**02:02 CDT**, not 10:08. The 10:08 figure was the snapshot's `retrieved_at`,
+i.e. its LAST fetch, which is exactly the overwrite-in-place trap flagged here.
+The empty 00:24 build missed the odds by **~98 minutes, not ~10 hours**. This
+changes nothing about the root cause or the fix — the guard's read went to
+Redis and returned None whenever the odds landed — but it does mean a working
+guard would have rebuilt the 08-13 board automatically at ~02:02.
 
 ### `#420` — **The MLB sim's pipeline wait was bounded in ticks, not in time.** COMMITTED `bf8833e9`, **NOT DEPLOYED**.
 
@@ -86,6 +90,64 @@ empty board. Do not read a post-deploy improvement as evidence for this one.
 the decision is mostly cheap reads, but not entirely — `fetch_schedule_for_date`
 and `_fetch_mlb_injuries` are network calls, so moving the gate below them was
 NOT done and should not be done without measuring that cost first.
+
+### `#421` — **The evening pre-generation runs before prop odds exist on 7 of 8 slates. Measured.** OPEN — needs a `render.yaml` decision.
+
+`SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_START_HOUR = 18` pre-generates tomorrow's
+slate at 18:00 CDT the night before. Measured against 8 slates (2026-08-06..13,
+the full extent of `book_quotes` — nothing exists before 08-06):
+
+    build hour (CDT)                 odds ready   beats 1st pitch   both
+    18:00 the night before (CURRENT)        1/8               8/8    1/8
+    04:00 - 10:00 slate day                 7/8               8/8    7/8
+    11:00 slate day                         7/8               7/8    6/8
+
+**Any same-day hour from 04:00 to 10:00 scores identically at 7/8.** This data
+does NOT discriminate inside that band; picking within it is a judgement about
+odds freshness vs. margin, not a measurement. Do not claim otherwise.
+
+The 8th slate is unfixable by scheduling: 2026-08-06 had prop odds first
+captured 11:25 against an **11:36 first pitch** — 11 minutes of lead. That is a
+book-side reality. Every option above is 7/8, never 8/8.
+
+**Lead time, first prop capture → first pitch:** min 0.2h, median 12.4h, max
+24.5h, n=8. Seven of eight slates had 10h+ of lead, so prop odds are normally
+available long before the games — the problem was never that they post late.
+
+**Method.** Full scan of `mlb_source/tracking/book_quotes/<date>.jsonl`, which
+carries both `captured_at` (our fetch) and `book_updated_at` (the book's own
+stamp). The two run 2–12 minutes apart consistently, so capture is prompt and
+`captured_at` is a tight upper bound on when the line existed. `kind` cleanly
+separates `game` (20,680 rows on 08-13) from `prop` (26,603).
+
+**Two measurement errors worth recording, both caught before conclusions:**
+1. The first pass stopped at the first `prop` row, assuming the file is
+   append-ordered by capture time. It is not — on 08-12 the first prop row in
+   FILE order stamps 02:03 while the first game row stamps 14:08. Every number
+   that pass produced was first-in-file, not earliest-in-time. Fixed by full
+   scan (~20MB/date).
+2. The corrected scan printed bare `%H:%M`, which rendered previous-evening
+   captures as same-day times — the 08-07 slate's odds looked like they landed
+   at 23:30 ON 08-07 when the capture is `2026-08-07T04:30Z` = 23:30 CDT on
+   **08-06**. Half the timestamps are previous-day, so the bare clock reading
+   inverted the question. Fixed with an explicit `-1d` offset.
+
+**CAVEAT, load-bearing:** `book_quotes` is written by the live-odds-worker
+capture path. The `#419` guard reads a DIFFERENT artifact —
+`snapshots/<date>/oddsapi_<group>_props_<date>.json`, written by
+`fetch_daily_oddsapi_markets.py`. This measurement establishes when prop odds
+were available *to the platform*, **not** that the snapshot file the guard
+reads existed at that moment. Those are not proven to move together and nobody
+has checked.
+
+**Recommendation, in order:** `#419` is the higher-value fix and is already
+committed — with a working guard the 08-13 board would have rebuilt itself at
+~02:02 with no schedule change at all. Deploy and verify that first. Only then
+consider moving the evening hour, because a schedule change on top of an
+unverified guard fix makes neither attributable. Note the hour lives in
+`render.yaml`, so changing it applies to production on push (`#284`).
+
+**n=8. Small.** Treat the 7/8 as a direction, not a rate.
 
 ### `#414` — **THE CACHE IS PROVABLY NOT HIT, AND THE BUILD GOT FASTER ANYWAY. Two signals disagree.** NEEDS ITS AUTHOR.
 
