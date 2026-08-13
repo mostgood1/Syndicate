@@ -114,3 +114,55 @@ class TestPayloadCache:
         """A shard APPEARING must invalidate. Absent is a state, not a gap."""
         fp = intel._odds_history_shard_fingerprint([{"slug": "mlb", "context_label": ""}])
         assert fp is None or isinstance(fp, tuple)
+
+
+class TestIndexStats:
+    """`#414` follow-up. The first version of this fix was UNVERIFIABLE: the
+    payload cache (0.7s of a ~1500s build) was instrumented and the index cache
+    (essentially all of it) was not. Deployed, then unanswerable.
+
+    These assert the counter distinguishes a working memo from an inert one,
+    which a boolean "the cache exists" could not.
+    """
+
+    def test_repeated_calls_on_one_payload_count_as_hits(self):
+        intel._reset_odds_history_index_stats()
+        payload = _payload(3)
+        for _ in range(4):
+            intel._odds_history_player_index_for(payload)
+        assert intel._ODDS_HISTORY_INDEX_STATS["misses"] == 1
+        assert intel._ODDS_HISTORY_INDEX_STATS["hits"] == 3
+
+    def test_an_inert_memo_is_visible_as_all_misses(self):
+        """If the payload object is rebuilt between calls the memo saves
+        nothing. That must show as misses tracking calls, not as silence."""
+        intel._reset_odds_history_index_stats()
+        for _ in range(4):
+            intel._odds_history_player_index_for(_payload(3))
+        assert intel._ODDS_HISTORY_INDEX_STATS["hits"] == 0
+        assert intel._ODDS_HISTORY_INDEX_STATS["misses"] == 4
+
+    def test_a_non_dict_payload_is_neither_hit_nor_miss(self):
+        """There is no payload to memoise, so counting it either way would move
+        the rate without anything changing."""
+        intel._reset_odds_history_index_stats()
+        intel._odds_history_player_index_for(None)
+        intel._odds_history_player_index_for("nope")
+        assert intel._ODDS_HISTORY_INDEX_STATS == {"hits": 0, "misses": 0,
+                                                   "build_seconds_saved_est": 0}
+
+    def test_the_reset_clears_only_the_counters(self):
+        intel._odds_history_player_index_for(_payload(2))
+        intel._reset_odds_history_index_stats()
+        assert intel._ODDS_HISTORY_INDEX_STATS["hits"] == 0
+        assert intel._ODDS_HISTORY_INDEX_STATS["misses"] == 0
+
+    def test_the_stats_line_reaches_stdout_not_a_logger(self, capsys):
+        """logger.info does not reach Render's log collector from this process;
+        an unreadable counter is the defect this counter exists to fix."""
+        intel._reset_odds_history_index_stats()
+        intel._odds_history_player_index_for(_payload(2))
+        intel._log_odds_history_index_stats("test")
+        out = capsys.readouterr().out
+        assert "ODDS_HISTORY_INDEX_STATS" in out
+        assert "hits=0 misses=1" in out and "hit_rate=0%" in out

@@ -2981,15 +2981,57 @@ def _merge_odds_history_payloads(payloads: list[dict[str, Any]]) -> dict[str, An
 _ODDS_HISTORY_INDEX_KEY = "__player_index_cache__"
 
 
+# `#414` follow-up. **The counter exists because the first version of this fix
+# was UNVERIFIABLE.** I instrumented the payload cache -- which the cleanup lane
+# then measured at 0.7s, i.e. ~2s of a ~1500s build -- and left the index cache,
+# the half carrying essentially all the cost, with no observable at all. Deployed
+# it, then could not answer whether it fired. That is the night's recurring shape
+# committed inside the fix for it.
+#
+# Counts, not a boolean: a single hit proves the branch executes, and only a
+# RATIO shows whether it is doing the work claimed. Expected ~1 miss per sport
+# per build with the rest hits; a miss count that tracks the call count means the
+# payload object is being rebuilt between calls and the memo is inert.
+#
+# Reset per build by the caller so the numbers describe ONE build rather than an
+# ever-growing process total, which would hide a regression under a large
+# denominator.
+_ODDS_HISTORY_INDEX_STATS: dict[str, int] = {"hits": 0, "misses": 0, "build_seconds_saved_est": 0}
+
+
+def _reset_odds_history_index_stats() -> None:
+    _ODDS_HISTORY_INDEX_STATS.update({"hits": 0, "misses": 0})
+
+
+def _log_odds_history_index_stats(where: str) -> None:
+    hits = _ODDS_HISTORY_INDEX_STATS.get("hits", 0)
+    misses = _ODDS_HISTORY_INDEX_STATS.get("misses", 0)
+    total = hits + misses
+    # `print`, not `logger.info` -- logger output does not reach Render's log
+    # collector from this process, which is how four layers of timing existed
+    # tonight and only two were readable.
+    print(
+        f"[intelligence] ODDS_HISTORY_INDEX_STATS where={where} hits={hits} "
+        f"misses={misses} calls={total} "
+        f"hit_rate={(hits / total * 100) if total else 0:.0f}%",
+        flush=True,
+    )
+
+
 def _odds_history_player_index_for(
     odds_history: dict[str, Any] | None,
 ) -> tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]]:
     """`_build_odds_history_player_index`, memoised on the payload itself."""
     if not isinstance(odds_history, dict):
+        # Not counted either way: there is no payload to memoise, so this is
+        # neither a hit nor a miss and folding it into either would move the
+        # rate without anything changing.
         return _build_odds_history_player_index(odds_history)
     cached = odds_history.get(_ODDS_HISTORY_INDEX_KEY)
     if cached is not None:
+        _ODDS_HISTORY_INDEX_STATS["hits"] = _ODDS_HISTORY_INDEX_STATS.get("hits", 0) + 1
         return cached
+    _ODDS_HISTORY_INDEX_STATS["misses"] = _ODDS_HISTORY_INDEX_STATS.get("misses", 0) + 1
     index = _build_odds_history_player_index(odds_history)
     odds_history[_ODDS_HISTORY_INDEX_KEY] = index
     return index
@@ -3925,6 +3967,7 @@ def _supplement_odds_history_from_candidate_dates(
 
 
 def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_history_by_sport: dict[str, dict[str, Any]] | None) -> list[dict[str, Any]]:
+    _reset_odds_history_index_stats()
     odds_history_by_sport = _supplement_odds_history_from_candidate_dates(candidates, odds_history_by_sport)
     enriched: list[dict[str, Any]] = []
     # Indexed once per sport rather than re-scanning the full odds-history
@@ -3963,6 +4006,10 @@ def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_
                 "last_updated": movement_context.get("last_updated"),
             }
         enriched.append(payload)
+    # `#414` follow-up: emitted at the END of the pass, when the call count is
+    # final. Emitting per call would bury the ratio in per-candidate noise, and
+    # emitting at the start would report the PREVIOUS pass.
+    _log_odds_history_index_stats(f"enrich:{len(candidates)}c")
     return enriched
 
 
