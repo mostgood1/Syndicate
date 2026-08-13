@@ -28933,6 +28933,50 @@ same reading you get from a broken scheduler, a dead worker, or a guard that
 never ran. **Verify a suppression by its own positive emission, never by the
 silence it creates.**
 
+### A pre-flight check cannot see an INTENT, only a STATE (2026-08-13)
+
+The check answers *"has someone started?"*. The question that matters is *"is
+someone about to?"*, and no amount of polling reaches it.
+
+MEASURED: the cleanup lane fired `cc7a8b65` (the `#409` drain-expiry fix) at
+01:33:55. Another lane fired `8e15e7fd` at **01:34:07 — twelve seconds later**
+— and Render cancelled the first. Twelve seconds is below the resolution of any
+poll-decide-POST loop, including the four-check pre-flight in the note below.
+By the time you read the deploys API, evaluate it, and issue the request,
+another lane can have begun.
+
+**Announce-then-fire is the only thing that closes a gap that narrow.** The lane
+that announced was the one that lost, because the lane that did not announce
+could not be seen.
+
+**This generalises past deploys to every check-then-act pattern here** — the
+refresh-run mutex, the sim-owner check, the id-collision grep before claiming a
+number. All of them read a state and act on it, and all of them have a window
+between the read and the act that the state cannot describe.
+
+### The deploy that wins carries LESS than the one it kills (2026-08-13)
+
+Three collisions in one night, all the same direction:
+
+    22:53  I cancelled the cleanup lane's #404 -- the fix for a stall MY deploy caused
+    ~01:0x 8e15e7fd landed WITHOUT cc7a8b65, shipping the #409 drain without its expiry fix
+    01:34  8e15e7fd cancelled cc7a8b65 by twelve seconds
+
+Every time, the surviving deploy carried strictly less than the one it
+displaced. **That is structural, not chance.** A lane firing on its own narrow
+change is by construction pinned to something older than a lane that has been
+accumulating fixes and waiting for a clean window. So:
+
+> **The discipline that makes you a good citizen is the same discipline that
+> makes you lose the race.** Waiting for build-idle, pinning a reviewed SHA, and
+> batching related fixes all increase the time your deploy spends unfired, which
+> is exactly the interval in which someone else's narrower deploy can take the
+> slot.
+
+The counter is announce-then-fire, and **it only works if everyone does it** —
+one lane skipping it defeats it for all the others, and does so invisibly,
+because the loser sees a cancellation with no owner attached.
+
 ### Before deploying a worker, check for SOMEONE ELSE'S deploy first (2026-08-12)
 
 I fired a deploy **34 seconds into another lane's**, cancelling it. Theirs was
