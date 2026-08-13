@@ -402,6 +402,18 @@
     is open; if it is closed at the fire time the run happens at next launch.
     So "durable" means "survives the session", not "survives the app being
     shut all night".
+  - **Second known gap, and it needed a fix: first-run tool approvals.** The
+    task has never run, so its Bash/curl/notification permissions are not yet
+    stored. If it pauses on a prompt at 00:03 with nobody watching, nothing
+    deploys and no ping arrives. The obvious remedy — click "Run now" to
+    pre-approve — was itself unsafe as originally written, because the task
+    relied on its **cron window** to mean "after the slate" and a manual run
+    bypasses the schedule. At 13:07 the job gate read `CLEAR` mid-slate, so
+    Run now would have deployed into live games. Fixed by making the slate
+    condition an explicit **Step 0** inside the prompt (`date +%H` must be
+    00–04, checked before anything else), so a manual run now stops
+    harmlessly. Same lesson as the `learnings.md` entry it came from —
+    encode the stated condition, do not let the schedule imply it.
 
 ## CLOSED THIS SESSION
 
