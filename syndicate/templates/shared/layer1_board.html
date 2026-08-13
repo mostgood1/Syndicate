@@ -57,6 +57,12 @@
   .l1-meta { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: #9fb0c6; margin-bottom: 12px; }
   .l1-meta b { color: #e8eef7; }
   .l1-warn { color: #f0b429; }
+  /* A live-derived projection reads differently from a pregame one, and the
+     difference is load-bearing: it is the only kind whose edge the live-edge
+     policy allows on an in-progress game. */
+  .l1-live-proj { color: #4ade80; }
+  .l1-actual { color: #8fa2b8; font-size: 11px; }
+  .l1-actual::before { content: "•"; margin-right: 2px; }
 
   /* Compact game cards. The slate at a glance, then the markets under it. */
   .l1-card {
@@ -749,15 +755,44 @@
         ? Number(p.age_hours) : null;
       var projStale = projAge !== null && projAge >= 24;
 
+      // THE LIVE TIER (`#412`). On an in-progress game three different numbers
+      // are in play and they must not be spelled the same way: what the live
+      // re-sim projects NOW, what the pregame sim projected, and what has
+      // ACTUALLY happened so far. The overlay used to write the live number over
+      // the pregame one, so the move from "we said 2.27" to "now 1.80, with 1
+      // already in the book" was invisible -- which is what "im not seeing
+      // proj/edge data on the live lines" was actually about.
+      var isLive = onProj && p.live_aware === true;
+      var simProj = (p.sim_projected === null || p.sim_projected === undefined) ? null : Number(p.sim_projected);
+      var actual = (p.actual_so_far === null || p.actual_so_far === undefined) ? null : Number(p.actual_so_far);
+      // A LIVE PROJECTION IS NEVER STALE, and `age_hours` says otherwise. The
+      // overlay preserves the pregame projection's fields, so `age_hours`
+      // describes the number that was REPLACED -- a fresh re-sim inheriting a
+      // 26h-old pregame timestamp would render with the stale marker, telling
+      // the reader to distrust the one number on the row that knows the score.
+      if (isLive) { projStale = false; }
+      var projNote = "";
+      if (isLive) {
+        projNote = "live re-sim"
+          + (simProj !== null ? " · pregame sim " + simProj.toFixed(2) : "")
+          + (actual !== null ? " · " + actual + " so far" : "");
+      }
+
       var cells = "";
       if (i === 0) {
         cells += '<td class="l1-mkt" rowspan="' + sides.length + '">' + label + line + seg + gaps
           + (r.player_name ? ' <span class="l1-side">' + esc(r.market) + "</span>" : "") + "</td>";
       }
       cells += '<td class="l1-side">' + esc(side) + "</td>"
-        + '<td' + (projAge !== null ? ' title="model output is ' + Math.round(projAge) + 'h old"' : "")
-                 + (projStale ? ' class="l1-warn"' : "") + '>'
+        + '<td' + (projNote ? ' title="' + esc(projNote) + '"'
+                   : (projAge !== null ? ' title="model output is ' + Math.round(projAge) + 'h old"' : ""))
+                 + (projStale ? ' class="l1-warn"' : (isLive ? ' class="l1-live-proj"' : "")) + '>'
           + (onProj && p.projected !== null && p.projected !== undefined ? Number(p.projected).toFixed(2) : "·")
+          // The actual is shown INLINE rather than hidden in the tooltip: on a
+          // live row it is the one number that is not a model output, and a
+          // projection of 1.80 means something different with 0 in the book
+          // than with 2.
+          + (isLive && actual !== null ? ' <span class="l1-actual">' + actual + "</span>" : "")
           + (projStale ? " *" : "") + "</td>"
         + '<td class="' + edgeCls + '"' + edgeTitle + '>' + edgeTxt + "</td>"
         + '<td class="l1-price l1-best">' + odds(best.price) + "</td>"
