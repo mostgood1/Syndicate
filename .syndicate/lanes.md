@@ -10,6 +10,61 @@ _(none — see CLOSED below)_
 
 ## CLOSED THIS SESSION
 
+### sim-execution-observability — CLOSED-PENDING-MEASUREMENT 2026-08-13
+- Goal: measure sim execution per sport (when/how long/how often/what triggers
+  a re-sim), then fix what the measurement exposed.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/live_refresh_loop.py`
+  - `syndicate/features/shared/sim_run_ledger.py`
+  - `syndicate/features/shared/odds_book_quotes.py`
+  - `syndicate/features/nfl/sources.py`
+  - `scripts/run_refresh_worker.py`
+  - `scripts/refresh_odds_sources.py`
+  - `syndicate/blueprints/ops.py`
+  - `syndicate/blueprints/home.py` (segment profiler only)
+  - `syndicate/features/intelligence.py` (SLOW_GAME_CANDIDATE only)
+- SHIPPED AND VERIFIED: `#388` (orphan cause recorded, observed twice in prod),
+  `#389` + artifact-root fix (guard and writer share one resolver),
+  `#390` (sim run ledger + `/api/ops/sims/ledger`), `#393` closed as
+  root-caused-no-code-change.
+- **OPEN AND UNMEASURED: where the board-build cost lives.** `448e1816` is live
+  (`15:27:25Z`) carrying `SLOW_SEGMENT_PROFILE` (named segments, rows vs tail)
+  and `_QUOTE_JOIN_STATS` (identity resolution by reason + `rows_walked`).
+  Neither has emitted: the line is gated per-GAME at 5s and daytime games are
+  ~0.4s each.
+- Verification still required: one EVENING build (historically 20:49-00:45Z),
+  then read one line:
+  - `tail_s` >> `rows_s` -> cost is post-loop; `enrich_block` names it
+  - `rows_s` >> `tail_s` -> the row loop is implicated after all
+  - `by_teams_fallthrough` ~= `calls` with large `rows_walked` -> the cheap
+    `event_id` key never matches, as predicted
+- Blocked by: nothing. Needs an evening slate only.
+- CAUTION: the previous instrument in this lane produced a confident wrong
+  answer (see `learnings.md`). Read the segment NAMES, not the totals.
+
+### soccer-sim-grouping — CLOSED 2026-08-10 — shipped and verified, one thread handed on
+- Goal: `#282` break the soccer sim into per-league groups. Grew into `#311`,
+  `#312`, `#327` as each surfaced from the one before.
+- Files (exclusive to this lane):
+  - `scripts/refresh_odds_sources.py`
+  - `scripts/run_refresh_worker.py`
+  - `scripts/audit_blueprint_drift.py` (new)
+  - `syndicate/features/shared/ops_refresh.py`
+  - `syndicate/features/shared/live_lens_loop.py`
+  - `syndicate/features/shared/memory_observability.py`
+  - `tests/test_live_lens_loop_publish_instrumentation.py` (new)
+- **SHIPPED AND VERIFIED:** `#282` (8 launches, full rotation), `#311` (cap
+  fired 16:06:31Z, first time ever, on the autorun path that was broken),
+  `#327` instrument work (ring + high-water + in-sweep sampler all confirmed).
+- **SHIPPED, MECHANISM UNTESTED:** `#312` — `f1bba90c` on `main`, live on
+  nothing (its only deploy was cancelled). `render.yaml` change parked on
+  branch **`hold/312-sync-false`**, deliberately off `main`.
+- **OPEN, HANDED ON:** `#327 RESIDUAL` — the allocator is unattributed after
+  five eliminations. Next action is one small change: record **bytes** on the
+  pull and sweep paths beside the existing counts.
+- No production change from this lane; all deploys were the oversight lane's.
+
+
 ### layer1-live-tier — CLOSED-PENDING-MEASUREMENT 2026-08-13
 - Goal: Layer 1 board carries live projection, sim projection and actual-so-far
   on live rows, with correct live game state; retire `book_grid`.

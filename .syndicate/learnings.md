@@ -142,3 +142,96 @@
   lane has touched.** Verify a ticket number against `origin/main` immediately
   before pushing, not when drafting — the gap between choosing and pushing is a
   real race.
+
+## An instrument's SPAN is not its NAME (2026-08-13)
+
+`SLOW_ROW_PROFILE` was written to measure per-row cost in
+`_game_bet_candidates_from_game`. Its closing mark was placed at the **end of
+the function**, after the entire post-loop tail, so the final delta covered
+*last iteration + tail*. On `rows=1` games that single delta **was the whole
+function**.
+
+It produced `rows=1 total_s=399.40 min=p50=max=399.398` and the conclusion
+"one pathological iteration takes 100–400s". The row loop was never implicated
+by the data.
+
+**Two failure modes worth separating:**
+
+1. The number was real and the span was wrong. Nothing about the output looked
+   malformed.
+2. `SLOW_ROW_PROFILE` and `SLOW_GAME_CANDIDATE` agreed to six decimal places,
+   which was read as two independent measurements corroborating. **They were
+   the same quantity measured twice.** Agreement produced by shared
+   construction is not confirmation — the same mechanism as dividing by the
+   wrong denominator across seven games and reading the consistency as
+   evidence.
+
+**Rule.** When adding a timing span, state what it EXCLUDES, and place a mark
+at every boundary you intend to attribute across. Name each segment by the work
+it *contains*. If two instruments agree exactly, first prove they are not
+reading the same clock interval.
+
+**The sharp part:** `a span's NAME is not its COVERAGE` was already recorded in
+`todo.md` earlier the same night, and the instrument written to act on it broke
+it. **A rule does not protect the code that implements it.**
+
+## Authorship cannot be read from `git blame` here (2026-08-13)
+
+Every commit in this repo is authored `github-actions[bot]`. A lane's work was
+attributed to the wrong session cross-session; they disproved it by listing the
+files they had touched. **Use file-touch sets, not `%an`.** The near-miss:
+had they accepted the framing to be agreeable, unfamiliarity with the code
+would have been laundered into apparent endorsement, and the misattribution
+would have become unfalsifiable — the one person able to deny it would already
+have appeared to confirm it.
+
+`syndicate/features/intelligence.py` and `syndicate/blueprints/intelligence.py`
+are a confusable pair and were the likely source of the error.
+
+### 2026-08-10 — a briefed premise is a hypothesis, not a starting condition
+- What was believed: soccer sims were OFF by standing instruction, so the lane
+  was working against a mitigated system.
+- What was actually true: the autorun flag was `'true'` live, all three sim
+  fixes were ancestors of the deployed commit, and a 20m13s sim was running.
+  **Nothing had been mitigating it all evening.**
+- The rule going forward: **verify the premise of the brief before writing code
+  against it.** Checking cost one env query and one ancestry check; it changed
+  the urgency of the whole lane.
+
+### 2026-08-10 — an instrument's blind spot will be mistaken for a finding
+- What was believed: the publish sweep was eliminated, because before/after
+  samples showed ±20MB deltas.
+- What was actually true: **a before/after pair cannot see a transient
+  allocated and released between its endpoints.** In-sweep sampling later found
+  lifts to **+642.6MB** the endpoints never saw. The elimination was an artifact
+  of the instrument, not a property of the system.
+- Then the correction was itself wrong: the retraction rested on one excursion
+  landing inside a sweep, at a **16–20% duty cycle** — a 1-in-5 event reported
+  as decisive.
+- The rule going forward: **ask what the instrument cannot see before trusting
+  what it shows, and compute the base rate before believing a coincidence.**
+  Both directions of this error were made in one evening on the same candidate.
+
+### 2026-08-10 — segment on process boundaries before any neighbour-based test
+- What was believed: a `+529.5MB` excursion had been observed with no publish
+  sweep running — the headline evidence for restoring an elimination.
+- What was actually true: **the detector's forward neighbour was a post-reboot
+  sample** (392.9MB). An ordinary sample on a rising baseline scored as a large
+  excursion. The original analysis was boot-segmented; that was regressed when
+  the detector was rewritten as a live watcher, and nothing in the output said
+  so — a fake excursion looks exactly like a real one.
+- The rule going forward: **any local/neighbour test must segment on boot
+  first.** A restart is a discontinuity, not a data point.
+
+### 2026-08-10 — counts are the wrong denominator when the cost is bytes
+- What was believed: a marginal cost of `−1.60 MB per artifact` showed the
+  publish sweep was cheap.
+- What was actually true: `published_count` counts files *published* and
+  `pulled_count` counts files *written*; **neither counts bytes held.** Sweeps
+  with `pub=0` still cost `+488.6MB`, and pulls with `pulled=0` cost `+575.7MB`.
+  The rate was fitted against a denominator that does not measure the cost —
+  and over a 15–34 population when the range of interest was 73–103.
+- The rule going forward: **before quoting a rate, check the denominator
+  actually measures the thing being paid for, and that it spans the population
+  of interest.**
+
