@@ -78,6 +78,7 @@
   - **STILL THE SINGLE NEXT ACTION: the 24h read, 2026-08-14 ~13:00 CDT.**
     Owner still unassigned. Everything else in this lane is done.
 
+
 - Goal: `memory_headroom_snapshot` decides on unreclaimable memory
   (`anon + shmem + slab_unreclaimable`), so that total memory in use FALLING
   can never tighten the guard. Unblocks `#417` and `#387` in one change.
@@ -596,3 +597,19 @@
 ## CLOSED
 
 _(none yet — seeded ledger)_
+
+### hooks-enforcement-wiring — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
+
+Recorded retroactively for traceability, matching the `render-yaml-web-block-hygiene`
+precedent. Harness-only work (`.claude/**`, `.gitignore`, `.gitattributes`);
+collisions were checked against the OPEN lanes and were nil, but that was a
+read, not a claim. Third session today to work `.claude/**` without a lane —
+if that keeps happening, the protocol should say harness work is exempt rather
+than have every session quietly decide it is.
+
+- Outcome: three hooks wired and measured end-to-end. `session-start` v3
+  delivers 1,243 B inside the ~2KB cap (v1 delivered ~5%); `lane-guard.py`
+  rewritten to parse the real lanes.md shape and confirmed blocking through
+  the harness; `checkpoint-guard.py` replaces the `.sh` and can now pass.
+- Commits: `0d0b8931`, `0642cdf7`, `5b2ca320`. Pushed: `f6fec4f1` only.
+- Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
