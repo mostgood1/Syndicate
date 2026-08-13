@@ -26,11 +26,11 @@
   used three times on 08-13 (`f6fec4f1`, `03073270`, `461c0df0`), twice
   because another session had uncommitted files the merge would have
   clobbered. `[from-git 08-13]`
-- Repo tip: local `main` `5b2ca320`, **20 ahead / 6 behind `origin/main`**
+- Repo tip: local `main` `5cdf45b6`, **20 ahead / 6 behind `origin/main`**
   (`571f774b`). The two have diverged. **The `session-start.sh` clause here is
-  now stale** — that file was committed in `0642cdf7` and the worktree is clean
+  now stale** — that file was committed in `0634e7bb` and the worktree is clean
   of it; it blocks nothing. What a push DOES carry is 3 unpushed `render.yaml`
-  commits (`054b2306`, `cc2e1803`, `e8611888`), which fire `blueprint_sync`.
+  commits (`d16950b9`, `1e09fa9b`, `7c60d0f8`), which fire `blueprint_sync`.
   `git push` from this checkout is not scoped to your own commits — read
   `git log origin/main..HEAD` first. Hook work was landed by cherry-picking
   onto `origin/main` in a throwaway worktree to avoid carrying them
