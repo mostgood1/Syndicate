@@ -237,6 +237,18 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
     # is just another null unless you can see the keyspace it is absent from --
     # the `#412` root cause was exactly a right value under an unexpected key.
     sample_prop_keys: list[str] = []
+    # BY GAME STATE, because the flat counter cannot be read (`#416`).
+    # Measured 2026-08-13 on a 2-live-game tail: `live_prob_seen: 0` of 67 rows,
+    # which reads as "the writer never sent it" and may equally be "65 of those
+    # rows were never eligible". A FINAL game's props come from
+    # `_final_live_prop_rows_from_registry` -- a different path that never
+    # computes a live probability and correctly emits null -- so final rows
+    # dilute the denominator with guaranteed zeros. Only the `live` row of this
+    # table can falsify anything.
+    by_state: dict[str, dict[str, int]] = {}
+
+    def _bucket(state: str) -> dict[str, int]:
+        return by_state.setdefault(state, {"rows": 0, "with_live_prob": 0, "with_live_projection": 0})
 
     games = (snapshot or {}).get("games") if isinstance(snapshot, Mapping) else None
     for game in games if isinstance(games, Sequence) else ():
@@ -245,8 +257,20 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         games_seen += 1
         status = game.get("status") if isinstance(game.get("status"), Mapping) else {}
         status_text = f"{status.get('abstract') or ''} {status.get('detailed') or ''}".strip().lower()
-        if any(token in status_text for token in ("live", "in progress", "in_progress")):
+        # FINAL IS CHECKED FIRST. A completed game's detailed state can still
+        # carry live-ish wording, and mislabelling one final game as live is
+        # exactly what would put a guaranteed-null row into the only bucket that
+        # can prove anything.
+        if any(token in status_text for token in ("final", "game over", "completed")):
+            game_state = "final"
+        elif any(token in status_text for token in ("live", "in progress", "in_progress")):
+            game_state = "live"
             live_games += 1
+        elif any(token in status_text for token in ("preview", "pre-game", "pre_game", "scheduled", "warmup")):
+            game_state = "pregame"
+        else:
+            game_state = "unknown"
+        bucket = _bucket(game_state)
         for prop in game.get("liveProps") if isinstance(game.get("liveProps"), Sequence) else ():
             if not isinstance(prop, Mapping):
                 continue
@@ -257,6 +281,14 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
             has_live_prob = prop.get("liveModelProbOver") is not None
             if has_live_prob:
                 rows_with_live_prob_seen += 1
+            bucket["rows"] += 1
+            if has_live_prob:
+                bucket["with_live_prob"] += 1
+            if prop.get("liveProjection") is not None:
+                # Carried alongside on purpose: a live game with projections but
+                # no probabilities is the writer half failing, while neither
+                # present means the row was never a live-tier candidate at all.
+                bucket["with_live_projection"] += 1
             player = _norm_name(prop.get("playerName"))
             market = _snapshot_market(prop)
             line = _as_float(prop.get("line"))
@@ -300,6 +332,7 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         "rows_with_live_prob_seen": rows_with_live_prob_seen,
         "rows_with_live_prob_indexed": rows_with_live_prob_indexed,
         "sample_prop_keys": sample_prop_keys,
+        "by_game_state": by_state,
     }
 
 
@@ -524,6 +557,11 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         "snapshot_live_prob_seen": indexed.get("rows_with_live_prob_seen"),
         "snapshot_live_prob_indexed": indexed.get("rows_with_live_prob_indexed"),
         "snapshot_prop_keys": indexed.get("sample_prop_keys"),
+        # THE ROW THAT MATTERS IS `live`. Final-game props come from a registry
+        # path that never computes a live probability, so their zeros are
+        # correct and meaningless -- pooled with the live rows they turn a
+        # falsifiable measurement into an unreadable one.
+        "snapshot_by_game_state": indexed.get("by_game_state"),
         "miss_no_player": miss_no_player,
         "miss_no_market_alias": miss_no_market_alias,
         "miss_no_line": miss_no_line,

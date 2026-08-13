@@ -449,3 +449,60 @@ def test_the_snapshot_keyspace_is_reported_when_the_field_is_absent():
     assert "liveProjection" in keys and "modelProbOver" in keys
     assert len(keys) <= 40
     assert all(isinstance(k, str) for k in keys), "keys only -- this must not leak values"
+
+
+def _game(abstract, detailed, *props):
+    return {"status": {"abstract": abstract, "detailed": detailed}, "liveProps": list(props)}
+
+
+def test_final_game_rows_do_not_dilute_the_live_measurement():
+    """`#416`: the flat counter could not be read.
+
+    Measured on a 2-live-game tail: `live_prob_seen: 0` of 67 rows. That reads as
+    "the writer never sent it" and may equally be "65 of those were never
+    eligible" -- a FINAL game's props come from
+    `_final_live_prop_rows_from_registry`, a different path that never computes a
+    live probability and correctly emits null. Pooled, guaranteed zeros drown the
+    only rows that can falsify anything.
+    """
+    live = _prop("Aaron Judge", "hitter_props", "hits", 0.5)
+    live["liveModelProbOver"] = 0.44
+    dead = _prop("Old Timer", "hitter_props", "hits", 0.5)
+    dead.pop("liveModelProbOver", None)
+    snapshot = {"games": [_game("Live", "In Progress", live),
+                          _game("Final", "Final", dead, dead, dead)]}
+    cov = attach_live_projections([], build_live_prop_index(snapshot))
+    states = cov["snapshot_by_game_state"]
+    assert states["live"] == {"rows": 1, "with_live_prob": 1, "with_live_projection": 1}
+    assert states["final"]["rows"] == 3
+    assert states["final"]["with_live_prob"] == 0
+    # The flat figure alone would read 1-of-4 and say nothing about the writer.
+    assert cov["snapshot_live_prob_seen"] == 1
+
+
+def test_a_final_game_is_never_bucketed_live():
+    """Final is tested FIRST, and that ordering is the point.
+
+    A completed game's detailed state can still carry live-ish wording.
+    Mislabelling one final game as live puts a guaranteed-null row into the only
+    bucket that can prove anything -- which is how this instrument would come to
+    confirm the failure it was built to rule out.
+    """
+    dead = _prop("Old Timer", "hitter_props", "hits", 0.5)
+    dead.pop("liveModelProbOver", None)
+    snapshot = {"games": [_game("Final", "Game Over: In Progress no more", dead)]}
+    states = attach_live_projections([], build_live_prop_index(snapshot))["snapshot_by_game_state"]
+    assert "live" not in states
+    assert states["final"]["rows"] == 1
+
+
+def test_projections_are_counted_beside_probabilities():
+    # A LIVE game with projections but no probabilities is the writer half
+    # failing. Neither present means the row was never a live-tier candidate.
+    # One number cannot tell those apart.
+    half = _prop("Aaron Judge", "hitter_props", "hits", 0.5, projection=0.9)
+    half.pop("liveModelProbOver", None)
+    states = attach_live_projections(
+        [], build_live_prop_index({"games": [_game("Live", "In Progress", half)]})
+    )["snapshot_by_game_state"]
+    assert states["live"] == {"rows": 1, "with_live_prob": 0, "with_live_projection": 1}
