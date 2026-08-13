@@ -52,11 +52,33 @@ over_note() {  # $1=label  $2=cap  $3=text
 # --- Open lanes: slug and goal only, hard-capped ---
 LANES=""
 if [ -f .syndicate/lanes.md ]; then
+  # Status is the field between the 1st and 2nd em-dash, and it is FREE TEXT.
+  # v3 required a literal " — OPEN", which rejected the live lane
+  # "— DEPLOYED, MEASUREMENT OPEN —" and under-reported open lanes 2 -> 1.
+  # v2's bare /OPEN/ had the opposite failure, counting "NO LANE WAS EVER
+  # OPENED" as open. Match the WORD within the status field only: the
+  # (^|[^A-Za-z])OPEN([^A-Za-z]|$) form is a portable word boundary, since
+  # \b/\y are not consistent across awk implementations.
   LANES_RAW=$(awk '
-    /^###[[:space:]]/ { open = ($0 ~ / — OPEN([^A-Za-z]|$)/) ? 1 : 0 }
+    /^###[[:space:]]/ {
+      st = $0
+      if (sub(/^###[^—]*—[[:space:]]*/, "", st)) {
+        sub(/—.*$/, "", st)
+        open = (st ~ /(^|[^A-Za-z])OPEN([^A-Za-z]|$)/) ? 1 : 0
+      } else {
+        open = 0
+      }
+    }
     open && /^###[[:space:]]/ { print; next }
     open && /^-[[:space:]]*Goal:/ { print "   " $0 }
   ' .syndicate/lanes.md 2>/dev/null)
+
+  # A "### " header with no em-dash has no parseable status and is NOT counted
+  # as open. That is the permissive direction, so it has to be visible: this
+  # exact class of silence is what hid the DEPLOYED-lane hole for 20 minutes.
+  H=$(grep -c '^###[[:space:]]' .syndicate/lanes.md 2>/dev/null || echo 0)
+  P=$(grep -cE '^###[[:space:]][^—]*—' .syndicate/lanes.md 2>/dev/null || echo 0)
+  UNPARSED=$(( ${H:-0} - ${P:-0} ))
   NOTES="${NOTES}$(over_note "OPEN LANES" "$LANE_CAP" "$LANES_RAW")"
   LANES=$(printf '%s' "$LANES_RAW" | head -c "$LANE_CAP")
 fi
@@ -82,6 +104,7 @@ add ""
 if [ -f .syndicate/lanes.md ]; then
   add "--- OPEN LANES ---"
   add "${LANES:-(none)}"
+  [ "${UNPARSED:-0}" -gt 0 ] && add "(${UNPARSED} lane header(s) have no parseable status and are NOT guarded)"
   add ""
 fi
 

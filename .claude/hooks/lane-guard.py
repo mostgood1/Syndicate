@@ -17,7 +17,15 @@ is written with forward slashes.
 import json, os, re, sys
 
 TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
-LANE_RE = re.compile(r"^###\s+(\S+)\s+—\s+(\w+)")
+HEADER_RE = re.compile(r"^###\s")
+# Status is the field between the 1st and 2nd em-dash, and it is FREE TEXT.
+# Reading it as one word (the old `(\w+)`) silently unprotected a live lane:
+# `memory-guard-reclaimable` was relabelled "— DEPLOYED, MEASUREMENT OPEN —",
+# whose first word is DEPLOYED, so its four claimed files stopped being
+# guarded with nothing reporting it. Match the WORD anywhere in the field:
+# accepts "DEPLOYED, MEASUREMENT OPEN", rejects "OPENED"/"REOPENED"/"CLOSED".
+LANE_RE = re.compile(r"^###\s+(\S+)\s+—\s*([^—]*)")
+OPEN_RE = re.compile(r"\bOPEN\b")
 FILES_RE = re.compile(r"^\s*-\s*Files\b[^:]*:(.*)$")
 FIELD_RE = re.compile(r"^-\s*\w")
 PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
@@ -47,10 +55,17 @@ def _claims(text):
     open_lane = False
     in_files = False
     for line in text.splitlines():
-        m = LANE_RE.match(line)
-        if m:
-            slug, status = m.group(1), m.group(2)
-            open_lane = status == "OPEN"
+        # Every "### " line ends the previous lane, parseable or not. Without
+        # this branch a header that fails LANE_RE (e.g. "### (superseded lane
+        # detail...)") fell through and INHERITED the previous lane's open
+        # state, attributing its Files block to the wrong slug.
+        if HEADER_RE.match(line):
+            m = LANE_RE.match(line)
+            if m:
+                slug = m.group(1)
+                open_lane = bool(OPEN_RE.search(m.group(2)))
+            else:
+                slug, open_lane = None, False
             in_files = False
             continue
 
