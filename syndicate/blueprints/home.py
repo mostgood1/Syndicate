@@ -2551,7 +2551,22 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
     # enriching the same data twice, at two stages, for one field. That work now
     # happens once in enrich_candidate_rows over the assembled list (which also
     # recomputes `edge`), so this pass is gone. Three enrichment sites -> two.
+    # `#414` follow-up. Per-ROW timing, one level below SLOW_GAME_CANDIDATE.
+    #
+    # MEASURED: MLB spends ~8-9s PER ROW here, near-constant across games
+    # (224.9s/26 rows, 184.9s/21, 107.0s/11, 100.1s/10, 71.6s/7). That is the
+    # wrong shape for a once-per-build index rebuild -- which is why #414's
+    # cache fix could not have helped even had its fingerprint matched. But
+    # NOTHING in this function's call graph touches odds history, while the
+    # cost tracks odds-history shard size. Reading the code cannot resolve
+    # that; it depends on the runtime size of what `game` carries.
+    #
+    # Timestamps, not a try/finally around the body: the loop has several
+    # `continue` paths and wrapping it would change control flow to measure it.
+    # Deltas between consecutive marks give per-row cost including the skips.
+    _row_marks: list[float] = []
     for row in game_recs:
+        _row_marks.append(time.time())
         if not isinstance(row, dict):
             continue
         row_market_text = _first_present_text(row.get("market_label"), row.get("market"), row.get("label")) or "Game bet"
@@ -2857,6 +2872,22 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             # enrichment was working. (Lost once to a revert; re-applied.)
             date_str=_quote_game_date(game),
         )
+    except Exception:
+        pass
+    _row_marks.append(time.time())
+    try:
+        _durs = sorted(b - a for a, b in zip(_row_marks, _row_marks[1:]))
+        _tot = sum(_durs)
+        # ONE line per slow game, not one per row: 76 rows/build would be noise,
+        # and min/p50/max answers the only question that matters here -- whether
+        # the cost is uniform across rows or carried by one of them.
+        if _durs and _tot >= float(os.environ.get("SYNDICATE_SLOW_ROW_TOTAL_SECONDS") or 5):
+            print(
+                f"[home] SLOW_ROW_PROFILE sport={_safe_text(sport.get('slug'), '?')} "
+                f"rows={len(_durs)} total_s={_tot:.2f} "
+                f"min_s={_durs[0]:.3f} p50_s={_durs[len(_durs)//2]:.3f} max_s={_durs[-1]:.3f}",
+                flush=True,
+            )
     except Exception:
         pass
     filtered = [row for row in candidates if row.get("edge") not in {"-", None} or row.get("confidence") not in {"-", None}]
