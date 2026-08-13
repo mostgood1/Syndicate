@@ -1,5 +1,84 @@
 # Syndicate TODO — canonical cross-session list
 
+### ID MAPPING OF RECORD — two of my IDs collided and were renumbered
+
+Neither commit can be amended: both are pushed to a shared branch with other
+lanes' work on top. Same situation as `#399`, whose commit message says `#397`
+and whose mapping of record is `daa078ef`. **The commit messages below are wrong
+and stay wrong; this table is the truth.**
+
+| commit | says | READ AS | who actually owns the id |
+|---|---|---|---|
+| `9882e7ef` | `#409`/`#410` | **`#415`** | `#409` is the cleanup lane's 6-commit worker-shutdown thread (`f5e1ce38`, `449a5109`, `66a87fb6`, `9fce1ee8`, `cc7a8b65`, `6fa7bf7f`) |
+| `d88ed790` | `#414` | **`#416`** | `#414` is another lane's 3-commit odds-history/build-time thread (`969e7649`, `1c7e2e55`, `f17721c2`) |
+
+`#410` is mine and uncontested; `#412` and `#413` are mine and uncontested
+(multi-commit, not duplicates).
+
+**HOW BOTH HAPPENED, because it is a race and not carelessness.** I checked
+`origin/main` for a free id at DRAFT time and pushed some minutes later. Another
+lane took the id inside that gap, both times. Checking is not enough — **the
+check has to happen at PUSH time**, immediately before `git push`, and even then
+it is only as good as the last `git fetch`.
+
+**AND THE TOOL THAT LOOKS LIKE IT ANSWERS THIS DOES NOT.** Every commit in this
+repo is authored `github-actions[bot]`, so `git log --format=%an` will confirm
+whichever hypothesis you bring to it. Authorship cannot arbitrate a collision
+here. The only usable discriminators are **which files a lane has touched** and
+session transcripts — that is how `#409` was settled, and I had it backwards
+until the other lane produced the file list.
+
+### `#415` — SHIPPED (commit says `#409`/`#410`). Retire `book_grid`, rename to Betting Board
+
+`9882e7ef`, plus `d73a9dff`/`ea6a2467` for the column work. See the `#407` notes.
+
+### `#416` — SHIPPED (commit says `#414`). The live re-sim now emits a live probability
+
+`d88ed790`. Touches `vendor/mlb_bettingv2/sim_engine/live_mc.py`,
+`vendor/.../flask_frontend.py`, `mlb/live_lens.py`, `live_projection_join.py`.
+
+`#412` gave live rows a projection and then, correctly, refused them an edge: the
+re-sim shipped a live MEAN and no live probability, and `modelProbOver` beside it
+was **bit-identical to the pregame value on 24 of 28 live rows**
+(`0.3530785` vs `0.3530785`). Three props whose over was ALREADY WON still read
+0.659/0.655/0.745 → **+36.5%/+32.3%/+15.8%**, more than twice the honest numbers
+on a board that sorts by edge.
+
+**The fix was already paid for.** `estimate_live` runs 120 rest-of-game sims,
+each producing a full box score in `GameResult.batter_stats`/`pitcher_stats`, and
+discarded all of it to keep the score. It now retains them as per-player
+REMAINING-stat histograms, so `P(over)` is the empirical share of simulated
+rest-of-games finishing above the line given what is banked. An already-won prop
+resolves to exactly **1.0**. No distributional assumption — deriving P(over) from
+the mean is refused for the reason WNBA refuses it.
+
+Load-bearing details:
+- **Absence is a zero.** A batter who never bats again has no row in that sim's
+  box score; left alone the histogram sums to fewer than `sims` and P(over) is
+  inflated by exactly the fraction of sims where he had no chance — so the player
+  LEAST likely to bat again looks MOST likely to go over. Backfilled after the
+  loop (0.33 → 0.20 demonstrated).
+- **`HRR` is summed per sim, not from three marginals** — a home run produces all
+  three at once, so marginals understate the joint badly.
+- **One Monte Carlo per game**, shared by the props and the game lens, or the
+  heaviest live compute in that file doubles.
+- **Cost measured, not asserted: +7%–16% CPU, ~72 KB/game (~1.1 MB/slate).** The
+  first draft of that comment said "negligible" and the measurement disagreed.
+- `liveModelProbOver` is a NEW field; `modelProbOver` is untouched and the
+  normaliser's fallback chain is deliberately not extended to it (that chain
+  reaches `estimatedWinProb`, the pregame number). The join prices
+  `live_prob_over` and has **no fallback** — a fallback would restore the defect
+  on exactly the rows the live model could not reach.
+
+**Second defect this exposed:** an already-decided prop is not an edge. P=1.0
+against a stale fair of 0.30 computes **+70%** — the largest number on the board,
+with no bet behind it because the book has settled or pulled that market.
+Withheld with a reason, the rule `live_edge_policy` already applies to a final
+game, scoped to one player.
+
+**NOT DEPLOYED at time of writing.** The tip carries three lanes' work; see the
+deploy note under `#413`.
+
 ### `#413` — SHIPPED. The board's game state was frozen at whenever the feed was first captured
 
 `1ce66a32`. `board_enrichment.attach_live_game_state_from_lens` +
