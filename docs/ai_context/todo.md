@@ -29508,6 +29508,45 @@ during a live window) rather than another quota reading. MLB is still
 ~97% of `by_sport` credits and the entire marginal-rate increase traces to
 it (mlb delta ≈ 7,384cr/hr of the 8,164cr/hr total).
 
+✅ **ROOT-CAUSED, 2026-08-13 — a real misconfiguration, not seasonal volume
+and not S0b.** `SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS = 14400` (4
+hours) is live on `live-odds-worker` (confirmed via the Render API). The
+code's own default and documented intent is **75 minutes (4500s)** —
+`_event_scoping_window_seconds()`'s comment: *"Matches live_refresh_loop.py's
+own `_T_WINDOW_RAMP_SECONDS` (75 min) -- a game inside its own T-window is
+exactly the case that window exists to catch."* This is **3.2x wider** than
+designed, absent from `render.yaml` (same live/IaC drift pattern as the
+`GAME_LINE_REGIONS` fix earlier this session), and has **no documentation
+justifying it anywhere**. The only other `14400` values in the whole repo
+are `SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS` /
+`SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS` — unrelated soccer
+*refresh-interval* settings that happen to share the "4 hours" value.
+Circumstantially looks like a copy/paste or a "refresh interval" vs
+"scoping window" mix-up when someone was setting env vars directly, not a
+deliberate choice.
+
+**Quantified against today's actual live slate (2026-08-13, 9 games,
+~16:30Z):** 4 games start within 75min (correctly full-tier either way), 3
+start past 240min (correctly reduced-tier either way) — but **2 games
+(822776 at 157min out, 822696 at 215min out) are getting full-tier
+segment+alternate markets right now that the intended 75min design would
+have kept on reduced tier.** That's **6/9 games full-tier instead of the
+intended 4/9 at this single snapshot** — ~50% inflation in full-tier game
+count, and it compounds: this isn't a one-time step like S0b, it's a
+per-cycle effect that scales with however many games sit in that
+165-minute excess window (75min→240min) at any given moment, which grows
+on fuller slates and during peak evening hours — exactly matching a
+*continuing*, non-plateauing drift rather than S0b's one-time shift.
+
+**Not fixed here — flagged with the fix identified but not applied.** The
+fix is almost certainly setting `SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS`
+back to `4500` (or removing the override so the 75-min default applies) on
+live-odds-worker, then measuring the next few burn readings to confirm the
+segment/alternate share stops climbing. Left as a decision for the user
+rather than applied unilaterally, matching this session's pattern for
+anything that changes live production behavior rather than just measuring
+it.
+
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
