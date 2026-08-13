@@ -1551,12 +1551,66 @@ def _mlb_top_props_candidate_total(payload: dict[str, Any]) -> int:
 	return total
 
 
-def _mlb_oddsapi_props_snapshot_has_entries(path: Path, key: str) -> bool:
-	payload = read_json_file(path)
+def _oddsapi_snapshot_entry_count(payload: Any, key: str) -> int:
 	if not isinstance(payload, dict):
-		return False
+		return 0
 	entries = payload.get(key)
-	return isinstance(entries, dict) and len(entries) > 0
+	return len(entries) if isinstance(entries, dict) else 0
+
+
+def _mlb_oddsapi_props_snapshot_has_entries(path: Path, key: str) -> bool:
+	"""Are today's OddsAPI prop lines on this box yet?
+
+	Reads the FILESYSTEM first, on purpose, and this is the whole fix for
+	`#419`. The module-level `read_json_file` is `refresh_state_store`'s, and
+	`_keyvalue_backed()` routes every path that doesn't contain
+	`migration_runs/` to Redis with **no filesystem fallback** -- a missing key
+	comes back as `(None, True)`, i.e. "confirmed absent, read succeeded".
+	These snapshots are never written there: the producer is
+	`vendor/mlb_bettingv2/tools/oddsapi/fetch_daily_oddsapi_markets.py`'s
+	`_write_json`, a plain `tmp.write_text()` + `replace()` onto the mounted
+	disk. Writer filesystem, reader Redis -- so this returned False on every
+	call in production and the `props_now_available` regen it gates has
+	**never once fired**, on any slate, since it was written.
+
+	That is why three prior incidents named in
+	`_mlb_props_now_available_needs_regen`'s docstring (2026-08-01, 08-02,
+	08-04) each got a logic fix that changed nothing: all of them sat
+	downstream of this read. Measured again 2026-08-13 -- top-props written
+	00:24:21 CDT with zero candidates, prop odds on disk from 10:08 CDT
+	(18 pitcher / 171 hitter markets), artifact still empty at 11:43, while
+	`daily_update.py` on the SAME box read those same files fine because it
+	uses ordinary file IO.
+
+	The keyvalue read is kept as a fallback rather than dropped: it can only
+	turn a False into a True here, never the reverse, so nothing that works
+	today can regress. Returning True is the side that causes work (one
+	scoped regen, rate-limited by the caller's own cooldown); returning False
+	is the side that causes the silent all-day stall being fixed.
+	"""
+	disk_count = 0
+	try:
+		disk_count = _oddsapi_snapshot_entry_count(
+			json.loads(path.read_text(encoding="utf-8-sig")), key
+		)
+	except FileNotFoundError:
+		disk_count = 0
+	except Exception:
+		disk_count = 0
+	if disk_count > 0:
+		return True
+	state_count = _oddsapi_snapshot_entry_count(read_json_file(path), key)
+	if state_count > 0:
+		# Worth knowing about: it would mean these snapshots have started
+		# being written through the state store after all, and the disk read
+		# above is no longer the authoritative one.
+		print(
+			f"[live_refresh_loop] MLB_PROPS_SNAPSHOT_KEYVALUE_ONLY key={key} "
+			f"path={path} entries={state_count}",
+			flush=True,
+		)
+		return True
+	return False
 
 
 def _mlb_props_now_available_needs_regen(*, now_epoch: float, date_str: str) -> bool:
@@ -1622,6 +1676,14 @@ def _mlb_props_now_available_needs_regen(*, now_epoch: float, date_str: str) -> 
 	if not has_pitcher_odds and not has_hitter_odds:
 		# Odds genuinely aren't posted yet -- the artifact being empty is
 		# correct, not stale. Nothing to regenerate against.
+		#
+		# Logged because this branch is where `#419` hid: it was reached on
+		# every call for months and said nothing, so "the guard declined" and
+		# "the guard was never evaluated" were indistinguishable in the logs.
+		print(
+			f"[live_refresh_loop] MLB_PROPS_REGEN_SKIPPED date={date_str} reason=no_odds_on_disk",
+			flush=True,
+		)
 		return False
 
 	marker_path = _mlb_props_regen_marker_path()
@@ -1629,10 +1691,38 @@ def _mlb_props_now_available_needs_regen(*, now_epoch: float, date_str: str) -> 
 	last_epoch = float((last or {}).get("epoch") or 0.0) if isinstance(last, dict) else 0.0
 	last_date = str((last or {}).get("date") or "") if isinstance(last, dict) else ""
 	if last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < _mlb_props_regen_cooldown_seconds():
+		print(
+			f"[live_refresh_loop] MLB_PROPS_REGEN_SKIPPED date={date_str} reason=cooldown "
+			f"age_s={int(now_epoch - last_epoch)} cooldown_s={_mlb_props_regen_cooldown_seconds()}",
+			flush=True,
+		)
 		return False
 
-	write_json_file(marker_path, {"epoch": now_epoch, "date": date_str, "reason": "props_now_available"})
+	# NB: deliberately no marker write here. This function is a pure
+	# predicate; the cooldown is consumed by _record_mlb_props_regen_attempt()
+	# on the launch path only. Writing it here spent the hour on the DECISION
+	# rather than on a launch, so a decision that was then dropped downstream
+	# (JOB_CAP_THROTTLED, or the caller preferring another trigger) silenced
+	# the guard for an hour having done nothing at all.
+	print(
+		f"[live_refresh_loop] MLB_PROPS_REGEN_DUE date={date_str} "
+		f"pitcher_odds={has_pitcher_odds} hitter_odds={has_hitter_odds}",
+		flush=True,
+	)
 	return True
+
+
+def _record_mlb_props_regen_attempt(*, now_epoch: float, date_str: str) -> None:
+	"""Consume the props-regen cooldown. Call ONLY once a launch is committed.
+
+	Split out of `_mlb_props_now_available_needs_regen` so the cooldown is
+	spent on work actually being launched rather than on the predicate being
+	consulted -- see the note at that function's return.
+	"""
+	write_json_file(
+		_mlb_props_regen_marker_path(),
+		{"epoch": now_epoch, "date": date_str, "reason": "props_now_available"},
+	)
 
 
 def _intelligence_pipeline_busy() -> bool:
@@ -1955,6 +2045,13 @@ def _mlb_daily_sim_decision(*, now_epoch: float, date_str: str) -> dict[str, Any
 			result["board_missing_game_pks"] = board_missing_game_pks
 		if props_regen_game_pks:
 			result["props_regen_game_pks"] = props_regen_game_pks
+			# Cooldown is consumed HERE, not in the predicate -- a launch is
+			# committed at this point. Consumed even when `reason` ended up as
+			# one of the other triggers: those widen to the full slate via
+			# merged_game_pks above, and the top-props stage rebuilds the whole
+			# artifact regardless of which games were resimmed, so the regen
+			# this cooldown rate-limits genuinely does happen.
+			_record_mlb_props_regen_attempt(now_epoch=now_epoch, date_str=date_str)
 		return result
 
 	_record_mlb_sim_check(now_epoch, date_str, current_fingerprints, launched=False)
