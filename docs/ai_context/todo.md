@@ -1201,6 +1201,54 @@ zero hits is right. The conclusive evidence is the duration, not that pair.
 
 Related: `#372` and `#376` both hit this same scan and treated it as local cost.
 
+### `#414` — THIRD CORRECTION. My event-bucket fix targets the wrong SHAPE and is NOT deployed. The cost is ONE pathological loop iteration per game
+
+**Withdrawn: the ~8-10 s/row figure I called "the finding that survived every
+reframing".** It divided game-elapsed by CANDIDATES EMITTED, not by loop
+ITERATIONS EXECUTED. The trap, and it is a good one: `rows=` on
+`SLOW_GAME_CANDIDATE` means candidates emitted (21, 26); `rows=` on
+`SLOW_ROW_PROFILE` means iterations (1, 2). **Same label, different quantity.**
+
+Per-iteration timing (`b0ab6974`):
+
+    rows=1  total_s=399.40  min=p50=max=399.398
+    rows=2  total_s=102.70  min_s=0.000  max_s=102.700
+
+**One iteration per game consumes the entire time; every other is ~0.000s.** Not
+distributed per-row work — a single pathological item.
+
+**SO `5abefe36` (bucket `unattributed` by event) IS NOT THE FIX AND IS NOT
+DEPLOYED.** It reduces per-candidate scan cost, and per-candidate cost is
+approximately zero for nearly every iteration. It is *correct* — the full-scan
+fallback means it can only be faster and never find less — but it targets a
+distributed cost that does not exist. Shipping it would have claimed a fix that
+could not materialise. It sits on `main`, unreleased, and should be treated as
+neutral cleanup rather than as work on this ticket.
+
+**WHAT SURVIVES, AND IT IS LESS THAN I CLAIMED TWICE:**
+
+- odds history correlates with cost — the WNBA control still holds (`rows=12`
+  constant, 1.2s -> 6.0s, four sports with no shard flat at 0.0s)
+- the mechanism is NOT the scan I proposed, and is not yet known
+
+Those two are compatible: one pathological iteration could be doing something
+expensive with the shard. **But I have no evidence for that beyond the
+correlation, and I have now proposed two mechanisms for this cost and been wrong
+about both.** The next person should treat my mechanism claims as unreliable and
+work from the per-iteration instrumentation.
+
+**THE ACTUAL TARGET, and it is a single-object question:** a checkpoint, timeout
+or skip at that one iteration boundary recovers 100-400 seconds per game, against
+the ~7s a per-sport checkpoint was worth. Reproducible against game_pks
+**823833, 824241, 822698, 823994, 823916** on 2026-08-12.
+
+**MY RECORD ON THIS TICKET, stated so nobody inherits the confidence:** three
+mechanisms proposed, three wrong. Index rebuilding (wrong — cost is not fixed
+per build). Payload reloading (wrong — one load per build, cache could never
+fire). Per-candidate scanning (wrong — cost is one iteration, not distributed).
+The diagnosis that odds history is *implicated* has held; every account of *how*
+has not.
+
 ### `#408` — OPEN, UNOWNED. 126 of 233 board rows carry NO ranking signal. `#400` changed soccer's market type and did not change its content
 
 **Measured on the served artifact 2026-08-12T23:29:41Z**, seated `ev_pct` by sport
