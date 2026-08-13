@@ -1,5 +1,107 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#414` — **VERIFIED INERT IN PRODUCTION 2026-08-13.** The fix is deployed and the cache is never hit. NEEDS ITS AUTHOR.
+
+**This is the most actionable open item from the 2026-08-12/13 session.** The
+root-cause entry further down is correct; the *fix* does not work. Measured on
+the first completed build after `d88ed790` landed (finished 02:42:27), by the
+author's own stated criterion:
+
+    ODDS_HISTORY_LOADED     1
+    ODDS_HISTORY_CACHE_HIT  0        <- fingerprint not matching
+
+Confirmed independently by duration, **same slate date** (`TZ=America/Chicago`,
+so the shard had not reset and the comparison is valid):
+
+    23:54   939.6s  rows=606   pre-deploy
+    02:38   946.0s  rows=460   post-deploy      = 1.01x
+
+Fewer rows, marginally *more* time. Two instruments agreeing — a positive-emission
+check and a duration measurement — which is stronger than either alone.
+
+**Where to look, from the same build.** Per-game timings inside MLB
+(`SLOW_GAME_CANDIDATE`, threshold 5s):
+
+    224.9s / 26 rows    184.9s / 21 rows    107.0s / 11 rows
+    100.1s / 10 rows     71.6s /  7 rows     12.1s / 1 row    9.5s / 1 row
+
+**~8–9 seconds per ROW, consistently.** That is the wrong shape for a
+once-per-build index rebuild, which would show a large fixed cost and cheap rows.
+It suggests the memoisation is keyed on something that varies per row or per
+market rather than per payload. Not investigated further — the author knows what
+they keyed it on.
+
+**The criterion is why this was caught in one build rather than next week.** The
+author wrote *"if `LOADED` appears and `CACHE_HIT` never does, the fingerprint is
+not matching and it is inert"* **before writing the fix**. Positive emission,
+named in advance, falsifiable in one read. Worth copying as a habit.
+
+### `#409` — SHIPPED. Phases 1+2 live on `d88ed790`; **phase 1 VERIFIED in production**; phase 3 withdrawn on measurement
+
+Written up in full at `docs/reports/refresh_worker_drain_and_restart_proposal.md`.
+The premise: refresh-worker is effectively **undeployable during a live slate** —
+the `#403` gate ran 45 minutes on 2026-08-12 and never found a clear window
+(build → sim → second build). That is the steady state, not bad luck.
+
+**Phase 1 — record what a kill destroyed.** refresh-worker had NO signal handler
+at all (`run_live_odds_refresh_worker.py:350` has one; `run_refresh_worker.py`
+had none), so every deploy killed it silently. **Verified in production the same
+night, by an unintended redeploy:**
+
+    02:20:48  WORKER_SHUTDOWN {"board_build": {"frame": "collect_candidates",
+                                "in_flight": true,
+                                "thread": "syndicate-intelligence-state-loop"}}
+    02:20:48  WORKER_SHUTDOWN_KILLED_BOARD_BUILD frame=collect_candidates uptime_s=296
+
+296 seconds of board work destroyed, and for the first time that fact is on the
+record instead of vanishing. This is also the end-to-end signal path that could
+only be verified *by construction* on the dev box — Windows `send_signal(SIGTERM)`
+calls `TerminateProcess` and never runs Python handlers, so the test is skipped
+there. It works on Linux.
+
+**The exit is in a `finally`, and that is the whole safety argument.** Installing
+a handler CHANGES what SIGTERM does; one that records and returns would leave the
+worker ignoring the signal until Render SIGKILLs it — strictly worse than no
+handler. `except Exception` does not catch `BaseException`, so `finally` is what
+makes the exit reachable from every path.
+
+**Phase 2 — drain the PIPELINE, not the process.** You cannot finish a 22-minute
+build inside a SIGTERM grace, but you can stop new long work from STARTING and
+then wait. `check_deploy_safety.py --drain` requests it, waits for idle, reports.
+Two refusal points (board build via `_board_build_deferral_reason`, MLB sim
+tick); in-flight work is never interrupted.
+
+- **The drain deferral is deliberately NOT bounded** like the hazards beneath it.
+  Those are bounded because an odds refresh is near-continuous and an unbounded
+  wait degenerates into "never run". A drain is the opposite: pushing through
+  after N defers defeats it. The bound lives in the flag's **expiry** instead.
+- **Expiry must EXCEED the longest work it waits on.** It was 45 min against a
+  build once observed at 77 min (4620s, `intelligence.py:9976`) — the flag would
+  have expired mid-wait, the deploy would have landed on the build anyway, and
+  the drain would have **reported success while destroying what it protected**,
+  only on the slowest builds. Now derived from the measured `COLLECT_SPAN_EXIT`
+  series and floored at the module default.
+- **The restart is the completion signal.** Nothing cleared the flag on success,
+  so a crashed deployer left the board deferred for the whole TTL *after* the
+  restart it wanted. `drain_active()` now ignores any drain requested before this
+  process booted.
+- **UNKNOWN resolves differently for each side, deliberately.** Worker asking "am
+  I drained?" → unreadable means NO (a wrong yes is a permanent outage). Deployer
+  asking "is it idle?" → unreadable means UNKNOWN, BLOCK (a wrong idle costs a
+  23-minute build). Both safe for their own side, pointing opposite ways.
+
+**Phase 3 — WITHDRAWN, twice, on measurement.** First: ~90% of the build is one
+sport (`mlb` 1169s max against `wnba` 7.4s, everything else ~0), so a per-SPORT
+checkpoint saves about seven seconds. Then the per-game data showed **MLB's own
+cost is itself concentrated** — two games were ~410s of a ~946s build — so a
+per-GAME checkpoint is nearly as useless. The original withdrawal was right at
+the wrong granularity.
+
+**Do not reopen without a measurement.** A real phase 3 needs a boundary inside
+MLB's per-row work, and the ~8–9 s/row figure above says that is where the cost
+actually is. Building the per-game checkpoint would have produced something
+correct, tested, and useless — the category this session hit twice.
+
 ### ID MAPPING OF RECORD — two of my IDs collided and were renumbered
 
 Neither commit can be amended: both are pushed to a shared branch with other
@@ -13339,6 +13441,61 @@ above, closer to the season); NFL preseason props (no real prop-odds
 source exists at all, correctly never attempted).
 
 **Operational notes:**
+- **A MEASURED NUMBER IS A TIMESTAMP, NOT A FACT.** Three lanes each generalised
+  from a flat stretch of the same series on 2026-08-12/13, in different
+  directions, and all three were wrong:
+  - one saw two rising points and wrote "it grows through the day";
+  - I saw three points inside a plateau, called the trend imaginary, and
+    committed that correction over the top of it;
+  - a third re-quoted "MLB 719.0s p50" across a todo entry, a report and three
+    messages while it silently became 1277s.
+  The truth needed 20 points: a **regime shift** (unit cost roughly tripled, 0.7
+  → 2.0+ s/row) that is **not monotonic** — it peaks, recedes, returns.
+  **What to do:** re-derive before re-quoting, and state the window a number was
+  measured over. A figure repeated without its timestamp becomes a fact by
+  attrition. `check_deploy_safety.py:_expected_build_seconds` carries the full
+  three-version history deliberately, so the next person cannot re-run the
+  argument from scratch.
+- **A CORRECT MEASUREMENT OF THE WRONG REFERENCE.** Distinct from measuring the
+  wrong *thing* — here the number is right and the comparison target is wrong,
+  which is harder to spot because nothing looks stale. 2026-08-13, three
+  instances in one hour:
+  - a lane compared a pinned SHA against `origin/main` to decide whether it
+    "rolled back", when the question was whether it reverts what is **deployed**.
+    "Behind the tip" and "reverts something running" are different questions and
+    the tip is the more natural reference, which is what makes it wrong.
+  - "rolled back" was used for "not shipped". Only the first reverts working
+    code; only the first is grounds to refuse a deploy.
+  - I benchmarked a sweep against the git mirror's 38,736 files when production
+    holds 117,377 — a correct measurement of the wrong disk, which cost an
+    18-minute production stall.
+- **ARMING IS INVISIBLE; ONLY FIRING IS.** Four deploy collisions on 2026-08-12/13,
+  three of which cancelled work in flight. **A pre-flight check cannot see an
+  intent, only a state** — it answers "has someone started?" when the question is
+  "is someone about to?". A watcher that had polled silently for 40 minutes fired
+  12 seconds before another lane's, and no check either lane ran could have seen
+  it. Generalises past deploys to every check-then-act pattern here: the
+  refresh-run mutex, the sim-owner check, the ID-collision grep.
+  **Tally worth keeping: 3 cancellations caused by silence, 3 races prevented by
+  announcing.** Announce-then-fire is the only thing that closes a 12-second
+  window. The durable fix is a visible arming record (a keyvalue key any lane can
+  read), not a smarter pin — `#409` phase 2's `publish_worker_state` is the shape
+  of it.
+- **AND THE DEPLOY THAT WINS CARRIES LESS THAN THE ONE IT KILLS.** All three
+  cancellations, same direction. Not chance: a lane firing on its own narrow
+  change is by construction pinned to something older than a lane that has been
+  accumulating fixes and waiting for a clean window. **The discipline that makes
+  you a good citizen is the same discipline that makes you lose the race.**
+- **A FAILED VERIFICATION THAT PRINTS A SUCCESS MESSAGE.** A lane disarmed a
+  watcher with `pkill`, then verified with
+  `(pgrep ... && echo STILL RUNNING) || echo "DISARMED"`. **`pgrep` does not
+  exist in that shell** — the command errored, took the `||` branch, and printed
+  DISARMED. They reported it as fact and stood down; their watcher then fired.
+  A *wrong* assertion about your own state is less recoverable than an
+  unobservable one, because nobody has reason to re-check it.
+  **What to do:** in a shell check, a missing binary and a false condition must
+  not share an exit path. Verify a background task by its own terminal output,
+  not by asking the shell about processes.
 - **THE STATE STORE IS SHARED BETWEEN SERVICES, AND THAT IS INVISIBLE AT THE
   CALL SITE.** `refresh_state_store._keyvalue_backed` routes every path except
   `migration_runs/` through the keyvalue store when the backend is keyvalue --
