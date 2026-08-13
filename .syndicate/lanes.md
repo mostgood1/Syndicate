@@ -6,7 +6,78 @@
 
 ## OPEN
 
-### memory-guard-reclaimable — OPEN — opened 2026-08-13 — session: memory-guard
+### checkpoint-guard-scope — OPEN — opened 2026-08-13 — session: hooks-test
+- Goal: `checkpoint-guard.sh` fires on **this session's unpersisted work** and
+  is silent otherwise — i.e. its pass branch becomes reachable and its
+  denominator becomes the session, not the worktree.
+- Files (exclusive to this lane):
+  - `.claude/hooks/checkpoint-guard.sh` — scope + parsing + witness.
+  - `.claude/commands/checkpoint.md` — step 7 wording only.
+- CORRECTION to the closed `hooks-enforcement-test` lane: step 7 (`touch
+  .syndicate/.last-checkpoint`) was reported missing from `checkpoint.md`.
+  **It is present and has been since `0d0b8931`.** The marker was absent
+  because that commit landed 08-13; the 27 observed Stop deliveries predate
+  it. The defect is not a missing instruction — it is that the pass branch
+  depends on a model executing an optional-looking last step.
+- Hypothesis: two independent causes of the all-fire distribution.
+  (1) `DIRTY` counts the whole worktree (66 files at the last checkpoint,
+  4 of them the session's), so the condition is ~always true in a repo whose
+  pipeline output is permanently dirty. (2) the pass branch needs BOTH
+  `$TODAY_LOG` and `$MARKER`, and the marker had never been written.
+- Falsification test: with the marker fresh and only generated output dirty,
+  the guard must exit 0. If it still exits 1, scope is not the cause.
+- Verification (both required):
+  1. PASS branch witnessed — exit 0 at least once. Never observed to date.
+  2. FIRE branch still works — touch a source file after the marker and
+     confirm exit 1 naming that file, so the fix is not inertness.
+- Note on method: running this hook in a terminal is legitimate here. The
+  08-13 FORBIDDEN entry is about assuming stdout ARRIVES; delivery for this
+  hook is already measured (27 deliveries), so what is unverified is the
+  predicate, and the predicate is testable locally.
+- Deploy exposure: none. Harness-only, no service code, no `render.yaml`.
+- Blocked by: none.
+
+### memory-guard-reclaimable — DEPLOYED, MEASUREMENT OPEN — opened 2026-08-13 — session: memory-guard
+- **CHECKPOINT 2026-08-13 13:3x CDT. Code done and shipped; the lane stays
+  OPEN because its verification is not complete.**
+  - Shipped: `03073270` live on refresh-worker since 13:05 CDT (deploy
+    `dep-d9v0b8bncjis73an78hg`). Verification items 1 and 2 (unit +
+    liveness-in-test) MET: 13/13 memory_observability, falsification tests
+    written before the fix and run red first.
+  - Verification item 3 (production) **NOT met.** T+23min shows
+    `LAYER2_SHORTLIST` x3 vs 0 in the preceding 4h12m and 0 aborts vs ~300 in
+    5.4h — but the container is 23 minutes from boot, and the PRE-FIX code
+    also rebuilt after a restart and re-froze ~3h later. Not discriminating
+    yet.
+  - **SINGLE NEXT ACTION for whoever picks this up: take the 24h read at
+    2026-08-14 ~13:00 CDT.** Count `MEMORY_GUARD_ABORT` and
+    `LAYER2_SHORTLIST` on `srv-d91dpertqb8s73co8ls0` since
+    `2026-08-13T18:05:38Z`, and record `anon` drift. Aborts ~0 with the board
+    still building = fix holds. Aborts resumed = it did not.
+    Write the result into the OPEN `deploys.md` row. OWNER STILL UNASSIGNED.
+  - Known gap, do not mistake for a result: `basis` cannot confirm the code
+    path ran — it is emitted only on the abort branch. See `learnings.md`.
+  - Push blocked, not by this lane: local `main` is 20 ahead / 6 behind and
+    `.claude/hooks/session-start.sh` holds another session's uncommitted work.
+    `03073270` is already on `origin/main`, so nothing here depends on it.
+- **CHECKPOINT 2026-08-13 ~15:0x CDT — final for this session.**
+  - Push blocker **CLEARED**: `session-start.sh` was committed by its own
+    session (`0642cdf7`/`f8bace6a`). Local `main` now **22 ahead / 6 behind**,
+    so a push needs a merge first and still carries other lanes' commits.
+    Nothing in this lane depends on it — `03073270` is already on origin.
+  - Filed **`#422`** (`7b480fe4`): web is 47 commits behind, only 14 of them
+    production, and `layer1-live-tier`'s "SHIPPED AND VERIFIED" may cover only
+    the worker half. Filed as an INFERENCE with the confirming check named.
+  - A blanket web deploy **FAILED `/preflight`** — 14 commits across five
+    lanes, two files claimed by open lanes, no named reader. The board slice
+    alone is the deploy worth making, and it belongs to `layer1-live-tier`.
+  - Three entries appended to `learnings.md`, all from this lane's own
+    instruments misleading it: a discriminator that only emits on failure; a
+    watcher whose label was not entailed by its exit condition; and
+    "pushed to origin" != "applied to production".
+  - **STILL THE SINGLE NEXT ACTION: the 24h read, 2026-08-14 ~13:00 CDT.**
+    Owner still unassigned. Everything else in this lane is done.
+
 - Goal: `memory_headroom_snapshot` decides on unreclaimable memory
   (`anon + shmem + slab_unreclaimable`), so that total memory in use FALLING
   can never tighten the guard. Unblocks `#417` and `#387` in one change.

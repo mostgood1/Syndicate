@@ -305,3 +305,273 @@ back **oldest-first regardless of `direction`**.
   keys with "no reader anywhere" — all seven were artifacts of the exclusion.
 - Cost: caught before anything was deleted. Would have been a production
   breakage on the next web deploy had the first pass been applied.
+
+### 2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers the obligation, not the content
+
+- What we believed: that `session-start.sh` exiting 0 with all five section
+  headers present in its stdout meant the ledger reached the session.
+  `HOOKS.md` verification step 4 — "`bash .claude/hooks/session-start.sh`
+  prints the ledger" — was accepted as proof and reported as PASS.
+- What was actually true: the harness caps hook stdout at ~2KB of injected
+  context and persists the remainder to a file. v1 emitted **39,924 B**
+  (session `ac67a9f1`, `hookName=SessionStart:startup`, `exitCode=0`,
+  `durationMs=459`, `type=hook_success`). About **5%** reached context, and it
+  was the least operational 5%. Byte offsets on a 42,836 B run:
+  `VERIFIED STATE` 40 (in), `OPEN LANES` 12,693 (cut), `STANDING RULES` 42,345
+  (cut), `OPEN OBLIGATIONS` 42,551 (cut), the `/lane /preflight /checkpoint`
+  line 42,709 (cut). **Every section the hook existed to deliver was past the
+  cut.** The hook fired perfectly and delivered nothing that mattered.
+- How we found out: the CLI could not be driven headlessly (OAuth expired), so
+  we read the transcript of a session that had already started —
+  `~/.claude/projects/<project>/ac67a9f1-*.jsonl`, line 3, an `attachment`
+  record carrying `stdout`, `exitCode`, `durationMs`, `hookEvent`. The
+  truncation was stated there in plain text: "Output too large (38.7KB) ...
+  Preview (first 2KB)". It was legible the entire time. Nobody had looked at
+  the delivery side.
+- The rule going forward: **a hook is a channel with a budget, and the only
+  measurement that counts is what ARRIVES, not what was emitted.** Verify a
+  hook by reading the `attachment` record in the consuming session's
+  transcript (`stdout` length, `exitCode`, `type`), never by running the script
+  in a terminal — a terminal has no cap, so it can only ever confirm the
+  emitter. Keep hook stdout under **2,000 B**. A hook's job is to deliver the
+  OBLIGATION to read the ledger plus the few facts too costly to miss; the
+  ledger itself gets read from disk by the session. Direct sibling of
+  `2026-08-13 — Presence is not reachability`: the content was present at the
+  emitter and unreachable at the destination.
+- Also — the size was seen and misread. The v1 output was reported as "524
+  lines injected at every session start ... a real context cost worth knowing
+  about." The number was in hand and was filed as an *expense* rather than as
+  *evidence of a defect*. A quantity that exceeds a limit is not a cost, it is
+  a failure. When a measurement is large, establish what it is large relative
+  to before describing it.
+- Cost: ~1 hour, self-inflicted, caught before any session relied on the
+  digest. `0d0b8931` (pushed as `f6fec4f1`) shipped a hook reported as working
+  that was ~5% functional.
+
+### 2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works
+
+- Named as the likely culprit when SessionStart could not be verified ("if the
+  ledger doesn't appear, the likely culprit is `shell: "bash"` not being
+  honored"). Measured working: session `ac67a9f1`, Claude Code **2.1.227**,
+  `hookName=SessionStart:startup`, `exitCode=0`, `durationMs=459`, `stderr`
+  empty, `type=hook_success`, on a `.sh` script invoked as
+  `"$CLAUDE_PROJECT_DIR"/.claude/hooks/session-start.sh`.
+- Do not re-litigate the shell. Note that `bash` is **not** on the Windows
+  system PATH here (`which bash` fails from PowerShell) — the `shell: "bash"`
+  field is what resolves it, so the exec form `{"command":"bash","args":[...]}`
+  would have failed where this succeeded.
+- The real failure was truncation, above. A guess about a failure mode is not a
+  finding; this one was wrong while the data to predict the right one was
+  already in hand.
+
+### 2026-08-13 — A guard that has never once PASSED is not a guard
+
+- What we believed: `checkpoint-guard.sh` enforces the `/checkpoint`
+  obligation that `CLAUDE.md` states in the strongest terms — "if the session
+  ends without a checkpoint, the work is considered lost."
+- What was actually true, measured across every transcript in this project:
+  **27 Stop-hook deliveries, 5 sessions, `exitCode 1` on all 27. Zero exit 0.**
+  `.syndicate/.last-checkpoint` had never been created, so the pass branch at
+  line 17 was unreachable. Sessions that *did* checkpoint were told they had
+  not. And the delivered stderr is prefixed **"Failed with non-blocking status
+  code"** — exit 1 on `Stop` informs, it does not hold the session. The
+  obligation was enforced by a log line that was wrong every time it fired.
+- The rule going forward: **a guard's pass branch needs a witness too.** The
+  ledger already says "before believing a zero, produce a case that makes the
+  instrument read non-zero" — this is the same rule pointed at the other
+  branch. An alarm that has never been silent is indistinguishable from an
+  alarm wired to a constant. Check the distribution of a guard's outcomes
+  before quoting any single one: all-fire and all-pass are both evidence of
+  a broken predicate, not of a system state.
+- Corollary on denominators, third instance in this ledger: the guard counts
+  the **whole dirty worktree** (64 files at the checkpoint that found this;
+  exactly 1 was the session's). In a repo where pipeline output is
+  permanently dirty, its condition is ~always true.
+- Also: **exit code is the enforcement contract, and it differs by event.**
+  `PreToolUse` exit 2 genuinely blocked a cross-lane `Edit` in the same
+  session's testing. `Stop` exit 1 did not. Do not infer that a hook enforces
+  from the fact that it runs, exits non-zero, and prints the right words.
+- How we found out: a lane opened for no purpose but to test the enforcement,
+  with probes run through the harness and results read from `attachment`
+  records — never from running a hook in a terminal. Direct application of the
+  08-13 FORBIDDEN entry, which was written after the emitter-vs-destination
+  distinction cost an hour.
+- Cost: none yet. The exposure is every session since the hooks landed
+  believing its checkpoint state had been checked.
+
+### 2026-08-13 — A discriminator that is only emitted on FAILURE cannot confirm a fix
+
+- What we believed: `/preflight`'s falsifiable-discriminator requirement was
+  satisfied. The plan said, in the lane and in `deploys.md`, "read `basis`
+  FIRST — `basis=unreclaimable` proves the new path executed."
+- What was actually true: `memory_headroom_snapshot`'s dict is printed only
+  inside the abort branch (`pipeline/intelligence_state.py:3215`), and the
+  other call site (`:516-527`) logs nothing at all. So `basis` is emitted
+  **only when the guard refuses.** A working fix leaves it permanently
+  silent. The discriminator was readable only in the world where the fix had
+  failed.
+- The rule going forward: **when choosing a signal to prove a fix ran, check
+  which BRANCH emits it.** A signal on the failure path proves the failure
+  path; it can never prove the success path. Before deploying, ask "if this
+  works perfectly, what line appears?" If the answer is "none", there is no
+  liveness proof and the deploy ships blind, however green the tests were.
+- Sharper: this is the mirror of `confirm an instrument can emit non-zero
+  before believing its zero` (2026-08-13). That entry covers a zero from an
+  instrument that never ran. This one covers a *silence that is indexed to
+  success* — the observation and the desired outcome are the same event, so
+  the measurement carries no information.
+- Cost: a production deploy with no way to confirm reachability, on a lane
+  whose own ledger already carried `presence is not reachability`.
+
+### 2026-08-13 — A watcher's headline can contradict its own body
+
+- What we believed: the re-warm test had passed. The watcher printed
+  `RESULT: RE-WARMED TO PRE-FIX LEVELS AND HELD`.
+- What was actually true: the same output block reported
+  `builds after peak=0`. The exit condition was `peak_memory >= 3500MB` with
+  **no requirement that a build occur after the peak** — so "HELD" was a word
+  in a format string, not a measured property. The peak itself (4042.6MB)
+  was a transient intra-build spike, at which the NEW formula would also have
+  refused (996MB available vs a 1900 floor).
+- The rule going forward: **the label a script prints is an assertion, and it
+  must be entailed by the condition that triggered it.** When writing a
+  watcher, state the exit condition in the output next to the verdict, so a
+  reader can check the inference rather than trust the adjective. Sibling of
+  `an instrument's SPAN is not its NAME` — same failure, moved from a timing
+  mark to a boolean.
+- Also recorded: a 100-line Render log query on refresh-worker spans **~35
+  seconds**. Any "n samples above X" from one query is a statement about that
+  window. A count of 0 there sat beside a 4042.6MB sample from six minutes
+  earlier.
+
+### 2026-08-13 — A guard's "is this mine" input must not default to the locked state
+
+- What we believed: `lane-guard`'s own-lane exemption was working, and probe C
+  (`.current-lane` empty -> the guard blocks your own files) was a synthetic
+  condition constructed to test the branch.
+- What was actually true: `.syndicate/.current-lane` **did not exist anywhere
+  in the repo** before it was created on 08-13, so `Current lane: 'none'` was
+  the baseline for every session that ever ran. It has already bitten:
+  session `ab30bcc8` was refused `tests/test_intelligence_state.py`, claimed
+  by `intelligence-state-red-baseline` — the lane it was working. And
+  `/lane close` step 4 *empties* the marker, so finishing a lane restores the
+  locked state for whoever comes next.
+- The rule going forward: **when a guard reads an identity token to decide
+  "yours vs theirs", the absent case must default to PERMISSIVE-with-a-reason,
+  not to deny.** Absent identity is not a hostile identity, it is a missing
+  input, and the failure surfaces as a confusing cross-lane collision message
+  rather than as "the marker is missing". Same shape as the ledger's
+  `unknown must not default permissive`, inverted: there the danger was a
+  failed join relaxing a rule, here it is a failed join inventing a conflict.
+- Method note, third instance: counting these blocks by grepping `BLOCKED:`
+  across transcripts returned **11**. The hook's own source and the counting
+  scripts contain the string. Real blocks, filtered to records carrying a
+  `tool_result`/`is_error` payload: **4**. Verify presence, trust absence.
+
+### 2026-08-13 — A path one toolchain resolves and another cannot makes a guard pass silently
+
+- What we believed: that a fixture repo built at `/tmp/cgtest` from the Bash
+  tool exercised `checkpoint-guard.py`. All four branches returned exit 0,
+  including the two that must return 1, and the reading was briefly taken as
+  "the guard is inert."
+- What was actually true: the guard was fine. `/tmp` is a Git Bash mount that
+  **native Windows Python cannot resolve**, so `os.path.isdir(root +
+  "/.syndicate")` was false and the script fail-opened at its first check —
+  before reaching any logic under test. Rebuilt at `C:/tmp/cgtest`, all four
+  branches discriminated correctly, including the pass branch.
+- How we found out: the run printed nothing at all — no stderr from any of the
+  four cases. A guard that is genuinely inert still reaches its own logic; one
+  that is silent across every input is usually not being reached.
+- The rule going forward: **this machine has two path universes, and a value
+  that crosses between them fails open rather than erroring.** Bash-tool paths
+  (`/tmp`, `/c/...`) are invisible to native Windows Python and to `python3`
+  invoked from PowerShell; `git cat-file blob origin/main:path` is mangled by
+  MSYS arg conversion into `origin\main;path` and returns an empty pipe, not an
+  error. Fixtures and payloads handed to a Windows interpreter must use
+  `C:/...`. When a check produces no output at all, verify it reached its own
+  code before believing its verdict — extends
+  `2026-08-13 — Confirm an instrument can emit non-zero before believing its zero`.
+- Three instruments failed clean in this one session — the `/tmp` fixture, the
+  MSYS-mangled `git cat-file`, and `grep -c $'\r'` inside a `for` loop, where
+  the pattern degenerated and matched every line, reporting CRLF in files that
+  `od` showed were pure LF. Every one of them read as a *good* result.
+- Cost: ~10 minutes and one wrong statement to the user, retracted in the same
+  turn. Nothing shipped on it.
+
+### 2026-08-13 — A free-text status field cannot be a predicate; test guards against the ledger, not against synthetics
+
+- What we believed: that tightening the lane test from the substring `/OPEN/`
+  to a literal `/ — OPEN/` was correct and complete. It was verified against
+  hand-written headers covering `OPEN`, `OPENED`, `REOPENED`, `CLOSED`, `DONE`.
+- What was actually true: the synthetics encoded the same assumption as the
+  code — that status is one word. Within the hour a real session relabelled its
+  lane `— DEPLOYED, MEASUREMENT OPEN —`, which the strict test rejects and the
+  old substring test accepted. The lane sits under `## OPEN`, its owner
+  considers it open, and `lane-guard.py` returns exit 0 for its files.
+- How we found out: a routine `git diff` during `/checkpoint`, not a test. The
+  hole existed for roughly 20 minutes with nothing reporting it.
+- The rule going forward: **a guard whose input humans hand-write must be
+  tested against the actual file, not against examples written by the same
+  person who wrote the guard.** Re-run guards over the live ledger after any
+  parsing change, and diff the set they classify as open against the lanes
+  physically under `## OPEN` — a mismatch is the whole test. Where a field is
+  free text, match a word (`\bOPEN\b`), never the whole field, and never a bare
+  substring.
+- Cost: no bad edit landed. The window was open ~20 minutes and was found by
+  accident, which is the part worth fixing.
+
+### 2026-08-13 — A discriminator that only emits on FAILURE cannot confirm success
+- What we believed: `#417`'s deploy could be verified by reading a `basis`
+  field added to the memory snapshot — `basis=unreclaimable` proving the new
+  code path ran, `basis=reclaimable_cache` proving it degraded. This was chosen
+  deliberately, to avoid trusting a bare zero.
+- What was actually true: the snapshot is printed only inside the abort branch
+  (`intelligence_state.py:3215`), and the other call site
+  (`_board_build_has_memory_headroom`) logs nothing at all. So `basis` is
+  emitted **only when the guard refuses** — i.e. only when the fix has failed.
+  A working fix leaves it silent forever, and its absence is a fact about the
+  emitter, not about the code.
+- The rule going forward: **when choosing a liveness signal, ask which branch
+  emits it. If the only emitter is the failure path, the signal cannot
+  distinguish "working" from "never ran" — the two produce identical silence.**
+  Put the proof on the path you expect to take, not on the one you are trying
+  to eliminate. Direct sibling of "confirm an instrument can emit non-zero
+  before believing its zero"; that entry covered a zero, this one covers a
+  total absence, which is worse because nothing appears at all.
+- Cost: none yet — caught before it was quoted as evidence. The deploy is
+  consequently unverifiable by its own designed check, and rests on the 24h
+  outcome read instead.
+
+### 2026-08-13 — A watcher's LABEL must be entailed by its exit CONDITION
+- What we believed: a background watcher reported
+  `RESULT: RE-WARMED TO PRE-FIX LEVELS AND HELD`, which was read as the deploy
+  surviving load.
+- What was actually true: its exit condition was only `peak_memory >= 3500MB`.
+  It never tested "held". Its own output line two rows down said
+  `builds after peak=0` — the label and the data contradicted each other in the
+  same four-line report.
+- The rule going forward: **the words a monitor prints are a claim; write them
+  from the condition that fired, not from the outcome you are hoping for.**
+  Before trusting a watcher's verdict, re-read the branch that produced it. Any
+  word in the label that does not correspond to a term in the predicate is
+  editorial.
+- Generalises the `SLOW_ROW_PROFILE` lesson from spans to verdicts: there the
+  instrument measured the wrong interval, here it measured the right thing and
+  then overstated what it meant. Both were believed because the headline read
+  cleanly.
+
+### 2026-08-13 — "Pushed to origin" is not "applied to production"
+- What we believed: `571f774b` recorded the render.yaml push obligation as
+  closed because "all three are on origin", and the web env-block audit
+  (62 -> 52 keys) was treated as done.
+- What was actually true: web's LIVE service carries **73** env keys while
+  `render.yaml` on origin declares **52**. `blueprint_sync` had not applied.
+  The audit is on GitHub and absent from production, and a future sync carries
+  a queued, unannounced 21-key reduction.
+- The rule going forward: **for `render.yaml`, "on origin" and "in effect" are
+  two different measurements, and only the second one matters. Read the live
+  service's `/v1/services/<id>/env-vars` and compare counts before recording a
+  config change as shipped.** The CLAUDE.md warning that a push applies to
+  production is about the *risk* that a sync fires; it is not a guarantee that
+  one *has*. Both errors are available, in opposite directions.
+- Cost: none yet. Caught while preflighting an unrelated web deploy.
