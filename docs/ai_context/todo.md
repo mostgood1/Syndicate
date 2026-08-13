@@ -812,6 +812,39 @@ rather than answer the question, and the value floor exists to stop junk, not to
 express "this sport has no edge today". Whoever takes this should decide the
 policy first.
 
+**PRICED 2026-08-13T00:55Z, and the answer is to REMOVE a guarantee rather than
+add a filter.** Measured on 200 sampled rows:
+
+                  n    med     spread   positive
+    mlb          54   +1.76     5.66     52/54
+    wnba         12   +2.61     4.12     12/12
+    nfl          72   -2.38     7.59      6/72
+    soccer       62   -6.67     0.05      0/62
+
+    A  per-sport median-EV gate   keeps mlb+wnba          66/200 (33%)
+    B  dispersion gate (<0.5)     keeps mlb+nfl+wnba     138/200 (69%)
+    C  GLOBAL RANK, top 100       {wnba 12, mlb 54, nfl 34}  med +1.37
+    D  absolute ev>0              70/200
+
+**C wins and needs no new rule.** Rank every row against every other and take
+the top 100: soccer falls out BY MERIT because -6.67 sorts below everything, and
+NFL keeps its 6 genuinely positive rows that (A) would have deleted. No sport
+gate, no dispersion test, no special-casing.
+
+A costs 34 rows including NFL's real content. B keeps NFL's 66 negative rows. D
+is a value gate, which `SHORTLIST_MIN_VALUE_PCT`'s own comment argues against.
+
+**The lever is `SHORTLIST_ROWS_PER_SPORT`.** It allocates 100 slots per sport
+whether or not the sport has 100 slots' worth of content. That guarantee is what
+seats unranked rows -- the same shape as `kind_floor` guaranteeing prop slots,
+and `#391`'s per-game cap was a third instance. **Three guarantees, all putting
+rows on the board that merit did not select.**
+
+**Board size becomes a quality dial.** At top 150 the median is already -0.66 and
+soccer re-enters with 12 rows. So N is not a display preference; ~100 is where
+quality holds on this slate and the right N is a function of how much positive-EV
+content exists that day, which argues for a *dynamic* cut rather than a constant.
+
 Related: `#400` (the change that surfaced it), `#407` (the consolidated board's
 requirement list — "complete data population" does not help if the rows carry no
 signal), `SHORTLIST_ROWS_PER_SPORT`, `SHORTLIST_KIND_FLOOR`.
@@ -28896,6 +28929,30 @@ Get `<deployed-sha>` from `/v1/services/<id>/deploys` -> `deploy.commit.id`,
 filtering to `status: "live"`. This is the same "presence is not reachability"
 shape as the inert fixes already on this list: pushed, merged, and on `main` are
 three things, and none of them is *running*.
+
+### `git blame` is NOT evidence of authorship in this repo (2026-08-13)
+
+**Every commit is `github-actions[bot] <github-actions[bot]@users.noreply.github.com>`**
+— yours, mine, and every other lane's. So `git log --format=%an`, `git blame`,
+and `git shortlog` will confirm whatever hypothesis you bring them, and look
+authoritative doing it. **A tool that cannot answer the question while appearing
+to is worse than no tool.**
+
+Demonstrated 2026-08-12/13: `#409` was attributed to me by one lane, which then
+offered to renumber my todo entry underneath me. I had never touched
+`worker_shutdown.py` or `test_worker_shutdown.py` — 382 lines. It belonged to a
+third lane, settled by oversight from that lane's own descriptions of the
+`os._exit(0)` reasoning and the Windows-skipped signal test.
+
+**The only discriminators are (a) which files a lane has touched and (b) session
+transcripts.** Three attributions that night resolved against the inferred
+answer: an auto-deploy robot that was a person deploying, a phantom fifth
+session that did not exist, and this. All three were "commits I did not make",
+which feels like evidence and is not.
+
+**How to apply:** before acting on an attribution — especially before editing or
+renumbering someone else's entry — check the file list, or ask. `git show <sha>
+--stat` answers it in one command.
 
 ### Claiming a TODO id is a RACE, and another session can commit your uncommitted work (2026-08-12)
 
