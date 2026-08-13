@@ -13553,6 +13553,54 @@ above, closer to the season); NFL preseason props (no real prop-odds
 source exists at all, correctly never attempted).
 
 **Operational notes:**
+- **WHERE A CONTROLLED COMPARISON IS AVAILABLE, A TIME SERIES IS NOT EVIDENCE.**
+  The single most useful line from 2026-08-12/13, and it explains every duration
+  retraction that night in one sentence. Four separate claims were made about
+  whether `#414` helped, from the same data, and **all four were withdrawn**:
+
+        -27%        anchored on the pre-fix MAX
+        1.01x       one mid-series point
+        monotonic   3 of 8 points starting from a local peak
+        ~200s→1509s the diagnosis's own growth curve
+
+  The series' spread (2.14x in s/row, 1.39–2.98) exceeded every effect any of
+  them claimed. **What survived untouched was the WNBA discriminator**: `rows=12`
+  held CONSTANT while elapsed went 1.2s → 6.0s, against nfl/soccer/nba/nhl flat
+  at 0.0s across 25 samples each. That is a **control**, not a trend — one
+  variable held fixed, one varied, and four negative cases. Nothing that went
+  wrong that night could touch it.
+  **What to do:** if you can hold something constant and compare, do that and do
+  not report the time series at all. If you cannot, plot the distribution before
+  quoting any ratio drawn from it.
+- **A CRITERION IS AN INSTRUMENT TOO, AND ITS PREMISES NEED CHECKING BEFORE IT IS
+  READ.** The first instance where the blind instrument was a **sentence** rather
+  than a counter — strictly larger than the category below it.
+  `#414` shipped with a stated criterion: *"if `ODDS_HISTORY_LOADED` appears and
+  `ODDS_HISTORY_CACHE_HIT` never does, the fingerprint is not matching and it is
+  inert."* Production showed exactly that, and three lanes concluded the fix was
+  broken. **It was not broken; it could never fire.** `LOADED` fires once per
+  build, so there is no second call to hit, and between builds a reload is
+  correct because the capture has written.
+  **The criterion only discriminates if `LOADED` fires more than once per build.**
+  At one load it returns "inert" identically for a working cache, a broken cache,
+  and a cache with nothing to do. Two separate failures, both actionable:
+  - **publishing it:** check what a criterion CANNOT distinguish before you
+    publish it — this one was written before the fix shipped and never tested
+    against its own denominator;
+  - **applying it:** verify the criterion's premise holds in YOUR data before
+    acting. The disproof (`LOADED` = 1) was in the same sentence as the reading
+    and went unnoticed three times.
+  *"I used the instrument as documented"* is a fair defence for a counter and a
+  weak one for a sentence — **a sentence carries its premises in plain language,
+  where they can be read.**
+- **THE SURVIVING CLAIM AFTER A SERIES OF RETRACTIONS CARRIES MORE WEIGHT THAN IT
+  EARNED.** It is the last thing standing, not the strongest thing. On
+  2026-08-12/13 three duration claims collapsed in succession, and the one
+  remaining — `CACHE_HIT = 0` — was then leaned on *because* it was all that was
+  left, and stated as "the only claim with evidential weight". It was the claim
+  that most needed interrogating, for exactly that reason, and it was wrong.
+  **What to do:** when a run of your claims has just failed, audit the survivor
+  first rather than promoting it.
 - **A MEASURED NUMBER IS A TIMESTAMP — AND SO IS THE BASELINE YOU COMPARE IT
   AGAINST.** Added after committing this note and then breaking it within the
   hour: I compared one post-deploy build against one hand-picked pre-deploy
