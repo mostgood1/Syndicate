@@ -1,5 +1,216 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#422` — **The web service is 47 commits stale, and the board work `layer1-live-tier` closed as "SHIPPED AND VERIFIED" may only ever have been verified on the WORKER half.** OPEN, UNOWNED — belongs to `layer1-live-tier`.
+
+**Measured 2026-08-13 14:44 CDT.** Web (`srv-d88ahvrbc2fs73eodu30`) is live on
+`936e2b47` since **08-12 21:44 CDT**. `origin/main` is `571f774b`.
+
+**47 commits behind, but that number is misleading and should not be quoted.**
+Only **14 touch production `.py`** — the rest are ledger, docs and tests. The
+real delta is **7 files, 785 insertions**:
+
+    syndicate/features/intelligence.py                 +313
+    vendor/mlb_bettingv2/tools/web/flask_frontend.py   +145
+    syndicate/features/shared/memory_observability.py  +134
+    syndicate/features/shared/live_refresh_loop.py     +107
+    syndicate/features/shared/live_projection_join.py   +78
+    syndicate/blueprints/home.py                        +75
+    syndicate/features/shared/odds_book_quotes.py       +42
+
+**THE ACTUAL QUESTION, and it is not "is web stale".** Four of those files are
+**web-path**: `intelligence.py`, `home.py`, `live_projection_join.py`,
+`flask_frontend.py`. They carry the `#412`/`#413`/`#415`/`#416` board work that
+`lanes.md` records as **"SHIPPED AND VERIFIED"** (`#412` prop join 0 -> 41,
+`#413` 210 rows corrected, `#415` Betting Board). That verification was taken
+against artifacts the **worker** produces. If web has not deployed since
+08-12 21:44, the **presentation half has never run in production**, and those
+closures are narrower than they read.
+
+**This is an INFERENCE, not a measurement.** What IS measured: the commits fall
+after web's deployed SHA, so that code is not running on web. What is NOT
+measured: whether any user-visible behaviour actually differs. **Do that check
+before acting** — it is cheap, and `learnings.md` already records the cost of
+treating "the fix is present in the tree" as "the path executes".
+
+**Scope discipline — a blanket web deploy FAILED `/preflight` 2026-08-13.**
+14 commits spanning **five lanes** is not one substantive change, two of the
+files are claimed by lanes that are open right now (`live_refresh_loop.py` by
+`mlb-props-regen`, `memory_observability.py` by `memory-guard-reclaimable`),
+and no reader or observable was named. **Ship the board slice alone**
+(`intelligence.py`, `home.py`, `live_projection_join.py`, `flask_frontend.py`),
+owned by `layer1-live-tier`, with its own expected effect and reader.
+
+**Two facts worth having before anyone deploys web:**
+
+- **The memory-guard change is INERT on web — verified, not assumed.** `#417`'s
+  fix is more permissive (it credits `active_file`), and web is a **2GB**
+  container with an OOM history (`#318` sampled it seconds before an oomKill).
+  But web's LIVE env has `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`,
+  `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`, `MLB_ENABLE_LIVE_LENS_LOOP=false`
+  — web does not run the loops that call `memory_headroom_snapshot`. Do not
+  re-raise this alarm without first re-reading those three keys, and DO re-raise
+  it if any of them flips to true.
+- **`blueprint_sync` has NOT applied. "On origin" != "in production."** Web's
+  live service carries **73 env keys**; `render.yaml` on origin declares **52**.
+  The web-block audit is pushed and **not live**. Commit `571f774b` ("close the
+  render.yaml push obligation — all three are on origin") is true about origin
+  and is easy to misread as the config being applied. A future sync therefore
+  carries a queued, unannounced **21-key reduction** — enumerate before it fires.
+
+**Next action:** `layer1-live-tier` confirms whether `#412`/`#413`/`#415`/`#416`
+have a web half that is not running, by diffing one served payload against what
+the artifact contains. If yes, that is the deploy, and those "VERIFIED" lines
+need amending to say which half was verified.
+
+### `#419` — **The `props_now_available` guard has never been able to fire. Writer filesystem, reader Redis.** COMMITTED `1b9b1e39`, **NOT DEPLOYED**.
+
+**Today's user-visible symptom:** MLB top-props and ladders were empty ~25
+minutes before first pitch. Both artifacts were written 00:24:21 CDT with
+`candidateCount: 0` by a run that **completed cleanly** (exit 0, 244s) — it
+simply ran ~10h before today's OddsAPI prop lines landed at 10:08 CDT
+(18 pitcher / 171 hitter markets). Nothing rebuilt them for 11 hours.
+
+**Root cause.** `_mlb_oddsapi_props_snapshot_has_entries` read the prop
+snapshots through `refresh_state_store.read_json_file`, which routes every
+path not containing `migration_runs/` to the keyvalue store **with no
+filesystem fallback** — a missing key returns `(None, True)`, i.e. "confirmed
+absent, read succeeded". Those snapshots are never written there: the producer
+is `vendor/mlb_bettingv2/tools/oddsapi/fetch_daily_oddsapi_markets.py`'s
+`_write_json`, a plain `tmp.write_text()` + `replace()` onto the mounted disk.
+`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` is confirmed live on refresh-worker,
+so `has_pitcher_odds`/`has_hitter_odds` were **False on every call**, the guard
+returned "odds genuinely aren't posted yet" silently, and the regen it gates
+**never once fired on any slate**.
+
+**This is why 08-01, 08-02 and 08-04 kept recurring.** All three are named in
+the guard's own docstring and each got a logic fix. Every one of them sat
+downstream of a read that always returned None.
+
+**Today's recovery was luck, not the safety net.** An unrelated 3-game lineup
+resim (`--only-game-pks 823829,824238,824561`) happened to be in flight; its
+top-props stage rewrites the whole artifact. The manual `force-mlb-resim`
+bounced off it with `previous_run_still_active`, so the fix is not attributable
+to that either. Artifact rebuilt 11:56:56 CDT — 12 pitcher cards, 12 hitter
+cards, 22 pitchers × 7 ladder markets, 24 hitters × 10.
+
+**Shipped:** disk-first read (keyvalue kept as fallback — it can only turn a
+False into a True, so nothing working can regress); cooldown marker moved out
+of the predicate onto the committed-launch path, so consulting the guard no
+longer spends the hour when nothing launches; both decline branches now log a
+reason (`MLB_PROPS_REGEN_SKIPPED`), because this branch ran for months saying
+nothing and "declined" was indistinguishable from "never evaluated".
+
+**Test hazard, recorded:** all five pre-existing tests for this guard
+`patch.object(live_refresh_loop, "read_json_file", ...)` — they replace exactly
+the symbol whose backend routing was the defect, and would pass against the
+broken code forever. The new tests do not patch it; verified red-then-green
+against the pre-fix read, with a liveness case proving it can still decline.
+
+**VERIFICATION STILL REQUIRED (production).** On a slate whose top-props was
+written before odds landed, a `MLB_SIM_TICK` carrying
+`mlbDailySim.reason = props_now_available` must appear within one cooldown of
+the odds file's `retrieved_at`. **That reason string has never once appeared in
+the logs**, so absence is the established baseline and a single occurrence is a
+clean positive. Until then this is a code fix with no production evidence.
+
+**Still open, separately:** today's season betting-card artifact is missing
+(`verdict: artifact_missing`) — scoped resims carry
+`--write-season-frontend-artifacts off`, so they never rebuild it. Not
+addressed here.
+
+**Odds-posting distribution now MEASURED — see `#421`.** And it corrects this
+entry's own timeline: prop odds for the 08-13 slate were being captured from
+**02:02 CDT**, not 10:08. The 10:08 figure was the snapshot's `retrieved_at`,
+i.e. its LAST fetch, which is exactly the overwrite-in-place trap flagged here.
+The empty 00:24 build missed the odds by **~98 minutes, not ~10 hours**. This
+changes nothing about the root cause or the fix — the guard's read went to
+Redis and returned None whenever the odds landed — but it does mean a working
+guard would have rebuilt the 08-13 board automatically at ~02:02.
+
+### `#420` — **The MLB sim's pipeline wait was bounded in ticks, not in time.** COMMITTED `bf8833e9`, **NOT DEPLOYED**.
+
+`_sim_pipeline_deferral_reason` bounded the wait at N consecutive defers. A
+tick count is only a time bound if tick spacing is fixed, and it is not.
+
+Measured 2026-08-13, refresh-worker, 15:05–16:20Z: **83 of 100 sim ticks
+returned `intelligence_pipeline_busy`**, and the sim decision was evaluated
+**5 times in 75 minutes**. That is the count bound working exactly as designed
+and still starving the decision on a day when first pitch was 12:06 CDT.
+
+Adds `SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFER_SECONDS` (default 600); either bound
+ends the streak. **The memory headroom check is unchanged and still has the
+final say**, so this widens *when* a breakthrough may be attempted, never
+whether it is safe — `#55`'s two-heavy-pipelines OOM is gated by the same
+condition it always was.
+
+Deliberately split from `#419` so the two stay attributable. **This is a
+bounding change, not a root cause** — `#419` is what actually caused today's
+empty board. Do not read a post-deploy improvement as evidence for this one.
+
+**Caution for whoever tunes further:** the real inefficiency is that the
+*decision* is gated by a check that exists to protect the *launch*. Evaluating
+the decision is mostly cheap reads, but not entirely — `fetch_schedule_for_date`
+and `_fetch_mlb_injuries` are network calls, so moving the gate below them was
+NOT done and should not be done without measuring that cost first.
+
+### `#421` — **The evening pre-generation runs before prop odds exist on 7 of 8 slates. Measured.** OPEN — needs a `render.yaml` decision.
+
+`SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_START_HOUR = 18` pre-generates tomorrow's
+slate at 18:00 CDT the night before. Measured against 8 slates (2026-08-06..13,
+the full extent of `book_quotes` — nothing exists before 08-06):
+
+    build hour (CDT)                 odds ready   beats 1st pitch   both
+    18:00 the night before (CURRENT)        1/8               8/8    1/8
+    04:00 - 10:00 slate day                 7/8               8/8    7/8
+    11:00 slate day                         7/8               7/8    6/8
+
+**Any same-day hour from 04:00 to 10:00 scores identically at 7/8.** This data
+does NOT discriminate inside that band; picking within it is a judgement about
+odds freshness vs. margin, not a measurement. Do not claim otherwise.
+
+The 8th slate is unfixable by scheduling: 2026-08-06 had prop odds first
+captured 11:25 against an **11:36 first pitch** — 11 minutes of lead. That is a
+book-side reality. Every option above is 7/8, never 8/8.
+
+**Lead time, first prop capture → first pitch:** min 0.2h, median 12.4h, max
+24.5h, n=8. Seven of eight slates had 10h+ of lead, so prop odds are normally
+available long before the games — the problem was never that they post late.
+
+**Method.** Full scan of `mlb_source/tracking/book_quotes/<date>.jsonl`, which
+carries both `captured_at` (our fetch) and `book_updated_at` (the book's own
+stamp). The two run 2–12 minutes apart consistently, so capture is prompt and
+`captured_at` is a tight upper bound on when the line existed. `kind` cleanly
+separates `game` (20,680 rows on 08-13) from `prop` (26,603).
+
+**Two measurement errors worth recording, both caught before conclusions:**
+1. The first pass stopped at the first `prop` row, assuming the file is
+   append-ordered by capture time. It is not — on 08-12 the first prop row in
+   FILE order stamps 02:03 while the first game row stamps 14:08. Every number
+   that pass produced was first-in-file, not earliest-in-time. Fixed by full
+   scan (~20MB/date).
+2. The corrected scan printed bare `%H:%M`, which rendered previous-evening
+   captures as same-day times — the 08-07 slate's odds looked like they landed
+   at 23:30 ON 08-07 when the capture is `2026-08-07T04:30Z` = 23:30 CDT on
+   **08-06**. Half the timestamps are previous-day, so the bare clock reading
+   inverted the question. Fixed with an explicit `-1d` offset.
+
+**CAVEAT, load-bearing:** `book_quotes` is written by the live-odds-worker
+capture path. The `#419` guard reads a DIFFERENT artifact —
+`snapshots/<date>/oddsapi_<group>_props_<date>.json`, written by
+`fetch_daily_oddsapi_markets.py`. This measurement establishes when prop odds
+were available *to the platform*, **not** that the snapshot file the guard
+reads existed at that moment. Those are not proven to move together and nobody
+has checked.
+
+**Recommendation, in order:** `#419` is the higher-value fix and is already
+committed — with a working guard the 08-13 board would have rebuilt itself at
+~02:02 with no schedule change at all. Deploy and verify that first. Only then
+consider moving the evening hour, because a schedule change on top of an
+unverified guard fix makes neither attributable. Note the hour lives in
+`render.yaml`, so changing it applies to production on push (`#284`).
+
+**n=8. Small.** Treat the 7/8 as a direction, not a rate.
+
 ### `#414` — **THE CACHE IS PROVABLY NOT HIT, AND THE BUILD GOT FASTER ANYWAY. Two signals disagree.** NEEDS ITS AUTHOR.
 
 **This is the most actionable open item from the 2026-08-12/13 session.** The
