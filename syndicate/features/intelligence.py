@@ -6213,28 +6213,49 @@ def _is_game_level_market(market_text: Any) -> bool:
 
 
 def _slow_game_label(game: dict[str, Any]) -> str:
-    """A human-traceable id for the SLOW_GAME_CANDIDATE line.
+    """A short, human-traceable id for the SLOW_GAME_CANDIDATE line.
 
-    The first version read `game_id`/`id` and printed `game_id=?` on EVERY
-    line of the first production build -- seven lines naming nothing, so
-    "which 26-row game costs 225s" stayed unanswerable. dashboard_games do not
-    carry those keys. The conventions actually in use on these dicts are
-    `game_pk` (7 call sites), `game_id` (6), `event_id` (6) and `matchup` (3),
-    and MLB in particular keys on `game_pk`.
+    TWO BUGS SHIPPED HERE, both from inferring the payload shape from how other
+    call sites USE a key instead of reading what the key holds.
 
-    Identifiers first, then the team pair, which is the form a human can act
-    on. Returns "?" only when a game carries no identity at all -- and that
-    would itself be worth seeing.
+    v1 read `game_id`/`id`, which dashboard_games do not carry -- every line
+    printed `game_id=?`.
+
+    v2 added `matchup` after seeing `game.get("matchup")` at three other call
+    sites, WITHOUT CHECKING ITS TYPE. It is a dict, so `_safe_text` stringified
+    the whole payload and each line became 495 characters:
+
+        game={'away':_{'abbr':_'MIL',_'id':_158,_'logo':_'https://...158.svg',
+        _'primary_color':_None, ... 'liveText':_'Dustin_May_vs_Robbie_Ray'}
+
+    And the check passed it: the watcher reported `unnamed (game=?): 0/6`,
+    because it tested for v1's failure mode rather than whether the output was
+    usable. **A check that confirms the absence of the LAST bug will wave
+    through the next one.**
+
+    So: only SCALARS are accepted as identifiers (with a bool guard, since
+    `isinstance(True, int)` is true), and the team pair is built from the
+    matchup SUB-dict. Verified against the real production payload from the
+    logs, not hand-constructed dicts -- inventing the shape is what shipped v2.
     """
-    for key in ("game_pk", "game_id", "event_id", "id", "matchup"):
-        text = _safe_text(game.get(key), "").strip()
-        if text:
-            return text.replace(" ", "_")
-    away = _safe_text(game.get("away_name") or game.get("away_tri"), "").strip()
-    home = _safe_text(game.get("home_name") or game.get("home_tri"), "").strip()
-    if away or home:
-        return (away or "?") + "@" + (home or "?")
+    for key in ("game_pk", "gamePk", "game_id", "event_id", "id"):
+        value = game.get(key)
+        if isinstance(value, (str, int)) and not isinstance(value, bool):
+            text = str(value).strip()
+            if text:
+                return text
+    raw_matchup = game.get("matchup")
+    if isinstance(raw_matchup, str) and raw_matchup.strip():
+        return raw_matchup.strip().replace(" ", "_")
+    matchup = raw_matchup if isinstance(raw_matchup, dict) else {}
+    away = matchup.get("away") if isinstance(matchup.get("away"), dict) else {}
+    home = matchup.get("home") if isinstance(matchup.get("home"), dict) else {}
+    a = _safe_text(away.get("abbr") or away.get("name"), "").strip()
+    h = _safe_text(home.get("abbr") or home.get("name"), "").strip()
+    if a or h:
+        return f"{a or '?'}@{h or '?'}".replace(" ", "_")
     return "?"
+
 
 def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
     dashboard_games = sport.get("dashboard_games") if isinstance(sport.get("dashboard_games"), list) else []
