@@ -2908,11 +2908,26 @@ def _game_bet_candidates_from_game(sport: dict[str, Any], game: dict[str, Any], 
             # The segment names ARE the finding -- an unlabelled percentile is
             # what let the first version be read as "one pathological row" when
             # its widest bucket silently contained the entire post-loop tail.
+            # The quote-join reason split, on the same line and the same window.
+            # `enrich_block` being the widest segment says WHERE the time goes;
+            # by_teams_fallthrough vs by_event says WHY, and rows_walked sizes it.
+            # Without the split, a dominant enrich_block is still ambiguous
+            # between two different per-candidate scans in two different modules.
+            _join = ""
+            try:
+                from syndicate.features.shared.odds_book_quotes import reset_quote_join_stats
+
+                _js = reset_quote_join_stats()
+                if _js:
+                    _join = " join:" + ",".join(f"{k}={v}" for k, v in sorted(_js.items()))
+            except Exception:
+                pass
             print(
                 f"[home] SLOW_SEGMENT_PROFILE sport={_safe_text(sport.get('slug'), '?')} "
                 f"total_s={_tot:.2f} rows={len(_rows)} rows_s={sum(_rows):.2f} "
                 f"tail_s={_tot - sum(_rows):.2f} "
-                + " ".join(f"{name}={dur:.2f}" for name, dur in _top),
+                + " ".join(f"{name}={dur:.2f}" for name, dur in _top)
+                + _join,
                 flush=True,
             )
     except Exception:

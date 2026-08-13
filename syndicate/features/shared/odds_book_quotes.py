@@ -586,6 +586,30 @@ def quote_rows_from_oddsapi_events(
 # cache key, so this costs nothing.
 _BOOK_QUOTES_CACHE: "OrderedDict[tuple[str, int, int], list[dict[str, Any]]]" = OrderedDict()
 
+# Which key resolved each `quote_ref_for_bet` call, and how many rows it had to
+# walk to find out. Counted PER CALL, never per row: the loop below runs ~122k
+# times per candidate and an increment inside it would be part of the cost it is
+# supposed to measure.
+#
+# The reason-split is the point, not the total. `event` is the cheap key;
+# `teams` means the cheap key missed and every row fell through to alias
+# resolution. A join can fail the same way silently (a null) or expensively (a
+# full scan), and only the by-reason count distinguishes "the join is broken"
+# from "the key is wrong" -- which is also what makes it a regression guard
+# after any fix, not just a diagnostic before one.
+_QUOTE_JOIN_STATS: dict[str, int] = {}
+
+
+def reset_quote_join_stats() -> dict[str, int]:
+    """Return the counts so far and start a fresh window."""
+    snapshot = dict(_QUOTE_JOIN_STATS)
+    _QUOTE_JOIN_STATS.clear()
+    return snapshot
+
+
+def _bump(key: str, amount: int = 1) -> None:
+    _QUOTE_JOIN_STATS[key] = _QUOTE_JOIN_STATS.get(key, 0) + amount
+
 # Measured multiplier from file bytes to resident bytes (6.3x, twice).
 _BOOK_QUOTES_RSS_PER_FILE_BYTE = 6.3
 
@@ -1210,15 +1234,33 @@ def quote_ref_for_bet(
     wanted_teams = _team_tokens(home_team, away_team, matchup)
 
     identified: list[Mapping[str, Any]] = []
+    hit_event = hit_player = hit_teams = 0
     for row in rows:
         if wanted_event and _normalize_token(row.get("event_id")) == wanted_event:
             identified.append(row)
+            hit_event += 1
             continue
         if wanted_player and _normalize_token(row.get("player_name")) == wanted_player:
             identified.append(row)
+            hit_player += 1
             continue
         if wanted_teams and _row_teams_match(row, wanted_teams, sport):
             identified.append(row)
+            hit_teams += 1
+    # Per call, not per row -- see _QUOTE_JOIN_STATS. `rows_walked` is the number
+    # that sizes the problem: it is len(rows) every time, because identity is
+    # decided by a full scan with no early exit.
+    _bump("calls")
+    _bump("rows_walked", len(rows))
+    if hit_event:
+        _bump("by_event")
+    elif hit_player:
+        _bump("by_player")
+    elif hit_teams:
+        # The expensive path: the cheap key missed and every row was alias-resolved.
+        _bump("by_teams_fallthrough")
+    else:
+        _bump("no_identity")
     if not identified:
         return None
 
