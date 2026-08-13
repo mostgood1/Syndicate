@@ -345,8 +345,17 @@
   - `origin/main` is now **`d6188ca7`** — a cherry-pick of `1b9b1e39` onto
     `f6fec4f1`, containing **`#419` and nothing else**. Verified before push:
     `render.yaml` byte-identical to origin/main (so **no `blueprint_sync`
-    exposure**), `memory_observability.py` byte-identical (so the
-    `memory-guard-reclaimable` lane's `#417` is **NOT** in it), `#420` excluded.
+    exposure**), `memory_observability.py` byte-identical, `#420` excluded.
+    **CORRECTION 13:07 CDT — I read that second check wrong.** I inferred
+    "identical to origin/main" ⇒ "`#417` is NOT in it". Identical means my
+    commit did not CHANGE the file, not that the fix is absent. `03073270`
+    (`#417/#387`) was already an ancestor of `f6fec4f1`, so **`d6188ca7`
+    CONTAINS `#417`**. Consequence is benign and actually better than what I
+    claimed: refresh-worker went live on `03073270` at some point after my
+    preflight, so live→target is now measured as exactly two commits —
+    `f6fec4f1` (`.claude/` hooks/settings, inert on the server; Render runs
+    `scripts/run_refresh_worker.py`) and `#419`. **The only runtime delta is
+    `#419`**, and deploying does not revert the memory-guard lane's work.
     Two files, +264/−7. Suite on that exact tree: 223 passed, exit 0.
   - **Why the cherry-pick.** `/preflight` FAILED on plain `main`. Two blockers,
     both other people's work: (1) `1b9b1e39` has `495e9d12` (`#417/#387`) as an
