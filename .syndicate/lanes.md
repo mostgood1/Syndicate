@@ -6,6 +6,106 @@
 
 ## OPEN
 
+### refresh-worker-anon-leak — OPEN — opened 2026-08-13 — session: memory-guard
+- Goal: name what allocates ~300MB/hour of ANONYMOUS memory on refresh-worker,
+  with evidence, so the board stops needing a restart every ~4 hours.
+  Testable outcome: `anon` growth over a full evening window attributed to a
+  named subsystem, or the growth shown to be bounded and the 1900MB floor
+  re-derived against it.
+- **This lane exists because fixing `#417` made it visible.** The old guard
+  credited only `inactive_file`, so it refused for a bookkeeping reason and
+  MASKED the real growth. Measured today on refresh-worker:
+  ```
+  #417's own window (pre-fix): anon FLAT, 1659 -> 1677.9, +18.9MB over 5.4h
+  today, post-fix:             anon 1163 -> 2603MB in 4.5h  (~300MB/hour)
+  ```
+  Same service, same guard, opposite verdict about `anon`. That contrast is
+  the whole finding.
+- Files: none claimed yet. **Diagnostic only until the allocator is named** —
+  `#327`'s lesson is that picking the next plausible candidate is how five
+  eliminations got burned. No code lane until there is a measurement.
+- Hypothesis (recorded before testing, per protocol): the growth is in a
+  long-lived worker process rather than the transient sim/publish children,
+  because a restart clears it completely and the children already exit.
+- Falsification test: if per-process RSS shows the growth in short-lived
+  children that come and go, the parent is exonerated and the leak is a
+  retention/accumulation issue in whatever survives them.
+- **Measurement RUNNING from a clean baseline.** Sampler `/c/tmp/leak_sampler.py`
+  -> `/c/tmp/leak_series.jsonl`, every 3 min for ~2h, capturing `anon` /
+  `unreclaimable` / `current` alongside `ALL_PROCESS_MEMORY` per-process RSS.
+  Started 23:0xZ against the 22:59:14Z restart (anon 980.6MB).
+  **Starting it was urgent: the restarts at 14:56, 18:05 and 22:59 each cleared
+  the leak AND destroyed the evidence window.** This is the first clean one
+  that has been recorded rather than spent.
+- Related: `#327 RESIDUAL` (493-878MB unattributed allocator, five causes
+  eliminated, leading lead never measured in bytes). Probably the same animal;
+  do not assume so — `#327`'s eliminations were against a different symptom.
+- Expected recurrence: on the measured trajectory the board should re-freeze
+  ~4-5h after the 22:59 restart. **That prediction is itself a test** — if it
+  does not recur, the growth is not linear and the model is wrong.
+- Blocked by: nothing.
+
+### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
+- Goal: the NFL day-of-game engine is proven, stage by stage, against
+  tonight's 6-game preseason slate (2026-08-13). Testable outcome: for each
+  of the five stages — sim run, odds refresh, sim-projection→odds mapping,
+  live lens, game-card update — a PRODUCTION measurement that is either
+  "works, here is the non-zero reading" or "broken here, this is the first
+  stage that is zero". No stage may be closed on a local-checkout reading.
+- **Opens as lane 4 against a stated cap of 3.** Recorded, not hidden;
+  `state.md` notes the cap is policy with no enforcement and that four ran
+  unchallenged on 08-13. Flagged to the user at open time.
+- Files: **read-only until a defect is named.** Diagnosis runs against
+  production HTTP + the Render API; nothing is edited in this phase.
+  Prospective claim if a fix follows, all NFL-scoped and none of them held
+  by another OPEN lane:
+  - `syndicate/features/nfl/**` (cards, preseason_cards, live_lens,
+    smartsim2_projection, preseason_projection, sources)
+  - `syndicate/blueprints/nfl.py`
+  - `pipeline/nfl_game_projections.py`
+- NOT touched, deliberately — claimed by other OPEN lanes:
+  `syndicate/features/shared/live_refresh_loop.py` (mlb-props-regen),
+  `pipeline/intelligence_state.py` and
+  `syndicate/features/shared/memory_observability.py`
+  (memory-guard-reclaimable). If the NFL defect lands in one of these, STOP
+  and surface the collision instead of editing across the lane boundary.
+- Hypothesis (recorded before testing): the day-of-game path is **not** end
+  to end for NFL, and the break is upstream of the board. Three specific
+  priors from the ledger, each to be confirmed or exonerated by measurement:
+  1. `attach_projections` wires mlb/wnba/soccer only, and `board_enrichment`
+     recorded that production holds no NFL predictions/edges of any kind
+     (`#329` notes) — so the sim→odds mapping stage may have no join at all.
+  2. `#377`: NFL `margin_mean` is a CONSTANT 0.96 and `total_mean` a constant
+     38.76 across every game. If a sim runs tonight and the projections are
+     still one value per market family, the sim executed and produced nothing
+     game-specific — a pass on "did it run" and a fail on "is it a
+     projection".
+  3. `#389` follow-up: NFL projections were written to the ephemeral checkout
+     (`/opt/render/project/src/data/...`) while the guard read
+     `/opt/render/project/data/...`; the `nfl_artifact_output_root()` fix is
+     recorded as AWAITING FIRST RUN. Tonight is the first live slate to test
+     whether a completed sim's artifact is now visible to the reader.
+- Falsification test: for prior 1 — a non-empty projection join on an NFL
+  card tonight exonerates it. For prior 2 — two or more distinct `projected`
+  values across tonight's 6 games exonerates it; one value confirms it. For
+  prior 3 — `SEASON_PROJECTION_ARTIFACT_MISSING` absent after a launch, with
+  the artifact readable at the guard's root, exonerates it.
+- Hazards carried from `learnings.md` into this lane:
+  - **A null agrees with everything.** Every zero recorded here needs a
+    positive control — a case that makes the same instrument read non-zero —
+    before it is written down as a finding. NFL is week-scoped, so an empty
+    board is the EXPECTED reading for a wrong week and must never be reported
+    as a broken stage.
+  - **Preseason and regular season are separate week domains** and separate
+    routes (`/nfl/preseason/*` vs `/nfl/*`). Tonight is preseason; reading
+    the regular-season route would produce a legitimate empty and look like a
+    defect.
+  - Local `data/nfl_source/**` is a lossy mirror. Production first, always.
+- Verification: a stage-by-stage table written into this lane and into
+  `state.md`, each row carrying its measurement and its timestamp, with the
+  first zero stage named explicitly if there is one.
+- Blocked by: none.
+
 ### quote-join-enrich-cost — OPEN — opened 2026-08-13 — session: memory-guard
 - Goal: the MLB board-build's ~33s per slow game is attributed to a named
   cause inside `enrich_block` and then cut. Testable outcome: on a comparable
@@ -358,7 +458,22 @@
     Owner still unassigned. Everything else in this lane is done.
 
 
-### memory-guard-reclaimable — DEPLOYED, MEASUREMENT OPEN — opened 2026-08-13 — session: memory-guard
+### memory-guard-reclaimable — CLOSED 2026-08-13 — fix VERIFIED, and it uncovered a leak
+- **OUTCOME: all three verification items MET at T+4.71h.** Unit and liveness
+  passed in test; production item 3 resolved 22:48Z. The live abort line
+  carries `'basis': 'unreclaimable'` — proving the new path executes — with
+  `active_file: 891.7` / `inactive_file: 229.8` credited as reclaimable. The
+  guard is reading the right quantity. It refuses now only because `anon` is
+  genuinely 2522.7MB.
+- **The 24h read is cancelled**, not skipped: waiting would have measured a
+  rebooted container, and the verdict was already unambiguous.
+- **The fix STAYS. Do not revert it** and do not read the 22:39-22:59 freeze as
+  its failure — see `#423`. The 1900MB floor is now the open question, and only
+  after the leak is understood; resizing against a leaking baseline just moves
+  the freeze later.
+- Handed on: the leak itself, as `#423` / lane `refresh-worker-anon-leak`.
+
+### memory-guard-reclaimable (detail below, kept for the file/line map) — session: memory-guard
 - Goal: `memory_headroom_snapshot` decides on unreclaimable memory
   (`anon + shmem + slab_unreclaimable`), so that total memory in use FALLING
   can never tighten the guard. Unblocks `#417` and `#387` in one change.
@@ -667,7 +782,7 @@
 - Blocked by: none.
 - **STATUS 2026-08-13 — HYPOTHESIS CONFIRMED, BOTH FIXES WRITTEN AND
   COMMITTED. NOT DEPLOYED. Production effect UNVERIFIED.**
-  - `d6188ca7` (`#419`) — the root cause. `bf8833e9` (`#420`) — the tick-vs-time
+  - `d6188ca7` (`#419`) — the root cause. `8a0d49d8` (`#420`) — the tick-vs-time
     bound, split out deliberately. `a0c5e7af` — tickets filed.
   - Falsification test RAN and the hypothesis survived: with the disk read
     stubbed out (pre-`#419` behaviour) the new regression test goes RED with
@@ -717,7 +832,7 @@
     `render.yaml` commits** (`d16950b9`, `1e09fa9b`, `7c60d0f8`), which per
     `#284` apply to production on push. User chose the cherry-pick.
   - **STILL LOCAL AND UNPUSHED, for their owners:** `#417`/`#387`
-    (`03073270`), `#420` (`bf8833e9`), the three `render.yaml` commits, and
+    (`03073270`), `#420` (`8a0d49d8`), the three `render.yaml` commits, and
     this lane's own doc commits. Expect duplicate-commit divergence on the next
     push — it has already happened once here (`a3f9ed97`).
   - **Deploy target is refresh-worker ONLY.** Confirmed by env, not assumed:
@@ -1011,7 +1126,7 @@
     candidate_pools`, `mlb_pool["candidate_count"] == 1`, and the inverted
     `_latest_key`), 1 inverted, 0 removed.
   - NOTE on the full-file number's provenance: this run is against
-    `841228d9`, not the `b48aa0d3` the brief cited — `memory-guard-reclaimable`
+    `d4bb29b5`, not the `b48aa0d3` the brief cited — `memory-guard-reclaimable`
     landed `03073270` (`memory_observability.py`, the `#417` unreclaimable-memory
     guard) in between. That is the interaction this lane flagged when it
     opened, and it turned out benign: the memory/headroom tests in this file
