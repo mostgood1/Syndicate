@@ -136,10 +136,27 @@
   `'basis': 'unreclaimable'` (proving the new path executes) with
   `active_file`/`inactive_file` credited as reclaimable. Do not revert it.
   `[measured 08-13 22:48Z]`
-- **There is a REAL anon leak on refresh-worker, previously MASKED by the
-  broken guard.** `anon` 1163 → 2603MB in 4.5h (18:05–22:48Z). `#417`'s own
-  window was FLAT (+18.9MB/5.4h). The old guard refused for a bookkeeping
-  reason and hid genuine growth. `[measured 08-13]`
+- **RETRACTED 23:33Z: the "~300MB/hour anon leak" is NOT established.** It came
+  from two point samples (`anon` 1163 → 2603 over 18:05–22:48Z), and `anon` is
+  now measured to swing **~1650 ↔ 3200MB within minutes**. Two points cannot
+  distinguish a ratchet from two phases of that swing — the same error retracted
+  the same evening for the v2 sampler. **Do not cite 300MB/hour.**
+  `[retracted 08-13 23:33Z]`
+- **What IS measured: `anon` oscillates hugely, and the guard samples one point
+  of it.** Floor series post-restart: 980.6 → ~1650 in 20 min (warm-up) → 1670 /
+  1652 / 1763 over the next 10 min, roughly flat. p50 1715 → 2176 → 2518, max to
+  **3203.7**. The guard needs `anon < 2196`, so a cycle builds or aborts
+  depending on where in the swing it reads. `[measured 08-13 23:19–23:29Z]`
+- **Regime is INTERMITTENT, not frozen.** Post-restart: 8 `LAYER2_SHORTLIST`
+  builds, 4 aborts. The 20:39–22:59 event was different in kind — 300
+  consecutive aborts, zero builds. `[measured 08-13 23:33Z]`
+- **Prediction falsified:** re-freeze was predicted at ~4–5h; aborts resumed at
+  **34 minutes**. The linear-growth model is wrong. `[measured 08-13 23:33Z]`
+- Open question, and the likely real defect: **`#417` fixed WHICH quantity the
+  guard reads; it did not make ONE READING of that quantity sufficient.** A
+  point-sampled guard against a 1550MB-swinging value gives an unstable
+  verdict. Trough/median sampling or hysteresis is the shape of the fix — not
+  another allocator hunt. `[from-measurement 08-13]`
 - **Restarts clear it and prove nothing.** 14:56, 18:05, 22:59 — each dropped
   `anon` (2603 → 980.6MB at 22:59) and each destroyed the evidence window.
   **A recovered board is not a fixed system.** `[measured 08-13]`

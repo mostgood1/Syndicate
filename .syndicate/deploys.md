@@ -75,6 +75,16 @@
     Trajectory across the window: `anon` **1163 -> 2603MB in 4.5 hours**.
     Compare `#417` itself: `anon` FLAT, +18.9MB over 5.4h. That one was
     bookkeeping; this is a real leak of roughly **300MB/hour**.
+    - **RETRACTED 23:33Z — the 300MB/hour figure is NOT established and must
+      not be cited.** Both numbers above are POINT SAMPLES, and `anon` is now
+      measured to swing **~1650 <-> 3200MB within minutes** (floor 1652, p50
+      2518, max 3203.7 in one 5-minute window). Two points cannot separate a
+      ratchet from two phases of that swing — the same method retracted the
+      same evening for the v2 sampler. The floor series, which is the honest
+      one, reads 1670 / 1652 / 1763: roughly flat.
+    - The original text is left standing because it is what was believed when
+      the deploy below was ordered. **`#417`'s guard fix remains verified and
+      correct** — what collapsed is the leak framing, not the fix.
   - **Consequence, and the reason this is a good outcome rather than a failed
     fix: the broken guard was MASKING genuine memory growth by failing for the
     wrong reason.** Repairing it made the real problem visible for the first
@@ -112,7 +122,10 @@
   `anon` **2603 -> 980.6MB**, available **1483 -> 3110.7MB**. The restart
   clears the leaked memory exactly as the 14:56 and 18:05 restarts did.
   **Expect the freeze to return on the same ~300MB/hour trajectory, i.e.
-  roughly 4-5 hours out.** If the board is fine tomorrow morning it is because
+  roughly 4-5 hours out.** — **PREDICTION FALSIFIED 23:33Z: aborts resumed at
+  34 minutes, not 4-5 hours, and the regime is INTERMITTENT (8 builds, 4
+  aborts) rather than the 300-consecutive-abort freeze this row describes.
+  The linear model is wrong; see `#423`.** If the board is fine tomorrow morning it is because
   something restarted it, not because this was fixed.
 - **Bundled, and the bundle is recorded honestly:** `#419` (`live_refresh_loop`,
   mlb-props-regen's), `#414` quote-join index + enrich instrument (behaviour +

@@ -147,6 +147,46 @@
   - Eliminated tonight, do not redo: cache coefficient (measured 5.89–6.33 vs
     6.3); one-huge-shard (today's MLB shard is 0.1MB); "the worker never
     flushes" (it caps arenas).
+- **CORRECTION 2026-08-13 23:33Z — THE PREDICTION IS FALSIFIED AND THE LEAK
+  CLAIM IS NOT ESTABLISHED. Read this before acting on anything above.**
+  - **Predicted re-freeze at ~4-5h. Aborts resumed at 34 minutes** (restart
+    22:59:14Z, `MEMORY_GUARD_ABORT` newest 23:33:29Z). The linear-growth model
+    is wrong.
+  - **But the REGIME is different, and that matters more than the timing.**
+    20:39-22:59 was 300 consecutive aborts with ZERO builds. Now it is
+    **intermittent**: 8 `LAYER2_SHORTLIST` builds and 4 aborts since the
+    restart. The board works, just not every cycle.
+  - **The floor series says why.** `anon` swings ~1650 <-> 3200MB within
+    minutes:
+    ```
+    window    floor      p50      max
+    23:19    1670.0   1715.3   1877.9
+    23:24    1652.2   2176.0   3203.7
+    23:29    1762.8   2518.4   3167.7
+    ```
+    The guard needs `anon < 2196` to pass (1900 available of 4096). Whether a
+    cycle builds therefore depends on **where in that swing the guard samples**.
+  - **SO THE ~300MB/hour LEAK IS RETRACTED AS A MEASUREMENT.** `anon 1163 ->
+    2603 over 4.5h` came from **two point samples** — the exact method retracted
+    hours earlier for the v2 sampler. Against a quantity that oscillates 1550MB
+    within minutes, two points cannot distinguish a ratchet from two different
+    phases of the same swing. **Do not cite the 300MB/hour figure.**
+  - What the floor actually shows so far: 980.6 (restart) -> ~1650 within 20
+    min (warm-up) -> **1670 / 1652 / 1763 over the next 10 min — roughly
+    FLAT.** No ratchet visible yet.
+  - **Caveat on the caveat, stated so it is not over-read the other way:**
+    three windows over 10 minutes cannot distinguish a flat floor from a slowly
+    rising one either. This retracts the leak as *established*, it does not
+    establish its absence. Hours of floor series settle it; the sampler runs.
+  - **REFRAME, and it is `#417`'s lesson one level up.** If this is a swing
+    rather than a ratchet, the defect is not an allocator to find — it is that
+    **a point-sampled guard against a 1550MB-swinging quantity gives an
+    unstable verdict.** `#417` fixed *which* quantity is read; it did not make
+    *one reading* of that quantity sufficient. A trough-or-median guard, or
+    hysteresis, would be the shape of the fix.
+  - `SLOW_SEGMENT_PROFILE` / `SLOW_ENRICH_PROFILE`: **0 post-restart.**
+    Consistent with the `#414` index working AND with no slow game having run.
+    Proves nothing yet — see the silence caveat above.
 - Blocked by: nothing. Measurement-bound, not idea-bound.
 
 ### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
