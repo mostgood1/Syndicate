@@ -4972,6 +4972,20 @@ I triggered `f1bba90c` at 15:54:50Z. Two errors:
    (`ALL_PROCESS_MEMORY` already lists every child with its cmdline) instead of
    probing for the hazards you happen to remember.
 
+**FIRST PROSPECTIVE CONFIRMATION, 2026-08-13.** The sim check — the third one,
+added after the 00:24:36 `killed_by_restart` — **held the oversight lane's deploy
+at `sim=running`.** Every prior confirmation was retrospective: reading a
+`killed_by_restart` afterwards and inferring the gate would have caught it.
+
+**This is the reading that makes the other three mean anything.** A guard observed
+only passing is untestable — this file's own instrument-blindness rule (*a healthy
+reading is evidence only once you know what makes it read unhealthy*) applied to a
+guard rather than to a metric. Until it refused something, "CLEAR TO DEPLOY" and
+"the check is silently broken" produced identical output, which is exactly the
+failure mode of the three-token pre-flight above.
+
+Reported cross-session by the oversight lane; the gate is `#388`'s.
+
 #### DURABLE THROUGH T+35, and the regression risk is cleared
 
 The change re-routes read/write for **every** path on the service that writes
