@@ -165,6 +165,66 @@
 - Included pipeline/build minutes exceeded in Aug: 1,549 of 1,000.
   `[measured 08-12]`
 
+
+## Session harness — what the hooks actually enforce
+
+- **`lane-guard.py` (PreToolUse) enforces.** Blocks `Edit` and `Write` against
+  a file claimed by another OPEN lane (exit 2, edit does not land); allows the
+  same file when `.syndicate/.current-lane` names the claiming lane.
+  `[measured 08-13, 4 probes through the harness]`
+- **With `.current-lane` empty or missing it blocks your OWN lane's files**,
+  reporting `Current lane: 'none'`. Correct by design, confusing symptom — a
+  session that hand-edits `lanes.md` instead of running `/lane` locks itself
+  out. **The marker did not exist at all before 08-13**, so `none` was the
+  baseline, and it has already bitten once: session `ab30bcc8` was refused
+  `tests/test_intelligence_state.py`, claimed by the very lane it was working
+  (`intelligence-state-red-baseline`). `/lane close` empties the marker, which
+  restores that state — only `/lane open` clears it. `[measured 08-13]`
+- **`Bash` bypasses it entirely** — the matcher is `Edit|Write|MultiEdit|
+  NotebookEdit`. The guard bounds the file tools, not the session.
+  `[measured 08-13]`
+- **`session-start.sh` delivers 1,243 B**, `exitCode=0`, no truncation marker,
+  measured from the arriving `attachment` record (session `2e6476cd`, line 3).
+  Inside the ~2KB cap that left v1 ~5% functional. `[measured 08-13]`
+- **`checkpoint-guard.sh` (Stop) has never passed and cannot.**
+  `.syndicate/.last-checkpoint` did not exist until this session, so line 17's
+  pass branch was unreachable: **27 Stop deliveries, 5 sessions, exit 1 on all
+  27, zero exit 0** — while checkpoints were demonstrably being written.
+  `[measured 08-13]`
+- **Exit 1 on Stop is advisory.** Delivered stderr carries "Failed with
+  non-blocking status code". `/checkpoint` is documented as an obligation and
+  is enforced by a log line. A gate would need exit 2 — and must not be raised
+  to exit 2 until the always-fires defect is fixed, or it wedges every session.
+  `[measured 08-13]`
+- Its `DIRTY` count is the **whole worktree**, not the session: 64 dirty files
+  at this checkpoint, 1 of them this session's. `[measured 08-13]`
+- **The 3-lane cap in `## Config` is policy with no enforcement.** Four OPEN
+  lanes ran this session unchallenged; `/lane open` checks file collisions
+  only and never counts. `[measured 08-13]`
+
+## Test baselines
+
+- `tests/test_intelligence_state.py` is **GREEN: 224 passed, 10 subtests
+  passed, 0 failed** on `bd227fa3`. It had carried a standing
+  `4 failed, 220 passed` on a clean checkout; `#288` closed 2026-08-13, all
+  four repaired in the test with **zero source changes**. **A failure in this
+  file is now yours** — it is no longer safe to assume standing noise, which is
+  the whole point of having fixed it. `[measured 08-13]`
+- It costs **~15 minutes** (891s red, 902s green), so it is not a quick check.
+  The four historically-broken tests run alone in ~35s and are the cheap
+  smoke: `test_build_candidate_pool_does_not_embed_full_odds_history_payload`,
+  `test_query_endpoint_default_unchanged_when_combined_flag_disabled`,
+  `test_read_latest_response_syncs_shared_backend_state`,
+  `test_background_loop_survives_board_window_watch_exception`.
+  `[measured 08-13]`
+- Two of those four are pinned against SOURCE by mutation, not just by green:
+  re-embedding `odds_history` on the per-sport pool entry, or removing the
+  sport-scoped `_latest_key` promotion skip, each turns the right test red.
+  `[measured 08-13]`
+- **Green here says nothing about `tests/test_intelligence.py`.** `#288`'s
+  record notes two query failures and a blotter failure in other files; those
+  were never in its scope and were **not re-measured** on 08-13.
+  `[unverified 08-13]`
 ## Board live tier (layer1-live-tier lane)
 
 - **The live prop join was matching 0 of 1385 rows** — keyed on `market`, which

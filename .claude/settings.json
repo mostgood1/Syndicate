@@ -33,7 +33,7 @@
           {
             "type": "command",
             "shell": "bash",
-            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/checkpoint-guard.sh",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/checkpoint-guard.py",
             "timeout": 30,
             "statusMessage": "Checking for uncheckpointed work..."
           }
