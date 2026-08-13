@@ -6096,11 +6096,36 @@ def _game_candidates_for_sport(sport: dict[str, Any]) -> list[dict[str, Any]]:
                 )
             },
         )
+    # `#393` follow-up. MEASURED: GAME_CANDIDATES_EXIT sport=mlb is p50 719.0s
+    # (max 1157.3s) while every other sport is <=4.6s -- soccer produces MORE
+    # rows in 0.0s. That is 77% of a 23-minute board build sitting in this one
+    # loop for one sport, and the existing instrumentation cannot see inside it:
+    # game_candidate_inputs samples only dashboard_games[:2] and carries no
+    # timing, and _log_stage_timing goes through logger.info, which never reaches
+    # Render's collector.
+    #
+    # Per-GAME timing, emitted only for games that are actually slow so a normal
+    # build stays quiet. print, not logger.info, for the reason above.
+    try:
+        _slow_game_threshold_s = float(str(os.environ.get("SYNDICATE_GAME_CANDIDATE_SLOW_LOG_SECONDS") or "5").strip() or 5)
+    except ValueError:
+        _slow_game_threshold_s = 5.0
     candidates: list[dict[str, Any]] = []
     for game in dashboard_games:
         if not isinstance(game, dict):
             continue
-        for row in _game_bet_candidates_from_game(sport, game, fallback_epoch=0.0):
+        _game_started_at = time.time()
+        _game_rows = _game_bet_candidates_from_game(sport, game, fallback_epoch=0.0)
+        _game_elapsed = time.time() - _game_started_at
+        if _game_elapsed >= _slow_game_threshold_s:
+            print(
+                f"[intelligence] SLOW_GAME_CANDIDATE sport={_safe_text(sport.get('slug'), '?')} "
+                f"game_id={_safe_text(game.get('game_id') or game.get('id'), '?')} "
+                f"elapsed_s={round(_game_elapsed, 2)} rows={len(_game_rows)} "
+                f"is_live={bool(game.get('is_live'))}",
+                flush=True,
+            )
+        for row in _game_rows:
             if not isinstance(row, dict):
                 continue
             row = dict(row)
