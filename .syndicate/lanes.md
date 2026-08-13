@@ -6,10 +6,156 @@
 
 ## OPEN
 
+### quote-join-enrich-cost — OPEN — opened 2026-08-13 — session: memory-guard
+- Goal: the MLB board-build's ~33s per slow game is attributed to a named
+  cause inside `enrich_block` and then cut. Testable outcome: on a comparable
+  evening slate, `SLOW_SEGMENT_PROFILE tail_s` for MLB drops below 10s with
+  `rows_walked` down by at least an order of magnitude.
+- **THE MEASUREMENT LANDED. This lane starts from data, not a hypothesis.**
+  `sim-execution-observability` handed this on CLOSED-PENDING-MEASUREMENT,
+  waiting for one evening build. It fired 2026-08-13 18:10Z on refresh-worker
+  (`03073270`), twice:
+  ```
+  18:10:24 [home] SLOW_SEGMENT_PROFILE sport=mlb total_s=33.32 rows=2
+     rows_s=0.00 tail_s=33.32 enrich_block=33.32 mlb_props_block=0.00
+     row[0]=0.00 join:by_player=15,by_teams_fallthrough=5,calls=20,
+     rows_walked=1718960
+  18:10:58 [home] SLOW_SEGMENT_PROFILE sport=mlb total_s=34.28 rows=2
+     rows_s=0.00 tail_s=34.28 enrich_block=34.27 record_rows_block=0.00
+     join:by_player=17,by_teams_fallthrough=2,calls=19,rows_walked=1
+  ```
+  Reading it against that lane's own decision rule:
+  - `tail_s` (33.32) **>>** `rows_s` (0.00) -> the cost is **post-loop**, and
+    `enrich_block=33.32` names it. The row loop is **EXONERATED** — 0.00s in
+    both samples.
+  - This confirms the retraction already in `learnings.md`: `SLOW_ROW_PROFILE`'s
+    "one pathological iteration takes 100-400s" was a span artifact. There is
+    no pathological row.
+  - `rows_walked=1718960` over `calls=20` — ~86k rows walked per call. The
+    second sample walked **1** row for a near-identical total time, which is
+    the single most interesting number here (see falsification test).
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/odds_book_quotes.py` — the join and its
+    counters. `_bump("rows_walked", len(rows))` at L1254; `_QUOTE_JOIN_STATS`
+    is per-call, not per-row (documented L1250).
+  - `syndicate/features/shared/quote_enrichment.py` — `enrich_candidate_rows`
+    at L366, the entry point the enrich block calls.
+  - `syndicate/blueprints/home.py` — `enrich_block` mark at L2872, profiler
+    emit at L2926. Segment/profiler code only.
+- NOT claimed, deliberately: `syndicate/features/intelligence.py`. It is the
+  caller (L6362) and holds the `blueprints.home` imports, but this lane does
+  not need to edit it, and `memory-guard-reclaimable` has a (never-exercised)
+  L2563-constant-only claim on it. If a fix needs that file, resolve the claim
+  first rather than editing across lanes.
+- Collision check: CLEAR. Neither OPEN lane (`memory-guard-reclaimable`,
+  `mlb-props-regen`) claims any of the three files above. The CLOSED
+  `sim-execution-observability` lane claimed two of them; this lane is the
+  continuation it handed on.
+- Hypothesis: the ~33s is a linear scan in the quote join, taken on the
+  `by_teams_fallthrough` path when the cheap `event_id` key misses.
+- **Falsification test, and it must be run FIRST.** The two samples disagree
+  with the hypothesis as stated: sample 1 walked **1,718,960** rows in 33.32s;
+  sample 2 walked **1** row in 34.28s. **Near-identical time, six orders of
+  magnitude apart in rows walked.** If `rows_walked` does not drive the time,
+  the join scan is NOT the cause and the cost is elsewhere in
+  `enrich_candidate_rows` — an I/O wait, a per-call artifact load, or a
+  network call. Do not optimise the scan until this is resolved.
+- **HAZARD — the two instruments agree EXACTLY and that is not corroboration.**
+  `SLOW_SEGMENT_PROFILE total_s=33.32` and `SLOW_GAME_CANDIDATE elapsed_s=33.32`
+  match to the hundredth in both samples. `learnings.md` ("An instrument's SPAN
+  is not its NAME") records that this exact agreement was previously read as two
+  independent measurements confirming each other when they were **the same
+  quantity measured twice**. Prove they are not reading the same clock interval
+  before citing either as independent evidence.
+- **HAZARD — `QUOTE_JOIN_STATS` returns 0 hits as a standalone token.** The
+  join counters are emitted *inside* the `SLOW_SEGMENT_PROFILE` line
+  (`join:...`), so a search for the bare token is not evidence of anything.
+  Do not read that zero as a missing instrument.
+- Architectural finding, recorded not actioned: `syndicate/features/
+  intelligence.py` imports **four** symbols from `syndicate/blueprints/home.py`
+  (`_build_sport_overview` L47, `_build_prop_dashboard_row` L48,
+  `_game_bet_candidates_from_game` L49, `_mlb_actual_payload_for_game` L6641).
+  The worker's board build therefore executes a Flask **presentation
+  blueprint**, which inverts the layering CLAUDE.md specifies. Concrete
+  consequence already observed: the `[home]` prefix makes worker cost look like
+  a web-route problem. Out of scope here; worth its own ticket.
+- Verification: a comparable evening slate shows MLB `tail_s` < 10s, with the
+  cause named in the lane before any change ships, and a before/after pair
+  taken from the SAME instrument on comparable slates.
+- Deploy exposure: refresh-worker `.py` only when it comes. No `render.yaml`.
+  NOTE: refresh-worker currently carries an OPEN `#417` measurement due
+  2026-08-14 13:00 — **do not deploy this lane's changes before that read
+  lands**, or the two changes become unattributable.
+- Blocked by: none for diagnosis. Deploy blocked until the `#417` read.
+
+### checkpoint-witness — CLOSED 2026-08-13 — opened 2026-08-13 — session: hooks-test
+- **OUTCOME: shipped to the working tree, all three verification items met,
+  5/5 cases against the LIVE file `settings.json` dispatches to.** Uncommitted.
+  - 1 PASS — session checkpointed after its work: exit 0, silent.
+  - 2 WARN — work postdates the session's own checkpoint: exit 1, names the
+    file, `witness: this session's checkpoint`.
+  - 3 WARN — **falsification met.** No signal of its own, fresh shared marker
+    (another session checkpointing): still exit 1. Under the old code this was
+    a silent pass. This is the defect that mattered.
+  - 4 PASS — step 7 via Bash `touch` is picked up as this session's signal.
+  - 5 PASS — ledger-only session: nothing at risk, silent.
+- Design changed once under test, before running: the first cut kept the
+  marker's mtime as a FALLBACK for sessions with no signal. That reinstated
+  the false pass for the single most important case — a session that has
+  NEVER checkpointed — so the mtime read was removed entirely. Step 7 is
+  honoured as an *act* seen in the transcript, not as a timestamp on disk.
+- A second session was editing this file concurrently and had independently
+  added a session-scoped log witness. Their half was kept; the two remaining
+  holes were both in the false-PASS direction (unscoped marker mtime; log
+  witness whose flag was session-scoped but whose *timestamp* was
+  `max(mtime)` over any file in `.syndicate/log/`). `Edit` reported the file
+  had changed on disk mid-lane, which is the only reason this was caught —
+  re-read, then continued on top of their structure rather than replacing it.
+- `checkpoint.md` step 7 rewritten to match: it had described mtime
+  comparison, which is no longer what happens.
+- Goal: `checkpoint-guard.py` decides on a witness derived from **this
+  session**, so (a) forgetting step 7 no longer produces a false warning and
+  (b) another session's checkpoint can no longer produce a false PASS.
+- Files (exclusive to this lane): `.claude/hooks/checkpoint-guard.py`,
+  `.claude/commands/checkpoint.md`. Neither is claimed by any other lane
+  (checked 2026-08-13 against every `###` header).
+- Predecessor: `checkpoint-guard-scope`, CLOSED-VOID — it rewrote a file that
+  had been deleted. This lane re-read the live artifact and confirmed it is
+  unchanged since `5cdf45b6` before editing.
+- The defect being fixed is **not** the one that lane chased. `5cdf45b6`
+  already scoped the denominator to the session's edited files. What remains is
+  the WITNESS: `.syndicate/.last-checkpoint` is repo-global, untracked, and
+  written by a manual step.
+  - False PASS: session A checkpoints at 15:10, touching the shared marker.
+    Session B edited code at 15:05 and stops without checkpointing. B's newest
+    work predates the marker, so B passes silently. With 3 concurrent sessions
+    this is the common case, not the corner case. **This is the dangerous
+    direction — it is the failure the guard exists to prevent.**
+  - False WARN: a session that writes the ledger but forgets step 7.
+- Fix: witness = the newest of this session's own signals, read from its own
+  transcript — the `/checkpoint` invocation timestamp and any `.syndicate/**`
+  write by a file tool. The global marker is used **only** when the session has
+  no signal of its own, so it can no longer be set by a different session.
+  `.syndicate/**` stops counting as work (it is the persistence, not the thing
+  at risk), which also removes the false warning from ledger appends.
+- Verified before coding: both signals are present in this session's transcript
+  — `/checkpoint` at `19:45:50Z` as `<command-name>/checkpoint</command-name>`,
+  and tool-written ledger edits at `19:53/19:58Z`. Bash-written appends (`cat
+  >>`) do NOT appear, which is why the command timestamp is needed as well.
+- Falsification test: construct a payload where the only witness is another
+  session's marker. The guard must WARN. If it passes, the contamination is
+  not fixed.
+- Verification (all three): (1) PASS when the session checkpointed after its
+  work; (2) WARN when only a foreign marker is newer; (3) WARN when real work
+  postdates the session's own checkpoint — run against the LIVE file that
+  `settings.json` dispatches to, with a synthetic payload on stdin.
+- Deploy exposure: none. Harness-only.
+- Blocked by: none.
+
 ### checkpoint-guard-scope — CLOSED-VOID 2026-08-13 — opened 2026-08-13 — session: hooks-test
 - **OUTCOME: no work product. The premise was already false when the lane was
   opened, and the lane edited a file that had been deleted.** Both defects it
-  set out to fix were fixed in `5b2ca320` — which was HEAD at this session's
+  set out to fix were fixed in `5cdf45b6` — which was HEAD at this session's
   start. That commit deleted `checkpoint-guard.sh`, added
   `checkpoint-guard.py`, and repointed `settings.json`. See RESULT below.
 - Goal: `checkpoint-guard.sh` fires on **this session's unpersisted work** and
@@ -20,7 +166,7 @@
   - `.claude/commands/checkpoint.md` — step 7 wording only.
 - CORRECTION to the closed `hooks-enforcement-test` lane: step 7 (`touch
   .syndicate/.last-checkpoint`) was reported missing from `checkpoint.md`.
-  **It is present and has been since `0d0b8931`.** The marker was absent
+  **It is present and has been since `f6fec4f1`.** The marker was absent
   because that commit landed 08-13; the 27 observed Stop deliveries predate
   it. The defect is not a missing instruction — it is that the pass branch
   depends on a model executing an optional-looking last step.
@@ -44,7 +190,7 @@
 - **RESULT 2026-08-13 — the lane rewrote `checkpoint-guard.sh`, which does not
   exist.** It was read at ~12:49, deleted upstream, and recreated at 14:55 by
   a `Write`. It sat untracked, invoked by nothing; `settings.json` has pointed
-  at `checkpoint-guard.py` since `5b2ca320`. Four tests were run and all four
+  at `checkpoint-guard.py` since `5cdf45b6`. Four tests were run and all four
   "passed" — against the orphan. The live hook was never executed.
   - Also mis-corrected `checkpoint.md` step 7 to describe the orphan's
     semantics (`data/**` `reports/**` `vendor/**` exclusions, log co-witness).
@@ -85,10 +231,10 @@
     `03073270` is already on `origin/main`, so nothing here depends on it.
 - **CHECKPOINT 2026-08-13 ~15:0x CDT — final for this session.**
   - Push blocker **CLEARED**: `session-start.sh` was committed by its own
-    session (`0642cdf7`/`f8bace6a`). Local `main` now **22 ahead / 6 behind**,
+    session (`0634e7bb`/`0f182961`). Local `main` now **22 ahead / 6 behind**,
     so a push needs a merge first and still carries other lanes' commits.
     Nothing in this lane depends on it — `03073270` is already on origin.
-  - Filed **`#422`** (`7b480fe4`): web is 47 commits behind, only 14 of them
+  - Filed **`#422`** (`b15fe051`): web is 47 commits behind, only 14 of them
     production, and `layer1-live-tier`'s "SHIPPED AND VERIFIED" may cover only
     the worker half. Filed as an INFERENCE with the confirming check named.
   - A blanket web deploy **FAILED `/preflight`** — 14 commits across five
@@ -232,7 +378,7 @@
     behaviour changes; per `learnings.md` a deployed fix can be inert.
 - **STATUS 2026-08-13 12:2x CDT — PUSHED to `origin/main` as `03073270`,
   decoupled from config. NOT DEPLOYED. Production effect still UNVERIFIED.**
-  - `/preflight` returned **FAIL** on the original candidate (`495e9d12` on
+  - `/preflight` returned **FAIL** on the original candidate (`03073270` on
     local `main`) for a reason that had nothing to do with the fix: local
     `main` carried **four unpushed `render.yaml` commits** underneath it
     (web env block 64 -> 52 keys). Render deploys from GitHub, so shipping
@@ -251,7 +397,7 @@
     among the 12 keys being removed from web. If the code default is True,
     removing it turns the loop ON for web rather than off — the `absent != off`
     hazard. NOT verified by this lane.
-  - **`main` has diverged and this commit now exists twice.** `495e9d12`
+  - **`main` has diverged and this commit now exists twice.** `03073270`
     (local) and `03073270` (origin) are the same change. Local `main` is 6
     ahead / 1 behind origin. Do not `git pull` and assume a clean merge —
     reconcile deliberately, and drop the local duplicate rather than
@@ -268,7 +414,7 @@
 - **STATUS 2026-08-13 ~12:5x CDT — local `main` reconciled with `origin/main`
   (`a3f9ed97`). Push HELD by decision. Still not deployed.**
   - Merge, not rebase. `git cherry` showed two local commits patch-equivalent
-    to origin (`495e9d12`≡`03073270`, `007f75b6`≡`b48aa0d3`); a rebase would
+    to origin (`03073270`≡`03073270`, `b48aa0d3`≡`b48aa0d3`); a rebase would
     have dropped them cleanly but rewritten **seven commits belonging to other
     sessions** working this shared checkout, and the ledger cites SHAs by
     hand. Verified after: 0 behind / 11 ahead, `origin/main` is an ancestor,
@@ -411,7 +557,7 @@
 - Blocked by: none.
 - **STATUS 2026-08-13 — HYPOTHESIS CONFIRMED, BOTH FIXES WRITTEN AND
   COMMITTED. NOT DEPLOYED. Production effect UNVERIFIED.**
-  - `1b9b1e39` (`#419`) — the root cause. `bf8833e9` (`#420`) — the tick-vs-time
+  - `d6188ca7` (`#419`) — the root cause. `bf8833e9` (`#420`) — the tick-vs-time
     bound, split out deliberately. `a0c5e7af` — tickets filed.
   - Falsification test RAN and the hypothesis survived: with the disk read
     stubbed out (pre-`#419` behaviour) the new regression test goes RED with
@@ -438,7 +584,7 @@
     `--write-season-frontend-artifacts off` and never rebuild it.
 - **STATUS 2026-08-13 12:50 CDT — `#419` IS PUSHED AND ARMED. DEPLOY PENDING
   THE SLATE. Anyone can finish this from cold; everything needed is below.**
-  - `origin/main` is now **`d6188ca7`** — a cherry-pick of `1b9b1e39` onto
+  - `origin/main` is now **`d6188ca7`** — a cherry-pick of `d6188ca7` onto
     `f6fec4f1`, containing **`#419` and nothing else**. Verified before push:
     `render.yaml` byte-identical to origin/main (so **no `blueprint_sync`
     exposure**), `memory_observability.py` byte-identical, `#420` excluded.
@@ -454,14 +600,14 @@
     `#419`**, and deploying does not revert the memory-guard lane's work.
     Two files, +264/−7. Suite on that exact tree: 223 passed, exit 0.
   - **Why the cherry-pick.** `/preflight` FAILED on plain `main`. Two blockers,
-    both other people's work: (1) `1b9b1e39` has `495e9d12` (`#417/#387`) as an
+    both other people's work: (1) `d6188ca7` has `03073270` (`#417/#387`) as an
     ANCESTOR, so no commit on main carries `#419` without it — two substantive
     changes, and `#417` moves `sufficient`, the exact gate `#420` reads;
     (2) local main was 12 ahead of origin including **three unpushed
-    `render.yaml` commits** (`054b2306`, `cc2e1803`, `e8611888`), which per
+    `render.yaml` commits** (`d16950b9`, `1e09fa9b`, `7c60d0f8`), which per
     `#284` apply to production on push. User chose the cherry-pick.
   - **STILL LOCAL AND UNPUSHED, for their owners:** `#417`/`#387`
-    (`495e9d12`), `#420` (`bf8833e9`), the three `render.yaml` commits, and
+    (`03073270`), `#420` (`bf8833e9`), the three `render.yaml` commits, and
     this lane's own doc commits. Expect duplicate-commit divergence on the next
     push — it has already happened once here (`a3f9ed97`).
   - **Deploy target is refresh-worker ONLY.** Confirmed by env, not assumed:
@@ -755,7 +901,7 @@
     candidate_pools`, `mlb_pool["candidate_count"] == 1`, and the inverted
     `_latest_key`), 1 inverted, 0 removed.
   - NOTE on the full-file number's provenance: this run is against
-    `841228d9`, not the `007f75b6` the brief cited — `memory-guard-reclaimable`
+    `841228d9`, not the `b48aa0d3` the brief cited — `memory-guard-reclaimable`
     landed `03073270` (`memory_observability.py`, the `#417` unreclaimable-memory
     guard) in between. That is the interaction this lane flagged when it
     opened, and it turned out benign: the memory/headroom tests in this file
@@ -784,8 +930,8 @@
   no duplicate keys on any service.
 - **Unverified: nothing was deployed.** Reachability is static analysis only —
   no process has been observed booting without these keys.
-- **Open obligation:** three commits unpushed (`054b2306`, `cc2e1803`,
-  `e8611888`), `origin/main` at `bf06710c`. Two `render.yaml` commits are
+- **Open obligation:** three commits unpushed (`d16950b9`, `1e09fa9b`,
+  `7c60d0f8`), `origin/main` at `bf06710c`. Two `render.yaml` commits are
   already on origin with no `blueprint_sync` seen in a ~23-minute window —
   that is a window, not an all-clear.
 
@@ -943,5 +1089,5 @@ than have every session quietly decide it is.
   delivers 1,243 B inside the ~2KB cap (v1 delivered ~5%); `lane-guard.py`
   rewritten to parse the real lanes.md shape and confirmed blocking through
   the harness; `checkpoint-guard.py` replaces the `.sh` and can now pass.
-- Commits: `0d0b8931`, `0642cdf7`, `5b2ca320`. Pushed: `f6fec4f1` only.
+- Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
