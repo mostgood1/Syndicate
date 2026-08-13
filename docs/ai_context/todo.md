@@ -1059,6 +1059,62 @@ all sat inside one plateau. **A measured number is a timestamp, not a fact** —
 both of us sampled a flat stretch in the middle of a climb, in opposite
 directions.
 
+### `#414` CORRECTED — my root cause was HALF right and my fix is INERT. The cost is a full linear scan of `unattributed` PER CANDIDATE, not an index rebuild
+
+**Confirmed inert in production.** Same slate date, shard not reset:
+
+    23:54  939.6s  rows=606   pre-deploy
+    02:38  946.0s  rows=460   post-deploy   = 1.01x, on FEWER rows
+
+**What I got right:** the input grows all day (MLB shard 57.11 MB) and cost
+tracks input size, not output. WNBA at `rows=12` constant going 1.2s -> 6.0s is
+still the discriminator and still holds.
+
+**What I got wrong:** I said the expensive work was REBUILDING the per-sport
+index. It is not. `_candidate_odds_history_state` (`intelligence.py:3393`):
+
+    pool = list(unattributed)                    # FULL LIST COPY, per candidate
+    if subject_key and subject_key in by_player:
+        pool.extend(by_player[subject_key])
+    for market_key, state in pool:
+        score = _candidate_odds_history_match_score(candidate, market_key, state)
+
+`_build_odds_history_player_index`'s July fix bucketed props by player to kill an
+`O(candidates x markets)` scan — **and only bucketed the player half.** Every
+game-level entry lives in `unattributed`, which is copied and scored IN FULL for
+every candidate. `_candidate_odds_history_match_score` does regex key parsing,
+text normalisation and MLB team-abbreviation expansion per entry.
+
+Cost = `candidates x |unattributed| x expensive_scoring`, and `unattributed`
+grows all day.
+
+**THE COST PROFILE PROVES THE MECHANISM, and it is the cleanup lane's
+measurement that settles it.** Per-game inside MLB on one build:
+
+    224.9s/26 rows  184.9s/21  107.0s/11  100.1s/10  71.6s/7  12.1s/1  9.5s/1
+    -> ~8-9 SECONDS PER ROW, flat across all seven
+
+**A rebuilt index gives a large FIXED cost and cheap rows. This is the
+opposite.** My hypothesis predicted the wrong shape and the data was already
+there to falsify it.
+
+**THE ACTUAL FIX: bucket `unattributed` too.** Key it by event/matchup so a
+candidate scores only its own game's game-level entries, exactly as `by_player`
+does for props. Same trick, applied to the half that was left linear.
+
+**My caching work is not wasted but is not the fix.** The index memo
+(`1c7e2e55`) and its hit/miss counter (`fe2fcbfa`) save the index BUILD, which
+is cheap relative to the scan. Keep them — they remove real work and the counter
+is how the next person avoids my mistake — but do not expect them to move the
+duration.
+
+**A correction to the verification, because it will mislead otherwise:**
+`ODDS_HISTORY_LOADED=1 / CACHE_HIT=0` is CORRECT, not a fingerprint failure.
+`_odds_history_payloads_by_sport` is called ONCE per board build, so one load and
+zero hits is right. The conclusive evidence is the duration, not that pair.
+
+Related: `#372` and `#376` both hit this same scan and treated it as local cost.
+
 ### `#408` — OPEN, UNOWNED. 126 of 233 board rows carry NO ranking signal. `#400` changed soccer's market type and did not change its content
 
 **Measured on the served artifact 2026-08-12T23:29:41Z**, seated `ev_pct` by sport
