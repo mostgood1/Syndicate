@@ -1,5 +1,78 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#413` — SHIPPED. The board's game state was frozen at whenever the feed was first captured
+
+`1ce66a32`. `board_enrichment.attach_live_game_state_from_lens` +
+`tests/test_live_game_state_from_lens.py`, wired into `book_grid_artifact`.
+
+Reported from the board: "we had the MIL SD game still showing and its final
+now." **NOT artifact lag**, which is what it looks like — measured against an
+artifact FIVE MINUTES OLD:
+
+| matchup | BOARD state | BOARD status | LENS abstract |
+|---|---|---|---|
+| MIL@SD | live | TOP 9 | **Final** |
+| CLE@DET | live | BOT 1 | Live (2h after first pitch) |
+
+`_mlb_feed_live_payload` (`blueprints/home.py:3333`) reads the cached
+`raw_feed_live_path` file and returns it **if it EXISTS**, consulting the live
+API only when it is absent. So whichever moment a game's feed was first captured
+becomes its state for the day. Presence used where freshness was meant — the
+same defect `#128` documented for mtime in this same feature.
+
+Overlays the live lens' status (a real fetch, and right) onto the chip's, joined
+on the team pair, from a snapshot already read here for the prop join. Runs
+BEFORE the projections because `live_edge_policy` reads `game.state` — correcting
+it afterwards leaves a settled game's edges standing. Verified on production:
+`rows_corrected: 210, transitions: {live->final: 210}`, snapshot age 2.6s; the
+seven genuinely-live games untouched.
+
+Two guards: a snapshot staler than 15 min may not override anything (a wedged
+lens would freeze the board harder than the bug), and **final is terminal** — an
+un-finaled game re-opens edges against a settled market.
+
+**Still owed:** making the feed cache honour freshness. It re-introduces per-game
+network I/O into a path already on an 8s wall-clock budget for 15 games, so it
+was deliberately not bundled with an urgent board correction.
+
+### `#412` — SHIPPED. The live prop join keyed on a display grouping and matched 0 of 1385 rows
+
+`6a65fe47` (join) + `b08cef31` (display). `live_projection_join.py`,
+`layer1_board.html`, two test files.
+
+The join was not partially broken, it was **totally** broken, and its own
+instrumentation said so: `rows_live_considered: 1385, rows_live_projected: 0,
+miss_no_market_alias: 1385, miss_no_player: 0`.
+
+`build_live_prop_index` keyed each snapshot row on `market` — but `market` is a
+**display GROUPING**: `hitter_props` covered hits (39 rows), total_bases (29),
+runs_scored and rbis at once. So it collided four markets onto one key AND
+matched no board market, since the board speaks OddsAPI (`batter_hits`). The
+correct key was the next field: `prop` is already the board vocabulary.
+
+**Control**, one production snapshot against one production board: old keying
+→ **0**, new keying → **41**. Same snapshot, same rows, same index.
+
+Also: alias families made symmetric (the snapshot speaks both `hits` and
+`batter_hits`); rows with a null `liveProjection` are NOT indexed (63 of 144
+carried a `modelProbOver` with every live field null — a pregame probability in
+a live-lens row, and indexing it hands `live_edge_policy` the exact
+pregame-vs-live edge `#340` exists to suppress); the overlay no longer writes
+over the pregame number, so `live_projected`/`sim_projected`/`actual_so_far` all
+ride the row; the snapshot ceiling is reported so a small count is attributable
+to lens coverage rather than looking like a broken join.
+
+Display half suppresses the `#350` stale marker on live rows — the overlay
+preserves the pregame fields, so `age_hours` describes the number that was
+REPLACED, and a re-sim seconds old would have rendered as 26h stale.
+
+**NOT DONE, deliberately: live GAME lines still carry no live projection.**
+`predictions.full` in the snapshot is the pregame sim — proven by all 6 FINAL
+games still carrying pregame win probabilities (0.489 on a completed game) and
+by 14 of 15 games holding clean 3-dp pregame values. Only `822698` showed a
+recomputed blend. Joining it would be the exact `#340` defect. A real live
+game-line tier needs the re-sim to emit one.
+
 ### `#399` — SHIPPED, NOT ENABLED. `book_quotes` is 38.7x compressible, so the retention question was the wrong question
 
 `65cf7a80` (its commit message says `#397` — that ID collided with `c5c382b6`
