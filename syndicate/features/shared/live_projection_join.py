@@ -60,9 +60,54 @@ _MARKET_ALIASES: dict[str, tuple[str, ...]] = {
     "earned_runs": ("earned_runs", "pitcher_earned_runs", "er"),
     "pitcher_hits_allowed": ("hits_allowed", "pitcher_hits_allowed"),
     "hits_allowed": ("hits_allowed", "pitcher_hits_allowed"),
+    "pitcher_walks": ("walks_allowed", "pitcher_walks"),
+    "walks_allowed": ("walks_allowed", "pitcher_walks"),
 }
 
 _LINE_TOLERANCE = 1e-6
+
+
+def _build_canonical_markets() -> dict[str, str]:
+    """Collapse every alias family to one canonical name, both directions.
+
+    `_MARKET_ALIASES` is a one-way expansion: `batter_hits -> (hits, h)`. That is
+    enough when only the board looks up, and it silently fails the moment the
+    other side of the join speaks the alias -- `hits` is not a key, so
+    `_market_candidates("hits")` returns `("hits",)` and never reaches
+    `batter_hits`. The snapshot speaks BOTH vocabularies (measured 2026-08-13:
+    `prop` was `hits` on 39 rows and `batter_hits` on 6, for the same market), so
+    the map has to be symmetric or the join depends on which name a row happened
+    to use.
+
+    Union by family, so direction stops mattering. Families that share no member
+    stay separate on purpose: `batter_strikeouts` must NOT merge with the
+    pitcher's `strikeouts`, and they do not, because neither family lists the
+    other's names.
+    """
+    parent: dict[str, str] = {}
+
+    def find(name: str) -> str:
+        parent.setdefault(name, name)
+        while parent[name] != name:
+            parent[name] = parent[parent[name]]
+            name = parent[name]
+        return name
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            # Longest name wins as the class representative purely for
+            # determinism -- the value is never displayed, only compared.
+            keep, drop = (ra, rb) if (len(ra), ra) >= (len(rb), rb) else (rb, ra)
+            parent[drop] = keep
+
+    for key, aliases in _MARKET_ALIASES.items():
+        for alias in aliases:
+            union(key, alias)
+    return {name: find(name) for name in parent}
+
+
+_CANONICAL_MARKETS = _build_canonical_markets()
 
 
 def _norm_name(value: Any) -> str:
@@ -89,6 +134,41 @@ def _market_candidates(board_market: Any) -> tuple[str, ...]:
         return ()
     aliases = _MARKET_ALIASES.get(key)
     return (key,) + tuple(a for a in (aliases or ()) if a != key)
+
+
+def _canonical_market(value: Any) -> str:
+    """The alias family a market name belongs to, or the name itself."""
+    key = _norm_market(value)
+    if not key:
+        return ""
+    return _CANONICAL_MARKETS.get(key, key)
+
+
+def _snapshot_market(prop: Mapping[str, Any]) -> str:
+    """The market a live-lens prop row is actually about.
+
+    `prop` FIRST, AND THIS IS THE WHOLE BUG (`#412`). `market` is a DISPLAY
+    GROUPING, not a market: measured on production 2026-08-13, `hitter_props`
+    covered hits, total_bases, runs_scored and rbis simultaneously --
+
+        market                prop                    rows
+        hitter_props          hits                      39
+        hitter_props          total_bases               29
+        hitter_total_bases    batter_total_bases        20
+        hitter_rbis           batter_rbis               15
+
+    -- so keying on `market` both (a) collided 39 unrelated rows onto one key and
+    (b) matched no board market, because the board speaks OddsAPI
+    (`batter_hits`). The result was `miss_no_market_alias = 1385 of 1385`: the
+    join missed literally every row while the correct key sat in the next field.
+
+    `market` is kept only as a fallback for rows that carry no `prop` at all.
+    """
+    for field in ("prop", "market"):
+        name = _canonical_market(prop.get(field))
+        if name:
+            return name
+    return ""
 
 
 def _as_float(value: Any) -> float | None:
@@ -119,6 +199,8 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
     rows_seen = 0
     rows_indexed = 0
     live_games = 0
+    skipped_no_live_projection = 0
+    skipped_no_key = 0
 
     games = (snapshot or {}).get("games") if isinstance(snapshot, Mapping) else None
     for game in games if isinstance(games, Sequence) else ():
@@ -134,10 +216,21 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
                 continue
             rows_seen += 1
             player = _norm_name(prop.get("playerName"))
-            market = _norm_market(prop.get("market") or prop.get("prop"))
+            market = _snapshot_market(prop)
             line = _as_float(prop.get("line"))
             projection = prop.get("liveProjection")
-            if not player or not market or line is None or projection is None:
+            if not player or not market or line is None:
+                skipped_no_key += 1
+                continue
+            if projection is None:
+                # `liveProjection` IS the live-awareness evidence, and nothing
+                # else here is. Measured 2026-08-13: 63 of 144 snapshot rows
+                # carried `modelProbOver` while `liveProjection`, `modelMean`
+                # and `actualSoFar` were ALL null -- a pregame probability
+                # sitting in a live-lens row. Indexing those would mark them
+                # `live_aware` and hand `live_edge_policy` exactly the pregame
+                # edge it exists to suppress, which is worse than no coverage.
+                skipped_no_live_projection += 1
                 continue
             index[(player, market, line)] = {
                 "live_projection": projection,
@@ -154,6 +247,8 @@ def build_live_prop_index(snapshot: Mapping[str, Any] | None) -> dict[str, Any]:
         "live_games": live_games,
         "rows_seen": rows_seen,
         "rows_indexed": rows_indexed,
+        "skipped_no_live_projection": skipped_no_live_projection,
+        "skipped_no_key": skipped_no_key,
     }
 
 
@@ -197,7 +292,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
 
         hit = None
         for candidate in _market_candidates(row.get("market")):
-            hit = index.get((player, candidate, line))
+            hit = index.get((player, _canonical_market(candidate), line))
             if hit is not None:
                 break
         if hit is None:
@@ -214,10 +309,21 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
             continue
 
         projection = dict(row.get("projection") or {})
+        # KEEP THE PREGAME NUMBER RATHER THAN OVERWRITING IT (`#412`). The three
+        # numbers a live row needs are the live projection, the pregame sim's
+        # projection, and what has ACTUALLY happened so far -- and this used to
+        # write the first over the second, so the board could never show the
+        # move from "we projected 6.5" to "now 4.2, with 3 already in the book".
+        # Only stamp them once: a second tick must not record the live number as
+        # the sim's.
+        projection.setdefault("sim_projected", projection.get("projected"))
+        projection.setdefault("sim_basis", projection.get("basis"))
+        projection.setdefault("sim_source", projection.get("source"))
         projection.update(
             {
                 "basis": "live_resim",
                 "projected": hit["live_projection"],
+                "live_projected": hit["live_projection"],
                 "model_prob_over": hit.get("model_prob_over"),
                 "actual_so_far": hit.get("actual_so_far"),
                 "source": "mlb_live_lens_monte_carlo",
@@ -235,7 +341,15 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         "rows_live_considered": considered,
         "rows_live_projected": matched,
         "live_games_in_snapshot": indexed.get("live_games"),
+        "snapshot_rows_seen": indexed.get("rows_seen"),
         "snapshot_rows_indexed": indexed.get("rows_indexed"),
+        # THE CEILING, stated. The snapshot indexes far fewer rows than the
+        # board carries (2026-08-13: 81 indexable against 1385 live board rows),
+        # so a low `rows_live_projected` is mostly the live lens' own coverage
+        # and NOT a broken join. Without these two numbers the two look
+        # identical and have completely different fixes.
+        "snapshot_skipped_no_live_projection": indexed.get("skipped_no_live_projection"),
+        "snapshot_skipped_no_key": indexed.get("skipped_no_key"),
         "miss_no_player": miss_no_player,
         "miss_no_market_alias": miss_no_market_alias,
         "miss_no_line": miss_no_line,
