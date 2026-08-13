@@ -43,6 +43,60 @@
 - Expected recurrence: on the measured trajectory the board should re-freeze
   ~4-5h after the 22:59 restart. **That prediction is itself a test** — if it
   does not recur, the growth is not linear and the model is wrong.
+- **EXONERATED 2026-08-13 23:1x — `_BOOK_QUOTES_RSS_PER_FILE_BYTE = 6.3` is
+  CORRECT. The cache budget is not blind.** Hypothesis was that the 500MB
+  budget projects `file_bytes * 6.3` without ever measuring residency, so an
+  understated coefficient would let the cache hold far more than it believes.
+  Measured against real production shards via the real `read_book_quotes`,
+  RSS before/after with the cache cleared between:
+  ```
+  shard        file_MB     rows   real_RSS_MB   REAL x   projected_MB   real/proj
+  2026-07-29      15.1   39,370          95.6     6.33           95.2       1.00
+  2026-07-22      14.3   37,139          87.3     6.11           90.0       0.97
+  2026-08-01      13.7   35,591          82.5     6.04           86.0       0.96
+  2026-08-09     207.4  478,782        1221.8     5.89         1306.4       0.94
+  ```
+  True multiplier 5.89-6.33 against a declared 6.3, slightly CONSERVATIVE at
+  scale. Stop re-investigating this. The adjacent traps are handled too:
+  `book_quotes_read_affordable` deliberately uses LOGICAL (uncompressed) bytes,
+  with the 38.7x compression ratio measured on that same shard.
+- **BUT the measurement pointed somewhere better, and the code says it out
+  loud.** `odds_book_quotes.py:578-582`: *"freeing an entry does NOT return
+  memory to the OS. It lets the next read REUSE those arenas instead of growing
+  new ones, so the retained set plateaus at roughly one shard rather than two.
+  The win is the plateau, not a reclaim."* And `_evict_book_quotes_over_budget`
+  is `while len(_BOOK_QUOTES_CACHE) > 1` — the last entry is never evicted, by
+  design. So one 207MB shard means ~1.2GB resident, held, and **2.4x the entire
+  500MB budget in a single entry.**
+- **HYPOTHESIS 2 (current, not yet confirmed): glibc arena retention across a
+  multi-date sweep, in a process that never trims.**
+  - refresh-worker does a multi-date sweep, so it loads shard after shard.
+  - Each freed shard leaves arenas held, by the design above.
+  - `malloc_trim` machinery EXISTS (`memory_observability.py`, ~250 lines,
+    with the fragmentation reasoning written out) and `pipeline/
+    intelligence_state.py:3201` uses it on the board-build path.
+  - **`scripts/run_refresh_worker.py` — pid 39, the process that accumulates —
+    never trims.** That asymmetry is the lead.
+  - Fits every observation: gradual growth, growth localised to the supervisor,
+    restart as the only cure.
+- **DISCRIMINATOR, and do not skip it.** The running sampler distinguishes the
+  two mechanisms: **stepwise** jumps at shard loads = retention/fragmentation;
+  a **smooth ramp** = something else accumulating per-cycle. `#327` burned five
+  eliminations by picking the next plausible candidate — do not add a
+  `malloc_trim` call before the series says which shape it is.
+- Instrument note: a case-SENSITIVE `grep malloc_trim` returned nothing outside
+  `memory_observability.py` and read as "nothing calls it". The real emitter is
+  `MALLOC_TRIM_FAILED`, uppercase. Search case-insensitively before concluding
+  a mechanism is unused.
+- pid 39 identified: `python scripts/run_refresh_worker.py`, ppid 1 — the
+  supervisor. Children are all transient and small (140 / 120 / 95 / 87 / 47MB
+  at 23:08). **Falsification test for hypothesis 1 REJECTED: the growth is not
+  in short-lived children.**
+- CONFOUND, self-inflicted and recorded: `_BOOK_QUOTES_INDEX_CACHE` (mine,
+  `#414`) shipped at 22:59 and lives in pid 39. Tonight's window is the first
+  containing it. The HISTORICAL leak is clean — 1163 -> 2603MB was measured
+  18:05-22:48 on `03073270`, which predates the index — but current-rate
+  numbers must separate the two before attributing anything.
 - Blocked by: nothing.
 
 ### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
