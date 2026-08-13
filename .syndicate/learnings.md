@@ -992,3 +992,34 @@ back **oldest-first regardless of `direction`**.
 - Cost: a ledger that stated a leak as measured fact for ~45 minutes, a lane
   opened on it, and an hour of allocator investigation aimed at a number that
   may not describe anything.
+
+### 2026-08-13 — A habit that fails silently needs a tool, not more care
+- What kept happening: publishing a commit means cherry-picking onto
+  `origin/main` in a throwaway worktree (local `main` carries other sessions'
+  commits, so `git push` is never scoped). Done by hand it failed **four times
+  in one session**, identically:
+  ```
+  cd /tmp/wt && git cherry-pick $(git rev-parse HEAD)
+  ```
+  The substitution evaluates AFTER the `cd`, resolving the WORKTREE's head and
+  cherry-picking a commit onto itself. **Git reports success, the payload is
+  empty, and `git push` says "Everything up-to-date."**
+- Why it survived four repetitions: every failure mode looks like the success
+  mode. There is no error, no conflict, no non-zero exit — only a payload that
+  is empty, and only if you happen to print it. It was caught each time by a
+  manual `git diff --stat origin/main..HEAD`, i.e. by vigilance, which is
+  exactly the thing that does not scale across a long session.
+- The rule going forward: **when the same mistake recurs and its signature is
+  indistinguishable from success, stop resolving to be careful and change the
+  shape of the operation.** `scripts/push_via_worktree.py` resolves every SHA
+  in the main repo BEFORE a worktree exists, and treats an empty payload as a
+  hard error naming that exact cause. The class of bug is now unreachable
+  rather than merely watched for.
+- Generalises past git: a silent no-op is worse than a loud failure, and a
+  procedure whose failure is silent should be encoded, not remembered. The
+  same logic is why the deploy path became `scripts/render_deploy.py` the same
+  evening.
+- The script also refuses to auto-resolve a cherry-pick conflict, deliberately:
+  a union-merge is how a NEWER upstream note gets silently reverted, which
+  nearly happened tonight when origin held a corrected "obligation CLOSED"
+  line and the local side still said "unpushed".
