@@ -29476,6 +29476,38 @@ the same diff (two of which are secrets — `ADMIN_TOKEN`,
 > confirmed correct, situation is stable and currently comfortable on the
 > marginal trend.**
 
+⚠️ **Correction, 2026-08-13T16:10Z: "stabilized" above was premature —
+same-baseline window now 136.1h total:**
+
+| Window | Burned | /hour | Projected 30d | vs 5M target |
+|---|---|---|---|---|
+| 489,989s (136.1h, 209,854 obs) | 921,537 | 6,770.6 | **4.87M** | **97.5%** |
+
+Back up near the ceiling. More importantly, **the marginal rate over just
+the newest ~48.9h is (921,537 − 522,284) / 48.9h ≈ 8,164cr/hour →
+~5.88M/mo (117.6%)** — HIGHER than both the whole-window average and the
+prior reading's marginal rate (3,523/hr), the opposite of what "stabilized"
+predicted. `by_market_family` share has **kept moving in the same
+direction for a 4th straight reading, not held flat**: props 42.5% → now
+**37.5%**; segment 35.9% → **39.4%**; alternate 18.0% → **19.7%**. Full
+trend across all readings: props 61-64% → 52.2% → 43.6% → 42.5% → **37.5%**
+— monotonic, five readings, never reversed.
+
+**This means the S0b region-widening explains the *initial* step change but
+not the *continuing* drift.** S0b was a one-time config activation; it
+should have produced one step change in the family ratio, not an ongoing
+multi-reading slide. Something else is layering on top — leading
+candidate unchanged from the original #325 note and now more clearly
+warranted: more MLB games genuinely spending more time in event-scoping's
+live/near-live "full" tier as the season progresses (more games/day,
+doubleheaders, extra innings), which would keep pushing segment/alternate
+share up independent of S0b. **Not confirmed — this is now the actual open
+question**, and it needs the investigation the original #325 note called
+for (compare full-tier vs reduced-tier game counts against the real slate
+during a live window) rather than another quota reading. MLB is still
+~97% of `by_sport` credits and the entire marginal-rate increase traces to
+it (mlb delta ≈ 7,384cr/hr of the 8,164cr/hr total).
+
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
