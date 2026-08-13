@@ -187,6 +187,39 @@
   - `SLOW_SEGMENT_PROFILE` / `SLOW_ENRICH_PROFILE`: **0 post-restart.**
     Consistent with the `#414` index working AND with no slow game having run.
     Proves nothing yet — see the silence caveat above.
+- **THE EXISTING HEAP CENSUS CANNOT SOLVE THIS, and that is now MEASURED
+  rather than argued. Do not reach for it.**
+  - `LIVE_ODDS_WORKER_MEMORY` (with `largest_gc_object`) looked like the better
+    instrument. It is not, for two independent reasons:
+  - **(a) It is not on the process that matters.** `run_refresh_worker.py` —
+    pid 39, the supervisor — emits **no heap census at all**. The emitter lives
+    in `run_live_odds_refresh_worker.py` and `refresh_odds_sources.py`; the
+    latter DOES run on refresh-worker, but as a ~95MB CHILD (observed as pid
+    244), not the accumulating parent.
+  - **(b) It is structurally blind to this workload.** The implementation is
+    `gc.get_objects()` + `sys.getsizeof()`
+    (`scripts/refresh_odds_sources.py:222`). `gc.get_objects()` never
+    enumerates `str`/`bytes`/`ndarray` (untracked on 3.11 — the fact
+    `memory_observability.py` already records), and `sys.getsizeof` is
+    SHALLOW, so on a DataFrame it returns the wrapper and not the backing
+    arrays.
+  - **The live proof, 2026-08-13 23:44Z on live-odds-worker:** it reported
+    `largest_gc_object = {type: DataFrame, size_bytes: 143262}` — **143KB — on
+    a process at 546MB RSS.** The census found **0.03%** of the memory and
+    called it the largest object. `#285` had already concluded the census
+    cannot separate the two hypotheses; that is exactly WHY it added
+    `malloc_trim` as the discriminator.
+  - **Consequence for this lane:** the remaining candidates are (1) live
+    `str`/`bytes`/`ndarray` retention and (2) fragmentation, and **no
+    gc-based census can distinguish them.** A real instrument must differ in
+    KIND — `tracemalloc` snapshots at allocation sites, or arena-level
+    accounting.
+  - **Do NOT build that yet.** The leak is currently RETRACTED as
+    unestablished (see the 23:33Z correction above), and building a
+    `tracemalloc` harness for what may be an oscillation rather than a ratchet
+    would repeat tonight's mistake at higher cost. It is also a code change to
+    a shared worker, so it wants its own lane and `/preflight`. **Read the
+    floor series first.**
 - Blocked by: nothing. Measurement-bound, not idea-bound.
 
 ### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
@@ -199,14 +232,25 @@
 - **Opens as lane 4 against a stated cap of 3.** Recorded, not hidden;
   `state.md` notes the cap is policy with no enforcement and that four ran
   unchallenged on 08-13. Flagged to the user at open time.
-- Files: **read-only until a defect is named.** Diagnosis runs against
-  production HTTP + the Render API; nothing is edited in this phase.
-  Prospective claim if a fix follows, all NFL-scoped and none of them held
-  by another OPEN lane:
-  - `syndicate/features/nfl/**` (cards, preseason_cards, live_lens,
-    smartsim2_projection, preseason_projection, sources)
-  - `syndicate/blueprints/nfl.py`
-  - `pipeline/nfl_game_projections.py`
+- Files (LITERAL PATHS — see the note below; a glob here is not enforcement):
+  - `syndicate/features/nfl/live_game_state.py`
+  - `syndicate/features/nfl/preseason_cards.py`
+  - `syndicate/features/shared/game_chip_scoreboard.py`
+  - `tests/conftest.py`
+  - `tests/test_nfl_live_game_state.py`
+  - `tests/test_nfl_preseason_market_board_live_odds.py`
+  - `tests/test_game_chip_scoreboard.py`
+  - `tests/test_nfl_preseason_cards.py`
+- **THIS BLOCK ORIGINALLY READ `syndicate/features/nfl/**`, AND THAT GUARDED
+  NOTHING.** `lane-guard.py` compares literal paths, so a glob claims no file
+  at all: every file above was edited with the lane reporting protection it
+  was not providing. Found during `/preflight`, by running the ledger's own
+  `awk '/^### /{h=$0} /<path>/{print h}'` check and getting NO header back for
+  three of the four source files. No collision resulted — none of them is
+  claimed by another OPEN lane — but the claim was false while it mattered.
+  **Never write a glob in a Files block.** Sibling of the 08-13 entry on
+  `lanes.md` being executable configuration rather than documentation: this is
+  the same class, arriving through syntax rather than through deletion.
 - NOT touched, deliberately — claimed by other OPEN lanes:
   `syndicate/features/shared/live_refresh_loop.py` (mlb-props-regen),
   `pipeline/intelligence_state.py` and
@@ -249,6 +293,86 @@
   `state.md`, each row carrying its measurement and its timestamp, with the
   first zero stage named explicitly if there is one.
 - Blocked by: none.
+
+#### MEASURED, 2026-08-13 slate (6 games, kickoffs 18:00–20:00 CDT)
+
+| stage | verdict | measurement |
+|---|---|---|
+| sim run | RAN, output degenerate | 2 runs (20:59:41Z season, 21:00:11Z preseason); 16 distinct per-game `generated_at` 21:00:18→21:02:06 |
+| odds refresh | **WORKS** | 8,537 shard rows, 11 books; DET@CIN 12→132 rows through kickoff, quotes <1.5 min fresh across 12 polls |
+| sim→odds mapping | join works, input degenerate | 39/68 rows carry a projection; suppression honest |
+| live lens | FAILS | `ll_live_rows = 0` on all 12 polls |
+| game cards | FAILS | `cards live=0 final=0` on all 12 polls |
+| board game state | **FAILS — root cause** | `by_state {pregame:6, live:0, final:0}` on all 12 polls, 35 min, with 3 games live |
+
+**ROOT CAUSE — one join, not five surfaces.** `_NFLDataProvider.games()`
+(`home.py:5704`) hands `build_game_chips` the week-scoped projection cards,
+which carry no game state at all: `status` is the plain string
+"Preseason Week 1", no `live_state`, no score, no clock, no kickoff time. So
+`game_chip_scoreboard._game_flags` returns `(False, False)` for every NFL game
+and `build_game_chip` stamps `pregame` by construction. Live lens, cards,
+`by_state` and the Layer 1 game-state join all inherit that one value.
+
+**FIXED** — `syndicate/features/nfl/live_game_state.py` stamps `live_state`
+onto the cards. Chosen because both `publication_adapter._shared_game_state`
+and `game_chip_scoreboard._game_flags` ALREADY read `live_state`; no NFL
+builder ever set one. `#334`'s lesson: the fix goes inside the shared shape,
+zero call sites touched. Live integration against the real slate:
+`matched 16/16, live 2`, `by_state {live:2, pregame:14}`, real scores
+(GB@PIT 3-0), real tokens (`Q1 3:42`), and a real kickoff time on all 16 —
+the cards had none before.
+
+#### CORRECTIONS MADE IN THIS LANE
+
+- **RETRACTED: "odds refresh stops at kickoff."** It does not. I read a
+  13-minute pregame→live transition lag (loop flipped `phase=live` at
+  23:13:24Z, 13 min after the 23:00Z kickoff) and reported a stoppage. The
+  odds path is the healthiest stage of the five. Exactly the "a null agrees
+  with everything" trap this lane's own hazard list named.
+- **RETRACTED: "the week label is wrong."** `PRESEASON_WEEK_LABELS` maps
+  internal week 2 → "Preseason Week 1" **deliberately** — internal week 1 is
+  Hall of Fame Weekend, so tonight IS public Preseason Week 1. Caught by
+  reading the code before shipping a "fix". Residual real nit, not fixed:
+  `requested_date` formats the RAW index as `f"Preseason Week {selected_week}"`,
+  so it says "Week 2" beside `date`'s "Week 1". Cosmetic, left alone.
+- **`#377` CONFIRMED and EXTENDED, and the join EXONERATED.** Not just
+  `margin_mean`: `home_win_rate` 0.5267, `margin_mean` 0.96, `total_mean`
+  44.38 are each ONE value across 16 games and 4 dates (08-13/14/15/16). The
+  16 distinct per-game `generated_at` stamps prove the sim ran per game and
+  produced identical output — so this is the MODEL, not the lookup.
+  `model_prob_over` varies (0.4393–0.5237) only because the LINES vary, which
+  makes a degenerate model read as a working one on the board. Lead, not
+  conclusion: the artifact carries
+  `rating_source=...[neutral_no_data/neutral_no_data]` and `seeds_used=2`.
+  **Unowned, needs its own lane.**
+- **UNRESOLVED:** cards and Layer 1 disagree about the same 16 games (cards
+  show per-game totals, e.g. DET@CIN 46.275; Layer 1 shows the constant
+  44.38). Different root resolvers — `default_nfl_source_root()` vs
+  `preferred_source_roots()`. Could not settle it: `smartsim2*` is not in
+  `HOT_ARTIFACT_PATTERNS`, so ops export/stream both 403 and the production
+  CSV is unreadable from here. Flagged, not guessed.
+
+#### FOUND IN PASSING — cross-sport, unclaimed file
+
+`game_chip_scoreboard._score_value(0)` returned **None**: it routed through
+`_text`, which is `str(value or "")`, so an integer 0 became `""`. Every
+scoreless team lost its score on the chip, in **every sport**. Found because
+GB @ PIT rendered `away 3, home None` instead of 3-0. Fixed in `_score_value`
+only — not in `_text`, whose other callers are labels and names where the
+falsy-collapse is harmless. Pinned by 6 tests in `test_game_chip_scoreboard.py`,
+including that the pregame 0-0 placeholder suppression still works.
+
+#### TEST HYGIENE DEFECT I INTRODUCED, THEN FIXED
+
+The game-state stamp made `build_preseason_cards_page_context` perform a live
+ESPN call — measured: exactly 1 fetch, ~1.5s, per build. That made the suite
+network-dependent, and `test_nfl_preseason_cards` began failing because it
+builds 2026 preseason week 1 (Hall of Fame weekend) and ESPN correctly returns
+`final` where the board used to hardcode `pregame` — a true reading of the
+world and a flaky test. Blocked at the `_fetch_scoreboard` seam by an autouse
+conftest fixture, so the index's own caching/keying still runs under test and
+only the socket is removed. Positive control written and run: no sockets
+opened, `_fetch_scoreboard` returns None under pytest.
 
 ### quote-join-enrich-cost — OPEN — opened 2026-08-13 — session: memory-guard
 - Goal: the MLB board-build's ~33s per slow game is attributed to a named
