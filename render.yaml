@@ -188,8 +188,22 @@ services:
         # disable via the env API is NOT reverted by the next blueprint sync.
         # Verify with scripts/audit_blueprint_drift.py before pushing this file.
         sync: false
-      - key: MLB_ENABLE_REFRESH_WORKER_AUTORUN
-        value: "true"
+      # #129/#312: MLB_ENABLE_REFRESH_WORKER_AUTORUN removed from here. It was
+      # declared "true" on this service while the refresh-worker block below
+      # declares it "false", and only refresh-worker can read it --
+      # run_refresh_worker.py's _mlb_auto_refresh_enabled() is the sole reader
+      # and this service's startCommand is gunicorn. So web's copy was inert,
+      # and it was the copy a reader hit FIRST: the file answered "MLB autorun
+      # is on" ~375 lines before it answered "off", with the #129 credit-burn
+      # writeup attached only to the second one. Same removal, same reason, as
+      # the RECONCILIATION_* pair below (#96).
+      #
+      # Not a behaviour change on either service. A blueprint_sync upserts
+      # declared keys and leaves live-only keys alone (measured -- see
+      # scripts/audit_blueprint_drift.py), so dropping the declaration leaves
+      # the live web value in place as an undeclared key; it stays unread
+      # there. To drop it from the live service too, delete it via the env
+      # API -- that is a separate production action.
       - key: MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
         value: "30"
       - key: MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
@@ -201,7 +215,8 @@ services:
       # Phase 1 of migrating off the daily-update GHA cron: NFL/NCAAF/NCAAB
       # have no live worker coverage today (live_refresh_loop.py's adaptive
       # tick only covers MLB/NBA/WNBA/NHL), so they only ever refreshed via
-      # the daily Action. Mirrors MLB_ENABLE_REFRESH_WORKER_AUTORUN above but
+      # the daily Action. Mirrors MLB_ENABLE_REFRESH_WORKER_AUTORUN (declared
+      # in the refresh-worker block below, not here -- see the note above) but
       # gated by season windows (these are weekly, not daily, sports) via
       # _active_weekly_sports_for_date(); defaults off for the same
       # dark-launch reasoning used elsewhere in this file.
