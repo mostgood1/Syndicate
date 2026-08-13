@@ -14595,13 +14595,15 @@ def _current_live_prop_rows(
     # one reading "live re-sim produced no probability". That is a true statement
     # that names the wrong layer, and there was no way to tell from the board
     # which of the six it was.
+    _live_mc_misses: Dict[str, int] = {}
     _live_mc_batters = len((live_mc_projection or {}).get("batterStatDist") or {})
     _live_mc_pitchers = len((live_mc_projection or {}).get("pitcherStatDist") or {})
     print(
         f"[live_props] LIVE_MC_DIAG date={d} game={_safe_int(card.get('gamePk'))} "
         f"passed_in={isinstance(live_mc_projection, dict)} "
         f"sims={(live_mc_projection or {}).get('simsRun')} "
-        f"batters={_live_mc_batters} pitchers={_live_mc_pitchers}",
+        f"batters={_live_mc_batters} pitchers={_live_mc_pitchers} "
+        f"names={len((live_mc_projection or {}).get('playerIdByName') or {})}",
         flush=True,
     )
 
@@ -14652,13 +14654,15 @@ def _current_live_prop_rows(
                 # `model_prob_over` above stays exactly as it was -- this is an
                 # ADDITIONAL field, so nothing that already reads the pregame
                 # number changes behaviour.
-                live_model_prob_over = _live_mc_prob_over(
+                live_model_prob_over = _live_mc_prob_over_for(
                     live_mc_projection,
                     player_id=_safe_int(model_row.get("pitcher_id") or model_entry.get("pitcher_id")),
+                    player_name=starter_name,
                     prop_key=str(prop_key),
                     kind="pitcher",
                     actual_value=actual_value,
                     line_value=float(line_value),
+                    misses=_live_mc_misses,
                 )
                 if _live_prop_market_resolved(actual_value, line_value):
                     continue
@@ -14779,13 +14783,15 @@ def _current_live_prop_rows(
             model_mean = _safe_float(model_row.get(str(cfg.get("mean_key"))))
             model_prob_over = _prob_over_line_from_dist(model_row.get(str(cfg.get("dist_key"))) or {}, float(line_value))
             actual_value = _live_stat_value(actual_row, {"market": "hitter_props", "prop": prop_key})
-            live_model_prob_over = _live_mc_prob_over(
+            live_model_prob_over = _live_mc_prob_over_for(
                 live_mc_projection,
                 player_id=_safe_int(model_row.get("batter_id")),
+                player_name=hitter_name,
                 prop_key=str(prop_key),
                 kind="batter",
                 actual_value=actual_value,
                 line_value=float(line_value),
+                misses=_live_mc_misses,
             )
             if _live_prop_market_resolved(actual_value, line_value):
                 continue
@@ -14876,6 +14882,13 @@ def _current_live_prop_rows(
             item.setdefault("meta", {})
             if isinstance(item.get("meta"), dict):
                 item["meta"].setdefault("livePitcherModelMismatches", pitcher_model_mismatches)
+    # The per-row outcome, by reason. `priced` is the only good one; the rest
+    # each have a different fix, and before this they were one bare None.
+    print(
+        f"[live_props] LIVE_MC_PRICED date={d} game={_safe_int(card.get('gamePk'))} "
+        f"rows={len(enriched_rows)} outcomes={_live_mc_misses or {}}",
+        flush=True,
+    )
     return enriched_rows
 
 
@@ -16510,6 +16523,41 @@ def _roster_from_snapshot_side(doc: Optional[Dict[str, Any]]) -> Any:
         return roster_from_dict(_snapshot_side_to_roster_doc(doc))
 
 
+def _live_mc_norm_name(value: Any) -> str:
+    text = re.sub(r"[.'`]", "", str(value or "").strip().lower())
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", text).split())
+
+
+def _live_mc_name_index(*docs: Optional[Dict[str, Any]]) -> Dict[str, int]:
+    """Every (name -> id) pair reachable in the roster docs.
+
+    Walks rather than assumes a shape: the lineup/bench/bullpen/starter rows do
+    not share one schema, and hard-coding the traversal is how this would break
+    silently the next time the roster artifact gains a section.
+    """
+    index: Dict[str, int] = {}
+
+    def walk(node: Any, depth: int = 0) -> None:
+        if depth > 6:
+            return
+        if isinstance(node, dict):
+            name = node.get("name") or node.get("full_name") or node.get("fullName") or node.get("player_name")
+            pid = node.get("id") or node.get("player_id") or node.get("mlbam_id") or node.get("mlbam")
+            key = _live_mc_norm_name(name)
+            pid_int = _safe_int(pid)
+            if key and pid_int:
+                index.setdefault(key, int(pid_int))
+            for value in node.values():
+                walk(value, depth + 1)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value, depth + 1)
+
+    for doc in docs:
+        walk(doc)
+    return index
+
+
 def _live_mc_bail(reason: str, detail: str = "") -> None:
     """Name the bail-out. SEVEN exits returned a bare None and looked identical.
 
@@ -16647,6 +16695,12 @@ def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optiona
         "batterStatDist": getattr(result, "batter_stat_dist", None) or {},
         "pitcherStatDist": getattr(result, "pitcher_stat_dist", None) or {},
         "simsRun": int(getattr(result, "sims_run", 0) or 0),
+        # NAME -> MLBAM ID, so the per-prop lookup does not depend on the prop
+        # row happening to carry an id field. The histograms are keyed by the
+        # sim's player ids; the prop rows are built from a different structure
+        # and carry the name reliably and the id only sometimes. An id-only join
+        # fails silently and looks exactly like "the sim had no opinion".
+        "playerIdByName": _live_mc_name_index(away_doc, home_doc),
     }
 
 
@@ -16709,6 +16763,44 @@ def _live_mc_prob_over(
     if not isinstance(player, dict):
         return None
     return _live_mc_prob_over_from_remaining(player.get(stat), actual_value, line_value)
+
+
+def _live_mc_prob_over_for(
+    live_mc_projection: Optional[Dict[str, Any]],
+    *,
+    player_id: Optional[int],
+    player_name: Any,
+    prop_key: str,
+    kind: str,
+    actual_value: Optional[float],
+    line_value: Optional[float],
+    misses: Optional[Dict[str, int]] = None,
+) -> Optional[float]:
+    """Id first, then name. Counts WHY a lookup missed rather than returning a bare None."""
+    def _miss(reason: str) -> None:
+        if misses is not None:
+            misses[reason] = misses.get(reason, 0) + 1
+
+    if not isinstance(live_mc_projection, dict):
+        _miss("no_live_mc")
+        return None
+    resolved = _safe_int(player_id)
+    if not resolved:
+        by_name = live_mc_projection.get("playerIdByName")
+        if isinstance(by_name, dict):
+            resolved = by_name.get(_live_mc_norm_name(player_name))
+    if not resolved:
+        _miss("no_player_id")
+        return None
+    value = _live_mc_prob_over(
+        live_mc_projection, player_id=int(resolved), prop_key=prop_key, kind=kind,
+        actual_value=actual_value, line_value=line_value,
+    )
+    if value is None:
+        _miss("no_dist_for_player_or_stat")
+    else:
+        _miss("priced")
+    return value
 
 
 def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], sim_context: Optional[Dict[str, Any]], market_row: Optional[Dict[str, Any]], *, date_str: Optional[str] = None, live_mc_projection: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
