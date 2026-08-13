@@ -201,3 +201,60 @@ MLB is the reference module (phase-1 complete, first fully local runtime contrac
 - Avoid adding new source-app fallback dependencies — the direction is toward fully local, Syndicate-owned artifact generation per sport.
 - Preserve existing script entrypoints as compatibility shims when refactoring the daily-update root rather than deleting them outright.
 - When touching the daily-update system, distinguish refresh vs. sim vs. artifact vs. manifest vs. evaluation work explicitly — it's moving from a time-driven wrapper toward a state-aware execution controller with run modes (full/incremental/sim_only/manifest_only/etc.).
+
+---
+
+# Syndicate — Session Protocol
+
+> This block is loaded into every Claude Code session in this repo.
+> It is short on purpose. The detail lives in `.syndicate/`.
+
+## The rule
+
+`.syndicate/` is the source of truth for what is true about this system,
+what is being worked on, and what we have already learned the hard way.
+Your context window is not. If a fact only exists in this conversation,
+it does not exist.
+
+## Start of every session
+
+1. Read `.syndicate/state.md` — current, verified system state.
+2. Read `.syndicate/lanes.md` — what other sessions are holding.
+3. Read `.syndicate/learnings.md` — the rules that came from past mistakes.
+
+Do not begin work until you have done this. If the user's request
+contradicts `state.md`, say so before proceeding.
+
+## Before touching code
+
+- Claim a lane: `/lane open <slug> "<goal>"`.
+- If another OPEN lane lists a file you need, stop and surface the
+  conflict. Do not edit across lanes.
+- If the task is diagnostic, write the hypothesis into the lane
+  **before** testing it, and record the result — including exoneration.
+
+## Before any deploy
+
+Run `/preflight`. It is a hard gate, not a formality.
+
+## End of every session (or every ~30 min of real work)
+
+Run `/checkpoint`. If the session ends without a checkpoint, the work
+is considered lost — the next session will not trust it.
+
+## Escalate to the systems engineer
+
+Use the `syndicate-engineer` subagent for anything that needs a survey
+of the repo or the ledger rather than a single edit:
+"is this safe to change", "what do we already know about X",
+"what should I pick up", "did we try this before". It reads wide and
+reports narrow, so it does not burn this session's context.
+
+## Non-negotiables
+
+- Never claim a fix works without a measurement written to
+  `.syndicate/deploys.md`.
+- Never revert or re-enable something that `learnings.md` marks
+  EXONERATED or FORBIDDEN without an explicit user override,
+  logged.
+- One change per deploy when diagnosing. Staggered, measured, logged.
