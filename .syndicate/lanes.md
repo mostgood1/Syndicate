@@ -97,6 +97,32 @@
   containing it. The HISTORICAL leak is clean — 1163 -> 2603MB was measured
   18:05-22:48 on `03073270`, which predates the index — but current-rate
   numbers must separate the two before attributing anything.
+- **MEASUREMENT DESIGN CORRECTED 23:19Z — v2's slope was an artifact and is
+  RETRACTED. Do not quote +2418 MB/hour.**
+  - v2 sampled the newest reading every 3 min. That series oscillates rather
+    than ramps:
+    ```
+    anon   1332.7 -> 1599.1 -> 1517.4 -> 1356.2 -> 1819.1
+    pid39  1073.9 -> 1147.7 -> 1214.4 -> 2005.6 -> 1488.5   (+791 then -517)
+    ```
+    An endpoint slope over that reads **+2418 MB/hour** against a historical
+    ~300 — 8x, and purely a function of which spikes the samples landed on.
+  - **Why: a single log query window already contains a huge spread.** Measured
+    directly: **73 CONTAINER_MEMORY readings in 1.7 minutes, anon min 1670.0 /
+    p50 1749.4 / max 1924.8 — a 254.8MB range.** v2 recorded ONE value out of
+    that band per sample. The transient allocation of sims, board builds and
+    shard loads completely buries a ~300MB/hour trend.
+  - **The right metric was already in `.syndicate` memory: THE FLOOR IS THE
+    RATCHET.** A leak raises the trough between cycles; peaks say nothing.
+    v3 (`C:	mp\leak_sampler3.py` -> `C:	mp\leak_floor.jsonl`) records
+    min/p50/max across every reading in each window, every 5 min. **Read the
+    running minimum of the per-window mins**, not the point series.
+  - Current floor for reference: **anon min 1670.0MB at 23:19Z** (restart
+    baseline was 980.6MB at 22:59Z).
+  - Caveat on v3, stated so it is not over-read: 100 log lines span only ~1.7
+    min on this service, so each window's min is a *spot* floor, not a
+    whole-cycle trough. The running minimum across many windows is what
+    approximates the true floor — a single window's min can still sit above it.
 - Blocked by: nothing.
 
 ### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
