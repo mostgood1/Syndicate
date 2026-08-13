@@ -58,8 +58,24 @@
   new path executed. `basis=reclaimable_cache` means it degraded to the old
   arithmetic and a zero abort count is inert-guard-shaped and means nothing.
   A zero is evidence only once the instrument is known able to read non-zero.
-- Measured: `<pending>` — 24h read due **2026-08-14 ~13:00 CDT**. OWNER NOT
-  YET ASSIGNED; this row stays open until someone is named.
+- Measured: `<pending>` — 24h read due **2026-08-14 ~13:00 CDT**.
+  **OWNER ASSIGNED 2026-08-13 15:3x CDT: scheduled task `417-24h-read`**, a
+  one-shot at 2026-08-14 13:00 CDT
+  (`C:\Users\tempadmin\.claude\scheduled-tasks\417-24h-read\SKILL.md`). It
+  carries the deploy boundary (`2026-08-13T18:05:38Z`), the service id, the
+  verdict rule, and the three traps that caught this session (the ~35-second
+  log-query window; `basis` being emitted only on the abort branch; and the
+  positive-control requirement before believing any zero).
+  - **Scheduled LOCALLY, not as a cloud routine, and that is load-bearing.**
+    `.env` is gitignored (`.gitignore:3`) and untracked, so a cloud agent gets
+    a checkout with no `RENDER_API_KEY` and cannot reach the Render API at all.
+    It would have reported a null reading that looks exactly like a real one.
+  - **Local tasks only run while the app is open.** If it is closed at 13:00
+    the run happens at next launch — so a late timestamp on this row means
+    "fired late", not "the worker was quiet". Check the run time before
+    reading the numbers.
+  - This row still stays open until the numbers are actually written into it.
+    An assigned owner is not a measurement.
 - INTERIM (T+23min, 13:28 CDT). **Positive, NOT sufficient. Row stays open.**
   - `LAYER2_SHORTLIST` x3 post-deploy — 18:19:15, 18:25:21, 18:28:30Z —
     against **0** in the 4h12m before. `MEMORY_GUARD_ABORT` post-deploy: 0,
