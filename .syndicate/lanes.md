@@ -257,10 +257,24 @@
   no duplicate keys on any service.
 - **Unverified: nothing was deployed.** Reachability is static analysis only —
   no process has been observed booting without these keys.
-- **Open obligation:** three commits unpushed (`054b2306`, `cc2e1803`,
-  `e8611888`), `origin/main` at `bf06710c`. Two `render.yaml` commits are
-  already on origin with no `blueprint_sync` seen in a ~23-minute window —
-  that is a window, not an all-clear.
+- **Obligation CLOSED 13:20 CDT — all three are pushed.** They are on
+  `origin/main` as `d16950b9` / `1e09fa9b` / `7c60d0f8`, rebuilt onto
+  `d6188ca7` rather than pushed from local `main`: by then local `main` had
+  been merged and built on by another session, so a plain push would have
+  shipped **15 commits, 11 of them not this lane's** (`#419`/`#420`,
+  `#417`/`#387`, a `.claude/settings.json` layer, test fixes). The pushed
+  tip differs from `d6188ca7` in `render.yaml` only.
+- Sync impact measured BEFORE pushing, not assumed: `would_revert: none`
+  **and** `would_create: none` on all three services. A `blueprint_sync`
+  would change zero live values and create zero keys.
+- **No `blueprint_sync` fired.** Checked 12:55 and 13:14 CDT — all triggers
+  `api`, services still live on their prior commits. `render.yaml` has been
+  on origin since 11:33 with no sync. **That is a long window, not a
+  guarantee**; `#284` documents a sync arriving with no user in it.
+- **Still unverified: nothing has booted without these keys.** Web is on
+  `936e2b47` from 08-12. The first deploy that picks up this blueprint is
+  the real test. `MLB_LIVE_LENS_DIR` is the one that would have broken it
+  had the grep-level pass been trusted over the call-graph trace.
 
 ### board-transport — CLOSED 2026-08-13 (work measured 08-10/11)
 - Goal: the board computes correctly every cycle and cannot cross the transport.
