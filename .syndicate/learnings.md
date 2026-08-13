@@ -725,3 +725,72 @@ back **oldest-first regardless of `direction`**.
   (3) argued for preserving a commit that did not need preserving, and
   instances (1) and (2) each briefly produced a confident wrong statement to
   the user.
+
+### 2026-08-13 — The stale-read rule failed on its second application, in a form it did not cover
+
+- The FORBIDDEN entry above ("never edit a file from a read taken earlier in
+  the session") was written after a rewrite of a file that had been deleted.
+  **Within the same session it was broken again**, differently: a defect was
+  REPORTED against `lane-guard.py` — "`memory-guard-reclaimable` is unguarded,
+  its status parses as DEPLOYED" — derived by running a copy of `LANE_RE`
+  lifted from a read taken ~2h earlier. `363743d0` had already replaced that
+  regex, and its comment names that lane as the motivating case. The claim was
+  false when written, and it was published to `state.md`, where a parallel
+  session could have acted on it.
+- Why the existing rule did not catch it: it says do not EDIT from a stale
+  read. This was not an edit. A stale read is equally dangerous when it is
+  used to MEASURE — and worse, because an edit gets a conflict warning from
+  the tooling while a measurement returns a clean, confident, wrong number.
+- The generalised rule: **a copy of code in your context is not the code. Do
+  not reimplement, reconstruct, or re-run a program's logic to predict what it
+  does — run the program.** Here the correct instrument was three lines:
+  feed the real payload to the real hook on stdin and read the exit code, the
+  only thing the harness acts on. It took one command and gave 5/5 against
+  five cases, including the two that mattered.
+- Corollary on retraction: the wrong finding was written into `state.md` as
+  measured. Retracting it required naming the commit that had already fixed
+  it, because "I was wrong" leaves the next session unable to tell whether the
+  hole is open. Sibling of `retraction is not innocence` — a retraction has to
+  say what IS true, not only what is not.
+- Cost: none to the system; the guard was correct throughout. ~15 minutes, and
+  one false line live in the shared ledger for ~20 minutes.
+
+### 2026-08-13 — A guard has TWO failure directions, and fixing the loud one is where the silent one survives
+
+- What we believed: that `checkpoint-guard` was fixed. Its denominator was
+  scoped to the session (`5b2ca320`), then a second witness was added so a
+  session that wrote the ledger but skipped `/checkpoint` step 7 was no longer
+  told it had lost work (`3042c5bc`). Eight fixture cases, all green.
+- What was actually true: **every one of those eight cases tested the same
+  direction.** They all asked "does this session get the right verdict for its
+  own actions". Not one asked "can a DIFFERENT session's action change my
+  verdict". The denominator had been made per-session while the witness,
+  `.syndicate/.last-checkpoint`, stayed repo-global and untracked. So:
+  - **FALSE WARN** — loud, annoying, noticed immediately, fixed first.
+  - **FALSE PASS** — silent. Session A checkpoints at 15:10 and touches the
+    shared marker. Session B edited code at 15:05 and stops without
+    checkpointing. B's newest work predates the marker, so **B passes** and its
+    work is lost — the exact outcome the hook exists to prevent, caused by
+    another session doing the right thing.
+  Reproduced against `3042c5bc`: B edits, never checkpoints, A touches the
+  marker → **exit 0**. Positive control with the marker removed → exit 1, so
+  the probe discriminates and the 0 is a verdict, not a broken instrument.
+- How we found out: the `hooks-test` session derived it from the design and
+  said so; it was reproduced here rather than accepted. Worth noting the
+  control is what made the result trustworthy — the prescription in
+  `A FAILED READ RENDERS AS A RESULT` working the first time it was actually
+  applied, after two bogus readings in the same investigation (a `/tmp` path
+  native Python could not resolve, then `${PIPESTATUS[0]}` reporting `echo`'s
+  exit status rather than the guard's). Both printed plausible numbers.
+- The rule going forward: **a guard's scope and its witness must have the same
+  granularity.** Per-session denominator + global witness is not a fix, it is
+  the same hole rotated — and rotated toward the silent direction. Whenever a
+  guard is narrowed, ask what else can satisfy it, not just what it now counts.
+  Concretely: **when fixing a guard that fails in one direction, write the test
+  for the opposite direction in the same pass**, and for anything on a shared
+  tree that means a two-actor test — one fixture where a second session's
+  action is what changes your verdict. A single-actor fixture suite cannot
+  express the failure that matters here, however many cases it has.
+- Cost: nothing shipped. `3042c5bc` was held unpushed once the gap was
+  confirmed, and the version on origin already has both defects, so nothing
+  regressed. Roughly one round of duplicated design work across two sessions.
