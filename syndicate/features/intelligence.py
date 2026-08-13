@@ -2960,7 +2960,104 @@ def _merge_odds_history_payloads(payloads: list[dict[str, Any]]) -> dict[str, An
     return merged
 
 
+# `#414`. Where a sport's player index is stashed, ON the sport's own payload.
+#
+# **The cache lives and dies with the payload object, which is what makes it
+# safe without any invalidation logic.** `_supplement_odds_history_from_candidate
+# _dates` shallow-copies the OUTER dict, so an unchanged sport keeps the same
+# inner payload object and the index carries across all four
+# `_enrich_candidates_with_odds_history` calls in a build. When it merges extra
+# shards it assigns a BRAND-NEW `{"markets": ...}` dict, which has no cache, so
+# a changed payload cannot serve a stale index. There is no key to get wrong and
+# no TTL to tune.
+#
+# Deliberately NOT a module-level cache keyed on `id()`: that pins a ~57MB
+# payload alive past the build to keep the id from being recycled, on a worker
+# whose anon memory already reaches 2.2GB with 2.7GB spikes (`#414`).
+#
+# Verified before choosing this: nothing serialises these payloads -- they are
+# read and passed, never `json.dumps`ed -- so a non-JSON value under a reserved
+# key cannot escape into an artifact.
+_ODDS_HISTORY_INDEX_KEY = "__player_index_cache__"
+
+
+def _odds_history_player_index_for(
+    odds_history: dict[str, Any] | None,
+) -> tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]]:
+    """`_build_odds_history_player_index`, memoised on the payload itself."""
+    if not isinstance(odds_history, dict):
+        return _build_odds_history_player_index(odds_history)
+    cached = odds_history.get(_ODDS_HISTORY_INDEX_KEY)
+    if cached is not None:
+        return cached
+    index = _build_odds_history_player_index(odds_history)
+    odds_history[_ODDS_HISTORY_INDEX_KEY] = index
+    return index
+
+
+# `#414`, second half: LOAD THE SHARDS ONCE PER BUILD, not once per call site.
+#
+# `_odds_history_payloads_by_sport` is called at three sites in a single board
+# build (`:7695`, `:9546`, `:9889`), each re-reading the same shards from disk.
+# MLB's 2026-08-12 shard measured **57.11 MB**, and a complete day is ~57MB, so
+# that is ~114MB of redundant parse per build -- and it grows all day, which is
+# why `collect_candidates` went ~200s at 14:41 to 1508.9s at 01:29.
+#
+# Keyed on the shards' own (path, mtime_ns, size) so it self-invalidates the
+# moment the capture writes: no TTL, and a mid-build write is picked up rather
+# than served stale. Single entry, because a build only ever works one overview.
+_ODDS_HISTORY_PAYLOAD_CACHE: dict[str, Any] = {"fingerprint": None, "payloads": None}
+
+
+def _odds_history_shard_fingerprint(overview: list[dict[str, Any]]) -> tuple | None:
+    """(path, mtime_ns, size) for every shard this overview would read.
+
+    Returns None when the fingerprint cannot be taken, and the caller then
+    SKIPS the cache rather than treating unknown as unchanged -- an unreadable
+    stat must not serve a stale 57MB payload.
+    """
+    from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
+
+    parts: list[tuple[str, int, int]] = []
+    try:
+        for sport in overview:
+            if not isinstance(sport, dict):
+                continue
+            slug = _safe_text(sport.get("slug"), "sport").lower()
+            if not slug:
+                continue
+            shard_key = _shard_key_from_context_label(slug, _safe_text(sport.get("context_label"), ""))
+            for key in _odds_history_shard_keys_for_sport(sport, slug, shard_key):
+                # EVERY candidate path, not just the winner. The loader has
+                # precedence rules across several locations, and a stale shared
+                # copy shadowing a fresh pull is a defect this file already
+                # records (2026-08-04). Fingerprinting only the resolved path
+                # would miss a change that alters WHICH path wins.
+                for path in odds_history_paths_for_sport(slug, key):
+                    try:
+                        st = path.stat()
+                    except OSError:
+                        # Absent is a real state and part of the fingerprint --
+                        # a shard appearing must invalidate the cache.
+                        parts.append((str(path), -1, -1))
+                        continue
+                    parts.append((str(path), st.st_mtime_ns, st.st_size))
+    except Exception:
+        return None
+    return tuple(sorted(parts))
+
+
 def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    fingerprint = _odds_history_shard_fingerprint(overview)
+    if fingerprint is not None and _ODDS_HISTORY_PAYLOAD_CACHE.get("fingerprint") == fingerprint:
+        cached = _ODDS_HISTORY_PAYLOAD_CACHE.get("payloads")
+        if isinstance(cached, dict):
+            print(
+                f"[intelligence] ODDS_HISTORY_CACHE_HIT sports={len(cached)} "
+                f"shards={len(fingerprint)}",
+                flush=True,
+            )
+            return cached
     payloads: dict[str, dict[str, Any]] = {}
     for sport in overview:
         if not isinstance(sport, dict):
@@ -2992,6 +3089,14 @@ def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str,
         odds_data_present=bool(payloads),
         sports_loaded=len(payloads),
         sample_sports=sorted(payloads.keys())[:5],
+    )
+    if fingerprint is not None:
+        _ODDS_HISTORY_PAYLOAD_CACHE["fingerprint"] = fingerprint
+        _ODDS_HISTORY_PAYLOAD_CACHE["payloads"] = payloads
+    print(
+        f"[intelligence] ODDS_HISTORY_LOADED sports={len(payloads)} "
+        f"cacheable={fingerprint is not None}",
+        flush=True,
     )
     return payloads
 
@@ -3834,7 +3939,7 @@ def _enrich_candidates_with_odds_history(candidates: list[dict[str, Any]], odds_
         sport_slug = _safe_text(payload.get("sport_slug"), "sport").lower()
         if sport_slug not in index_by_sport:
             odds_history = (odds_history_by_sport or {}).get(sport_slug) if isinstance(odds_history_by_sport, dict) else None
-            index_by_sport[sport_slug] = _build_odds_history_player_index(odds_history)
+            index_by_sport[sport_slug] = _odds_history_player_index_for(odds_history)
         movement_context = _candidate_odds_history_context(payload, index_by_sport[sport_slug])
         if movement_context:
             market_data = payload.get("market_data") if isinstance(payload.get("market_data"), dict) else {}
