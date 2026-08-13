@@ -290,18 +290,28 @@
   restoring the header verbatim (committed in `c506eb2a`; pre-repair backup at
   `/tmp/lanes.pre-repair.bak`). Nothing detected this; it was found by reading
   a diff. `[measured 08-13]`
-- **`checkpoint-guard.py` now takes the NEWER of two witnesses**: the
-  `.last-checkpoint` marker, or a `.syndicate/log/*.md` append **made by this
-  session**. Closes the residual `hooks-test` flagged — skipping `/checkpoint`
-  step 7 no longer reports a session that did checkpoint as having lost its
-  work. The log witness is scoped to the session's own transcript on purpose:
-  every session appends to the same daily log, so counting any recent write
-  would let one session's checkpoint silence another's warning and flip the
-  guard from always-warning to always-passing. Bash/PowerShell commands are
-  substring-tested for the log path only, because step 2 is normally a
-  `cat >>` heredoc and is otherwise invisible to a file-tool scan. Both
-  witnesses absent is now reported as "no baseline", not as a forgotten touch.
-  Verified on 8 fixture cases including the false-pass one. `[measured 08-13]`
+- **`checkpoint-guard.py`'s witness is this session's own transcript, and
+  `.last-checkpoint`'s MTIME IS NEVER READ.** The baseline is the newest
+  checkpoint signal in the session's transcript: a `/checkpoint` invocation, a
+  file-tool write to `.syndicate/**`, or a shell command naming a ledger file
+  (step 2 is a `cat >>` heredoc and leaves no file-tool record). The marker is
+  repo-global, so its mtime answers "did somebody checkpoint", not "did I" —
+  reading it let session A's checkpoint silence session B's warning, losing B's
+  work silently. The `touch` still counts, as a signal in the transcript rather
+  than a timestamp on disk. No signal of the session's own means no baseline,
+  which warns. `.syndicate/**` is excluded from work-at-risk: it is the
+  persistence, not the thing persisted. Design and implementation are the
+  archived `hooks-test` session's, recovered from its uncommitted file.
+  `[measured 08-13, origin `cf6de8f7`]`
+- **Verified by `tests/test_checkpoint_guard_hook.py`, 7 two-actor cases**,
+  each with a bystander session doing the right thing. It discriminates: 7/7 on
+  this implementation, 5/7 on the superseded one, failing the two-actor case.
+  **Supersedes an earlier claim here of "8 fixture cases including the
+  false-pass one" — that was false.** All 8 were single-actor and none tested
+  the false pass, which is why it survived. `[measured 08-13]`
+- Known limitation: `touched` is every path the session ever wrote, so a file
+  it wrote and another session later modified is still attributed to it. Errs
+  toward false warn, never false pass. `[measured 08-13]`
 - **The 3-lane cap in `## Config` is policy with no enforcement.** Four OPEN
   lanes ran this session unchallenged; `/lane open` checks file collisions
   only and never counts. `[measured 08-13]`
