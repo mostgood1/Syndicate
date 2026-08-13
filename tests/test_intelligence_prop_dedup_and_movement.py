@@ -521,11 +521,16 @@ class OddsHistoryPlayerIndexTests(unittest.TestCase):
     def test_prop_candidate_only_scans_its_own_player_bucket(self) -> None:
         odds_history = self._big_odds_history(real_player="tomoyuki sugano", other_player_count=2000)
         index = intelligence._build_odds_history_player_index(odds_history)
-        by_player, unattributed = index
+        # `#414`: a 3-tuple now -- game-level entries are ALSO bucketed, by
+        # event, because leaving them linear was the O(candidates * markets)
+        # cost this class documents, surviving for moneyline/spread/total.
+        by_player, unattributed, by_event = index
         # 2000 filler players + the real one = 2001 buckets; the game-level
-        # entry is the only thing in the unattributed pool.
+        # entry is the only thing in the unattributed pool, and it now also
+        # appears under its own event bucket.
         self.assertEqual(len(by_player), 2001)
         self.assertEqual(len(unattributed), 1)
+        self.assertEqual(len(by_event), 1)
 
         candidate = {
             "candidate_type": "prop",
@@ -556,9 +561,13 @@ class OddsHistoryPlayerIndexTests(unittest.TestCase):
         self.assertIn("h2h", market_key)
 
     def test_empty_odds_history_returns_empty_index(self) -> None:
-        by_player, unattributed = intelligence._build_odds_history_player_index(None)
+        # `#414`: the index is a 3-tuple since game-level entries got their own
+        # event buckets. `unattributed` is still returned whole because
+        # `_candidate_odds_history_state` falls back to it on a bucket miss.
+        by_player, unattributed, by_event = intelligence._build_odds_history_player_index(None)
         self.assertEqual(by_player, {})
         self.assertEqual(unattributed, [])
+        self.assertEqual(by_event, {})
 
 
 class NormalizedMarketTextDiacriticTests(unittest.TestCase):

@@ -2996,11 +2996,20 @@ _ODDS_HISTORY_INDEX_KEY = "__player_index_cache__"
 # Reset per build by the caller so the numbers describe ONE build rather than an
 # ever-growing process total, which would hide a regression under a large
 # denominator.
-_ODDS_HISTORY_INDEX_STATS: dict[str, int] = {"hits": 0, "misses": 0, "build_seconds_saved_est": 0}
+_ODDS_HISTORY_INDEX_STATS: dict[str, int] = {
+    "hits": 0,
+    "misses": 0,
+    "build_seconds_saved_est": 0,
+    # `#414`: the two that actually matter. `full_scans` tracking the candidate
+    # count means the event bucket is never hitting and the fix is inert -- the
+    # same inertness the index memo shipped with, now visible in one number.
+    "event_bucket_hits": 0,
+    "full_scans": 0,
+}
 
 
 def _reset_odds_history_index_stats() -> None:
-    _ODDS_HISTORY_INDEX_STATS.update({"hits": 0, "misses": 0})
+    _ODDS_HISTORY_INDEX_STATS.update({"hits": 0, "misses": 0, "event_bucket_hits": 0, "full_scans": 0})
 
 
 def _log_odds_history_index_stats(where: str) -> None:
@@ -3013,14 +3022,20 @@ def _log_odds_history_index_stats(where: str) -> None:
     print(
         f"[intelligence] ODDS_HISTORY_INDEX_STATS where={where} hits={hits} "
         f"misses={misses} calls={total} "
-        f"hit_rate={(hits / total * 100) if total else 0:.0f}%",
+        f"hit_rate={(hits / total * 100) if total else 0:.0f}% "
+        f"event_bucket_hits={_ODDS_HISTORY_INDEX_STATS.get('event_bucket_hits', 0)} "
+        f"full_scans={_ODDS_HISTORY_INDEX_STATS.get('full_scans', 0)}",
         flush=True,
     )
 
 
 def _odds_history_player_index_for(
     odds_history: dict[str, Any] | None,
-) -> tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]]:
+) -> tuple[
+    dict[str, list[tuple[str, dict[str, Any]]]],
+    list[tuple[str, dict[str, Any]]],
+    dict[str, list[tuple[str, dict[str, Any]]]],
+]:
     """`_build_odds_history_player_index`, memoised on the payload itself."""
     if not isinstance(odds_history, dict):
         # Not counted either way: there is no payload to memoise, so this is
@@ -3347,9 +3362,36 @@ def _candidate_odds_history_match_score(candidate: dict[str, Any], market_key: A
     return score
 
 
+# `#414`. The event identity a game-level entry and a candidate can BOTH
+# produce, used to bucket `unattributed` the way `by_player` buckets props.
+#
+# Order matters: `event_key`/`event_id` are exact when present, `matchup` is the
+# textual fallback. Returns "" when nothing usable exists, and the caller then
+# takes the FULL scan rather than an empty bucket -- an unkeyable candidate must
+# not silently lose its matches.
+def _odds_history_event_key_from_parsed(parsed: Mapping[str, str]) -> str:
+    for field in ("event_key", "event_id", "matchup"):
+        value = _normalized_market_text(_safe_text(parsed.get(field), ""))
+        if value:
+            return value
+    return ""
+
+
+def _odds_history_event_key_from_candidate(candidate: Mapping[str, Any]) -> str:
+    for field in ("event_key", "event_id", "matchup"):
+        value = _normalized_market_text(_safe_text(candidate.get(field), ""))
+        if value:
+            return value
+    return ""
+
+
 def _build_odds_history_player_index(
     odds_history: dict[str, Any] | None,
-) -> tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]]:
+) -> tuple[
+    dict[str, list[tuple[str, dict[str, Any]]]],
+    list[tuple[str, dict[str, Any]]],
+    dict[str, list[tuple[str, dict[str, Any]]]],
+]:
     """Splits a sport's odds-history markets into per-player buckets (keyed
     by the market key's own player_name/player_key field) plus a small
     remainder list of unattributed (game-level: moneyline/spread/total)
@@ -3362,12 +3404,25 @@ def _build_odds_history_player_index(
     board incident. A prop candidate only ever needs its own player's
     handful of entries, so bucketing by player_name turns that scan into a
     small, O(1)-lookup pool instead.
+
+    `#414`: THAT FIX BUCKETED THE PROP HALF AND LEFT THE GAME-LEVEL HALF LINEAR.
+    Every game-level entry landed in `unattributed`, which
+    `_candidate_odds_history_state` copied and scored IN FULL for every
+    candidate -- the same `O(candidates * markets)` shape, surviving for
+    moneyline/spread/total. Measured 2026-08-13: ~8-9 SECONDS PER ROW, flat
+    across seven games (224.9s/26 rows, 184.9s/21, 107.0s/11, 100.1s/10,
+    71.6s/7). A per-build cost gives cheap rows; a per-row cost is this.
+
+    So `unattributed` is now ALSO bucketed, by event. It is still returned whole
+    as the second element because the caller falls back to it -- see
+    `_candidate_odds_history_state`.
     """
     by_player: dict[str, list[tuple[str, dict[str, Any]]]] = {}
     unattributed: list[tuple[str, dict[str, Any]]] = []
+    by_event: dict[str, list[tuple[str, dict[str, Any]]]] = {}
     markets = (odds_history or {}).get("markets") if isinstance(odds_history, dict) else None
     if not isinstance(markets, dict):
-        return by_player, unattributed
+        return by_player, unattributed, by_event
     for market_key, state in markets.items():
         if not isinstance(state, dict):
             continue
@@ -3377,35 +3432,69 @@ def _build_odds_history_player_index(
             by_player.setdefault(player, []).append((str(market_key), state))
         else:
             unattributed.append((str(market_key), state))
-    return by_player, unattributed
+            event_key = _odds_history_event_key_from_parsed(parsed)
+            if event_key:
+                by_event.setdefault(event_key, []).append((str(market_key), state))
+    return by_player, unattributed, by_event
 
 
 def _candidate_odds_history_state(
-    candidate: dict[str, Any], odds_history_index: tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]]
+    candidate: dict[str, Any],
+    odds_history_index: tuple[
+        dict[str, list[tuple[str, dict[str, Any]]]],
+        list[tuple[str, dict[str, Any]]],
+        dict[str, list[tuple[str, dict[str, Any]]]],
+    ],
 ) -> tuple[str, dict[str, Any] | None]:
-    by_player, unattributed = odds_history_index
+    by_player, unattributed, by_event = odds_history_index
     if not by_player and not unattributed:
         return "", None
 
     subject_key = _normalized_market_text(_safe_text(candidate.get("player_name"), "")) or _normalized_market_text(
         _safe_text(_candidate_subject_key(candidate), "")
     )
+
+    def _best_of(pool: list[tuple[str, dict[str, Any]]]) -> tuple[str, dict[str, Any] | None, float]:
+        best_key, best_state, best_score = "", None, 0.0
+        for market_key, state in pool:
+            score = _candidate_odds_history_match_score(candidate, market_key, state)
+            if score > best_score:
+                best_key, best_score, best_state = market_key, score, state
+        return best_key, best_state, best_score
+
+    # `#414`. FAST PATH: this candidate's own event plus its own player, instead
+    # of copying and scoring every game-level entry in the sport.
+    #
+    # **The fallback is what makes this non-regressive.** If the narrow pool
+    # produces no positive score we scan the full `unattributed` list exactly as
+    # before, so any match reachable by the old code is still reachable. The
+    # bucket can only make it FASTER when it hits; it can never make it find
+    # less. That matters because the event key is textual (`matchup`) whenever
+    # `event_key`/`event_id` are absent, and a normalisation mismatch between the
+    # market key and the candidate would otherwise silently drop real joins --
+    # the exact class of failure this file already records for 2026-07-24,
+    # 07-31 and 08-04.
+    event_key = _odds_history_event_key_from_candidate(candidate)
+    narrow: list[tuple[str, dict[str, Any]]] = []
+    if event_key and event_key in by_event:
+        narrow.extend(by_event[event_key])
+    if subject_key and subject_key in by_player:
+        narrow.extend(by_player[subject_key])
+    if narrow:
+        best_key, best_state, best_score = _best_of(narrow)
+        if best_score > 0.0:
+            _ODDS_HISTORY_INDEX_STATS["event_bucket_hits"] = (
+                _ODDS_HISTORY_INDEX_STATS.get("event_bucket_hits", 0) + 1
+            )
+            return best_key, best_state
+
     pool = list(unattributed)
     if subject_key and subject_key in by_player:
         pool.extend(by_player[subject_key])
     if not pool:
         return "", None
-
-    best_key = ""
-    best_state: dict[str, Any] | None = None
-    best_score = 0.0
-    for market_key, state in pool:
-        score = _candidate_odds_history_match_score(candidate, market_key, state)
-        if score > best_score:
-            best_key = market_key
-            best_score = score
-            best_state = state
-
+    _ODDS_HISTORY_INDEX_STATS["full_scans"] = _ODDS_HISTORY_INDEX_STATS.get("full_scans", 0) + 1
+    best_key, best_state, best_score = _best_of(pool)
     if best_score <= 0.0:
         return "", None
     return best_key, best_state
@@ -3413,7 +3502,11 @@ def _candidate_odds_history_state(
 
 def _candidate_odds_history_context(
     candidate: dict[str, Any],
-    odds_history_index: tuple[dict[str, list[tuple[str, dict[str, Any]]]], list[tuple[str, dict[str, Any]]]],
+    odds_history_index: tuple[
+        dict[str, list[tuple[str, dict[str, Any]]]],
+        list[tuple[str, dict[str, Any]]],
+        dict[str, list[tuple[str, dict[str, Any]]]],
+    ],
 ) -> dict[str, Any] | None:
     market_key, history_state = _candidate_odds_history_state(candidate, odds_history_index)
     market_data = candidate.get("market_data") if isinstance(candidate.get("market_data"), dict) else {}

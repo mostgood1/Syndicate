@@ -148,8 +148,11 @@ class TestIndexStats:
         intel._reset_odds_history_index_stats()
         intel._odds_history_player_index_for(None)
         intel._odds_history_player_index_for("nope")
-        assert intel._ODDS_HISTORY_INDEX_STATS == {"hits": 0, "misses": 0,
-                                                   "build_seconds_saved_est": 0}
+        # Asserts the COUNTERS, not the dict shape -- an exact-equality check
+        # here failed the moment `#414` added event-bucket counters, which is a
+        # test coupled to something it is not about.
+        assert intel._ODDS_HISTORY_INDEX_STATS["hits"] == 0
+        assert intel._ODDS_HISTORY_INDEX_STATS["misses"] == 0
 
     def test_the_reset_clears_only_the_counters(self):
         intel._odds_history_player_index_for(_payload(2))
@@ -166,3 +169,56 @@ class TestIndexStats:
         out = capsys.readouterr().out
         assert "ODDS_HISTORY_INDEX_STATS" in out
         assert "hits=0 misses=1" in out and "hit_rate=0%" in out
+
+
+class TestEventBucket:
+    """`#414` proper fix. `by_player` bucketed props and left every game-level
+    entry in `unattributed`, copied and scored IN FULL per candidate -- the same
+    O(candidates * markets) shape the July fix removed for props only.
+
+    Measured 2026-08-13: ~8-9 seconds PER ROW, flat across seven games. A
+    per-build cost gives cheap rows; this was per-row.
+    """
+
+    @staticmethod
+    def _hist(*keys):
+        return {"markets": {k: {"history": [{"line": 1.5}]} for k in keys}}
+
+    def test_a_game_candidate_scores_only_its_own_event(self):
+        hist = self._hist(
+            "event_id=g1|market=h2h|matchup=Aces at Sky",
+            "event_id=g2|market=h2h|matchup=Fever at Sun",
+            "event_id=g3|market=h2h|matchup=Wings at Dream",
+        )
+        idx = intel._build_odds_history_player_index(hist)
+        by_player, unattributed, by_event = idx
+        assert len(unattributed) == 3, "game-level entries must still be in unattributed"
+        assert len(by_event) == 3, "each event must get its own bucket"
+
+    def test_the_full_scan_still_runs_when_the_bucket_misses(self):
+        """THE NON-REGRESSION GUARANTEE. A candidate whose event key does not
+        match any bucket must still find its match via the full list, or a
+        normalisation mismatch silently drops real joins."""
+        hist = self._hist("event_id=g1|market=h2h|matchup=Aces at Sky")
+        idx = intel._build_odds_history_player_index(hist)
+        intel._reset_odds_history_index_stats()
+        cand = {"matchup": "Aces at Sky", "market": "h2h", "sport_slug": "wnba",
+                "event_id": "COMPLETELY-DIFFERENT"}
+        intel._candidate_odds_history_state(cand, idx)
+        assert intel._ODDS_HISTORY_INDEX_STATS["full_scans"] == 1, "bucket miss did not fall back"
+
+    def test_an_unkeyable_candidate_takes_the_full_scan(self):
+        hist = self._hist("event_id=g1|market=h2h|matchup=Aces at Sky")
+        idx = intel._build_odds_history_player_index(hist)
+        intel._reset_odds_history_index_stats()
+        intel._candidate_odds_history_state({"market": "h2h"}, idx)
+        assert intel._ODDS_HISTORY_INDEX_STATS["full_scans"] == 1
+
+    def test_an_empty_index_returns_nothing_without_scanning(self):
+        idx = intel._build_odds_history_player_index({"markets": {}})
+        key, state = intel._candidate_odds_history_state({"matchup": "x"}, idx)
+        assert key == "" and state is None
+
+    def test_the_builder_returns_three_elements(self):
+        idx = intel._build_odds_history_player_index(self._hist("event_id=g1|market=h2h"))
+        assert len(idx) == 3, "callers unpack three; a 2-tuple would raise at runtime"
