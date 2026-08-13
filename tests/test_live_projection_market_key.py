@@ -338,3 +338,59 @@ def test_an_undecided_prop_at_the_same_line_still_prices():
     coverage = attach_live_projections(grid, index)
     assert coverage["rows_live_edged"] == 1
     assert grid[0]["projection"]["edge_vs_market_pct"] == 18.0
+
+
+def test_every_layer_between_the_resim_and_the_board_carries_the_field():
+    """`#416` shipped INERT the first time, and this is the guard for that.
+
+    The re-sim computed `live_model_prob_over` correctly and
+    `_normalize_live_lens_live_prop_row` -- a WHITELIST that rebuilds each row
+    from an explicit key list -- dropped it one layer before the snapshot.
+    Deployed on both workers, `LIVE_PROB` read 0 on every tick while
+    `liveProjection` populated normally: present, running, and unreachable.
+
+    The chain is four hops and a whitelist at any of them is silent:
+
+        _current_live_prop_rows        computes  live_model_prob_over
+        _normalize_live_lens_live_prop_row  ->   liveModelProbOver   <- dropped here
+        mlb/live_lens._normalize_live_prop_row   passthrough
+        live_projection_join.build_live_prop_index consumes it
+    """
+    import pathlib
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    vendor = (repo / "vendor" / "mlb_bettingv2" / "tools" / "web"
+              / "flask_frontend.py").read_text(encoding="utf-8", errors="replace")
+    lens = (repo / "syndicate" / "features" / "mlb" / "live_lens.py").read_text(encoding="utf-8")
+    join = (repo / "syndicate" / "features" / "shared"
+            / "live_projection_join.py").read_text(encoding="utf-8")
+
+    # 1. computed, and written onto the row in BOTH loops (hitter and pitcher)
+    assert vendor.count('"live_model_prob_over": live_model_prob_over,') == 2
+
+    # 2. survives the whitelist normaliser -- the hop that actually failed
+    norm = vendor[vendor.index("def _normalize_live_lens_live_prop_row"):]
+    norm = norm[:norm.index("\ndef ")]
+    assert '"liveModelProbOver": _safe_float(row.get("live_model_prob_over")),' in norm
+
+    # 3. survives Syndicate's own normaliser
+    assert '"liveModelProbOver": row.get("liveModelProbOver")' in lens
+
+    # 4. is read by the join, from its OWN key and never from the pregame one
+    assert '"live_prob_over": prop.get("liveModelProbOver"),' in join
+
+
+def test_the_live_probability_is_not_folded_into_the_pregame_fallback_chain():
+    """`modelProbOver`'s chain reaches `estimatedWinProb` -- the PREGAME number.
+
+    Folding the live field into that chain would make an absent live probability
+    silently resolve to the pregame one, which is the original defect restored
+    at the normaliser instead of at the join.
+    """
+    import pathlib
+
+    lens = (pathlib.Path(__file__).resolve().parents[1] / "syndicate" / "features" / "mlb"
+            / "live_lens.py").read_text(encoding="utf-8")
+    line = next(l for l in lens.splitlines() if '"liveModelProbOver"' in l)
+    assert "estimatedWinProb" not in line
+    assert "estimated_win_prob" not in line

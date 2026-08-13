@@ -17064,6 +17064,14 @@ def _normalize_live_lens_live_prop_row(row: Dict[str, Any], snapshot: Optional[D
         "edge": _safe_float(row.get("edge")),
         "odds": _safe_int(row.get("odds")),
         "modelProbOver": _safe_float(row.get("model_prob_over")),
+        # THIS NORMALISER IS A WHITELIST, and that is why the first cut of the
+        # live probability shipped inert: `_current_live_prop_rows` computed
+        # `live_model_prob_over` correctly and this function rebuilt the row from
+        # an explicit key list that did not mention it, so it was discarded one
+        # layer before the snapshot. Deployed on both workers, `LIVE_PROB` read 0
+        # on every tick while `liveProjection` populated normally -- a fix that
+        # is present, running, and unreachable.
+        "liveModelProbOver": _safe_float(row.get("live_model_prob_over")),
         "outsMean": _safe_float(row.get("outs_mean")),
         "marketLabel": row.get("market_label") or row.get("prop") or row.get("market"),
         "reason_summary": str(row.get("reason_summary") or "").strip(),
