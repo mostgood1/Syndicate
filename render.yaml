@@ -889,6 +889,24 @@ services:
       # `us,us2` the plan's instructions call for.
       - key: SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS
         value: "eu,us_ex"
+      # #325 (2026-08-13): found set to 14400 (4h) live on this service only
+      # -- absent from render.yaml, so silently surviving every restart with
+      # no record of why. `_event_scoping_window_seconds()`'s own comment
+      # says this must match live_refresh_loop.py's 75-minute T-window
+      # (`_T_WINDOW_RAMP_SECONDS`); 14400 was 3.2x that, with no
+      # documentation anywhere justifying it -- the only other 14400 values
+      # in the repo are unrelated soccer refresh-interval settings, so this
+      # looks like a copy/paste or interval-vs-window mix-up rather than a
+      # deliberate choice. Quantified against the live 2026-08-13 slate: 6/9
+      # games were getting full-tier segment+alternate markets instead of
+      # the intended 4/9 -- a per-cycle, compounding effect (unlike S0b's
+      # one-time step) that explains the OddsAPI market-family share
+      # climbing across five straight #325 readings instead of plateauing.
+      # Reset to the code's own default explicitly, both to fix production
+      # and so this value has a record in git instead of only living in the
+      # dashboard.
+      - key: SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS
+        value: "4500"
       - key: SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
         value: "true"
       # MLB daily sim / look-ahead / evening-next-day sim ownership moved to
