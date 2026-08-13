@@ -8,15 +8,24 @@
 ## Config
 
 - Max concurrent open lanes: **3** `[policy]`
-- Repo tip: local `main` `5b2ca320`, **20 ahead / 6 behind `origin/main`**
-  (`571f774b`). The two have diverged. **The `session-start.sh` clause here is
-  now stale** — that file was committed in `0642cdf7` and the worktree is clean
-  of it; it blocks nothing. What a push DOES carry is 3 unpushed `render.yaml`
-  commits (`054b2306`, `cc2e1803`, `e8611888`), which fire `blueprint_sync`.
-  `git push` from this checkout is not scoped to your own commits — read
-  `git log origin/main..HEAD` first. Hook work was landed by cherry-picking
-  onto `origin/main` in a throwaway worktree to avoid carrying them
-  (`f6fec4f1`). Supersedes the `478edd78` line. `[from-git 08-13 14:5x]`
+- Repo tip: local `main` `541f6020`, **25 ahead / 8 behind `origin/main`**
+  (`461c0df0`). The two have diverged and both ends move every few minutes —
+  re-read, do not reuse these. `[from-git 08-13 15:1x]`
+- **CORRECTION: a push from this checkout does NOT carry a `render.yaml`
+  change, and the previous warning here that it fires `blueprint_sync` was
+  wrong.** The three commits it named (`054b2306`, `cc2e1803`, `e8611888`)
+  are **patch-equivalent to commits already on `origin`** — another session
+  re-landed them as `d16950b9`/`1e09fa9b`/`7c60d0f8`. `git cherry origin/main
+  main` marks all three `-`, and `git diff origin/main..main -- render.yaml`
+  is **empty** (web block 52 keys on both sides). Verified immediately before
+  pushing `461c0df0`. `[measured 08-13 15:1x]`
+- Still true, and the reason the warning existed: **`git push` from this
+  checkout is not scoped to your own commits.** Read
+  `git log origin/main..HEAD` before pushing. When it carries other lanes'
+  work, cherry-pick onto `origin/main` in a throwaway worktree instead —
+  used three times on 08-13 (`f6fec4f1`, `03073270`, `461c0df0`), twice
+  because another session had uncommitted files the merge would have
+  clobbered. `[from-git 08-13]`
 - Deployed SHA: **three different commits, none of them the repo tip.**
   refresh-worker re-read at 08-13 **13:05** CDT; the other two at **11:56**.
   All `status=live`, `trigger=api`. `[measured 08-13]`
@@ -37,12 +46,24 @@
   785 insertions**, of which `intelligence.py`, `home.py`,
   `live_projection_join.py` and `flask_frontend.py` are web-path. See `#422`.
   `[measured 08-13 14:44]`
-- **`blueprint_sync` has NOT applied. "On origin" is not "in production."**
-  Web's LIVE service carries **73** env vars; `render.yaml` on origin declares
-  **52**. The web env-block audit is pushed and **not in effect**, so a future
-  sync carries a queued, unannounced 21-key reduction. Read
+- **"On origin" is not "in production."** Web's LIVE service carries **73**
+  env vars; `render.yaml` on origin declares **52**. The web env-block audit
+  is pushed and **not reflected on the live service**. Read
   `/v1/services/<id>/env-vars` before recording any config change as shipped.
   `[measured 08-13 14:44]`
+- **SELF-CORRECTION to the line above, same session.** It originally read
+  "a future sync carries a queued, unannounced 21-key reduction". **That is
+  wrong** and contradicted the measured sync semantics recorded further down
+  this file: a sync **upserts declared keys and leaves live-only keys alone**
+  (2026-08-08, refresh-worker went 92 → 93 while the blueprint declared 84;
+  a full replace would have driven it to 84). Removing a declaration
+  therefore **never removes the live value** — it only reclassifies the key
+  as undeclared. So the 21-key gap is not queued work; it is 21 live-only
+  keys that no sync will ever clear. **The web env-block audit cannot take
+  effect on a live service at all** unless someone deletes those keys through
+  the env API. Anyone wanting the audit to mean something in production has
+  to do that deliberately. `[measured 08-13 15:1x — see
+  scripts/audit_blueprint_drift.py header]`
 - **Web does not run the loops that call `memory_headroom_snapshot`.** Live env:
   `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`,
   `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`,
