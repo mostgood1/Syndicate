@@ -13659,6 +13659,26 @@ above, closer to the season); NFL preseason props (no real prop-odds
 source exists at all, correctly never attempted).
 
 **Operational notes:**
+- **A CHECK THAT CATCHES THE PROBLEM IS WORTHLESS IF THE NEXT COMMAND RUNS
+  REGARDLESS.** Worse than having no check, because the output then *documents*
+  work that did not happen and the next reader has no reason to doubt it.
+  Measured 2026-08-13 (`b0ab6974`): a script did a `str.replace` for
+  `~8-10 s/row` where the file said `~8-9 s/row`, so it matched nothing and
+  silently no-op'd. **The script asserted on it and the assertion fired
+  correctly.** But the following `git add` / `git commit` lines were separate
+  shell commands, not gated on the script's exit status, so the commit went out
+  carrying half its own message — claiming two edits when one had applied. The
+  tripwire existed and was wired to nothing.
+  **What to do, procedurally:**
+  - `set -e` (or `&&` chaining) in any shell block where a later step depends on
+    an earlier one. Newline-separated commands do NOT stop on failure.
+  - After a scripted edit, `grep` for the NEW text and gate the commit on that
+    grep, not on the script having run.
+  - A commit message is a claim. If the diffstat does not match what the message
+    says, the message is wrong — check it before pushing, not after.
+  This is `#406`'s no-op-patch lesson one level up: *a patch that does nothing
+  looks exactly like a patch that works*, and so does a verification that never
+  gets consulted.
 - **WHERE A CONTROLLED COMPARISON IS AVAILABLE, A TIME SERIES IS NOT EVIDENCE.**
   The single most useful line from 2026-08-12/13, and it explains every duration
   retraction that night in one sentence. Four separate claims were made about
@@ -29426,6 +29446,28 @@ from.
 `ODDS_HISTORY_CACHE_HIT: 0` settled `#414`'s cache question in one reading: a
 counter reading zero is a fact about the code path, not a sample from a series.
 When a duration comparison is unattributable, look for a counter that isn't.
+
+**Narrow sampling is one of THREE shapes seen the same night, all producing
+confident, checkable-looking output.** Recorded together because the countermeasure
+differs for each and only the first is about sample size:
+
+| shape | instance | why it convinced |
+|---|---|---|
+| wrong **denominator** | `224.9s / 26 rows` divided game time by *candidates emitted*, not *iterations run* | **looked constant across 7 games because it was the same wrong division 7 times** — consistency read as corroboration when it was a shared denominator |
+| wrong **reference** | a pinned deploy compared against `origin/main` instead of the deployed SHA | both sides were real commits |
+| **blind instrument** | `/mlb/api/live-lens` read zero for `#416` — it reports `simContextAvailable: False` on all 15 games and cannot run the sim being looked for | a null has no units to sanity-check, so nothing looks wrong |
+
+The third nearly filed a working fix as broken. **Before believing a zero, confirm
+the instrument can emit non-zero** — see the `#409`/`child_count` retraction, same
+failure a week earlier.
+
+**A 5-minute reader rollback is visible in artifact SHAPE, not just deploy logs.**
+refresh-worker went to `8bf29186` at 03:11:48 — a commit *predating* `d88ed790` —
+corrected to `15e9d47e` at 03:16:34. The board artifact built at 03:14:55 **lost
+the `rows_live_edged` field entirely** and got it back at 03:18:27. A missing key
+in one artifact is the fingerprint of a brief rollback, and would be
+unattributable a day later once the deploy list scrolled. Check field PRESENCE
+across consecutive artifacts when a metric behaves oddly for one build only.
 
 ### The mirror is lossy for MEASUREMENT, not just for DATA (2026-08-12)
 
