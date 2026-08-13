@@ -1,5 +1,67 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#422` — **The web service is 47 commits stale, and the board work `layer1-live-tier` closed as "SHIPPED AND VERIFIED" may only ever have been verified on the WORKER half.** OPEN, UNOWNED — belongs to `layer1-live-tier`.
+
+**Measured 2026-08-13 14:44 CDT.** Web (`srv-d88ahvrbc2fs73eodu30`) is live on
+`936e2b47` since **08-12 21:44 CDT**. `origin/main` is `571f774b`.
+
+**47 commits behind, but that number is misleading and should not be quoted.**
+Only **14 touch production `.py`** — the rest are ledger, docs and tests. The
+real delta is **7 files, 785 insertions**:
+
+    syndicate/features/intelligence.py                 +313
+    vendor/mlb_bettingv2/tools/web/flask_frontend.py   +145
+    syndicate/features/shared/memory_observability.py  +134
+    syndicate/features/shared/live_refresh_loop.py     +107
+    syndicate/features/shared/live_projection_join.py   +78
+    syndicate/blueprints/home.py                        +75
+    syndicate/features/shared/odds_book_quotes.py       +42
+
+**THE ACTUAL QUESTION, and it is not "is web stale".** Four of those files are
+**web-path**: `intelligence.py`, `home.py`, `live_projection_join.py`,
+`flask_frontend.py`. They carry the `#412`/`#413`/`#415`/`#416` board work that
+`lanes.md` records as **"SHIPPED AND VERIFIED"** (`#412` prop join 0 -> 41,
+`#413` 210 rows corrected, `#415` Betting Board). That verification was taken
+against artifacts the **worker** produces. If web has not deployed since
+08-12 21:44, the **presentation half has never run in production**, and those
+closures are narrower than they read.
+
+**This is an INFERENCE, not a measurement.** What IS measured: the commits fall
+after web's deployed SHA, so that code is not running on web. What is NOT
+measured: whether any user-visible behaviour actually differs. **Do that check
+before acting** — it is cheap, and `learnings.md` already records the cost of
+treating "the fix is present in the tree" as "the path executes".
+
+**Scope discipline — a blanket web deploy FAILED `/preflight` 2026-08-13.**
+14 commits spanning **five lanes** is not one substantive change, two of the
+files are claimed by lanes that are open right now (`live_refresh_loop.py` by
+`mlb-props-regen`, `memory_observability.py` by `memory-guard-reclaimable`),
+and no reader or observable was named. **Ship the board slice alone**
+(`intelligence.py`, `home.py`, `live_projection_join.py`, `flask_frontend.py`),
+owned by `layer1-live-tier`, with its own expected effect and reader.
+
+**Two facts worth having before anyone deploys web:**
+
+- **The memory-guard change is INERT on web — verified, not assumed.** `#417`'s
+  fix is more permissive (it credits `active_file`), and web is a **2GB**
+  container with an OOM history (`#318` sampled it seconds before an oomKill).
+  But web's LIVE env has `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`,
+  `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`, `MLB_ENABLE_LIVE_LENS_LOOP=false`
+  — web does not run the loops that call `memory_headroom_snapshot`. Do not
+  re-raise this alarm without first re-reading those three keys, and DO re-raise
+  it if any of them flips to true.
+- **`blueprint_sync` has NOT applied. "On origin" != "in production."** Web's
+  live service carries **73 env keys**; `render.yaml` on origin declares **52**.
+  The web-block audit is pushed and **not live**. Commit `571f774b` ("close the
+  render.yaml push obligation — all three are on origin") is true about origin
+  and is easy to misread as the config being applied. A future sync therefore
+  carries a queued, unannounced **21-key reduction** — enumerate before it fires.
+
+**Next action:** `layer1-live-tier` confirms whether `#412`/`#413`/`#415`/`#416`
+have a web half that is not running, by diffing one served payload against what
+the artifact contains. If yes, that is the deploy, and those "VERIFIED" lines
+need amending to say which half was verified.
+
 ### `#419` — **The `props_now_available` guard has never been able to fire. Writer filesystem, reader Redis.** COMMITTED `1b9b1e39`, **NOT DEPLOYED**.
 
 **Today's user-visible symptom:** MLB top-props and ladders were empty ~25
