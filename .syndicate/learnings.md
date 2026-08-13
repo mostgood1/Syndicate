@@ -406,3 +406,38 @@ back **oldest-first regardless of `direction`**.
 - The real failure was truncation, above. A guess about a failure mode is not a
   finding; this one was wrong while the data to predict the right one was
   already in hand.
+
+### 2026-08-13 — A guard that has never once PASSED is not a guard
+
+- What we believed: `checkpoint-guard.sh` enforces the `/checkpoint`
+  obligation that `CLAUDE.md` states in the strongest terms — "if the session
+  ends without a checkpoint, the work is considered lost."
+- What was actually true, measured across every transcript in this project:
+  **27 Stop-hook deliveries, 5 sessions, `exitCode 1` on all 27. Zero exit 0.**
+  `.syndicate/.last-checkpoint` had never been created, so the pass branch at
+  line 17 was unreachable. Sessions that *did* checkpoint were told they had
+  not. And the delivered stderr is prefixed **"Failed with non-blocking status
+  code"** — exit 1 on `Stop` informs, it does not hold the session. The
+  obligation was enforced by a log line that was wrong every time it fired.
+- The rule going forward: **a guard's pass branch needs a witness too.** The
+  ledger already says "before believing a zero, produce a case that makes the
+  instrument read non-zero" — this is the same rule pointed at the other
+  branch. An alarm that has never been silent is indistinguishable from an
+  alarm wired to a constant. Check the distribution of a guard's outcomes
+  before quoting any single one: all-fire and all-pass are both evidence of
+  a broken predicate, not of a system state.
+- Corollary on denominators, third instance in this ledger: the guard counts
+  the **whole dirty worktree** (64 files at the checkpoint that found this;
+  exactly 1 was the session's). In a repo where pipeline output is
+  permanently dirty, its condition is ~always true.
+- Also: **exit code is the enforcement contract, and it differs by event.**
+  `PreToolUse` exit 2 genuinely blocked a cross-lane `Edit` in the same
+  session's testing. `Stop` exit 1 did not. Do not infer that a hook enforces
+  from the fact that it runs, exits non-zero, and prints the right words.
+- How we found out: a lane opened for no purpose but to test the enforcement,
+  with probes run through the harness and results read from `attachment`
+  records — never from running a hook in a terminal. Direct application of the
+  08-13 FORBIDDEN entry, which was written after the emitter-vs-destination
+  distinction cost an hour.
+- Cost: none yet. The exposure is every session since the hooks landed
+  believing its checkpoint state had been checked.

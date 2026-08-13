@@ -415,6 +415,115 @@
     harmlessly. Same lesson as the `learnings.md` entry it came from —
     encode the stated condition, do not let the schedule imply it.
 
+### hooks-enforcement-test — CLOSED 2026-08-13 — opened 2026-08-13 — session: hooks-test
+- OUTCOME: `lane-guard` (PreToolUse) **enforces**, measured at the destination
+  in 4 probes. `session-start` **delivers within budget** (1,243 B arrived,
+  no truncation). `checkpoint-guard` (Stop) **fires but cannot pass and does
+  not block** — 27/27 deliveries across 5 sessions at `exitCode 1`, and the
+  harness labels that "non-blocking". Two defects filed below.
+
+#### RESULTS — measured 2026-08-13, this session
+
+| probe | attempt | result |
+|---|---|---|
+| A | `Edit` own-lane file, marker set | ALLOWED — correct |
+| B | `Edit` foreign-claimed file | **BLOCKED**, exit 2, edit did not land |
+| C | `Edit` own-lane file, marker EMPTY | **BLOCKED** — marker is load-bearing |
+| D | `Write` foreign-claimed file | **BLOCKED** — matcher covers Write, not just Edit |
+| E | `Bash` heredoc to foreign-claimed file | **WROTE THROUGH** — by design; the matcher is file-tools only |
+
+- SessionStart, measured from the ARRIVING `attachment` record in this
+  session's transcript (`2e6476cd`, line 3): `hookName=SessionStart:startup`,
+  `exitCode=0`, `durationMs=1528`, **stdout 1,243 B**, no "Output too large"
+  marker. The v3 rewrite holds against the ~2KB cap that made v1 ~5%
+  functional. This is the destination-side check the 08-13 FORBIDDEN entry
+  demands, not a terminal run.
+- Probe C is the one worth remembering: with `.syndicate/.current-lane` empty
+  the guard blocks the session's **own** files, and the message reads
+  `Current lane: 'none'` — correct behaviour, confusing symptom. A session
+  that opens a lane by hand-editing `lanes.md`, or one resumed after
+  `/clear`, will hit this and look like a cross-lane collision.
+- **Probe C is not hypothetical — it has already happened.** The marker did
+  **not exist at all** before this session created it, so `none` was the repo's
+  baseline. Session `ab30bcc8` line 186 carries a real block:
+  `BLOCKED: tests/test_intelligence_state.py is claimed by OPEN lane
+  'intelligence-state-red-baseline'. Current lane: 'none'.` — a session
+  refused access to the file of the lane it was working (`#288`, the lane
+  behind the `224 passed` baseline in `state.md`). `[measured 08-13]`
+- **Closing a lane restores the failure state.** `/lane close` step 4 empties
+  the marker, and an empty marker is the same lockout as a missing one. This
+  session left it empty per the doc. Safe only because `/lane open` writes it
+  — any session that edits a claimed file before opening a lane is locked out.
+- METHOD NOTE — counting these from transcripts inflates badly. A first pass
+  matching `BLOCKED:` across all transcripts returned **11**; the hook's own
+  source and the counting scripts contain the string. Filtering to records
+  with a real `tool_result` / `is_error` payload gives **4** (3 probes here,
+  1 prior). Sibling of the substring-containment caveat already in
+  `learnings.md`.
+
+#### DEFECT 1 — `checkpoint-guard` can never take its pass branch
+- `.syndicate/.last-checkpoint` **does not exist and never has**, so
+  `[ -f "$MARKER" ]` at `checkpoint-guard.sh:17` is always false and the
+  short-circuit is unreachable. Every Stop with a dirty tree warns.
+- Measured across every transcript in this project: **27 Stop-hook deliveries,
+  5 sessions, `exitCode 1` on all 27. Zero exit 0.** Meanwhile
+  `.syndicate/log/2026-08-13.md` is 32,956 B — checkpoints ARE being written.
+  The guard has been reporting "no checkpoint" at sessions that checkpointed.
+- Second half of the defect: `DIRTY` counts the whole worktree — **65 files at
+  baseline**, mostly pipeline output and other sessions' work. Even once the
+  marker exists, a background artifact write after the checkpoint pushes
+  `NEWEST` past `MARK` and the warning returns. The predicate is ~always true,
+  so the alarm carries no information. Same shape as the `learnings.md`
+  instrument-blindness entries.
+- Fix: `/checkpoint` step 7 must actually `touch` the marker (it is in the
+  command doc and was not happening), and the guard should compare against
+  files the SESSION touched rather than the whole dirty tree.
+
+#### DEFECT 2 — the Stop guard is advisory, not a gate
+- Delivered stderr is prefixed **"Failed with non-blocking status code"**. Exit
+  1 on Stop informs; it does not hold the session. The PreToolUse guard's
+  exit 2 genuinely blocked (probe B). `CLAUDE.md` presents `/checkpoint` as an
+  obligation — "if the session ends without a checkpoint, the work is
+  considered lost" — and the enforcement behind it is a log line.
+- Fix if a gate is wanted: exit 2. Decide deliberately; a blocking Stop hook
+  that always fires (Defect 1) would wedge every session.
+
+#### DEFECT 3 — nothing enforces the concurrent-lane cap
+- `state.md` sets max concurrent OPEN lanes to **3** `[policy]`. This test
+  opened lanes 3 and 4 and no check anywhere complained. `/lane open` step 3
+  checks file collisions only; the cap is never counted.
+
+- Probe fixtures (`reports/hooks_probe/`) and the temporary
+  `hooks-probe-foreign` lane were deleted after the run. Nothing shipped;
+  no code changed.
+
+#### ORIGINAL LANE ENTRY (kept for the claim/hypothesis record)
+- Goal: prove the three wired hooks ENFORCE at the destination, not just emit
+  at the source. Named test, deliberately disposable — this lane exists to be
+  the subject of its own experiment.
+- Files (exclusive to this lane):
+  - `.claude/hooks/lane-guard.py` — subject; not guarded by itself (the guard
+    exempts `.claude/**` and `.syndicate/**`).
+  - `.claude/hooks/checkpoint-guard.sh` — subject.
+  - `.claude/hooks/session-start.sh` — subject.
+  - `reports/hooks_probe/mine.txt` — probe file, THIS lane owns it. Expected
+    ALLOW.
+  - probe file owned by the temporary foreign lane below. Expected BLOCK.
+- Hypothesis: `lane-guard.py` blocks a cross-lane edit through the harness
+  (exit 2 on a `PreToolUse` match), and permits an edit whose claiming lane
+  matches `.syndicate/.current-lane`.
+- Falsification test: if the foreign-claimed Edit SUCCEEDS, the guard is inert
+  in production regardless of what running it in a terminal shows. If the
+  own-lane Edit is BLOCKED, the `.current-lane` marker is not being read and
+  the guard is unusable (it would block every session's own work).
+- Verification: both probes attempted as real `Edit` tool calls in this
+  session, plus the SessionStart digest measured from the ARRIVING
+  `attachment` record in this session's transcript — not from a terminal run.
+  Per `learnings.md` 2026-08-13 (hook stdout cap): a terminal has no cap, so
+  it can only ever confirm the emitter.
+- Blocked by: none. No file overlap with `memory-guard-reclaimable` or
+  `mlb-props-regen`.
+
 ## CLOSED THIS SESSION
 
 ### intelligence-state-red-baseline — CLOSED 2026-08-13 — opened 2026-08-13 — session: intel-state-baseline

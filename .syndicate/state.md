@@ -115,6 +115,42 @@
 - Included pipeline/build minutes exceeded in Aug: 1,549 of 1,000.
   `[measured 08-12]`
 
+## Session harness — what the hooks actually enforce
+
+- **`lane-guard.py` (PreToolUse) enforces.** Blocks `Edit` and `Write` against
+  a file claimed by another OPEN lane (exit 2, edit does not land); allows the
+  same file when `.syndicate/.current-lane` names the claiming lane.
+  `[measured 08-13, 4 probes through the harness]`
+- **With `.current-lane` empty or missing it blocks your OWN lane's files**,
+  reporting `Current lane: 'none'`. Correct by design, confusing symptom — a
+  session that hand-edits `lanes.md` instead of running `/lane` locks itself
+  out. **The marker did not exist at all before 08-13**, so `none` was the
+  baseline, and it has already bitten once: session `ab30bcc8` was refused
+  `tests/test_intelligence_state.py`, claimed by the very lane it was working
+  (`intelligence-state-red-baseline`). `/lane close` empties the marker, which
+  restores that state — only `/lane open` clears it. `[measured 08-13]`
+- **`Bash` bypasses it entirely** — the matcher is `Edit|Write|MultiEdit|
+  NotebookEdit`. The guard bounds the file tools, not the session.
+  `[measured 08-13]`
+- **`session-start.sh` delivers 1,243 B**, `exitCode=0`, no truncation marker,
+  measured from the arriving `attachment` record (session `2e6476cd`, line 3).
+  Inside the ~2KB cap that left v1 ~5% functional. `[measured 08-13]`
+- **`checkpoint-guard.sh` (Stop) has never passed and cannot.**
+  `.syndicate/.last-checkpoint` did not exist until this session, so line 17's
+  pass branch was unreachable: **27 Stop deliveries, 5 sessions, exit 1 on all
+  27, zero exit 0** — while checkpoints were demonstrably being written.
+  `[measured 08-13]`
+- **Exit 1 on Stop is advisory.** Delivered stderr carries "Failed with
+  non-blocking status code". `/checkpoint` is documented as an obligation and
+  is enforced by a log line. A gate would need exit 2 — and must not be raised
+  to exit 2 until the always-fires defect is fixed, or it wedges every session.
+  `[measured 08-13]`
+- Its `DIRTY` count is the **whole worktree**, not the session: 64 dirty files
+  at this checkpoint, 1 of them this session's. `[measured 08-13]`
+- **The 3-lane cap in `## Config` is policy with no enforcement.** Four OPEN
+  lanes ran this session unchallenged; `/lane open` checks file collisions
+  only and never counts. `[measured 08-13]`
+
 ## Test baselines
 
 - `tests/test_intelligence_state.py` is **GREEN: 224 passed, 10 subtests
