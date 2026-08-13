@@ -758,6 +758,78 @@ Related: the board audit (six bespoke builders, five ranking paths, four
 `build_book_grid` call sites), `#329` (which replaced the HTML page and left the
 builders live).
 
+### `#414` — ROOT CAUSE FOUND. The 25-minute board build is not a leak: it re-reads and re-indexes a 57 MB odds-history shard that grows all day, up to 3x per build
+
+**`collect_candidates` degraded 7.5x in eleven hours** — measured 2026-08-12/13
+from `COLLECT_SPAN_EXIT`, every non-zero sample:
+
+    14:41-16:35   ~180-290s   rows ~297     baseline ~200s
+    18:02          341.5s     rows  631
+    19:49          804.4s     rows  511
+    20:53         1173.5s     rows  714
+    21:43         1372.2s     rows  667
+    00:49         1419.2s     rows  712
+    01:29         1508.9s     rows  533     <- 7.5x baseline, on FEWER rows
+
+**THE INPUT, MEASURED:**
+
+    mlb_source/tracking/odds_history/2026-08-12.json   57.11 MB   (today, still filling)
+                                     2026-08-11.json   57.30 MB   (a complete day)
+                                     2026-08-10.json   38.38 MB
+
+The shard accumulates ticks through the day. `_odds_history_payloads_by_sport`
+loads it every build (`intelligence_state.py:4263`), and
+`_enrich_candidates_with_odds_history` builds a per-sport index over the WHOLE
+payload (`intelligence.py:3837`) — which the board audit established runs **up to
+three times** over overlapping rows per build (`:9535`, `:9883`, `:10359`).
+
+**EVERY OBSERVATION FITS, AND THE DISCRIMINATOR IS WNBA:**
+
+    wnba  GAME_CANDIDATES_EXIT  2s -> 3s -> 4s -> 5s   at rows=12 EVERY BUILD
+
+Identical output, 2.5x the time. No slate-size confound, no row-count confound.
+MLB shows the same at larger scale (776s..1277s while rows fell 227 -> 121), and
+every sport with no meaningful odds history — nfl, soccer, nba, nhl, ncaa* —
+reads **0s throughout**. Cost tracks INPUT SIZE, not output.
+
+`anon` memory climbed 1563 -> 2241 MB inside two minutes mid-build, with a
+2676 MB spike: 57 MB of JSON parsed and indexed, three times.
+
+**~2.85x the data producing ~7.5x the time is SUPERLINEAR** — consistent with
+rebuilding an index over a growing payload rather than streaming it.
+
+**THIS RETRO-EXPLAINS TWO EARLIER TICKETS.** `#372` disabled
+`_layer2_movement_columns` because "the odds-history load (~20MB shard) stalled
+the shortlist build" — same file, same mechanism, at a THIRD of today's size.
+And `#376`'s "163 seconds in two odds-enrichment calls" was this, measured before
+the shard had grown. **Two lanes have now independently hit this and treated it
+as a local cost.**
+
+**IT IS NOT A LEAK AND MUST NOT BE FIXED AS ONE.** Nothing is retained across
+builds. The process is doing honest work on an input that doubles between lunch
+and midnight, and it resets at date rollover. Hunting allocator retention or
+adding a memory guard will find nothing — `#387`'s guard is already the wrong
+instrument for the wrong axis.
+
+**Directions, cheapest first, none implemented:**
+
+1. **Cache the index, keyed on shard mtime+size.** Rebuilt only when the file
+   changes rather than per call. Kills the 3x immediately.
+2. **Load once per build, not per enrichment call.** The three call sites are
+   `#376`'s finding and the audit's; passing one index through removes 2/3 of
+   the work with no new state.
+3. **Index incrementally.** Ticks are append-only; a full re-index of an
+   append-only file is the actual defect.
+4. **Bound what is loaded** to the window the board can display, rather than the
+   whole day.
+
+**Do NOT start with (4)** — it is the one that changes what the board can show,
+and (1)+(2) are strictly mechanical.
+
+Related: `#372` (movement disabled for this cost), `#376` (163s, same calls),
+`#387` (wrong axis), `#409` phase 3 (a checkpoint bounds restart loss and does
+nothing about this).
+
 ### `#408` — OPEN, UNOWNED. 126 of 233 board rows carry NO ranking signal. `#400` changed soccer's market type and did not change its content
 
 **Measured on the served artifact 2026-08-12T23:29:41Z**, seated `ev_pct` by sport
