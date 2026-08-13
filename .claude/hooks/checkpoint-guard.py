@@ -27,17 +27,56 @@ through Bash redirection reads as clean here, the same blind spot lane-guard
 has. Closing it means parsing shell commands, which fails open far more often
 than it catches anything.
 
+WITNESS (2026-08-13). The denominator above is this session's; the witness now
+is too. `.syndicate/.last-checkpoint` is repo-global and untracked, so on a
+tree with concurrent sessions it was answering the wrong question:
+
+  - FALSE PASS, the dangerous direction. Session A checkpoints at 15:10 and
+    touches the shared marker. Session B edited code at 15:05 and stops
+    without checkpointing. B's newest work predates the marker, so B passed
+    silently - the exact loss this hook exists to prevent, caused by another
+    session doing the right thing.
+  - FALSE WARN: a session that wrote the ledger but forgot `/checkpoint`
+    step 7 was warned anyway, and its own ledger writes were counted as
+    unpersisted work.
+
+The witness is now the newest of THIS session's signals, read from its own
+transcript: the `/checkpoint` invocation timestamp, and any `.syndicate/**`
+write by a file tool. Both are needed - ledger appends written with `cat >>`
+leave no file-tool record, and a `/checkpoint` that ran leaves a command
+record even then. The global marker is consulted ONLY when the session has no
+signal of its own, so it can no longer be satisfied by a different session.
+
+`.syndicate/**` no longer counts as work. It is the persistence, not the thing
+at risk, and counting it warned about the very writes that discharge the
+obligation.
+
 Non-blocking by design: exit 1, never 2. HOOKS.md is explicit that this warns
 and does not trap a session, and exit 2 on Stop would prevent stopping.
 Fails open: any error exits 0 and the session proceeds.
 """
-import json, os, re, subprocess, sys
+import datetime, json, os, re, subprocess, sys
 
 FILE_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
 SHELL_TOOLS = ("Bash", "PowerShell")
-LOG_RE = re.compile(r"^\.syndicate/log/[^/]+\.md$")
-LOG_HINT_RE = re.compile(r"\.syndicate/log/[^\s'\"]+\.md")
+LEDGER_PREFIX = ".syndicate/"
+LEDGER_HINT_RE = re.compile(
+    r"\.syndicate/(log/[^\s'\"]+\.md|state\.md|lanes\.md|learnings\.md|\.last-checkpoint)"
+)
+CHECKPOINT_CMD_RE = re.compile(r"<command-name>/?checkpoint</command-name>")
 MAX_LISTED = 6
+
+
+def _epoch(stamp):
+    """ISO-8601 transcript timestamp -> epoch seconds, or 0.0."""
+    if not isinstance(stamp, str):
+        return 0.0
+    try:
+        return datetime.datetime.fromisoformat(
+            stamp.replace("Z", "+00:00")
+        ).timestamp()
+    except Exception:
+        return 0.0
 
 
 def _norm(root, path):
@@ -53,38 +92,59 @@ def _norm(root, path):
 
 
 def _scan_transcript(transcript_path, root):
-    """(paths this session wrote, whether it appended to a .syndicate/log entry).
+    """(paths this session wrote, epoch of its most recent checkpoint signal).
 
-    The log flag is the second checkpoint witness. It is deliberately scoped to
-    THIS session: `.syndicate/log/<date>.md` is appended by every session, so
-    treating any recent write to it as proof would let one session's checkpoint
-    silence another's warning. In a repo with five sessions live that turns the
-    guard from always-warning into always-passing, which is the same defect
-    facing the other way.
+    The witness is deliberately scoped to THIS session and taken from the
+    TRANSCRIPT's own timestamps, never from a file's mtime. Every ledger file
+    is written by every session, so any mtime read off disk answers "did
+    somebody checkpoint", not "did I". With five sessions live that turns the
+    guard from always-warning into always-passing - the same defect facing the
+    other way, and the more dangerous direction, because the warning it
+    suppresses is the one that had something to say.
 
-    Bash/PowerShell commands are inspected for the log path only. That is not
-    general shell parsing - it is one substring test against one known
-    filename, because `/checkpoint` step 2 is normally a `cat >>` heredoc and
-    would otherwise be invisible here (this guard's own author checkpointed
-    that way).
+    Three signals count, all from this session:
+      - a `/checkpoint` invocation (a user entry carrying <command-name>);
+      - a file-tool write to `.syndicate/**`;
+      - a shell command naming a ledger file, because `/checkpoint` step 2 is
+        normally a `cat >>` heredoc and leaves no file-tool record (this
+        guard's own author checkpointed that way). That is one substring test
+        against known filenames, not general shell parsing.
     """
     touched = set()
-    wrote_log = False
+    checkpoint_ts = 0.0
     try:
         with open(transcript_path, encoding="utf-8", errors="replace") as fh:
             for line in fh:
                 line = line.strip()
-                if not line or '"tool_use"' not in line:
+                if not line:
+                    continue
+                has_tool = '"tool_use"' in line
+                has_cmd = "<command-name>" in line
+                if not has_tool and not has_cmd:
                     continue
                 try:
                     entry = json.loads(line)
                 except Exception:
                     continue
+                stamp = _epoch(entry.get("timestamp"))
                 content = (entry.get("message") or {}).get("content")
+
+                if isinstance(content, str):
+                    if CHECKPOINT_CMD_RE.search(content) and stamp > checkpoint_ts:
+                        checkpoint_ts = stamp
+                    continue
                 if not isinstance(content, list):
                     continue
+
                 for block in content:
-                    if not isinstance(block, dict) or block.get("type") != "tool_use":
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") == "text":
+                        text = block.get("text") or ""
+                        if CHECKPOINT_CMD_RE.search(text) and stamp > checkpoint_ts:
+                            checkpoint_ts = stamp
+                        continue
+                    if block.get("type") != "tool_use":
                         continue
                     name = block.get("name")
                     inp = block.get("input") or {}
@@ -95,15 +155,19 @@ def _scan_transcript(transcript_path, root):
                         rel = _norm(root, fp)
                         if rel:
                             touched.add(rel)
-                            if LOG_RE.match(rel):
-                                wrote_log = True
+                            if rel.startswith(LEDGER_PREFIX) and stamp > checkpoint_ts:
+                                checkpoint_ts = stamp
                     elif name in SHELL_TOOLS:
                         cmd = inp.get("command") or ""
-                        if isinstance(cmd, str) and LOG_HINT_RE.search(cmd.replace("\\", "/")):
-                            wrote_log = True
+                        if (
+                            isinstance(cmd, str)
+                            and LEDGER_HINT_RE.search(cmd.replace("\\", "/"))
+                            and stamp > checkpoint_ts
+                        ):
+                            checkpoint_ts = stamp
     except Exception:
-        return None, False
-    return touched, wrote_log
+        return None, 0.0
+    return touched, checkpoint_ts
 
 
 def _dirty(root):
@@ -144,7 +208,7 @@ def main():
     if not transcript or not os.path.exists(transcript):
         return 0
 
-    touched, wrote_log = _scan_transcript(transcript, root)
+    touched, checkpoint_ts = _scan_transcript(transcript, root)
     if not touched:
         return 0
 
@@ -152,39 +216,26 @@ def main():
     if dirty is None:
         return 0
 
-    mine = sorted(touched & dirty)
+    # `.syndicate/**` is the persistence, not the thing at risk. Counting it as
+    # work warned about the very writes that discharge the obligation.
+    mine = sorted(
+        p for p in (touched & dirty) if not p.startswith(LEDGER_PREFIX)
+    )
     if not mine:
-        return 0  # everything this session wrote is committed
+        return 0  # nothing at risk: committed, or ledger-only
 
-    # Baseline = the NEWER of two independent witnesses. The marker is the
-    # explicit signal; a log append by this session is the fallback, so that
-    # forgetting `/checkpoint` step 7 does not report a session that did
-    # checkpoint as having lost its work. Both absent is reported as "no
-    # baseline" rather than as a forgotten touch, because those are different
-    # facts and only one of them is the session's fault.
-    baseline = 0.0
-    witness = None
-
-    marker = os.path.join(root, ".syndicate", ".last-checkpoint")
-    if os.path.exists(marker):
-        try:
-            baseline = os.path.getmtime(marker)
-            witness = "marker"
-        except Exception:
-            baseline = 0.0
-
-    if wrote_log:
-        log_dir = os.path.join(root, ".syndicate", "log")
-        try:
-            for name in os.listdir(log_dir):
-                if not name.endswith(".md"):
-                    continue
-                m = os.path.getmtime(os.path.join(log_dir, name))
-                if m > baseline:
-                    baseline, witness = m, "log append"
-        except Exception:
-            pass
-    mark_mtime = baseline
+    # Baseline: this session's own checkpoint, from its own transcript.
+    #
+    # `.syndicate/.last-checkpoint`'s MTIME is deliberately never read. It is
+    # repo-global, so a session that has never checkpointed would be silenced
+    # by any other session touching it - and "never checkpointed with work
+    # outstanding" is the exact case this hook exists to catch. Step 7 still
+    # counts, but as a SIGNAL rather than a timestamp: the Bash `touch` naming
+    # it is matched in this session's transcript like any other ledger write.
+    # No session signal means no baseline, which warns. That is the safe
+    # direction.
+    baseline = checkpoint_ts
+    witness = "this session's checkpoint" if baseline else None
 
     newest = 0.0
     newest_file = None
@@ -196,7 +247,7 @@ def main():
         if m > newest:
             newest, newest_file = m, rel
 
-    if mark_mtime and newest and mark_mtime >= newest:
+    if baseline and newest and baseline >= newest:
         return 0
 
     shown = mine[:MAX_LISTED]
@@ -211,8 +262,9 @@ def main():
         sys.stderr.write("  ... and %d more\n" % more)
     if not baseline:
         sys.stderr.write(
-            "No baseline: no .syndicate/.last-checkpoint, and this session has not "
-            "appended to .syndicate/log/. It has never checkpointed.\n"
+            "No baseline: this session has never checkpointed. A shared "
+            ".syndicate/.last-checkpoint, if one exists, is another session's "
+            "and is not evidence about this one.\n"
         )
     elif newest_file:
         sys.stderr.write(
