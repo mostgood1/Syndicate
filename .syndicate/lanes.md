@@ -87,6 +87,39 @@
   2026-08-14 13:00 — **do not deploy this lane's changes before that read
   lands**, or the two changes become unattributable.
 - Blocked by: none for diagnosis. Deploy blocked until the `#417` read.
+- **STATUS 2026-08-13 16:2x CDT — INSTRUMENT WRITTEN, PUSHED, NOT DEPLOYED.**
+  - `7ce27100` on `origin/main`: `SLOW_ENRICH_PROFILE` splits
+    `enrich_candidate_rows` into `setup_s`/`join_s`/`post_s`/`score_s` plus
+    `accounted_s`/`unattributed_s`. **Observability only, no behaviour change.**
+    Gated at 5s (`SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS`), one line per slow game.
+  - Verified rather than assumed, four ways: **liveness** (forced slow join →
+    emits, `join_s=0.51` of `total_s=0.54`); **accounting**
+    (`accounted_s == total_s`, `unattributed_s=0.00` — no blind spot);
+    **silence** below threshold; **degraded path** (a raising join still returns
+    every row). Plus a **mutation check** — deleting the `join_s` accumulation
+    turns exactly the two attribution tests red and leaves the other 19 green,
+    so they are not toothless (`#288`'s failure mode).
+  - Two deliberate safety properties: timing locals live OUTSIDE the `try`
+    (its `except Exception` swallows and returns unenriched candidates, so
+    anything raising in there degrades the board silently), and the emit is in
+    a `finally` (three exits; a profiler covering only the happy one would
+    under-report exactly the slow calls worth seeing).
+  - **DEPLOY FOLDED INTO THE 2026-08-14 13:00 WINDOW** as Part 3 of the
+    `417-24h-read` scheduled task, gated on the `#417` read returning a
+    CONCLUSIVE verdict. If that read is INCONCLUSIVE the deploy is skipped —
+    another reboot would reset the re-warm clock and the read would never land.
+  - **Scope of that deploy depends on what happens overnight.** If
+    `deploy-419-refresh-worker` fires (00:00–05:00) the worker lands on
+    `d6188ca7` and `7ce27100` then adds **exactly one production file**
+    (`quote_enrichment.py`). If it does NOT fire, `7ce27100` also carries
+    `live_refresh_loop.py` (+107, `#419`) which belongs to `mlb-props-regen` —
+    two substantive changes, and not this lane's to bundle. The task is told
+    to check and ask rather than decide.
+  - **First useful reading is the following EVENING, not at deploy time.** The
+    line only fires on a slow game and MLB's slow builds cluster 20:49–00:45Z.
+    Silence before then is expected and is not evidence — the same mistake the
+    predecessor lane made when it read "neither instrument has emitted" as a
+    finding.
 
 ### checkpoint-witness — CLOSED 2026-08-13 — opened 2026-08-13 — session: hooks-test
 - **OUTCOME: shipped to the working tree, all three verification items met,
