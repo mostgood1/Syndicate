@@ -1754,6 +1754,34 @@ def _max_consecutive_pipeline_defers() -> int:
 	return max(1, value)
 
 
+def _max_pipeline_defer_seconds() -> int:
+	"""Wall-clock companion to _max_consecutive_pipeline_defers.
+
+	`#420`. The existing bound counts TICKS, and the docstring below claims it
+	bounds the wait -- but a tick count is only a time bound if tick spacing is
+	fixed, and it is not: the loop interval is configurable, ticks stretch
+	under load, and a tick that returns early on another gate never reaches
+	this counter at all. Measured 2026-08-13 on refresh-worker: 83 of 100 sim
+	ticks in a 75-minute window returned `intelligence_pipeline_busy`, and only
+	5 evaluations of the sim decision happened in that window -- which is the
+	count-bound working exactly as designed, and still leaving the MLB slate's
+	decision unevaluated for minutes at a stretch on a day when first pitch was
+	12:06 CDT.
+
+	Bounding on elapsed time as well makes the guarantee the docstring already
+	claims: the decision cannot go unevaluated for longer than this, no matter
+	what the tick cadence does. The headroom check below is unchanged and still
+	has the final say, so this widens WHEN a breakthrough may be attempted, not
+	whether it is safe to take.
+	"""
+	raw = str(os.environ.get("SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFER_SECONDS") or "").strip()
+	try:
+		value = int(raw or 600)
+	except ValueError:
+		value = 600
+	return max(0, value)
+
+
 def _last_pipeline_defer_state_path() -> Path:
 	return _meta_dir() / "last_mlb_sim_pipeline_defer.json"
 
@@ -1789,14 +1817,25 @@ def _sim_pipeline_deferral_reason(*, now_epoch: float, date_str: str) -> str | N
 		return None
 
 	defers = _read_pipeline_defer_count(date_str)
-	if defers < _max_consecutive_pipeline_defers():
-		_write_pipeline_defer_count(date_str, defers + 1, now_epoch)
+	stored_streak_start = _read_pipeline_defer_streak_start(date_str)
+	streak_started = now_epoch if stored_streak_start is None else stored_streak_start
+	waited_seconds = max(0.0, now_epoch - streak_started)
+	max_wait = _max_pipeline_defer_seconds()
+	# `#420`: either bound may end the wait. The count bound is the original
+	# #55 behaviour; the elapsed bound makes it a real time guarantee when tick
+	# spacing is not fixed (see _max_pipeline_defer_seconds).
+	waited_long_enough = defers >= _max_consecutive_pipeline_defers() or (
+		max_wait > 0 and waited_seconds >= max_wait
+	)
+	if not waited_long_enough:
+		_write_pipeline_defer_count(date_str, defers + 1, now_epoch, since_epoch=streak_started)
 		return "intelligence_pipeline_busy"
 
 	headroom = _mlb_sim_memory_headroom_snapshot()
 	if headroom is not None and headroom.get("sufficient"):
 		print(
 			f"[live_refresh_loop] SIM_PROCEEDING_DESPITE_BUSY_PIPELINE defers={defers} "
+			f"waited_s={int(waited_seconds)} bound={'elapsed' if defers < _max_consecutive_pipeline_defers() else 'count'} "
 			f"{json.dumps(headroom, sort_keys=True)}",
 			flush=True,
 		)
@@ -1818,12 +1857,48 @@ def _read_pipeline_defer_count(date_str: str) -> int:
 		return 0
 
 
-def _write_pipeline_defer_count(date_str: str, count: int, now_epoch: float) -> None:
+def _read_pipeline_defer_streak_start(date_str: str) -> float | None:
+	"""Epoch at which the current unbroken defer streak began, None if no streak.
+
+	`#420`. Separate reader rather than widening _read_pipeline_defer_count's
+	return type, because existing tests patch that function by name and a
+	tuple return would break them silently at the call site.
+
+	Returns None rather than 0.0 for "absent" on purpose: epoch 0.0 is a
+	legitimate value, and the caller selects with `is None`. Writing this as
+	`streak_start or now_epoch` restarted the clock on every tick whenever the
+	streak genuinely began at epoch 0 -- caught by
+	test_elapsed_bound_ends_the_wait_even_below_the_count_bound, which is
+	exactly the shape a unit test sees and production (large epochs) never
+	would.
+	"""
+	payload = read_json_file(_last_pipeline_defer_state_path())
+	if not isinstance(payload, dict) or str(payload.get("date") or "") != date_str:
+		return None
+	raw = payload.get("sinceEpoch")
+	if raw is None:
+		return None
 	try:
-		write_json_file(
-			_last_pipeline_defer_state_path(),
-			{"date": date_str, "count": int(count), "epoch": float(now_epoch), "recordedAt": _utc_now()},
-		)
+		return max(0.0, float(raw))
+	except (TypeError, ValueError):
+		return None
+
+
+def _write_pipeline_defer_count(
+	date_str: str, count: int, now_epoch: float, *, since_epoch: float | None = None
+) -> None:
+	try:
+		record: dict[str, Any] = {
+			"date": date_str,
+			"count": int(count),
+			"epoch": float(now_epoch),
+			"recordedAt": _utc_now(),
+		}
+		# Only carried while a streak is live; a reset (count=0) drops it so the
+		# next streak starts its own clock rather than inheriting the last one's.
+		if since_epoch is not None and int(count) > 0:
+			record["sinceEpoch"] = float(since_epoch)
+		write_json_file(_last_pipeline_defer_state_path(), record)
 	except Exception:
 		pass
 
