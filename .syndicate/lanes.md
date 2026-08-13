@@ -6,10 +6,156 @@
 
 ## OPEN
 
+### quote-join-enrich-cost — OPEN — opened 2026-08-13 — session: memory-guard
+- Goal: the MLB board-build's ~33s per slow game is attributed to a named
+  cause inside `enrich_block` and then cut. Testable outcome: on a comparable
+  evening slate, `SLOW_SEGMENT_PROFILE tail_s` for MLB drops below 10s with
+  `rows_walked` down by at least an order of magnitude.
+- **THE MEASUREMENT LANDED. This lane starts from data, not a hypothesis.**
+  `sim-execution-observability` handed this on CLOSED-PENDING-MEASUREMENT,
+  waiting for one evening build. It fired 2026-08-13 18:10Z on refresh-worker
+  (`03073270`), twice:
+  ```
+  18:10:24 [home] SLOW_SEGMENT_PROFILE sport=mlb total_s=33.32 rows=2
+     rows_s=0.00 tail_s=33.32 enrich_block=33.32 mlb_props_block=0.00
+     row[0]=0.00 join:by_player=15,by_teams_fallthrough=5,calls=20,
+     rows_walked=1718960
+  18:10:58 [home] SLOW_SEGMENT_PROFILE sport=mlb total_s=34.28 rows=2
+     rows_s=0.00 tail_s=34.28 enrich_block=34.27 record_rows_block=0.00
+     join:by_player=17,by_teams_fallthrough=2,calls=19,rows_walked=1
+  ```
+  Reading it against that lane's own decision rule:
+  - `tail_s` (33.32) **>>** `rows_s` (0.00) -> the cost is **post-loop**, and
+    `enrich_block=33.32` names it. The row loop is **EXONERATED** — 0.00s in
+    both samples.
+  - This confirms the retraction already in `learnings.md`: `SLOW_ROW_PROFILE`'s
+    "one pathological iteration takes 100-400s" was a span artifact. There is
+    no pathological row.
+  - `rows_walked=1718960` over `calls=20` — ~86k rows walked per call. The
+    second sample walked **1** row for a near-identical total time, which is
+    the single most interesting number here (see falsification test).
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/odds_book_quotes.py` — the join and its
+    counters. `_bump("rows_walked", len(rows))` at L1254; `_QUOTE_JOIN_STATS`
+    is per-call, not per-row (documented L1250).
+  - `syndicate/features/shared/quote_enrichment.py` — `enrich_candidate_rows`
+    at L366, the entry point the enrich block calls.
+  - `syndicate/blueprints/home.py` — `enrich_block` mark at L2872, profiler
+    emit at L2926. Segment/profiler code only.
+- NOT claimed, deliberately: `syndicate/features/intelligence.py`. It is the
+  caller (L6362) and holds the `blueprints.home` imports, but this lane does
+  not need to edit it, and `memory-guard-reclaimable` has a (never-exercised)
+  L2563-constant-only claim on it. If a fix needs that file, resolve the claim
+  first rather than editing across lanes.
+- Collision check: CLEAR. Neither OPEN lane (`memory-guard-reclaimable`,
+  `mlb-props-regen`) claims any of the three files above. The CLOSED
+  `sim-execution-observability` lane claimed two of them; this lane is the
+  continuation it handed on.
+- Hypothesis: the ~33s is a linear scan in the quote join, taken on the
+  `by_teams_fallthrough` path when the cheap `event_id` key misses.
+- **Falsification test, and it must be run FIRST.** The two samples disagree
+  with the hypothesis as stated: sample 1 walked **1,718,960** rows in 33.32s;
+  sample 2 walked **1** row in 34.28s. **Near-identical time, six orders of
+  magnitude apart in rows walked.** If `rows_walked` does not drive the time,
+  the join scan is NOT the cause and the cost is elsewhere in
+  `enrich_candidate_rows` — an I/O wait, a per-call artifact load, or a
+  network call. Do not optimise the scan until this is resolved.
+- **HAZARD — the two instruments agree EXACTLY and that is not corroboration.**
+  `SLOW_SEGMENT_PROFILE total_s=33.32` and `SLOW_GAME_CANDIDATE elapsed_s=33.32`
+  match to the hundredth in both samples. `learnings.md` ("An instrument's SPAN
+  is not its NAME") records that this exact agreement was previously read as two
+  independent measurements confirming each other when they were **the same
+  quantity measured twice**. Prove they are not reading the same clock interval
+  before citing either as independent evidence.
+- **HAZARD — `QUOTE_JOIN_STATS` returns 0 hits as a standalone token.** The
+  join counters are emitted *inside* the `SLOW_SEGMENT_PROFILE` line
+  (`join:...`), so a search for the bare token is not evidence of anything.
+  Do not read that zero as a missing instrument.
+- Architectural finding, recorded not actioned: `syndicate/features/
+  intelligence.py` imports **four** symbols from `syndicate/blueprints/home.py`
+  (`_build_sport_overview` L47, `_build_prop_dashboard_row` L48,
+  `_game_bet_candidates_from_game` L49, `_mlb_actual_payload_for_game` L6641).
+  The worker's board build therefore executes a Flask **presentation
+  blueprint**, which inverts the layering CLAUDE.md specifies. Concrete
+  consequence already observed: the `[home]` prefix makes worker cost look like
+  a web-route problem. Out of scope here; worth its own ticket.
+- Verification: a comparable evening slate shows MLB `tail_s` < 10s, with the
+  cause named in the lane before any change ships, and a before/after pair
+  taken from the SAME instrument on comparable slates.
+- Deploy exposure: refresh-worker `.py` only when it comes. No `render.yaml`.
+  NOTE: refresh-worker currently carries an OPEN `#417` measurement due
+  2026-08-14 13:00 — **do not deploy this lane's changes before that read
+  lands**, or the two changes become unattributable.
+- Blocked by: none for diagnosis. Deploy blocked until the `#417` read.
+
+### checkpoint-witness — CLOSED 2026-08-13 — opened 2026-08-13 — session: hooks-test
+- **OUTCOME: shipped to the working tree, all three verification items met,
+  5/5 cases against the LIVE file `settings.json` dispatches to.** Uncommitted.
+  - 1 PASS — session checkpointed after its work: exit 0, silent.
+  - 2 WARN — work postdates the session's own checkpoint: exit 1, names the
+    file, `witness: this session's checkpoint`.
+  - 3 WARN — **falsification met.** No signal of its own, fresh shared marker
+    (another session checkpointing): still exit 1. Under the old code this was
+    a silent pass. This is the defect that mattered.
+  - 4 PASS — step 7 via Bash `touch` is picked up as this session's signal.
+  - 5 PASS — ledger-only session: nothing at risk, silent.
+- Design changed once under test, before running: the first cut kept the
+  marker's mtime as a FALLBACK for sessions with no signal. That reinstated
+  the false pass for the single most important case — a session that has
+  NEVER checkpointed — so the mtime read was removed entirely. Step 7 is
+  honoured as an *act* seen in the transcript, not as a timestamp on disk.
+- A second session was editing this file concurrently and had independently
+  added a session-scoped log witness. Their half was kept; the two remaining
+  holes were both in the false-PASS direction (unscoped marker mtime; log
+  witness whose flag was session-scoped but whose *timestamp* was
+  `max(mtime)` over any file in `.syndicate/log/`). `Edit` reported the file
+  had changed on disk mid-lane, which is the only reason this was caught —
+  re-read, then continued on top of their structure rather than replacing it.
+- `checkpoint.md` step 7 rewritten to match: it had described mtime
+  comparison, which is no longer what happens.
+- Goal: `checkpoint-guard.py` decides on a witness derived from **this
+  session**, so (a) forgetting step 7 no longer produces a false warning and
+  (b) another session's checkpoint can no longer produce a false PASS.
+- Files (exclusive to this lane): `.claude/hooks/checkpoint-guard.py`,
+  `.claude/commands/checkpoint.md`. Neither is claimed by any other lane
+  (checked 2026-08-13 against every `###` header).
+- Predecessor: `checkpoint-guard-scope`, CLOSED-VOID — it rewrote a file that
+  had been deleted. This lane re-read the live artifact and confirmed it is
+  unchanged since `5cdf45b6` before editing.
+- The defect being fixed is **not** the one that lane chased. `5cdf45b6`
+  already scoped the denominator to the session's edited files. What remains is
+  the WITNESS: `.syndicate/.last-checkpoint` is repo-global, untracked, and
+  written by a manual step.
+  - False PASS: session A checkpoints at 15:10, touching the shared marker.
+    Session B edited code at 15:05 and stops without checkpointing. B's newest
+    work predates the marker, so B passes silently. With 3 concurrent sessions
+    this is the common case, not the corner case. **This is the dangerous
+    direction — it is the failure the guard exists to prevent.**
+  - False WARN: a session that writes the ledger but forgets step 7.
+- Fix: witness = the newest of this session's own signals, read from its own
+  transcript — the `/checkpoint` invocation timestamp and any `.syndicate/**`
+  write by a file tool. The global marker is used **only** when the session has
+  no signal of its own, so it can no longer be set by a different session.
+  `.syndicate/**` stops counting as work (it is the persistence, not the thing
+  at risk), which also removes the false warning from ledger appends.
+- Verified before coding: both signals are present in this session's transcript
+  — `/checkpoint` at `19:45:50Z` as `<command-name>/checkpoint</command-name>`,
+  and tool-written ledger edits at `19:53/19:58Z`. Bash-written appends (`cat
+  >>`) do NOT appear, which is why the command timestamp is needed as well.
+- Falsification test: construct a payload where the only witness is another
+  session's marker. The guard must WARN. If it passes, the contamination is
+  not fixed.
+- Verification (all three): (1) PASS when the session checkpointed after its
+  work; (2) WARN when only a foreign marker is newer; (3) WARN when real work
+  postdates the session's own checkpoint — run against the LIVE file that
+  `settings.json` dispatches to, with a synthetic payload on stdin.
+- Deploy exposure: none. Harness-only.
+- Blocked by: none.
+
 ### checkpoint-guard-scope — CLOSED-VOID 2026-08-13 — opened 2026-08-13 — session: hooks-test
 - **OUTCOME: no work product. The premise was already false when the lane was
   opened, and the lane edited a file that had been deleted.** Both defects it
-  set out to fix were fixed in `5b2ca320` — which was HEAD at this session's
+  set out to fix were fixed in `5cdf45b6` — which was HEAD at this session's
   start. That commit deleted `checkpoint-guard.sh`, added
   `checkpoint-guard.py`, and repointed `settings.json`. See RESULT below.
 - Goal: `checkpoint-guard.sh` fires on **this session's unpersisted work** and
@@ -20,7 +166,7 @@
   - `.claude/commands/checkpoint.md` — step 7 wording only.
 - CORRECTION to the closed `hooks-enforcement-test` lane: step 7 (`touch
   .syndicate/.last-checkpoint`) was reported missing from `checkpoint.md`.
-  **It is present and has been since `0d0b8931`.** The marker was absent
+  **It is present and has been since `f6fec4f1`.** The marker was absent
   because that commit landed 08-13; the 27 observed Stop deliveries predate
   it. The defect is not a missing instruction — it is that the pass branch
   depends on a model executing an optional-looking last step.
@@ -44,7 +190,7 @@
 - **RESULT 2026-08-13 — the lane rewrote `checkpoint-guard.sh`, which does not
   exist.** It was read at ~12:49, deleted upstream, and recreated at 14:55 by
   a `Write`. It sat untracked, invoked by nothing; `settings.json` has pointed
-  at `checkpoint-guard.py` since `5b2ca320`. Four tests were run and all four
+  at `checkpoint-guard.py` since `5cdf45b6`. Four tests were run and all four
   "passed" — against the orphan. The live hook was never executed.
   - Also mis-corrected `checkpoint.md` step 7 to describe the orphan's
     semantics (`data/**` `reports/**` `vendor/**` exclusions, log co-witness).
@@ -85,10 +231,10 @@
     `03073270` is already on `origin/main`, so nothing here depends on it.
 - **CHECKPOINT 2026-08-13 ~15:0x CDT — final for this session.**
   - Push blocker **CLEARED**: `session-start.sh` was committed by its own
-    session (`0642cdf7`/`f8bace6a`). Local `main` now **22 ahead / 6 behind**,
+    session (`0634e7bb`/`0f182961`). Local `main` now **22 ahead / 6 behind**,
     so a push needs a merge first and still carries other lanes' commits.
     Nothing in this lane depends on it — `03073270` is already on origin.
-  - Filed **`#422`** (`7b480fe4`): web is 47 commits behind, only 14 of them
+  - Filed **`#422`** (`b15fe051`): web is 47 commits behind, only 14 of them
     production, and `layer1-live-tier`'s "SHIPPED AND VERIFIED" may cover only
     the worker half. Filed as an INFERENCE with the confirming check named.
   - A blanket web deploy **FAILED `/preflight`** — 14 commits across five
@@ -231,6 +377,82 @@
   - REMAINING before this can close: the production half of Verification
     (items 2 and 3 above) is untouched. Nothing here proves the deployed
     behaviour changes; per `learnings.md` a deployed fix can be inert.
+- **STATUS 2026-08-13 12:2x CDT — PUSHED to `origin/main` as `03073270`,
+  decoupled from config. NOT DEPLOYED. Production effect still UNVERIFIED.**
+  - `/preflight` returned **FAIL** on the original candidate (`03073270` on
+    local `main`) for a reason that had nothing to do with the fix: local
+    `main` carried **four unpushed `render.yaml` commits** underneath it
+    (web env block 64 -> 52 keys). Render deploys from GitHub, so shipping
+    the fix required a push, and that push would have fired `blueprint_sync`
+    — rewriting the whole env block on all three live services. A code fix
+    would have carried an undecided production config change as a passenger.
+  - Resolved by cherry-picking onto `origin/main` in a throwaway worktree
+    (the shared tree has other sessions' uncommitted work). Verified before
+    pushing: 3 files, **zero `render.yaml` delta**, web-block key count
+    64 == 64, and `render.yaml` absent from the commit entirely. 20/20 tests
+    green on that base (13 memory_observability + 7 overview guard).
+  - **The `render.yaml` web-block audit is now unshipped and unowned.** It
+    still sits on local `main` only. It needs its own `/preflight` and its
+    own `deploys.md` row — it is a production config change, not a passenger.
+    One item for whoever takes it: `MLB_ENABLE_LIVE_LENS_LOOP: "false"` is
+    among the 12 keys being removed from web. If the code default is True,
+    removing it turns the loop ON for web rather than off — the `absent != off`
+    hazard. NOT verified by this lane.
+  - **`main` has diverged and this commit now exists twice.** `03073270`
+    (local) and `03073270` (origin) are the same change. Local `main` is 6
+    ahead / 1 behind origin. Do not `git pull` and assume a clean merge —
+    reconcile deliberately, and drop the local duplicate rather than
+    re-landing it.
+  - Deploy still gated: `scripts/check_deploy_safety.py` returned NOT CLEAR
+    twice, 12:14 and 12:2x CDT — MLB sims running back-to-back (pid 4514
+    `tip_off_window`, then pid 4718 `fingerprint_change`) plus a live odds
+    refresh, with live games in progress. Deploying kills them.
+  - **Falsifiable discriminator for the post-deploy read, stated before the
+    deploy:** the new `basis` field. `basis=unreclaimable` proves the new
+    path executed; `basis=reclaimable_cache` means it degraded to the old
+    arithmetic and any "zero aborts" reading is inert-guard-shaped and means
+    nothing. Read that BEFORE reading the abort count.
+- **STATUS 2026-08-13 ~12:5x CDT — local `main` reconciled with `origin/main`
+  (`a3f9ed97`). Push HELD by decision. Still not deployed.**
+  - Merge, not rebase. `git cherry` showed two local commits patch-equivalent
+    to origin (`03073270`≡`03073270`, `b48aa0d3`≡`b48aa0d3`); a rebase would
+    have dropped them cleanly but rewritten **seven commits belonging to other
+    sessions** working this shared checkout, and the ledger cites SHAs by
+    hand. Verified after: 0 behind / 11 ahead, `origin/main` is an ancestor,
+    all six other-session SHAs unchanged, and the merge commit is **empty
+    against its first parent** — content was already identical, only ancestry
+    changed.
+  - One conflict (`.syndicate/lanes.md`), both regions ours-only with an
+    **empty theirs side**. Resolved keep-ours; verified content-complete
+    (468 lines both sides, differing only CRLF vs LF).
+  - NEAR-MISS worth recording: the first merge attempt was aborted because
+    another session had **8 files staged in the shared index** (the
+    `.syndicate` enforcement hooks). A merge commit takes the WHOLE index, so
+    completing it would have swallowed their in-flight work. Proved the merge
+    safe in a throwaway worktree instead, and ran it only once their index
+    cleared. `learnings.md` already has the never-chain-add-and-commit rule;
+    this is the same hazard arriving through `git merge` instead.
+- **RETRACTION — the `render.yaml` hazard I raised is NOT a hazard.** This
+  lane earlier flagged `MLB_ENABLE_LIVE_LENS_LOOP: "false"` as a possible
+  `absent != off` trap in the web-block audit. Checked against the code:
+  **no Python reads that key anywhere** — it exists only in `render.yaml`, so
+  removing it from web is inert. Also cleared:
+  `WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN` defaults **False** when absent
+  (`scripts/run_refresh_worker.py:338`), `REFRESH_PREDICT_PROPS_SMART_SIM_PBP`
+  defaults **True** matching its removed value, and
+  `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` is read only by a worker script as
+  EXTRAS (absent = no extras, `scripts/fetch_mlb_oddsapi_local.py:1593`).
+  The audit's "already declared on both workers, unchanged there" claim holds.
+  Recording the retraction loudly because a false caveat about someone else's
+  work silently devalues their correct readings too.
+- **What still blocks the push is the MECHANISM, not the diff.** A
+  `blueprint_sync` writes the WHOLE env block on all three services — not the
+  diff — including live drift nobody has read, and last time it 502'd every
+  route for ~2 minutes. That restart kills an in-flight MLB sim exactly as a
+  deploy does. Decision taken: **hold the push until
+  `check_deploy_safety.py` reports CLEAR, then push and deploy in the same
+  quiet window** so the config sync and the code deploy cost one interruption
+  instead of two. Watcher `b07yqo98b` is armed, polling every 90s.
 - Discrepancy noted, does not affect the verdict: the `#417` narrative in
   `.syndicate/log/2026-08-13.md` and `todo.md` says `current_mb` fell
   "3120 -> 2705", but the 4-row table it sits beside records 2988.6 -> 2705.3.
@@ -334,6 +556,107 @@
   breakthrough rate to move when their fix lands, and do not read that as a
   result of this lane's work.
 - Blocked by: none.
+- **STATUS 2026-08-13 — HYPOTHESIS CONFIRMED, BOTH FIXES WRITTEN AND
+  COMMITTED. NOT DEPLOYED. Production effect UNVERIFIED.**
+  - `d6188ca7` (`#419`) — the root cause. `bf8833e9` (`#420`) — the tick-vs-time
+    bound, split out deliberately. `a0c5e7af` — tickets filed.
+  - Falsification test RAN and the hypothesis survived: with the disk read
+    stubbed out (pre-`#419` behaviour) the new regression test goes RED with
+    the exact production symptom
+    (`MLB_PROPS_REGEN_SKIPPED reason=no_odds_on_disk`), while the liveness test
+    stays GREEN. So the test is a discriminator, not an always-fail.
+  - `tests/test_live_refresh_loop.py` 226 passed / 13 subtests, exit 0. Seven
+    adjacent suites that import this module: 148 passed, exit 0.
+  - `#420` found a second, latent bug on the way: `streak_start or now_epoch`
+    treats a legitimate epoch `0.0` as absent and restarts the clock every
+    tick. Caught by the new elapsed-bound test — a shape unit tests see and
+    production, with large epochs, never would. Reader now returns `None` for
+    absent and the caller selects with `is None`.
+  - **What is NOT established:** that any of this changes production. The
+    verification criterion is unchanged and still outstanding — one
+    `MLB_SIM_TICK` carrying `mlbDailySim.reason = props_now_available`. That
+    string has never appeared in the logs, so absence is the baseline.
+  - **Deploy not attempted on purpose.** An MLB slate went live ~12:06 CDT and
+    a deploy kills an in-flight sim. Deploy decision belongs to the next
+    window, and `/preflight` applies. `.py` only on refresh-worker — no
+    `render.yaml`, so no `blueprint_sync` exposure.
+  - Handed on, not fixed here: today's season betting-card artifact is missing
+    (`verdict: artifact_missing`); scoped resims carry
+    `--write-season-frontend-artifacts off` and never rebuild it.
+- **STATUS 2026-08-13 12:50 CDT — `#419` IS PUSHED AND ARMED. DEPLOY PENDING
+  THE SLATE. Anyone can finish this from cold; everything needed is below.**
+  - `origin/main` is now **`d6188ca7`** — a cherry-pick of `d6188ca7` onto
+    `f6fec4f1`, containing **`#419` and nothing else**. Verified before push:
+    `render.yaml` byte-identical to origin/main (so **no `blueprint_sync`
+    exposure**), `memory_observability.py` byte-identical, `#420` excluded.
+    **CORRECTION 13:07 CDT — I read that second check wrong.** I inferred
+    "identical to origin/main" ⇒ "`#417` is NOT in it". Identical means my
+    commit did not CHANGE the file, not that the fix is absent. `03073270`
+    (`#417/#387`) was already an ancestor of `f6fec4f1`, so **`d6188ca7`
+    CONTAINS `#417`**. Consequence is benign and actually better than what I
+    claimed: refresh-worker went live on `03073270` at some point after my
+    preflight, so live→target is now measured as exactly two commits —
+    `f6fec4f1` (`.claude/` hooks/settings, inert on the server; Render runs
+    `scripts/run_refresh_worker.py`) and `#419`. **The only runtime delta is
+    `#419`**, and deploying does not revert the memory-guard lane's work.
+    Two files, +264/−7. Suite on that exact tree: 223 passed, exit 0.
+  - **Why the cherry-pick.** `/preflight` FAILED on plain `main`. Two blockers,
+    both other people's work: (1) `d6188ca7` has `03073270` (`#417/#387`) as an
+    ANCESTOR, so no commit on main carries `#419` without it — two substantive
+    changes, and `#417` moves `sufficient`, the exact gate `#420` reads;
+    (2) local main was 12 ahead of origin including **three unpushed
+    `render.yaml` commits** (`d16950b9`, `1e09fa9b`, `7c60d0f8`), which per
+    `#284` apply to production on push. User chose the cherry-pick.
+  - **STILL LOCAL AND UNPUSHED, for their owners:** `#417`/`#387`
+    (`03073270`), `#420` (`bf8833e9`), the three `render.yaml` commits, and
+    this lane's own doc commits. Expect duplicate-commit divergence on the next
+    push — it has already happened once here (`a3f9ed97`).
+  - **Deploy target is refresh-worker ONLY.** Confirmed by env, not assumed:
+    `SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER` is `true` there and `false` on
+    live-odds-worker, which matches where `MLB_SIM_TICK` actually appears.
+    (`SYNDICATE_MLB_REFRESH_TICK_OWNER=true` on live-odds governs a different
+    path — odds-refresh sport launch — do not be misled by it.)
+  - Gate at 17:45Z: `HOLD, 7 job(s) in flight`, including a live
+    `run_mlb_daily_sim_job.py`. Last first pitch 21:10 CDT, so expect CLEAR
+    ~00:15–00:30 CDT. A persistent Monitor is polling
+    `scripts/deploy_preflight.py --service refresh-worker
+    --target-commit d6188ca7 --json` every 10 min. **That monitor dies with the
+    session — re-run the gate by hand if picking this up cold.**
+  - Deploy only on `verdict: CLEAR`. Do NOT cancel a deploy once it passes
+    `build_ended`: per that script's own header, cancelling mid-update CAUSES a
+    restart rather than avoiding one.
+  - **Verification (the whole point).** One `MLB_SIM_TICK` carrying
+    `mlbDailySim.reason = props_now_available` on refresh-worker within one
+    3600s cooldown of prop odds landing (measured median 02:02 CDT, `#421`).
+    **That string has never appeared in the logs**, so absence is the
+    established baseline and a single occurrence is a clean positive. Also
+    expect `MLB_PROPS_REGEN_DUE`; `MLB_PROPS_REGEN_SKIPPED reason=no_odds_on_disk`
+    appearing *after* odds are on disk would mean the fix did not take.
+  - Rollback: redeploy `448e1816` on refresh-worker, or revert `d6188ca7`.
+  - **A DURABLE scheduled task now owns this deploy**, so it no longer depends
+    on a session staying alive: `deploy-419-refresh-worker`, at
+    `C:\Users\tempadmin\.claude\scheduled-tasks\deploy-419-refresh-worker\SKILL.md`,
+    firing every 20 min between 00:00–04:59 local. It is self-limiting: exits
+    silently on `HOLD`, exits and deletes itself once `d6188ca7` is live,
+    deploys at most once, never pushes, never touches `render.yaml`, and
+    notifies only on a real outcome. **If you deploy this by hand, delete that
+    task** or it will keep firing tomorrow night.
+  - Known gap in that mechanism: scheduled tasks only run while the desktop app
+    is open; if it is closed at the fire time the run happens at next launch.
+    So "durable" means "survives the session", not "survives the app being
+    shut all night".
+  - **Second known gap, and it needed a fix: first-run tool approvals.** The
+    task has never run, so its Bash/curl/notification permissions are not yet
+    stored. If it pauses on a prompt at 00:03 with nobody watching, nothing
+    deploys and no ping arrives. The obvious remedy — click "Run now" to
+    pre-approve — was itself unsafe as originally written, because the task
+    relied on its **cron window** to mean "after the slate" and a manual run
+    bypasses the schedule. At 13:07 the job gate read `CLEAR` mid-slate, so
+    Run now would have deployed into live games. Fixed by making the slate
+    condition an explicit **Step 0** inside the prompt (`date +%H` must be
+    00–04, checked before anything else), so a manual run now stops
+    harmlessly. Same lesson as the `learnings.md` entry it came from —
+    encode the stated condition, do not let the schedule imply it.
 
 ### hooks-enforcement-test — CLOSED 2026-08-13 — opened 2026-08-13 — session: hooks-test
 - OUTCOME: `lane-guard` (PreToolUse) **enforces**, measured at the destination
@@ -445,6 +768,151 @@
   `mlb-props-regen`.
 
 ## CLOSED THIS SESSION
+
+### intelligence-state-red-baseline — CLOSED 2026-08-13 — opened 2026-08-13 — session: intel-state-baseline
+- OUTCOME: `tests/test_intelligence_state.py` goes `4 failed / 220 passed` ->
+  **`224 passed, 0 failed`**, all four repaired in the TEST with zero source
+  changes, two of them proven load-bearing by source mutation. Verification
+  items 1-3 all ran; results are in the STATUS block at the end of this lane.
+- Goal: `tests/test_intelligence_state.py` is GREEN on a clean checkout, so a
+  session working `#417`/`#338` in `pipeline/intelligence_state.py` can tell its
+  own regression from standing noise. Testable outcome: 224 passed / 0 failed
+  (baseline measured 2026-08-13: **4 failed, 220 passed, 10 subtests, 891s**).
+- Files (exclusive to this lane):
+  - `tests/test_intelligence_state.py` — **test-only lane.** All four failures
+    are defects in the TEST, not in `pipeline/intelligence_state.py`; see the
+    per-test findings below. If any of them turns out to need a source change,
+    this lane STOPS and coordinates first.
+- NOT touched, deliberately: `pipeline/intelligence_state.py`,
+  `syndicate/blueprints/intelligence.py`,
+  `syndicate/features/shared/refresh_state_store.py`. Each of the four failures
+  is a case of production code being *right* and the test having rotted around
+  it. Changing any of them to make a test green would be the exact inversion
+  this lane exists to prevent.
+- **Collision check against `memory-guard-reclaimable`: CLEAR.** That lane
+  claims `pipeline/intelligence_state.py` (L3189 constant only) and
+  `tests/test_memory_observability.py`. This lane claims neither. It does NOT
+  claim `tests/test_intelligence_state.py` — its own STATUS note records
+  running 25 memory/headroom tests from this file as a read-only consumer
+  sweep, which is a read, not a claim. Flagged anyway: if that lane's
+  `memory_headroom_snapshot` change lands while this lane is open, the
+  memory-guard tests in THIS file may move. That is their change, not this
+  lane's, and this lane must not "fix" it.
+- Hypothesis (recorded before fixing — all four now CONFIRMED by traceback):
+  each failure is an independent rot, with no common cause and nothing
+  implicating the module under test.
+  1. `test_read_latest_response_syncs_shared_backend_state` — **stale fake.**
+     Its inline `FakeClient.set` is `lambda self, key, value`, but
+     `refresh_state_store.write_json_file` has called `client.set(..., ex=ttl)`
+     since `50a093b9` (2026-07-31, keyvalue TTL). `TypeError: unexpected
+     keyword argument 'ex'`. The real fake in
+     `tests/test_refresh_state_store.py:26` already takes `ex`; this one was
+     missed. Production code is correct.
+  2. `test_background_loop_survives_board_window_watch_exception` — **premise
+     overturned.** Asserts `_latest_key == queued_key` for a payload carrying
+     `sport: "mlb"`. `intelligence_state.py:5178-5183` now deliberately
+     refuses to promote a sport-scoped payload to `_latest_key`
+     (`LATEST_KEY_PROMOTION_SKIPPED_SPORT_SCOPED`, emitted in the failing run)
+     because `_latest_key` drives the fallback-free `BOARD_SNAPSHOT_PATH`
+     write and a one-sport board must never become "the board". The new
+     behaviour already has its own test at line 1739
+     (`test_background_loop_never_promotes_a_sport_scoped_payload_to_latest_key`).
+     This test simply predates it.
+  3. `test_query_endpoint_default_unchanged_when_combined_flag_disabled` —
+     **date rot.** Fixture `selected_date` is hardcoded `2026-07-27` and the
+     request is the dateless default question, which
+     `_normalize_default_query_payload` stamps with today. 17 days apart, so
+     `_response_needs_refresh` rejects it on date mismatch and
+     `_stale_within_threshold(max_age_days=2)` refuses it as a stale fallback
+     — leaving `_empty_default_intelligence_response()`. That cascade is
+     deliberate and commented. The test passed the week it was written and
+     could not pass after 2026-07-29.
+  4. `test_build_candidate_pool_does_not_embed_full_odds_history_payload` —
+     **not hermetic; the exact `#288` defect, second instance.** It patches
+     `syndicate.features.intelligence.collect_all_recommendations`, which
+     `pipeline/intelligence_state.py` never references — so the patch is a
+     no-op and the candidates come from real git-tracked mirror data under
+     `data/mlb_source/.../2026-06-10/`. That date is now two months past, so
+     every one of the 32 scored candidates trips `_candidate_is_final` and is
+     dropped (`candidate_scoring input_count=32 output_count=0
+     final_filtered=32`), `candidate_pools` skips MLB via `if not
+     sport_candidates: continue`, and `pool["candidate_pools"]["mlb"]`
+     KeyErrors. The comment at line 3374 records that its sibling
+     `test_build_candidate_pool_skips_sports_without_manifests` was REMOVED
+     under `#288` for this identical defect; this one survived that pass.
+- Falsification test: if a failure is a real defect in
+  `pipeline/intelligence_state.py`, then the production path it exercises is
+  wrong and the fix belongs in source. Discriminator applied to each: does the
+  current source behaviour have (a) an explicit comment stating the intent,
+  and (b) a separate test pinning it? For 2 and 3 both hold. For 1 the
+  changed call is in a different module with its own correct fake. For 4 the
+  patched symbol is provably not referenced by the module under test —
+  `grep collect_all_recommendations pipeline/intelligence_state.py` is empty.
+  Nothing survived as a source defect.
+- HAZARD — test 4 must not be made green by relaxing it. Its live assertions
+  are `assertNotIn("odds_history", mlb_pool)` / `assertIn(
+  "odds_history_shard_key", mlb_pool)` — the pointer-not-payload contract that
+  was the dominant memory driver before `#288`. The `mocked_loader.call_count
+  == 2` assertion **already passes against a completely empty pool**, so it
+  proves nothing on its own. The rewrite must be verified by MUTATION:
+  re-embed `odds_history` in the pool dict and confirm the test goes red.
+  Making it pass without that check would leave a second toothless test where
+  `#288` removed the first.
+- HAZARD — the `#288` comment at line 3374 says "DO NOT restore it by updating
+  the expected constant". The same rule binds here: test 4 is repaired by
+  removing its dependence on `data/`, not by re-tuning a fixture date until
+  the mirror happens to agree.
+- Verification (all three required):
+  1. Each of the four fails before its own fix and passes after — run
+     individually, not only as part of the file.
+  2. Mutation checks against SOURCE, both required: re-embed `odds_history`
+     on the per-sport pool entry and the rewritten test 4 (the pool test) must
+     go red; remove the sport-scoped promotion skip and the rewritten test on
+     `_latest_key` must go red.
+  3. Full file green: `python -m pytest tests/test_intelligence_state.py`
+     back to 0 failed, with the passing count going 220 -> 224 and no test
+     deleted or skipped.
+- Deploy: none. Test-only change, no production behaviour touched, no
+  `render.yaml`. Nothing to gate.
+- Blocked by: none.
+- **STATUS 2026-08-13 — ALL THREE VERIFICATION ITEMS MET. Lane complete.**
+  - (1) The four run individually: `4 passed in 35.34s`, against
+    `4 failed in 44.25s` on the same four before the change.
+  - (2) MUTATION CHECKS PASSED, run in a throwaway detached worktree at HEAD
+    (`C:/tmp/isrb-mut`) so `pipeline/intelligence_state.py` was never edited in
+    the shared tree — that file is claimed by `memory-guard-reclaimable`.
+    Two source mutations applied at once (they hit different tests):
+    - re-embedded `"odds_history": {...}` beside `odds_history_shard_key` in
+      the per-sport pool dict -> `test_build_candidate_pool_does_not_embed_
+      full_odds_history_payload` FAILED with `AssertionError: 'odds_history'
+      unexpectedly found in {...}`. Right test, right reason.
+    - replaced `if effective_sport != "all":` with `if False:` ->
+      `test_background_loop_survives_board_window_watch_exception` FAILED with
+      `'e7557377...' is not None`. Right test, right reason.
+    - The mutation output ALSO settles the toothlessness worry directly: the
+      failing dict printed `'candidate_count': 1` with a fully-populated
+      `candidates` list, so the repaired test is inspecting a real pool, not
+      an empty one.
+  - (3) Full file: **`224 passed, 10 subtests passed in 901.58s`, 0 failed** —
+    against the recorded baseline `4 failed, 220 passed, 10 subtests passed in
+    891.33s`. 220 -> 224, nothing deleted, nothing skipped, no `@skip` or
+    `xfail` added.
+  - Diff is `tests/test_intelligence_state.py` ONLY. Zero source files touched.
+    Net assertion change: +4 added (`candidate_count == 1`, `"mlb" in
+    candidate_pools`, `mlb_pool["candidate_count"] == 1`, and the inverted
+    `_latest_key`), 1 inverted, 0 removed.
+  - NOTE on the full-file number's provenance: this run is against
+    `841228d9`, not the `b48aa0d3` the brief cited — `memory-guard-reclaimable`
+    landed `03073270` (`memory_observability.py`, the `#417` unreclaimable-memory
+    guard) in between. That is the interaction this lane flagged when it
+    opened, and it turned out benign: the memory/headroom tests in this file
+    are green on the new formula. `pipeline/intelligence_state.py` and
+    `tests/test_intelligence_state.py` are byte-identical across
+    `007f75b6..841228d9`, so the four diagnoses are unaffected by the move.
+  - Housekeeping left behind: `C:/tmp/isrb-mut` is out of `git worktree list`
+    and empty, but the directory itself would not delete (a lingering handle).
+    Harmless; delete it if it is still there next session.
+
 
 ### render-yaml-web-block-hygiene — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
 - Recorded after the fact. The originating task carried an explicit "do not open
@@ -636,5 +1104,5 @@ than have every session quietly decide it is.
   delivers 1,243 B inside the ~2KB cap (v1 delivered ~5%); `lane-guard.py`
   rewritten to parse the real lanes.md shape and confirmed blocking through
   the harness; `checkpoint-guard.py` replaces the `.sh` and can now pass.
-- Commits: `0d0b8931`, `0642cdf7`, `5b2ca320`. Pushed: `f6fec4f1` only.
+- Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
