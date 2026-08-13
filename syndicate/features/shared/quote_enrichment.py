@@ -37,7 +37,9 @@ is the opposite of informative. Rows without a quote keep their original
 
 from __future__ import annotations
 
+import os
 import re
+import time
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -363,6 +365,67 @@ _FLAT_QUOTE_FIELDS = (
 )
 
 
+def _emit_enrich_profile(
+    *,
+    sport_slug: str,
+    candidate_count: int,
+    join_calls: int,
+    quoted: int,
+    setup_s: float,
+    join_s: float,
+    post_s: float,
+    score_s: float,
+    total_s: float,
+) -> None:
+    """One line per SLOW `enrich_candidate_rows` call. Splits the segment that
+    `SLOW_SEGMENT_PROFILE` could only name as a single `enrich_block`.
+
+    `#414` lane `quote-join-enrich-cost`. The outer profiler measured
+    `enrich_block=33.32` of a `total_s=33.32` and could go no further, so the
+    33s had no owner inside this function.
+
+    SEGMENTS, each named for the work it CONTAINS:
+      `setup_s` -- import, `_game_date`, `_team_names`. Once per call, before
+                   the loop.
+      `join_s`  -- `quote_ref_for_bet` ONLY, summed across candidates. This is
+                   the suspected cost and the reason the line exists.
+      `post_s`  -- flat-field copy, both `_implied_probability` calls, and the
+                   `#231`/`#238` edge math. EXCLUDES `_attach_board_score`.
+      `score_s` -- `_attach_board_score` only.
+
+    `unattributed_s` is `total_s` minus the four segments and is emitted
+    DELIBERATELY. `learnings.md` ("An instrument's SPAN is not its NAME")
+    records a profiler whose closing mark silently absorbed a whole post-loop
+    tail. If time is going somewhere unmarked, this field is where it shows up
+    — a large `unattributed_s` means read the code, not the segments.
+
+    Note `join_calls` counts candidates that REACHED the join; candidates
+    skipped by the `already has a quote` guard are in `candidate_count` but not
+    in `join_calls`. Divide by `join_calls`, never by `candidate_count`.
+    """
+    try:
+        threshold = float(os.environ.get("SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS") or 5)
+    except Exception:
+        threshold = 5.0
+    if total_s < threshold:
+        return
+    try:
+        accounted = setup_s + join_s + post_s + score_s
+        per_call = (join_s / join_calls) if join_calls else 0.0
+        print(
+            f"[quote_enrichment] SLOW_ENRICH_PROFILE sport={sport_slug or '?'} "
+            f"total_s={total_s:.2f} setup_s={setup_s:.2f} join_s={join_s:.2f} "
+            f"post_s={post_s:.2f} score_s={score_s:.2f} "
+            f"accounted_s={accounted:.2f} unattributed_s={total_s - accounted:.2f} "
+            f"candidates={candidate_count} join_calls={join_calls} quoted={quoted} "
+            f"join_s_per_call={per_call:.4f}",
+            flush=True,
+        )
+    except Exception:
+        # An instrument must never be able to break the thing it measures.
+        return
+
+
 def enrich_candidate_rows(
     game: Mapping[str, Any],
     candidates: list[dict[str, Any]],
@@ -385,6 +448,12 @@ def enrich_candidate_rows(
     """
     if not candidates:
         return candidates
+    # Timing locals live OUTSIDE the try on purpose: the `except Exception`
+    # below swallows everything and returns unenriched candidates, so anything
+    # that can raise in here would degrade production silently.
+    _t_start = time.perf_counter()
+    _setup_s = _join_s = _post_s = _score_s = 0.0
+    _join_calls = _quoted = 0
     try:
         from syndicate.features.shared.odds_book_quotes import quote_ref_for_bet
 
@@ -394,10 +463,12 @@ def enrich_candidate_rows(
         now = now or datetime.now(timezone.utc)
         event_id = game.get("event_id") or game.get("gamePk") or game.get("game_pk")
         home_team, away_team, matchup = _team_names(game)
+        _setup_s = time.perf_counter() - _t_start
 
         for candidate in candidates:
             if not isinstance(candidate, dict) or candidate.get("quote"):
                 continue
+            _t_join = time.perf_counter()
             quote = quote_ref_for_bet(
                 sport=sport_slug,
                 date_str=date_str,
@@ -413,8 +484,12 @@ def enrich_candidate_rows(
                 matchup=matchup,
                 now=now,
             )
+            _join_s += time.perf_counter() - _t_join
+            _join_calls += 1
             if not quote:
                 continue
+            _quoted += 1
+            _t_post = time.perf_counter()
             candidate["quote"] = quote
             for flat_key, quote_key in _FLAT_QUOTE_FIELDS:
                 candidate[flat_key] = quote.get(quote_key)
@@ -458,11 +533,30 @@ def enrich_candidate_rows(
                 candidate["edge"] = f"{edge_value:.1f}%"
                 candidate["edge_priced_against"] = "vigged_best_price"
                 candidate["ev_priced_against"] = quote.get("best_bookmaker")
+            _post_s += time.perf_counter() - _t_post
             # Scored LAST on this path: the sim component reads
             # `model_edge_pct`, which the block above has only just written.
+            _t_score = time.perf_counter()
             _attach_board_score(candidate, quote)
+            _score_s += time.perf_counter() - _t_score
     except Exception:
         return candidates
+    finally:
+        # `finally`, not a line before each `return`: this function has three
+        # exits (the no-date guard, the exception swallow, the normal path) and
+        # a profiler that only covers the happy one would under-report exactly
+        # the slow, broken calls worth seeing.
+        _emit_enrich_profile(
+            sport_slug=sport_slug,
+            candidate_count=len(candidates),
+            join_calls=_join_calls,
+            quoted=_quoted,
+            setup_s=_setup_s,
+            join_s=_join_s,
+            post_s=_post_s,
+            score_s=_score_s,
+            total_s=time.perf_counter() - _t_start,
+        )
     return candidates
 
 
