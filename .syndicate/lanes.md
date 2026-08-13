@@ -482,6 +482,18 @@
     expect `MLB_PROPS_REGEN_DUE`; `MLB_PROPS_REGEN_SKIPPED reason=no_odds_on_disk`
     appearing *after* odds are on disk would mean the fix did not take.
   - Rollback: redeploy `448e1816` on refresh-worker, or revert `d6188ca7`.
+  - **A DURABLE scheduled task now owns this deploy**, so it no longer depends
+    on a session staying alive: `deploy-419-refresh-worker`, at
+    `C:\Users\tempadmin\.claude\scheduled-tasks\deploy-419-refresh-worker\SKILL.md`,
+    firing every 20 min between 00:00–04:59 local. It is self-limiting: exits
+    silently on `HOLD`, exits and deletes itself once `d6188ca7` is live,
+    deploys at most once, never pushes, never touches `render.yaml`, and
+    notifies only on a real outcome. **If you deploy this by hand, delete that
+    task** or it will keep firing tomorrow night.
+  - Known gap in that mechanism: scheduled tasks only run while the desktop app
+    is open; if it is closed at the fire time the run happens at next launch.
+    So "durable" means "survives the session", not "survives the app being
+    shut all night".
 
 ## CLOSED THIS SESSION
 
