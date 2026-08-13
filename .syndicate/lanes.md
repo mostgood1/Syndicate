@@ -87,6 +87,51 @@
   2026-08-14 13:00 — **do not deploy this lane's changes before that read
   lands**, or the two changes become unattributable.
 - Blocked by: none for diagnosis. Deploy blocked until the `#417` read.
+- **STATUS 2026-08-13 16:4x CDT — HYPOTHESIS CONFIRMED, NOT FALSIFIED. THE
+  FALSIFICATION TEST ABOVE RESTED ON MY OWN TRUNCATION ARTIFACT. Read this
+  before acting on anything earlier in this lane.**
+  - **RETRACTED: "sample 2 walked 1 row in 34.28s".** That was never in the
+    data. The log line is **216 characters** and the printout that produced it
+    cut at **210**, turning `rows_walked=1633012` into `rows_walked=1`. The
+    "six orders of magnitude apart for identical time" paradox — the entire
+    stated reason to distrust the join-scan hypothesis — was an artifact of my
+    own display code, not a property of the system.
+  - **Eight samples, pulled untruncated 2026-08-13 16:4x from the already-
+    deployed profiler.** No new deploy was needed to get them.
+    ```
+    time      total_s   rows_walked  calls  rows/call  s/call  s per 1M rows
+    18:07:20    54.17     5,143,272     62     82,956   0.874         10.53
+    18:07:59    38.39     2,073,900     25     82,956   1.536         18.51
+    18:08:20    21.22     1,161,384     14     82,956   1.516         18.27
+    18:08:44    24.11     1,327,296     16     82,956   1.507         18.16
+    18:09:19    34.59     1,704,000     20     85,200   1.730         20.30
+    18:09:50    31.72     1,718,960     20     85,948   1.586         18.45
+    18:10:24    33.32     1,718,960     20     85,948   1.666         19.38
+    18:10:58    34.28     1,633,012     19     85,948   1.804         20.99
+    ```
+  - **`rows_walked` per call is essentially CONSTANT: 82,956 – 85,948.** Every
+    call walks the same ~83k rows. Linear fit of `total_s` on `rows_walked`,
+    excluding the 5.1M sample: **19.86 s per million rows, intercept −1.07s,
+    R² = 0.918.** Near-zero intercept and near-perfect proportionality — the
+    time IS the scan. Hypothesis CONFIRMED.
+  - **And it is sharper than the lane predicted.** The lane expected the cost
+    on the `by_teams_fallthrough` path when the cheap `event_id` key misses.
+    It is not: `by_player` resolves 15–17 of ~20 calls and those calls STILL
+    walk ~83k rows. **The scan is unconditional** — a successful join costs the
+    same as a failed one. Fixing the fallthrough would have changed nothing.
+  - Cost model: ~83k rows/call × ~20s per million ≈ **1.6s per call**, and a
+    game makes 14–62 calls, which reproduces the observed 21–54s.
+  - One sample resists the model: 18:07:20 is **10.53** s/M against ~18–21 for
+    the other seven, and it is the largest (5.1M rows, 62 calls). Cheaper per
+    row at higher volume suggests an amortised per-call cost (shard load, cache
+    warm). Recorded rather than explained away — it is the one point that would
+    move the fix's expected payoff.
+  - **Fix direction:** index the quote log by join key instead of scanning it
+    per candidate. Not a micro-optimisation of the scan.
+  - The `SLOW_ENRICH_PROFILE` deploy is still worth doing — it separates
+    `join_s` from `post_s`/`score_s` definitively and gives `join_s_per_call`
+    directly — but it is now CONFIRMATION of a known answer, not the discovery
+    step. Do not let its absence block the fix.
 - **STATUS 2026-08-13 16:2x CDT — INSTRUMENT WRITTEN, PUSHED, NOT DEPLOYED.**
   - `7ce27100` on `origin/main`: `SLOW_ENRICH_PROFILE` splits
     `enrich_candidate_rows` into `setup_s`/`join_s`/`post_s`/`score_s` plus
