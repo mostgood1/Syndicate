@@ -68,47 +68,68 @@ cannot be recreated, expire what can.**
 
 **NOT ENABLED.** `SYNDICATE_ARTIFACT_RETENTION_ENABLED` unset; dry-run.
 
-### `#393` — OPEN, UNOWNED, HANDED OFF. A completed L2 build does not reach the served shortlist — three plausible causes eliminated, cause still unknown
+### `#393` — CLOSED, ROOT-CAUSED, NO CODE CHANGE. The L2 shortlist was starving because refresh-worker restarts kept killing a 23-minute build
 
-**Symptom, reported by the session that shipped `#391`/`#392`** (both live on
-`c07b6441`, both unverified): a board build ran at **19:53:28Z** with a healthy
-`sports=8` overview and raised nothing, but the **served shortlist is still the
-19:09:47Z artifact, without the new keys.** Something sits between a completed
-build and the published artifact.
+**The reported symptom** (market-board lane, ~22:00Z): a board build completed
+with a healthy `sports=8` overview and raised nothing, but the served shortlist
+stayed at an artifact 46+ minutes old against a 900s floor.
 
-**This entry exists so the next person does not re-run the three checks I already
-ran.** I did not find the cause. What I did establish, with evidence:
+**MEASURED 2026-08-13 00:04Z — the symptom no longer reproduces:**
 
-1. **NOT `#359`.** The persisted live-lens publish watermark is live:
-   `git merge-base --is-ancestor d970aec2 c07b6441` -> yes, and the deployed blob
-   contains `live_lens_publish_watermark` (6 hits). The shape matches `#359`
-   exactly — a completed build whose artifact never reaches the served path —
-   but that specific fix is running.
-2. **NOT the hot-artifact allowlist.** `reports/intelligence/layer2_shortlist_*.json`
-   matches **none of the 97 `HOT_ARTIFACT_PATTERNS`** (tested by fnmatch), which
-   looks damning and is a red herring: the shortlist does not use that path at
-   all. `write_layer2_shortlist` goes through `refresh_state_store.write_json_file`,
-   and `_keyvalue_backed` excludes only `migration_runs/`, so the artifact
-   crosses the service boundary via the keyvalue store. Read and write route
-   through the same predicate by design, so they cannot disagree.
-3. **NO oversized-payload refusal found.** `KEYVALUE_WRITE_REJECTED`,
-   `LAYER2_SHORTLIST_WRITE_FAILED` and `LAYER2_SHORTLIST_FAILED` all returned
-   zero hits on refresh-worker for 18:30Z–21:00Z. This was the best hypothesis —
-   a refused write leaves web serving the last good copy, which is exactly a
-   shortlist frozen at a timestamp.
+    asked=2026-08-12 (central today)  written_at=2026-08-13T00:01:59Z  age=2 min    rows=200
+    asked=2026-08-13 (tomorrow)       written_at=2026-08-12T17:29:06Z  age=395 min  rows=200
 
-**THE CAVEAT THAT MATTERS, and the first thing to check.** Result 3 is a null on
-**refresh-worker only**, and `start_intelligence_state_background_loop` is
-started from **both** `syndicate/app.py:335` (web) and
-`run_refresh_worker.py:2958` (worker). Ownership is an env flag that moves with
-no code diff. **If web owns the loop, I searched the wrong service and result 3
-proves nothing.** Read each service's live env-vars before trusting it — and
-note the window was 2.5h, not all day.
+**Read the date you asked for.** My own first reading said "394 minutes stale"
+because I queried *tomorrow*. Tomorrow's shortlist is written once by a
+look-ahead pass and not rebuilt, which is correct. The board date's shortlist
+was 2 minutes old.
 
-**Next cheapest step:** establish which service actually wrote the 19:09:47Z
-shortlist, then re-run check 3 against that service. A `written_at` of 19:09:47Z
-against a build at 19:53:28Z means the write either never fired or was refused;
-which of those it is decides everything downstream.
+**CAUSE, from the completion cadence:**
+
+    21:48:50 -> 22:02:37 -> 22:04:57 -> 22:52:30 -> 22:57:02 -> 23:29:41 -> 00:01:59
+    gaps:      13.8   2.3       47.6       4.5       32.7       32.3   min
+
+The 47.6-minute hole is the reported window. `collect_candidates` measures
+**1372s (~23 min)** and refresh-worker took **three restarts inside 25 minutes**
+(one of them mine), so no build survived to write. Once the deploy freeze let
+one complete at 22:52:30, shortlists resumed at roughly the build cadence.
+
+**So the symptom was deploy churn starving a long in-process build — not a
+publish defect, not a write failure, not a stale artifact path.** No code
+change. The fix is the deploy discipline already recorded in Operational notes:
+a build is in flight while the newest `BUILD_SPAN_ENTER` is more recent than the
+newest `LAYER2_SHORTLIST`, and a restart then wastes ~23 minutes of work that is
+**invisible to the sim check**, because the build runs in-process. Three lanes
+converged on that check independently the same night.
+
+**THE THREE HYPOTHESES ELIMINATED EARLIER WERE ALL CORRECTLY ELIMINATED**, and
+the one caveat on them now resolves in favour of the original result:
+
+1. NOT `#359` — the persisted publish watermark is live (`d970aec2` is an
+   ancestor of the deployed commit, and the blob contains it).
+2. NOT the hot-artifact allowlist — `layer2_shortlist_*.json` matches none of
+   the 97 patterns, which looks damning and is a red herring: the shortlist
+   crosses via the keyvalue store, not that path.
+3. NO oversized-payload refusal — `KEYVALUE_WRITE_REJECTED`,
+   `LAYER2_SHORTLIST_WRITE_FAILED`, `LAYER2_SHORTLIST_FAILED` all zero. **I had
+   flagged that this was measured on refresh-worker only and might be the wrong
+   service.** It is the right one: `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP`
+   is `true` on refresh-worker and `false` on web and live-odds-worker.
+
+**A FOURTH HYPOTHESIS I FORMED AND KILLED BEFORE ACTING ON IT**, recorded
+because it is the shape a plausible wrong fix would have taken.
+`SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE` is **true on web** and **false on
+refresh-worker**, which reads like the classic split: the reader prefers a
+canonical board state the writer never writes. Reading
+`board_layer2_shortlist_api` shows the opposite — it takes the standalone
+artifact FIRST and uses board state only as a fallback, with a comment saying
+exactly why (`#310`-era measurement: the canonical state is never written). A
+flag mismatch that *looks* causal is not causal, and the endpoint said so in
+writing.
+
+**Left open deliberately:** nothing here explains why `collect_candidates` takes
+23 minutes. That is a real cost — it is what makes restart churn so expensive —
+and it is unowned. Closing `#393` closes the *staleness*, not the build time.
 
 ### `#388` — FIXED, DEPLOYED, AND CONFIRMED IN PRODUCTION (with one regression found and fixed the same night). Half of all MLB sims were killed by deploys, and the run ledger recorded nothing — every completed run read `exit_code: 0`
 
