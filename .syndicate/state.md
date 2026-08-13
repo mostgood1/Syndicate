@@ -197,7 +197,31 @@
   failure (it counted `NO LANE WAS EVER OPENED` as open). Neither strictness
   is right: the fix is `OPEN` against the status field only, which
   accepts `DEPLOYED, MEASUREMENT OPEN` and rejects `OPENED`/`REOPENED`.
-  **Not yet applied.** `[measured 08-13]`
+  **FIXED in `363743d0`** — both hooks now take the field between the 1st
+  and 2nd em-dash and match the WORD `OPEN` in it. Both agree on the same
+  set, which they did not before. `[measured 08-13]`
+- **`lane-guard` is blind to `.claude/**` by design** — `rel.startswith(".claude")`
+  returns 0 before any lane is consulted, so the enforcement layer cannot
+  protect the directory it lives in. Every real collision today happened
+  there. **Three sessions worked `.claude/**` with no lane on 08-13** (ops-kit
+  11:00, hooks-enforcement 12:18, hooks-test 14:5x), each deciding
+  independently that harness work is exempt. The protocol does not say it is.
+  `[measured 08-13]`
+- **`.syndicate/.current-lane` is ONE file shared by every session.** It named
+  `checkpoint-guard-scope` — another session's lane — during this session's
+  run. So `lane-guard` identifies whoever opened a lane most recently, not
+  you: it can block your own edits AND fail to block a foreign session,
+  depending on who ran `/lane open` last. It cannot do its job with more than
+  one session live, and 5 were. `[measured 08-13]`
+- **A lane's guard state hangs on ONE header line in a hand-edited shared
+  file, and its deletion is silent.** At 14:5x the `memory-guard-reclaimable`
+  header was removed from `lanes.md` while its body stayed; the body was
+  absorbed into the preceding `checkpoint-guard-scope — CLOSED-VOID` block and
+  **all 4 of its claimed files went to exit 0** — the same hole `363743d0` had
+  just closed, reopened by a different mechanism 40 minutes later. Repaired by
+  restoring the header (`f2ba6c1`-era working tree; backup at
+  `/tmp/lanes.pre-repair.bak`). Nothing detected this; it was found by reading
+  a diff. `[measured 08-13]`
 - **The 3-lane cap in `## Config` is policy with no enforcement.** Four OPEN
   lanes ran this session unchallenged; `/lane open` checks file collisions
   only and never counts. `[measured 08-13]`
