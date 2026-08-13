@@ -187,3 +187,10 @@ data/odds_events/
 # fixture output into this repo-root file across several sessions (66720d0b,
 # 42472a9f, 71b57a82, ...) and got committed by accident each time.
 /report.json
+
+# Session-local hook markers, not shared ledger state. `/lane open` writes the
+# current slug so lane-guard.py can tell this session's claims from another
+# session's; `/checkpoint` touches the second so checkpoint-guard.sh can tell
+# persisted work from lost work. Both are per-machine, per-session.
+.syndicate/.current-lane
+.syndicate/.last-checkpoint

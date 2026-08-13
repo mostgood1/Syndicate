@@ -1,6 +1,6 @@
 ---
 description: Persist this session's work to the Syndicate ledger before context is lost
-allowed-tools: Read, Write, Edit, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*)
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(touch:*)
 ---
 
 Write this session to disk. Assume the context window dies immediately after.
@@ -26,5 +26,9 @@ Write this session to disk. Assume the context window dies immediately after.
 
 6. Report, in five lines or fewer: what is now durable, what is at risk,
    and the single next action for whoever picks this up.
+
+7. `touch .syndicate/.last-checkpoint`. The `checkpoint-guard` Stop hook
+   compares this marker's mtime against the newest changed file to decide
+   whether this session's work was persisted.
 
 Do not summarize the conversation. Summarize the *system*.
