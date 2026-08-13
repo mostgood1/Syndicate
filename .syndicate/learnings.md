@@ -784,7 +784,7 @@ back **oldest-first regardless of `direction`**.
 - **Known baseline, or this check will be ignored within a day.** It prints
   three classes it cannot distinguish, and only the first is a finding:
   1. genuinely unpushed commits — the signal. As of 08-13: `3042c5bc`,
-     `841228d9`, `a0c5e7af`, `a3f9ed97`, `bd227fa3`, `bf8833e9`.
+     `d4bb29b5`, `a0c5e7af`, `a3f9ed97`, `bd227fa3`, `8a0d49d8`.
   2. session ids, which are 8 hex chars and look identical to short SHAs —
      `2e6476cd`, `ab30bcc8`, `ac67a9f1`. All are prefixed `session` in the
      text; that prefix is the only thing separating them.

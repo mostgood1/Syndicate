@@ -95,10 +95,22 @@
   only in one clone, because this repo's standard push path (cherry-pick onto
   `origin/main` in a throwaway worktree) mints a new SHA. After the pass: 168
   refs resolve on origin, 0 fabricated. `[measured 08-13]`
-- **Still local-only, will get NEW SHAs when pushed — do not cite these:**
-  `3042c5bc` (checkpoint-guard log-witness, held on purpose), `841228d9`,
-  `a0c5e7af`, `a3f9ed97`, `bd227fa3`, `bf8833e9`. Delete this list once they
-  land. `[measured 08-13]`
+- **Local-only SHAs, in two kinds — the distinction matters.** `[measured 08-13]`
+  - *Will never land, do not wait for them:* `3042c5bc` (checkpoint-guard
+    log-witness — SUPERSEDED by the adopted transcript-witness design, and
+    replaying it would regress `checkpoint-guard.py`); `a3f9ed97` (a merge
+    whose content is already upstream — no patch to cherry-pick).
+  - *Pending, blocked on a conflict needing their author's judgment:*
+    `a0c5e7af` (collides in `docs/ai_context/todo.md`); `bd227fa3` (collides
+    in `.syndicate/lanes.md`, and the change is an `OPEN`→`CLOSED` status
+    flip — union-resolving it would stack contradictory headers and invent a
+    phantom lane).
+  - *Landed, and rewritten throughout this ledger to their origin SHAs:*
+    bf8833e9→`8a0d49d8`, 841228d9→`d4bb29b5` (old SHAs deliberately
+    unbackticked so this entry does not inflate the check). **Pushing does not make the
+    old SHA resolve** — the cherry-pick mints a new one, so the reference has
+    to be rewritten too. That step was missed the first time and is the whole
+    reason this list exists.
 - Short session ids are indistinguishable from short SHAs. Every one in the
   ledger is prefixed `session` — keep it that way. `[policy]`
 
