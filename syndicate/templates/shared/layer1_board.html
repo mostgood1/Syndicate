@@ -21,8 +21,8 @@
   from ONE fetch so they cannot disagree across the transition.
 #}
 
-{% block title %}Syndicate | {{ sport|upper }} Market Board{% endblock %}
-{% block page_title %}{{ sport|upper }} Market Board{% endblock %}
+{% block title %}Syndicate | {{ sport|upper }} Betting Board{% endblock %}
+{% block page_title %}{{ sport|upper }} Betting Board{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -141,7 +141,6 @@
     <a class="l1-tab" href="?date={{ next_date }}">{{ next_date }} &rarr;</a>
     <button id="l1-refresh" class="l1-tab">Refresh</button>
     <a class="l1-tab" href="/{{ sport }}/cards?date={{ selected_date }}">Back to Cards</a>
-    <a class="l1-tab" href="/market-board/books?sport={{ sport }}&date={{ selected_date }}">Book grid →</a>
   </div>
 
   <div class="l1-tabs" id="l1-views"></div>
@@ -230,10 +229,34 @@
             + "&window=" + encodeURIComponent(state.window)
             + "&view=" + encodeURIComponent(state.view)
             + (state.league ? "&league=" + encodeURIComponent(state.league) : "");
-    q("l1-body").innerHTML = '<div class="l1-empty">Loading…</div>';
+    // REFRESH IN PLACE, DO NOT RELOAD (`#410`). This blanked the board to
+    // "Loading…" on EVERY poll, so a 60s auto-refresh made the page flash empty
+    // and rebuild 23,000 cells while the reader was looking at it. The spinner
+    // belongs to the FIRST load, when there is genuinely nothing to show; after
+    // that the old board stays up until the new one is ready to swap in.
+    if (!state.board) {
+      q("l1-body").innerHTML = '<div class="l1-empty">Loading…</div>';
+    }
     fetch(url, { headers: { "Accept": "application/json" } })
       .then(function (r) { return r.json(); })
-      .then(function (b) { state.board = b; render(); })
+      .then(function (b) {
+        var first = !state.board;
+        state.board = b;
+        // DEFAULT TO A GAME, not the whole slate. The full board is every game
+        // x every market x every side x every book -- 23,078 cells on a 3-game
+        // WNBA slate, and MLB carries 37 books against WNBA's 11. One game is
+        // ~7,600. "All" stays one click away; it is the default that was wrong.
+        if (first && !state.game) {
+          var games = b.games || [];
+          if (games.length > 1) {
+            // Prefer a LIVE game if the slate has one -- that is the one the
+            // reader came for, and it is the one whose prices are moving.
+            var live = games.filter(function (g) { return String(g.state) === "live"; })[0];
+            state.game = String((live || games[0]).event_id || "");
+          }
+        }
+        render();
+      })
       .catch(function (e) {
         q("l1-body").innerHTML = '<div class="l1-empty">Board request failed: ' + esc(e && e.message) + "</div>";
       });
@@ -895,7 +918,12 @@
         + "</div>";
       return;
     }
+    // Scroll survives the swap. Without this an auto-refresh yanks the reader
+    // back to the top mid-scan, which reads as the page reloading even once the
+    // blanking above is gone.
+    var scrollY = window.scrollY;
     q("l1-body").innerHTML = groupedHtml(games);
+    if (scrollY) { window.scrollTo(0, scrollY); }
     // Re-wire after every render: the buttons are new DOM each time, and a slip
     // whose buttons are wired once at load silently stops staging the moment a
     // tab is clicked.

@@ -134,3 +134,41 @@ def test_sort_headers_are_rewired_after_every_render():
     # already document.
     html = _html()
     assert 'querySelectorAll("th[data-sort]")' in html
+
+
+def test_a_refresh_does_not_blank_the_board():
+    """`#410` -- reported from the live board: "keeps reloading instead of refreshing in line".
+
+    `fetchBoard` set the body to "Loading…" unconditionally, so every 60s
+    auto-refresh flashed the page empty and rebuilt 23,078 cells under the
+    reader. The spinner belongs to the FIRST load only.
+    """
+    html = _html()
+    start = html.index("function fetchBoard")
+    body = html[start:start + 2400]
+    assert "if (!state.board) {" in body, "the loading state is still unconditional"
+    idx_guard = body.index("if (!state.board) {")
+    idx_blank = body.index('l1-empty">Loading')
+    assert idx_guard < idx_blank, "the blank must sit INSIDE the first-load guard"
+
+
+def test_the_board_defaults_to_one_game():
+    """Also reported live: the board opened on the whole slate.
+
+    Every game x market x side x book is 23,078 cells on a 3-game WNBA slate,
+    and MLB carries 37 books against WNBA's 11. One game is ~7,600.
+    """
+    html = _html()
+    assert "if (first && !state.game)" in html
+    assert 'String(g.state) === "live"' in html, "a live game should win the default"
+    assert "state.game = String((live || games[0]).event_id" in html
+
+
+def test_scroll_survives_a_re_render():
+    # Without this an auto-refresh yanks the reader to the top mid-scan, which
+    # reads as a reload even once the blanking is fixed.
+    html = _html()
+    start = html.index("function render()")
+    body = html[start:start + 1600]
+    assert "var scrollY = window.scrollY;" in body
+    assert "window.scrollTo(0, scrollY);" in body

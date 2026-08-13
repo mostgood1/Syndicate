@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from flask import Blueprint, jsonify, make_response, render_template, request
+from flask import Blueprint, jsonify, make_response, redirect, render_template, request
 from flask import redirect
 
 from pipeline.intelligence_state import read_latest_intelligence_board_snapshot_response
@@ -2878,39 +2878,41 @@ def board_cross_book_api():
 
 @intelligence_bp.get("/market-board/books")
 def market_board_books_page():
-    """L1-A, the book grid — the BOOK VIEW of the Layer 1 market board (S1).
+    """RETIRED (`#409`). Redirects to the per-sport Betting Board.
 
-    Lives under `/market-board` on purpose. That hub already is the Layer 1
-    family — its own copy reads "every quoted line for every game … not just
-    the recommendation engine's picks" — and routes to `/<sport>/market-board`
-    per sport. This is the same inventory pivoted by BOOK instead of by game, so
-    it belongs in that family rather than as an orphan page.
+    This served `book_grid.html`, the book-pivoted Layer 1 view. It is retired
+    because it could not compute a fair value for any game line on the board:
+    `book_grid.html:590` reached Fair only via `modelled_fair` or
+    `proj.market_fair_prob_over`, and `modelled_fair` is **0 on all 782 core
+    rows across four sports** -- two-sided markets skip the margin model by
+    design. Measured 2026-08-12:
 
-    It is NOT part of Layer 2 and does not replace it. `/` is the consolidated
-    L2 recommendation surface; that answers "what should I bet". This answers
-    "show me every price". Collapsing them would lose the shortlist, which is
-    the product.
+        sport   core  modelled_fair  consensus  two-sided
+        mlb      341        0           341        341
+        wnba      40        0            40         40
+        nfl      126        0           126        126
+        soccer   275        0           275        275
 
-    Sport-switchable in one page rather than one route per sport, because the
-    grid is identical across sports — only the market vocabulary differs, and
-    that comes from the data.
+    So its Fair column was not blank for one sport, it was structurally blank
+    everywhere, always -- and its tooltip said "no two-sided market, so no-vig
+    fair value cannot be computed" on 782 rows that were ALL two-sided with both
+    sides priced. A tooltip naming the wrong condition is worse than a blank.
+
+    The Betting Board reaches all 782 through its consensus-devig tier, carries
+    projections on 694 of them since `#364`/`#365`, and took this page's
+    per-book column layout in `#408`. Nothing here was lost.
+
+    A REDIRECT RATHER THAN A DELETE. `cross_book.html` links here from two
+    places, `market_board_hub` from one, and the URL is bookmarkable. A 404
+    would turn a retirement into an outage for anyone holding the link, and the
+    sport/date carry across so the reader lands on the same slate they asked
+    for.
     """
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     sport = str(request.args.get("sport") or "mlb").strip().lower()
-    sports = ["mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"]
-    if sport not in sports:
+    if sport not in {"mlb", "nba", "wnba", "nhl", "nfl", "ncaaf", "ncaab", "soccer"}:
         sport = "mlb"
-    return _no_cache_response(
-        make_response(
-            render_template(
-                "book_grid.html",
-                sport=sport,
-                sports=sports,
-                selected_date=selected_date,
-                nav_path=request.path,
-            )
-        )
-    )
+    return redirect(f"/{sport}/market-board?date={selected_date}", code=302)
 
 
 @intelligence_bp.get("/market-board/opportunities")
