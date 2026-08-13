@@ -830,6 +830,54 @@ Related: `#372` (movement disabled for this cost), `#376` (163s, same calls),
 `#387` (wrong axis), `#409` phase 3 (a checkpoint bounds restart loss and does
 nothing about this).
 
+
+#### INDEPENDENT CONFIRMATION, and how the lane that localised it still missed it
+
+**The WNBA discriminator re-derived from production, separately:**
+
+    WNBA, rows=12 CONSTANT all day        sports with NO odds-history shard
+      15:15  1.2s    19:49  2.5s            nfl     max 0.0s over 25 samples
+      16:31  1.7s    21:39  3.6s            soccer  max 0.0s over 25 samples
+      17:49  2.1s    22:44  5.1s            nba     max 0.0s over 25 samples
+      18:50  1.3s    00:45  6.0s            nhl     max 0.0s over 25 samples
+
+Identical output, 5x the time, no slate or row confound. Cost tracks INPUT size,
+not output. `#414` holds.
+
+**I had localised the cost correctly and still eliminated the right input.** The
+sequence, because the error is reusable:
+
+1. Narrowed the 23-minute build to `GAME_CANDIDATES_EXIT sport=mlb`, 719s p50
+   against <=4.6s for every other sport. Correct.
+2. **Eliminated odds history because `odds_history_payloads_by_sport` measures
+   0.7s.** A span with the right name in it, cheap, so the input was dropped.
+   The expensive work is *indexing* that same payload inside the per-sport path
+   — a different operation, under a different span, on the same data.
+3. Proposed `book_quotes` instead, on a correlation with the 22:30 compaction,
+   then refuted it properly by enumerating every call `_game_bet_candidates_from_game`
+   makes. Right method, wrong file — and the refutation left me with nothing,
+   because step 2 had already discarded the answer.
+
+**THE RULE: a span's NAME is not its COVERAGE.** Eliminating an input because
+one span mentioning it is cheap is invalid — the same payload can be read once
+cheaply and indexed three times expensively, and only the first has the obvious
+name. Before ruling out an input, ask which spans touch it, not which span is
+named after it.
+
+**The discriminator was available to me and I filed it wrong.** I had WNBA at
+4.6s p50 and recorded it as "fast, therefore not implicated". Its row count was
+constant at 12 in the same data I was reading. `#414` asked whether WNBA had
+changed over time; I only asked whether it was big. **A control does not have to
+be large to be decisive — it has to be unconfounded.**
+
+**Also stale on my side:** I quoted "MLB 719.0s p50" as the headline in this
+file, in `docs/reports/sim_execution_observability_report.md`, and in three
+cross-lane messages. It was 1277s by the time I last repeated it. Oversight made
+the mirror-image error, retracting "the build is growing" on three samples that
+all sat inside one plateau. **A measured number is a timestamp, not a fact** —
+both of us sampled a flat stretch in the middle of a climb, in opposite
+directions.
+
 ### `#408` — OPEN, UNOWNED. 126 of 233 board rows carry NO ranking signal. `#400` changed soccer's market type and did not change its content
 
 **Measured on the served artifact 2026-08-12T23:29:41Z**, seated `ev_pct` by sport
@@ -29001,6 +29049,36 @@ Get `<deployed-sha>` from `/v1/services/<id>/deploys` -> `deploy.commit.id`,
 filtering to `status: "live"`. This is the same "presence is not reachability"
 shape as the inert fixes already on this list: pushed, merged, and on `main` are
 three things, and none of them is *running*.
+
+### An instrument's NAME is not its COVERAGE (2026-08-13)
+
+Eighth instance of the night's recurring shape, and the only one that cost a
+CORRECT hypothesis rather than raising a false alarm.
+
+Chasing a 25-minute board build, I ruled out odds history because the span
+`odds_history_payloads_by_sport` measures **0.7s**. Right name, cheap, input
+eliminated. `#414` then established odds history IS the cause: a 57 MB shard,
+loaded and re-indexed over the whole payload up to three times per build. The
+cheap span loads it; the expensive work indexes it, elsewhere, under a different
+name.
+
+**Before ruling out an input, ask which spans TOUCH it — not which span is named
+after it.** The same payload can be read once cheaply and processed three times
+expensively, and only the first has the obvious label.
+
+The others tonight, for the pattern: `child_count` reading 0 with three sims
+running; a pre-flight reading 0 samples from a suspended worker as "clear"; a
+test suite killed by its own timeout reporting 0 failures; `STEP_END` on a
+redirected stderr; `_log_stage_timing` on `logger.info`; `SLOW_GAME_CANDIDATE`
+threshold-gated so absence is success; and a `RETENTION_SWEEP` whose absence is
+the fix working. **Every one reads healthy for a reason that has nothing to do
+with health.**
+
+**Corollary on controls.** The discriminator that settled `#414` was WNBA:
+rows=12 constant all day, 1.2s -> 6.0s. I had that data and filed WNBA under
+"fast, therefore not implicated". A control does not have to be LARGE to be
+decisive — it has to be UNCONFOUNDED. I asked whether it was big; the right
+question was whether it had changed.
 
 ### `git blame` is NOT evidence of authorship in this repo (2026-08-13)
 
