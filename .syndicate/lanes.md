@@ -134,6 +134,41 @@
   - REMAINING before this can close: the production half of Verification
     (items 2 and 3 above) is untouched. Nothing here proves the deployed
     behaviour changes; per `learnings.md` a deployed fix can be inert.
+- **STATUS 2026-08-13 12:2x CDT — PUSHED to `origin/main` as `03073270`,
+  decoupled from config. NOT DEPLOYED. Production effect still UNVERIFIED.**
+  - `/preflight` returned **FAIL** on the original candidate (`495e9d12` on
+    local `main`) for a reason that had nothing to do with the fix: local
+    `main` carried **four unpushed `render.yaml` commits** underneath it
+    (web env block 64 -> 52 keys). Render deploys from GitHub, so shipping
+    the fix required a push, and that push would have fired `blueprint_sync`
+    — rewriting the whole env block on all three live services. A code fix
+    would have carried an undecided production config change as a passenger.
+  - Resolved by cherry-picking onto `origin/main` in a throwaway worktree
+    (the shared tree has other sessions' uncommitted work). Verified before
+    pushing: 3 files, **zero `render.yaml` delta**, web-block key count
+    64 == 64, and `render.yaml` absent from the commit entirely. 20/20 tests
+    green on that base (13 memory_observability + 7 overview guard).
+  - **The `render.yaml` web-block audit is now unshipped and unowned.** It
+    still sits on local `main` only. It needs its own `/preflight` and its
+    own `deploys.md` row — it is a production config change, not a passenger.
+    One item for whoever takes it: `MLB_ENABLE_LIVE_LENS_LOOP: "false"` is
+    among the 12 keys being removed from web. If the code default is True,
+    removing it turns the loop ON for web rather than off — the `absent != off`
+    hazard. NOT verified by this lane.
+  - **`main` has diverged and this commit now exists twice.** `495e9d12`
+    (local) and `03073270` (origin) are the same change. Local `main` is 6
+    ahead / 1 behind origin. Do not `git pull` and assume a clean merge —
+    reconcile deliberately, and drop the local duplicate rather than
+    re-landing it.
+  - Deploy still gated: `scripts/check_deploy_safety.py` returned NOT CLEAR
+    twice, 12:14 and 12:2x CDT — MLB sims running back-to-back (pid 4514
+    `tip_off_window`, then pid 4718 `fingerprint_change`) plus a live odds
+    refresh, with live games in progress. Deploying kills them.
+  - **Falsifiable discriminator for the post-deploy read, stated before the
+    deploy:** the new `basis` field. `basis=unreclaimable` proves the new
+    path executed; `basis=reclaimable_cache` means it degraded to the old
+    arithmetic and any "zero aborts" reading is inert-guard-shaped and means
+    nothing. Read that BEFORE reading the abort count.
 - Discrepancy noted, does not affect the verdict: the `#417` narrative in
   `.syndicate/log/2026-08-13.md` and `todo.md` says `current_mb` fell
   "3120 -> 2705", but the 4-row table it sits beside records 2988.6 -> 2705.3.
@@ -237,6 +272,35 @@
   breakthrough rate to move when their fix lands, and do not read that as a
   result of this lane's work.
 - Blocked by: none.
+- **STATUS 2026-08-13 — HYPOTHESIS CONFIRMED, BOTH FIXES WRITTEN AND
+  COMMITTED. NOT DEPLOYED. Production effect UNVERIFIED.**
+  - `1b9b1e39` (`#419`) — the root cause. `bf8833e9` (`#420`) — the tick-vs-time
+    bound, split out deliberately. `a0c5e7af` — tickets filed.
+  - Falsification test RAN and the hypothesis survived: with the disk read
+    stubbed out (pre-`#419` behaviour) the new regression test goes RED with
+    the exact production symptom
+    (`MLB_PROPS_REGEN_SKIPPED reason=no_odds_on_disk`), while the liveness test
+    stays GREEN. So the test is a discriminator, not an always-fail.
+  - `tests/test_live_refresh_loop.py` 226 passed / 13 subtests, exit 0. Seven
+    adjacent suites that import this module: 148 passed, exit 0.
+  - `#420` found a second, latent bug on the way: `streak_start or now_epoch`
+    treats a legitimate epoch `0.0` as absent and restarts the clock every
+    tick. Caught by the new elapsed-bound test — a shape unit tests see and
+    production, with large epochs, never would. Reader now returns `None` for
+    absent and the caller selects with `is None`.
+  - **What is NOT established:** that any of this changes production. The
+    verification criterion is unchanged and still outstanding — one
+    `MLB_SIM_TICK` carrying `mlbDailySim.reason = props_now_available`. That
+    string has never appeared in the logs, so absence is the baseline.
+  - **Deploy not attempted on purpose.** An MLB slate went live ~12:06 CDT and
+    a deploy kills an in-flight sim. Deploy decision belongs to the next
+    window, and `/preflight` applies. `.py` only on refresh-worker — no
+    `render.yaml`, so no `blueprint_sync` exposure.
+  - Handed on, not fixed here: today's season betting-card artifact is missing
+    (`verdict: artifact_missing`); scoped resims carry
+    `--write-season-frontend-artifacts off` and never rebuild it. And the
+    odds-posting time distribution is unmeasured — one day's 10:08 CDT is not
+    a schedule.
 
 ## CLOSED THIS SESSION
 
