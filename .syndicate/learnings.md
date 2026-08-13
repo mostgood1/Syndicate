@@ -270,3 +270,38 @@ correct reading anyone takes with it. Trust absence (a nonsense token returns 0)
 verify presence (counts inflate on substring containment), and note results come
 back **oldest-first regardless of `direction`**.
 
+
+### 2026-08-13 — "Who reads this env var" is a grep question; "does this service read it" is not
+- What we believed: an env key whose only readers live in `scripts/` or
+  `vendor/` is dead on the web service, because web's startCommand is gunicorn.
+  A repo-wide grep for the key name settles it.
+- What was actually true: `MLB_LIVE_LENS_DIR`'s only reader is
+  `_resolve_mlb_live_lens_dir()` in a vendored module — and
+  `flask_frontend.py:135` **calls that function at module scope**, so the read
+  executes on import, and `syndicate/features/mlb/live_lens.py` imports it.
+  Deleting the key would have broken MLB live-lens on web. The grep was right
+  about the file and wrong about the service.
+- How we found out: only by building a call graph and asking what is reachable
+  from the *specific symbols* web imports. Three attempts were needed:
+  1. Enclosing-function analysis alone — said "not reachable" for a key that is
+     read on every import. **Wrong in the dangerous direction.**
+  2. Adding module-level calls — swept in a call inside
+     `if __name__ == "__main__"`, and briefly implied that importing a vendor
+     module starts a background loop on the web service. **Wrong in the
+     alarming direction.**
+  3. Excluding `__main__` blocks and following `threading.Thread(target=fn)`
+     as a graph edge — `target=` is a Name, not a Call, so a naive walker never
+     traverses the thread body and every key read inside it reads as dead.
+- The rule going forward: **reachability has three entry classes, and a trace
+  that omits any one of them is not evidence. (1) module-level statements,
+  including calls to functions defined elsewhere in the file; (2) the specific
+  symbols another module imports — not the module as a whole; (3) indirect
+  targets: thread/process `target=`, callbacks, registries, decorators.**
+  Exclude `if __name__ == "__main__"`. A negative result from an incomplete
+  trace is indistinguishable from a real one, so state which classes were
+  covered whenever the conclusion is "unreachable, safe to delete."
+- Also: an audit that excludes `vendor/` is not an audit of this repo. Vendored
+  code is executed in production. The first pass excluded it and reported seven
+  keys with "no reader anywhere" — all seven were artifacts of the exclusion.
+- Cost: caught before anything was deleted. Would have been a production
+  breakage on the next web deploy had the first pass been applied.

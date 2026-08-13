@@ -11,14 +11,13 @@
 - Repo tip: `478edd78`, `origin/main` at the same commit. Supersedes the
   `93fc7cae` line. `[from-git 08-13]`
 - Deployed SHA: **three different commits, none of them the repo tip.**
-  Read from `/v1/services/<id>/deploys` at 08-13 11:13 CDT; all three
+  Read from `/v1/services/<id>/deploys` at 08-13 **11:56** CDT; all three
   `status=live`, `trigger=api`, nothing in flight. `[measured 08-13]`
   - `syndicate` (web) — `936e2b47`, live since **08-12 21:44 CDT**.
   - `refresh-worker` — `448e1816`, live since **08-13 10:27 CDT**.
-  - `live-odds-worker` — `2caa8eac`, live since **08-12 22:21 CDT**.
-- All three are ancestors of the tip — the services lag, they have not
-  diverged. Measured against `9f0e9f8b`: web 34 commits behind (12 touching
-  `.py`), live-odds-worker 25 (6 `.py`), refresh-worker 11 (0 `.py`).
+  - `live-odds-worker` — `95effcfa`, live since **08-13 11:36 CDT**.
+- These go stale in minutes, not days. live-odds-worker moved
+  `2caa8eac` → `95effcfa` inside one 40-minute session. Re-read before use.
   `[measured 08-13]`
 - **The web service is the stale one.** It has not been redeployed since
   last night, so any web-path `.py` fix committed today is on `main` and is
@@ -27,6 +26,34 @@
 - Because `autoDeploy = no`, the repo tip is an upper bound on every
   service and never a reading of any of them. Re-read per service; do not
   reuse the SHAs above once a deploy fires. `[policy]`
+
+## `render.yaml` env hygiene (`#96` family)
+
+- The web `envVars:` list is anchored `&shared_render_env_vars` but the alias
+  **is never referenced anywhere in the file** — nothing was ever shared, so
+  worker-only keys accumulated on web for months. `[from-code 08-13]`
+- Web block audited and cut **62 → 52 entries** (`606a2f28`, `054b2306`,
+  `cc2e1803`, `e8611888`). Every removed key was already declared on both
+  workers and is unchanged there. `[from-code 08-13]`
+- **Three duplicate declarations existed, one per service** (web and
+  live-odds-worker: `SYNDICATE_WNBA_SOURCE_APP_FALLBACK`; refresh-worker:
+  `SYNDICATE_BOOTSTRAP_ON_START`). All same-value, all deduped. Zero
+  duplicates on any service now. `[measured 08-13]`
+- A `blueprint_sync` **upserts declared keys and leaves live-only keys
+  alone** — it does NOT replace the whole env block. So removing a
+  declaration does not remove the live value; it reclassifies it as
+  undeclared. This is narrower than CLAUDE.md's warning implies.
+  `[measured — see scripts/audit_blueprint_drift.py header]`
+- Blueprint drift: **0 values a sync would revert**, all three services.
+  Snapshot only — one env-API change makes it non-zero. `[measured 08-13 11:52]`
+
+## Both workers publish over the internal hostname
+
+- `SYNDICATE_WEB_PUBLISH_URL='http://syndicate-an21:10000'` on refresh-worker
+  and live-odds-worker; **not set on web**, correctly. Confirmed in config and
+  in the running process — 20 `PUBLISH_OK` lines on live-odds-worker at
+  11:17:11 CDT all carry the internal URL. This extends the closed cutover
+  lane, which had evidence from refresh-worker only. `[measured 08-13]`
 
 ## Keyvalue store (`#324`)
 
