@@ -638,3 +638,48 @@ back **oldest-first regardless of `direction`**.
 - Cost: no bad edit landed either time, both caught by reading diffs rather
   than by instrumentation. Roughly an hour of duplicated work on
   `checkpoint-guard` before the collision surfaced.
+
+### 2026-08-13 — A FAILED READ RENDERS AS A RESULT. Five instances, one session, five different tools
+- What we believed, five separate times: that a check had returned a
+  measurement. Each time it had returned a **failure**, typed identically to a
+  real answer, and each was acted on as evidence.
+- The five, all inside one session, all in ad-hoc verification written to check
+  something else:
+  1. `git show "origin/main:.syndicate/learnings.md" | grep -c` returned **0**.
+     Git Bash had mangled `rev:path` into `origin\main;.syndicate\...`; git
+     errored, `grep -c` counted the empty stream. Read as "the content did not
+     reach origin" — it had.
+  2. `[ -d "$(dirname "$gd")" ]` where `$gd` was unreadable: `dirname ""` is
+     `.`, and `.` always exists. **Ten stale worktree entries printed `LIVE`.**
+     The test could not return false.
+  3. Unreadable worktree `HEAD` files → "*** NOT reachable, would orphan
+     commits ***". The files were not locked, they were already deleted. The
+     alarm was raised by the absence of the input, not by the state.
+  4. A "did this content survive?" check grepped the **commit message** against
+     the file and found nothing, reading as "unique content, do not delete".
+     The diff was present verbatim, 108 of 108 lines.
+  5. `MEMORY_GUARD_ABORT` "0 samples above 3903MB" from one log query — that
+     query spanned **35 seconds**. A 4042.6MB peak had already been seen.
+- The shape: **a probe has three outcomes — present, absent, and I-could-not-
+  tell — and shell/grep/git idioms collapse the third into one of the first
+  two silently.** Which one it collapses into decides whether you get a false
+  alarm (3) or a false all-clear (1, 2, 5). Both directions occurred here.
+- The rule going forward: **before believing a negative result from a one-off
+  check, run the positive control.** Grep for something you KNOW is in the
+  file; if that also returns 0, the probe is broken, not the world. It costs
+  one command and it caught nothing this session only because it was skipped.
+  Corollary: `grep -c` on a pipeline whose upstream can fail is not a count,
+  it is a count-or-zero. Check the upstream exit status, or query a way that
+  cannot silently produce an empty stream.
+- Why this is recorded despite four neighbouring entries already covering
+  pieces of it (`a grep excerpt is not the file`, `confirm an instrument can
+  emit non-zero`, `unknown must not default permissive`, `absent signal is
+  about the emitter`): those are each about a *specific instrument*. This is
+  about the **throwaway checks written while verifying something else**, which
+  get no error handling precisely because they are not the thing under test.
+  Production code that swallowed errors this way would be a defect; in a
+  verification one-liner it is the default.
+- Cost: none directly — every instance was caught by re-reading. But instance
+  (3) argued for preserving a commit that did not need preserving, and
+  instances (1) and (2) each briefly produced a confident wrong statement to
+  the user.
