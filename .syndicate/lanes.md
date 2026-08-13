@@ -123,7 +123,31 @@
     min on this service, so each window's min is a *spot* floor, not a
     whole-cycle trough. The running minimum across many windows is what
     approximates the true floor — a single window's min can still sit above it.
-- Blocked by: nothing.
+- **CHECKPOINT 2026-08-13 23:3xZ — measurement running, NOT yet conclusive.**
+  - Floor sampler v3 live (`C:	mp\leak_sampler3.py` -> `C:	mp\leak_floor.jsonl`),
+    5-min windows, min/p50/max per window. **Read the RUNNING MINIMUM of the
+    per-window mins**, never a point sample — v2's point series produced a
+    retracted +2418 MB/hour.
+  - Reference points: restart baseline `anon` **980.6MB @ 22:59Z**; floor
+    **1670.0MB @ 23:19Z**; guard floor is 1900MB.
+  - **The two obvious fixes are already done and already measured.** Do not
+    propose adding a flush: `malloc_trim` returned 1109.6MB/24 calls/46min and
+    only halved the ratchet, and `configure_malloc_arenas(2)` runs at
+    `run_refresh_worker.py:3156`. At guard time trim returns 0.0–2.9MB, so the
+    residual is **live objects or fragmentation**, not free-but-unreturned.
+  - **NEXT ACTION for whoever picks this up:** read the floor series. Climbing
+    toward 1900 with the arena cap already live implicates **live retention**
+    (candidate 1) over fragmentation (candidate 2), because the cap was the
+    probe for (2). A heap census cannot settle it — `gc.get_objects()` never
+    enumerates `str`/`bytes`/`ndarray`, which is most of this workload — so the
+    next instrument must differ in KIND: `tracemalloc` on allocation sites, or
+    arena-level accounting.
+  - **Standing prediction as a test:** board re-freezes ~03:00–04:00Z. If it
+    does not, the growth is not linear and the model is wrong.
+  - Eliminated tonight, do not redo: cache coefficient (measured 5.89–6.33 vs
+    6.3); one-huge-shard (today's MLB shard is 0.1MB); "the worker never
+    flushes" (it caps arenas).
+- Blocked by: nothing. Measurement-bound, not idea-bound.
 
 ### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
 - Goal: the NFL day-of-game engine is proven, stage by stage, against

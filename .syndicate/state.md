@@ -26,14 +26,22 @@
   used three times on 08-13 (`f6fec4f1`, `03073270`, `461c0df0`), twice
   because another session had uncommitted files the merge would have
   clobbered. `[from-git 08-13]`
-- Deployed SHA: **three different commits, none of them the repo tip.**
-  refresh-worker re-read at 08-13 **13:05** CDT; the other two at **11:56**.
-  All `status=live`, `trigger=api`. `[measured 08-13]`
-  - `syndicate` (web) — `936e2b47`, live since **08-12 21:44 CDT**.
-  - `refresh-worker` — **`03073270`**, live since **08-13 13:05 CDT**
-    (deploy `dep-d9v0b8bncjis73an78hg`). Carries the `#417`/`#387` memory
-    guard fix. Supersedes `448e1816`.
-  - `live-odds-worker` — `95effcfa`, live since **08-13 11:36 CDT**.
+- Deployed SHA: **re-read 2026-08-13 23:28Z, and they are NOT all equal.**
+  `[measured 08-13 23:28Z]`
+  - `syndicate` (web) — **`d4bb29b5`**, live since **23:03:32Z**. Supersedes
+    `936e2b47`; web is no longer the stale service.
+  - `refresh-worker` — **`d4bb29b5`**, live since **22:59:14Z**. Supersedes
+    `03073270`.
+  - `live-odds-worker` — **still `95effcfa`.** Its `d4bb29b5` deploy has been
+    `build_in_progress` since 22:55:27Z — 33+ minutes against a normal 4. The
+    old instance keeps serving (Render does not swap until a build succeeds)
+    and is healthy. **It does NOT have the `#417` memory fix.** Low impact: the
+    guard has never fired on that service (all refusal tokens zero over ~6
+    days).
+  - **A fired deploy is not a landed deploy.** All three were reported deployed
+    tonight on the strength of the POST responses; one was false for 33+
+    minutes. Check `status=live` AND the commit, never the 201.
+
 - These go stale in minutes, not days. live-odds-worker moved
   `2caa8eac` → `95effcfa` inside one 40-minute session. Re-read before use.
   `[measured 08-13]`
@@ -104,6 +112,43 @@
     reason this list exists.
 - Short session ids are indistinguishable from short SHAs. Every one in the
   ledger is prefixed `session` — keep it that way. `[policy]`
+
+## refresh-worker memory — `#417` CLOSED, `#423` OPEN
+
+- **`#417`'s guard fix is VERIFIED and STAYS.** The live abort line carries
+  `'basis': 'unreclaimable'` (proving the new path executes) with
+  `active_file`/`inactive_file` credited as reclaimable. Do not revert it.
+  `[measured 08-13 22:48Z]`
+- **There is a REAL anon leak on refresh-worker, previously MASKED by the
+  broken guard.** `anon` 1163 → 2603MB in 4.5h (18:05–22:48Z). `#417`'s own
+  window was FLAT (+18.9MB/5.4h). The old guard refused for a bookkeeping
+  reason and hid genuine growth. `[measured 08-13]`
+- **Restarts clear it and prove nothing.** 14:56, 18:05, 22:59 — each dropped
+  `anon` (2603 → 980.6MB at 22:59) and each destroyed the evidence window.
+  **A recovered board is not a fixed system.** `[measured 08-13]`
+- **Both allocator flushes are ALREADY deployed and already measured (`#285`).**
+  `malloc_trim` returned 1109.6MB across 24 calls/46min (gc: −104.3MB);
+  `configure_malloc_arenas(2)` runs at `run_refresh_worker.py:3156` before
+  threads spawn. The trim **halved** the ratchet (~24 → ~11 MB/min) and did not
+  stop it; at guard time it returns 0.0–2.9MB. **So the residual is NOT
+  free-but-unreturned memory** — it is live objects or fragmentation.
+  Do not propose "add a flush". `[measured 08-10, re-read 08-13]`
+- **`_BOOK_QUOTES_RSS_PER_FILE_BYTE = 6.3` is CORRECT — EXONERATED.** Measured
+  5.89–6.33× on four real shards, conservative at scale. The 500MB budget is
+  not blind. `[measured 08-13 23:1xZ]`
+
+## `#414` board-build cost — cause found, fix shipped, effect UNVERIFIED
+
+- **The MLB board-build cost was the quote-join identity scan.** Eight
+  production samples fit `19.86s per million rows walked` (R²=0.918) with
+  ~83k rows walked per call, constant. `tail_s` 21–54s, `rows_s` 0.00 — the
+  row loop is EXONERATED. `[measured 08-13]`
+- Index shipped in `d4bb29b5`: **85.43 → 0.66 ms/call (130×)** locally at
+  production shard size, equivalence proven over 30+ query shapes.
+  **Production effect UNVERIFIED.** `[measured local 08-13]`
+- **If the index works, `SLOW_SEGMENT_PROFILE` goes SILENT** (gated at 5s).
+  Read its absence only against `LAYER2_SHORTLIST` still recurring and the
+  pre-fix baseline of 8 lines in ~4 minutes. `[policy]`
 
 ## `render.yaml` env hygiene (`#96` family)
 
