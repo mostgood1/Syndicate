@@ -176,3 +176,36 @@ def _isolate_intelligence_pipeline_busy_signal():
 
     with _patch.object(live_refresh_loop, "_intelligence_pipeline_busy", return_value=False):
         yield
+
+
+@pytest.fixture(autouse=True)
+def _no_live_espn_calls_in_tests():
+    # NFL cards/market-board now stamp real game state from ESPN's scoreboard
+    # (syndicate/features/nfl/live_game_state.py), so building an NFL board
+    # makes a live HTTP call -- measured: exactly 1 fetch, ~1.5s, per
+    # build_preseason_cards_page_context.
+    #
+    # That makes any test touching those builders network-dependent AND
+    # non-deterministic against real game state: test_nfl_preseason_cards'
+    # market-board test began failing the moment this landed, because it
+    # builds 2026 preseason week 1 -- Hall of Fame weekend -- and ESPN
+    # correctly reports those games as `final` rather than the `pregame` the
+    # board used to hardcode. A true reading of the world, and a flaky test.
+    #
+    # Blocked at the fetch seam rather than at nfl_game_state_index, so the
+    # index's own caching/keying logic still runs under test and only the
+    # socket is removed. Returning None is the module's real
+    # ESPN-unreachable path, which yields an empty index and leaves every
+    # card exactly as it was pre-fix.
+    #
+    # Tests that want game state patch _fetch_scoreboard or
+    # nfl_game_state_index themselves; a monkeypatch inside a test rebinds
+    # over this for its scope, same contract as _no_background_loops_in_tests.
+    from unittest.mock import patch as _patch
+
+    from syndicate.features.nfl import live_game_state
+
+    live_game_state._cache.clear()
+    with _patch.object(live_game_state, "_fetch_scoreboard", return_value=None):
+        yield
+    live_game_state._cache.clear()
