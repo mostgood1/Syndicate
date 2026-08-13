@@ -3052,69 +3052,28 @@ def _odds_history_player_index_for(
     return index
 
 
-# `#414`, second half: LOAD THE SHARDS ONCE PER BUILD, not once per call site.
+# `#414` RETRACTED HALF. There was a payload cache here, keyed on the shards'
+# (path, mtime_ns, size). It was correct and it could NEVER FIRE, and the counter
+# I added to prove it worked is what proved it could not:
 #
-# `_odds_history_payloads_by_sport` is called at three sites in a single board
-# build (`:7695`, `:9546`, `:9889`), each re-reading the same shards from disk.
-# MLB's 2026-08-12 shard measured **57.11 MB**, and a complete day is ~57MB, so
-# that is ~114MB of redundant parse per build -- and it grows all day, which is
-# why `collect_candidates` went ~200s at 14:41 to 1508.9s at 01:29.
+#     ODDS_HISTORY_LOADED     02:35:16, 02:59:49   -> exactly 1 per build
+#     ODDS_HISTORY_CACHE_HIT  none
 #
-# Keyed on the shards' own (path, mtime_ns, size) so it self-invalidates the
-# moment the capture writes: no TTL, and a mid-build write is picked up rather
-# than served stale. Single entry, because a build only ever works one overview.
-_ODDS_HISTORY_PAYLOAD_CACHE: dict[str, Any] = {"fingerprint": None, "payloads": None}
-
-
-def _odds_history_shard_fingerprint(overview: list[dict[str, Any]]) -> tuple | None:
-    """(path, mtime_ns, size) for every shard this overview would read.
-
-    Returns None when the fingerprint cannot be taken, and the caller then
-    SKIPS the cache rather than treating unknown as unchanged -- an unreadable
-    stat must not serve a stale 57MB payload.
-    """
-    from syndicate.features.shared.odds_control_plane import odds_history_paths_for_sport
-
-    parts: list[tuple[str, int, int]] = []
-    try:
-        for sport in overview:
-            if not isinstance(sport, dict):
-                continue
-            slug = _safe_text(sport.get("slug"), "sport").lower()
-            if not slug:
-                continue
-            shard_key = _shard_key_from_context_label(slug, _safe_text(sport.get("context_label"), ""))
-            for key in _odds_history_shard_keys_for_sport(sport, slug, shard_key):
-                # EVERY candidate path, not just the winner. The loader has
-                # precedence rules across several locations, and a stale shared
-                # copy shadowing a fresh pull is a defect this file already
-                # records (2026-08-04). Fingerprinting only the resolved path
-                # would miss a change that alters WHICH path wins.
-                for path in odds_history_paths_for_sport(slug, key):
-                    try:
-                        st = path.stat()
-                    except OSError:
-                        # Absent is a real state and part of the fingerprint --
-                        # a shard appearing must invalidate the cache.
-                        parts.append((str(path), -1, -1))
-                        continue
-                    parts.append((str(path), st.st_mtime_ns, st.st_size))
-    except Exception:
-        return None
-    return tuple(sorted(parts))
-
-
+# One load per build means there is nothing to serve within a build, and between
+# builds the odds capture has written, so the fingerprint legitimately differs
+# and reloading is CORRECT. Three lanes read that zero as a broken fingerprint;
+# it was the arithmetic of the call pattern.
+#
+# I built it on the audit's "called at three sites" without checking that those
+# sites are in DIFFERENT ENTRY PATHS -- `collect_candidates`,
+# `collect_all_recommendations`, `run_intelligence_query` -- of which one runs
+# per board build, and `#385` gates the one that would have doubled it. Removed
+# rather than left as correct-but-inert code with a counter that invites the
+# same misreading again.
+#
+# The real cost is ~8-10 seconds PER ROW inside the game loop, measured
+# near-constant across two builds. See the event bucketing above.
 def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    fingerprint = _odds_history_shard_fingerprint(overview)
-    if fingerprint is not None and _ODDS_HISTORY_PAYLOAD_CACHE.get("fingerprint") == fingerprint:
-        cached = _ODDS_HISTORY_PAYLOAD_CACHE.get("payloads")
-        if isinstance(cached, dict):
-            print(
-                f"[intelligence] ODDS_HISTORY_CACHE_HIT sports={len(cached)} "
-                f"shards={len(fingerprint)}",
-                flush=True,
-            )
-            return cached
     payloads: dict[str, dict[str, Any]] = {}
     for sport in overview:
         if not isinstance(sport, dict):
@@ -3147,14 +3106,9 @@ def _odds_history_payloads_by_sport(overview: list[dict[str, Any]]) -> dict[str,
         sports_loaded=len(payloads),
         sample_sports=sorted(payloads.keys())[:5],
     )
-    if fingerprint is not None:
-        _ODDS_HISTORY_PAYLOAD_CACHE["fingerprint"] = fingerprint
-        _ODDS_HISTORY_PAYLOAD_CACHE["payloads"] = payloads
-    print(
-        f"[intelligence] ODDS_HISTORY_LOADED sports={len(payloads)} "
-        f"cacheable={fingerprint is not None}",
-        flush=True,
-    )
+    # Kept: it is how the call-count premise above is re-checked without
+    # re-deriving it from timings.
+    print(f"[intelligence] ODDS_HISTORY_LOADED sports={len(payloads)}", flush=True)
     return payloads
 
 

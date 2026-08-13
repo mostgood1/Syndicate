@@ -69,51 +69,11 @@ class TestIndexCache:
         assert len(payload["markets"]) == 2
 
 
-class TestPayloadCache:
-    def test_an_unfingerprintable_overview_skips_the_cache(self, monkeypatch):
-        """Unknown must not be treated as unchanged -- an unreadable stat must
-        never serve a stale 57MB payload."""
-        monkeypatch.setattr(intel, "_odds_history_shard_fingerprint", lambda ov: None)
-        loads = []
-        monkeypatch.setattr(intel, "_load_odds_history_payload_for_sport",
-                            lambda slug, key: (loads.append(1), {"markets": {}})[1])
-        ov = [{"slug": "mlb", "context_label": ""}]
-        intel._odds_history_payloads_by_sport(ov)
-        intel._odds_history_payloads_by_sport(ov)
-        assert len(loads) >= 2, "a None fingerprint was cached as if it were valid"
-
-    def test_a_matching_fingerprint_serves_the_cache_without_reloading(self, monkeypatch):
-        monkeypatch.setattr(intel, "_odds_history_shard_fingerprint", lambda ov: (("p", 1, 2),))
-        intel._ODDS_HISTORY_PAYLOAD_CACHE["fingerprint"] = None
-        loads = []
-        monkeypatch.setattr(intel, "_load_odds_history_payload_for_sport",
-                            lambda slug, key: (loads.append(1), {"markets": {}})[1])
-        ov = [{"slug": "mlb", "context_label": ""}]
-        intel._odds_history_payloads_by_sport(ov)
-        first = len(loads)
-        intel._odds_history_payloads_by_sport(ov)
-        intel._odds_history_payloads_by_sport(ov)
-        assert len(loads) == first, f"reloaded {len(loads)-first}x despite an unchanged fingerprint"
-
-    def test_a_changed_fingerprint_reloads(self, monkeypatch):
-        """The capture writing mid-build must invalidate, not be served stale."""
-        fp = {"v": (("p", 1, 2),)}
-        monkeypatch.setattr(intel, "_odds_history_shard_fingerprint", lambda ov: fp["v"])
-        intel._ODDS_HISTORY_PAYLOAD_CACHE["fingerprint"] = None
-        loads = []
-        monkeypatch.setattr(intel, "_load_odds_history_payload_for_sport",
-                            lambda slug, key: (loads.append(1), {"markets": {}})[1])
-        ov = [{"slug": "mlb", "context_label": ""}]
-        intel._odds_history_payloads_by_sport(ov)
-        before = len(loads)
-        fp["v"] = (("p", 99, 2),)
-        intel._odds_history_payloads_by_sport(ov)
-        assert len(loads) > before, "a changed shard mtime served a stale payload"
-
-    def test_an_absent_shard_is_part_of_the_fingerprint(self, tmp_path, monkeypatch):
-        """A shard APPEARING must invalidate. Absent is a state, not a gap."""
-        fp = intel._odds_history_shard_fingerprint([{"slug": "mlb", "context_label": ""}])
-        assert fp is None or isinstance(fp, tuple)
+# `#414`: TestPayloadCache removed with the cache it covered. The counter it
+# was written to protect is what proved the cache could never fire -- 1 load per
+# build means nothing to serve within a build, and between builds the shard has
+# changed so a reload is correct. Tests for a no-op are worse than none: they
+# make the no-op look load-bearing.
 
 
 class TestIndexStats:
