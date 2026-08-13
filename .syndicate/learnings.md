@@ -823,6 +823,18 @@ back **oldest-first regardless of `direction`**.
         while read s; do git merge-base --is-ancestor $s origin/main 2>/dev/null ||
         echo "UNRESOLVABLE: $s"; done
 
+- **Known baseline, or this check will be ignored within a day.** It prints
+  three classes it cannot distinguish, and only the first is a finding:
+  1. genuinely unpushed commits — the signal. As of 08-13: `3042c5bc`,
+     `841228d9`, `a0c5e7af`, `a3f9ed97`, `bd227fa3`, `bf8833e9`.
+  2. session ids, which are 8 hex chars and look identical to short SHAs —
+     `2e6476cd`, `ab30bcc8`, `ac67a9f1`. All are prefixed `session` in the
+     text; that prefix is the only thing separating them.
+  3. SHAs quoted as examples, including `f2ba6c1` inside this very entry.
+  So the clean state is **10 lines, not 0.** Compare against that list, do not
+  read a non-empty result as failure — a check whose normal output is ten
+  warnings gets scrolled past, which is how `checkpoint-guard` spent its
+  entire life warning 28 times out of 28.
 - Cost: nothing shipped wrong, but for most of 08-13 the ledger's evidence
   pointers did not resolve for anyone reading it from a clean checkout, which
   is the only way a reader who was not present would read it.
