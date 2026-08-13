@@ -388,7 +388,7 @@ back **oldest-first regardless of `direction`**.
   a failure. When a measurement is large, establish what it is large relative
   to before describing it.
 - Cost: ~1 hour, self-inflicted, caught before any session relied on the
-  digest. `0d0b8931` (pushed as `f6fec4f1`) shipped a hook reported as working
+  digest. `f6fec4f1` (pushed as `f6fec4f1`) shipped a hook reported as working
   that was ~5% functional.
 
 ### 2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works
@@ -624,7 +624,7 @@ back **oldest-first regardless of `direction`**.
 - What we believed: `checkpoint-guard.sh` was the Stop hook, with the two
   defects measured earlier in the session (unreachable pass branch, worktree
   denominator). A rewrite was written, tested four ways, and all four passed.
-- What was actually true: **the file had been deleted**. `5b2ca320` — HEAD at
+- What was actually true: **the file had been deleted**. `5cdf45b6` — HEAD at
   this session's start, sitting in plain sight in the session's own
   environment block — deleted `checkpoint-guard.sh`, added
   `checkpoint-guard.py`, and repointed `settings.json`. A parallel session had
@@ -666,7 +666,7 @@ back **oldest-first regardless of `direction`**.
      several sessions hand-edit concurrently. Deleting that line orphans the
      body into the preceding lane's block: `memory-guard-reclaimable` lost its
      header at ~14:5x and all 4 of its claimed files silently went to exit 0,
-     40 minutes after `363743d0` closed the identical hole via the status
+     40 minutes after `559d353d` closed the identical hole via the status
      regex. Found by reading a `git diff`, not by any check.
 - The rule going forward: **`lanes.md` is executable configuration, not
   documentation, and it is edited by hand by several sessions at once.** After
@@ -733,7 +733,7 @@ back **oldest-first regardless of `direction`**.
   **Within the same session it was broken again**, differently: a defect was
   REPORTED against `lane-guard.py` — "`memory-guard-reclaimable` is unguarded,
   its status parses as DEPLOYED" — derived by running a copy of `LANE_RE`
-  lifted from a read taken ~2h earlier. `363743d0` had already replaced that
+  lifted from a read taken ~2h earlier. `559d353d` had already replaced that
   regex, and its comment names that lane as the motivating case. The claim was
   false when written, and it was published to `state.md`, where a parallel
   session could have acted on it.
@@ -758,7 +758,7 @@ back **oldest-first regardless of `direction`**.
 ### 2026-08-13 — A guard has TWO failure directions, and fixing the loud one is where the silent one survives
 
 - What we believed: that `checkpoint-guard` was fixed. Its denominator was
-  scoped to the session (`5b2ca320`), then a second witness was added so a
+  scoped to the session (`5cdf45b6`), then a second witness was added so a
   session that wrote the ledger but skipped `/checkpoint` step 7 was no longer
   told it had lost work (`3042c5bc`). Eight fixture cases, all green.
 - What was actually true: **every one of those eight cases tested the same
@@ -794,3 +794,35 @@ back **oldest-first regardless of `direction`**.
 - Cost: nothing shipped. `3042c5bc` was held unpushed once the gap was
   confirmed, and the version on origin already has both defects, so nothing
   regressed. Roughly one round of duplicated design work across two sessions.
+
+### 2026-08-13 — Cite the SHA that will exist on origin, not the one your clone minted
+
+- What we believed: that a SHA in backticks is a verifiable evidence pointer,
+  and that `state.md`'s rule "every line carries an evidence tag" was being met.
+- What was actually true: this repo's standard push path is **cherry-pick onto
+  `origin/main` in a throwaway worktree** — `state.md` records three uses on
+  08-13 alone — and a cherry-pick **mints a new SHA**. Every SHA written before
+  its push therefore names a commit that exists only in the author's clone.
+  Measured across `.syndicate/**`: 64 distinct SHA-like refs, **19 local-only
+  spanning 69 references**, from several sessions. `git show 363743d0` returns
+  nothing on a fresh clone; the same change is there as `559d353d`.
+- Worse, and found in the same pass: **one fabricated SHA**, `f2ba6c1`,
+  written into `state.md` as if it were evidence for a repair. It resolved
+  nowhere — not local, not origin. Nothing in the system catches that. The
+  ledger asserts referential integrity and has never checked it.
+- The rule going forward: **write the SHA after the push, and write the one
+  that is on `origin`.** If a commit must be referenced before it is pushed,
+  cite the commit SUBJECT — the subject survives cherry-pick, the SHA does not.
+  Deploy SHAs read from the Render API are already origin SHAs and are fine as
+  they are. Session ids are visually identical to short SHAs; always prefix
+  them with `session`.
+- The check, cheap enough to run at any checkpoint — anything it prints is
+  either unpushed or invented:
+
+      grep -rhoE '`[0-9a-f]{7,40}`' .syndicate/ | tr -d '`' | sort -u |
+        while read s; do git merge-base --is-ancestor $s origin/main 2>/dev/null ||
+        echo "UNRESOLVABLE: $s"; done
+
+- Cost: nothing shipped wrong, but for most of 08-13 the ledger's evidence
+  pointers did not resolve for anyone reading it from a clean checkout, which
+  is the only way a reader who was not present would read it.

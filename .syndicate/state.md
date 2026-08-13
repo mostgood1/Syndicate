@@ -8,12 +8,12 @@
 ## Config
 
 - Max concurrent open lanes: **3** `[policy]`
-- Repo tip: local `main` `541f6020`, **25 ahead / 8 behind `origin/main`**
+- Repo tip: local `main` `c506eb2a`, **25 ahead / 8 behind `origin/main`**
   (`461c0df0`). The two have diverged and both ends move every few minutes —
   re-read, do not reuse these. `[from-git 08-13 15:1x]`
 - **CORRECTION: a push from this checkout does NOT carry a `render.yaml`
   change, and the previous warning here that it fires `blueprint_sync` was
-  wrong.** The three commits it named (`054b2306`, `cc2e1803`, `e8611888`)
+  wrong.** The three commits it named (`d16950b9`, `1e09fa9b`, `7c60d0f8`)
   are **patch-equivalent to commits already on `origin`** — another session
   re-landed them as `d16950b9`/`1e09fa9b`/`7c60d0f8`. `git cherry origin/main
   main` marks all three `-`, and `git diff origin/main..main -- render.yaml`
@@ -79,13 +79,27 @@
   service and never a reading of any of them. Re-read per service; do not
   reuse the SHAs above once a deploy fires. `[policy]`
 
+## Ledger SHA references
+
+- **69 references across four ledger files were rewritten 08-13 from local
+  SHAs to their `origin/main` equivalents.** They named commits that existed
+  only in one clone, because this repo's standard push path (cherry-pick onto
+  `origin/main` in a throwaway worktree) mints a new SHA. After the pass: 168
+  refs resolve on origin, 0 fabricated. `[measured 08-13]`
+- **Still local-only, will get NEW SHAs when pushed — do not cite these:**
+  `3042c5bc` (checkpoint-guard log-witness, held on purpose), `841228d9`,
+  `a0c5e7af`, `a3f9ed97`, `bd227fa3`, `bf8833e9`. Delete this list once they
+  land. `[measured 08-13]`
+- Short session ids are indistinguishable from short SHAs. Every one in the
+  ledger is prefixed `session` — keep it that way. `[policy]`
+
 ## `render.yaml` env hygiene (`#96` family)
 
 - The web `envVars:` list is anchored `&shared_render_env_vars` but the alias
   **is never referenced anywhere in the file** — nothing was ever shared, so
   worker-only keys accumulated on web for months. `[from-code 08-13]`
-- Web block audited and cut **62 → 52 entries** (`606a2f28`, `054b2306`,
-  `cc2e1803`, `e8611888`). Every removed key was already declared on both
+- Web block audited and cut **62 → 52 entries** (`606a2f28`, `d16950b9`,
+  `1e09fa9b`, `7c60d0f8`). Every removed key was already declared on both
   workers and is unchanged there. `[from-code 08-13]`
 - **Three duplicate declarations existed, one per service** (web and
   live-odds-worker: `SYNDICATE_WNBA_SOURCE_APP_FALLBACK`; refresh-worker:
@@ -187,7 +201,7 @@
 - **`session-start.sh` delivers 1,243 B**, `exitCode=0`, no truncation marker,
   measured from the arriving `attachment` record (session `2e6476cd`, line 3).
   Inside the ~2KB cap that left v1 ~5% functional. `[measured 08-13]`
-- **`checkpoint-guard.py` (Stop) can now pass — fixed in `5b2ca320`.**
+- **`checkpoint-guard.py` (Stop) can now pass — fixed in `5cdf45b6`.**
   Two independent causes, both measured. (1) `.syndicate/.last-checkpoint` did
   not exist until 08-13, so the pass branch was unreachable: **28 Stop
   deliveries, 5 sessions, exit 1 on all 28, zero exit 0** — while checkpoints
@@ -198,10 +212,33 @@
   repo: **exit 0 with 62 dirty files present**; before commit it named exactly
   the 2 that were this session's. Replaces `checkpoint-guard.sh`, deleted.
   `[measured 08-13]`
+- **Its witness is now session-scoped too (uncommitted, working tree).** The
+  marker's mtime is no longer read at all: `.last-checkpoint` is repo-global,
+  so session A's checkpoint silenced session B's warning — a false PASS, the
+  direction that loses work. The baseline is this session's own `/checkpoint`
+  invocation or ledger write, taken from transcript timestamps. `.syndicate/**`
+  no longer counts as work. 5/5 cases against the live file, including the
+  falsification: no own signal + fresh foreign marker still warns.
+  `[measured 08-13]`
+- **RETRACTED — `lane-guard` DOES guard `memory-guard-reclaimable`.** A line
+  here claimed its four files were unprotected because the status reads
+  "DEPLOYED, MEASUREMENT OPEN". That was false and never held: `559d353d`
+  ("match OPEN as a WORD in the status field, in both guards") had already
+  replaced the one-word status match, and its comment names this very lane.
+  The claim came from running an old copy of the regex, not the live file.
+  Measured against the hook `settings.json` dispatches to, 5/5 cases:
+  `memory_observability.py` and `pipeline/intelligence_state.py` both
+  **exit 2 BLOCKED**, `mlb-props-regen`'s file blocked, a CLOSED lane's file
+  and an unclaimed file both allowed. The digest and the enforcement AGREE.
+  `[measured 08-13]`
+- The digest's "1 lane header has no parseable status" is
+  `### (superseded lane detail, kept for the file/line map)` — not a lane, and
+  correctly unguarded. `559d353d` also stopped such a header inheriting the
+  previous lane's open state. `[measured 08-13]`
 - **Exit 1 on Stop is advisory.** Delivered stderr carries "Failed with
   non-blocking status code". `/checkpoint` is documented as an obligation and
   is enforced by a log line. A gate would need exit 2; the always-fires defect
-  that made that unsafe is fixed (`5b2ca320`), but raising it is a deliberate
+  that made that unsafe is fixed (`5cdf45b6`), but raising it is a deliberate
   decision, not a follow-up cleanup. `[measured 08-13]`
 - Its denominator is now **the files this session edited**, not the worktree.
   Known gap, deliberate: only `Edit|Write|MultiEdit|NotebookEdit` are counted,
@@ -218,7 +255,7 @@
   failure (it counted `NO LANE WAS EVER OPENED` as open). Neither strictness
   is right: the fix is `OPEN` against the status field only, which
   accepts `DEPLOYED, MEASUREMENT OPEN` and rejects `OPENED`/`REOPENED`.
-  **FIXED in `363743d0`** — both hooks now take the field between the 1st
+  **FIXED in `559d353d`** — both hooks now take the field between the 1st
   and 2nd em-dash and match the WORD `OPEN` in it. Both agree on the same
   set, which they did not before. `[measured 08-13]`
 - **`lane-guard` is blind to `.claude/**` by design** — `rel.startswith(".claude")`
@@ -238,9 +275,9 @@
   file, and its deletion is silent.** At 14:5x the `memory-guard-reclaimable`
   header was removed from `lanes.md` while its body stayed; the body was
   absorbed into the preceding `checkpoint-guard-scope — CLOSED-VOID` block and
-  **all 4 of its claimed files went to exit 0** — the same hole `363743d0` had
+  **all 4 of its claimed files went to exit 0** — the same hole `559d353d` had
   just closed, reopened by a different mechanism 40 minutes later. Repaired by
-  restoring the header (`f2ba6c1`-era working tree; backup at
+  restoring the header verbatim (committed in `c506eb2a`; pre-repair backup at
   `/tmp/lanes.pre-repair.bak`). Nothing detected this; it was found by reading
   a diff. `[measured 08-13]`
 - **`checkpoint-guard.py` now takes the NEWER of two witnesses**: the
