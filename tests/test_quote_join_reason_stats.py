@@ -102,7 +102,18 @@ class CountingIsNotItselfThePerRowCost(unittest.TestCase):
 
         src = textwrap.dedent(inspect.getsource(obq.quote_ref_for_bet))
         lines = src.splitlines()
-        start = next(i for i, ln in enumerate(lines) if ln.strip() == "for row in rows:")
+        # `#414` renamed the loop when identity stopped being a full scan:
+        # `for row in rows:` became `for position in sorted(positions):` over the
+        # indexed candidate union. The anchor is matched by SHAPE rather than by
+        # that exact literal, because the previous version failed with
+        # StopIteration the moment the loop was renamed -- a test that breaks on
+        # a rename reports a defect that is not there, and the temptation is
+        # then to delete it rather than re-aim it.
+        start = next(
+            i for i, ln in enumerate(lines)
+            if ln.strip().startswith("for ") and ln.strip().endswith(":")
+            and ("in rows" in ln or "sorted(positions)" in ln)
+        )
         loop_indent = len(lines[start]) - len(lines[start].lstrip())
 
         # The loop body is every following line indented deeper than `for`.

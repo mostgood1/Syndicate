@@ -1186,6 +1186,61 @@ def _normalize_token(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().replace("_", " ").replace("-", " ").split())
 
 
+# `#414`. The identity scan was the whole board-build cost, measured rather than
+# guessed: eight production samples fit `total_s = 19.86s per million rows
+# walked`, intercept -1.07s, R^2 = 0.918. Every call walked the full shard
+# (82,956-85,948 rows), because identity was decided by a linear pass.
+#
+# WHY AN INDEX IS SAFE HERE, INCLUDING FOR TEAMS. `event_id` and `player_name`
+# are exact-token compares, so they are ordinary dict keys. Teams are NOT --
+# `_row_teams_match` delegates to the per-sport alias maps, and "chc" vs
+# "chicago cubs" is exactly the gap that made a pure string heuristic fail
+# (0 of 108 candidates priced, 2026-08-06). But that predicate reads ONLY
+# `row["home_team"]` and `row["away_team"]`, so two rows carrying the same pair
+# can never disagree. A shard holds ~15 distinct pairs against ~83k rows, so the
+# fuzzy matcher runs once per PAIR instead of once per ROW, with identical
+# results. Nothing about identity is loosened.
+#
+# Lifetime is tied to the rows cache by construction: same key, and any key not
+# present in `_BOOK_QUOTES_CACHE` is dropped. The index can never outlive or
+# disagree with the rows it describes, so a compaction or mtime change
+# invalidates both together. It stores row POSITIONS, not rows.
+_BOOK_QUOTES_INDEX_CACHE: "OrderedDict[tuple[str, int, int], dict[str, Any]]" = OrderedDict()
+
+
+def _build_quote_shard_index(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    by_event: dict[str, list[int]] = {}
+    by_player: dict[str, list[int]] = {}
+    team_groups: dict[tuple[str, str], list[int]] = {}
+    for position, row in enumerate(rows):
+        event_token = _normalize_token(row.get("event_id"))
+        if event_token:
+            by_event.setdefault(event_token, []).append(position)
+        player_token = _normalize_token(row.get("player_name"))
+        if player_token:
+            by_player.setdefault(player_token, []).append(position)
+        pair = (str(row.get("home_team") or ""), str(row.get("away_team") or ""))
+        if pair != ("", ""):
+            team_groups.setdefault(pair, []).append(position)
+    return {"by_event": by_event, "by_player": by_player, "team_groups": team_groups}
+
+
+def _quote_shard_index(rows: list[dict[str, Any]], cache_key: tuple[str, int, int] | None) -> dict[str, Any]:
+    if cache_key is None:
+        # Unkeyable path (missing file stat). Build once, do not cache -- an
+        # unkeyed entry could never be invalidated.
+        return _build_quote_shard_index(rows)
+    cached = _BOOK_QUOTES_INDEX_CACHE.get(cache_key)
+    if cached is not None:
+        _BOOK_QUOTES_INDEX_CACHE.move_to_end(cache_key)
+        return cached
+    index = _build_quote_shard_index(rows)
+    _BOOK_QUOTES_INDEX_CACHE[cache_key] = index
+    for stale in [key for key in _BOOK_QUOTES_INDEX_CACHE if key not in _BOOK_QUOTES_CACHE]:
+        _BOOK_QUOTES_INDEX_CACHE.pop(stale, None)
+    return index
+
+
 def quote_ref_for_bet(
     *,
     sport: Any,
@@ -1233,9 +1288,31 @@ def quote_ref_for_bet(
     wanted_player = _normalize_token(player_name)
     wanted_teams = _team_tokens(home_team, away_team, matchup)
 
+    # `#414`. Narrow to rows that COULD match before testing anything. A row can
+    # only be identified by an exact `event_id`, an exact `player_name`, or a
+    # team pair the alias matcher accepts -- so any row outside this union would
+    # have failed all three predicates anyway, and skipping it changes nothing.
+    index = _quote_shard_index(rows, _book_quotes_cache_key(resolve_book_quotes_path(str(sport or ""), str(date_str or ""))))
+    positions: set[int] = set()
+    if wanted_event:
+        positions.update(index["by_event"].get(wanted_event, ()))
+    if wanted_player:
+        positions.update(index["by_player"].get(wanted_player, ()))
+    if wanted_teams:
+        # Once per distinct pair (~15 a slate), not once per row (~83k). Same
+        # predicate, same inputs -- `_row_teams_match` reads only these two
+        # fields, so every row in a group gets the answer its pair earned.
+        for (home_value, away_value), group in index["team_groups"].items():
+            if _row_teams_match({"home_team": home_value, "away_team": away_value}, wanted_teams, sport):
+                positions.update(group)
+
     identified: list[Mapping[str, Any]] = []
     hit_event = hit_player = hit_teams = 0
-    for row in rows:
+    # Sorted, so `identified` keeps shard order exactly as the full scan left it.
+    # Downstream narrowing and best-price selection are order-sensitive at the
+    # tie, and this is a join whose wrong answers are silent.
+    for position in sorted(positions):
+        row = rows[position]
         if wanted_event and _normalize_token(row.get("event_id")) == wanted_event:
             identified.append(row)
             hit_event += 1
@@ -1247,11 +1324,15 @@ def quote_ref_for_bet(
         if wanted_teams and _row_teams_match(row, wanted_teams, sport):
             identified.append(row)
             hit_teams += 1
-    # Per call, not per row -- see _QUOTE_JOIN_STATS. `rows_walked` is the number
-    # that sizes the problem: it is len(rows) every time, because identity is
-    # decided by a full scan with no early exit.
+    # Per call, not per row -- see _QUOTE_JOIN_STATS. `rows_walked` still means
+    # rows actually walked, so the metric stays honest across this change: it
+    # was len(rows) when identity needed a full scan and is now the candidate
+    # union. `shard_rows` carries what the full scan would have cost, so the
+    # ratio between them is readable on the same line rather than needing a
+    # before/after deploy to see.
     _bump("calls")
-    _bump("rows_walked", len(rows))
+    _bump("rows_walked", len(positions))
+    _bump("shard_rows", len(rows))
     if hit_event:
         _bump("by_event")
     elif hit_player:
