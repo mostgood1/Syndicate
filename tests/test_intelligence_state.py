@@ -580,7 +580,25 @@ class IntelligenceStateTests(unittest.TestCase):
                         {
                             "store": {},
                             "get": lambda self, key: self.store.get(key),
-                            "set": lambda self, key, value: self.store.__setitem__(key, str(value)) or True,
+                            # `ex` is not optional decoration. `50a093b9`
+                            # (2026-07-31, "Add TTL + reclaim sweep for the
+                            # keyvalue backend") made
+                            # refresh_state_store.write_json_file call
+                            # client.set(key, value, ex=ttl_seconds) on every
+                            # keyvalue-backed path. This fake's signature was
+                            # never widened, so it raised TypeError inside
+                            # _execute_keyvalue_operation -- which is not a
+                            # ConnectionError/TimeoutError, so it is not
+                            # retried, it is re-raised -- and this test had
+                            # been red on a clean checkout ever since. The
+                            # equivalent fake in
+                            # tests/test_refresh_state_store.py:26 has taken
+                            # `ex` since that commit; this inline one was
+                            # missed. Accepted and deliberately IGNORED: this
+                            # test covers the shared-backend sync path, and
+                            # TTL/expiry semantics belong to
+                            # test_refresh_state_store.py, not here.
+                            "set": lambda self, key, value, ex=None: self.store.__setitem__(key, str(value)) or True,
                             "exists": lambda self, key: 1 if key in self.store else 0,
                         },
                     )()
@@ -2548,8 +2566,35 @@ class IntelligenceStateTests(unittest.TestCase):
                 "syndicate.blueprints.intelligence.read_combined_intelligence_response",
                 side_effect=AssertionError("combined reader must not be called when the flag is off"),
             ):
-                with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(engine_response)):
-                    response = intelligence_query_api()
+                # DATE ROT, fixed by pinning rather than by re-dating the
+                # fixture. This test had been red on a clean checkout since
+                # 2026-07-29 and would have rotted again on any fresh
+                # hardcoded date.
+                #
+                # The request is the DATELESS default question, which
+                # _normalize_default_query_payload stamps with
+                # central_today_iso(). Once real "today" drifted past the
+                # fixture's 2026-07-27, the non-combined cascade below did
+                # exactly what it is written to do: _response_needs_refresh
+                # rejected the cached response on request-date != response-date,
+                # and _stale_within_threshold (max_age_days=2) then refused it
+                # as a stale fallback too, so the route correctly served
+                # _empty_default_intelligence_response() and
+                # top_opportunities came back []. That cascade is deliberate
+                # -- serving a settled slate from weeks ago as "today's board"
+                # is the misleading-display bug it exists to prevent -- so the
+                # source is right and the fixture was wrong.
+                #
+                # Pinning "today" to the fixture's own date keeps this test on
+                # the branch it is actually about (flag off -> default path,
+                # combined reader never called) instead of silently
+                # re-measuring the staleness cascade, which has its own tests.
+                # central_today_iso is imported into the blueprint's namespace
+                # (syndicate/blueprints/intelligence.py:38), so this is the
+                # one name the route resolves through.
+                with patch("syndicate.blueprints.intelligence.central_today_iso", return_value="2026-07-27"):
+                    with patch("syndicate.blueprints.intelligence.read_latest_intelligence_state", return_value=dict(engine_response)):
+                        response = intelligence_query_api()
 
         payload = response.get_json()
         self.assertIsNotNone(payload)
@@ -3440,7 +3485,80 @@ class IntelligenceStateTests(unittest.TestCase):
         # other attaches small per-candidate odds_history slices after
         # candidates exist (keyed off the manifest/selected_date shard) --
         # so 2 calls per sport is the correct post-fix count, not 1.
+        #
+        # NOT HERMETIC UNTIL 2026-08-13 -- this is the SECOND instance of the
+        # `#288` defect, and it is the reason this test had been red on a
+        # clean checkout. See the `#288` note above
+        # test_build_candidate_pool_aborts_early_when_memory_critical: its
+        # sibling test_build_candidate_pool_skips_sports_without_manifests was
+        # REMOVED for patching
+        # `syndicate.features.intelligence.collect_all_recommendations`, a
+        # symbol pipeline/intelligence_state.py does not reference anywhere,
+        # which makes the patch a no-op and hands the test whatever real
+        # git-tracked mirror data happens to sit in
+        # data/mlb_source/.../2026-06-10/. This test patched the same dead
+        # symbol and survived that pass.
+        #
+        # The rot it produced: 2026-06-10 is now two months past, so all 32
+        # candidates the real collector built from that mirror trip
+        # _candidate_is_final and are dropped during scoring
+        # (`candidate_scoring input_count=32 output_count=0
+        # final_filtered=32`). _build_candidate_pool's manifest loop then
+        # skips MLB entirely via `if not sport_candidates: continue`, and
+        # pool["candidate_pools"]["mlb"] KeyErrors. Nothing was wrong with the
+        # code under test -- filtering a settled game off today's board is
+        # correct -- the test simply had no candidates of its own.
+        #
+        # Repaired by injecting candidates at the collector this module
+        # ACTUALLY calls, so the assertions below depend on nothing under
+        # data/ and cannot rot with the calendar again. Per the `#288` note,
+        # NOT repaired by moving the fixture date forward until the mirror
+        # happens to agree.
         service = IntelligenceStateService()
+        # One synthetic MLB candidate, injected below at
+        # pipeline.intelligence_state.collect_candidates_with_fallback_merge.
+        # It only has to survive _serialize_candidate and reach the manifest
+        # loop -- the contract under test is the SHAPE of the per-sport pool
+        # entry, not the candidate's own content.
+        synthetic_candidates = [
+            {
+                "name": "MLB Play",
+                "sport": "MLB",
+                "sport_slug": "mlb",
+                "market": "Hits",
+                "market_type": "hits",
+                "matchup": "NYY @ BOS",
+                "event_id": "test-event-1",
+                "entity": "Test Player",
+                "line": 1.5,
+                "score": 91.0,
+                "odds": -110,
+                "edge": 4.2,
+                "confidence": 0.6,
+                "game_date": "2026-06-10",
+            },
+        ]
+
+        def _slate_filter_passthrough(candidates, *, selected_date, chips_by_sport=None):
+            # The slate join is the one remaining reader of data/ on this
+            # path: it loads real scoreboard chips for selected_date and drops
+            # anything that does not match one, so the synthetic candidate
+            # above dies as `chips_present_no_match` (measured: considered=1
+            # kept=0) and this test would be right back to asserting against
+            # an empty pool. Stubbed to a pass-through so it cannot do that.
+            # Its own behaviour is covered by tests/test_candidate_slate_filter.py
+            # and tests/test_slate_date_timezone_discipline.py -- not here.
+            kept = [dict(candidate) for candidate in candidates]
+            return kept, {
+                "selected_date": selected_date,
+                "considered": len(kept),
+                "kept": len(kept),
+                "dropped": {},
+                "per_sport": {},
+                "unmatched_samples": [],
+                "unfiltered_reason": "stubbed_by_test",
+            }
+
         status = {
             "selected_date": "2026-06-10",
             "tracked_summary": {"tracked_ok": 1, "tracked_total": 1},
@@ -3473,23 +3591,46 @@ class IntelligenceStateTests(unittest.TestCase):
             )
 
             with patch("pipeline.intelligence_state.reports_root", return_value=reports_root):
-                # See the matching comment in
-                # test_build_candidate_pool_skips_sports_without_manifests --
-                # _build_candidate_pool's overview fallback now calls
+                # _build_candidate_pool's overview fallback calls
                 # build_intelligence_overview directly.
                 with patch("pipeline.intelligence_state.build_intelligence_overview", return_value=status["sports"]):
                     with patch(
-                        "syndicate.features.intelligence.collect_all_recommendations",
-                        return_value=[{"name": "MLB Play", "sport": "MLB", "market": "Hits", "score": 91.0, "odds": -110}],
+                        # THE correct injection point, and the whole repair:
+                        # this is the collector pipeline/intelligence_state.py
+                        # actually calls (see the `_span(
+                        # "candidate_collection_with_fallback", ...)` block).
+                        # The old patch targeted
+                        # syndicate.features.intelligence.collect_all_recommendations,
+                        # which this module never references -- so it injected
+                        # nothing and the real collector ran against data/.
+                        "pipeline.intelligence_state.collect_candidates_with_fallback_merge",
+                        return_value=[dict(candidate) for candidate in synthetic_candidates],
                     ):
                         with patch(
-                            "pipeline.intelligence_state.load_odds_history_payload_for_sport",
-                            return_value={"markets": {}},
-                        ) as mocked_loader:
-                            pool = service._build_candidate_pool("2026-06-10", "fingerprint-1")
+                            "syndicate.features.shared.candidate_slate_filter.stamp_and_filter_candidates_to_slate",
+                            side_effect=_slate_filter_passthrough,
+                        ):
+                            with patch(
+                                "pipeline.intelligence_state.load_odds_history_payload_for_sport",
+                                return_value={"markets": {}},
+                            ) as mocked_loader:
+                                pool = service._build_candidate_pool("2026-06-10", "fingerprint-1")
+
+        # Liveness first. mocked_loader.call_count == 2 passes just as happily
+        # against a completely empty pool (the manifest loop loads the shard
+        # before it looks at candidates), which is exactly how the pre-repair
+        # version of this test read green on its headline assertion while the
+        # pool it meant to inspect did not exist. Assert the pool is populated
+        # before asserting anything about its shape, so a future regression to
+        # zero candidates fails here instead of silently making the two
+        # contract assertions below vacuous.
+        self.assertEqual(pool["candidate_count"], 1)
+        self.assertIn("mlb", pool["candidate_pools"])
 
         self.assertEqual(mocked_loader.call_count, 2)
         mlb_pool = pool["candidate_pools"]["mlb"]
+        self.assertEqual(mlb_pool["candidate_count"], 1)
+        # The actual contract: pointer, not payload.
         self.assertNotIn("odds_history", mlb_pool)
         self.assertIn("odds_history_shard_key", mlb_pool)
 
@@ -5364,8 +5505,35 @@ class BoardWindowWatchFailureDoesNotKillTheLoopTests(unittest.TestCase):
                         service._background_loop()
 
         mocked_compute.assert_called_once_with(normalized)
+        # These two are what this test is actually for: the loop survived the
+        # raised _ensure_default_board_window_watched, went on to pop its
+        # pending key, and computed and stored a snapshot for it. Against
+        # pre-fix code the thread dies before the pop and neither holds.
         self.assertIn(queued_key, service._snapshots)
-        self.assertEqual(service._latest_key, queued_key)
+        # PREMISE OVERTURNED -- this used to assert
+        # `assertEqual(service._latest_key, queued_key)`, and had been red on
+        # a clean checkout since the sport-scoped promotion guard landed.
+        #
+        # The fixture payload above carries sport="mlb", and
+        # intelligence_state.py now REFUSES to promote a sport-scoped payload
+        # to self._latest_key (it prints
+        # LATEST_KEY_PROMOTION_SKIPPED_SPORT_SCOPED and leaves it alone).
+        # That is deliberate and load-bearing: _latest_key is what every
+        # DATELESS read resolves through AND what drives _persist_locked's
+        # fallback-free BOARD_SNAPSHOT_PATH write, while a sport-scoped
+        # response has its top_opportunities/recommendations filtered to one
+        # sport but a candidate_count still reflecting the FULL pool -- so
+        # one sport's tab would silently become "the board" with nothing in
+        # the snapshot able to detect it. The rule is pinned in its own test,
+        # test_background_loop_never_promotes_a_sport_scoped_payload_to_latest_key.
+        #
+        # So the old assertion was not testing loop survival at all; it was
+        # asserting the pre-guard promotion behaviour as a side effect, and
+        # it is the ONE line here that a correct source change was always
+        # going to break. Kept as an assertion rather than deleted, inverted
+        # to the current contract, so this test still fails if promotion ever
+        # starts leaking sport-scoped keys back into _latest_key.
+        self.assertIsNone(service._latest_key)
 
     def test_background_loop_records_evaluation_ledger_for_legacy_pending_keys_path(self) -> None:
         # This is the path actually live in production (canonical board

@@ -6,7 +6,11 @@
 
 ## OPEN
 
-### intelligence-state-red-baseline — OPEN — opened 2026-08-13 — session: intel-state-baseline
+### intelligence-state-red-baseline — CLOSED 2026-08-13 — opened 2026-08-13 — session: intel-state-baseline
+- OUTCOME: `tests/test_intelligence_state.py` goes `4 failed / 220 passed` ->
+  **`224 passed, 0 failed`**, all four repaired in the TEST with zero source
+  changes, two of them proven load-bearing by source mutation. Verification
+  items 1-3 all ran; results are in the STATUS block at the end of this lane.
 - Goal: `tests/test_intelligence_state.py` is GREEN on a clean checkout, so a
   session working `#417`/`#338` in `pipeline/intelligence_state.py` can tell its
   own regression from standing noise. Testable outcome: 224 passed / 0 failed
@@ -98,14 +102,53 @@
 - Verification (all three required):
   1. Each of the four fails before its own fix and passes after — run
      individually, not only as part of the file.
-  2. Mutation check on test 4 (above), and on test 2 the rewritten assertion
-     must fail if the sport-scoped skip is removed from source.
+  2. Mutation checks against SOURCE, both required: re-embed `odds_history`
+     on the per-sport pool entry and the rewritten test 4 (the pool test) must
+     go red; remove the sport-scoped promotion skip and the rewritten test on
+     `_latest_key` must go red.
   3. Full file green: `python -m pytest tests/test_intelligence_state.py`
      back to 0 failed, with the passing count going 220 -> 224 and no test
      deleted or skipped.
 - Deploy: none. Test-only change, no production behaviour touched, no
   `render.yaml`. Nothing to gate.
 - Blocked by: none.
+- **STATUS 2026-08-13 — ALL THREE VERIFICATION ITEMS MET. Lane complete.**
+  - (1) The four run individually: `4 passed in 35.34s`, against
+    `4 failed in 44.25s` on the same four before the change.
+  - (2) MUTATION CHECKS PASSED, run in a throwaway detached worktree at HEAD
+    (`C:/tmp/isrb-mut`) so `pipeline/intelligence_state.py` was never edited in
+    the shared tree — that file is claimed by `memory-guard-reclaimable`.
+    Two source mutations applied at once (they hit different tests):
+    - re-embedded `"odds_history": {...}` beside `odds_history_shard_key` in
+      the per-sport pool dict -> `test_build_candidate_pool_does_not_embed_
+      full_odds_history_payload` FAILED with `AssertionError: 'odds_history'
+      unexpectedly found in {...}`. Right test, right reason.
+    - replaced `if effective_sport != "all":` with `if False:` ->
+      `test_background_loop_survives_board_window_watch_exception` FAILED with
+      `'e7557377...' is not None`. Right test, right reason.
+    - The mutation output ALSO settles the toothlessness worry directly: the
+      failing dict printed `'candidate_count': 1` with a fully-populated
+      `candidates` list, so the repaired test is inspecting a real pool, not
+      an empty one.
+  - (3) Full file: **`224 passed, 10 subtests passed in 901.58s`, 0 failed** —
+    against the recorded baseline `4 failed, 220 passed, 10 subtests passed in
+    891.33s`. 220 -> 224, nothing deleted, nothing skipped, no `@skip` or
+    `xfail` added.
+  - Diff is `tests/test_intelligence_state.py` ONLY. Zero source files touched.
+    Net assertion change: +4 added (`candidate_count == 1`, `"mlb" in
+    candidate_pools`, `mlb_pool["candidate_count"] == 1`, and the inverted
+    `_latest_key`), 1 inverted, 0 removed.
+  - NOTE on the full-file number's provenance: this run is against
+    `841228d9`, not the `007f75b6` the brief cited — `memory-guard-reclaimable`
+    landed `03073270` (`memory_observability.py`, the `#417` unreclaimable-memory
+    guard) in between. That is the interaction this lane flagged when it
+    opened, and it turned out benign: the memory/headroom tests in this file
+    are green on the new formula. `pipeline/intelligence_state.py` and
+    `tests/test_intelligence_state.py` are byte-identical across
+    `007f75b6..841228d9`, so the four diagnoses are unaffected by the move.
+  - Housekeeping left behind: `C:/tmp/isrb-mut` is out of `git worktree list`
+    and empty, but the directory itself would not delete (a lingering handle).
+    Harmless; delete it if it is still there next session.
 
 ### memory-guard-reclaimable — OPEN — opened 2026-08-13 — session: memory-guard
 - Goal: `memory_headroom_snapshot` decides on unreclaimable memory

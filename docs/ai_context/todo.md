@@ -9571,7 +9571,65 @@ that question for free, forever.
 ESPN (`1de982be`), NCAAF's is something else again — each gate needs its own
 line, and that is the shape of the work rather than a reason to skip it.
 
-### #288 — `tests/test_intelligence_state.py` failures: stale fixtures, NOT a reproduction of #286. Not fixed
+### #288 — `tests/test_intelligence_state.py` failures: stale fixtures, NOT a reproduction of #286. **FIXED 2026-08-13 — file is green**
+
+> **2026-08-13 UPDATE — the remaining four are fixed; this file now runs
+> `224 passed, 10 subtests passed, 0 failed` (901.58s).** Baseline immediately
+> before, same machine, clean checkout: `4 failed, 220 passed, 10 subtests
+> passed` (891.33s). Lane `intelligence-state-red-baseline` in
+> `.syndicate/lanes.md` carries the full record.
+>
+> **All four were defects in the TEST. Zero source files changed** — the diff is
+> `tests/test_intelligence_state.py` only. That matters more than the green:
+> every one of the four was production code being *right* and the test having
+> rotted around it, so "fix the failure" and "change the code" pointed in
+> opposite directions in all four cases.
+>
+> - `test_read_latest_response_syncs_shared_backend_state` — stale fake. Its
+>   inline `FakeClient.set` never grew the `ex` kwarg that `50a093b9`
+>   (2026-07-31, keyvalue TTL) started passing. `TypeError` is not a
+>   `ConnectionError`/`TimeoutError`, so `_execute_keyvalue_operation` does not
+>   retry it — it re-raises. The fake in `tests/test_refresh_state_store.py:26`
+>   took `ex` at the time; this inline one was missed.
+> - `test_background_loop_survives_board_window_watch_exception` — premise
+>   overturned, rewritten with the reason in-line rather than deleted. It
+>   asserted `_latest_key == queued_key` for a `sport="mlb"` payload, which
+>   `LATEST_KEY_PROMOTION_SKIPPED_SPORT_SCOPED` now deliberately refuses. The
+>   assertion is inverted to `assertIsNone`, so it still fails if sport-scoped
+>   keys ever leak back into `_latest_key`.
+> - `test_query_endpoint_default_unchanged_when_combined_flag_disabled` — date
+>   rot. Fixture pinned to `2026-07-27` against a dateless default question
+>   stamped with real today; `_stale_within_threshold(max_age_days=2)` correctly
+>   refused it from 2026-07-30 onward. Fixed by patching `central_today_iso`
+>   rather than by re-dating the fixture, so it cannot rot a third time.
+> - `test_build_candidate_pool_does_not_embed_full_odds_history_payload` —
+>   **the second instance of this ticket's own headline finding.** It patched
+>   `syndicate.features.intelligence.collect_all_recommendations`, the same
+>   dead symbol that got `test_build_candidate_pool_skips_sports_without_manifests`
+>   removed under this ticket, so it too ran against real
+>   `data/mlb_source/.../2026-06-10/` mirror data. Two months on, all 32 real
+>   candidates now trip `_candidate_is_final` (`candidate_scoring input_count=32
+>   output_count=0 final_filtered=32`), MLB is skipped by `if not
+>   sport_candidates: continue`, and the pool lookup `KeyError`s. Repaired by
+>   injecting at `pipeline.intelligence_state.collect_candidates_with_fallback_merge`
+>   — the collector this module actually calls — and stubbing the slate join,
+>   which was the last reader of `data/` on this path. **Not** repaired by
+>   moving the fixture date, per this ticket's own "DO NOT restore it by
+>   updating the expected constant".
+>
+> **Verified by mutation, not by green.** `mocked_loader.call_count == 2` passes
+> against a completely empty pool, which is how the pre-repair test read green
+> on its headline assertion while the pool it meant to inspect did not exist.
+> So the repaired tests were run against two deliberately broken copies of
+> `pipeline/intelligence_state.py` in a throwaway worktree: re-embedding
+> `odds_history` on the pool entry turned the pool test red
+> (`'odds_history' unexpectedly found`), and removing the sport-scoped
+> promotion skip turned the loop test red. Both failed for the right reason,
+> and the mutation output showed `candidate_count: 1` with a populated
+> `candidates` list — so the repaired test inspects a real pool. Three
+> liveness assertions were added for the same reason.
+
+
 
 The thesis that these were the cheap local instrument for the production zero is
 **refuted**. Measured on `main` in this worktree:
