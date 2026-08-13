@@ -8,10 +8,9 @@
 ## Config
 
 - Max concurrent open lanes: **3** `[policy]`
-- Repo tip: `a9df9f9b` (`a9df9f9b0fa24f08b647e31a76e835df7028500a`),
-  `origin/main` at the same commit, 2026-08-13 10:16 -05:00,
-  "#401 runner: not a defect -- a 24h interval with 15.6h elapsed".
-  `[from-git 08-13]`
+- Repo tip: `3447f983`, `origin/main` at the same commit,
+  2026-08-13 10:2x -05:00, "todo: point the egress tickets at the report that
+  justifies them". `[from-git 08-13]`
 - Deployed SHA: **not derivable from git.** `autoDeploy = no` on all three
   services, so the repo tip is an upper bound, not the running commit — and
   each service can sit on a different one. Read
@@ -40,6 +39,17 @@
 
 ## Open problems
 
+- **The L2 board freezes silently and only a restart clears it (`#417`).**
+  `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` fired 300 consecutive
+  cycles `09:29:27Z–14:54:44Z`, aborting before the fingerprint, so no
+  shortlist was built or written for **4h12m**. Not a leak: `anon` drifted
+  **+18.9 MB** across all 300 samples. The guard
+  (`_MIN_SAFE_MEMORY_HEADROOM_BYTES = 1900`) credits only `inactive_file`, so
+  when the kernel promoted ~243 MB to `active_file` at ~11:02, effective
+  headroom fell 1877 → 1643 **while total memory in use fell 3120 → 2705 MB**.
+  Sibling of `#387`, different guard. `[measured 08-13]`
+- **Expected to recur** as the worker re-warms — the 14:56 restart is the only
+  thing that cleared it. `[unverified 08-13]`
 - `live-odds-worker` disk usage climbing steadily, ~20% → ~40% of 50 GB
   over two weeks. Something accumulates and is not cleaned up.
   **Not yet diagnosed.** `[measured 08-12]`
@@ -55,3 +65,10 @@
   internet and back in. `[from-code 08-12]`
 - Secondary cause: a checksum was computed and sent but never compared, so
   unchanged artifacts re-uploaded in full every sweep. `[from-code 08-12]`
+- **Cutover is live and durable.** Every `PUBLISH_OK` on refresh-worker at
+  `14:54:11Z` carries `url=http://syndicate-an21:10000/...`, and `render.yaml`
+  holds the internal hostname for both workers, so a `blueprint_sync`
+  reinforces it rather than reverting it. `[measured 08-13]`
+- `#401`'s maintenance runner is **not** broken: 15.62h elapsed against an
+  86400s interval, the env override unset on both workers. Next run expected
+  ~`23:38:06Z`. `[measured 08-13]`

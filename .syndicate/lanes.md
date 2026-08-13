@@ -6,7 +6,23 @@
 
 ## OPEN
 
-### internal-hostname-cutover — OPEN — opened 2026-08-13 — session: <name>
+_(none — see CLOSED below)_
+
+## CLOSED THIS SESSION
+
+### internal-hostname-cutover — CLOSED 2026-08-13 — verified in production
+- Verification met: every `PUBLISH_OK` line on refresh-worker at `14:54:11Z`
+  carries `url=http://syndicate-an21:10000/api/ops/artifact...`, publishes
+  succeeding (`published_hot_artifacts count=14 failed=0`), and
+  `PUBLISH_BUDGET uploads=915 used_mb=302.4 ceiling_mb=20480.0`.
+- Durability: `render.yaml` carries the internal hostname for both workers, so
+  a `blueprint_sync` reinforces the fix instead of reverting it — the one thing
+  that could silently have undone it.
+- Report committed at `eaf7965d`; tickets now point at it (`3447f983`).
+
+### (superseded lane detail, kept for the file/line map)
+
+### internal-hostname-cutover — CLOSED — opened 2026-08-13 — session: <name>
 - Goal: `SYNDICATE_WEB_PUBLISH_URL` points at the internal private-network
   hostname; worker→web traffic no longer leaves the Render network.
 - Files:

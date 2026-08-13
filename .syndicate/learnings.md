@@ -55,3 +55,52 @@
 - The rule going forward: **hypotheses go into the lane before they are
   tested, and exonerations are written down as loudly as findings.** The
   expensive failure is re-litigating a dead end three sessions later.
+
+### 2026-08-13 — A guard can measure a number that moves without the system moving
+- What we believed: the board was stale because building it had become
+  slow (the `#414` thread — four hours of apparent slowness).
+- What was actually true: builds were not running **at all**.
+  `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` fired 300
+  consecutive cycles and aborted before the first stage. At ~11:02 the
+  kernel promoted ~243 MB of page cache from `inactive_file` to
+  `active_file`; the guard credits only `inactive_file`, so effective
+  headroom fell 1877 → 1643 MB **while total memory in use fell 3120 →
+  2705 MB.** `anon` drifted +18.9 MB across all 300 samples — nothing
+  about the system's real memory pressure changed.
+- The rule going forward: **when a threshold decides whether work runs,
+  audit what moves the quantity it reads — not just the constant.** A
+  stale constant is the easy half. A quantity that swings on kernel LRU
+  bookkeeping makes the guard's verdict unrelated to the risk it guards.
+  Guard on unreclaimable memory (`anon + shmem + slab_unreclaimable`),
+  which is what an OOM kill actually responds to.
+- Corollary that generalises past memory: **if usage going DOWN can make
+  a guard stricter, the guard is reading the wrong quantity.** That
+  inversion is a complete proof on its own — no baseline needed.
+- Cost: 4h12m of a stale board served as current, and an investigation
+  aimed at build duration.
+
+### 2026-08-13 — A criterion has a DIRECTION, and checking it is free
+- What we believed: `#401`'s maintenance runner was silently broken —
+  "has not executed in 15 hours and I do not know why", after an earlier
+  "the old shared stamp is suppressing it" was falsified.
+- What was actually true: a 24h interval with 15.62h elapsed. Not due,
+  short by 8.38h.
+- The sharper point: **the silence itself already excluded the suspected
+  cause.** A failed stamp write leaves `last = 0.0`, and `_due()` treats
+  missing-or-unreadable as due — so a broken stamp runs maintenance
+  **every tick**. The hypothesis and the symptom pointed in opposite
+  directions. No instrumentation was needed.
+- The rule going forward: before instrumenting, ask **which way the
+  suspected fault would push the observable.** Extends "a criterion is an
+  instrument too": an instrument has a sign as well as a denominator.
+
+### 2026-08-13 — A grep excerpt is not the file
+- What was actually true: a `grep` result rendered
+  `open("/proc/self/status")` as `open("\proc\self\status")`. A
+  permanently-inert memory guard was half written up on that basis —
+  against another lane's freshly shipped work.
+- The rule going forward: **read the file before filing a defect against
+  a literal.** Search output is a pointer, not evidence. `sed -n` on the
+  path is authoritative where a tool's excerpt is not.
+- Cost: none, caught before filing. Records the near-miss because the
+  next one will not announce itself.
