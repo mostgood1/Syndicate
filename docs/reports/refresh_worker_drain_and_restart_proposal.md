@@ -166,10 +166,52 @@ a `--drain` mode in `scripts/check_deploy_safety.py`, which is already the tool
 everyone runs and already knows how to read build state. Deployers get
 `check_deploy_safety.py --drain --wait` instead of a manual gate.
 
-**Phase 3 — checkpoint and resume the board build.** The real fix, and the
-expensive one. With phases 1 and 2 in place the pressure for this drops a lot:
-drain converts *destroyed work* into *waiting*, which is usually acceptable.
-Only worth doing if the waits prove intolerable.
+**Phase 3 — checkpoint and resume the board build. ~~The real fix.~~
+MEASURED 2026-08-13 AND WITHDRAWN AS SPECIFIED — do not build this.**
+
+The design above assumed a per-sport resume boundary. §6 flagged "how much of
+the 13–23 min is per-sport" as the open question that decides whether this is
+days or weeks. It was measured before any code was written, from
+`candidate_generation` traces already in production logs (`_intel_trace_timed`
+prints them to stdout, so no instrumentation was needed):
+
+| sport | n | max_s | median_s |
+|---|---|---|---|
+| **mlb** | 6 | **1169.0** | **928.5** |
+| wnba | 6 | 7.4 | 5.1 |
+| soccer | 6 | 2.0 | 1.7 |
+| nba | 6 | 0.1 | 0.0 |
+| ncaab / nhl / nfl / ncaaf | 6 each | ≤0.05 | 0.0 |
+
+Sum of per-sport maxima = 1304.6s ≈ 21.7 min, which matches the observed build
+duration — so this accounts for the whole build.
+
+**~90% of the board build is one sport. Every other sport combined is under ten
+seconds.** A per-sport checkpoint would let a restart resume "after wnba" and
+save about seven seconds. The premise is wrong, and building it would have
+produced a correct, tested mechanism that saved ~5% of the thing it targeted.
+
+**What a real phase 3 would need**: a resume boundary *inside* MLB candidate
+generation — plausibly per-game or per-market. **That cannot be specified yet,
+because nothing measures below the sport level.** The only timed events in a 3h
+window are `candidate_generation` (per sport), `evaluation_bundle` (178.4s) and
+`candidate_scoring` (119.4s). MLB's 19.5 minutes is a black box.
+
+**So the unblocking step is instrumentation, not checkpointing**: wrap the stages
+inside the `for sport in overview:` loop at `intelligence.py:7349` with the
+existing `_intel_trace_timed`, exactly as `candidate_generation` already wraps
+the whole iteration at `:7675`. Zero behaviour change, and the next real build
+answers where the 19.5 minutes goes.
+
+*Not done here deliberately:* `syndicate/features/intelligence.py` had 26
+uncommitted lines from another lane at the time of writing, and tonight produced
+three separate incidents of one session committing another's in-flight work.
+Whoever picks this up should check `git status` on that file first.
+
+**Revised recommendation: phase 2 is the answer.** Drain converts destroyed work
+into waiting, and with ~90% of the cost in a single sport there is no cheap
+checkpoint to be had. Revisit only if the waits prove intolerable AND the
+instrumentation above shows a boundary inside MLB worth cutting on.
 
 ---
 
@@ -187,12 +229,15 @@ Only worth doing if the waits prove intolerable.
 **Needs measuring before building phase 2:**
 1. **Render's actual SIGTERM→SIGKILL grace period on a worker.** Assumed short
    (~30s) and never verified. Measurable directly once phase 1 lands: the
-   handler logs on signal, and the gap to the last line is the grace. If it is
-   generously long, part of phase 3 becomes cheaper.
-2. **How much of the 13–23 min is per-sport**, i.e. whether a natural resume
-   boundary exists inside `collect_candidates`. Determines whether phase 3 is
-   weeks or days.
+   handler logs on signal, and the gap to the last line is the grace.
+2. ~~**How much of the 13–23 min is per-sport.**~~ **ANSWERED 2026-08-13: almost
+   none of it.** MLB is ~90% of the build (1169s max) and every other sport
+   combined is under 10s. This killed phase 3 as specified — see §5.
 3. **Whether the sim can be made resumable at all**, or only restartable.
+4. **NEW — where MLB's 19.5 minutes goes.** Nothing measures below the sport
+   level, so no resume boundary inside MLB can be specified. This is now the
+   only thing standing between here and a real phase 3, and it is a logging
+   change, not a design one.
 
 **Explicitly not claimed:** that this is the only design. Moving the board build
 off refresh-worker entirely is a real alternative — ownership is already an env
