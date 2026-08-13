@@ -4737,6 +4737,31 @@ cheaper to test than magnitude and does not depend on catching the biggest case
 **The instrument half of `#327` is CLOSED and archived** (see `todo_closed.md`,
 2026-08-10). The excursion itself is not.
 
+#### NEXT ACTION — one small change, and it is the only thing blocking progress
+
+**Record BYTES on both hot-artifact paths, beside the counts already there.**
+
+| where | add |
+|---|---|
+| `pull_hot_artifacts` (`artifact_publisher.py`) | total bytes of each export response; put `response_bytes` on the existing `live_lens_pull_after` sample |
+| `sweep_changed_hot_artifacts` | sum of `candidate.stat().st_size` for every file read; put `swept_bytes` on `live_lens_publish_after` |
+
+**Why this and nothing else.** Every number in this entry is a *count* or a
+*container reading*. The hypothesis is about **bytes held**, and bytes have never
+been measured. `pub=0` cost `+488.6MB` and `pulled=0` cost `+575.7MB`, so the
+existing counters are provably the wrong denominator — a rate against them is
+meaningless, which is exactly how `−1.60 MB/artifact` misled this lane.
+
+**The reading that settles it:** a cycle where `response_bytes` or `swept_bytes`
+is large while the count is zero, correlated with the container peak. If bytes
+track the peak, the allocator is found. If bytes are small while the peak is
+large, the hot-artifact path is genuinely excluded and the search moves on — and
+that is the first clean exclusion this item would have.
+
+**Do NOT** start by hunting a bigger sweep (`LARGE_SWEEP` thresholds are
+unreachable — sizes plateau), or by adding a per-artifact callback (blind inside
+one 207MB file, and it breaks three tests). Both were tried.
+
 **What is established:**
 
 - **In-process**, in the long-lived worker pid — 100–104% of the growth, no
@@ -5578,6 +5603,28 @@ Board verified: **15 games, `HOU @ SD` present, `reconciled=None`** — it came 
 through the normal path, so the net is dormant rather than load-bearing.
 
 ### #312 — ON `main` AS `f1bba90c`, LIVE ON NOTHING (its only deploy was cancelled). Audit tool shipped and running. 8 switches protected, 22 still pinned, and the sync mechanism itself remains UNTESTED
+
+#### NEXT ACTION — nothing to build; this needs a deploy to complete, or a decision to stop
+
+**`f1bba90c` rides in on the next uncommitted-cause worker deploy.** Nobody has
+to do anything for the protection to take effect. Two things to do when it does:
+
+1. **Run `py -3 scripts/audit_blueprint_drift.py` in the SAME MINUTE as any
+   future `render.yaml` push.** It exits 1 on drift. The 0-drift reading is a
+   snapshot and one env-API call invalidates it.
+2. **Watch for a `blueprint_sync` deploy.** The mechanism is still **untested** —
+   the only deploy carrying this change was cancelled, so it was never offered
+   its input. **That is the wrong experiment, not a null result**, and
+   `CLAUDE.md`'s bolded rule still rests on a single 2026-08-08 measurement.
+
+**Verification gotcha:** `grep -c "sync: false" render.yaml` reads **double** —
+each converted key's comment contains the literal in backticks. Parse the YAML.
+Correct count is **9** (8 new + `ANTHROPIC_API_KEY`).
+
+**22 kill switches remain pinned to literals** — deliberately, they are ownership
+in disguise (`true` on one service, `false` on the others). Changing those trades
+a durable emergency disable for the blueprint's auto-correction of a
+cross-service misconfiguration, which is the property `#278` needed.
 
 `render.yaml:532-533` hardcodes `SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN: "true"`,
 so disabling it through the single-key env endpoint is not durable — the next
