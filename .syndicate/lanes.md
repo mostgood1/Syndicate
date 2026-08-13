@@ -10,6 +10,26 @@ _(none — see CLOSED below)_
 
 ## CLOSED THIS SESSION
 
+### board-transport — CLOSED 2026-08-13 (work measured 08-10/11)
+- Goal: the board computes correctly every cycle and cannot cross the transport.
+- Files (exclusive to this lane while open):
+  - `pipeline/intelligence_state.py`
+  - `syndicate/features/shared/refresh_state_store.py`
+  - `syndicate/features/shared/memory_observability.py`
+  - `syndicate/blueprints/ops.py` (trace blocks only)
+  - `scripts/deploy_preflight.py`, `tests/test_state_freshness.py`,
+    `tests/test_candidate_trace_reads.py`, `tests/test_deploy_preflight.py`
+- CLOSED: `#317` transport, `#322` state cache, `#324` keyvalue residency,
+  `#327` memory instrument, `#334` freshness reporting, `#337` write-path count.
+- **OPEN and handed back:** `#338` (serve reads `query_state_cache` at 150 while
+  `board_snapshot` stores 220 — cause not localised), `#332` (NFL autorun guard,
+  filed not fixed).
+- **Blocked on another lane:** `#336`/`#338` are downstream of `#285`'s memory
+  ratchet. The overview guard needs **~725MB** it does not have
+  (3000MB floor vs 2275.5MB measured headroom), so it aborts at
+  `sports_done=0 sports_total=8` and the candidate pool is empty by construction.
+- All commits are ancestors of `478edd78`. No uncommitted work from this lane.
+
 ### sim-execution-observability — CLOSED-PENDING-MEASUREMENT 2026-08-13
 - Goal: measure sim execution per sport (when/how long/how often/what triggers
   a re-sim), then fix what the measurement exposed.

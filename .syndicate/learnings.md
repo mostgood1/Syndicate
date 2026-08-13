@@ -235,3 +235,38 @@ are a confusable pair and were the likely source of the error.
   actually measures the thing being paid for, and that it spans the population
   of interest.**
 
+### 2026-08-13 — Presence is not reachability: verify the PATH, not the symbol
+
+**Overturned belief:** that confirming a fix is present in the deployed code
+means the observed behaviour goes through it.
+
+Five failures in one lane, same root. A commit range read as a call path
+(`#331` — primitives shipped, call site uncommitted, reported as landed). Two
+identically-named memory emitters unified when there were three (`#327` — the
+third called the stderr-only logger directly). Three real code paths patched for
+`#334`, none of which the serving route takes — the endpoint had **four**
+readers. One of two copy-pasted trace blocks fixed (`#338`). And finally the
+reporting script that skipped dict-valued keys, so the "still broken" reading was
+the tool, not the endpoint.
+
+**What actually works:** enumerate the callers and fix the choke point they all
+share. The `#334` fix that finally held touched **zero call sites** — the logic
+went *inside* the shared function, which is what made it unmissable. A grep, a
+commit range, and a name match all answer "is this symbol here"; none answers
+"does the path that produces this observation execute this code".
+
+**State a falsifiable discriminator before deploying.** Ours was "three
+microsecond-apart sub-values means the recompute never ran; one consistent value
+means it did." It read 3 after each of three targeted fixes and 1 after the
+enumerated one — so the deploy that worked was distinguishable from the three
+that did not, without argument.
+
+**Corollary — retracting a caveat matters as much as retracting a finding.** I
+published "the Render logs `text` filter is unreliable", which was false: it is a
+correct case-insensitive substring match and I had judged absence from a 150-char
+truncation of a 1500-char line. Two other lanes had conclusions resting on zeros
+from that API. A false warning about an instrument silently devalues every
+correct reading anyone takes with it. Trust absence (a nonsense token returns 0),
+verify presence (counts inflate on substring containment), and note results come
+back **oldest-first regardless of `direction`**.
+
