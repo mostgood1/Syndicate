@@ -1,23 +1,79 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#414` — **VERIFIED INERT IN PRODUCTION 2026-08-13.** The fix is deployed and the cache is never hit. NEEDS ITS AUTHOR.
+### `#414` — **THE CACHE IS PROVABLY NOT HIT, AND THE BUILD GOT FASTER ANYWAY. Two signals disagree.** NEEDS ITS AUTHOR.
 
 **This is the most actionable open item from the 2026-08-12/13 session.** The
-root-cause entry further down is correct; the *fix* does not work. Measured on
-the first completed build after `d88ed790` landed (finished 02:42:27), by the
-author's own stated criterion:
+root-cause entry further down is correct. What the *fix* is doing is unresolved.
+
+**WHAT HOLDS — the author's own stated criterion, unchanged across two completed
+builds after `d88ed790`:**
 
     ODDS_HISTORY_LOADED     1
     ODDS_HISTORY_CACHE_HIT  0        <- fingerprint not matching
 
-Confirmed independently by duration, **same slate date** (`TZ=America/Chicago`,
-so the shard had not reset and the comparison is valid):
+That is a direct observation of the mechanism. **The cache is not being hit.**
 
-    23:54   939.6s  rows=606   pre-deploy
-    02:38   946.0s  rows=460   post-deploy      = 1.01x
+**WHAT DOES NOT HOLD — and this entry said the opposite for an hour.** I first
+reported "verified inert" on a second signal:
 
-Fewer rows, marginally *more* time. Two instruments agreeing — a positive-emission
-check and a duration measurement — which is stronger than either alone.
+    23:54   939.6s   pre-deploy
+    02:38   946.0s   post-deploy    = 1.01x, "no improvement"
+
+That was **one comparison point picked out of a series oscillating 930–1509s**.
+Three builds show the opposite:
+
+    02:05:05   1394.2s   rows=468   2.98 s/row
+    02:38:58    946.0s   rows=460   2.06 s/row
+    03:00:35    770.9s   rows=499   1.54 s/row
+
+**AND THAT WAS ALSO ENDPOINT SELECTION — withdrawn too.** `02:05` is a local
+peak; take any noisy series from its maximum and it declines. Against the full
+distribution:
+
+    PRE-FIX  s/row:  1.39  1.54  1.93  1.99  2.83  2.98   range 1.39–2.98, spread 2.14x
+    POST-FIX s/row:  1.54  2.06
+
+    post-fix points inside the pre-fix range:  2 of 2
+    vs pre-fix median 1.99:                    0.77x and 1.04x  (straddles 1.0)
+    pre-fix BEST 1.39 vs post-fix best 1.54:   pre-fix was already better
+
+**The pre-fix series already contained a better value than either post-fix
+build.** Three claims came out of this one dataset — −27% (anchored on the
+pre-fix max), 1.01x (one mid-series point), and monotonic decline (3 of 8 points
+spanning the deploy). **All three are endpoint selection on a series whose spread
+exceeds every effect claimed. None survives.**
+
+**THE DURATION DATA CANNOT ATTRIBUTE ANYTHING, IN EITHER DIRECTION.** Not
+"inert", not "improving". Determining it needs many more builds or a controlled
+comparison.
+
+**So: the cache is provably not hit, and nothing about the timings can be
+concluded.** A counter reading zero is a fact about the code path; a duration
+delta on a 2.14x-spread series is a coin flip. **Keep the mechanism as the
+headline and discard the timings — including the ones that flatter the fix.**
+
+**This is the third instance in one session of a baseline being treated as a
+fact** (see the operational note). The docstring in
+`check_deploy_safety.py:_expected_build_seconds` records two earlier ones, and
+this one was committed within an hour of writing that note. **A measured number
+is a timestamp — and so is the baseline you compare it against.**
+
+**The most durable finding is neither signal but the RATIO**, identical across
+both builds:
+
+    build1  225/26  185/21  107/11  100/10  72/7  12/1  9/1
+    build2  229/26  196/21   99/11   95/10  73/7        9/1
+    s/row      8.8     9.3     9.9     8.6  10.5        8.8
+
+**~8–10 seconds per ROW, near constant, measured twice independently.** That is
+the wrong shape for a once-per-build index rebuild, which would show a large
+fixed cost and cheap rows. It suggests the expensive work scales with output, so
+a per-payload memoisation may be targeting a cost that is not where the time
+goes — independently of whether the fingerprint matches.
+
+**Confound, stated rather than buried:** build 1 ran on `d88ed790`, build 2 on
+`e02ea347`, with a worker restart between them. Not a clean A/B, and that restart
+is itself one of the candidate explanations above.
 
 **Where to look, from the same build.** Per-game timings inside MLB
 (`SLOW_GAME_CANDIDATE`, threshold 5s):
@@ -13497,6 +13553,14 @@ above, closer to the season); NFL preseason props (no real prop-odds
 source exists at all, correctly never attempted).
 
 **Operational notes:**
+- **A MEASURED NUMBER IS A TIMESTAMP — AND SO IS THE BASELINE YOU COMPARE IT
+  AGAINST.** Added after committing this note and then breaking it within the
+  hour: I compared one post-deploy build against one hand-picked pre-deploy
+  build from a series oscillating 930–1509s, got 1.01x, and reported `#414` as
+  "verified inert". Three builds showed a monotonic decline (1394 → 946 → 771).
+  The reading was correct; the *reference* was one sample of a noisy series
+  treated as a fixed point. **Before quoting a ratio, plot the series.** A single
+  before/after pair cannot distinguish a change from the variance it sits in.
 - **A MEASURED NUMBER IS A TIMESTAMP, NOT A FACT.** Three lanes each generalised
   from a flat stretch of the same series on 2026-08-12/13, in different
   directions, and all three were wrong:
