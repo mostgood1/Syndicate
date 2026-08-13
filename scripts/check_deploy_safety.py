@@ -137,24 +137,45 @@ def _newest_timestamp(rows: list[dict[str, Any]]) -> str:
 def _expected_build_seconds(key: str) -> float | None:
     """SLOWEST recent COLLECT_SPAN_EXIT elapsed_s, or None when unreadable.
 
-    MAX, NOT MEDIAN -- BECAUSE THE COST IS ASYMMETRIC, NOT BECAUSE THE SERIES
-    GROWS. The first version of this comment said `collect_candidates` "grows
-    through the day as the slate fills", from two measurements: 804s at 19:49
-    and 1372s at 21:43. A third landed at 1080.81s at 22:52, which falsifies it
-    -- the series VARIES with slate size, it does not trend.
+    MAX, NOT MEDIAN -- BECAUSE THE COST IS ASYMMETRIC. That reason has survived
+    two wrong explanations of the same data, and the history is kept because the
+    next person will otherwise re-run it.
 
-    The decision does not change and the reasoning had to. Max is right because
-    the two errors cost wildly different amounts: over-waiting costs idle
-    minutes, under-waiting costs ~23 minutes of destroyed board work plus a
-    stale board for everyone verifying anything against it. A median over the
-    last dozen runs returned 13.4min against a real build of 22.9min, which is
-    exactly how the next person deploys into one.
+    v1 said the series "grows through the day as the slate fills", from two
+    points (804s at 19:49, 1372s at 21:43).
+    v2 said that was falsified by a third (1080.8s at 22:52) and asserted the
+    series "VARIES with slate size, it does not trend".
+    v3, the truth, from 20 points walked back in 3h chunks 2026-08-13:
 
-    Worth keeping the correction visible rather than quietly editing the number:
-    a right decision resting on a wrong stated reason is the more dangerous of
-    the two, because the next person to touch this will reason from the premise,
-    not the outcome -- and "it grows" invites someone to replace max with a trend
-    extrapolation, which on a varying series is worse than either.
+        15:25-17:10   186-224s    rows ~297   s/row 0.61-0.81   <- flat baseline
+        18:02          341.5s     rows  631   s/row 0.54        <- rows double
+        19:49          804.4s     rows  511   s/row 1.57
+        21:43         1372.2s     rows  667   s/row 2.06
+        23:54          939.6s     rows  676   s/row 1.39
+        01:29         1508.9s     rows  533   s/row 2.83
+
+    There IS a regime shift -- unit cost roughly TRIPLED (0.7 -> 2.0+ s/row), so
+    slate size does not explain it -- and it is NOT monotonic: it peaks, recedes
+    to ~930s, and returns. A band of roughly 930-1510s since 21:43.
+
+    Both earlier readings sampled a flat stretch and generalised in opposite
+    directions. v1 saw two rising points inside a climb; v2 saw three points
+    inside a plateau. **A measured number is a timestamp, not a fact.**
+
+    Max over the recent window is still right, and now for a better-supported
+    reason: on a band-oscillating series max picks the top of the band, which is
+    what "how long might I wait" needs. It would LAG a monotonic climb -- so if
+    the s/row figure keeps rising, revisit this. Do not replace it with a trend
+    extrapolation on the strength of any two points; that is the mistake this
+    docstring has already recorded twice.
+
+    The asymmetry is unchanged and is the load-bearing part: over-waiting costs
+    idle minutes, under-waiting costs ~23 minutes of destroyed board work. A
+    median over the last dozen returned 13.4min against a real build of 22.9min.
+
+    SEPARATE ISSUE, NOT THIS FUNCTION'S: a 6.7x regression in build time at
+    flat-to-falling row counts is a real defect and is not fixed by estimating it
+    better. See the sim-timing lane's findings.
     """
     import re
 
