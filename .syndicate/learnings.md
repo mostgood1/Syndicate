@@ -305,3 +305,61 @@ back **oldest-first regardless of `direction`**.
   keys with "no reader anywhere" — all seven were artifacts of the exclusion.
 - Cost: caught before anything was deleted. Would have been a production
   breakage on the next web deploy had the first pass been applied.
+
+### 2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers the obligation, not the content
+
+- What we believed: that `session-start.sh` exiting 0 with all five section
+  headers present in its stdout meant the ledger reached the session.
+  `HOOKS.md` verification step 4 — "`bash .claude/hooks/session-start.sh`
+  prints the ledger" — was accepted as proof and reported as PASS.
+- What was actually true: the harness caps hook stdout at ~2KB of injected
+  context and persists the remainder to a file. v1 emitted **39,924 B**
+  (session `ac67a9f1`, `hookName=SessionStart:startup`, `exitCode=0`,
+  `durationMs=459`, `type=hook_success`). About **5%** reached context, and it
+  was the least operational 5%. Byte offsets on a 42,836 B run:
+  `VERIFIED STATE` 40 (in), `OPEN LANES` 12,693 (cut), `STANDING RULES` 42,345
+  (cut), `OPEN OBLIGATIONS` 42,551 (cut), the `/lane /preflight /checkpoint`
+  line 42,709 (cut). **Every section the hook existed to deliver was past the
+  cut.** The hook fired perfectly and delivered nothing that mattered.
+- How we found out: the CLI could not be driven headlessly (OAuth expired), so
+  we read the transcript of a session that had already started —
+  `~/.claude/projects/<project>/ac67a9f1-*.jsonl`, line 3, an `attachment`
+  record carrying `stdout`, `exitCode`, `durationMs`, `hookEvent`. The
+  truncation was stated there in plain text: "Output too large (38.7KB) ...
+  Preview (first 2KB)". It was legible the entire time. Nobody had looked at
+  the delivery side.
+- The rule going forward: **a hook is a channel with a budget, and the only
+  measurement that counts is what ARRIVES, not what was emitted.** Verify a
+  hook by reading the `attachment` record in the consuming session's
+  transcript (`stdout` length, `exitCode`, `type`), never by running the script
+  in a terminal — a terminal has no cap, so it can only ever confirm the
+  emitter. Keep hook stdout under **2,000 B**. A hook's job is to deliver the
+  OBLIGATION to read the ledger plus the few facts too costly to miss; the
+  ledger itself gets read from disk by the session. Direct sibling of
+  `2026-08-13 — Presence is not reachability`: the content was present at the
+  emitter and unreachable at the destination.
+- Also — the size was seen and misread. The v1 output was reported as "524
+  lines injected at every session start ... a real context cost worth knowing
+  about." The number was in hand and was filed as an *expense* rather than as
+  *evidence of a defect*. A quantity that exceeds a limit is not a cost, it is
+  a failure. When a measurement is large, establish what it is large relative
+  to before describing it.
+- Cost: ~1 hour, self-inflicted, caught before any session relied on the
+  digest. `0d0b8931` (pushed as `f6fec4f1`) shipped a hook reported as working
+  that was ~5% functional.
+
+### 2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works
+
+- Named as the likely culprit when SessionStart could not be verified ("if the
+  ledger doesn't appear, the likely culprit is `shell: "bash"` not being
+  honored"). Measured working: session `ac67a9f1`, Claude Code **2.1.227**,
+  `hookName=SessionStart:startup`, `exitCode=0`, `durationMs=459`, `stderr`
+  empty, `type=hook_success`, on a `.sh` script invoked as
+  `"$CLAUDE_PROJECT_DIR"/.claude/hooks/session-start.sh`.
+- Do not re-litigate the shell. Note that `bash` is **not** on the Windows
+  system PATH here (`which bash` fails from PowerShell) — the `shell: "bash"`
+  field is what resolves it, so the exec form `{"command":"bash","args":[...]}`
+  would have failed where this succeeded.
+- The real failure was truncation, above. A guess about a failure mode is not a
+  finding; this one was wrong while the data to predict the right one was
+  already in hand.
