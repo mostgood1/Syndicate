@@ -159,10 +159,34 @@ cost is itself concentrated** — two games were ~410s of a ~946s build — so a
 per-GAME checkpoint is nearly as useless. The original withdrawal was right at
 the wrong granularity.
 
-**Do not reopen without a measurement.** A real phase 3 needs a boundary inside
-MLB's per-row work, and the ~8–9 s/row figure above says that is where the cost
-actually is. Building the per-game checkpoint would have produced something
-correct, tested, and useless — the category this session hit twice.
+**REOPENED 2026-08-13, and the target is now specific.** The withdrawal rested on
+a "~8–9 s/row" figure that divided game-elapsed by **candidates emitted** rather
+than by **iterations executed** — not a rate of anything, and withdrawn (see the
+`#414` entry). Per-ITERATION timing shows the opposite shape:
+
+    ONE `game_recs` iteration per MLB game takes 100–400s.
+    Every other iteration in that loop is ~0.000s.
+
+Call path confirmed two ways. By code: `intelligence.py:49` imports
+`_game_bet_candidates_from_game`, `:6362` calls it and is exactly what
+`SLOW_GAME_CANDIDATE` wraps, and `home.py:2568`'s `for row in game_recs` is what
+`SLOW_ROW_PROFILE` instruments — caller and callee, one path. And independently
+of the code: six `SLOW_GAME_CANDIDATE`/`SLOW_ROW_PROFILE` pairs agree to three
+decimal places at the same instant (10.05/10.050, 295.78/295.783,
+399.40/399.398, 116.82/116.822, 61.68/61.683, 102.70/102.700). Two separate loops
+would not.
+
+**So a checkpoint, timeout, or skip at that ONE iteration boundary recovers
+100–400 seconds per game** — against the ~7 seconds a per-sport checkpoint was
+worth. A different proposition from anything considered before, and a
+single-object question rather than a systemic one.
+
+**Reproducible:** game_pks **823833, 824241, 822698, 823994, 823916** on
+2026-08-12, inside `home.py:_game_bet_candidates_from_game`.
+
+**Still true:** per-SPORT and per-GAME checkpointing remain useless for the
+reasons originally measured. What changed is that a THIRD granularity exists one
+level below both, and that is where the cost lives.
 
 ### ID MAPPING OF RECORD — two of my IDs collided and were renumbered
 
