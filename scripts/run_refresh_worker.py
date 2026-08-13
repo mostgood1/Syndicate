@@ -3233,10 +3233,37 @@ def main() -> int:
         # relocated here from live-odds-worker 2026-07-20 to isolate the
         # 1000-sim Monte Carlo job's memory footprint from that worker's
         # odds-refresh/SmartSim/live-lens load.
+        # `#409` phase 2. Publish what this worker is doing, every cycle, so a
+        # deployer can wait for idle instead of guessing. `in_flight` is set by
+        # the code that LAUNCHES work, never inferred -- a deployer acting on an
+        # inferred idle would be trusting a guess with a 23-minute build behind
+        # it.
+        _drain_hold = None
         try:
-            mlb_sim_meta = _run_mlb_sim_tick()
-            if mlb_sim_meta:
-                print(f"[refresh_worker] MLB_SIM_TICK {json.dumps(mlb_sim_meta, sort_keys=True, default=str)}", flush=True)
+            from pipeline.intelligence_state import _mlb_sim_subprocess_running
+            from syndicate.features.shared.deploy_drain import drain_hold_reason, publish_worker_state, set_in_flight
+
+            _drain_hold = drain_hold_reason()
+            set_in_flight("mlb_sim", bool(_mlb_sim_subprocess_running()))
+            publish_worker_state("refresh-worker")
+        except Exception as exc:
+            # Deliberately NOT silent. If this fails no heartbeat is published,
+            # the deployer reads the state as stale, and `read_worker_state`
+            # returns "unknown" -> it blocks rather than deploying. That is the
+            # safe direction, but a deployer blocked forever with no explanation
+            # is its own outage, so say why.
+            print(f"[refresh_worker] DRAIN_STATE_PUBLISH_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+        try:
+            if _drain_hold:
+                # Refuse to START a new sim while drained. An already-running
+                # sim is NOT interrupted -- drain waits for work to finish, it
+                # does not kill it.
+                print(f"[refresh_worker] DRAIN_HOLD stage=mlb_sim_tick reason={_drain_hold}", flush=True)
+            else:
+                mlb_sim_meta = _run_mlb_sim_tick()
+                if mlb_sim_meta:
+                    print(f"[refresh_worker] MLB_SIM_TICK {json.dumps(mlb_sim_meta, sort_keys=True, default=str)}", flush=True)
         except Exception as exc:
             print(f"[refresh_worker] MLB_SIM_TICK_ERROR {type(exc).__name__}: {exc}", flush=True)
         _diag_log_all_process_memory("post_mlb_sim_tick")

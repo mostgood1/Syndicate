@@ -439,6 +439,36 @@ def _board_build_deferral_reason(*, consecutive_odds_defers: int, consecutive_si
     box genuinely cannot host it and that is a capacity fact worth logging
     rather than hiding behind an unbounded wait.
     """
+    # `#409` phase 2 -- CHECKED FIRST, AND DELIBERATELY NOT BOUNDED LIKE THE
+    # HAZARDS BELOW.
+    #
+    # The two hazards below are bounded because they are conditions the build
+    # must eventually push through: an odds refresh is near-continuous, so an
+    # unbounded wait degenerates into "never run". A drain is the opposite --
+    # it is a request to STOP starting builds so a deploy can land on an idle
+    # worker, and pushing through it after N defers would defeat the entire
+    # mechanism.
+    #
+    # What stops a drain starving the board is not a defer count but the flag's
+    # own expiry: `deploy_drain` writes `expires_at` into the payload and
+    # `drain_active()` ignores it past that, so a deployer that crashes mid-drain
+    # cannot silence the board for longer than the TTL. The bound lives in the
+    # data, not in this counter.
+    #
+    # Measured cost of not having this, 2026-08-12: three deploys inside 25
+    # minutes each killed an in-flight build, leaving the served board ~35
+    # minutes stale.
+    try:
+        from syndicate.features.shared.deploy_drain import drain_hold_reason
+
+        drain_reason = drain_hold_reason()
+        if drain_reason:
+            return drain_reason
+    except Exception:
+        # A drain check that fails must not stop the board building. Same
+        # direction as `drain_active()`'s own except: for the WORKER, unknown
+        # means "not draining".
+        pass
     if _mlb_sim_subprocess_running():
         if _env_bool("SYNDICATE_BOARD_BUILD_FORCE_DESPITE_SIM"):
             # Explicit force lever, off by default. Added 2026-07-27 to test

@@ -31,6 +31,8 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 DEFAULT_BASE_URL = "https://syndicate-an21.onrender.com"
 
 
@@ -235,15 +237,108 @@ def _as_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+
+def _run_drain(*, owner: str, wait_seconds: int) -> int:
+    """Request a drain, wait for the worker to go idle, report.
+
+    NEVER deploys and never clears the drain on timeout. A drain that gives up
+    and reports is recoverable; one that gives up and proceeds is the 23-minute
+    build this whole mechanism exists to protect.
+
+    Exit 0 = idle, safe to deploy (then clear the drain).
+    Exit 1 = still busy at the cap.
+    Exit 2 = UNKNOWN -- the worker never acked, or its heartbeat is stale. NOT
+             the same as clear, and deliberately not exit 0.
+    """
+    import time as _time
+
+    from syndicate.features.shared.deploy_drain import (
+        read_worker_state,
+        request_drain,
+        _HEARTBEAT_STALE_SECONDS,
+    )
+
+    # THE DRAIN FLAG MUST REACH THE SAME STORE THE WORKER READS, and from a
+    # laptop it does not by default. `refresh_state_store` falls back to LOCAL
+    # FILES when the keyvalue backend is unconfigured -- so without this guard
+    # `--drain` writes a file on your machine, prints DRAIN_REQUESTED, waits,
+    # and the production worker never hears about any of it. A no-op that
+    # reports success is the worst shape a safety tool can have, and it is the
+    # same defect class as `#401` shipping an env flag nothing read.
+    from syndicate.features.shared.refresh_state_store import _state_backend_kind
+
+    if _state_backend_kind() != "keyvalue":
+        print("[UNKNOWN] Drain requires the keyvalue backend; this shell is not configured for it.")
+        print("  Without it the flag is written to a LOCAL FILE and the production worker never sees it.")
+        print("  Set SYNDICATE_REFRESH_STATE_BACKEND=keyvalue and SYNDICATE_REFRESH_STATE_URL to the")
+        print("  same values the workers use, then re-run. Refusing rather than pretending.")
+        return 2
+
+    request_drain(owner, reason="check_deploy_safety --drain")
+    print(f"Drain requested by {owner}. Waiting up to {wait_seconds}s for refresh-worker to go idle.")
+    print("  (a build already running is NOT interrupted -- drain waits for it to finish)")
+    deadline = _time.time() + max(30, int(wait_seconds))
+    last = ""
+    while _time.time() < deadline:
+        state, verdict = read_worker_state("refresh-worker")
+        busy = [k for k, v in ((state or {}).get("in_flight") or {}).items() if v]
+        line = f"  {verdict:<8} in_flight={busy or '[]'} commit={(state or {}).get('commit')}"
+        if line != last:
+            print(line, flush=True)
+            last = line
+        if verdict == "idle":
+            print("")
+            print("CLEAR: refresh-worker is drained and idle. Deploy now, then:")
+            print(f"  python scripts/check_deploy_safety.py --undrain --drain-owner {owner}")
+            return 0
+        _time.sleep(15)
+
+    state, verdict = read_worker_state("refresh-worker")
+    if verdict == "unknown":
+        print("")
+        print("[UNKNOWN] refresh-worker never acknowledged the drain.")
+        print("  Either the running build predates drain support, or its heartbeat is stale")
+        print(f"  (> {_HEARTBEAT_STALE_SECONDS}s). An unacknowledged drain is NOT a drained worker --")
+        print("  deploying now would kill whatever is in flight. Drain left in place; it expires on its own.")
+        return 2
+    print("")
+    print("NOT CLEAR: still busy at the wait cap. Drain left in place (it expires on its own).")
+    print("  Re-run to keep waiting, or clear it with --undrain if you are abandoning the deploy.")
+    return 1
+
+
+def _run_undrain(*, owner: str) -> int:
+    from syndicate.features.shared.deploy_drain import clear_drain
+
+    return 0 if clear_drain(owner) else 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    parser.add_argument("--undrain", action="store_true",
+                        help="Clear a drain this owner set (after deploying, or on abandon).")
+    parser.add_argument("--drain", action="store_true",
+                        help="Request a drain on refresh-worker and wait for it to go idle, then report.")
+    parser.add_argument("--drain-owner", default=os.environ.get("USER") or os.environ.get("USERNAME") or "deployer",
+                        help="Owner token: only this owner can clear the drain it set.")
+    parser.add_argument("--drain-wait-seconds", type=int, default=1800,
+                        help="Cap on how long to wait for idle. On timeout this REPORTS and never auto-deploys.")
     parser.add_argument(
         "--allow-live-games",
         action="store_true",
         help="Treat in-progress games as acceptable. They are only a warning by default, never a block.",
     )
     args = parser.parse_args()
+
+    # `#409` phase 2. Drain: ask refresh-worker to stop STARTING new builds and
+    # sims, wait for what is running to finish, then report a clear window.
+    # Surfaced here rather than as a separate script because this is the tool
+    # every lane already runs -- a drain nobody invokes is not a protocol.
+    if args.undrain:
+        return _run_undrain(owner=args.drain_owner)
+    if args.drain:
+        return _run_drain(owner=args.drain_owner, wait_seconds=args.drain_wait_seconds)
 
     token = _load_admin_token()
     if not token:
