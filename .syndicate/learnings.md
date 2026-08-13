@@ -576,3 +576,65 @@ back **oldest-first regardless of `direction`**.
   one *has*. Both errors are available, in opposite directions.
 - Cost: none yet. Caught while preflighting an unrelated web deploy.
 
+
+### 2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session
+
+- What we believed: `checkpoint-guard.sh` was the Stop hook, with the two
+  defects measured earlier in the session (unreachable pass branch, worktree
+  denominator). A rewrite was written, tested four ways, and all four passed.
+- What was actually true: **the file had been deleted**. `5b2ca320` — HEAD at
+  this session's start, sitting in plain sight in the session's own
+  environment block — deleted `checkpoint-guard.sh`, added
+  `checkpoint-guard.py`, and repointed `settings.json`. A parallel session had
+  already fixed both defects, better. The rewrite `Write`-created a file that
+  had been removed; it sat untracked, invoked by nothing, and the four green
+  tests were run against it. The live hook was never executed once.
+- How it survived so long: every check was internally consistent. The file
+  read fine (a 90-minute-old snapshot), `git status -- .claude` was clean
+  (correct — the orphan did not exist yet), and the tests genuinely exercised
+  the logic. Nothing disagreed with anything, because everything was measuring
+  the same stale object. **The contradiction was only visible in a file nobody
+  re-read: `settings.json`, which names the hook that actually runs.**
+- The rule going forward: **before editing any file, re-read it, and read the
+  config that dispatches to it.** A hook, handler or entrypoint is defined by
+  what invokes it, not by its filename. On a shared tree the gap between
+  reading and editing is a race, and `Write` silently resurrects a deletion
+  rather than failing — a deleted file and a file you have not re-read are
+  indistinguishable from the editor's side.
+- Corollary: **passing tests are not evidence the right artifact was tested.**
+  Four tests, four branches, all green, zero coverage of the running code.
+  This is `presence is not reachability` inverted: there the code was present
+  and unreachable; here the tests were reachable and the code was absent.
+- Cost: ~40 minutes and one resurrected file, caught only because the ledger
+  entry a parallel session wrote about their own fix contradicted the plan.
+  Read `state.md` before starting a lane, not just at session start — it moves.
+
+### 2026-08-13 — The enforcement layer cannot protect itself, and a lane is one deletable line
+
+- What we believed: that with `lane-guard` wired, concurrent sessions could
+  not collide on the same file, and that a lane under `## OPEN` is guarded.
+- What was actually true, twice in one hour and by two different mechanisms:
+  1. `lane-guard` returns 0 for anything under `.claude/**` before consulting
+     any lane (`rel.startswith(".claude")`). Two sessions independently
+     root-caused and rewrote `checkpoint-guard` inside the same hour; the
+     guard was structurally incapable of noticing. **Three sessions worked
+     `.claude/**` with no lane on 08-13**, each privately concluding harness
+     work is exempt. The protocol never says so.
+  2. A lane's entire protection is one `### slug — STATUS —` line in a file
+     several sessions hand-edit concurrently. Deleting that line orphans the
+     body into the preceding lane's block: `memory-guard-reclaimable` lost its
+     header at ~14:5x and all 4 of its claimed files silently went to exit 0,
+     40 minutes after `363743d0` closed the identical hole via the status
+     regex. Found by reading a `git diff`, not by any check.
+- The rule going forward: **`lanes.md` is executable configuration, not
+  documentation, and it is edited by hand by several sessions at once.** After
+  ANY concurrent-session ledger edit, re-run the guard over the files that
+  matter rather than trusting the file to still say what it said. The cheap
+  check is one line: `awk '/^### /{h=$0} /<path>/{print h}' .syndicate/lanes.md`
+  — if a file's nearest preceding header is not the lane you expect, the block
+  is orphaned. And harness work needs either a stated exemption in the
+  protocol or a real lane; three sessions deciding it individually is how the
+  one collision that mattered happened.
+- Cost: no bad edit landed either time, both caught by reading diffs rather
+  than by instrumentation. Roughly an hour of duplicated work on
+  `checkpoint-guard` before the collision surfaced.

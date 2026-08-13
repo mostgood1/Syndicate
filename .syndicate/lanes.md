@@ -6,7 +6,12 @@
 
 ## OPEN
 
-### checkpoint-guard-scope — OPEN — opened 2026-08-13 — session: hooks-test
+### checkpoint-guard-scope — CLOSED-VOID 2026-08-13 — opened 2026-08-13 — session: hooks-test
+- **OUTCOME: no work product. The premise was already false when the lane was
+  opened, and the lane edited a file that had been deleted.** Both defects it
+  set out to fix were fixed in `5b2ca320` — which was HEAD at this session's
+  start. That commit deleted `checkpoint-guard.sh`, added
+  `checkpoint-guard.py`, and repointed `settings.json`. See RESULT below.
 - Goal: `checkpoint-guard.sh` fires on **this session's unpersisted work** and
   is silent otherwise — i.e. its pass branch becomes reachable and its
   denominator becomes the session, not the worktree.
@@ -36,8 +41,26 @@
   predicate, and the predicate is testable locally.
 - Deploy exposure: none. Harness-only, no service code, no `render.yaml`.
 - Blocked by: none.
-
-### memory-guard-reclaimable — DEPLOYED, MEASUREMENT OPEN — opened 2026-08-13 — session: memory-guard
+- **RESULT 2026-08-13 — the lane rewrote `checkpoint-guard.sh`, which does not
+  exist.** It was read at ~12:49, deleted upstream, and recreated at 14:55 by
+  a `Write`. It sat untracked, invoked by nothing; `settings.json` has pointed
+  at `checkpoint-guard.py` since `5b2ca320`. Four tests were run and all four
+  "passed" — against the orphan. The live hook was never executed.
+  - Also mis-corrected `checkpoint.md` step 7 to describe the orphan's
+    semantics (`data/**` `reports/**` `vendor/**` exclusions, log co-witness).
+    None of that is true of the `.py`. Reverted.
+  - Cleanup: orphan deleted, `checkpoint.md` restored with
+    `git checkout --`. `git status -- .claude` is empty against HEAD. Nothing
+    from this lane survives in the harness.
+  - The `.py`'s scoping is **better** than what this lane built: its
+    denominator is the files the session actually edited, parsed from its own
+    `transcript_path`, not a path-prefix heuristic over the worktree.
+- **RESIDUAL — one real gap in the live `.py`, NOT acted on.** Its only pass
+  witness is `.last-checkpoint` (L152). A session that writes the ledger but
+  forgets step 7 has its own `.syndicate/` writes counted as unpersisted work
+  and is warned anyway. Adding today's log as a second witness would close it.
+  Left to the owning session — that file is another lane's freshly shipped
+  work and this lane has just demonstrated why it should not edit it blind. — opened 2026-08-13 — session: memory-guard
 - **CHECKPOINT 2026-08-13 13:3x CDT. Code done and shipped; the lane stays
   OPEN because its verification is not complete.**
   - Shipped: `03073270` live on refresh-worker since 13:05 CDT (deploy
@@ -79,6 +102,8 @@
     Owner still unassigned. Everything else in this lane is done.
 
 
+
+### memory-guard-reclaimable — DEPLOYED, MEASUREMENT OPEN — opened 2026-08-13 — session: memory-guard
 - Goal: `memory_headroom_snapshot` decides on unreclaimable memory
   (`anon + shmem + slab_unreclaimable`), so that total memory in use FALLING
   can never tighten the guard. Unblocks `#417` and `#387` in one change.
