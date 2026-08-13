@@ -8,13 +8,22 @@
 ## Config
 
 - Max concurrent open lanes: **3** `[policy]`
-- Repo tip: `478edd78`, `origin/main` at the same commit. Supersedes the
-  `93fc7cae` line. `[from-git 08-13]`
+- Repo tip: local `main` `5b2ca320`, **20 ahead / 6 behind `origin/main`**
+  (`571f774b`). The two have diverged. **The `session-start.sh` clause here is
+  now stale** — that file was committed in `0642cdf7` and the worktree is clean
+  of it; it blocks nothing. What a push DOES carry is 3 unpushed `render.yaml`
+  commits (`054b2306`, `cc2e1803`, `e8611888`), which fire `blueprint_sync`.
+  `git push` from this checkout is not scoped to your own commits — read
+  `git log origin/main..HEAD` first. Hook work was landed by cherry-picking
+  onto `origin/main` in a throwaway worktree to avoid carrying them
+  (`f6fec4f1`). Supersedes the `478edd78` line. `[from-git 08-13 14:5x]`
 - Deployed SHA: **three different commits, none of them the repo tip.**
-  Read from `/v1/services/<id>/deploys` at 08-13 **11:56** CDT; all three
-  `status=live`, `trigger=api`, nothing in flight. `[measured 08-13]`
+  refresh-worker re-read at 08-13 **13:05** CDT; the other two at **11:56**.
+  All `status=live`, `trigger=api`. `[measured 08-13]`
   - `syndicate` (web) — `936e2b47`, live since **08-12 21:44 CDT**.
-  - `refresh-worker` — `448e1816`, live since **08-13 10:27 CDT**.
+  - `refresh-worker` — **`03073270`**, live since **08-13 13:05 CDT**
+    (deploy `dep-d9v0b8bncjis73an78hg`). Carries the `#417`/`#387` memory
+    guard fix. Supersedes `448e1816`.
   - `live-odds-worker` — `95effcfa`, live since **08-13 11:36 CDT**.
 - These go stale in minutes, not days. live-odds-worker moved
   `2caa8eac` → `95effcfa` inside one 40-minute session. Re-read before use.
@@ -135,18 +144,38 @@
 - **`session-start.sh` delivers 1,243 B**, `exitCode=0`, no truncation marker,
   measured from the arriving `attachment` record (session `2e6476cd`, line 3).
   Inside the ~2KB cap that left v1 ~5% functional. `[measured 08-13]`
-- **`checkpoint-guard.sh` (Stop) has never passed and cannot.**
-  `.syndicate/.last-checkpoint` did not exist until this session, so line 17's
-  pass branch was unreachable: **27 Stop deliveries, 5 sessions, exit 1 on all
-  27, zero exit 0** — while checkpoints were demonstrably being written.
+- **`checkpoint-guard.py` (Stop) can now pass — fixed in `5b2ca320`.**
+  Two independent causes, both measured. (1) `.syndicate/.last-checkpoint` did
+  not exist until 08-13, so the pass branch was unreachable: **28 Stop
+  deliveries, 5 sessions, exit 1 on all 28, zero exit 0** — while checkpoints
+  were demonstrably being written. (2) After the marker appeared it STILL
+  returned exit 1, because the denominator was the whole worktree: marker
+  13:28:57 vs newest dirty file 13:30:17. It now counts only files this
+  session edited, read from `transcript_path` on the hook payload. On the live
+  repo: **exit 0 with 62 dirty files present**; before commit it named exactly
+  the 2 that were this session's. Replaces `checkpoint-guard.sh`, deleted.
   `[measured 08-13]`
 - **Exit 1 on Stop is advisory.** Delivered stderr carries "Failed with
   non-blocking status code". `/checkpoint` is documented as an obligation and
-  is enforced by a log line. A gate would need exit 2 — and must not be raised
-  to exit 2 until the always-fires defect is fixed, or it wedges every session.
-  `[measured 08-13]`
-- Its `DIRTY` count is the **whole worktree**, not the session: 64 dirty files
-  at this checkpoint, 1 of them this session's. `[measured 08-13]`
+  is enforced by a log line. A gate would need exit 2; the always-fires defect
+  that made that unsafe is fixed (`5b2ca320`), but raising it is a deliberate
+  decision, not a follow-up cleanup. `[measured 08-13]`
+- Its denominator is now **the files this session edited**, not the worktree.
+  Known gap, deliberate: only `Edit|Write|MultiEdit|NotebookEdit` are counted,
+  so a session writing purely through `Bash` redirection reads as clean — the
+  same blind spot `lane-guard` has. `[measured 08-13]`
+- **A lane's status is free text, and both guards treat it as a predicate — so
+  a lane can sit under `## OPEN` and be enforced by nothing.** Live right now:
+  `memory-guard-reclaimable` was relabelled
+  `— DEPLOYED, MEASUREMENT OPEN —` by its own session. `lane-guard.py` reads
+  the status as the first word (`DEPLOYED`) and returns **exit 0 for
+  `memory_observability.py`** — its 4 claimed files are unprotected; and
+  `session-start.sh` v3 requires literal `— OPEN`, so the digest reports **1
+  open lane when the file lists 2**. v1's substring test had the opposite
+  failure (it counted `NO LANE WAS EVER OPENED` as open). Neither strictness
+  is right: the fix is `OPEN` against the status field only, which
+  accepts `DEPLOYED, MEASUREMENT OPEN` and rejects `OPENED`/`REOPENED`.
+  **Not yet applied.** `[measured 08-13]`
 - **The 3-lane cap in `## Config` is policy with no enforcement.** Four OPEN
   lanes ran this session unchallenged; `/lane open` checks file collisions
   only and never counts. `[measured 08-13]`
@@ -246,8 +275,22 @@
   when the kernel promoted ~243 MB to `active_file` at ~11:02, effective
   headroom fell 1877 → 1643 **while total memory in use fell 3120 → 2705 MB**.
   Sibling of `#387`, different guard. `[measured 08-13]`
-- **Expected to recur** as the worker re-warms — the 14:56 restart is the only
-  thing that cleared it. `[unverified 08-13]`
+- **`#417` FIX IS DEPLOYED, NOT YET PROVEN.** `03073270` live on
+  refresh-worker since 13:05 CDT. The guard now decides on
+  `max - max(anon + shmem + slab_unreclaimable, current - reclaimable_file)`,
+  with `active_file` counted as reclaimable. At T+23min: `LAYER2_SHORTLIST`
+  **x3** vs 0 in the preceding 4h12m, `MEMORY_GUARD_ABORT` **0** vs ~300 in
+  5.4h. `[measured 08-13 13:28]`
+- **That is NOT yet evidence the fix holds.** The pre-fix code also rebuilt
+  after the 14:56 restart (built 15:08) and re-froze ~3h later — it was
+  aborting again by 18:00Z. The deploy has not survived that re-warm
+  interval, so T+23min is consistent with "rebooted" as much as "fixed".
+  **The 24h read settles it: due 2026-08-14 ~13:00 CDT, OWNER UNASSIGNED.**
+  `[unverified 08-13]`
+- **It is also unconfirmed that the new code PATH executed.** `basis`, the
+  field meant to prove it, is emitted only inside the abort branch
+  (`intelligence_state.py:3215`), so a working fix leaves it silent forever.
+  Needs a success-path log — its own change and deploy. `[unverified 08-13]`
 - `live-odds-worker` disk usage climbing steadily, ~20% → ~40% of 50 GB
   over two weeks. Something accumulates and is not cleaned up.
   **Not yet diagnosed.** `[measured 08-12]`

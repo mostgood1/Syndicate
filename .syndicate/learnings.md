@@ -441,3 +441,124 @@ back **oldest-first regardless of `direction`**.
   distinction cost an hour.
 - Cost: none yet. The exposure is every session since the hooks landed
   believing its checkpoint state had been checked.
+
+### 2026-08-13 — A discriminator that is only emitted on FAILURE cannot confirm a fix
+
+- What we believed: `/preflight`'s falsifiable-discriminator requirement was
+  satisfied. The plan said, in the lane and in `deploys.md`, "read `basis`
+  FIRST — `basis=unreclaimable` proves the new path executed."
+- What was actually true: `memory_headroom_snapshot`'s dict is printed only
+  inside the abort branch (`pipeline/intelligence_state.py:3215`), and the
+  other call site (`:516-527`) logs nothing at all. So `basis` is emitted
+  **only when the guard refuses.** A working fix leaves it permanently
+  silent. The discriminator was readable only in the world where the fix had
+  failed.
+- The rule going forward: **when choosing a signal to prove a fix ran, check
+  which BRANCH emits it.** A signal on the failure path proves the failure
+  path; it can never prove the success path. Before deploying, ask "if this
+  works perfectly, what line appears?" If the answer is "none", there is no
+  liveness proof and the deploy ships blind, however green the tests were.
+- Sharper: this is the mirror of `confirm an instrument can emit non-zero
+  before believing its zero` (2026-08-13). That entry covers a zero from an
+  instrument that never ran. This one covers a *silence that is indexed to
+  success* — the observation and the desired outcome are the same event, so
+  the measurement carries no information.
+- Cost: a production deploy with no way to confirm reachability, on a lane
+  whose own ledger already carried `presence is not reachability`.
+
+### 2026-08-13 — A watcher's headline can contradict its own body
+
+- What we believed: the re-warm test had passed. The watcher printed
+  `RESULT: RE-WARMED TO PRE-FIX LEVELS AND HELD`.
+- What was actually true: the same output block reported
+  `builds after peak=0`. The exit condition was `peak_memory >= 3500MB` with
+  **no requirement that a build occur after the peak** — so "HELD" was a word
+  in a format string, not a measured property. The peak itself (4042.6MB)
+  was a transient intra-build spike, at which the NEW formula would also have
+  refused (996MB available vs a 1900 floor).
+- The rule going forward: **the label a script prints is an assertion, and it
+  must be entailed by the condition that triggered it.** When writing a
+  watcher, state the exit condition in the output next to the verdict, so a
+  reader can check the inference rather than trust the adjective. Sibling of
+  `an instrument's SPAN is not its NAME` — same failure, moved from a timing
+  mark to a boolean.
+- Also recorded: a 100-line Render log query on refresh-worker spans **~35
+  seconds**. Any "n samples above X" from one query is a statement about that
+  window. A count of 0 there sat beside a 4042.6MB sample from six minutes
+  earlier.
+
+### 2026-08-13 — A guard's "is this mine" input must not default to the locked state
+
+- What we believed: `lane-guard`'s own-lane exemption was working, and probe C
+  (`.current-lane` empty -> the guard blocks your own files) was a synthetic
+  condition constructed to test the branch.
+- What was actually true: `.syndicate/.current-lane` **did not exist anywhere
+  in the repo** before it was created on 08-13, so `Current lane: 'none'` was
+  the baseline for every session that ever ran. It has already bitten:
+  session `ab30bcc8` was refused `tests/test_intelligence_state.py`, claimed
+  by `intelligence-state-red-baseline` — the lane it was working. And
+  `/lane close` step 4 *empties* the marker, so finishing a lane restores the
+  locked state for whoever comes next.
+- The rule going forward: **when a guard reads an identity token to decide
+  "yours vs theirs", the absent case must default to PERMISSIVE-with-a-reason,
+  not to deny.** Absent identity is not a hostile identity, it is a missing
+  input, and the failure surfaces as a confusing cross-lane collision message
+  rather than as "the marker is missing". Same shape as the ledger's
+  `unknown must not default permissive`, inverted: there the danger was a
+  failed join relaxing a rule, here it is a failed join inventing a conflict.
+- Method note, third instance: counting these blocks by grepping `BLOCKED:`
+  across transcripts returned **11**. The hook's own source and the counting
+  scripts contain the string. Real blocks, filtered to records carrying a
+  `tool_result`/`is_error` payload: **4**. Verify presence, trust absence.
+
+### 2026-08-13 — A path one toolchain resolves and another cannot makes a guard pass silently
+
+- What we believed: that a fixture repo built at `/tmp/cgtest` from the Bash
+  tool exercised `checkpoint-guard.py`. All four branches returned exit 0,
+  including the two that must return 1, and the reading was briefly taken as
+  "the guard is inert."
+- What was actually true: the guard was fine. `/tmp` is a Git Bash mount that
+  **native Windows Python cannot resolve**, so `os.path.isdir(root +
+  "/.syndicate")` was false and the script fail-opened at its first check —
+  before reaching any logic under test. Rebuilt at `C:/tmp/cgtest`, all four
+  branches discriminated correctly, including the pass branch.
+- How we found out: the run printed nothing at all — no stderr from any of the
+  four cases. A guard that is genuinely inert still reaches its own logic; one
+  that is silent across every input is usually not being reached.
+- The rule going forward: **this machine has two path universes, and a value
+  that crosses between them fails open rather than erroring.** Bash-tool paths
+  (`/tmp`, `/c/...`) are invisible to native Windows Python and to `python3`
+  invoked from PowerShell; `git cat-file blob origin/main:path` is mangled by
+  MSYS arg conversion into `origin\main;path` and returns an empty pipe, not an
+  error. Fixtures and payloads handed to a Windows interpreter must use
+  `C:/...`. When a check produces no output at all, verify it reached its own
+  code before believing its verdict — extends
+  `2026-08-13 — Confirm an instrument can emit non-zero before believing its zero`.
+- Three instruments failed clean in this one session — the `/tmp` fixture, the
+  MSYS-mangled `git cat-file`, and `grep -c $'\r'` inside a `for` loop, where
+  the pattern degenerated and matched every line, reporting CRLF in files that
+  `od` showed were pure LF. Every one of them read as a *good* result.
+- Cost: ~10 minutes and one wrong statement to the user, retracted in the same
+  turn. Nothing shipped on it.
+
+### 2026-08-13 — A free-text status field cannot be a predicate; test guards against the ledger, not against synthetics
+
+- What we believed: that tightening the lane test from the substring `/OPEN/`
+  to a literal `/ — OPEN/` was correct and complete. It was verified against
+  hand-written headers covering `OPEN`, `OPENED`, `REOPENED`, `CLOSED`, `DONE`.
+- What was actually true: the synthetics encoded the same assumption as the
+  code — that status is one word. Within the hour a real session relabelled its
+  lane `— DEPLOYED, MEASUREMENT OPEN —`, which the strict test rejects and the
+  old substring test accepted. The lane sits under `## OPEN`, its owner
+  considers it open, and `lane-guard.py` returns exit 0 for its files.
+- How we found out: a routine `git diff` during `/checkpoint`, not a test. The
+  hole existed for roughly 20 minutes with nothing reporting it.
+- The rule going forward: **a guard whose input humans hand-write must be
+  tested against the actual file, not against examples written by the same
+  person who wrote the guard.** Re-run guards over the live ledger after any
+  parsing change, and diff the set they classify as open against the lanes
+  physically under `## OPEN` — a mismatch is the whole test. Where a field is
+  free text, match a word (`\bOPEN\b`), never the whole field, and never a bare
+  substring.
+- Cost: no bad edit landed. The window was open ~20 minutes and was found by
+  accident, which is the part worth fixing.
