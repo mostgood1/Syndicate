@@ -213,3 +213,59 @@ def test_the_snapshot_ceiling_is_reported():
     assert coverage["snapshot_rows_seen"] == 2
     assert coverage["snapshot_rows_indexed"] == 1
     assert coverage["snapshot_skipped_no_live_projection"] == 1
+
+
+def test_a_live_row_never_carries_a_numeric_edge():
+    """THE EDGE WAS WRITTEN AND THEN BACKED OUT, on measurement.
+
+    There is a real ordering bug behind it: `attach_projections` decides the
+    edge and consults `live_edge_unavailable_reason` BEFORE this overlay runs,
+    so `live_aware` is always False when the policy is asked. Fixing that is two
+    lines, and the edge it produced was `#340` wearing a live label.
+
+    An edge needs a PROBABILITY, and the re-sim does not ship one -- on 24 of 28
+    live-aware rows its `modelProbOver` is bit-identical to the pregame value
+    (`0.3530785` against `0.3530785`) while `liveProjection` genuinely moves.
+
+    THE TELL: three rows whose over was ALREADY WON (1 hit against a 0.5 line)
+    still carried P(over) of 0.659/0.655/0.745, giving +36.5%/+15.8%/+32.3%.
+    Mean |edge| on already-decided rows was 28.2% against 12.0% on undecided
+    ones -- the fabricated numbers were more than TWICE the size of the real
+    ones, on a board that sorts by edge.
+    """
+    index = build_live_prop_index(
+        _snapshot(_prop("Angel Genao", "hitter_props", "hits", 0.5, projection=1.0, actual=1.0))
+    )
+    grid = [_row("Angel Genao", "batter_hits", 0.5,
+                 projection={"model_prob_over": 0.659, "market_fair_prob_over": 0.294})]
+    coverage = attach_live_projections(grid, index)
+    p = grid[0]["projection"]
+    assert p["edge_vs_market_pct"] is None, (
+        "a pregame probability was priced against a live market -- the #340 defect"
+    )
+    assert coverage["rows_live_edge_withheld"] == 1
+
+
+def test_the_withheld_edge_says_why():
+    # A blank edge with no reason reads as "the join failed". This one is a
+    # positive decision and has to be spelled differently from a failure.
+    index = build_live_prop_index(
+        _snapshot(_prop("Brandon Lowe", "hitter_props", "total_bases", 1.5))
+    )
+    grid = [_row("Brandon Lowe", "batter_total_bases", 1.5)]
+    attach_live_projections(grid, index)
+    reason = grid[0]["projection"]["edge_unavailable_reason"]
+    assert "live probability" in reason and "mean" in reason
+
+
+def test_deriving_a_probability_from_the_live_mean_is_not_attempted():
+    # WNBA already refuses this: "inventing P(over) from a mean would put a
+    # fabricated number into EV". A future edit that reaches for the mean to
+    # manufacture P(over) would pass every other test in this file.
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "syndicate" / "features" / "shared" / "live_projection_join.py").read_text(encoding="utf-8")
+    body = src[src.index("def attach_live_projections("):]
+    assert "edge_vs_market_pct\"] = round(" not in body
+    assert "edge_vs_market_pct\"] = None" in body

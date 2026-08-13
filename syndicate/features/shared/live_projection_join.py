@@ -22,8 +22,18 @@ explicitly `refuse_if_compute_in_request_path` -- "the one genuinely heavy piece
 of live-lens compute" -- so this reads the PUBLISHED snapshot and nothing else.
 An absent snapshot yields zero coverage and a stated reason, never a recompute.
 
-It also does not decide whether an edge is allowed. That stays in
-`live_edge_policy`, which this feeds by marking a projection live-derived.
+IT DOES NOT PRODUCE AN EDGE, and that is a measured decision rather than an
+omission. The re-sim ships a live MEAN and no live probability: on 24 of 28
+live-aware rows its `modelProbOver` is bit-identical to the pregame probability
+(`0.3530785` against `0.3530785`) while `liveProjection` genuinely moves. An
+edge needs the probability, so pricing that one against a re-priced market is
+`#340` in a live label -- confirmed by three rows whose over was ALREADY WON
+still carrying P(over) near 0.65-0.75 and edges of +36.5%/+32.3%/+15.8%, more
+than twice the size of the honest ones and sorting above them.
+
+Every live row therefore carries a projection and a NAMED blank edge. That stays
+true until the re-sim emits a live probability; deriving one from the mean is
+refused for the same reason WNBA refuses it.
 
 THE JOIN IS INSTRUMENTED ON PURPOSE. Market naming differs between the board
 (OddsAPI keys: `batter_hits`) and the live lens (its own families), and an
@@ -37,6 +47,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping, Sequence
 from typing import Any
+
 
 # Board market key -> the live lens' own market family. The board speaks
 # OddsAPI; the live lens speaks the sim's vocabulary. Kept explicit rather than
@@ -264,6 +275,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         return {"supported": False, "reason": "no live snapshot", "rows_live_projected": 0}
 
     matched = 0
+    edge_blocked = 0
     considered = 0
     miss_no_player = 0
     miss_no_market_alias = 0
@@ -336,10 +348,58 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         row["projection"] = projection  # type: ignore[index]
         matched += 1
 
+        # NO LIVE EDGE, AND THE REASON IS MEASURED RATHER THAN ASSUMED.
+        #
+        # There is a real ordering bug here: `attach_projections` decides the
+        # edge and consults `live_edge_unavailable_reason` BEFORE this overlay
+        # runs, so `live_aware` is always False when the policy is asked. The
+        # policy was written to permit a live-aware edge and the pipeline could
+        # never present it one. Fixing that ordering is a two-line change.
+        #
+        # IT WAS WRITTEN, AND THEN BACKED OUT, because the edge it produced was
+        # the `#340` defect wearing a live label. An edge needs a PROBABILITY,
+        # and the live re-sim does not ship one:
+        #
+        #   live-aware rows: lens `modelProbOver` == pregame prob   24
+        #                    differs                                 4
+        #
+        # Bit-identical -- `0.3530785` against `0.3530785`. `liveProjection`
+        # genuinely moves (sim 1.107 -> live 0.646); the probability beside it
+        # does not. Pricing it against a re-priced live market is exactly what
+        # `live_edge_policy` exists to refuse.
+        #
+        # The tell, and the reason this was caught rather than shipped: three
+        # rows whose over was ALREADY WON (1 hit against a 0.5 line) still
+        # carried P(over) of 0.659/0.655/0.745, producing edges of +36.5%,
+        # +15.8%, +32.3%. Mean |edge| on already-decided rows was 28.2% against
+        # 12.0% on undecided ones -- the fabricated numbers were more than twice
+        # the size of the real ones and would have sorted straight to the top of
+        # a board built to surface the biggest edges. That is the "+23 points on
+        # a coin flip" measurement of `#340`, reproduced.
+        #
+        # Deriving P(over) from the live MEAN is not the way out either: WNBA
+        # already refuses that ("inventing P(over) from a mean would put a
+        # fabricated number into EV"). The honest state is a projection with a
+        # named reason for its blank edge, and it stays that way until the
+        # re-sim emits a live probability.
+        projection["edge_vs_market_pct"] = None
+        projection["edge_unavailable_reason"] = (
+            "live re-sim ships a live mean but no live probability, so there is "
+            "nothing honest to price against the market"
+        )
+        edge_blocked += 1
+
     return {
         "supported": True,
         "rows_live_considered": considered,
         "rows_live_projected": matched,
+        # PROJECTED AND EDGED ARE DIFFERENT CLAIMS, and the gap between them is
+        # the whole reported symptom -- the first cut served 84 projected rows
+        # with 0 edges and looked like a success from the projection count
+        # alone. This counts the blank edges as a POSITIVE act with a reason
+        # attached, so "we chose not to price this" never again reads the same
+        # as "the join failed".
+        "rows_live_edge_withheld": edge_blocked,
         "live_games_in_snapshot": indexed.get("live_games"),
         "snapshot_rows_seen": indexed.get("rows_seen"),
         "snapshot_rows_indexed": indexed.get("rows_indexed"),
