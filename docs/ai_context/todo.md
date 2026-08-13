@@ -1,5 +1,92 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#419` — **The `props_now_available` guard has never been able to fire. Writer filesystem, reader Redis.** COMMITTED `1b9b1e39`, **NOT DEPLOYED**.
+
+**Today's user-visible symptom:** MLB top-props and ladders were empty ~25
+minutes before first pitch. Both artifacts were written 00:24:21 CDT with
+`candidateCount: 0` by a run that **completed cleanly** (exit 0, 244s) — it
+simply ran ~10h before today's OddsAPI prop lines landed at 10:08 CDT
+(18 pitcher / 171 hitter markets). Nothing rebuilt them for 11 hours.
+
+**Root cause.** `_mlb_oddsapi_props_snapshot_has_entries` read the prop
+snapshots through `refresh_state_store.read_json_file`, which routes every
+path not containing `migration_runs/` to the keyvalue store **with no
+filesystem fallback** — a missing key returns `(None, True)`, i.e. "confirmed
+absent, read succeeded". Those snapshots are never written there: the producer
+is `vendor/mlb_bettingv2/tools/oddsapi/fetch_daily_oddsapi_markets.py`'s
+`_write_json`, a plain `tmp.write_text()` + `replace()` onto the mounted disk.
+`SYNDICATE_REFRESH_STATE_BACKEND=keyvalue` is confirmed live on refresh-worker,
+so `has_pitcher_odds`/`has_hitter_odds` were **False on every call**, the guard
+returned "odds genuinely aren't posted yet" silently, and the regen it gates
+**never once fired on any slate**.
+
+**This is why 08-01, 08-02 and 08-04 kept recurring.** All three are named in
+the guard's own docstring and each got a logic fix. Every one of them sat
+downstream of a read that always returned None.
+
+**Today's recovery was luck, not the safety net.** An unrelated 3-game lineup
+resim (`--only-game-pks 823829,824238,824561`) happened to be in flight; its
+top-props stage rewrites the whole artifact. The manual `force-mlb-resim`
+bounced off it with `previous_run_still_active`, so the fix is not attributable
+to that either. Artifact rebuilt 11:56:56 CDT — 12 pitcher cards, 12 hitter
+cards, 22 pitchers × 7 ladder markets, 24 hitters × 10.
+
+**Shipped:** disk-first read (keyvalue kept as fallback — it can only turn a
+False into a True, so nothing working can regress); cooldown marker moved out
+of the predicate onto the committed-launch path, so consulting the guard no
+longer spends the hour when nothing launches; both decline branches now log a
+reason (`MLB_PROPS_REGEN_SKIPPED`), because this branch ran for months saying
+nothing and "declined" was indistinguishable from "never evaluated".
+
+**Test hazard, recorded:** all five pre-existing tests for this guard
+`patch.object(live_refresh_loop, "read_json_file", ...)` — they replace exactly
+the symbol whose backend routing was the defect, and would pass against the
+broken code forever. The new tests do not patch it; verified red-then-green
+against the pre-fix read, with a liveness case proving it can still decline.
+
+**VERIFICATION STILL REQUIRED (production).** On a slate whose top-props was
+written before odds landed, a `MLB_SIM_TICK` carrying
+`mlbDailySim.reason = props_now_available` must appear within one cooldown of
+the odds file's `retrieved_at`. **That reason string has never once appeared in
+the logs**, so absence is the established baseline and a single occurrence is a
+clean positive. Until then this is a code fix with no production evidence.
+
+**Still open, separately:** today's season betting-card artifact is missing
+(`verdict: artifact_missing`) — scoped resims carry
+`--write-season-frontend-artifacts off`, so they never rebuild it. Not
+addressed here.
+
+**Also unmeasured:** when prop odds typically first post. Today's 10:08 CDT is
+a single point, and the snapshot files are overwritten in place, so
+`retrieved_at` is the last fetch and not the first. A morning-window schedule
+change needs that distribution first — do not pick an hour from one day.
+
+### `#420` — **The MLB sim's pipeline wait was bounded in ticks, not in time.** COMMITTED `bf8833e9`, **NOT DEPLOYED**.
+
+`_sim_pipeline_deferral_reason` bounded the wait at N consecutive defers. A
+tick count is only a time bound if tick spacing is fixed, and it is not.
+
+Measured 2026-08-13, refresh-worker, 15:05–16:20Z: **83 of 100 sim ticks
+returned `intelligence_pipeline_busy`**, and the sim decision was evaluated
+**5 times in 75 minutes**. That is the count bound working exactly as designed
+and still starving the decision on a day when first pitch was 12:06 CDT.
+
+Adds `SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFER_SECONDS` (default 600); either bound
+ends the streak. **The memory headroom check is unchanged and still has the
+final say**, so this widens *when* a breakthrough may be attempted, never
+whether it is safe — `#55`'s two-heavy-pipelines OOM is gated by the same
+condition it always was.
+
+Deliberately split from `#419` so the two stay attributable. **This is a
+bounding change, not a root cause** — `#419` is what actually caused today's
+empty board. Do not read a post-deploy improvement as evidence for this one.
+
+**Caution for whoever tunes further:** the real inefficiency is that the
+*decision* is gated by a check that exists to protect the *launch*. Evaluating
+the decision is mostly cheap reads, but not entirely — `fetch_schedule_for_date`
+and `_fetch_mlb_injuries` are network calls, so moving the gate below them was
+NOT done and should not be done without measuring that cost first.
+
 ### `#414` — **THE CACHE IS PROVABLY NOT HIT, AND THE BUILD GOT FASTER ANYWAY. Two signals disagree.** NEEDS ITS AUTHOR.
 
 **This is the most actionable open item from the 2026-08-12/13 session.** The
