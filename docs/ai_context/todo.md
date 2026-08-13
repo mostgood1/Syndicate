@@ -29063,6 +29063,20 @@ cheap span loads it; the expensive work indexes it, elsewhere, under a different
 name.
 
 **Before ruling out an input, ask which spans TOUCH it — not which span is named
+
+**THE GENERAL FORM, and it is the sharpest statement of tonight's recurring
+shape: a CORRECT measurement of the WRONG THING is more dangerous than no
+measurement, because it terminates the search.** No measurement leaves the
+question open. A cheap, correct number attached to a plausible name closes it.
+
+*"I measured the input and it was cheap"* and *"the input is not implicated"*
+are different claims. **The span name is what makes them look identical.**
+
+Same shape as the mirror-as-measurement note below: benchmarking a sweep at
+15.6s against 38,736 local files was also a correct measurement — of a disk
+holding a third of production's 117,377 — and it produced an 18-minute stall.
+Neither error is carelessness; both are a true number answering a question
+nobody asked out loud.
 after it.** The same payload can be read once cheaply and processed three times
 expensively, and only the first has the obvious label.
 
