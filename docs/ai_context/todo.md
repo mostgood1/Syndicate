@@ -248,16 +248,53 @@ by its ENDING mark charged the last iteration's body to the following tail
 segment. Visible only because a sample line read `rows_loop_end=0.46` on a game
 whose rows were supposedly free. Segments are named by their START mark now.
 
-**LEADING HYPOTHESIS, explicitly not yet measured:** `enrich_candidate_rows`
-(`home.py`, from `quote_enrichment`) runs over the whole assembled candidate list
-in the tail, and `#414`'s own correction found the real cost to be **a full linear
-scan of `unattributed` PER CANDIDATE** in `_candidate_odds_history_state`
-(`intelligence.py:3393`). That fits every observation at once: cost tracks
-odds-history shard size, scales with candidates emitted, and touches nothing
-inside the row loop — which is exactly why reading the loop never explained it.
-**It also means the discredited per-CANDIDATE denominator may have had the right
-shape for the wrong reason.** One build with the new line settles it; do not
-adopt it before then.
+**LEADING HYPOTHESIS, explicitly not yet measured, and read from the code rather
+than inferred from a timing:** the tail's `enrich_candidate_rows` (`home.py`,
+from `quote_enrichment`) runs over the whole assembled candidate list, and for
+each candidate calls `quote_ref_for_bet`, which does:
+
+    rows = read_book_quotes(sport, date)   # CACHED -- ~122k dicts, so not I/O
+    for row in rows:                       # FULL linear scan, PER CANDIDATE
+        _normalize_token(row["event_id"])  # never matches for MLB (see below)
+        _row_teams_match(row, ...)         # alias resolution, per row
+
+**MLB is the worst case by construction, and `quote_ref_for_bet`'s own docstring
+says why:** board rows carry a StatsAPI `gamePk` while quote rows carry an
+OddsAPI event hash, so the cheap `event_id` equality **never** matches for MLB;
+game-level rows have no `player_name` either. Every one of the ~122k rows
+therefore falls through to `_row_teams_match` and full alias resolution. At ~26
+candidates/game that is ~3.2M alias-resolving row visits per game — the right
+order of magnitude for 100–400s.
+
+It fits every observation at once: cost tracks book-quotes shard size (which
+grows all day), scales with candidates emitted, and touches nothing inside the
+row loop — which is exactly why reading the loop never explained it. **It also
+means the discredited per-CANDIDATE denominator may have had the right shape for
+the wrong reason.**
+
+**Two DIFFERENT per-candidate scans are in play and an earlier draft of this
+entry conflated them.** This one is `quote_ref_for_bet` over `book_quotes`
+(`odds_book_quotes.py`). The `#414` thread separately identified a full scan of
+`unattributed` per candidate in `_candidate_odds_history_state`
+(`intelligence.py:3393`). Same shape, different function, different data; either,
+both, or neither may be the dominant cost. `SLOW_SEGMENT_PROFILE` separates the
+tail from the rows but **not these two from each other** — if `enrich_block`
+dominates, that is the next split to make.
+
+**Authorship of the `#414` odds-history thread (`969e7649`, `1c7e2e55`,
+`fe2fcbfa`, `5abefe36`, `8b66b958`) is NOT established.** I attributed it
+cross-session to the lane doing the live-probability work; they disproved that
+by file-touch — they have opened none of `syndicate/features/intelligence.py`,
+`tests/test_intelligence_prop_dedup_and_movement.py` or
+`tests/test_odds_history_index_cache.py`, and their `#414` is the one that lost
+the id collision and became `#416` (`3503de2a`). The confusable pair is
+`syndicate/features/intelligence.py` vs `syndicate/blueprints/intelligence.py`.
+**`git blame` cannot settle this — every commit here is authored
+`github-actions[bot]`.** Use file-touch sets. Do not restate `5abefe36`'s status
+as anyone's opinion until its author is identified.
+
+One build with the new line settles the rows-vs-tail split; do not adopt any of
+this before then.
 
 **Still true:** per-SPORT and per-GAME checkpointing remain useless for the
 reasons originally measured. What changed is that a THIRD granularity exists one
