@@ -212,18 +212,21 @@ services:
         value: "60"
       - key: MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
         value: "60"
-      # Phase 1 of migrating off the daily-update GHA cron: NFL/NCAAF/NCAAB
-      # have no live worker coverage today (live_refresh_loop.py's adaptive
-      # tick only covers MLB/NBA/WNBA/NHL), so they only ever refreshed via
-      # the daily Action. Mirrors MLB_ENABLE_REFRESH_WORKER_AUTORUN (declared
-      # in the refresh-worker block below, not here -- see the note above) but
-      # gated by season windows (these are weekly, not daily, sports) via
-      # _active_weekly_sports_for_date(); defaults off for the same
-      # dark-launch reasoning used elsewhere in this file.
-      - key: WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN
-        value: "false"
-      - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
-        value: "21600"
+      # WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN /
+      # WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS removed from here, with the
+      # MLB pair above and for the same reason: run_refresh_worker.py's
+      # _weekly_sports_auto_refresh_enabled() /
+      # _weekly_sports_refresh_interval_seconds() are their only readers, and
+      # this service runs gunicorn. Both were already declared on
+      # refresh-worker, so nothing is lost -- the "Phase 1 of migrating off
+      # the daily-update GHA cron" rationale that used to sit here moved down
+      # there with them, next to the key it explains.
+      #
+      # Absent is the same as what was declared here on both counts, so this
+      # cannot change behaviour even if something on web did read them:
+      # _weekly_sports_auto_refresh_enabled() treats absent as False (this
+      # said "false"), and _weekly_sports_refresh_interval_seconds() defaults
+      # to 21600 (this said "21600").
       # #96: RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN/
       # RECONCILIATION_REFRESH_INTERVAL_SECONDS moved from here to the
       # refresh-worker service's own envVars block below. This `envVars:`
@@ -597,6 +600,17 @@ services:
       # ownership answer lives in a default rather than in this file.
       - key: SYNDICATE_MLB_REFRESH_TICK_OWNER
         value: "false"
+      # Phase 1 of migrating off the daily-update GHA cron: NFL/NCAAF/NCAAB
+      # have no live worker coverage today (live_refresh_loop.py's adaptive
+      # tick only covers MLB/NBA/WNBA/NHL), so they only ever refreshed via
+      # the daily Action. Mirrors MLB_ENABLE_REFRESH_WORKER_AUTORUN above but
+      # gated by season windows (these are weekly, not daily, sports) via
+      # _active_weekly_sports_for_date().
+      #
+      # This comment moved here from the web service's envVars block, where it
+      # documented a copy of these keys that no web process could read. This
+      # is the service that reads them, so the explanation lives with the
+      # declaration now.
       - key: WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN
         value: "true"
       - key: WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
