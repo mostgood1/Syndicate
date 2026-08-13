@@ -539,12 +539,97 @@ def build_book_grid(
                 }
             )
 
+    # `#411`: a line its own market has moved off is not an available bet.
+    # Runs BEFORE the bound below, so a superseded line cannot consume a slot
+    # that a live one needed.
+    grid, superseded = drop_superseded_lines(grid)
+    if superseded:
+        print(f"[book_grid] SUPERSEDED_LINES_DROPPED count={superseded} kept={len(grid)}", flush=True)
+
     # Widest grids first: a row quoted by eleven books is more useful than one
     # quoted by one, and it is the shape the reference surface leads with.
     grid.sort(key=lambda row: (-int(row.get("books_quoting") or 0), str(row.get("market") or "")))
     if max_rows is not None:
         return grid[: max(0, int(max_rows))]
     return grid
+
+
+# How far behind its own market a line may fall and still be shown (`#411`).
+#
+# REPORTED FROM THE BOARD: "Framber Valdez for Detroit shows o15.5, 16.5, and
+# 17.5 and odds are about the same so these must be at different times."
+# Measured 2026-08-13, exactly that:
+#
+#     outs        15.5  seen 55m  3 books
+#     outs        16.5  seen 53m  1 book
+#     outs        17.5  seen 17m  8 books   <- the only live one
+#     strikeouts   2.5  seen 19m  1 book    <- current, line falls as he pitches
+#     strikeouts   4.5  seen 79m  7 books   <- abandoned an hour ago
+#
+# `book_quotes` is a CHANGE LOG and the grid keys a market instance by LINE, so
+# every line a book has ever offered becomes its own row and keeps its last
+# price forever. Nothing marked them dead. A reader sees three "available"
+# alternates at similar odds; only one can be bet.
+#
+# BOOK COUNT IS NOT THE DISCRIMINATOR -- `strikeouts 4.5` carries SEVEN books and
+# is an hour stale, while `strikeouts 2.5` carries one and is live. Only
+# `seen_age_seconds` separates them, which is why `#366` had to reach row level
+# before this was fixable at all.
+#
+# RELATIVE, NOT ABSOLUTE, and that is the whole design. A flat "drop anything
+# older than 20 minutes" would empty a thin market where every line is
+# legitimately an hour old and nothing has moved. This drops a line only when
+# its OWN market has a materially fresher one -- evidence the book repriced and
+# left this line behind. A market whose lines are uniformly old keeps all of
+# them, because there is no evidence either way and a blank board is not an
+# improvement over a stale one.
+_STALE_ALT_LINE_LAG_SECONDS = 15 * 60
+
+
+def _line_group_key(row: Mapping[str, Any]) -> tuple[str, ...]:
+    """Everything that identifies a market EXCEPT its line.
+
+    Alternates of one market share this key, so they can be compared against
+    each other. `player_name` is in it: two players' props in the same market
+    are different markets and must not prune one another.
+    """
+    return tuple(
+        str(row.get(field) or "")
+        for field in ("sport", "event_id", "kind", "market", "segment", "player_name")
+    )
+
+
+def drop_superseded_lines(
+    grid: list[dict[str, Any]],
+    *,
+    lag_seconds: float = _STALE_ALT_LINE_LAG_SECONDS,
+) -> tuple[list[dict[str, Any]], int]:
+    """Remove lines their own market has visibly moved off. Returns (kept, dropped).
+
+    Only acts where `seen_age_seconds` is present on BOTH the row and its
+    group's freshest member -- an unknown age is not evidence of staleness, and
+    pruning on absence is how a capture hiccup would silently empty the board.
+    """
+    freshest: dict[tuple[str, ...], float] = {}
+    for row in grid:
+        seen = row.get("seen_age_seconds")
+        if seen is None:
+            continue
+        key = _line_group_key(row)
+        current = freshest.get(key)
+        if current is None or float(seen) < current:
+            freshest[key] = float(seen)
+
+    kept: list[dict[str, Any]] = []
+    dropped = 0
+    for row in grid:
+        seen = row.get("seen_age_seconds")
+        best = freshest.get(_line_group_key(row))
+        if seen is not None and best is not None and (float(seen) - best) > lag_seconds:
+            dropped += 1
+            continue
+        kept.append(row)
+    return kept, dropped
 
 
 def book_grid_summary(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
