@@ -1452,6 +1452,42 @@ Related: `#400` (the change that surfaced it), `#407` (the consolidated board's
 requirement list — "complete data population" does not help if the rows carry no
 signal), `SHORTLIST_ROWS_PER_SPORT`, `SHORTLIST_KIND_FLOOR`.
 
+### `#401` runner — NOT A DEFECT. Handed over as "has not executed in 15 hours and I do not know why". It is a 24h interval with 15.6h elapsed
+
+Closing this so it does not get re-investigated. The archiving lane flagged
+`run_disk_maintenance()` returning silently since `23:38:06Z` (2026-08-12) as an
+unresolved defect, having earlier concluded "the old shared stamp is suppressing
+it" and seen that falsified by the silence.
+
+**Neither explanation was needed. The arithmetic closes it:**
+
+    last run    2026-08-12 23:38:06Z
+    checked     2026-08-13 15:15:15Z
+    elapsed     15.62h
+    interval    86400s -- _INTERVAL_DEFAULT_SECONDS, and
+                SYNDICATE_DISK_MAINTENANCE_INTERVAL_SECONDS is unset on BOTH workers
+    due         False, short by 8.38h
+
+`_due()` is behaving exactly as written. **Falsifiable prediction: the next
+`DISK_MAINTENANCE` line lands ~23:38:06Z today (6:38 PM CT), within one tick.**
+If it does not, *then* there is a defect and the early returns need instrumenting.
+
+**The stamp is also proven healthy by the silence itself,** which is the part
+worth keeping. A failed stamp write leaves `last = 0.0`, and `_due()` treats
+missing-or-unreadable as due — so a broken stamp produces maintenance running
+**every tick**, the opposite symptom. Silence is only reachable when the stamp is
+being read successfully with a recent epoch. The suspected failure mode and the
+observed symptom point in opposite directions.
+
+**Two near-misses of my own while closing this, both from misreading an
+instrument rather than the system:** I read `open("\proc\self\status")` out of a
+`grep` result and had it half-written up as a permanently-inert memory guard —
+the source says `/proc/self/status`, and the backslashes were the search tool's
+rendering, not the file. `sed` on the file is authoritative where a grep
+excerpt is not. Separately, `psutil` genuinely is absent (not in
+`requirements*.txt`; the worker logs `psutil_unavailable:ImportError`), so that
+guard does run on the `/proc` fallback — which works on Linux. The guard is fine.
+
 ### `#417` — OPEN, UNOWNED. The board froze for 4h12m because the kernel MOVED page cache between two buckets. `_MIN_SAFE_MEMORY_HEADROOM_BYTES` aborts on a number that changes without memory pressure changing
 
 **Sibling of `#387`, not a duplicate — a different guard, and a different
