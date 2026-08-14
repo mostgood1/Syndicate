@@ -40,15 +40,49 @@
   - Also ruled out: the leagues are not skipped wholesale — the live-state path
     writes their files (16:46:54Z, "0 live games"). It is specific to the odds
     fetch steps.
-- Hypothesis: the all-leagues pregame job does not survive to its tail. Leading
-  candidate is that it runs `launch_mode="web_process"` ON live-odds-worker,
-  which recycles itself on `max_uptime_seconds` (observed 06:16:58Z and
-  12:22:21Z today, `earlyExit=true`) — a recycle mid-job kills the subprocess
-  partway down the league list. A step timeout or runtime budget would produce
-  the same signature and is not yet separated from it.
-- Falsification test: if a pregame job is shown running to completion across
-  ALL ten leagues while the tail leagues still do not update, the run is not
-  being truncated and the fault is inside the per-league fetch instead.
+- **ROOT CAUSE PROVEN 2026-08-14 17:00Z via `/api/ops/odds-refresh/plan`
+  (dry_run, cost nothing). The run is 50 steps GROUPED BY KIND, not by league:**
+
+      steps  1-10   every league's schedule
+      steps 11-20   every league's `artifacts`  <- TEN SOCCER SIMS
+      steps 21-30   every league's odds
+      steps 31-40   every league's props
+      steps 41-50   every league's picks
+
+  The odds steps land at #21-30 — **behind all ten sims.** And the boundary is
+  exact:
+
+      soccer_eredivisie_odds        step #27   CURRENT
+      soccer_primeira_liga_odds     step #28   dark
+      soccer_championship_odds      step #29   dark
+      soccer_belgian_pro_league_odds step #30  dark
+
+  **The run dies between step 27 and step 28.** That is not a hypothesis about
+  ordering; it is the ordering, read off the planner, matching the observed
+  fresh/dark split with no exceptions.
+- **CORRECTION, and it changes the OTHER lane.** I wrote in
+  `soccer-projection-gap` that it is "NOT downstream of the odds-coverage bug",
+  reasoning that eredivisie's odds are current while 94 of its 99 markets carry
+  no projection. The observation was right; **the inference was wrong.** Both
+  are the SAME truncation at different step positions: eredivisie's ODDS step
+  is #27 and ran; its PROPS step is #37 and its PICKS step is #47, and
+  **steps 31-50 never execute for ANY league.** So no league gets props or
+  picks, which is why soccer projection coverage is 30% and props are the worst
+  of it. One cause, three symptoms — I had split it into two lanes on a
+  distinction that does not exist.
+- The earlier `web_process` / worker-recycle hypothesis is NOT needed to
+  explain this and is not evidence-backed. What still needs naming is WHY the
+  run stops at ~27 steps (time budget, memory, step timeout) — but the fix does
+  not depend on that answer.
+- **Fix direction, cheap and order-only:** run every league's ODDS before any
+  league's `artifacts` sim. Odds fetches are seconds and 1.46 credits/call;
+  the sims are minutes and are what consumes the budget. Reordering costs no
+  additional OddsAPI spend and makes odds coverage independent of whether the
+  sims finish. Prioritising leagues with fixtures TODAY is the second
+  refinement, not the first.
+- Falsification test: if a run is shown completing all 50 steps while the tail
+  leagues still do not update, truncation is not the cause and the fault is
+  inside the per-league fetch instead.
 - Files (exclusive to this lane):
   - `scripts/refresh_odds_sources.py` — league step construction/ordering.
   - `tests/test_soccer_odds_coverage.py` (new).
@@ -82,9 +116,21 @@
   Board-wide soccer: **8,299 rows, 2,503 projected = 30.2%**.
 - **The decisive observation:** eredivisie is the ONE league whose odds are
   current, and **94 of its 99 markets have no projection**. The odds arrived
-  and the projections did not meet them. So this cannot be explained by the
-  capture gap, and fixing capture will not fix this. Player props are where the
-  gap is widest; game lines are largely projected.
+  and the projections did not meet them.
+- **~~So this cannot be explained by the capture gap, and fixing capture will
+  not fix this.~~ THAT INFERENCE WAS WRONG — corrected same session, 17:00Z.**
+  The planner shows the pregame run is 50 steps grouped BY KIND: schedules
+  1-10, sims 11-20, odds 21-30, **props 31-40, picks 41-50** — and the run dies
+  between step 27 and 28. So eredivisie's odds step (#27) ran while its props
+  (#37) and picks (#47) did not, and **steps 31-50 never execute for ANY
+  league.** The projection gap and the odds-coverage gap are ONE truncation
+  observed at two step positions. I split them into two lanes on a distinction
+  that does not exist; the shared fix is in `soccer-odds-coverage`.
+- What this lane still owns, because reordering will NOT answer it: whether the
+  sim actually produces per-market projections once its steps get to run, the
+  37-of-75 `unknown` game states, and the game-chips date scoping. Those are
+  not explained by step truncation and must be measured after the reorder
+  lands, not before — otherwise a fixed run will be credited with fixing them.
 - Second, possibly-related defect from the same payload: `by_state` reports
   **37 of 75 soccer games as `unknown`** — the game-state join failed on half
   the board. An unknown state is not cosmetic; `#298`/`#300` make it FAIL the
