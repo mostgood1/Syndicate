@@ -270,6 +270,21 @@
 - Blocked by: none.
 
 ### soccer-projection-gap — OPEN — opened 2026-08-14 — session: board-ui
+- **PREMISE CORRECTED 2026-08-14 18:4xZ — read this first.** This lane was
+  opened on the reasoning that the projection gap is independent of the odds
+  gap, because eredivisie's odds were current while 94 of its 99 markets had
+  no projection. **Eredivisie's odds were NOT current.** Its `game` rows stop
+  at 2026-08-10T20:54:06 like everyone else's; only its `prop` rows are fresh,
+  from a different producer. The observation that founded this lane was an
+  artifact of that mask.
+- **What that does and does not change.** It removes the PROOF of
+  independence — the two gaps may share a cause after all. It does NOT make
+  them the same lane: 30% projection coverage, 37/75 `unknown` game states and
+  56 game-chips on a 4-fixture day are still measured, still unexplained, and
+  still not obviously downstream of a stale odds capture. Keep the lane, drop
+  the claim.
+- **Do not measure this lane until `soccer-odds-coverage` is fixed.** With
+  game odds four days stale, any projection-coverage number is confounded.
 - Goal: soccer markets on the board carry the sim's projections. Testable
   outcome: `rows_with_projection / rows` for soccer rises from **30%** toward
   the coverage MLB achieves (1,622 of 2,537 = 64% the same day), and no league
@@ -503,7 +518,23 @@ the FIRST for a model it did not originally scope.**
   point of edit.
 - Blocked by: none for diagnosis. Blocked on lane reassignment for any fix.
 
-### board-ui-freshness-slip-books — OPEN — opened 2026-08-14 — session: board-ui
+### board-ui-freshness-slip-books — CLOSED 2026-08-14 — all three shipped and verified
+- **Outcome: DONE.** Deploy `b98f5ed7` (web, live 15:33:06Z), then the ops
+  half as `f9aa2399`/`8ff4e513`.
+  1. Odds age is served AND rendered — non-null on `view=all` and `pregame`,
+     null with 0 games on `live`. The API test caught a real bug pre-deploy:
+     the timestamps were derived BEFORE `partition_board_by_state`, which
+     recomputes the block, so every filtered tab would have silently lost the
+     odds age while `all` looked correct.
+  2. Rail: `board_cards.css` linked (the slip's styles never loaded on this
+     page), collapse returns 250px to the board (920 -> 1170 measured), Ask
+     button on every row with context resolved off the `<tr>`.
+  3. Books default to the operator's 11 of 36, All-books one click away,
+     hidden count stated. 20 header columns instead of 46.
+- One prediction MISSED and recorded as such: I said the odds age would read
+  >120 min; it read 23.0 because the capture recovered between readings. The
+  number I committed to was a property of the outage, not of the change.
+- 95 tests green. Verification written into `deploys.md`.
 - Goal: three UI defects on `/<sport>/market-board`, each with a testable
   outcome:
   1. **The board reports build age and hides odds age, and the two differ by
