@@ -2104,7 +2104,52 @@ the stage never runs. The 1,479MB figure in this ticket's original title is
 STILL unverified and must not be used to re-derive the threshold; that is
 `#380`'s mistake and the caution `#417` repeats.
 
-**NEXT ACTION — a LOCAL run, no deploy, no production contact.** Call
+**THE LOCAL RUN IS DONE. 2026-08-14. THE STAGE COSTS 127MB. THE GUARD RESERVES
+3,000MB — a 23x OVER-RESERVATION.**
+
+Harness: `C:	mp\measure_overview.py` — patches `_overview_headroom_exhausted`
+to False, wraps `_build_sport_overview`, brackets each sport with process RSS.
+All 8 sports ran to completion, which has not happened in production in the
+observed window.
+
+```
+RSS 80.3 -> 207.6 MB       TOTAL DELTA  +127.2 MB
+largest single sport       ncaaf  +79.1 MB
+sum of hydrated deltas     +88.9 MB
+elapsed                    237.5 s
+guard demands              3000 MB
+```
+
+**THE 1,479MB FIGURE IN THIS TICKET'S TITLE IS NOW FALSIFIED, not merely
+unverified — it is off by more than an order of magnitude** against the first
+actual measurement of the stage. It came from a code comment. Do not carry it
+forward.
+
+Coverage, so the number is not over-read: **4 of 8 sports hydrated real games**
+(soccer 56 — `data_health: healthy`, 90 pregame; ncaaf 16; nfl 10; wnba 1).
+The other four (mlb, nba, ncaab, nhl) returned zero games from this checkout's
+mirror and are therefore UNMEASURED. If they scale like ncaaf's 79MB, a full
+slate might reach ~300-400MB — still an order of magnitude under 3,000.
+
+Two further caveats. The loop's own comment says peak is the SUM across sports,
+not the max, because every hydrated overview is held simultaneously; the
++127.2MB total already reflects that. And this is Windows RSS on a warm
+interpreter, not cgroup `anon` on Render — **the magnitude is the transferable
+claim, not the exact number.**
+
+**What this means for the threshold.** A guard reserving 3,000MB of a 4,096MB
+container for a 127MB stage cannot be satisfied, which is exactly what the 100
+production events show. It is not protecting against `#279`'s OOM kills — those
+came from sims and the publish sweep, not from this stage. Any re-derivation
+should start from the measured 127MB (or a full-slate re-measure once the mirror
+carries mlb/nba/ncaab/nhl), plus real headroom for the sims that share the box —
+NOT from the retired 1,479 figure.
+
+**SEPARATE FINDING, first time this stage has ever been timed: 237.5 SECONDS**
+for 127MB. If board builds are slow, this is a latency problem independent of
+memory and deserves its own ticket rather than being folded in here.
+
+**(superseded) NEXT ACTION — a LOCAL run, no deploy, no production contact.** Call
 `build_intelligence_overview` with the guard disabled and record RSS across the
 sports loop. That is the only way to obtain the per-sport cost, and it needs
 nothing from Render. Only then can the floor be re-derived against a measurement
