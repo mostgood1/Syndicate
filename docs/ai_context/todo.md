@@ -31580,6 +31580,88 @@ fixtures now supply synthetic prior-season plays with distinct per-club EPA,
 which is what their names always described. Still hermetic; no test touches the
 real `pbp_2025.csv`. No assertion was weakened.
 
+### `#429` — OPEN, UNOWNED. `mlb batter_hits_runs_rbis` projects a CONSTANT 0.0 across the whole slate, and the real mean is sitting one lookup away
+
+**Found by `#425`'s degeneracy detector on its first live board**, unprompted,
+2026-08-14 — not by anyone looking. That is the detector doing exactly the job
+it was built for.
+
+**THIS RESOLVES A QUESTION `#377` EXPLICITLY LEFT OPEN.** That ticket recorded:
+*"`mlb batter_hits_runs_rbis` shows `distinct=1, value 0.0`. That may be a
+single row rather than a constant — the sample is too small to call, and it
+should be re-measured on a fuller slate before anyone treats it as either."*
+Re-measured on a full slate: **190 rows across 188 games, all 0.0.** It is a
+constant, not a single row.
+
+#### The measurement (production `/api/board/book-grid?sport=mlb`, 2026-08-14)
+
+    market                     rows  distinct  sample
+    batter_hits_runs_rbis        83         1  0.0            <-- constant
+    batter_total_bases           89        87  0.945, 1.028, 1.123 ...
+    batter_hits                  15        15  0.577, 0.831, 0.844 ...
+    strikeouts                   22        22  2.64, 3.175, 3.228 ...
+    outs                         17        17  15.73, 16.187 ...
+    totals                       25        14  6.632, 7.647 ...
+    spreads                      18        14  -2.155, -2.117 ...
+
+**IT IS ISOLATED TO THIS ONE MARKET.** Every sibling varies properly, including
+`batter_hits` and `batter_total_bases`, which are built from the same family of
+inputs. So this is NOT the MLB prop model failing and NOT the `#377` NFL shape
+(a whole sport with no ratings data) — it is one market key.
+
+#### Severity: the constant reaches a number a bettor reads, but does not tempt a bet
+
+    market lines quoted   : 1.5 (82 rows), 2.5 (1 row)
+    edge_vs_market_pct    : present on 83 of 83, range -11.87 .. -6.85
+    edge_vs_line          : absent on all 83
+
+A projection of `0.0` against a 1.5 line means the model reads the UNDER at
+~100% on every one of these rows. **Mitigating, and stated so nobody
+over-escalates:** every resulting EV is NEGATIVE, so this is not generating
+attractive-looking bets — it is polluting the board with meaningless numbers
+rather than recommending bad wagers. The EVs are still fabricated: an EV
+computed from a 0.0 projection carries no information whichever sign it has.
+
+**ALREADY MITIGATED, DO NOT RE-FIX THAT PART.** `#425` gap 2 marks all 83 rows
+`degenerate: true` and attaches
+`projection is a single constant (0.0) across 188 games -- the model had no
+usable input for this slate`. The board no longer asserts this silently. What
+remains is the underlying producer.
+
+#### Two leads, both from notes already in the repo. LEADS, NOT CONCLUSIONS.
+
+1. **`box_score_stats.py:21` says the combined market has no entry in the stat
+   vocabulary at all.** `_HITTER_STAT_FIELDS` covers `hits`, `runs`, `rbi`,
+   `home_runs`, `total_bases` — and its own comment records that the other
+   convention *"has no entry for the combined `hits_runs_rbis` market at all"*.
+   A lookup keyed on `hits_runs_rbis` against a dict with no such key returns
+   nothing, and something downstream turns that into `0.0` instead of `None`.
+   **That last step is the real defect if this lead holds** — an absent stat
+   must render blank, never zero, because zero is a legal projection.
+
+2. **`intelligence.py:5808` records the real mean existing upstream and not
+   reaching the structured field.** A 2026-08-02 audit confirmed
+   `Miguel Rojas hits_runs_rbis mean 1.807` present in its `daily_top_props`
+   row, *"it just never reaches this candidate's structured `projected` field"*
+   — the narrative text even quotes "around 1.8" while the field is empty.
+   So a correct value for this exact market demonstrably exists in the
+   pipeline. **The fix may be a join, not a model.**
+
+#### First step
+
+Do not start in the model. Take one player on today's slate, find their
+`daily_top_props` `hits_runs_rbis` mean (a real number near ~1.8 is expected),
+and trace where it becomes `0.0` on the board. If the two leads above are the
+same defect, this is a missing key plus a `None`-to-`0.0` coercion, and both
+are small.
+
+#### Done looks like
+
+Either per-player values that vary, or the market suppressed with an
+attributable reason. **A constant 0.0 is not acceptable as an outcome** — it is
+`#377`'s pattern, a number that looks authoritative and means nothing, and it
+survived this long only because nobody compared rows.
+
 ### `#428` — OPEN, UNOWNED, BLOCKED ON DATA. Six projection models have never been measured, and now they say so — which is not the same as being good
 
 Carved out of `#425` at its closure rather than left inside it, because the
