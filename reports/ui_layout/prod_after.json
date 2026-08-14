@@ -1,0 +1,1064 @@
+{
+  "baseUrl": "https://syndicate-an21.onrender.com",
+  "sports": {
+    "ncaaf": {
+      "route": "/ncaaf/cards",
+      "desktop": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 16,
+        "stripCards": 16,
+        "cardHeightMin": 526,
+        "cardHeightMax": 571,
+        "cardHeightSpread": 45,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": "12px/400",
+          ".cards-tab": "10px/800",
+          ".cards-head-team-name": "16px/700",
+          ".cards-data-pair span": "10px/700",
+          ".cards-data-pair strong": "15px/700"
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": "tabular-nums",
+          ".cards-mini-metric strong": "tabular-nums"
+        },
+        "nameBoxes": [
+          {
+            "text": "North Carolina",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "TCU",
+            "width": 30,
+            "wrap": "break-word"
+          },
+          {
+            "text": "San Jos\u00e9 State",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "USC",
+            "width": 31,
+            "wrap": "break-word"
+          },
+          {
+            "text": "NC State",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Virginia",
+            "width": 58,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Jacksonville State",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "North Dakota State",
+            "width": 64,
+            "wrap": "break-word"
+          }
+        ],
+        "touchTargetFailures": [
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          }
+        ],
+        "tabClickThrough": [
+          {
+            "tab": "identity",
+            "activePanels": [
+              "identity"
+            ],
+            "cardHeight": 556,
+            "ok": true
+          },
+          {
+            "tab": "context",
+            "activePanels": [
+              "context"
+            ],
+            "cardHeight": 483,
+            "ok": true
+          },
+          {
+            "tab": "coverage",
+            "activePanels": [
+              "coverage"
+            ],
+            "cardHeight": 419,
+            "ok": true
+          },
+          {
+            "tab": "details",
+            "activePanels": [
+              "details"
+            ],
+            "cardHeight": 548,
+            "ok": true
+          }
+        ]
+      },
+      "mobile": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 16,
+        "stripCards": 16,
+        "cardHeightMin": 1345,
+        "cardHeightMax": 1398,
+        "cardHeightSpread": 53,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": "12px/400",
+          ".cards-tab": "10px/800",
+          ".cards-head-team-name": "16px/700",
+          ".cards-data-pair span": "10px/700",
+          ".cards-data-pair strong": "15px/700"
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": "tabular-nums",
+          ".cards-mini-metric strong": "tabular-nums"
+        },
+        "nameBoxes": [
+          {
+            "text": "North Carolina",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "TCU",
+            "width": 30,
+            "wrap": "break-word"
+          },
+          {
+            "text": "San Jos\u00e9 State",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "USC",
+            "width": 31,
+            "wrap": "break-word"
+          },
+          {
+            "text": "NC State",
+            "width": 67,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Virginia",
+            "width": 58,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Jacksonville State",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "North Dakota State",
+            "width": 90,
+            "wrap": "break-word"
+          }
+        ],
+        "touchTargetFailures": []
+      }
+    },
+    "nfl": {
+      "route": "/nfl/cards",
+      "desktop": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 16,
+        "stripCards": 16,
+        "cardHeightMin": 1030,
+        "cardHeightMax": 1047,
+        "cardHeightSpread": 17,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": "12px/400",
+          ".cards-market-label": "10px/700",
+          ".cards-market-main": "15px/400",
+          ".cards-market-sub": "16px/400",
+          ".cards-tab": "10px/800",
+          ".cards-head-team-name": "16px/700",
+          ".cards-data-pair span": "10px/700",
+          ".cards-data-pair strong": "15px/700"
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": "tabular-nums",
+          ".cards-market-main": "tabular-nums",
+          ".cards-mini-metric strong": "tabular-nums"
+        },
+        "nameBoxes": [
+          {
+            "text": "New England Patriots",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Seattle Seahawks",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "San Francisco 49ers",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "LA",
+            "width": 19,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Chicago Bears",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Carolina Panthers",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Tampa Bay Buccaneers",
+            "width": 64,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Cincinnati Bengals",
+            "width": 64,
+            "wrap": "break-word"
+          }
+        ],
+        "touchTargetFailures": [
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          }
+        ],
+        "tabClickThrough": [
+          {
+            "tab": "game",
+            "activePanels": [
+              "game"
+            ],
+            "cardHeight": 1030,
+            "ok": true
+          },
+          {
+            "tab": "boxscore",
+            "activePanels": [
+              "boxscore"
+            ],
+            "cardHeight": 581,
+            "ok": true
+          },
+          {
+            "tab": "props",
+            "activePanels": [
+              "props"
+            ],
+            "cardHeight": 546,
+            "ok": true
+          },
+          {
+            "tab": "panels",
+            "activePanels": [
+              "panels"
+            ],
+            "cardHeight": 711,
+            "ok": true
+          }
+        ]
+      },
+      "mobile": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 16,
+        "stripCards": 16,
+        "cardHeightMin": 2116,
+        "cardHeightMax": 2183,
+        "cardHeightSpread": 67,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": "12px/400",
+          ".cards-market-label": "10px/700",
+          ".cards-market-main": "15px/400",
+          ".cards-market-sub": "16px/400",
+          ".cards-tab": "10px/800",
+          ".cards-head-team-name": "16px/700",
+          ".cards-data-pair span": "10px/700",
+          ".cards-data-pair strong": "15px/700"
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": "tabular-nums",
+          ".cards-market-main": "tabular-nums",
+          ".cards-mini-metric strong": "tabular-nums"
+        },
+        "nameBoxes": [
+          {
+            "text": "New England Patriots",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Seattle Seahawks",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "San Francisco 49ers",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "LA",
+            "width": 19,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Chicago Bears",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Carolina Panthers",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Tampa Bay Buccaneers",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Cincinnati Bengals",
+            "width": 90,
+            "wrap": "break-word"
+          }
+        ],
+        "touchTargetFailures": []
+      }
+    },
+    "soccer": {
+      "route": "/soccer/epl/cards",
+      "desktop": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 1,
+        "stripCards": 1,
+        "cardHeightMin": 1152,
+        "cardHeightMax": 1152,
+        "cardHeightSpread": 0,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": "12px/400",
+          ".cards-market-label": "10px/700",
+          ".cards-market-main": "15px/400",
+          ".cards-market-sub": "16px/400",
+          ".cards-tab": "10px/800",
+          ".cards-head-team-name": "13px/700",
+          ".cards-data-pair span": "10px/700",
+          ".cards-data-pair strong": "15px/700"
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": "tabular-nums",
+          ".cards-market-main": "tabular-nums",
+          ".cards-mini-metric strong": "tabular-nums"
+        },
+        "nameBoxes": [
+          {
+            "text": "Coventry City",
+            "width": 87,
+            "wrap": "normal"
+          },
+          {
+            "text": "Arsenal",
+            "width": 47,
+            "wrap": "normal"
+          },
+          {
+            "text": "Coventry City",
+            "width": 135,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Arsenal",
+            "width": 78,
+            "wrap": "break-word"
+          }
+        ],
+        "touchTargetFailures": [
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          }
+        ],
+        "tabClickThrough": [
+          {
+            "tab": "game",
+            "activePanels": [
+              "game"
+            ],
+            "cardHeight": 1152,
+            "ok": true
+          },
+          {
+            "tab": "boxscore",
+            "activePanels": [
+              "boxscore"
+            ],
+            "cardHeight": 768,
+            "ok": true
+          },
+          {
+            "tab": "props",
+            "activePanels": [
+              "props"
+            ],
+            "cardHeight": 751,
+            "ok": true
+          },
+          {
+            "tab": "panels",
+            "activePanels": [
+              "panels"
+            ],
+            "cardHeight": 1086,
+            "ok": true
+          }
+        ]
+      },
+      "mobile": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 1,
+        "stripCards": 1,
+        "cardHeightMin": 2542,
+        "cardHeightMax": 2542,
+        "cardHeightSpread": 0,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": "12px/400",
+          ".cards-market-label": "10px/700",
+          ".cards-market-main": "15px/400",
+          ".cards-market-sub": "16px/400",
+          ".cards-tab": "10px/800",
+          ".cards-head-team-name": "13px/700",
+          ".cards-data-pair span": "10px/700",
+          ".cards-data-pair strong": "15px/700"
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": "tabular-nums",
+          ".cards-market-main": "tabular-nums",
+          ".cards-mini-metric strong": "tabular-nums"
+        },
+        "nameBoxes": [
+          {
+            "text": "Coventry City",
+            "width": 87,
+            "wrap": "normal"
+          },
+          {
+            "text": "Arsenal",
+            "width": 47,
+            "wrap": "normal"
+          },
+          {
+            "text": "Coventry City",
+            "width": 90,
+            "wrap": "break-word"
+          },
+          {
+            "text": "Arsenal",
+            "width": 78,
+            "wrap": "break-word"
+          }
+        ],
+        "touchTargetFailures": []
+      }
+    },
+    "ncaab": {
+      "route": "/ncaab/cards",
+      "desktop": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflowPx": 0,
+        "boxSizing": null,
+        "cards": 0,
+        "stripCards": 0,
+        "cardHeightMin": null,
+        "cardHeightMax": null,
+        "cardHeightSpread": null,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {},
+        "tabularFigures": {},
+        "nameBoxes": [],
+        "touchTargetFailures": [],
+        "tabClickThrough": []
+      },
+      "mobile": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflowPx": 0,
+        "boxSizing": null,
+        "cards": 0,
+        "stripCards": 0,
+        "cardHeightMin": null,
+        "cardHeightMax": null,
+        "cardHeightSpread": null,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {},
+        "tabularFigures": {},
+        "nameBoxes": [],
+        "touchTargetFailures": []
+      }
+    }
+  },
+  "ok": true
+}
