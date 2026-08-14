@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import importlib.util
 import json
 import os
@@ -1682,3 +1684,78 @@ class _NoProcPath(Path):
 
     def is_dir(self):  # type: ignore[override]
         return False
+
+
+class MallocArenaDiagnosticTests(unittest.TestCase):
+    """`#423` step 1 wiring.
+
+    The emitter rides on the existing stage calls rather than a timer of its
+    own: `#241` is on record as a worker whose PERIODIC work caused a
+    production restart loop, and this process reaches its memory ceiling every
+    ~1.1h. These tests pin the three properties that make that safe -- it is
+    rate limited, it is disableable, and it cannot take the worker down.
+    """
+
+    @staticmethod
+    def _load_module():
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "run_refresh_worker.py"
+        spec = importlib.util.spec_from_file_location("test_arena_worker", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+
+    def test_it_emits_once_then_rate_limits(self) -> None:
+        module = self._load_module()
+        module._ARENA_DIAG_LAST["at"] = 0.0
+        snap = {"arenas": 2, "system_current_mb": 6.0, "free_held_mb": 1.5,
+                "in_use_mb": 4.5, "free_held_pct": 25.0, "reads_as": "fragmentation"}
+        with patch("syndicate.features.shared.memory_observability.malloc_arena_snapshot",
+                   return_value=snap):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                module._diag_log_malloc_arena("post_mlb_sim_tick")
+                module._diag_log_malloc_arena("post_mlb_sim_tick")  # immediately again
+            out = buf.getvalue()
+        # Exactly one line: the second call is inside the 120s window. Without
+        # the limiter this rides every stage call on a worker that is already
+        # memory-bound.
+        self.assertEqual(out.count("MALLOC_ARENA "), 1, out)
+        self.assertIn('"reads_as": "fragmentation"', out)
+        self.assertIn("stage=post_mlb_sim_tick", out)
+
+    def test_the_kill_switch_silences_it(self) -> None:
+        module = self._load_module()
+        module._ARENA_DIAG_LAST["at"] = 0.0
+        with patch.dict(os.environ, {"SYNDICATE_ARENA_DIAG": "0"}), \
+             patch("syndicate.features.shared.memory_observability.malloc_arena_snapshot",
+                   return_value={"arenas": 1}):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                module._diag_log_malloc_arena("boot")
+            self.assertNotIn("MALLOC_ARENA", buf.getvalue())
+
+    def test_a_raising_snapshot_cannot_take_the_worker_down(self) -> None:
+        # The whole reason it is wrapped. A diagnostic that can kill the worker
+        # is worse than no diagnostic on a service that already restarts hourly.
+        module = self._load_module()
+        module._ARENA_DIAG_LAST["at"] = 0.0
+        with patch("syndicate.features.shared.memory_observability.malloc_arena_snapshot",
+                   side_effect=RuntimeError("libc exploded")):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                module._diag_log_malloc_arena("boot")   # must not raise
+            self.assertIn("MALLOC_ARENA_FAILED", buf.getvalue())
+
+    def test_off_glibc_it_says_nothing_rather_than_emitting_zeros(self) -> None:
+        # Every dev machine here returns None. A zeroed reading would say "the
+        # allocator holds nothing", which is worse than silence.
+        module = self._load_module()
+        module._ARENA_DIAG_LAST["at"] = 0.0
+        with patch("syndicate.features.shared.memory_observability.malloc_arena_snapshot",
+                   return_value=None):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                module._diag_log_malloc_arena("boot")
+            self.assertNotIn("MALLOC_ARENA ", buf.getvalue())
