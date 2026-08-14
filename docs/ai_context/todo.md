@@ -2054,7 +2054,76 @@ stopped then), so "no `LAYER2_SHORTLIST` since 10:56" is a real absence and not
 a search-window artifact. Worth stating because the worker is chatty enough that
 100 unfiltered lines cover only ~20 seconds.
 
-### `#387` — OPEN, UNOWNED, THE BOARD IS STARVED BY A THRESHOLD THAT IS 2x ITS STAGE. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` demands 3,000MB for a stage measured at 1,479MB
+### `#387` — **MEASURED 2026-08-14: THE GUARD HAS NEVER ONCE BEEN SATISFIED. 97 of 100 runs produced NOTHING.** Not a stale constant — a threshold this container cannot meet
+
+**THIS IS THE LARGEST CORRECTNESS DEFECT FOUND ON 2026-08-13/14, larger than the
+`#423` leak.** The leak at least permitted intermittent builds. This has emptied
+the overview for the entire observed window.
+
+**MEASURED — 100 `OVERVIEW_STOPPED_FOR_MEMORY` events, 2026-08-12T16:58:56 ->
+2026-08-14T03:51:40 (~35 hours):**
+
+```
+headroom range across all 100 :  2054.7 - 2961.6 MB
+floor                         :  3000.0 MB
+best reading ever seen        :  38.4 MB SHORT
+readings that cleared the bar :  0 of 100
+
+sports_done at the stop:
+   0  -> 97 events   (stopped before hydrating ANY sport, incl. mlb)
+   4  ->  2 events
+   1  ->  1 event
+```
+
+**97 of 100 runs stopped before the first sport.** The board is not degraded, it
+is **empty by construction**, and has been for at least 35 hours.
+
+**THE GUARD IS READING THE WRONG QUANTITY — and the data says so directly.**
+More work correlates with MORE headroom, which is impossible if hydration were
+the cost being guarded:
+
+```
+sports_done=0  headroom 2054.7   (worst)
+sports_done=1  headroom 2906.2
+sports_done=4  headroom 2961.6   (best)
+```
+
+If the overview's own footprint drove this, headroom would FALL as sports
+completed. It rises. The guard is tracking container-wide noise from sims and
+the publish sweep, not the stage it gates. Same shape as `#417`: a threshold
+whose input moves for reasons unrelated to the risk.
+
+**A 3000MB floor on a 4096MB container demands 73% of the box free.** Since
+`#417` corrected `headroom` to an unreclaimable basis, the two best readings ever
+recorded (2906.2, 2961.6 — both from 2026-08-14, the healthiest this worker has
+been) still refuse.
+
+**THE STAGE COST STILL CANNOT BE MEASURED FROM PRODUCTION, AND THAT IS THE
+POINT.** There is no before/after delta to compute because there is no "after" —
+the stage never runs. The 1,479MB figure in this ticket's original title is
+STILL unverified and must not be used to re-derive the threshold; that is
+`#380`'s mistake and the caution `#417` repeats.
+
+**NEXT ACTION — a LOCAL run, no deploy, no production contact.** Call
+`build_intelligence_overview` with the guard disabled and record RSS across the
+sports loop. That is the only way to obtain the per-sport cost, and it needs
+nothing from Render. Only then can the floor be re-derived against a measurement
+rather than a comment.
+
+**DO NOT simply lower the number.** The guard exists because of `#279`'s 8 OOM
+kills in 82 minutes. But note what the evidence now supports: a guard that has
+refused 100 of 100 times is not protecting anything — it is the reason there is
+nothing to protect.
+
+**Related, and worth stating so the three are not confused:** refresh-worker has
+THREE independent memory guards. `#417`'s `pre_source_state_fingerprint` (fixed,
+verified). `#423`'s allocation growth (open, not arena fragmentation). And this
+one, which is the current binding constraint on the board and was untouched all
+night because its emitter is `OVERVIEW_STOPPED_FOR_MEMORY`, not
+`MEMORY_GUARD_ABORT` — searching for the familiar token returned a clean zero and
+read as "not memory."
+
+**(original title, kept for the record)** OPEN, UNOWNED, THE BOARD IS STARVED BY A THRESHOLD THAT IS 2x ITS STAGE. `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` demands 3,000MB for a stage measured at 1,479MB
 
 **The overview is empty on ~70% of builds since 2026-08-12 16:38:47Z**, so
 `collect_candidates` gets nothing and the board rebuilds from a fallback that
