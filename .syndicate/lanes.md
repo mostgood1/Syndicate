@@ -35,6 +35,54 @@
   or shorter than the model-backed rows', the 0.5 default is not selecting for
   longshots, the shortlist is optimistic but not inverted, and A1-A2 stay
   correct-but-not-urgent. Record the result either way.
+- **A0 RESULT — the observable is CONFIRMED and the mechanism is NOT the one I
+  hypothesised. Both halves matter.** `[measured 2026-08-14 18:26Z, served
+  `/api/board/layer2-shortlist?sport=all&limit=500`, artifact written
+  18:26:23Z, 250 rows]`
+
+      price (American)      n    plus-money   median    p75      p90      max
+      with model_edge_pct   76   48 (63.2%)    +113    +182     +240     +326
+      without              174  143 (82.2%)    +875   +2200    +4000  +10000
+
+  Per sport: soccer 100 rows, **100% plus-money, median +2200**; wnba 12 rows,
+  100% plus-money, median +455; mlb-without +112.5; nfl-without −105.
+  So the model-free half of the board really does sit at far longer prices —
+  the shape the hypothesis predicted.
+- **But the 0.5 terminal did NOT produce it, and crediting it would have been
+  the wrong cause.** Every published row carries `quote.fair_method`, and it is
+  `consensus` (150) or `book_margin_model` (100) — never the recommendation
+  lane. `_fair_probability` does not price this surface at all. Its 0.5
+  terminal is real (confirmed by reading the file) and reaches the
+  intelligence/portfolio lane, NOT the shortlist. A1-A2 remain correct; they
+  are not the fix for what A0 found.
+- **What A0 actually found — a degeneracy, proven arithmetically, 100/100 rows.**
+  All 100 soccer rows are priced by `book_margin_model`, every one with
+  `books_quoting: 1`. That model is `fair = implied x (1 - hold)`
+  (`book_margin_model.py:194`), so on a one-sided row
+  **`ev_pct` is identically `-assumed_hold_pct`** — a restatement of the book's
+  own margin, carrying no information about the bet.
+  - Reproduced exactly: predicting `ev_pct` from
+    `round(implied x (1-h), 4) / implied - 1` matches the served value on
+    **100 of 100 rows, 0 mismatches, max abs error 0.0100pt** — which is the
+    rounding step itself.
+  - **3 distinct holds underlie 19 distinct `ev_pct` values.** The apparent
+    spread is 4-dp quantisation of `fair` at longshot probabilities
+    (`fair` 0.0092 on a +10000 price), not signal. Same shape as `#429`'s
+    constant, one layer up.
+  - The value floor **cannot ever reject these rows**: soccer's floor is
+    `-8.1425 = -1.25 x 6.514`, and 6.514 is the same modelled hold that defines
+    their EV. `markets_measured: 0`, `method: modelled_hold`.
+  - **All 100 carry a negative `score`.** 40% of the published "opportunity"
+    board is one-book longshot props (`player_shots` 43, `player_shots_on_target`
+    29, `player_to_receive_red_card` 18, `player_assists` 10) ranked on a
+    constant, with `rows_with_projection: 12 of 8512` and
+    `rows_with_model_edge: 0` for the sport.
+  - Board-wide: `ev_pct` median is **+1.13 on model-backed rows and −6.54 on
+    model-free rows**; 174 of 250 published rows have negative EV.
+- Severity verdict: the lane is urgent, but the urgent item is this degeneracy
+  (A3's territory), not A1/A2. A1/A2 keep their own justification — known sign,
+  different surface — and are done first only because they are small and
+  independent.
 - Verification: re-fetch the served shortlist after deploy and check the three
   outcomes above; unit tests pinning each fix, mutation-checked (restoring the
   old line must turn exactly that test red).
@@ -57,6 +105,42 @@
 - Blocked by: none. Independent of Lane B (CLV) by design.
 
 ### soccer-odds-coverage — OPEN — opened 2026-08-14 — session: board-ui
+- **ROOT CAUSE FOUND 2026-08-14 18:4xZ, and the lane's whole framing was wrong.
+  It is not three leagues. Soccer GAME-odds capture is frozen for ALL of them.**
+  Split the shard by `kind` and it is unambiguous:
+
+      league               kind    rows   newest captured_at
+      eredivisie           prop     467   2026-08-14T17:21:44   <- TODAY
+      eredivisie           game      77   2026-08-10T20:54:06   <- 3.8 days
+      primeira_liga        game     141   2026-08-10T20:54:08
+      belgian_pro_league   game     111   2026-08-10T20:54:11
+      championship         game      93   2026-08-11T00:54:47
+
+  **Every league's `game` rows stop at 08-10/08-11 — eredivisie included.**
+  Eredivisie only LOOKED healthy because it also carries 467 prop rows from a
+  DIFFERENT producer (`fetch_soccer_oddsapi_props_local.py`) that ran today.
+  The other three have no prop rows, so nothing masked them.
+- **Corroborated independently by file mtime.** All four
+  `<league>/api/odds/game_odds_current.csv` — the game-odds step's own output —
+  bound to **48-96h old** via the export route's `since` filter. That matches
+  the `game` row timestamps exactly. The probe was validated first against a
+  control (the shard itself, known to have gained rows at 12:21 CDT, reads
+  "within 2h, not within 1h") rather than trusted unvalidated.
+- **This retires the league-specific hypothesis AND the step-position one.**
+  There is nothing special about positions 8/9/10; there is something special
+  about eredivisie having a second producer. `soccer_{league}_odds` has not
+  written for ANY league in ~4 days.
+- **It also explains two earlier observations I could not place:** the odds CSVs
+  containing today's fixtures with real prices (written 08-10, when today was
+  upcoming — the exact caveat I flagged and then nearly dismissed), and
+  eredivisie's 99 board rows with only 5 projected (most of those rows are
+  props, which is also why its board median read 62 min).
+- **STILL UNKNOWN: why the game-odds step stops.** Now a single question about
+  one step across all ten leagues, not ten questions — far more tractable.
+  Next: get `soccer_<league>_odds` step stdout/stderr from a run, and check
+  whether the step is even being SELECTED (its `phases=("pregame",)` means a
+  `phase="live"` run builds no odds step at all — and refresh-worker's soccer
+  unit autorun runs `phase="live"`).
 - Goal: every active soccer league's odds refresh on their own cadence, not
   just the leagues near the front of `_SOCCER_LEAGUE_SLUGS`. Testable outcome:
   the newest `captured_at` per league in
