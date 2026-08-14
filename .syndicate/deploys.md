@@ -1301,6 +1301,24 @@ people learn to route around. Run the gate, read it, then deploy.
   had no slate" from "soccer's slate was all one-book longshots" — which is
   exactly the ambiguity `rows_uninformative_ev` was shipped in the same commit
   to resolve. Without it this deploy would read as a soccer outage.
+- **WHY THE CONTROL HELD — established 21:2xZ, and it was NOT luck.** A later
+  reading showed mlb 84 -> 78 and I briefly took the control to have failed.
+  It had not: that reading is 21:22Z against a 19:58Z measurement, so it is
+  **1.4 hours of slate drift plus two unrelated deploys**, not this rule.
+  `total_rows` 156 -> 150 and `rows_uninformative_ev` 4003 -> 3842 drift the
+  same way. Re-read the post-deploy measurement before attributing a later
+  delta to the deploy.
+  The substantive question that scare raised is worth keeping, because the
+  premise I originally gave for P5 WAS wrong. I predicted MLB could not move
+  because "every MLB row is `consensus`" — read off the survivors. Measured on
+  the book-grid, MLB in fact carries **357 one-sided rows with a modelled
+  fair** (wnba 42, nfl 0), so the rule CAN reach MLB.
+  It does not, for a better reason than I predicted: MLB has
+  `rows_with_model_edge = 2256`, and `_row_ev_is_hold_restatement` returns
+  False for any row carrying a model view. **The narrowness clause is what
+  protects MLB, not the absence of modelled rows.** The rule is doing exactly
+  what it was designed to do, and the control held on the mechanism rather
+  than on a coincidence of MLB's pricing.
 - **Boot-confound, stated:** the worker rebooted at 19:49:15Z, so
   `memory_anon_mb` restarted from a clean floor. Any memory reading after that
   time is NOT comparable to the pre-deploy series the `anon-allocation-site` and
@@ -1436,7 +1454,18 @@ people learn to route around. Run the gate, read it, then deploy.
   - **Standing question this exposes, for `layer2-board-freshness`:** why has the
     intelligence state not recomputed in ~3.6h? That lane is already open on
     build refusals. Not chased here.
-  - **Risk status: A1/A2 is live and UNVERIFIED.** The 145/145 pre-deploy
+  - **UPDATE 20:44Z — A CYCLE RAN, AND P1 IS NOW MEASURED.**
+    `snapshot_generated_at` advanced to **2026-08-14T20:29:31Z**, which is
+    post-deploy (live 20:13Z), so this is a real post-change reading.
+    - **P1 (safety): PASS.** `recommendation_count` = **148**, not 0. The lane
+      did not empty. That was the revert trigger; it is not triggered.
+    - **P2 (direction): CONSISTENT, NOT PROVEN.** 145 -> 148 is the predicted
+      direction (no-vig pricing raises edges, more candidates clear `edge > 0`),
+      but the two readings are 3.9 HOURS apart and the slate moved in between.
+      +3 is not cleanly attributable to the change. Recorded as consistent, not
+      as evidence. A clean read needs two cycles either side of one deploy.
+    - **P3: still unmeasured** — see the instrument deploy below.
+  - **Risk status: A1/A2 is live, P1 VERIFIED, P2 confounded, P3 unmeasured.** The 145/145 pre-deploy
     measurement (every published recommendation carries a real
     `model_probability`) is the reason this is judged low-risk to leave running
     rather than pre-emptively reverted — but that is an argument, not a
@@ -1489,3 +1518,166 @@ people learn to route around. Run the gate, read it, then deploy.
 - Rollback: redeploy `bef782cb`. Not needed — nothing regressed.
 - Verdict: **capability shipped and verified; divergence NOT fixed.** Lane stays
   OPEN.
+
+
+## 2026-08-14 21:01Z — refresh-worker `7b1f3fdc` — instrument: emit even on zero
+
+- **Lane:** `recommendation-lane-correctness`. Branch
+  `deploy/model-audit-instrument-always-emits`, cut from `79148d8e`
+  (refresh-worker's live SHA), verified fast-forward. One change: remove the
+  `if rejected:` guard on the `FILTER_CANDIDATES` line so `rejected={}` prints.
+- **Why it was deployed at all:** the guard made "ran and rejected nothing"
+  indistinguishable from "never ran", which is precisely what cost the A1/A2
+  measurement four hours earlier. Mutation-checked: restoring the guard turns
+  exactly one test red.
+- **Pre-deploy 20:5xZ:** 0 full-sim launch markers in 8 min; headroom 1,458 MB.
+- **MEASUREMENT: NOT OBTAINED — and the reason is now NAMED.**
+  - 8 minutes of polling, then ten NARROW 90-second windows (to defeat the
+    100-line tail cap that made the earlier "0 lines" meaningless): **still no
+    `FILTER_CANDIDATES` line.**
+  - **Because no cycle has run.** `snapshot_generated_at` is STILL
+    `2026-08-14T20:29:31Z` at 21:03Z — 34 minutes stale.
+  - **That is a defect, not a slow cadence.** Read from the live env:
+    `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP = true` and
+    `SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS = 60`. The loop is ENABLED
+    and configured to recompute every **60 seconds**. A 34-minute-old snapshot
+    is ~34x its own interval.
+  - **What the worker is doing instead**, sampled over 3 minutes (100 lines):
+    repeated `SEASON_PROJECTION_LAUNCHING sport=nfl` followed by
+    `Traceback` out of `scripts/generate_smartsim2_nfl_projections.py`, failing
+    on pbp that "loaded ZERO plays" because `data/nfl_source/tracking/` is
+    gitignored and absent from the checkout.
+  - **HYPOTHESIS, EXPLICITLY NOT A CONCLUSION:** the crashing NFL season
+    projection is starving the intelligence loop. What is MEASURED is only
+    co-occurrence — loop enabled at 60s, snapshot 34 min stale, worker busy
+    crashing. Causation is untested. Do not credit a fix to this without
+    measuring the loop directly.
+  - **This blocks three verifications, none of them caused by my changes:**
+    A1/A2's P2 and P3, and this deploy's own effect.
+- **Rollback:** redeploy `79148d8e`. Not warranted — the change is one log line
+  and cannot affect the stall (which predates it: 20:29Z vs deploy 21:01Z).
+
+### 2026-08-14 — web `aadcde77` — board-ui Lane E card defects — **MEASURED, EVERY CRITERION MET**
+
+**Deploy `dep-d9vokalbedkc73erc9bg`, live at 21:42:56Z. Measured 21:4xZ with
+the same probe that produced the before-reading**
+(`reports/ui_layout/prod_before.json` -> `prod_after.json`):
+
+    sport   width    overflow      touch-fail   orphan tabs         unreachable panels
+    ncaaf   desktop  28px -> 0px   48 -> 64*    ['game'] -> []      ['identity','coverage'] -> []
+    ncaaf   mobile   40px -> 0px   48 -> 0      ['game'] -> []      ['identity','coverage'] -> []
+    nfl     desktop  28px -> 0px   64 -> 64*    -                   -
+    nfl     mobile   20px -> 0px   64 -> 0      -                   -
+    soccer  desktop  28px -> 0px    4 -> 4*     -                   -
+    soccer  mobile   20px -> 0px    4 -> 0      -                   -
+    ncaab   desktop  28px -> 0px    0 -> 0      (0 cards served)
+    ncaab   mobile   20px -> 0px    0 -> 0      (0 cards served)
+
+NCAAF trusted click-through, the defect this lane existed for:
+
+    BEFORE  game    -> 0 panels active, card 187px   <- blank
+            context -> ['context'] 485px
+            details -> ['details'] 550px
+    AFTER   identity-> ['identity'] 556px
+            context -> ['context'] 483px
+            coverage-> ['coverage'] 419px   <- was unreachable
+            details -> ['details'] 548px
+
+`font-variant-numeric` on the numeric classes: `normal` -> `tabular-nums`,
+every sport.
+
+**\* Read the desktop touch-target column honestly: it did NOT regress.** The
+44px minimum was applied at `<=767px` only, on the judgement that a mouse does
+not need a 44px target; desktop tabs are unchanged at 28px and were never
+counted as passing. NCAAF's desktop count rose 48 -> 64 purely because each
+card now carries FOUR tabs instead of three (16 cards x 4) — the number went
+up because a previously unreachable panel became reachable. If we decide the
+44px floor should apply at every width, that is a new decision and a new
+measurement, not a regression of this one.
+
+**Original pre-deploy block, kept as written:**
+
+- **Service:** web only (`srv-d88ahvrbc2fs73eodu30`). refresh-worker and
+  live-odds-worker untouched, so the refresh-worker deploy freeze/train and any
+  in-flight MLB sim (which runs on refresh-worker) are unaffected.
+- **What is deployed:** branch `deploy/board-ui-lane-e` =
+  `aadcde77b064337a676e92e45f47563db215f3ca` = web's OWN live commit
+  `5382943c` plus exactly one commit, `cf066942` (also on `origin/main`).
+  **Deliberately NOT main's tip.** `origin/main` is 28 commits ahead of what
+  web runs, including 440 deleted lines across the three `ask_the_syndicate*`
+  blueprints, plus `layer2_board.py`, `intelligence.py`, `prop_projections.py`
+  and the new `mlb_prop_calibration.py` — four other lanes' production
+  changes, one of which (`aac18260`) state.md records as deliberately on
+  NEITHER service. Deploying the tip would have shipped all of that under this
+  lane's name.
+- **Diff applied:** 18 files, +3172/-94, all UI — 5 templates, 6
+  stylesheets/JS, `features/ncaaf/cards.py`, `features/mlb/season.py`, a new
+  probe + tests, and deletion of the dead `static/mlb/board.js`.
+- **EXPECTED EFFECT, as numbers, in a window.** Re-run the SAME instrument
+  that produced the before-reading (`py -3 scripts/ui_layout_probe.py
+  --base-url https://syndicate-an21.onrender.com`) within 10 minutes of
+  `finishedAt`:
+
+    | production measurement                 | before (08-14)        | expected after |
+    |---|---|---|
+    | overflow 1440, nfl/ncaaf/soccer/ncaab  | 28px                  | 0px            |
+    | overflow 390                           | 20px (ncaaf 40px)     | 0px            |
+    | ncaaf tabs addressing no panel          | 1 (`game`)            | 0              |
+    | ncaaf panels no tab reaches             | 2 (identity,coverage) | 0              |
+    | trusted click, ncaaf default tab        | 0 panels, 187px card  | 1 panel, >250px|
+    | mobile tabs under 44px                  | 64 nfl / 48 ncaaf     | 0              |
+    | font-variant-numeric, numeric classes   | `normal`              | `tabular-nums` |
+
+- **Who reads it:** this session, immediately after `finishedAt`, writing the
+  result into this row. While it still says PENDING, nobody has read it and
+  the deploy is evidence of nothing.
+- **Blast radius:** 1 instance, 50GB disk at `/opt/render/project/data`, so
+  the deploy is stop-then-start — instances cannot overlap and routes 502 for
+  roughly 1-3 minutes. No `render.yaml` change, therefore no `blueprint_sync`
+  and no env rewrite.
+- **Rollback, exact:** POST `/v1/services/srv-d88ahvrbc2fs73eodu30/deploys`
+  `{"commitId": "5382943cb9d7c64a2004cdb57b43e52f68b26981"}` — web's current
+  live commit, preserved on `origin` as this branch's base. Code-level:
+  `git revert cf066942` on `main`.
+- **Ledger check:** no FORBIDDEN rule applies (no `render.yaml`, no publish
+  URL). "One substantive change per deploy" is satisfied literally. No OPEN
+  lane claims any of the 18 files — checked by executing `lane-guard.py`'s own
+  `_claims()` over `lanes.md`, not by reading it.
+- **Preflight verdict: PASS.**
+
+## 2026-08-14 22:12Z — refresh-worker `2b14fbeb` — CLV opening ledger (audit §7 #1)
+
+- **Lane:** `clv-without-settlement`. Branch `deploy/clv-opening-ledger`, cut
+  from `7b1f3fdc` (refresh-worker's own live SHA), **fast-forward verified**.
+- **PREFLIGHT HELD THIS DEPLOY ONCE, CORRECTLY.** At 21:46Z the process table
+  showed `run_mlb_daily_sim_job.py --date 2026-08-14` (pid 346) plus a
+  `daily_update.py --workflow ui-daily --sims 1000` tree and two multiprocessing
+  workers. Deploying would have killed an in-flight MLB sim.
+  - **My own gate misfired first and must not be trusted as written.** It
+    counted 16 "sim launch markers" in 8 minutes that were `ALL_PROCESS_MEMORY`
+    telemetry lines containing the matched string, not launches. It reached the
+    right verdict for the wrong reason.
+  - **`MLB_SIM_TICK` is NOT the discriminator either** — it read
+    `mlbDailySim: {"launched": false}` while the sim was running, because it
+    reports whether THIS TICK launched one, not whether one is alive.
+  - **The discriminator is the PROCESS TABLE** in `ALL_PROCESS_MEMORY.processes`.
+    Cleared at 22:12:13Z: process_count 12 -> 5 -> 3, all three blockers gone.
+- **PREDICTIONS, written before the deploy:**
+  1. `[clv_opening_ledger] OPENINGS date=2026-08-14 rows_in=N written=M ...`
+     appears in refresh-worker logs within one board build.
+  2. FIRST build after deploy: `written` ≈ `rows_in` (~150), `already=0`.
+  3. SECOND build: `written=0`, `already≈150` — idempotence in production, which
+     is the whole first-sighting-only contract and the thing unit tests cannot
+     prove about a real disk.
+  4. `unkeyable_rows=0` and `duplicate_in_batch=0` — the fixed key produced 0
+     collisions on the same payload offline.
+- **REVERT TRIGGERS:** `truncated_at_ceiling=true` (dedup has failed and the
+  file is growing per-tick), or `clv_openings_error` appearing on the shortlist
+  payload (instrumentation taking the board down — the wrapper should make this
+  impossible, so it firing means the wrapper is wrong).
+- **KNOWN LIMITATION, stated rather than discovered later:** the counter is
+  LOG-ONLY. It is not on `/api/board/layer2-shortlist` — that endpoint has an
+  explicit key list and `clv_openings` was not added to it. Readable via the
+  Render logs API, which works; not readable on the wire.
+- **Rollback:** redeploy `7b1f3fdc` on `srv-d91dpertqb8s73co8ls0` by commitId.
+- **MEASUREMENT: _______**

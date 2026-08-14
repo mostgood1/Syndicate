@@ -1727,3 +1727,230 @@ back **oldest-first regardless of `direction`**.
   been invisible until someone deployed web from main and wondered where the
   ops routes went — with the deploy branches still green and a ledger that
   said "landed".
+
+### 2026-08-14 — Separating `add` from `commit` is not enough if you chain them with `&&`
+
+- What we believed: the standing rule "never chain add and commit" was being
+  followed. The command was `git add <my two files> && git diff --cached --stat
+  && git commit ...` — three separate commands, with an inspection step in the
+  middle.
+- What was actually true: **~32 files from other sessions were ALREADY in the
+  index** before `git add` ran. The `git diff --cached --stat` printed all of
+  them, exactly as designed — and then `git commit` ran anyway, in the same
+  chain, before a human or the model could read the output. The commit swept in
+  another session's entire audit output, screenshots, a new blueprint and a new
+  script.
+- The rule's INTENT is an inspection gate. `&&` removes the gate while leaving
+  the appearance of one: the diagnostic is emitted and immediately obsoleted by
+  the next command in the chain. A printed check nobody can act on before the
+  action fires is decoration.
+- The rule going forward: **the inspection must be its own tool call, with the
+  commit in a LATER call.** And prefer the pathspec form, which makes the index
+  state irrelevant:
+
+      git commit -F - -- path/one.py path/two.py
+
+  That commits only those paths and leaves everything else staged, so a shared
+  index cannot leak into your commit no matter what another session has queued.
+- Recovery, for the next person who does this: `git reset --soft HEAD~1`
+  restores the index exactly as it was (all 32 still staged), then re-commit
+  with the pathspec form. Nothing was lost and nothing was pushed.
+- Why this is worth an entry when a memory already said "never chain add and
+  commit": the memory names the two commands. The failure was in the THIRD
+  command that was supposed to be the safeguard. A rule stated as "do not chain
+  A and B" does not cover "chain A, a check, and B".
+
+### 2026-08-14 — A saturated log window proves nothing, and the untouched sibling is the control
+- What we believed: worker→web file publishing was broken by a wrong internal
+  hostname (`SYNDICATE_WEB_PUBLISH_URL = http://syndicate-an21:10000` while
+  `render.yaml` names the web service `syndicate`), that it was NOT caused by
+  the A3 deploy, and that it was plausibly the missing cause under the OPEN
+  soccer lanes ("odds frozen platform-wide"). Written into `state.md` AND as a
+  lead on another lane.
+- What was actually true: **`syndicate-an21` resolves fine.** refresh-worker
+  logged `PUBLISH_OK` to that exact URL at 19:54:40Z and 20:03:16Z, and
+  live-odds-worker logged 14/18/13 `PUBLISH_OK` across three windows. The
+  failures were a **transient burst** — OK → 11 FAILED at 19:59:36 → OK — not a
+  standing outage, and no explanation for a days-long soccer freeze.
+- How the error was made: I read "0 FAILED before / 11 after" off windows that
+  each returned exactly **100 lines, the API cap**. This logs API returns the
+  **TAIL** of a window regardless of `startTime`, so a saturated window is
+  silent about anything earlier in it. I already knew this — it is written in
+  this session's own log — and used it as evidence anyway.
+- How we found out: the user asked "are you sure this isn't due to a deploy?"
+  The right control took ONE query: **live-odds-worker has the same env var and
+  I never deployed it.** It was publishing successfully the whole time.
+- The rule going forward: **when you suspect a change caused a symptom, find the
+  sibling that did NOT get the change and look there first.** A same-config,
+  same-moment, untouched service settles causation in one query, while
+  before/after windows on the affected service can be silently truncated.
+  Corollary: **a log window that returns exactly `limit` rows is evidence of
+  nothing absent** — re-query narrower until it comes back under the cap, or
+  count POSITIVE markers (`PUBLISH_OK`) instead, which a tail cannot hide.
+- Second rule: **do not write a lead into another lane's ledger at higher
+  confidence than the weakest link in it.** I labelled the hostname half
+  "inferred, not tested" and still wrote the conclusion as a probable cause of
+  their open bug. Retracted in place before anyone acted on it, but the next one
+  may not be caught in time.
+- Cost: none externally — nothing was changed on the strength of it, and both
+  writes were retracted within ~15 minutes. The A3 deploy measurement is
+  unaffected; it was verified by prediction plus an unchanged control.
+
+### 2026-08-14 — A regex over a hand-written ledger inverts "NOT claimed" into "claimed"
+
+- What we believed: `recommendation-lane-correctness` had grown from 4 claimed
+  files to 13 and was squatting on four other lanes' files, including
+  `pipeline/intelligence_state.py` and `layer1_board.py`. It was one sentence
+  from being reported to the user as cross-lane sprawl.
+- What was actually true: that lane claims SIX things and documents a collision
+  check for every expansion. The extra paths came from two lines the extractor
+  could not distinguish from claims:
+  - `- NOT claimed, deliberately: <path> is held by <other lane>`
+  - `- Collision check: ... Claimed elsewhere are <paths> (<lanes>)`
+  **Both lines exist precisely to record that those files are SOMEBODY ELSE'S.**
+  A pattern match for backticked `.py` paths inside the Files block read them
+  with the opposite meaning.
+- The rule going forward: **`lanes.md` is prose written for humans, and the
+  negations are load-bearing. Do not derive a claim set from a regex over it.**
+  If a lane's claims matter — for a collision check, a census, or an
+  accusation — read the block. The cheap guard: any extracted claim list should
+  be re-checked against the lines containing `NOT claimed`, `Collision`,
+  `elsewhere`, or `held by` before it is used.
+- Direct sibling of `2026-08-13 — A grep excerpt is not the file` and of the
+  stale-`LANE_RE` incident: the third time in this ledger that reimplementing a
+  parse over ledger text produced a confident wrong statement about another
+  lane's work. The pattern is not "grep is unreliable" — it is **deriving a
+  claim about someone else's work from a machine read of their prose.**
+- Cost: none. Caught by reading the block before reporting. The direction of the
+  error is what makes it worth recording — it manufactured an accusation
+  against a lane that had done the collision checks correctly.
+
+### 2026-08-14 — An audit's CAUSAL claim is a hypothesis; its MEASUREMENT is evidence
+- What we believed: `plan_2026-08-14_ui.md` E3 and the audit behind it both
+  said NFL/NCAAF cards break team names mid-word at 390px because "the mobile
+  card grid does not stack — cards stay in a ~250px scrolling row".
+- What was actually true: `.cards-grid` is `grid-template-columns: 1fr` and
+  always has been. The scrolling row is `.cards-scoreboard`, the summary
+  STRIP, which kept `grid-auto-flow: column` at every width. And it was only
+  half the defect: `.cards-strip-head` also kept the matchup and the
+  kickoff cluster side by side, splitting a 328px head 189/129 so each team
+  block got 68px and the name inside it **30px**. No wrapping rule renders
+  "North Carolina" in 30px.
+- How we found out: measured the boxes before editing anything —
+  `getBoundingClientRect()` on the element that was actually narrow, rather
+  than on the element the plan named.
+- The rule going forward: **an audit's measurements and its explanations have
+  different evidentiary status.** "28px of overflow at 1440" is a reading and
+  survives being handed on; "because the grid does not stack" is the auditor's
+  inference and must be re-derived by whoever acts on it. Before editing the
+  rule an audit names, confirm that rule currently produces the symptom — the
+  cheap version is one `getComputedStyle`/`getBoundingClientRect` on the
+  element, which takes a minute and would have caught this.
+- Cost: none — caught before editing. Recorded because following it would
+  have "fixed" a rule that was already correct, measured no change, and left
+  a real defect standing with a lane closed on top of it.
+- Corollary observed the same hour: the same audit's E2 diagnosis (a missing
+  `box-sizing` reset) was CORRECT but INCOMPLETE — it took 28px to 2px, and
+  the residual was `100vw` counting the scrollbar gutter. A correct cause is
+  not necessarily the whole cause. Re-measure after the fix, not just before.
+
+## 2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop
+
+**Believed:** the intelligence-state background loop had stopped, because
+`/api/intelligence/status` reported `snapshot_generated_at` 34–53 minutes old
+against a configured 60-second interval, while refresh-worker was visibly
+crashing in `generate_smartsim2_nfl_projections.py`. The hypothesis was that
+the crashing NFL job was starving the loop.
+
+**Measured:** FALSE, on both halves.
+- The season projection launches via `subprocess.Popen` — **non-blocking** —
+  and `start_intelligence_state_background_loop()` runs on its own thread.
+- The loop was running the whole time:
+  `21:22:58 [intelligence_state] LAYER2_SHORTLIST rows=150 considered=14062
+  sports=['mlb','nfl','wnba']`, 140 `PUBLISH_OK`, **0 publish failures**.
+
+**Why it matters:** `/api/intelligence/status`'s snapshot and the layer2
+shortlist are DIFFERENT ARTIFACTS on different cadences. Reading one and
+concluding about the other produced a confident, wrong diagnosis that pointed
+at another session's lane. **Name the artifact before naming the failure.**
+
+**How to apply:** before declaring a loop dead, find a line the loop itself
+emits. A consumer-side staleness reading tells you a consumer is stale; it does
+not tell you the producer stopped.
+
+## 2026-08-14 — a control is only as good as the premise under it
+
+**Believed:** the A3 uninformative-EV rule could not touch MLB, "because every
+MLB row is `consensus`". That premise was read off the SERVED rows — the
+survivors — and generalised to the pool.
+
+**Measured:** MLB carries **357 one-sided rows with a modelled fair** (wnba 42,
+nfl 0). The rule CAN reach MLB. It doesn't, for a different and better reason:
+mlb has `rows_with_model_edge = 2256`, and the rule keeps any row with a model
+view. The control held **on the narrowness clause**, not on MLB's pricing.
+
+**Why it matters:** the control passed, so nothing broke — but it passed for a
+reason I could not have defended if asked. A control that holds by luck is
+indistinguishable from one that holds by mechanism until someone checks, and
+the check is what makes it evidence.
+
+**How to apply:** when writing a control, state the MECHANISM that makes it
+immune, then verify that mechanism against the pool the rule actually filters —
+never against the rows that survived it. Related: [[feedback_a_rate_not_count]],
+[[feedback_read_the_field_you_already_have]].
+
+## 2026-08-14 — re-read the post-deploy measurement before blaming the deploy
+
+Observed mlb `selected` at 84 → 78 and concluded a pre-registered control had
+failed. It had not: the earlier entry in `deploys.md` recorded 84/60/12
+UNCHANGED at 19:58Z, immediately post-deploy. The 78 was read at 21:22Z — 1.4
+hours and two unrelated deploys later. `total_rows` (156→150) and
+`rows_uninformative_ev` (4003→3842) drifted identically, which is the signature
+of slate movement, not of a rule.
+
+**How to apply:** a delta is only attributable to a change if it is measured
+against the reading taken closest to that change. The ledger already held the
+right number; I compared against memory instead of against the ledger.
+
+### 2026-08-14 — A COUNT can rise because the population grew, not because the property got worse
+- What we believed, for about a minute while reading the post-deploy numbers:
+  the mobile touch-target fix had regressed something on desktop. NCAAF's
+  count of sub-44px tabs went **48 -> 64** across the deploy.
+- What was actually true: the fix applied a 44px floor at `<=767px` only, and
+  desktop tabs are unchanged at 28px — they were never counted as passing. The
+  count rose because the same fix made a previously UNREACHABLE panel
+  reachable, so every card now renders four tabs where it rendered three.
+  16 cards x 4 = 64. The property did not move; the population did.
+- The rule going forward: **when a count changes across a fix, check whether
+  the fix changed what is being counted.** A raw count carries an implicit
+  denominator — here "tabs that exist" — and a change that adds members makes
+  the count move on its own. Report it as a rate, or report the denominator
+  beside it, or the next reader files a regression that does not exist.
+- Sibling of the rate-not-count and pooled-denominator entries above, arrived
+  at from a third direction: those were about a number that stayed still while
+  the system moved. This is a number that moved while the property stood still.
+- Cost: none — caught in the same reading, and written into `deploys.md` next
+  to the number so it cannot be re-derived as a defect later.
+
+### 2026-08-14 — An audit brief's "known already" inputs are claims, not axioms
+
+- What we believed: the board-engine brief supplies prior findings as inputs
+  "not to be re-derived", so they could be built on directly.
+- What was actually true: **three of them did not survive first contact.**
+  `static/mlb/board.js` — cited twice, as a byte-identical duplicate AND as
+  confirmed dead code — **does not exist**. The devig count of 5 is not
+  reproducible: a name-shaped pattern finds 4, and a widened grep finds
+  per-sport `market_anchoring.py` the narrow one misses entirely. And the brief's
+  own environment is a hazard: `.claude/worktrees/` holds full repo copies, so
+  any unscoped census triple-counts and manufactures duplication findings.
+- The rule going forward: **spend the first ten minutes of any audit
+  re-verifying the inputs it tells you not to re-derive.** An input marked
+  "known" is the one nobody will check, which is exactly why a stale one
+  propagates. Cheap to test, and a single dead citation invalidates every
+  downstream count that assumed it.
+- Sharper: the brief was internally consistent — it cited `board.js` in two
+  different sections, which READS as corroboration and is actually one stale
+  fact counted twice. Two citations of the same source are not two sources.
+- Cost: none. Caught in Pass 1 because the census returned 1 byte-identical
+  group where the brief implied 2, and the discrepancy was chased rather than
+  explained away.
