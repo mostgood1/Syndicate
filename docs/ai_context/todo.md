@@ -31580,7 +31580,7 @@ fixtures now supply synthetic prior-season plays with distinct per-club EPA,
 which is what their names always described. Still hermetic; no test touches the
 real `pbp_2025.csv`. No assertion was weakened.
 
-### `#429` — **FIXED 2026-08-14, NOT YET DEPLOYED.** `mlb batter_hits_runs_rbis` projected a CONSTANT 0.0 slate-wide; HRR is a SUMMATION and the mean is now derived from its components
+### `#429` — **CLOSED-VERIFIED 2026-08-14. Deployed to both services and confirmed against the sim's own probabilities.** `mlb batter_hits_runs_rbis` projected a CONSTANT 0.0 slate-wide; HRR is a SUMMATION and the mean is now derived from its components
 
 > **THE FIX CAME FROM A DOMAIN FACT, NOT FROM THE CODE.** HRR is
 > Hits + Runs + RBIs — not an independently simulated stat, but a SUM of three
@@ -31630,14 +31630,31 @@ real `pbp_2025.csv`. No assertion was weakened.
 > read time instead; the producer bug survives and would be worth fixing at
 > source, but nothing on the board now depends on it.
 >
-> **VALIDATION LIMIT, stated plainly:** the derivation could not be
-> cross-checked against the sim's own `p_hrr_2plus`, because every local
-> artifact has that probability at 0.0 too (checked 2026-05-28, 06-06, 07-09 —
-> the whole HRR family is dead in the mirror) while production has real
-> probabilities. On the live board only `batter_hits` overlapped, n=6,
-> `corr 0.994` — consistent, but it tests that hits track HRR, which is
-> trivially true, NOT that the sum is right. The linearity argument is what
-> carries this, plus the magnitude and ordering checks.
+> **~~VALIDATION LIMIT~~ — CLOSED 2026-08-14 ON PRODUCTION.** This paragraph
+> originally said the derivation could not be cross-checked against the sim's
+> own `p_hrr_2plus`, because every local artifact has that probability dead at
+> 0.0 (checked 2026-05-28, 06-06, 07-09) while production has real ones. That
+> was true of the MIRROR and stopped being true the moment the fix was live:
+> production carries BOTH numbers on the same 88 rows.
+>
+>     TEST     corr(derived mean, sim P(2+))  = 0.9267
+>     CONTROL  corr(market line,  sim P(2+))  = 0.1156
+>
+> Monotonic across the whole range with no inversions —
+> `1.363-1.754 -> 0.416`, `1.996-2.182 -> 0.526`, `2.388-2.573 -> 0.594`,
+> `3.113-3.833 -> 0.676` — and the tails are baseball-sane (Yordan Alvarez and
+> CJ Abrams high, bench bats low).
+>
+> **This is a real test, not a restatement.** The derived mean and the sim's
+> probability are produced in different places; nothing forces them to agree
+> unless the derivation measures the same quantity the probability measures.
+> The CONTROL is what makes the 0.93 mean something — the near-constant market
+> line correlates at 0.12, so this is not everything correlating with
+> everything.
+>
+> The earlier partial check (only `batter_hits` overlapped on the board, n=6,
+> `corr 0.994`) is superseded and was correctly labelled at the time as NOT a
+> test of the sum — it only showed hits track HRR, which is trivially true.
 
 ### ~~`#429` — OPEN, UNOWNED. `mlb batter_hits_runs_rbis` projects a CONSTANT 0.0 across the whole slate, and the real mean is sitting one lookup away~~
 
