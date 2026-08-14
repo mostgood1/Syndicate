@@ -31563,10 +31563,31 @@ real `pbp_2025.csv`. No assertion was weakened.
 > `projected_derived_from: "h_mean+r_mean+rbi_mean"`. And a real `hrr_mean` is
 > never overridden, so if the producer is ever fixed this code stands aside.
 >
-> **STILL UNKNOWN, and deliberately not chased:** the line in the sim that
-> writes `hrr_mean: 0.0`. It was never located. This reconstructs the value at
-> read time instead; the producer bug survives and would be worth fixing at
-> source, but nothing on the board now depends on it.
+> **~~STILL UNKNOWN, and deliberately not chased~~ — FOUND AND FIXED THE SAME
+> DAY.** This paragraph said the line writing `hrr_mean: 0.0` "was never
+> located". It is `daily_update.py`: the topn mean is
+> `_stat(pid, stat_key) / denom_sims` with `stat_key="H+R+RBI"`, and `_stat`
+> reads only what `_inc_sum` accumulated — **that composite was never passed to
+> `_inc_sum` anywhere in the file.** Every sibling mean worked because its
+> `_inc_sum` line exists; the one composite in the mapping was the one stat
+> never summed. My earlier grep missed it because the key is written
+> DYNAMICALLY from a spec tuple, so the literal `"hrr_mean":` never appears at
+> the write site.
+>
+> Fixed at **both** copies of the accumulation (`294f9ca9`, refresh-worker
+> live 16:16:56Z), with a test that anchors on `TB` one line above so the two
+> copies cannot drift.
+>
+> **CONFIRMED IN PRODUCTION 2026-08-14 11:56 CDT.** Board `derived == 0` with
+> 90 rows still valued, and at the source `daily_summary_2026_08_14.json`
+> (generated 11:39:16) carries `hrr_mean` NONZERO on **1008 of 1008** topn
+> rows, 233 distinct, against a `pa_mean` control of 1008/1008.
+>
+> **The board's range is IDENTICAL across the handover** (`1.363..3.833` before
+> and after), because the producer and the read-time derivation compute the
+> same quantity. No transition artifact — which is what the linearity argument
+> predicted. The read-time path is now belt-and-braces rather than
+> load-bearing, and a test pins that a real `hrr_mean` is never overridden.
 >
 > **~~VALIDATION LIMIT~~ — CLOSED 2026-08-14 ON PRODUCTION.** This paragraph
 > originally said the derivation could not be cross-checked against the sim's

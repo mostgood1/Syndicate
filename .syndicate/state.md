@@ -81,8 +81,21 @@ All measured on production 2026-08-14 unless marked otherwise.
   - Producer fixed at source (`_inc_sum(pid, "H+R+RBI", hrr)`, **both** copies
     of the accumulation) and live on refresh-worker. `_stat` reads only what
     `_inc_sum` accumulated and this composite was never summed, so the mean was
-    `0 / sims`. **NOT YET PROVEN — needs the next sim to write a summary.**
-    `[unverified 08-14]`
+    `0 / sims`. **CONFIRMED IN PRODUCTION 11:56 CDT**: board `derived == 0`
+    with 90 rows still valued, and the production
+    `daily_summary_2026_08_14.json` (generated 11:39:16) carries `hrr_mean`
+    NONZERO on **1008 of 1008** topn rows, 233 distinct, against a `pa_mean`
+    control of 1008/1008. Supersedes the "NOT YET PROVEN" line that stood here.
+    `[measured 08-14]`
+  - **The board's range is IDENTICAL across the handover** (`1.363..3.833`
+    before and after `derived` fell 90 -> 0). The value did not move when its
+    source changed, because both paths compute `h + r + rbi`. No transition
+    artifact. `[measured 08-14]`
+  - **An unscoped full-slate MLB sim is a known OOM cause** —
+    `live_refresh_loop.py:2761` says so in its own comment, which is why the
+    loop batches through `--only-game-pks`. Do not trigger one to force an
+    artifact rebuild; read the artifact through `/api/ops/artifacts/stream`
+    instead. `[from-code 08-14]`
   - **Discriminator needing no artifact access:** `projected_derived_from` is
     stamped only when the read-time path had to reconstruct. On the board,
     `derived == 0` with values present means the producer is fixed;
@@ -210,6 +223,54 @@ All measured on production 2026-08-14 unless marked otherwise.
     reason this list exists.
 - Short session ids are indistinguishable from short SHAs. Every one in the
   ledger is prefixed `session` — keep it that way. `[policy]`
+
+## ANSWERED — MLB quote capture never stopped. It runs every ~2 hours. `[measured 08-14 16:3xZ]`
+
+**Read from the artifact itself via `/api/ops/artifacts/stream`, not from logs.
+Every distinct `captured_at` in `mlb_source/tracking/book_quotes/2026-08-14.jsonl`:**
+
+    22:27:40 (prev day)  1,888 rows
+    07:03:23             4,206      gap 515.7 min  (overnight)
+    09:05:01             3,895      gap 121.6
+    11:06:35             5,337      gap 121.6
+    13:09:08             7,230      gap 122.5
+    15:10:44             5,324      gap 121.6
+    16:20:38             3,728      gap  69.9
+
+- **Seven captures in 18h on a metronomic ~121.6-minute beat.** That is a
+  schedule, not a fault. Nothing is broken: capture works, the direct streamed
+  publish works, web has the file (14,514,368 bytes and growing), and
+  refresh-worker's streamed pull works (MLB is absent from the
+  `STREAM_PULL_ABSENT` 404 list; only out-of-season sports 404).
+- **THE DRIVER: `refresh-worker`'s `live_refresh_loop`, not live-odds-worker.**
+  `[live_refresh_loop] ODDS_SWEEP_OUTCOME sport=mlb ... since_launch_s=6597`
+  (14:58:44Z) — `since_launch_s` IS the cadence. **live-odds-worker emits none
+  of these lines and carries `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP='false'`.**
+  The service named for odds is not doing the odds work; the 4GiB
+  memory-pressured worker is. Same shape as the `which service runs the code`
+  rule — loop ownership is an env flag that moves with no diff.
+- **The configured intervals are NOT what is happening.**
+  `SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS=60` and
+  `MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS=60`, against a measured 7,296s.
+  A `PREGAME_RELAUNCH_COOLDOWN_SKIPPED cooldown_s=1800` gate is visible in the
+  same loop and does not explain 7,296s either. **What turns 60s into 7,296s is
+  NOT established** — do not assume it is the cooldown.
+- **This is the real cause of "candidates that are no longer bettable."** The
+  board's MLB prices are up to ~2 hours old by construction. It also fully
+  explains the `board-ui` lane's independent reading: they sampled at 15:00Z and
+  got a freshest row of **13:09:05Z** — that is the 13:09:08 burst. Their
+  "1h51m stale" IS this cadence. So was the frozen `considered=14195`.
+- **Owner note: `syndicate/features/shared/live_refresh_loop.py` is claimed by
+  the OPEN `mlb-props-regen` lane.** This diagnosis is handed over, not acted
+  on. Any cadence change also spends OddsAPI calls against the 5M cap, so it is
+  a product decision, not a tuning tweak.
+- **METHOD, three strikes in one session and all the same shape.** "Capture
+  stopped at 15:10:44" came from ONE read of a bursty quantity taken inside a
+  gap; ten minutes later the newest row was 16:20:38. Before that, the 12MB
+  ceiling; before that, "the fetch is not running" from a log token whose
+  emitter I had never seen produce a non-zero. **Every one was a single sample
+  of something that moves, promoted to a conclusion.** The fix that finally
+  worked was to stop reading logs and read the artifact's full distribution.
 
 ## RETRACTED — the 12MB publish ceiling is NOT the cause `[falsified 08-14 16:2xZ]`
 

@@ -1010,7 +1010,8 @@ people learn to route around. Run the gate, read it, then deploy.
   producer compute `h + r + rbi`, so there is no transition artifact and no
   window where the two disagree. A board that MOVED would have been the
   surprise.
-- **OPEN OBLIGATION, with a discriminator that needs no artifact access.**
+- **~~OPEN OBLIGATION~~ — CLOSED 2026-08-14 11:56 CDT, see the measurement
+  below. Kept because the discriminator is reusable.**
   `prop_projections` stamps `projected_derived_from` only when it had to
   reconstruct the value, and stands aside the moment a real `hrr_mean` appears.
   So on the served board:
@@ -1021,4 +1022,41 @@ people learn to route around. Run the gate, read it, then deploy.
 
   Due after the next `run_mlb_daily_sim_job` writes a daily summary. **Owner:
   UNASSIGNED.**
+- **MEASURED 2026-08-14 11:56 CDT — CLOSED, PRODUCER CONFIRMED. `derived == 0`.**
+
+      hrr rows 90   with a value 90   distinct 87   range 1.363..3.833
+      DERIVED  0    (was 90)
+      summary  /opt/render/project/data/mlb_source/source_artifacts/
+               data/daily/daily_summary_2026_08_14.json
+
+  Confirmed at the SOURCE as well as on the board, by reading the production
+  artifact directly through `/api/ops/artifacts/stream`:
+
+      daily_summary_2026_08_14.json   generated 11:39:16   2,298,627 bytes
+      hrr topn rows   1008
+      hrr_mean        present 1008, NONZERO 1008, distinct 233
+      CONTROL pa_mean present 1008, nonzero 1008
+
+- **NO TRANSITION ARTIFACT, which was the prediction and is the satisfying
+  part.** The board's range is IDENTICAL across the handover (`1.363..3.833`
+  before and after `derived` fell 90 -> 0). The value did not move when its
+  source changed, because the producer and the read-time derivation both
+  compute `h + r + rbi` — exactly what the linearity argument said would
+  happen. The read-time path is now belt-and-braces, not load-bearing, and a
+  test pins that a real `hrr_mean` is never overridden.
+- **THE 11:47 "STILL RECONSTRUCTING" READING WAS A STALENESS ARTIFACT, NOT A
+  PRODUCER FAILURE.** A regular sim had already written real means at 11:39:16;
+  the board artifact checked at 11:47 had been built just before it. The
+  watcher's own wording ("NOT a failure by itself") happened to be right for
+  the wrong reason — it blamed a scoped `fingerprint_change` resim, when in
+  fact the producer had already worked and the board had simply not rebuilt.
+  Same trap as the pre-deploy artifact read earlier today, in the opposite
+  direction.
+- **NO FULL DAILY UPDATE WAS TRIGGERED, deliberately.** The obvious way to
+  force this was an unscoped full-slate sim — and `live_refresh_loop.py:2761`
+  records in its own comment that an unscoped run **"is what OOM-killed the 2GB
+  worker"**, which is why the loop batches through `--only-game-pks` now.
+  Firing the known OOM shape at a service that OOM-killed three times the
+  previous night, to answer a question a GET could answer, would have been a
+  bad trade. Reading the artifact cost one request.
 - Rollback: redeploy `214f5151` (re-read the live commit first).
