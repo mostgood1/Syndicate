@@ -2213,8 +2213,56 @@ the stage never runs. The 1,479MB figure in this ticket's original title is
 STILL unverified and must not be used to re-derive the threshold; that is
 `#380`'s mistake and the caution `#417` repeats.
 
-**THE LOCAL RUN IS DONE. 2026-08-14. THE STAGE COSTS 127MB. THE GUARD RESERVES
-3,000MB — a 23x OVER-RESERVATION.**
+**RETRACTED 2026-08-14 05:1xZ — THE 127MB MEASUREMENT DID NOT INCLUDE MLB, AND
+MLB IS THE ENTIRE COST. THE 3000MB FLOOR IS CORRECT. DO NOT LOWER IT.**
+
+The guard's own comment carries a production measurement I had not read when I
+wrote the section below:
+
+```
+05:10:57  post_pull_hot_artifacts    993.8MB container   478MB anon
+05:10:57  OVERVIEW_SPORT_BEGIN mlb
+05:12:10  mlb board_contract        3922.6MB  95.8%     <- +2.9GB in 73s
+05:12:23  post_build_overview       3911.4MB container  3009MB anon
+```
+
+**MLB alone is +2.9GB.** My local run measured +127MB across 8 sports because
+**4 of them — mlb, nba, ncaab, nhl — had no games in this checkout's mirror.**
+I measured the overview without the sport that dominates it, and reported the
+result as the stage cost. The coverage caveat was recorded, but as a footnote
+rather than as the thing that invalidates the headline.
+
+**The comment even anticipates the exact change I was about to make: "A 1000MB
+floor waves MLB through every time."** With `anon` already reaching 3480MB on
+2026-08-14 and MLB adding ~2.9GB on top, lowering this floor would very likely
+restore the OOM loop that ran 03:20-04:04 that morning.
+
+**So the framing in the section below is WRONG and is retracted:**
+- NOT "a 23x over-reservation" — it is sized to a measured 2.9GB spike.
+- NOT "a threshold this container cannot meet" — it is a circuit breaker that
+  is SUPPOSED to refuse under load, and the comment states the coverage cost as
+  a deliberate trade: a skipped cycle keeps the sims, odds capture and every
+  other loop alive, where a SIGKILL takes all of them.
+- The 97-of-100 `sports_done=0` figure is still accurate as an OBSERVATION, but
+  it describes the breaker doing its job under a memory problem, not a
+  miscalibrated constant.
+
+**WHAT THE REAL TARGET IS, and the comment already names it:**
+`build_cards_page_context` running HYDRATED on the worker with
+`force_refresh=True`, which defeats the overview cache on every cycle.
+`handoff_refresh_worker_oom.md` measured the same call at ~3.7GB on 2026-07-26.
+Fix that and the floor becomes satisfiable on its own; lower the floor without
+fixing it and the process dies.
+
+**METHOD NOTE, because this is the fourth comment-sourced number this session
+and the only one that held.** The others (1,479MB stage, ~23min build, the
+`#417` basis) were stale or unsourced. This one was a real measurement with its
+inputs written down. **"It came from a comment" is not evidence either way —
+read the comment before overriding it.** I did not, and proposed a change that
+would have taken production down.
+
+**(superseded, retained so the error is auditable)** THE LOCAL RUN IS DONE. 2026-08-14. THE STAGE COSTS 127MB. THE GUARD RESERVES
+3,000MB — a 23x OVER-RESERVATION.
 
 Harness: `C:	mp\measure_overview.py` — patches `_overview_headroom_exhausted`
 to False, wraps `_build_sport_overview`, brackets each sport with process RSS.
