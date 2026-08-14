@@ -29,6 +29,12 @@ from syndicate.features.intelligence import _build_board_dictionary
 from syndicate.features.intelligence import _balanced_recommendation_order
 from syndicate.features.intelligence import candidate_identity_key
 from syndicate.features.intelligence import collect_candidates_with_fallback_merge
+# `#387` streaming cutover: collection, advanced-context rows and the tracked-
+# file list are now driven PER SPORT inside `_build_candidate_pool`, so the
+# hydrated overview can be released between sports.
+from syndicate.features.intelligence import collect_candidates
+from syndicate.features.intelligence import _advanced_input_rows_for_sport
+from syndicate.features.intelligence import _tracked_repo_files
 from syndicate.features.intelligence import _apply_candidate_tier_penalty
 from syndicate.features.intelligence import _greedy_low_correlation_selection
 from syndicate.features.intelligence import _query_preferences
@@ -4394,30 +4400,119 @@ class IntelligenceStateService:
         if _abort_build_candidate_pool_if_memory_critical("post_pull_hot_artifacts"):
             return self._empty_candidate_pool(selected_date, source_fingerprint)
 
-        overview = None
+        # `#387` CUTOVER: PEAK IS NOW MAX-OF-ONE-SPORT, NOT SUM-OF-EIGHT.
+        #
+        # This used to bind the whole hydrated overview to `overview` and hold
+        # it for the rest of the function. `build_intelligence_overview`'s own
+        # comment records the cost -- every sport held simultaneously, MLB alone
+        # +2.9GB -- and the measured excursion that crosses the 4GiB ceiling is
+        # `post_pull 2223MB -> board_contract 4096.0MB -> back to 2091MB`.
+        #
+        # Now each sport is consumed and RELEASED before the next hydrates.
+        # Everything the old code took from the whole list is accumulated here
+        # per sport instead, and each accumulator is small:
+        #   candidates          - `collect_candidates` already works on a
+        #                         one-sport list (ops.py does exactly this)
+        #   odds_history_by_sport, advanced_by_sport, overview_summary
+        #                       - all per-sport dicts/lists already
+        #
+        # `preferences` moves ABOVE the stream because collection needs it per
+        # sport and it does not depend on the overview at all.
+        preferences = _profile_stage(
+            "query_preferences",
+            _query_preferences,
+            "top edges today",
+            mode="recommendation",
+            sport="all",
+            timing="all",
+            include_props=True,
+            include_games=True,
+        )
+        streamed_candidates: list[dict[str, Any]] = []
+        odds_history_by_sport: dict[str, dict[str, Any]] = {}
+        advanced_by_sport: dict[str, list[dict[str, Any]]] = {}
+        overview_summary: list[dict[str, Any]] = []
+        summary_parts: list[str] = []
+        tracked_repo_files = _tracked_repo_files()
+
+        def _consume_sport(sport_row: dict[str, Any]) -> None:
+            slug = _safe_text(sport_row.get("slug"), "sport").lower()
+            summary_parts.append(
+                f"{slug}:g={len(sport_row.get('dashboard_games') or [])},r={len(sport_row.get('home_rails') or [])}"
+            )
+            overview_summary.extend(self._overview_live_summary([sport_row]))
+            try:
+                odds_history_by_sport.update(self._odds_history_payloads_by_sport([sport_row]))
+            except Exception as exc:
+                print(f"[intelligence_state] STREAM_ODDS_HISTORY_FAILED sport={slug} {type(exc).__name__}: {exc}", flush=True)
+            try:
+                advanced_by_sport[slug] = _advanced_input_rows_for_sport(sport_row, tracked_repo_files)
+            except Exception as exc:
+                print(f"[intelligence_state] STREAM_ADVANCED_ROWS_FAILED sport={slug} {type(exc).__name__}: {exc}", flush=True)
+            try:
+                streamed_candidates.extend(
+                    collect_candidates([sport_row], preferences, odds_history_by_sport) or []
+                )
+            except Exception as exc:
+                # One sport failing to collect must not lose the other seven --
+                # the old whole-list call had the same all-or-nothing hazard and
+                # this is strictly better, but say so rather than swallowing.
+                print(f"[intelligence_state] STREAM_COLLECT_FAILED sport={slug} {type(exc).__name__}: {exc}", flush=True)
+
+        # RETURN VALUE IS KEPT AND USED AS A FALLBACK, deliberately.
+        #
+        # A caller (or a test double) that ignores `consumer=` and just returns
+        # the list would otherwise stream ZERO sports and silently build an
+        # empty pool -- a total board outage presenting as "no candidates
+        # today", which is the failure mode this repo has chased more than once.
+        # ~30 tests patch `build_intelligence_overview` with a plain
+        # `return_value`, and production may yet grow a caller that does the
+        # same. Consuming a returned list when nothing was streamed makes the
+        # cutover correct under BOTH shapes instead of trusting every caller to
+        # have been updated. Costs nothing on the streamed path, where the
+        # returned list is empty by construction.
+        returned = None
         if self._app is not None:
             try:
                 with self._app.app_context():
-                    overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
+                    returned = _profile_stage(
+                        "data_ingestion", build_intelligence_overview,
+                        selected_date=selected_date, force_refresh=True, consumer=_consume_sport,
+                    )
             except RuntimeError:
-                overview = None
-        if overview is None:
-            # Was build_intelligence_status(...) with only .get("sports")
-            # ever used from its return -- confirmed root cause of today's
-            # OOM crashes: refresh-worker never has self._app set (see
-            # start_intelligence_state_background_loop() call in
-            # scripts/run_refresh_worker.py, no app passed), so this branch
-            # runs on every single cycle. build_intelligence_status wraps
-            # build_intelligence_overview and then does a second full
-            # per-sport pass (tracked/advanced summary counts, calling
-            # _advanced_input_rows_for_sport again, plus readiness_gate and
-            # a simulation-contract file read) -- all of it computed and
-            # immediately discarded here, since only the flat sports list
-            # was ever read. Calling build_intelligence_overview directly
-            # skips that entire redundant pass.
-            overview = _profile_stage("data_ingestion", build_intelligence_overview, selected_date=selected_date, force_refresh=True)
-            if not isinstance(overview, list):
-                overview = []
+                summary_parts.clear()
+                returned = None
+        if not summary_parts and isinstance(returned, list) and returned:
+            print(
+                f"[intelligence_state] OVERVIEW_STREAM_FELL_BACK_TO_LIST sports={len(returned)}",
+                flush=True,
+            )
+            for _row in returned:
+                if isinstance(_row, Mapping):
+                    _consume_sport(dict(_row))
+            returned = None
+        if not summary_parts:
+            # refresh-worker never has self._app set (see
+            # start_intelligence_state_background_loop in
+            # scripts/run_refresh_worker.py, no app passed), so this branch runs
+            # on every worker cycle. Unchanged apart from streaming.
+            returned = _profile_stage(
+                "data_ingestion", build_intelligence_overview,
+                selected_date=selected_date, force_refresh=True, consumer=_consume_sport,
+            )
+            if not summary_parts and isinstance(returned, list) and returned:
+                print(
+                    f"[intelligence_state] OVERVIEW_STREAM_FELL_BACK_TO_LIST sports={len(returned)}",
+                    flush=True,
+                )
+                for _row in returned:
+                    if isinstance(_row, Mapping):
+                        _consume_sport(dict(_row))
+            returned = None
+        # `overview` is deliberately NOT rebound to the rows. Anything below
+        # that still needs the whole list is a bug this cutover must surface,
+        # not paper over.
+        overview = None
         # `#336`. INSTRUMENT, NOT A FIX. The board stopped rebuilding for 68+
         # minutes with `CANDIDATE_POOL_READY count=0` while `LAYER2_SHORTLIST`
         # reported `considered=6072` in the same second, and nothing between
@@ -4437,14 +4532,10 @@ class IntelligenceStateService:
         # fault from an overview with 0 sports, and the count alone cannot
         # tell them apart.
         try:
-            _sport_summary = " ".join(
-                f"{_row.get('slug')}:g={len(_row.get('dashboard_games') or [])},r={len(_row.get('home_rails') or [])}"
-                for _row in (overview or [])
-                if isinstance(_row, Mapping)
-            )
+            _sport_summary = " ".join(summary_parts)
             print(
                 f"[intelligence_state] BOARD_OVERVIEW_READY date={selected_date} "
-                f"sports={len(overview or [])} {_sport_summary}",
+                f"sports={len(summary_parts)} {_sport_summary}",
                 flush=True,
             )
         except Exception as _summary_exc:
@@ -4507,19 +4598,7 @@ class IntelligenceStateService:
             )
             return result
 
-        preferences = _span(
-            "query_preferences",
-            _query_preferences,
-            "top edges today",
-            mode="recommendation",
-            sport="all",
-            timing="all",
-            include_props=True,
-            include_games=True,
-        )
-        odds_history_by_sport = _span(
-            "odds_history_payloads_by_sport", self._odds_history_payloads_by_sport, overview
-        )
+        # `preferences` and `odds_history_by_sport` are built during the stream above.
         # collect_candidates_with_fallback_merge (syndicate/features/intelligence.py)
         # is the shared collect-with-fallback entry point extracted from this
         # function so run_intelligence_query gets the same
@@ -4533,9 +4612,14 @@ class IntelligenceStateService:
             _profile_stage,
             "candidate_collection_with_fallback",
             collect_candidates_with_fallback_merge,
-            overview,
+            # None, not the rows: the rare thin-pool/empty-pool fallbacks
+            # re-hydrate for themselves when handed None, so they still work
+            # without every cycle carrying eight sports just in case.
+            None,
             preferences,
             odds_history_by_sport,
+            precollected_candidates=streamed_candidates,
+            advanced_by_sport=advanced_by_sport,
             selected_date=selected_date,
             apply_edge_filter=_env_bool("SYNDICATE_BOARD_APPLY_EDGE_FILTER", default=True),
             # `#385`: driven by the SAME predicate that sets
@@ -4824,7 +4908,7 @@ class IntelligenceStateService:
             # Dropping it is also what makes the handoff's SUM -> MAX overview
             # fix possible at all: a per-sport overview cannot be released
             # before the next one hydrates while this dict holds the whole list.
-            "overview_summary": self._overview_live_summary(overview),
+            "overview_summary": overview_summary,
             "candidate_count": len(global_pool),
             "layer2_shortlist": layer2_shortlist,
             "candidate_pools": {
