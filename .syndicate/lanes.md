@@ -3301,3 +3301,19 @@ STILL OWED (not deployed).**
   tested on what it must NOT refuse; the decline list alone would have passed.**
 - Also caught: `matches` as a domain token let "qwertyuiop nothing matches this
   at all" through. Dropped; `match` kept.
+- **Committed `3b21c856`.** Staged through an ISOLATED index
+  (`GIT_INDEX_FILE`), not the shared one -- a parallel session cleared the
+  shared index between this lane's `git add` and its `git diff --cached`, and
+  committed `0041a902` in the same window. Verified after: the commit contains
+  zero foreign files, and `recommendation_engine.py` / `intelligence.py` are
+  still uncommitted in the working tree where their own lane left them.
+  **Recipe worth reusing while several sessions are live.**
+- **`.syndicate/.current-lane` handed to `recommendation-lane-correctness`**,
+  which has in-flight edits to `recommendation_engine.py`. The marker is
+  single-valued, so holding it here would block that lane from its own claimed
+  file -- the cost `board-ui-freshness-slip-books` already recorded. This lane
+  needs no further edits, only a production read.
+- **NOT DEPLOYED.** `.py` pushes do not ship (`autoDeploy: no`), so the
+  production re-measure cannot happen until someone deploys deliberately.
+  `/preflight` before that, and note the standing rule that a deploy kills an
+  in-flight MLB sim.
