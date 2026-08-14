@@ -18,12 +18,15 @@
   216,135 -> 10,043 rows walked per call; board-build 21-54s -> 7-8s. Quote
   21.5x, NOT the 130x measured locally — the shard grew ~83k -> ~216k rows/call.
   The profiler counters are CUMULATIVE across the window.
-- **Deployed SHAs `[measured 08-14 16:17Z]` — re-read before use. They moved
-  FIVE times in one evening and TWICE inside 25 minutes on 08-14; a stale one
-  nearly shipped a rollback, and a stale one made a blast-radius claim wrong
-  by 20 commits.** web **`214f5151`** (16:00:27Z), refresh-worker
-  **`294f9ca9`** (16:16:56Z), live-odds-worker `83e3e5f2` `[unverified — not
-  re-read 08-14]`. Supersedes the 02:18Z line (`e29b807f`/`75b8aae6`).
+- **Deployed SHAs `[measured 08-14 17:54Z]` — re-read before use. They moved
+  FIVE times in one evening, TWICE inside 25 minutes on 08-14, and web moved
+  AGAIN during this session's own reconciliation. A stale read nearly shipped a
+  rollback and made one blast-radius claim wrong by 20 commits.**
+  web **`f9aa2399`** (17:52:38Z, another session's `#433`), refresh-worker
+  **`294f9ca9`** (16:16:56Z), live-odds-worker **unread this session — do not
+  quote the old `83e3e5f2`** `[unverified]`.
+  - **`aac18260` (`#428` MLB prop skill) is on origin and on NEITHER service.**
+    Checked by ancestry against both live commits at 17:54Z, not assumed.
 
 ## Model skill (`#428`) — what is MEASURED and what is not
 
@@ -478,6 +481,28 @@ WRONG. Read this first.**
   cause 2.** A shortlist rebuilt every 5 minutes off a 2-hour-old quote shard
   is a board that LOOKS fresh and is not — strictly worse than one that is
   visibly stale, because nothing on it says so.
+
+## `#387` FIX IS DEPLOYED AND ITS CODE PATH IS PROVEN TO RUN `[measured 08-14 17:4xZ]`
+
+- **`LAYER2_FAST_REFRESH date=` fired 6 times** since 15:42:29Z. That line is
+  emitted on the SUCCESS path by design, so it is a liveness proof, not an
+  inference. The Layer 2 fast path executes in production.
+- **126-min window: 24 board refreshes, longest gap 19.6 min.** Baseline before
+  the change: 5 refreshes / 180 min, longest gap **104.7 min**.
+- **`MEMORY_GUARD_ABORT` = 28 in that same window** — the Layer 1 guard is
+  refusing again (`anon` back at plateau) and the board refreshed anyway. That
+  is the exact condition that used to produce the 104.7-min freeze.
+- **`LAYER2_GUARD_SKIP` = 0** — the declared falsifier did not fire, so the
+  600MB Layer 2 floor is not too tight. 0 tracebacks.
+- **CONFOUND, stated: two further deploys landed inside the window**
+  (`214f5151` 15:59:55Z, `294f9ca9` 16:16:56Z, neither mine). The 6
+  `LAYER2_FAST_REFRESH` lines are direct evidence of this change; the aggregate
+  24/19.6 figures are NOT cleanly attributable to it alone.
+- Live refresh-worker commit is **`294f9ca9`**, and **`530fc5d8` IS an ancestor
+  of it** (`git merge-base --is-ancestor`, checked this session) — so the fix is
+  still running. `9ec20a06` (per-sport cooldown) is NOT in live, correctly.
+- **Deployed SHAs moved THREE times in 35 minutes today** (15:42 / 15:59 /
+  16:16). Re-read inside the step that uses one; never carry one across turns.
 
 ## Board freshness is a REFUSAL RATE, not a build duration (layer2-board-freshness)
 
