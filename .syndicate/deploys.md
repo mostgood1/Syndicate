@@ -687,7 +687,7 @@ people learn to route around. Run the gate, read it, then deploy.
 - Rollback: redeploy `2e4e2544` (read the live commit first) and set
   `SYNDICATE_TRACEMALLOC_DIAG=1` if its owner wants the instrument back.
 
-## DEPLOYED 2026-08-14 10:42 CDT — `530fc5d8` refresh-worker — Layer 2 shortlist off the Layer 1 floor — MEASUREMENT OPEN
+## DEPLOYED 2026-08-14 10:42 CDT — `530fc5d8` refresh-worker — Layer 2 shortlist off the Layer 1 floor — **MEASURED, CRITERIA MET**
 
 - **Preflight 2026-08-14 10:24 CDT (15:24Z): PASS on scope, HOLD on timing.**
 - **1. Scope — PASS, exactly one substantive change.** Live is `2d6f7a2f`
@@ -1169,3 +1169,211 @@ people learn to route around. Run the gate, read it, then deploy.
   by a `lane-guard.py` stdin probe (exit 0) — the memory lanes mention it in
   prose, not in a Files block, so no reassignment was needed.
 - Measured: `<pending>`
+
+- **FINAL MEASUREMENT — 3h CLEAN WINDOW, 16:16:56-19:24Z = 187.3 min, live
+  commit `294f9ca9` unchanged throughout (verified by SHA, not by timestamp).**
+
+      board refreshes         37   = 11.9/hour    BASELINE 5 in 180min = 1.7/hour
+        via the fast path     23   <-- cycles that previously produced NOTHING
+        via the full build    14
+      gaps (min)              min 1.6 / p50 5.3 / max 11.8    BASELINE max 104.7
+      MEMORY_GUARD_ABORT      96   the Layer 1 guard refusing, as designed
+      LAYER2_GUARD_SKIP        0   <-- the declared FALSIFIER never fired
+      FAST_REFRESH_FAILED      0   Traceback 0   OOM/restart events 0
+
+  **All five stated criteria MET.** Refresh count 37 > 5. Longest gap 11.8 <
+  30. The guard is still actively refusing (96 times), so this is not a
+  boot-confounded quiet period. The falsifier stayed at 0 across all 96
+  refusals, so the 600MB Layer 2 floor is correctly sized. No OOM.
+  - **The span now EXCEEDS the 180-min baseline (187.3 min), which is what makes
+    the max-gap comparison sound.** In the earlier 103.9-min reading a
+    104.7-min gap was barely observable and I said so; here it was fully
+    observable and did not occur.
+  - **Attribution: 23 fast-path refreshes.** Those cycles produced nothing
+    before this change. Baseline 146 aborts/180min -> 5 refreshes; now 96
+    aborts/187min -> 37 refreshes.
+  - **Residual confound, still stated:** the abort RATE is lower than baseline
+    (30.8/h vs 48.7/h), so this window carries less memory pressure. The 7.0x
+    refresh-rate improvement is therefore not wholly attributable; the 23
+    fast-path lines and the absent long freeze are.
+
+## 2026-08-14 19:29Z — web `ea1d2ed6` — A3 uninformative-EV rule + `rows_uninformative_ev`
+
+- **Lane:** `recommendation-lane-correctness` (model audit 2026-08-14, A3).
+- **Deploy:** `dep-d9vmp8dbedkc73enkldg`, web only, by `commitId` (services are
+  pinned to `main` with `autoDeploy=no`; deploys here go by explicit commit, so
+  no service-config change and NO `render.yaml` touched → no `blueprint_sync`).
+- **Branch:** `deploy/model-audit-a3-uninformative-ev`, cut from `8ff4e513`
+  (web's own live SHA) — verified a **pure fast-forward**, not a rollback.
+  Deliberately NOT cut from `main`: `origin/main..HEAD` is **136 commits**
+  across several sessions, none of which passed this gate.
+- **Scope:** ONE substantive change. A1/A2 (`recommendation_engine.py`) and A3a
+  (`opportunity_signals.py`) were deliberately EXCLUDED and remain undeployed,
+  so this deploy's effect is attributable.
+- **EXPECTED EFFECT ON WEB: NONE that a user can see, and that is the point.**
+  Web has `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`, so it does
+  not build the shortlist — it reads the artifact. This ships the READER
+  (`rows_uninformative_ev` on `/api/board/layer2-shortlist`) so the counter is
+  visible the moment the builder ships. Until then the key should read **null**.
+- **PREDICTION, so this is falsifiable:** after this deploy and before any
+  refresh-worker deploy, `/api/board/layer2-shortlist` carries the KEY
+  `rows_uninformative_ev` with value **null**, and `total_rows` stays ~256 with
+  soccer still at 100. If soccer drops on WEB alone, my reading of loop
+  ownership is wrong and this must be reverted.
+- **Rollback:** redeploy `8ff4e513` on `srv-d88ahvrbc2fs73eodu30` by commitId.
+- **MEASUREMENT `[19:38Z, /api/board/layer2-shortlist]` — ALL THREE PREDICTIONS HELD.**
+  - Key `rows_uninformative_ev` **present** on the payload: `True`.
+  - Its value: **`null`** — exactly as predicted, because the BUILDER has not
+    shipped. The reader is in place and reads nothing yet.
+  - `total_rows` **256**, `per_sport.selected` = mlb 84 / nfl 60 / **soccer 100** /
+    wnba 12, `fair_method` mix consensus 156 / **book_margin_model 100**.
+  So web did NOT apply the filter, which CONFIRMS the loop-ownership reading
+  (`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` on web) rather
+  than assuming it. Had soccer dropped here, the reading was wrong and this was
+  the revert trigger. It did not.
+  **This deploy is therefore VERIFIED INERT BY DESIGN — it changes nothing a
+  user sees and is not evidence that A3 works.** The behaviour change is still
+  entirely ahead of us, in the held refresh-worker deploy.
+
+### NOT deployed in this window, and why
+- **refresh-worker (`29ed6de1`, branch `deploy/model-audit-a3-worker`, pushed
+  and verified a fast-forward from `294f9ca9`) is HELD.** It is the service that
+  actually applies the filter. Held because, measured at 19:26Z:
+  - headroom is **182–226 MB of 4096** (`memory_anon_mb` 2703, `container_memory_mb`
+    ~3884), and two OPEN lanes (`anon-allocation-site`,
+    `refresh-worker-anon-leak`) are measuring exactly that number. A deploy
+    reboots the worker and resets the quantity under measurement —
+    `learnings.md`: "the floor IS the ratchet; every deploy reboots".
+  - MLB is **mid-slate** (`MLB_SIM_TICK … reason: "sport_currently_live"`,
+    `LIVE_MC_DIAG` running per game). No FULL sim is in flight — that check
+    passed — but live props/live-lens work is active.
+  Needs an explicit go/no-go from the user or the memory lanes' owner.
+
+## 2026-08-14 19:42Z — refresh-worker `29ed6de1` — A3, the BUILDER half
+
+- **Lane:** `recommendation-lane-correctness` (A3). Second half of the same one
+  substantive change; web's reader shipped at 19:37Z and measured inert.
+- **Branch:** `deploy/model-audit-a3-worker`, cut from `294f9ca9`
+  (refresh-worker's OWN live SHA) and verified a **fast-forward**.
+  - **A rollback was caught here.** The web branch (`ea1d2ed6`, off `8ff4e513`)
+    is NOT an ancestor for this service — deploying it would have dropped four
+    commits including `294f9ca9`, the `#429` MLB HRR producer fix `state.md`
+    records as confirmed in production. The two services diverge from
+    `b98f5ed7`, so NO single branch fast-forwards both. Hence two branches.
+- **Shipped over the user's stated risk, with the risk stated:** headroom and
+  the two OPEN memory lanes (`anon-allocation-site`, `refresh-worker-anon-leak`)
+  were raised; the user chose to ship. This deploy REBOOTS the worker and resets
+  `memory_anon_mb`, so any memory reading taken after 19:42Z is boot-confounded
+  and must not be compared to a pre-deploy floor.
+- **Pre-deploy checks, fresh at 19:41:34Z (not reused from 19:26Z):**
+  - **0 full-sim launch markers in 8 minutes** — no full MLB sim to kill.
+  - headroom **386.9 MB** (recovered from 182 MB), `memory_anon_mb` 2531.
+- **PREDICTIONS — written before the deploy, all falsifiable, one is a control:**
+  1. `rows_uninformative_ev` becomes a **positive integer** (currently `null`).
+  2. `per_sport.soccer.selected` **100 → 0–12**.
+  3. `total_rows` **256 → ~156**.
+  4. `fair_method` mix `book_margin_model` **100 → 0**.
+  5. **CONTROL:** mlb 84 / nfl 60 / wnba 12 selected stay **UNCHANGED**. All
+     three sports price by `consensus`, so the rule must not touch them. If any
+     of them moves, the rule is over-firing and this reverts immediately.
+  Window: one board rebuild after the worker is live (~10–15 min observed).
+- **Rollback:** redeploy `294f9ca9` on `srv-d91dpertqb8s73co8ls0` by commitId.
+- **MEASUREMENT `[19:58:41Z build, read 19:58Z]` — ALL FIVE HELD, INCLUDING THE CONTROL.**
+
+      P1  rows_uninformative_ev   null -> 4003        (positive integer)
+      P2  soccer selected          100 -> absent      (0 rows; within 0-12)
+      P3  total_rows               256 -> 156         (exactly 256-100)
+      P4  book_margin_model rows   100 -> 0
+      P5  CONTROL mlb/nfl/wnba   84/60/12 -> 84/60/12 UNCHANGED
+
+  **The control is the load-bearing half.** All three of those sports price by
+  `consensus`, so a correct rule must not touch them — and it did not, to the
+  row. The board lost exactly the 100 `book_margin_model` rows and nothing else.
+  `fair_method` mix is now `{consensus: 156}`, with zero modelled rows served.
+- **`rows_uninformative_ev: 4003` is pool-side, not board-side** — it counts
+  every candidate the rule rejected at that stage, not the 100 that would have
+  been selected. Both numbers are wanted: 100 is what a user stopped seeing,
+  4,003 is how much of the pool was margin-restatement.
+- **The counter earned itself on the first build.** Soccer is now ABSENT from
+  `per_sport` rather than present at 0, so the payload alone cannot tell "soccer
+  had no slate" from "soccer's slate was all one-book longshots" — which is
+  exactly the ambiguity `rows_uninformative_ev` was shipped in the same commit
+  to resolve. Without it this deploy would read as a soccer outage.
+- **Boot-confound, stated:** the worker rebooted at 19:49:15Z, so
+  `memory_anon_mb` restarted from a clean floor. Any memory reading after that
+  time is NOT comparable to the pre-deploy series the `anon-allocation-site` and
+  `refresh-worker-anon-leak` lanes are building.
+
+### ask-refusal-gate — `market_summary` stops answering non-betting questions
+- **PREFLIGHT: PASS** 2026-08-14 14:45 CDT.
+- Deployed: **2026-08-14 15:01 CDT (`20:01:18Z`)** — web
+  `srv-d88ahvrbc2fs73eodu30`, deploy `dep-d9vn4j49v7es73b8leq0`, commit
+  **`bef782cb`**, trigger `api`. Build+swap ~7.5 min.
+- **1. Scope — ONE substantive change.** Diff against the LIVE sha (re-read from
+  the API, not from `state.md`, which had a stale `f9aa2399`): `ea1d2ed6`,
+  deployed 19:37:00Z by another session. Three files, 291 insertions:
+  `ask_the_syndicate_router.py`, `ask_the_syndicate.py`,
+  `test_ask_router_board_summary_default.py`. Nothing else.
+  - **Deployed from a SIDE BRANCH, not main, and that is required here.**
+    `origin/main` and local `main` have diverged by **119 / 142 commits** since
+    `03073270` (2026-08-13 12:19). Main is not a safe deploy base. `bef782cb`'s
+    parent is exactly `ea1d2ed6`, so the running service moves by one change.
+    Same pattern the model-audit A3 deploy used
+    (`deploy/model-audit-a3-uninformative-ev`).
+- **2. Expected effect — a number and a window.** On the first request after the
+  deploy reports `live`: `POST /api/syndicate/query {"question":"What is the
+  capital of France?"}` returns `answered: false`, `intent: "out_of_scope"`,
+  `top_opportunities: []`, in **under 1 s** (it short-circuits before the
+  snapshot read; it took **10.9 s** and returned five betting picks at
+  `f9aa2399`). Across the 52-question harness: **refusal 3/8 → 6/8**, and
+  `market_summary` 40 → 37 of 52 resolved intents.
+  - **What will NOT be comparable, stated up front:** the content classes
+    (`lookup`, `ranking`, `entity`, `history`) score against a live slate that
+    has moved since the 20/52 baseline. Only the routing-determined classes are
+    slate-independent. Read `refusal` and the intent distribution; do not read
+    the overall 20/52 → N as if it isolated this change.
+- **3. Measurement — who reads it.** This session, immediately on deploy
+  completion: `py -3 scripts/ask_syndicate_regression.py --out
+  reports/ask_regression/post_deploy_2026_08_14.json`, plus a direct probe of
+  the three fixed questions (F04 weather, F06 capital, F08 personal records).
+- **4. Blast radius.** Web only; both workers untouched. Web runs on a
+  persistent disk, so this is **stop-then-start with real downtime** — instances
+  cannot overlap and every route 502s during the swap.
+  - `check_deploy_safety.py` **CLEAR** at 14:41 CDT: MLB sim finished (exit=0),
+    odds refresh idle, board build idle (last completed 17:48:33Z, ~3.5 min
+    build, so this is the quiet window).
+  - **Accepted caveat: LIVE GAMES ARE IN PROGRESS.** Live-lens ticks and live
+    prop hydration take an interruption. Same caveat accepted on `#417`.
+- **5. Rollback — stated now.** `POST /v1/services/srv-d88ahvrbc2fs73eodu30/deploys`
+  with `{"commitId": "ea1d2ed6"}`. Nothing to un-migrate; the change is one
+  branch in a router.
+- **6. Ledger check.** No `learnings.md` FORBIDDEN/EXONERATED rule covers this
+  work (grepped). **`render.yaml` is NOT touched**, so no `blueprint_sync`. No
+  OPEN lane claims any `ask_the_syndicate*` file — zero mentions across
+  `lanes.md`.
+- **7. Verdict: PASS.** 136 tests pass **against the deploy tree itself**
+  (`bef782cb` checked out to a worktree), not against main — the ask adapter and
+  data modules are byte-identical between `ea1d2ed6` and the tested base, so the
+  test imports resolve the same way.
+- **Measured: CONFIRMED IN PRODUCTION 2026-08-14 15:05 CDT. The prediction was
+  met exactly, and nothing else moved.**
+  - **The code is proven to be running**: `/api/ops/version` reports commit
+    `bef782cb`, and `intent: "out_of_scope"` is a value that did not exist
+    before this deploy — it cannot be emitted by the old code.
+  - The three target questions, live: `answered: false`,
+    `intent: out_of_scope`, `top_opportunities: []`, each with its own reason
+    string (the personal-records case correctly gets the accounts reason, not
+    the generic one). **Latency 10.9 s → 0.19–0.44 s**, because a declined
+    question now short-circuits before the snapshot read.
+  - Harness re-run: **20/52 → 23/52**. **`refusal` 3/8 → 6/8** as predicted.
+    `should_have_declined` 5 → 2 (F03 entity, F05 temporal — both known, both
+    need a different layer).
+  - **ZERO REGRESSIONS, and this is the load-bearing half**: advice 4/5,
+    entity 2/10, explain 4/6, history 1/5, lookup 2/8, ranking 4/10 — every one
+    identical to the baseline. The slate moved underneath the run (156 rows vs
+    200, 3 active sports vs 4) and the content classes still scored the same,
+    which is a stronger null result than a static slate would have given.
+  - `answer_source` is `snapshot` on 49 and **absent on the 3 declines** —
+    correct, they are a different response shape, and it is how a log will tell
+    the modes apart once J2 lands.
+- Verdict: **shipped and verified.** Rollback not needed.

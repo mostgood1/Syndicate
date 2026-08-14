@@ -204,6 +204,36 @@
 - Blocked by: none. Independent of Lane B (CLV) by design.
 
 ### soccer-odds-coverage — OPEN — opened 2026-08-14 — session: board-ui
+- **~~CROSS-LANE LEAD~~ — RETRACTED 20:1xZ BY ITS AUTHOR, BEFORE ANYONE ACTED.
+  IGNORE THE BLOCK BELOW.** `syndicate-an21` resolves fine: refresh-worker
+  logged PUBLISH_OK to that exact URL at 19:54:40Z and 20:03:16Z, and
+  live-odds-worker logged 14/18/13 PUBLISH_OK across three windows. The
+  failures were a transient burst (OK → 11 FAILED at 19:59:36 → OK), not a
+  standing outage, and they do **not** explain "frozen platform-wide". The
+  hostname claim was an inference from Render's naming convention, labelled
+  untested, and is now falsified. **Nothing here should change this lane's
+  direction.** Original text kept only so the error is visible:
+
+      [artifact_publisher] PUBLISH_FAILED
+        path=soccer_source/<league>/api/live_state/live_state_2026-08-14.json
+        url=http://syndicate-an21:10000/api/ops/artifacts/publish
+        error=<urlopen error [Errno -2] Name or service not known>
+
+  11 lines in one 6-min window across `mls`, `ligue_1`, `primeira_liga`.
+  `SYNDICATE_WEB_PUBLISH_URL = http://syndicate-an21:10000` on BOTH workers,
+  while `render.yaml` names the web service **`syndicate`** — Render's internal
+  hostname is the SERVICE NAME, and `syndicate-an21` is the PUBLIC subdomain
+  prefix.
+  - **Measured:** `syndicate-an21` does not resolve (the error is the proof).
+  - **Inferred, NOT tested:** that `syndicate` would resolve. Test before
+    shipping any hostname change.
+  - Keyvalue state publishes fine (the Layer 2 shortlist rebuilt at 19:58:41Z),
+    so only FILE artifacts are affected — which is why the board looks alive
+    while per-sport files go stale.
+  - Suspect `internal-hostname-cutover` (CLOSED 2026-08-13 "verified in
+    production") set the public prefix believing it was the internal name.
+  - Not touched by that lane's owner here: it is config, needs a deploy to take
+    effect, and is not this lane's file set.
 - **STATUS 2026-08-14 19:3xZ — NO LONGER BLOCKED ON OBSERVABILITY. Now
   waiting on one scheduled event.**
   - `ccd10349` live on live-odds-worker **14:24:09 CDT**, post-deploy clean,
@@ -849,6 +879,13 @@ the FIRST for a model it did not originally scope.**
   `LAYER2_GUARD_SKIP` 0 across all 96, so the 600MB floor is correctly sized;
   zero failures, zero OOM. Full detail and the one residual confound in
   `deploys.md`.
+- **THIRD work item, same lane: the `#387` streaming mechanism, `0041a902`.**
+  `build_intelligence_overview(consumer=...)`, 6 tests, mutation-pinned.
+  **NOT WIRED** — `_build_candidate_pool` still calls the list form, so nothing
+  has changed in production. The cutover's decision gate is answered (thin-pool
+  merge: 0 enters in 6h against 39 live control spans); the plan is to stream by
+  default and re-hydrate for that rare path. Spec in
+  `docs/ai_context/handoff_overview_hydration.md`.
 - Second work item (`pool["overview"]` retention) shipped as `100c9cb5`,
   **committed, NOT deployed** — it rides the next refresh-worker deploy.
 - **CLEAN-WINDOW RESULT 16:16:56-18:00:49Z (103.9 min, no intervening deploy):
@@ -3225,7 +3262,7 @@ than have every session quietly decide it is.
 - Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
 
-### ask-refusal-gate — OPEN — opened 2026-08-14 — session: ask-audit
+### ask-refusal-gate — CLOSED-VERIFIED 2026-08-14 — refusal 3/8 -> 6/8 in production, zero regressions — opened 2026-08-14 — session: ask-audit
 - Goal: `market_summary` stops being the answer to questions that are not about
   betting. **Testable outcome:** `"What is the capital of France?"`,
   `"What is the weather at the stadium right now?"` and `"What is my account
@@ -3317,3 +3354,17 @@ STILL OWED (not deployed).**
   production re-measure cannot happen until someone deploys deliberately.
   `/preflight` before that, and note the standing rule that a deploy kills an
   in-flight MLB sim.
+
+**ask-refusal-gate CLOSED-VERIFIED 2026-08-14 15:05 CDT.** Deployed `bef782cb`
+(`dep-d9vn4j49v7es73b8leq0`, live `20:01:18Z`). All three verification criteria
+MET:
+1. New unit cases pass — 136 tests, run against the DEPLOY TREE not main.
+2. The 2026-08-03 default is intact — `test_vague_betting_questions_still_get_the_summary_default`
+   pins it directly now, instead of via a gibberish proxy that conflated "not
+   the dead end" with "a board summary".
+3. **Production re-measure done: 20/52 → 23/52, `refusal` 3/8 → 6/8, every
+   other class byte-identical to the baseline.** Declined-question latency
+   10.9 s → 0.19 s. Full evidence in `deploys.md`.
+
+Carried forward, not fixed here: F03 needs entity validation, F05 needs
+temporal validation. Neither is a word-list problem.
