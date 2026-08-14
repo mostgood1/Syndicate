@@ -328,7 +328,155 @@ def attach_live_game_state_from_lens(grid: list, *, sport: str, selected_date: s
     }
 
 
+# `#425`. Flag only at or above this many DISTINCT GAMES carrying the same
+# single value. Two or three games can tie by coincidence; four independent
+# games agreeing to full float precision cannot happen to a working model.
+# Deliberately conservative, because a false positive BLANKS a real projection
+# and that is worse than the gap it closes.
+_MIN_GAMES_FOR_DEGENERACY_VERDICT = 4
+
+
+def _projection_unit_key(row: dict[str, Any]) -> tuple:
+    """The GAME (or player-in-game) a row belongs to.
+
+    Counting ROWS here would be wrong and would manufacture false positives:
+    alt lines put many rows on one game, so a 3-game slate with 40
+    `spreads_alt` rows would look like 40 agreeing units. The 2026-08-13 NFL
+    board carried 117 rows on a single game.
+    """
+    event_id = str(row.get("event_id") or "").strip()
+    game = event_id or (str(row.get("home_team") or ""), str(row.get("away_team") or ""))
+    player = str(row.get("player_name") or "").strip()
+    return (game, player) if player else (game,)
+
+
+def _projected_value(projection: dict[str, Any]) -> Any:
+    """`projected_raw` where present, else `projected`.
+
+    Raw is the MODEL's output, before calibration. Calibration mapping several
+    distinct inputs onto one output is a real but DIFFERENT bug, and reading
+    the calibrated value would conflate the two.
+    """
+    if projection.get("projected_raw") is not None:
+        return projection.get("projected_raw")
+    return projection.get("projected")
+
+
+def detect_degenerate_projections(grid: list, *, sport: str) -> dict:
+    """`#425`. Report any (kind, market, segment) whose projection is ONE value.
+
+    WHY THIS EXISTS, AND WHY A SKILL NOTE CANNOT REPLACE IT. On 2026-08-13 the
+    NFL board served `margin 0.96 / total 44.38 / home_win 0.5267` on ALL 16
+    preseason games across FOUR dates, and **nothing anywhere reported it**. It
+    was found by a human noticing that every card looked the same. The cause
+    was not a bad model: the nflverse play-by-play was absent from the root the
+    generator resolved, so every club rated neutral and 300 seeds ran over two
+    identical league-average teams.
+
+    That is exactly the case a backtested skill note CANNOT catch. `skill_note`
+    asks "did this model predict well historically"; a model with genuine skill
+    still emits a constant today if today's input went missing. Skill is a
+    property of the MODEL, this is a property of the RUN.
+
+    Covers every sport by construction: it reads the grid after whichever
+    per-sport branch ran, so a producer wired later is covered without being
+    touched. That is the whole point of `#425` -- `skill_note` is called in
+    exactly one of seven builders, and a check covering one of seven producers
+    will be absent the next time it matters.
+
+    Returns `{}` when there is nothing to say, so a healthy board adds no keys.
+    """
+    groups: dict[tuple, dict[str, Any]] = {}
+    for row in grid:
+        if not isinstance(row, dict):
+            continue
+        projection = row.get("projection")
+        if not isinstance(projection, dict):
+            continue
+        value = _projected_value(projection)
+        if value is None:
+            continue
+        key = (
+            str(row.get("kind") or ""),
+            str(row.get("market") or ""),
+            str(row.get("segment") or ""),
+        )
+        bucket = groups.setdefault(key, {"values": set(), "units": set(), "rows": []})
+        bucket["values"].add(value)
+        bucket["units"].add(_projection_unit_key(row))
+        bucket["rows"].append(row)
+
+    findings: list[dict[str, Any]] = []
+    for (kind, market, segment), bucket in sorted(groups.items()):
+        units = len(bucket["units"])
+        if len(bucket["values"]) != 1 or units < _MIN_GAMES_FOR_DEGENERACY_VERDICT:
+            continue
+        value = next(iter(bucket["values"]))
+        findings.append(
+            {
+                "sport": sport,
+                "kind": kind,
+                "market": market,
+                "segment": segment,
+                "value": value,
+                "games": units,
+                "rows": len(bucket["rows"]),
+            }
+        )
+        for row in bucket["rows"]:
+            projection = row.get("projection")
+            if isinstance(projection, dict):
+                projection["degenerate"] = True
+                # Named the same way the existing suppression reason is
+                # (`#377`/`#367`), so an empty cell stays attributable rather
+                # than mysterious and the board needs no new field to render it.
+                projection.setdefault(
+                    "projection_unavailable_reason",
+                    f"projection is a single constant ({value}) across {units} games "
+                    "-- the model had no usable input for this slate",
+                )
+
+    if not findings:
+        return {}
+    for finding in findings:
+        _LOGGER.warning(
+            "DEGENERATE_PROJECTION sport=%s kind=%s market=%s segment=%s value=%s games=%s rows=%s",
+            finding["sport"], finding["kind"], finding["market"],
+            finding["segment"], finding["value"], finding["games"], finding["rows"],
+        )
+    return {
+        "degenerate_projection_groups": len(findings),
+        "degenerate_projections": findings,
+    }
+
+
 def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
+    """Per-sport projection join, plus a cross-sport degeneracy check (`#425`).
+
+    THE CHECK IS APPLIED HERE, NOT IN THE PER-SPORT BODY, AND THAT IS THE
+    POINT. `_attach_projections_by_sport` has THIRTEEN return sites across
+    seven sports; adding the check at each is precisely the failure `#334`
+    records -- three of four call paths patched and the fourth silently still
+    broken. Wrapping covers every sport, every return path, and every producer
+    wired in future, and touches ZERO call sites (there are four:
+    `intelligence.py`, `book_grid_artifact.py`, `layer2_shortlist.py`, and
+    `attach_live_projections_for_sport` below).
+    """
+    coverage = _attach_projections_by_sport(grid, sport=sport, selected_date=selected_date)
+    if not isinstance(coverage, dict):
+        return coverage
+    try:
+        degeneracy = detect_degenerate_projections(grid, sport=sport)
+    except Exception:
+        # A reporting check must never be able to break the join it reports on.
+        _LOGGER.exception("DEGENERATE_PROJECTION_SCAN_FAILURE sport=%s", sport)
+        return coverage
+    if degeneracy:
+        coverage.update(degeneracy)
+    return coverage
+
+
+def _attach_projections_by_sport(grid: list, *, sport: str, selected_date: str) -> dict:
     """Stamp the sim's projection and edge onto player-prop rows (S3).
 
     Per-sport, because each sim ships a different shape. An unwired sport
