@@ -6,6 +6,48 @@
 
 ## OPEN
 
+### nfl-degenerate-writer — OPEN — opened 2026-08-13 — session: nfl-day-of-game
+- Goal: a SmartSim2 NFL run with no play-by-play data cannot write a
+  league-constant projection artifact over a healthy one. Testable outcome:
+  with the pbp absent, the generator exits non-zero having written NOTHING,
+  and the previously-good artifact is byte-identical afterwards.
+- Why this exists: `98950c6d` made the READER immune to the degenerate file
+  (drops both-sides-neutral rows, reads every root, newest wins). It does not
+  stop the file being WRITTEN, and writing it OVERWRITES the healthy copy —
+  which is how the board came to serve `margin 0.96 / total 44.38 /
+  home_win 0.5267` on all 16 games across 4 dates.
+- Root cause, already measured: `data/nfl_source/tracking/` is **gitignored**,
+  so the nflverse pbp is on the mounted disk and absent from the repo
+  checkout. A run whose `DATA_ROOT` resolves to the checkout loads ZERO plays,
+  `team_rating` returns `(0.0, 0.0, "neutral_no_data")` for every club, and
+  300 seeds are burned producing byte-identical rows.
+- Files (exclusive to this lane):
+  - `scripts/generate_smartsim2_nfl_projections.py` — the shared guards live
+    here because the preseason script imports from it (`team_rating`,
+    `load_pbp_plays`), so one implementation covers both generators.
+  - `scripts/generate_smartsim2_nfl_preseason_projections.py` — wire the guard.
+  - `tests/test_nfl_degenerate_writer_guard.py` (new).
+- NOT touched: `syndicate/features/shared/nfl_game_projections.py`. The
+  reader-side fix is already deployed and verified; re-opening it would put two
+  changes on one observable.
+- Design decision, recorded before implementing: refuse only when **EVERY**
+  projection in the run is degenerate. A partial (e.g. two clubs whose
+  abbreviations do not resolve) still yields a file carrying real information
+  for the other games, and the deployed reader already drops the bad rows.
+  Refusing on a partial would blank a mostly-good board — a worse failure than
+  the one being fixed.
+- Two guards, deliberately at different stages:
+  1. PRECONDITION — zero plays loaded for both seasons is a hard data outage.
+     Fail before simulating, so the failure names the missing path instead of
+     surfacing as odd numbers 300 seeds later.
+  2. PRE-WRITE — every projection degenerate means do not write AT ALL, so the
+     last good artifact survives. Never truncate a healthy file with a bad one.
+- Falsification test: the guard must NOT fire on a run where at least one club
+  has real ratings, and must NOT fire on an empty schedule (no games is a
+  different condition from no data, and conflating them would make an
+  out-of-season run look like an outage).
+- Blocked by: none.
+
 ### refresh-worker-anon-leak — OPEN — opened 2026-08-13 — session: memory-guard
 - Goal: name what allocates ~300MB/hour of ANONYMOUS memory on refresh-worker,
   with evidence, so the board stops needing a restart every ~4 hours.

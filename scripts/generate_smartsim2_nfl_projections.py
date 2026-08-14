@@ -48,6 +48,10 @@ from syndicate.features.nfl.smartsim2_projection import SmartSimNflProjection
 from syndicate.features.nfl.smartsim2_projection import write_projection_artifact
 from syndicate.features.nfl.sources import default_nfl_source_root
 from syndicate.features.nfl.sources import nfl_artifact_output_root
+# Reused rather than reimplemented: the reader already decides what counts as
+# degenerate (`98950c6d`), and a second copy of that predicate here would let
+# the writer's idea of "worthless" drift from the reader's.
+from syndicate.features.shared.nfl_game_projections import _is_degenerate_rating_source
 
 DATA_ROOT = default_nfl_source_root()
 SEEDS_PER_GAME = 300
@@ -89,6 +93,98 @@ def pbp_team_code(team: str) -> str:
     """The schedule's code translated into the play-by-play's spelling."""
     key = str(team or "").strip().upper()
     return _PBP_TEAM_CODE_ALIASES.get(key, key)
+
+
+class DegenerateProjectionRun(RuntimeError):
+    """A run that has no ratings data and would write league constants.
+
+    Raised INSTEAD of writing. The failure this prevents is not a crash, it is
+    a silently plausible artifact: with no play-by-play, `team_rating` returns
+    `(0.0, 0.0, "neutral_no_data")` for every club, and 300 seeds over two
+    identical league-average teams produce byte-identical rows for every game.
+    Measured on production 2026-08-13 -- the board served `margin 0.96`,
+    `total 44.38`, `home_win 0.5267` on ALL 16 preseason games across FOUR
+    dates, and it looked exactly like a real projection.
+
+    `98950c6d` made the READER immune to such a file. This makes the WRITER
+    unable to produce one, which matters because writing it OVERWRITES the
+    healthy artifact -- the reader's immunity is no help once the good copy is
+    gone.
+    """
+
+
+def assert_ratings_data_available(
+    *,
+    season: int,
+    current_plays: list[tuple[int, str, str, str, float]],
+    prior_plays: list[tuple[int, str, str, str, float]] | None,
+) -> None:
+    """PRECONDITION guard: refuse before simulating, not after.
+
+    Placed ahead of the sim loop deliberately. The same outage caught at write
+    time would have burned 300 seeds x N games first, and -- worse -- the
+    operator would read the failure as something about the projections rather
+    than about a missing input file.
+
+    Names the resolved path, because the cause is almost always root
+    resolution rather than a genuinely absent file: `data/nfl_source/tracking/`
+    is GITIGNORED, so the pbp exists on the mounted disk and NOT in the repo
+    checkout, and a run whose DATA_ROOT resolved to the checkout finds nothing.
+    """
+    if current_plays or prior_plays:
+        return
+    raise DegenerateProjectionRun(
+        "NO PLAY-BY-PLAY DATA: refusing to generate projections that would be "
+        f"identical for every game.\n"
+        f"  looked for : {_pbp_path(season)}\n"
+        f"          and : {_pbp_path(season - 1)}\n"
+        f"  DATA_ROOT  : {DATA_ROOT}\n"
+        "  Both loaded ZERO plays, so every team would rate neutral_no_data "
+        "and every game would receive the same league-average projection.\n"
+        "  NOTE: data/nfl_source/tracking/ is gitignored -- the pbp lives on "
+        "the mounted disk and is absent from the repo checkout. If DATA_ROOT "
+        "points at the checkout, that is the bug, not a missing download."
+    )
+
+
+def assert_projections_carry_information(
+    projections: list,
+    *,
+    season: int,
+    week: int,
+) -> None:
+    """PRE-WRITE guard: never truncate a healthy artifact with a worthless one.
+
+    Fires only when EVERY projection is degenerate. A PARTIAL degenerate run
+    still carries real information for its other games, and the deployed
+    reader already drops the bad rows -- refusing on a partial would blank a
+    mostly-good board, which is a worse failure than the one being fixed.
+    (Production carries exactly that partial case whenever a club's
+    abbreviation does not resolve.)
+
+    An EMPTY list is not an outage and is deliberately allowed through: no
+    games is a different condition from no data, and conflating them would
+    make an out-of-season run look like a broken pipeline.
+    """
+    if not projections:
+        return
+    degenerate = [
+        projection
+        for projection in projections
+        if _is_degenerate_rating_source(getattr(projection, "rating_source", ""))
+    ]
+    if len(degenerate) < len(projections):
+        return
+    raise DegenerateProjectionRun(
+        f"EVERY projection for season={season} week={week} is degenerate "
+        f"({len(degenerate)}/{len(projections)} rated neutral_no_data on BOTH "
+        "sides): refusing to write.\n"
+        "  Such a file is byte-identical for every game and would OVERWRITE "
+        "the last good artifact, which is how a league constant reached the "
+        "board on 2026-08-13.\n"
+        f"  DATA_ROOT: {DATA_ROOT}\n"
+        "  Nothing was written; the previous artifact is intact."
+    )
 
 
 def _pbp_path(season: int) -> Path:
@@ -344,6 +440,9 @@ def main() -> None:
     current_plays = load_pbp_plays(args.season)
     prior_plays = load_pbp_plays(args.season - 1)
     log(f"PBP_LOADED current_plays={len(current_plays)} prior_plays={len(prior_plays)}")
+    # Before the sim loop, so an outage names the missing input rather than
+    # surfacing as suspiciously round numbers 300 seeds later.
+    assert_ratings_data_available(season=args.season, current_plays=current_plays, prior_plays=prior_plays)
 
     schedule_rows = week_schedule(args.season, args.week, current_plays)
     used_real_schedule_fallback = False
@@ -380,6 +479,10 @@ def main() -> None:
     # Resolved HERE, not at import, so the value follows the environment
     # rather than freezing whatever it was when the module loaded.
     output_root = nfl_artifact_output_root()
+    # LAST THING BEFORE THE WRITE. A degenerate file would replace the last
+    # good artifact, so the check has to sit between the sim and the write --
+    # not earlier, where the projections do not exist yet, and not after.
+    assert_projections_carry_information(projections, season=args.season, week=args.week)
     path = write_projection_artifact(projections, season=args.season, week=args.week, data_root=output_root)
     injury_notes_path = DATA_ROOT / f"smartsim2_projections_{args.season}_wk{args.week}_injury_notes.json"
     if all_injury_diagnostics:

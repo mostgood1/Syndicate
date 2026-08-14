@@ -49,6 +49,8 @@ if str(REPO_ROOT) not in sys.path:
 
 from scripts.fetch_nfl_preseason_schedule import preseason_schedule_path
 from scripts.generate_smartsim2_nfl_projections import SEEDS_PER_GAME
+from scripts.generate_smartsim2_nfl_projections import assert_projections_carry_information
+from scripts.generate_smartsim2_nfl_projections import assert_ratings_data_available
 from scripts.generate_smartsim2_nfl_projections import load_pbp_plays
 from scripts.generate_smartsim2_nfl_projections import team_rating
 from syndicate.features.football.sim_engine.smartsim2.calibration_profile import NFL_CALIBRATION_PROFILE
@@ -226,6 +228,12 @@ def main() -> None:
 
     prior_season_plays = load_pbp_plays(args.season - 1)
     log(f"PBP_LOADED prior_season_plays={len(prior_season_plays)}")
+    # Preseason has no current season to fall back on -- the prior season is
+    # the ONLY ratings source here, so an empty load is unambiguously the
+    # outage this guard exists for. Passed as `current_plays=[]` for the same
+    # reason build_preseason_projection does: that is the real state, not a
+    # placeholder.
+    assert_ratings_data_available(season=args.season, current_plays=[], prior_plays=prior_season_plays)
 
     schedule_rows = preseason_schedule_rows(args.season, args.week)
     log(f"SCHEDULE rows={len(schedule_rows)}")
@@ -253,6 +261,10 @@ def main() -> None:
     # Resolved HERE, not at import, so the value follows the environment
     # rather than freezing whatever it was when the module loaded.
     output_root = nfl_artifact_output_root()
+    # Between the sim and the write: a degenerate file would replace the last
+    # good artifact, and the reader's immunity is no help once the good copy
+    # is gone.
+    assert_projections_carry_information(projections, season=args.season, week=args.week)
     path = write_preseason_projection_artifact(projections, season=args.season, week=args.week, data_root=output_root)
     elapsed = time.time() - start
 
