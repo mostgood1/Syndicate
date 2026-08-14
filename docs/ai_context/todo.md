@@ -1123,7 +1123,7 @@ samples.
 the process count.** "0 launches" reads identically whether the guard suppressed
 them or NFL simply is not active — only the named reason discriminates.
 
-#### FOLLOW-UP to `#389` — ROOT-CAUSED AND FIXED (`2ee6a003`, refresh-worker 23:37:58Z). AWAITING FIRST RUN. An unrelated file decided where NFL projections were written, so the guard never saw them
+#### FOLLOW-UP to `#389` — **CLOSED 2026-08-13. CONFIRMED WORKING IN PRODUCTION on its first real run.** An unrelated file decided where NFL projections were written, so the guard never saw them
 
 **MEASURED, from the generator's own log line — not inferred:**
 
@@ -1186,6 +1186,48 @@ observation is a POSITIVE emission** — an `artifact_path=` line reading
 `/opt/render/project/data/...` with no `/src/` — due ~21:00 on 2026-08-13. The
 absence of `SEASON_PROJECTION_ARTIFACT_MISSING` is NOT confirmation: it is
 absent right now only because nothing ran.
+
+**CONFIRMED 2026-08-13 — the predicted emission arrived, on schedule and at the
+right root.** The block above is left standing because it named the one
+observation that would settle this, in advance, and it is worth seeing that the
+prediction was met on its own terms rather than reinterpreted after the fact:
+
+    2026-08-13T20:59:41Z  SEASON_PROJECTION_LAUNCHING sport=nfl season=2026 week=1
+                          reason=artifact_missing_retry since_launch_seconds=86543
+    2026-08-13T21:00:11Z  SEASON_PROJECTION_LAUNCHING sport=nfl_preseason season=2026 week=2
+                          reason=artifact_missing_retry since_launch_seconds=86461
+    2026-08-13T21:02:06Z  artifact_path=/opt/render/project/data/nfl_source/
+                          smartsim2_preseason_projections_2026_wk2.csv
+
+**`/opt/render/project/data/`, NOT `/opt/render/project/src/data/`.** Writer and
+guard resolve the same root, which was the entire defect.
+
+**Corroborating, and deliberately reported SECOND** — this ticket was right that
+an absence cannot confirm it, so the absence is not carrying the verdict:
+`SEASON_PROJECTION_ARTIFACT_MISSING` fired **30 times before** the 21:02:06Z
+write and **0 times after**. Queried as its own window
+(`2026-08-13T21:02:10Z -> 2026-08-14T01:07Z`) rather than inferred from result
+ordering — Render returns logs oldest-first regardless of `direction`, and an
+ordering-based read has produced wrong conclusions here before. A positive
+control in the same window returned 5 `[refresh_worker]` rows, so the zero is a
+quiet guard and not an empty window.
+
+**Third, independent signal — the artifact's CONTENT.** The file that run
+produced carries a real rating on **16 of 16** games (`rating_source` =
+`prior_season_fallback`, both-sides-neutral: 0). So the run did not merely write
+*somewhere*; it wrote a healthy artifact, which also proves the worker reads
+`pbp_2025.csv` from the root it resolved.
+
+**Two facts this closure establishes for whoever needs them later:**
+- The ~90 discarded sims/day are gone. The busy loop existed because the guard
+  could never see the output; it can now.
+- The mounted disk holds the nflverse pbp on the worker's resolved root.
+  Therefore a future "NFL projections are degenerate" report is **NOT** this
+  defect and should be traced to file SELECTION on the READ side. That is
+  exactly what happened on 2026-08-13: `load_nfl_game_projections` deduped
+  candidate files by NAME across source roots and preferred a same-named
+  degenerate copy, serving one constant to the board while the cards served 16
+  distinct values from the healthy copy. Fixed separately.
 
 ### `#390` — BUILT, DEPLOYED, AND CONFIRMED IN PRODUCTION (`2411d748`). No sport except MLB had any sim run ledger, so "when did this sim run and how long did it take" was unanswerable for 6 of 7 sports
 
@@ -30956,3 +30998,77 @@ the emitter was fine and the window was in the future.
   is **`test_mlb_has_live_game_reads_live_lens_counts`** — identified 2026-07-25:
   it passes in isolation and in most full runs, so it is order/timing dependent,
   not a real failure. Baseline before blaming your change.
+
+### `#424` — CLOSED-VERIFIED 2026-08-13. The NFL day-of-game engine: game state never left `pregame`, and the board served one projection for every game
+
+Filed at closure rather than at discovery, per `#71` — shipped work must reach
+this file. Four changes, three deploys, all measured in production against the
+live 6-game preseason slate.
+
+**THE TWO DEFECTS, both measured on the served payload:**
+
+    by_state          {pregame: 6, live: 0}   with 5 games genuinely in progress
+    projected_raw     ONE value (44.38) across 16 games and FOUR dates
+
+DET @ CIN was carrying **117 live in-game market rows at 1.3-minute freshness**
+while the board called it `pregame`. The board was taking live odds on a game
+it believed had not kicked off.
+
+**CAUSE 1 — one missing field, not five broken surfaces.**
+`_NFLDataProvider.games()` (`home.py:5704`) hands `build_game_chips` the
+week-scoped projection cards, and those carry no game state at all: `status` is
+a plain STRING, there is no `live_state`, no score, no clock, no kickoff time.
+So `game_chip_scoreboard._game_flags` returned `(False, False)` for every NFL
+game, forever, and every consumer inherited it — board `state`, `by_state`, the
+live lens, the cards' own `shared_is_live`. Fixed at the choke point both
+`publication_adapter._shared_game_state` and `_game_flags` already read
+(`live_state`), so zero call sites changed. `syndicate/features/nfl/live_game_state.py`.
+
+**CAUSE 2 — the constant was NEVER a model defect.** Running the real generator
+with empty `prior_season_plays` reproduces `margin 0.960 / total 44.380 /
+home_win 0.5267` EXACTLY, on all four preseason weeks and any matchup.
+Corroborating tell: the four weeks carry different shrinkage factors
+(0.92/0.80/0.55/0.92) and 0.0 shrunk by any of them is still 0.0, so a
+degenerate input silently makes the week-specific adjustment a no-op. Meanwhile
+the CARDS surface — reading a file of the SAME NAME — served 16 distinct totals
+with `prior_season_fallback` on nearly every club. Two copies existed;
+`load_nfl_game_projections` deduped candidates by **NAME across source roots**,
+so only the first root's copy was ever opened.
+
+**WHAT SHIPPED**
+
+| origin SHA | change | deployed |
+|---|---|---|
+| `e29b807f` | `live_state` stamped onto NFL cards from ESPN; preseason market board falls back to the live book grid; `_score_value(0)` no longer returns None (cross-sport — a real 0 score rendered blank) | web 18:54 |
+| `98950c6d` | dedupe on resolved PATH not filename; drop both-sides-`neutral_no_data` rows; newest `generated_at` wins | worker 19:10 |
+| `111a5000` | `team_rating` translates `LAR`/`WSH` into the pbp's `LA`/`WAS` | worker 19:13 |
+| `c7cff28c` | the WRITER refuses: no plays -> fail before the sim; all-degenerate -> write nothing, preserving the last good artifact | worker 20:29 |
+
+**VERIFIED IN PRODUCTION**, on an artifact `generated_at 00:36:18Z` — 23 minutes
+AFTER the deploy instant, which is what makes it a reading of the new code:
+
+    by_state        {pregame:6, live:0}  ->  {live:5, pregame:1, final:0}
+    projected_raw   1 distinct  ->  6 distinct, 44.38 gone
+    board vs cards  disagreed  ->  AGREE 6/6 to three decimals
+
+Real scores and clocks (`DET@CIN 3-10 Q2 0:07`). The two-sided control is the
+game that had NOT kicked off: still `pregame`, now with a real start time — a
+blanket relabel could not produce that.
+
+**STILL OPEN, and deliberately not closed here:**
+- `111a5000` and `c7cff28c` are both **inert until the next season-projection
+  autorun (~2026-08-14 21:00 CDT)**. Neither has been observed doing anything.
+  Expected then: `MIA@WSH` / `LAR@KC` `rating_source` flips off
+  `neutral_no_data`, and no `DegenerateProjectionRun` fires. **OWNER UNASSIGNED.**
+- `#377` can now be closed by someone who owns it: it sat OPEN and UNOWNED for
+  days as a product decision about what a betting board may assert, and it was
+  file selection the whole time.
+
+**TWO EXISTING TESTS HAD TO CHANGE, and that is the finding worth keeping.**
+`test_main_falls_back_when_no_pbp_exists_yet` and
+`test_main_writes_artifact_for_real_schedule_rows` both ran `main()` with no
+play-by-play at all and asserted only that an artifact existed and named the
+game — **so the degenerate-write behaviour was pinned by passing tests.** Their
+fixtures now supply synthetic prior-season plays with distinct per-club EPA,
+which is what their names always described. Still hermetic; no test touches the
+real `pbp_2025.csv`. No assertion was weakened.
