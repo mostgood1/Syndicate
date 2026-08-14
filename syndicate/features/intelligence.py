@@ -2558,8 +2558,16 @@ def _query_preferences(
 # This is a circuit breaker around MLB's cost, NOT a fix for it. The real work
 # is making build_cards_page_context cheaper or not running it hydrated on the
 # worker at all -- handoff_refresh_worker_oom.md measured the same call at
-# ~3.7GB on 2026-07-26 and its `force_refresh=True` note (the overview cache is
-# defeated on every cycle) is the obvious next lever.
+# ~3.7GB on 2026-07-26.
+#
+# `#387`, 2026-08-14: THE `force_refresh=True` LEVER THIS COMMENT USED TO NAME
+# IS ALREADY SPENT. `collect_all_recommendations` only builds an overview when
+# `overview is None`, and both call sites pass one, so the flag never reached
+# its branch -- the double-fetch was fixed when `overview=` was threaded
+# through, and only the dead literals survived to keep the lead looking live.
+# They are now removed. What remains true is the first sentence: the cost is
+# `build_cards_page_context` running HYDRATED on the worker, and that is
+# untouched.
 _OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000 * 1024 * 1024
 
 
@@ -10378,7 +10386,15 @@ def collect_candidates_with_fallback_merge(
                 "collect_all_recommendations:empty_fallback",
                 collect_all_recommendations,
                 selected_date=selected_date,
-                force_refresh=True,
+                # `#387`. force_refresh REMOVED, not changed to False: it was
+                # already inert here. `collect_all_recommendations` only calls
+                # `build_intelligence_overview` when `overview is None`, and
+                # this site passes one, so the flag never reached its branch.
+                # Passing it read as "this path re-hydrates every cycle", which
+                # is what `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`'s comment still
+                # cites as the obvious next lever -- that double-fetch was fixed
+                # when `overview=` was threaded through, and only the literal
+                # survived to keep the stale lead alive.
                 log_pipeline=False,
                 overview=overview,
             )
@@ -10401,7 +10417,7 @@ def collect_candidates_with_fallback_merge(
                 "collect_all_recommendations:thin_pool_merge",
                 collect_all_recommendations,
                 selected_date=selected_date,
-                force_refresh=True,
+                # Same as the fallback branch above: inert, and misleading.
                 log_pipeline=False,
                 overview=overview,
             )
