@@ -465,14 +465,25 @@ def test_malloc_info_in_use_is_system_minus_free_and_never_negative():
 
 
 def test_malloc_info_states_the_verdict_the_step_exists_to_produce():
+    # The verdict is now CONDITIONAL on the arena being where the memory
+    # actually is, so both calls here pass `anon_mb`. The first production
+    # reading (refresh-worker 2026-08-14 01:22:54Z) reported a confident
+    # "fragmentation" off `system_current 215.1MB` while the cgroup said `anon`
+    # was ~1893MB -- a true statement about 11% of the process, printed as a
+    # statement about the process. Without coverage supplied this now returns
+    # `coverage_unknown`, which is the point; see
+    # test_malloc_info_says_coverage_unknown_rather_than_guessing.
+    #
+    # anon 6.0MB == the arena total, i.e. 100% coverage.
     # 1.5 of 6.0 = 25% free-held -> the fragmentation side of the line.
-    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_XML)
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_XML, anon_mb=6.0)
     assert parsed["free_held_pct"] == 25.0
     assert parsed["reads_as"] == "fragmentation"
     # Almost nothing free against a large system -> the other candidate.
     live = _MALLOC_INFO_XML.replace('<total type="rest" count="7" size="1572864"/>',
                                     '<total type="rest" count="7" size="1024"/>')
-    assert memory_observability.parse_malloc_info_xml(live)["reads_as"] == "live_retention"
+    assert memory_observability.parse_malloc_info_xml(
+        live, anon_mb=4.7)["reads_as"] == "live_retention"
 
 
 @pytest.mark.parametrize("bad", [
@@ -544,10 +555,42 @@ def test_malloc_info_reads_the_top_level_totals_not_the_per_heap_ones():
     assert parsed["arenas"] == 2
 
 
+def test_malloc_info_verdict_refuses_when_the_arena_is_not_where_the_memory_is():
+    """The defect the first production reading exposed.
+
+    refresh-worker 2026-08-14 01:22:54Z reported `system_current 215.1MB` with
+    `free_held 60.9%` and printed **fragmentation**, while the cgroup said
+    `anon` was ~1893MB. The allocator held 11% of the process's anonymous
+    memory and the verdict described the fragmentation of that 11% as though
+    it spoke for the whole. Correct number, wrong population.
+    """
+    # 6.0MB of arena against 1893MB of anon -- 0.3% coverage.
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_SAMPLE, anon_mb=1893.0)
+    assert parsed["reads_as"] == "arena_not_representative"
+    assert parsed["arena_coverage_pct"] == pytest.approx(0.3, abs=0.1)
+    # The underlying numbers are still reported -- the guard suppresses the
+    # VERDICT, not the measurement.
+    assert parsed["free_held_pct"] == pytest.approx(25.0, abs=0.1)
+
+    # Just under half is still not enough to conclude from.
+    edge = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_SAMPLE, anon_mb=12.5)
+    assert edge["reads_as"] == "arena_not_representative"
+
+
+def test_malloc_info_says_coverage_unknown_rather_than_guessing():
+    # No `anon_mb` supplied: the parser must not fall back to the old
+    # unconditional verdict, which is what made the first reading misleading.
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_SAMPLE)
+    assert parsed["reads_as"] == "coverage_unknown"
+    assert "arena_coverage_pct" not in parsed
+
+
 def test_malloc_info_verdict_splits_fragmentation_from_live_retention():
     # The whole point of the instrument: which of the two surviving `#423`
     # candidates the allocator is in. 1.5 of 6.0MB free-held = 25.0%.
-    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_SAMPLE)
+    # anon 6.0MB == the arena total, i.e. 100% coverage: the verdict is
+    # meaningful precisely because the allocator holds all of it.
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_SAMPLE, anon_mb=6.0)
     assert parsed["free_held_pct"] == pytest.approx(25.0, abs=0.1)
     assert parsed["reads_as"] == "fragmentation"
 
@@ -557,7 +600,7 @@ def test_malloc_info_verdict_splits_fragmentation_from_live_retention():
     live = _MALLOC_INFO_SAMPLE.replace(
         '<total type="rest" count="8" size="1572864"/>',
         '<total type="rest" count="8" size="1024"/>')
-    parsed_live = memory_observability.parse_malloc_info_xml(live)
+    parsed_live = memory_observability.parse_malloc_info_xml(live, anon_mb=4.7)
     assert parsed_live["reads_as"] == "live_retention"
     assert parsed_live["free_held_pct"] < 1.0
 

@@ -1361,7 +1361,7 @@ _MALLOC_INFO_STATE: dict[str, Any] = {"resolved": False, "fn": None, "libc": Non
                                       "unavailable_reason": ""}
 
 
-def parse_malloc_info_xml(xml_text: str) -> dict[str, Any] | None:
+def parse_malloc_info_xml(xml_text: str, anon_mb: float | None = None) -> dict[str, Any] | None:
     """Reduce `malloc_info` XML to the numbers that decide the question.
 
     Pure and side-effect free ON PURPOSE: the libc call cannot be exercised off
@@ -1410,11 +1410,35 @@ def parse_malloc_info_xml(xml_text: str) -> dict[str, Any] | None:
     }
     if system_current > 0:
         out["free_held_pct"] = round(100.0 * free_held / system_current, 1)
-    # The verdict this exists to produce, stated so a reader does not have to
-    # re-derive the threshold every time. Deliberately coarse: it is a pointer
-    # to the next instrument, not a measurement.
+    # THE COVERAGE GUARD, AND WHY IT EXISTS. First production reading,
+    # refresh-worker 2026-08-14 01:22:54Z:
+    #
+    #   system_current 215.1MB, free_held 60.9%  ->  printed "fragmentation"
+    #   cgroup `anon` at the same instant         ->  ~1893MB
+    #
+    # The allocator accounted for 11% of the process's anonymous memory, and
+    # the verdict described the fragmentation of that 11% as though it were a
+    # statement about the whole. It is a correct number about the wrong
+    # population -- the same shape as every other misread this codebase keeps
+    # recording. Whatever holds the other ~1680MB is not a glibc arena
+    # (`mmapped` was 0.7MB), so no arena metric can speak to it.
+    #
+    # So the verdict is now CONDITIONAL on the arena being representative.
+    # `anon_mb` is optional because the parser stays pure and testable; when a
+    # caller cannot supply it, say `coverage_unknown` rather than guess.
     if out.get("free_held_pct") is not None:
-        out["reads_as"] = ("fragmentation" if out["free_held_pct"] >= 25.0
+        coverage_pct = None
+        if isinstance(anon_mb, (int, float)) and anon_mb > 0:
+            coverage_pct = round(100.0 * out["system_current_mb"] / float(anon_mb), 1)
+            out["arena_coverage_pct"] = coverage_pct
+        if coverage_pct is None:
+            out["reads_as"] = "coverage_unknown"
+        elif coverage_pct < 50.0:
+            # Below half, the arena simply is not where the memory lives, and
+            # neither branch below can be concluded from it.
+            out["reads_as"] = "arena_not_representative"
+        else:
+            out["reads_as"] = ("fragmentation" if out["free_held_pct"] >= 25.0
                            else "live_retention")
     return out
 
@@ -1495,7 +1519,15 @@ def malloc_arena_snapshot() -> dict[str, Any] | None:
             libc.fclose(ctypes.c_void_p(stream))
             if buf:
                 libc.free(buf)
-        return parse_malloc_info_xml(xml_text)
+        # Pair the arena reading with the cgroup number it must be judged
+        # against. Without this the verdict is computed over whatever slice of
+        # memory glibc happens to own -- 11% of it, in the first production
+        # reading.
+        anon_mb = None
+        stat = _read_container_memory_stat()
+        if stat and isinstance(stat.get("anon"), int):
+            anon_mb = stat["anon"] / 1024 / 1024
+        return parse_malloc_info_xml(xml_text, anon_mb=anon_mb)
     except Exception as exc:
         print(f"[memory_observability] MALLOC_INFO_FAILED {type(exc).__name__}: {exc}",
               flush=True)
