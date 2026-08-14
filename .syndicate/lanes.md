@@ -86,10 +86,39 @@
 - Verification: re-fetch the served shortlist after deploy and check the three
   outcomes above; unit tests pinning each fix, mutation-checked (restoring the
   old line must turn exactly that test red).
+- **CHECKPOINT 2026-08-14 — A0 DONE, A1 DONE, A2 DONE, A3/A4 NOT STARTED.
+  NOTHING DEPLOYED, and the exclusion's blast radius is UNMEASURED.**
+  - A1/A2 landed in `recommendation_engine.py` (+186/-28, **uncommitted**):
+    `_model_probability_only` (model-only P(outcome), else None),
+    `_market_fair_probability` (nested quote ONLY), `calculate_edge` and
+    `_repriced_probabilities` priced against no-vig fair and labelled
+    `edge_priced_against`, the same substitution removed from
+    `_tracking_snapshot`'s opening-EV path, and `filter_candidates` now
+    rejecting `no_model_probability` by name.
+  - `tests/test_recommendation_probability_sources.py` (**new, uncommitted**),
+    15 cases, **mutation-pinned**: restoring `confidence` -> 2 red, restoring
+    `score/100 + 0.5` -> 5 red, restoring vigged pricing -> 3 red. 66 green
+    across the lane's set.
+  - **Do NOT deploy before reading the new `FILTER_CANDIDATES` print line.**
+    How many production candidates carry a real `model_probability` is unknown,
+    so how many rows `no_model_probability` removes is unknown. `logger.info`
+    does not reach Render's collector, which is why the line was added.
+  - **Expect NO shortlist change from A1/A2.** The shortlist is priced by
+    `layer2_board` (`quote.fair_method` = `consensus` / `book_margin_model`),
+    not by this module. The lane's stated exit criteria (a)-(c) are written
+    against the shortlist and therefore CANNOT be met by A1/A2 — they belong to
+    A3/A4. Criteria need restating before this lane closes.
+  - Pre-existing failure, proven not mine by re-running it against the pristine
+    file from HEAD: `test_intelligence_state.py::...falls_back_on_empty_pool`
+    asserts `force_refresh=True` on a call `#387` removed. That file belongs to
+    `layer2-board-freshness` — NOT edited. Full run 238 passed / 1 failed.
+  - Next action: A3, informed by A0 — the 100 one-book longshot rows ranked on
+    `-hold`, plus the 33 rows published with a negative `model_edge_pct`.
 - Files (exclusive to this lane):
   - `syndicate/features/shared/recommendation_engine.py`
   - `syndicate/features/shared/layer2_board.py` — A3/A4 only.
-  - `tests/test_recommendation_engine.py`, `tests/test_layer2_board.py`.
+  - `tests/test_recommendation_engine.py`, `tests/test_layer2_board.py`,
+    `tests/test_recommendation_probability_sources.py` (new this session).
   - Collision check 2026-08-14: parsed every OPEN lane's claim block. Claimed
     elsewhere are `scripts/refresh_odds_sources.py` (soccer-odds-coverage),
     `pipeline/intelligence_state.py` (layer2-board-freshness),
@@ -105,6 +134,29 @@
 - Blocked by: none. Independent of Lane B (CLV) by design.
 
 ### soccer-odds-coverage — OPEN — opened 2026-08-14 — session: board-ui
+- **STATUS 2026-08-14 19:0xZ — producer identified, failure mode still
+  unnamed. The reorder shipped by this lane does NOT fix it.**
+  - `phase=pregame` builds 10 odds steps; `phase=live` builds **0**. So
+    refresh-worker's soccer autorun (`phase="live"`) never fetches soccer
+    odds. **The sole producer is `_launch_autorun_soccer_pregame_refresh` on
+    live-odds-worker, 4h cadence.** Single point of failure.
+  - A pregame autorun launched **18:13:14Z**, 31 min after `9a3a5bc6` (the
+    reorder) went live — odds at steps #11-20, not #21-30. 43 min later: zero
+    `game` rows for any league. **Position was never the variable.**
+  - `PROCESS_TREE_MEMORY child_count: 0` at 18:21:34Z — subprocess likely gone
+    ~8 min after launch. One periodic sample; loose bound, not proof.
+  - **BLOCKED ON OBSERVABILITY, not on ideas.** The run's stdout/stderr go to
+    a file on the worker's disk; web cannot read it (`exists=False` from
+    `/api/ops/odds-refresh/logs` is the disk split, NOT missing logs). No
+    error has been seen anywhere in four days.
+- **NEXT ACTION, and it is deliberately small:** make
+  `_launch_autorun_soccer_pregame_refresh` emit its per-step result summary to
+  the worker's OWN stdout, which Render's log API does capture. That converts
+  a four-day silent failure into a visible one. It is worker-path code in
+  `scripts/run_live_odds_refresh_worker.py` — **claimed by OPEN lanes
+  `refresh-worker-anon-leak` / `anon-allocation-site`, so it needs a lane
+  reassignment or their owner.** Do not diagnose further without it; three
+  hypotheses have already died for want of one log line.
 - **ROOT CAUSE FOUND 2026-08-14 18:4xZ, and the lane's whole framing was wrong.
   It is not three leagues. Soccer GAME-odds capture is frozen for ALL of them.**
   Split the shard by `kind` and it is unambiguous:

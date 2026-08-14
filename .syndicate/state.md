@@ -510,6 +510,38 @@ WRONG. Read this first.**
   is a board that LOOKS fresh and is not — strictly worse than one that is
   visibly stale, because nothing on it says so.
 
+## GOAL #1 — A NAMED, UNFIXED INSTANCE OF `#253` `[measured 08-14 18:5xZ]`
+
+- **`#253`'s worker cache bound was applied to MLB ONLY.** MLB has
+  `_MLB_CARDS_CONTEXT_CACHE_MAX_ENTRIES_WORKER = 2` and a `_cards_cache_limit()`
+  that switches on `_render_web_dyno()`. **NBA and WNBA have no worker variant
+  at all** — `_NBA_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32`,
+  `_WNBA_CARDS_CONTEXT_CACHE_MAX_ENTRIES = 32`, assigned unconditionally.
+  `_render_web_dyno()` exists in both files but gates OTHER decisions
+  (date fallbacks), not the cache bound. Same for
+  `_SOCCER_MARKET_BOARD_CACHE_MAX_ENTRIES = 32` and
+  `_JSONL_ROWS_CACHE_MAX_ENTRIES = 32`.
+- **And the 32-entry limit is never reached, so nothing is ever evicted.**
+  Measured 5h: the HYDRATED overview ran **9 times** (72 `OVERVIEW_SPORT_BEGIN
+  skip_game_hydration=False` / 8 sports = 9 each) against 736 cheap
+  fingerprint passes. Nine builds against a 32-entry cache means **every
+  context built is retained for the life of the process.** MLB's limit of 2 caps
+  it; the others do not.
+- **MAGNITUDE IS NOT ESTABLISHED, and this is the honest limit of it.** NBA,
+  NCAAB and NHL are out of season so their contexts are near-empty; WNBA and
+  soccer are live but small (WNBA had 1 game in an earlier sample). This is a
+  named retention with a known mechanism, NOT a demonstrated large one. Do not
+  quote it as MB until somebody sizes a context.
+- **The instrument gap that blocks sizing it, stated so the next reader does not
+  mistake silence for absence:** `_log_cards_context_memory` and the
+  `[mlb_cards]` prints exist ONLY in `syndicate/features/mlb/cards.py`. NBA and
+  WNBA cards emit nothing, so their cache behaviour is invisible in production
+  logs. Zero `[wnba_cards]` lines is a fact about the emitter, not the cache.
+- **The overview's own shape is unchanged and still the big one.** 9 hydrated
+  passes in 5h, each hydrating ALL EIGHT sports including 4 out of season, with
+  peak = SUM not MAX (`handoff_overview_hydration.md`). That remains the
+  architectural fix and it is still unstarted.
+
 ## GOAL #1 (the memory plateau) — what is now ELIMINATED `[measured 08-14 18:3xZ]`
 
 Nothing new is convicted. Four candidates are struck off, which narrows it.
@@ -1115,10 +1147,29 @@ Nothing new is convicted. Four candidates are struck off, which narrows it.
 - **The vendor is NOT the cause.** `/api/ops/oddsapi/sports` (new, read-only):
   all ten soccer keys `listed=True, active=True` out of an 82-entry catalogue.
   `[measured 08-14 18:3xZ]`
-- **WHY the step stopped is UNKNOWN and is the open question.** `[unverified]`
-  Untested lead: `soccer_{league}_odds` is `phases=("pregame",)` while
-  refresh-worker's soccer unit autorun runs `phase="live"` — which would build
-  no odds step at all.
+- **SOCCER GAME ODDS HAVE EXACTLY ONE PRODUCER, and it is not refresh-worker.**
+  `[measured 08-14 18:5xZ, /api/ops/odds-refresh/plan dry_run]`
+  `phase=pregame` builds 50 steps including **10 odds steps**; `phase=live`
+  builds 20 steps and **0 odds steps**. refresh-worker's soccer unit autorun
+  runs `phase="live"`, so **it never fetches soccer odds at all** — by design
+  since `#148`. Everything depends on
+  `_launch_autorun_soccer_pregame_refresh` on live-odds-worker, 4h cadence.
+  **Single point of failure; write this down before theorising again.**
+- **The `#433` step reorder does NOT fix the outage.** `[measured 08-14 18:56Z]`
+  A pregame autorun launched **18:13:14Z**, 31 min after `9a3a5bc6` went live,
+  so odds ran at steps #11-20 instead of #21-30. 43 minutes later: still zero
+  `game` rows for any league. Position was never the variable. The reorder is
+  retained on its own merits (cheap captures should not queue behind ten sims)
+  but must not be credited with fixing capture.
+- **WHY the step fails, or the run exits, is STILL UNKNOWN.** `[unverified]`
+  No error has been observed anywhere. `PROCESS_TREE_MEMORY child_count: 0` at
+  18:21:34Z suggests the subprocess was gone ~8 min after launch, but that is
+  one periodic sample and bounds the lifetime loosely — it is not proof.
+- **The run's own logs are UNREADABLE FROM WEB.** `[measured 08-14 18:5xZ]`
+  `/api/ops/odds-refresh/logs` returns `exists=False` for both lanes with fresh
+  stamps. That is the web/worker **disk split**, not an absence of logs. Do not
+  read it as evidence. The step outcomes must be emitted to the worker's own
+  stdout (which Render's log API does capture) before this is diagnosable.
 - **Two hypotheses are DEAD; do not re-run them.** `[measured 08-14]`
   (1) Step truncation at #27 of 50 — falsified by a single-league scoped run
   (~6 steps) that captured nothing. (2) Three-specific-leagues — all ten are
@@ -1139,3 +1190,32 @@ Nothing new is convicted. Four candidates are struck off, which narrows it.
   7200s, soccer 28800s.
 - Per-sweep MLB cost ~214 credits / 31 calls — **ONE interrupted sample,
   order-of-magnitude only.** `[unverified]`
+
+## The published shortlist's edge numbers (lane `recommendation-lane-correctness`)
+
+- **40% of the published board is ranked on a constant.** All 100 soccer rows on
+  `/api/board/layer2-shortlist` are priced by `book_margin_model` with
+  `books_quoting: 1`. That model is `fair = implied x (1 - hold)`, so `ev_pct`
+  is identically `-assumed_hold_pct` — the book's own margin restated, carrying
+  no information about the bet. Reproduced on **100 of 100 rows, 0 mismatches**;
+  **3 distinct holds underlie 19 distinct `ev_pct` values** (the spread is 4-dp
+  rounding of `fair`, not signal); **all 100 carry a negative `score`**. The
+  value floor cannot reject them — soccer's floor is `-8.1425 = -1.25 x 6.514`
+  and 6.514 is the same modelled hold. `[measured 08-14 18:26Z]`
+- **The model-free half of the board is the longshot half.** Rows without
+  `model_edge_pct`: median **+875**, 82.2% plus-money, p90 +4000. Rows with it:
+  median **+113**, 63.2%. 174 of 250 published rows have negative `ev_pct`
+  (median -6.54). `[measured 08-14 18:26Z]`
+- **The audit's "0.5 coin-flip default" is FALSE as a production mechanism.**
+  `_fair_probability`'s `0.5` terminal is unreachable: every
+  `filter_candidates` call site is fed `_score_candidates` output and
+  `score_candidate` always assigns `score`, so `score/100` fires first. That
+  rung yields fair probabilities of 0.01-0.13 and so a large NEGATIVE edge —
+  model-free candidates were silently REJECTED, not published. Removing only
+  the `0.5` would have been an inert fix. `[measured + from-code 08-14]`
+- The recommendation lane does **not** price the shortlist. Every published row
+  carries `quote.fair_method` = `consensus` or `book_margin_model`. Fixes to
+  `recommendation_engine` should NOT be expected to move the shortlist.
+  `[measured 08-14]`
+- Web service is **`https://syndicate-an21.onrender.com`**
+  (`srv-d88ahvrbc2fs73eodu30`). `syndicate.onrender.com` 404s. `[measured 08-14]`
