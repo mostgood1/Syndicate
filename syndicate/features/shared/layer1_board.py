@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 # THE SHARD IS KEYED BY CAPTURE DATE, NOT BY GAME DATE, and that difference is
@@ -175,6 +175,80 @@ def _row_state(row: Mapping[str, Any]) -> str:
 
 def _row_is_enriched(row: Mapping[str, Any]) -> bool:
     return isinstance(row.get("game"), dict)
+
+
+def _odds_freshness(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """How old the ODDS are, which is not how old the BOARD is (`#430`).
+
+    THE DEFECT THIS ANSWERS, measured on production 2026-08-14 15:00Z, MLB:
+    the artifact's `generated_at` was 14:58:49Z -- 1.6 minutes old -- and the
+    board header said so. The freshest quote observation across all 14 games was
+    **13:09Z, 1h51m earlier**. A reader looking at "built 2m old" has no way to
+    learn that, and the number they need is the one that is missing.
+
+    TWO CLOCKS, AND THE RIGHT ONE IS THE SECOND. `book_grid` computes both and
+    its docstring already explains why they differ:
+
+        age_seconds       time since this price last MOVED
+        seen_age_seconds  time since we last LOOKED at this market
+
+    `book_quotes` is a change log, so a motionless pregame market reads as hours
+    old on the first clock while being perfectly current -- 424-minute NFL
+    medians were once read as a capture outage and were nothing of the kind.
+    "How old are the odds we have from the last odds refresh" is the SECOND
+    clock, so that is what leads here. The first is carried alongside, labelled,
+    because a board where nothing has moved in an hour is still worth seeing.
+
+    RELATIVE TO THE BUILD, NOT TO NOW. Both ages were computed against the
+    worker's clock at artifact-build time, so a stored 30s in an artifact built
+    seven minutes ago means the odds are 7.5 minutes old. This returns the
+    build-relative numbers unchanged and leaves the re-anchoring to the caller,
+    which is the only layer that knows `generated_at`. Getting that backwards
+    would understate every age by exactly the artifact's own age.
+
+    ABSENT IS UNKNOWN, NEVER FRESH. Rows predating last-seen tracking carry no
+    `seen_age_seconds` at all, and `rows_missing_seen_age` is reported rather
+    than silently excluded: a board whose only datable row is also its freshest
+    is a different claim from one where every row agrees.
+    """
+    seen: list[float] = []
+    moved: list[float] = []
+    missing_seen = 0
+    for row in rows:
+        raw_seen = row.get("seen_age_seconds")
+        if isinstance(raw_seen, (int, float)) and not isinstance(raw_seen, bool):
+            seen.append(float(raw_seen))
+        else:
+            missing_seen += 1
+        raw_moved = row.get("age_seconds")
+        if isinstance(raw_moved, (int, float)) and not isinstance(raw_moved, bool):
+            moved.append(float(raw_moved))
+
+    def _median(values: list[float]) -> float | None:
+        if not values:
+            return None
+        ordered = sorted(values)
+        mid = len(ordered) // 2
+        if len(ordered) % 2:
+            return ordered[mid]
+        return (ordered[mid - 1] + ordered[mid]) / 2
+
+    return {
+        # MIN is the headline: the single freshest look anywhere on the board.
+        # It is the most GENEROUS reading available, which is deliberate -- if
+        # even the best row is two hours old, no qualifier rescues the board.
+        "seen_age_seconds_min": min(seen) if seen else None,
+        # And the median, because one fresh row does not make a fresh board.
+        # These were identical on the 08-14 capture (6576.8 both), which is
+        # itself the finding: the whole board refreshes in one sweep, so the
+        # min is not a lucky row -- it is the sweep.
+        "seen_age_seconds_median": _median(seen),
+        "seen_age_seconds_max": max(seen) if seen else None,
+        "rows_with_seen_age": len(seen),
+        "rows_missing_seen_age": missing_seen,
+        # The other clock, never mixed into the fields above.
+        "price_move_age_seconds_min": min(moved) if moved else None,
+    }
 
 
 def _game_key(row: Mapping[str, Any]) -> str:
@@ -478,6 +552,10 @@ def build_layer1_board(
         },
         "enrichment": enrichment,
         "enrichment_detail": enrichment_detail,
+        # Computed over the DATE-SCOPED rows, not the whole grid. A 7-day soccer
+        # window read from one artifact would otherwise report the freshness of
+        # days the caller is not looking at.
+        "odds_freshness": _odds_freshness(rows),
     }
     if not rows:
         # Never an empty list with no explanation. `#296`: a sport with no quotes
@@ -520,4 +598,13 @@ def partition_board_by_state(board: Mapping[str, Any], state: str) -> dict[str, 
         "games_in_view": len(games),
         "rows_in_view": sum(len(game.get("rows") or []) for game in games),
     }
+    # RECOMPUTED FOR THE VIEW, not inherited. `dict(board)` would carry the whole
+    # slate's `odds_freshness` onto a filtered board, and the two genuinely
+    # differ: live games are re-quoted on a tighter cadence than pregame ones, so
+    # the full board's freshest look is frequently a live row that the pregame
+    # view does not contain. Inheriting it would let the pregame board claim a
+    # freshness that belongs to a game it is not showing.
+    out["odds_freshness"] = _odds_freshness(
+        [row for game in games for row in (game.get("rows") or []) if isinstance(row, Mapping)]
+    )
     return out

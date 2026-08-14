@@ -25,6 +25,19 @@
 {% block page_title %}{{ sport|upper }} Betting Board{% endblock %}
 
 {% block extra_head %}
+{#
+  THE RAIL'S STYLESHEET, WHICH THIS PAGE HAS BEEN MISSING SINCE `#329` (`#431`).
+
+  `bet_slip.js` and `ask_bar.js` render `.bet-slip__*` / `.ask-bar__*` markup
+  whose styles live ONLY here. `intelligence.html` loads this file; this page
+  never did -- so the slip rendered as bare unstyled text ("Your slip is empty /
+  Tap Slip on any pick to add it here"), its collapse affordance was invisible
+  because `#bet-slip-panel[data-collapsed]` is defined in this file, and the
+  rail sat permanently at 300px eating board width. The mechanism was wired
+  correctly the whole time; the page just never told the browser what it looks
+  like. Nothing here is edited -- five boards share it -- it is linked.
+#}
+<link rel="stylesheet" href="{{ url_for('static', filename='shared/board_cards.css') }}" />
 <style>
   .l1-wrap { padding: 0 12px 40px; }
   .l1-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
@@ -109,12 +122,43 @@
   .l1-empty code { color: #f0b429; }
 
   /* Bet slip rail. The board and the slip side by side, same as the legacy
-     board -- a pick you cannot stage is a board you can only read. */
+     board -- a pick you cannot stage is a board you can only read.
+
+     COLLAPSIBLE (`#431`), because the board is the wide thing on this page and
+     the rail is not. MLB renders 36 book columns against a 300px fixed rail, so
+     an empty slip was permanently costing a fifth of the viewport and the board
+     scrolled horizontally to pay for it. Collapsed, the rail becomes a 34px
+     spine that still shows the staged count -- hidden entirely would make the
+     slip unreachable, which is a worse trade than the one being fixed. */
   .l1-layout { display: flex; gap: 16px; align-items: flex-start; }
   .l1-main { flex: 1 1 auto; min-width: 0; }
-  .l1-rail { flex: 0 0 300px; position: sticky; top: 10px; }
+  .l1-rail { flex: 0 0 300px; position: sticky; top: 10px; display: flex; flex-direction: column; gap: 14px; }
   .l1-rail h2 { font-size: 13px; color: #8fa2b8; margin: 0 0 8px; }
-  @media (max-width: 1100px) { .l1-layout { display: block; } .l1-rail { width: 100%; margin-top: 16px; position: static; } }
+  .l1-rail__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .l1-rail__toggle {
+    background: #141b25; color: #9fb0c6; border: 1px solid #26313f; border-radius: 6px;
+    padding: 3px 8px; font-size: 11px; cursor: pointer; line-height: 1.4;
+  }
+  .l1-rail__toggle:hover { color: #e8eef7; border-color: #35455a; }
+  .l1-layout[data-rail="collapsed"] .l1-rail { flex-basis: 34px; }
+  /* Everything but the reopen button goes. `display:none` rather than a width
+     transition: the slip's own panels have min-widths that would otherwise
+     force the rail back open from the inside. */
+  .l1-layout[data-rail="collapsed"] .l1-rail__section { display: none; }
+  .l1-layout[data-rail="collapsed"] .l1-rail__head { flex-direction: column; }
+  .l1-layout[data-rail="collapsed"] .l1-rail h2 { display: none; }
+  /* The staged count survives the collapse. A slip you cannot see is fine; a
+     slip you cannot tell is NON-EMPTY is how a staged pick gets forgotten. */
+  .l1-rail__badge {
+    display: none; background: #14532d; color: #bbf7d0; border: 1px solid #166534;
+    border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 700;
+  }
+  .l1-layout[data-rail="collapsed"] .l1-rail__badge[data-count]:not([data-count="0"]) { display: inline-block; }
+  @media (max-width: 1100px) {
+    .l1-layout, .l1-layout[data-rail="collapsed"] { display: block; }
+    .l1-rail { width: 100%; margin-top: 16px; position: static; }
+    .l1-layout[data-rail="collapsed"] .l1-rail__section { display: block; }
+  }
 
   .l1-slip-btn {
     background: #14532d; color: #bbf7d0; border: 1px solid #166534;
@@ -125,6 +169,26 @@
      row still shows the market has that side and the book simply is not
      quoting it -- absence with a reason, same rule as everywhere else here. */
   .l1-slip-btn:disabled { background: #1a2230; color: #47526180; border-color: #26313f; cursor: not-allowed; }
+  /* The main board's per-pick Ask button (`board-action-button--ask`), carried
+     onto every row here. Same `data-ask-action="ask-pick"` contract, same
+     `ask_bar.js` -- glyph-only because a table row has no space for a word. */
+  .l1-ask-btn {
+    background: #1e293b; color: #cbd5e1; border: 1px solid #334155;
+    border-radius: 5px; padding: 2px 7px; font-size: 11px; cursor: pointer; margin-left: 4px;
+  }
+  .l1-ask-btn:hover { background: #273449; color: #fff; }
+
+  /* ODDS AGE, styled as its own claim (`#430`). Deliberately NOT the same
+     colour as the build age beside it: they are different quantities that
+     differed by 1h49m on the capture that prompted this, and rendering them
+     alike is what let the fresh-looking one stand for both. */
+  .l1-odds-age { color: #e8eef7; }
+  .l1-odds-age b { color: #34d399; }
+  .l1-odds-age--warn b { color: #f0b429; }
+  .l1-odds-age--bad b { color: #f87171; }
+
+  /* Book-column set control. */
+  .l1-books-note { color: #6b7d94; font-size: 11px; }
 </style>
 {% endblock %}
 
@@ -153,14 +217,30 @@
   <div class="l1-tabs" id="l1-markets"></div>
   <div class="l1-tabs" id="l1-segments"></div>
   <div class="l1-tabs" id="l1-leagues"></div>
+  <div class="l1-tabs" id="l1-books"></div>
   <div class="l1-tabs" id="l1-games"></div>
   <div class="l1-meta" id="l1-meta"></div>
 
-  <div class="l1-layout">
+  <div class="l1-layout" id="l1-layout">
     <div class="l1-main"><div id="l1-body"></div></div>
     <aside class="l1-rail">
-      <h2>Bet slip</h2>
-      <div id="bet-slip-panel"></div>
+      <div class="l1-rail__head">
+        <span class="l1-rail__badge" id="l1-rail-badge" data-count="0"></span>
+        <button type="button" class="l1-rail__toggle" id="l1-rail-toggle"
+                title="Collapse the rail so the board gets the full width">&raquo;</button>
+      </div>
+      {# Ask the Syndicate, same panel and same script as the main board. It has
+         to be present for the per-row Ask button to have anywhere to render its
+         answer -- `ask_bar.js` writes into `#ask-bar-panel` and silently does
+         nothing without it. #}
+      <section class="l1-rail__section">
+        <h2>Ask the Syndicate</h2>
+        <div id="ask-bar-panel"></div>
+      </section>
+      <section class="l1-rail__section">
+        <h2>Bet slip</h2>
+        <div id="bet-slip-panel"></div>
+      </section>
     </aside>
   </div>
 </div>
@@ -168,9 +248,37 @@
 
 {% block extra_scripts %}
 <script src="{{ url_for('static', filename='shared/bet_slip.js') }}"></script>
+<script src="{{ url_for('static', filename='shared/ask_bar.js') }}"></script>
 <script>
 (function () {
-  var state = { sport: "{{ sport }}", date: "{{ selected_date }}", window: "slate", view: "all", segment: "", league: "{{ initial_league or '' }}", market: "", game: "", sort: { key: null, dir: 1 }, board: null };
+  // DEFAULT BOOK COLUMNS (`#432`). Chosen by the operator on 2026-08-14, not
+  // derived: coverage cannot pick these, because the widest book on the board
+  // is not necessarily one anyone holds an account with. MLB quotes 36 books
+  // today and rendering all 36 made the board scroll sideways past the columns
+  // that matter -- Proj, Edge, Best.
+  //
+  // ORDER IS THE LIST'S, NOT ALPHABETICAL. Alphabetical put betanysports before
+  // draftkings; this puts the majors first, then the sharp/exchange prices, then
+  // the prediction markets, which is the order they are actually read in.
+  //
+  // A FILTER, NEVER A FETCH BOUNDARY. Every book still arrives in the payload
+  // and "All books" is one click -- so a price that exists is never invisible
+  // for want of a preference, it is one toggle away. Persisted per browser.
+  var DEFAULT_BOOKS = [
+    "draftkings", "fanduel", "betmgm", "williamhill_us", "betrivers", "fanatics",
+    "pinnacle", "novig", "prophetx",
+    "kalshi", "polymarket"
+  ];
+  var BOOKS_STORAGE_KEY = "syndicate_l1_books_all_v1";
+  var RAIL_STORAGE_KEY = "syndicate_l1_rail_collapsed_v1";
+  function readFlag(key) {
+    try { return window.localStorage.getItem(key) === "true"; } catch (e) { return false; }
+  }
+  function writeFlag(key, value) {
+    try { window.localStorage.setItem(key, value ? "true" : "false"); } catch (e) { /* private mode */ }
+  }
+
+  var state = { sport: "{{ sport }}", date: "{{ selected_date }}", window: "slate", view: "all", segment: "", league: "{{ initial_league or '' }}", market: "", game: "", sort: { key: null, dir: 1 }, board: null, allBooks: readFlag(BOOKS_STORAGE_KEY) };
 
   function q(id) { return document.getElementById(id); }
   function esc(s) { return String(s === null || s === undefined ? "" : s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
@@ -219,6 +327,15 @@
   }
   function viewerZone() {
     try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) { return ""; }
+  }
+  // "1h51m", not "111m". The board's ages run from seconds to hours and a bare
+  // minute count stops being readable somewhere around the first hour -- which
+  // is exactly the range the odds age lives in when it matters.
+  function fmtAge(minutes) {
+    var m = Math.max(0, Math.round(minutes));
+    if (m < 60) { return m + "m"; }
+    var h = Math.floor(m / 60);
+    return h + "h" + (m % 60 ? (m % 60) + "m" : "");
   }
 
   // The side the PROJECTION describes, not the first side. Mirrors book_grid's
@@ -453,6 +570,55 @@
       bits.push('<span' + (stale ? ' class="l1-warn"' : '') + '>built '
         + esc(String(b.generated_at).slice(11, 19)) + "Z" + ageTxt + "</span>");
     }
+
+    // ODDS AGE, BESIDE BUILD AGE AND NEVER INSTEAD OF IT (`#430`).
+    //
+    // These are two different clocks and the board only ever showed the one that
+    // flatters it. Measured on production 2026-08-14 15:00Z, MLB: `built` read
+    // 2m old while the freshest quote observation on the whole 14-game board was
+    // 13:09Z — 1h51m. The artifact really had just rebuilt; it rebuilt from odds
+    // nobody had refetched in nearly two hours, and "built 2m old" is what a
+    // reader was left to price off.
+    //
+    // `odds_observed_at` is the time we LAST LOOKED at a market, not the time a
+    // price last MOVED — `book_quotes` is a change log, so a motionless pregame
+    // market reads as hours old on the move clock while being perfectly current.
+    // Reading the wrong one here would cry stale on every quiet market.
+    var fr = b.odds_freshness;
+    if (fr && fr.odds_observed_at) {
+      var oddsMin = null;
+      try { oddsMin = (Date.now() - Date.parse(fr.odds_observed_at)) / 60000; } catch (e) { oddsMin = null; }
+      if (oddsMin !== null && isFinite(oddsMin)) {
+        var cls = "l1-odds-age";
+        // 15m: a full odds-refresh cycle plus slack. 45m: past any cadence this
+        // pipeline runs on, so the capture itself is behind.
+        if (oddsMin >= 45) { cls += " l1-odds-age--bad"; }
+        else if (oddsMin >= 15) { cls += " l1-odds-age--warn"; }
+        var medMin = null;
+        if (fr.odds_observed_at_median) {
+          try { medMin = (Date.now() - Date.parse(fr.odds_observed_at_median)) / 60000; } catch (e) { medMin = null; }
+        }
+        var ttl = "Time since we last LOOKED at these markets, not since a price last moved."
+          + " Freshest quote observed " + String(fr.odds_observed_at).slice(11, 19) + "Z"
+          + (medMin !== null && isFinite(medMin) ? "; median row " + fmtAge(medMin) : "")
+          + ". Derived from the artifact's own seen-age, re-anchored to its build time ("
+          + String(fr.artifact_generated_at || "").slice(11, 19) + "Z)."
+          + (fr.rows_missing_seen_age
+              ? " " + fr.rows_missing_seen_age + " of "
+                + (fr.rows_missing_seen_age + fr.rows_with_seen_age)
+                + " rows carry no seen-age and are excluded — unknown, not fresh."
+              : "");
+        bits.push('<span class="' + cls + '" title="' + esc(ttl) + '">odds <b>'
+          + esc(fmtAge(oddsMin)) + "</b> old</span>");
+      }
+    } else if (fr && fr.rows_with_seen_age === 0 && (b.counts || {}).rows) {
+      // UNKNOWN IS SAID, NOT OMITTED. A board with no seen-age tracking at all
+      // would otherwise render exactly like a fresh one — which is the failure
+      // this whole addition exists to stop, reproduced one level down.
+      bits.push('<span class="l1-warn" title="No row on this board carries a'
+        + ' seen-age, so how old these odds are cannot be determined from the'
+        + ' artifact. Not a claim that they are fresh.">odds age unknown</span>');
+    }
     if (b.enrichment && b.enrichment !== "enriched") {
       bits.push('<span class="l1-warn">' + esc(b.enrichment) + "</span>");
     }
@@ -660,10 +826,66 @@
   // The book set is computed PER CARD, from the rows actually shown. A board-wide
   // column set would carry an empty column on every game that does not have that
   // book, and the widest sport (MLB, 37 books) would make every card unreadable.
+  //
+  // `#432` narrows it further to the operator's own books unless "All books" is
+  // on. The intersection is taken with the card's OWN books, so a default book
+  // that is not quoting this game still gets no empty column -- the preference
+  // narrows the set, it never widens it.
   function booksFor(rows) {
     var seen = {};
     rows.forEach(function (r) { (r.books || []).forEach(function (b) { seen[b] = 1; }); });
-    return Object.keys(seen).sort();
+    var present = Object.keys(seen).sort();
+    if (state.allBooks) { return present; }
+    var picked = DEFAULT_BOOKS.filter(function (b) { return seen[b]; });
+    // NEVER AN EMPTY GRID. A card quoted only by books outside the default set
+    // would otherwise render with no price columns at all, which reads as "no
+    // books quote this" -- the opposite of what is true. Fall back to showing
+    // everything and let the count in the strip explain it.
+    return picked.length ? picked : present;
+  }
+
+  // How many books the board is HIDING, counted across the rows on screen. A
+  // filtered view that does not say what it filtered is the silent-truncation
+  // failure this board keeps meeting; here the count is the whole justification
+  // for the toggle existing.
+  function bookCounts() {
+    var seen = {};
+    (((state.board || {}).games) || []).forEach(function (g) {
+      (g.rows || []).forEach(function (r) {
+        if (state.game && String(g.event_id || "") !== state.game) { return; }
+        if (state.market && String(r.market) !== state.market) { return; }
+        if (state.segment && segOf(r) !== state.segment) { return; }
+        (r.books || []).forEach(function (b) { seen[b] = 1; });
+      });
+    });
+    var all = Object.keys(seen);
+    return { total: all.length, shown: DEFAULT_BOOKS.filter(function (b) { return seen[b]; }).length };
+  }
+
+  function renderBooks() {
+    var counts = bookCounts();
+    if (!counts.total) { q("l1-books").innerHTML = ""; return; }
+    var hidden = counts.total - counts.shown;
+    var html = ['<span class="l1-tabs__label">Books</span>',
+      '<span class="l1-tab' + (state.allBooks ? "" : " l1-tab--on") + '" data-books="mine"'
+        + ' title="' + esc(DEFAULT_BOOKS.join(", ")) + '">My books ' + counts.shown + "</span>",
+      '<span class="l1-tab' + (state.allBooks ? " l1-tab--on" : "") + '" data-books="all">All books '
+        + counts.total + "</span>"];
+    if (!state.allBooks && hidden > 0) {
+      html.push('<span class="l1-books-note">' + hidden + " book" + (hidden === 1 ? "" : "s")
+        + " hidden — every price is still in the payload, one click away</span>");
+    }
+    q("l1-books").innerHTML = html.join("");
+    Array.prototype.forEach.call(q("l1-books").querySelectorAll("[data-books]"), function (el) {
+      el.onclick = function () {
+        state.allBooks = el.getAttribute("data-books") === "all";
+        writeFlag(BOOKS_STORAGE_KEY, state.allBooks);
+        // Client-side, same as the market and segment strips: the columns are
+        // already in `cells`, so refetching to widen them would be a round trip
+        // for data the page is holding.
+        render();
+      };
+    });
   }
 
   function rowHtml(r, g, books) {
@@ -818,31 +1040,64 @@
             var ttl = cell.reason ? ' title="' + esc(cell.reason) + '"' : "";
             return '<td class="' + cls + '"' + ttl + '>' + (has ? odds(cell.price) : "·") + "</td>";
           }).join("")
-        + "<td>" + slipButton(r, g, side, best, priced) + "</td>";
-      return "<tr>" + cells + "</tr>";
+        + "<td>" + slipButton(priced) + askButton() + "</td>";
+      // THE CONTEXT MOVED TO THE <tr> (`#431`), and it had to. Both
+      // `bet_slip.js` and `ask_bar.js` resolve a pick with
+      // `button.closest("[data-syndicate-name]")`. The attributes used to sit on
+      // the Slip button itself, where `closest` found them because an element is
+      // its own closest match -- but the Ask button is a SIBLING, so it would
+      // have walked straight past them to the page and staged nothing. On the
+      // row, one set of attributes serves both buttons, which is also how the
+      // main board does it (the attributes are on the card, not the button).
+      return "<tr" + slipAttrs(r, g, side, best) + ">" + cells + "</tr>";
     }).join("");
   }
 
-  // The slip is entirely generic -- it reads `data-syndicate-*` off whatever
-  // element carries the toggle -- so this stages a leg with no changes to
-  // bet_slip.js at all. `selection` is the SIDE, which is the field the ledger
-  // needs to grade a settled prop: it can know the final total and the line,
-  // but not which side was bet.
-  function slipButton(r, g, side, best, priced) {
-    if (!priced) {
-      return '<button class="l1-slip-btn" disabled title="No book is quoting this side">Slip</button>';
-    }
+  // The slip and the ask bar are entirely generic -- both read `data-syndicate-*`
+  // off the nearest ancestor carrying them -- so this serves both with no
+  // changes to `bet_slip.js` or `ask_bar.js` at all. `selection` is the SIDE,
+  // which is the field the ledger needs to grade a settled prop: it can know the
+  // final total and the line, but not which side was bet.
+  //
+  // The three `-sport-slug` / `-matchup` / `-player-name` keys are read only by
+  // `ask_bar.js` (`contextFromCard`) and are what let the briefing name the
+  // fixture instead of asking about a bare "over". `-sport` stays too: the slip
+  // reads that spelling and the ask bar reads the other, and unifying them is a
+  // change to two shared files this lane is not touching.
+  function slipAttrs(r, g, side, best) {
     var name = r.player_name || g.matchup || "";
-    return '<button class="l1-slip-btn" data-slip-action="toggle"'
-      + ' data-syndicate-name="' + esc(name) + '"'
+    return ' data-syndicate-name="' + esc(name) + '"'
       + ' data-syndicate-market="' + esc(r.market) + '"'
       + ' data-syndicate-selection="' + esc(side) + '"'
       + ' data-syndicate-prop-line="' + esc(r.line === null || r.line === undefined ? "" : r.line) + '"'
-      + ' data-syndicate-odds="' + esc(best.price) + '"'
+      + ' data-syndicate-odds="' + esc(best.price === null || best.price === undefined ? "" : best.price) + '"'
       + ' data-syndicate-sport="' + esc(state.sport) + '"'
+      + ' data-syndicate-sport-slug="' + esc(state.sport) + '"'
+      + ' data-syndicate-matchup="' + esc(g.matchup || "") + '"'
+      + (r.player_name ? ' data-syndicate-player-name="' + esc(r.player_name) + '"' : "")
+      + ' data-syndicate-candidate-type="' + esc(r.kind || "") + '"'
       + ' data-syndicate-event-id="' + esc(r.event_id || "") + '"'
-      + ' data-syndicate-game-date="' + esc(state.date) + '"'
-      + ">Slip</button>";
+      + ' data-syndicate-game-date="' + esc(state.date) + '"';
+  }
+
+  function slipButton(priced) {
+    if (!priced) {
+      return '<button class="l1-slip-btn" disabled title="No book is quoting this side">Slip</button>';
+    }
+    return '<button class="l1-slip-btn" data-slip-action="toggle">Slip</button>';
+  }
+
+  // The main board's per-pick Syndicate button, on every line here (`#431`).
+  // Same `data-ask-action="ask-pick"` contract `ask_bar.js` already wires, so
+  // this asks "what's the case for and against <pick>?" against the same
+  // endpoint with the same context keys.
+  //
+  // Enabled even on an unpriced side, unlike Slip: you cannot stage a bet with
+  // no price, but you can certainly ask about one -- "why is nobody quoting
+  // this?" is a real question and the disabled state would refuse it.
+  function askButton() {
+    return '<button class="l1-ask-btn" data-ask-action="ask-pick"'
+      + ' title="Ask the Syndicate about this pick">&#9776;</button>';
   }
 
   var SORT_COLS = [
@@ -938,7 +1193,7 @@
 
   function render() {
     var b = state.board || {};
-    renderViews(); renderMarkets(); renderSegments(); renderLeagues(); renderGames(); renderMeta();
+    renderViews(); renderMarkets(); renderSegments(); renderLeagues(); renderBooks(); renderGames(); renderMeta();
     var games = b.games || [];
     if (!games.length) {
       // NEVER a bare empty state. `#296`: a sport with no quotes must say WHY,
@@ -975,12 +1230,60 @@
       window.SyndicateBetSlip.wireSlipButtons(q("l1-body"));
       window.SyndicateBetSlip.syncSlipButtonStates();
     }
+    // Same re-wire, same reason: the Ask buttons are new DOM on every render, so
+    // wiring them once at load would leave them inert the moment a tab is
+    // clicked or the 60s auto-refresh swaps the board.
+    if (window.SyndicateAskBar) { window.SyndicateAskBar.wireAskButtons(q("l1-body")); }
+    syncRailBadge();
+  }
+
+  // THE RAIL. Collapsed state is a preference, so it is persisted and applied
+  // before the first render rather than after -- applying it later makes the
+  // board visibly reflow on every page load.
+  function applyRail() {
+    var collapsed = readFlag(RAIL_STORAGE_KEY);
+    q("l1-layout").setAttribute("data-rail", collapsed ? "collapsed" : "open");
+    var btn = q("l1-rail-toggle");
+    btn.innerHTML = collapsed ? "&laquo;" : "&raquo;";
+    btn.title = collapsed ? "Show the bet slip and Ask the Syndicate"
+                          : "Collapse the rail so the board gets the full width";
+    syncRailBadge();
+  }
+  // Read out of the slip's OWN storage rather than tracked separately: two
+  // counters for one slip is how they end up disagreeing, and the slip is
+  // written by a shared script this lane does not touch.
+  function syncRailBadge() {
+    var count = 0;
+    try {
+      var raw = window.localStorage.getItem("syndicate_bet_slip_v1");
+      var parsed = raw ? JSON.parse(raw) : [];
+      if (Array.isArray(parsed)) { count = parsed.length; }
+    } catch (e) { count = 0; }
+    var badge = q("l1-rail-badge");
+    badge.setAttribute("data-count", String(count));
+    badge.textContent = count ? count + " staged" : "";
   }
 
   q("l1-sport").onchange = function () { state.sport = this.value; state.league = ""; window.location.href = "/" + state.sport + "/market-board?date=" + state.date; };
   q("l1-date").onchange = function () { state.date = this.value; fetchBoard(); };
   q("l1-window").onchange = function () { state.window = this.value; fetchBoard(); };
   q("l1-refresh").onclick = fetchBoard;
+  q("l1-rail-toggle").onclick = function () {
+    writeFlag(RAIL_STORAGE_KEY, !readFlag(RAIL_STORAGE_KEY));
+    applyRail();
+  };
+  // THE BADGE TRACKS THE SLIP THROUGH EVERY PATH THAT CAN CHANGE IT, and there
+  // are two: staging from a row, and removing/clearing/committing inside the
+  // panel. Both go through `bet_slip.js`, which owns the storage and never calls
+  // back into this page -- so wiring only the panel (as this first did) left the
+  // badge reading empty with a pick staged, which is the one state it exists to
+  // report. Delegated at the container so it survives every re-render.
+  //
+  // Deferred a tick because the click handler that writes localStorage has not
+  // run yet when this one fires.
+  ["bet-slip-panel", "l1-body"].forEach(function (id) {
+    q(id).addEventListener("click", function () { window.setTimeout(syncRailBadge, 0); });
+  });
 
   // AUTO-REFRESH. The board this replaced polled every 60s
   // (`market_board.js`: setInterval(loadGameChips, 60000)) and the swap dropped
@@ -1003,6 +1306,8 @@
   });
 
   if (window.SyndicateBetSlip) { window.SyndicateBetSlip.init(); }
+  if (window.SyndicateAskBar) { window.SyndicateAskBar.init(); }
+  applyRail();
   fetchBoard();
 })();
 </script>
