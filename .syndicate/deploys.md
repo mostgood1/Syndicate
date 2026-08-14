@@ -1106,3 +1106,66 @@ people learn to route around. Run the gate, read it, then deploy.
   step timeout) is still unnamed. This removes the consequence, not the cause;
   a truncating run now loses sims and picks rather than odds.
 - Measured: `<pending>`
+
+- **CLEAN-WINDOW MEASUREMENT 2026-08-14 16:16:56-18:00:49Z (103.9 min, NO
+  intervening deploy — live `294f9ca9` throughout, which contains `530fc5d8`).**
+
+      board refreshes        22   = 12.7/hour     (baseline 5 in 180 min = 1.7/hour)
+        of which fast-path    8   <-- cycles that previously produced NOTHING
+        of which full build  14
+      gaps (min)             min 1.6 / p50 4.2 / max 11.8   (baseline max 104.7)
+      MEMORY_GUARD_ABORT     37   the Layer 1 guard still refusing, as designed
+      LAYER2_GUARD_SKIP       0   <-- the declared FALSIFIER did not fire
+      FAST_REFRESH_FAILED     0   Traceback 0   OOM/restart events 0
+
+  - **The attributable number is the 8 fast-path refreshes.** Those are cycles
+    where the Layer 1 guard refused and the board refreshed anyway — the exact
+    behaviour this change adds, and impossible before it.
+  - **CONFOUND, stated rather than buried: the abort RATE also fell** (146/180min
+    = 48.7/h before, 37/103.9min = 21.4/h now), so this window is under less
+    memory pressure than the baseline. The 7.5x refresh-rate improvement is
+    therefore NOT wholly attributable to this change. The 8 fast-path lines and
+    the absence of any long freeze are.
+  - **SPAN SHORTFALL, stated: 103.9 min against the 3h criterion I set.** A gap
+    as large as the 104.7-min baseline is only barely observable in a 104-min
+    window, so the max-gap comparison is weak here and the RATE comparison is
+    the sound one. Not retro-fitting the criterion to the data: the 3h read is
+    still owed and is armed.
+
+### `#433` — the soccer pregame run reports its own outcome (live-odds-worker, PINNED)
+- Deployed: 2026-08-14 ~14:1x CDT — **row written BEFORE the deploy fired.**
+- Commit: **`ccd10349`** = live commit `9a3a5bc6` **plus only this change**,
+  pushed as `deploy/soccer-run-visibility-433`. Production delta: **one file**,
+  `scripts/run_live_odds_refresh_worker.py`. `main` carries the same patch as
+  `039ce501`.
+- Change: the worker reads the run artifact its own detached child wrote and
+  prints a compact summary to ITS OWN stdout — one `SOCCER_PREGAME_RUN_SUMMARY`
+  line, one line per `_odds` step, one line per failure anywhere, and
+  `SOCCER_PREGAME_RUN_NO_ARTIFACT` when the child wrote nothing at all.
+- **WHY, and it is the whole point of the lane right now.** Soccer game odds
+  stopped 2026-08-10 and produced no visible error for four days — not because
+  anything swallowed an exception, but because `launch_refresh_run` spawns the
+  refresh with `stdout=DEVNULL, stderr=DEVNULL` and the child's log files land
+  on **live-odds-worker's own disk**, which the web service cannot read
+  (`/api/ops/odds-refresh/logs` -> `exists=False` from web, forever). Render
+  captures only a service's OWN stdout. Three hypotheses have died for want of
+  one log line.
+- **Deliberately NOT inheriting the child's stdout.** A 50-step refresh is
+  thousands of lines every 4 hours through the log collector; noise is why
+  nobody reads logs. And `ops_refresh.py` records that making this launch
+  blocking stalled the tick loop and contributed to an OOM — so the reporter
+  reads LAST run's artifact on the NEXT tick and never waits.
+- Expected effect, and it is an OBSERVATION not a repair: within one tick of
+  the next pregame autorun (4h cadence), `SOCCER_PREGAME_RUN_SUMMARY` appears
+  in live-odds-worker's Render logs with per-odds-step outcomes — or
+  `SOCCER_PREGAME_RUN_NO_ARTIFACT` if the child dies first. **This does NOT fix
+  the outage. It makes the failure legible for the first time since 08-10.**
+- Measurement: read live-odds-worker's logs for `SOCCER_PREGAME_RUN_` after the
+  next autorun. Written into this row.
+- Rollback: redeploy `9a3a5bc6` (re-read the live commit first). Print-only
+  change; a rollback restores silence and nothing else.
+- Ledger check: no FORBIDDEN/EXONERATED rule applies; no `render.yaml` change,
+  so no `blueprint_sync`. `run_live_odds_refresh_worker.py` confirmed unclaimed
+  by a `lane-guard.py` stdin probe (exit 0) — the memory lanes mention it in
+  prose, not in a Files block, so no reassignment was needed.
+- Measured: `<pending>`
