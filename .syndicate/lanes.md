@@ -801,6 +801,43 @@ opened, `_fetch_scoreboard` returns None under pytest.
 
 ### quote-join-enrich-cost — FOLLOW-UP 2026-08-14 04:37Z — the fix HOLDS, the workload OUTGREW it
 
+- **UNION-NARROWING ANALYSIS 2026-08-14 05:0xZ — TRACED, NOT SHIPPED. Read the
+  equivalence warning before writing any of it.**
+  - **Where the ~12k rows/call come from.** The union is
+    `by_event | by_player | team_groups`
+    (`odds_book_quotes.py` ~1292-1307). For a GAME row, `wanted_teams` pulls in
+    **every quote row for that game** — every market x every book x every
+    selection. That branch dominates; `by_event` and `by_player` are narrow.
+  - **OPTION A — market prefilter.** The caller already passes `market`. A
+    `by_market` index intersected with the union would cut it by roughly the
+    markets-per-game factor (potentially 10x+).
+    **NOT equivalence-preserving.** Today the order is identity FIRST, then
+    market narrowing with `candidates = narrowed or candidates`. That trailing
+    `or` means a market-vocabulary mismatch **falls back to every row of the
+    game**. Prefiltering by market removes that fallback: rows that today
+    return a same-game quote would return `None`.
+    Arguably MORE correct — but it is a silent-failure join, and the decision
+    to drop the fallback must be made deliberately, not as a side effect of an
+    optimisation.
+  - **OPTION B — skip `team_groups` when `by_event` or `by_player` already hit.**
+    Team matching is the FALLBACK identity signal; when `event_id` matched, its
+    rows are the same game anyway. Same objection: it changes which rows reach
+    `identified`, so it is not equivalence-preserving either.
+  - **WHY NEITHER WAS SHIPPED TONIGHT.** The original `#414` index was safe
+    because it was PROVABLY equivalent — 30+ query shapes asserted identical
+    against a full-scan reference, exercising `by_event`, `by_player`,
+    `by_teams_fallthrough` AND `no_identity`. Both options above deliberately
+    change the identified set, so a differential test cannot pass; they need a
+    test that PINS the new semantics, plus an explicit answer to "is losing the
+    market fallback intended?".
+  - This function's own docstring is the reason for the caution: *"a missing
+    quote is visibly missing, a wrong one silently misprices the card and, once
+    `#213` records it at bet time, poisons CLV."*
+  - **RECOMMENDED ORDER for whoever takes it:** (1) decide the fallback
+    question — it is a product call, not a performance one; (2) write the test
+    that pins the chosen semantics; (3) then implement. Doing 3 first is how a
+    silent mispricing ships.
+
 - **The `#414` index is still doing its job.** 833,619 rows walked against a
   13,215,068-row shard = **6.3% scanned**, ~16x reduction, consistent with the
   21.5x measured at 00:18Z. It has not degraded.
