@@ -43,7 +43,60 @@ per-game enrich from 21-54s to 7-8s in production (21.5x fewer rows walked). Any
 figure predating 2026-08-13 evening describes a board that no longer exists.
 The 23-minute comment almost certainly does.
 
-**NEXT ACTION — no deploy needed.** Instrument the build end-to-end on
+**MEASURED 2026-08-14 04:4xZ FROM INSTRUMENTATION THAT ALREADY EXISTED. Do NOT
+add a BOARD_BUILD_BEGIN/END pair — it would reproduce the very error that makes
+the existing figure misleading.**
+
+`_span` in `pipeline/intelligence_state.py:4231` has emitted `elapsed_s` on
+`BUILD_SPAN_EXIT` since `#376`. The gate never reads it — it infers duration by
+pairing `BUILD_SPAN_ENTER` timestamps against `LAYER2_SHORTLIST`. The data was
+already there.
+
+```
+stage                                 n   median       max     total
+candidate_collection_with_fallback   30     0.00    687.29    2597.2
+odds_history_payloads_by_sport       35     0.00      1.70       8.9
+query_preferences                    35     0.00      0.19       0.6
+```
+
+**`candidate_collection_with_fallback` IS the build cost** — 2597.2s of 2606.7s
+across 30 calls. The other stages are rounding error.
+
+**THE DISTRIBUTION IS BIMODAL, AND THAT RESOLVES ALL THREE FIGURES.** Median
+**0.00s**, max **687.29s (11.5 min)**. Most calls return instantly; a few do
+enormous work. So:
+
+- **~23 min** — plausible for a build whose dominant stage can hit 11.5 min,
+  possibly more than once. Not obviously wrong.
+- **3.2 / 3.7 min** — the gate's `typical=`, computed over a population
+  dominated by the instant short-circuits.
+- **3.96 min** — `#387`'s local overview run, which never took the pathological
+  path.
+
+**None of the three is wrong. They measure different MODES of the same bimodal
+distribution.** A median over that mix is meaningless, which is exactly why
+`typical=` misleads a deploy decision.
+
+**Why it is bimodal fits the rest of the night:** when `#387` starves the
+overview, `collect_candidates` receives an empty pool and returns immediately;
+when it does not, the full cost lands. The 97-of-100 empty overviews and the
+0.00s median are the same fact seen from two directions.
+
+**REVISED NEXT ACTION.** Not more instrumentation — the spans are adequate.
+Change how the gate READS them:
+1. `_expected_build_seconds` must stop using a central measure. Use a high
+   percentile (p90), or report both modes explicitly.
+2. Treat the empty-pool short-circuit as a NON-BUILD rather than a fast build,
+   or it keeps dragging the estimate toward zero. A build that produced no
+   shortlist is not a 0.00s build.
+3. Only then reconcile or retire the ~23 min comment.
+
+**Caveats.** 100 log lines is ONE window, so these 30 calls are not necessarily
+representative. And `candidate_collection_with_fallback` is a wrapper — the
+687s is somewhere INSIDE it, and the existing spans do not decompose further.
+That decomposition is the only place new instrumentation would earn its cost.
+
+**(superseded) NEXT ACTION — no deploy needed.** Instrument the build end-to-end on
 refresh-worker: one `BOARD_BUILD_BEGIN` / `BOARD_BUILD_END` pair with elapsed
 seconds and the sport count, so `typical=` stops being derived from inference.
 Then reconcile or retire the 23-minute comment. Until then, treat the gate's
