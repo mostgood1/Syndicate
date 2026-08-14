@@ -799,6 +799,38 @@ conftest fixture, so the index's own caching/keying still runs under test and
 only the socket is removed. Positive control written and run: no sockets
 opened, `_fetch_scoreboard` returns None under pytest.
 
+### quote-join-enrich-cost — FOLLOW-UP 2026-08-14 04:37Z — the fix HOLDS, the workload OUTGREW it
+
+- **The `#414` index is still doing its job.** 833,619 rows walked against a
+  13,215,068-row shard = **6.3% scanned**, ~16x reduction, consistent with the
+  21.5x measured at 00:18Z. It has not degraded.
+- **But per-game cost is climbing again: 7-8s -> 14.70s.** Fresh MLB readings:
+  ```
+  04:37:09  total 14.70s  walked  833,619  shard 13,215,068  calls 69
+  04:29:34  total  9.12s  walked  760,417  shard 12,832,072  calls 44
+  04:15:55  total  4.76s  walked   16,642  shard     49,172  calls  2
+  ```
+- **TWO separable drivers, and neither is the index failing:**
+  1. **Call count 20 -> 69 per game.** More candidates enriched — good for board
+     richness, linear in cost.
+  2. **Cost per call 0.2755 -> 0.7346s (2.7x).** The shard grew again:
+     **~191k rows/call now**, against ~216k earlier and ~83k yesterday
+     afternoon. 6.3% of a bigger shard is still more rows.
+- `join` is **14.69 of 14.70s**; `post`, `score` and `unattributed_s` are all
+  0.00. The segment split is clean and the join is the entire cost — same shape
+  as before the fix, at a lower level.
+- The two small games at 04:15 (3.95s / 4.76s on a 49,172-row shard) confirm
+  cost tracks shard size closely, which is what a join-dominated profile
+  predicts.
+- **NEXT LEVER, unchanged from what this lane already named: the residual ~12k
+  rows walked PER CALL.** Indexing removed the full-shard scan; what remains is
+  a linear pass over the candidate union, and at 69 calls a game that is ~833k
+  row visits per game. Narrowing the union, or making the per-row test cheaper,
+  is the remaining work.
+- **Do not read this as a regression of the fix.** Without the index those same
+  games would walk 13.2M rows instead of 833k. The lane's verification stands;
+  this records that the win is real and eroding under growth.
+
 ### quote-join-enrich-cost — PRODUCTION RESULT IN 2026-08-14 00:18Z — the index works, 21.5x measured
 
 - **Both profilers fired at 00:11:15 and 00:18:46Z**, after
