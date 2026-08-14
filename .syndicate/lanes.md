@@ -6,7 +6,37 @@
 
 ## OPEN
 
-### projection-degeneracy-detector — OPEN — opened 2026-08-14 — session: nfl-day-of-game
+### projection-degeneracy-detector — CLOSED-VERIFIED 2026-08-14 — opened 2026-08-14 — session: nfl-day-of-game
+
+**OUTCOME — the lane's stated testable outcome, met.** A synthetic constant
+slate is flagged with sport, market and value; a varying slate is not; and the
+check runs on all seven producers without touching any of them.
+
+Shipped `2e4e2544`. **NOT DEPLOYED** — committed and pushed only.
+
+    real failure shape (16 games x 3 markets, the 2026-08-13 constants)
+      -> 2 groups flagged, games=16 correctly counted despite 32 alt-line rows
+    22 tests, falsification cases outnumbering positive ones
+
+- Design held exactly as recorded at open: wrapper over
+  `_attach_projections_by_sport`, 13 return sites and 4 call sites untouched,
+  games counted not rows, `projected_raw` preferred, threshold >= 4 games.
+- `.current-lane` was claimed BRIEFLY and RESTORED to `anon-allocation-site`.
+  The pre-open check that said the marker was unnecessary was correct WHEN
+  TAKEN and became false the moment this lane claimed the file — a guard's
+  input changes when you change the guard's configuration. Re-run such checks
+  after opening a lane, not before.
+- **`#425` IS ONLY HALF CLOSED, and the lane says so rather than the ticket
+  quietly aging:** gap 2 (degeneracy detection) is done; gap 1 (skill
+  annotation on six builders) is untouched and needs six measured backtests,
+  which is modelling work and not plumbing. `#425` stays OPEN for it.
+- Pre-existing, NOT caused here, NOT fixed here:
+  `tests/test_layer2_projection_carry.py` has **4 failures**, verified
+  identical with this change stashed. Unowned.
+- Files released: `syndicate/features/shared/board_enrichment.py`,
+  `tests/test_projection_degeneracy.py`.
+
+### projection-degeneracy-detector — CLOSED-VERIFIED — superseded header, kept for the file/line map
 - Goal: `#425`. A projection that has collapsed to ONE value across a slate is
   detected and reported for **every** sport, not just the one where a human
   happened to notice. Testable outcome: a synthetic constant slate is flagged
