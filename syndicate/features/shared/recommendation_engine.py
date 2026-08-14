@@ -287,6 +287,8 @@ def _repriced_probabilities(candidate: Mapping[str, Any], *, model_probability: 
             "odds": None,
             "market_probability": None,
             "implied_probability": None,
+            "market_fair_probability": None,
+            "edge_priced_against": None,
             "edge": None,
             "edge_pct": None,
             "expected_value": None,
@@ -297,27 +299,43 @@ def _repriced_probabilities(candidate: Mapping[str, Any], *, model_probability: 
             "odds": current_odds,
             "market_probability": None,
             "implied_probability": None,
+            "market_fair_probability": None,
+            "edge_priced_against": None,
             "edge": None,
             "edge_pct": None,
             "expected_value": None,
         }
 
+    # `confidence` is NOT a probability -- see `_model_probability_only`. It was
+    # the last rung here too, so a scoring artefact could stand in for the model
+    # on this path even after `_fair_probability` was fixed. `fair_probability`
+    # is dropped for the same reason: it is the MARKET's de-vigged fair, copied
+    # to the candidate's top level by `quote_enrichment`, so using it here made
+    # `edge` a restatement of the hold rather than a model-vs-market gap.
     resolved_model_probability = _coerce_probability(model_probability)
     if resolved_model_probability is None:
-        resolved_model_probability = _coerce_probability(candidate.get("model_probability"))
-    if resolved_model_probability is None:
-        resolved_model_probability = _coerce_probability(candidate.get("fair_probability"))
-    if resolved_model_probability is None:
-        resolved_model_probability = _coerce_probability(candidate.get("confidence"))
+        resolved_model_probability = _model_probability_only(candidate)
+
+    # `#238` applied to this lane. The raw price still carries the book's
+    # margin; comparing a model probability to it is wrong by roughly half the
+    # hold, systematically and in one direction. Use the no-vig fair when the
+    # market has one and say so, exactly as `quote_enrichment` does.
+    market_fair, market_fair_method = _market_fair_probability(candidate)
+    if market_fair is not None:
+        priced_against_probability = market_fair
+        priced_against = "modelled_no_vig_fair" if market_fair_method == "book_margin_model" else "no_vig_fair"
+    else:
+        priced_against_probability = implied_probability
+        priced_against = "vigged_current_price"
 
     expected_value = _coerce_float(candidate.get("expected_value"))
     edge = _coerce_float(candidate.get("edge"))
     edge_pct = _coerce_float(candidate.get("edge_pct"))
-    if implied_probability is not None and resolved_model_probability is not None:
-        edge = round(resolved_model_probability - implied_probability, 4)
+    if priced_against_probability is not None and resolved_model_probability is not None:
+        edge = round(resolved_model_probability - priced_against_probability, 4)
         edge_pct = round(edge * 100.0, 2)
-        if implied_probability > 0.0:
-            expected_value = round((resolved_model_probability / implied_probability) - 1.0, 4)
+        if priced_against_probability > 0.0:
+            expected_value = round((resolved_model_probability / priced_against_probability) - 1.0, 4)
     elif edge is None:
         edge = _coerce_float(candidate.get("edge"))
 
@@ -325,6 +343,8 @@ def _repriced_probabilities(candidate: Mapping[str, Any], *, model_probability: 
         "odds": current_odds,
         "market_probability": implied_probability,
         "implied_probability": implied_probability,
+        "market_fair_probability": market_fair,
+        "edge_priced_against": priced_against,
         "edge": edge,
         "edge_pct": edge_pct,
         "expected_value": expected_value,
@@ -345,13 +365,14 @@ def _tracking_snapshot(
             open_ev = round(float(ev_pct) / 100.0, 4)
     if open_ev is None:
         open_implied_for_ev = _parse_american_odds(open_odds)
+        # Third site of the same substitution -- `confidence` and the market's
+        # own `fair_probability` both dropped here for the reasons in
+        # `_model_probability_only`. This one feeds the OPENING EV that CLV is
+        # later measured from, so a fabricated number here would contaminate
+        # the very measurement the audit's Lane B exists to produce.
         resolved_model_probability = _coerce_probability(model_probability)
         if resolved_model_probability is None:
-            resolved_model_probability = _coerce_probability(candidate.get("model_probability"))
-        if resolved_model_probability is None:
-            resolved_model_probability = _coerce_probability(candidate.get("fair_probability"))
-        if resolved_model_probability is None:
-            resolved_model_probability = _coerce_probability(candidate.get("confidence"))
+            resolved_model_probability = _model_probability_only(candidate)
         if open_implied_for_ev is not None and resolved_model_probability is not None and open_implied_for_ev > 0.0:
             open_ev = round((float(resolved_model_probability) / float(open_implied_for_ev)) - 1.0, 4)
     if open_ev is None:
@@ -674,20 +695,108 @@ def _market(candidate: Mapping[str, Any]) -> str:
     return str(market).strip().lower() or "market"
 
 
-def _fair_probability(candidate: Mapping[str, Any]) -> float:
-    for key in ("fair_probability", "model_probability", "confidence"):
-        probability = _coerce_probability(candidate.get(key))
-        if probability is not None:
-            return probability
-    score = _coerce_float(candidate.get("score"))
-    if score is not None:
-        return max(0.01, min(0.99, score / 100.0))
-    return 0.5
+def _market_fair_probability(candidate: Mapping[str, Any]) -> tuple[float | None, str | None]:
+    """The MARKET's no-vig fair probability, and how it was derived.
+
+    Kept separate from the model's probability because they are different
+    quantities that this module used to read out of the same key. `#238`'s
+    de-vig writes `fair_probability` onto the quote, and `quote_enrichment`'s
+    `_FLAT_QUOTE_FIELDS` copies it up to the candidate's TOP LEVEL under that
+    same name -- so `candidate["fair_probability"]` on any quote-enriched
+    candidate is the market's fair value, not a model output. Reading it as
+    "the model's fair probability" (which `_fair_probability` did, first in its
+    chain) makes the edge a pure line-shopping signal wearing a model's label.
+
+    The method travels with the number, because `book_margin_model`'s own
+    docstring is explicit that a modelled fair value must never be silently
+    mixed with a measured two-sided one.
+
+    READS THE NESTED QUOTE ONLY, never the flattened top-level
+    `fair_probability`. That key is genuinely ambiguous: `quote_enrichment`
+    flattens the MARKET's fair value into it, and `rank_recommendations` writes
+    the MODEL's probability into the same key on its own output. Reading it
+    here made a recommendation compare a model against itself -- caught by
+    `test_rank_recommendations_reprices_live_current_odds`, which went to
+    `expected_value 0.0` because `0.6 / 0.6 - 1 == 0`. Nothing is lost by
+    ignoring it: `quote_enrichment` sets `row["quote"]` before it flattens, so
+    the nested dict is present wherever the flat keys are.
+    """
+    quote = _copy_mapping(candidate.get("quote"))
+    probability = _coerce_probability(quote.get("fair_probability"))
+    if probability is None:
+        return (None, None)
+    method = str(quote.get("fair_method") or "").strip() or None
+    return (probability, method)
+
+
+def _model_probability_only(candidate: Mapping[str, Any]) -> float | None:
+    """P(outcome) as a MODEL stated it, or None. No substitutes.
+
+    `#428`/audit 2026-08-14 fix 4. The chain this replaces was
+    `fair_probability -> model_probability -> confidence -> score/100 -> 0.5`,
+    and every rung after the second was wrong in a different way:
+
+    - `fair_probability` is the MARKET's de-vigged fair (see above), not a
+      model. It sat FIRST, so on every quote-enriched candidate the "model"
+      probability was the market's own number and the resulting edge measured
+      only whether this book beat consensus.
+    - `confidence` is a scoring artefact. `score_candidate` derives it from
+      `source_strength` plus readiness/movement bonuses; it is a measure of how
+      much we trust the INPUT, not of how often the bet wins. Consumed here it
+      manufactured a large positive edge: 0.85 confidence against a +150 price
+      reads as +45 points of edge, against a threshold of 0.0.
+    - `score/100` is not a probability at all. `score_candidate` computes
+      `edge x confidence - tier_penalty`, which is unbounded and routinely
+      negative. Measured this session with the real function: a typical
+      score of 4.05 yields fair_prob 0.0405 and an edge of -0.36; a negative
+      score clamps to 0.01. So model-free candidates were not "treated as a
+      coin flip" -- they were silently rejected by a meaningless negative
+      edge, with no reason ever recorded.
+    - `0.5` was UNREACHABLE in the real pipeline. Every call site of
+      `filter_candidates` is fed `_score_candidates` output, and
+      `score_candidate` always assigns `score` (intelligence.py, end of the
+      function), so the `score/100` rung always fired first. The audit's
+      headline claim that a 0.5 coin-flip default clears a 0.0 threshold does
+      not survive contact with the pipeline; removing only the 0.5 would have
+      been an inert fix.
+
+    A candidate with no model probability now returns None and is EXCLUDED by
+    name in `filter_candidates`, rather than being priced off a scoring
+    artefact. `_probability_from_simulation_payload` stays in the chain because
+    a sim payload IS a model output.
+    """
+    probability = _coerce_probability(candidate.get("model_probability"))
+    if probability is not None:
+        return probability
+    return _probability_from_simulation_payload(candidate)
+
+
+def _fair_probability(candidate: Mapping[str, Any]) -> float | None:
+    """Back-compat alias. Returns None where it used to invent a number."""
+    return _model_probability_only(candidate)
 
 
 def calculate_edge(candidate: Mapping[str, Any], *, fair_probability: float | None = None, implied_probability: float | None = None) -> dict[str, Any]:
+    """Model edge, priced against the no-vig fair when one exists.
+
+    `#238`: comparing a model probability to a raw book price overstates or
+    understates edge by roughly half the hold (measured median hold 6.25%, so
+    ~3.1 points) -- the difference between clearing a threshold and being
+    dropped. That was fixed in `prop_projections`, `nfl_game_projections`,
+    `soccer_projections` and `quote_enrichment` and left live here.
+
+    `quote_enrichment._model_edge_pct(model_prob, fair_prob)` is the repo's
+    already-correct formula for this; this function now computes the same
+    comparison. When no opposing side exists there is no fair value, so the
+    vigged price is used and LABELLED rather than silently mixed in -- the same
+    keep-but-label choice `quote_enrichment` makes at its `vigged_best_price`
+    branch.
+    """
     base_candidate = _copy_mapping(candidate)
-    fair_probability_value = fair_probability if fair_probability is not None else _fair_probability(base_candidate)
+    fair_probability_value = fair_probability if fair_probability is not None else _model_probability_only(base_candidate)
+
+    market_fair, market_fair_method = _market_fair_probability(base_candidate)
+
     if implied_probability is None:
         implied_probability = _coerce_probability(base_candidate.get("implied_probability"))
     if implied_probability is None:
@@ -695,14 +804,26 @@ def calculate_edge(candidate: Mapping[str, Any], *, fair_probability: float | No
         implied_probability = _coerce_probability(market_context.get("implied_probability"))
     if implied_probability is None:
         implied_probability = _parse_american_odds(base_candidate.get("odds"))
+
+    # Price the model against the no-vig fair where one exists; fall back to the
+    # vigged price only when it does not, and say which happened.
+    if market_fair is not None:
+        priced_against_probability = market_fair
+        priced_against = "modelled_no_vig_fair" if market_fair_method == "book_margin_model" else "no_vig_fair"
+    else:
+        priced_against_probability = implied_probability
+        priced_against = "vigged_current_price" if implied_probability is not None else None
+
     edge = None
-    if fair_probability_value is not None and implied_probability is not None:
-        edge = round(float(fair_probability_value) - float(implied_probability), 4)
-    elif _coerce_float(base_candidate.get("edge")) is not None:
+    if fair_probability_value is not None and priced_against_probability is not None:
+        edge = round(float(fair_probability_value) - float(priced_against_probability), 4)
+    elif fair_probability_value is None and _coerce_float(base_candidate.get("edge")) is not None:
         edge = round(float(_coerce_float(base_candidate.get("edge")) or 0.0) / 100.0, 4)
     return {
-        "fair_probability": round(float(fair_probability_value), 4),
+        "fair_probability": round(float(fair_probability_value), 4) if fair_probability_value is not None else None,
         "implied_probability": round(float(implied_probability), 4) if implied_probability is not None else None,
+        "market_fair_probability": round(float(market_fair), 4) if market_fair is not None else None,
+        "edge_priced_against": priced_against,
         "edge": edge,
     }
 
@@ -1206,6 +1327,27 @@ def filter_candidates(
         fair_probability = edge_data["fair_probability"]
         implied_probability = edge_data["implied_probability"]
         edge = edge_data["edge"]
+        # Exclude by NAME, not by arithmetic. Before this, a candidate with no
+        # model probability still got one -- `score/100`, an unbounded scoring
+        # artefact -- which produced a large negative edge and dropped the row
+        # at the threshold below with `reason: "edge_below_threshold"`. That
+        # reason was false: the edge was never measured. A rejection that
+        # misreports its own cause is worse than a missing one, because it
+        # makes the shortlist's own diagnostics argue that the model
+        # disagreed when no model ever ran.
+        if fair_probability is None:
+            rejected.append(
+                {
+                    "sport": candidate_sport_slug,
+                    "name": _selection(candidate),
+                    "market": market,
+                    "is_live": candidate_is_live,
+                    "reason": "no_model_probability",
+                }
+            )
+            if rejected_sink is not None:
+                rejected_sink.append({**candidate, "_shadow_rejection_reason": "no_model_probability"})
+            continue
         reliability_multiplier = float(sport_profile.get("reliability_multiplier") or 1.0) * float(market_profile.get("reliability_multiplier") or 1.0)
         calibration_error = float(market_profile.get("calibration_error") or sport_profile.get("calibration_error") or 0.0)
         market_roi = _coerce_float(market_profile.get("metrics", {}).get("roi"))
@@ -1293,6 +1435,22 @@ def filter_candidates(
             }
         )
         filtered.append(_standardize_recommendation_fields(enriched, edge=edge, fair_probability=fair_probability, implied_probability=implied_probability))
+    # ONE line, unconditional, via print -- `logger.info` does not reach
+    # Render's log collector (CLAUDE.md states this outright), so the
+    # `rejected_reasons` block below is invisible in production, which is where
+    # the `no_model_probability` exclusion has to be measured before it can be
+    # trusted. Bounded on purpose: a summary per CALL, never per candidate.
+    if rejected:
+        reason_counts: dict[str, int] = {}
+        for item in rejected:
+            reason_key = str(item.get("reason") or "unknown")
+            reason_counts[reason_key] = reason_counts.get(reason_key, 0) + 1
+        print(
+            f"[recommendation_engine] FILTER_CANDIDATES sport={sport or 'all'} "
+            f"in={len(candidate_rows)} out={len(filtered)} "
+            f"rejected={json.dumps(reason_counts, sort_keys=True)}",
+            flush=True,
+        )
     if logger.isEnabledFor(logging.INFO):
         before_rows = candidate_rows
         after_rows = filtered
