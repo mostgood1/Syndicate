@@ -3230,11 +3230,267 @@ def _nfl_preseason_matchup_evidence(question: str, context: dict[str, Any]) -> d
 
 
 # ---------------------------------------------------------------------------
+# The published board, for every sport (`M1`)
+# ---------------------------------------------------------------------------
+
+# Markets a question can name, mapped to the substring that identifies them on
+# a shortlist row. Coarse on purpose: this narrows a ranked list, it does not
+# resolve an entity.
+_BOARD_MARKET_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("total_bases", ("total bases", "total base")),
+    ("batter_rbis", ("rbi", "rbis")),
+    ("batter_home_runs", ("home run", "home runs")),
+    ("player_points", ("points prop", "points props")),
+    ("player_rebounds", ("rebound", "rebounds")),
+    ("player_assists", ("assist", "assists")),
+    ("player_shots", ("shots", "shot")),
+    ("goal_scorer", ("scorer", "goalscorer", "anytime")),
+    ("spreads", ("spread", "spreads", "handicap")),
+    ("h2h", ("moneyline", "money line", "h2h")),
+    ("totals", ("total", "totals", "over/under")),
+)
+
+_BOARD_RANKING_HINTS = (
+    "best", "top", "biggest", "most", "highest", "largest", "rank", "ranked",
+    "ranking", "leaders", "leaderboard", "value", "edges", "edge", "every",
+    "all", "which", "list", "show",
+)
+
+
+def _board_ranking_intent(question: str, words: set[str]) -> bool:
+    """Whether the question asks to RANK or FILTER rather than look one thing up.
+
+    Deliberately broader than `_is_ranking_intent_question`, which asks "does
+    this name an MLB prop market". This asks "is this an aggregation question
+    at all", which is sport-independent.
+    """
+    if _is_ranking_intent_question(words):
+        return True
+    normalized = f" {str(question or '').lower()} "
+    return any(f" {hint} " in normalized for hint in _BOARD_RANKING_HINTS)
+
+
+def _board_min_edge_pct(question: str) -> float | None:
+    """`"edge over 5 percent"` -> 5.0. None when the question sets no floor."""
+    match = re.search(
+        r"(?:over|above|more than|at least|greater than|>)\s*(\d+(?:\.\d+)?)\s*(?:%|percent|pct|points?)",
+        str(question or ""),
+        re.IGNORECASE,
+    )
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
+def _board_market_filter(question: str) -> str | None:
+    normalized = f" {str(question or '').lower()} "
+    for market_key, needles in _BOARD_MARKET_HINTS:
+        if any(needle in normalized for needle in needles):
+            return market_key
+    return None
+
+
+def _board_row_label(row: dict[str, Any]) -> str:
+    player = str(row.get("player_name") or "").strip()
+    side = str(row.get("side") or "").strip()
+    line = row.get("line")
+    if player:
+        parts = [player]
+        if side:
+            parts.append(side)
+        if line is not None:
+            parts.append(str(line))
+        return " ".join(parts)
+    away, home = str(row.get("away_team") or ""), str(row.get("home_team") or "")
+    matchup = f"{away} @ {home}".strip(" @")
+    label = f"{side} {line}".strip()
+    return f"{label} ({matchup})" if matchup else label
+
+
+def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
+    """Rank and filter THE WHOLE PUBLISHED BOARD, for any sport (`M1`).
+
+    **THE PROBLEM THIS EXISTS FOR.** Measured 2026-08-14, the funnel behind an
+    aggregation question was 14,216 opportunities considered -> 200 published ->
+    145 in the snapshot -> a 12-row evidence-pack ceiling -> **5 rows returned**.
+    "Show me every play with an edge over 5 percent" was answered from a fixed
+    prefix of a pre-ranked list, which is not an aggregation primitive. And
+    every sport except MLB had no ranking path at all: `_fetchers_for_sport`
+    sends ranking questions to `_mlb_top_candidates_evidence`, which requires
+    `_detect_mlb_market` and reads MLB artifact paths.
+
+    **WHY IT READS THE SHORTLIST ARTIFACT AND NOT THE SNAPSHOT.** Two reasons,
+    either sufficient:
+
+      * It is the SAME artifact `/api/board/layer2-shortlist` serves, so chat
+        and the cards stop being able to disagree. They did: measured at one
+        instant, chat reported a top edge of 5.02% while the board served
+        13.59%, because they read different pools. Sharing the source fixes
+        that by construction rather than by keeping two paths in sync.
+      * `read_layer2_shortlist` is a pure `read_json_file` -- no compute -- so
+        it is legal on the web request path under the standing rule that
+        request handlers read precomputed artifacts and never recompute.
+
+    **COUNTS ARE RETURNED, NOT JUST ROWS.** An aggregation question needs a
+    denominator: "12 of 156 published rows clear 5%" is an answer, "here are 5
+    rows" is not.
+
+    Returns None -- not an empty table -- when the artifact is absent or the
+    question is not an aggregation, so `collect_focused_evidence` merges only
+    real sections.
+    """
+    words = _question_words(question)
+    if not _board_ranking_intent(question, words):
+        return None
+
+    from pipeline.intelligence_state import read_layer2_shortlist
+    from syndicate.features.shared.timezone import central_today_iso
+
+    selected_date = str(context.get("selected_date") or "").strip() or central_today_iso()
+    payload = read_layer2_shortlist(selected_date)
+    if not isinstance(payload, dict):
+        return None
+    rows = [row for row in (payload.get("rows") or []) if isinstance(row, dict)]
+    if not rows:
+        return None
+
+    total_published = len(rows)
+    sport = str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
+    filters: list[str] = []
+
+    if sport:
+        # EXACT match, not the substring test `build_evidence_pack` uses --
+        # `"nba" in "wnba"` is True and silently answers NBA questions with
+        # WNBA rows.
+        #
+        # An empty result is REPORTED, not silently widened back to every
+        # sport. "no NHL rows on today's board" is a true and useful answer;
+        # showing MLB rows instead is not.
+        rows = [row for row in rows if str(row.get("sport") or "").strip().lower() == sport]
+        filters.append(f"sport={sport}")
+
+    market_filter = _board_market_filter(question)
+    if market_filter:
+        narrowed = [row for row in rows if market_filter in str(row.get("market") or "").lower()]
+        # A market filter that matches nothing DOES fall back, unlike the sport
+        # filter above: a market hint is guessed from prose, while the sport
+        # came from context. Fewer correctly-sported rows beats none.
+        if narrowed:
+            rows = narrowed
+            filters.append(f"market~{market_filter}")
+
+    min_edge = _board_min_edge_pct(question)
+    if min_edge is not None:
+        rows = [
+            row for row in rows
+            if isinstance(row.get("model_edge_pct"), (int, float)) and float(row["model_edge_pct"]) >= min_edge
+        ]
+        filters.append(f"model_edge>={min_edge}%")
+
+    matched = len(rows)
+    as_of = payload.get("written_at") or selected_date
+    if not matched:
+        return {
+            "evidence": {
+                "source": "layer2_shortlist",
+                "as_of": as_of,
+                "total_published": total_published,
+                "matched": 0,
+                "filters": filters,
+                "note": "nothing on the published board matches this question",
+            },
+            "tables": [], "charts": [], "as_of": selected_date, "sport": sport or None,
+        }
+
+    # Rank on the model's disagreement with the market where it exists, and on
+    # EV where it does not. Measured 2026-08-14: only 57 of 200 published rows
+    # carry `model_edge_pct` at all, so ranking on it alone would silently drop
+    # three quarters of the board -- including all of soccer and all of WNBA.
+    def _rank_key(row: dict[str, Any]) -> tuple[int, float]:
+        edge = row.get("model_edge_pct")
+        if isinstance(edge, (int, float)):
+            return (1, float(edge))
+        ev = row.get("ev_pct")
+        return (0, float(ev) if isinstance(ev, (int, float)) else float("-inf"))
+
+    rows.sort(key=_rank_key, reverse=True)
+    top = rows[:15]
+
+    table_rows = []
+    for row in top:
+        edge = row.get("model_edge_pct")
+        ev = row.get("ev_pct")
+        table_rows.append([
+            str(row.get("sport") or "").upper(),
+            str(row.get("market") or ""),
+            _board_row_label(row),
+            f"{float(ev):+.2f}%" if isinstance(ev, (int, float)) else "-",
+            f"{float(edge):+.2f}%" if isinstance(edge, (int, float)) else "no model",
+        ])
+
+    scope = ", ".join(filters) if filters else "whole board"
+    tables = [{
+        "title": f"Published board — {scope} ({matched} of {total_published} rows)",
+        "columns": ["Sport", "Market", "Selection", "EV", "Model edge"],
+        "rows": table_rows,
+    }]
+    points = [
+        {"x": _board_row_label(row)[:28], "y": round(float(row["model_edge_pct"]), 2)}
+        for row in top if isinstance(row.get("model_edge_pct"), (int, float))
+    ]
+    # No row in the result carries a model number, so a "top edges" chart would
+    # be an empty frame implying we had nothing to say. Drop it and let the
+    # table -- which says `no model` per row -- stand on its own.
+    charts = [{
+        "type": "bar",
+        "title": f"Top edges — {scope}",
+        "x_label": "Selection",
+        "y_label": "Model edge %",
+        "points": points,
+    }] if points else []
+
+    return {
+        "evidence": {
+            "source": "layer2_shortlist",
+            "as_of": as_of,
+            "total_published": total_published,
+            "opportunities_considered": payload.get("opportunities_considered"),
+            "matched": matched,
+            "rows_with_model_comparison": sum(
+                1 for row in rows if isinstance(row.get("model_edge_pct"), (int, float))
+            ),
+            "filters": filters,
+            "active_sports": payload.get("active_sports") or [],
+            "top": top,
+        },
+        "tables": tables, "charts": charts, "as_of": selected_date, "sport": sport or None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 
 def _fetchers_for_sport(sport: str, question: str) -> list:
+    # `M1`. The board fetcher runs for EVERY sport, including ones with no
+    # branch below, and it is listed FIRST so an aggregation question is
+    # answered from the published pool before any per-sport entity fetcher
+    # gets a chance to return nothing.
+    #
+    # Prepending here rather than adding it to each branch is the same
+    # reasoning `attach_projections` records: this function has eight return
+    # sites, and editing each is how a sport added later is silently missed.
+    # `_board_candidates_evidence` self-gates on ranking intent, so listing it
+    # everywhere costs a set-intersection on a non-ranking question.
+    fetchers: list = [_board_candidates_evidence]
+    return fetchers + _entity_fetchers_for_sport(sport, question)
+
+
+def _entity_fetchers_for_sport(sport: str, question: str) -> list:
     if sport == "mlb":
         # A ranking-intent question ("best HRR targets today") is a
         # fundamentally different shape than a game/player question, and

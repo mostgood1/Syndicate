@@ -3368,3 +3368,37 @@ MET:
 
 Carried forward, not fixed here: F03 needs entity validation, F05 needs
 temporal validation. Neither is a word-list problem.
+
+### ask-board-candidates — OPEN — opened 2026-08-14 — session: ask-audit
+- Goal: a ranking question is answered from the WHOLE published pool, for every
+  sport, with a real denominator. **Testable outcome:** `scripts/ask_syndicate_regression.py`'s
+  `ranking` class moves off 4/10, `B01`'s `top_edge_diverges_from_board` failure
+  clears (chat's top edge equals the board's, same instant), and no other class
+  regresses from the post-K1 baseline (advice 4/5, entity 2/10, explain 4/6,
+  history 1/5, lookup 2/8, refusal 6/8; overall 23/52).
+- Source: Lane M1 of `.syndicate/plan_2026-08-14_ask_the_syndicate.md`, promoted
+  to second ship under the no-LLM decision.
+- Why: measured 2026-08-14, the funnel is 14,216 considered -> 200 published ->
+  145 in the snapshot chat reads -> 12 evidence-pack ceiling -> **5 rows
+  returned**. A fixed prefix of a pre-ranked list is not an aggregation
+  primitive. And chat said the biggest edge was 5.02% while the board served
+  13.59% at the same instant, because they read different pools.
+- Approach: one fetcher over `read_layer2_shortlist` -- a PURE ARTIFACT READ
+  (`pipeline/intelligence_state.py:1953`, `read_json_file`, no compute), which
+  is what makes it legal in the web request path AND what fixes the divergence
+  by construction: chat and the cards then read the same artifact. Registered
+  for every sport rather than written per sport, which is why it subsumes K4
+  (the no-sport ranking branch hardcoded to an MLB-only leaderboard) and most of
+  K10 (wnba/nhl/nba have entity-only fetchers).
+- Files (exclusive to this lane):
+  - `syndicate/blueprints/ask_the_syndicate_data.py` -- new fetcher +
+    `_fetchers_for_sport` registration.
+  - `tests/test_ask_board_candidates.py` -- new.
+  - Collision check: CLEAR. Zero mentions of `ask_the_syndicate_data` across
+    every lane in `lanes.md` 2026-08-14.
+- Hypothesis: none, this is construction not diagnosis.
+- Verification: (1) unit tests over a synthetic shortlist payload, including the
+  empty-artifact and wrong-date cases; (2) deploy and re-run the harness,
+  recording the class-by-class delta against the 23/52 post-K1 baseline in
+  `deploys.md`. **A class score that does not move means it is not done.**
+- Blocked by: none.
