@@ -419,6 +419,35 @@ conftest fixture, so the index's own caching/keying still runs under test and
 only the socket is removed. Positive control written and run: no sockets
 opened, `_fetch_scoreboard` returns None under pytest.
 
+### quote-join-enrich-cost — PRODUCTION RESULT IN 2026-08-14 00:18Z — the index works, 21.5x measured
+
+- **Both profilers fired at 00:11:15 and 00:18:46Z**, after
+  `SYNDICATE_SLOW_ROW_TOTAL_SECONDS=1` / `SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS=1`
+  were set on refresh-worker (both were absent, defaulting to 5s — at which the
+  instruments could never fire if the fix worked).
+  ```
+  SLOW_SEGMENT_PROFILE  total_s=7.17 tail_s=7.17 enrich_block=7.17
+                        rows_walked=502,157  shard_rows=10,806,750  calls=50
+  SLOW_ENRICH_PROFILE   total_s=7.17 join_s=7.16 post_s=0.00 score_s=0.00
+                        accounted_s=7.17 unattributed_s=0.00
+                        candidates=26 join_calls=26 join_s_per_call=0.2755
+  ```
+- **READ THESE COUNTERS AS CUMULATIVE, NOT PER-CALL.** `_bump` accumulates
+  across the window, so `shard_rows` is 50 calls x ~216k, not a 10.8M-row
+  shard. Per call: **216,135 rows before -> 10,043 walked now = 21.5x
+  reduction, measured in production.**
+- **Board-build cost 21-54s -> 7-8s.** The `#414` cause is fixed.
+- **Not the 130x measured locally, and the same line says why: the shard GREW.**
+  ~83k rows/call this afternoon -> ~216k now (2.6x). The index is working
+  against a target that got bigger. Quote the 21.5x, not the 130x.
+- `unattributed_s=0.00` — the segment accounting is complete, so the split is
+  trustworthy.
+- **`join_s` is still 7.16 of 7.17s.** The join remains essentially the entire
+  cost; it is just 3-7x less of it. **The next lever is the residual ~10k
+  rows/call, not the scan that is already gone.** Do not re-optimise the scan.
+- Verification for this lane is now MET in production. What remains open is
+  only whether 7-8s is acceptable, which is a different question.
+
 ### quote-join-enrich-cost — OPEN — opened 2026-08-13 — session: memory-guard
 - Goal: the MLB board-build's ~33s per slow game is attributed to a named
   cause inside `enrich_block` and then cut. Testable outcome: on a comparable

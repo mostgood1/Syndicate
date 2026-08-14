@@ -1053,3 +1053,29 @@ back **oldest-first regardless of `direction`**.
   has more than one cause.
 - Cost: two retractions and ~90 minutes. Cheap for the outcome — the leak is
   now established with a test that will not need re-litigating.
+
+### 2026-08-14 — I RE-READ THE DEPLOYED SHA BEFORE EVERY *READ* AND SKIPPED IT BEFORE A *WRITE*
+- What we believed: deploying `d4bb29b5` to refresh-worker was a pure restart
+  with no new code — verified, and true when checked.
+- What was actually true: another session deployed **`111a5000` at 00:16:53Z,
+  ninety seconds before I fired at 00:18:06Z.** By the time my deploy ran, that
+  "restart only" target was a **rollback of 850 lines** of their NFL work
+  (`live_game_state.py` +298, `preseason_cards.py` +147,
+  `nfl_game_projections.py` +96, `game_chip_scoreboard.py` +13). Cancelled
+  mid-build; `111a5000` stayed live and nothing was reverted.
+- **The rule I broke is one I had been applying correctly all evening.**
+  `state.md` says deployed SHAs "go stale in minutes, not days — re-read before
+  use." I re-read before every *diagnostic* read and did not re-read in the
+  seconds before a *write*. A stale SHA makes a read wrong; it makes a deploy
+  destructive.
+- The rule going forward: **re-read the live SHA inside the same step that
+  deploys, and assert the target is a descendant of it.** "I checked a few
+  minutes ago" is not a check on a repo with concurrent sessions. A deploy
+  tool should refuse when `merge-base --is-ancestor <live> <target>` fails —
+  that single assertion turns this class of accident into an error message.
+- Second failure in the same episode: **the restart I wanted had already
+  happened.** `111a5000` going live at 00:16:53 restarted the worker and reset
+  `anon` to ~472MB. My deploy was redundant as well as harmful — checking the
+  live SHA would have shown both.
+- Caught only because I asked what `111a5000` was instead of assuming my own
+  deploy was the newest thing on the service.
