@@ -106,6 +106,28 @@ def _start_refresh_job(payload: dict[str, Any], *, mode: str = "fast") -> tuple[
             mode=str(_payload_value(launch_payload, "mode", "fast") or "fast"),
             force_refresh=_coerce_bool(_payload_value(launch_payload, "force_refresh")),
             launch_mode=_payload_value(launch_payload, "launch_mode"),
+            # PER-LEAGUE SCOPE, REACHABLE FROM OPS (`#433`). `launch_refresh_run`
+            # has accepted `soccer_leagues` since `#282` and
+            # `refresh_odds_sources.py` has implemented `--soccer-leagues`, but
+            # this function never passed it -- so every ops-triggered soccer
+            # refresh was all-leagues, all 50 steps, whether the caller wanted
+            # one league or ten.
+            #
+            # That gap had teeth on 2026-08-14. Three leagues' odds were 3.6
+            # days stale with kickoffs two hours out, and the only remedy
+            # reachable through the API was a full ten-league run -- which is
+            # exactly the run that had been dying at step 27 and leaving those
+            # leagues dark in the first place. Scoping to one league turns a
+            # 50-step job into ~6, which finishes long before anything can
+            # truncate it.
+            #
+            # Unknown slugs are rejected loudly by `refresh_odds_sources.py`
+            # itself (`SystemExit` naming the known set), so no validation is
+            # duplicated here -- an unrecognised league must not silently become
+            # "all leagues", which is what passing it through unchecked would
+            # risk if that guard were ever relaxed.
+            soccer_leagues=_payload_value(launch_payload, "soccer_leagues"),
+            soccer_date=_payload_value(launch_payload, "soccer_date"),
         )
     except Exception as exc:
         return job_id, _store_ops_job(
