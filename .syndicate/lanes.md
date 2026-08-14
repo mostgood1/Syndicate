@@ -239,7 +239,7 @@ Run against the REAL program, not the guard functions. 105 tests pass.
   **the degenerate-write behaviour was pinned by passing tests.** Fixtures now
   supply synthetic prior-season plays; no assertion weakened, still hermetic.
 - **CARRY-FORWARD, unowned:** `c7cff28c` and `111a5000` are BOTH inert until
-  the next season-projection autorun, **~2026-08-14 21:00 CDT**. One run
+  the next season-projection autorun, **~2026-08-14 16:00 CDT (21:00Z)**. One run
   verifies both. Expected: no `DegenerateProjectionRun`, and `MIA@WSH` /
   `LAR@KC` `rating_source` flips off `neutral_no_data`.
 - Files released: `scripts/generate_smartsim2_nfl_projections.py`,
@@ -639,7 +639,7 @@ measured. Closed on evidence, not on completion of the work list.**
   root) **not the cause here**, though the same root-resolution family is.
 - **CARRY-FORWARD, unowned. Do not close these silently:**
   1. `111a5000`'s `LAR`/`WSH` alias fix is live but changes nothing until the
-     next season-projection autorun, **due ~2026-08-14 21:00 CDT**. Expect
+     next season-projection autorun, **due ~2026-08-14 16:00 CDT (21:00Z)**. Expect
      `MIA@WSH` / `LAR@KC` `rating_source` to flip off `neutral_no_data`.
   2. **The degenerate file is still WRITABLE.** `data/nfl_source/tracking/` is
      gitignored, so a generator run rooted at the repo checkout still produces

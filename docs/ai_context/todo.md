@@ -31502,7 +31502,7 @@ blanket relabel could not produce that.
 
 **STILL OPEN, and deliberately not closed here:**
 - `111a5000` and `c7cff28c` are both **inert until the next season-projection
-  autorun (~2026-08-14 21:00 CDT)**. Neither has been observed doing anything.
+  autorun (~2026-08-14 16:00 CDT (21:00Z))**. Neither has been observed doing anything.
   Expected then: `MIA@WSH` / `LAR@KC` `rating_source` flips off
   `neutral_no_data`, and no `DegenerateProjectionRun` fires. **OWNER UNASSIGNED.**
 - `#377` can now be closed by someone who owns it: it sat OPEN and UNOWNED for

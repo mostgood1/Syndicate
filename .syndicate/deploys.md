@@ -454,7 +454,7 @@ people learn to route around. Run the gate, read it, then deploy.
       98950c6d  projection LOADER -> moves the board at the next ARTIFACT build
       111a5000  pbp aliases       -> moves only newly GENERATED projections,
                                      i.e. the next season-projection autorun
-                                     (~daily, last launched 21:00 CDT today)
+                                     (~daily, last launched 16:00 CDT (21:00Z) today)
   So this one cannot move tonight's board numbers at all, and the loader fix
   remains solely attributable for them. Stated here rather than assumed,
   because "one change per deploy" was knowingly bent and the reason has to
@@ -464,7 +464,7 @@ people learn to route around. Run the gate, read it, then deploy.
   those two games stop carrying league-average projections. NOT observable
   tonight.
 - Measured: <EMPTY -- OPEN OBLIGATION. Due after the next season-projection
-  autorun, ~2026-08-14 21:00 CDT. Owner: UNASSIGNED.>
+  autorun, ~2026-08-14 16:00 CDT (21:00Z). Owner: UNASSIGNED.>
 
 ### nfl-day-of-game — WATCHER DEFECT, recorded because it nearly became a finding
 - `worker_verify.ps1` printed `STILL 44.38 -- fix did not take` against an
@@ -514,7 +514,7 @@ people learn to route around. Run the gate, read it, then deploy.
   succeeds, writes a healthy artifact, emits no `DegenerateProjectionRun`, and
   `MIA@WSH` / `LAR@KC` `rating_source` flips off `neutral_no_data`.
 - Rollback: redeploy `111a50001f88f0ab887ab1b1b31c3daf61ed36a7`.
-- Measured: <EMPTY -- OPEN OBLIGATION, due ~2026-08-14 21:00 CDT.
+- Measured: <EMPTY -- OPEN OBLIGATION, due ~2026-08-14 16:00 CDT (21:00Z).
   Owner: UNASSIGNED.>
 
 ### `#389` follow-up — CONFIRMED WORKING on its first real run (no deploy; a reading)
