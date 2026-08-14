@@ -5,9 +5,12 @@ import json
 import os
 import re
 import statistics
+from datetime import datetime
 from typing import Any
 from functools import lru_cache
 from pathlib import Path
+
+from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 
 from syndicate.features.ncaaf.sources import available_weeks
 from syndicate.features.ncaaf.sources import build_module_links
@@ -708,6 +711,7 @@ def _scoreboard_projection(row: dict[str, Any], week: int) -> dict[str, Any]:
         "win_probability": format_pct(win_probability),
         "source_label": "Predicted totals artifact",
         "kickoff": kickoff,
+        "kickoff_label": _format_kickoff_label(kickoff),
         "venue": venue,
     }
 
@@ -741,6 +745,7 @@ def _runtime_scoreboard_projection(row: dict[str, Any], week: int) -> dict[str, 
         "home_win_probability": win_probability,
         "source_label": LEGACY_ENGINE_SOURCE_LABEL,
         "kickoff": kickoff,
+        "kickoff_label": _format_kickoff_label(kickoff),
         "venue": venue,
     }
     _attach_smartsim2_shadow_fields(
@@ -951,6 +956,44 @@ def _format_decimal(value: Any, *, places: int = 3) -> str:
     if amount is None:
         return "-"
     return f"{amount:.{places}f}".rstrip("0").rstrip(".")
+
+
+def _format_kickoff_label(value: Any) -> str:
+    """Human kickoff string for the card, in the platform's display timezone.
+
+    Measured 2026-08-14 on production: NCAAF cards rendered
+    `KICKOFF 2026-08-29T16:00:00.000Z` -- the raw `start_date_api` value
+    straight from the schedule row, reaching the UI unformatted.
+
+    This is deliberately a SEPARATE key from `kickoff` rather than a
+    reformat in place. `kickoff` is parsed as data downstream --
+    `ncaaf/betting_card.py:_kickoff_date_and_label` calls
+    `datetime.fromisoformat` on exactly this field to build its per-day
+    grouping -- so formatting it at the producer would have traded a
+    cosmetic defect for a broken betting card.
+
+    Central, because that is what every other display surface in this repo
+    uses (`features/shared/timezone.py`, `SYNDICATE_BOARD_TZ`). Times are
+    assembled with portable strftime directives only: `%-I`/`%-d` are
+    POSIX-only and raise on Windows, where this also runs.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return text
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=CENTRAL_TIMEZONE)
+    local = parsed.astimezone(CENTRAL_TIMEZONE)
+    hour = local.hour % 12 or 12
+    meridiem = "AM" if local.hour < 12 else "PM"
+    zone = local.strftime("%Z") or "CT"
+    return (
+        f"{local.strftime('%a')} {local.strftime('%b')} {local.day}, "
+        f"{hour}:{local.strftime('%M')} {meridiem} {zone}"
+    )
 
 
 def _publication_ready(coverage_tier: str | None) -> bool:
@@ -1409,6 +1452,7 @@ def _build_ncaaf_card_contract(row: dict[str, Any], week: int, *, season: int) -
             "secondary_color": home_context["secondary_color"],
         },
         "kickoff": scoreboard.get("kickoff") or f"{_week_label(week, season=season)} kickoff unavailable",
+        "kickoff_label": scoreboard.get("kickoff_label") or f"{_week_label(week, season=season)} kickoff unavailable",
         "venue": scoreboard.get("venue") or "Venue unavailable",
         "status": f"Week {week}",
         "status_detail": "Historical summary",
@@ -1804,6 +1848,7 @@ def _build_smartsim_ncaaf_card_contract(row: dict[str, Any], week: int, *, seaso
                     "secondary_color": home_context["secondary_color"],
                 },
                 "kickoff": scoreboard.get("kickoff") or f"{_week_label(week, season=season)} kickoff unavailable",
+                "kickoff_label": scoreboard.get("kickoff_label") or f"{_week_label(week, season=season)} kickoff unavailable",
                 "venue": scoreboard.get("venue") or "Venue unavailable",
                 "status": f"Week {week}",
                 "status_detail": LEGACY_ENGINE_SOURCE_LABEL,
@@ -1853,6 +1898,7 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
         "win_probability": win_probability,
         "source_label": SMARTSIM2_PUBLIC_LABEL,
         "kickoff": row.get("start_date") or "Kickoff unavailable",
+        "kickoff_label": _format_kickoff_label(row.get("start_date")) or "Kickoff unavailable",
         "venue": row.get("venue") or "Venue unavailable",
         "smartsim2_available": True,
         "smartsim2_margin": projection.margin_mean,
@@ -2009,6 +2055,7 @@ def _build_smartsim2_standalone_ncaaf_card_contract(row: dict[str, Any], week: i
                     "secondary_color": home_context["secondary_color"],
                 },
                 "kickoff": scoreboard["kickoff"],
+                "kickoff_label": scoreboard.get("kickoff_label") or scoreboard["kickoff"],
                 "venue": scoreboard["venue"],
                 "status": f"Week {week}",
                 "status_detail": SMARTSIM2_PUBLIC_LABEL,

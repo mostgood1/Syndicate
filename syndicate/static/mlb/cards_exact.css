@@ -1542,6 +1542,15 @@ body.cards-body {
   font-family: "Space Grotesk", sans-serif;
 }
 
+/* Numeric-only classes from the group above -- the R/H/E scoreboard column
+   and the live-lens headline both update on the poll. */
+.cards-mini-metric strong,
+.cards-strip-score,
+.cards-lens-main,
+.cards-market-main {
+  font-variant-numeric: tabular-nums;
+}
+
 .cards-mini-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1766,6 +1775,10 @@ body.cards-body {
   font-size: 15px;
   line-height: 1.08;
   overflow-wrap: anywhere;
+  /* Odds/projection figures on a 30s poll -- proportional digits re-flowed on
+     every tick. Measured 2026-08-14: font-variant-numeric computed to
+     `normal` on all five sports. */
+  font-variant-numeric: tabular-nums;
 }
 
 .cards-box-totals {

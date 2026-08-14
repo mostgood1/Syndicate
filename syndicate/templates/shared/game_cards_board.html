@@ -151,8 +151,6 @@
 {% block extra_scripts %}
   <script src="{{ url_for('static', filename='shared/game_board.js') }}"></script>
   {% if cards_script %}
-    {% if cards_script != 'mlb/board.js' %}
-      <script src="{{ url_for('static', filename=cards_script) }}"></script>
-    {% endif %}
+    <script src="{{ url_for('static', filename=cards_script) }}"></script>
   {% endif %}
 {% endblock %}
