@@ -6,7 +6,42 @@
 
 ## OPEN
 
-### nfl-degenerate-writer — OPEN — opened 2026-08-13 — session: nfl-day-of-game
+### nfl-degenerate-writer — CLOSED-VERIFIED 2026-08-13 — opened 2026-08-13 — session: nfl-day-of-game
+
+**OUTCOME — the lane's own testable outcome, met exactly as written.**
+It said: *"with the pbp absent, the generator exits non-zero having written
+NOTHING, and the previously-good artifact is byte-identical afterwards."*
+
+    no pbp   -> exit 1, artifact sha DAAF137A85EE9984 UNCHANGED,
+                message names the gitignored-directory cause
+    control  -> same command, real pbp: exit 0, artifact rewritten,
+                rating_source = prior_season_fallback
+
+Run against the REAL program, not the guard functions. 105 tests pass.
+
+- Shipped `c7cff28c`, refresh-worker, live `2026-08-14T01:35:38Z`.
+  **No sim killed** — `state=finished` read before the POST.
+- Post-deploy: `DegenerateProjectionRun` 0, `Traceback` 0, against a 20-row
+  positive control. Worker healthy (rss 1607MB, headroom 1483MB).
+- **The guard is INERT in production and that was measured BEFORE shipping**:
+  the worker can see `pbp_2025.csv` (21:02:06Z `artifact_path=` on the mounted
+  disk; artifact carries a real rating on 16/16 games). It is a trap for a
+  failure mode not currently occurring. If it ever fires, root resolution moved.
+- Design decision held: refuse only when EVERY projection is degenerate.
+  Falsification cases both pass — a partial run and an empty schedule are
+  allowed through.
+- **Two existing tests had to change, and that is the finding.** Both ran
+  `main()` with no play-by-play and asserted only that an artifact existed, so
+  **the degenerate-write behaviour was pinned by passing tests.** Fixtures now
+  supply synthetic prior-season plays; no assertion weakened, still hermetic.
+- **CARRY-FORWARD, unowned:** `c7cff28c` and `111a5000` are BOTH inert until
+  the next season-projection autorun, **~2026-08-14 21:00 CDT**. One run
+  verifies both. Expected: no `DegenerateProjectionRun`, and `MIA@WSH` /
+  `LAR@KC` `rating_source` flips off `neutral_no_data`.
+- Files released: `scripts/generate_smartsim2_nfl_projections.py`,
+  `scripts/generate_smartsim2_nfl_preseason_projections.py`, their tests.
+
+### nfl-degenerate-writer — CLOSED-VERIFIED — superseded header, kept for the file/line map
 - Goal: a SmartSim2 NFL run with no play-by-play data cannot write a
   league-constant projection artifact over a healthy one. Testable outcome:
   with the pbp absent, the generator exits non-zero having written NOTHING,

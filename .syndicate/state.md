@@ -505,8 +505,39 @@
   generator run whose root resolved to the repo checkout rates every team
   `neutral_no_data` and writes identical rows. Now dedupes on resolved PATH,
   drops both-sides-neutral rows, newest `generated_at` wins. `[from-code 08-13]`
-- **THE ROOT CAUSE IS UNFIXED.** The reader is immune; nothing stops the
-  degenerate file being WRITTEN. No ticket filed. `[unverified 08-13]`
+- **The WRITER is now guarded too (`c7cff28c`, refresh-worker, live
+  `2026-08-14T01:35:38Z`).** Supersedes the line that stood here saying the
+  root cause was unfixed. Two guards: zero plays loaded for both seasons fails
+  BEFORE the sim; every-projection-degenerate writes NOTHING, so the last good
+  artifact survives. Threshold is ALL-degenerate, not any — a partial still
+  carries real information and the reader already drops bad rows. Proven
+  end-to-end against the real program: no pbp -> exit 1 with the artifact
+  byte-identical; control with real pbp -> exit 0, artifact rewritten.
+  `[measured 08-13]`
+- **That guard is INERT in production, and that was measured before shipping.**
+  The worker CAN see `pbp_2025.csv`: its 21:00:11Z run printed
+  `artifact_path=/opt/render/project/data/nfl_source/...` at 21:02:06Z and the
+  resulting artifact carries a real rating on **16 of 16** games. Post-deploy,
+  `DegenerateProjectionRun`/`Traceback` both 0 against a 20-row positive
+  control. So it is a trap for a failure mode not currently occurring — if it
+  ever fires, root resolution has moved. `[measured 08-13]`
+- **`PBP_LOADED` CANNOT be used to answer "does the worker see the pbp".** The
+  generators emit it through a `log()` that writes only to `--progress-log`,
+  never stdout, so it never reaches Render's collector. A 0 there is a fact
+  about the emitter. Use `artifact_path=` (printed) or the artifact's
+  `rating_source`. `[from-code 08-13]`
+- **`#389`'s follow-up is CONFIRMED WORKING**, on the criterion the ticket set
+  in advance: a positive `artifact_path=` on the mounted disk with no `/src/`.
+  Corroborating: `SEASON_PROJECTION_ARTIFACT_MISSING` 30 before that write, 0
+  after, queried as its own window with a control. Writer and staleness guard
+  finally resolve the same root — the defect that discarded ~90 NFL sims/day.
+  `[measured 08-13]`
+- **`#377` is CLOSED-VERIFIED**, and it had THREE parts. `projected` distinct
+  **1 -> 6** on the same 34-card board it was filed against; its product
+  decision was already answered by `7c854234` (41 rows carry
+  `projection_unavailable_reason`, 75 carry `model_skill`). Its third part —
+  `skill_note` covers **1 of 7** projection builders — was never worked and is
+  now **`#425`, OPEN, UNOWNED**. `[measured 08-13]`
 - **Two clubs were rated league-average all season.** Schedule spells them
   `LAR`/`WSH`, nflverse pbp spells them `LA`/`WAS`; production read
   `prior_season_fallback` on every club except exactly those two. Fixed in

@@ -1104,3 +1104,69 @@ back **oldest-first regardless of `direction`**.
   per-game) and nothing compared them. A cheap cross-surface equality check on
   the same logical quantity would have found this immediately, and is now the
   closing evidence in `deploys.md` (6/6 agree).
+
+### 2026-08-13 — A FIXTURE THAT OMITS A MARKER FILE TESTS A DIFFERENT DIRECTORY, AND SCORES IT AS A DEFECT
+
+- What we believed: that an end-to-end harness had proven the new
+  degenerate-writer guard did not work. It reported, in its own words,
+  `exit_non_zero=FAIL  artifact_byte_identical=FAIL  names_the_cause=FAIL` --
+  three independent-looking failures, which is exactly the shape that reads as
+  conclusive.
+- What was actually true: the fixture built a temp root with no play-by-play,
+  but `default_nfl_source_root()` -> `_first_existing_root()` selects a
+  candidate ONLY if it contains `upcoming_recs_*.csv`. The temp root had no
+  such marker, so the resolver **skipped it and fell through to the real repo
+  data dir**, which holds `pbp_2025.csv` with 32,937 plays. There was no outage
+  to catch. The guard was correct and silent, and the harness scored correct
+  silence as three failures.
+- Why it survived a moment's thought: every FAIL was consistent with every
+  other FAIL, because they were all downstream of the same wrong directory.
+  Internal agreement across a harness's checks is worth nothing when the checks
+  share an input -- the same mechanism as two instruments reading one clock.
+- The rule going forward: **a fixture that selects a resource by CONVENTION
+  must assert which resource it actually selected, before it is allowed to
+  render a verdict.** Concretely: print the resolved root/path/connection and
+  compare it to the intended one, and abort if they differ. v2 does exactly
+  that (`if resolved -ne $root { ABORT: this fixture tests nothing }`) and the
+  guard then passed all three checks plus a positive control.
+- Sibling of `A path one toolchain resolves and another cannot makes a guard
+  pass silently` (2026-08-13). That entry covers a path a tool CANNOT resolve;
+  this covers one it resolves to something ELSE, which is worse -- there is no
+  error anywhere, and the wrong answer is fully formed.
+- Cost: ~10 minutes, and one moment of believing a just-written guard was
+  broken. Nothing shipped on it.
+
+### 2026-08-13 — CLOSING A TICKET IS A SCOPE DECISION, AND WHOLESALE CLOSURE SILENTLY RETIRES THE PART NOBODY WORKED
+
+- What we believed: that `#377` ("PROJECTED is a CONSTANT") could be closed,
+  because the constant was gone -- `projected` distinct 1 -> 6 on the same
+  34-card board it was filed against.
+- What was actually true: `#377` contained THREE claims, and only two were
+  addressed.
+  1. the constant -- fixed this session (`98950c6d`, `c7cff28c`);
+  2. the product decision about what a skill-less model may assert -- already
+     answered months-earlier by `7c854234`, and BOTH its offered options were
+     taken (41 rows carry `projection_unavailable_reason`, 75 carry
+     `model_skill`). Verified live rather than assumed;
+  3. **`skill_note` is called in exactly one of seven projection builders** --
+     never worked, never owned, and the ticket itself called this *"THE
+     SYSTEMIC EXPOSURE… NOT THE MODEL"*.
+  Stamping CLOSED would have retired (3) with no successor.
+- The rule going forward: **before closing a ticket, enumerate its distinct
+  claims and resolve each one separately. Any claim without evidence gets
+  carved out into its own ticket, with a forward reference from the closure,
+  BEFORE the parent is marked closed.** A ticket is not an atom; long entries
+  in this repo routinely accrete a second and third finding under the original
+  headline, and the accreted ones are the least likely to have an owner.
+- Corollary, and the reason this is worth a rule rather than care: the part
+  most likely to be orphaned is the part written LAST, which is usually the
+  most general -- the specific bug gets fixed and the systemic observation it
+  provoked dies with it. Here (3) was strictly better evidenced at closure than
+  when filed: `#377` argued it from a model with no skill, while the actual
+  2026-08-13 failure was a projection collapsing to one value across 16 games
+  with nothing reporting it. Carved out as `#425`.
+- Also recorded: `#377` DIAGNOSED ITSELF WRONG and that error was load-bearing.
+  It concluded *"the constant is in the SOURCE… a model collapsed to the league
+  average"*, which framed the whole thing as a product decision and is why it
+  sat OPEN and UNOWNED for days. It was file selection. See the neighbouring
+  entry on reproducing a constant from an empty input.
