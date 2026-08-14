@@ -2851,8 +2851,10 @@ def _diag_log_malloc_arena(stage: str) -> None:
         snapshot = malloc_arena_snapshot()
         if not snapshot:
             return  # off glibc, or unreadable -- MALLOC_INFO_INIT already said why
+        # Same reason as TRACEMALLOC_SITES below: without a pid, a supervisor
+        # reading and a 35MB child reading look identical.
         print(
-            f"[refresh_worker] MALLOC_ARENA stage={stage} "
+            f"[refresh_worker] MALLOC_ARENA stage={stage} pid={os.getpid()} "
             + json.dumps(snapshot, sort_keys=True),
             flush=True,
         )
@@ -2889,8 +2891,14 @@ def _diag_log_allocation_sites(stage: str) -> None:
         snapshot = allocation_snapshot()
         if not snapshot:
             return  # not tracing -- TRACEMALLOC_INIT already said why
+        # `#423`. THE PID IS NOT DECORATION. 5 of the first 6 readings came
+        # from short-lived CHILD processes (anon ~70MB, top site pure import
+        # machinery) and only one caught pid 39, the process that actually
+        # accumulates -- indistinguishable in the log because the payload
+        # carried no pid. That is the same defect that wasted time on
+        # LIVE_ODDS_WORKER_MEMORY earlier the same night.
         print(
-            f"[refresh_worker] TRACEMALLOC_SITES stage={stage} "
+            f"[refresh_worker] TRACEMALLOC_SITES stage={stage} pid={os.getpid()} "
             + json.dumps(snapshot, sort_keys=True),
             flush=True,
         )
@@ -3249,7 +3257,20 @@ def main() -> int:
     try:
         from syndicate.features.shared.memory_observability import start_allocation_tracing
 
-        start_allocation_tracing(1)
+        # `#423`. nframe=3, not 1. At one frame the top site came back as
+        # `decoder.py:353` -- Python's own json module, 491.3MB across 7,172,382
+        # live objects -- which names the ALLOCATOR and not the CALLER. That
+        # 491MB is `_BOOK_QUOTES_CACHE` at its 500MB budget (68 bytes/object,
+        # ~2 shards of ~216k rows), i.e. a bounded by-design cost rather than
+        # the leak. The growth is in the ~76% of `anon` tracemalloc could not
+        # see at one frame, and three frames is what turns "JSON parsing" into
+        # "this read, from this caller".
+        #
+        # The cost is real and bounded: three frames per live allocation rather
+        # than one. Accepted deliberately while the worker is OOM-killing --
+        # a cheaper instrument that cannot name the caller is not cheaper, it
+        # is just another cycle of guessing.
+        start_allocation_tracing(3)
     except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop boot
         print(f"[refresh_worker] TRACEMALLOC_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     _diag_log_all_process_memory("boot")
