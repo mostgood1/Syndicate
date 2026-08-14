@@ -1440,17 +1440,27 @@ def filter_candidates(
     # `rejected_reasons` block below is invisible in production, which is where
     # the `no_model_probability` exclusion has to be measured before it can be
     # trusted. Bounded on purpose: a summary per CALL, never per candidate.
-    if rejected:
-        reason_counts: dict[str, int] = {}
-        for item in rejected:
-            reason_key = str(item.get("reason") or "unknown")
-            reason_counts[reason_key] = reason_counts.get(reason_key, 0) + 1
-        print(
-            f"[recommendation_engine] FILTER_CANDIDATES sport={sport or 'all'} "
-            f"in={len(candidate_rows)} out={len(filtered)} "
-            f"rejected={json.dumps(reason_counts, sort_keys=True)}",
-            flush=True,
-        )
+    #
+    # UNCONDITIONAL, and that word is load-bearing. This was written as
+    # `if rejected:` and it cost a measurement the same session: after the
+    # A1/A2 deploy the line did not appear, and "rejected nothing" was
+    # indistinguishable from "the cycle never ran" -- so the deploy sat
+    # unverifiable until an unrelated timestamp settled it. A zero has to be
+    # PRINTABLE for a zero to mean anything, which is the same lesson `#373`,
+    # `#381`, `#397` and `#400` each learned on a counter rather than a log
+    # line. `rejected={}` is the single most informative thing this line can
+    # say, because it is the only output that distinguishes a rule that ran and
+    # passed everything from a rule that never executed.
+    reason_counts: dict[str, int] = {}
+    for item in rejected:
+        reason_key = str(item.get("reason") or "unknown")
+        reason_counts[reason_key] = reason_counts.get(reason_key, 0) + 1
+    print(
+        f"[recommendation_engine] FILTER_CANDIDATES sport={sport or 'all'} "
+        f"in={len(candidate_rows)} out={len(filtered)} "
+        f"rejected={json.dumps(reason_counts, sort_keys=True)}",
+        flush=True,
+    )
     if logger.isEnabledFor(logging.INFO):
         before_rows = candidate_rows
         after_rows = filtered

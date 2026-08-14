@@ -194,3 +194,27 @@ class ModelFreeExclusionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_the_instrument_emits_even_when_nothing_is_rejected(capsys):
+    """A zero must be printable, or it cannot be told from "never ran".
+
+    Written after `if rejected:` cost a real measurement: the A1/A2 deploy went
+    live, the line did not appear, and silence was consistent with BOTH "the
+    rule passed everything" and "the cycle never executed".
+    """
+    from syndicate.features.shared.recommendation_engine import filter_candidates
+
+    # One candidate that passes cleanly, so `rejected` is empty.
+    candidate = {
+        "sport": "mlb",
+        "market": "totals",
+        "model_probability": 0.62,
+        "odds": 150,
+        "score": 30.0,
+        "confidence": 55.0,
+    }
+    filter_candidates([candidate])
+    out = capsys.readouterr().out
+    assert "FILTER_CANDIDATES" in out, "instrument stayed silent on an empty rejection set"
+    assert "rejected={}" in out, f"expected an explicit empty map, got: {out!r}"
