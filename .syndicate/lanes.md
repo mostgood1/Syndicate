@@ -12,7 +12,11 @@
 slate is flagged with sport, market and value; a varying slate is not; and the
 check runs on all seven producers without touching any of them.
 
-Shipped `2e4e2544`. **NOT DEPLOYED** — committed and pushed only.
+Shipped `2e4e2544`. **DEPLOYED AND VERIFIED ON BOTH SERVICES** — web
+`03:09:33Z`, refresh-worker `14:22:32Z` on 2026-08-14. (This line previously
+read "NOT DEPLOYED", which was true when the lane closed and stale within
+hours; see the `deploys.md` row for the measurement and for why the worker
+half was held overnight through an OOM incident.)
 
     real failure shape (16 games x 3 markets, the 2026-08-13 constants)
       -> 2 groups flagged, games=16 correctly counted despite 32 alt-line rows

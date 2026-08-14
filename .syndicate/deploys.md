@@ -572,3 +572,51 @@ people learn to route around. Run the gate, read it, then deploy.
   live near-OOM, and it belongs to the OPEN `anon-allocation-site` /
   `refresh-worker-anon-leak` lanes. Recorded here only so the reading is not
   lost; not diagnosed.
+
+### projection-degeneracy-detector — `#425` gap 2 — WEB `2e4e2544`, then REFRESH-WORKER `2e4e2544`
+- Web: `dep-d9v8aqdbedkc73b41ntg`, live **2026-08-14T03:09:33Z**.
+- refresh-worker: `dep-d9vi6hu417fc73d2ofmg`, live **2026-08-14T14:22:32Z**.
+  **No sim killed** — `sim_run_status state=finished` read before the POST.
+- Change: `detect_degenerate_projections` reports any (kind, market, segment)
+  whose projection has collapsed to ONE value across >= 4 distinct GAMES.
+  Applied in a wrapper over `_attach_projections_by_sport`, so it covers all
+  seven sports, all 13 return sites, and any producer wired later, touching
+  ZERO call sites.
+- **THE WORKER DEPLOY WAS HELD OVERNIGHT, DELIBERATELY, AND THAT WAS RIGHT.**
+  Ordered at ~22:0x CDT while refresh-worker was OOM-killing: `server_failed
+  oomKilled memoryLimit 4Gi` at 03:20:11Z, 03:39:57Z and 03:46:47Z. Deploying
+  then would have (a) erased the crash evidence the `anon-allocation-site`
+  lane needed, (b) made my change the visible suspect for the next kill, and
+  (c) silently applied the standard mitigation (a restart) while calling it a
+  feature deploy. Held, surfaced, deployed the next morning after 5h stable.
+- **The cause of those OOMs was NOT this change and is not on `main`.**
+  `2bc0a712` — the other session's `#423 step 2: wire tracemalloc into the
+  worker` — was deployed from a clone and rolled back to `75b8aae6` at
+  04:26:55Z. Verified by CONTENT as well as lineage, because cherry-picks mint
+  new SHAs here and ancestry alone would not settle it: tracemalloc occurrences
+  are 3 in both `2e4e2544` and the live `75b8aae6`, i.e. comments only, none of
+  the 235-line wiring.
+- Pre-deploy checks, all three passed: `2bc0a712` not contained in `2e4e2544`;
+  `75b8aae6` (live) IS contained, so not a rollback; production delta is
+  **exactly one file**, `board_enrichment.py`.
+- MEASURED 2026-08-14 14:22–14:24Z:
+
+      deploy live               14:22:32Z
+      artifact generated_at     14:23:23Z   <- POST-deploy, so the reading counts
+      oom kills since deploy    0
+      distinct projected_raw    3           (1 would be a regression to 44.38)
+      degenerate groups         none reported
+
+- **WHY A REBUILT ARTIFACT IS THE LIVENESS PROOF AND SILENCE IS NOT.** This
+  detector returns `{}` when there is nothing to report, so a healthy board
+  emits NOTHING — silence is the expected success state and cannot distinguish
+  "ran and found nothing" from "never executed". The ledger has been caught by
+  exactly that shape twice (`basis` emitted only on the abort branch). So the
+  verdict is gated on `generated_at` postdating the deploy: a rebuilt artifact
+  proves `attach_projections` ran, and the detector sits unconditionally inside
+  it. A `DEGENERATE_PROJECTION` line would be a positive emission, but tonight's
+  board is healthy so its absence is correct and carries no information.
+- **`#425` remains OPEN for gap 1** — the skill annotation on six builders,
+  which needs six measured backtests. Not shipped, not started.
+- Rollback: redeploy `75b8aae6` (read the live commit first — it moved five
+  times in one evening and a stale SHA nearly shipped a rollback).
