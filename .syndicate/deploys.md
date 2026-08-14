@@ -882,7 +882,36 @@ people learn to route around. Run the gate, read it, then deploy.
 - Rollback: `DELETE /v1/services/srv-d91dpertqb8s73co8lt0/env-vars/SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB`
   then redeploy pinned at the then-live commit; the code fallback returns it to
   7200. Re-read the live commit first.
-- Measured: `<pending>`
+- Measured: 2026-08-14 11:20-11:29 CDT. Deploy `live` 16:04:20Z at commit
+  `83e3e5f2` — status AND commit checked, not the 201.
+  - **The gate's own output at 16:20:30Z is the primary evidence:**
+
+        PREGAME_CADENCE_SKIPPED sports=nfl,soccer,wnba
+        PREGAME_CADENCE_DETAIL  nfl:6011/7200  soccer:4191/28800  wnba:2371/7200
+
+    **MLB is ABSENT from the skip list, so MLB swept.** Under the old 7200 it
+    would have been skipped here (marker_age 4,178s < 7,200) and held to
+    ~17:20Z. nfl/wnba still read `interval_s=7200` and soccer `28800`, so the
+    change is scoped to MLB exactly as intended — no collateral cadence move.
+  - **Gap, measured end to end on the served board:** previous sweep
+    10:10:38 CDT, new sweep observed **11:20:52 CDT** = **4,215s (1h10m15s)**,
+    against the previous measured gap of **7,289s (2h01m29s)**. A 42% cut.
+  - **Lands inside the predicted band, which is the useful part.** I predicted
+    3,600-4,500s rather than exactly 3,600 because the loop wakes every 900s
+    and sweeps whatever is past its interval, so the setting is a FLOOR and the
+    tick quantises it. 4,215s sits in that band. Anyone reading "1 hour" as
+    "3,600s exactly" will file a bug against correct behaviour.
+  - **A methodology note worth keeping.** The board's `odds_observed_at` lags a
+    real sweep by up to one artifact rebuild — the artifact was built 11:18:03,
+    BEFORE the 11:20:16 tick, so between 11:20 and 11:28 the board still read
+    10:10 and "no change" was ambiguous between "no sweep" and "sweep not yet
+    rebuilt". Six consecutive readings said nothing. The discriminator was not
+    another reading; it was the worker's own gate line, which already had the
+    answer. The board caught up at the 11:28:21 rebuild and agreed.
+  - No `server_failed`, no OOM, no restart loop after the deploy.
+- Verdict: **shipped and verified.** MLB pregame odds now refresh on a ~1h10m
+  effective cadence instead of ~2h01m. Cost is 2x MLB pregame sweeps; the
+  absolute OddsAPI call figure is still unmeasured and is the open follow-up.
 
 ### `#429` — HRR mean derived from its components — WEB + REFRESH-WORKER `214f5151`
 - Web `dep-d9vjlc0u01pc738a78jg`, refresh-worker `dep-d9vjlc7qj5pc73dp71mg`,
