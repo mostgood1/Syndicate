@@ -1424,6 +1424,106 @@ def api_ops_oddsapi_quota() -> Any:
     return jsonify({"ok": True, "quota": normalize_timestamped_payload(read_oddsapi_quota())})
 
 
+@ops_bp.get("/api/ops/oddsapi/sports")
+def api_ops_oddsapi_sports() -> Any:
+    """WHICH COMPETITIONS THE VENDOR IS ACTUALLY OFFERING, right now (`#433`).
+
+    THE QUESTION THIS EXISTS TO ANSWER. On 2026-08-14 three soccer leagues --
+    primeira_liga, championship, belgian_pro_league -- went 3.6 days without a
+    single quote reaching `tracking/book_quotes`, while eredivisie on the same
+    shard, the same fetch script, the same key and the same region kept
+    capturing normally. Every explanation tried from inside the pipeline was
+    falsified: the season gate returns all ten leagues active, a per-league
+    scoped run captured nothing either (so it is not the 50-step run being
+    truncated), and the shard append logged no failure.
+
+    The one input nobody could see is the vendor's own catalogue. If OddsAPI
+    has stopped listing (or stopped marking `active`) those three sport keys,
+    then no cadence, ordering or scoping change in this repo can fix it, and
+    every hour spent inside the pipeline is wasted. That is a big enough fork
+    in the diagnosis to deserve a route.
+
+    STRICTLY READ-ONLY, AND FREE. `/v4/sports` is the vendor's catalogue
+    endpoint: it takes no market or region parameters and returns no prices.
+    Per OddsAPI's own documentation it does not count against the quota --
+    **and this does not take that on trust.** The response's quota headers are
+    recorded through the normal `record_oddsapi_quota` path, so if it ever DOES
+    bill, the burn shows up in `/api/ops/oddsapi/quota` attributed to this
+    endpoint rather than silently inflating some sport's total. Measuring the
+    cost of the thing you added to measure costs is cheap; assuming it is free
+    is how an unattributed line item is born.
+
+    This writes nothing else and triggers no refresh.
+    """
+    # `urllib.parse` explicitly, not relied on as a side effect of importing
+    # `urllib.request` -- that happens to work in CPython and is not a contract.
+    import urllib.parse
+    import urllib.request
+
+    from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+
+    api_key = str(os.environ.get("ODDS_API_KEY") or "").strip()
+    if not api_key:
+        # Named explicitly. "unavailable" would leave a caller unable to tell a
+        # missing key from a vendor outage, which is the same
+        # absence-without-a-reason failure the board keeps being fixed for.
+        return jsonify({"ok": False, "error": "ODDS_API_KEY is not set on this service"}), 503
+
+    base = str(os.environ.get("ODDS_API_BASE") or "https://api.the-odds-api.com/v4").rstrip("/")
+    url = f"{base}/sports?apiKey={urllib.parse.quote(api_key)}"
+    try:
+        request = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8", "replace"))
+            headers = dict(response.headers)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 502
+
+    try:
+        # `endpoint` carries no apiKey: `_sanitize_endpoint` redacts it, but the
+        # URL is not handed over in the first place.
+        record_oddsapi_quota(headers, sport="ops_catalogue", endpoint=f"{base}/sports")
+    except Exception:  # noqa: BLE001
+        # Telemetry must never fail the read it is describing.
+        pass
+
+    listed = {str(item.get("key")): item for item in payload if isinstance(item, dict)}
+
+    # The join the caller actually wants: OUR league slug -> the vendor's key ->
+    # is it there. Reading a raw 60-entry catalogue and matching slugs by eye is
+    # how the wrong key gets blamed.
+    from scripts.fetch_soccer_oddsapi_odds_local import LEAGUE_SPORT_KEYS
+
+    soccer = []
+    for league, sport_key in sorted(LEAGUE_SPORT_KEYS.items()):
+        entry = listed.get(sport_key)
+        soccer.append(
+            {
+                "league": league,
+                "sport_key": sport_key,
+                # Three distinct states, never collapsed: absent from the
+                # catalogue, present but inactive (out of season), present and
+                # active. Only the third can produce odds.
+                "listed": entry is not None,
+                "active": bool((entry or {}).get("active")) if entry is not None else None,
+                "title": (entry or {}).get("title"),
+                "has_outrights": (entry or {}).get("has_outrights"),
+            }
+        )
+
+    return jsonify(
+        {
+            "ok": True,
+            "server_time": _utc_now(),
+            "catalogue_count": len(listed),
+            "soccer": soccer,
+            # The unfiltered key list, so a sport this repo has not mapped yet
+            # is still discoverable without another deploy.
+            "all_keys": sorted(listed),
+        }
+    )
+
+
 @ops_bp.post("/api/ops/oddsapi/quota/reset")
 def api_ops_oddsapi_quota_reset() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
