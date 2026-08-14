@@ -18,9 +18,92 @@
   216,135 -> 10,043 rows walked per call; board-build 21-54s -> 7-8s. Quote
   21.5x, NOT the 130x measured locally — the shard grew ~83k -> ~216k rows/call.
   The profiler counters are CUMULATIVE across the window.
-- **Deployed SHAs `[measured 08-14 02:18Z]` — re-read before use, these moved
-  five times in one evening and a stale one nearly shipped a rollback:**
-  web `e29b807f`, refresh-worker `75b8aae6`, live-odds-worker `83e3e5f2`.
+- **Deployed SHAs `[measured 08-14 16:17Z]` — re-read before use. They moved
+  FIVE times in one evening and TWICE inside 25 minutes on 08-14; a stale one
+  nearly shipped a rollback, and a stale one made a blast-radius claim wrong
+  by 20 commits.** web **`214f5151`** (16:00:27Z), refresh-worker
+  **`294f9ca9`** (16:16:56Z), live-odds-worker `83e3e5f2` `[unverified — not
+  re-read 08-14]`. Supersedes the 02:18Z line (`e29b807f`/`75b8aae6`).
+
+## NFL day-of-game and the projection column (`#377`, `#425`, `#429`)
+
+All measured on production 2026-08-14 unless marked otherwise.
+
+- **NFL game state is REAL on the board.** `by_state` went
+  `{pregame:6, live:0}` -> `{live:5, pregame:1, final:0}` with real scores and
+  clocks (`DET@CIN 3-10 Q2 0:07`). Cause was one missing join:
+  `_NFLDataProvider.games()` handed `build_game_chips` week-scoped projection
+  cards carrying no state at all, so `_game_flags` returned `(False, False)`
+  for every NFL game forever. Fixed by stamping `live_state` in the card
+  builder — the choke point `publication_adapter` and `game_chip_scoreboard`
+  both already read. `[measured 08-13]`
+- **The board's live/final counts LAG by up to one artifact rebuild (~15 min
+  observed).** Not a defect; do not read a stale `live` as a state bug. A
+  reading that disagrees with ESPN is expected inside that window.
+  `[measured 08-13]`
+- **`#377`'s constant is GONE and was never a model failure.** The board served
+  one `margin 0.96 / total 44.38 / home_win 0.5267` for all 16 preseason games
+  because `load_nfl_game_projections` deduped candidate files by NAME across
+  source roots and read a copy generated where the nflverse pbp was absent.
+  Now dedupes on resolved PATH, drops both-sides-neutral rows, newest
+  `generated_at` wins. `projected` distinct **1 -> 6**, and the board and cards
+  — which read the same filename and had disagreed — now agree **6/6** to
+  three decimals. `[measured 08-13]`
+- **A constant that reproduces EXACTLY from an empty input is a data outage,
+  not a weak model.** Running the real generator with empty
+  `prior_season_plays` reproduced `0.960 / 44.380 / 0.5267` on all four weeks.
+  Use that test before touching any model. `[measured 08-13]`
+- **`#425` gap 2 — degeneracy detection — LIVE on both services and VERIFIED.**
+  Reports any `(kind, market, segment)` collapsed to one value across >=4
+  distinct GAMES, for every sport, from a wrapper over
+  `_attach_projections_by_sport` (13 return sites, 4 call sites, none touched).
+  It found a real defect unprompted on its first live board. `[measured 08-14]`
+- **`#425` gap 1 — skill declaration — LIVE on both services and VERIFIED.**
+  Every projection carries `model_skill`; `unmeasured` is now a first-class
+  value. `nfl 20 measured`, **`mlb 1631` / `wnba 209` / `soccer 12`
+  unmeasured**. NFL alone could not have proven this — it is the only producer
+  with real skill numbers and exercises only the normalize branch. Counts
+  surface in the `projections` coverage block, **not** in `counts`.
+  `[measured 08-14]`
+- **THE SIX MODELS ARE STILL UNMEASURED — `unmeasured` is honest, not
+  sufficient.** `#428` carries the backtests and is **blocked on DATA, not
+  effort**: soccer results 0 files, MLB `feed_live` 1 date, WNBA game-cards 4
+  files. Do not start it by backtesting what is on disk. `[measured 08-14]`
+- **`#429` — `mlb batter_hits_runs_rbis` projected a constant `0.0` across 188
+  games. FIXED BOTH ENDS.** HRR is Hits+Runs+RBIs, a SUM of three primitives
+  the sim models separately, so the mean is derivable exactly by linearity of
+  expectation (holds despite the three being heavily correlated; means only,
+  never probabilities).
+  - Read-time derivation live on both services, **VERIFIED**: distinct
+    **1 -> 85**, range 1.363..3.833 against a 1.5 line, and cross-checked
+    against the sim's OWN probabilities — `corr 0.9267` with a control of
+    `0.1156` for the near-constant market line. `[measured 08-14]`
+  - Producer fixed at source (`_inc_sum(pid, "H+R+RBI", hrr)`, **both** copies
+    of the accumulation) and live on refresh-worker. `_stat` reads only what
+    `_inc_sum` accumulated and this composite was never summed, so the mean was
+    `0 / sims`. **NOT YET PROVEN — needs the next sim to write a summary.**
+    `[unverified 08-14]`
+  - **Discriminator needing no artifact access:** `projected_derived_from` is
+    stamped only when the read-time path had to reconstruct. On the board,
+    `derived == 0` with values present means the producer is fixed;
+    `derived == 88` means it is still writing `0.0`. `[code 08-14]`
+- **`SYNDICATE_TRACEMALLOC_DIAG` was `1` on refresh-worker while the commit
+  wiring it says "default OFF".** Set to **`0`** 2026-08-14 (key kept, not
+  deleted — the gate is `value in {1,true,yes,on}`, so absent and `0` are
+  equally off, and a visible key shows it was disabled deliberately). Restore
+  with `1` + a deploy. Its owning session is archived. `[measured 08-14]`
+- **The NFL season-projection autorun fires at 21:00Z = 16:00 CDT, NOT 21:00
+  CDT.** Seven ledger lines carried a UTC timestamp reported as local — a
+  five-hour error that would have armed a watcher after the event. Render logs
+  are UTC; this ledger is CDT. `[measured 08-14]`
+- **`#389`'s follow-up is CONFIRMED WORKING** on the criterion it set in
+  advance: a positive `artifact_path=` on the mounted disk with no `/src/`
+  (21:02:06Z), plus `SEASON_PROJECTION_ARTIFACT_MISSING` 30 before that write
+  and 0 after. Writer and staleness guard finally resolve the same root.
+  `[measured 08-13]`
+- **A closed lane is an ACTIVE LOCK, not a stale note.** `lane-guard` returned
+  exit 2 for two files for hours after their work shipped and was verified.
+  Close a lane when the measurement lands. `[measured 08-14]`
 
 - Max concurrent open lanes: **3** `[policy]`
 - Repo tip: local `main` `c506eb2a`, **25 ahead / 8 behind `origin/main`**
@@ -127,6 +210,173 @@
     reason this list exists.
 - Short session ids are indistinguishable from short SHAs. Every one in the
   ledger is prefixed `session` — keep it that way. `[policy]`
+
+## RETRACTED — the 12MB publish ceiling is NOT the cause `[falsified 08-14 16:2xZ]`
+
+**Everything in the section below this one was written as a root cause and is
+WRONG. Read this first.**
+
+- **THE FILE CROSSES FINE.** Fetched web's own copy through
+  `/api/ops/artifacts/stream`: `mlb_source/tracking/book_quotes/2026-08-14.jsonl`
+  is **12,800,063 bytes on WEB** — byte-identical to the size live-odds-worker
+  reports. Worker -> web transport is WORKING.
+- **Why the ceiling never mattered, and it was written in the code the whole
+  time.** `artifact_publisher.py:1007` says it plainly: the ceiling lives in
+  `_publish_skip_reason`, which is **sweep-only**, while **the direct path
+  streams and never consults it** — verified there in production against
+  book_grid at 12,855,903 bytes. And `append_book_quotes` takes
+  `publish: bool = True` **by default**, with no call site overriding it, so
+  every append already publishes through the direct streamed path. The
+  `SWEEP_SKIPPED_DETAIL too_large=` lines are a NOISY DUPLICATE of a publish
+  that already happened — real, measured, and not load-bearing.
+- **What is actually measured now:** the newest `captured_at` anywhere in the
+  shard is **2026-08-14T15:10:44.825256+00:00**, and 860 of the last 861 rows
+  carry that same instant — one capture burst, then nothing for ~70 minutes.
+  So the open question is why MLB capture stopped producing rows after
+  15:10:44Z. **That is NOT established, and it is not a transport fault.**
+- **How this went wrong, because the pattern is the point.** A real anomaly
+  (`too_large` on a 12.8MB file, 12 occurrences) was promoted to root cause
+  because it was surprising and fit the symptom. The falsifying fact — that the
+  direct path bypasses the ceiling — was in a comment in the same file, twenty
+  lines from the constant, and was read AFTER the conclusion was written. The
+  ledger already carries this exact rule: *"the more a datum overturns the
+  expected answer, the more it must be re-read at full width before being
+  written down."* Also `#402`'s comment records THREE prior sessions misreading
+  `{'too_large': N}` the same way. This is the fourth.
+- **Standing correction for whoever reads a `too_large` line next: it does NOT
+  mean the artifact failed to publish.** Check the direct path first. The
+  sweep's refusal and the artifact's actual delivery are independent.
+
+
+
+### SUPERSEDED BY THE RETRACTION ABOVE — kept for the reasoning trail
+
+- **`_PUBLISH_MAX_BYTES = 12 * 1024 * 1024` = 12,582,912 bytes**
+  (`artifact_publisher.py:956`). The MLB shard
+  `mlb_source/tracking/book_quotes/2026-08-14.jsonl` is **12,800,063 bytes** —
+  **over by 217,151 bytes, 1.7%.** `_publish_skip_reason` returns
+  `too_large:12800063` and the sweep drops it, every cycle:
+  `SWEEP_SKIPPED_DETAIL too_large=[mlb_source/tracking/book_quotes/2026-08-14.jsonl(12800063)]`
+  on live-odds-worker, 12 occurrences in 3h.
+- **So MLB quote capture is FINE and the TRANSPORT is what stopped.** The file
+  is being written on live-odds-worker's disk; it simply never crosses to
+  refresh-worker, whose Layer 2 has been reading a frozen copy ever since.
+- **Positive control is in the data, by contrast:** `nfl_source/tracking/
+  book_quotes/2026-08-14.state.json` (1,268,613 bytes) publishes normally at
+  16:08:46. Sports under the ceiling cross; MLB, over it, does not. That is the
+  mechanism confirmed by a working case, not by inference from a zero.
+- **It explains the timestamp the `board-ui` lane measured independently.**
+  They found the freshest MLB row `updated_at` = **13:09:05Z** against a
+  1.6-min-old artifact. That is when the shard crossed 12MB. Two lanes, two
+  instruments, one cause.
+- **THIS RECURS DAILY.** The shard is an append-only per-date JSONL that grows
+  all day, so every day it crosses 12MB at some hour and MLB odds transport
+  dies from that moment until midnight. Today: ~13:09Z. It is not a one-off.
+- **RETRACTION of this session's earlier framing: "the quote capture stopped"
+  was WRONG, and so was "`append_book_quotes` was not called."** Both came from
+  zero `[odds_book_quotes]` lines on live-odds-worker. That zero has a SECOND
+  cause I had not read: `_append_mlb_book_quotes`
+  (`scripts/fetch_mlb_oddsapi_local.py:1550`) returns early on `if not rows:`
+  **before** calling `append_book_quotes`, and that early return prints
+  nothing. The unconditional print at `odds_book_quotes.py:422` proves only
+  that `append_book_quotes` was not REACHED — not that capture stopped. The
+  actual fault was one layer further out, in the publisher.
+- **DO NOT just raise `_PUBLISH_MAX_BYTES`.** Its own comment forbids it
+  without a measured reason: the bound is what stops the sweep shipping 51MB
+  odds_history shards every cycle, and the cost is bandwidth, disk churn and
+  receiver time — the same egress that produced a month of overage billing
+  (`learnings.md`, 2026-08-12 FORBIDDEN). A gzipped/compacted transport
+  (`odds_book_quotes` already writes `.jsonl.gz` for older shards — the soccer
+  cache evictions show `2026-08-09.jsonl.gz`) or a delta/chunked publish is the
+  shape that does not reopen that.
+- Sibling, same window, NOT the same file, do not conflate: refresh-worker also
+  drops `mlb_source/source_artifacts/data/daily/ladders/daily_ladders_2026_08_14.json`
+  (15,689,798 bytes) on the same rule.
+
+## THE BOARD HAS TWO INDEPENDENT STALENESS CAUSES, and fixing one is not enough
+
+- **Cause 1 — refusal rate.** See the section below. 96.7% of board cycles were
+  refused pre-reboot. `[measured 08-14 14:39Z]`
+- **Cause 2 — THE QUOTE INPUT IS NOT MOVING, and this one is live RIGHT NOW,
+  after the reboot, on a worker that is rebuilding the board fine.**
+  `[measured 08-14 15:1xZ]`
+  - Post-reboot the shortlist rebuilds **12x in 1.5h** — healthy cadence — and
+    `LAYER2_SHORTLIST` reports **`considered=14195` on every single one**
+    (14:44:31, 14:46:53, 14:50:57, 15:04:29, 15:12:36; and 14167 on the two
+    before that). The board is rebuilding off an input that does not change.
+  - **live-odds-worker emitted ZERO `[odds_book_quotes]` lines in a 1h window**
+    (positive control: 715 `PUBLISH_OK`/`LAYER2` lines in the same fetch, so
+    the probe is live). `odds_book_quotes.py:422` prints **unconditionally** —
+    every exit from the append function goes through it or the `FAILED` line —
+    so zero means **that function was not called on that service at all.**
+    It is the writer of the `book_quotes` shards `layer2_shortlist.py` reads
+    via `read_book_quotes`.
+  - Independently corroborated by the `board-ui-freshness-slip-books` lane from
+    the other end: `/api/board/layer1?sport=mlb` at 15:00Z carried artifact
+    `generated_at` 14:58:49Z (1.6 min) against a freshest row `updated_at` of
+    **13:09:05Z — 1h51m**, with min `seen_age_seconds` 6576.8s agreeing. Two
+    lanes, two instruments, two ends of the pipeline, same conclusion.
+  - **METHOD WARNING on this measurement.** The first pass grepped
+    `BOOK_QUOTES`/`BOOK_QUOTES_APPENDED`/`QUOTE_CAPTURE` and got 0 on both
+    services. **Those tokens do not exist** — the emitter prints a bare JSON
+    blob under `[odds_book_quotes]`. That zero was a broken probe and was
+    within one step of being reported as "capture is dead". Run the positive
+    control; verify the token against the emitter, not against memory.
+  - Also seen, unrelated to the above but worth knowing: refresh-worker's
+    `_BOOK_QUOTES_CACHE` is evicting **today's** WNBA shard
+    (`wnba_source/tracking/book_quotes/2026-08-14.jsonl`) at its 500MB budget.
+    Live data being evicted to stay under budget.
+- **Consequence for any board-freshness work: rebuilding more often cannot fix
+  cause 2.** A shortlist rebuilt every 5 minutes off a 2-hour-old quote shard
+  is a board that LOOKS fresh and is not — strictly worse than one that is
+  visibly stale, because nothing on it says so.
+
+## Board freshness is a REFUSAL RATE, not a build duration (layer2-board-freshness)
+
+- **96.7% of board cycles are refused before any work.** Measured
+  11:39-14:39Z on refresh-worker (live commit `2e4e2544`, re-read in the same
+  run): **146 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` against 5
+  completed builds.** Every other abort stage was 0.
+  `OVERVIEW_STOPPED_FOR_MEMORY next_sport=mlb` fired 3 times.
+  `[measured 08-14 14:39Z]`
+- **Longest stretch with NO Layer 2 rebuild: 104.7 minutes** (12:44:20 ->
+  14:29:00Z). Gaps n=4: 2.1 / p50 7.8 / max 104.7 min. That gap IS the stale
+  board — rows for games that had already started. `[measured 08-14]`
+- **The guard doing the refusing protects a stage Layer 2 never runs.** It is
+  `_MIN_SAFE_MEMORY_HEADROOM_BYTES` (1900MB), sized in its own comment for
+  `build_intelligence_overview`. Production's own proof they are independent:
+  on 3 of the 5 completed builds `CANDIDATE_POOL_READY count=0` while
+  `LAYER2_SHORTLIST` returned `rows=256 considered=13665` on the SAME cycle.
+  `[measured 08-14]`
+- **The Layer 2 stage costs 14-27s and +27..181MB** (4 builds, 14:43-14:51Z,
+  sports mlb/nfl/soccer/wnba; the 14:48 sample is 2 sports). Coverage stated
+  because it is 4 builds in one 8-minute window on one boot — it does NOT
+  cover a 7-sport October slate. `[measured 08-14]`
+- Legacy `candidate_collection_with_fallback`: n=5, p50 0.00s, max 260.28s,
+  **sum 498.7s / 3h**. The 0.00s builds are the ones with an empty overview.
+  `[measured 08-14]`
+
+## refresh-worker memory today: a PLATEAU, not a ratchet `[measured 08-14 14:15Z]`
+
+- Over 11:45-14:15Z (2.5h, boot-segmented, 3,427 CONTAINER_MEMORY samples)
+  `anon` went **2620.1 -> 2439.6MB**. It did not ratchet. It oscillates
+  ~1400-2800MB. **The 08-13 growth regime is not what was running today** —
+  do not carry 08-13's rate forward without re-measuring.
+- The defect is the LEVEL: p50 ~2200-2800MB against the 2196MB the guard needs
+  (4096 - 1900). The guard is therefore refusing roughly whenever it looks,
+  which is the 96.7% above.
+- Split at peak: container 3830.1MB / 93.5%, `accounted_rss` 2468.5MB over 6
+  processes, **main worker pid 39 = 2236.98MB**, reclaimable file cache
+  1428.0MB, unreclaimable 2402.7 ~= anon 2393.5.
+- Loudest repeating allocator: MLB **`board_contract`** (1,022
+  begin->games_normalized transitions in 2.5h, ~1 per 8.8s) and
+  **`cards_context`** (127, ~1 per 71s), sawtoothing about +637MB against
+  -555MB per cycle. A sawtooth is not by itself a retainer — **what holds the
+  ~1400-2000MB FLOOR is still unnamed.**
+- **The board build is NOT the retainer.** It ran 5 times in 3 hours while
+  `anon` stayed high throughout.
+- A deploy at **14:22:32Z (`2e4e2544`, trigger=api)** restarted the worker;
+  `anon` fell to 244MB and builds resumed at ~2min cadence. Reboot, not fix.
 
 ## refresh-worker memory — `#417` CLOSED, `#423` OPEN
 
