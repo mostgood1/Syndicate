@@ -31067,7 +31067,66 @@ fixtures now supply synthetic prior-season plays with distinct per-club EPA,
 which is what their names always described. Still hermetic; no test touches the
 real `pbp_2025.csv`. No assertion was weakened.
 
-### `#425` — OPEN, UNOWNED. A skill check that covers ONE of seven projection builders is a check that will be absent the next time it matters
+### `#425` — **HALF DONE.** Gap 2 (degeneracy detection) SHIPPED `2e4e2544`. Gap 1 (skill annotation on six builders) STILL OPEN, UNOWNED
+
+> **STATUS 2026-08-14. Read this before treating the ticket as either done or
+> untouched — it is neither.**
+>
+> **GAP 2 — DEGENERACY DETECTION: DONE, in `2e4e2544`.**
+> `detect_degenerate_projections` reports any `(kind, market, segment)` whose
+> projection has collapsed to a single value, for **every sport**, and marks
+> the affected rows with an attributable
+> `projection_unavailable_reason`. Coverage gains
+> `degenerate_projection_groups` / `degenerate_projections`, and a
+> `DEGENERATE_PROJECTION` warning is logged with sport, market, value and game
+> count.
+>
+> **Where it lives is the design, not an implementation detail.**
+> `attach_projections` had **13 return sites across 7 sports**; adding the
+> check at each is exactly the `#334` failure (three of four call paths
+> patched, the fourth silently still broken). The per-sport body became
+> `_attach_projections_by_sport` and `attach_projections` became a thin
+> wrapper that scans the grid afterwards — one place, every sport, all 13
+> return paths, **every producer wired in future**, and zero call sites
+> touched. That is what makes the coverage structural rather than a thing
+> someone has to remember.
+>
+> **Counts GAMES, not rows.** Alt lines put many rows on one game (the
+> 2026-08-13 NFL board carried 117 rows on a single game), so a row-based
+> count would call a 3-game slate a 60-unit constant. Threshold is **>= 4
+> distinct games**, deliberately conservative: a false positive BLANKS a real
+> projection, which is worse than the gap it closes.
+>
+> Verified against the real failure shape: 16 games × 3 markets with the
+> 2026-08-13 constants flags 2 groups reporting `games=16` despite 32 alt-line
+> rows. 22 tests, and the FALSIFICATION cases outnumber the positive ones —
+> varying slate, 3-game constant slate, 20 alt rows on 3 games, no projections,
+> all-null projections, constant total beside varying spread. Plus a boundary
+> test at exactly the threshold, without which the below-threshold test would
+> pass against a detector that never fires.
+>
+> **GAP 1 — SKILL ANNOTATION: NOT DONE. This is what keeps `#425` open.**
+> `skill_note` is still called in exactly one of seven builders. These six have
+> none:
+>
+>     soccer_projections        wnba_game_projections     wnba_projections
+>     prop_projections          live_projection_join      game_board_contract
+>
+> **Deliberately not bulk-wired, and this is a judgement worth inheriting:**
+> the annotation is only worth anything if it carries a MEASURED number.
+> `#367` produced NFL's the hard way — corr −0.047 over 146 real games. Six
+> models means six backtests, which is modelling work, not plumbing. Filling
+> the field with placeholders would be worse than the gap: a board that says
+> "skill: unknown" everywhere trains readers to ignore the field, and then the
+> one real warning is invisible too.
+>
+> **Note the two gaps are genuinely independent, which is why shipping one was
+> not premature.** Gap 2 catches a model whose INPUT vanished today; gap 1
+> describes a model that never predicted well. The 2026-08-13 failure was
+> purely the former, and a fully-populated skill table would not have caught
+> it.
+
+**Original entry follows.**
 
 **Carved out of `#377` at its closure (2026-08-13) so it does not disappear
 with it.** `#377`'s two observable defects are fixed and verified; this — which
