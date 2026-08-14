@@ -31800,6 +31800,43 @@ correctly REFUSED to emit a constant: only 9 of 361 completed games carry a
 projection, because `pred_margin`/`pred_total` only began being written on
 2026-08-02. Not a defect, not measurable yet, re-run ~2026-08-26. Details below.
 
+**COVERAGE SWEEP RUN 2026-08-14. One clear GO, two NOT ESTABLISHED — and the
+two non-results are my probe, not the data.**
+
+| model | files found | projection populated | verdict |
+|---|---|---|---|
+| `prop_projections` (MLB props) | **9 of 12** dates | **9 of 9** carry `hitter_props_likelihood_topn` across 8 markets (`hits`, `total_bases`, `rbi`, `runs`, `doubles`, `triples`, `sb`, `hits_runs_rbis`) | **GO — best next target** |
+| `wnba_projections` (WNBA props) | 10 of 12 dates | **NOT ESTABLISHED** | probe was wrong |
+| `soccer_projections` | 0 of 9 league/date combos | **NOT ESTABLISHED** | path unverified |
+
+**MLB PROPS IS THE ONE TO BUILD NEXT.** Deep history, eight markets, and the
+outcome side is real work but available (`MLB StatsAPI feed_live` per game gives
+per-player box scores). It is also the model behind `#429`, so its output is
+already better understood than any of the others.
+
+**THE WNBA-PROPS ZERO IS RETRACTED — DO NOT CITE IT.** The sweep tested for a
+column named `projection`/`projected` in the CSV header. The real header is
+`player,team,plays,ladders,sim_ladders,model,_plays_list,top_play,...` and the
+per-market values are NESTED inside the `plays` blob
+(`{'market': 'pa', 'side': 'UNDER', 'line': 23.5, 'price': 100.0, 'edge': ...}`).
+The sibling `recommendations_slate_<date>.json` demonstrably carries
+`"projection": 18.33, "projected": 18.33` for the same player/market. So the
+data is probably there and the probe simply could not see it. **Re-check by
+parsing the nested structure before anyone concludes anything.**
+
+**THE SOCCER ZERO IS ALSO NOT A FINDING.** Nine league/date combinations
+(`mls`/`epl`/`la_liga` x 3 dates) at
+`soccer_source/<league>/api/recommendations/recommendations_<date>.json`
+returned nothing at all — which reads equally as "the artifact is not there" and
+"I guessed the wrong path". No positive control was run, so it establishes
+nothing. Confirm the real path from `soccer_projections.load_soccer_projections`
+before recording soccer as blocked.
+
+**METHOD NOTE, and it is the fourth instance today:** both non-results came from
+guessing a field or path name. `files found` and `projection populated` are
+different questions and only the first was answered reliably. A zero from a
+probe that never located the data is not evidence about the data.
+
 **BEFORE BUILDING ANY OF THE OTHER THREE, RUN THE COVERAGE CHECK FIRST.** The
 WNBA attempt spent its whole cost discovering that the data was 13 days old. A
 coverage sweep is cheap and answers "is this measurable at all" before anyone
