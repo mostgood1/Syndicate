@@ -3202,17 +3202,78 @@ def _release_freed_memory_to_os(reason: str) -> dict[str, Any] | None:
         return None
 
 
-def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
+# THE LAYER 2 SHORTLIST'S OWN FLOOR. Deliberately NOT the 1900MB above.
+#
+# `_MIN_SAFE_MEMORY_HEADROOM_BYTES` is sized for build_intelligence_overview's
+# ~1.9GB transient, and its own comment states the rule this constant follows:
+# "the floor must be the cost of the stage being guarded, not a round number."
+# The Layer 2 shortlist does not run that stage. It reads book-quote shards,
+# builds a grid, enriches and ranks -- and its cost was measured rather than
+# assumed, on refresh-worker 2026-08-14 across the four builds that completed
+# between 14:43 and 14:51Z (post_candidate_building -> post_layer2_shortlist):
+#
+#     14:44:04 -> 14:44:31   27s   2126.9 -> 2154.2MB container   +27.3MB
+#     14:46:27 -> 14:46:53   26s   2001.6 -> 2072.6MB             +71.1MB
+#     14:48:33 -> 14:48:47   14s   2106.6 -> 2287.7MB            +181.2MB   (2 sports)
+#     14:50:30 -> 14:50:57   27s   2115.8 -> 2185.3MB             +69.5MB
+#
+# COVERAGE, stated in the same sentence as the number because a partial
+# measurement is a different answer and not a smaller one: four builds, one
+# 8-minute window, one boot, sports mlb/nfl/soccer/wnba (the 14:48 sample is
+# soccer/wnba only). It does NOT cover an October 7-sport slate. The span also
+# INCLUDES the manifest loop that precedes the shortlist call, so it
+# over-attributes rather than under-attributes -- the safe direction.
+#
+# 600MB is the largest observed delta (181MB) carried at ~3.3x margin. The
+# margin is deliberately generous in RATIO and still small in ABSOLUTE terms,
+# because the two errors are not symmetric: too high only costs board
+# freshness on a cycle that was already refusing, while too low costs an OOM
+# kill that takes the sims and every other loop in this process with it.
+# `#241` is on record as a worker whose added periodic work caused a
+# production restart loop. Raise this, never lower it, without a measurement
+# that covers a wider slate than the four builds above.
+_LAYER2_MIN_SAFE_HEADROOM_BYTES = 600 * 1024 * 1024
+
+
+def _abort_if_memory_critical(stage: str, floor_bytes: int, *, token: str = "MEMORY_GUARD_ABORT") -> bool:
+    """Shared guard body. `floor_bytes` is the cost of the stage being guarded.
+
+    Split out of `_abort_build_candidate_pool_if_memory_critical` so a cheap
+    stage can be gated on a cheap floor. The line carries `floor_mb` so a
+    reader can tell WHICH guard refused -- with two floors live, a bare
+    `MEMORY_GUARD_ABORT stage=...` no longer identifies the threshold that
+    fired, and the whole point of the split is that they disagree.
+
+    `token` IS A CROSS-LANE CONTRACT, NOT A FORMATTING CHOICE.
+    `MEMORY_GUARD_ABORT` is a COUNTED quantity elsewhere in this repo: `#417`'s
+    verification criterion (`.syndicate/lanes.md`, still open and unowned when
+    this was written) is literally "count `MEMORY_GUARD_ABORT` on
+    refresh-worker since 2026-08-13T18:05:38Z -- aborts ~0 with the board still
+    building = the fix holds." A second guard emitting the same token under a
+    DIFFERENT floor would have added its refusals to that count and read as
+    that fix failing worse than it does. `scripts/diagnose_sim_pipeline.py` and
+    `scripts/diagnose_betting_pipeline.py` match it by regex alternation and
+    would have been skewed the same way.
+
+    So: a new guard gets its OWN token, and the existing counter keeps
+    measuring exactly what it measured before. Adding `floor_mb=` to the
+    existing line is safe by the same audit -- every consumer matches the token
+    by alternation, none parses positionally.
+    """
     try:
         from syndicate.features.shared.memory_observability import memory_headroom_snapshot
 
-        snapshot = memory_headroom_snapshot(_MIN_SAFE_MEMORY_HEADROOM_BYTES)
+        snapshot = memory_headroom_snapshot(floor_bytes)
     except Exception as exc:
         print(f"[intelligence_state] MEMORY_GUARD_CHECK_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
         return False
     if snapshot is None or snapshot.get("sufficient", True):
         return False
-    print(f"[intelligence_state] MEMORY_GUARD_ABORT stage={stage} snapshot={snapshot}", flush=True)
+    print(
+        f"[intelligence_state] {token} stage={stage} "
+        f"floor_mb={floor_bytes // (1024 * 1024)} snapshot={snapshot}",
+        flush=True,
+    )
     try:
         import gc
 
@@ -3220,6 +3281,10 @@ def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
     except Exception:
         pass
     return True
+
+
+def _abort_build_candidate_pool_if_memory_critical(stage: str) -> bool:
+    return _abort_if_memory_critical(stage, _MIN_SAFE_MEMORY_HEADROOM_BYTES)
 
 
 def _profile_stage(stage_name: str, callback, *args, **kwargs):
@@ -3286,6 +3351,11 @@ class IntelligenceStateService:
         self._last_run_finished_at: float = 0.0
         self._last_run_key: str | None = None
         self._loaded_from_disk = False
+        # Rate-limit stamp for the Layer 2 fast path. Set by BOTH the fast path
+        # and the full build's own shortlist write, so a healthy cycle that
+        # already produced a shortlist does not immediately get a second one --
+        # the point is board age, not two independent schedules.
+        self._layer2_fast_refresh_at: float = 0.0
         self._app: Flask | None = None
 
     def _artifact_signature(self, relative_path: str | None) -> dict[str, Any]:
@@ -3353,6 +3423,128 @@ class IntelligenceStateService:
             "updated_at": str(active_payload.get("updated_at") or "").strip() or None,
             "market_count": int(market_count),
         }
+
+    def _refresh_layer2_shortlist_only(self, selected_date: str | None) -> dict[str, Any] | None:
+        """Rebuild and persist JUST the Layer 2 shortlist, off the heavy path.
+
+        WHY THIS EXISTS -- measured on refresh-worker 2026-08-14, 11:39-14:39Z,
+        live commit `2e4e2544` re-read in the same run:
+
+            146  MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint
+              5  completed board builds
+
+        96.7% of board cycles were refused before doing any work at all, by a
+        guard sized for `build_intelligence_overview`. The longest stretch with
+        no `LAYER2_SHORTLIST` line was **104.7 minutes** (12:44:20 -> 14:29:00Z).
+        That is the stale board: rows whose games had started, still served,
+        because the process that would have dropped them never ran.
+
+        THE SHORTLIST DOES NOT READ WHAT THAT GUARD PROTECTS. It needs the date
+        and the sports with a manifest -- not `overview`, not the candidate
+        pool, not `_collect_candidates`. The strongest evidence is production's
+        own: on 3 of those 5 completed builds the Layer 1 pool returned
+        `count=0` while `LAYER2_SHORTLIST` returned 256 rows from 13,665
+        opportunities on the same cycle.
+
+        WHAT THIS IS NOT. It does not lower either existing floor and it does
+        not run the overview. The expensive path stays refused exactly as often
+        as before; this only stops the cheap path being refused WITH it.
+
+        THE PULL IS NOT OPTIONAL. `read_book_quotes` reads this service's own
+        disk, and the quotes are captured by live-odds-worker -- so without
+        `pull_hot_artifacts` the shortlist would rebuild on schedule against
+        prices that never move, which is a WORSE failure than a stale board
+        because it looks fresh. Confirmed in `artifact_publisher`: book_quotes
+        reach this worker only through that call's explicit path list.
+
+        Never raises. Returns the shortlist it wrote, or None if it did not run.
+        """
+        normalized_date = str(selected_date or "").strip()
+        if not normalized_date:
+            return None
+        if not _env_bool("SYNDICATE_LAYER2_FAST_REFRESH_ENABLED", default=True):
+            return None
+        # WORKER-ONLY, enforced by the same authority `_build_candidate_pool`
+        # uses rather than a second copy of the test. `_compute_board_publication_
+        # response` has TWO callers -- the background loop AND
+        # `run_intelligence_query`, which does execute in a live request on web
+        # when the loop flag is off (it is: `SYNDICATE_ENABLE_INTELLIGENCE_STATE_
+        # BACKGROUND_LOOP=false` on the live web service). Without this, a web
+        # request that happened to hit the memory-guard branch would pull
+        # artifacts and rebuild a shortlist inside a 2GB container with an OOM
+        # history -- the exact shape of `#98`.
+        #
+        # Caught, not propagated: this method's contract is that it never
+        # raises, and a refusal here is a correct skip rather than a failure of
+        # the publication it sits inside.
+        try:
+            from syndicate.features.shared.request_path_guard import refuse_if_compute_in_request_path
+
+            refuse_if_compute_in_request_path("layer2_fast_refresh")
+        except Exception as exc:
+            print(f"[intelligence_state] LAYER2_FAST_REFRESH_SKIPPED reason={type(exc).__name__}", flush=True)
+            return None
+        # Rate limit, in front of the memory guard rather than behind it: the
+        # loop tick is ~71s and the shortlist stage measured 14-27s, so an
+        # ungated fast path would run at a ~30% duty cycle on a worker that is
+        # already the memory-constrained service. At the 300s default it is
+        # ~8%, which is comfortably below the 498.7s/3h (4.6%) the Layer 1
+        # collection was already spending, and still caps board age at ~5min
+        # against the 104.7min measured.
+        min_interval = max(60, _env_int("SYNDICATE_LAYER2_FAST_REFRESH_SECONDS", 300))
+        now = time.time()
+        last = float(getattr(self, "_layer2_fast_refresh_at", 0.0) or 0.0)
+        if last and (now - last) < min_interval:
+            return None
+        # ITS OWN floor, not the overview's. See _LAYER2_MIN_SAFE_HEADROOM_BYTES.
+        _release_freed_memory_to_os("pre_layer2_fast_refresh_guard")
+        # Own token -- see `_abort_if_memory_critical`. `#417`'s open
+        # verification counts bare `MEMORY_GUARD_ABORT` and must not pick this
+        # guard's refusals up as that guard's.
+        if _abort_if_memory_critical(
+            "layer2_fast_refresh", _LAYER2_MIN_SAFE_HEADROOM_BYTES, token="LAYER2_GUARD_SKIP"
+        ):
+            return None
+        self._layer2_fast_refresh_at = now
+        started = time.time()
+        try:
+            from syndicate.features.shared.artifact_publisher import pull_hot_artifacts
+
+            pull_hot_artifacts(date_str=normalized_date)
+        except Exception as exc:
+            # Same contract as the heavy path's pull: a network blip means this
+            # cycle reads slightly older quotes, not that the board stops.
+            print(f"[intelligence_state] LAYER2_FAST_PULL_FAILED error={exc}", flush=True)
+        try:
+            from pipeline.layer2_shortlist import build_layer2_shortlist
+
+            manifests = self._available_sport_manifests(normalized_date)
+            shortlist = build_layer2_shortlist(normalized_date, list(manifests.keys()))
+        except Exception as exc:
+            print(f"[intelligence_state] LAYER2_FAST_REFRESH_FAILED error={type(exc).__name__}: {exc}", flush=True)
+            return None
+        try:
+            write_layer2_shortlist(normalized_date, shortlist)
+        except Exception as exc:
+            print(f"[intelligence_state] LAYER2_FAST_REFRESH_WRITE_FAILED error={exc}", flush=True)
+            return None
+        # ON THE SUCCESS PATH, not only the failure path. The ledger records a
+        # deploy whose only discriminator was emitted inside an abort branch,
+        # so a working fix left it permanently silent and "working" and "never
+        # ran" produced identical evidence. `rows` and `considered` here are
+        # what makes this path's liveness readable, and they are what the
+        # verification query counts.
+        print(
+            f"[intelligence_state] LAYER2_FAST_REFRESH date={normalized_date} "
+            f"rows={len(shortlist.get('rows') or [])} "
+            f"considered={shortlist.get('opportunities_considered')} "
+            f"sports={shortlist.get('active_sports')} "
+            f"elapsed_s={round(time.time() - started, 2)}",
+            flush=True,
+        )
+        _diag_log_all_process_memory("post_layer2_fast_refresh")
+        _release_freed_memory_to_os("post_layer2_fast_refresh")
+        return shortlist
 
     def _available_sport_manifests(self, selected_date: str | None) -> OrderedDict[str, dict[str, Any]]:
         # Root-caused 2026-07-25: this only ever reads sport.get("slug") below,
@@ -4535,6 +4727,18 @@ class IntelligenceStateService:
         # is what actually makes L2-A readable by web. See write_layer2_shortlist.
         try:
             write_layer2_shortlist(str(selected_date or ""), layer2_shortlist)
+            # Share the rate-limit stamp with the fast path. A full build that
+            # just wrote a GOOD shortlist IS a refresh; without this the fast
+            # path would fire again moments later on the next refused cycle and
+            # pay the pull twice for the same board age.
+            #
+            # `error` checked explicitly: the branch above writes an errored
+            # empty payload too, and stamping on that would silence the fast
+            # path for a full interval precisely when it is the only thing left
+            # that could rebuild the board. A failure must not look like a
+            # refresh.
+            if not layer2_shortlist.get("error"):
+                self._layer2_fast_refresh_at = time.time()
         except Exception as exc:
             print(f"[intelligence_state] LAYER2_SHORTLIST_WRITE_FAILED error={exc}", flush=True)
         _diag_log_all_process_memory("post_layer2_shortlist")
@@ -5264,6 +5468,27 @@ class IntelligenceStateService:
         except Exception:
             pass
         if _abort_build_candidate_pool_if_memory_critical("pre_source_state_fingerprint"):
+            # THE REFUSAL IS SPLIT HERE, and this is the whole change.
+            #
+            # This guard refuses the Layer 1 pool build, correctly -- it is
+            # sized for `build_intelligence_overview` and that stage really can
+            # take the process over 4GiB. What it must NOT keep doing is taking
+            # the Layer 2 shortlist down with it: that is the board web serves,
+            # it does not run the overview, and its own cost measured 14-27s
+            # and +27..181MB against this guard's 1900MB floor.
+            #
+            # Measured consequence of NOT splitting it (11:39-14:39Z 2026-08-14):
+            # 146 refusals here against 5 completed builds, and a 104.7-minute
+            # stretch in which the shortlist was never rebuilt -- so the board
+            # kept serving rows for games that had already started.
+            #
+            # `ok: False` is preserved deliberately. This response still failed
+            # to produce a Layer 1 pool and must not be read as a successful
+            # publication; the shortlist reaches web through
+            # `write_layer2_shortlist`'s own artifact (see its docstring), and
+            # is carried on the response only so a caller that has one can see
+            # it without a second read.
+            layer2_shortlist = self._refresh_layer2_shortlist_only(selected_date)
             return _decorate_response_with_state_meta(
                 {
                     "ok": False,
@@ -5273,6 +5498,12 @@ class IntelligenceStateService:
                     "by_sport": {},
                     "selected_date": selected_date,
                     "candidate_count": 0,
+                    "layer2_shortlist": layer2_shortlist or {"rows": []},
+                    # Distinguishes "the fast path ran" from "it was rate
+                    # limited or refused by its own floor" -- without this the
+                    # two are the same empty rows list, which is the failure
+                    # mode this file's own ledger keeps recording.
+                    "layer2_fast_refresh_ran": layer2_shortlist is not None,
                 },
                 None,
                 source="worker",
