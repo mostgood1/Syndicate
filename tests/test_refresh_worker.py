@@ -1759,3 +1759,83 @@ class MallocArenaDiagnosticTests(unittest.TestCase):
             with contextlib.redirect_stdout(buf):
                 module._diag_log_malloc_arena("boot")
             self.assertNotIn("MALLOC_ARENA ", buf.getvalue())
+
+
+class AllocationTracingDiagnosticTests(unittest.TestCase):
+    """`#423` step 2 wiring.
+
+    Default OFF is the load-bearing property: tracemalloc keeps a traceback per
+    live allocation on a process that reaches its 4GB ceiling hourly, and #241
+    is on record as a worker whose periodic work caused a production restart
+    loop. These pin that it stays inert unless asked, is rate limited when on,
+    and cannot take the worker down.
+    """
+
+    @staticmethod
+    def _load_module():
+        repo_root = Path(__file__).resolve().parents[1]
+        script_path = repo_root / "scripts" / "run_refresh_worker.py"
+        spec = importlib.util.spec_from_file_location("test_tracemalloc_worker", script_path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec is not None and spec.loader is not None
+        spec.loader.exec_module(module)
+        return module
+
+    def test_it_is_inert_unless_explicitly_enabled(self) -> None:
+        module = self._load_module()
+        module._TRACEMALLOC_DIAG_LAST["at"] = 0.0
+        # No env var set at all -- the default production path.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("SYNDICATE_TRACEMALLOC_DIAG", None)
+            with patch("syndicate.features.shared.memory_observability.allocation_snapshot") as snap:
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    module._diag_log_allocation_sites("post_mlb_sim_tick")
+                self.assertNotIn("TRACEMALLOC_SITES", buf.getvalue())
+                # And the expensive call is never even reached.
+                snap.assert_not_called()
+
+    def test_when_enabled_it_emits_once_then_rate_limits(self) -> None:
+        module = self._load_module()
+        module._TRACEMALLOC_DIAG_LAST["at"] = 0.0
+        payload = {"traced_mb": 1500.0, "peak_mb": 1600.0, "anon_mb": 2031.0,
+                   "traced_pct_of_anon": 73.9,
+                   "top": [{"site": "sim.py:42", "mb": 900.0, "count": 12}]}
+        with patch.dict(os.environ, {"SYNDICATE_TRACEMALLOC_DIAG": "1"}), \
+             patch("syndicate.features.shared.memory_observability.allocation_snapshot",
+                   return_value=payload):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                module._diag_log_allocation_sites("post_mlb_sim_tick")
+                module._diag_log_allocation_sites("post_mlb_sim_tick")  # inside 600s
+            out = buf.getvalue()
+        self.assertEqual(out.count("TRACEMALLOC_SITES "), 1, out)
+        # traced_pct_of_anon is the number the lane turns on -- it must survive
+        # into the line, not just the top list.
+        self.assertIn('"traced_pct_of_anon": 73.9', out)
+        self.assertIn("sim.py:42", out)
+
+    def test_a_raising_snapshot_cannot_take_the_worker_down(self) -> None:
+        module = self._load_module()
+        module._TRACEMALLOC_DIAG_LAST["at"] = 0.0
+        with patch.dict(os.environ, {"SYNDICATE_TRACEMALLOC_DIAG": "1"}), \
+             patch("syndicate.features.shared.memory_observability.allocation_snapshot",
+                   side_effect=RuntimeError("snapshot exploded")):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                module._diag_log_allocation_sites("boot")   # must not raise
+            self.assertIn("TRACEMALLOC_SITES_FAILED", buf.getvalue())
+
+    def test_not_tracing_says_nothing_rather_than_emitting_zeros(self) -> None:
+        # allocation_snapshot returns None when tracing never started. A zeroed
+        # line would read as "nothing is allocated", which is worse than silence
+        # and is the shape the gc census already failed by.
+        module = self._load_module()
+        module._TRACEMALLOC_DIAG_LAST["at"] = 0.0
+        with patch.dict(os.environ, {"SYNDICATE_TRACEMALLOC_DIAG": "1"}), \
+             patch("syndicate.features.shared.memory_observability.allocation_snapshot",
+                   return_value=None):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                module._diag_log_allocation_sites("boot")
+            self.assertNotIn("TRACEMALLOC_SITES ", buf.getvalue())

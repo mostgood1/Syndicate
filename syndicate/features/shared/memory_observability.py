@@ -1532,3 +1532,107 @@ def malloc_arena_snapshot() -> dict[str, Any] | None:
         print(f"[memory_observability] MALLOC_INFO_FAILED {type(exc).__name__}: {exc}",
               flush=True)
         return None
+
+
+# --- `#423` step 2: allocation-site tracing ----------------------------------
+#
+# WHY THIS IS SAFE TO REACH FOR NOW, AND WAS NOT BEFORE. Two instruments failed
+# this lane by being blind to the memory that matters: the gc census reported
+# 143KB of a 546MB process (`gc.get_objects` never enumerates
+# str/bytes/ndarray), and glibc's arenas hold 11-24% of `anon` while plateauing
+# at ~393MB as `anon` climbs. `tracemalloc` was checked against BOTH before any
+# of this was written -- local test, numpy float64 and python bytes both at
+# exactly 100% traced-vs-RSS. It can see NumPy buffers. That is the whole
+# reason this step exists.
+#
+# START POSITION IS LOAD-BEARING. `tracemalloc` only records allocations made
+# AFTER it starts. Starting it at a periodic stage call would miss everything
+# already resident and report a confident, tiny number -- the same failure mode
+# as the gc census, arrived at differently. It must start at boot or not at all.
+#
+# DEFAULT OFF. It stores a traceback per live allocation on a process that
+# reaches its 4GB ceiling hourly, and `#241` is on record as a worker whose
+# periodic work caused a production restart loop. `nframe=1` keeps the per
+# allocation cost to one frame; the snapshot itself is rate limited separately
+# because `take_snapshot()` walks every traced block.
+_TRACEMALLOC_STATE: dict[str, Any] = {"started": False, "reason": ""}
+
+
+def allocation_tracing_enabled() -> bool:
+    return str(os.environ.get("SYNDICATE_TRACEMALLOC_DIAG") or "").strip() in {"1", "true", "yes", "on"}
+
+
+def start_allocation_tracing(nframe: int = 1) -> bool:
+    """Begin tracing at boot, or say why not. Safe to call twice."""
+    if _TRACEMALLOC_STATE["started"]:
+        return True
+    if not allocation_tracing_enabled():
+        _TRACEMALLOC_STATE["reason"] = "disabled"
+    else:
+        try:
+            import tracemalloc
+
+            if not tracemalloc.is_tracing():
+                tracemalloc.start(max(1, int(nframe)))
+            _TRACEMALLOC_STATE["started"] = tracemalloc.is_tracing()
+        except Exception as exc:
+            _TRACEMALLOC_STATE["reason"] = f"{type(exc).__name__}: {exc}"
+    print(
+        "[memory_observability] TRACEMALLOC_INIT "
+        + json.dumps({"started": _TRACEMALLOC_STATE["started"],
+                      "nframe": nframe,
+                      "reason": _TRACEMALLOC_STATE["reason"] or None}, sort_keys=True),
+        flush=True,
+    )
+    return bool(_TRACEMALLOC_STATE["started"])
+
+
+def allocation_snapshot(top_n: int = 8) -> dict[str, Any] | None:
+    """Traced total against cgroup `anon`, plus the largest sites.
+
+    The RATIO is the point, not the top list. Both directions of gap have
+    benign readings and neither is automatically a defect -- see the lane:
+
+      traced > anon   expected. Lazy zero pages: `np.zeros` reports its full
+                      requested size while RSS has not moved. Measured locally
+                      at +400MB traced against ~0 RSS.
+      traced < anon   TWO causes, distinguish before concluding. Object boxing
+                      under nframe=1 (measured: RSS +818.7MB, traced +230.2MB
+                      for six million boxed ints), OR genuine blindness. Retry
+                      with a larger nframe before calling it blindness.
+    """
+    if not _TRACEMALLOC_STATE["started"]:
+        return None
+    try:
+        import tracemalloc
+
+        if not tracemalloc.is_tracing():
+            return None
+        traced_bytes, peak_bytes = tracemalloc.get_traced_memory()
+        out: dict[str, Any] = {
+            "traced_mb": round(traced_bytes / 1024 / 1024, 1),
+            "peak_mb": round(peak_bytes / 1024 / 1024, 1),
+        }
+        stat = _read_container_memory_stat()
+        anon = stat.get("anon") if stat else None
+        if isinstance(anon, int) and anon > 0:
+            anon_mb = anon / 1024 / 1024
+            out["anon_mb"] = round(anon_mb, 1)
+            out["traced_pct_of_anon"] = round(100.0 * (traced_bytes / 1024 / 1024) / anon_mb, 1)
+        snapshot = tracemalloc.take_snapshot().filter_traces((
+            tracemalloc.Filter(False, tracemalloc.__file__),
+            tracemalloc.Filter(False, __file__),
+        ))
+        sites = []
+        for stat_row in snapshot.statistics("lineno")[:max(1, int(top_n))]:
+            frame = stat_row.traceback[0] if stat_row.traceback else None
+            sites.append({
+                "site": f"{frame.filename.split('/')[-1]}:{frame.lineno}" if frame else "?",
+                "mb": round(stat_row.size / 1024 / 1024, 1),
+                "count": stat_row.count,
+            })
+        out["top"] = sites
+        return out
+    except Exception as exc:
+        print(f"[memory_observability] TRACEMALLOC_SNAPSHOT_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
