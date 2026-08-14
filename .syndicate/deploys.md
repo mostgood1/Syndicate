@@ -934,3 +934,62 @@ people learn to route around. Run the gate, read it, then deploy.
   it now.
 - Rollback: redeploy `b98f5ed7` (web) / `530fc5d8` (worker) — but re-read the
   live commit first, it moved twice in 25 minutes today.
+
+- **INTERIM READING T+30min (15:42:29-16:12:08Z). NOT the measurement, and NOT
+  yet evidence for the fix.**
+  - 5 board refreshes in 29.7 min; gaps min 2.1 / p50 4.0 / **max 10.2 min**.
+    Baseline was 5 refreshes in 180 min with a max gap of 104.7.
+  - Zero tracebacks, zero `LAYER2_GUARD_SKIP`, zero OOM/restart events. The
+    refactor of the 6-call-site guard did not break anything.
+  - **`LAYER2_FAST_REFRESH` = 0, and `MEMORY_GUARD_ABORT` = 0. THE NEW CODE
+    PATH HAS NOT EXECUTED ONCE.** The deploy restarted the worker, `anon` is
+    still low, so the Layer 1 guard has not refused yet — and the fast path
+    only fires when it does. **The improvement above is therefore NOT
+    attributable to this change; it is what the OLD code also does after a
+    restart.** `state.md`: "restarts clear it and prove nothing."
+  - The discriminating window opens when `anon` returns to plateau (~35 min
+    post-restart, so ~16:17Z+) and `MEMORY_GUARD_ABORT` resumes. Until a
+    `LAYER2_FAST_REFRESH` line exists, this deploy is UNVERIFIED.
+  - Confound worth noting for the T+3h read: `considered` now MOVES (14195 ->
+    13920 -> 13908) where it was frozen. That is rows aging out of the horizon
+    as games start, not new quotes arriving — consistent with the frozen shard
+    diagnosed above, not with recovery.
+
+### `#429` PRODUCER — sum H+R+RBI in the sim — REFRESH-WORKER `294f9ca9`
+- `dep-d9vjtc61egvs73e6c0d0`, live **2026-08-14 11:17 CDT (16:16:56Z)**.
+  refresh-worker ONLY: `daily_update.py` is executed by the MLB sim job, which
+  runs there; a web deploy would have been inert. No sim killed
+  (`state=finished` before the POST).
+- Delta was **exactly one production file**, `vendor/mlb_bettingv2/tools/daily_update.py`.
+- Change: `_inc_sum(pid, "H+R+RBI", hrr)`, at BOTH copies of the per-sim hitter
+  accumulation. The topn mean is `_stat(pid, stat_key) / denom_sims` and
+  `_stat` reads only what `_inc_sum` accumulated — `"H+R+RBI"` was never passed
+  to it anywhere in the file, so the numerator was always 0. Every sibling mean
+  worked because its `_inc_sum` line exists; the one COMPOSITE in the mapping
+  was the one stat never summed.
+- **WHAT LANDING PROVES AND WHAT IT DOES NOT.** It proves the code is on the
+  service that runs the sim. It does NOT prove `hrr_mean` is nonzero — that
+  becomes true only when the NEXT sim writes a daily summary, which is a
+  separate event and a separate measurement. Recorded this way because an
+  earlier watcher today conflated "deploy live" with "artifact rebuilt" and
+  called a pre-deploy artifact a failure.
+- MEASURED at T+0, and an UNCHANGED board is the PASS here:
+
+      hrr rows 88   distinct 85   range 1.363..3.833   derived 88
+
+  `#429`'s read-time derivation still supplies every value, and both it and the
+  producer compute `h + r + rbi`, so there is no transition artifact and no
+  window where the two disagree. A board that MOVED would have been the
+  surprise.
+- **OPEN OBLIGATION, with a discriminator that needs no artifact access.**
+  `prop_projections` stamps `projected_derived_from` only when it had to
+  reconstruct the value, and stands aside the moment a real `hrr_mean` appears.
+  So on the served board:
+
+      derived == 88, values present   -> producer still writing 0.0 (today)
+      derived == 0,  values present   -> PRODUCER FIXED, read-time path dormant
+      derived == 0,  values absent    -> REGRESSION, both paths failed
+
+  Due after the next `run_mlb_daily_sim_job` writes a daily summary. **Owner:
+  UNASSIGNED.**
+- Rollback: redeploy `214f5151` (re-read the live commit first).
