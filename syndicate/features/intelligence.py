@@ -2570,6 +2570,55 @@ def _query_preferences(
 # untouched.
 _OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000 * 1024 * 1024
 
+# `#387`, 2026-08-14 EVENING: ONE FLOOR IS NOW TWO, BECAUSE THE STREAMING
+# CUTOVER CHANGED WHAT THE SPAN ABOVE MEASURES.
+#
+# The comment above sizes 3000MB off "MLB alone is +2.9GB, and the loop holds
+# every sport's hydrated overview simultaneously, so what matters is whether the
+# NEXT sport fits". The cutover deleted the second half of that premise -- each
+# sport is now released before the next hydrates -- and it moved per-sport
+# candidate collection INSIDE the guarded span. Neither edit touched this
+# constant, and the constant is what decided the outcome.
+#
+# MEASURED IN PRODUCTION on the streamed path, both post-deploy passes:
+#     22:56:16 -> 22:57:22  mlb  current  830 -> 1798MB   headroom 2900.7
+#     23:12:36 -> 23:14:32  mlb  current  629 -> 2172MB   headroom 2587.3
+#     both:  min_required 3000.0  sufficient=False  -> STOPPED at sports_done=1
+#     -> BOARD_OVERVIEW_READY sports=1, where every build in the preceding 3h
+#        read sports=8.
+# So the floor now refuses the SEVEN CHEAP SPORTS on the strength of a number
+# sized for MLB, after MLB has already been paid for.
+#
+# AND THE SEVEN ARE CHEAP -- measured, not assumed:
+#     23:12:29.973 -> 23:12:30.144   nfl ncaaf ncaab nhl soccer
+#     current 627.4 -> 629.1MB   (+1.7MB, 171 milliseconds, five sports)
+#     and on the OLD code an entire EIGHT-sport HYDRATED pass moved anon
+#     444.6 -> 804.2MB, i.e. +360MB for all eight including MLB.
+# MLB is in a class of its own, exactly as the 2026-08-07 comment says. It is
+# also the sport that runs FIRST, so the expensive check is the one at
+# sports_done=0 -- and that one is NOT relaxed here.
+#
+# WHY THE EXPENSIVE FLOOR IS NOT LOWERED. On 2026-08-14 20:03:11Z MLB took the
+# process from anon 522MB to a 4096MB SIGKILL in 25 seconds -- a +3.5GB
+# excursion, against the +1.0GB measured twice tonight. That variance is
+# unexplained, so the gate in front of MLB keeps its full 3000MB margin.
+#
+# UNKNOWN SPORTS TAKE THE EXPENSIVE FLOOR. A sport absent from the cheap set --
+# a new module, a renamed slug, a typo -- must not fall through to the relaxed
+# branch. An unknown cost is not a cheap cost.
+_OVERVIEW_MIN_SAFE_HEADROOM_STREAMED_BYTES = 1500 * 1024 * 1024
+_OVERVIEW_CHEAPLY_HYDRATED_SPORTS = frozenset(
+    {"nba", "wnba", "nfl", "ncaaf", "ncaab", "nhl", "soccer"}
+)
+
+
+def _overview_headroom_floor_bytes(next_sport: str) -> tuple[int, str]:
+    """(floor, label) for the sport about to hydrate. Unknown -> expensive."""
+    slug = (next_sport or "").strip().lower()
+    if slug in _OVERVIEW_CHEAPLY_HYDRATED_SPORTS:
+        return _OVERVIEW_MIN_SAFE_HEADROOM_STREAMED_BYTES, "streamed"
+    return _OVERVIEW_MIN_SAFE_HEADROOM_BYTES, "expensive"
+
 
 def _overview_headroom_exhausted(*, next_sport: str, sports_done: int, sports_total: int) -> bool:
     """True when the next sport's hydration should be skipped for memory.
@@ -2578,17 +2627,22 @@ def _overview_headroom_exhausted(*, next_sport: str, sports_done: int, sports_to
     dev has no cgroups) -- a missing measurement must not silently truncate the
     board everywhere that is not Render.
     """
+    floor_bytes, floor_label = _overview_headroom_floor_bytes(next_sport)
     try:
         from syndicate.features.shared.memory_observability import memory_headroom_snapshot
 
-        snapshot = memory_headroom_snapshot(_OVERVIEW_MIN_SAFE_HEADROOM_BYTES)
+        snapshot = memory_headroom_snapshot(floor_bytes)
     except Exception as exc:  # pragma: no cover - defensive, must never raise
         print(f"[intelligence] OVERVIEW_MEMORY_CHECK_FAILED {type(exc).__name__}: {exc}", flush=True)
         return False
     if snapshot is None or snapshot.get("sufficient", True):
         return False
+    # `floor` is in the line because the decision is no longer readable from the
+    # snapshot alone: two different floors now produce this same message, and
+    # without the label a relaxed refusal is indistinguishable from a strict one.
     print(
         f"[intelligence] OVERVIEW_STOPPED_FOR_MEMORY next_sport={next_sport} "
+        f"floor={floor_label} floor_mb={floor_bytes / (1024 * 1024):.0f} "
         f"sports_done={sports_done} sports_total={sports_total} snapshot={snapshot}",
         flush=True,
     )
