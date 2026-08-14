@@ -2814,6 +2814,7 @@ def _diag_log_all_process_memory(stage: str) -> None:
     except Exception as exc:
         print(f"[refresh_worker] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
     _diag_log_malloc_arena(stage)
+    _diag_log_allocation_sites(stage)
 
 
 # `#423` step 1. Rides on the stage calls above rather than a timer of its own,
@@ -2857,6 +2858,44 @@ def _diag_log_malloc_arena(stage: str) -> None:
         )
     except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop the worker
         print(f"[refresh_worker] MALLOC_ARENA_FAILED stage={stage} "
+              f"{type(exc).__name__}: {exc}", flush=True)
+
+
+# `#423` step 2. Rate limited FIVE times as long as the arena reading, and for a
+# different reason: `take_snapshot()` walks every traced block, so its cost
+# scales with the leak itself -- it is most expensive exactly when the process
+# is largest. 600s makes even a pathological second-long snapshot a 0.17% duty
+# cycle. Inert unless SYNDICATE_TRACEMALLOC_DIAG is on, so the default path
+# costs one dict lookup.
+_TRACEMALLOC_DIAG_LAST: dict[str, float] = {"at": 0.0}
+_TRACEMALLOC_DIAG_MIN_INTERVAL_SECONDS = 600.0
+
+
+def _diag_log_allocation_sites(stage: str) -> None:
+    """Emit traced-vs-anon and the largest sites. Never raises."""
+    try:
+        from syndicate.features.shared.memory_observability import (
+            allocation_snapshot,
+            allocation_tracing_enabled,
+        )
+
+        if not allocation_tracing_enabled():
+            return
+        now = time.time()
+        if now - _TRACEMALLOC_DIAG_LAST["at"] < _TRACEMALLOC_DIAG_MIN_INTERVAL_SECONDS:
+            return
+        _TRACEMALLOC_DIAG_LAST["at"] = now
+
+        snapshot = allocation_snapshot()
+        if not snapshot:
+            return  # not tracing -- TRACEMALLOC_INIT already said why
+        print(
+            f"[refresh_worker] TRACEMALLOC_SITES stage={stage} "
+            + json.dumps(snapshot, sort_keys=True),
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop the worker
+        print(f"[refresh_worker] TRACEMALLOC_SITES_FAILED stage={stage} "
               f"{type(exc).__name__}: {exc}", flush=True)
 
 
@@ -3201,6 +3240,18 @@ def main() -> int:
         configure_malloc_arenas(2)
     except Exception as exc:  # noqa: BLE001 - a memory hint must never stop boot
         print(f"[refresh_worker] MALLOC_ARENA_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # `#423` step 2. Must start HERE, not at a periodic stage call: tracemalloc
+    # only records allocations made after it starts, so a late start would miss
+    # everything already resident and report a confident tiny number -- the same
+    # failure mode as the gc census, reached a different way. Default OFF
+    # (`SYNDICATE_TRACEMALLOC_DIAG`); it keeps a traceback per live allocation on
+    # a process that hits its ceiling hourly.
+    try:
+        from syndicate.features.shared.memory_observability import start_allocation_tracing
+
+        start_allocation_tracing(1)
+    except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop boot
+        print(f"[refresh_worker] TRACEMALLOC_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     _diag_log_all_process_memory("boot")
     assert_refresh_state_backend_ready(process_name="refresh-worker")
     _bootstrap_soccer_player_seed_files()
