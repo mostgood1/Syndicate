@@ -6,6 +6,56 @@
 
 ## OPEN
 
+### projection-degeneracy-detector — OPEN — opened 2026-08-14 — session: nfl-day-of-game
+- Goal: `#425`. A projection that has collapsed to ONE value across a slate is
+  detected and reported for **every** sport, not just the one where a human
+  happened to notice. Testable outcome: a synthetic constant slate is flagged
+  with sport, market and value; a varying slate is not; and the check runs on
+  all seven producers without touching any of them.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/board_enrichment.py` — the wrapper + detector.
+  - `tests/test_projection_degeneracy.py` (new).
+- **`.current-lane` deliberately NOT claimed.** It is one file shared by every
+  session and `anon-allocation-site` holds it right now; taking it would break
+  that session's own-lane exemption. Verified against the real hook that both
+  my files return exit 0 without it, so claiming it would buy nothing and cost
+  someone else. Re-check if a file added here IS claimed by an open lane.
+- **SCOPE: `#425` has TWO gaps and this lane fixes ONE.** Stated so the ticket
+  is not closed on half the work:
+  1. **No degeneracy check** — IN SCOPE. A model with real historical skill can
+     still emit a constant TODAY because its input went missing, and a
+     backtested skill note cannot catch that. It is what actually happened on
+     2026-08-13, and nothing reported it.
+  2. **No skill annotation on six builders** — OUT OF SCOPE. Needs a measured
+     backtest per model (`#367` did NFL's: corr −0.047 over 146 games). Six
+     backtests is not a plumbing change, and inventing skill numbers to fill
+     the field would be worse than the gap. Stays open on `#425`.
+- Design, recorded before implementing:
+  - `attach_projections` has **13 return sites across 7 sports**. Adding the
+    check at each is the exact mistake `#334` records. Instead the per-sport
+    body becomes `_attach_projections_by_sport` and `attach_projections`
+    becomes a thin wrapper running the detector over the GRID afterwards — one
+    place, all sports, all 13 paths, **zero call sites touched** (4 callers:
+    `intelligence.py:2208`, `book_grid_artifact.py:221`,
+    `layer2_shortlist.py:176`, and one internal).
+  - Group by `(kind, market, segment)`; count distinct **GAMES**, not rows —
+    alt lines put many rows on one game and a row-based count would inflate
+    into false positives. Unit key is `event_id`, falling back to
+    `(home_team, away_team)`, plus `player_name` for props.
+  - Compare `projected_raw` where present, else `projected`. Raw is the model
+    output before calibration; calibration mapping distinct inputs onto one
+    output is a different bug.
+- Threshold and its justification: flag only when distinct values == 1 across
+  **>= 4 distinct games**. Two- or three-game slates can tie by coincidence;
+  four independent games agreeing to full float precision cannot happen to a
+  working model. Deliberately conservative — a false positive BLANKS a real
+  projection.
+- Falsification tests, which matter more than the positive ones: a varying
+  slate must NOT flag; a 3-game constant slate must NOT flag (below threshold);
+  a slate with many alt-line ROWS but few GAMES must NOT flag; a sport with no
+  projections must NOT flag.
+- Blocked by: none.
+
 ### anon-allocation-site — OPEN — opened 2026-08-14 — session: memory-guard
 - Goal: name the allocation site holding refresh-worker's **~1700MB of
   non-arena anonymous memory**, with evidence. Testable outcome: a named
@@ -52,6 +102,38 @@
 - Deploy exposure: refresh-worker `.py` only. No `render.yaml`. Its own
   `/preflight`; re-read the live SHA in the same step that deploys (it moved
   five times on 08-13 and a stale one nearly shipped a rollback).
+- **FALSIFICATION TEST RUN 2026-08-14 02:3xZ — PASSED. The lane proceeds.**
+  Local, deploy-free (`C:	mp	raced_vs_real.py`), Python 3.11.9 / numpy
+  1.26.4, `tracemalloc.start(1)`:
+  ```
+  allocation              RSS       traced    seen
+  numpy float64 random  +400.1MB   +400.0MB   100.0%
+  python bytes          +400.1MB   +400.0MB   100.0%
+  numpy float64 zeros     +0.0MB   +400.0MB   n/a
+  pandas DataFrame        +0.1MB   +400.0MB   n/a
+  python list of ints   +818.7MB   +230.2MB    28.1%
+  ```
+  - **NumPy buffers ARE fully traced.** That was the open question and the
+    reason to check first. `tracemalloc` will NOT be blind the way the gc
+    census was (143KB reported of 546MB resident) or the arena reading was
+    (11-24% coverage). Two instruments failed this lane; this one fails
+    differently or not at all.
+- **HOW TO READ traced-vs-anon IN PRODUCTION. Both directions have benign
+  explanations and neither is automatically a defect:**
+  - **traced > RSS is EXPECTED and benign.** `np.zeros` and a zero-filled
+    DataFrame allocate lazily — the OS returns copy-on-write zero pages and RSS
+    does not move until something writes, while `tracemalloc` correctly reports
+    the full requested size. Both showed +400MB traced against ~0 RSS. A gap in
+    this direction means untouched pages, not an instrument fault.
+    `random_sample` is the honest comparison because it writes every byte, and
+    it came out at exactly 100%.
+  - **traced < anon has TWO causes and they MUST be distinguished, not
+    assumed.** (a) object-boxing under `nframe=1` — the list-of-ints row grew
+    RSS 818.7MB while traced showed 230.2MB, because six million boxed ints are
+    spread across allocations one frame does not fully attribute; or (b)
+    genuine blindness. Check (a) first by re-reading with a larger `nframe` on
+    a bounded window before concluding (b). Concluding blindness from a shortfall
+    that is really object overhead would retire a working instrument.
 - Blocked by: nothing. The falsification test needs no deploy.
 
 
