@@ -1,0 +1,794 @@
+{
+ "mlb": {
+  "overflow": {
+   "docW": 1440,
+   "offenders": [
+    {
+     "tag": "a",
+     "cls": "cards-strip-card",
+     "right": 4028,
+     "width": 280
+    },
+    {
+     "tag": "div",
+     "cls": "cards-strip-head",
+     "right": 4018,
+     "width": 260
+    },
+    {
+     "tag": "span",
+     "cls": "",
+     "right": 4018,
+     "width": 52
+    },
+    {
+     "tag": "div",
+     "cls": "cards-linescore is-compact",
+     "right": 4018,
+     "width": 260
+    },
+    {
+     "tag": "div",
+     "cls": "cards-linescore-head",
+     "right": 4018,
+     "width": 260
+    },
+    {
+     "tag": "span",
+     "cls": "cards-linescore-stat-head",
+     "right": 4018,
+     "width": 18
+    },
+    {
+     "tag": "div",
+     "cls": "cards-linescore-row",
+     "right": 4018,
+     "width": 260
+    },
+    {
+     "tag": "div",
+     "cls": "cards-strip-meta",
+     "right": 4018,
+     "width": 260
+    }
+   ],
+   "scrollW": 1440
+  },
+  "tabs": {
+   "tabHTML": [
+    "<button class=\"cards-tab is-active\" type=\"button\" data-tab-target=\"overview\">Game</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"boxscore\">Box Score</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"props\">Props</button>"
+   ],
+   "panelIds": [
+    "overview",
+    "boxscore",
+    "props"
+   ],
+   "cardClass": "cards-game-card"
+  },
+  "renderer": {
+   "scripts": [
+    "/static/shared/polling.js?v=1786729658000000000",
+    "/static/mlb/cards_source.js?v=1786729658000000000",
+    "/static/mlb/back_to_top.js?v=1786729658000000000"
+   ],
+   "styles": [
+    "/static/shared/standalone_shell.css?v=1786729658000000000",
+    "/static/mlb/cards_exact.css?v=1786729658000000000"
+   ],
+   "hasHeadTeamName": 0,
+   "teamNameLike": [
+    "cards-linescore-team-label",
+    "cards-linescore-team",
+    "cards-linescore-team",
+    "cards-linescore-team-label",
+    "cards-linescore-team",
+    "cards-linescore-team"
+   ]
+  },
+  "sizes": {
+   ".cards-mini-copy": {
+    "fontSize": "10px",
+    "weight": "400",
+    "lh": "11.8px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 12
+   },
+   ".cards-market-main": {
+    "fontSize": "12px",
+    "weight": "400",
+    "lh": "12.24px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 12
+   },
+   ".cards-market-label": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "14.5px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-market-sub": {
+    "fontSize": "10px",
+    "weight": "400",
+    "lh": "11.8px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 12
+   },
+   ".cards-head-team-name": null,
+   ".cards-tab": {
+    "fontSize": "9px",
+    "weight": "800",
+    "lh": "normal",
+    "color": "rgb(8, 19, 31)",
+    "numeric": "normal",
+    "h": 25
+   },
+   ".cards-subcopy": {
+    "fontSize": "16px",
+    "weight": "400",
+    "lh": "23.2px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 23
+   },
+   ".cards-section-label": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "14.5px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 29
+   },
+   ".cards-data-pair span": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "14.5px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-data-pair strong": {
+    "fontSize": "13px",
+    "weight": "700",
+    "lh": "14.04px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 14
+   },
+   ".cards-table-title": {
+    "fontSize": "18px",
+    "weight": "800",
+    "lh": "26.1px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 26
+   }
+  }
+ },
+ "wnba": {
+  "overflow": {
+   "docW": 1440,
+   "offenders": [],
+   "scrollW": 1440
+  },
+  "tabs": {
+   "tabHTML": [
+    "<button class=\"cards-tab is-active\" type=\"button\" data-card-tab=\"game\" data-card-target=\"039bf012a0015d3c6753cc0b21100866e\">Game</button>",
+    "<button class=\"cards-tab \" type=\"button\" data-card-tab=\"box\" data-card-target=\"039bf012a0015d3c6753cc0b21100866e\">Box Score</button>",
+    "<button class=\"cards-tab \" type=\"button\" data-card-tab=\"props\" data-card-target=\"039bf012a0015d3c6753cc0b21100866e\">Props</button>"
+   ],
+   "panelIds": [
+    "game",
+    "box",
+    "props"
+   ],
+   "cardClass": "cards-game-card "
+  },
+  "renderer": {
+   "scripts": [
+    "/static/shared/polling.js?v=1786729658000000000",
+    "/static/shared/sport_cards_utils.js?v=1786729658000000000",
+    "/wnba/cards-parity.js?v=1786729658000000000"
+   ],
+   "styles": [
+    "/static/shared/standalone_shell.css?v=1786729658000000000",
+    "/wnba/styles.css?v=1786729658000000000",
+    "/wnba/cards-parity.css?v=1786729658000000000"
+   ],
+   "hasHeadTeamName": 0,
+   "teamNameLike": [
+    "cards-linescore-team-label",
+    "cards-linescore-team",
+    "cards-linescore-team",
+    "cards-linescore-team-label",
+    "cards-linescore-team",
+    "cards-linescore-team"
+   ]
+  },
+  "sizes": {
+   ".cards-mini-copy": {
+    "fontSize": "10px",
+    "weight": "400",
+    "lh": "11.8px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 12
+   },
+   ".cards-market-main": {
+    "fontSize": "12px",
+    "weight": "400",
+    "lh": "12.24px",
+    "color": "rgb(0, 0, 0)",
+    "numeric": "normal",
+    "h": 12
+   },
+   ".cards-market-label": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "14.5px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-market-sub": {
+    "fontSize": "10px",
+    "weight": "400",
+    "lh": "11.8px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 12
+   },
+   ".cards-head-team-name": null,
+   ".cards-tab": {
+    "fontSize": "16px",
+    "weight": "400",
+    "lh": "23.2px",
+    "color": "rgb(8, 33, 29)",
+    "numeric": "normal",
+    "h": 33
+   },
+   ".cards-subcopy": {
+    "fontSize": "9px",
+    "weight": "400",
+    "lh": "10.35px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 10
+   },
+   ".cards-section-label": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "14.5px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-data-pair span": {
+    "fontSize": "9px",
+    "weight": "800",
+    "lh": "9.9px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 10
+   },
+   ".cards-data-pair strong": {
+    "fontSize": "13px",
+    "weight": "700",
+    "lh": "13.52px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 22
+   },
+   ".cards-table-title": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "14.5px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 15
+   }
+  }
+ },
+ "nfl": {
+  "overflow": {
+   "docW": 1440,
+   "offenders": [
+    {
+     "tag": "strong",
+     "cls": "",
+     "right": 4706,
+     "width": 52
+    },
+    {
+     "tag": "a",
+     "cls": "cards-strip-card",
+     "right": 4659,
+     "width": 280
+    },
+    {
+     "tag": "div",
+     "cls": "cards-strip-head",
+     "right": 4647,
+     "width": 256
+    },
+    {
+     "tag": "div",
+     "cls": "cards-head-left cards-head-matchup",
+     "right": 4647,
+     "width": 256
+    },
+    {
+     "tag": "div",
+     "cls": "cards-head-team",
+     "right": 4647,
+     "width": 102
+    },
+    {
+     "tag": "div",
+     "cls": "cards-head-team-name",
+     "right": 4647,
+     "width": 62
+    },
+    {
+     "tag": "div",
+     "cls": "cards-mini-copy",
+     "right": 4647,
+     "width": 62
+    },
+    {
+     "tag": "div",
+     "cls": "cards-mini-metrics cards-mini-metrics--strip",
+     "right": 4647,
+     "width": 256
+    }
+   ],
+   "scrollW": 1468
+  },
+  "tabs": {
+   "tabHTML": [
+    "<button class=\"cards-tab is-active\" type=\"button\" data-tab-target=\"game\">Game</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"boxscore\">Box Score</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"props\">Props</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"panels\">Details</button>"
+   ],
+   "panelIds": [
+    "game",
+    "boxscore",
+    "props",
+    "panels"
+   ],
+   "cardClass": "feature-game-card cards-game-card"
+  },
+  "renderer": {
+   "scripts": [
+    "/static/shared/polling.js",
+    "/static/shared/board_rail_toggle.js",
+    "/static/shared/game_board.js"
+   ],
+   "styles": [
+    "/static/shared/app.css",
+    "/static/shared/standalone_shell.css",
+    "/static/shared/dense_cards.css"
+   ],
+   "hasHeadTeamName": 64,
+   "teamNameLike": [
+    "cards-head-team",
+    "cards-head-team-name",
+    "cards-head-team",
+    "cards-head-team-name",
+    "cards-head-team",
+    "cards-head-team-name"
+   ]
+  },
+  "sizes": {
+   ".cards-mini-copy": {
+    "fontSize": "12px",
+    "weight": "400",
+    "lh": "17.4px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 17
+   },
+   ".cards-market-main": {
+    "fontSize": "15px",
+    "weight": "400",
+    "lh": "15px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-market-label": {
+    "fontSize": "10px",
+    "weight": "700",
+    "lh": "14px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 14
+   },
+   ".cards-market-sub": {
+    "fontSize": "16px",
+    "weight": "400",
+    "lh": "22.4px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 22
+   },
+   ".cards-head-team-name": {
+    "fontSize": "16px",
+    "weight": "700",
+    "lh": "16.8px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 67
+   },
+   ".cards-tab": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "normal",
+    "color": "rgb(8, 19, 31)",
+    "numeric": "normal",
+    "h": 28
+   },
+   ".cards-subcopy": {
+    "fontSize": "11px",
+    "weight": "400",
+    "lh": "14.3px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 85
+   },
+   ".cards-section-label": null,
+   ".cards-data-pair span": {
+    "fontSize": "10px",
+    "weight": "700",
+    "lh": "14px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 28
+   },
+   ".cards-data-pair strong": {
+    "fontSize": "15px",
+    "weight": "700",
+    "lh": "15px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-table-title": {
+    "fontSize": "18px",
+    "weight": "700",
+    "lh": "18.9px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 19
+   }
+  }
+ },
+ "ncaaf": {
+  "overflow": {
+   "docW": 1440,
+   "offenders": [
+    {
+     "tag": "strong",
+     "cls": "",
+     "right": 4682,
+     "width": 28
+    },
+    {
+     "tag": "a",
+     "cls": "cards-strip-card",
+     "right": 4659,
+     "width": 280
+    },
+    {
+     "tag": "div",
+     "cls": "cards-strip-head",
+     "right": 4647,
+     "width": 256
+    },
+    {
+     "tag": "div",
+     "cls": "cards-head-left cards-head-matchup",
+     "right": 4647,
+     "width": 256
+    },
+    {
+     "tag": "div",
+     "cls": "cards-head-team",
+     "right": 4647,
+     "width": 102
+    },
+    {
+     "tag": "div",
+     "cls": "cards-mini-metrics cards-mini-metrics--strip",
+     "right": 4647,
+     "width": 256
+    },
+    {
+     "tag": "div",
+     "cls": "cards-mini-metric",
+     "right": 4647,
+     "width": 80
+    },
+    {
+     "tag": "div",
+     "cls": "cards-strip-live",
+     "right": 4647,
+     "width": 256
+    }
+   ],
+   "scrollW": 1468
+  },
+  "tabs": {
+   "tabHTML": [
+    "<button class=\"cards-tab is-active\" type=\"button\" data-tab-target=\"game\">Game</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"context\">Team Context</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"details\">Details</button>"
+   ],
+   "panelIds": [
+    "identity",
+    "context",
+    "coverage",
+    "details"
+   ],
+   "cardClass": "feature-game-card cards-game-card"
+  },
+  "renderer": {
+   "scripts": [
+    "/static/shared/polling.js",
+    "/static/shared/board_rail_toggle.js",
+    "/static/shared/game_board.js"
+   ],
+   "styles": [
+    "/static/shared/app.css",
+    "/static/shared/standalone_shell.css",
+    "/static/shared/dense_cards.css"
+   ],
+   "hasHeadTeamName": 64,
+   "teamNameLike": [
+    "cards-head-team",
+    "cards-head-team-name",
+    "cards-head-team",
+    "cards-head-team-name",
+    "cards-head-team",
+    "cards-head-team-name"
+   ]
+  },
+  "sizes": {
+   ".cards-mini-copy": {
+    "fontSize": "12px",
+    "weight": "400",
+    "lh": "17.4px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 17
+   },
+   ".cards-market-main": null,
+   ".cards-market-label": null,
+   ".cards-market-sub": null,
+   ".cards-head-team-name": {
+    "fontSize": "16px",
+    "weight": "700",
+    "lh": "16.8px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 50
+   },
+   ".cards-tab": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "normal",
+    "color": "rgb(8, 19, 31)",
+    "numeric": "normal",
+    "h": 28
+   },
+   ".cards-subcopy": null,
+   ".cards-section-label": null,
+   ".cards-data-pair span": {
+    "fontSize": "10px",
+    "weight": "700",
+    "lh": "14px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 28
+   },
+   ".cards-data-pair strong": {
+    "fontSize": "15px",
+    "weight": "700",
+    "lh": "15px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 30
+   },
+   ".cards-table-title": {
+    "fontSize": "18px",
+    "weight": "700",
+    "lh": "18.9px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 19
+   }
+  }
+ },
+ "soccer": {
+  "overflow": {
+   "docW": 1440,
+   "offenders": [
+    {
+     "tag": "header",
+     "cls": "standalone-app-header",
+     "right": 1468,
+     "width": 1458
+    },
+    {
+     "tag": "article",
+     "cls": "feature-game-card cards-game-card",
+     "right": 1458,
+     "width": 1448
+    },
+    {
+     "tag": "div",
+     "cls": "standalone-app-header__inner",
+     "right": 1451,
+     "width": 1424
+    },
+    {
+     "tag": "nav",
+     "cls": "standalone-app-header__nav",
+     "right": 1451,
+     "width": 921
+    },
+    {
+     "tag": "a",
+     "cls": "standalone-app-header__link standalone-app-header__link--active",
+     "right": 1451,
+     "width": 80
+    },
+    {
+     "tag": "div",
+     "cls": "cards-strip-head",
+     "right": 1444,
+     "width": 1420
+    },
+    {
+     "tag": "div",
+     "cls": "cards-status-cluster",
+     "right": 1444,
+     "width": 220
+    },
+    {
+     "tag": "div",
+     "cls": "cards-score-ribbon",
+     "right": 1444,
+     "width": 1420
+    }
+   ],
+   "scrollW": 1468
+  },
+  "tabs": {
+   "tabHTML": [
+    "<button class=\"cards-tab is-active\" type=\"button\" data-tab-target=\"game\">Game</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"boxscore\">Box Score</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"props\">Props</button>",
+    "<button class=\"cards-tab\" type=\"button\" data-tab-target=\"panels\">Details</button>"
+   ],
+   "panelIds": [
+    "game",
+    "boxscore",
+    "props",
+    "panels"
+   ],
+   "cardClass": "feature-game-card cards-game-card"
+  },
+  "renderer": {
+   "scripts": [
+    "/static/shared/polling.js",
+    "/static/shared/board_rail_toggle.js",
+    "/static/shared/game_board.js"
+   ],
+   "styles": [
+    "/static/shared/app.css",
+    "/static/shared/standalone_shell.css",
+    "/static/shared/dense_cards.css"
+   ],
+   "hasHeadTeamName": 4,
+   "teamNameLike": [
+    "cards-head-team",
+    "cards-head-team-name",
+    "cards-head-team",
+    "cards-head-team-name",
+    "cards-head-team",
+    "cards-head-team-name"
+   ]
+  },
+  "sizes": {
+   ".cards-mini-copy": {
+    "fontSize": "12px",
+    "weight": "400",
+    "lh": "17.4px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 17
+   },
+   ".cards-market-main": {
+    "fontSize": "15px",
+    "weight": "400",
+    "lh": "15px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-market-label": {
+    "fontSize": "10px",
+    "weight": "700",
+    "lh": "14px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 14
+   },
+   ".cards-market-sub": {
+    "fontSize": "16px",
+    "weight": "400",
+    "lh": "22.4px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 22
+   },
+   ".cards-head-team-name": {
+    "fontSize": "13px",
+    "weight": "700",
+    "lh": "14.95px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-tab": {
+    "fontSize": "10px",
+    "weight": "800",
+    "lh": "normal",
+    "color": "rgb(8, 19, 31)",
+    "numeric": "normal",
+    "h": 28
+   },
+   ".cards-subcopy": {
+    "fontSize": "11px",
+    "weight": "400",
+    "lh": "14.3px",
+    "color": "rgb(191, 208, 223)",
+    "numeric": "normal",
+    "h": 69
+   },
+   ".cards-section-label": null,
+   ".cards-data-pair span": {
+    "fontSize": "10px",
+    "weight": "700",
+    "lh": "14px",
+    "color": "rgb(147, 169, 188)",
+    "numeric": "normal",
+    "h": 28
+   },
+   ".cards-data-pair strong": {
+    "fontSize": "15px",
+    "weight": "700",
+    "lh": "15px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 15
+   },
+   ".cards-table-title": {
+    "fontSize": "18px",
+    "weight": "700",
+    "lh": "18.9px",
+    "color": "rgb(237, 244, 251)",
+    "numeric": "normal",
+    "h": 19
+   }
+  }
+ }
+}

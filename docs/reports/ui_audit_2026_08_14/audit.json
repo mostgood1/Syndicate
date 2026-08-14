@@ -1,0 +1,1167 @@
+{
+ "desktop_1440": {
+  "mlb": {
+   "path": "/mlb/cards",
+   "load_errors": [],
+   "cardCount": 14,
+   "fontCombos": {
+    "17px/900/17px": 2,
+    "10px/700/13.2px": 2,
+    "22px/700/22px": 2,
+    "11px/700/15.95px": 31,
+    "10px/800/14.5px": 98,
+    "15px/700/15px": 1,
+    "11px/600/15.95px": 1,
+    "10px/700/11.5px": 1,
+    "10px/700/14.5px": 3,
+    "10px/700/normal": 11,
+    "10.5px/400/13.125px": 2,
+    "10px/400/11.8px": 18,
+    "12px/400/12.24px": 4,
+    "9px/800/normal": 13,
+    "16px/700/23.2px": 7,
+    "10px/900/14.5px": 8,
+    "16px/400/23.2px": 20,
+    "13px/700/14.04px": 49,
+    "9.5px/400/10.925px": 43,
+    "15px/400/15px": 12,
+    "10px/700/12px": 97,
+    "10px/400/12px": 500
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": "overview",
+     "afterClick": {
+      "id": "overview",
+      "chars": 2585
+     }
+    },
+    {
+     "label": "Box Score",
+     "target": "boxscore",
+     "afterClick": {
+      "id": "boxscore",
+      "chars": 2699
+     }
+    },
+    {
+     "label": "Props",
+     "target": "props",
+     "afterClick": {
+      "id": "props",
+      "chars": 2106
+     }
+    }
+   ],
+   "panels": [
+    {
+     "id": "overview",
+     "chars": 2585,
+     "emptyCopy": 0
+    },
+    {
+     "id": "boxscore",
+     "chars": 3607,
+     "emptyCopy": 0
+    },
+    {
+     "id": "props",
+     "chars": 4474,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    1120,
+    1190,
+    1167,
+    1139,
+    1129,
+    1167,
+    1167,
+    1167,
+    1167,
+    1235,
+    1190,
+    1167,
+    914,
+    1190
+   ],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": false,
+   "tabBoxes": [
+    [
+     54,
+     25
+    ],
+    [
+     88,
+     25
+    ],
+    [
+     59,
+     25
+    ]
+   ],
+   "tab_switch_errors": {}
+  },
+  "wnba": {
+   "path": "/wnba/cards",
+   "load_errors": [],
+   "cardCount": 2,
+   "fontCombos": {
+    "15px/700/15px": 2,
+    "12px/700/12px": 2,
+    "17px/700/17px": 2,
+    "11px/700/15.95px": 9,
+    "10px/800/14.5px": 36,
+    "13px/700/13px": 1,
+    "10px/700/11.8px": 2,
+    "10px/400/12px": 2,
+    "10px/400/11.8px": 37,
+    "12px/400/12.24px": 4,
+    "11px/400/12.98px": 4,
+    "16px/400/23.2px": 25,
+    "13px/700/13.65px": 3,
+    "10px/900/14.5px": 10,
+    "12px/400/12.96px": 8,
+    "9px/400/10.35px": 22,
+    "9px/700/9.9px": 1,
+    "9px/800/9.9px": 4,
+    "13px/700/13.52px": 4,
+    "9px/400/9.9px": 3,
+    "15px/400/17.1px": 3,
+    "9px/400/10.08px": 20,
+    "9px/800/10.08px": 31,
+    "11px/600/11.88px": 3,
+    "9px/800/13.05px": 23,
+    "10px/700/14.5px": 8,
+    "11px/700/11.55px": 28,
+    "14px/700/20.3px": 4,
+    "14px/400/14px": 16,
+    "11px/500/12.65px": 16,
+    "13px/700/14.95px": 22,
+    "13px/400/14.95px": 154,
+    "11px/400/11.88px": 9,
+    "10px/400/10.5px": 9,
+    "13px/400/14.04px": 1,
+    "13px/700/14.04px": 13,
+    "10.5px/700/12.075px": 7,
+    "10.5px/400/12.075px": 7
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": null
+    },
+    {
+     "label": "Box Score",
+     "target": null
+    },
+    {
+     "label": "Props",
+     "target": null
+    }
+   ],
+   "panels": [
+    {
+     "id": "game",
+     "chars": 1912,
+     "emptyCopy": 0
+    },
+    {
+     "id": "box",
+     "chars": 6667,
+     "emptyCopy": 0
+    },
+    {
+     "id": "props",
+     "chars": 4461,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    1476,
+    1462
+   ],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": false,
+   "tabBoxes": [
+    [
+     68,
+     33
+    ],
+    [
+     117,
+     33
+    ],
+    [
+     76,
+     33
+    ]
+   ],
+   "tab_switch_errors": {
+    "null": "CLICK FAILED: TimeoutError"
+   }
+  },
+  "nba": {
+   "path": "/nba/cards",
+   "load_errors": [],
+   "cardCount": 0,
+   "fontCombos": {},
+   "tabs": [],
+   "panels": [],
+   "heights": [],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": false,
+   "tabBoxes": [],
+   "tab_switch_errors": {}
+  },
+  "nhl": {
+   "path": "/nhl/cards",
+   "load_errors": [],
+   "cardCount": 0,
+   "fontCombos": {},
+   "tabs": [],
+   "panels": [],
+   "heights": [],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": false,
+   "tabBoxes": [],
+   "tab_switch_errors": {}
+  },
+  "nfl": {
+   "path": "/nfl/cards",
+   "load_errors": [],
+   "cardCount": 16,
+   "fontCombos": {
+    "16px/700/16.8px": 2,
+    "12px/700/17.4px": 15,
+    "11px/700/15.4px": 13,
+    "12px/700/16.8px": 1,
+    "13px/700/18.2px": 1,
+    "12px/400/17.4px": 18,
+    "10px/700/14px": 16,
+    "15px/400/15px": 4,
+    "16px/400/22.4px": 4,
+    "10px/800/normal": 4,
+    "15px/700/15px": 6,
+    "18px/900/18.9px": 9,
+    "11px/400/14.3px": 7,
+    "10px/800/14px": 2,
+    "16px/700/22.4px": 4
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": "game",
+     "afterClick": {
+      "id": "game",
+      "chars": 1255
+     }
+    },
+    {
+     "label": "Box Score",
+     "target": "boxscore",
+     "afterClick": {
+      "id": "boxscore",
+      "chars": 150
+     }
+    },
+    {
+     "label": "Props",
+     "target": "props",
+     "afterClick": {
+      "id": "props",
+      "chars": 208
+     }
+    },
+    {
+     "label": "Details",
+     "target": "panels",
+     "afterClick": {
+      "id": "panels",
+      "chars": 563
+     }
+    }
+   ],
+   "panels": [
+    {
+     "id": "game",
+     "chars": 1255,
+     "emptyCopy": 0
+    },
+    {
+     "id": "boxscore",
+     "chars": 525,
+     "emptyCopy": 0
+    },
+    {
+     "id": "props",
+     "chars": 349,
+     "emptyCopy": 2
+    },
+    {
+     "id": "panels",
+     "chars": 1073,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    1036,
+    1036,
+    1036,
+    1050,
+    1036,
+    1036,
+    1036,
+    1036,
+    1036,
+    1036,
+    1036,
+    1036,
+    1036,
+    1036,
+    1036,
+    1036
+   ],
+   "longestName": "New England Patriots",
+   "nameCount": 64,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": true,
+   "tabBoxes": [
+    [
+     60,
+     28
+    ],
+    [
+     98,
+     28
+    ],
+    [
+     66,
+     28
+    ],
+    [
+     78,
+     28
+    ]
+   ],
+   "tab_switch_errors": {}
+  },
+  "ncaaf": {
+   "path": "/ncaaf/cards",
+   "load_errors": [],
+   "cardCount": 16,
+   "fontCombos": {
+    "16px/700/16.8px": 2,
+    "12px/700/17.4px": 21,
+    "11px/700/15.4px": 12,
+    "12px/700/16.8px": 1,
+    "10px/700/14px": 24,
+    "18px/900/18.9px": 6,
+    "15px/700/15px": 18,
+    "12px/400/17.4px": 26,
+    "10px/800/normal": 3
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": "game",
+     "afterClick": {
+      "id": "identity",
+      "chars": 637
+     }
+    },
+    {
+     "label": "Team Context",
+     "target": "context",
+     "afterClick": {
+      "id": "context",
+      "chars": 455
+     }
+    },
+    {
+     "label": "Details",
+     "target": "details",
+     "afterClick": {
+      "id": "details",
+      "chars": 496
+     }
+    }
+   ],
+   "panels": [
+    {
+     "id": "identity",
+     "chars": 610,
+     "emptyCopy": 0
+    },
+    {
+     "id": "context",
+     "chars": 874,
+     "emptyCopy": 0
+    },
+    {
+     "id": "coverage",
+     "chars": 537,
+     "emptyCopy": 0
+    },
+    {
+     "id": "details",
+     "chars": 1084,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    498,
+    558,
+    498,
+    513,
+    498,
+    528,
+    498,
+    498,
+    498,
+    543,
+    513,
+    528,
+    513,
+    543,
+    498,
+    543
+   ],
+   "longestName": "Jacksonville State",
+   "nameCount": 64,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": true,
+   "tabBoxes": [
+    [
+     60,
+     28
+    ],
+    [
+     125,
+     28
+    ],
+    [
+     78,
+     28
+    ]
+   ],
+   "tab_switch_errors": {}
+  },
+  "ncaab": {
+   "path": "/ncaab/cards",
+   "load_errors": [],
+   "cardCount": 0,
+   "fontCombos": {},
+   "tabs": [],
+   "panels": [],
+   "heights": [],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": true,
+   "tabBoxes": [],
+   "tab_switch_errors": {}
+  },
+  "soccer": {
+   "path": "/soccer/epl/cards",
+   "load_errors": [],
+   "cardCount": 1,
+   "fontCombos": {
+    "16px/700/16.8px": 2,
+    "12px/700/17.4px": 31,
+    "11px/700/15.4px": 16,
+    "12px/700/16.8px": 1,
+    "13px/700/18.2px": 1,
+    "12px/400/17.4px": 37,
+    "10px/700/14px": 18,
+    "15px/400/15px": 4,
+    "16px/400/22.4px": 4,
+    "10px/800/normal": 4,
+    "15px/700/15px": 6,
+    "18px/900/18.9px": 12,
+    "11px/400/14.3px": 16,
+    "10px/800/14px": 2,
+    "16px/700/22.4px": 26
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": "game",
+     "afterClick": {
+      "id": "game",
+      "chars": 865
+     }
+    },
+    {
+     "label": "Box Score",
+     "target": "boxscore",
+     "afterClick": {
+      "id": "boxscore",
+      "chars": 638
+     }
+    },
+    {
+     "label": "Props",
+     "target": "props",
+     "afterClick": {
+      "id": "props",
+      "chars": 1350
+     }
+    },
+    {
+     "label": "Details",
+     "target": "panels",
+     "afterClick": {
+      "id": "panels",
+      "chars": 1635
+     }
+    }
+   ],
+   "panels": [
+    {
+     "id": "game",
+     "chars": 865,
+     "emptyCopy": 0
+    },
+    {
+     "id": "boxscore",
+     "chars": 2155,
+     "emptyCopy": 0
+    },
+    {
+     "id": "props",
+     "chars": 2613,
+     "emptyCopy": 0
+    },
+    {
+     "id": "panels",
+     "chars": 2847,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    949
+   ],
+   "longestName": "Coventry City",
+   "nameCount": 4,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": true,
+   "tabBoxes": [
+    [
+     60,
+     28
+    ],
+    [
+     98,
+     28
+    ],
+    [
+     66,
+     28
+    ],
+    [
+     78,
+     28
+    ]
+   ],
+   "tab_switch_errors": {}
+  }
+ },
+ "mobile_390": {
+  "mlb": {
+   "path": "/mlb/cards",
+   "load_errors": [],
+   "cardCount": 14,
+   "fontCombos": {
+    "21px/900/21px": 2,
+    "12px/700/15.84px": 2,
+    "22px/700/22px": 2,
+    "11px/700/15.95px": 4,
+    "10px/800/14.5px": 98,
+    "15px/700/15px": 1,
+    "12px/700/17.4px": 22,
+    "11px/600/15.95px": 1,
+    "11px/700/12.65px": 1,
+    "11px/700/normal": 1,
+    "10px/400/12px": 2,
+    "11px/400/13.86px": 18,
+    "14px/400/15.12px": 4,
+    "10px/800/normal": 3,
+    "16px/700/23.2px": 9,
+    "10px/700/14.5px": 6,
+    "10px/900/14.5px": 8,
+    "16px/400/23.2px": 20,
+    "13px/700/14.04px": 36,
+    "10.5px/400/12.81px": 9,
+    "11px/400/14.3px": 22,
+    "15px/400/15px": 12,
+    "10.5px/700/12.6px": 97,
+    "10.5px/400/12.6px": 512,
+    "10.5px/700/normal": 10,
+    "10.5px/800/normal": 10,
+    "15px/700/16.2px": 13
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": "overview",
+     "afterClick": {
+      "id": "overview",
+      "chars": 2586
+     }
+    },
+    {
+     "label": "Box Score",
+     "target": "boxscore",
+     "afterClick": {
+      "id": "boxscore",
+      "chars": 2697
+     }
+    },
+    {
+     "label": "Props",
+     "target": "props",
+     "afterClick": {
+      "id": "props",
+      "chars": 2106
+     }
+    }
+   ],
+   "panels": [
+    {
+     "id": "overview",
+     "chars": 2586,
+     "emptyCopy": 0
+    },
+    {
+     "id": "boxscore",
+     "chars": 3605,
+     "emptyCopy": 0
+    },
+    {
+     "id": "props",
+     "chars": 4474,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    4184,
+    4373,
+    4132,
+    3620,
+    3846,
+    3930,
+    4132,
+    3907,
+    4340,
+    4207,
+    3874,
+    3831,
+    3657,
+    4416
+   ],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": false,
+   "tabBoxes": [
+    [
+     60,
+     28
+    ],
+    [
+     98,
+     28
+    ],
+    [
+     66,
+     28
+    ]
+   ],
+   "tab_switch_errors": {}
+  },
+  "wnba": {
+   "path": "/wnba/cards",
+   "load_errors": [
+    "console.error: Failed to load resource: the server responded with a status of 404 ()"
+   ],
+   "cardCount": 2,
+   "fontCombos": {
+    "17px/700/17px": 2,
+    "11px/700/11px": 2,
+    "18px/700/18px": 2,
+    "11px/700/15.95px": 9,
+    "10px/800/14.5px": 36,
+    "13px/700/13px": 1,
+    "10px/700/11.8px": 2,
+    "10px/400/12px": 2,
+    "10px/400/11.8px": 37,
+    "12px/400/12.24px": 4,
+    "11px/400/12.98px": 4,
+    "16px/400/23.2px": 25,
+    "13px/700/13.65px": 31,
+    "10px/900/14.5px": 10,
+    "12px/400/12.96px": 8,
+    "9px/400/10.35px": 22,
+    "9px/700/9.9px": 1,
+    "9px/800/9.9px": 4,
+    "13px/700/13.52px": 4,
+    "9px/400/9.9px": 3,
+    "15px/400/17.1px": 3,
+    "9.5px/400/13.775px": 10,
+    "9.5px/800/13.775px": 31,
+    "11px/600/11.88px": 3,
+    "9.5px/400/11.21px": 10,
+    "9px/800/13.05px": 23,
+    "10px/700/14.5px": 8,
+    "14px/700/20.3px": 4,
+    "14px/400/14px": 16,
+    "11px/500/12.65px": 16,
+    "13px/700/14.95px": 22,
+    "13px/400/14.95px": 154,
+    "11px/400/11.88px": 9,
+    "10px/400/10.5px": 9,
+    "13px/400/14.04px": 1,
+    "13px/700/14.04px": 13,
+    "10.5px/700/12.075px": 7,
+    "10.5px/400/12.075px": 7
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": null
+    },
+    {
+     "label": "Box Score",
+     "target": null
+    },
+    {
+     "label": "Props",
+     "target": null
+    }
+   ],
+   "panels": [
+    {
+     "id": "game",
+     "chars": 1912,
+     "emptyCopy": 0
+    },
+    {
+     "id": "box",
+     "chars": 6667,
+     "emptyCopy": 0
+    },
+    {
+     "id": "props",
+     "chars": 4461,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    3727,
+    3522
+   ],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": false,
+   "tabBoxes": [
+    [
+     113,
+     38
+    ],
+    [
+     113,
+     38
+    ],
+    [
+     113,
+     38
+    ]
+   ],
+   "tab_switch_errors": {
+    "null": "CLICK FAILED: TimeoutError"
+   }
+  },
+  "nba": {
+   "path": "/nba/cards",
+   "load_errors": [],
+   "cardCount": 0,
+   "fontCombos": {},
+   "tabs": [],
+   "panels": [],
+   "heights": [],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": false,
+   "tabBoxes": [],
+   "tab_switch_errors": {}
+  },
+  "nhl": {
+   "path": "/nhl/cards",
+   "load_errors": [],
+   "cardCount": 0,
+   "fontCombos": {},
+   "tabs": [],
+   "panels": [],
+   "heights": [],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": false,
+   "tabBoxes": [],
+   "tab_switch_errors": {}
+  },
+  "nfl": {
+   "path": "/nfl/cards",
+   "load_errors": [],
+   "cardCount": 16,
+   "fontCombos": {
+    "16px/700/16.8px": 2,
+    "12px/700/17.4px": 15,
+    "11px/700/15.4px": 13,
+    "12px/700/16.8px": 1,
+    "13px/700/18.2px": 1,
+    "12px/400/17.4px": 18,
+    "10px/700/14px": 16,
+    "15px/400/15px": 4,
+    "16px/400/22.4px": 4,
+    "10px/800/normal": 4,
+    "15px/700/15px": 6,
+    "18px/900/18.9px": 9,
+    "11px/400/14.3px": 7,
+    "10px/800/14px": 2,
+    "16px/700/22.4px": 4
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": "game",
+     "afterClick": {
+      "id": "game",
+      "chars": 1255
+     }
+    },
+    {
+     "label": "Box Score",
+     "target": "boxscore",
+     "afterClick": {
+      "id": "boxscore",
+      "chars": 150
+     }
+    },
+    {
+     "label": "Props",
+     "target": "props",
+     "afterClick": {
+      "id": "props",
+      "chars": 208
+     }
+    },
+    {
+     "label": "Details",
+     "target": "panels",
+     "afterClick": {
+      "id": "panels",
+      "chars": 563
+     }
+    }
+   ],
+   "panels": [
+    {
+     "id": "game",
+     "chars": 1255,
+     "emptyCopy": 0
+    },
+    {
+     "id": "boxscore",
+     "chars": 525,
+     "emptyCopy": 0
+    },
+    {
+     "id": "props",
+     "chars": 349,
+     "emptyCopy": 2
+    },
+    {
+     "id": "panels",
+     "chars": 1073,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    1964,
+    1949,
+    1964,
+    1964,
+    1964,
+    1964,
+    1949,
+    1964,
+    1964,
+    1964,
+    1979,
+    1964,
+    1964,
+    1964,
+    1964,
+    1964
+   ],
+   "longestName": "New England Patriots",
+   "nameCount": 64,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": true,
+   "tabBoxes": [
+    [
+     60,
+     28
+    ],
+    [
+     98,
+     28
+    ],
+    [
+     66,
+     28
+    ],
+    [
+     78,
+     28
+    ]
+   ],
+   "tab_switch_errors": {}
+  },
+  "ncaaf": {
+   "path": "/ncaaf/cards",
+   "load_errors": [],
+   "cardCount": 16,
+   "fontCombos": {
+    "16px/700/16.8px": 2,
+    "12px/700/17.4px": 21,
+    "11px/700/15.4px": 12,
+    "12px/700/16.8px": 1,
+    "10px/700/14px": 24,
+    "18px/900/18.9px": 6,
+    "15px/700/15px": 18,
+    "12px/400/17.4px": 26,
+    "10px/800/normal": 3
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": "game",
+     "afterClick": {
+      "id": "identity",
+      "chars": 637
+     }
+    },
+    {
+     "label": "Team Context",
+     "target": "context",
+     "afterClick": {
+      "id": "context",
+      "chars": 455
+     }
+    },
+    {
+     "label": "Details",
+     "target": "details",
+     "afterClick": {
+      "id": "details",
+      "chars": 496
+     }
+    }
+   ],
+   "panels": [
+    {
+     "id": "identity",
+     "chars": 610,
+     "emptyCopy": 0
+    },
+    {
+     "id": "context",
+     "chars": 874,
+     "emptyCopy": 0
+    },
+    {
+     "id": "coverage",
+     "chars": 537,
+     "emptyCopy": 0
+    },
+    {
+     "id": "details",
+     "chars": 1084,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    1220,
+    1250,
+    1220,
+    1254,
+    1270,
+    1252,
+    1220,
+    1235,
+    1220,
+    1265,
+    1235,
+    1250,
+    1270,
+    1250,
+    1220,
+    1250
+   ],
+   "longestName": "Jacksonville State",
+   "nameCount": 64,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": true,
+   "tabBoxes": [
+    [
+     60,
+     28
+    ],
+    [
+     125,
+     28
+    ],
+    [
+     78,
+     28
+    ]
+   ],
+   "tab_switch_errors": {}
+  },
+  "ncaab": {
+   "path": "/ncaab/cards",
+   "load_errors": [],
+   "cardCount": 0,
+   "fontCombos": {},
+   "tabs": [],
+   "panels": [],
+   "heights": [],
+   "longestName": null,
+   "nameCount": 0,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": true,
+   "tabBoxes": [],
+   "tab_switch_errors": {}
+  },
+  "soccer": {
+   "path": "/soccer/epl/cards",
+   "load_errors": [],
+   "cardCount": 1,
+   "fontCombos": {
+    "16px/700/16.8px": 2,
+    "12px/700/17.4px": 31,
+    "11px/700/15.4px": 16,
+    "12px/700/16.8px": 1,
+    "13px/700/18.2px": 1,
+    "12px/400/17.4px": 37,
+    "10px/700/14px": 18,
+    "15px/400/15px": 4,
+    "16px/400/22.4px": 4,
+    "10px/800/normal": 4,
+    "15px/700/15px": 6,
+    "18px/900/18.9px": 12,
+    "11px/400/14.3px": 16,
+    "10px/800/14px": 2,
+    "16px/700/22.4px": 26
+   },
+   "tabs": [
+    {
+     "label": "Game",
+     "target": "game",
+     "afterClick": {
+      "id": "game",
+      "chars": 865
+     }
+    },
+    {
+     "label": "Box Score",
+     "target": "boxscore",
+     "afterClick": {
+      "id": "boxscore",
+      "chars": 638
+     }
+    },
+    {
+     "label": "Props",
+     "target": "props",
+     "afterClick": {
+      "id": "props",
+      "chars": 1350
+     }
+    },
+    {
+     "label": "Details",
+     "target": "panels",
+     "afterClick": {
+      "id": "panels",
+      "chars": 1635
+     }
+    }
+   ],
+   "panels": [
+    {
+     "id": "game",
+     "chars": 865,
+     "emptyCopy": 0
+    },
+    {
+     "id": "boxscore",
+     "chars": 2155,
+     "emptyCopy": 0
+    },
+    {
+     "id": "props",
+     "chars": 2613,
+     "emptyCopy": 0
+    },
+    {
+     "id": "panels",
+     "chars": 2847,
+     "emptyCopy": 0
+    }
+   ],
+   "heights": [
+    1820
+   ],
+   "longestName": "Coventry City",
+   "nameCount": 4,
+   "overflowingNames": 0,
+   "horizontalPageOverflow": true,
+   "tabBoxes": [
+    [
+     60,
+     28
+    ],
+    [
+     98,
+     28
+    ],
+    [
+     66,
+     28
+    ],
+    [
+     78,
+     28
+    ]
+   ],
+   "tab_switch_errors": {}
+  }
+ }
+}

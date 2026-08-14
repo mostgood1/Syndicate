@@ -441,6 +441,73 @@ def handle_market_summary(payload: dict[str, Any]) -> dict[str, Any]:
     return _build_route_payload(payload, decision)
 
 
+_OUT_OF_SCOPE_CAPABILITIES: tuple[str, ...] = (
+    "tonight's board and the edges on it",
+    "a specific game, matchup or player prop",
+    "what the model projects and how confident it is",
+    "how the model has performed historically",
+)
+
+_OUT_OF_SCOPE_REASONS: dict[str, str] = {
+    "personal_records": (
+        "This is a board analytics surface with no user accounts, so there are "
+        "no personal balances, wagers or history to look up."
+    ),
+    "no_domain_vocabulary": (
+        "That question is outside what this surface covers -- it answers "
+        "questions about the betting board, its games and its models."
+    ),
+}
+
+
+def _out_of_scope_response(question: str, decision: RouteDecision) -> dict[str, Any]:
+    """A decline that says WHY and WHAT IT CAN do instead.
+
+    Returned before the snapshot read, so a declined question does no work --
+    measured 2026-08-14, "What is the capital of France?" took 10.9 s to return
+    five irrelevant betting opportunities.
+
+    Shape deliberately mirrors the answering path (`ok`, `surface`, `intent`,
+    `routing`, `structured_response`) so an existing consumer parses it without
+    a new branch, and `top_opportunities` is an EMPTY LIST rather than absent --
+    a caller that iterates it gets nothing, which is the intent, instead of a
+    KeyError.
+
+    `answered: false` is the discriminating field. It exists because a caller
+    cannot otherwise distinguish "declined" from "answered with nothing found",
+    and those have different meanings to a user and different fixes for us.
+    """
+    reason_key = decision.matched_terms[0] if decision.matched_terms else "no_domain_vocabulary"
+    reason = _OUT_OF_SCOPE_REASONS.get(reason_key, _OUT_OF_SCOPE_REASONS["no_domain_vocabulary"])
+    return {
+        "ok": True,
+        "answered": False,
+        "surface": "syndicate",
+        "question": question,
+        "intent": decision.intent,
+        "routing": {
+            "handler": decision.handler_name,
+            "matched_terms": list(decision.matched_terms),
+            "score": decision.score,
+        },
+        "query_type": decision.intent,
+        "schema_type": "out_of_scope",
+        "structured_response": {
+            "schema_type": "out_of_scope",
+            "relevance_matched": False,
+            "top_opportunities": [],
+            "rationale_summary": {
+                "summary": reason,
+                "board_notes": [],
+                "analysis_brief": {},
+                "supporting_evidence": {},
+            },
+        },
+        "declined_reason": reason,
+        "can_answer": list(_OUT_OF_SCOPE_CAPABILITIES),
+    }
+
+
 @ask_the_syndicate_bp.route("/api/syndicate/query", methods=["POST", "OPTIONS"])
 def ask_the_syndicate_query_api():
     if request.method == "OPTIONS":
@@ -460,6 +527,9 @@ def ask_the_syndicate_query_api():
     # so it doubles as the context source for the per-pick routing fallback
     # in SyndicateQueryRouter.route -- see that function's own comment.
     decision = _QUERY_ROUTER.route(str(shaped_payload.get("question") or question), context=shaped_payload)
+
+    if decision.intent == "out_of_scope":
+        return _with_cors_headers(jsonify(_out_of_scope_response(question, decision)))
 
     cache_key = _query_cache_key(question, payload, decision)
     cached_response = _read_cached_response(cache_key)

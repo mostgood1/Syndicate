@@ -3224,3 +3224,80 @@ than have every session quietly decide it is.
   the harness; `checkpoint-guard.py` replaces the `.sh` and can now pass.
 - Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
+
+### ask-refusal-gate — OPEN — opened 2026-08-14 — session: ask-audit
+- Goal: `market_summary` stops being the answer to questions that are not about
+  betting. **Testable outcome:** `"What is the capital of France?"`,
+  `"What is the weather at the stadium right now?"` and `"What is my account
+  balance and betting history?"` stop returning five betting opportunities, and
+  `scripts/ask_syndicate_regression.py`'s `refusal` class moves off 3/8 with
+  **no regression in any other class** (currently: advice 4/5, entity 2/10,
+  explain 4/6, history 1/5, lookup 2/8, ranking 4/10; overall 20/52).
+- Why this first: measured on production 2026-08-14, `market_summary` is the
+  resolved intent on **40 of 52** regression questions. It is the router's
+  deliberate default for anything unmatched (`ask_the_syndicate_router.py:44-50`),
+  and that default was CORRECT for vague *betting* questions -- it fixed a real
+  dead end on 2026-08-03. It was never scoped to exclude questions that are not
+  about betting at all.
+- Files (exclusive to this lane):
+  - `syndicate/blueprints/ask_the_syndicate_router.py` -- the default branch.
+  - `syndicate/blueprints/ask_the_syndicate.py` -- early return for the new
+    intent. **Added after opening**, once the dispatch was traced: the adapter
+    selects a schema on `decision.intent` and an unknown intent falls to
+    `_bet_analysis_schema`, i.e. the dead end this lane exists to avoid.
+    Short-circuiting in the route keeps the change out of the adapter (see
+    below) and skips the snapshot read for a question being declined.
+  - `tests/test_ask_router_board_summary_default.py` -- new cases.
+  - Collision check: CLEAR. Grepped every OPEN lane's claim block 2026-08-14;
+    zero mentions of any `ask_the_syndicate*` file. The other OPEN lanes claim
+    `pipeline/intelligence_state.py`, `syndicate/blueprints/intelligence.py`,
+    `syndicate/features/shared/*`, `scripts/run_refresh_worker.py`.
+  - NOT claimed, deliberately: `ask_the_syndicate_adapter.py`. A parallel
+    session shipped `_board_summary_sentence` / `_is_general_board_question`
+    there (`addec418`, `5c7e4d67`) building for exactly this no-LLM world. This
+    lane routes; it does not touch their prose layer.
+- Hypothesis (diagnostic half): the default is unconditional, so ANY question
+  with no rule match returns a board summary regardless of subject.
+- Falsification test: if some upstream guard already declines non-betting
+  questions and the five measured board dumps came from something else, the
+  router is exonerated and this lane is void. **Checked before opening: no such
+  guard exists** -- `route()` returns `market_summary` at score 0 with no
+  subject test, and production returned five opportunities for "What is the
+  capital of France?".
+- Verification: (1) new unit cases pass; (2) the four pre-existing test classes
+  in `test_ask_router_board_summary_default.py` still pass -- especially
+  `test_unmatched_question_defaults_to_summary_not_single_bet_analysis`, which
+  pins the 2026-08-03 fix this must not undo; (3) re-run the regression harness
+  against production after deploy and record the class-by-class delta here.
+- Blocked by: none.
+
+**RESULT 2026-08-14 -- code complete, locally verified, PRODUCTION MEASUREMENT
+STILL OWED (not deployed).**
+
+- **(1) and (2) DONE.** `136 passed, 23 subtests` across
+  `test_ask_router_board_summary_default.py`, `test_ask_market_summary_ranking.py`
+  and `test_ask_the_syndicate.py`. Blast radius is 4 files (grep
+  `ask_the_syndicate_router`), all covered: the two blueprints and the two test
+  files. The adapter imports only `RouteDecision`, and `out_of_scope` never
+  reaches it -- the route short-circuits first.
+- **(3) OWED.** Not deployed. `.py` pushes do not ship (`autoDeploy: no`).
+- **Deterministic delta across all 52 regression questions**, router-level so it
+  isolates this change from slate movement: `market_summary` **40 -> 37**,
+  `out_of_scope` **0 -> 3**, `bet_analysis` 11 -> 11, `matchup_analysis` 1 -> 1.
+  **3 cases changed, all 3 correct (F04 weather, F06 capital of France, F08
+  personal records), ZERO regressions.** Refusal class 3/8 -> **6/8** expected.
+- **MY "5 of 8" ESTIMATE WAS WRONG** and it was load-bearing for prioritisation.
+  5 refusal cases were failing, not 8, and a lexical gate fixes 3 of those 5.
+  F03 (dead player / nonexistent matchup) needs entity validation; F05
+  (impossible tense) needs temporal validation. Both carry real domain
+  vocabulary, so no word list catches them -- corrected in the plan.
+- **Two regressions were caught by testing the ANSWER direction, not the decline
+  direction, and would have shipped otherwise.** "How is Jokic looking tonight?"
+  and "Best TB targets today?" were both declined by the first version -- a bare
+  player name carries no domain noun, and `_fetchers_for_sport`'s own comment
+  already records that exact Jokic phrasing as one the keyword sets miss. Fixed
+  by treating day-scoping (`tonight`/`today`/...) as domain vocabulary, since a
+  question scoped to a slate day IS about the slate. **A refusal gate must be
+  tested on what it must NOT refuse; the decline list alone would have passed.**
+- Also caught: `matches` as a domain token let "qwertyuiop nothing matches this
+  at all" through. Dropped; `match` kept.
