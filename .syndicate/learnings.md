@@ -1696,3 +1696,33 @@ back **oldest-first regardless of `direction`**.
   next session a false blocker on the single highest-value next action. Someone
   picking that up cold would have gone looking for a lane owner who did not
   need to exist.
+
+### 2026-08-14 — PINNED DEPLOYS PUT CODE IN PRODUCTION THAT WAS NEVER ON MAIN
+- What I believed at three consecutive checkpoints: everything I had shipped
+  was on `origin/main`. I had verified the ledger content each time, and the
+  reorder commit, and reported "all content is on origin".
+- What was actually true: **two production changes on web — the ops league
+  scoping and the `/api/ops/oddsapi/sports` route — existed ONLY on their
+  deploy branches and on the running service.** `origin/main` had neither. The
+  next web deploy from main would have silently removed both.
+- How it happened, and it is structural rather than careless: to keep blast
+  radius to one file I cherry-picked each change onto its SERVICE's live commit
+  and pushed that to a `deploy/*` branch. That is the right call and I would
+  make it again — but it creates **two** destinations, and only one of them is
+  the one everyone else reads. One push to main was rejected non-fast-forward
+  (origin had moved), I noted "I'll rebase and land it", and the thread was
+  never picked up. A rejected push leaves no artifact; nothing reminds you.
+- **The rule: a pinned deploy is TWO pushes, and the branch one is the one
+  that lies to you.** The service is running, the feature works, every
+  functional check passes — and main does not have it. Deploy-branch success
+  actively masks main-branch absence.
+- **The check that caught it, worth institutionalising: before archiving, diff
+  each DEPLOYED file against `origin/main` by content, per service.** Not
+  ancestry — the deploy SHAs are never ancestors of main by construction here,
+  so `merge-base --is-ancestor` says "NOT_on_main" for both the real gap and
+  the harmless case, and is useless as a discriminator. Content diff separates
+  them in one line.
+- Cost: none, caught at the archive check. Had it not been, the loss would have
+  been invisible until someone deployed web from main and wondered where the
+  ops routes went — with the deploy branches still green and a ledger that
+  said "landed".
