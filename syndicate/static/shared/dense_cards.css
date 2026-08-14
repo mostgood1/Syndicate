@@ -1,3 +1,31 @@
+/* Measured 2026-08-14 (production, 1440x1200): NFL, NCAAF, NCAAB and soccer
+   scroll horizontally by exactly 28px at every width --
+   documentElement.scrollWidth 1468 vs clientWidth 1440. MLB and WNBA do not,
+   and the only difference is that mlb/cards_exact.css and
+   wnba/cards-parity.css each open with a `* { box-sizing: border-box }` while
+   the sports served by game_cards_board.html inherit no reset at all. Under
+   content-box, `.cards-game-card`'s `width: min(100%, 1540px)` plus 13px
+   padding and a 1px border lays out at 1448px inside a 1440px viewport, and
+   `.standalone-app-header`'s `width: min(1640px, 100vw - 16px)` plus 16px
+   padding at 1458px. syndicate.html:8 already carried this exact diagnosis as
+   a page-local hack; this is the same reset, at the shared stylesheet.
+
+   It lives here rather than in standalone_shell.css because THIS file is
+   linked unconditionally by game_cards_board.html, while standalone_shell.css
+   is behind `show_standalone_cards_header` and would miss any board whose
+   module is not cards/game_detail/season_review.
+
+   Scoped to `body.cards-body`: every board built through game_board_contract
+   carries that class (page_body_class defaults to "cards-body
+   syndicate-<sport>-cards-page"), while the other pages linking this
+   stylesheet were laid out under content-box. */
+body.cards-body,
+body.cards-body *,
+body.cards-body *::before,
+body.cards-body *::after {
+  box-sizing: border-box;
+}
+
 .cards-scoreboard {
   display: grid;
   grid-auto-flow: column;
@@ -113,7 +141,15 @@
   font-size: 16px;
   font-weight: 700;
   line-height: 1.05;
-  overflow-wrap: anywhere;
+  /* `anywhere` breaks a word even when the line has a legal wrap point, and
+     it also shrinks the element's min-content width, which is what let the
+     strip column get narrow enough to produce "New Engla nd Patrio ts" at
+     390px (nfl_mobile.png, 2026-08-14). `break-word` breaks a word only when
+     that word cannot fit on a line by itself, which is the behaviour this
+     rule was reaching for. The strip also stacks at <=767px now (see the
+     .cards-scoreboard override below), so the two together mean a full name
+     wraps between words instead of through them. */
+  overflow-wrap: break-word;
 }
 
 /* Soccer's compact scoreboard strip only (.cards-strip-card--soccer,
@@ -313,6 +349,13 @@
   font-family: "Space Grotesk", "IBM Plex Sans", sans-serif;
   font-size: 15px;
   line-height: 1;
+  /* These carry odds, projections and probabilities on a surface that
+     re-renders every 30s. Measured 2026-08-14: font-variant-numeric computed
+     to `normal` on all five sports, so each poll re-flowed the digits and the
+     numbers visibly jittered. `tabular-nums` is already used on the layer-1
+     board, the portfolio and the cross-book page -- this is the card surface
+     catching up, not a new convention. */
+  font-variant-numeric: tabular-nums;
 }
 
 .cards-market-row {
@@ -694,12 +737,18 @@
 
 .cards-tabs {
   display: inline-flex;
+  /* Wraps because a card's tab set is now derived from the panels it
+     actually has (see _game_card_ncaaf.html) rather than hardcoded to three,
+     so a game with a blend trial and a matchup comparison carries more of
+     them. Without this the rail widened past the card at narrow widths. */
+  flex-wrap: wrap;
   gap: 6px;
   padding: 3px;
   border: 1px solid var(--cards-line);
   border-radius: 999px;
   background: rgba(5, 14, 24, 0.58);
   width: fit-content;
+  max-width: 100%;
 }
 
 .cards-tabs-rail {
@@ -720,6 +769,19 @@
   letter-spacing: 0.12em;
   text-transform: uppercase;
   cursor: pointer;
+}
+
+/* Touch targets. Measured 2026-08-14 at 390px: every sport's tabs were 28px
+   tall (WNBA 38px), against WCAG 2.5.5's 44x44 -- the height was the failing
+   axis everywhere, never the width. Raising the target rather than the font
+   size keeps the existing 10px label and the rail's proportions; the pill is
+   still 44px of hit area because the padding grows with it. Desktop keeps
+   the compact rail: a mouse does not need 44px. */
+@media (max-width: 767px) {
+  .cards-tab {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
 }
 
 .cards-tab.is-active {
@@ -840,8 +902,20 @@
 }
 
 @media (max-width: 767px) {
+  /* Measured 2026-08-14 at 390x844 (nfl_mobile.png): the strip kept
+     `grid-auto-flow: column` at every width, so on a 390px viewport it stayed
+     a horizontally scrolling row of ~260px cards. Each card then splits into
+     two team columns of ~90px, which is narrower than the team name, and
+     names broke mid-word -- "New Engla nd Patrio ts", "Seattle Seaha wks".
+     Note for anyone re-reading the audit: this is the STRIP, not
+     `.cards-grid`, which has been `grid-template-columns: 1fr` all along.
+     Row flow gives each strip card the full column width, and the names then
+     wrap on word boundaries with no other change. */
   .cards-scoreboard {
-    grid-auto-columns: minmax(260px, 1fr);
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: visible;
   }
 
   .cards-head-matchup,
@@ -851,6 +925,28 @@
 
   .cards-status-cluster {
     justify-items: start;
+  }
+
+  /* The card head kept the matchup and the kickoff/venue cluster side by side
+     at every width. Measured locally at 375px: head 328px split 189/129, so
+     each team block got 68px and the name inside it 30px -- "North Carolina"
+     cannot be rendered in 30px by any wrapping rule, which is the other half
+     of the mid-word breaking (the first half was the strip, above). Stacking
+     them gives the matchup the full card width and each team ~150px.
+     `min-width: 220px` on the cluster is what forced the split; it is a
+     desktop constraint and is dropped here. */
+  .cards-strip-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .cards-head-matchup {
+    flex: 1 1 100%;
+  }
+
+  .cards-status-cluster {
+    flex: 1 1 100%;
+    min-width: 0;
   }
 
   .cards-mini-metrics--strip,

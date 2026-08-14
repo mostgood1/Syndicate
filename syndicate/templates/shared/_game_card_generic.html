@@ -116,11 +116,26 @@
   </div>
 
   <div class="cards-tabs-rail">
-    <div class="cards-tabs">
-      <button class="cards-tab is-active" type="button" data-tab-target="game">Game</button>
-      <button class="cards-tab" type="button" data-tab-target="boxscore">Box Score</button>
-      <button class="cards-tab" type="button" data-tab-target="props">Props</button>
-      {% if game.panels %}<button class="cards-tab" type="button" data-tab-target="panels">Details</button>{% endif %}
+    {#- A tab set, not three loose buttons: before this, `aria-selected` was
+        toggled by the shared script on bare <button>s with no role="tab", no
+        tablist, no aria-controls and no tabpanels, so a screen reader was
+        told about a selected state on a control it had no way to understand
+        as one of a set. Ids are namespaced by the card so a slate of 15 games
+        does not collide. -#}
+    {% set card_dom_id = game.gamePk %}
+    {% set card_tabs = [{'id': 'game', 'label': 'Game'}, {'id': 'boxscore', 'label': 'Box Score'}, {'id': 'props', 'label': 'Props'}]
+      + ([{'id': 'panels', 'label': 'Details'}] if game.panels else []) %}
+    <div class="cards-tabs" role="tablist" aria-label="Game card sections">
+      {% for tab in card_tabs %}
+        <button class="cards-tab{% if loop.first %} is-active{% endif %}"
+                type="button"
+                role="tab"
+                id="tab-{{ card_dom_id }}-{{ tab.id }}"
+                data-tab-target="{{ tab.id }}"
+                aria-controls="panel-{{ card_dom_id }}-{{ tab.id }}"
+                aria-selected="{{ 'true' if loop.first else 'false' }}"
+                tabindex="{{ '0' if loop.first else '-1' }}">{{ tab.label }}</button>
+      {% endfor %}
     </div>
     <div class="cards-mini-metrics cards-mini-metrics--rail">
       {% for metric in metrics[:3] %}
@@ -132,7 +147,7 @@
     </div>
   </div>
 
-  <section class="cards-panel is-active" data-panel-id="game">
+  <section class="cards-panel is-active" data-panel-id="game" id="panel-{{ card_dom_id }}-game" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-game" tabindex="0">
     <div class="cards-overview-grid">
       <div class="cards-panel-card cards-panel-card--overview-main">
         <div class="cards-box-head">
@@ -220,7 +235,7 @@
     </div>
   </section>
 
-  <section class="cards-panel" data-panel-id="boxscore">
+  <section class="cards-panel" data-panel-id="boxscore" id="panel-{{ card_dom_id }}-boxscore" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-boxscore" tabindex="0">
     <div class="cards-box-grid{% if box_sections|length < 2 %} cards-box-grid--stack{% endif %}">
       {% for section in box_sections %}
         <div class="cards-panel-card">
@@ -251,7 +266,7 @@
     </div>
   </section>
 
-  <section class="cards-panel" data-panel-id="props">
+  <section class="cards-panel" data-panel-id="props" id="panel-{{ card_dom_id }}-props" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-props" tabindex="0">
     <div class="cards-box-grid{% if prop_rows|length < 4 %} cards-box-grid--stack{% endif %}">
       <div class="cards-panel-card cards-panel-card--overview-main">
         <div class="cards-box-head">
@@ -301,7 +316,7 @@
   </section>
 
   {% if game.panels %}
-  <section class="cards-panel" data-panel-id="panels">
+  <section class="cards-panel" data-panel-id="panels" id="panel-{{ card_dom_id }}-panels" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-panels" tabindex="0">
     <div class="cards-box-grid{% if game.panels|length < 2 %} cards-box-grid--stack{% endif %}">
       {% for panel in game.panels %}
         <div class="cards-panel-card">

@@ -21,12 +21,40 @@
   {% set home_rank = home_team.get('rank') or home_header.get('rank') or home_header.get('ap_rank') or home_header.get('ranking') %}
   {% set away_conf = away_team.get('conference_short_name') or away_team.get('conference') or away_header.get('conference_short_name') or away_header.get('conference') %}
   {% set home_conf = home_team.get('conference_short_name') or home_team.get('conference') or home_header.get('conference_short_name') or home_header.get('conference') %}
-  {% set kickoff = scoreboard.get('kickoff') or away_header.get('kickoff') or home_header.get('kickoff') or '-' %}
+  {#- Display kickoff, never the raw one. `kickoff` is an ISO timestamp that
+      betting_card.py parses for day grouping; `kickoff_label` is the Central
+      string built for this card (ncaaf/cards.py:_format_kickoff_label). The
+      raw value stays as the last-resort fallback so an unparseable row still
+      renders something rather than a dash. -#}
+  {% set kickoff = scoreboard.get('kickoff_label') or away_header.get('kickoff_label') or home_header.get('kickoff_label')
+     or scoreboard.get('kickoff') or away_header.get('kickoff') or home_header.get('kickoff') or '-' %}
+  {#- The '-' placeholders in this template (11 of them) are deliberately left
+      alone here: Lane F3 replaces them platform-wide at the contract, and
+      half-applying it would break that lane's measured baseline. -#}
   {% set venue = scoreboard.get('venue') or away_header.get('venue') or home_header.get('venue') or '-' %}
 
   {% if not ncaaf %}
     {% include 'shared/_game_card_generic.html' %}
   {% else %}
+    {#- Tab ids and panel ids are one namespace, always. Measured 2026-08-14:
+        the rail pointed at "game" while the default panel was "identity", so
+        activateTab() turned every panel off and none back on -- the card
+        collapsed to a 187px header strip the moment a user came back to the
+        default tab. Four more panels (the blend trial, the reasons list, the
+        matchup comparison and coverage) were rendered with no tab pointing at
+        them at all, i.e. shipped to the browser and unreachable. Both defects
+        are the same missing rule: a panel exists iff a tab addresses it.
+        `card_tabs` below is that rule, written once and used to render both
+        halves, so the two cannot drift apart again. -#}
+    {% set card_dom_id = game.gamePk %}
+    {% set blend_panel_id = ('blend-trial-public' if scoreboard.projection_sources_mode == 'public_trial' else 'blend-trial-diagnostic') if scoreboard and scoreboard.projection_sources else none %}
+    {% set show_matchup_tab = show_matchup_context is defined and show_matchup_context and matchup_context_items %}
+    {% set card_tabs = [{'id': 'identity', 'label': 'Game'}]
+      + ([{'id': blend_panel_id, 'label': ('Model Comparison' if scoreboard.projection_sources_mode == 'public_trial' else 'Blend Trial')}] if blend_panel_id else [])
+      + ([{'id': 'smartsim-reasons', 'label': 'Why It Leans'}] if smartsim_reason_items else [])
+      + [{'id': 'context', 'label': 'Team Context'}]
+      + ([{'id': 'matchup-context', 'label': 'Matchup'}] if show_matchup_tab else [])
+      + [{'id': 'coverage', 'label': 'Coverage'}, {'id': 'details', 'label': 'Details'}] %}
     <div class="cards-strip-head">
       <div class="cards-head-left cards-head-matchup">
         {% set away_logo_url = game.away.logo_url or away_team.get('logo_url') %}
@@ -71,7 +99,7 @@
       </div>
     </div>
 
-    <section class="cards-panel is-active" data-panel-id="identity">
+    <section class="cards-panel is-active" data-panel-id="identity" id="panel-{{ card_dom_id }}-identity" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-identity" tabindex="0">
       <div class="cards-overview-grid">
         <div class="cards-panel-card cards-panel-card--overview-main">
           <div class="cards-box-head">
@@ -141,7 +169,7 @@
 
     {% if scoreboard and scoreboard.projection_sources %}
       {% set is_public_trial = scoreboard.projection_sources_mode == 'public_trial' %}
-      <section class="cards-panel" data-panel-id="{{ 'blend-trial-public' if is_public_trial else 'blend-trial-diagnostic' }}">
+      <section class="cards-panel" data-panel-id="{{ blend_panel_id }}" id="panel-{{ card_dom_id }}-{{ blend_panel_id }}" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-{{ blend_panel_id }}" tabindex="0">
         <div class="cards-panel-card cards-panel-card--overview-main">
           <div class="cards-box-head">
             <div>
@@ -163,7 +191,7 @@
     {% endif %}
 
     {% if smartsim_reason_items %}
-      <section class="cards-panel" data-panel-id="smartsim-reasons">
+      <section class="cards-panel" data-panel-id="smartsim-reasons" id="panel-{{ card_dom_id }}-smartsim-reasons" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-smartsim-reasons" tabindex="0">
         <div class="cards-panel-card cards-panel-card--overview-main">
           <div class="cards-box-head">
             <div>
@@ -186,7 +214,7 @@
       </section>
     {% endif %}
 
-    <section class="cards-panel" data-panel-id="context">
+    <section class="cards-panel" data-panel-id="context" id="panel-{{ card_dom_id }}-context" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-context" tabindex="0">
       <div class="cards-panel-card cards-panel-card--overview-main">
         <div class="cards-box-head">
           <div>
@@ -213,7 +241,7 @@
     </section>
 
     {% if show_matchup_context is defined and show_matchup_context and matchup_context_items %}
-      <section class="cards-panel" data-panel-id="matchup-context">
+      <section class="cards-panel" data-panel-id="matchup-context" id="panel-{{ card_dom_id }}-matchup-context" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-matchup-context" tabindex="0">
         <div class="cards-panel-card cards-panel-card--overview-main">
           <div class="cards-box-head">
             <div>
@@ -236,7 +264,7 @@
       </section>
     {% endif %}
 
-    <section class="cards-panel" data-panel-id="coverage">
+    <section class="cards-panel" data-panel-id="coverage" id="panel-{{ card_dom_id }}-coverage" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-coverage" tabindex="0">
       <div class="cards-overview-grid">
         <div class="cards-panel-card cards-panel-card--overview-main">
           <div class="cards-box-head">
@@ -273,10 +301,17 @@
     </section>
 
     <div class="cards-tabs-rail">
-      <div class="cards-tabs">
-        <button class="cards-tab is-active" type="button" data-tab-target="game">Game</button>
-        <button class="cards-tab" type="button" data-tab-target="context">Team Context</button>
-        <button class="cards-tab" type="button" data-tab-target="details">Details</button>
+      <div class="cards-tabs" role="tablist" aria-label="Game card sections">
+        {% for tab in card_tabs %}
+          <button class="cards-tab{% if loop.first %} is-active{% endif %}"
+                  type="button"
+                  role="tab"
+                  id="tab-{{ card_dom_id }}-{{ tab.id }}"
+                  data-tab-target="{{ tab.id }}"
+                  aria-controls="panel-{{ card_dom_id }}-{{ tab.id }}"
+                  aria-selected="{{ 'true' if loop.first else 'false' }}"
+                  tabindex="{{ '0' if loop.first else '-1' }}">{{ tab.label }}</button>
+        {% endfor %}
       </div>
       <div class="cards-mini-metrics cards-mini-metrics--rail">
         <div class="cards-mini-metric">
@@ -290,7 +325,7 @@
       </div>
     </div>
 
-    <section class="cards-panel" data-panel-id="details">
+    <section class="cards-panel" data-panel-id="details" id="panel-{{ card_dom_id }}-details" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-details" tabindex="0">
       <div class="cards-box-grid{% if game.panels is defined and game.panels|length < 2 %} cards-box-grid--stack{% endif %}">
         {% for panel in game.panels %}
           <div class="cards-panel-card">

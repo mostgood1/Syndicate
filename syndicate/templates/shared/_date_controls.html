@@ -35,8 +35,22 @@
       <a class="cards-nav-pill" href="{{ reset_href }}">Reset</a>
     {% endif %}
     <a class="cards-nav-pill" id="cardsNextDateLink{{ control_dom_suffix }}" href="{{ next_href }}" rel="next">Next</a>
+    {#- Measured 2026-08-14 at 390px (nfl_mobile.png): BETTING CARD, PICKS and
+        LIVE LENS each rendered twice on the NFL cards page -- once as a
+        control pill in this form, once in the module nav immediately below
+        it. Every sport that sets `cards_control_links` overlaps its own
+        `module_links` the same way (nfl, ncaaf, ncaab, nba, nhl, wnba,
+        soccer); MLB alone already de-duplicated, in Python, at
+        features/mlb/cards.py:5436. Doing it here instead fixes it once for
+        every sport and for whatever ships next, and leaves MLB's filter as a
+        harmless no-op. Labels only -- two pills with the same label and
+        different hrefs are the same destination in practice on these pages,
+        and matching on href would miss the query-string variants. -#}
+    {% set module_link_labels = (links or []) | map(attribute='label') | map('string') | map('trim') | map('lower') | list %}
     {% for link in cards_control_links or [] %}
-      <a class="cards-nav-pill{% if link.active %} is-active{% endif %}" href="{{ link.href }}">{{ link.label }}</a>
+      {% if (link.label | string | trim | lower) not in module_link_labels %}
+        <a class="cards-nav-pill{% if link.active %} is-active{% endif %}" href="{{ link.href }}">{{ link.label }}</a>
+      {% endif %}
     {% endfor %}
   </form>
   {% if links %}

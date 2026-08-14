@@ -81,10 +81,24 @@
   </div>
 
   <div class="cards-tabs-rail">
-    <div class="cards-tabs">
-      <button class="cards-tab is-active" type="button" data-tab-target="overview">Game</button>
-      <button class="cards-tab" type="button" data-tab-target="boxscore">Box Score</button>
-      <button class="cards-tab" type="button" data-tab-target="props">Props</button>
+    {#- Same tab-set markup as the generic card. Note the first panel here is
+        `overview` where every other variant calls it `game` -- left as-is
+        deliberately: it is a real divergence but folding it in belongs to the
+        template consolidation (plan_2026-08-14_ui.md, I5), and renaming it
+        here would only move the inconsistency. -#}
+    {% set card_dom_id = game.gamePk %}
+    {% set card_tabs = [{'id': 'overview', 'label': 'Game'}, {'id': 'boxscore', 'label': 'Box Score'}, {'id': 'props', 'label': 'Props'}] %}
+    <div class="cards-tabs" role="tablist" aria-label="Game card sections">
+      {% for tab in card_tabs %}
+        <button class="cards-tab{% if loop.first %} is-active{% endif %}"
+                type="button"
+                role="tab"
+                id="tab-{{ card_dom_id }}-{{ tab.id }}"
+                data-tab-target="{{ tab.id }}"
+                aria-controls="panel-{{ card_dom_id }}-{{ tab.id }}"
+                aria-selected="{{ 'true' if loop.first else 'false' }}"
+                tabindex="{{ '0' if loop.first else '-1' }}">{{ tab.label }}</button>
+      {% endfor %}
     </div>
     <div class="cards-mini-metrics cards-mini-metrics--rail">
       {% if game.get('starter_metrics') %}
@@ -106,7 +120,7 @@
     </div>
   </div>
 
-  <section class="cards-panel is-active" data-panel-id="overview">
+  <section class="cards-panel is-active" data-panel-id="overview" id="panel-{{ card_dom_id }}-overview" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-overview" tabindex="0">
     <div class="cards-overview-grid">
       <div class="cards-panel-card cards-panel-card--overview-main">
         <div class="cards-box-head">
@@ -248,7 +262,7 @@
     </div>
   </section>
 
-  <section class="cards-panel" data-panel-id="boxscore">
+  <section class="cards-panel" data-panel-id="boxscore" id="panel-{{ card_dom_id }}-boxscore" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-boxscore" tabindex="0">
     <div class="cards-box-grid">
       <div class="cards-panel-card cards-box-panel">
         <div class="cards-box-head">
@@ -375,7 +389,7 @@
     </div>
   </section>
 
-  <section class="cards-panel" data-panel-id="props">
+  <section class="cards-panel" data-panel-id="props" id="panel-{{ card_dom_id }}-props" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-props" tabindex="0">
     <div class="cards-props-grid">
       <div class="cards-panel-card">
         <div class="cards-box-head">

@@ -160,7 +160,12 @@ def build_season_page_context(season: int, selected_date: str, *, profile: str =
         "page_shell_class": "syndicate-mlb-cards-shell",
         "cards_grid_class": "mlb-cards-grid",
         "cards_stylesheet": "mlb/cards.css",
-        "cards_script": "mlb/board.js",
+        # No `cards_script`: this page's only script was static/mlb/board.js,
+        # which was the first 52 lines of shared/game_board.js with the IIFE
+        # closed early -- a pure copy. game_cards_board.html already loads the
+        # shared script unconditionally and had a special case skipping this
+        # one, so the file has been dead code at this route. Deleted 2026-08-14
+        # with that special case; behaviour here is unchanged.
         "teaser": {
             "label": "Official betting card",
             "body": "Jump from the season review into the official MLB betting-card page for this date.",

@@ -18,7 +18,14 @@
 }
 
 .standalone-app-header {
-  width: min(1640px, calc(100vw - 16px));
+  /* `100vw` includes the classic scrollbar gutter, so on a page tall enough
+     to scroll this header was ~2px wider than its container and pushed the
+     document's scrollWidth past clientWidth on its own -- a second, smaller
+     source of the horizontal scroll the box-sizing reset fixed (measured
+     locally 2026-08-14: 1427 vs 1425 with the reset already in place).
+     `100%` resolves against the shell, which is already inside the
+     scrollbar. */
+  width: min(1640px, 100%);
   margin: 0 auto 12px;
   padding: 14px 16px;
   border: 1px solid var(--cards-line);

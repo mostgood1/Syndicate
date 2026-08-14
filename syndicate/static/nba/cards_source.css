@@ -3975,3 +3975,19 @@ body[data-viewport='phone'] .cards-scoreboard {
     font-size: 26px;
   }
 }
+
+
+/* Tabular figures on the numeric card classes. Measured 2026-08-14 across
+   all five sports: font-variant-numeric computed to `normal` everywhere on
+   the card surfaces, which are exactly the surfaces that re-render on a 30s
+   poll -- so proportional digits visibly re-flowed on every tick. Appended
+   as one block rather than edited into each rule because this file is a
+   ~4,000-line fork slated for consolidation (plan_2026-08-14_ui.md, I3);
+   keeping the change in one place makes it trivial to carry over or drop. */
+.cards-data-pair strong,
+.cards-mini-metric strong,
+.cards-market-main,
+.cards-lens-main,
+.cards-strip-score {
+  font-variant-numeric: tabular-nums;
+}
