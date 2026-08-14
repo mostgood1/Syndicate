@@ -6,7 +6,293 @@
 
 ## OPEN
 
-### projection-skill-declaration — OPEN — opened 2026-08-14 — session: nfl-day-of-game
+### odds-capture-stall — CLOSED 2026-08-14 — NOT A DEFECT: the 2h gap IS the configured pregame cadence
+- **Outcome: EXONERATED. There was no stall.** The gap is
+  `_PREGAME_SWEEP_INTERVAL_FALLBACK = 2 * 3600` in
+  `live_refresh_loop.py:3955`, a deliberate `#15 Phase 1` decision dated
+  2026-07-27 in its own comment: *daily sports drift-sample every 2h pregame,
+  soccer every 8h.* My hypothesis (a gate skipping the fetch through failure)
+  named the right MECHANISM and the wrong CHARACTER. The alternative I wrote
+  into this lane before testing — "is 2h just a long sample of the ordinary
+  cadence" — is the one that won.
+- **The reconciliation, every number:**
+  - `PREGAME_CADENCE_DETAIL` prints the gate's own arithmetic:
+    `mlb:marker_age_s=1820/interval_s=7200`. MLB is skipped until its marker
+    passes 7200s.
+  - 13:09:01Z — skip list `nfl,soccer,wnba`; **MLB absent, so MLB swept.**
+    Quote observed 13:09:14Z. The 13-second offset is the sweep itself.
+  - 13:39 / 13:54 / 14:09 / 14:25 / 14:40Z — MLB in the skip list, marker_age
+    climbing 1820 -> 4564, all under 7200.
+  - 15:10:38Z — skip list `nfl,wnba`; **MLB absent again, so MLB swept.**
+    Freshest observation moves to 15:10Z.
+  - 13:09 -> 15:10 is **7,289s against an interval of 7,200** — the gap is the
+    constant plus one tick's rounding. Nothing failed.
+  - Per-sport intervals confirmed live in the same log line: mlb/nfl/wnba
+    7200s, soccer 28800s. That reconciles the cross-sport spread measured at
+    10:37 (mlb 23.5m, wnba 54.0m, nfl 53.1m, soccer 12.9m) — every one of those
+    is a position inside its own sweep interval, not a health signal.
+- **Near-game cover DOES exist and I nearly missed it.** `_t_window_due_sports`
+  arms a per-game **T-75** ramp sweep and a **T-10** closing sweep, for mlb and
+  wnba only (`_T_WINDOW_COMMENCE_PROVIDERS`). So an individual game gets two
+  fresh looks close to its own start regardless of the 2h drift cadence. The
+  exposure is the MIDDAY window between sweeps, not the moments before a game.
+  Zero `T_WINDOW_SWEEP_DUE` in my 13:00-15:30Z sample is CORRECT and carries no
+  information: first pitch was 18:20Z, so T-75 could not arm until 17:05Z. An
+  absence outside the window is not an absence.
+- **Not memory, not a crash, and both were checked before being ruled out:**
+  795MB/2048MB with 1252MB headroom; zero `MEMORY_GUARD` hits; the two
+  `server_failed earlyExit=true evicted=false` events are the worker's own
+  `max_uptime_seconds` recycle (`run_live_odds_refresh_worker.py:411` prints
+  `RECYCLING ... to reset accumulated page cache`), ~6h apart, by design.
+- **What this leaves OPEN, and it is a product decision, not a bug:** is a 2h
+  pregame drift sample the right cadence for a board that is priced off? The
+  levers are named and are env-only, no code change:
+  `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_<SPORT>` per sport, or
+  `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS` globally
+  (`live_refresh_loop.py:3958`). Tightening them spends OddsAPI budget against
+  the 5M call cap. **NOT CHANGED — handed to the user with the tradeoff stated.**
+- Verification: the falsification test ran and killed the hypothesis. Recorded
+  as an exoneration rather than quietly dropped.
+- Files: none touched. Read-only diagnosis throughout, so the claimed-file
+  conflict with `mlb-props-regen` / the memory lanes never had to be resolved.
+
+### (superseded lane detail — the OPEN body this lane was opened with)
+- Goal: name why MLB odds went **2h01m without a single new quote observation**
+  on 2026-08-14 while the refresh loop ticked ~8 times through it. Testable
+  outcome: the gap is attributed to a named gate/failure with a log line or a
+  counter proving it, and either fixed or filed with the fix specified.
+- **MEASURED BEFORE HYPOTHESISING, all times CDT:**
+  - Freshest MLB quote observation was **08:09:14** and was still 08:09:14 when
+    re-read **78 minutes later** — the identical instant, so this is a stall,
+    not a slow cadence. Read twice off `/api/board/layer1` (10:00 and 10:18).
+  - The board artifact rebuilt normally through the whole gap (10:09 build
+    against 08:09 odds). **Board freshness and odds freshness are independent**
+    — the grid keeps re-pivoting a frozen shard, which is exactly why nothing
+    downstream noticed.
+  - **The loop was NOT dead.** `loop_tick_begin` on live-odds-worker at 08:08,
+    08:24, 08:39, 08:54, 09:09 ... and `loop_sleep` carrying
+    `interval_seconds: 900`, i.e. the adaptive pregame cadence, working as
+    designed. Ticks ran; quotes did not appear.
+  - **Not memory.** 795MB of 2048, 1252MB headroom, zero `MEMORY_GUARD` hits in
+    the window. The two `server_failed earlyExit=true evicted=false` events
+    (06:16Z, 12:22Z, ~6h apart) are the worker's OWN `max_uptime_seconds`
+    recycle, not crashes — `run_live_odds_refresh_worker.py:411` prints
+    `RECYCLING ... to reset accumulated page cache`. Do not chase these.
+  - **It recovered on its own** between 10:18 and 10:36 (freshest observation
+    moved to 10:10). So the target is an intermittent gate, not a dead service.
+  - Cross-sport at 10:37: mlb 23.5m, wnba 54.0m, nfl 53.1m, soccer 12.9m. Tens
+    of minutes is NORMAL here. The 2h hole is the tail of an existing
+    distribution, not a unique event — so "is 2h just a long sample of the
+    ordinary cadence" is a live alternative to the gate story and must be
+    tested, not assumed away.
+- Hypothesis: the tick runs but the per-sport fetch is skipped by a gate that
+  is time- or state-dependent (a T-window/cost gate, an "already captured"
+  short-circuit, or an OddsAPI error swallowed into a no-op), so the tick
+  reports success while writing nothing to the `book_quotes` shard.
+- Falsification test: if a tick inside a stall is shown to CALL the OddsAPI and
+  receive quotes, then the fetch is not being skipped and the loss is
+  downstream in the shard write or the last-seen tracking — a different fix in
+  a different file, and this hypothesis is dead.
+- Secondary falsifier: if the per-tick quote-write count is nonzero throughout
+  the 08:09-10:10 window, then nothing stalled and `seen_age` is simply not
+  measuring what the board is now reporting — which would make the freshness
+  field I just shipped WRONG and is the first thing to rule out.
+- Files: none claimed yet — this is read-only diagnosis until the gate is
+  named. Any fix will land in `syndicate/features/shared/live_refresh_loop.py`
+  or `scripts/run_live_odds_refresh_worker.py`, **both of which are claimed by
+  OPEN lane `mlb-props-regen`** (`live_refresh_loop.py`) and
+  `refresh-worker-anon-leak` / `anon-allocation-site`
+  (`run_live_odds_refresh_worker.py`). Diagnosis can proceed; a fix cannot be
+  written here without reassigning that file. Flagged now rather than at the
+  point of edit.
+- Blocked by: none for diagnosis. Blocked on lane reassignment for any fix.
+
+### board-ui-freshness-slip-books — OPEN — opened 2026-08-14 — session: board-ui
+- Goal: three UI defects on `/<sport>/market-board`, each with a testable
+  outcome:
+  1. **The board reports build age and hides odds age, and the two differ by
+     two hours.** MEASURED 2026-08-14 15:00Z against production
+     (`/api/board/layer1?sport=mlb&date=2026-08-14&window=slate`): artifact
+     `generated_at` 14:58:49Z — **1.6 min old** — while the freshest `updated_at`
+     across all 14 games' rows is **13:09:05Z (8:09am CDT), 1h51m old**, and
+     the minimum `seen_age_seconds` (6576.8s) independently agrees. The header
+     says "built 2m old" and a reader takes that as the odds. Outcome: the meta
+     strip carries an odds-observation age derived from the rows, warn-styled
+     past a threshold, and the two ages are never conflatable.
+  2. Bet slip is unstyled and un-collapsible on this page, so the rail eats
+     board width permanently. ROOT CAUSE FOUND: `bet_slip.js` renders
+     `.bet-slip__*` markup whose styles live ONLY in
+     `static/shared/board_cards.css`, which `intelligence.html` loads and
+     `shared/layer1_board.html` does not. Outcome: slip renders identically to
+     the main board's, collapses, and each row carries the same
+     `data-ask-action="ask-pick"` Syndicate button the main board has.
+  3. 36 books render as 36 columns on MLB. Outcome: a user-chosen default
+     subset with a one-click "all books" toggle, persisted.
+- Files (exclusive to this lane):
+  - `syndicate/templates/shared/layer1_board.html` — the board page itself.
+  - `syndicate/features/shared/layer1_board.py` — board-level odds-freshness
+    derivation (`#1`).
+  - `syndicate/blueprints/intelligence.py` — `/api/board/layer1` provenance
+    fields only.
+  - `tests/test_layer1_board.py` — new cases.
+  - Collision check: CLEAR. Parsed every OPEN lane's claim block 2026-08-14;
+    the four other OPEN lanes claim `pipeline/intelligence_state.py`,
+    `syndicate/features/shared/{projection_skill,board_enrichment,memory_observability,live_refresh_loop,refresh_state_store}.py`,
+    `scripts/run_refresh_worker.py` and their tests. No overlap.
+  - NOT claimed, deliberately: `syndicate/static/shared/bet_slip.js` and
+    `board_cards.css` are shared by five boards; this lane LINKS the stylesheet
+    rather than editing either.
+- Hypothesis (diagnostic half, `#1`): the board's odds are stale on a cadence
+  the artifact rebuild hides — the grid rebuilds every ~10 min off a quote
+  shard that is refreshed far less often, so build age is not odds age.
+- Falsification test: if a fresh read shows `updated_at` tracking
+  `generated_at` within minutes, the two ages are the same quantity, the
+  measurement above was a one-off capture gap, and item 1 is cosmetic.
+- Verification: re-fetch `/api/board/layer1` after deploy and confirm the
+  served payload carries the odds-observation timestamp; drive the page with
+  the `run-syndicate` skill and confirm the slip renders styled + collapses and
+  the default column count drops from 36 to the chosen set.
+- Blocked by: item 3 needs the user's book selection before it can be built.
+- **`.syndicate/.current-lane` TAKEN FROM `layer2-board-freshness`, and that is
+  a real cost, not a formality.** I first tried to leave it alone, reasoning
+  that the guard only blocks files another lane claims — WRONG, and it blocked
+  my own first edit. `lane-guard.py` skips a claim only when
+  `slug == current`, so the marker is not "who else is running", it is "whose
+  claims are waived". It is single-valued, so two concurrent lanes cannot both
+  be protected: while it names this lane, `layer2-freshness` is blocked from
+  editing `pipeline/intelligence_state.py` — its OWN claimed file. Restored to
+  `layer2-board-freshness` at this lane's checkpoint. If that session hits a
+  BLOCKED message in the meantime, this is why.
+
+### layer2-board-freshness — OPEN — CODE WRITTEN AND TESTED, NOT DEPLOYED, NOT MEASURED — opened 2026-08-14 — session: layer2-freshness
+- **STATUS 2026-08-14: the change is written, tested and mutation-pinned. It is
+  NOT deployed and its production effect is UNMEASURED.** Working tree only:
+  `pipeline/intelligence_state.py` (+216), `tests/test_layer2_fast_refresh.py`
+  (new, 7 tests). Do not record this lane as delivering anything until the
+  verification query below has been re-run against a deployed commit.
+  - What shipped into the tree: `_abort_if_memory_critical(stage, floor_bytes)`
+    extracted from the existing guard (which is now a wrapper, unchanged in
+    behaviour); `_LAYER2_MIN_SAFE_HEADROOM_BYTES = 600MB`;
+    `_refresh_layer2_shortlist_only()`; the split refusal at the
+    `pre_source_state_fingerprint` branch. The `MEMORY_GUARD_ABORT` line gained
+    `floor_mb=` so two live floors are tellable apart.
+  - Gates on the fast path, in order: env flag
+    `SYNDICATE_LAYER2_FAST_REFRESH_ENABLED` (default ON — absent means ON, say
+    so before touching `render.yaml`), `refuse_if_compute_in_request_path`
+    (web runs `run_intelligence_query` in a request and is a 2GB container),
+    `SYNDICATE_LAYER2_FAST_REFRESH_SECONDS` rate limit (default 300s, shared
+    with the full build's shortlist write), then its own 600MB floor.
+  - **Mutation-pinned, which is the part worth trusting.** Repointing the fast
+    path at the 1900MB floor turns 2 of 7 tests red with
+    `MEMORY_GUARD_ABORT stage=layer2_fast_refresh floor_mb=1900` in the
+    captured stdout — the branch executed and the floor is the discriminator.
+  - Also green: `test_malloc_trim_release.py` 7 (trim ordering is pinned there
+    and the guard was refactored), `test_candidate_pool_manifest_gate.py` 9,
+    and `state.md`'s 4-test cheap smoke from `test_intelligence_state.py`.
+  - NOT included, deliberately (one change per deploy): `pool["overview"]`
+    embeds every sport's hydrated overview into the cached candidate pool
+    (`_max_snapshots`=12) and is read only by `_live_pipeline_summary`, for
+    counts and one timestamp. Real retention, worth its own change — but pools
+    cache only when `candidate_count > 0`, so it is not the plateau.
+  - Deploy exposure when it goes: refresh-worker `.py` only, no `render.yaml`.
+    Needs `/preflight`, an in-flight-sim check, and the live SHA re-read inside
+    the deploying step.
+- Goal: the Layer 2 shortlist (the board web actually serves) refreshes on a
+  cadence set by ITS OWN cost, not by whether refresh-worker has enough
+  headroom to hydrate eight sports' overviews. Testable outcome: over a 3h
+  production window, `LAYER2_SHORTLIST` build count rises from 5 and the
+  longest no-rebuild gap falls well below the measured 104.7 min, with no new
+  OOM kill and no change to the Layer 1 pool's own guards.
+- **MEASURED FIRST (refresh-worker, 11:39-14:39Z 2026-08-14, live commit
+  `2e4e2544` re-read in the same run):**
+  - **146 `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` vs 5
+    completed builds = 96.7% of board cycles refused before any work at all.**
+    That guard is `_MIN_SAFE_MEMORY_HEADROOM_BYTES` (1900MB), and its own
+    comment says it is sized for `build_intelligence_overview`'s ~1.9GB
+    transient. `anon` p50 pre-reboot was ~2200-2800MB against the 2196MB it
+    needs (4096-1900), so it refuses roughly whenever it looks.
+  - Longest gap with NO Layer 2 rebuild: **104.7 min** (12:44:20 -> 14:29:00Z).
+    That is the stale board: candidates whose games started during it.
+  - The refusal is total. Line 5266 returns `{"ok": false, "error":
+    "memory_guard_abort"}` for the WHOLE publication, so the shortlist — which
+    does not read the overview — dies with it.
+  - **Layer 2 does not consume what the guard is protecting.** On 3 of the 5
+    completed builds the Layer 1 pool returned `count=0` while
+    `LAYER2_SHORTLIST` returned **256 rows from 13,665 opportunities** on the
+    same cycle. `build_layer2_shortlist(selected_date, manifests.keys())` needs
+    only the date and `_available_sport_manifests` — not `overview`, not
+    `candidates`, not `_collect_candidates`.
+  - **The Layer 2 stage's own cost, measured across 4 builds:** 14-27s and
+    +27 to +181MB container. Against a 1900MB floor.
+  - Legacy `candidate_collection_with_fallback` cost 498.7s of the 3h window.
+- **NOT THE FORBIDDEN CHANGE.** This does NOT lower
+  `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` (3000MB) or
+  `_MIN_SAFE_MEMORY_HEADROOM_BYTES` (1900MB). Both stay exactly as they are and
+  keep gating exactly the stages they were measured against. This adds a
+  SEPARATE, SMALLER floor in front of a SEPARATE, CHEAPER stage — which is what
+  that constant's own comment asks for: "the floor must be the cost of the
+  stage being guarded, not a round number." See
+  `docs/ai_context/handoff_overview_hydration.md`, do-not #1.
+- Files (claimed by this lane):
+  - `pipeline/intelligence_state.py` — the Layer 2 fast path and the split
+    refusal at the `pre_source_state_fingerprint` guard.
+  - `tests/test_intelligence_state.py` — new cases.
+  - No OPEN lane claims either (checked 2026-08-14 against the live
+    `lane-guard.py` via stdin probe, exit 0, and against the nearest-preceding-
+    header map in this file).
+- Hypothesis: board staleness is NOT build slowness. It is refusal rate. The
+  builds that run are fine (27s tail); 96.7% of them never start.
+- Falsification test: if `LAYER2_SHORTLIST` count does not rise after the
+  change, the refusals were not what was blocking it and this lane is wrong.
+  A second falsifier: if the Layer 2 fast path's own floor is crossed as often
+  as the 1900MB one, then the shortlist is not as cheap as the four samples
+  say and the measurement was too narrow.
+- Verification: the same 3h production query re-run post-deploy — build count,
+  longest gap, abort count by stage, and an OOM check in the Render EVENTS api
+  (not the logs; `#423` records that kills are invisible in logs).
+- **Policy note, stated rather than hidden: this is the 5th OPEN lane against a
+  documented cap of 3.** The cap is policy with no enforcement (`state.md`).
+  Flagging rather than silently exceeding.
+- Blocked by: none.
+
+### projection-skill-declaration — CLOSED-VERIFIED 2026-08-14 — opened 2026-08-14 — session: nfl-day-of-game
+
+**OUTCOME — the lane's stated testable outcome, met on production.** Every
+projection row on every sport carries a `model_skill` block; NFL keeps its
+richer measured note untouched; the other producers report
+`status: "unmeasured"` explicitly.
+
+Shipped `2d6f7a2f`. **DEPLOYED AND VERIFIED on both services** — web
+`03:09:33Z`, refresh-worker `14:22:32Z`.
+
+    nfl      20 rows   {'measured': 20}      <- normalize path
+    mlb    1631 rows   {'unmeasured': 1631}  <- the point of #425 gap 1
+    wnba    209 rows   {'unmeasured': 209}
+    soccer   12 rows   {'unmeasured': 12}
+
+**NFL alone would not have proven it** — it is the one producer with real skill
+numbers, so it only exercises the normalize branch. 1,852 rows across three
+sports now declare that nobody has measured the model behind them.
+
+- Counts surface in the `projections` coverage block
+  (`rows_with_measured_skill` 101 / `rows_with_unmeasured_skill` 947 on NFL's
+  book-grid), **not** in `counts` — an earlier claim in this lane said `counts`
+  and was wrong.
+- **`#425` was closed on BOTH gaps and the six MEASUREMENTS were carved out as
+  `#428`** rather than left to age inside a closed ticket. `#428` is blocked on
+  data, not effort: soccer results 0 files, MLB `feed_live` 1 date, WNBA
+  game-cards 4 files.
+- **CLOSED LATE, and that is the lesson.** The work shipped and was verified
+  hours before this header was updated, during which `lane-guard` returned
+  **exit 2** for `projection_skill.py` and `board_enrichment.py` — locking two
+  files against every other session for no reason. A lane whose work is done is
+  not a harmless stale note; it is an active lock. Close it when the
+  measurement lands, not at checkpoint.
+- Files released: `syndicate/features/shared/projection_skill.py`,
+  `syndicate/features/shared/board_enrichment.py`,
+  `tests/test_projection_skill.py`.
+
+### projection-skill-declaration — CLOSED-VERIFIED — superseded header, kept for the file/line map
 - Goal: `#425` gap 1. Every projection on the board declares whether its model
   has ever been evaluated, so a consumer can tell a validated number from an
   unvalidated one. Testable outcome: 100% of projection rows carry a
