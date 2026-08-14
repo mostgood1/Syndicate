@@ -299,7 +299,44 @@
   window. Do not bundle it into an incident restart.
 - Blocked by: nothing. Measurement-bound, not idea-bound.
 
-### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
+### nfl-day-of-game — CLOSED-VERIFIED 2026-08-13 — opened 2026-08-13 — session: nfl-day-of-game
+
+**OUTCOME. All five stages exercised against the live 6-game preseason slate.
+Four verified working, one shipped-but-not-yet-observable. Three deploys, all
+measured. Closed on evidence, not on completion of the work list.**
+
+    sims                  model SOUND; the "identical projections" was file
+                          selection, not the model. 2 clubs mis-rated -- fixed,
+                          effect NOT yet observable (see carry-forward).
+    odds refresh          HEALTHY, was never broken. Do not re-investigate.
+    sim proj -> odds      FIXED + VERIFIED. distinct projected_raw 1 -> 6;
+                          board and cards agree 6/6 to three decimals.
+    live lens             FIXED + VERIFIED via game state.
+    game card updates     FIXED + VERIFIED. shared_is_live 0 -> 4,
+                          startTime 0/16 -> 16/16.
+
+- Shipped (ORIGIN SHAs — local `9bb2501a`/`3c3dfdfe`/`f1c6c540` will not
+  resolve for anyone else): `e29b807f` web 18:54, `98950c6d` refresh-worker
+  19:10, `111a5000` refresh-worker 19:13. Measurements in `deploys.md`.
+- Priors from the opening entry, resolved: prior 1 (no sim join) **partly
+  right** — the join existed but read the wrong file. Prior 2 (`#377`
+  degenerate model) **REFUTED** — the model is fine. Prior 3 (`#389` artifact
+  root) **not the cause here**, though the same root-resolution family is.
+- **CARRY-FORWARD, unowned. Do not close these silently:**
+  1. `111a5000`'s `LAR`/`WSH` alias fix is live but changes nothing until the
+     next season-projection autorun, **due ~2026-08-14 21:00 CDT**. Expect
+     `MIA@WSH` / `LAR@KC` `rating_source` to flip off `neutral_no_data`.
+  2. **The degenerate file is still WRITABLE.** `data/nfl_source/tracking/` is
+     gitignored, so a generator run rooted at the repo checkout still produces
+     league-constant projections. The reader is now immune; the writer is not.
+     No ticket filed.
+  3. MLB sim ledger never records completion (34/34 `running`), so no deploy
+     gate can ask "did the MLB sim finish".
+- Files released: all of `syndicate/features/nfl/**`, `blueprints/nfl.py`,
+  `shared/nfl_game_projections.py`, `shared/game_chip_scoreboard.py`,
+  `scripts/generate_smartsim2_nfl_projections.py`.
+
+### nfl-day-of-game — CLOSED-VERIFIED — superseded header, kept for the file/line map
 - Goal: the NFL day-of-game engine is proven, stage by stage, against
   tonight's 6-game preseason slate (2026-08-13). Testable outcome: for each
   of the five stages — sim run, odds refresh, sim-projection→odds mapping,

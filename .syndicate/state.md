@@ -479,6 +479,53 @@
   the tail — see `learnings.md`. Leading candidate is per-candidate scanning in
   the tail; unmeasured. `[unverified 08-13]`
 
+## NFL day-of-game (nfl-day-of-game lane)
+
+- **NFL games now carry real state on every surface.** `by_state` went
+  `{pregame:6, live:0}` → `{live:5, pregame:1, final:0}` with real scores and
+  clocks (`DET@CIN 3-10 Q2 0:07`). The game that had not kicked off stayed
+  `pregame` with a real start time, so this is not a blanket relabel.
+  Read on an artifact `generated_at 00:36:18Z`, **23 min after the deploy
+  instant** — freshness checked, not assumed. `e29b807f` (web) +
+  `98950c6d` (refresh-worker). `[measured 08-13 19:36]`
+- **The cause was one missing field, not five broken surfaces.**
+  `_NFLDataProvider.games()` fed `build_game_chips` week-scoped projection
+  cards with no game state at all (`status` a plain STRING, no `live_state`),
+  so `_game_flags` returned `(False, False)` for every NFL game forever. The
+  fix sets `live_state`, which `publication_adapter._shared_game_state` and
+  `game_chip_scoreboard._game_flags` both already read. `[from-code 08-13]`
+- **`#377`'s constant is GONE and was never a model defect.** `distinct
+  projected_raw` 1 → 6; board and cards now agree 6/6 to three decimals on
+  tonight's games, having disagreed while reading the same FILENAME.
+  `rows_with_projection` held at 75 — no row lost a projection.
+  `[measured 08-13 19:36]`
+- **It was file selection.** `load_nfl_game_projections` deduped candidates by
+  NAME across source roots, so only the first root's copy was ever opened, and
+  `data/nfl_source/tracking/` (the nflverse pbp) is **gitignored** — a
+  generator run whose root resolved to the repo checkout rates every team
+  `neutral_no_data` and writes identical rows. Now dedupes on resolved PATH,
+  drops both-sides-neutral rows, newest `generated_at` wins. `[from-code 08-13]`
+- **THE ROOT CAUSE IS UNFIXED.** The reader is immune; nothing stops the
+  degenerate file being WRITTEN. No ticket filed. `[unverified 08-13]`
+- **Two clubs were rated league-average all season.** Schedule spells them
+  `LAR`/`WSH`, nflverse pbp spells them `LA`/`WAS`; production read
+  `prior_season_fallback` on every club except exactly those two. Fixed in
+  `team_rating` (the one function both generators share), deployed `111a5000`
+  — **but NOT observable until the next season-projection autorun, due
+  ~08-14 21:00 CDT. OWNER UNASSIGNED.** `[measured 08-13; effect unverified]`
+- **NFL odds refresh is HEALTHY and was never the defect.** A 13-minute
+  pregame→live transition lag was misread as a stoppage. The loop flips
+  `phase=live` on its own and live games reached 117/99 quote rows at 1.3-min
+  freshness. Do not re-investigate. `[measured 08-13]`
+- **`PRESEASON_WEEK_LABELS` mapping internal week 2 → "Preseason Week 1" is
+  CORRECT, not a bug.** Internal week 1 is the Hall of Fame game. A session
+  nearly "fixed" it. `[from-code 08-13]`
+- **The MLB sim ledger never records completion.** 34 of 34 runs on 08-13 and
+  1 of 1 on 08-14 read `state=running, finished_at=null`, while soccer
+  (187/187) and wnba (10/10) record `ok`. So "did the MLB sim finish" is
+  **unanswerable from the ledger** — a deploy gate cannot be built on it.
+  MLB-specific, uninvestigated. `[measured 08-13]`
+
 ## Open problems
 
 - **Something allocates 493–878MB in-process on refresh-worker and nothing knows
