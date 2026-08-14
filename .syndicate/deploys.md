@@ -479,3 +479,55 @@ people learn to route around. Run the gate, read it, then deploy.
 - Replaced by `worker_verify2.ps1`, which renders NO verdict until
   `generated_at > deploy instant` and prints `PREDATES THE DEPLOY. No verdict.`
   until then -- stale and failed must not be spelled the same way.
+
+### nfl-degenerate-writer — the writer cannot emit a degenerate artifact (REFRESH-WORKER) — c7cff28c
+- Deployed: 2026-08-13 20:29 CDT. Deploy `dep-d9v6uvegekts73eus2u0`.
+  Service: `refresh-worker` (srv-d91dpertqb8s73co8ls0).
+- **NO SIM KILLED.** `sim_run_status` read `state=finished` at 20:29:23 before
+  the POST — the first of tonight's four worker deploys that cost nothing.
+- Change: two guards in the generators. `assert_ratings_data_available` refuses
+  before the sim when zero plays load for both seasons;
+  `assert_projections_carry_information` refuses before the WRITE when every
+  projection is degenerate, so the last good artifact survives. Threshold is
+  ALL-degenerate, not any: a partial still carries real information and the
+  deployed reader already drops the bad rows.
+- **THIS DEPLOY IS EXPECTED TO BE INERT, AND THAT WAS MEASURED FIRST.** The
+  worker can see `pbp_2025.csv`: its 21:00:11Z run printed
+  `artifact_path=/opt/render/project/data/nfl_source/smartsim2_preseason_projections_2026_wk2.csv`
+  at 21:02:06Z, and that artifact carries a real rating on **16 of 16** games
+  (`both sides neutral: 0`). So the refusal branch should never fire here. The
+  guard is a trap for a failure mode that is not currently occurring — which is
+  precisely why deploying it is cheap.
+- **A RETRACTED PROBE, recorded so nobody repeats it.** The first attempt to
+  answer "can the worker see the pbp" searched Render logs for `PBP_LOADED` and
+  found **0 rows over 72h with both controls passing**. That is meaningless:
+  the generators emit `PBP_LOADED` through a `log()` that writes ONLY to the
+  `--progress-log` FILE, never stdout, so it can never reach Render's
+  collector. The zero was a fact about the emitter. Ledger: *absent signal is
+  about the emitter — check the line is EMITTED before concluding it is lost.*
+- Expected tonight: nothing. There is no success-path signal for an inert
+  guard, and the watch only establishes (a) live at the intended commit and
+  (b) the worker did not start crashing on it.
+- **REAL VERIFICATION IS THE NEXT SEASON-PROJECTION AUTORUN, ~2026-08-14 21:00
+  CDT** (interval 86400s, last launched 08-13 21:00). That single run verifies
+  BOTH this guard and `111a5000`'s LAR/WSH alias fix. Expected: the run
+  succeeds, writes a healthy artifact, emits no `DegenerateProjectionRun`, and
+  `MIA@WSH` / `LAR@KC` `rating_source` flips off `neutral_no_data`.
+- Rollback: redeploy `111a50001f88f0ab887ab1b1b31c3daf61ed36a7`.
+- Measured: <EMPTY -- OPEN OBLIGATION, due ~2026-08-14 21:00 CDT.
+  Owner: UNASSIGNED.>
+
+### `#389` follow-up — CONFIRMED WORKING on its first real run (no deploy; a reading)
+- `todo.md` carries `nfl_artifact_output_root()` as **AWAITING FIRST RUN**. It
+  has now had one, and it worked.
+- `SEASON_PROJECTION_ARTIFACT_MISSING` fired **30 times** before the 21:02:06Z
+  write and **0 times after**, queried as its own window
+  (`2026-08-13T21:02:10Z -> now`) rather than inferred from result ordering —
+  Render returns logs oldest-first regardless of `direction`, and an
+  ordering-based read has produced wrong conclusions here before. Positive
+  control in the same window: 5 `[refresh_worker]` rows, so the zero is a quiet
+  guard and not an empty window.
+- Means the writer and the staleness guard finally agree on a path. That is the
+  defect that was discarding ~90 completed NFL sims/day.
+- Someone should move `#389`'s follow-up out of AWAITING FIRST RUN in
+  `todo.md`. Not done here — this session did not own that ticket.
