@@ -25,6 +25,45 @@
   **`294f9ca9`** (16:16:56Z), live-odds-worker `83e3e5f2` `[unverified — not
   re-read 08-14]`. Supersedes the 02:18Z line (`e29b807f`/`75b8aae6`).
 
+## Model skill (`#428`) — what is MEASURED and what is not
+
+- **`#428` IS FOUR MODELS, NOT SIX.** `live_projection_join` is a JOIN (its own
+  docstring says so) and `game_board_contract` is a passthrough
+  (`_first_present(...)`). Neither is backtestable; a harness for either is
+  wasted work. Real targets: `soccer_projections`, `wnba_game_projections`,
+  `wnba_projections`, `prop_projections`. `[from-code 08-14]`
+- **MLB hitter props are MEASURED: BIASED, NOT BLIND.** 2,487 player-games
+  (2026-08-01..08-14), joined on `batter_id` — which IS the MLB StatsAPI person
+  id, an exact join. Every counting market carries real signal AND loses to a
+  constant baseline by sitting too high; de-biasing flips 5 of 7 to beating it.
+  `hits` r=0.16 +28.6%, `tb` r=0.15 +17.7%, `rbi` r=0.13 +30.5%,
+  `runs` r=0.16 +25.9%, `2b`/`3b` ~no signal, `sb` the only one that beats the
+  mean as published. `[measured 08-14]`
+- **TWO stacked causes, and a playing-time fix ALONE will not fix it.**
+  `pa_mean` +18.4% vs real plate appearances, `ab_mean` +17.2%; per-PA rates
+  still +12.2% after normalising. Opportunity explains **55%** of the count
+  bias. Fix opportunity first (upstream of every market), then RE-MEASURE.
+  `[measured 08-14]`
+- **"No measured skill" would have been the WRONG conclusion here** and would
+  have suppressed a model that needs calibrating rather than retiring — the
+  same shape as `#367`'s NFL totals. Always decompose bias before publishing a
+  skill verdict. `[measured 08-14]`
+- Written into `mlb_prop_calibration` and attached BY THE PRODUCER, so
+  `projection_skill` stands aside for measured markets and still stamps
+  `unmeasured` for the rest. `batter_hits_runs_rbis` is deliberately absent —
+  it was the degenerate 0.0 through the whole window. **NOT DEPLOYED**
+  (`aac18260` is committed and pushed only). `[code 08-14]`
+- **WNBA game lines: NOT MEASURABLE YET, nothing broken.** `pred_margin` starts
+  2026-08-02 — 47 files no column, 0 unpopulated, 14 fully populated. 9 of 361
+  completed games carry one. n=30 due ~2026-08-26. `[measured 08-14]`
+- **PRODUCTION HAS FAR MORE HISTORY THAN THE CHECKOUT: 81 WNBA dates vs "4
+  files" locally.** The local `game_cards_*.csv` are 7-column stubs with no
+  projection column at all. Never scope a backtest from the checkout.
+  `[measured 08-14]`
+- **UNKNOWN, and NOT zero:** `wnba_projections` and `soccer_projections`
+  coverage. Both sweep readings were probe failures (wrong CSV shape; guessed
+  path, no control) and are retracted as evidence. `[unverified 08-14]`
+
 ## NFL day-of-game and the projection column (`#377`, `#425`, `#429`)
 
 All measured on production 2026-08-14 unless marked otherwise.
@@ -223,6 +262,54 @@ All measured on production 2026-08-14 unless marked otherwise.
     reason this list exists.
 - Short session ids are indistinguishable from short SHAs. Every one in the
   ledger is prefixed `session` — keep it that way. `[policy]`
+
+## WHY 60s BECOMES ~7,300s FOR MLB — two multipliers, both measured `[measured 08-14 17:0xZ]`
+
+**Odds-refresh LAUNCHES on refresh-worker, derived from `since_launch_s` resets
+(2.5h window) — the launch is what captures quotes, ~20s later:**
+
+    07:03:00  soccer
+    13:08:30  mlb            gap 365.5 min   <-- carries MLB
+    14:40:00  nfl,wnba       gap  91.5 min
+    15:10:00  mlb,soccer     gap  30.0 min   <-- carries MLB
+    15:40:30  wnba           gap  30.5 min
+    16:20:00  mlb            gap  39.5 min   <-- carries MLB
+    16:50:30  nfl            gap  30.5 min
+
+1. **`SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS=60` is the TICK interval,
+   never the launch interval.** The loop ticks; it launches far less often.
+2. **MULTIPLIER 1 — the pregame relaunch cooldown, 1800s, and it is GLOBAL.**
+   Measured launch gaps 30.0 / 30.5 / 39.5 / 30.5 min == the 1800s cooldown,
+   dead on. Confirmed independently from the live tick state
+   (`/api/ops/live-refresh/state`): `skipped=True, phase=pregame,
+   error="pregame refresh relaunch blocked by cooldown"`. `_pregame_relaunch_blocked`
+   reads ONE marker, `reports/live_refresh_loop/last_pregame_refresh_launch.json`,
+   keyed by date only — **not by sport and not by service.** So a launch for ANY
+   sport starts the 1800s clock for EVERY sport. 60s -> 1800s is a 30x.
+3. **MULTIPLIER 2 — sports rotate across launches.** MLB rides only some of
+   them: 13:08:30, 15:10:00, 16:20:00. Roughly every 2-4 launches, so
+   1800s x ~4 = ~7,200s. That is the observed 121.6-minute capture cadence, and
+   the MLB launch times match the capture bursts to within ~20-40s
+   (13:08:30/13:09:08, 15:10:00/15:10:44, 16:20:00/16:20:38).
+- **THE LEVERAGE, and it is a design fact rather than a tuning value: because
+  the cooldown is global rather than per-sport, every sport added to the
+  rotation dilutes every other sport's cadence.** Eight sports on one 1800s
+  global cooldown cannot give any of them a fast refresh. A per-sport cooldown
+  would decouple them; that is the change worth considering, not lowering 1800.
+- Also true and separately worth knowing: `reports/live_refresh_loop/**` is
+  **deliberately keyvalue-backed**, so that marker is shared by web and BOTH
+  workers, and both workers run `live_refresh_loop` (refresh-worker emits
+  `ODDS_SWEEP_OUTCOME`/`MLB_LIVE_PROBE`; live-odds-worker emits
+  `PREGAME_RELAUNCH_COOLDOWN_SKIPPED`). Whether they contend for that one
+  marker is NOT established here and would multiply again if they do.
+- Gates that are NOT responsible, checked and excluded: the off-hours gate
+  (`#15`) never printed `ODDS_REFRESH_OFF_HOURS_SKIPPED` once in the 13:08-15:12
+  gap, and its ceilings are 900s game-day / 3600s dead-period, neither of which
+  is 7,300s. `MLB_LIVE_PROBE live=False` throughout, so it COULD have fired and
+  did not.
+- **Owner: `syndicate/features/shared/live_refresh_loop.py` is claimed by the
+  OPEN `mlb-props-regen` lane.** Diagnosis only; nothing changed. Any cadence
+  increase also spends OddsAPI calls against the 5M cap.
 
 ## ANSWERED — MLB quote capture never stopped. It runs every ~2 hours. `[measured 08-14 16:3xZ]`
 

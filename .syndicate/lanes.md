@@ -154,7 +154,41 @@
 - Blocked by: none. Related to `soccer-odds-coverage` but independent of it,
   proven by the eredivisie row above.
 
-### wnba-skill-backtest — OPEN — opened 2026-08-14 — session: nfl-day-of-game
+### wnba-skill-backtest — CLOSED-VERIFIED 2026-08-14 — opened 2026-08-14 — session: nfl-day-of-game
+
+**OUTCOME — the lane's stated testable outcome was "a correlation and an MAE
+against a constant baseline over a stated sample, OR an evidenced statement that
+the data does not support one". It produced the SECOND of those for WNBA, and
+the FIRST for a model it did not originally scope.**
+
+- **WNBA game lines: NOT MEASURABLE YET, and nothing is broken.** `pred_margin`
+  appears only from 2026-08-02 — 47 files have no column, 0 have it
+  unpopulated, 14 have it and every one is 100% populated. 9 of 361 completed
+  games carry a projection. Needs TIME, not work: n=30 ~2026-08-26. Re-run
+  `scripts/backtest_wnba_projection.py` then; it needs no changes.
+- **MLB hitter props: MEASURED (`aac18260`).** 2,487 player-games, exact
+  `batter_id` join, DNPs excluded. Biased, not blind — every counting market
+  carries signal AND loses to a constant baseline; de-biasing flips 5 of 7.
+  Two stacked causes: opportunity +18.4%, per-PA rate +12.2%, opportunity
+  explaining 55%. Written into `mlb_prop_calibration.MEASURED_SKILL` and
+  attached by the producer, so `projection_skill` stands aside for measured
+  markets and still stamps `unmeasured` for the rest.
+- **`#428` rescoped: FOUR models, not six.** `live_projection_join` is a join
+  and `game_board_contract` is a passthrough; neither is backtestable.
+- **NOT DEPLOYED.** `aac18260` is committed and pushed only.
+- Three self-inflicted defects caught and fixed inside this lane, all recorded
+  in `learnings.md`: a guard gating on the wrong denominator, a verdict
+  stronger than its threshold, and a test whose name did not match its
+  assertion.
+- **Two coverage zeros RETRACTED as evidence**, not findings: `wnba_projections`
+  (probe read the wrong CSV shape — values are nested in `plays`) and
+  `soccer_projections` (guessed path, no positive control).
+- Files released: `scripts/backtest_wnba_projection.py`,
+  `scripts/backtest_mlb_props.py`,
+  `syndicate/features/shared/mlb_prop_calibration.py`,
+  `syndicate/features/shared/prop_projections.py`.
+
+### wnba-skill-backtest — CLOSED-VERIFIED — superseded header, kept for the file/line map
 - Goal: `#428`, first of six. Measure whether the WNBA game model predicts
   anything, and write the answer into a `MEASURED_SKILL`-shaped constant the
   producer attaches itself. Testable outcome: a correlation and an MAE for
@@ -2012,6 +2046,46 @@ opened, `_fetch_scoreboard` returns None under pytest.
   per-sample record and is what the fixture uses.
 
 ### mlb-props-regen — OPEN — opened 2026-08-13 — session: mlb-props-regen
+- **CROSS-LANE EDIT TAKEN 2026-08-14, WITH AN EXPLICIT USER OVERRIDE, LOGGED
+  HERE BECAUSE THE PROTOCOL REQUIRES IT.** Session `layer2-freshness` edited
+  `syndicate/features/shared/live_refresh_loop.py` — this lane's claimed file —
+  to make the pregame relaunch cooldown PER-SPORT. `lane-guard` refused it
+  (exit 2) and the user authorised the override after being shown the block and
+  the two live measurement windows it risks.
+  - **Scope is narrow and named**: `_last_pregame_launch_path`,
+    `_read_last_pregame_launch`, `_record_pregame_launch`,
+    `_pregame_relaunch_blocked`, and the one call site that filters
+    `sports_to_launch`. Nothing else in this file was touched. If this lane has
+    uncommitted work elsewhere in it, there is no overlap.
+  - **Why it could not wait**: the global cooldown is the measured cause of
+    MLB's ~121.6-minute odds capture cadence (see `state.md`), which is why the
+    board carries candidates that are no longer bettable.
+  - **WRITTEN, TESTED, PUSHED TO A BRANCH — NOT ON `main`, NOT DEPLOYED.**
+    Commit `ea8fad58` locally, pushed as `origin/odds/pregame-cooldown-per-sport`.
+    **Deliberately not on `main`**: `autoDeploy` is off, but other sessions
+    deploy refresh-worker several times a day and would have shipped this
+    mid-measurement. `origin/main` moved to `e9990ccb` ("#433 soccer: capture
+    odds before simulating") while this was being written, which is exactly the
+    scenario the branch avoids.
+  - What changed, five symbols only: `_record_pregame_launch` (stamps per-sport,
+    keeps the legacy `epoch` for rollback), `_pregame_relaunch_blocked` (blocks
+    only when EVERY candidate sport is cooling), and the two call sites, which
+    now resolve the candidate sport list the same way the existing cadence
+    filter does. `_apply_pregame_sport_cadence` was already per-sport and
+    correct and is untouched — the defect was that the global gate ran BEFORE it
+    and skipped the whole tick.
+  - Tests: `tests/test_pregame_cooldown_per_sport.py` 12 passed, mutation-pinned
+    (forcing the sport list empty turns exactly the 2 decoupling tests red and
+    leaves the 10 safety tests green). `tests/test_live_refresh_loop.py`
+    **226 passed / 13 subtests — identical to this lane's own baseline**, so the
+    owning lane's suite is intact.
+  - **Expected effect when it ships, and the cost:** MLB capture cadence
+    ~121.6 min -> ~30 min (its own cooldown). Launch VOLUME rises roughly with
+    the number of active sports, so OddsAPI spend rises against the 5M cap.
+    Measure calls, not just cadence, in the first window.
+  - **NOT DEPLOYED, deliberately.** Held until `530fc5d8`'s verification window
+    and the `soccer-odds-coverage` per-league measurement both close, so neither
+    is confounded. That was the user's explicit choice.
 - Goal: MLB top-props/ladders rebuild automatically once prop odds land,
   instead of serving an empty artifact written before the odds existed.
   Testable outcome: a slate whose top-props artifact was written pre-odds
