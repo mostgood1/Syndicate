@@ -1,6 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** OPEN, UNOWNED, split out of `#387` 2026-08-14
+### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** PARTLY CLOSED 2026-08-14 — timed on current code, estimator hardened, split out of `#387` 2026-08-14
+
+**MEASURED 2026-08-14 18:0xZ ON THE DEPLOYED CODE (`294f9ca9`), refresh-worker,
+4h window. This is the end-to-end timing the ticket asked for, taken from the
+instrumentation that already existed — no new spans, per the ticket's own
+warning.**
+
+```
+COLLECT_SPAN_EXIT collect_candidates   n=39  p50=0.00  p90=146.19  max=209.66
+  of those >= 1s:                      n=9   p50=138.30           max=209.66
+  >= 60s: 23.1%      >= 600s: 0.0%
+BUILD_SPAN_EXIT candidate_collection_with_fallback
+                                       n=38  p50=0.00  p90=260.28  max=434.26
+```
+
+**A CURRENT BOARD BUILD IS ~2-4 MINUTES, NOT ~23.** Nothing in a 4h window came
+within 3x of the 23-minute figure. That figure is not "unsourced" as this ticket
+originally claimed — `_expected_build_seconds`'s own docstring sources it to a
+real 22.9-minute build — but it **predates `#414`** (21.5x on the quote-join
+identity scan) and describes a board that no longer exists.
+
+**ITEM 1 OF THE REVISED NEXT ACTION WAS ALREADY DONE.** The ticket said
+`_expected_build_seconds` "must stop using a central measure". It never used
+one — it has always returned `max(...)`, with a well-argued docstring on why the
+asymmetry demands it. Verify before fixing.
+
+**ITEM 2 IS DONE, AND IT WAS REAL.** ~77% of `COLLECT_SPAN_EXIT` values are
+sub-second empty-pool short-circuits. MAX defends a MIXED sample; it is
+undefended against a sample that is entirely short-circuits, because the max of
+twelve zeros is zero. `_expected_build_seconds` now excludes sub-second
+non-builds before taking the max and falls back to a conservative 210s (never
+~0) when the window holds none. Tests:
+`tests/test_deploy_safety_build_estimate.py`, 9 passed, mutation-pinned.
+
+**NOT A LIVE FAILURE, and the distinction is kept deliberately.** Running the
+gate returned `a build takes ~2.3min` throughout. `_render_logs(..., limit=12)`
+returns rows **oldest-first regardless of `direction`** (a Render API quirk
+already in `learnings.md`), so the twelve it samples are not the twelve a
+ranking picks. The exposure was latent — likely at 77%, not certain. It was
+nearly written up as a live defect off the ranked-twelve calculation; running
+the program instead of reimplementing its logic is what caught that.
+
+**ITEM 3 — the 23-minute comment.** Left in place deliberately, now with the
+measurement beside it. It is the historical worst case and the asymmetry
+argument still holds; retiring it on one 4h window would be the same
+over-generalisation this ticket's own history records twice.
+
+**STILL OPEN:** `candidate_collection_with_fallback` is a wrapper and the
+138-210s is somewhere INSIDE it. The existing spans do not decompose further.
+That decomposition is the only place new instrumentation would earn its cost.
 
 **Filed because `#387`'s local run produced the first end-to-end timing of the
 overview stage and it belongs in its own ticket rather than buried in a memory

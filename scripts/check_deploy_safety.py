@@ -134,6 +134,25 @@ def _newest_timestamp(rows: list[dict[str, Any]]) -> str:
     return max(stamps) if stamps else ""
 
 
+# `#427`. A `collect_candidates` call that returns in under a second did not
+# build anything -- it short-circuited on an empty pool. Measured 2026-08-14:
+# real builds cluster at 138-210s and the short-circuits at 0.00s, so any
+# threshold in between separates them cleanly. 1.0s is deliberately near the
+# bottom of that gap: the cost of misclassifying a genuine 1-second build as a
+# non-build is one conservative estimate, and the cost of the reverse is an
+# estimate of zero.
+_MIN_REAL_BUILD_SECONDS = 1.0
+
+# What to report when the window contains no real build. NOT zero and NOT None:
+# None reads as "unknown" (which callers already treat as a block, fine), but a
+# small number reads as "a build is cheap, deploy freely" -- the one answer that
+# is never safe here. 210s is the MAX real build measured in the same 4h window
+# that motivated this, so it is the top of the observed band rather than a
+# guess. It is knowingly LOWER than the historical ~23min figure, which predates
+# `#414`'s 21.5x quote-join fix and describes a board that no longer exists.
+_NO_REAL_BUILD_FALLBACK_SECONDS = 210.0
+
+
 def _expected_build_seconds(key: str) -> float | None:
     """SLOWEST recent COLLECT_SPAN_EXIT elapsed_s, or None when unreadable.
 
@@ -193,7 +212,41 @@ def _expected_build_seconds(key: str) -> float | None:
                 continue
     if not values:
         return None
-    return max(values)
+    # `#427`. EXCLUDE THE NON-BUILDS BEFORE TAKING THE MAX.
+    #
+    # MAX was chosen (see above) because the cost is asymmetric, and against a
+    # MIXED sample that is right -- it picks the top of the band where a median
+    # would sag. It is undefended against a sample that is ENTIRELY
+    # short-circuits, because the max of twelve zeros is zero.
+    #
+    # That population is not rare. Measured on refresh-worker over 4h to
+    # 2026-08-14 18:0xZ (live `294f9ca9`), n=39 `COLLECT_SPAN_EXIT`:
+    #
+    #     p50 0.00   p90 146.19   max 209.66
+    #     >= 1s: n=9, p50 138.30, max 209.66
+    #     ~77% of calls are sub-second; 23.1% are >= 60s
+    #
+    # The sub-second calls are `collect_candidates` returning immediately on an
+    # empty pool (`#387`'s starved overview). **A build that produced nothing is
+    # not a fast build, it is a non-build**, and averaging it in -- by any
+    # statistic, max included -- answers a different question from the one the
+    # caller asks, which is "how long might I have to wait".
+    #
+    # NOT a live failure today, and that distinction is kept deliberately: the
+    # gate returned `~2.3min` when run against production while this was being
+    # written. `_render_logs(..., limit=12)` takes rows OLDEST-FIRST regardless
+    # of direction (a Render API quirk already recorded in `learnings.md`), so
+    # which twelve it sees is not the twelve a ranking would pick. The exposure
+    # is a sample that happens to contain no real build -- likely at 77%, not
+    # certain. This closes it rather than waiting to be surprised by it.
+    #
+    # Fallback is CONSERVATIVE, never ~0: over-waiting costs idle minutes,
+    # under-waiting costs a destroyed board build. Returning a small number here
+    # would tell an operator there is nothing to protect.
+    real_builds = [value for value in values if value >= _MIN_REAL_BUILD_SECONDS]
+    if real_builds:
+        return max(real_builds)
+    return _NO_REAL_BUILD_FALLBACK_SECONDS
 
 
 def board_build_state() -> tuple[bool | None, dict[str, Any]]:
