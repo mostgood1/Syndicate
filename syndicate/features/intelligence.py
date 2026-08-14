@@ -10326,6 +10326,7 @@ def collect_candidates_with_fallback_merge(
     apply_thin_pool_merge: bool = True,
     apply_empty_pool_fallback: bool = True,
     advanced_by_sport: dict[str, list[dict[str, Any]]] | None = None,
+    precollected_candidates: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Single collect-with-fallback entry point, extracted from
     IntelligenceStateService._build_candidate_pool so every caller gets the
@@ -10359,7 +10360,23 @@ def collect_candidates_with_fallback_merge(
     fallback above still applies for these callers -- a pool with zero
     candidates is never intentional.
     """
-    raw_candidates = _collect_span("collect_candidates", collect_candidates, overview, preferences, odds_history_by_sport)
+    # `precollected_candidates`: the caller already ran collection PER SPORT and
+    # released each sport's hydrated overview before the next one built (the
+    # `#387` SUM -> MAX cutover). Skipping the call here is the whole point --
+    # re-running it would need the whole overview back, which is the retention
+    # being removed.
+    #
+    # Everything below is unchanged and still applies: the edge filter, the
+    # thin-pool merge and the empty-pool fallback all operate on the pool, not
+    # on the overview. In streamed mode `overview` arrives as None, and
+    # `collect_all_recommendations` REBUILDS it for itself when it is None --
+    # so the two rare fallbacks re-hydrate on demand instead of forcing every
+    # cycle to carry eight sports just in case. Measured 2026-08-14: the
+    # thin-pool merge fired 0 times in 6h against 39 live collection spans.
+    if precollected_candidates is not None:
+        raw_candidates = list(precollected_candidates)
+    else:
+        raw_candidates = _collect_span("collect_candidates", collect_candidates, overview, preferences, odds_history_by_sport)
     if not raw_candidates and not apply_empty_pool_fallback:
         # `#385`. The empty-pool fallback exists to REFILL this pool. When
         # Layer 2 is primary the pool is not what gets served, so refilling it
@@ -10461,6 +10478,8 @@ def collect_candidates_with_fallback_merge(
             raw_candidates = []
     elif apply_edge_filter:
         if advanced_by_sport is None:
+            # Streamed callers pass this in, accumulated per sport, precisely
+            # because `overview` is gone by now.
             tracked = _tracked_repo_files()
             advanced_by_sport = {
                 _safe_text(sport_row.get("slug"), "sport").lower(): _advanced_input_rows_for_sport(sport_row, tracked)
