@@ -620,3 +620,69 @@ people learn to route around. Run the gate, read it, then deploy.
   which needs six measured backtests. Not shipped, not started.
 - Rollback: redeploy `75b8aae6` (read the live commit first — it moved five
   times in one evening and a stale SHA nearly shipped a rollback).
+
+### projection-skill-declaration — `#425` gap 1 — WEB + REFRESH-WORKER `2d6f7a2f`
+- Web: `dep-d9vilfm1egvs73eaineg`, live **2026-08-14T14:56:03Z**.
+- refresh-worker: `dep-d9vimqu1egvs73eaktq0`, live **14:58:09Z**.
+  No sim killed — `sim_run_status state=finished` read before the POST.
+- Change: every projection carries `model_skill`; six producers that never
+  measured their model now report `status: "unmeasured"` instead of nothing.
+- **AN ENV VAR WAS CHANGED FIRST, AND IT WAS ANOTHER SESSION'S INSTRUMENT.**
+  `SYNDICATE_TRACEMALLOC_DIAG` on refresh-worker was **`1`**, and the range
+  `2e4e2544..2d6f7a2f` carries `b03c978b` ("#423 step 2: wire tracemalloc into
+  the worker, **default OFF**"). Default-off is true of the code and was FALSE
+  of production. Deploying unchanged would have armed a per-live-allocation
+  traceback on a 4Gi service that OOM-killed 3x the previous night. Set to
+  **`0`** via the single-key endpoint (a deploy is what injects env changes; a
+  restart does not), verified reading back `0`, then deployed.
+  - Set to `"0"` rather than DELETED on purpose: the gate is
+    `value in {1,true,yes,on}`, so absent and `"0"` are equally off, but
+    keeping the key visible tells its owner it was deliberately disabled
+    rather than mysteriously vanished. To restore: set `1` and redeploy.
+  - The owning session (`anon-allocation-site`) is ARCHIVED. Its live
+    successor was messaged and had not replied at deploy time. Flagged here
+    because turning off someone else's instrument without an answer is a real
+    cost, not a footnote.
+- **ALSO SHIPPED, NOT MINE, AND ITS AUTHOR'S LABEL IS NOW STALE:** `72df4049`
+  (`#426`), whose own commit message says "NOT DEPLOYED, NOT VERIFIED" —
+  `nfl_game_projections.py` +54, `intelligence.py` +24. It could not be
+  separated: Render deploys a commit from `main`, and cherry-picking my change
+  onto the live commit would produce a SHA `main` does not contain. This is the
+  standing cost of deploying from a shared trunk, recorded rather than solved.
+- MEASURED 15:12Z and again 15:24Z, both on POST-deploy artifacts:
+
+      A tracemalloc  TRACEMALLOC_SITES 0, SETUP_FAILED 0
+                     against a positive control of 20 [refresh_worker] rows,
+                     so the zero is measured and not a broken query
+      B stability    server_failed since deploy = 0
+      C gap 1        artifact 15:20:24Z (post-deploy); 20/20 NFL projection
+                     rows carry model_skill
+
+- **BOTH BRANCHES CONFIRMED IN PRODUCTION, and NFL alone would not have done
+  it.** NFL reads `measured` because it is the one producer with real skill
+  numbers, so it only exercises the normalize path. The `unmeasured` path —
+  the entire point of gap 1 — was confirmed on the other sports:
+
+      nfl      20 rows   {'measured': 20}
+      mlb    1631 rows   {'unmeasured': 1631}
+      wnba    209 rows   {'unmeasured': 209}
+      soccer   12 rows   {'unmeasured': 12}
+
+  1,852 rows across three sports now declare that nobody has measured the
+  model behind them. Counts surface in the `projections` coverage block
+  (`rows_with_measured_skill` 101 / `rows_with_unmeasured_skill` 947 on NFL's
+  book-grid), NOT in `counts` — a claim in the lane that said otherwise was
+  wrong and is corrected here.
+- **Unlike the degeneracy detector, this fix is NOT silent on success.** It
+  stamps a visible field, so the verdict rests on a positive reading rather
+  than on an artifact-rebuild inference.
+- **The detector found a real defect on its first live board, unprompted:**
+  `mlb batter_hits_runs_rbis` constant `0.0` across 188 games. Filed as
+  `#429`; it also settles a question `#377` had explicitly left open.
+- Watcher note: `gap1_verify.ps1` reported "board unreadable" 14 times. That
+  was ITS OWN failure — `Wait-Live` returned an array because `Write-Output`
+  inside it was captured into the return value, so the datetime conversion
+  threw and every later poll errored. The board was never down. Re-measured
+  with `gap1_check.py` rather than reported.
+- Rollback: redeploy `2e4e2544` (read the live commit first) and set
+  `SYNDICATE_TRACEMALLOC_DIAG=1` if its owner wants the instrument back.
