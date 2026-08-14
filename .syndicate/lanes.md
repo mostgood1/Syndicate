@@ -6,6 +6,55 @@
 
 ## OPEN
 
+### anon-allocation-site — OPEN — opened 2026-08-14 — session: memory-guard
+- Goal: name the allocation site holding refresh-worker's **~1700MB of
+  non-arena anonymous memory**, with evidence. Testable outcome: a named
+  call site (file + function) accounting for >50% of the growth across one
+  evening window, or a measured demonstration that the growth is invisible to
+  allocation tracing — which is itself a result.
+- **Successor to `refresh-worker-anon-leak`, not a parallel lane.** That lane
+  eliminated the allocator branch (see its 02:18Z entry: coverage 11-24%,
+  `system_current` plateaus at ~393MB while `anon` climbs). Its remaining
+  question is exactly this lane's goal. **Do not run both** — the parent stays
+  open only as the diagnostic record and its eliminations; new work happens
+  here.
+- Files (claimed by this lane):
+  - `syndicate/features/shared/memory_observability.py` — tracing helpers,
+    alongside the existing `malloc_trim` / `mallopt` / `malloc_info` bindings.
+  - `scripts/run_refresh_worker.py` — wiring, on the existing stage emitter.
+  - `tests/test_memory_observability.py`, `tests/test_refresh_worker.py`.
+  - No OPEN lane claims any of these (checked 2026-08-14 02:2xZ).
+- Hypothesis: the ~1700MB is live NumPy/Monte Carlo buffers retained by
+  references, not freed memory. It is outside glibc's arenas because large
+  array allocations take their own path.
+- **FALSIFICATION TEST, AND IT MUST RUN FIRST.** `tracemalloc` only sees
+  allocations made through **Python's** allocator (`PyMem_*`/`PyObject_*`).
+  If NumPy's large buffers bypass that, tracemalloc will report a total far
+  below the ~1700MB and the tool is blind here exactly as the gc census was
+  (measured: 143KB reported of 546MB resident). **Before instrumenting the
+  worker, prove the tool can see the memory**: compare
+  `tracemalloc.get_traced_memory()[0]` against cgroup `anon` in one reading.
+  Traced << anon means STOP — a different instrument is needed, and this lane
+  must not spend a deploy learning that in production.
+- **HAZARD — the tool can cause the failure it is measuring.** `tracemalloc`
+  stores a traceback per live allocation; on a process that reaches its 4GB
+  ceiling hourly that overhead is not free. Mitigations, in order: `nframe=1`,
+  enable for a bounded window rather than permanently, and default OFF behind
+  an env flag. `#241` is on record as a worker whose periodic work caused a
+  production restart loop.
+- **HAZARD — every arena reading with `arena_coverage_pct` below 50% is
+  `arena_not_representative` BY DESIGN.** Do not read those as a new finding;
+  that guard was added 2026-08-14 01:48Z precisely because the unguarded
+  verdict misreported four times.
+- Verification: a named site with a byte figure, reproduced across two
+  windows; or the falsification above, recorded as "tracemalloc cannot see
+  it" with the traced-vs-anon numbers that show it.
+- Deploy exposure: refresh-worker `.py` only. No `render.yaml`. Its own
+  `/preflight`; re-read the live SHA in the same step that deploys (it moved
+  five times on 08-13 and a stale one nearly shipped a rollback).
+- Blocked by: nothing. The falsification test needs no deploy.
+
+
 ### nfl-degenerate-writer — CLOSED-VERIFIED 2026-08-13 — opened 2026-08-13 — session: nfl-day-of-game
 
 **OUTCOME — the lane's own testable outcome, met exactly as written.**
