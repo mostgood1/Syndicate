@@ -31836,7 +31836,85 @@ backtesting whatever is on disk.** A correlation from n=4 is `#377` again — an
 authoritative-looking number that means nothing — and it would be worse coming
 from the ticket written to prevent that than from anywhere else.
 
-**FIRST STEP, and it is not modelling:** establish per-sport historical
+**FIRST STEP DONE 2026-08-14 — AND IT PARTLY FALSIFIES THIS TICKET'S OWN
+"BLOCKED" FRAMING.** The blocked-on-data claim above was reached from the LOCAL
+checkout, which is precisely what CLAUDE.md says not to do. Re-taken against
+production:
+
+    sport        production history            local read that produced "blocked"
+    wnba         81 available_dates            "4 game-card files"
+                 2026-05-17 .. 2026-08-15      (off by ~20x)
+    nhl          20 available_dates
+    nba          13 available_dates
+    nfl          18 available_weeks
+    ncaaf         1 available_week
+    mlb / ncaab / soccer   archive payload does not expose available_dates in
+                           this shape -- UNKNOWN, not zero. Needs a different
+                           surface; do not record it as absent.
+
+**WNBA IS NOT BLOCKED.** 81 stored dates, each reporting `Sim ready | Props
+ready` with a `game_cards_<date>.csv` and a `recommendations_slate_<date>.json`.
+That is real backtest material and it was sitting in production the whole time.
+The "soccer results 0 files / MLB feed_live 1 date / WNBA 4 files" line above is
+a fact about one developer checkout and should not be cited again.
+
+**WHAT THE ARCHIVE API DOES NOT GIVE YOU, so nobody expects a shortcut:** it is
+a navigational INDEX, not a joined dataset. `rank_cards` carry
+`{label, value}` display metrics ("Games: 14", "Picks: 10") and the FILENAMES
+of the stored artifacts — not projections beside outcomes. A backtest still has
+to read the per-date artifacts and do the join itself. The index is how you
+learn WHICH dates exist, which is exactly the coverage question and no more.
+
+**WNBA MEASURED 2026-08-14 — THE ANSWER IS "NOT YET", AND IT IS NOT A DEFECT.**
+Harness shipped as `scripts/backtest_wnba_projection.py`. It ran over all 81
+production dates and **correctly refused to emit a skill constant.**
+
+    dates considered                  81
+    dates with no projection artifact 32
+    dates with no ESPN final           3
+    games joined to a final          361
+    ...of those, WITH pred_margin      9   (2.5%)
+
+**The 2.5% is a NEW COLUMN, not a broken pipeline**, and the two were separated
+before anything was filed:
+
+    files with NO pred_margin column : 47   2026-05-17 .. 2026-08-01
+    files with the column, unpopulated: 0
+    files with POPULATED pred_margin : 14   2026-08-02 .. 2026-08-15
+
+Cleanly separated in time, and every one of those 14 dates is **fully**
+populated (1/1, 2/2, 3/3 — no partial days anywhere). So `pred_margin` /
+`pred_total` began being written on **2026-08-02** and has not missed a game
+since. Nothing is losing model output; there is simply only ~13 days of it.
+
+**WNBA IS THEREFORE UNMEASURABLE TODAY AND NEEDS TIME, NOT WORK.** ~22 games
+carry a projection, 9 of them completed. At roughly 1.7 completed games/day,
+n=30 arrives around **2026-08-26** and n=100 around late September. Re-run the
+harness then; it needs no changes.
+
+**DO NOT CITE THE n=9 NUMBERS.** An earlier run of this script printed
+`margins corr 0.5228, mae_model 12.389 vs baseline 4.889` and `totals corr
+0.4771`. Those came from **9 games** and are worthless — they are exactly the
+authoritative-looking figure `#377` and `#429` were about. They are recorded
+here only so nobody rediscovers and believes them.
+
+**THE HARNESS ITSELF CAUGHT THE POOLED-DENOMINATOR BUG, in its own first run.**
+v1 gated `--min-games` on games JOINED TO A FINAL (361) and then computed
+statistics over whichever of those carried a projection (9). The guard passed on
+361 while every number rested on 9 — the ledger's "a pooled denominator can make
+a measurement unreadable", reproduced by the script written to avoid it. It now
+gates on the PER-METRIC count and prints both, because a joined game the model
+never scored says nothing about the model.
+
+**REVISED STATUS: not blocked, but genuinely large.** Per sport it is a bespoke
+harness (NFL's imports `shrunk_rating`/`team_rating`/`load_pbp_plays` and
+generalises to nothing), plus a per-date artifact read and join. Start with
+WNBA, where the coverage is deepest and the contract is simplest — it ships
+means without a distribution, so correlation against outcomes is the only
+honest measure available and there is no probability to be tempted into
+deriving.
+
+**Superseded first step, kept for the reasoning:** establish per-sport historical
 coverage from PRODUCTION (`/api/ops/...` with `ADMIN_TOKEN`, or the per-sport
 JSON APIs), and report, per model, the number of dates where a projection and a
 real outcome BOTH exist. That number decides whether each measurement is worth
