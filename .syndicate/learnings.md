@@ -1239,3 +1239,32 @@ back **oldest-first regardless of `direction`**.
   `arena_coverage_pct` and refuses below 50%.
 - Cost: ~90 minutes chasing an allocator that was never growing, and one
   deploy to correct an instrument I had written the same evening.
+
+### 2026-08-14 — I MEASURED A STAGE WITHOUT THE THING THAT DOMINATES IT, AND ALMOST SHIPPED THE FIX
+- What we believed: `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000MB` was a 23x
+  over-reservation against a stage measured at 127MB, and the floor should come
+  down. Written into `#387` as a measurement, with a recommended next action.
+- What was actually true: the local run hydrated **4 of 8 sports**, and the four
+  that returned zero games (mlb, nba, ncaab, nhl) include the one that IS the
+  cost. The guard's own comment carries the production numbers: MLB alone takes
+  the container 993.8MB -> 3922.6MB, **+2.9GB in 73 seconds**, and `anon` does
+  not come back down. The comment even names the change I was about to make and
+  rejects it: *"A 1000MB floor waves MLB through every time."*
+- **The coverage caveat WAS in my write-up.** I recorded "4 of 8 hydrated,
+  the others are unmeasured" as a footnote and then quoted 127MB as the stage
+  cost in the headline, the commit subject, and the recommendation. **A caveat
+  that does not change the headline is decoration.** If the unmeasured part can
+  invalidate the conclusion, it belongs in the sentence that states it.
+- The rule going forward: **before quoting a measurement, ask which input
+  dominates and whether the run contained it.** A partial run does not produce a
+  smaller version of the answer — it produces a different answer wearing the
+  same units. Coverage is not a confidence interval on the number; it decides
+  whether the number is about the thing at all.
+- Corollary, and it cuts against a habit this session built: **"it came from a
+  comment" is not evidence against a number.** Four comment-sourced figures were
+  challenged tonight — 1,479MB stage, ~23min build, `#417`'s basis, and this
+  floor. Three were stale or unsourced. This one was a real measurement with its
+  inputs written down, and treating the pattern as a rule nearly took production
+  down. Read the comment before overriding it.
+- Cost: none in production — the change was not shipped. A ticket carried a
+  recommendation that would have restored an OOM loop, for about an hour.
