@@ -35,7 +35,58 @@ A **36.3-point projection against a 54.5 line** should make the Under enormously
 projection contributes nothing; the ordering is pure arb surplus. (For the
 record the Under won — actual 41.)
 
-**HYPOTHESIS, NOT YET CONFIRMED: `_MODEL_EDGE_MAX_POINTS = 15.0`**
+**MEASURED 2026-08-14 03:0xZ AGAINST THE SERVED PAYLOAD — the hypothesis below
+is FALSIFIED and the guard is EXONERATED. Read this before anything after it.**
+
+`/api/board/layer2-shortlist`, `written_at 2026-08-14T02:19:29Z`, 200 rows:
+
+```
+rows served                    200
+rows with a projection object   93
+rows WITH edge_vs_market_pct     0     <-- ZERO. not "few". zero.
+rows with no projection at all 107
+
+why the edge is missing:
+  46   (NONE STATED)                                              nfl
+  33   spread row does not state which side its line belongs to   nfl
+  14   game is live: a pregame projection cannot be priced ...     mlb
+  98   no projection object at all                                soccer
+```
+
+**`_MODEL_EDGE_MAX_POINTS` NEVER RUNS.** `edge_vs_market_pct` is `None` at the
+SOURCE, so the plausibility bound never receives a value to reject. It is not
+suppressing anything. Do not touch it.
+
+**THREE INDEPENDENT CAUSES, converging on one symptom — which is why the board
+looks systemically broken rather than broken in one place:**
+
+1. **soccer — 98 of 200 rows (49%) carry NO projection object.** Ingest says
+   `"no soccer recommendations for this date"`. **Half the board cannot rank on
+   the model by construction.**
+2. **nfl — 33 rows structurally cannot produce an edge.**
+   `nfl_game_projections.py:399` hardcodes `edge_vs_market_pct: None` with
+   `probability_unavailable_reason: "spread row does not state which side its
+   line belongs to"`. The projection is a MARGIN MEAN
+   (`basis: smartsim2_margin_mean`), not a probability, and the code refuses to
+   guess the sign because "a guessed sign inverts the edge while looking
+   plausible." Correct as written. **The product has no probability-space model
+   for NFL.**
+3. **nfl — 46 rows have NO EDGE AND NO STATED REASON. This is the new defect
+   and the only one that is unambiguously a bug.** Every other suppression path
+   writes a reason; these 46 are silent. A row that cannot be priced must say
+   why — that is the same `unknown must not default permissive` rule this
+   codebase keeps relearning. **Start here: find the NFL path that returns a
+   projection without either an edge or a reason.**
+4. mlb — 14 rows, all suppressed by `#340`'s live-edge policy. Working as
+   designed; MLB games were live. Not a defect.
+
+**So the board ranks on arbitrage because the model produces no edge ANYWHERE,
+for four different reasons, none of which is the scoring weight.** The
+`sim_component` in `blended_score` is `None` on every row because its
+`model_edge` argument is `None` on every row.
+
+**SUPERSEDED HYPOTHESIS, kept because it was acted on:
+`_MODEL_EDGE_MAX_POINTS = 15.0`**
 (`syndicate/features/shared/layer2_board.py`). An 18-point projection/line gap
 implies a probability far outside the market's, exceeds the plausibility bound,
 and the model edge is DROPPED — so the row falls back to EV-only ranking. **The
