@@ -1212,3 +1212,30 @@ back **oldest-first regardless of `direction`**.
   average"*, which framed the whole thing as a product decision and is why it
   sat OPEN and UNOWNED for days. It was file selection. See the neighbouring
   entry on reproducing a constant from an empty input.
+
+### 2026-08-14 — A PLATEAU IS A STRONGER SIGNAL THAN A PERCENTAGE
+- What we believed, on one reading: the arena verdict said `fragmentation` at
+  60.9% free-held, so allocator fragmentation was the live candidate for
+  `#423`.
+- What was actually true: across ten readings the arena held only **11-24%** of
+  `anon`, and — the decisive part — **`system_current` PLATEAUED at ~393MB
+  across three consecutive readings while `anon` kept climbing.** A bounded
+  quantity cannot be the source of an unbounded one. Fragmentation is dead as
+  an explanation, and the same fact explains why `malloc_trim` returned
+  0.0-2.9MB at guard time: there was never much there to return.
+- **The rule going forward: when attributing growth, look for what STOPS
+  growing, not for what is large.** A percentage describes one instant and can
+  be high for uninteresting reasons; a plateau against a rising total is a
+  structural statement and needs no threshold to interpret. Same shape as the
+  trough-vs-earlier-peak test recorded hours earlier — both replace "how big is
+  it" with "what does it do over time", and both settled a question that a
+  single number had left ambiguous twice.
+- Corollary that cost real time: **a verdict computed over a subset must state
+  its coverage.** `reads_as` printed `fragmentation` four times off 211-343MB
+  of arena while `anon` sat at 1400-1900MB — true statements about 15-25% of
+  the process, presented as statements about the process. The instrument built
+  to resolve `#423` reproduced `#423`'s own failure mode on its first
+  production line, and I shipped it. Any derived verdict now carries
+  `arena_coverage_pct` and refuses below 50%.
+- Cost: ~90 minutes chasing an allocator that was never growing, and one
+  deploy to correct an instrument I had written the same evening.

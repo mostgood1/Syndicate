@@ -374,6 +374,40 @@ Run against the REAL program, not the guard functions. 105 tests pass.
   `render.yaml`. But it is a code change to a shared worker under active
   memory pressure, so it takes its own `/preflight` and its own measurement
   window. Do not bundle it into an incident restart.
+- **ANSWERED IN PART 2026-08-14 02:18Z — IT IS NOT ARENA FRAGMENTATION.**
+  Ten guarded readings at `anon` ~2031MB, refresh-worker `75b8aae6`:
+  ```
+  01:57  sys=228.9  free%=64.3  cov%=14.1
+  02:01  sys=382.6  free%=79.1  cov%=23.6
+  02:08  sys=393.4  free%=54.0  cov%=11.0
+  02:13  sys=393.4  free%=80.2  cov%=17.8
+  02:15  sys=392.8  free%=80.2  cov%=18.3
+  ```
+  - **Arena coverage 11.0-24.4%.** glibc holds at most a quarter of the
+    process's anonymous memory.
+  - **`system_current` PLATEAUS at ~393MB** — three consecutive readings
+    identical — **while `anon` keeps climbing.** The arena is bounded; the
+    growth is entirely outside it. That is the discriminator, and it is
+    stronger than the coverage percentage alone.
+  - `mmapped` 0.7MB, `arenas` 2 (the `mallopt` cap confirmed applied). So it
+    is not glibc's mmap path and not arena proliferation either.
+  - **This explains `malloc_trim` returning 0.0-2.9MB at guard time** — not
+    "too fragmented to return whole pages", simply nothing there to return.
+  - **CLOSES the fragmentation branch.** Do not spend more time on allocator
+    tuning, arena counts, or trim cadence.
+- **NEXT STEP, now justified where it was not:** `tracemalloc` (or an
+  allocation-site sampler) pointed at **array/buffer allocation**, not the
+  gc-tracked heap — the census is measured blind here (143KB reported of 546MB
+  resident). Leading candidate for the ~1700MB is NumPy/Monte Carlo buffers on
+  their own path; **unmeasured, and naming it is the lane's remaining work.**
+  Its own lane and `/preflight`: it is a code change to a shared worker, and
+  `tracemalloc` stores a traceback per allocation on a process that reaches its
+  ceiling hourly.
+- **UNEXPLAINED, do not lose:** a board build ran **>8 min at `anon`
+  1378-1934MB with ZERO aborts** and never landed (started 01:36:45, typical
+  3.7min), with the guard passing and 260MB of headroom. Every other stall
+  tonight was memory pressure; this one was not. The restart erased it. Catch
+  the next occurrence before theorising.
 - Blocked by: nothing. Measurement-bound, not idea-bound.
 
 ### nfl-day-of-game — CLOSED-VERIFIED 2026-08-13 — opened 2026-08-13 — session: nfl-day-of-game
