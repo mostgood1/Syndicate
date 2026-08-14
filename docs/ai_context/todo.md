@@ -31767,6 +31767,45 @@ survived this long only because nobody compared rows.
 Carved out of `#425` at its closure rather than left inside it, because the
 part most likely to be orphaned is the one written last and never owned.
 
+**SCOPE CORRECTED 2026-08-14 — IT IS NOT SIX BACKTESTS. Two of the six named
+producers are not models at all**, and building a harness for either would be
+wasted work:
+
+| producer | what it is | measurable? |
+|---|---|---|
+| `soccer_projections` | soccer game lines | MODEL — unmeasured |
+| `wnba_game_projections` | WNBA game lines | MODEL — **attempted, see below** |
+| `wnba_projections` | WNBA player props | MODEL — unmeasured |
+| `prop_projections` | MLB player props | MODEL — unmeasured |
+| `live_projection_join` | **a JOIN, not a model** | N/A here |
+| `game_board_contract` | **passthrough / normalisation** | N/A |
+
+- `live_projection_join`'s own docstring says it outright: *"So this is a JOIN,
+  not a model."* It carries MLB's live-lens Monte Carlo output onto board rows.
+  **That Monte Carlo is a real model and IS worth measuring — but it is a
+  separate target, not this module.** Measuring the join would measure nothing.
+- `game_board_contract` does
+  `_first_present(row.get("projected"), row.get("projection"), row.get("model_mean"))`
+  — it selects an already-computed value. There is nothing to backtest, and it
+  should be treated as exempt from the skill contract rather than left looking
+  like an unmeasured model.
+
+**So the real target list is FOUR models, plus the MLB live-lens Monte Carlo as
+a fifth if someone wants it.** `#425` gap 1's "one of seven producers" framing
+was right about the CHECK's coverage and wrong as a count of models to measure.
+
+**PROGRESS: 1 of the 4 attempted.** `wnba_game_projections` — harness shipped
+(`scripts/backtest_wnba_projection.py`), ran over all 81 production dates, and
+correctly REFUSED to emit a constant: only 9 of 361 completed games carry a
+projection, because `pred_margin`/`pred_total` only began being written on
+2026-08-02. Not a defect, not measurable yet, re-run ~2026-08-26. Details below.
+
+**BEFORE BUILDING ANY OF THE OTHER THREE, RUN THE COVERAGE CHECK FIRST.** The
+WNBA attempt spent its whole cost discovering that the data was 13 days old. A
+coverage sweep is cheap and answers "is this measurable at all" before anyone
+writes a bespoke harness — which is what this ticket's first step always said
+and what the WNBA run demonstrates the value of.
+
 **WHAT IS ALREADY TRUE (`2d6f7a2f`, `#425` gap 1).** Every projection carries
 `model_skill`, and six producers report `status: "unmeasured"`:
 
