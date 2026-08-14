@@ -494,3 +494,90 @@ def test_malloc_arena_snapshot_degrades_quietly_off_glibc(capsys):
         {"resolved": False, "fn": None, "libc": None, "unavailable_reason": ""})
     assert memory_observability.malloc_arena_snapshot() is None
     assert "MALLOC_INFO_INIT" in capsys.readouterr().out
+
+
+# --- `#423` step 1: malloc_info parsing --------------------------------------
+#
+# The libc call cannot execute anywhere in this repo's dev environment
+# (Windows, no WSL), so the binding's first proof is a production
+# MALLOC_INFO_INIT line. That makes the PARSER the only half that can be
+# pinned here -- and parsing is the half that silently returns a plausible
+# wrong number.
+
+_MALLOC_INFO_SAMPLE = """<malloc version="1">
+<heap nr="0">
+<sizes>
+<size from="33" to="33" total="66" count="2"/>
+</sizes>
+<total type="fast" count="2" size="66"/>
+<total type="rest" count="5" size="1048576"/>
+<system type="current" size="4194304"/>
+<system type="max" size="4194304"/>
+</heap>
+<heap nr="1">
+<sizes/>
+<total type="fast" count="0" size="0"/>
+<total type="rest" count="3" size="524288"/>
+<system type="current" size="2097152"/>
+<system type="max" size="2097152"/>
+</heap>
+<total type="fast" count="2" size="66"/>
+<total type="rest" count="8" size="1572864"/>
+<total type="mmap" count="1" size="1048576"/>
+<system type="current" size="6291456"/>
+<system type="max" size="6291456"/>
+</malloc>
+"""
+
+
+def test_malloc_info_reads_the_top_level_totals_not_the_per_heap_ones():
+    # THE TRAP THIS PINS: `<total>` and `<system>` appear at BOTH levels with
+    # identical tag names. An ElementTree `.iter()` would sum the two heaps AND
+    # the aggregate, inflating everything ~2x while still looking plausible.
+    # Top level here is system 6291456 and free 66 + 1572864.
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_SAMPLE)
+    assert parsed is not None
+    assert parsed["system_current_mb"] == pytest.approx(6.0, abs=0.05)
+    assert parsed["free_held_mb"] == pytest.approx(1.5, abs=0.05)
+    assert parsed["in_use_mb"] == pytest.approx(4.5, abs=0.05)
+    assert parsed["mmapped_mb"] == pytest.approx(1.0, abs=0.05)
+    assert parsed["arenas"] == 2
+
+
+def test_malloc_info_verdict_splits_fragmentation_from_live_retention():
+    # The whole point of the instrument: which of the two surviving `#423`
+    # candidates the allocator is in. 1.5 of 6.0MB free-held = 25.0%.
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_SAMPLE)
+    assert parsed["free_held_pct"] == pytest.approx(25.0, abs=0.1)
+    assert parsed["reads_as"] == "fragmentation"
+
+    # Same shape, almost nothing free -> the other verdict. This is the reading
+    # that would mean `malloc_trim` has nothing left to hand back and the
+    # residual is LIVE, which is what production showed at guard time.
+    live = _MALLOC_INFO_SAMPLE.replace(
+        '<total type="rest" count="8" size="1572864"/>',
+        '<total type="rest" count="8" size="1024"/>')
+    parsed_live = memory_observability.parse_malloc_info_xml(live)
+    assert parsed_live["reads_as"] == "live_retention"
+    assert parsed_live["free_held_pct"] < 1.0
+
+
+def test_malloc_info_returns_none_rather_than_a_zeroed_reading():
+    # A zeroed dict would read as "the allocator holds nothing" -- strictly
+    # worse than silence, and exactly the permissive-on-unknown shape this
+    # repo keeps getting caught by. Every unusable input must be None.
+    assert memory_observability.parse_malloc_info_xml("") is None
+    assert memory_observability.parse_malloc_info_xml("not xml at all") is None
+    assert memory_observability.parse_malloc_info_xml("<other><a/></other>") is None
+    # Well-formed, right root, but no top-level `system current` to anchor on.
+    assert memory_observability.parse_malloc_info_xml(
+        '<malloc version="1"><heap nr="0"/></malloc>') is None
+
+
+def test_malloc_info_survives_a_non_numeric_size():
+    # glibc will not emit this, but the parser must not raise on it -- a
+    # diagnostic that throws inside the worker's stage emitter is worse than
+    # one that returns nothing.
+    broken = _MALLOC_INFO_SAMPLE.replace('<system type="current" size="6291456"/>',
+                                         '<system type="current" size="banana"/>')
+    assert memory_observability.parse_malloc_info_xml(broken) is None

@@ -2813,6 +2813,51 @@ def _diag_log_all_process_memory(stage: str) -> None:
         log_and_persist_process_memory(stage)
     except Exception as exc:
         print(f"[refresh_worker] DIAG_MEMORY_LOG_FAILED stage={stage} {type(exc).__name__}: {exc}", flush=True)
+    _diag_log_malloc_arena(stage)
+
+
+# `#423` step 1. Rides on the stage calls above rather than a timer of its own,
+# deliberately: `#241` is on record as a worker whose PERIODIC work caused a
+# production restart loop, and this process already reaches its ceiling every
+# ~1.1h. No new cadence is introduced, and the arena reading lands at the same
+# instant as the RSS reading it has to be compared against.
+#
+# WHY IT IS RATE LIMITED ANYWAY. glibc's `malloc_info` walks each arena's bins
+# to total them, so its cost rises with the number of free chunks -- i.e. it is
+# most expensive in exactly the fragmented state we are trying to catch. 120s
+# makes even a pathological 50ms call a 0.04% duty cycle. It has not been
+# measured on this heap; if `MALLOC_ARENA` lines ever correlate with a stall,
+# that is the first thing to suspect.
+#
+# Kill switch is `SYNDICATE_ARENA_DIAG=0`, but note an env change needs a deploy
+# to take effect on Render -- a rollback is the faster stop.
+_ARENA_DIAG_LAST: dict[str, float] = {"at": 0.0}
+_ARENA_DIAG_MIN_INTERVAL_SECONDS = 120.0
+
+
+def _diag_log_malloc_arena(stage: str) -> None:
+    """Emit one glibc arena reading, at most every 120s. Never raises."""
+    try:
+        if str(os.environ.get("SYNDICATE_ARENA_DIAG") or "").strip() == "0":
+            return
+        now = time.time()
+        if now - _ARENA_DIAG_LAST["at"] < _ARENA_DIAG_MIN_INTERVAL_SECONDS:
+            return
+        _ARENA_DIAG_LAST["at"] = now
+
+        from syndicate.features.shared.memory_observability import malloc_arena_snapshot
+
+        snapshot = malloc_arena_snapshot()
+        if not snapshot:
+            return  # off glibc, or unreadable -- MALLOC_INFO_INIT already said why
+        print(
+            f"[refresh_worker] MALLOC_ARENA stage={stage} "
+            + json.dumps(snapshot, sort_keys=True),
+            flush=True,
+        )
+    except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop the worker
+        print(f"[refresh_worker] MALLOC_ARENA_FAILED stage={stage} "
+              f"{type(exc).__name__}: {exc}", flush=True)
 
 
 _BOOK_GRID_LAST_RUN: dict[str, float] = {}
