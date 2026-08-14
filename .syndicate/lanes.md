@@ -87,6 +87,45 @@ Shipped `2e4e2544`. **NOT DEPLOYED** — committed and pushed only.
 - Blocked by: none.
 
 ### anon-allocation-site — OPEN — opened 2026-08-14 — session: memory-guard
+- **NAMED 2026-08-14 04:1xZ — `json.loads` (`decoder.py:353`), 491.3MB across
+  7,172,382 LIVE OBJECTS. AND THE WORKER IS OOM-KILLING.**
+  - Production OOM kills confirmed in the Render EVENTS api (not the logs):
+    `server_failed / oomKilled / memoryLimit 4G` at **03:20:11, 03:39:57,
+    03:46:47, 04:04:27** — same instance `-wc6hd`, `evicted: false`. Four in
+    one hour.
+  - The single supervisor reading that caught it, `anon` 2490.9MB:
+    ```
+    491.3MB  n=7,172,382  decoder.py:353            <- json.JSONDecoder
+     32.2MB  n=  214,094  importlib._bootstrap:241
+     13.1MB  n=   82,408  copy.py:231               <- deepcopy
+      8.1MB  n=   37,374  intelligence.py:2342
+      1.5MB  n=   56,366  odds_book_quotes.py:1215
+    ```
+    `json.loads` output is 15x the next contributor. `copy.py` (82k objects)
+    is the second theme.
+  - **WHAT THIS DOES NOT ESTABLISH, and it matters:** tracemalloc names where
+    memory is ALLOCATED, not what HOLDS it — and retention is the bug. Traced
+    covers **23.7%** of `anon` (589.8 of 2490.9MB), so ~1900MB remains outside
+    its view at `nframe=1`. 491MB is the largest VISIBLE allocator, not proven
+    the largest.
+  - **5 of 6 readings were CHILD processes** (`anon` ~70MB, top site pure
+    import machinery). Only 03:07:40 caught pid 39. **The emitter does not log
+    a pid**, which is the same defect that wasted time on
+    `LIVE_ODDS_WORKER_MEMORY` earlier tonight — reproduced by me. Add the pid.
+  - **NEXT: raise `nframe` 1 -> 3.** At one frame the site is `decoder.py:353`,
+    which is Python's own json module and tells us nothing about WHICH read
+    retains. Three frames gives the caller — the difference between "JSON
+    parsing" and "this artifact read". That is the fix-enabling measurement.
+  - Consistent with everything else: `#423` already showed the growth is NOT
+    arena fragmentation (arenas plateau ~393MB while `anon` climbs), i.e. live
+    retention. 7.17M live objects from parsed artifacts is exactly that shape.
+  - **Timing caveat I cannot clear:** the first OOM (03:20:11) is 38 min after
+    my tracemalloc deploy (02:41:39). `nframe=1` keeps a traceback per live
+    allocation and the lane recorded that hazard before shipping. The events
+    window only reaches 30 events so earlier kills are not visible. The leak
+    itself was confirmed at 00:04 — hours before the deploy — so the growth is
+    not mine, but I cannot prove the instrument is not accelerating it.
+    Rollback to `75b8aae6` removes it if the kills need stopping first.
 - Goal: name the allocation site holding refresh-worker's **~1700MB of
   non-arena anonymous memory**, with evidence. Testable outcome: a named
   call site (file + function) accounting for >50% of the growth across one
