@@ -31580,7 +31580,107 @@ fixtures now supply synthetic prior-season plays with distinct per-club EPA,
 which is what their names always described. Still hermetic; no test touches the
 real `pbp_2025.csv`. No assertion was weakened.
 
-### `#425` — **HALF DONE.** Gap 2 (degeneracy detection) SHIPPED `2e4e2544`. Gap 1 (skill annotation on six builders) STILL OPEN, UNOWNED
+### `#428` — OPEN, UNOWNED, BLOCKED ON DATA. Six projection models have never been measured, and now they say so — which is not the same as being good
+
+Carved out of `#425` at its closure rather than left inside it, because the
+part most likely to be orphaned is the one written last and never owned.
+
+**WHAT IS ALREADY TRUE (`2d6f7a2f`, `#425` gap 1).** Every projection carries
+`model_skill`, and six producers report `status: "unmeasured"`:
+
+    soccer_projections      wnba_game_projections   wnba_projections
+    prop_projections        live_projection_join    game_board_contract
+
+Only `nfl_game_projections` reports a real measurement, and its verdict is not
+flattering — margins `corr -0.047 / n=146` ("no measured skill"), totals
+`corr 0.269` ("barely better than predicting the historical mean").
+
+**WHAT IS MISSING: the numbers.** `unmeasured` is honest, not sufficient. A
+board can now say "nobody has checked this model", which is a real improvement
+over silence, but it still cannot say whether any of the six predicts anything.
+
+**WHY THIS IS BLOCKED, and it is a DATA gate, not an effort gate.** Measured on
+the repo checkout 2026-08-14:
+
+    soccer results                0 files
+    MLB raw/statsapi/feed_live    1 date
+    WNBA processed game-cards     4 files
+
+CLAUDE.md's standing warning covers exactly this shape: a backtest built on
+these "will look like it ran on months of data and actually be running on
+whatever the narrowest family happens to cover". **Do not start this by
+backtesting whatever is on disk.** A correlation from n=4 is `#377` again — an
+authoritative-looking number that means nothing — and it would be worse coming
+from the ticket written to prevent that than from anywhere else.
+
+**FIRST STEP, and it is not modelling:** establish per-sport historical
+coverage from PRODUCTION (`/api/ops/...` with `ADMIN_TOKEN`, or the per-sport
+JSON APIs), and report, per model, the number of dates where a projection and a
+real outcome BOTH exist. That number decides whether each measurement is worth
+attempting at all. Publish the intersection, not the union.
+
+**HOW TO MEASURE ONE, once a sport clears that bar.** Follow
+`scripts/backtest_nfl_preseason_projection.py`: regenerate historical
+projections in memory from the era's own inputs (never overwrite production
+artifacts), join to real final scores, and report correlation **and MAE against
+a constant baseline**. The baseline is the part that is easy to omit and is
+what makes the number mean anything — NFL's totals model beats the historical
+mean by 0.22 MAE and that is the whole of its value. That harness is
+NFL-specific by construction (it imports `shrunk_rating`, `team_rating`,
+`load_pbp_plays`), so each sport needs its own; there is no generic evaluator
+in the repo today.
+
+**WHERE THE RESULT GOES.** Into a constant like
+`nfl_preseason_calibration.MEASURED_SKILL`, attached by the producer itself.
+`projection_skill.attach_projection_skill` then stands aside automatically — it
+only fills rows whose producer emitted nothing, and
+`test_a_measured_note_is_never_reworded` pins that code which did not measure a
+model cannot alter what the measurement says.
+
+**DONE LOOKS LIKE:** for each of the six, either a real `MEASURED_SKILL`
+constant with its sample size and seasons, or a recorded, evidenced statement
+that the data does not exist to measure it. **Both are acceptable outcomes.**
+The unacceptable outcome is a number without a sample size behind it.
+
+### `#425` — **CLOSED 2026-08-14.** Both gaps shipped: degeneracy detection (`2e4e2544`) and skill declaration (`2d6f7a2f`). The six actual MEASUREMENTS are carved out as `#428`
+
+> **CLOSURE 2026-08-14 — and read the boundary, because the title of this
+> ticket promises more than its closure delivers.**
+>
+> **GAP 1 — SKILL ANNOTATION: DONE, in `2d6f7a2f`.** Every projection on every
+> sport now carries a `model_skill` block. Silent absence became **declared**
+> absence: `status: "unmeasured"` sits on the row, with explicit nulls rather
+> than missing keys so a consumer never branches on which producer wrote it.
+> `rows_with_measured_skill` / `rows_with_unmeasured_skill` are reported, which
+> is the actual substance of this ticket — "if any of them collapsed, nothing
+> would say so" becomes a number someone reads rather than something they must
+> notice. Applied at the `attach_projections` wrapper: one place, seven sports,
+> 13 return sites, zero call sites.
+>
+> **WHAT GAP 1'S CLOSURE DOES NOT MEAN.** The six models are still unmeasured.
+> Nothing here says they are good, and nothing says they are bad — it says
+> nobody knows, on the row, where before the row said nothing at all.
+> **The measurements are `#428`.**
+>
+> Why they were not done here: the data is absent. Measured on the checkout
+> 2026-08-14 — soccer results **0 files**, MLB `feed_live` **1 date**, WNBA
+> processed game-cards **4 files**. CLAUDE.md's standing warning is this exact
+> case, and emitting a correlation from n=4 would be `#377`'s failure
+> (an authoritative-looking number that means nothing) committed by the work
+> written to prevent it. The NFL harness does not generalise either — it
+> imports `shrunk_rating`, `team_rating`, `load_pbp_plays`.
+>
+> **The two checks are INDEPENDENT and neither implies the other**, which is
+> why wiring `skill_note` everywhere would never have caught the 44.38
+> constant. Degeneracy asks *did this RUN collapse*; skill asks *has this MODEL
+> ever been evaluated*. A model with real historical skill still emits a
+> constant when today's input goes missing; a model that varies plausibly can
+> still be unmeasured. Pinned by
+> `test_degeneracy_and_skill_are_independent_signals`.
+>
+> **Deployment state at closure:** gap 2 is LIVE on web (`03:09:33Z`) and
+> refresh-worker (`14:22:32Z`). **Gap 1 (`2d6f7a2f`) is pushed and NOT
+> DEPLOYED to either service.** Closing the ticket does not deploy it.
 
 > **STATUS 2026-08-14. Read this before treating the ticket as either done or
 > untouched — it is neither.**
