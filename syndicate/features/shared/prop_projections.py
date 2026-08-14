@@ -78,6 +78,33 @@ def _norm_name(value: Any) -> str:
     return " ".join(text.split())
 
 
+def _attach_measured_skill(payload: dict[str, Any], market_key: str) -> None:
+    """`#428`. Carry the backtest's verdict on the row that shows the number.
+
+    THE PRODUCER ATTACHES ITS OWN SKILL, which is the contract
+    `projection_skill` is built around: it fills only where `model_skill` is
+    ABSENT, so a measured market takes this note and an unmeasured one is
+    stamped `unmeasured` rather than inheriting a neighbour's number.
+
+    Deliberately silent for a market with no measurement --
+    `mlb_prop_calibration.skill_note` returns None, and None is the honest
+    answer. `batter_hits_runs_rbis` is exactly that case today: it was the
+    degenerate `0.0` throughout the backtest window (`#429`), so it has no
+    number and must not borrow one.
+
+    Never raises. A missing calibration module must not take down the join it
+    annotates.
+    """
+    try:
+        from syndicate.features.shared.mlb_prop_calibration import skill_note
+
+        note = skill_note(market_key)
+    except Exception:
+        return
+    if note:
+        payload["model_skill"] = note
+
+
 def _dist_mean(dist: Mapping[str, Any]) -> float | None:
     total = 0.0
     weighted = 0.0
@@ -393,6 +420,7 @@ class PropProjectionIndex:
                 # rule the rest of this board follows: a value a consumer
                 # cannot tell the provenance of is worse than a labelled one.
                 payload["projected_derived_from"] = derived_from
+            _attach_measured_skill(payload, market_key)
             return payload
 
         return None
