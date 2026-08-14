@@ -1165,11 +1165,24 @@ Nothing new is convicted. Four candidates are struck off, which narrows it.
   No error has been observed anywhere. `PROCESS_TREE_MEMORY child_count: 0` at
   18:21:34Z suggests the subprocess was gone ~8 min after launch, but that is
   one periodic sample and bounds the lifetime loosely — it is not proof.
-- **The run's own logs are UNREADABLE FROM WEB.** `[measured 08-14 18:5xZ]`
-  `/api/ops/odds-refresh/logs` returns `exists=False` for both lanes with fresh
-  stamps. That is the web/worker **disk split**, not an absence of logs. Do not
-  read it as evidence. The step outcomes must be emitted to the worker's own
-  stdout (which Render's log API does capture) before this is diagnosable.
+- **The run's own logs are UNREADABLE FROM WEB — and this is now instrumented.**
+  `[measured 08-14 18:5xZ]` `/api/ops/odds-refresh/logs` returns `exists=False`
+  for both lanes with fresh stamps. That is the web/worker **disk split**, not
+  an absence of logs; never read it as evidence. `launch_refresh_run` spawns
+  the refresh `stdout=DEVNULL, stderr=DEVNULL` and the child's log files land
+  on the WORKER's disk, while Render's collector captures only a service's own
+  stdout — which is how four days of failure produced no visible error.
+- **FIX SHIPPED (observability only, NOT a repair).** `[measured 08-14 19:24Z]`
+  live-odds-worker `ccd10349` (= `9a3a5bc6` + one file) live **14:24:09 CDT**;
+  post-deploy logs clean, **zero tracebacks**. It reads the artifact its own
+  child wrote and prints `SOCCER_PREGAME_RUN_SUMMARY`, one line per `_odds`
+  step, one line per failure, and `SOCCER_PREGAME_RUN_NO_ARTIFACT` when the
+  child wrote nothing.
+  - **Emits nothing until the next launch, BY DESIGN.** The on-disk status file
+    predates the change and has no `artifactsDir`. Zero `SOCCER_PREGAME_RUN_`
+    lines right after the deploy is correct, not a failure.
+  - **First readable outcome ~17:28 CDT** (4h autorun ~17:13, reported one tick
+    later). Until then the failure mode remains unnamed. `[unverified]`
 - **Two hypotheses are DEAD; do not re-run them.** `[measured 08-14]`
   (1) Step truncation at #27 of 50 — falsified by a single-league scoped run
   (~6 steps) that captured nothing. (2) Three-specific-leagues — all ten are

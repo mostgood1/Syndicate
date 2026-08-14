@@ -1596,3 +1596,61 @@ back **oldest-first regardless of `direction`**.
   whenever `<ref>` contains a slash.** Resolve the ref to a SHA first.
 - Cost: none. Caught before it was written to the ledger — which is the only
   reason it belongs here as a near-miss rather than as a retraction.
+
+### 2026-08-14 — A watcher that compares TIMESTAMPS to identify a thing will misidentify it by microseconds
+
+- What we believed: the 3h clean measurement window had been destroyed by
+  another session's deploy. The watcher said so in plain language:
+  `!! A DEPLOY INTERVENED -- the 3h clean window was reset.`
+- What was actually true: **no deploy intervened.** The watcher was comparing
+  the live deploy's `finishedAt` against the window-start constant:
+
+      window start (my constant)   2026-08-14T16:16:56
+      "intervening" deploy          2026-08-14T16:16:56.066938
+
+  The same deploy. I had written the constant without fractional seconds, so
+  `fin > DEPLOY` was true by **66 milliseconds**. The window was clean the whole
+  time and the measurement simply never ran.
+- Cost if accepted: the lane would have closed on a 103.9-min partial reading
+  with its span shortfall unresolved, and the 3h criterion I had explicitly
+  refused to retro-fit would have been quietly abandoned on a false alarm.
+  Re-running it gave 37 refreshes / 187.3 min with a max gap of 11.8 min —
+  a stronger result than the partial, on a span that finally exceeded the
+  180-min baseline and so made the max-gap comparison sound.
+- The rule going forward: **to answer "is this still the same thing", compare
+  the IDENTITY, not a timestamp derived from it.** The fix was one line — check
+  the deploy's commit SHA against the SHA the window opened on. A timestamp is a
+  measurement of an event; the SHA IS the event. Identity comparisons do not
+  have precision, and precision is where this class of bug lives.
+- Sibling of `A FAILED READ RENDERS AS A RESULT` (2026-08-13), with the failure
+  moved from a broken probe to a correct probe compared wrongly. Both produce a
+  confident, well-formatted, wrong verdict — and this one produced it in the
+  *pessimistic* direction, which is the one that gets believed because it sounds
+  appropriately cautious.
+- Also worth keeping: the watcher printed its reasoning (`live now: <sha>
+  finished <ts>`) on the line above its verdict. That is the only reason the
+  contradiction was visible at all. **A verdict line should always carry the
+  values it was computed from.**
+
+### 2026-08-14 — I PREDICTED FILE OWNERSHIP INSTEAD OF PROBING IT, TWICE
+- What I believed, twice, and wrote into a checkpoint as a blocker: that
+  `scripts/refresh_odds_sources.py` and then
+  `scripts/run_live_odds_refresh_worker.py` were claimed by other OPEN lanes
+  and would need a reassignment before I could touch them. The second one was
+  handed to the next session as "needs a lane reassignment or their owner".
+- What was actually true: **both returned exit 0 from `lane-guard.py`.** The
+  other lanes mention those paths in PROSE — inside hypotheses and measurement
+  notes — not in a `Files:` block, and the guard only parses the Files block. No
+  reassignment was ever needed for either.
+- Why I got it wrong: I grepped the ledger for the filename and treated any hit
+  as a claim. That is not what the guard does, and the guard is the thing that
+  actually blocks. **I was modelling the mechanism instead of running it**, on a
+  mechanism that takes one stdin probe to run.
+- **The rule: file ownership is answered by the GUARD, not by reading the
+  ledger.** Pipe the path into `.claude/hooks/lane-guard.py` and read the exit
+  code. A grep over `lanes.md` over-reports, because lane bodies legitimately
+  discuss files they do not claim.
+- Cost, and it is not zero even though nothing broke: one checkpoint handed the
+  next session a false blocker on the single highest-value next action. Someone
+  picking that up cold would have gone looking for a lane owner who did not
+  need to exist.

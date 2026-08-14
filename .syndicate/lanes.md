@@ -204,6 +204,27 @@
 - Blocked by: none. Independent of Lane B (CLV) by design.
 
 ### soccer-odds-coverage — OPEN — opened 2026-08-14 — session: board-ui
+- **STATUS 2026-08-14 19:3xZ — NO LONGER BLOCKED ON OBSERVABILITY. Now
+  waiting on one scheduled event.**
+  - `ccd10349` live on live-odds-worker **14:24:09 CDT**, post-deploy clean,
+    zero tracebacks. The worker now reads the artifact its own detached child
+    wrote and prints the per-step outcome to its OWN stdout, which is the only
+    thing Render's collector captures.
+  - **It emits nothing until the next launch, by design** — the on-disk status
+    file predates the change and has no `artifactsDir`. Do not read the
+    current silence as the fix failing.
+  - **NEXT READABLE OUTCOME ~17:28 CDT.** Autorun fires ~17:13 (4h after
+    18:13:14Z), reported one tick later. Read live-odds-worker's Render logs
+    for `SOCCER_PREGAME_RUN_`.
+- **What the log will decide, stated in advance so the reading is not
+  post-hoc:**
+  - `SOCCER_PREGAME_STEP name=soccer_<league>_odds ok=False rc=<n>` -> the odds
+    step RUNS and FAILS. Take `rc` and the step's own stderr next.
+  - odds steps absent from the summary entirely -> the run never reaches them;
+    look at what precedes them and at the run's own exit.
+  - `SOCCER_PREGAME_RUN_NO_ARTIFACT` -> the child dies before writing anything;
+    the cause is in launch/startup, not in any step.
+- The `#433` step reorder remains shipped and remains NOT a fix for this.
 - **STATUS 2026-08-14 19:0xZ — producer identified, failure mode still
   unnamed. The reorder shipped by this lane does NOT fix it.**
   - `phase=pregame` builds 10 odds steps; `phase=live` builds **0**. So
@@ -820,7 +841,16 @@ the FIRST for a model it did not originally scope.**
   plus `check_deploy_safety.py` still reporting a sane figure on live data.
 - Blocked by: none. No deploy — this is an operator-side script.
 
-### layer2-board-freshness — OPEN — VERIFIED ON A 103.9-MIN CLEAN WINDOW, 3h READ STILL OWED — opened 2026-08-14 — session: layer2-freshness
+### layer2-board-freshness — CLOSED-VERIFIED 2026-08-14 — 3h clean window, all five criteria met — opened 2026-08-14 — session: layer2-freshness
+- **CLOSED ON THE FULL 3h READ (16:16:56-19:24Z, 187.3 min, commit `294f9ca9`
+  unchanged, verified by SHA).** 37 refreshes = 11.9/hour against 1.7/hour;
+  23 of them via the new fast path; longest gap 11.8 min against 104.7;
+  96 `MEMORY_GUARD_ABORT` so the guard is still actively refusing;
+  `LAYER2_GUARD_SKIP` 0 across all 96, so the 600MB floor is correctly sized;
+  zero failures, zero OOM. Full detail and the one residual confound in
+  `deploys.md`.
+- Second work item (`pool["overview"]` retention) shipped as `100c9cb5`,
+  **committed, NOT deployed** — it rides the next refresh-worker deploy.
 - **CLEAN-WINDOW RESULT 16:16:56-18:00:49Z (103.9 min, no intervening deploy):
   22 refreshes = 12.7/hour against a 1.7/hour baseline; 8 of them via the new
   fast path on cycles the Layer 1 guard refused; longest gap 11.8 min against
