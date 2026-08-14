@@ -1,5 +1,78 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#426` — **THE BOARD RANKS ON ARBITRAGE, NOT ON THE MODEL. The intelligence is being suppressed before it reaches the board.** OPEN, UNOWNED, user-reported 2026-08-14
+
+**This is the product's core claim failing quietly.** The board is meant to
+surface model-driven edges. On the served Layer 2 board it is ranking rows by
+cross-book arbitrage surplus, with the model contributing nothing — and because
+an arb is +EV on BOTH legs, the board shows **both sides of the same game**,
+which is what makes it read as nonsense to a user.
+
+**Reported from the served board (screenshot, 2026-08-14 preseason NFL + MLB).**
+
+**FIRST: the both-sides rows are NOT an EV bug.** Brewers @ Dodgers:
+
+```
+Under 4.5 totals_alt  -117  KALSHI   fair -123  EV +2.5%
+Over  4.5 totals_alt  +130  BETMGM   fair +123  EV +2.9%
+```
+
+The two fairs sum to 100% (55.2 / 44.8), so the de-vig is coherent. Both legs
+beat fair because they are at DIFFERENT BOOKS — `-117` and `+130` imply 97.4%
+together, a genuine arbitrage. `#384` fixed the version where EV *was* the arb
+surplus mislabelled as edge; fair is now a proper consensus, so a real arb
+legitimately reads +EV on both sides. **Do not "fix" the EV maths.**
+
+**THE ACTUAL DEFECT — the model is not breaking the tie.** Cardinals @ Raiders:
+
+```
+Over  54.5 totals  +110  DRAFTKINGS  EV +5.0%   projected 36.3   actual 41
+Under 54.5 totals  +102  FANDUEL     EV +1.0%   projected 36.3   actual 41
+```
+
+A **36.3-point projection against a 54.5 line** should make the Under enormously
++EV and the Over indefensible. The board ranks them the OTHER WAY ROUND. The
+projection contributes nothing; the ordering is pure arb surplus. (For the
+record the Under won — actual 41.)
+
+**HYPOTHESIS, NOT YET CONFIRMED: `_MODEL_EDGE_MAX_POINTS = 15.0`**
+(`syndicate/features/shared/layer2_board.py`). An 18-point projection/line gap
+implies a probability far outside the market's, exceeds the plausibility bound,
+and the model edge is DROPPED — so the row falls back to EV-only ranking. **The
+guard would be doing exactly its job.** It exists because `#263` found 93 of 100
+rows ranked on model edges implying 86-89% win probabilities.
+
+**If that holds, the bug is upstream: the NFL preseason projections are wrong,
+or in the wrong units, or joined to the wrong line.** The guard is the messenger.
+
+**CONFIRMING MEASUREMENT — one look at the served payload, no deploy:**
+do the NFL rows carry `model_edge_pct: null` alongside a non-null `projected`?
+- **yes** -> the guard is firing; fix the projections, not the board.
+- **no** -> the model edge is present and being out-weighted by EV in the
+  ranking, which is a scoring-weight defect in the board itself.
+These are opposite fixes. **Do not start work before this is read.**
+
+**WHY THIS CONNECTS TO `#423` AND `#417`, which is the part worth holding onto.**
+The memory leak stops the board building at all; `#417`'s guard was refusing
+builds on a bookkeeping artifact; and now, when a build DOES land, the model
+edge is suppressed before it reaches the ranking. Three different failures, one
+consequence: **the intelligence engine's output is not reaching the board.**
+Fixing memory makes the board build. It does not make the board *intelligent* —
+that is this ticket.
+
+**Second, smaller defect (UX, real):** both legs of an arbitrage are presented
+as independent "opportunities" with no indication they are a pair. Even once
+ranking is correct, a user cannot act on both and should not see them as two
+finds. They want pairing, or one-per-market suppression.
+
+**Caveats on this filing, stated so nobody over-reads it.** The numbers are read
+off a screenshot of the served board plus a code trace; the local
+`reports/intelligence/layer2_shortlist_2026_08_13.json` mirror has **0 rows**
+(the documented lossy-mirror trap), so nothing here was verified against a
+production payload. The `_MODEL_EDGE_MAX_POINTS` link is inference from the
+code, not a measurement.
+
+
 ### `#422` — **The web service is 47 commits stale, and the board work `layer1-live-tier` closed as "SHIPPED AND VERIFIED" may only ever have been verified on the WORKER half.** OPEN, UNOWNED — belongs to `layer1-live-tier`.
 
 **Measured 2026-08-13 14:44 CDT.** Web (`srv-d88ahvrbc2fs73eodu30`) is live on
