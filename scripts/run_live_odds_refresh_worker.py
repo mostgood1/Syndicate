@@ -87,6 +87,86 @@ def _soccer_active_for_date(date_str: str) -> bool:
     return "soccer" in active
 
 
+def _report_previous_soccer_pregame_run(last_status: dict) -> None:
+    """Print the PREVIOUS run's per-step outcome to THIS worker's stdout (`#433`).
+
+    WHY THIS EXISTS, and it is not a nice-to-have. Soccer game odds stopped
+    being captured on 2026-08-10 and nobody saw an error for four days. Not
+    because nothing was logged -- because of WHERE it was logged:
+
+      * `launch_refresh_run` spawns the refresh detached with
+        `stdout=DEVNULL, stderr=DEVNULL` (`ops_refresh.py`). Its comment says
+        the child's output is "already captured to
+        odds_refresh.json/odds_refresh.stderr.txt ... so there's no diagnostic
+        value in inheriting them here." That is TRUE and, on this deployment,
+        misleading: those files land on **live-odds-worker's own disk**, and
+        Render gives the web service a DIFFERENT disk. So
+        `/api/ops/odds-refresh/logs` returns `exists=False` from web forever --
+        which reads as "no logs" and is really "wrong machine".
+      * Render's log collector only captures a service's OWN stdout.
+
+    The worker CAN read its own disk. So rather than inheriting the child's
+    stdout -- which would push a full 50-step refresh, thousands of lines, into
+    the log collector every 4 hours -- this reads the run artifact the child
+    already wrote and emits ONE compact line per step plus a summary.
+
+    Deliberately reports the PREVIOUS run, on the next tick. The launch is
+    fire-and-forget by design (`ops_refresh.py` documents that making it
+    blocking stalled this worker's tick loop and contributed to an OOM), so
+    there is no point at which this function could wait for a result. Reading
+    last tick's artifact costs nothing and cannot stall anything.
+
+    Never raises: an observability side-effect must not be able to break the
+    autorun it is describing -- the same rule `_append_soccer_book_quotes`
+    follows, and the reason a failing shard append stayed silent.
+    """
+    try:
+        artifacts_dir = str((last_status or {}).get("artifactsDir") or "").strip()
+        stamp = str((last_status or {}).get("runStamp") or "").strip()
+        if not artifacts_dir or (last_status or {}).get("reported"):
+            return
+        result_path = Path(artifacts_dir) / "odds_refresh.json"
+        if not result_path.exists():
+            # A launched run with no artifact is itself the finding: the child
+            # died before writing anything. Say so -- silence here is what the
+            # four-day outage looked like from outside.
+            print(
+                f"[live_odds_worker] SOCCER_PREGAME_RUN_NO_ARTIFACT stamp={stamp} "
+                f"path={result_path} (child wrote nothing)",
+                flush=True,
+            )
+            return
+        payload = json.loads(result_path.read_text(encoding="utf-8", errors="replace"))
+        results = payload.get("results") or []
+        steps = []
+        for entry in results if isinstance(results, list) else []:
+            generation = (entry or {}).get("generation") or {}
+            for step in generation.get("steps") or []:
+                steps.append(step)
+        ok_count = sum(1 for s in steps if s.get("ok") or s.get("return_code") == 0)
+        failed = [s for s in steps if not (s.get("ok") or s.get("return_code") == 0)]
+        print(
+            f"[live_odds_worker] SOCCER_PREGAME_RUN_SUMMARY stamp={stamp} "
+            f"steps={len(steps)} ok={ok_count} failed={len(failed)}",
+            flush=True,
+        )
+        # Only the odds steps by name, plus every failure. The full 50-step list
+        # every 4 hours is noise; the odds steps are the ones this outage was
+        # about, and a failure anywhere is always worth a line.
+        for step in steps:
+            name = str(step.get("name") or "")
+            is_odds = name.endswith("_odds")
+            ok = bool(step.get("ok") or step.get("return_code") == 0)
+            if is_odds or not ok:
+                print(
+                    f"[live_odds_worker] SOCCER_PREGAME_STEP name={name} ok={ok} "
+                    f"rc={step.get('return_code')} skipped={step.get('skipped')}",
+                    flush=True,
+                )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[live_odds_worker] SOCCER_PREGAME_RUN_SUMMARY_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
 def _launch_autorun_soccer_pregame_refresh() -> None:
     if not _soccer_pregame_refresh_enabled():
         return
@@ -95,6 +175,18 @@ def _launch_autorun_soccer_pregame_refresh() -> None:
         return
     status_path = _soccer_pregame_autorun_status_path()
     last_status = read_json_file(status_path) or {}
+    # BEFORE the cadence gate, deliberately. The gate returns on most ticks, so
+    # reporting after it would emit the previous run's outcome only on the tick
+    # that launches the NEXT one -- i.e. up to 4 hours late, which is most of
+    # the way back to the silence this is fixing.
+    _report_previous_soccer_pregame_run(last_status)
+    if last_status and not last_status.get("reported"):
+        # Mark reported so the summary is emitted once, not on every tick for
+        # four hours. Written back with the rest of the record intact.
+        try:
+            write_json_file(status_path, {**last_status, "reported": True})
+        except Exception:  # noqa: BLE001
+            pass
     last_epoch = float((last_status or {}).get("epoch") or 0.0)
     if last_epoch > 0.0 and (time.time() - last_epoch) < float(_soccer_pregame_refresh_interval_seconds()):
         return
@@ -113,8 +205,26 @@ def _launch_autorun_soccer_pregame_refresh() -> None:
         write_json_file(status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date, "error": f"{type(exc).__name__}: {exc}"})
         print(f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_FAILED {type(exc).__name__}: {exc}", flush=True)
         return
-    write_json_file(status_path, {"epoch": time.time(), "sports": "soccer", "date": selected_date})
-    print(f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_LAUNCHED date={selected_date} pid={result.get('pid')}", flush=True)
+    # `artifactsDir` and `runStamp` are what make the NEXT tick able to report
+    # this run's outcome. Without them the summary has no artifact to read and
+    # the launch is once again the last thing anyone hears about the run.
+    write_json_file(
+        status_path,
+        {
+            "epoch": time.time(),
+            "sports": "soccer",
+            "date": selected_date,
+            "runStamp": result.get("run_stamp"),
+            "artifactsDir": result.get("artifacts_dir"),
+            "pid": result.get("pid"),
+            "reported": False,
+        },
+    )
+    print(
+        f"[live_odds_worker] SOCCER_PREGAME_AUTORUN_LAUNCHED date={selected_date} "
+        f"pid={result.get('pid')} stamp={result.get('run_stamp')}",
+        flush=True,
+    )
 
 
 def _memory_trace_enabled() -> bool:
