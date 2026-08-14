@@ -981,3 +981,33 @@ back **oldest-first regardless of `direction`**.
   a union-merge is how a NEWER upstream note gets silently reverted, which
   nearly happened tonight when origin held a corrected "obligation CLOSED"
   line and the local side still said "unpushed".
+
+### 2026-08-14 — A TROUGH THAT CLEARS AN EARLIER PEAK IS A RATCHET. That is the test
+- What we believed, three times in one evening, each time on the evidence
+  available: (1) refresh-worker leaks ~300MB/hour [from two point samples];
+  (2) no leak is established, it may be a 1550MB oscillation [after measuring
+  the within-window spread]; (3) the leak is real at ~+1200MB/hour [after 45
+  minutes of floor series].
+- What was actually true: (3). But (2) was the correct call **on the evidence
+  then available**, and (1) was not — it asserted a rate two points could not
+  support.
+- **The test that settles ratchet-vs-oscillation, and it is not a slope:**
+  compare the LATEST TROUGH against an EARLIER PEAK. At 00:06 the floor was
+  2588.9 against a 23:19 peak of 1877.9. A trough above an earlier peak cannot
+  be produced by any oscillation, however wide — no averaging, no regression,
+  no minimum sample count. A slope over a noisy series proves nothing and cost
+  two retractions to learn.
+- **Why the instrument seemed to change its mind: the SYSTEM changed, not the
+  measurement.** Early windows spread 1650<->3200 (1550MB); late windows
+  2589<->2651 (60MB). As memory filled there was less headroom to swing in, so
+  the floor became legible. **An instrument that is inconclusive early can
+  become decisive later without being fixed** — do not discard it, and do not
+  read its early silence as a verdict.
+- Corollary on predictions: predicted re-freeze at 4-5h; first aborts at 34
+  min; sustained freeze at 1.13h. The 34-minute aborts looked like
+  falsification and were a DIFFERENT mechanism — peaks crossing the threshold —
+  while the real onset was the floor crossing it. **Two mechanisms, one log
+  line.** Before calling a prediction falsified, check whether the observable
+  has more than one cause.
+- Cost: two retractions and ~90 minutes. Cheap for the outcome — the leak is
+  now established with a test that will not need re-litigating.

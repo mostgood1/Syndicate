@@ -136,7 +136,19 @@
   `'basis': 'unreclaimable'` (proving the new path executes) with
   `active_file`/`inactive_file` credited as reclaimable. Do not revert it.
   `[measured 08-13 22:48Z]`
-- **RETRACTED 23:33Z: the "~300MB/hour anon leak" is NOT established.** It came
+- **RESOLVED 2026-08-14 00:06Z: THE LEAK IS REAL.** The floor series (the
+  trough of `anon`, not point samples) rose **1670 -> 2589MB in 45 min**, and
+  the latest TROUGH now sits above the first window's PEAK (1877.9) — a
+  comparison that distinguishes a ratchet from an oscillation, and one that
+  point-sampling cannot make. Rate ~+1200 MB/hour. The board re-froze at
+  T+1.13h after the 22:59 restart. **`#417`'s guard is behaving correctly
+  throughout — it refuses because `anon` genuinely exceeds the floor. The
+  defect is upstream of the guard.** `[measured 08-14 00:06Z]`
+- The **300MB/hour figure** stays withdrawn as a NUMBER (it came from two point
+  samples and is ~4x off); the PHENOMENON it described is confirmed. The
+  supersession below is kept so the reasoning is auditable.
+- **SUPERSEDED 23:33Z (kept for the record): "the ~300MB/hour anon leak is NOT
+  established."** It came
   from two point samples (`anon` 1163 → 2603 over 18:05–22:48Z), and `anon` is
   now measured to swing **~1650 ↔ 3200MB within minutes**. Two points cannot
   distinguish a ratchet from two phases of that swing — the same error retracted
