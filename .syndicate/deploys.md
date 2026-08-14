@@ -531,3 +531,92 @@ people learn to route around. Run the gate, read it, then deploy.
   defect that was discarding ~90 completed NFL sims/day.
 - Someone should move `#389`'s follow-up out of AWAITING FIRST RUN in
   `todo.md`. Not done here — this session did not own that ticket.
+
+### `#419` props-regen guard — VERIFIED WORKING (scheduled deploy was a no-op)
+- 2026-08-14 09:15 CDT, service `refresh-worker` (`srv-d91dpertqb8s73co8ls0`),
+  commit `d6188ca7`, change `#419` (`_mlb_props_now_available_needs_regen` read
+  prop snapshots through Redis while the producer writes the mounted disk).
+- **No deploy was performed by this task, and none was needed.** `#419` had
+  already reached production at **2026-08-13 17:59 CDT** (`22:59:14Z`) via a
+  **manual** deploy of `d4bb29b5`, not by the scheduled job. Live commit is now
+  `75b8aae6` (08-13 23:26 CDT), which contains `d6188ca7`; the fix code is
+  present in that tree, checked by `git grep` against the commit, not inferred
+  from ancestry alone.
+- Gate verdict acted on: **slate gate FAILED** — the task ran at 09:10 CDT and
+  its window is 00:00–04:59, so a deploy was forbidden regardless. It was moot;
+  the already-live check exits first. `deploy_preflight.py` was never reached.
+  - Clock trap worth keeping: the first `date` call in the session reported
+    `00:04` when it was `09:04`, which would have opened the slate gate on a
+    false reading. It was caught because the Render log timestamps ran ~9h
+    *ahead* of the supposed local time. A single clock reading is not a
+    measurement — cross-check it against a timestamp from another system.
+- **Measured — this closes the obligation, it is not pending:**
+  - Baseline: **0** `MLB_PROPS_REGEN_DUE` across the entire retained log window
+    (`2026-08-07T14:12Z` -> `2026-08-13T22:59Z`, ~6.4 days). Not an empty
+    window — same query returns hits on the far side of the boundary.
+  - First `MLB_PROPS_REGEN_DUE` at `2026-08-13T23:00:09Z` — **55 seconds after
+    the fix went live** — with `pitcher_odds=True hitter_odds=True`, the two
+    flags that were unconditionally `False` on every call before it.
+  - ~15 `DUE` since, across both slate dates, hourly.
+  - `MLB_PROPS_REGEN_SKIPPED reason=cooldown` with `age_s` resetting
+    (660 -> 1517 -> 2147 -> 2781 -> 3417) — the cooldown is being *set*, which
+    only happens after a regen actually runs.
+  - End-to-end proof: `MLB_DAILY_SIM_END date=2026-08-14
+    run_stamp=20260814_140135 state=finished exit_code=0 duration_seconds=625
+    reason=props_now_available`. A regen fired from this guard and completed.
+- Scheduled task `deploy-419-refresh-worker` deleted after this entry; its work
+  was done by someone else's manual deploy before it ever fired.
+- **Unrelated, seen while reading these logs, NOT this lane:** `refresh-worker`
+  is sitting at **99.5-99.8% of its 4096MB** during the props regen
+  (`container_memory_headroom_mb` 9.0-20.7, `accounted_rss_mb` ~3045). That is
+  live near-OOM, and it belongs to the OPEN `anon-allocation-site` /
+  `refresh-worker-anon-leak` lanes. Recorded here only so the reading is not
+  lost; not diagnosed.
+
+### projection-degeneracy-detector — `#425` gap 2 — WEB `2e4e2544`, then REFRESH-WORKER `2e4e2544`
+- Web: `dep-d9v8aqdbedkc73b41ntg`, live **2026-08-14T03:09:33Z**.
+- refresh-worker: `dep-d9vi6hu417fc73d2ofmg`, live **2026-08-14T14:22:32Z**.
+  **No sim killed** — `sim_run_status state=finished` read before the POST.
+- Change: `detect_degenerate_projections` reports any (kind, market, segment)
+  whose projection has collapsed to ONE value across >= 4 distinct GAMES.
+  Applied in a wrapper over `_attach_projections_by_sport`, so it covers all
+  seven sports, all 13 return sites, and any producer wired later, touching
+  ZERO call sites.
+- **THE WORKER DEPLOY WAS HELD OVERNIGHT, DELIBERATELY, AND THAT WAS RIGHT.**
+  Ordered at ~22:0x CDT while refresh-worker was OOM-killing: `server_failed
+  oomKilled memoryLimit 4Gi` at 03:20:11Z, 03:39:57Z and 03:46:47Z. Deploying
+  then would have (a) erased the crash evidence the `anon-allocation-site`
+  lane needed, (b) made my change the visible suspect for the next kill, and
+  (c) silently applied the standard mitigation (a restart) while calling it a
+  feature deploy. Held, surfaced, deployed the next morning after 5h stable.
+- **The cause of those OOMs was NOT this change and is not on `main`.**
+  `2bc0a712` — the other session's `#423 step 2: wire tracemalloc into the
+  worker` — was deployed from a clone and rolled back to `75b8aae6` at
+  04:26:55Z. Verified by CONTENT as well as lineage, because cherry-picks mint
+  new SHAs here and ancestry alone would not settle it: tracemalloc occurrences
+  are 3 in both `2e4e2544` and the live `75b8aae6`, i.e. comments only, none of
+  the 235-line wiring.
+- Pre-deploy checks, all three passed: `2bc0a712` not contained in `2e4e2544`;
+  `75b8aae6` (live) IS contained, so not a rollback; production delta is
+  **exactly one file**, `board_enrichment.py`.
+- MEASURED 2026-08-14 14:22–14:24Z:
+
+      deploy live               14:22:32Z
+      artifact generated_at     14:23:23Z   <- POST-deploy, so the reading counts
+      oom kills since deploy    0
+      distinct projected_raw    3           (1 would be a regression to 44.38)
+      degenerate groups         none reported
+
+- **WHY A REBUILT ARTIFACT IS THE LIVENESS PROOF AND SILENCE IS NOT.** This
+  detector returns `{}` when there is nothing to report, so a healthy board
+  emits NOTHING — silence is the expected success state and cannot distinguish
+  "ran and found nothing" from "never executed". The ledger has been caught by
+  exactly that shape twice (`basis` emitted only on the abort branch). So the
+  verdict is gated on `generated_at` postdating the deploy: a rebuilt artifact
+  proves `attach_projections` ran, and the detector sits unconditionally inside
+  it. A `DEGENERATE_PROJECTION` line would be a positive emission, but tonight's
+  board is healthy so its absence is correct and carries no information.
+- **`#425` remains OPEN for gap 1** — the skill annotation on six builders,
+  which needs six measured backtests. Not shipped, not started.
+- Rollback: redeploy `75b8aae6` (read the live commit first — it moved five
+  times in one evening and a stale SHA nearly shipped a rollback).
