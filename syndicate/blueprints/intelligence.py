@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -2574,6 +2574,55 @@ def board_layer1_api():
             return _no_cache_response(
                 jsonify({"ok": False, "error": f"unknown view {view!r}; expected all, pregame, live or final."})
             ), 400
+
+    # ODDS AGE IS NOT BOARD AGE, and until now only the second was served
+    # (`#430`). `build_layer1_board` returns the ages the WORKER measured, which
+    # are relative to its own clock at build time; only here is `generated_at`
+    # known, so only here can they become a wall-clock instant the browser can
+    # subtract from `Date.now()`.
+    #
+    # Measured on production 2026-08-14 15:00Z, MLB: `generated_at` 14:58:49Z
+    # (1.6 min old) against a freshest observation of 13:09Z -- 1h51m. The board
+    # header read "built 2m old" and nothing on the page contradicted it.
+    #
+    # AFTER THE PARTITION, DELIBERATELY, and it was written before it first.
+    # `partition_board_by_state` RECOMPUTES `odds_freshness` for the filtered
+    # view -- it has to, or a pregame board inherits a live game's freshness --
+    # and the recomputed block carries only the worker's relative ages. Deriving
+    # the timestamps upstream of that put them on a dict the partition then threw
+    # away, so `view=all` was correct and every other tab silently lost the odds
+    # age and fell back to rendering "unknown". Caught by
+    # `tests/test_layer1_api_odds_freshness.py`, which is why that test exists.
+    freshness = board.get("odds_freshness")
+    if isinstance(freshness, dict):
+        generated_raw = board.get("generated_at")
+        generated_dt = None
+        if isinstance(generated_raw, str) and generated_raw.strip():
+            try:
+                generated_dt = datetime.fromisoformat(generated_raw.replace("Z", "+00:00"))
+            except ValueError:
+                generated_dt = None
+        for age_key, stamp_key in (
+            ("seen_age_seconds_min", "odds_observed_at"),
+            ("seen_age_seconds_median", "odds_observed_at_median"),
+            ("price_move_age_seconds_min", "price_moved_at"),
+        ):
+            age = freshness.get(age_key)
+            if generated_dt is not None and isinstance(age, (int, float)) and not isinstance(age, bool):
+                # Absolute, not another age: an age computed on the server is
+                # stale by the time it renders, and the client already re-derives
+                # every other age it shows.
+                freshness[stamp_key] = (generated_dt - timedelta(seconds=float(age))).isoformat()
+            else:
+                # `null` STAYS `null`. An unknown observation time must not fall
+                # back to `generated_at` -- that would report a two-hour-old
+                # board as freshly quoted, which is the exact failure this field
+                # was added to expose.
+                freshness[stamp_key] = None
+        # The subtraction's own input, so a reader can check the arithmetic
+        # rather than trust it -- and so an artifact age of 40 minutes is
+        # visible as the reason a "fresh" board is not one.
+        freshness["artifact_generated_at"] = generated_raw
 
     board["ok"] = True
     board["server_time"] = _server_timestamp()
