@@ -220,6 +220,51 @@
     would repeat tonight's mistake at higher cost. It is also a code change to
     a shared worker, so it wants its own lane and `/preflight`. **Read the
     floor series first.**
+- **RESOLVED 2026-08-14 00:06Z — THE LEAK IS REAL. This supersedes the 23:33Z
+  retraction, which was over-cautious. Third and final revision of this claim.**
+  - The floor series spoke once it had ~45 minutes:
+    ```
+    window     FLOOR      p50      max
+    23:19     1670.0   1715.3   1877.9
+    23:24     1652.2   2176.0   3203.7
+    23:29     1762.8   2518.4   3167.7
+    23:34     2329.4   2410.5   2417.0
+    23:44     2025.0   2025.0   2367.5
+    23:54     2491.7   2492.7   2493.7
+    00:04     2588.9   2613.3   2651.2
+    ```
+  - **The decisive fact is not the slope, it is that the LATEST TROUGH (2588.9)
+    is above the FIRST WINDOW'S PEAK (1877.9).** A trough that clears an earlier
+    peak is a ratchet and cannot be an oscillation. That is the comparison
+    point-sampling could never make, and it is the one to reach for next time.
+  - Floor rose **1670 -> 2589MB in 45 min (~+1200 MB/hour)** — roughly 4x the
+    retracted 300MB/hour figure, which remains withdrawn as a *number* even
+    though the *phenomenon* is confirmed.
+  - **The oscillation collapsed as the floor rose**: spread was 1650<->3200
+    early, now 2589<->2651 (~60MB). Less headroom to swing in. This is WHY the
+    floor is readable now and was not at 23:33 — the instrument did not change,
+    the system did.
+  - **Board state matches exactly.** Guard needs `anon < 2196`; floor is 2589,
+    so it is over threshold at every sample. `MEMORY_GUARD_ABORT` 25 post-
+    restart, newest 00:06:31Z (seconds ago); `LAYER2_SHORTLIST` 12, last
+    23:56:47Z. It built while the floor was under the line and stopped when the
+    floor crossed it. **Board is freezing again at T+1.13h.**
+  - Prediction accounting, kept honest: predicted 4-5h, aborts first appeared at
+    34 min (which looked like falsification), sustained freeze at ~1.13h. **The
+    linear model was wrong in both directions** — early aborts were the peaks
+    crossing, the real onset was the floor crossing. Two different mechanisms
+    with the same log line.
+  - **`#417`'s guard is behaving CORRECTLY throughout.** It is refusing because
+    `anon` genuinely exceeds the floor. Do not touch the guard; the defect is
+    upstream of it.
+- **NEXT ACTION unchanged in kind but now justified:** the leak is real, so a
+  `tracemalloc`-class instrument is warranted where it was not two hours ago.
+  The gc census still cannot help (measured: 143KB reported of 546MB resident).
+  Scope it as its own lane with `/preflight` — it is a code change to a shared
+  worker.
+- Operational note: the board will need another restart to serve fresh data,
+  and each restart destroys the evidence window. **Capture the floor series
+  before restarting** — that is now a repeatable procedure, not a one-off.
 - Blocked by: nothing. Measurement-bound, not idea-bound.
 
 ### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
