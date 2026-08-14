@@ -1578,3 +1578,63 @@ back **oldest-first regardless of `direction`**.
 - Cost: ~4 hours, two deploys against wrong causes, three fixtures to kickoff
   with 3.8-day-old odds. Blast radius stayed small only because every deploy
   was pinned to one file on its service's live commit.
+
+### 2026-08-14 — A fallback CHAIN has a rung that fires; find it before costing the fix
+- What we believed: the 2026-08-14 model audit's headline finding (2) — that
+  `_fair_probability` "invents" a probability, that "a candidate with no model
+  probability at all is treated as a coin flip", and that "against a plus-money
+  side, a 0.5 default manufactures a large edge that then clears a threshold of
+  0.0". The derived plan called this a longshot selector shipping to users
+  daily and ranked it as the lane's urgent half.
+- What was actually true: the `0.5` terminal is **unreachable in production**.
+  The chain was `fair_probability -> model_probability -> confidence ->
+  score/100 -> 0.5`, and every `filter_candidates` call site is fed
+  `_score_candidates` output, whose `score_candidate` **always** assigns
+  `score`. So `score/100` always fires first. Exercised on the real function: a
+  typical score of 4.05 gives fair_prob 0.0405 and an edge of **-0.36**.
+  Model-free candidates were not published as coin flips — they were silently
+  REJECTED by a meaningless negative edge, under
+  `reason: "edge_below_threshold"`, which claimed an edge had been measured
+  when no model had ever run. **The sign was backwards and so was the outcome.**
+- How we found out: read what writes each key in the chain, then ran the real
+  function over one candidate per shape. Both steps are minutes.
+- The rule going forward: **when a defect is described as "it falls back to
+  X", the fix is worthless until you know which rung actually fires.** Removing
+  the last rung of a chain whose third rung always fires is an inert fix that
+  will be reported as shipped. Enumerate the chain, find who writes each key
+  upstream, and exercise the function once per shape before estimating impact
+  or urgency.
+- Corollary, and the more dangerous half: **a wrong rung can invert the sign.**
+  The audit predicted over-publication; the code produced silent exclusion.
+  A fix costed against the wrong direction can make things worse.
+- Second corollary: **a rejection reason that misreports its own cause is worse
+  than no reason.** `edge_below_threshold` made the shortlist's own diagnostics
+  argue the model had disagreed, on rows where no model existed. Reject by
+  name.
+- Cost: none — caught before any code shipped. The audit's *conclusion* (the
+  chain is broken, exclude rather than invent) survived; only its mechanism,
+  direction and severity were wrong.
+
+### 2026-08-14 — A MANGLED SHELL ARGUMENT NEARLY BECAME "THE LEDGER LOST MY WORK"
+- What I believed for about ninety seconds: the retraction and root cause I had
+  just pushed were NOT on `origin/main`. Four greps, all returning 0, against
+  files I had verified before pushing.
+- What was actually true: MSYS path conversion rewrote
+  `git show origin/main:.syndicate/lanes.md` into
+  `origin\main;.syndicate\lanes.md`. Git never saw a revision. The content was
+  on origin the whole time — `origin/main` IS the commit I pushed.
+- Why it nearly stuck: the failure mode was *plausible*. This tree has
+  concurrent sessions that overwrite shared ledger files, and "another session
+  clobbered it" is a real thing that happens here. A believable story plus a
+  zero result is enough to skip the check. The only reason I caught it is that
+  one variant of the command surfaced the mangled path in its error text.
+- **The rule: a zero result from a shell one-liner is a claim about the
+  COMMAND before it is a claim about the world.** Re-run it a second way before
+  believing it — here, `OM=$(git rev-parse origin/main)` then
+  `git show "$OM:path"`, which cannot be mangled. Same discipline as validating
+  the mtime probe against a control earlier the same session; the difference is
+  that time I did it first and this time I nearly didn't.
+- Standing note for this box: **`git show <ref>:<path>` is unsafe in bash here
+  whenever `<ref>` contains a slash.** Resolve the ref to a SHA first.
+- Cost: none. Caught before it was written to the ledger — which is the only
+  reason it belongs here as a near-miss rather than as a retraction.
