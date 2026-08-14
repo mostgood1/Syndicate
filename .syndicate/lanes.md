@@ -265,6 +265,38 @@
 - Operational note: the board will need another restart to serve fresh data,
   and each restart destroys the evidence window. **Capture the floor series
   before restarting** — that is now a repeatable procedure, not a one-off.
+- **INSTRUMENT PLAN (filed 2026-08-14 in THIS lane, deliberately not a new
+  one).** A separate attribution lane would strand every elimination recorded
+  above and push us to 5 OPEN against a cap of 3. Escalate cheapest-first:
+  - **STEP 1 — `glibc malloc_info()`, near-zero cost.** Dumps per-arena
+    totals: bytes in use vs bytes free-but-held. **This alone separates the two
+    surviving candidates** — large free-within-arena means FRAGMENTATION; arenas
+    mostly live means RETENTION. It is a `ctypes` call into libc, no dependency,
+    no per-allocation bookkeeping. `memory_observability.py` already binds
+    `mallopt`/`malloc_trim` the same way, so the pattern exists.
+  - **STEP 2 — `/proc/self/smaps_rollup`**, also free: `Rss`/`Pss`/`Anonymous`
+    for the process, to cross-check pid 39's share against the cgroup `anon`
+    the guard reads. Answers "is this even pid 39's memory" without a census.
+  - **STEP 3 — `tracemalloc`, ONLY if steps 1-2 say RETENTION.** It attributes
+    live bytes to allocation sites, which is what we would then need.
+  - **HAZARD, and it is why tracemalloc is step 3 and not step 1: it is NOT
+    free on this container.** It stores a traceback per allocation; on a worker
+    that already reaches its ceiling every ~1.1h, the instrument can push it
+    over and change the thing it measures. `learnings.md` already records that
+    worker periodic work is never free (`#241` caused a prod restart loop).
+    If it is used: `nframe=1`, enabled for a bounded window, never permanently,
+    and never during a slate the board depends on.
+  - **Do not reach for the gc census at any step** — measured blind: 143KB
+    reported of 546MB resident.
+- **Prospective file claim when a step ships** (none held yet; diagnostic
+  work needs no claim): `syndicate/features/shared/memory_observability.py`
+  (where the libc bindings live) and `scripts/run_refresh_worker.py` (pid 39,
+  the only process worth instrumenting). **Neither is claimed by any OPEN lane
+  as of 2026-08-14 00:3xZ** — verified, not assumed.
+- **Deploy exposure when it ships:** refresh-worker `.py` only, no
+  `render.yaml`. But it is a code change to a shared worker under active
+  memory pressure, so it takes its own `/preflight` and its own measurement
+  window. Do not bundle it into an incident restart.
 - Blocked by: nothing. Measurement-bound, not idea-bound.
 
 ### nfl-day-of-game — OPEN — opened 2026-08-13 — session: nfl-day-of-game
@@ -448,7 +480,20 @@ opened, `_fetch_scoreboard` returns None under pytest.
 - Verification for this lane is now MET in production. What remains open is
   only whether 7-8s is acceptable, which is a different question.
 
-### quote-join-enrich-cost — OPEN — opened 2026-08-13 — session: memory-guard
+### quote-join-enrich-cost — CLOSED 2026-08-14 — all three verification criteria MET
+- Criteria as written, checked one by one: (1) evening slate MLB `tail_s` < 10s
+  -> **7.17s**; (2) cause named in the lane BEFORE the change shipped -> the
+  join scan, `19.86s per million rows walked`, R²=0.918; (3) before/after from
+  the SAME instrument on comparable slates -> `SLOW_SEGMENT_PROFILE` 21-54s at
+  18:07-18:11Z vs 7-8s at 00:11-00:18Z.
+- Result: **21.5x fewer rows walked per call (216,135 -> 10,043), board-build
+  21-54s -> 7-8s.** `join_s` is still ~100% of the cost, so the remaining lever
+  is the residual ~10k rows/call — a NEW question, not this lane's.
+- Only measurable because `SYNDICATE_SLOW_ROW_TOTAL_SECONDS`/
+  `SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS` were set to 1; at the 5s default a
+  working index is indistinguishable from a broken instrument.
+
+### quote-join-enrich-cost (detail below, kept for the file/line map) — session: memory-guard
 - Goal: the MLB board-build's ~33s per slow game is attributed to a named
   cause inside `enrich_block` and then cut. Testable outcome: on a comparable
   evening slate, `SLOW_SEGMENT_PROFILE tail_s` for MLB drops below 10s with
