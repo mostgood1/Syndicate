@@ -54,6 +54,42 @@ SEEDS_PER_GAME = 300
 PROFILE_NAME = "nfl_v1"
 OFFENSIVE_PLAY_TYPES = frozenset({"pass", "run"})
 
+# THE SCHEDULE AND THE PLAY-BY-PLAY SPELL TWO CLUBS DIFFERENTLY, and the only
+# symptom is a silently league-average projection for those games.
+#
+# Measured 2026-08-13 by diffing the two code sets directly:
+#     schedule_preseason_2026.csv : ... LAC LAR ... WSH   (32)
+#     nflverse pbp_2025.csv       : ... LA  LAC ... WAS   (32)
+#     in schedule, absent from pbp: ['LAR', 'WSH']
+#     in pbp, absent from schedule: ['LA',  'WAS']
+#
+# `team_rating` matches `posteam`/`defteam` by exact string, so Washington and
+# the LA Rams found zero qualifying plays in either season and fell through to
+# the `neutral_no_data` branch -- a real 0.0/0.0 rating that produces a
+# confident-looking projection carrying no team information at all. Confirmed
+# on production the same day: every club reported `prior_season_fallback`
+# except exactly these two (`[neutral_no_data/prior_season_fallback]` on
+# MIA@WSH, `[prior_season_fallback/neutral_no_data]` on LAR@KC).
+#
+# Applied inside `team_rating`, which is the one function BOTH generators use
+# (the preseason script imports it rather than reimplementing it), so the
+# regular-season and preseason paths cannot drift apart on this.
+#
+# Deliberately narrow: only codes that provably differ between the two feeds
+# on real data. This is not a general alias table -- `team_aliases` is that,
+# and reaching for it here would pull display-name resolution into a numeric
+# ratings path.
+_PBP_TEAM_CODE_ALIASES: dict[str, str] = {
+    "LAR": "LA",
+    "WSH": "WAS",
+}
+
+
+def pbp_team_code(team: str) -> str:
+    """The schedule's code translated into the play-by-play's spelling."""
+    key = str(team or "").strip().upper()
+    return _PBP_TEAM_CODE_ALIASES.get(key, key)
+
 
 def _pbp_path(season: int) -> Path:
     return DATA_ROOT / "tracking" / "nflverse" / "pbp" / f"pbp_{season}.csv"
@@ -114,7 +150,14 @@ def team_rating(
     """Returns (offense_rating, defense_rating, rating_source_tag). Falls
     back to the entire prior season when this season has no qualifying
     plays yet for this team (week 1, or an early bye); defaults to neutral
-    0.0 when neither source has data, rather than raising."""
+    0.0 when neither source has data, rather than raising.
+
+    The team code is translated into the play-by-play's spelling first --
+    see `_PBP_TEAM_CODE_ALIASES`. Without it Washington and the LA Rams match
+    zero plays and land on the neutral branch, which is indistinguishable
+    downstream from a genuine data outage.
+    """
+    team = pbp_team_code(team)
     offense = _mean_epa(current_plays, team=team, side="offense", before_week=week)
     defense_allowed = _mean_epa(current_plays, team=team, side="defense", before_week=week)
     if offense is not None and defense_allowed is not None:
