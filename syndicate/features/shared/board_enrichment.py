@@ -473,6 +473,23 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
         return coverage
     if degeneracy:
         coverage.update(degeneracy)
+
+    # `#425` gap 1, and the two checks are DIFFERENT questions on purpose.
+    # Degeneracy asks "did this RUN collapse"; skill asks "has this MODEL ever
+    # been evaluated". A model with real historical skill still emits a
+    # constant when today's input goes missing, and a model that varies
+    # plausibly can still have never been measured -- neither check implies
+    # the other, and NFL was the only one of seven producers answering the
+    # second.
+    try:
+        from syndicate.features.shared.projection_skill import attach_projection_skill
+
+        skill = attach_projection_skill(grid, sport=sport)
+    except Exception:
+        _LOGGER.exception("PROJECTION_SKILL_SCAN_FAILURE sport=%s", sport)
+        return coverage
+    if skill:
+        coverage.update(skill)
     return coverage
 
 
