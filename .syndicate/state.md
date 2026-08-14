@@ -558,7 +558,7 @@
   `prior_season_fallback` on every club except exactly those two. Fixed in
   `team_rating` (the one function both generators share), deployed `111a5000`
   — **but NOT observable until the next season-projection autorun, due
-  ~08-14 21:00 CDT. OWNER UNASSIGNED.** `[measured 08-13; effect unverified]`
+  ~08-14 16:00 CDT (21:00Z). OWNER UNASSIGNED.** `[measured 08-13; effect unverified]`
 - **NFL odds refresh is HEALTHY and was never the defect.** A 13-minute
   pregame→live transition lag was misread as a stoppage. The loop flips
   `phase=live` on its own and live games reached 117/99 quote rows at 1.3-min
