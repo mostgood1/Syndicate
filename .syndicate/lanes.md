@@ -6,7 +6,118 @@
 
 ## OPEN
 
-### recommendation-lane-correctness — OPEN — opened 2026-08-14 — session: model-audit
+### clv-without-settlement — OPEN — DIAGNOSIS DONE, DESIGN BLOCKED ON ONE DECISION — opened 2026-08-14 — session: model-audit
+- Goal: audit §7 ranked fix **#1** — produce `clv_pct` per recommendation with
+  no dependency on grading, outcomes or `settle_result`. The audit calls this
+  the one measurement that unblocks §4's threshold, §6's cadence decision, and
+  every "where should modelling effort go" question.
+- **READ-ONLY SO FAR. No files claimed, no code changed.**
+
+**FINDING 1 — the CLOSE side is in far better shape than the audit implies,
+but not where it says.** `[measured 08-14 21:3xZ via /api/ops/odds-history/inspect]`
+
+      sport/date        markets   closing_line STAMPED   history_points > 0
+      mlb  2026-08-13       1074          18  ( 1.7%)        1074 (100%)
+      wnba 2026-08-13        119          11  ( 9.2%)         119 (100%)
+      mlb  2026-08-14       3361           0  ( 0.0%)   (no transitions yet)
+
+  The stamp fires only when the pregame->live transition is OBSERVED
+  (`odds_refresh_tracking.py:1599` requires `was_confirmed_pregame` and a prior
+  `is_live is False`). Only 81 of 1074 MLB markets were ever seen live at all.
+  **Building the join on the STAMPED close yields ~18 rows.** But every market
+  has history (median 20 points), so a close is DERIVABLE for ~100% by taking
+  the last pregame observation before `commence_time`.
+- **Design consequence:** the two are NOT the same measurement and must never be
+  mixed silently — the `book_margin_model` lesson. A CLV row must carry
+  `close_source` = `observed_transition` (gold, ~2%) vs `last_pregame_quote`
+  (derived, ~100%) plus `close_age_seconds` = commence_time - captured_at, so a
+  close taken 2h early (the pregame sweep cadence) is visible as such.
+
+**FINDING 2 — THE BLOCKER. The OPENING side is effectively unavailable, and the
+audit's premise that this is reachable "without touching the 367 MB chunk path"
+does not hold.** `[measured 08-14]`
+  - `data/prediction_ledger.json` holds **3 records** (it is the portfolio's
+    positions — the `pending_count: 3` on `/api/portfolio/summary`), NOT the
+    8,276 recommendations.
+  - The 8,276 recommendation records WITH their opening `quote` are written to
+    `evaluation_ledger_chunks/<date>.jsonl` — the 367 MB path.
+  - `board_state_ledger_recorded_fingerprints` is only per-date HASHES; it
+    records THAT a board state went into those chunks, not the openings.
+  - **The chunks are not merely expensive, they are being SKIPPED at read time.**
+    Observed in refresh-worker logs 21:24:54Z:
+    `[intelligence_evaluation] SKIP_OVERSIZED_LEDGER_CHUNK path=2026-08-05.jsonl
+    bytes=367229260 ceiling=256000000`. And 19 of 21 dates do not exist at all.
+  - So openings are unreadable for every date, including the two that exist.
+
+**THE DECISION THIS NEEDS (not mine to take alone — it is a build):**
+  - **(a) Record a compact opening snapshot going forward.** One small JSONL per
+    date, first-sighting-only per `market_id`: sport, market, side, price,
+    bookmaker, books_quoting, fair_prob, model_prob, captured_at. Bounded by
+    distinct market_ids/day (~3.4k for MLB), so kilobytes, not 367 MB. The
+    joiner then needs no chunk access at all. **Cost: first real CLV number is
+    ~24h away, not today.** This is what "unrecorded is unrecoverable" implies.
+  - **(b) Recover openings from the 08-05/08-06 chunks.** Rejected unless
+    overridden: they exceed the read ceiling and are already skipped, so this
+    means raising a guard that exists for OOM reasons on a 4 GB worker, to
+    recover 2 dates.
+- **Recommendation: (a).** It is the audit's own "smallest change that starts
+  capturing CLV" once Finding 2 is accounted for, and it does not touch the
+  memory-sensitive path the two OPEN memory lanes are working.
+- **NEXT ACTION:** get a decision on (a) vs (b). If (a), claim
+  `pipeline/intelligence_state.py` (writer) — **currently held by
+  `layer2-board-freshness`, so that lane must be consulted first.**
+- Files: none claimed yet, deliberately.
+
+### recommendation-lane-correctness — OPEN — 4 SHIPPED+VERIFIED, 1 HELD BACK, 1 UNMEASURED — opened 2026-08-14 — session: model-audit
+- **CHECKPOINT 2026-08-14 21:3xZ — STATUS BY ITEM:**
+  - **A3 uninformative-EV — CLOSED-VERIFIED.** web `ea1d2ed6` + worker
+    `29ed6de1`. 5/5 predictions held at 19:58:41Z incl. the control.
+  - **Ranked #3+#4 — LIVE, P1 VERIFIED ONLY.** worker `79148d8e` (20:13Z).
+    `recommendation_count` 145→148 on a post-deploy cycle; lane did not empty.
+    P2 confounded by 3.9h slate drift. **P3 UNMEASURED.**
+  - **Instrument (`FILTER_CANDIDATES` always emits) — LIVE, UNMEASURED.**
+    worker `7b1f3fdc` (21:01Z). No line observed yet.
+  - **A3a score monotonicity — COMMITTED, DELIBERATELY NOT DEPLOYED.**
+    `28291eb6`. corr(reliability, score) = −0.8312 on 156 negative-value rows
+    vs +0.8560 control on 98 positive. **Do not deploy without a pool-side
+    counter** — its effect is on SELECTION and is invisible in the served
+    shortlist, which returns only survivors.
+  - **Ranked #5 (unify devig ordering) — NOT STARTED, now UNCONTESTED.** The
+    second "Model audit" session (`local_c5a93aaf`) was handed the split and
+    stopped responding; user reassigned its work here. #5 touches
+    `opportunity_signals.py`, which this lane holds.
+- **NEXT ACTION for whoever picks this up:** get a `FILTER_CANDIDATES` line.
+  It is the only unmeasured thing blocking #3/#4 from closing, and the
+  instrument that produces it is already live. Poll narrow (90s) Render log
+  windows on `srv-d91dpertqb8s73co8ls0` — wide windows saturate at the 100-line
+  cap and return the TAIL, so "0 occurrences" from a wide window means nothing.
+- **Nothing of value is uncommitted.** Main-tree edits to the 7 lane files are
+  duplicates of the five pushed `deploy/model-audit-*` branches. Worktree
+  `C:/tmp/wt-a3` is disposable.
+- **CONSOLIDATION 2026-08-14 21:2xZ — TWO SESSIONS ARE ON THE SAME AUDIT.**
+  A second session titled "Model audit" (`local_c5a93aaf`) is live on
+  `.syndicate/audit_2026-08-14_models.md`. Handoff sent naming exactly what is
+  shipped, what is held back, and the file claims. The split agreed FROM MY
+  SIDE (their reply not yet received — do not treat this as bilateral):
+  - **MINE, shipped:** ranked fixes **#3 + #4** (`79148d8e`, live 20:13Z),
+    the A3 uninformative-EV rule (`ea1d2ed6` web / `29ed6de1` worker), and the
+    instrument fix (`7b1f3fdc`, live 21:01Z).
+  - **MINE, committed and deliberately NOT deployed:** `28291eb6`
+    (score monotonicity). Flagged to them explicitly as do-not-deploy until a
+    pool-side counter exists — its effect is on SELECTION and is invisible in
+    the served shortlist.
+  - **CONFLICT FLAGGED, UNRESOLVED:** ranked fix **#5** (unify devig ordering)
+    touches `opportunity_signals.py`, which this lane claims AND has an
+    undeployed commit against. Whoever takes #5 must take the file handover
+    explicitly rather than editing around the claim.
+  - **THEIRS, free of my claims:** #1 (CLV without settlement — the audit's own
+    "everything else is worth less until it exists"), #2, #6, #7, #8, #9, #10.
+  - **SHARED BLOCKER:** the intelligence state loop is stalled (enabled, 60s
+    interval, snapshot 34+ min old) while refresh-worker crashes repeatedly in
+    `generate_smartsim2_nfl_projections.py`. Co-occurrence only, causation
+    UNTESTED. Any verification needing a fresh intelligence cycle is currently
+    unmeasurable — that is not a reason to credit or blame either session's
+    changes.
 - Goal: no published shortlist row derives its edge from a fabricated
   probability or from a vigged price. Testable outcome, all on the served
   `/api/board/layer2-shortlist`: (a) zero rows whose fair probability came from
@@ -871,7 +982,7 @@ the FIRST for a model it did not originally scope.**
   plus `check_deploy_safety.py` still reporting a sane figure on live data.
 - Blocked by: none. No deploy — this is an operator-side script.
 
-### layer2-board-freshness — CLOSED-VERIFIED 2026-08-14 — 3h clean window, all five criteria met — opened 2026-08-14 — session: layer2-freshness
+### layer2-board-freshness — CLOSED-VERIFIED 2026-08-14 (memory follow-on lives on branch `memory/overview-sum-to-max`, undeployed) — 3h clean window, all five criteria met — opened 2026-08-14 — session: layer2-freshness
 - **CLOSED ON THE FULL 3h READ (16:16:56-19:24Z, 187.3 min, commit `294f9ca9`
   unchanged, verified by SHA).** 37 refreshes = 11.9/hour against 1.7/hour;
   23 of them via the new fast path; longest gap 11.8 min against 104.7;
@@ -3429,3 +3540,192 @@ temporal validation. Neither is a word-list problem.
   scorer that was blind — it read only `structured_response` and M1 answers in
   `visuals.tables`. Fixed the harness before drawing a conclusion. **Check what
   makes the instrument read non-null before believing a null.**
+
+### board-ui-visible-defects — OPEN — opened 2026-08-14 — session: board-ui-defects
+- Goal: Lane E + the "do now" bundle of `plan_2026-08-14_ui.md`. Testable
+  outcome, all four generic-board sports (nfl, ncaaf, ncaab, soccer) at 1440
+  and 390: `documentElement.scrollWidth == clientWidth` (today 1468 vs 1440);
+  NCAAF's default `Game` tab renders a populated panel after a round trip
+  through another tab (today: 187px blank card); the tab a user selected
+  survives a `game_board.js` poll swap; no mid-word team-name break at 390.
+- Files (exclusive to this lane):
+  - `syndicate/templates/shared/_game_card_ncaaf.html` — E1 tab/panel id
+    mismatch, unreachable panels, ARIA.
+  - `syndicate/templates/shared/_game_card_generic.html` — ARIA/tab ids.
+  - `syndicate/templates/shared/_game_card_mlb.html` — ARIA/tab ids.
+  - `syndicate/templates/shared/game_cards_board.html` — E6 drops the
+    `mlb/board.js` special case.
+  - `syndicate/static/shared/game_board.js` — E4 tab-state preservation,
+    arrow-key nav, drop the duplicate Enter/Space handler.
+  - `syndicate/static/shared/standalone_shell.css` — E2 box-sizing reset.
+  - `syndicate/static/shared/dense_cards.css` — E3 mobile stacking, touch
+    targets, tabular figures.
+  - `syndicate/static/mlb/board.js` — E6 delete (byte-identical copy).
+  - `syndicate/static/mlb/cards_exact.css` — tabular figures, tab targets.
+  - `syndicate/static/nba/cards_source.css` — tabular figures.
+  - `syndicate/static/wnba/cards-parity.css` — tabular figures.
+  - `syndicate/features/mlb/season.py` — E6 removes the `cards_script`
+    pointer at the deleted file. ONE line; no other lane claims this file.
+  - `syndicate/features/ncaaf/cards.py` — E5 kickoff formatting.
+  - `syndicate/features/nfl/cards.py` — E7 duplicate nav pills.
+  - `tests/test_game_board_ui.py` (new).
+  - Collision check RUN, not assumed: `.claude/hooks/lane-guard.py`'s own
+    `_claims()` executed over `lanes.md` yields 19 claimed paths across the
+    OPEN lanes; none is a template, a stylesheet, a `static/` file, or any
+    of the three feature modules above. `board-ui-freshness-slip-books`,
+    which the plan names as the blocking lane, is CLOSED as of 2026-08-14 —
+    the plan's "explicitly not now" line about its file set is stale.
+- Hypothesis (E2, the only causal claim here; the rest are defects read off
+  the DOM): the 28px overflow is `box-sizing: content-box` on the four
+  sports whose stylesheets carry no global reset, NOT a layout rule —
+  `.cards-game-card` is `width: min(100%, 1540px)` + 13px padding + 1px
+  border, which is 1448px inside a 1440px viewport under content-box and
+  exactly 1440 under border-box.
+- Falsification test: if a border-box reset lands and `scrollWidth` is still
+  > `clientWidth` on any of the four, the overflow has a second source and
+  the one-line diagnosis in `syndicate.html:8` is incomplete.
+- Correction to the plan, found while scoping E3 and worth writing down
+  before the work starts: the plan and the audit both attribute the mobile
+  mid-word name breaking to "the card grid does not stack". `.cards-grid` is
+  already `grid-template-columns: 1fr`. The horizontally scrolling ~250px
+  row in `nfl_mobile.png` is `.cards-scoreboard` — `grid-auto-flow: column`
+  with `grid-auto-columns: minmax(280px, 1fr)`, narrowed to 260px at
+  ≤767px but never switched to row flow. The fix is in the strip, not the
+  grid.
+- Verification: re-run the audit's own probe (overflow at both widths, per
+  sport) against a locally served build, plus a trusted click-through of
+  every NCAAF tab and a poll-swap simulation. Production numbers only after
+  a web deploy, which is a separate decision.
+- Blocked by: none.
+
+#### board-ui-visible-defects — RESULT 2026-08-14 — Lane E + the do-now bundle, MEASURED, NOT DEPLOYED
+
+**Instrument first.** `scripts/ui_layout_probe.py` (new) is the audit's probes
+made re-runnable, and it was validated by pointing it at PRODUCTION before
+touching anything. It reproduced the audit exactly — which is what makes its
+"OK" afterwards mean something:
+
+    PRODUCTION (web f9aa2399/8ff4e513, unchanged, 2026-08-14):
+      ncaaf desktop  16 cards  28px overflow  tab->missing panel `game`
+                                              unreachable panels identity,coverage
+                                              TRUSTED click on `game` FAILS
+      ncaaf mobile   16 cards  40px overflow  48 tabs under 44px
+      nfl   desktop  16 cards  28px overflow
+      nfl   mobile   16 cards  20px overflow  64 tabs under 44px
+      soccer/ncaab   28px desktop, 20px mobile
+
+    LOCAL, after this lane:
+      ncaaf/nfl/soccer, both widths:  0px overflow, 0 orphan tabs,
+      0 unreachable panels, every trusted tab click leaves exactly one panel
+      active, 0 tabs under 44px.
+
+**Mobile overflow was 20-40px, not the 28px the audit reported** — the audit
+measured desktop only and the number was carried over. NCAAF's 40px is the
+worst on the platform.
+
+Item by item, with what was actually true where it differed from the plan:
+
+- **E1** NCAAF tab/panel ids. Fixed by deriving the rail FROM the panel list in
+  one `card_tabs` structure, not by editing the string — the same edit also
+  closed the four unreachable panels (`coverage`, plus the blend trial, the
+  reasons list and the matchup comparison, all conditional and all previously
+  shipped with no tab). Card height on the default tab: 187px blank -> 552px.
+- **E2** Overflow. Diagnosis in `syndicate.html:8` was CORRECT but INCOMPLETE.
+  The box-sizing reset took 28px -> 2px; the residual 2px is
+  `.standalone-app-header`'s `width: min(1640px, calc(100vw - 16px))`, where
+  `100vw` includes the scrollbar gutter. Both fixed; 0px measured. The reset
+  went into `dense_cards.css`, NOT `standalone_shell.css` as the plan said:
+  that file is behind `show_standalone_cards_header` and would miss any board
+  whose module is not cards/game_detail/season_review. Scoped to
+  `body.cards-body` so unrelated pages keep content-box.
+- **E3** The plan's causal claim was WRONG and it cost a fix. "The mobile card
+  grid does not stack" — `.cards-grid` has been `grid-template-columns: 1fr`
+  the whole time. The mid-word breaking had TWO sources, both in the card head:
+  (1) `.cards-scoreboard` kept `grid-auto-flow: column` at every width, so the
+  strip stayed a scrolling row of ~260px cards; (2) `.cards-strip-head` kept
+  the matchup and the kickoff cluster side by side, splitting a 328px head
+  189/129 so each team block got 68px and the NAME inside it 30px. "North
+  Carolina" cannot be rendered in 30px by any wrapping rule. Also
+  `overflow-wrap: anywhere` -> `break-word` (`anywhere` breaks even when the
+  line has a legal wrap point). Measured name box, 390px: 52px -> 90px in the
+  strip, 42px -> 107px in the card head.
+- **E4** Tab state across the poll. Verified against the REAL swap path, not a
+  simulation: select a tab, dirty the grid so the `innerHTML ===` guard cannot
+  short-circuit, dispatch the window `focus` the polling loop listens on,
+  confirm the swap happened (marker gone) and the selection survived.
+- **E5** Kickoff. `kickoff_label` is a NEW key, deliberately — `kickoff` is
+  parsed downstream by `ncaaf/betting_card.py:_kickoff_date_and_label`, so
+  reformatting in place would have traded a cosmetic defect for a broken
+  betting card. Central, matching every other display surface. Renders
+  `Sat Aug 29, 11:00 AM CDT` from `2026-08-29T16:00:00.000Z`.
+- **E6** `static/mlb/board.js` deleted (53 lines = `game_board.js`'s first 52
+  plus an early IIFE close). It was already dead: `game_cards_board.html`
+  carried a special case skipping it. `/mlb/season/2026` now serves
+  polling.js + board_rail_toggle.js + game_board.js and 200s.
+- **E7** Duplicate nav. The duplication is NOT NFL-only — every sport setting
+  `cards_control_links` overlaps its own `module_links` (nfl, ncaaf, ncaab,
+  nba, nhl, wnba, soccer). MLB alone de-duplicated, in Python. Fixed once in
+  `_date_controls.html` for all of them.
+- **Do-now** `tabular-nums` on the numeric classes in all four sheets
+  (computed `normal` -> `tabular-nums`, verified); mobile tab targets 28px ->
+  44px (touch-target failures nfl 64 -> 0, ncaaf 48 -> 0); the full ARIA tab
+  pattern in all three card templates, verified with REAL key events:
+  roving tabindex, focus follows selection, Home/End, wrap-around. The
+  redundant Enter/Space handler (which ran `activateTab` twice) is gone.
+
+**FOUND, NOT FIXED, and deliberately so:**
+- The DESKTOP strip still breaks names mid-word on long ones ("Jackso nville
+  State") — a 280px strip card gives each team ~52px. Out of Lane E's stated
+  exit criteria (390px only) and the fix is a design decision: either shrink
+  and truncate as soccer already does at 13px, or stack the two team rows.
+  Needs the user's call, not a unilateral restyle of four sports.
+- **This directly contradicts Lane G1.** G1 says raise soccer's 13px team
+  names to 16px. That 13px + `white-space: nowrap` + ellipsis is a DELIBERATE
+  fix, commented in `dense_cards.css`, for exactly this problem on long club
+  names. Do not "fix" it without solving the 52px box first.
+- `ncaaf/betting_card.py:_kickoff_date_and_label` groups by the UTC date of
+  the kickoff, not the Central one — the exact trap `features/shared/
+  timezone.py` documents. A Saturday-evening kickoff buckets to Sunday. One
+  line to fix, but it moves user-visible day grouping with no measurement
+  behind it, and the file is outside this lane.
+
+**Tests:** `tests/test_game_board_ui.py` (new, 12 tests) asserts the
+tab-id/panel-id RELATIONSHIP rather than rendered strings — the NCAAF defect
+was invisible to every existing test because it lived between two attributes.
+Also `tests.test_archives` (the CI suite) 383 pass, plus the ncaaf/nfl/soccer/
+market-board/template suites.
+
+**NOT DEPLOYED, and nothing is committed.** Every number above is local or
+production-before. Web deploy is a separate decision and the user's call.
+
+#### board-ui-visible-defects — CLOSED-VERIFIED 2026-08-14 — deployed and measured IN PRODUCTION
+
+`deploy/board-ui-lane-e` = `aadcde77` (web's own live `5382943c` + the single
+commit `cf066942`, NOT main's tip, which was 28 commits and four other lanes
+ahead). Deploy `dep-d9vokalbedkc73erc9bg`, live 21:42:56Z.
+
+Every criterion in the lane's Verification line met, read off PRODUCTION with
+the same instrument that recorded the before-state:
+
+    overflow 1440 / 390, ncaaf+nfl+soccer+ncaab   28px / 20-40px  ->  0 / 0
+    ncaaf default tab (trusted click)             0 panels, 187px ->  1 panel, 556px
+    ncaaf orphan tabs / unreachable panels        1 / 2           ->  0 / 0
+    mobile tabs under 44px                        64 nfl, 48 ncaaf, 4 soccer -> 0
+    font-variant-numeric on numeric classes       normal          ->  tabular-nums
+
+Full row, including the honest reading of the desktop touch-target count that
+ROSE (48 -> 64 on ncaaf, because a fourth tab now exists where a panel was
+previously unreachable — not a regression), is in `deploys.md`.
+
+Carried forward, NOT fixed, deliberately: the desktop strip still breaks long
+names mid-word ("Jackso nville State") in a ~52px box — a design decision, and
+it CONTRADICTS Lane G1's "raise soccer's 13px names to 16px", since that 13px
++ ellipsis is the documented fix for this same problem. And
+`ncaaf/betting_card.py:_kickoff_date_and_label` groups by UTC date, so a
+Saturday-evening kickoff buckets to Sunday.
+
+- **FINAL, 2026-08-14 ~21:5xZ:** shipped and closed. `cf066942` (fix) and
+  `ee590ed5` (`prod_after.json`, the reading) are on `origin/main`; web runs
+  `aadcde77` = its own prior live commit + the fix, deploy
+  `dep-d9vokalbedkc73erc9bg`, live 21:42:56Z. Nothing of this lane remains in
+  the working tree. Marker `.syndicate/.current-lane` cleared.

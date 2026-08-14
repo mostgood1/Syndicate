@@ -5,6 +5,134 @@
 > **Seeded 2026-08-13 from prior session notes. Lines marked `[unverified]`
 > must be confirmed against the dashboard before anyone relies on them.**
 
+## >>> START HERE — HANDOFF FOR THE NEXT SESSION (2026-08-14 ~21:30Z) <<<
+
+**`docs/ai_context/handoff_tier0_and_board_engine.md`** — self-contained, written
+for a cold start. Then `.syndicate/plan_2026-08-14_program.md` for sequencing.
+
+**Single next action: ship `086702ae` (branch `memory/overview-sum-to-max`).**
+refresh-worker OOM-killed at 20:03:11Z and nothing is deployed to stop the next
+one. A 522MB worker died in 25s inside one 8-sport hydrated pass. Gate: 223
+passed, the one failure proven pre-existing. There is no idle window — poll the
+deploy gate every 10s and fire the POST in the same step as the CLEAR.
+
+Deployed and verified: `530fc5d8` only. Held on branches: `086702ae` (memory),
+`9ec20a06` (odds cadence — needs `soccer-odds-coverage` sign-off and an OddsAPI
+spend call). Local only: `0ddecded`.
+
+
+## BOARD / INTELLIGENCE ENGINE AUDIT — notes exist, ~70% of the brief `[measured 08-14 21:xxZ]`
+
+**Read `.syndicate/audit_2026-08-14_board_engine_SYNTHESIS.md` first** — it
+carries the brief's five deliverables. Passes 1-3 are the working.
+
+Structural facts now measured, none previously in this ledger:
+- Board path: **506 files / 238,071 lines**, 43 over 1,000 lines.
+- **24 import cycles. 24 hub modules >10 importers** — `rank_board` (29) and
+  `game_board_contract` (28) are board CONCEPTS carrying hub load.
+- **164 of 390 modules statically unreachable** from any route or loop entry.
+  **SHORTLIST, NOT A DELETION LIST** — thread targets and registries not followed.
+- **38 functions whose every return is `None`/`[]`/`{}`.**
+- Config: web **73** keys, workers **104**, code reads **127**.
+- **42 sites define or convert a probability.** The `edge`/`EV`/`confidence`
+  collisions are probably ONE substrate problem, not three bugs.
+- **`model_skill` and `min_value_pct` have ZERO defining functions.**
+- **19 freshness / 23 market-movement / 18 prob<->odds implementations.**
+- Neutral-default surface: 40x `0.5`, 240 bare `except: pass`, 388 filters that
+  return their input unchanged on empty.
+- **91 of 390 modules branch on liveness; there is no single pregame/live
+  boundary** — it is a cross-cutting conditional, not a seam.
+- Chat reads the shortlist ARTIFACT directly (2 of 4 `read_layer2_shortlist`
+  call sites are `ask_the_syndicate_data.py`), so chat staleness IS artifact age.
+
+**Proposed invariant (§7), not yet implemented:** a probability, edge or EV not
+computed from data must be `None`, never a number — enforced in
+`game_board_contract`, which 28 modules import and every card passes through.
+
+**BLOCKED ON INPUTS, not effort:** §9 needs the shadow candidate ledger turned
+ON (it is off, so filter precision is structurally unmeasurable); §10's target
+architecture needs the §5 glossary, which must be built by READING — two
+mechanical attempts failed and are recorded.
+
+**GUARD ON TWO LISTS IN THAT AUDIT.** The 164 unreachable modules and the 71
+configured-but-unread env keys are shortlists. The env list contains
+`MLB_LIVE_LENS_DIR`, whose only reader is a VENDORED module called at import
+scope; `learnings.md` records that deleting it would have broken MLB live-lens.
+The scan excluded `vendor/` and `scripts/` — the exclusion that produced seven
+false positives before.
+
+**Three of the audit brief's own "known" inputs are wrong:**
+`static/mlb/board.js` does not exist (cited twice), the devig count is not
+settled at 5, and `.claude/worktrees/` holds full repo copies that triple-count
+any unscoped grep.
+
+## SESSION / LANE CENSUS `[measured 08-14 20:4xZ]`
+
+- **TWO LIVE SESSIONS SHARE ONE LANE.** `Model audit` and
+  `Audit 2026-08-14 models` are both active and both on
+  `recommendation-lane-correctness`. **`lane-guard` matches on SLUG, so it
+  cannot separate them, and `.current-lane` is single-valued, so it cannot
+  represent them.** Two sessions editing one file set with the guard providing
+  neither any protection from the other, and nothing in the harness reports it.
+- **MOST OPEN LANES ARE ORPHANED — owner session gone, file claims still held.**
+  Only `recommendation-lane-correctness` has a live session. `soccer-odds-coverage`,
+  `soccer-projection-gap` (board-ui), `anon-allocation-site`,
+  `refresh-worker-anon-leak` (memory-guard), `mlb-props-regen` and
+  `ask-board-candidates` have none. This is why `.current-lane` thrashed between
+  sessions that no longer exist, and why a cross-lane override was needed for
+  `live_refresh_loop.py` — blocked by a lane whose owner had finished.
+- **`recommendation-lane-correctness` is disciplined, not sprawling** —
+  correcting an over-read of my own. It claims 6 things
+  (`recommendation_engine.py`, `layer2_board.py` A3/A4, `opportunity_signals.py`,
+  `blueprints/intelligence.py`, 4 test files), each expansion carrying its own
+  collision check. It took `blueprints/intelligence.py` at 19:2xZ **after**
+  `board-ui-freshness-slip-books` closed. The paths that made it look like a
+  land-grab are in its COLLISION-CHECK line as files claimed elsewhere.
+  **A regex over a hand-written ledger read "NOT claimed, deliberately" as a
+  claim.** Read the block, not a pattern match over it.
+
+## >>> REFRESH-WORKER DEPLOY FREEZE — TRAIN FORMING 2026-08-14 20:3xZ <<<
+
+**Do not fire an ad-hoc refresh-worker deploy. Add to the train instead.**
+
+WHY. refresh-worker took a deploy every ~20 min this evening — `530fc5d8`
+15:42, `214f5151` 15:59, `294f9ca9` 16:16, `29ed6de1` 19:49. **Every one resets
+every session's measurement window.** One 3h window was lost to this and had to
+be re-run. With 4+ sessions shipping, ad-hoc deploys mean we invalidate each
+other's evidence faster than we can gather it.
+
+WHY BATCHING IS ALLOWED HERE, against `learnings.md`'s "one substantive change
+per deploy while diagnosing": that rule is about changes contending for the
+**same metric**. A train is safe when each rider names a metric no other rider
+can move. State yours when you board.
+
+BOARDING
+1. Name your branch/commits, and **the ONE metric that is yours**.
+2. Metrics claimed so far:
+   - `layer2-freshness`: memory PEAK on one hydrated overview pass (MB).
+     Branch `memory/overview-sum-to-max` = `c39569ef` -> `946d77e3` ->
+     `086702ae`.
+   - `recommendation-lane-correctness` (model-audit): shortlist row composition
+     / EV / which rows seat a slot. Asked, not yet confirmed.
+3. **Held OFF the train deliberately**: `odds/pregame-cooldown-per-sport`
+   (`9ec20a06`). It changes odds cadence and would confound
+   `soccer-odds-coverage`'s per-league measurement. Needs that lane's sign-off.
+
+MECHANICS
+- One deploy, assembled on `origin/main`, gate + `/preflight` first.
+- **There is no idle window**: MLB sims run near-continuously with ~60-90s
+  lulls, so the deploy must be fired from inside a detected lull. A 10s-interval
+  poller that fires the POST in the same step as the CLEAR is the method that
+  worked at 15:36 (zero jobs killed). A first `CLEAR` is often just a lull
+  between sims — confirm with spaced samples.
+- Then a **30-minute measurement freeze**, no further deploys, while each rider
+  reads their own metric.
+
+BASELINE THAT MAKES THIS WORTH DOING, from tonight's kill: `OVERVIEW_SPORT_BEGIN
+mlb` -> `oomKilled` in 25s from a 522MB floor. After the train, that pass should
+track one sport and never approach 4GiB.
+
+
 ## Config
 
 - **`#423` — the leak is NOT glibc arena fragmentation. `[measured 08-14 02:18Z]`**
@@ -22,11 +150,17 @@
   FIVE times in one evening, TWICE inside 25 minutes on 08-14, and web moved
   AGAIN during this session's own reconciliation. A stale read nearly shipped a
   rollback and made one blast-radius claim wrong by 20 commits.**
-  **SUPERSEDED 08-14 18:32Z — web moved again, and live-odds-worker is no
-  longer unread.** `[measured 08-14 18:32Z, status AND commit, not the 201]`
-  web **`8ff4e513`** (18:32:36Z, `#433` OddsAPI catalogue route),
-  refresh-worker **`294f9ca9`** (16:16:56Z, unchanged),
-  live-odds-worker **`9a3a5bc6`** (17:42:02Z, `#433` soccer step order).
+  **SUPERSEDED AGAIN 08-14 21:0xZ — refresh-worker moved THREE more times.**
+  `[measured 08-14 21:0xZ, deploy status == live]`
+  web **`ea1d2ed6`** (19:37:00Z, A3 reader),
+  refresh-worker **`7b1f3fdc`** (21:01Z, instrument), which supersedes
+  `79148d8e` (20:13Z, ranked #3/#4) and `29ed6de1` (19:49:15Z, A3 builder),
+  live-odds-worker **`9a3a5bc6`** (17:42:02Z, unchanged).
+  **WEB AND REFRESH-WORKER DIVERGE FROM `b98f5ed7` AND NO SINGLE BRANCH
+  FAST-FORWARDS BOTH.** Verified 08-14: deploying web's branch to
+  refresh-worker would have DROPPED four commits including `294f9ca9`, the
+  `#429` MLB HRR fix. Cut every deploy branch from the TARGET SERVICE's own
+  live SHA and check `git merge-base --is-ancestor` before deploying.
   - **Two services are deliberately NOT on `origin/main`.** `9a3a5bc6` and
     `8ff4e513` are cherry-picks onto each service's own live commit, pushed as
     `deploy/soccer-step-order-433` and `deploy/ops-oddsapi-catalogue-433`.
@@ -492,6 +626,155 @@ WRONG. Read this first.**
   cause 2.** A shortlist rebuilt every 5 minutes off a 2-hour-old quote shard
   is a board that LOOKS fresh and is not — strictly worse than one that is
   visibly stale, because nothing on it says so.
+
+## `#387` CUTOVER IS WRITTEN AND TESTED — NOT DEPLOYED `[08-14 20:2xZ]`
+
+- Branch **`memory/overview-sum-to-max`** now carries three commits, all
+  origin SHAs (cherry-picks mint new ones — cite these):
+  `c39569ef` pool retention -> `946d77e3` streaming mechanism ->
+  **`086702ae` the cutover**. **None is on `main`. None is deployed.**
+- `_build_candidate_pool` consumes each sport and releases it before the next
+  hydrates. `preferences` moved above the stream. The rare thin/empty-pool
+  fallbacks re-hydrate on demand (`collect_all_recommendations` rebuilds when
+  handed `overview=None`), so they still work without every cycle carrying
+  eight sports.
+- **The list fallback is load-bearing.** A caller that ignores `consumer=` and
+  returns the list would stream ZERO sports and build an EMPTY POOL — a total
+  board outage presenting as "no candidates today". ~30 tests patch that
+  function with a plain `return_value`. If nothing streamed but a list came
+  back it is consumed, and `OVERVIEW_STREAM_FELL_BACK_TO_LIST` prints.
+- **THE MEASUREMENT THAT WOULD MAKE IT OFFICIAL**, with a baseline that now
+  exists because of tonight's kill: one hydrated pass, `OVERVIEW_SPORT_BEGIN
+  mlb` -> peak. Before: 522MB -> dead at 4GiB in 25s. After: peak should track
+  ONE sport and never approach it. Needs a deploy window with no intervening
+  deploy — refresh-worker took one every ~20 min all evening.
+
+## CORRECTION — `tests/test_intelligence_state.py` is NOT "GREEN 224" any more `[measured 08-14 20:2xZ]`
+
+- It is **223 passed / 1 failed / 10 subtests**. The failure,
+  `test_collect_candidates_with_fallback_merge_falls_back_on_empty_pool`,
+  asserts `collect_all_recommendations(..., force_refresh=True, ...)` on a call
+  site from which `#387` **removed that dead argument earlier today**.
+- **Verified pre-existing** by stashing the cutover diff and re-running: it
+  fails identically without it. So the standing rule "a failure in this file is
+  now yours" is currently WRONG for this one test — it belongs to the
+  `force_refresh` removal, and the test needs updating to match.
+
+## OOM 2026-08-14 20:03:11Z — THE OVERVIEW TRANSIENT KILLED A WORKER THAT WAS AT 522MB `[measured 08-14 20:1xZ]`
+
+**The single most direct evidence in this ledger that peak, not floor, is the
+acute cause.**
+
+    20:02:26  OVERVIEW_SPORT_BEGIN mlb  force_refresh=True skip_game_hydration=False
+    20:02:26  anon  343MB      <- worker booted 19:49, 13 min earlier
+    20:02:37  anon  393MB
+    20:02:46  anon  522MB
+    20:02:48  OVERVIEW_SPORT_BEGIN nba, wnba
+    20:02:50  OVERVIEW_SPORT_BEGIN nfl
+    20:02:55  OVERVIEW_SPORT_BEGIN ncaaf, ncaab, nhl
+    20:02:57  OVERVIEW_SPORT_BEGIN soccer     <- all eight held at once
+    20:03:11  server_failed  oomKilled memoryLimit 4Gi  instance -xnxxv
+
+- **A 522MB worker died in 25 seconds inside ONE hydrated overview pass.** The
+  ~1400-2000MB floor played no part — there had not been time to accumulate
+  one. Peak = SUM across eight sports is sufficient on its own to cross 4GiB.
+- Earlier peak sample the same cycle: **3719.9MB at 20:01:18**, stage
+  `board_contract_games_normalized`.
+- **This is exactly what the `#387` SUM -> MAX cutover addresses**, and it is
+  the strongest argument yet for wiring it. Anything that only lowers the floor
+  would NOT have prevented this kill.
+- **Attribution, stated carefully:** `530fc5d8` (Layer 2 fast path) was live and
+  had been for 4h20m including a measured 3h window with ZERO OOM events; it
+  runs `skip_game_hydration=True` and never triggers a hydrated pass, so it is
+  not on this path. `29ed6de1` deployed 14 min earlier (another session, +77
+  lines of Layer 2 scoring) does not drive `board_contract` either. **One kill
+  on one boot exonerates nothing** — but the 522MB floor means there was
+  nothing for added periodic work to have accumulated.
+- Recovered: 2 `BOOTED` lines, `anon` back to 1629MB. **One kill, not a loop.**
+- OOMs predate today's changes (4 kills 03:20-04:04Z), so this is not a new
+  regression — it is the standing defect firing again.
+
+## IS THERE AN OFFICIAL MEMORY FIX? NO. `[measured 08-14 20:1xZ]`
+
+Stated plainly so nobody inherits a false sense of closure.
+
+- **`530fc5d8` IS official** — on origin, IN the live refresh-worker commit,
+  verified on a 3h clean window, all five criteria met. **It fixes board
+  FRESHNESS, not memory.**
+- **The two memory commits are NOT official and were LOCAL-ONLY** until now:
+  neither `100c9cb5` nor `0041a902` was on `origin/main` or in any deployed
+  commit. Now pushed as branch **`memory/overview-sum-to-max`**
+  (`c39569ef` = the pool retention, `946d77e3` = the streaming mechanism;
+  cherry-picks mint new SHAs, so cite THESE, not the local ones).
+- **`0041a902`/`946d77e3` is a MECHANISM, not a fix.**
+  `_build_candidate_pool` still calls the list form, so production memory is
+  byte-for-byte unchanged.
+- **What "official" requires here, so the bar is not moved later:**
+  1. wire `_build_candidate_pool` to the consumer (spec + answered decision
+     gate in `handoff_overview_hydration.md`);
+  2. tests green, including the existing equivalence and release pins;
+  3. on origin AND in the live commit (check by SHA, not by "I pushed it");
+  4. **the measurement that makes it a fix: the `board_contract` peak stops
+     scaling with sport count.** Baseline to beat is the recorded excursion
+     `post_pull 2223MB -> 4096.0MB -> 2091MB`. Peak per hydrated pass, before
+     and after, on the same slate size.
+- Until (4) exists, this is "cause identified, fix built, effect unmeasured" —
+  which is exactly the state `#417` was in when it was briefly believed closed.
+
+## GOAL #1 HAS TWO QUANTITIES. Do not let the unnamed one hide the named one.
+
+- **PEAK (acute, IDENTIFIED, fix built and unwired).** OOM kills happen at the
+  4GiB ceiling, and the ceiling is crossed by a TRANSIENT, not by the baseline:
+  `post_pull 2223MB -> soccer board_contract 4096.0MB -> back to 2091MB`, a
+  ~1873MB excursion. The cause is named and measured: the overview holds all
+  eight sports' hydrated rows at once, so peak is the SUM (MLB alone +2.9GB).
+  `0041a902` is the mechanism that turns it into MAX. **NOT WIRED.**
+- **FLOOR (chronic, UNNAMED).** The persistent ~1400-2000MB `anon` base. Four
+  candidates eliminated this session; leading hypothesis is large allocations
+  neither gc-tracked nor in glibc arenas. Reducing this buys headroom; it is
+  NOT what crosses the ceiling.
+- **These want different fixes and should not be traded off against each
+  other.** An earlier checkpoint in this file framed "name the floor" as the
+  whole of goal #1, which under-states a peak cause that is already identified
+  with a tested fix in hand. Corrected here so the next session does not
+  inherit the wrong priority: **wire the cutover first — it addresses the
+  quantity that actually kills the process.**
+
+## `#387` SUM -> MAX: mechanism SHIPPED, cutover NOT DONE `[measured 08-14 20:0xZ]`
+
+- **`build_intelligence_overview(consumer=...)` exists and is tested**
+  (`0041a902`, committed, NOT deployed, **NOT WIRED**). Each sport's row is
+  emitted and dropped before the next hydrates; the list path runs through the
+  same `_emit`, so the modes cannot drift. `sports_done` is counted rather than
+  `len(overview)` (streaming leaves that empty, and a guard fed a constant is
+  not a guard), and `sport_row = None` after emit is mutation-pinned.
+- **`_build_candidate_pool` STILL CALLS THE LIST FORM.** Nothing has changed in
+  production. The saving is unquantified in MB.
+- **The cutover's decision gate is ANSWERED:** the only whole-overview consumer
+  left on the board path is the thin-pool merge, and
+  `collect_all_recommendations:thin_pool_merge` shows **0 enters in 6h** against
+  **39** live `collect_candidates` spans in the same window (positive control).
+  It fires only at 1-19 candidates — **rare, not dead**. Plan: stream by
+  default and RE-HYDRATE for that path, rather than gate it off.
+- `pool["overview"]` no longer holds the hydrated rows (`100c9cb5`, committed,
+  not deployed) — that was the last whole-list holder and it is what made the
+  cutover possible at all. Its `by_sport` output is byte-identical to the
+  hydrated path.
+- **Deploy state: `530fc5d8` is live and verified. `100c9cb5` and `0041a902`
+  ride the next refresh-worker deploy and have never run in production.**
+
+## `#387` LAYER 2 FIX — VERIFIED ON A FULL 3h CLEAN WINDOW `[measured 08-14 19:24Z]`
+
+- 16:16:56-19:24Z, 187.3 min, commit `294f9ca9` unchanged (verified by SHA, not
+  timestamp): **37 refreshes = 11.9/hour** vs 1.7 baseline, **23 via the fast
+  path**, longest gap **11.8 min** vs **104.7**, **96** `MEMORY_GUARD_ABORT`
+  (guard still actively refusing, so not a boot-confounded quiet period),
+  `LAYER2_GUARD_SKIP` **0** across all 96, zero failures, zero OOM.
+  **All five criteria met; lane CLOSED-VERIFIED.**
+- The span exceeds the 180-min baseline, which is what makes the max-gap
+  comparison sound — at 103.9 min it was not.
+- Residual confound, stated: abort rate 30.8/h vs 48.7/h baseline, so the 7x
+  rate improvement is not wholly attributable. The 23 fast-path refreshes are.
 
 ## GOAL #1 — A NAMED, UNFIXED INSTANCE OF `#253` `[measured 08-14 18:5xZ]`
 
@@ -1215,3 +1498,198 @@ Nothing new is convicted. Four candidates are struck off, which narrows it.
   `[measured 08-14]`
 - Web service is **`https://syndicate-an21.onrender.com`**
   (`srv-d88ahvrbc2fs73eodu30`). `syndicate.onrender.com` 404s. `[measured 08-14]`
+
+## A3 SHIPPED AND VERIFIED — the board no longer publishes hold-restatement rows
+
+- **LIVE on both services 2026-08-14.** web `ea1d2ed6` (19:37:00Z, reader),
+  refresh-worker `29ed6de1` (19:49:15Z, builder — this is the one that filters;
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=true` ONLY there).
+  `[measured 08-14 19:58Z]`
+- **Measured on the first post-deploy build (19:58:41Z), five predictions
+  written BEFORE the deploy, all held:** `rows_uninformative_ev` null → **4003**;
+  soccer selected **100 → 0** (absent from `per_sport`); `total_rows`
+  **256 → 156** (exactly 256−100); `book_margin_model` served rows **100 → 0**;
+  and the **CONTROL — mlb 84 / nfl 60 / wnba 12 — UNCHANGED to the row.**
+  `fair_method` mix is now `{consensus: 156}`. `[measured 08-14]`
+- **WHY that control held — the mechanism, not a coincidence `[measured 08-14
+  21:2xZ]`.** NOT because MLB lacks modelled rows: the book-grid shows mlb
+  carries **357 one-sided rows with a modelled fair** (wnba 42, nfl 0), so the
+  rule CAN reach MLB. It held because mlb has `rows_with_model_edge = 2256` and
+  the rule keeps any row carrying a model view. **The narrowness clause is what
+  protects MLB.** A later reading of mlb 84 → 78 is 1.4h of SLATE DRIFT against
+  a 19:58Z measurement, not the rule — `total_rows` 156→150 and
+  `rows_uninformative_ev` 4003→3842 drift identically. Re-read the post-deploy
+  measurement before attributing a later delta to the deploy.
+- **RANKED FIXES #3 + #4 (audit §7) ARE LIVE on refresh-worker `79148d8e`
+  (20:13Z). P1 VERIFIED ONLY.** `[measured 08-14 20:44Z]` A post-deploy cycle
+  ran (`snapshot_generated_at` 20:29:31Z) and `recommendation_count` went
+  145 → **148** — the lane did NOT empty, which was the revert trigger.
+  The DIRECTION is unproven: the two readings are 3.9h apart and slate drift is
+  unexcluded. **P3 (the `FILTER_CANDIDATES` instrument) remains UNMEASURED.**
+- **The audit's `0.5`-fallback mechanism was BACKWARDS `[measured 08-14]`.** The
+  `0.5` terminal is UNREACHABLE in production: every `filter_candidates` call
+  site is fed `_score_candidates` output, so `score/100` always won first
+  (score 4.05 → fair_prob 0.0405 → edge −0.36). Model-free candidates were not
+  published as coin flips — they were silently REJECTED under
+  `reason: "edge_below_threshold"`, a reason that claimed an edge had been
+  measured when no model had run. Removing only the `0.5` would have changed
+  nothing.
+- **The intelligence-state background loop IS RUNNING `[measured 08-14
+  21:22Z]`** — `[intelligence_state] LAYER2_SHORTLIST rows=150
+  considered=14062 sports=['mlb','nfl','wnba']`, with 140 `PUBLISH_OK` and 0
+  publish failures. What is stale is only the `/api/intelligence/status`
+  SNAPSHOT (`recommendation_count`), a different artifact from the layer2
+  shortlist. **Do not diagnose "the loop is dead" from a stale snapshot.**
+  The NFL season projection launches via `subprocess.Popen` (non-blocking) on
+  its own thread and does NOT block the loop — hypothesis tested and FALSE.
+- **Soccer now serves ZERO shortlist rows, and that is the intended state, not
+  an outage.** Its whole shortlist presence was one-book longshot props
+  (`player_shots`, `player_shots_on_target`, `player_to_receive_red_card`,
+  `player_assists`) whose `ev_pct` was arithmetically `-assumed_hold_pct`.
+  **Read `rows_uninformative_ev` before diagnosing soccer as broken** — soccer
+  is ABSENT from `per_sport` rather than present at 0, so that counter is the
+  only thing distinguishing "no slate" from "slate was all margin restatement".
+- **This does NOT depend on soccer projections and never will.**
+  `player_shots`/`player_shots_on_target` map to a MEAN and `soccer_projections`
+  refuses by design to derive a probability from a mean; the rows are one-sided
+  so `_no_vig_over_probability` returns None. Two independent rules each
+  guarantee no `model_edge_pct`. The filter **self-heals**: it keys on
+  `fair_method`, so if soccer ever gets two-sided quotes the fair becomes
+  `consensus` and the rows return with a real EV, no code change.
+  `[from-code 08-14]`
+- **The two services are on DIVERGENT lines and no single branch fast-forwards
+  both.** They diverge at `b98f5ed7`; web ran `8ff4e513` (deploy branch),
+  refresh-worker `294f9ca9` (main). A branch cut for web is a **ROLLBACK** for
+  refresh-worker — it would have dropped `#429`'s MLB HRR producer fix. Cut one
+  deploy branch PER SERVICE from that service's own live SHA and check
+  `git merge-base --is-ancestor` both ways before every deploy. `[measured 08-14]`
+- **Deploys here go by explicit `commitId`.** Both services are configured
+  `branch=main, autoDeploy=no` yet run off-branch commits, so a deploy needs no
+  service-config change and touches no `render.yaml` → no `blueprint_sync`.
+  `[measured 08-14]`
+- **STILL UNDEPLOYED from this lane, deliberately:** A1/A2
+  (`recommendation_engine.py`) and A3a (`opportunity_signals.py`, the
+  `blended_score` monotonicity fix). Excluded so A3's effect stayed
+  attributable. `[08-14]`
+
+## ~~WORKER→WEB FILE-ARTIFACT PUBLISHING IS FAILING ON A DNS NAME~~ — **RETRACTED 2026-08-14 20:1xZ**
+
+**THE SECTION BELOW IS WRONG ON ITS CENTRAL CLAIM. Kept only so the reasoning
+error is visible; do not act on it.**
+
+- **`syndicate-an21` RESOLVES FINE.** `[measured 08-14]` refresh-worker logged
+  **PUBLISH_OK at 19:54:40Z and 20:03:16Z to that exact URL**, and
+  live-odds-worker logged **14 / 18 / 13 PUBLISH_OK** across three windows
+  including 19:50-20:10Z. The "internal hostname is the service name, so
+  `syndicate-an21` is wrong" claim was an INFERENCE from Render's naming
+  convention, I labelled it untested, and it is now **falsified**.
+- **The failures were a TRANSIENT BURST, not a standing outage.** PUBLISH_OK at
+  19:54:40 → 11 PUBLISH_FAILED at 19:59:36 → PUBLISH_OK at 20:03:16. Success
+  brackets the burst on both sides.
+- **So it does NOT explain "soccer odds frozen platform-wide."** That lead was
+  over-reach and is withdrawn; a cross-lane note on `soccer-odds-coverage` has
+  been retracted in place.
+- **Was it caused by the A3 deploy? NOT PROVEN EITHER WAY, and probably not.**
+  The worker published successfully 5 minutes AFTER going live and again 4
+  minutes after the burst, so this is not a container-start effect. It is also
+  not exonerated: I have no cause for it.
+- **The method error that produced this, worth more than the finding:** I read
+  "0 PUBLISH_FAILED before / 11 after" off windows that each returned exactly
+  **100 lines — the API cap**. This logs API returns the TAIL of a window
+  regardless of `startTime`, so a saturated window proves NOTHING about absence.
+  I then stated "not caused by my deploy" as settled. The user challenged it,
+  and the correct control — **live-odds-worker, same env var, never deployed by
+  me** — took one query and was decisive. Reach for the untouched control first.
+
+### (original, wrong, retained for the record)
+
+**Found incidentally while health-checking the A3 deploy. NOT caused by it —
+this is an env var, and A3 changed no env var and no publish code.**
+
+- **Measured** `[08-14 19:59:36Z, refresh-worker logs]`:
+
+      [artifact_publisher] PUBLISH_FAILED
+        path=soccer_source/<league>/api/live_state/live_state_2026-08-14.json
+        url=http://syndicate-an21:10000/api/ops/artifacts/publish
+        error=<urlopen error [Errno -2] Name or service not known>
+
+  11 such lines in one 6-minute window, across `mls`, `ligue_1`,
+  `primeira_liga` and others.
+- **`SYNDICATE_WEB_PUBLISH_URL = http://syndicate-an21:10000` on BOTH workers**
+  (refresh-worker and live-odds-worker). `[measured 08-14]`
+- **`render.yaml` names the web service `syndicate`.** Render's INTERNAL
+  hostname is the SERVICE NAME; `syndicate-an21` is the PUBLIC subdomain prefix
+  (`syndicate-an21.onrender.com`). So the publish URL names a host that does not
+  exist on the private network — which is exactly what the DNS error says.
+  - **Confidence split, deliberately:** that `syndicate-an21` does NOT resolve
+    is **measured** (the error is the proof). That `syndicate` WOULD resolve is
+    **inferred** from Render's naming convention and is **NOT tested**. Do not
+    ship a hostname change on the strength of the second half — test it first.
+- **This is plausibly the missing piece under the OPEN soccer lanes**
+  (`soccer-odds-coverage`: "soccer game odds are frozen platform-wide";
+  "soccer odds have ONE producer, and the reorder did not fix it"). If worker→web
+  FILE publishing is dead, artifacts computed on the worker never reach the disk
+  web reads, and a step-ordering fix could not possibly help. **Offered as a
+  lead, not a diagnosis — not this lane's file set, and not measured end to end.**
+- **Why it has stayed invisible:** keyvalue-backed state (`refresh_state_store`)
+  publishes fine — the Layer 2 shortlist rebuilt normally at 19:58:41Z. Only
+  FILE artifacts go through this HTTP path. So the board looks alive while
+  file-backed per-sport artifacts go stale.
+- **Suspect `internal-hostname-cutover` (CLOSED 2026-08-13, "verified in
+  production").** If that cutover set the public subdomain prefix believing it
+  was the internal name, it would have silently broken file publishing while
+  passing whatever check closed it. Worth re-opening rather than trusting.
+- **NOT FIXED HERE.** It is config, it needs a deploy to take effect
+  (a restart does not re-inject env), and it belongs to the soccer/publish
+  owners. Flagged only.
+
+## Card UI — what is TRUE in production vs. what is fixed locally
+
+- **Production still carries all of it. `[measured 08-14, prod, trusted
+  Playwright]`** `scripts/ui_layout_probe.py --base-url
+  https://syndicate-an21.onrender.com`: 28px horizontal overflow desktop on
+  nfl/ncaaf/soccer/ncaab, **20-40px MOBILE (the audit reported desktop only)**,
+  NCAAF's default `Game` tab targets a panel that does not exist (blank 187px
+  card on a trusted click) with `identity` and `coverage` unreachable, every
+  sport's mobile tab targets 28px against WCAG's 44, `font-variant-numeric:
+  normal` on every numeric card class.
+- **Fixed and measured LOCALLY, not deployed, not committed. `[measured
+  08-14, local]`** Same probe: 0px overflow both widths, 0 orphan tabs, 0
+  unreachable panels, every trusted tab click activates exactly one panel,
+  0 tabs under 44px, tabular figures on. Lane `board-ui-visible-defects`.
+- **The probe is the durable part.** It reproduces the 2026-08-14 audit's
+  numbers on demand, and it was validated against production BEFORE the fix
+  so its post-fix "OK" is a reading, not an assumption. Synthetic
+  `el.click()` is not used anywhere in it — the audit had to retract a
+  finding produced that way.
+- **NBA / NHL / NCAAB serve 0 cards, in production and locally.** Their rows
+  in the audit's divergence matrix are code-only. Re-measure in October.
+  `[measured 08-14]`
+
+- **Card UI defects are FIXED IN PRODUCTION as of 2026-08-14 21:42:56Z.
+  `[measured 08-14 21:4xZ, prod, trusted Playwright]`** Supersedes the block
+  above: web `aadcde77` (= `5382943c` + `cf066942`, pinned branch
+  `deploy/board-ui-lane-e`). Horizontal overflow 28px desktop / 20-40px mobile
+  -> **0 at both widths on nfl, ncaaf, soccer and ncaab**; NCAAF's default tab
+  0 panels/187px -> 1 panel/556px; orphan tabs and unreachable panels -> 0;
+  mobile tab targets under 44px 64/48/4 -> 0; numeric classes `normal` ->
+  `tabular-nums`. Before/after JSON in `reports/ui_layout/`.
+- **Deployed SHAs re-read 08-14 21:35Z, and ALL THREE had moved again since
+  the 18:32Z line above** — web `5382943c` (now `aadcde77`), refresh-worker
+  `7b1f3fdc`, live-odds-worker `ccd10349`. `[measured]` The rule stands: read
+  them, never quote them.
+- **`origin/main` is 28 commits ahead of what web runs, and the local tree was
+  147 ahead / 119 behind `origin/main` at 21:0xZ. `[measured 08-14]`** Local
+  `main` has not been pushed since the 08-13 12:11 split; this lane pushed via
+  a throwaway worktree at `origin/main` rather than reconciling it. **Nobody
+  should deploy main's tip to web without enumerating that 28-commit delta** —
+  it carries four other lanes' production changes, including 440 deleted lines
+  across the `ask_the_syndicate*` blueprints and `aac18260`, which state.md
+  records as deliberately on neither service.
+
+- **Lane `board-ui-visible-defects` shipped: `cf066942` (fix) and `ee590ed5`
+  (the production reading) are on `origin/main`; web runs `aadcde77`.
+  `[measured 08-14 21:4xZ]`** `scripts/ui_layout_probe.py` is the durable
+  instrument — it reproduced the audit's before-numbers against the unchanged
+  service, which is what makes its after-numbers a reading rather than a
+  belief. Re-run it before trusting any future claim about card layout.
