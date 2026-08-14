@@ -731,6 +731,25 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
                 _inc_sum(pid, "HBP", hbp)
                 _inc_sum(pid, "SB", sb)
                 _inc_sum(pid, "TB", tb)
+                # `#429`. WITHOUT THIS LINE `hrr_mean` IS 0.0 FOR EVERY HITTER,
+                # FOREVER. The topn row builds its mean as
+                # `_stat(pid, stat_key) / denom_sims` with `stat_key="H+R+RBI"`
+                # (see `_row` and the `hits_runs_rbis_*` entries in its mapping),
+                # and `_stat` reads ONLY what `_inc_sum` has accumulated. Every
+                # other hitter mean works because its `_inc_sum` line is right
+                # here -- `pa_mean`/`ab_mean`/`h_mean` are all populated this
+                # way. H+R+RBI was the one composite in the mapping and the one
+                # stat never summed, so it divided 0 by the sim count.
+                #
+                # Measured before the fix, `daily_summary_2026_07_09.json`:
+                # `hrr_mean` present on 936 of 936 topn rows, nonzero on 0 --
+                # while `p_hrr_2plus` on the same rows was genuine. The row was
+                # real and exactly one field was dead.
+                #
+                # `hrr` is already computed above as `int(h + rr + rbi)`, so
+                # this sums the same quantity the distribution loop below
+                # already bins. Do not recompute it here; the two must not drift.
+                _inc_sum(pid, "H+R+RBI", hrr)
 
                 acc = hitter_prop_acc.setdefault(int(pid), {})
                 for dist_key, row_key, mean_key in _HITTER_PROP_DIST_SPECS:
@@ -4415,6 +4434,12 @@ def _sim_many(
                     _inc_sum(pid, "HBP", hbp)
                     _inc_sum(pid, "SB", sb)
                     _inc_sum(pid, "TB", tb)
+                    # `#429`, SECOND SITE. This file carries two copies of the
+                    # per-sim hitter accumulation and they must not drift --
+                    # fixing only the one you happen to find is exactly the
+                    # `#334` failure recorded in the ledger. See the long note
+                    # at the first site for why the omission zeroes `hrr_mean`.
+                    _inc_sum(pid, "H+R+RBI", hrr)
 
                     acc = hitter_prop_acc.setdefault(int(pid), {})
                     for dist_key, row_key, mean_key in _HITTER_PROP_DIST_SPECS:
