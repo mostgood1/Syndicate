@@ -531,3 +531,44 @@ people learn to route around. Run the gate, read it, then deploy.
   defect that was discarding ~90 completed NFL sims/day.
 - Someone should move `#389`'s follow-up out of AWAITING FIRST RUN in
   `todo.md`. Not done here — this session did not own that ticket.
+
+### `#419` props-regen guard — VERIFIED WORKING (scheduled deploy was a no-op)
+- 2026-08-14 09:15 CDT, service `refresh-worker` (`srv-d91dpertqb8s73co8ls0`),
+  commit `d6188ca7`, change `#419` (`_mlb_props_now_available_needs_regen` read
+  prop snapshots through Redis while the producer writes the mounted disk).
+- **No deploy was performed by this task, and none was needed.** `#419` had
+  already reached production at **2026-08-13 17:59 CDT** (`22:59:14Z`) via a
+  **manual** deploy of `d4bb29b5`, not by the scheduled job. Live commit is now
+  `75b8aae6` (08-13 23:26 CDT), which contains `d6188ca7`; the fix code is
+  present in that tree, checked by `git grep` against the commit, not inferred
+  from ancestry alone.
+- Gate verdict acted on: **slate gate FAILED** — the task ran at 09:10 CDT and
+  its window is 00:00–04:59, so a deploy was forbidden regardless. It was moot;
+  the already-live check exits first. `deploy_preflight.py` was never reached.
+  - Clock trap worth keeping: the first `date` call in the session reported
+    `00:04` when it was `09:04`, which would have opened the slate gate on a
+    false reading. It was caught because the Render log timestamps ran ~9h
+    *ahead* of the supposed local time. A single clock reading is not a
+    measurement — cross-check it against a timestamp from another system.
+- **Measured — this closes the obligation, it is not pending:**
+  - Baseline: **0** `MLB_PROPS_REGEN_DUE` across the entire retained log window
+    (`2026-08-07T14:12Z` -> `2026-08-13T22:59Z`, ~6.4 days). Not an empty
+    window — same query returns hits on the far side of the boundary.
+  - First `MLB_PROPS_REGEN_DUE` at `2026-08-13T23:00:09Z` — **55 seconds after
+    the fix went live** — with `pitcher_odds=True hitter_odds=True`, the two
+    flags that were unconditionally `False` on every call before it.
+  - ~15 `DUE` since, across both slate dates, hourly.
+  - `MLB_PROPS_REGEN_SKIPPED reason=cooldown` with `age_s` resetting
+    (660 -> 1517 -> 2147 -> 2781 -> 3417) — the cooldown is being *set*, which
+    only happens after a regen actually runs.
+  - End-to-end proof: `MLB_DAILY_SIM_END date=2026-08-14
+    run_stamp=20260814_140135 state=finished exit_code=0 duration_seconds=625
+    reason=props_now_available`. A regen fired from this guard and completed.
+- Scheduled task `deploy-419-refresh-worker` deleted after this entry; its work
+  was done by someone else's manual deploy before it ever fired.
+- **Unrelated, seen while reading these logs, NOT this lane:** `refresh-worker`
+  is sitting at **99.5-99.8% of its 4096MB** during the props regen
+  (`container_memory_headroom_mb` 9.0-20.7, `accounted_rss_mb` ~3045). That is
+  live near-OOM, and it belongs to the OPEN `anon-allocation-site` /
+  `refresh-worker-anon-leak` lanes. Recorded here only so the reading is not
+  lost; not diagnosed.
