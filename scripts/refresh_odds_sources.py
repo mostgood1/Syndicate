@@ -1242,26 +1242,52 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                 description=f"Refresh {league} ESPN schedule/fixture artifact.",
             )
         )
-    for league in league_slugs:
-        steps.append(
-            RefreshStep(
-                name=f"soccer_{league}_artifacts",
-                phases=("pregame", "live"),
-                cwd=REPO_ROOT,
-                command=(
-                    python_exe,
-                    "scripts/build_soccer_artifacts.py",
-                    "--league",
-                    league,
-                    *_soccer_artifact_scope_args(league, args.date, pinned_date=pinned_date),
-                    "--source-root",
-                    str(soccer_root),
-                    "--out-root",
-                    str(soccer_root),
-                ),
-                description=f"Refresh {league}'s current-week simulation, props, and recommendation artifacts.",
-            )
-        )
+    # CAPTURE BEFORE SIMULATE (`#433`). These two loops used to sit AFTER the
+    # `artifacts` sim loop below, and that ordering was silently costing three
+    # leagues their odds entirely.
+    #
+    # THE MEASUREMENT. The soccer pregame run is 50 steps for 10 leagues, and
+    # they are grouped BY KIND, not by league -- every league's schedule, then
+    # every league's sim, then every league's odds, and so on. Read off
+    # `/api/ops/odds-refresh/plan` on production 2026-08-14:
+    #
+    #      1-10   schedules
+    #     11-20   artifacts        <- TEN soccer sims, minutes each
+    #     21-30   odds             <- seconds each, 1.46 credits/call
+    #     31-40   props
+    #     41-50   picks
+    #
+    # The run does not reach the end. The boundary was exact and reproducible
+    # in the shard (`soccer_source/tracking/book_quotes/2026-08-14.jsonl`):
+    #
+    #     soccer_eredivisie_odds          #27   captured 2026-08-14T13:16Z
+    #     soccer_primeira_liga_odds       #28   captured 2026-08-10T20:54Z
+    #     soccer_championship_odds        #29   captured 2026-08-11T00:54Z
+    #     soccer_belgian_pro_league_odds  #30   captured 2026-08-10T20:54Z
+    #
+    # It dies between 27 and 28. Three leagues went 3.6 DAYS without an odds
+    # capture -- including three of that day's four fixtures, two hours from
+    # kickoff -- and steps 31-50 (props and picks) never ran for ANY league,
+    # which is the same reason soccer projection coverage sat at 30%.
+    #
+    # WHY REORDERING IS THE RIGHT FIX AND NOT A WORKAROUND. The cheap steps were
+    # queued behind the expensive ones for no reason: `build_soccer_artifacts.py`
+    # does not read `game_odds_current.csv`, so the sim has NO dependency on the
+    # capture. Odds and props are pure OddsAPI captures that take seconds; the
+    # sims take minutes and are what exhausts the run. Putting capture first
+    # makes odds coverage independent of whether the sims finish, and costs
+    # nothing extra -- same steps, same call volume, different order.
+    #
+    # `picks` STAYS LAST and must: it grades simulated projections *against*
+    # captured odds (`build_soccer_picks.py:149` reads `game_odds_current.csv`,
+    # and bails when either input is missing), so it depends on both loops
+    # above it.
+    #
+    # This does not explain WHY the run stops at ~27 steps -- time budget,
+    # memory, or a step timeout is still unnamed. It removes the consequence,
+    # not the cause, and the cause is still worth finding: a run that dies
+    # mid-list will now lose sims and picks instead of odds, which is the
+    # cheaper thing to lose but still a loss.
     for league in league_slugs:
         steps.append(
             RefreshStep(
@@ -1294,6 +1320,26 @@ def _build_soccer_steps(args: argparse.Namespace) -> list[RefreshStep]:
                     str(soccer_root / league / "props" / f"{args.date}.csv"),
                 ),
                 description=f"Capture {league} player-prop odds (anytime scorer, shots, etc.) from The Odds API.",
+            )
+        )
+    for league in league_slugs:
+        steps.append(
+            RefreshStep(
+                name=f"soccer_{league}_artifacts",
+                phases=("pregame", "live"),
+                cwd=REPO_ROOT,
+                command=(
+                    python_exe,
+                    "scripts/build_soccer_artifacts.py",
+                    "--league",
+                    league,
+                    *_soccer_artifact_scope_args(league, args.date, pinned_date=pinned_date),
+                    "--source-root",
+                    str(soccer_root),
+                    "--out-root",
+                    str(soccer_root),
+                ),
+                description=f"Refresh {league}'s current-week simulation, props, and recommendation artifacts.",
             )
         )
     for league in league_slugs:
