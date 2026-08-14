@@ -180,6 +180,30 @@ class MainTests(unittest.TestCase):
                 writer.writeheader()
                 writer.writerow({**{k: "" for k in fieldnames}, "game_id": "g1", "week": "1", "home_team": "ARI", "away_team": "CAR"})
 
+            # SYNTHETIC PRIOR-SEASON PLAYS. Added 2026-08-13 with the
+            # degenerate-writer guard: this fixture previously supplied no
+            # play-by-play at all, so `main()` ran with every club rated
+            # `neutral_no_data` and wrote a file identical for every game --
+            # the exact production defect that put one constant on 16 games
+            # across four dates. The test passed, because it only asserted the
+            # artifact existed and named the game. The broken behaviour had
+            # test coverage asserting it.
+            #
+            # Still hermetic: synthetic rows under tmp, never the real
+            # pbp_2025.csv.
+            pbp_dir = os.path.join(tmp, "tracking", "nflverse", "pbp")
+            os.makedirs(pbp_dir, exist_ok=True)
+            with open(os.path.join(pbp_dir, "pbp_2025.csv"), "w", encoding="utf-8", newline="") as handle:
+                pbp_fields = ["season_type", "week", "posteam", "defteam", "play_type", "epa"]
+                pbp_writer = csv.DictWriter(handle, fieldnames=pbp_fields)
+                pbp_writer.writeheader()
+                for week, (off, deff, play, epa) in enumerate(
+                    [("ARI", "CAR", "pass", "0.12"), ("CAR", "ARI", "run", "-0.07"),
+                     ("ARI", "CAR", "run", "0.05"), ("CAR", "ARI", "pass", "-0.03")],
+                    start=1,
+                ):
+                    pbp_writer.writerow({"season_type": "REG", "week": str(week), "posteam": off, "defteam": deff, "play_type": play, "epa": epa})
+
             # load_pbp_plays() (imported from the REGULAR-season script)
             # reads from that module's own DATA_ROOT, not this one's --
             # patch both so the real production pbp_2025.csv is never

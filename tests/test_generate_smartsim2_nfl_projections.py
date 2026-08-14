@@ -120,7 +120,43 @@ class RealScheduleFallbackTests(unittest.TestCase):
 
         self.assertEqual(rows, [])
 
+    def _write_prior_season_pbp(self, tmp, season, teams):
+        """Synthetic prior-season plays, so a test about the SCHEDULE is not
+        also a test about a total ratings outage.
+
+        Added 2026-08-13 with the degenerate-writer guard. This fixture used to
+        supply no play-by-play at all, which meant `main()` ran with every club
+        rated `neutral_no_data` and produced a file identical for every game --
+        the exact production defect that put one constant on 16 games. The test
+        passed, because it only asserted the artifact existed and named the
+        game. **The broken behaviour had test coverage asserting it.**
+
+        Kept hermetic: synthetic rows under tmp, never the real pbp_2025.csv.
+        """
+        import csv
+        import os
+
+        directory = os.path.join(tmp, "tracking", "nflverse", "pbp")
+        os.makedirs(directory, exist_ok=True)
+        fieldnames = ["season_type", "week", "posteam", "defteam", "play_type", "epa"]
+        with open(os.path.join(directory, f"pbp_{season}.csv"), "w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            for index, team in enumerate(teams):
+                other = teams[(index + 1) % len(teams)]
+                # Distinct epa per club, so the resulting projections differ by
+                # matchup -- a fixture where every team rates identically would
+                # reintroduce the constant this guard exists to prevent.
+                writer.writerow({"season_type": "REG", "week": "1", "posteam": team, "defteam": other, "play_type": "pass", "epa": f"{0.10 + index * 0.05:.2f}"})
+                writer.writerow({"season_type": "REG", "week": "1", "posteam": other, "defteam": team, "play_type": "run", "epa": f"{-0.08 - index * 0.03:.2f}"})
+                writer.writerow({"season_type": "REG", "week": "2", "posteam": team, "defteam": other, "play_type": "run", "epa": f"{0.04 + index * 0.02:.2f}"})
+                writer.writerow({"season_type": "REG", "week": "2", "posteam": other, "defteam": team, "play_type": "pass", "epa": f"{-0.05 - index * 0.01:.2f}"})
+
     def test_main_falls_back_when_no_pbp_exists_yet(self) -> None:
+        # "No pbp exists yet" means THIS season has none (week 1, nothing
+        # played). The PRIOR season still does -- that is what
+        # `prior_season_fallback` is for. Supplying it keeps this a test of the
+        # schedule fallback rather than of a data outage, which now refuses.
         import os
         import sys
         import tempfile
@@ -131,6 +167,7 @@ class RealScheduleFallbackTests(unittest.TestCase):
             self._write_real_schedule(tmp, 2026, [
                 {"game_id": "2026_01_NE_SEA", "week": "1", "home_team": "SEA", "away_team": "NE"},
             ])
+            self._write_prior_season_pbp(tmp, 2025, ["SEA", "NE"])
             with patch.object(gen, "DATA_ROOT", Path(tmp)), patch.object(gen, "nfl_artifact_output_root", lambda: Path(tmp)), patch.object(
                 sys, "argv", ["generate_smartsim2_nfl_projections.py", "--season", "2026", "--week", "1", "--seeds", "2"],
             ):
