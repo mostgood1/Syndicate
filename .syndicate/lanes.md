@@ -114,11 +114,81 @@
     `layer2-board-freshness` — NOT edited. Full run 238 passed / 1 failed.
   - Next action: A3, informed by A0 — the 100 one-book longshot rows ranked on
     `-hold`, plus the 33 rows published with a negative `model_edge_pct`.
+- **A3 DONE 2026-08-14, two defects, both measured first. STILL NOT DEPLOYED.**
+  - **The score inversion.** `blended_score` returned `value * reliability`,
+    which discounts positive value and **promotes negative value**. Measured on
+    the served shortlist 18:59:34Z: 156 of 256 rows carried negative value and
+    `corr(reliability, score) = -0.8312` across them, against a **+0.8560
+    control** on the 98 positive rows. Fixed as `min(value, value*reliability)`
+    in `opportunity_signals.py` (+ a `reliability_applied` flag).
+    **Simulated before claiming impact: 100 scores unchanged, 156 changed,
+    top-50 churn ZERO** — negatives never outranked positives. The real effect
+    is on which rows a capped board SELECTS out of the pool, and that is
+    **not observable from the shortlist API**.
+  - **The uninformative-EV rule.** `_row_ev_is_hold_restatement` +
+    `rows_uninformative_ev` in `layer2_board.py`, applied before the per-sport
+    bucket so `kind_floor`/`per_sport` cannot re-seat what it rejects.
+  - Tests: `tests/test_layer2_uninformative_ev.py` (7, new file) and 5 added to
+    `tests/test_opportunity_signals.py`. **Mutation-pinned** both ways.
+  - **13 failures in `test_layer2_board.py` / `test_layer2_projection_carry.py`
+    are PRE-EXISTING** — proven against pristine files from HEAD, same 13. The
+    fixtures build a two-sided row with `cells: {}`, `_fair_by_side` returns
+    `({}, None)`, and the fixture yields ZERO candidates. They went stale when
+    `#384` made `cells` load-bearing and **currently cannot detect anything**.
+    Flagged, not fixed — its own piece of work.
+  - **DEPLOY BLOCKER, and it belongs to another lane.** The exclusion drops
+    **100 of 256 served rows, all soccer**. Soccer carries
+    `rows_with_projection: 12 of 8,512` (0.1%), so it would fall to roughly
+    0–12 published rows until projections land — which is exactly what the OPEN
+    `soccer-projection-gap` lane owns. Do not ship without that owner agreeing,
+    or ship it behind the projection fix rather than before it.
+  - **Counter not on the wire yet.** `rows_uninformative_ev` must be added to
+    `/api/board/layer2-shortlist`'s explicit key list in
+    `syndicate/blueprints/intelligence.py`, held by
+    `board-ui-freshness-slip-books`. `#397` says a counter absent from that
+    endpoint is invisible no matter how well it works. Needs that lane.
+  - Marker note: `.current-lane` was taken by `layer2-board-freshness` at
+    14:03:53 mid-edit; borrowed ~15s for one edit and restored immediately.
+- **SEQUENCING RESOLVED 2026-08-14 — I WAS WRONG, AND THE DEPENDENCY IS
+  ILLUSORY.** I recorded above that A3 must ship behind `soccer-projection-gap`.
+  It must not; sequencing it that way blocks A3 indefinitely.
+  - For all 100 rows A3 removes, **two independent DELIBERATE design rules each
+    guarantee `model_edge_pct` can never be non-null**: (1) `player_shots` and
+    `player_shots_on_target` map to a **mean**, and `soccer_projections` refuses
+    to derive a probability from a mean on purpose; (2) the rows are one-sided,
+    so `_no_vig_over_probability` returns None — the same condition that made
+    `book_margin_model` price them. `player_to_receive_red_card` and
+    `player_assists` are not in the market map at all. Raising projection
+    COVERAGE cannot change any of this.
+  - **Measured, with a control** `[19:1xZ, /api/board/book-grid]`:
+    soccer `player_shots` **44 rows, 100% one-sided, mean books_quoting 1.00**;
+    `player_shots_on_target` **29 rows, 100% one-sided**. MLB props on the same
+    call: **1,470 two-sided vs 330 one-sided**. The pipeline can build two-sided
+    prop rows; this is soccer's feed, not a broken join.
+  - **The rule SELF-HEALS, which is why it is safe alone.** It keys on
+    `fair_method == "book_margin_model"`. If soccer ever gets two-sided quotes
+    the fair becomes `consensus`, the rule stops firing and the rows return with
+    a real EV — no code change, no coordination.
+  - **So A3 is unblocked and needs only a PRODUCT decision:** is soccer serving
+    ~0 shortlist rows correct, given the alternative is 100 rows ranked on a
+    constant that can never acquire a model? Pending the user.
+  - Remaining wiring: `rows_uninformative_ev` onto
+    `/api/board/layer2-shortlist`. `board-ui-freshness-slip-books` **CLOSED**
+    2026-08-14, so `syndicate/blueprints/intelligence.py` is now unclaimed and
+    this lane can take it.
 - Files (exclusive to this lane):
   - `syndicate/features/shared/recommendation_engine.py`
   - `syndicate/features/shared/layer2_board.py` — A3/A4 only.
   - `tests/test_recommendation_engine.py`, `tests/test_layer2_board.py`,
-    `tests/test_recommendation_probability_sources.py` (new this session).
+    `tests/test_recommendation_probability_sources.py` (new this session),
+    `tests/test_layer2_uninformative_ev.py` (new this session).
+  - `syndicate/features/shared/opportunity_signals.py` — A3's `blended_score`
+    monotonicity fix. Added to the claim when A3 started; no OPEN lane claims it
+    (checked 2026-08-14 by scanning every lane's claim block).
+  - `syndicate/blueprints/intelligence.py` — **CLAIMED 2026-08-14 19:2xZ**, the
+    `rows_uninformative_ev` key on `/api/board/layer2-shortlist` ONLY. Freed by
+    `board-ui-freshness-slip-books` closing; verified by scanning every claim
+    block — the only other mentions are in CLOSED lanes.
   - Collision check 2026-08-14: parsed every OPEN lane's claim block. Claimed
     elsewhere are `scripts/refresh_odds_sources.py` (soccer-odds-coverage),
     `pipeline/intelligence_state.py` (layer2-board-freshness),
@@ -322,6 +392,50 @@
 - Blocked by: none.
 
 ### soccer-projection-gap — OPEN — opened 2026-08-14 — session: board-ui
+- **INCIDENTAL BUT DIRECTLY ON POINT, observed 2026-08-14 19:25Z** in
+  live-odds-worker's logs while verifying an unrelated deploy:
+
+      [build_soccer_artifacts] SOCCER_PLAYER_ROWS_MISSING league=eredivisie
+        players_dir=/opt/render/project/data/soccer_source/eredivisie/players
+      [build_soccer_artifacts] SOCCER_PLAYER_ROWS_MISSING league=primeira_liga
+      [build_soccer_artifacts] SOCCER_PLAYER_ROWS_MISSING league=championship
+
+  **The sim is reporting it has no player rows to simulate.** That is a
+  first-class candidate for why soccer PROP markets carry no projections —
+  which is where this lane measured the gap to be widest (eredivisie: 99
+  market rows, 5 projected). The producer is saying, in its own log, that its
+  input is missing.
+  - **NOT yet a finding.** Observed once, on three leagues, while looking at
+    something else. Nobody has checked whether `players/` is empty, stale, or
+    simply relocated, nor whether game-line projections come from a different
+    path that is unaffected. Do that before building on it.
+  - Cheap first step: read `soccer_source/<league>/players/` on the worker's
+    disk and compare against a league that DOES project.
+- **CROSS-LANE NOTE from `recommendation-lane-correctness` (session model-audit),
+  2026-08-14 19:1xZ. Not an edit to this lane's plan — one measurement its goal
+  depends on. TWO PRODUCTION ENDPOINTS DISAGREE ABOUT THIS LANE'S HEADLINE
+  NUMBER BY 250x, same sport, same date, 45 seconds apart:**
+
+      /api/board/layer1?sport=soccer  rows 8,456  rows_with_projection 2,504 = 29.6%  [19:11:10Z]
+      /api/board/layer2-shortlist     rows 8,512  rows_with_projection    12 =  0.1%  [19:10:25Z]
+
+  This lane's "8,299 rows, 2,503 projected = 30.2%" is the **layer1** figure and
+  its testable outcome is written against it. The **layer2** ingest — the join
+  that actually puts `model_edge_pct` on the shortlist — reports
+  `rows_with_projection: 12`, `rows_with_true_probability: 6`,
+  `rows_with_model_edge: 0`, `matches_in_source: 4`,
+  `unmatched_match_rows: 8,393`. These are two different joins and at most one
+  describes the board a user sees. **Suggest not closing on a coverage number
+  until it is settled which path is being measured.** Not investigated here —
+  this lane's file set, not that one's.
+- **Also relevant to scope:** for `player_shots` / `player_shots_on_target`,
+  `soccer_projections` maps the source to a **mean** and refuses by design to
+  derive a probability from it ("a mean presented as a probability is a
+  fabricated edge"), and the rows are 100% one-sided so
+  `_no_vig_over_probability` returns None. So those markets can never carry
+  `edge_vs_market_pct` however well the sim runs — raising projection COVERAGE
+  will not give them a model edge. `player_to_receive_red_card` and
+  `player_assists` are not in the market map at all.
 - **PREMISE CORRECTED 2026-08-14 18:4xZ — read this first.** This lane was
   opened on the reasoning that the projection gap is independent of the odds
   gap, because eredivisie's odds were current while 94 of its 99 markets had
@@ -713,6 +827,36 @@ the FIRST for a model it did not originally scope.**
   104.7; `LAYER2_GUARD_SKIP` = 0 so the 600MB floor held; zero failures, zero
   OOM.** Full detail and the two stated caveats (abort rate also fell; span is
   104 min not 180) are in `deploys.md`.
+- **SECOND WORK ITEM ADDED 2026-08-14, same file, same session: `pool["overview"]`
+  retention.** Kept in this lane rather than opening a rival one, because a
+  second lane claiming `pipeline/intelligence_state.py` would fight this one for
+  the single `.current-lane` marker.
+  - `_build_candidate_pool` embeds **every sport's fully hydrated overview** into
+    the returned pool (`"overview": [dict(item) for item in overview ...]`),
+    which is then cached up to `_max_snapshots`=12 deep AND JSON round-tripped on
+    every build and every cache hit.
+  - Its ONLY consumer is `_live_pipeline_summary`, which reads it for per-sport
+    COUNTS (live games, live prop items, distinct game ids) and one timestamp.
+  - **DONE, commit `100c9cb5`, NOT DEPLOYED.** `pool["overview"]` is replaced by
+    `pool["overview_summary"]` — five derived values per sport from a new
+    `_overview_live_summary`. The legacy key is still READ as a fallback because
+    `run_intelligence_query` persists the whole pool inside its response.
+    `tests/test_overview_summary_retention.py` 7 passed; the load-bearing one is
+    EQUIVALENCE (`json.dumps(sort_keys=True)` over the real consumer), not the
+    byte saving.
+  - **The saving is NOT quantified and must not be quoted as MB.** What is
+    established is the SHAPE: 12 cached pools x 8 hydrated sport rows, plus a
+    JSON round-trip of all of it per build and per cache hit. Sizing it needs a
+    real slate.
+  - **Next in this thread: the SUM -> MAX streaming change itself**, now
+    unblocked. `_collect_candidates` and `_odds_history_payloads_by_sport` both
+    already iterate per-sport; the `skip_game_hydration=True` fingerprint pass
+    must NOT be streamed (its output is a fingerprint — truncating it keys the
+    caller's cache off a partial sport list).
+  - So this is the last whole-list holder of the hydrated overview, and dropping
+    it is the prerequisite for the handoff's architectural fix (peak SUM -> MAX):
+    a streamed per-sport overview cannot exist while something downstream keeps
+    the whole list alive.
 - **Lane stays OPEN only for the span shortfall.** The criterion was a 3h clean
   window and this is 1.73h. Closing on it would be retro-fitting the criterion
   to favourable data.
