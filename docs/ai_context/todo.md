@@ -1,5 +1,61 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** OPEN, UNOWNED, split out of `#387` 2026-08-14
+
+**Filed because `#387`'s local run produced the first end-to-end timing of the
+overview stage and it belongs in its own ticket rather than buried in a memory
+one.** Memory and latency are different problems with different fixes; folding
+them together is how `#387` sat for days behind a threshold nobody had measured.
+
+**MEASURED 2026-08-14 (local, guard disabled, all 8 sports completed):**
+
+```
+build_intelligence_overview(skip_game_hydration=False)
+  elapsed        237.5 s   (3.96 min)
+  total RSS      +127.2 MB
+  hydrated       4 of 8 sports (soccer 56 games, ncaaf 16, nfl 10, wnba 1)
+```
+
+**THREE FIGURES IN THIS REPO DISAGREE, and no two were measured the same way:**
+
+| figure | source | what it claims |
+|---|---|---|
+| **~23 min** | `check_deploy_safety.py` comment ("~23 min of work") | a board build |
+| **3.2 / 3.7 min** | the gate's own `typical=` at runtime, 2026-08-14 | a board build |
+| **3.96 min** | `#387`'s local run, this ticket | the OVERVIEW STAGE only |
+
+The 23-minute comment is the one deploys are reasoned about — it is why the gate
+treats an in-flight build as a blocker. **It is unsourced.** The runtime
+`typical=` is computed from history and disagrees with it by ~7x. And the local
+figure covers only the overview, not the whole build, so it is a LOWER BOUND on
+the real thing rather than a contradiction of either.
+
+**WHY THIS MATTERS BEYOND TIDINESS.** Every deploy decision tonight weighed
+"killing an in-flight build" against urgency, using a number nobody has
+verified. Twice a build was left to run and did not land (01:36 for >8 min,
+against a stated 3.7min typical). If the true duration is 23 min, waiting was
+right and the gate is calibrated; if it is 4, those builds were already failing
+and the wait cost nothing but time. **The same evidence supports opposite
+decisions depending on which figure is true.**
+
+**RELATED, and the reason the timing may already have moved:** `#414` cut the
+per-game enrich from 21-54s to 7-8s in production (21.5x fewer rows walked). Any
+figure predating 2026-08-13 evening describes a board that no longer exists.
+The 23-minute comment almost certainly does.
+
+**NEXT ACTION — no deploy needed.** Instrument the build end-to-end on
+refresh-worker: one `BOARD_BUILD_BEGIN` / `BOARD_BUILD_END` pair with elapsed
+seconds and the sport count, so `typical=` stops being derived from inference.
+Then reconcile or retire the 23-minute comment. Until then, treat the gate's
+in-flight blocker as **unverified**, not wrong.
+
+**Caveats on the local number, so it is not over-quoted.** 4 of 8 sports had no
+games in this checkout's mirror, so a full slate would be slower. It is Windows
+on a warm interpreter, not Render. And it excludes candidate generation,
+scoring, and the shortlist write — the overview is a stage of the build, not the
+build.
+
+
 ### `#426` — **THE BOARD RANKS ON ARBITRAGE, NOT ON THE MODEL. The intelligence is being suppressed before it reaches the board.** OPEN, UNOWNED, user-reported 2026-08-14
 
 **This is the product's core claim failing quietly.** The board is meant to
