@@ -7,6 +7,21 @@
 
 ## Config
 
+- **`#423` — the leak is NOT glibc arena fragmentation. `[measured 08-14 02:18Z]`**
+  Ten readings at `anon` ~2031MB: arena coverage **11.0-24.4%**, and
+  `system_current` **plateaus at ~393MB while `anon` climbs**. The allocator is
+  bounded; the growth is outside it. `mmapped` 0.7MB, `arenas` 2 (cap applied).
+  Explains `malloc_trim` returning 0.0-2.9MB at guard time. **Stop tuning the
+  allocator.** What holds the other ~1700MB is UNMEASURED — NumPy/Monte Carlo
+  buffers are the leading candidate, not a finding.
+- **`#414` quote-join index: 21.5x in production. `[measured 08-14 00:18Z]`**
+  216,135 -> 10,043 rows walked per call; board-build 21-54s -> 7-8s. Quote
+  21.5x, NOT the 130x measured locally — the shard grew ~83k -> ~216k rows/call.
+  The profiler counters are CUMULATIVE across the window.
+- **Deployed SHAs `[measured 08-14 02:18Z]` — re-read before use, these moved
+  five times in one evening and a stale one nearly shipped a rollback:**
+  web `e29b807f`, refresh-worker `75b8aae6`, live-odds-worker `83e3e5f2`.
+
 - Max concurrent open lanes: **3** `[policy]`
 - Repo tip: local `main` `c506eb2a`, **25 ahead / 8 behind `origin/main`**
   (`461c0df0`). The two have diverged and both ends move every few minutes —
