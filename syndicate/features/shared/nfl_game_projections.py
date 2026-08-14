@@ -362,6 +362,60 @@ def attach_nfl_game_projections(
                             1.0 - _normal_cdf((line - mean) / stdev), 4
                         )
                         projection["basis"] = "smartsim2_total_normal"
+
+                # `#426`. THIS BRANCH PRODUCED A PROBABILITY AND NO EDGE, AND SAID
+                # NOTHING ABOUT WHY.
+                #
+                # Measured on the served board 2026-08-14T02:19:29Z: 28 NFL totals
+                # rows carried `model_prob_over` (0.2068 on a 54.5 line -- the
+                # model reading the Under at ~79%) with `edge_vs_market_pct`
+                # ABSENT ENTIRELY. Not None-with-a-reason: the key was never set.
+                # Every other suppression path in this tree writes a reason, so
+                # these rows were the one silent hole, and 0 of 200 board rows had
+                # a model edge as a result. The board ranked on cross-book
+                # arbitrage instead, which is why it showed both sides of the same
+                # game.
+                #
+                # `_no_vig_over_probability` was ALREADY generic -- its own
+                # docstring records the last time this bug was fixed: "Handling
+                # just over/under is why every game market came back with a
+                # projection and no edge." It handles home/away as well as
+                # over/under. This branch simply never called it.
+                #
+                # The skill caveat travels with the row rather than suppressing
+                # it: totals correlation is 0.269 ("barely better than predicting
+                # the historical mean"), which is weak but is NOT `#377`'s
+                # margins case (-0.047, "no measured skill"), and this file
+                # already publishes `projected` for totals on exactly that
+                # distinction. `model_skill` is attached above so the edge cannot
+                # be read without it.
+                from syndicate.features.shared.prop_projections import (
+                    _no_vig_over_probability,
+                )
+
+                model_prob_over = projection.get("model_prob_over")
+                if model_prob_over is None:
+                    projection["edge_vs_market_pct"] = None
+                    projection["edge_unavailable_reason"] = (
+                        "no over probability: the sim reported no usable total_stdev"
+                        if line is not None
+                        else "no over probability: the row carries no line to price against"
+                    )
+                else:
+                    market_fair = _no_vig_over_probability(row)
+                    if market_fair is None:
+                        # One-sided market. De-vigging needs both legs; pretending
+                        # otherwise is what `#238` measured as ~3.1 points of
+                        # manufactured edge per row.
+                        projection["edge_vs_market_pct"] = None
+                        projection["edge_unavailable_reason"] = (
+                            "market is one-sided: no two-sided consensus to de-vig against"
+                        )
+                    else:
+                        projection["market_fair_prob_over"] = round(float(market_fair), 4)
+                        projection["edge_vs_market_pct"] = round(
+                            (float(model_prob_over) - float(market_fair)) * 100.0, 2
+                        )
         else:  # spreads
             mean = entry.get("margin_mean")
             line = _as_float(row.get("line"))
