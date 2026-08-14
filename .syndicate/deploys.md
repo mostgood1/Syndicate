@@ -1060,3 +1060,49 @@ people learn to route around. Run the gate, read it, then deploy.
   previous night, to answer a question a GET could answer, would have been a
   bad trade. Reading the artifact cost one request.
 - Rollback: redeploy `214f5151` (re-read the live commit first).
+
+### `#433` — soccer capture-before-simulate (live-odds-worker, PINNED, 1 file)
+- Deployed: 2026-08-14 ~12:3x CDT — **row written BEFORE the deploy fired.**
+- Commit: **`9a3a5bc6`** = the live commit `83e3e5f2` **plus only this change**,
+  pushed as `deploy/soccer-step-order-433`. Not `main`'s tip.
+- **WHY PINNED, and this is the whole point of the row.** live-odds-worker has
+  been on `83e3e5f2` since 2026-08-13 23:43Z. Deploying it at `origin/main`
+  (`e9990ccb`) would have carried **22 production files** from four other
+  lanes — `memory_observability.py`, `run_refresh_worker.py`,
+  `pipeline/intelligence_state.py`, `board_enrichment.py`, `projection_skill.py`
+  and the NFL set — onto a **2GB service with an OOM history**, none of it
+  measured on THIS service. That is the batching failure `CLAUDE.md` names.
+  Cherry-picking onto the live commit instead makes the production delta
+  exactly **one file**: `scripts/refresh_odds_sources.py`.
+  `main` already carries the same change as `e9990ccb`; the two are the same
+  patch, so this does not fork the fix, only the deploy.
+- Change: soccer step order becomes `schedule -> odds -> props -> artifacts ->
+  picks`. Previously the 50-step run put all ten sims (11-20) AHEAD of the odds
+  captures (21-30) and died between step 27 and 28, so three leagues went 3.6
+  days without odds and steps 31-50 never ran for any league.
+- **Not a workaround:** `build_soccer_artifacts.py` does not read
+  `game_odds_current.csv`, so the sim never depended on the capture it was
+  blocking. `picks` stays last because it DOES depend on both.
+- Service selection: live-odds-worker only. Per `#148` it owns the soccer
+  pregame odds/props/schedule steps
+  (`_launch_autorun_soccer_pregame_refresh`); refresh-worker's soccer autorun
+  runs `phase="live"` per-league and is unaffected by this ordering.
+  **refresh-worker is NOT redeployed, so no in-flight MLB sim is killed.**
+- Expected effect, as a number: on the next soccer pregame run, the dark
+  leagues' odds steps execute at positions **#18/#19/#20 instead of
+  #28/#29/#30** — inside the ~27 steps the run actually completes — and the
+  newest `captured_at` for primeira_liga, championship and belgian_pro_league
+  in `soccer_source/tracking/book_quotes/<date>.jsonl` moves from 08-10/08-11
+  to today. Zero additional OddsAPI spend: same steps, same call volume.
+- Measurement: me, by re-reading the shard per league after the next pregame
+  run. Written into this row.
+- Rollback: redeploy `83e3e5f2` on live-odds-worker (re-read the live commit
+  first). The change is order-only, so a rollback restores the old ordering and
+  nothing else.
+- Ledger check: no FORBIDDEN/EXONERATED rule applies. No `render.yaml` change,
+  so no `blueprint_sync`. `scripts/refresh_odds_sources.py` confirmed
+  unclaimed by any OPEN lane via a `lane-guard.py` stdin probe (exit 0).
+- **Known-not-fixed:** why the run stops at ~27 steps (time budget, memory or
+  step timeout) is still unnamed. This removes the consequence, not the cause;
+  a truncating run now loses sims and picks rather than odds.
+- Measured: `<pending>`
