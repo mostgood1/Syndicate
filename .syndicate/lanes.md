@@ -6,6 +6,152 @@
 
 ## OPEN
 
+### soccer-odds-coverage — OPEN — opened 2026-08-14 — session: board-ui
+- Goal: every active soccer league's odds refresh on their own cadence, not
+  just the leagues near the front of `_SOCCER_LEAGUE_SLUGS`. Testable outcome:
+  the newest `captured_at` per league in
+  `soccer_source/tracking/book_quotes/<date>.jsonl` is within one sweep
+  interval for ALL leagues with fixtures, not 3 of 6.
+- **MEASURED AT THE SHARD, 2026-08-14 (production, via
+  `/api/ops/artifacts/export`), shard `2026-08-14.jsonl`, 833 rows:**
+
+      league               rows   newest captured_at
+      eredivisie            488   2026-08-14T13:16:41Z   <- current
+      primeira_liga         141   2026-08-10T20:54:08Z   <- 3.8 days
+      belgian_pro_league    111   2026-08-10T20:54:11Z   <- 3.8 days
+      championship           93   2026-08-11T00:54:47Z   <- 3.6 days
+
+  Three of today's FOUR fixtures are in the dark leagues, kicking off 13:45,
+  14:00 and 14:15 CDT.
+- **The ordering is the signal.** Dark leagues are positions **8, 9, 10** in
+  `_SOCCER_LEAGUE_SLUGS`; every fresh league (la_liga 2, mls 6, eredivisie 7)
+  is earlier. `refresh_odds_sources.py:1220` builds ONE STEP PER LEAGUE in slug
+  order, so a run that ends early always loses the same tail. primeira_liga and
+  belgian stopped **3 seconds apart**; championship exactly 4h later — matching
+  the autorun interval, i.e. successive runs each dying near the same point.
+- **Two candidate causes FALSIFIED before hypothesising:**
+  - Season gate: `active_leagues_for_date('2026-08-14')` returns **all 10**
+    leagues active. It is not excluding them.
+  - Per-league rotation starvation (`#356`): that is refresh-worker's SIM
+    autorun (`run_refresh_worker.py:1140`, one league per tick). The ODDS half
+    is `_launch_autorun_soccer_pregame_refresh`
+    (`run_live_odds_refresh_worker.py:90`), which passes **no**
+    `soccer_leagues` and so launches every league in ONE job. Not rotation.
+  - Also ruled out: the leagues are not skipped wholesale — the live-state path
+    writes their files (16:46:54Z, "0 live games"). It is specific to the odds
+    fetch steps.
+- Hypothesis: the all-leagues pregame job does not survive to its tail. Leading
+  candidate is that it runs `launch_mode="web_process"` ON live-odds-worker,
+  which recycles itself on `max_uptime_seconds` (observed 06:16:58Z and
+  12:22:21Z today, `earlyExit=true`) — a recycle mid-job kills the subprocess
+  partway down the league list. A step timeout or runtime budget would produce
+  the same signature and is not yet separated from it.
+- Falsification test: if a pregame job is shown running to completion across
+  ALL ten leagues while the tail leagues still do not update, the run is not
+  being truncated and the fault is inside the per-league fetch instead.
+- Files (exclusive to this lane):
+  - `scripts/refresh_odds_sources.py` — league step construction/ordering.
+  - `tests/test_soccer_odds_coverage.py` (new).
+  - **Ownership checked by PROBE, not by reading:** the two
+    `refresh_odds_sources.py` claims in this file belong to CLOSED lanes
+    (`sim-execution-observability`, `soccer-sim-grouping`), and the mention
+    inside OPEN `refresh-worker-anon-leak` is PROSE, not a Files-block claim.
+    `lane-guard.py` fed this exact path on stdin returns **exit 0**. No lane
+    needed reassigning; the user authorised taking it and it was not held.
+- MITIGATION FIRED FIRST, before diagnosis was complete: all-soccer pregame
+  refresh job `a93384d014574861981a05328a62ebe9` at 11:52:22 CDT, because three
+  games kick off within two hours and a correct fix does not arrive in time to
+  matter for them. League scoping was NOT available — `soccer_leagues` is not
+  plumbed through `/api/ops/odds-refresh/run`.
+- Blocked by: none.
+
+### soccer-projection-gap — OPEN — opened 2026-08-14 — session: board-ui
+- Goal: soccer markets on the board carry the sim's projections. Testable
+  outcome: `rows_with_projection / rows` for soccer rises from **30%** toward
+  the coverage MLB achieves (1,622 of 2,537 = 64% the same day), and no league
+  with a fixture serves 0 projections.
+- **MEASURED 2026-08-14 on the served board, and this is NOT downstream of the
+  odds-coverage bug — which is why it is a separate lane:**
+
+      league               market rows   with projection
+      eredivisie                    99                 5   <- odds are CURRENT
+      belgian_pro_league             4                 4
+      championship                   3                 3
+      primeira_liga                  4                 0   <- zero
+
+  Board-wide soccer: **8,299 rows, 2,503 projected = 30.2%**.
+- **The decisive observation:** eredivisie is the ONE league whose odds are
+  current, and **94 of its 99 markets have no projection**. The odds arrived
+  and the projections did not meet them. So this cannot be explained by the
+  capture gap, and fixing capture will not fix this. Player props are where the
+  gap is widest; game lines are largely projected.
+- Second, possibly-related defect from the same payload: `by_state` reports
+  **37 of 75 soccer games as `unknown`** — the game-state join failed on half
+  the board. An unknown state is not cosmetic; `#298`/`#300` make it FAIL the
+  staleness floor, so it can suppress rows downstream.
+- Third, on the app-wide surface: `/api/board/game-chips` returns **56 soccer
+  chips for date=2026-08-14** when only **4** fixtures are today — epl,
+  bundesliga, serie_a and ligue_1 all appear and none play today. Every chip
+  also carries `status`, `away_abbr`, `home_abbr` = null. The Layer 2 home
+  cards are simultaneously over-inclusive on date and unhydrated.
+- Hypothesis: not yet formed, deliberately. Three distinct symptoms (projection
+  join, game-state join, chip date-scoping) could be one cause or three, and
+  guessing here is exactly how the 08-14 cadence mistake happened. First action
+  is to establish whether the soccer sim WROTE projections for today's fixtures
+  at all, which separates "not produced" from "produced, not joined".
+- Falsification test for that first step: if projection artifacts for
+  eredivisie 2026-08-14 contain per-market projections the board is not
+  showing, the sim is fine and this is purely a join defect. If they are absent
+  or thin, the sim never produced them and the join is exonerated.
+- Files: none claimed yet — read-only until the sim-vs-join question is
+  settled. Naming files now would claim the wrong ones.
+- Blocked by: none. Related to `soccer-odds-coverage` but independent of it,
+  proven by the eredivisie row above.
+
+### wnba-skill-backtest — OPEN — opened 2026-08-14 — session: nfl-day-of-game
+- Goal: `#428`, first of six. Measure whether the WNBA game model predicts
+  anything, and write the answer into a `MEASURED_SKILL`-shaped constant the
+  producer attaches itself. Testable outcome: a correlation and an MAE for
+  `pred_margin` and `pred_total` against real finals, **each reported against a
+  constant baseline**, over a stated sample size — or an evidenced statement
+  that the data does not support one.
+- **WHY WNBA FIRST:** production holds **81 dates** (2026-05-17..08-15), the
+  deepest of any sport, and its contract ships MEANS WITHOUT A DISTRIBUTION, so
+  correlation is the only honest measure available and there is no probability
+  to be tempted into deriving.
+- **THE "BLOCKED ON DATA" PREMISE WAS WRONG AND IS ALREADY CORRECTED IN `#428`.**
+  It came from a LOCAL read ("4 game-card files"); production has 81 dates. The
+  local `game_cards_*.csv` are 7-column stubs with no projections at all, while
+  production's carry 19 columns including `pred_margin` / `pred_total`. Do not
+  scope anything here from the checkout.
+- Data, both confirmed by fetching before any code was written:
+  - PROJECTIONS — production `wnba_source/data/processed/game_cards_<date>.csv`
+    via `/api/ops/artifacts/stream?path=`, admin token. Carries `pred_margin`,
+    `pred_total`, plus the market's `home_spread` / `total` for a baseline.
+  - OUTCOMES — **not in that file.** Sourced from ESPN's public WNBA scoreboard,
+    the same feed `#429`-era NFL work already uses. Join on date + tri-codes.
+- Files (exclusive to this lane):
+  - `scripts/backtest_wnba_projection.py` (new)
+  - later, if a number is produced: a `MEASURED_SKILL` constant + the one-line
+    producer attach in `syndicate/features/shared/wnba_projections.py`
+- **HAZARDS, written before running anything:**
+  - **Report MAE against a CONSTANT BASELINE, not bare correlation.** NFL's
+    totals model sits at r=0.269 and beats the historical mean by only 0.22
+    MAE; a bare r would have read as skill. The baseline is the finding.
+  - **A sample size is part of the number.** `#377`/`#429` both produced
+    authoritative-looking values with no n behind them. If the join yields few
+    games, say so and do NOT emit a constant.
+  - **Publish the INTERSECTION, not the union** — CLAUDE.md's standing trap.
+    Dates with a projection but no final, or vice versa, are excluded and
+    COUNTED.
+  - Margin sign convention must be pinned against a real game before any
+    correlation is believed; an inverted sign turns skill into anti-skill and
+    looks plausible either way.
+- Falsification: if the model has no skill, that is a RESULT and gets written
+  down. `#367` did exactly that for NFL (corr −0.047) and it is why NFL's
+  margin projection is suppressed today.
+- Blocked by: none.
+
 ### odds-capture-stall — CLOSED 2026-08-14 — NOT A DEFECT: the 2h gap IS the configured pregame cadence
 - **Outcome: EXONERATED. There was no stall.** The gap is
   `_PREGAME_SWEEP_INTERVAL_FALLBACK = 2 * 3600` in
