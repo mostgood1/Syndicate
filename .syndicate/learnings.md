@@ -1472,3 +1472,80 @@ back **oldest-first regardless of `direction`**.
 - Generalises past backtests: any check of the form "enough data?" must name
   which data. `len(rows)` is almost never the right answer when the rows are
   heterogeneous.
+
+### 2026-08-14 — THREE wrong root causes in one session, one shape: a single sample of a moving quantity
+
+- What we believed, three times in ninety minutes, each stated to the user as a
+  finding:
+  1. **"MLB odds capture stopped"** — from zero `[odds_book_quotes]` lines on
+     live-odds-worker. But `_append_mlb_book_quotes` returns early on
+     `if not rows:` BEFORE the call that prints, and the odds refresh runs in
+     detached subprocesses. **The instrument had never once been observed
+     emitting non-zero**, so its zero carried no information.
+  2. **"The 12MB publish ceiling blocks the transport"** — from 12 real
+     `SWEEP_SKIPPED_DETAIL too_large=` lines against a 12,800,063-byte shard.
+     But the ceiling is **sweep-only**; the direct path streams and never
+     consults it, which `artifact_publisher.py:1007` states explicitly **twenty
+     lines below the constant I quoted**. Web had the file, byte-identical.
+     That same comment records THREE prior sessions misreading `{'too_large':N}`
+     the same way. This was the fourth.
+  3. **"Capture stopped at 15:10:44Z"** — from one read of the shard's tail.
+     Ten minutes later the newest row was 16:20:38Z. Capture runs in ~2h bursts;
+     the read landed in a gap.
+- What was actually true: **nothing was broken.** MLB book-quote capture runs on
+  a ~121.6-minute cadence because the pregame relaunch cooldown (1800s) is keyed
+  by DATE ONLY — not by sport — and sports rotate across launches, so MLB rides
+  every 2nd-4th one.
+- **The single shape underneath all three: a quantity that MOVES, sampled ONCE,
+  promoted to a conclusion.** Each sample was real. Each was reported honestly.
+  Each was wrong about the system because one sample of a bursty, rotating, or
+  conditionally-emitted quantity is a point, not a rate.
+- **What finally worked, and it is the prescription: stop reading the
+  instrument and read the STATE.** Streaming the whole artifact and extracting
+  every distinct `captured_at` gave the complete cadence — 7 bursts, gaps
+  515.7/121.6/121.6/122.5/121.6/69.9 — in one call, with no log-token guessing
+  and no sampling. The logs are an emitter with unknown coverage; the artifact
+  is the thing itself.
+- The rule going forward: **before concluding from an absence or a single
+  reading, ask "what is the period of this thing?" and take a span longer than
+  it — or read the durable state instead of the event stream.** And when a
+  finding rests on a constant, read the whole comment AND the call sites of the
+  function that owns it before publishing; the disconfirming sentence was
+  already written in the file all three times.
+- Cost: three wrong statements to the user, all retracted the same session,
+  nothing shipped on any of them. The retractions are in `state.md`. The real
+  cause was found and the fix written the same session.
+
+### 2026-08-14 — I CALLED A CORRELATION A PROOF, TWICE IN ONE SESSION
+- What I believed: the soccer odds gap was step truncation. The evidence felt
+  airtight — the pregame run is 50 steps grouped by kind, odds sit at #21-30
+  behind ten sims, and the fresh/dark split matched the step order with **no
+  exceptions**: `soccer_eredivisie_odds` #27 current, #28/#29/#30 all 3.6 days
+  stale. I wrote "ROOT CAUSE PROVEN" into the lane, shipped a reorder, and told
+  the user it was the fix.
+- What was actually true: unknown, but **not that**. A single-league scoped run
+  for `belgian_pro_league` captured nothing either — and that job is ~6 steps.
+  **A 6-step job cannot die at step 27.** One four-minute test, available the
+  whole time, would have killed the theory before it was deployed.
+- **The rule: when a pattern implies a mechanism, test the mechanism directly
+  before shipping against it.** The step-order story predicted "shrink the step
+  list and it works". That prediction was cheap, decisive, and I ran it AFTER
+  deploying instead of before. A correlation across ten leagues is still one
+  observation of one run shape; it is not ten independent confirmations.
+- Second instance the same session, same shape: a 2h odds gap measured twice at
+  the identical instant read as an outage, and was `interval_s=7200` — I had
+  measured a constant and called it a failure. Both times a clean pattern
+  substituted for a test. Both times the test was minutes of work.
+- **What I did right, and it limited the damage:** the reorder was pinned to a
+  single file on the live commit rather than batched onto main's tip, so the
+  wrong theory shipped ~80 lines of defensible reordering instead of 22 files
+  of four lanes' unmeasured work. A wrong diagnosis with a small blast radius
+  is recoverable; the same diagnosis with a batched deploy would not have been.
+- Corollary I nearly missed: the odds CSVs contain today's fixtures with real
+  prices, which LOOKS like proof the captures are fresh — but a CSV written
+  four days ago would contain them too, because they were upcoming then. I
+  caught that one before publishing it. Same class of error as the two above,
+  and the only reason it did not become a third is that I asked what else could
+  produce the observation.
+- Cost: one unnecessary deploy, a wrong "PROVEN" in the ledger for ~90 minutes,
+  and three fixtures that reached kickoff stale while I chased the wrong thing.

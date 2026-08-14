@@ -6,6 +6,56 @@
 
 ## OPEN
 
+### recommendation-lane-correctness — OPEN — opened 2026-08-14 — session: model-audit
+- Goal: no published shortlist row derives its edge from a fabricated
+  probability or from a vigged price. Testable outcome, all on the served
+  `/api/board/layer2-shortlist`: (a) zero rows whose fair probability came from
+  the `0.5` terminal or from `confidence`, (b) every recommendation-lane edge
+  labelled `edge_priced_against: "no_vig_fair"`, (c) zero published rows
+  carrying a negative `model_edge_pct` (or the field hidden on them).
+- Source: Lane A of `.syndicate/plan_2026-08-14_models.md`, derived from
+  `.syndicate/audit_2026-08-14_models.md` §4 and ranked fixes 3 and 4.
+- **Both defects CONFIRMED in the local tree this session, by reading the file
+  rather than trusting the audit prose** (`0a18d901` + local edits):
+  - `recommendation_engine.py:685` — `_fair_probability` ends `return 0.5`, and
+    line 678 consumes `confidence` as if it were P(outcome).
+  - `recommendation_engine.py:294` — `_repriced_probabilities` sets
+    `implied_probability = _parse_american_odds(current_odds)`, the raw vigged
+    price, and `filter_candidates:1204-1205` passes it straight into
+    `calculate_edge`, overriding whatever the candidate carried.
+  - Not in the audit, found the same pass: `_repriced_probabilities:311` and
+    `_tracking_snapshot:354` ALSO fall back to `confidence` as a model
+    probability. A1 must fix three sites, not one.
+- Hypothesis (recorded before testing, per protocol — this is A0): the fabricated
+  edge is largest exactly where there is no model, because a 0.5 default against
+  a plus-money side manufactures a large edge and against a favourite
+  manufactures almost none. If so the model-free published rows should skew
+  plus-money relative to the 57 rows carrying `model_edge_pct`.
+- Falsification test: if the model-free rows' price distribution is the same as
+  or shorter than the model-backed rows', the 0.5 default is not selecting for
+  longshots, the shortlist is optimistic but not inverted, and A1-A2 stay
+  correct-but-not-urgent. Record the result either way.
+- Verification: re-fetch the served shortlist after deploy and check the three
+  outcomes above; unit tests pinning each fix, mutation-checked (restoring the
+  old line must turn exactly that test red).
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/recommendation_engine.py`
+  - `syndicate/features/shared/layer2_board.py` — A3/A4 only.
+  - `tests/test_recommendation_engine.py`, `tests/test_layer2_board.py`.
+  - Collision check 2026-08-14: parsed every OPEN lane's claim block. Claimed
+    elsewhere are `scripts/refresh_odds_sources.py` (soccer-odds-coverage),
+    `pipeline/intelligence_state.py` (layer2-board-freshness),
+    `syndicate/templates/shared/layer1_board.html` +
+    `syndicate/features/shared/layer1_board.py` + `syndicate/blueprints/intelligence.py`
+    (board-ui-freshness-slip-books), `syndicate/features/shared/live_refresh_loop.py`
+    (mlb-props-regen). No overlap with this lane's set.
+  - NOT claimed, deliberately: `syndicate/blueprints/intelligence.py` is held by
+    `board-ui-freshness-slip-books`. If A4 needs a new counter on the wire,
+    surface it to that lane rather than editing across the boundary — `#397`
+    says a counter absent from that endpoint is invisible no matter how well it
+    works, so this is a real constraint on A4, not a formality.
+- Blocked by: none. Independent of Lane B (CLV) by design.
+
 ### soccer-odds-coverage — OPEN — opened 2026-08-14 — session: board-ui
 - Goal: every active soccer league's odds refresh on their own cadence, not
   just the leagues near the front of `_SOCCER_LEAGUE_SLUGS`. Testable outcome:
@@ -40,8 +90,44 @@
   - Also ruled out: the leagues are not skipped wholesale — the live-state path
     writes their files (16:46:54Z, "0 live games"). It is specific to the odds
     fetch steps.
-- **ROOT CAUSE PROVEN 2026-08-14 17:00Z via `/api/ops/odds-refresh/plan`
-  (dry_run, cost nothing). The run is 50 steps GROUPED BY KIND, not by league:**
+- **RETRACTED 2026-08-14 18:2xZ — the "ROOT CAUSE PROVEN" claim below is
+  FALSIFIED. Read this before the block it retracts.**
+  - **The falsifier: a SINGLE-LEAGUE scoped run for `belgian_pro_league`
+    (job `0ca3c16b`, launched 12:59:45 CDT, confirmed claimed and running)
+    captured NOTHING.** That job is ~6 steps. **A 6-step job cannot die at
+    step 27.** Step truncation therefore cannot explain these three leagues.
+  - Two further facts that cut the same way: the odds CSVs
+    (`<league>/api/odds/game_odds_current.csv`) contain TODAY's fixtures with
+    real prices for all four leagues — belgian 35 rows for 2026-08-14
+    including Cercle Brugge v Sint Truiden at +125 — and the shard append
+    (`_append_soccer_book_quotes`, which swallows exceptions and prints
+    `append FAILED`) logged no failure on either worker.
+    **CAVEAT, stated because it is exactly the trap I fell into this morning:
+    a CSV written on 08-10 would ALSO contain today's fixtures, since they
+    were upcoming then. I could not obtain the file mtime, so this is
+    suggestive, NOT proof that the captures are fresh.**
+  - **What I got wrong, and how.** The step-position correlation was real and
+    striking — #27 fresh, #28/#29/#30 dark, no exceptions — and I promoted it
+    to "proven" on the strength of the pattern alone, without running the
+    four-minute single-league test that would have killed it. Correlation
+    with a plausible mechanism is not a cause. This is the second time in one
+    session I have taken a clean-looking pattern for a proof; the first was
+    calling a 2h cadence an outage.
+  - **The reorder that shipped from this claim is NOT harmful and is NOT
+    withdrawn** — cheap captures should not queue behind ten sims regardless,
+    it is tested, and it is pinned to one file — but it did not fix this bug
+    and must not be recorded as having done so.
+  - **The surviving discriminator, which is now the whole question:
+    eredivisie captures and the other three never do — through the all-league
+    autorun, a manifest job, AND a single-league scoped run.** Same script,
+    same key, same region, same shard writer. That is league-specific, not
+    position-specific. Next step is `/api/ops/oddsapi/sports` (`#433`,
+    shipped) to see whether the vendor still lists those three keys at all.
+
+- ~~**ROOT CAUSE PROVEN 2026-08-14 17:00Z via `/api/ops/odds-refresh/plan`
+  (dry_run, cost nothing). The run is 50 steps GROUPED BY KIND, not by
+  league:**~~ (retained for the ordering evidence, which is accurate; the
+  causal claim is retracted above)
 
       steps  1-10   every league's schedule
       steps 11-20   every league's `artifacts`  <- TEN SOCCER SIMS
@@ -390,7 +476,88 @@ the FIRST for a model it did not originally scope.**
   `layer2-board-freshness` at this lane's checkpoint. If that session hits a
   BLOCKED message in the meantime, this is why.
 
-### layer2-board-freshness — OPEN — CODE WRITTEN AND TESTED, NOT DEPLOYED, NOT MEASURED — opened 2026-08-14 — session: layer2-freshness
+### build-time-estimate — CLOSED 2026-08-14 — board build timed at ~2-4 min on current code; estimator can no longer collapse to ~0 — opened 2026-08-14 — session: layer2-freshness
+- **VERIFICATION RAN, both criteria, result stated.**
+  1. Unit test in which an all-short-circuit window must not yield ~0:
+     `tests/test_deploy_safety_build_estimate.py` 9 passed, and
+     **mutation-pinned** — restoring `return max(values)` turns exactly that one
+     test red (`0.0 not greater than or equal to 60.0`), the other 8 stay green.
+  2. `check_deploy_safety.py` against live data still reports
+     `a build takes ~2.3min` — unchanged, because the fix only alters the
+     all-short-circuit case. `tests/test_deploy_preflight.py` 9 passed.
+- Commit `0ddecded` (local). Operator-side script only; **no service code, no
+  deploy, nothing to measure in production.**
+- Outcome: a current board build is **~2-4 min** (n=39, p90 146.19s, max
+  209.66s), not ~23. The 23-min figure predates `#414` and is left in place with
+  the measurement beside it rather than retired on one 4h window.
+- Two corrections to `#427` itself, both now in the ticket: its item 1 was
+  already satisfied (`_expected_build_seconds` always used `max`), and the
+  23-minute figure is not "unsourced" — the docstring traces it to a real
+  22.9-min build.
+- Left open in the ticket, deliberately: `candidate_collection_with_fallback` is
+  a wrapper and the 138-210s sits somewhere inside it. That decomposition is the
+  only place new instrumentation would earn its cost.
+- Goal (`#427`): the deploy gate's build-duration estimate cannot collapse to
+  ~0 when its sample happens to contain only empty-pool short-circuits, and the
+  ticket's three disagreeing figures are reconciled against the CURRENT code.
+  Testable outcome: `_expected_build_seconds` returns a value derived only from
+  calls that did real work, and returns a conservative fallback (never None-as-
+  zero, never ~0) when the window contains none.
+- **MEASURED FIRST, refresh-worker 4h to 2026-08-14 18:0xZ, live `294f9ca9`:**
+
+      COLLECT_SPAN_EXIT collect_candidates   n=39  p50=0.00  p90=146.19  max=209.66
+        of those >= 1s:                      n=9   p50=138.30            max=209.66
+      fraction >= 60s: 23.1%      fraction >= 600s: 0.0%
+      BUILD_SPAN_EXIT candidate_collection_with_fallback n=38 p50=0.00 p90=260.28 max=434.26
+
+  **So ~77% of calls are the empty-pool short-circuit and the real ones cluster
+  at 138-210s.** A current board build is ~2-4 min, NOT ~23 min. The 23-minute
+  figure predates `#414` (21.5x on the quote join) and describes a board that no
+  longer exists.
+- **NEAR-MISS, recorded because it nearly became a filed defect.** From the
+  distribution I computed "max of the LAST 12 = 0.1s" and was about to report
+  the gate as broken. Running the gate instead returned **`a build takes
+  ~2.3min`**. Cause: `_render_logs(..., limit=12)` gets rows **oldest-first
+  regardless of direction** — a quirk already in `learnings.md` — so the 12 it
+  samples are not the 12 I ranked. **The defect is LATENT, not live.** Do not
+  write it up as a live failure.
+- Files (claimed by this lane):
+  - `scripts/check_deploy_safety.py` — `_expected_build_seconds` only.
+  - `tests/test_deploy_safety_build_estimate.py` (new).
+  - `docs/ai_context/todo.md` — `#427` findings.
+  - Collision check: `lane-guard` stdin probe returns exit 0 for all three; the
+    only lanes naming these files are CLOSED (`board-transport`) or mention them
+    in prose rather than claiming them.
+- Hypothesis: the estimator's MAX defence was chosen against a mixed sample
+  (where a median would sag) and is undefended against a sample that is
+  ENTIRELY short-circuits, in which case max is also ~0.
+- Falsification test: if fewer than ~10% of `COLLECT_SPAN_EXIT` values are
+  sub-second, the short-circuit population is too small to threaten the sample
+  and this lane is solving a non-problem. **Measured 77% — it is real.**
+- Verification: a unit test in which an all-short-circuit window yields the
+  conservative fallback rather than ~0, red against the current implementation;
+  plus `check_deploy_safety.py` still reporting a sane figure on live data.
+- Blocked by: none. No deploy — this is an operator-side script.
+
+### layer2-board-freshness — OPEN — VERIFIED ON A 103.9-MIN CLEAN WINDOW, 3h READ STILL OWED — opened 2026-08-14 — session: layer2-freshness
+- **CLEAN-WINDOW RESULT 16:16:56-18:00:49Z (103.9 min, no intervening deploy):
+  22 refreshes = 12.7/hour against a 1.7/hour baseline; 8 of them via the new
+  fast path on cycles the Layer 1 guard refused; longest gap 11.8 min against
+  104.7; `LAYER2_GUARD_SKIP` = 0 so the 600MB floor held; zero failures, zero
+  OOM.** Full detail and the two stated caveats (abort rate also fell; span is
+  104 min not 180) are in `deploys.md`.
+- **Lane stays OPEN only for the span shortfall.** The criterion was a 3h clean
+  window and this is 1.73h. Closing on it would be retro-fitting the criterion
+  to favourable data.
+- **STATUS 2026-08-14 17:4xZ.** Deployed and its path is PROVEN to execute:
+  `LAYER2_FAST_REFRESH` x6, 24 refreshes / 126 min, longest gap 19.6 min against
+  a 104.7-min baseline, with 28 `MEMORY_GUARD_ABORT` in the same window (the
+  guard refusing is the condition this change exists for). `LAYER2_GUARD_SKIP`
+  = 0, so the 600MB floor held. Lane stays OPEN because two other deploys
+  landed inside the window and the AGGREGATE is therefore not cleanly
+  attributable — the liveness is, the magnitude is not.
+- **NEXT ACTION:** take one clean 3h window with no intervening deploy and
+  re-run the same counts. Only then close.
 - **STATUS 2026-08-14: the change is written, tested and mutation-pinned. It is
   NOT deployed and its production effect is UNMEASURED.** Working tree only:
   `pipeline/intelligence_state.py` (+216), `tests/test_layer2_fast_refresh.py`
