@@ -1268,3 +1268,151 @@ back **oldest-first regardless of `direction`**.
   down. Read the comment before overriding it.
 - Cost: none in production — the change was not shipped. A ticket carried a
   recommendation that would have restored an OOM loop, for about an hour.
+
+### 2026-08-14 — A guard's floor is a claim about ONE stage; refusing everything downstream of it is a separate bug
+
+- What we believed: the Layer 2 board was stale because the intelligence
+  engine had become slow, and because refresh-worker is leaking memory. Two
+  sessions of work had gone into making the build cheaper (`#414`'s 21.5x
+  quote-join index) and into naming the leak's allocation site (`#423`).
+- What was actually true, measured over one 3h production window: **the builds
+  that run are fine — 96.7% of them never start.** 146
+  `MEMORY_GUARD_ABORT stage=pre_source_state_fingerprint` against 5 completed
+  builds, and a 104.7-minute stretch with no shortlist rebuild at all. Making
+  the build faster cannot move a number whose denominator is refusals.
+- And the guard was refusing correctly. `_MIN_SAFE_MEMORY_HEADROOM_BYTES` is
+  sized, in its own comment, for `build_intelligence_overview`'s ~1.9GB
+  transient — a stage the Layer 2 shortlist does not run. The bug was never the
+  floor's VALUE. It was that one floor gated a whole publication containing two
+  stages whose costs differ by ~10x. Production proved the independence itself:
+  3 of the 5 completed builds had `CANDIDATE_POOL_READY count=0` while
+  `LAYER2_SHORTLIST` returned 256 rows from 13,665 opportunities on the same
+  cycle.
+- **The rule going forward: a memory floor is a claim about the cost of ONE
+  stage. Before putting a guard in front of a span, enumerate what is inside
+  the span and what each part costs. If the span contains work an order of
+  magnitude cheaper than the floor, the guard is not protecting that work — it
+  is deleting it.** The cheap work needs its own, measured floor, and the abort
+  line needs to say WHICH floor fired or the two become indistinguishable in
+  the logs.
+- Second belief overturned in the same window: **the "leak" was not leaking.**
+  Boot-segmented over 2.5h, `anon` went 2620.1 -> 2439.6MB — it oscillates
+  ~1400-2800MB around a high plateau and did not ratchet. The 08-13 rate is a
+  fact about 08-13. A plateau and a ratchet demand different fixes (find the
+  retainer vs. find the allocator), and the ledger's own framing had carried
+  the ratchet forward unchallenged into a new day.
+- Method note that produced both: the first read of the same data said "the
+  floor fell 1310MB in 3h, it is recovering." It was a deploy at 14:22:32Z
+  restarting the worker. Boot-segmenting is already a rule here
+  (`2026-08-10 — segment on process boundaries before any neighbour-based
+  test`); it was nearly broken again because the discontinuity was somebody
+  ELSE's deploy, which does not announce itself in your own session.
+- Cost: none. Caught before anything was written down, and the sessions that
+  optimised the build were not wasted — they are why the 5 builds that do run
+  finish in 27s.
+
+### 2026-08-14 — A CADENCE IS NOT AN OUTAGE, AND I ESCALATED ONE AS THE OTHER
+- What I believed, and told the user in bold: MLB odds "have not been refetched
+  since 8:09am CDT, now 2h10m and counting", framed as a capture stall worth
+  chasing. I had two independent readings 78 minutes apart showing the freshest
+  observation frozen at the *identical* instant, which felt decisive.
+- What was actually true: `_PREGAME_SWEEP_INTERVAL_FALLBACK = 2 * 3600`. Daily
+  sports drift-sample every 2h pregame by a decision dated 2026-07-27 in the
+  constant's own comment. The gap measured **7,289s against an interval of
+  7,200** — I had measured the constant and called it an outage.
+- **The rule: before calling a gap a failure, look for the interval it equals.**
+  Two identical readings prove a quantity is not advancing; they say nothing
+  about whether it is *supposed* to be. "Frozen" and "sampled" are the same
+  observation at any sampling rate below your polling rate — the discriminator
+  is not another reading, it is the configured period. I took a third and
+  fourth reading when I should have grepped for a constant.
+- What did work, and is worth repeating: writing the competing explanation into
+  the lane BEFORE testing. I recorded "is 2h just a long sample of the ordinary
+  cadence" as a live alternative, so when `PREGAME_CADENCE_DETAIL` printed
+  `interval_s=7200` the answer was already framed as a choice between two
+  stated options rather than a surprise to be rationalised. The lane closed as
+  an exoneration in one step.
+- Corollary on null results, which I nearly got wrong in the same hour: zero
+  `T_WINDOW_SWEEP_DUE` in my sample was CORRECT and carried no information —
+  first pitch was 18:20Z and T-75 cannot arm before 17:05Z. I sampled
+  13:00-15:30Z. **An absence measured outside the window where the thing can
+  occur is not an absence.** Same shape as the entry on absence-in-a-window.
+- Cost: ~20 minutes and one incorrect escalation to the user, corrected in the
+  same session before anything was changed. Nothing was deployed on the wrong
+  premise; the UI work it prompted stands on its own and is, if anything, more
+  clearly justified — a 2h cadence is exactly the fact a board should state.
+
+### 2026-08-14 — A CONSTANT THAT REPRODUCES EXACTLY FROM AN EMPTY INPUT IS A DATA OUTAGE, NOT A WEAK MODEL
+
+- What we believed, twice, on two different sports: that an identical
+  projection on every game meant a collapsed model. `#377` had sat OPEN and
+  UNOWNED for days on that reading, framed as a product decision about what a
+  skill-less model may assert. `#429` was filed with the same instinct.
+- What was actually true both times: the model was fine and the INPUT was
+  missing. NFL served `margin 0.96 / total 44.38 / home_win 0.5267` on 16
+  games because `load_nfl_game_projections` deduped candidate files by NAME
+  across source roots and opened a copy generated where the play-by-play was
+  absent. MLB served `0.0` on 188 games because one composite stat was never
+  passed to the accumulator its mean divides by.
+- **The test that settles it in one command.** Run the real generator with the
+  suspected-missing input emptied and see whether it reproduces the observed
+  constant EXACTLY. NFL printed `0.960 / 44.380 / 0.5267` on all four weeks and
+  any matchup — to three decimals, the served values. A weak model produces
+  VARYING numbers with no predictive power; a missing input produces ONE
+  number. Those are cheaply distinguishable BEFORE touching any modelling code.
+- Corroborating tell, free wherever a parameter must change the output: NFL's
+  four preseason weeks carry different shrinkage factors (0.92/0.80/0.55/0.92)
+  and every week served the same constant. **Shrinking 0.0 by anything is still
+  0.0** — when a parameter that must move the output demonstrably does not, the
+  input is zero, not the parameter wrong.
+- The rule going forward: **before treating "every row is identical" as a
+  modelling defect, reproduce the constant from an empty input.** If it matches,
+  the bug is upstream in data availability or file selection and every hour
+  spent in the model is wasted.
+- Second-order, and the cheaper detector: the two surfaces DISAGREED for days —
+  the cards showed 16 distinct totals while the board showed one constant, from
+  files of the same name — and nothing compared them. A cross-surface equality
+  check on the same logical quantity finds this immediately and is now the
+  closing evidence in `deploys.md` (6/6 agree).
+
+### 2026-08-14 — A LANE LEFT OPEN AFTER ITS WORK SHIPS IS AN ACTIVE LOCK, NOT A STALE NOTE
+
+- What we believed: that closing a lane is bookkeeping, safely deferred to
+  `/checkpoint`. `projection-skill-declaration` shipped, deployed to both
+  services and was verified on production hours before its header was updated.
+- What was actually true: `lane-guard` returned **exit 2** for
+  `projection_skill.py` and `board_enrichment.py` that entire time, locking two
+  files against every other session on a shared tree, for work that was
+  finished. Measured through the live hook, not inferred.
+- The rule going forward: **close a lane when its measurement lands, not at
+  checkpoint.** The ledger already treats an unmeasured deploy as an open
+  obligation; an unclosed lane is worse, because it also blocks other people.
+- Method note that nearly cost the verification: the first release check used
+  `pipeline/intelligence_state.py` as its control, ASSUMING it was claimed. It
+  returned 0 — making "released" and "the guard returns 0 for everything"
+  indistinguishable. Re-run against files genuinely claimed by open lanes
+  (`live_refresh_loop.py`, `memory_observability.py`, `layer1_board.html`) all
+  returned 2. **A control you have not verified is claimed is not a control.**
+
+### 2026-08-14 — `git add <paths>` SCOPES THE INDEX; ONLY A PATHSPEC ON `commit` SCOPES THE COMMIT
+
+- What we believed: that staging explicitly by path was enough to keep a
+  parallel session's work out of a commit. The repo's standing note says "never
+  chain add and commit"; the add WAS correctly scoped.
+- What was actually true: the index already held another session's staged
+  files, and a bare `git commit` took all of them — 505 insertions, of which 65
+  were mine. Their `deploys.md` row was a **PENDING preflight marked "HOLD on
+  timing"**; pushing it would have published a deploy record for a deploy they
+  had deliberately not made, under my commit message.
+- How it was caught: reading the commit's own `--stat` afterwards, not by
+  trusting that the `add` defined the commit. Recovered with
+  `git reset --soft HEAD~1` (unpushed), then `git commit -F msg -- <paths>`,
+  which leaves the other session's files staged exactly as they were.
+- The rule going forward: **on a shared tree, always `git commit -- <paths>`.**
+  Check `git diff --cached --name-only` BEFORE committing and the commit's
+  `--stat` AFTER. And note the argument order: `-m`/`-F` must come BEFORE the
+  `--`, or git reads the message as a pathspec.
+- Where it is unavoidable — appending to a ledger file another session has
+  staged — commit it DELIBERATELY and say so in the message, rather than
+  letting it ride in silently. Done twice afterwards on `deploys.md` and
+  `lanes.md`.
