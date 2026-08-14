@@ -409,3 +409,88 @@ def test_container_memory_log_omits_the_split_when_memory_stat_is_unreadable(mon
     assert payload["memory_pct_of_max"] == pytest.approx(91.7, abs=0.2)
     for key in ("memory_anon_mb", "memory_reclaimable_mb", "memory_unreclaimable_mb", "memory_unreclaimable_pct_of_max"):
         assert key not in payload
+
+
+# --- `#423` malloc_info parser -----------------------------------------------
+#
+# The libc call cannot run on any dev machine in this repo (Windows, no WSL),
+# so the binding's first proof is a production `MALLOC_INFO_INIT` line. The
+# PARSER is the half that CAN be tested, and it is also the half that fails
+# quietly: reading the wrong tag level returns a plausible number, not an error.
+
+# Real glibc shape: per-<heap> totals and top-level totals share tag names.
+# Two heaps on purpose, so a parser that iterates instead of reading direct
+# children double-counts and fails these tests.
+_MALLOC_INFO_XML = """<malloc version="1">
+<heap nr="0">
+<sizes><size from="17" to="32" total="320" count="10"/></sizes>
+<total type="fast" count="10" size="320"/>
+<total type="rest" count="5" size="1048576"/>
+<system type="current" size="4194304"/>
+</heap>
+<heap nr="1">
+<sizes></sizes>
+<total type="fast" count="0" size="0"/>
+<total type="rest" count="2" size="524288"/>
+<system type="current" size="2097152"/>
+</heap>
+<total type="fast" count="10" size="320"/>
+<total type="rest" count="7" size="1572864"/>
+<total type="mmap" count="1" size="1048576"/>
+<system type="current" size="6291456"/>
+<system type="max" size="6291456"/>
+</malloc>
+"""
+
+
+def test_malloc_info_reads_top_level_totals_not_per_heap():
+    # The whole point. Both levels use <total type="rest">; summing every match
+    # gives 1048576+524288+1572864 and a number that still looks reasonable.
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_XML)
+    assert parsed is not None
+    assert parsed["arenas"] == 2
+    assert parsed["system_current_mb"] == 6.0          # top-level 6291456
+    assert parsed["free_held_mb"] == 1.5               # 320 + 1572864
+    assert parsed["mmapped_mb"] == 1.0
+
+
+def test_malloc_info_in_use_is_system_minus_free_and_never_negative():
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_XML)
+    assert parsed["in_use_mb"] == 4.5                  # 6.0 - 1.5
+    # A malformed pair must not yield a negative "in use", which would read as
+    # an allocator returning memory it never had.
+    weird = _MALLOC_INFO_XML.replace('<system type="current" size="6291456"/>',
+                                     '<system type="current" size="1"/>')
+    assert memory_observability.parse_malloc_info_xml(weird)["in_use_mb"] >= 0.0
+
+
+def test_malloc_info_states_the_verdict_the_step_exists_to_produce():
+    # 1.5 of 6.0 = 25% free-held -> the fragmentation side of the line.
+    parsed = memory_observability.parse_malloc_info_xml(_MALLOC_INFO_XML)
+    assert parsed["free_held_pct"] == 25.0
+    assert parsed["reads_as"] == "fragmentation"
+    # Almost nothing free against a large system -> the other candidate.
+    live = _MALLOC_INFO_XML.replace('<total type="rest" count="7" size="1572864"/>',
+                                    '<total type="rest" count="7" size="1024"/>')
+    assert memory_observability.parse_malloc_info_xml(live)["reads_as"] == "live_retention"
+
+
+@pytest.mark.parametrize("bad", [
+    "", "not xml at all",
+    "<other><total type='fast' size='9'/></other>",
+    "<malloc version='1'><heap nr='0'/></malloc>",
+])
+def test_malloc_info_garbage_returns_None_not_a_confident_zero(bad):
+    # A parser that returns zeros on bad input is worse than one returning
+    # nothing: zeros read as "the allocator is holding nothing".
+    assert memory_observability.parse_malloc_info_xml(bad) is None
+
+
+def test_malloc_arena_snapshot_degrades_quietly_off_glibc(capsys):
+    # Every developer machine in this repo takes this branch. It must return
+    # None, must not raise, and MALLOC_INFO_INIT must still name the reason --
+    # otherwise a failed bind and a successful no-op are both silence.
+    memory_observability._MALLOC_INFO_STATE.update(
+        {"resolved": False, "fn": None, "libc": None, "unavailable_reason": ""})
+    assert memory_observability.malloc_arena_snapshot() is None
+    assert "MALLOC_INFO_INIT" in capsys.readouterr().out

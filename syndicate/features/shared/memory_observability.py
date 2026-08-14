@@ -1336,3 +1336,167 @@ def log_list_memory(name: str, list_obj: Any) -> None:
     except Exception:
         payload["length"] = None
     print(f"LIST_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
+
+
+# --- `#423` step 1: glibc arena accounting -----------------------------------
+#
+# WHAT THIS ANSWERS, AND WHY IT IS STEP 1. Two candidates survive for
+# refresh-worker's anon growth: live objects, or free memory too fragmented for
+# `malloc_trim` to hand back. `malloc_info` separates them directly -- it
+# reports, per arena, how much the allocator holds from the OS and how much of
+# that is sitting in free chunks. Large free-but-held => fragmentation. Small
+# free with large system => live retention.
+#
+# It costs one libc call and no per-allocation bookkeeping, which is why it
+# comes before `tracemalloc`. `tracemalloc` stores a traceback per allocation
+# and this worker already reaches its ceiling every ~1.1h; an instrument that
+# can push the process over is not a first move (`#241`: worker periodic work
+# is never free).
+#
+# THE INIT LINE IS NOT DECORATION -- same reasoning `_resolve_malloc_trim`
+# records. None of this can execute on any dev machine in this repo (Windows,
+# no WSL), so the first proof it works is a production log line. Without
+# `MALLOC_INFO_INIT`, a failed `dlopen` and a successful call are both silence.
+_MALLOC_INFO_STATE: dict[str, Any] = {"resolved": False, "fn": None, "libc": None,
+                                      "unavailable_reason": ""}
+
+
+def parse_malloc_info_xml(xml_text: str) -> dict[str, Any] | None:
+    """Reduce `malloc_info` XML to the numbers that decide the question.
+
+    Pure and side-effect free ON PURPOSE: the libc call cannot be exercised off
+    Linux, so this half is where the tests live. Everything below is parsing,
+    and parsing is what silently returns a plausible wrong number.
+
+    Reads the TOP-LEVEL totals -- the direct children of `<malloc>`, which
+    aggregate every arena -- not the per-`<heap>` ones. They are the same tag
+    names at both levels, so an `iter()` here would double count.
+    """
+    try:
+        import xml.etree.ElementTree as ET
+
+        root = ET.fromstring(xml_text)
+    except Exception:
+        return None
+    if root.tag != "malloc":
+        return None
+
+    def top(tag: str, type_: str) -> int | None:
+        for child in root:                     # direct children only
+            if child.tag == tag and child.get("type") == type_:
+                try:
+                    return int(child.get("size") or 0)
+                except (TypeError, ValueError):
+                    return None
+        return None
+
+    system_current = top("system", "current")
+    fast = top("total", "fast")
+    rest = top("total", "rest")
+    mmapped = top("total", "mmap")
+    if system_current is None:
+        return None
+
+    # `fast` and `rest` are both FREE chunks the allocator is holding: fastbins
+    # and everything else. Their sum is what a perfect `malloc_trim` could
+    # theoretically reach; what it actually returns is bounded by whole pages.
+    free_held = (fast or 0) + (rest or 0)
+    out: dict[str, Any] = {
+        "arenas": sum(1 for child in root if child.tag == "heap"),
+        "system_current_mb": round(system_current / 1024 / 1024, 1),
+        "free_held_mb": round(free_held / 1024 / 1024, 1),
+        "in_use_mb": round(max(0, system_current - free_held) / 1024 / 1024, 1),
+        "mmapped_mb": round((mmapped or 0) / 1024 / 1024, 1),
+    }
+    if system_current > 0:
+        out["free_held_pct"] = round(100.0 * free_held / system_current, 1)
+    # The verdict this exists to produce, stated so a reader does not have to
+    # re-derive the threshold every time. Deliberately coarse: it is a pointer
+    # to the next instrument, not a measurement.
+    if out.get("free_held_pct") is not None:
+        out["reads_as"] = ("fragmentation" if out["free_held_pct"] >= 25.0
+                           else "live_retention")
+    return out
+
+
+def _resolve_malloc_info() -> Any:
+    """Bind `malloc_info` + `open_memstream`, once, or say why it could not.
+
+    Returns None off glibc. Callers must treat None as "no reading available",
+    never as an error -- every developer machine in this repo takes that branch.
+    """
+    if _MALLOC_INFO_STATE["resolved"]:
+        return _MALLOC_INFO_STATE["fn"]
+    _MALLOC_INFO_STATE["resolved"] = True
+    if not sys.platform.startswith("linux"):
+        _MALLOC_INFO_STATE["unavailable_reason"] = f"platform={sys.platform}"
+    else:
+        try:
+            import ctypes
+            import ctypes.util
+
+            for candidate in ("libc.so.6", ctypes.util.find_library("c"), None):
+                try:
+                    libc = ctypes.CDLL(candidate, use_errno=True)
+                except Exception:
+                    continue
+                info = getattr(libc, "malloc_info", None)
+                memstream = getattr(libc, "open_memstream", None)
+                if info is None or memstream is None:
+                    continue
+                info.argtypes = [ctypes.c_int, ctypes.c_void_p]
+                info.restype = ctypes.c_int
+                memstream.argtypes = [ctypes.POINTER(ctypes.c_char_p),
+                                      ctypes.POINTER(ctypes.c_size_t)]
+                memstream.restype = ctypes.c_void_p
+                _MALLOC_INFO_STATE["fn"] = info
+                _MALLOC_INFO_STATE["libc"] = libc   # keep the CDLL alive
+                break
+            else:
+                _MALLOC_INFO_STATE["unavailable_reason"] = "symbol_not_found"
+        except Exception as exc:
+            _MALLOC_INFO_STATE["unavailable_reason"] = f"{type(exc).__name__}: {exc}"
+    print(
+        "[memory_observability] MALLOC_INFO_INIT "
+        + json.dumps({"bound": _MALLOC_INFO_STATE["fn"] is not None,
+                      "reason": _MALLOC_INFO_STATE["unavailable_reason"] or None},
+                     sort_keys=True),
+        flush=True,
+    )
+    return _MALLOC_INFO_STATE["fn"]
+
+
+def malloc_arena_snapshot() -> dict[str, Any] | None:
+    """One arena reading, or None where glibc is unavailable.
+
+    Note the reading is very slightly self-perturbing: `open_memstream` and the
+    XML buffer are themselves allocations. They are kilobytes against the
+    hundreds of megabytes in question, and they inflate `free_held` rather than
+    `in_use`, i.e. toward the fragmentation verdict. Worth knowing before a
+    borderline call is read as decisive.
+    """
+    info = _resolve_malloc_info()
+    if info is None:
+        return None
+    try:
+        import ctypes
+
+        libc = _MALLOC_INFO_STATE["libc"]
+        buf = ctypes.c_char_p()
+        size = ctypes.c_size_t()
+        stream = libc.open_memstream(ctypes.byref(buf), ctypes.byref(size))
+        if not stream:
+            return None
+        try:
+            info(0, stream)
+            libc.fflush(ctypes.c_void_p(stream))
+            xml_text = ctypes.string_at(buf, size.value).decode("utf-8", "replace")
+        finally:
+            libc.fclose(ctypes.c_void_p(stream))
+            if buf:
+                libc.free(buf)
+        return parse_malloc_info_xml(xml_text)
+    except Exception as exc:
+        print(f"[memory_observability] MALLOC_INFO_FAILED {type(exc).__name__}: {exc}",
+              flush=True)
+        return None
