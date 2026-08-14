@@ -2010,7 +2010,63 @@ same object I quoted from. This is the second filing in this session where a
 "nothing explains it" conclusion came from an incomplete read of a response that
 did explain it, and the first one (`#376`) cost six passes.
 
-### `#377` — OPEN, UNOWNED, SERIOUS. PROJECTED is a CONSTANT, not a projection — two values across the entire board
+### `#377` — **CLOSED-VERIFIED 2026-08-13.** PROJECTED is a CONSTANT, not a projection — two values across the entire board
+
+> **CLOSURE, measured on the served payload 2026-08-13 20:35 CDT** (artifact
+> `generated_at 2026-08-14T01:33:57Z`). Both halves are resolved, by two
+> different changes, and **the third part is NOT closed — it is carved out as
+> `#425`, below.** Read that before treating this as finished.
+>
+> **1. The constant is gone.** `#377`'s exact observable, on the same 34-card
+> board it was measured against:
+>
+>     projected       n=34   distinct 1 -> 6   [36.265, 36.295, 38.715,
+>                                               40.525, 40.655, 41.125]
+>     projected_raw   n=34   distinct 1 -> 6
+>
+> **And it was never a model defect.** Running the real generator with empty
+> `prior_season_plays` reproduces `margin 0.960 / total 44.380 /
+> home_win 0.5267` EXACTLY, on all four preseason weeks and any matchup — so
+> the constant was a DATA OUTAGE. `data/nfl_source/tracking/` is gitignored, a
+> generator run rooted at the repo checkout rated every club `neutral_no_data`,
+> and `load_nfl_game_projections` deduped candidate files by **NAME across
+> source roots** so only that copy was ever opened. The cards surface was
+> serving 16 distinct totals from the healthy copy of the same filename the
+> whole time; nothing compared the two. Fixed in `98950c6d` (dedupe on resolved
+> PATH, drop both-sides-neutral rows, newest `generated_at` wins) and guarded
+> at the writer in `c7cff28c`. Full record: `#424`.
+>
+> **This entry's own diagnosis was wrong, and that is the lesson.** It states
+> *"the constant is in the SOURCE: every NFL game's `margin_mean` is 0.96 …
+> That is what a model collapsed to the league average looks like"* — and
+> concluded a product decision was needed about what a degenerate model may
+> assert. The model was fine. **A constant that reproduces EXACTLY from an
+> empty input is a data outage, not a weak model**, and the two are cheaply
+> distinguishable before touching any modelling code. `#377` sat OPEN and
+> UNOWNED for days on the wrong half of that fork.
+>
+> **2. The product decision it posed was already answered, by `7c854234`** —
+> *"#377: stop publishing the NFL margin projection — it has negative measured
+> skill"* — and BOTH options it offered were taken, not one. Verified live on
+> the same payload:
+>
+>     rows carrying model_skill                   75
+>     rows carrying projection_unavailable_reason 41
+>     model_skill: {"correlation": -0.047, "sample_games": 146,
+>                   "seasons": "2023-2025",
+>                   "verdict": "no measured skill -- moneyline probabilities
+>                               are uninformative"}
+>     reason:      "margin model has no measured skill (corr -0.047 over 146 games)"
+>
+> So the margin projection is SUPPRESSED with an attributable reason, and the
+> skill annotation is CARRIED to the board. The 34 surviving `projected` values
+> are totals, which now vary per game.
+>
+> **Note the `#367` skill figure is unaffected by the constant bug and still
+> stands.** A constant has zero variance, so `corr = -0.047` could not have
+> been computed from degenerate output — that measurement was taken against
+> real, varying projections. The NFL margin model genuinely has no measured
+> skill; that is why suppression is still correct.
 
 Reported off the board by the user. Measured on the served payload, 34 NFL cards,
 and re-measured hours later with identical results:
@@ -31010,3 +31066,55 @@ game — **so the degenerate-write behaviour was pinned by passing tests.** Thei
 fixtures now supply synthetic prior-season plays with distinct per-club EPA,
 which is what their names always described. Still hermetic; no test touches the
 real `pbp_2025.csv`. No assertion was weakened.
+
+### `#425` — OPEN, UNOWNED. A skill check that covers ONE of seven projection builders is a check that will be absent the next time it matters
+
+**Carved out of `#377` at its closure (2026-08-13) so it does not disappear
+with it.** `#377`'s two observable defects are fixed and verified; this — which
+`#377` itself called *"THE SYSTEMIC EXPOSURE… NOT THE MODEL"* — is untouched
+and was never worked.
+
+`skill_note` is called in **exactly one of seven** projection builders, only
+`nfl_game_projections`. These six have none:
+
+    soccer_projections        wnba_game_projections     wnba_projections
+    prop_projections          live_projection_join      game_board_contract
+
+That does not mean those models are degenerate — MLB's spread demonstrates at
+least one is not. **It means that if any of them collapsed, nothing would say
+so.**
+
+**AND THE 2026-08-13 EVIDENCE MAKES THIS SHARPER, NOT WEAKER.** `#377` argued
+this from the NFL margin model having no skill. The stronger case is what
+actually happened: the NFL TOTALS projection collapsed to a single value across
+16 games and four dates, served it to the board as an authoritative number, and
+**no check anywhere reported it.** It was caught by a human noticing every card
+looked the same. On any of the other six builders the same collapse would still
+render as confident numbers indefinitely.
+
+**Two distinct gaps, and they need different fixes — do not conflate them:**
+
+1. **No skill annotation.** Six builders publish numbers with no statement of
+   whether the model has measured predictive power. `#367`/`#377` show what the
+   annotation looks like when it exists (`model_skill` + a
+   `projection_unavailable_reason` the board can render).
+2. **No degeneracy check.** Distinct from skill: a model can have real
+   historical skill and still emit a constant TODAY because its input went
+   missing. That is exactly the 2026-08-13 failure, and a skill note computed
+   from historical backtests would NOT have caught it. The cheap detector is
+   per-build and needs no modelling: **count distinct projected values per
+   (sport, market) and flag `distinct == 1` where `n > 1`.**
+
+**Cheapest first step, and it is genuinely cheap:** `nfl_game_projections`
+already reports `rows_dropped_degenerate` in its coverage dict (`98950c6d`).
+Lifting that idea into whatever all seven builders share — or into the board
+enrichment that consumes them — covers the population in one place rather than
+seven, which is the `#334` lesson.
+
+**A second cross-check that cost nothing and would have caught this in a day:**
+the BOARD and the CARDS read the same underlying projection and disagreed for
+days — one constant vs. 16 distinct values from the same filename. Nothing
+compared them. A same-quantity-two-surfaces equality assertion is now the
+closing evidence in `deploys.md` and could be a standing check.
+
+**Not started. No owner. Not blocked by anything.**
