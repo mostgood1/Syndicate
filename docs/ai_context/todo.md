@@ -31580,7 +31580,66 @@ fixtures now supply synthetic prior-season plays with distinct per-club EPA,
 which is what their names always described. Still hermetic; no test touches the
 real `pbp_2025.csv`. No assertion was weakened.
 
-### `#429` — OPEN, UNOWNED. `mlb batter_hits_runs_rbis` projects a CONSTANT 0.0 across the whole slate, and the real mean is sitting one lookup away
+### `#429` — **FIXED 2026-08-14, NOT YET DEPLOYED.** `mlb batter_hits_runs_rbis` projected a CONSTANT 0.0 slate-wide; HRR is a SUMMATION and the mean is now derived from its components
+
+> **THE FIX CAME FROM A DOMAIN FACT, NOT FROM THE CODE.** HRR is
+> Hits + Runs + RBIs — not an independently simulated stat, but a SUM of three
+> primitives the sim already models separately. Once that is said out loud the
+> fix is arithmetic, and the sim never needs to be found.
+>
+> **Why it is EXACT and not an approximation.** Expectation is linear:
+> `E[H+R+RBI] = E[H] + E[R] + E[RBI]`, and that holds no matter how correlated
+> the three are. They are heavily correlated — a home run is 1 hit + 1 run +
+> 1 RBI — which would wreck a variance or a probability derived this way and
+> leaves the MEAN untouched. So the fix composes MEANS ONLY;
+> `model_prob_over` still comes from the sim's own `p_hrr_*` field, and a test
+> pins that.
+>
+> **Why the components were already in hand.** They arrive on DIFFERENT bucket
+> rows (`h_mean` on hits_*, `r_mean` on runs_*, `rbi_mean` on rbi_*), which is
+> exactly why an HRR row looks bare. `ingest_game` already folds every
+> `*_mean` into `_hitter_means[name]` regardless of which bucket carried it —
+> so all three were in memory the whole time, one lookup away, as this
+> ticket's original title guessed for the wrong reason.
+>
+> **END-TO-END on the real artifact** (`daily_summary_2026_07_09.json`, via the
+> actual loader, not a fixture):
+>
+>     players scored          234 of 234
+>     derived                 234        blanked 0
+>     distinct values         206        <- was 1
+>     range                   1.009 .. 2.471   against a 1.5 market line
+>
+> Ordering is baseball-plausible (Elly De La Cruz 2.440, Riley Greene 2.433 at
+> the top; bench bats ~1.0), which a wrong-field or wrong-scale join would not
+> produce.
+>
+> **A blank is still possible and still correct.** Missing any one component
+> returns `None`, never a partial sum — a partial is silently too low and looks
+> like a real projection. And where the value cannot be derived at all, the
+> dead `0.0` is now BLANKED rather than served, which a test caught during
+> implementation: the first version let the fabricated zero through whenever
+> derivation failed.
+>
+> **Labelled, not silent:** a reconstructed value carries
+> `projected_derived_from: "h_mean+r_mean+rbi_mean"`. And a real `hrr_mean` is
+> never overridden, so if the producer is ever fixed this code stands aside.
+>
+> **STILL UNKNOWN, and deliberately not chased:** the line in the sim that
+> writes `hrr_mean: 0.0`. It was never located. This reconstructs the value at
+> read time instead; the producer bug survives and would be worth fixing at
+> source, but nothing on the board now depends on it.
+>
+> **VALIDATION LIMIT, stated plainly:** the derivation could not be
+> cross-checked against the sim's own `p_hrr_2plus`, because every local
+> artifact has that probability at 0.0 too (checked 2026-05-28, 06-06, 07-09 —
+> the whole HRR family is dead in the mirror) while production has real
+> probabilities. On the live board only `batter_hits` overlapped, n=6,
+> `corr 0.994` — consistent, but it tests that hits track HRR, which is
+> trivially true, NOT that the sum is right. The linearity argument is what
+> carries this, plus the magnitude and ordering checks.
+
+### ~~`#429` — OPEN, UNOWNED. `mlb batter_hits_runs_rbis` projects a CONSTANT 0.0 across the whole slate, and the real mean is sitting one lookup away~~
 
 **Found by `#425`'s degeneracy detector on its first live board**, unprompted,
 2026-08-14 — not by anyone looking. That is the detector doing exactly the job
