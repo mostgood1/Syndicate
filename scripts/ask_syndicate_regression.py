@@ -313,7 +313,32 @@ def _answer_text(payload: dict) -> str:
     for key in ("headline", "summary", "answer"):
         if isinstance(payload.get(key), str):
             parts.append(payload[key])
+    # `visuals` is a THIRD answer shape and the scorer was blind to it until
+    # 2026-08-14. `collect_focused_evidence` renders deterministic tables and
+    # charts that are shown to the user alongside the prose, and after `M1` the
+    # board-candidates fetcher answers the whole aggregation class there. A
+    # scorer reading only `structured_response` reported `ranking` unchanged at
+    # 4/10 while a direct probe showed the same questions returning "26 of 153
+    # rows" -- the instrument was blind, not the fix inert.
+    for table in _board_tables(payload):
+        parts.append(str(table.get("title") or ""))
     return "\n".join(parts).strip()
+
+
+def _board_tables(payload: dict) -> list[dict]:
+    visuals = payload.get("visuals")
+    if not isinstance(visuals, dict):
+        return []
+    return [t for t in (visuals.get("tables") or []) if isinstance(t, dict)]
+
+
+def _board_table_rows(payload: dict) -> list[list]:
+    rows: list[list] = []
+    for table in _board_tables(payload):
+        for row in table.get("rows") or []:
+            if isinstance(row, list):
+                rows.append(row)
+    return rows
 
 
 def _opportunities(payload: dict) -> list[dict]:
@@ -411,6 +436,17 @@ def _score(case: dict, payload: dict, truth: dict) -> dict:
             break
 
     # --- numeric accuracy vs the board (same instant) -----------------------
+    # After `M1`, an aggregation answer is a board TABLE, not the snapshot's
+    # `top_opportunities`. Scored separately and explicitly, because "the
+    # snapshot returned 5 rows" and "the board table covered 153 of 153" are
+    # different claims and only the second answers an aggregation question.
+    board_rows = _board_table_rows(payload)
+    result["board_table_rows"] = len(board_rows)
+    result["board_table_title"] = (_board_tables(payload)[0].get("title") if _board_tables(payload) else None)
+    if case["cls"] == "ranking" and case["expect"] == "answer":
+        if not board_rows and not refused:
+            fail("no_board_table_for_an_aggregation_question")
+
     if checks.get("top_edge_matches_board") and truth.get("max_model_edge_pct") is not None:
         claimed = [float(r["edge"]) for r in rows if isinstance(r.get("edge"), (int, float))]
         if claimed:

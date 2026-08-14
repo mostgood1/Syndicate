@@ -1377,3 +1377,113 @@ people learn to route around. Run the gate, read it, then deploy.
     correct, they are a different response shape, and it is how a log will tell
     the modes apart once J2 lands.
 - Verdict: **shipped and verified.** Rollback not needed.
+
+## 2026-08-14 20:1xZ — refresh-worker `79148d8e` — A1/A2 probability sources + no-vig pricing
+
+- **Lane:** `recommendation-lane-correctness` (A1/A2). Branch
+  `deploy/model-audit-a1a2-probability-sources`, cut from `29ed6de1`
+  (refresh-worker's live SHA), **verified fast-forward**. One substantive
+  change; A3a is NOT on this branch.
+- **Target: refresh-worker ONLY.** It alone has
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=true`. Web does not run
+  this lane and is not being deployed.
+- **THIS GATE FAILED ON ITS FIRST PASS** — no predicted number for the
+  exclusion rate, which is the "ship it and find out" posture the gate exists
+  to stop. Resolved by measuring the input BEFORE deploying rather than by
+  arguing:
+  - `/api/ops/intelligence/candidate-trace` on WEB is useless for this:
+    `1_collect_candidates_count: 0`. Web is display-only on its own disk and
+    cannot run the pipeline. Recorded so nobody retries it.
+  - `/api/intelligence/status` DOES answer it. Of the **145** currently
+    published recommendations, **145 carry a real `model_probability`** and
+    145 also carry a simulation-payload probability. `[measured 20:12Z]`
+    So A1's `no_model_probability` exclusion removes **0 of 145**.
+    By sport: mlb 138, nfl 3, wnba 3, championship 1 — all keep.
+- **PREDICTIONS, written before the deploy:**
+  1. **SAFETY / revert trigger:** `recommendation_count` stays **> 0**. If the
+     lane empties, revert immediately. Supported by 145/145 above.
+  2. **DIRECTION:** `recommendation_count` **>= 145, and likely HIGHER.** A2
+     prices the model against the no-vig fair instead of the vigged price, and
+     the no-vig fair is the SMALLER number, so every edge grows by roughly half
+     the hold and MORE candidates clear the `edge > 0` gate. `#238`'s own
+     framing — the vigged comparison made the sim "look systematically
+     pessimistic" — predicts an increase, not a cull.
+  3. `[recommendation_engine] FILTER_CANDIDATES` appears in refresh-worker logs
+     with a `rejected={...}` map. `no_model_probability` may appear as a reason
+     for POOL-side candidates (which were previously rejected anyway, but
+     mislabelled `edge_below_threshold`).
+- **Pre-deploy checks 20:10Z:** 0 full-sim launch markers in 8 min; headroom
+  **1,830 MB**. Second worker reboot inside the hour — again boot-confounds the
+  two OPEN memory lanes.
+- **Rollback:** redeploy `29ed6de1` on `srv-d91dpertqb8s73co8ls0` by commitId.
+- **DEPLOYED AND LIVE 20:13Z. MEASUREMENT: NOT OBTAINED — do not read this as a pass.**
+  - `recommendation_count` reads **145**, identical to pre-deploy. **That number
+    is STALE and proves nothing:** `snapshot_generated_at = 2026-08-14T16:39:14Z`
+    — ~3.6 HOURS old and long before the deploy. The intelligence state has not
+    been recomputed since 16:39Z, so no post-deploy cycle has run and none of
+    P1/P2/P3 has been tested. I read the count first and nearly banked it;
+    checking the timestamp is what caught it.
+  - **P3 did not fire either: 0 `FILTER_CANDIDATES` lines in 20 minutes.**
+    Consistent with "the cycle never ran", NOT evidence about the code.
+  - **DEFECT IN MY OWN INSTRUMENT, found by this:** the print is guarded by
+    `if rejected:`, so it is SILENT when nothing was rejected. That makes
+    "ran and rejected nothing" indistinguishable from "never ran" — the exact
+    zero-must-be-visible failure this repo keeps hitting, which I flagged in
+    other people's code earlier the same session. The guard should be removed so
+    the line always emits. Not fixed here; recorded as owed.
+  - **Standing question this exposes, for `layer2-board-freshness`:** why has the
+    intelligence state not recomputed in ~3.6h? That lane is already open on
+    build refusals. Not chased here.
+  - **Risk status: A1/A2 is live and UNVERIFIED.** The 145/145 pre-deploy
+    measurement (every published recommendation carries a real
+    `model_probability`) is the reason this is judged low-risk to leave running
+    rather than pre-emptively reverted — but that is an argument, not a
+    measurement. Revert trigger stands: `recommendation_count == 0` on a FRESH
+    snapshot.
+
+### ask-board-candidates (`M1`) — aggregation answered from the published board
+- Deployed: **2026-08-14 15:38 CDT (`20:38:18Z`)** — web `srv-d88ahvrbc2fs73eodu30`,
+  deploy `dep-d9vnm46417fc73ebm9fg`, commit **`5382943c`**, trigger `api`.
+  Single change on the live SHA `bef782cb`. `check_deploy_safety.py` CLEAR at
+  20:30:20Z after waiting out a refresh-worker board build; live-games caveat
+  accepted as before.
+- Expected: ranking class 4/10 → higher; `B01`'s `top_edge_diverges_from_board`
+  clears.
+- **Measured: THE CAPABILITY IS REAL AND VERIFIED. THE STATED CRITERION WAS NOT
+  MET. Both halves matter and the second is the finding.**
+  - **Working, by direct probe:** "biggest edges" → `152 of 152 rows`; "every
+    play with an edge over 5 percent" → **`25 of 152 rows`**, an aggregation
+    with a denominator that was previously unanswerable. `/api/ops/version`
+    confirms `5382943c`.
+  - **7 of 10 ranking questions are now answered from the published board, up
+    from 0.** B04 (MLB total bases → 11 of 152, sport+market filtered) and B05
+    (totals → 36 of 152) both previously scored
+    `declined_an_answerable_question`.
+  - **Soccer correctly returned NOTHING rather than MLB rows** — the board's
+    `active_sports` was `[mlb, nfl, wnba]` at the time, so zero soccer rows is
+    the true answer. The "report, do not widen" branch is exercised in
+    production.
+  - **The class score did NOT move: still 4/10.** The remaining failures are
+    not M1's: B01 is the SNAPSHOT's headline number, B02 checks
+    `structured_response` rows, B03/B08 are sport routing (K2/K3), and B06/B10
+    miss the ranking-intent detector.
+- **THE INSTRUMENT WAS BLIND, AND I NEARLY READ THAT AS A FAILED FIX.** The
+  first post-deploy run reported `ranking` unchanged at 4/10 while a direct
+  probe showed the same questions returning "26 of 153 rows". Cause:
+  `_answer_text`/`_opportunities` scored only `structured_response`, and `M1`
+  answers in `visuals.tables` — a third answer shape the scorer did not know
+  existed. **A null reading is evidence only once the instrument is known able
+  to read non-null.** Harness fixed (`_board_tables`, `_board_table_rows`, and
+  a `no_board_table_for_an_aggregation_question` check) before any conclusion
+  was drawn.
+- **M1 SUPPLEMENTS, IT DOES NOT REPLACE — this is the real structural result.**
+  `structured_response.top_opportunities` still comes from the snapshot, so
+  chat's headline still disagrees with the board (`23.81%` vs `14.09%`,
+  measured post-deploy; it was `5.02%` vs `13.59%` pre-deploy — the gap moved,
+  it did not close). Killing the divergence needs the market-summary schema to
+  source its rows from the board artifact too, which lives in
+  `ask_the_syndicate_adapter.py` — **deliberately not claimed by this lane**,
+  because a parallel session shipped `_board_summary_sentence` there.
+- Rollback: redeploy `bef782cb`. Not needed — nothing regressed.
+- Verdict: **capability shipped and verified; divergence NOT fixed.** Lane stays
+  OPEN.

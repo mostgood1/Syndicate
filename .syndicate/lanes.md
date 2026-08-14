@@ -3402,3 +3402,30 @@ temporal validation. Neither is a word-list problem.
   recording the class-by-class delta against the 23/52 post-K1 baseline in
   `deploys.md`. **A class score that does not move means it is not done.**
 - Blocked by: none.
+
+**ask-board-candidates — RESULT 2026-08-14, LANE STAYS OPEN.** Deployed
+`5382943c` (`dep-d9vnm46417fc73ebm9fg`, live `20:38:18Z`). Full evidence in
+`deploys.md`.
+
+- **Criterion 1 MET (unit tests):** 24 new + 160 across the ask suite.
+- **Criterion 2 NOT MET:** the `ranking` class did **not** move off 4/10, and
+  `B01`'s `top_edge_diverges_from_board` did **not** clear. The lane cannot
+  close on its own stated terms.
+- **But the capability IS real and verified:** 7 of 10 ranking questions are now
+  answered from the published board (was 0); "every play with an edge over 5
+  percent" returns `25 of 152 rows`. The remaining class failures belong to
+  other lanes — B01 is the snapshot headline, B03/B08 are sport routing
+  (K2/K3), B06/B10 miss the ranking-intent detector.
+- **WHAT THIS LANE GOT WRONG, and it is a design error not a bug:** M1
+  SUPPLEMENTS the answer with a board table; it does not REPLACE the snapshot's
+  `top_opportunities`. So the divergence the lane goal names survives — it moved
+  from `5.02 vs 13.59` to `23.81 vs 14.09`. Closing it needs the market-summary
+  schema builder to source rows from the board artifact, in
+  `ask_the_syndicate_adapter.py`, which this lane deliberately did not claim.
+  **That is the next step and it should be its own lane**, opened against the
+  adapter after checking the parallel session that owns `_board_summary_sentence`.
+- **A near-miss worth carrying:** the first post-deploy harness run said
+  `ranking` was unchanged, which reads exactly like an inert fix. It was the
+  scorer that was blind — it read only `structured_response` and M1 answers in
+  `visuals.tables`. Fixed the harness before drawing a conclusion. **Check what
+  makes the instrument read non-null before believing a null.**

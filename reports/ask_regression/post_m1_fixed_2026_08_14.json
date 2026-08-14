@@ -1,0 +1,861 @@
+{
+ "generated_at": "2026-08-14T20:45:00+00:00",
+ "base_url": "https://syndicate-an21.onrender.com",
+ "truth": {
+  "fetched_at": "2026-08-14T20:44:16+00:00",
+  "rows": 152,
+  "considered": 14013,
+  "returned": 152,
+  "active_sports": [
+   "mlb",
+   "nfl",
+   "wnba"
+  ],
+  "per_sport": {
+   "mlb": {
+    "available": 2709,
+    "game": 45,
+    "prop": 35,
+    "selected": 80
+   },
+   "nfl": {
+    "available": 94,
+    "game": 60,
+    "prop": 0,
+    "selected": 60
+   },
+   "wnba": {
+    "available": 958,
+    "game": 8,
+    "prop": 4,
+    "selected": 12
+   }
+  },
+  "max_model_edge_pct": 14.09,
+  "max_ev_pct": 4.8868,
+  "teams": [
+   "arizona diamondbacks",
+   "athletics",
+   "atlanta braves",
+   "atlanta falcons",
+   "baltimore orioles",
+   "baltimore ravens",
+   "boston red sox",
+   "buffalo bills",
+   "carolina panthers",
+   "chicago bears",
+   "chicago cubs",
+   "chicago white sox",
+   "cincinnati reds",
+   "cleveland browns",
+   "cleveland guardians",
+   "colorado rockies",
+   "dallas cowboys",
+   "dallas wings",
+   "denver broncos",
+   "detroit tigers",
+   "houston astros",
+   "indiana fever",
+   "jacksonville jaguars",
+   "kansas city chiefs",
+   "kansas city royals",
+   "los angeles angels",
+   "los angeles dodgers",
+   "los angeles rams",
+   "miami dolphins",
+   "miami marlins",
+   "milwaukee brewers",
+   "minnesota vikings",
+   "new orleans saints",
+   "new york giants",
+   "new york jets",
+   "new york mets",
+   "new york yankees",
+   "philadelphia eagles",
+   "pittsburgh pirates",
+   "portland fire",
+   "san diego padres",
+   "san francisco giants",
+   "seattle mariners",
+   "seattle seahawks",
+   "seattle storm",
+   "st. louis cardinals",
+   "tampa bay buccaneers",
+   "tampa bay rays",
+   "texas rangers",
+   "toronto blue jays",
+   "washington commanders",
+   "washington nationals"
+  ],
+  "players": [
+   "agust\u00edn ram\u00edrez",
+   "alanna smith",
+   "andres gimenez",
+   "bryce eldridge",
+   "buddy kennedy",
+   "christian vazquez",
+   "colton cowser",
+   "dominique malonga",
+   "ernie clement",
+   "fernando tatis jr.",
+   "garrett mitchell",
+   "gavin sheets",
+   "hao-yu lee",
+   "ildemaro vargas",
+   "jade melbourne",
+   "jarren duran",
+   "javier sanoja",
+   "jeff mcneil",
+   "jj bleday",
+   "joe mack",
+   "joey ortiz",
+   "jonathan aranda",
+   "jose tena",
+   "josh lowe",
+   "jung hoo lee",
+   "keibert ruiz",
+   "lexie hull",
+   "luis campusano",
+   "masataka yoshida",
+   "max clark",
+   "nathan lukes",
+   "nick loftin",
+   "rafael devers",
+   "rafael flores",
+   "ronny simon",
+   "tyler o'neill",
+   "willson contreras",
+   "yainer diaz"
+  ],
+  "portfolio": {
+   "avg_clv": null,
+   "avg_edge": null,
+   "by_sport": [
+    {
+     "avg_edge": null,
+     "losses": 0,
+     "pnl": 0.0,
+     "predictions": 3,
+     "roi": 0.0,
+     "settled": 0,
+     "sport": "multi",
+     "win_rate": null,
+     "wins": 0
+    }
+   ],
+   "decisive_count": 0,
+   "exposure_by_sport": [
+    {
+     "pct": 100.0,
+     "sport": "multi",
+     "stake": 60.0
+    }
+   ],
+   "generated_at": "2026-08-14T20:44:16Z",
+   "ok": true,
+   "pending_count": 3,
+   "positions": [
+    {
+     "bet_type": "parlay",
+     "clv": null,
+     "confidence": null,
+     "edge": null,
+     "id": "d2904a64-7be2-4fa3-b29a-4db3859881a1",
+     "legs": [
+      {
+       "event_id": "41d927261a15c8d84075af83997d53c1",
+       "game_date": "2026-08-13",
+       "line": "5.5",
+       "market": "spreads",
+       "odds": 164,
+       "pick": "away",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "prophetx",
+          "line": 5.5,
+          "price": 164
+         },
+         {
+          "bookmaker": "novig",
+          "line": 5.5,
+          "price": 163
+         },
+         {
+          "bookmaker": "polymarket",
+          "line": 5.5,
+          "price": 163
+         },
+         {
+          "bookmaker": "sport888",
+          "line": 5.5,
+          "price": 150
+         },
+         {
+          "bookmaker": "williamhill_us",
+          "line": 5.5,
+          "price": 150
+         },
+         {
+          "bookmaker": "fanatics",
+          "line": 5.5,
+          "price": 150
+         },
+         {
+          "bookmaker": "kalshi",
+          "line": 5.5,
+          "price": 150
+         },
+         {
+          "bookmaker": "fanduel",
+          "line": 5.5,
+          "price": 148
+         },
+         {
+          "bookmaker": "betmgm",
+          "line": 5.5,
+          "price": 145
+         },
+         {
+          "bookmaker": "gtbets",
+          "line": 5.5,
+          "price": 140
+         },
+         {
+          "bookmaker": "bovada",
+          "line": 5.5,
+          "price": 140
+         },
+         {
+          "bookmaker": "nordicbet",
+          "line": 5.5,
+          "price": 125
+         },
+         {
+          "bookmaker": "draftkings",
+          "line": 5.5,
+          "price": 123
+         },
+         {
+          "bookmaker": "coolbet",
+          "line": 5.5,
+          "price": 120
+         },
+         {
+          "bookmaker": "unibet_nl",
+          "line": 5.5,
+          "price": 118
+         },
+         {
+          "bookmaker": "unibet_se",
+          "line": 5.5,
+          "price": 118
+         },
+         {
+          "bookmaker": "betsson",
+          "line": 5.5,
+          "price": 117
+         },
+         {
+          "bookmaker": "betrivers",
+          "line": 5.5,
+          "price": 112
+         },
+         {
+          "bookmaker": "leovegas_se",
+          "line": 5.5,
+          "price": 110
+         },
+         {
+          "bookmaker": "mybookieag",
+          "line": 5.5,
+          "price": 110
+         }
+        ],
+        "best_bookmaker": "prophetx",
+        "best_ev_pct": 3.5151,
+        "best_price": 164,
+        "book_age_seconds": 246,
+        "book_updated_at": "2026-08-13T21:51:41Z",
+        "bookmaker": "prophetx",
+        "books_quoting": 20,
+        "capture_age_seconds": 238,
+        "captured_at": "2026-08-13T21:51:48.363293+00:00",
+        "consensus_price": 134,
+        "edge_vs_consensus_pct": 4.86,
+        "ev_pct": 3.5151,
+        "fair_price": 155,
+        "fair_probability": 0.392102,
+        "hold_pct": -3.3843,
+        "line": 5.5,
+        "price": 164,
+        "price_rank": 1,
+        "sides_quoted": 2
+       },
+       "selection": "CHC @ WSH",
+       "sport": "mlb"
+      }
+     ],
+     "market": "parlay",
+     "matchup": null,
+     "odds": 164.0,
+     "placed_bet": "Parlay (1 legs)",
+     "pnl": null,
+     "selection": "1-leg parlay",
+     "sport": "multi",
+     "stake": 25.0,
+     "status": "pending",
+     "timestamp": "2026-08-13T21:55:47Z"
+    },
+    {
+     "bet_type": "parlay",
+     "clv": null,
+     "confidence": null,
+     "edge": null,
+     "id": "7b26364d-dc34-4a4d-9166-2c7704ac39e2",
+     "legs": [
+      {
+       "event_id": "41d927261a15c8d84075af83997d53c1",
+       "game_date": "2026-08-13",
+       "line": "5.5",
+       "market": "strikeouts",
+       "odds": 106,
+       "pick": "over",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "fanduel",
+          "line": 5.5,
+          "price": 106
+         },
+         {
+          "bookmaker": "bovada",
+          "line": 5.5,
+          "price": 105
+         },
+         {
+          "bookmaker": "betonlineag",
+          "line": 5.5,
+          "price": 100
+         },
+         {
+          "bookmaker": "betrivers",
+          "line": 5.5,
+          "price": -103
+         },
+         {
+          "bookmaker": "betmgm",
+          "line": 5.5,
+          "price": -105
+         },
+         {
+          "bookmaker": "draftkings",
+          "line": 5.5,
+          "price": -135
+         },
+         {
+          "bookmaker": "fanatics",
+          "line": 5.5,
+          "price": -155
+         }
+        ],
+        "best_bookmaker": "fanduel",
+        "best_price": 106,
+        "book_age_seconds": 6853,
+        "book_updated_at": "2026-08-13T20:01:04Z",
+        "bookmaker": "fanduel",
+        "books_quoting": 7,
+        "capture_age_seconds": 6841,
+        "captured_at": "2026-08-13T20:01:15.985345+00:00",
+        "consensus_price": -111,
+        "edge_vs_consensus_pct": 4.06,
+        "fair_price": null,
+        "fair_probability": null,
+        "hold_pct": null,
+        "line": 5.5,
+        "price": 106,
+        "price_rank": 1,
+        "sides_quoted": 0
+       },
+       "selection": "Cade Cavalli",
+       "sport": "mlb"
+      },
+      {
+       "event_id": "41d927261a15c8d84075af83997d53c1",
+       "game_date": "2026-08-13",
+       "line": "5.5",
+       "market": "strikeouts",
+       "odds": 125,
+       "pick": "over",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "fanduel",
+          "line": 5.5,
+          "price": 106
+         },
+         {
+          "bookmaker": "bovada",
+          "line": 5.5,
+          "price": 105
+         },
+         {
+          "bookmaker": "betonlineag",
+          "line": 5.5,
+          "price": 100
+         },
+         {
+          "bookmaker": "betrivers",
+          "line": 5.5,
+          "price": -103
+         },
+         {
+          "bookmaker": "betmgm",
+          "line": 5.5,
+          "price": -105
+         },
+         {
+          "bookmaker": "draftkings",
+          "line": 5.5,
+          "price": -135
+         },
+         {
+          "bookmaker": "fanatics",
+          "line": 5.5,
+          "price": -155
+         }
+        ],
+        "best_bookmaker": "fanduel",
+        "best_price": 106,
+        "book_age_seconds": 6854,
+        "book_updated_at": "2026-08-13T20:01:04Z",
+        "bookmaker": "fanduel",
+        "books_quoting": 7,
+        "capture_age_seconds": 6842,
+        "captured_at": "2026-08-13T20:01:15.985345+00:00",
+        "consensus_price": -111,
+        "edge_vs_consensus_pct": 4.06,
+        "fair_price": null,
+        "fair_probability": null,
+        "hold_pct": null,
+        "line": 5.5,
+        "price": 106,
+        "price_rank": 1,
+        "sides_quoted": 0
+       },
+       "selection": "Kevin Gausman",
+       "sport": "mlb"
+      }
+     ],
+     "market": "parlay",
+     "matchup": null,
+     "odds": 364.0,
+     "placed_bet": "Parlay (2 legs)",
+     "pnl": null,
+     "selection": "2-leg parlay",
+     "sport": "multi",
+     "stake": 10.0,
+     "status": "pending",
+     "timestamp": "2026-08-13T21:55:18Z"
+    },
+    {
+     "bet_type": "parlay",
+     "clv": null,
+     "confidence": null,
+     "edge": null,
+     "id": "b2b19aa8-bb96-4a3b-92e7-b2e8a2e32e83",
+     "legs": [
+      {
+       "event_id": "7f3d422253cc0ea2296a6cb920fc2186",
+       "game_date": "2026-08-13",
+       "line": "7.5",
+       "market": "strikeouts",
+       "odds": -180,
+       "pick": "over",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "betmgm",
+          "line": 7.5,
+          "price": 130
+         },
+         {
+          "bookmaker": "draftkings",
+          "line": 7.5,
+          "price": -180
+         }
+        ],
+        "best_bookmaker": "betmgm",
+        "best_price": 130,
+        "book_age_seconds": 3883,
+        "book_updated_at": "2026-08-13T17:44:05Z",
+        "bookmaker": "betmgm",
+        "books_quoting": 2,
+        "capture_age_seconds": 3837,
+        "captured_at": "2026-08-13T17:44:51.368730+00:00",
+        "consensus_price": -117,
+        "edge_vs_consensus_pct": 10.44,
+        "fair_price": null,
+        "fair_probability": null,
+        "hold_pct": null,
+        "line": 7.5,
+        "price": 130,
+        "price_rank": 1,
+        "sides_quoted": 0
+       },
+       "selection": "Braxton Ashcraft",
+       "sport": "mlb"
+      },
+      {
+       "event_id": "3e1c279359817c97e285db96732ef225",
+       "game_date": "2026-08-13",
+       "line": "5.5",
+       "market": "strikeouts",
+       "odds": -110,
+       "pick": "over",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "draftkings",
+          "line": 5.5,
+          "price": -120
+         },
+         {
+          "bookmaker": "betmgm",
+          "line": 5.5,
+          "price": -120
+         },
+         {
+          "bookmaker": "betonlineag",
+          "line": 5.5,
+          "price": -141
+         },
+         {
+          "bookmaker": "fanatics",
+          "line": 5.5,
+          "price": -145
+         },
+         {
+          "bookmaker": "fanduel",
+          "line": 5.5,
+          "price": -146
+         },
+         {
+          "bookmaker": "bovada",
+          "line": 5.5,
+          "price": -150
+         }
+        ],
+        "best_bookmaker": "draftkings",
+        "best_ev_pct": 0.6364,
+        "best_price": -120,
+        "book_age_seconds": 1188,
+        "book_updated_at": "2026-08-13T18:29:00Z",
+        "bookmaker": "draftkings",
+        "books_quoting": 6,
+        "capture_age_seconds": 1163,
+        "captured_at": "2026-08-13T18:29:24.987530+00:00",
+        "consensus_price": -136,
+        "edge_vs_consensus_pct": 3.08,
+        "ev_pct": 0.6364,
+        "fair_price": -122,
+        "fair_probability": 0.548926,
+        "hold_pct": 1.046,
+        "line": 5.5,
+        "price": -120,
+        "price_rank": 1,
+        "sides_quoted": 2
+       },
+       "selection": "Logan Gilbert",
+       "sport": "mlb"
+      }
+     ],
+     "market": "parlay",
+     "matchup": null,
+     "odds": 197.0,
+     "placed_bet": "Parlay (2 legs)",
+     "pnl": null,
+     "selection": "2-leg parlay",
+     "sport": "multi",
+     "stake": 25.0,
+     "status": "pending",
+     "timestamp": "2026-08-13T18:48:48Z"
+    }
+   ],
+   "roi": null,
+   "schema": "portfolio_summary_v1",
+   "settled_count": 0,
+   "today_count": 0,
+   "total_pnl": 0,
+   "total_tracked": 3,
+   "win_rate": null
+  }
+ },
+ "passed": 4,
+ "total": 10,
+ "answer_sources": {
+  "snapshot": 10
+ },
+ "results": [
+  {
+   "id": "B01",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "What are the biggest edges on the board tonight?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 117,
+   "failures": [
+    "top_edge_diverges_from_board:23.81_vs_14.09"
+   ],
+   "warnings": [
+    "selection_not_on_board:away ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:away 1",
+    "selection_not_on_board:over 2.5"
+   ],
+   "refused": false,
+   "board_table_rows": 15,
+   "board_table_title": "Published board \u2014 whole board (152 of 152 rows)",
+   "chat_top_edge_pct": 23.81,
+   "board_top_edge_pct": 14.09,
+   "as_of": "2026-08-14",
+   "passed": false,
+   "latency_s": 8.49
+  },
+  {
+   "id": "B02",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Rank today's best opportunities across every sport.",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 117,
+   "failures": [
+    "single_sport_answer_for_3_active_sports"
+   ],
+   "warnings": [
+    "selection_not_on_board:away ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:away 1",
+    "selection_not_on_board:over 2.5"
+   ],
+   "refused": false,
+   "board_table_rows": 15,
+   "board_table_title": "Published board \u2014 whole board (152 of 152 rows)",
+   "sports_in_answer": [],
+   "as_of": "2026-08-14",
+   "passed": false,
+   "latency_s": 1.99
+  },
+  {
+   "id": "B03",
+   "cls": "ranking",
+   "sport": "soccer",
+   "question": "What are the best soccer bets today?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 176,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "selection_not_on_board:away ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:away 1",
+    "selection_not_on_board:over 2.5"
+   ],
+   "refused": false,
+   "board_table_rows": 15,
+   "board_table_title": "Published board \u2014 whole board (152 of 152 rows)",
+   "as_of": "2026-08-14",
+   "passed": false,
+   "latency_s": 6.6
+  },
+  {
+   "id": "B04",
+   "cls": "ranking",
+   "sport": "mlb",
+   "question": "Which MLB total bases props have the most value?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 64,
+   "failures": [],
+   "warnings": [],
+   "refused": false,
+   "board_table_rows": 11,
+   "board_table_title": "Published board \u2014 sport=mlb, market~total_bases (11 of 152 rows)",
+   "as_of": "2026-08-14",
+   "passed": true,
+   "latency_s": 3.25
+  },
+  {
+   "id": "B05",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Which totals moved the most since open?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 48,
+   "failures": [],
+   "warnings": [],
+   "refused": false,
+   "board_table_rows": 15,
+   "board_table_title": "Published board \u2014 market~totals (36 of 152 rows)",
+   "as_of": "2026-08-14",
+   "passed": true,
+   "latency_s": 1.33
+  },
+  {
+   "id": "B06",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "How many opportunities are on the board right now?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 69,
+   "failures": [
+    "no_board_table_for_an_aggregation_question"
+   ],
+   "warnings": [
+    "selection_not_on_board:away ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:away 1",
+    "selection_not_on_board:over 2.5",
+    "board_count_152_not_stated",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "board_table_rows": 0,
+   "board_table_title": null,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 4.35
+  },
+  {
+   "id": "B07",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Show me every play with an edge over 5 percent.",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 191,
+   "failures": [],
+   "warnings": [
+    "selection_not_on_board:away ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:away 1",
+    "selection_not_on_board:over 2.5"
+   ],
+   "refused": false,
+   "board_table_rows": 15,
+   "board_table_title": "Published board \u2014 model_edge>=5.0% (25 of 152 rows)",
+   "as_of": "2026-08-14",
+   "passed": true,
+   "latency_s": 1.53
+  },
+  {
+   "id": "B08",
+   "cls": "ranking",
+   "sport": "wnba",
+   "question": "Best WNBA player props tonight?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "no_sport_resolved_expected_wnba"
+   ],
+   "warnings": [],
+   "refused": true,
+   "board_table_rows": 0,
+   "board_table_title": null,
+   "as_of": "2026-08-14",
+   "passed": false,
+   "latency_s": 6.42
+  },
+  {
+   "id": "B09",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Which sport has the most value on the board today?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 117,
+   "failures": [],
+   "warnings": [
+    "selection_not_on_board:away ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:away 1",
+    "selection_not_on_board:over 2.5"
+   ],
+   "refused": false,
+   "board_table_rows": 15,
+   "board_table_title": "Published board \u2014 whole board (152 of 152 rows)",
+   "as_of": "2026-08-14",
+   "passed": true,
+   "latency_s": 2.92
+  },
+  {
+   "id": "B10",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Who is favored in the late games?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 125,
+   "failures": [
+    "no_board_table_for_an_aggregation_question"
+   ],
+   "warnings": [
+    "selection_not_on_board:away ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:home ml",
+    "selection_not_on_board:away 1",
+    "selection_not_on_board:over 2.5",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "board_table_rows": 0,
+   "board_table_title": null,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 2.97
+  }
+ ]
+}
