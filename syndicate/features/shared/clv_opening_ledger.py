@@ -162,6 +162,15 @@ def _opening_record(row: Mapping[str, Any], key: str, captured_at: str) -> dict[
         "price": quote.get("price"),
         "bookmaker": str(quote.get("bookmaker") or "").strip().lower() or None,
         "books_quoting": quote.get("books_quoting"),
+        # OUR price at every book that quoted this side, captured at the same
+        # instant as the opening. This is what makes a SAME-BOOK CLV possible:
+        # odds history keeps a median of 2 books per (event, market) and the
+        # board publishes the best of ~13, so the best book's own close is
+        # usually absent. Measured 2026-08-14: exact (event, market, best_book)
+        # existed in history for 3 of 55 mlb game rows. With every book's
+        # opening recorded, the joiner can pair whichever book the close exists
+        # for -- an unbiased comparison instead of a best-of-N one.
+        "book_prices": quote.get("book_prices") or None,
         "fair_probability": _as_float(quote.get("fair_probability")),
         "fair_method": quote.get("fair_method"),
         # Carried so CLV can later be split by whether a model had a view at

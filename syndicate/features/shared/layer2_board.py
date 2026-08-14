@@ -831,6 +831,30 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                     ((row.get("modelled_fair") or {}).get(side) or {}).get("assumed_hold_pct")
                 ),
                 "suspect_stale": bool(side_best.get("suspect_stale")),
+                # EVERY BOOK'S PRICE FOR THIS SIDE, so CLV can be measured
+                # same-book later. `best` is one book by definition, and pairing
+                # a best-of-N opening against a different book's close is biased
+                # upward -- measured at +6.2 pts and a 91% beat rate, which is
+                # the selection effect, not skill.
+                #
+                # Same-book needs OUR price at a book the close is recorded for,
+                # and we cannot know which that is at write time: odds history
+                # keeps a **median of 2 books per (event, market)** while the
+                # board picks the best of ~13. Measured 2026-08-14, mlb: the
+                # exact (event, market, best_book) triple existed in history for
+                # **3 of 55** game rows. Recording every book we saw makes the
+                # overlap near-certain instead of a 1-in-6 guess.
+                #
+                # Flat {book: price}, not the whole cell: the ledger needs the
+                # number, and a nested dict per book would put age/stale/rank on
+                # every row of an artifact that is already mostly market data.
+                "book_prices": {
+                    str(book): cell[side]["price"]
+                    for book, cell in (row.get("cells") or {}).items()
+                    if isinstance(cell, Mapping)
+                    and isinstance(cell.get(side), Mapping)
+                    and cell[side].get("price") is not None
+                },
             }
 
             candidate: dict[str, Any] = {field: row.get(field) for field in _IDENTITY_FIELDS}

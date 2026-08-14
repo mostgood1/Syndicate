@@ -291,3 +291,53 @@ def test_a_same_book_row_does_reach_the_headline(tmp_path):
     )
     assert report["same_book_n"] == 1
     assert report["avg_clv_pct"] is not None
+
+
+def test_a_same_book_pair_is_preferred_and_uses_that_books_own_opening(tmp_path):
+    """The whole point of recording `book_prices`.
+
+    History keeps a median of 2 books per (event, market); the board publishes
+    the best of ~13. Our price AT the tracked book, against THAT book's close,
+    is the only pairing free of the best-of-N selection effect.
+    """
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_game_opening(bookmaker="polymarket"),
+          "quote": {"price": -120, "bookmaker": "polymarket",
+                    "book_prices": {"polymarket": -120, "fanduel": -135}},
+          "line": None}],
+        date="2026-08-14", root=tmp_path,
+    )
+    tracked = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+               "away_team=Miami Marlins|market=h2h|bookmaker=fanduel")
+    report = compute_clv_for_date(
+        "2026-08-14", "mlb", root=tmp_path,
+        history_payload={"markets": {tracked: _state([_point("2026-08-14T22:30:00+00:00")])}},
+    )
+    row = report["rows"][0]
+    assert row["close_book_scope"] == "same_book"
+    assert row["matched_bookmaker"] == "fanduel"
+    assert row["open_price"] == -135, "used the best-book price, not fanduel's own opening"
+    assert row["open_price_best_book"] == -120
+    assert report["avg_clv_pct"] is not None, "a genuine same-book pair must reach the headline"
+
+
+def test_without_our_price_at_that_book_it_stays_a_biased_fallback(tmp_path):
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_game_opening(bookmaker="polymarket"),
+          "quote": {"price": -120, "bookmaker": "polymarket",
+                    "book_prices": {"polymarket": -120}},
+          "line": None}],
+        date="2026-08-14", root=tmp_path,
+    )
+    tracked = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+               "away_team=Miami Marlins|market=h2h|bookmaker=fanduel")
+    report = compute_clv_for_date(
+        "2026-08-14", "mlb", root=tmp_path,
+        history_payload={"markets": {tracked: _state([_point("2026-08-14T22:30:00+00:00")])}},
+    )
+    assert report["rows"][0]["close_book_scope"] == "different_book_close"
+    assert report["avg_clv_pct"] is None

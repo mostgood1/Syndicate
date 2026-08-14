@@ -315,6 +315,53 @@ def compute_clv_for_date(
                 str(opening.get("event_id")).strip(),
                 str(opening.get("market") or "").strip().lower(),
             )
+            # PREFER A GENUINE SAME-BOOK PAIR BEFORE FALLING BACK.
+            #
+            # The opening now carries OUR price at every book that quoted the
+            # side, so when the best book's close is missing we can still make
+            # an UNBIASED comparison: take our price at some book history did
+            # record, against that same book's close. That is the only pairing
+            # free of the best-of-N selection effect, and it is why
+            # `book_prices` is recorded at all.
+            #
+            # Tried before the different-book fallback, deliberately: falling
+            # back first would produce a number, and a biased number that looks
+            # fine is worse than an honest gap.
+            book_prices = opening.get("book_prices")
+            if isinstance(book_prices, Mapping) and book_prices:
+                for market_key, alternate in markets.items():
+                    if not isinstance(alternate, Mapping):
+                        continue
+                    parts = dict(
+                        part.split("=", 1) for part in str(market_key).split("|") if "=" in part
+                    )
+                    if (
+                        str(parts.get("event_id") or "").strip() != event_key[0]
+                        or str(parts.get("market") or "").strip().lower() != event_key[1]
+                    ):
+                        continue
+                    book = str(parts.get("bookmaker") or "").strip().lower()
+                    our_price = book_prices.get(book)
+                    if our_price is None:
+                        continue
+                    candidate = resolve_close(opening, alternate)
+                    if candidate.get("close_price") is None:
+                        continue
+                    candidate["close_book_scope"] = "same_book"
+                    candidate["matched_bookmaker"] = book
+                    candidate["open_price_override"] = our_price
+                    resolved = candidate
+                    break
+
+        if (
+            resolved.get("close_price") is None
+            and not str(opening.get("player_name") or "").strip()
+            and str(opening.get("event_id") or "").strip()
+        ):
+            event_key = (
+                str(opening.get("event_id")).strip(),
+                str(opening.get("market") or "").strip().lower(),
+            )
             for alternate in by_event_market.get(event_key, []):
                 if alternate is state:
                     continue
@@ -330,7 +377,13 @@ def compute_clv_for_date(
         if reason:
             unresolved[reason] = unresolved.get(reason, 0) + 1
             continue
-        clv = clv_pct_from_prices(opening.get("price"), resolved.get("close_price"))
+        # When a same-book pair was found, CLV must use OUR price at THAT book,
+        # not the best-book headline price -- otherwise the comparison is
+        # same-book in name only and carries the same bias it exists to remove.
+        open_price = resolved.get("open_price_override")
+        if open_price is None:
+            open_price = opening.get("price")
+        clv = clv_pct_from_prices(open_price, resolved.get("close_price"))
         if clv is None:
             unresolved["clv_uncomputable"] = unresolved.get("clv_uncomputable", 0) + 1
             continue
@@ -345,7 +398,9 @@ def compute_clv_for_date(
                 "player_name": opening.get("player_name"),
                 "line": opening.get("line"),
                 "bookmaker": opening.get("bookmaker"),
-                "open_price": opening.get("price"),
+                "open_price": open_price,
+                "open_price_best_book": opening.get("price"),
+                "matched_bookmaker": resolved.get("matched_bookmaker") or opening.get("bookmaker"),
                 "open_captured_at": opening.get("captured_at"),
                 "close_price": resolved.get("close_price"),
                 "close_source": resolved.get("close_source"),
