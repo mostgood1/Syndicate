@@ -1079,3 +1079,70 @@ back **oldest-first regardless of `direction`**.
   live SHA would have shown both.
 - Caught only because I asked what `111a5000` was instead of assuming my own
   deploy was the newest thing on the service.
+
+### 2026-08-13 — A "PURE READ" endpoint is a reader you will not find by grepping the attach
+
+- What we believed: that deploying web alone would move every NFL game-state
+  observable, because `attach_game_state` runs at serve time. Two call sites
+  were enumerated to support it — `/api/board/book-grid`
+  (`intelligence.py:2378`) and the cross-book route (`:2838`) — and both
+  genuinely do call it on every request.
+- What was actually true: `/api/board/layer1` is a THIRD reader and calls it
+  **never**. Its own docstring says so in the first line — "A PURE READ of the
+  precomputed grid" — and its game state is whatever
+  `build_book_grid_artifact` stamped on **refresh-worker**
+  (`book_grid_artifact.py:214`). The web deploy passed 3 of its 4 observables
+  and could not have passed the fourth.
+- Why the usual method missed it: grepping `_attach_book_grid_game_state`
+  finds the callers, and a route that deliberately does NOT call it is
+  invisible to that search. **The dangerous reader is the one defined by
+  absence.** The same grep that proves "these three call it" says nothing
+  about how many routes serve the same data without calling it.
+- The rule going forward: **when a fix's observable is served by an endpoint,
+  ask what BUILDS the payload that endpoint returns, not which functions
+  mutate it.** For anything artifact-backed the answer is usually a different
+  service, and "the code is deployed" then says nothing about the reading. Find
+  the readers from the DATA (who writes this artifact, who reads it) rather
+  than from the function name.
+- Direct descendant of `presence is not reachability` (2026-08-13, same repo,
+  same day, four-reader endpoint) — and it was made with that entry already
+  in context. A rule that names a specific symbol does not generalise itself
+  to the next symbol. What transferred was the *shape*; what did not was the
+  discipline of enumerating readers before claiming blast radius.
+- Cost: one web deploy that delivered 3 of 4 effects and a confident wrong
+  statement in preflight answer 4. No production harm — the deploy was correct
+  as far as it went, and the failure was caught by measuring rather than by
+  assuming.
+
+### 2026-08-13 — A CONSTANT that reproduces exactly is a data outage, not a weak model
+
+- What we believed: the NFL board's identical projections on all 16 preseason
+  games (`margin 0.96`, `total 44.38`, `home_win 0.5267`) were `#377`'s
+  degenerate model — a model measured at ~zero skill finally collapsing.
+- What was actually true: the model was fine. Production `rating_source` read
+  `prior_season_fallback` on nearly every club and the CARDS surface served 16
+  DISTINCT totals from a file of the same name. Two copies existed; the board's
+  reader picked the one built where the play-by-play was missing.
+- **The test that settled it in one command, and generalises.** Run the real
+  generator with the suspected-missing input emptied, and see whether it
+  reproduces the observed constant EXACTLY. It printed
+  `0.960 / 44.380 / 0.5267` on all four weeks and on any matchup — to three
+  decimals, the served values. A weak model produces *varying* numbers with no
+  predictive power; a missing input produces *one* number. **Those are
+  distinguishable, cheaply, before touching any modelling code.**
+- The corroborating tell, worth naming because it is free: the four preseason
+  weeks carry DIFFERENT shrinkage factors (0.92/0.80/0.55/0.92), yet every week
+  served the same constant. Shrinking 0.0 by any factor is still 0.0 — so **a
+  degenerate input silently makes a week-specific adjustment a no-op.** When a
+  parameter that must change the output demonstrably does not, the input is
+  zero, not the parameter wrong.
+- The rule going forward: **before treating "every row is identical" as a
+  modelling defect, reproduce the constant from an empty input.** If it matches
+  exactly, the bug is upstream in data availability or file selection, and
+  every hour spent in the model is wasted. `#377` sat OPEN and UNOWNED for days
+  as a product decision about what a board may assert; it was a file-selection
+  bug the whole time.
+- Second-order: the two surfaces DISAGREED for days (board constant, cards
+  per-game) and nothing compared them. A cheap cross-surface equality check on
+  the same logical quantity would have found this immediately, and is now the
+  closing evidence in `deploys.md` (6/6 agree).

@@ -404,4 +404,78 @@ people learn to route around. Run the gate, read it, then deploy.
 - Rollback: redeploy the worker's prior commit (read it from
   /v1/services/srv-d91dpertqb8s73co8ls0/deploys before acting; state.md's
   recorded SHA goes stale in minutes).
-- Measured: <EMPTY -- OPEN OBLIGATION. Owner: this session.>
+- **MEASURED 2026-08-13 19:36 CDT. BOTH OBSERVABLES PASS. Lane closed.**
+  Artifact `generated_at 2026-08-14T00:36:18Z` — **23 minutes AFTER the
+  00:13:10Z deploy instant**, so this is a reading of the new code and not of
+  a stale artifact. That check is stated first because the earlier watcher
+  failed exactly here.
+
+      OBS1  by_state   {pregame:6, live:0}  ->  {live:5, pregame:1, final:0}
+      OBS4  distinct projected_raw   1 [44.38]  ->  6 distinct, 44.38 GONE
+
+- OBS1 detail — real state, not a blanket relabel. The two-sided control is
+  the last row: the game that had not kicked off is still `pregame` and now
+  carries a real start time, which a "mark everything live" bug could not do.
+
+      DET @ CIN  live  3-10  Q2 0:07     GB @ PIT   live  6-7  Q2 0:00
+      IND @ NE   live  0-3   Q2 6:00     ARI @ LV   live  7-7  Q1 0:37
+      LAC @ HOU  live  3-7   Q1 1:56     TEN @ SF   pregame  8:00P CT
+
+- OBS4 is **outcome (a)**, the best of the three possibilities this row listed
+  in advance: the HEALTHY artifact copy won. Not outcome (b) — projections
+  were not blanked. `rows_with_projection` held at 75, so no row lost its
+  projection; the same rows now carry per-game numbers instead of one constant.
+- **The decisive cross-check.** The board and the cards read the same filename
+  and disagreed before the fix (board: one constant; cards: 16 distinct). They
+  now agree on all six of tonight's games, to three decimals:
+
+      DET @ CIN 46.275   GB @ PIT 44.335   IND @ NE 46.745
+      ARI @ LV  41.915   LAC @ HOU 41.885  TEN @ SF 46.145   -- 6/6 AGREE
+
+  Run with a positive control (16 card keys parsed) after a first attempt
+  keyed on a field layer1 does not carry and reported 6/6 DIFFER — a failed
+  read rendering as a result, caught by the control rather than by the verdict.
+- Retroactively closes OBS1 on the WEB row above, which correctly FAILED there:
+  the effect needed this service, exactly as that row predicted.
+
+### nfl-day-of-game — pbp team-code aliases (REFRESH-WORKER) — 111a5000
+- Deployed: 2026-08-13 19:13 CDT. Deploy `dep-d9v5r861egvs73cbs08g`.
+  Service: `refresh-worker` (srv-d91dpertqb8s73co8ls0).
+- Sim killed, again with explicit user authorisation: `20260814_001053`,
+  `reason=fingerprint_change`, in flight at 19:13:10.
+- Change: `team_rating` translates the schedule's `LAR`/`WSH` into the
+  play-by-play's `LA`/`WAS` before matching. Those two clubs matched zero
+  plays in either season and fell to `neutral_no_data` -- a real 0.0/0.0
+  rating producing a confident projection with no team information.
+  Measured by diffing the code sets on the real files, and confirmed on
+  production: every club read `prior_season_fallback` EXCEPT exactly these two.
+- WHY THIS DOES NOT CONFOUND THE 98950c6d MEASUREMENT, which was still open
+  when this shipped. The two changes act at different stages:
+      98950c6d  projection LOADER -> moves the board at the next ARTIFACT build
+      111a5000  pbp aliases       -> moves only newly GENERATED projections,
+                                     i.e. the next season-projection autorun
+                                     (~daily, last launched 21:00 CDT today)
+  So this one cannot move tonight's board numbers at all, and the loader fix
+  remains solely attributable for them. Stated here rather than assumed,
+  because "one change per deploy" was knowingly bent and the reason has to
+  survive without me.
+- Expected: at the NEXT generator run, `rating_source` on MIA@WSH and LAR@KC
+  changes from `[neutral_no_data/...]` to `[prior_season_fallback/...]`, and
+  those two games stop carrying league-average projections. NOT observable
+  tonight.
+- Measured: <EMPTY -- OPEN OBLIGATION. Due after the next season-projection
+  autorun, ~2026-08-14 21:00 CDT. Owner: UNASSIGNED.>
+
+### nfl-day-of-game — WATCHER DEFECT, recorded because it nearly became a finding
+- `worker_verify.ps1` printed `STILL 44.38 -- fix did not take` against an
+  artifact whose `generated_at` was 00:08:31Z -- about two minutes BEFORE the
+  worker it was judging came up. The label was not entailed by the condition
+  that produced it: the script never required the artifact to postdate the
+  deploy.
+- This is the ledger's own "a watcher's LABEL must be entailed by its exit
+  CONDITION" entry, reproduced by someone who had read it earlier the same
+  session. Caught by reading `generated_at` in the output rather than the
+  verdict beside it.
+- Replaced by `worker_verify2.ps1`, which renders NO verdict until
+  `generated_at > deploy instant` and prints `PREDATES THE DEPLOY. No verdict.`
+  until then -- stale and failed must not be spelled the same way.
