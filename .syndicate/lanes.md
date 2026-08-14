@@ -6,6 +6,46 @@
 
 ## OPEN
 
+### projection-skill-declaration — OPEN — opened 2026-08-14 — session: nfl-day-of-game
+- Goal: `#425` gap 1. Every projection on the board declares whether its model
+  has ever been evaluated, so a consumer can tell a validated number from an
+  unvalidated one. Testable outcome: 100% of projection rows carry a
+  `model_skill` block on every sport; NFL keeps its richer measured note
+  untouched; the other six report `status: "unmeasured"` explicitly.
+- **SCOPE, AND WHAT THIS DELIBERATELY DOES NOT DO.** It does NOT measure the six
+  models. That needs six bespoke backtests and the data is not there:
+  measured on this checkout today — soccer results **0 files**, MLB
+  `feed_live` **1 date**, WNBA processed game-cards **4 files**. CLAUDE.md's
+  standing warning is exactly this case: a backtest built on those "will look
+  like it ran on months of data and actually be running on whatever the
+  narrowest family happens to cover". Producing `correlation: 0.31` from n=4
+  would be `#377`'s own failure — an authoritative-looking number that means
+  nothing — committed by the ticket written to prevent it.
+- So this closes the SYSTEMIC half: silent absence becomes **declared**
+  absence. `unmeasured` is a first-class value, not a missing key. The six
+  actual measurements get their own ticket with the data gate named.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/projection_skill.py` (new)
+  - `syndicate/features/shared/board_enrichment.py` — one call in the existing
+    `attach_projections` wrapper
+  - `tests/test_projection_skill.py` (new)
+- Design:
+  - Same choke point as the degeneracy detector: the `attach_projections`
+    wrapper. One place, seven sports, 13 return sites, zero call sites.
+  - **Never overwrite a producer's own note.** NFL's `skill_note` is
+    profile-aware (preseason only) and carries real backtest numbers; the
+    wrapper fills in only where `model_skill` is ABSENT, and normalises the
+    existing one by adding `status: "measured"` so both shapes agree.
+  - **Keep the unmeasured note SMALL.** It lands on every projection row on
+    every sport, and `#374` records `extraHitterProps` being 68% of the MLB
+    live-lens payload. Prose belongs in the module docstring, not in 2,000
+    rows. Status + verdict + nulls only.
+- Falsification tests: NFL's measured note must survive byte-identical apart
+  from the added `status`; a row with no projection must not gain one; the
+  block must not grow the payload by more than a few keys.
+- Blocked by: none. The six measurements are NOT blocked by this — they are
+  blocked by production data access.
+
 ### projection-degeneracy-detector — CLOSED-VERIFIED 2026-08-14 — opened 2026-08-14 — session: nfl-day-of-game
 
 **OUTCOME — the lane's stated testable outcome, met.** A synthetic constant
