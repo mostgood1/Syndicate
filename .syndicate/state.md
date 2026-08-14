@@ -22,9 +22,20 @@
   FIVE times in one evening, TWICE inside 25 minutes on 08-14, and web moved
   AGAIN during this session's own reconciliation. A stale read nearly shipped a
   rollback and made one blast-radius claim wrong by 20 commits.**
-  web **`f9aa2399`** (17:52:38Z, another session's `#433`), refresh-worker
-  **`294f9ca9`** (16:16:56Z), live-odds-worker **unread this session — do not
-  quote the old `83e3e5f2`** `[unverified]`.
+  **SUPERSEDED 08-14 18:32Z — web moved again, and live-odds-worker is no
+  longer unread.** `[measured 08-14 18:32Z, status AND commit, not the 201]`
+  web **`8ff4e513`** (18:32:36Z, `#433` OddsAPI catalogue route),
+  refresh-worker **`294f9ca9`** (16:16:56Z, unchanged),
+  live-odds-worker **`9a3a5bc6`** (17:42:02Z, `#433` soccer step order).
+  - **Two services are deliberately NOT on `origin/main`.** `9a3a5bc6` and
+    `8ff4e513` are cherry-picks onto each service's own live commit, pushed as
+    `deploy/soccer-step-order-433` and `deploy/ops-oddsapi-catalogue-433`.
+    Deploying either from main's tip would have carried **22 production files**
+    from four other lanes — `memory_observability.py`, `run_refresh_worker.py`,
+    `intelligence_state.py`, `board_enrichment.py`, `projection_skill.py` —
+    onto a 2GB service with an OOM history. The same patches ARE on main
+    (`e9990ccb`, and `1bb6fd53`/`18215ef9` local-only); only the deploys are
+    pinned. Do not "reconcile" a service to main without re-reading that delta.
   - **`aac18260` (`#428` MLB prop skill) is on origin and on NEITHER service.**
     Checked by ancestry against both live commits at 17:54Z, not assumed.
 
@@ -498,6 +509,37 @@ WRONG. Read this first.**
   cause 2.** A shortlist rebuilt every 5 minutes off a 2-hour-old quote shard
   is a board that LOOKS fresh and is not — strictly worse than one that is
   visibly stale, because nothing on it says so.
+
+## GOAL #1 (the memory plateau) — what is now ELIMINATED `[measured 08-14 18:3xZ]`
+
+Nothing new is convicted. Four candidates are struck off, which narrows it.
+
+- **The MLB cards-context cache EARNS its retention — 22.9% hit rate**
+  (91 hits / 398 begins / 307 full builds over 5h; 91+307=398 exactly).
+  `handoff_overview_hydration.md`'s "mathematically zero hit rate, safe to zero,
+  ~60MB free" is **RETRACTED IN THAT FILE**. It carried `#253`'s correct finding
+  about `_MLB_TODAY_CACHE` across to a different cache with a different key.
+  **Do not zero it.**
+- **glibc arenas are not holding it**: `MALLOC_ARENA` reports `in_use_mb 83.4`,
+  `free_held_mb 298.3`, `system_current_mb 381.7`, `mmapped_mb 0.6` against
+  `anon` ~1490MB. Confirms `#423` from a second instrument.
+- **It is not in GC-tracked Python objects**: `HEAP_CENSUS` at
+  `container_mb 2150.996` counts **325,653** gc-tracked objects total
+  (dict 155,042 / list 72,799 / function 30,812). Millions would be needed to
+  explain the plateau. This also sits badly with the `nframe=1` tracemalloc
+  reading of "7.17M live objects from `json.loads`" — those two instruments
+  disagree and the disagreement is itself unexplained.
+- **The board build is not the retainer** (established earlier: it ran 5 times
+  in 3h while `anon` stayed high).
+- **What remains, and it is a hypothesis not a finding:** large allocations that
+  are neither gc-tracked nor in glibc's arenas — NumPy/Monte Carlo buffers being
+  the obvious candidate. `tracemalloc` is currently OFF
+  (`SYNDICATE_TRACEMALLOC_DIAG='0'`, verified on the live service) and the
+  `anon-allocation-site` lane's own next step (`nframe=3`) needs a deploy of
+  instruments that were rolled back after four OOM kills followed them.
+- **Cheap unexploited signal for whoever continues**: 307 full cards-context
+  builds in 5h is one per ~59s, each with a measured ±500-650MB sawtooth. The
+  churn is real even though the cache is not the leak.
 
 ## `#387` FIX IS DEPLOYED AND ITS CODE PATH IS PROVEN TO RUN `[measured 08-14 17:4xZ]`
 
@@ -1058,3 +1100,42 @@ WRONG. Read this first.**
 - `#401`'s maintenance runner is **not** broken: 15.62h elapsed against an
   86400s interval, the env override unset on both workers. Next run expected
   ~`23:38:06Z`. `[measured 08-13]`
+
+## Soccer odds capture — VERIFIED 2026-08-14 18:4xZ
+
+- **Soccer GAME odds have not been captured for ANY league since 08-10/08-11.**
+  `[measured 08-14 18:4xZ]` The `book_quotes` shard split by `kind`:
+  eredivisie `prop` 467 rows newest **2026-08-14T17:21:44**; eredivisie `game`
+  77 rows newest **2026-08-10T20:54:06**; primeira_liga / belgian_pro_league /
+  championship carry `game` rows ONLY, all 08-10/08-11.
+  **Eredivisie looked healthy solely because prop rows from a different
+  producer masked it.** Corroborated by mtime: all four
+  `<league>/api/odds/game_odds_current.csv` bound to **48-96h old** via the
+  export route's `since` filter, probe validated against a control first.
+- **The vendor is NOT the cause.** `/api/ops/oddsapi/sports` (new, read-only):
+  all ten soccer keys `listed=True, active=True` out of an 82-entry catalogue.
+  `[measured 08-14 18:3xZ]`
+- **WHY the step stopped is UNKNOWN and is the open question.** `[unverified]`
+  Untested lead: `soccer_{league}_odds` is `phases=("pregame",)` while
+  refresh-worker's soccer unit autorun runs `phase="live"` — which would build
+  no odds step at all.
+- **Two hypotheses are DEAD; do not re-run them.** `[measured 08-14]`
+  (1) Step truncation at #27 of 50 — falsified by a single-league scoped run
+  (~6 steps) that captured nothing. (2) Three-specific-leagues — all ten are
+  affected. The step reorder shipped against (1) is retained on its own merits
+  but did NOT fix this.
+
+## OddsAPI budget — VERIFIED 2026-08-14 17:2xZ
+
+- **Projected 30-day burn 4,640,809 credits = 92.8% of the 5M cap.**
+  `[measured 08-14 17:2xZ, /api/ops/oddsapi/quota]` `credits_per_hour` 6,445.6.
+  Headroom ~360k/month. By sport: mlb **93.7%** of spend (8.72 cr/call), soccer
+  4.2% (**1.46** cr/call — 6x cheaper than MLB), nfl 1.4%, wnba 0.7%.
+  Pregame hours are cheap (10-18k/hr); live hours dominate (83-228k/hr).
+- **MLB pregame sweep interval is now 3600s, and the effective gap is
+  ~1h10m, not 1h.** `[measured 08-14 16:20Z]` Gap moved 7,289s -> **4,215s**.
+  The loop wakes every 900s and sweeps whatever is past its interval, so the
+  setting is a FLOOR the tick quantises — expect 3,600-4,500s. nfl/wnba remain
+  7200s, soccer 28800s.
+- Per-sweep MLB cost ~214 credits / 31 calls — **ONE interrupted sample,
+  order-of-magnitude only.** `[unverified]`

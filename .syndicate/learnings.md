@@ -1507,3 +1507,32 @@ back **oldest-first regardless of `direction`**.
   produce the observation.
 - Cost: one unnecessary deploy, a wrong "PROVEN" in the ledger for ~90 minutes,
   and three fixtures that reached kickoff stale while I chased the wrong thing.
+
+### 2026-08-14 — A HEALTHY-LOOKING SIBLING MASKED A PLATFORM-WIDE OUTAGE
+- What we believed, for most of a session: three soccer leagues had a broken
+  odds capture while eredivisie was fine. The contrast WAS the evidence — same
+  script, same key, same region, one works — and it drove three successive
+  hypotheses (season gate, step truncation, per-league fetch fault), two of
+  which were shipped against.
+- What was actually true: **soccer GAME odds were frozen for all ten leagues
+  since 08-10.** Eredivisie carried 467 fresh `prop` rows from a DIFFERENT
+  producer; its `game` rows stopped at 2026-08-10T20:54:06 exactly like the
+  others. The "healthy" comparator was never healthy — it was masked.
+- **The rule: when one member of a set looks healthy and the rest do not,
+  disaggregate the healthy one before theorising about the sick ones.** A
+  single `GROUP BY kind` on the artifact answered in one query what three
+  hypotheses and two deploys could not. I had been comparing leagues, which is
+  the axis the symptom presented; the discriminating axis was the PRODUCER
+  inside each league.
+- Corollary that generalises past this bug: **a comparator is a hypothesis.**
+  "Eredivisie works" was load-bearing in every theory I built and was never
+  itself tested. The cheapest possible check on any differential diagnosis is
+  to verify the control is actually a control.
+- Second-order: the same disaggregation retroactively explained two loose ends
+  I had shelved — odds CSVs containing today's fixtures (written 08-10, when
+  they were upcoming) and eredivisie's 99 board rows with 5 projections (mostly
+  props). **Unexplained residue was pointing at the answer the whole time**;
+  I had labelled both "odd, not blocking" and moved on.
+- Cost: ~4 hours, two deploys against wrong causes, three fixtures to kickoff
+  with 3.8-day-old odds. Blast radius stayed small only because every deploy
+  was pinned to one file on its service's live commit.
