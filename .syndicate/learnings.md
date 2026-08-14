@@ -1374,3 +1374,59 @@ back **oldest-first regardless of `direction`**.
   staged — commit it DELIBERATELY and say so in the message, rather than
   letting it ride in silently. Done twice afterwards on `deploys.md` and
   `lanes.md`.
+
+### 2026-08-14 — DECOMPOSE BIAS BEFORE PUBLISHING A SKILL VERDICT
+
+- What we believed, and were one commit from writing into a constant: the MLB
+  hitter-prop model has NO MEASURED SKILL. Over 2,487 player-games every single
+  counting market lost to a constant baseline — `hits` MAE 0.7321 vs 0.6978,
+  `tb` 1.3652 vs 1.3167, and so on for seven markets. That is exactly the
+  reading `#367` published for NFL margins, and it would have gone into
+  `MEASURED_SKILL` as "no skill".
+- What was actually true: the model is **BIASED, NOT BLIND**. Every market also
+  carried a positive correlation (0.13–0.16), and subtracting the mean error
+  flipped **5 of 7** to beating the baseline. The ranking information is real;
+  the LEVEL is wrong.
+- **Why "no skill" would have been actively harmful, not merely incomplete:**
+  the two conclusions have OPPOSITE remedies. "No skill" means suppress the
+  projection (what NFL margins correctly do). "Biased" means CALIBRATE it —
+  `#367`'s own totals fix, `calibrated_total`, is that remedy. Publishing the
+  wrong one retires a model that needed a constant subtracted.
+- The rule going forward: **before writing any skill verdict, subtract the mean
+  error and re-score.** Report `mae_model`, `mae_constant_baseline` AND
+  `mae_debiased` together. A model that beats the baseline only after
+  de-biasing is a calibration ticket, not a dead model, and the three numbers
+  side by side are what make that legible. MAE alone cannot separate them.
+- Then decompose further, because the CAUSE changes the fix again. Normalising
+  by opportunity (`pa_mean`) removed 55% of the count bias — real and NOT all
+  of it, with +12.2% per-PA rate inflation left over. So "fix playing time" is
+  the biggest single lever and is still insufficient on its own. **Report the
+  PROPORTION explained, never a binary**: the first version of that check
+  printed "one fix, not eight" on a threshold `rate < raw/2` that `12.2 vs
+  13.5` passed by a hair — a verdict far stronger than its own data, and the
+  same defect as a watcher label its exit condition does not entail.
+- Cost: none. Caught because seven markets failing the same way in the same
+  direction looked like one cause rather than seven faults, and that was worth
+  one more test.
+
+### 2026-08-14 — A GUARD MUST COUNT THE ROWS THE STATISTIC USES, NOT THE ROWS THE JOIN PRODUCED
+
+- What we believed: the WNBA backtest was protected against publishing a number
+  from a thin sample. It had an explicit `--min-games` gate, written from the
+  ledger's own warnings about sample size, and the gate PASSED.
+- What was actually true: it gated on games JOINED TO A FINAL — **361** — and
+  then computed every statistic over whichever of those carried a projection —
+  **9**. The guard was satisfied by a denominator forty times larger than the
+  one the numbers rested on, and it printed `corr 0.5228` from nine games.
+- The rule going forward: **a guard's denominator must be the denominator of
+  the thing it is guarding.** If a statistic is computed over a subset, the gate
+  counts the subset. Print BOTH — "361 joined, 9 with a projection" — because
+  the gap between them is itself the finding: here it was the whole story
+  (a column added 13 days earlier), not a footnote to a skill result.
+- This is the ledger's "a pooled denominator can make a measurement unreadable"
+  arriving in a new place: not a counter mixing populations, but a GUARD
+  reading a different population from the statistic it protects. Same shape,
+  and the script written to avoid it committed it.
+- Generalises past backtests: any check of the form "enough data?" must name
+  which data. `len(rows)` is almost never the right answer when the rows are
+  heterogeneous.
