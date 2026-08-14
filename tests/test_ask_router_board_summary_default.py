@@ -34,11 +34,41 @@ class BoardSummaryRoutingTests(unittest.TestCase):
         self.assertEqual(decision.handler_name, "handle_market_summary")
 
     def test_unmatched_question_defaults_to_summary_not_single_bet_analysis(self) -> None:
-        # The load-bearing property: bet_analysis dead-ends when nothing
-        # matches, a summary always has an answer. An unrecognised question
-        # must not land on the dead end.
+        # THE LOAD-BEARING PROPERTY, RESTATED -- read this before changing it.
+        #
+        # 2026-08-03 pinned "an unmatched question must not land on
+        # bet_analysis", because bet_analysis dead-ends and renders as "No
+        # structured answer came back". That property is unchanged and is what
+        # this asserts.
+        #
+        # 2026-08-14 narrowed WHERE it lands. The original assertion was
+        # `== "market_summary"` on a gibberish string, which conflated "not the
+        # dead end" (the real property) with "a board summary" (one way of
+        # satisfying it). Gibberish now routes to `out_of_scope`, which is also
+        # not the dead end and is a better answer than five betting picks.
+        #
+        # A vague BETTING question still gets the summary -- that is the case
+        # 2026-08-03 actually reported, and it is covered by
+        # test_common_board_summary_phrasings and
+        # test_vague_betting_questions_still_get_the_summary_default below.
         decision = self.router.route("qwertyuiop nothing matches this at all")
-        self.assertEqual(decision.intent, "market_summary")
+        self.assertNotEqual(decision.intent, "bet_analysis")
+        self.assertNotEqual(decision.handler_name, "handle_bet_analysis")
+
+    def test_vague_betting_questions_still_get_the_summary_default(self) -> None:
+        # The 2026-08-03 fix, pinned directly rather than via a gibberish
+        # proxy: a question that is clearly about the board but matches no
+        # explicit rule must still reach the summary, not be declined.
+        for question in (
+            "who is favored in the late games",
+            "how has the model performed over the last 30 days",
+            "how is jokic looking tonight",
+            "best tb targets today",
+            "how many goals will arsenal score",
+            "what is united's price this weekend",
+        ):
+            with self.subTest(question=question):
+                self.assertEqual(self.router.route(question).intent, "market_summary")
 
     def test_common_board_summary_phrasings(self) -> None:
         for question in (
@@ -98,8 +128,80 @@ class BoardSummaryRoutingTests(unittest.TestCase):
         self.assertEqual(comparison.intent, "comparison")
 
     def test_context_without_a_subject_does_not_change_the_default(self) -> None:
+        # A bare `sport` is not a subject, so the per-pick fallback must not
+        # engage. Post-2026-08-14 the gibberish lands on out_of_scope rather
+        # than a summary; what is pinned here is that it does not become
+        # bet_analysis just because a sport rode along.
         decision = self.router.route("qwertyuiop nothing matches this at all", context={"sport": "mlb"})
-        self.assertEqual(decision.intent, "market_summary")
+        self.assertNotEqual(decision.intent, "bet_analysis")
+
+
+class OutOfScopeRoutingTests(unittest.TestCase):
+    """`market_summary` stopped being the answer to non-betting questions.
+
+    Measured on production 2026-08-14: `market_summary` was the resolved intent
+    on 40 of 52 regression questions, and "What is the capital of France?"
+    returned five betting opportunities with a "Best edge 4.9%" summary. A
+    surface that answers everything is worse than one that declines, because a
+    user cannot tell the two modes apart.
+    """
+
+    def setUp(self) -> None:
+        self.router = SyndicateQueryRouter()
+
+    def test_general_knowledge_is_declined(self) -> None:
+        for question in (
+            "what is the capital of france?",
+            "who is the president",
+            "translate this to spanish",
+            "what time is it",
+        ):
+            with self.subTest(question=question):
+                decision = self.router.route(question)
+                self.assertEqual(decision.intent, "out_of_scope")
+                self.assertEqual(decision.matched_terms, ("no_domain_vocabulary",))
+
+    def test_weather_is_declined_despite_naming_a_stadium(self) -> None:
+        # "stadium" is sports vocabulary but not BETTING vocabulary, and the
+        # gate is deliberately about the latter.
+        decision = self.router.route("what is the weather at the stadium right now?")
+        self.assertEqual(decision.intent, "out_of_scope")
+
+    def test_personal_records_are_declined_even_though_they_say_betting(self) -> None:
+        # This is why the personal-records rule runs BEFORE the domain gate:
+        # these questions carry betting vocabulary and would otherwise pass it.
+        for question in (
+            "what is my account balance and betting history?",
+            "show me my bets from last week",
+            "what is my portfolio worth",
+        ):
+            with self.subTest(question=question):
+                decision = self.router.route(question)
+                self.assertEqual(decision.intent, "out_of_scope")
+                self.assertEqual(decision.matched_terms, ("personal_records",))
+
+    def test_an_attached_pick_still_wins_over_the_gate(self) -> None:
+        # A per-card "Ask about this pick" click attaches a subject and its
+        # phrasing may carry no domain noun. The context fallback runs before
+        # the gate, so the click keeps working.
+        decision = self.router.route(
+            "What's the case for and against Colorado Rockies steam move?",
+            context={"selection": "Colorado Rockies steam move"},
+        )
+        self.assertEqual(decision.intent, "bet_analysis")
+
+    def test_the_gate_only_applies_when_nothing_matched(self) -> None:
+        # An explicit rule match must never be overridden by the gate, even if
+        # the phrasing is otherwise sparse.
+        self.assertEqual(self.router.route("compare a and b").intent, "comparison")
+        self.assertEqual(self.router.route("top edges").intent, "market_summary")
+
+    def test_declining_is_not_the_bet_analysis_dead_end(self) -> None:
+        # The whole point of the 2026-08-03 default. A decline must be its own
+        # intent, not a fall-through to the empty single-bet shell.
+        decision = self.router.route("what is the capital of france?")
+        self.assertNotEqual(decision.handler_name, "handle_bet_analysis")
+        self.assertEqual(decision.handler_name, "handle_out_of_scope")
 
 
 

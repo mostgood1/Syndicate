@@ -688,6 +688,7 @@ people learn to route around. Run the gate, read it, then deploy.
   `SYNDICATE_TRACEMALLOC_DIAG=1` if its owner wants the instrument back.
 
 ## DEPLOYED 2026-08-14 10:42 CDT — `530fc5d8` refresh-worker — Layer 2 shortlist off the Layer 1 floor — MEASUREMENT OPEN
+## DEPLOYED 2026-08-14 10:42 CDT — `530fc5d8` refresh-worker — Layer 2 shortlist off the Layer 1 floor — **MEASURED, CRITERIA MET**
 
 - **Preflight 2026-08-14 10:24 CDT (15:24Z): PASS on scope, HOLD on timing.**
 - **1. Scope — PASS, exactly one substantive change.** Live is `2d6f7a2f`
@@ -883,6 +884,36 @@ people learn to route around. Run the gate, read it, then deploy.
   then redeploy pinned at the then-live commit; the code fallback returns it to
   7200. Re-read the live commit first.
 - Measured: `<pending>`
+- Measured: 2026-08-14 11:20-11:29 CDT. Deploy `live` 16:04:20Z at commit
+  `83e3e5f2` — status AND commit checked, not the 201.
+  - **The gate's own output at 16:20:30Z is the primary evidence:**
+
+        PREGAME_CADENCE_SKIPPED sports=nfl,soccer,wnba
+        PREGAME_CADENCE_DETAIL  nfl:6011/7200  soccer:4191/28800  wnba:2371/7200
+
+    **MLB is ABSENT from the skip list, so MLB swept.** Under the old 7200 it
+    would have been skipped here (marker_age 4,178s < 7,200) and held to
+    ~17:20Z. nfl/wnba still read `interval_s=7200` and soccer `28800`, so the
+    change is scoped to MLB exactly as intended — no collateral cadence move.
+  - **Gap, measured end to end on the served board:** previous sweep
+    10:10:38 CDT, new sweep observed **11:20:52 CDT** = **4,215s (1h10m15s)**,
+    against the previous measured gap of **7,289s (2h01m29s)**. A 42% cut.
+  - **Lands inside the predicted band, which is the useful part.** I predicted
+    3,600-4,500s rather than exactly 3,600 because the loop wakes every 900s
+    and sweeps whatever is past its interval, so the setting is a FLOOR and the
+    tick quantises it. 4,215s sits in that band. Anyone reading "1 hour" as
+    "3,600s exactly" will file a bug against correct behaviour.
+  - **A methodology note worth keeping.** The board's `odds_observed_at` lags a
+    real sweep by up to one artifact rebuild — the artifact was built 11:18:03,
+    BEFORE the 11:20:16 tick, so between 11:20 and 11:28 the board still read
+    10:10 and "no change" was ambiguous between "no sweep" and "sweep not yet
+    rebuilt". Six consecutive readings said nothing. The discriminator was not
+    another reading; it was the worker's own gate line, which already had the
+    answer. The board caught up at the 11:28:21 rebuild and agreed.
+  - No `server_failed`, no OOM, no restart loop after the deploy.
+- Verdict: **shipped and verified.** MLB pregame odds now refresh on a ~1h10m
+  effective cadence instead of ~2h01m. Cost is 2x MLB pregame sweeps; the
+  absolute OddsAPI call figure is still unmeasured and is the open follow-up.
 
 ### `#429` — HRR mean derived from its components — WEB + REFRESH-WORKER `214f5151`
 - Web `dep-d9vjlc0u01pc738a78jg`, refresh-worker `dep-d9vjlc7qj5pc73dp71mg`,
@@ -1140,3 +1171,321 @@ people learn to route around. Run the gate, read it, then deploy.
   by a `lane-guard.py` stdin probe (exit 0) — the memory lanes mention it in
   prose, not in a Files block, so no reassignment was needed.
 - Measured: `<pending>`
+
+- **FINAL MEASUREMENT — 3h CLEAN WINDOW, 16:16:56-19:24Z = 187.3 min, live
+  commit `294f9ca9` unchanged throughout (verified by SHA, not by timestamp).**
+
+      board refreshes         37   = 11.9/hour    BASELINE 5 in 180min = 1.7/hour
+        via the fast path     23   <-- cycles that previously produced NOTHING
+        via the full build    14
+      gaps (min)              min 1.6 / p50 5.3 / max 11.8    BASELINE max 104.7
+      MEMORY_GUARD_ABORT      96   the Layer 1 guard refusing, as designed
+      LAYER2_GUARD_SKIP        0   <-- the declared FALSIFIER never fired
+      FAST_REFRESH_FAILED      0   Traceback 0   OOM/restart events 0
+
+  **All five stated criteria MET.** Refresh count 37 > 5. Longest gap 11.8 <
+  30. The guard is still actively refusing (96 times), so this is not a
+  boot-confounded quiet period. The falsifier stayed at 0 across all 96
+  refusals, so the 600MB Layer 2 floor is correctly sized. No OOM.
+  - **The span now EXCEEDS the 180-min baseline (187.3 min), which is what makes
+    the max-gap comparison sound.** In the earlier 103.9-min reading a
+    104.7-min gap was barely observable and I said so; here it was fully
+    observable and did not occur.
+  - **Attribution: 23 fast-path refreshes.** Those cycles produced nothing
+    before this change. Baseline 146 aborts/180min -> 5 refreshes; now 96
+    aborts/187min -> 37 refreshes.
+  - **Residual confound, still stated:** the abort RATE is lower than baseline
+    (30.8/h vs 48.7/h), so this window carries less memory pressure. The 7.0x
+    refresh-rate improvement is therefore not wholly attributable; the 23
+    fast-path lines and the absent long freeze are.
+
+## 2026-08-14 19:29Z — web `ea1d2ed6` — A3 uninformative-EV rule + `rows_uninformative_ev`
+
+- **Lane:** `recommendation-lane-correctness` (model audit 2026-08-14, A3).
+- **Deploy:** `dep-d9vmp8dbedkc73enkldg`, web only, by `commitId` (services are
+  pinned to `main` with `autoDeploy=no`; deploys here go by explicit commit, so
+  no service-config change and NO `render.yaml` touched → no `blueprint_sync`).
+- **Branch:** `deploy/model-audit-a3-uninformative-ev`, cut from `8ff4e513`
+  (web's own live SHA) — verified a **pure fast-forward**, not a rollback.
+  Deliberately NOT cut from `main`: `origin/main..HEAD` is **136 commits**
+  across several sessions, none of which passed this gate.
+- **Scope:** ONE substantive change. A1/A2 (`recommendation_engine.py`) and A3a
+  (`opportunity_signals.py`) were deliberately EXCLUDED and remain undeployed,
+  so this deploy's effect is attributable.
+- **EXPECTED EFFECT ON WEB: NONE that a user can see, and that is the point.**
+  Web has `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`, so it does
+  not build the shortlist — it reads the artifact. This ships the READER
+  (`rows_uninformative_ev` on `/api/board/layer2-shortlist`) so the counter is
+  visible the moment the builder ships. Until then the key should read **null**.
+- **PREDICTION, so this is falsifiable:** after this deploy and before any
+  refresh-worker deploy, `/api/board/layer2-shortlist` carries the KEY
+  `rows_uninformative_ev` with value **null**, and `total_rows` stays ~256 with
+  soccer still at 100. If soccer drops on WEB alone, my reading of loop
+  ownership is wrong and this must be reverted.
+- **Rollback:** redeploy `8ff4e513` on `srv-d88ahvrbc2fs73eodu30` by commitId.
+- **MEASUREMENT `[19:38Z, /api/board/layer2-shortlist]` — ALL THREE PREDICTIONS HELD.**
+  - Key `rows_uninformative_ev` **present** on the payload: `True`.
+  - Its value: **`null`** — exactly as predicted, because the BUILDER has not
+    shipped. The reader is in place and reads nothing yet.
+  - `total_rows` **256**, `per_sport.selected` = mlb 84 / nfl 60 / **soccer 100** /
+    wnba 12, `fair_method` mix consensus 156 / **book_margin_model 100**.
+  So web did NOT apply the filter, which CONFIRMS the loop-ownership reading
+  (`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` on web) rather
+  than assuming it. Had soccer dropped here, the reading was wrong and this was
+  the revert trigger. It did not.
+  **This deploy is therefore VERIFIED INERT BY DESIGN — it changes nothing a
+  user sees and is not evidence that A3 works.** The behaviour change is still
+  entirely ahead of us, in the held refresh-worker deploy.
+
+### NOT deployed in this window, and why
+- **refresh-worker (`29ed6de1`, branch `deploy/model-audit-a3-worker`, pushed
+  and verified a fast-forward from `294f9ca9`) is HELD.** It is the service that
+  actually applies the filter. Held because, measured at 19:26Z:
+  - headroom is **182–226 MB of 4096** (`memory_anon_mb` 2703, `container_memory_mb`
+    ~3884), and two OPEN lanes (`anon-allocation-site`,
+    `refresh-worker-anon-leak`) are measuring exactly that number. A deploy
+    reboots the worker and resets the quantity under measurement —
+    `learnings.md`: "the floor IS the ratchet; every deploy reboots".
+  - MLB is **mid-slate** (`MLB_SIM_TICK … reason: "sport_currently_live"`,
+    `LIVE_MC_DIAG` running per game). No FULL sim is in flight — that check
+    passed — but live props/live-lens work is active.
+  Needs an explicit go/no-go from the user or the memory lanes' owner.
+
+## 2026-08-14 19:42Z — refresh-worker `29ed6de1` — A3, the BUILDER half
+
+- **Lane:** `recommendation-lane-correctness` (A3). Second half of the same one
+  substantive change; web's reader shipped at 19:37Z and measured inert.
+- **Branch:** `deploy/model-audit-a3-worker`, cut from `294f9ca9`
+  (refresh-worker's OWN live SHA) and verified a **fast-forward**.
+  - **A rollback was caught here.** The web branch (`ea1d2ed6`, off `8ff4e513`)
+    is NOT an ancestor for this service — deploying it would have dropped four
+    commits including `294f9ca9`, the `#429` MLB HRR producer fix `state.md`
+    records as confirmed in production. The two services diverge from
+    `b98f5ed7`, so NO single branch fast-forwards both. Hence two branches.
+- **Shipped over the user's stated risk, with the risk stated:** headroom and
+  the two OPEN memory lanes (`anon-allocation-site`, `refresh-worker-anon-leak`)
+  were raised; the user chose to ship. This deploy REBOOTS the worker and resets
+  `memory_anon_mb`, so any memory reading taken after 19:42Z is boot-confounded
+  and must not be compared to a pre-deploy floor.
+- **Pre-deploy checks, fresh at 19:41:34Z (not reused from 19:26Z):**
+  - **0 full-sim launch markers in 8 minutes** — no full MLB sim to kill.
+  - headroom **386.9 MB** (recovered from 182 MB), `memory_anon_mb` 2531.
+- **PREDICTIONS — written before the deploy, all falsifiable, one is a control:**
+  1. `rows_uninformative_ev` becomes a **positive integer** (currently `null`).
+  2. `per_sport.soccer.selected` **100 → 0–12**.
+  3. `total_rows` **256 → ~156**.
+  4. `fair_method` mix `book_margin_model` **100 → 0**.
+  5. **CONTROL:** mlb 84 / nfl 60 / wnba 12 selected stay **UNCHANGED**. All
+     three sports price by `consensus`, so the rule must not touch them. If any
+     of them moves, the rule is over-firing and this reverts immediately.
+  Window: one board rebuild after the worker is live (~10–15 min observed).
+- **Rollback:** redeploy `294f9ca9` on `srv-d91dpertqb8s73co8ls0` by commitId.
+- **MEASUREMENT `[19:58:41Z build, read 19:58Z]` — ALL FIVE HELD, INCLUDING THE CONTROL.**
+
+      P1  rows_uninformative_ev   null -> 4003        (positive integer)
+      P2  soccer selected          100 -> absent      (0 rows; within 0-12)
+      P3  total_rows               256 -> 156         (exactly 256-100)
+      P4  book_margin_model rows   100 -> 0
+      P5  CONTROL mlb/nfl/wnba   84/60/12 -> 84/60/12 UNCHANGED
+
+  **The control is the load-bearing half.** All three of those sports price by
+  `consensus`, so a correct rule must not touch them — and it did not, to the
+  row. The board lost exactly the 100 `book_margin_model` rows and nothing else.
+  `fair_method` mix is now `{consensus: 156}`, with zero modelled rows served.
+- **`rows_uninformative_ev: 4003` is pool-side, not board-side** — it counts
+  every candidate the rule rejected at that stage, not the 100 that would have
+  been selected. Both numbers are wanted: 100 is what a user stopped seeing,
+  4,003 is how much of the pool was margin-restatement.
+- **The counter earned itself on the first build.** Soccer is now ABSENT from
+  `per_sport` rather than present at 0, so the payload alone cannot tell "soccer
+  had no slate" from "soccer's slate was all one-book longshots" — which is
+  exactly the ambiguity `rows_uninformative_ev` was shipped in the same commit
+  to resolve. Without it this deploy would read as a soccer outage.
+- **Boot-confound, stated:** the worker rebooted at 19:49:15Z, so
+  `memory_anon_mb` restarted from a clean floor. Any memory reading after that
+  time is NOT comparable to the pre-deploy series the `anon-allocation-site` and
+  `refresh-worker-anon-leak` lanes are building.
+
+### ask-refusal-gate — `market_summary` stops answering non-betting questions
+- **PREFLIGHT: PASS** 2026-08-14 14:45 CDT.
+- Deployed: **2026-08-14 15:01 CDT (`20:01:18Z`)** — web
+  `srv-d88ahvrbc2fs73eodu30`, deploy `dep-d9vn4j49v7es73b8leq0`, commit
+  **`bef782cb`**, trigger `api`. Build+swap ~7.5 min.
+- **1. Scope — ONE substantive change.** Diff against the LIVE sha (re-read from
+  the API, not from `state.md`, which had a stale `f9aa2399`): `ea1d2ed6`,
+  deployed 19:37:00Z by another session. Three files, 291 insertions:
+  `ask_the_syndicate_router.py`, `ask_the_syndicate.py`,
+  `test_ask_router_board_summary_default.py`. Nothing else.
+  - **Deployed from a SIDE BRANCH, not main, and that is required here.**
+    `origin/main` and local `main` have diverged by **119 / 142 commits** since
+    `03073270` (2026-08-13 12:19). Main is not a safe deploy base. `bef782cb`'s
+    parent is exactly `ea1d2ed6`, so the running service moves by one change.
+    Same pattern the model-audit A3 deploy used
+    (`deploy/model-audit-a3-uninformative-ev`).
+- **2. Expected effect — a number and a window.** On the first request after the
+  deploy reports `live`: `POST /api/syndicate/query {"question":"What is the
+  capital of France?"}` returns `answered: false`, `intent: "out_of_scope"`,
+  `top_opportunities: []`, in **under 1 s** (it short-circuits before the
+  snapshot read; it took **10.9 s** and returned five betting picks at
+  `f9aa2399`). Across the 52-question harness: **refusal 3/8 → 6/8**, and
+  `market_summary` 40 → 37 of 52 resolved intents.
+  - **What will NOT be comparable, stated up front:** the content classes
+    (`lookup`, `ranking`, `entity`, `history`) score against a live slate that
+    has moved since the 20/52 baseline. Only the routing-determined classes are
+    slate-independent. Read `refusal` and the intent distribution; do not read
+    the overall 20/52 → N as if it isolated this change.
+- **3. Measurement — who reads it.** This session, immediately on deploy
+  completion: `py -3 scripts/ask_syndicate_regression.py --out
+  reports/ask_regression/post_deploy_2026_08_14.json`, plus a direct probe of
+  the three fixed questions (F04 weather, F06 capital, F08 personal records).
+- **4. Blast radius.** Web only; both workers untouched. Web runs on a
+  persistent disk, so this is **stop-then-start with real downtime** — instances
+  cannot overlap and every route 502s during the swap.
+  - `check_deploy_safety.py` **CLEAR** at 14:41 CDT: MLB sim finished (exit=0),
+    odds refresh idle, board build idle (last completed 17:48:33Z, ~3.5 min
+    build, so this is the quiet window).
+  - **Accepted caveat: LIVE GAMES ARE IN PROGRESS.** Live-lens ticks and live
+    prop hydration take an interruption. Same caveat accepted on `#417`.
+- **5. Rollback — stated now.** `POST /v1/services/srv-d88ahvrbc2fs73eodu30/deploys`
+  with `{"commitId": "ea1d2ed6"}`. Nothing to un-migrate; the change is one
+  branch in a router.
+- **6. Ledger check.** No `learnings.md` FORBIDDEN/EXONERATED rule covers this
+  work (grepped). **`render.yaml` is NOT touched**, so no `blueprint_sync`. No
+  OPEN lane claims any `ask_the_syndicate*` file — zero mentions across
+  `lanes.md`.
+- **7. Verdict: PASS.** 136 tests pass **against the deploy tree itself**
+  (`bef782cb` checked out to a worktree), not against main — the ask adapter and
+  data modules are byte-identical between `ea1d2ed6` and the tested base, so the
+  test imports resolve the same way.
+- **Measured: CONFIRMED IN PRODUCTION 2026-08-14 15:05 CDT. The prediction was
+  met exactly, and nothing else moved.**
+  - **The code is proven to be running**: `/api/ops/version` reports commit
+    `bef782cb`, and `intent: "out_of_scope"` is a value that did not exist
+    before this deploy — it cannot be emitted by the old code.
+  - The three target questions, live: `answered: false`,
+    `intent: out_of_scope`, `top_opportunities: []`, each with its own reason
+    string (the personal-records case correctly gets the accounts reason, not
+    the generic one). **Latency 10.9 s → 0.19–0.44 s**, because a declined
+    question now short-circuits before the snapshot read.
+  - Harness re-run: **20/52 → 23/52**. **`refusal` 3/8 → 6/8** as predicted.
+    `should_have_declined` 5 → 2 (F03 entity, F05 temporal — both known, both
+    need a different layer).
+  - **ZERO REGRESSIONS, and this is the load-bearing half**: advice 4/5,
+    entity 2/10, explain 4/6, history 1/5, lookup 2/8, ranking 4/10 — every one
+    identical to the baseline. The slate moved underneath the run (156 rows vs
+    200, 3 active sports vs 4) and the content classes still scored the same,
+    which is a stronger null result than a static slate would have given.
+  - `answer_source` is `snapshot` on 49 and **absent on the 3 declines** —
+    correct, they are a different response shape, and it is how a log will tell
+    the modes apart once J2 lands.
+- Verdict: **shipped and verified.** Rollback not needed.
+
+## 2026-08-14 20:1xZ — refresh-worker `79148d8e` — A1/A2 probability sources + no-vig pricing
+
+- **Lane:** `recommendation-lane-correctness` (A1/A2). Branch
+  `deploy/model-audit-a1a2-probability-sources`, cut from `29ed6de1`
+  (refresh-worker's live SHA), **verified fast-forward**. One substantive
+  change; A3a is NOT on this branch.
+- **Target: refresh-worker ONLY.** It alone has
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=true`. Web does not run
+  this lane and is not being deployed.
+- **THIS GATE FAILED ON ITS FIRST PASS** — no predicted number for the
+  exclusion rate, which is the "ship it and find out" posture the gate exists
+  to stop. Resolved by measuring the input BEFORE deploying rather than by
+  arguing:
+  - `/api/ops/intelligence/candidate-trace` on WEB is useless for this:
+    `1_collect_candidates_count: 0`. Web is display-only on its own disk and
+    cannot run the pipeline. Recorded so nobody retries it.
+  - `/api/intelligence/status` DOES answer it. Of the **145** currently
+    published recommendations, **145 carry a real `model_probability`** and
+    145 also carry a simulation-payload probability. `[measured 20:12Z]`
+    So A1's `no_model_probability` exclusion removes **0 of 145**.
+    By sport: mlb 138, nfl 3, wnba 3, championship 1 — all keep.
+- **PREDICTIONS, written before the deploy:**
+  1. **SAFETY / revert trigger:** `recommendation_count` stays **> 0**. If the
+     lane empties, revert immediately. Supported by 145/145 above.
+  2. **DIRECTION:** `recommendation_count` **>= 145, and likely HIGHER.** A2
+     prices the model against the no-vig fair instead of the vigged price, and
+     the no-vig fair is the SMALLER number, so every edge grows by roughly half
+     the hold and MORE candidates clear the `edge > 0` gate. `#238`'s own
+     framing — the vigged comparison made the sim "look systematically
+     pessimistic" — predicts an increase, not a cull.
+  3. `[recommendation_engine] FILTER_CANDIDATES` appears in refresh-worker logs
+     with a `rejected={...}` map. `no_model_probability` may appear as a reason
+     for POOL-side candidates (which were previously rejected anyway, but
+     mislabelled `edge_below_threshold`).
+- **Pre-deploy checks 20:10Z:** 0 full-sim launch markers in 8 min; headroom
+  **1,830 MB**. Second worker reboot inside the hour — again boot-confounds the
+  two OPEN memory lanes.
+- **Rollback:** redeploy `29ed6de1` on `srv-d91dpertqb8s73co8ls0` by commitId.
+- **DEPLOYED AND LIVE 20:13Z. MEASUREMENT: NOT OBTAINED — do not read this as a pass.**
+  - `recommendation_count` reads **145**, identical to pre-deploy. **That number
+    is STALE and proves nothing:** `snapshot_generated_at = 2026-08-14T16:39:14Z`
+    — ~3.6 HOURS old and long before the deploy. The intelligence state has not
+    been recomputed since 16:39Z, so no post-deploy cycle has run and none of
+    P1/P2/P3 has been tested. I read the count first and nearly banked it;
+    checking the timestamp is what caught it.
+  - **P3 did not fire either: 0 `FILTER_CANDIDATES` lines in 20 minutes.**
+    Consistent with "the cycle never ran", NOT evidence about the code.
+  - **DEFECT IN MY OWN INSTRUMENT, found by this:** the print is guarded by
+    `if rejected:`, so it is SILENT when nothing was rejected. That makes
+    "ran and rejected nothing" indistinguishable from "never ran" — the exact
+    zero-must-be-visible failure this repo keeps hitting, which I flagged in
+    other people's code earlier the same session. The guard should be removed so
+    the line always emits. Not fixed here; recorded as owed.
+  - **Standing question this exposes, for `layer2-board-freshness`:** why has the
+    intelligence state not recomputed in ~3.6h? That lane is already open on
+    build refusals. Not chased here.
+  - **Risk status: A1/A2 is live and UNVERIFIED.** The 145/145 pre-deploy
+    measurement (every published recommendation carries a real
+    `model_probability`) is the reason this is judged low-risk to leave running
+    rather than pre-emptively reverted — but that is an argument, not a
+    measurement. Revert trigger stands: `recommendation_count == 0` on a FRESH
+    snapshot.
+
+### ask-board-candidates (`M1`) — aggregation answered from the published board
+- Deployed: **2026-08-14 15:38 CDT (`20:38:18Z`)** — web `srv-d88ahvrbc2fs73eodu30`,
+  deploy `dep-d9vnm46417fc73ebm9fg`, commit **`5382943c`**, trigger `api`.
+  Single change on the live SHA `bef782cb`. `check_deploy_safety.py` CLEAR at
+  20:30:20Z after waiting out a refresh-worker board build; live-games caveat
+  accepted as before.
+- Expected: ranking class 4/10 → higher; `B01`'s `top_edge_diverges_from_board`
+  clears.
+- **Measured: THE CAPABILITY IS REAL AND VERIFIED. THE STATED CRITERION WAS NOT
+  MET. Both halves matter and the second is the finding.**
+  - **Working, by direct probe:** "biggest edges" → `152 of 152 rows`; "every
+    play with an edge over 5 percent" → **`25 of 152 rows`**, an aggregation
+    with a denominator that was previously unanswerable. `/api/ops/version`
+    confirms `5382943c`.
+  - **7 of 10 ranking questions are now answered from the published board, up
+    from 0.** B04 (MLB total bases → 11 of 152, sport+market filtered) and B05
+    (totals → 36 of 152) both previously scored
+    `declined_an_answerable_question`.
+  - **Soccer correctly returned NOTHING rather than MLB rows** — the board's
+    `active_sports` was `[mlb, nfl, wnba]` at the time, so zero soccer rows is
+    the true answer. The "report, do not widen" branch is exercised in
+    production.
+  - **The class score did NOT move: still 4/10.** The remaining failures are
+    not M1's: B01 is the SNAPSHOT's headline number, B02 checks
+    `structured_response` rows, B03/B08 are sport routing (K2/K3), and B06/B10
+    miss the ranking-intent detector.
+- **THE INSTRUMENT WAS BLIND, AND I NEARLY READ THAT AS A FAILED FIX.** The
+  first post-deploy run reported `ranking` unchanged at 4/10 while a direct
+  probe showed the same questions returning "26 of 153 rows". Cause:
+  `_answer_text`/`_opportunities` scored only `structured_response`, and `M1`
+  answers in `visuals.tables` — a third answer shape the scorer did not know
+  existed. **A null reading is evidence only once the instrument is known able
+  to read non-null.** Harness fixed (`_board_tables`, `_board_table_rows`, and
+  a `no_board_table_for_an_aggregation_question` check) before any conclusion
+  was drawn.
+- **M1 SUPPLEMENTS, IT DOES NOT REPLACE — this is the real structural result.**
+  `structured_response.top_opportunities` still comes from the snapshot, so
+  chat's headline still disagrees with the board (`23.81%` vs `14.09%`,
+  measured post-deploy; it was `5.02%` vs `13.59%` pre-deploy — the gap moved,
+  it did not close). Killing the divergence needs the market-summary schema to
+  source its rows from the board artifact too, which lives in
+  `ask_the_syndicate_adapter.py` — **deliberately not claimed by this lane**,
+  because a parallel session shipped `_board_summary_sentence` there.
+- Rollback: redeploy `bef782cb`. Not needed — nothing regressed.
+- Verdict: **capability shipped and verified; divergence NOT fixed.** Lane stays
+  OPEN.

@@ -3646,8 +3646,29 @@ def _read_last_pregame_launch() -> dict[str, Any]:
 	return payload if isinstance(payload, dict) else {}
 
 
-def _record_pregame_launch(epoch: float, date_str: str) -> None:
-	write_json_file(_last_pregame_launch_path(), {"epoch": epoch, "date": date_str, "recordedAt": _utc_now()})
+def _record_pregame_launch(epoch: float, date_str: str, sports: Any = None) -> None:
+	"""Stamp the cooldown. PER-SPORT since 2026-08-14; `epoch` kept for rollback.
+
+	Only the sports actually in THIS launch are stamped -- a sport excluded by
+	owner rules or by the cadence filter keeps its window armed, which is the
+	same rule `_apply_pregame_sport_cadence`'s own comment states for markers.
+
+	`epoch`/`date` are still written unchanged so that rolling this file back
+	leaves a marker the OLD global reader understands. A new reader treats a
+	sport with no entry of its own as inheriting `epoch`, so the first tick
+	after this deploys does not stampede every sport at once.
+	"""
+	existing = _read_last_pregame_launch()
+	carried = existing.get("sports") if isinstance(existing.get("sports"), dict) else {}
+	per_sport: dict[str, float] = dict(carried) if str(existing.get("date") or "") == date_str else {}
+	for sport in (sports or []):
+		normalized = str(sport).strip().lower()
+		if normalized:
+			per_sport[normalized] = float(epoch)
+	write_json_file(
+		_last_pregame_launch_path(),
+		{"epoch": epoch, "date": date_str, "sports": per_sport, "recordedAt": _utc_now()},
+	)
 
 
 def _off_hours_max_staleness_seconds() -> int:
@@ -4184,14 +4205,68 @@ def _apply_pregame_sport_cadence(
 	return kept, skipped
 
 
-def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str) -> bool:
+def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str, sports: Any = None) -> bool:
+	"""True only when EVERY candidate sport is still inside its own cooldown.
+
+	PER-SPORT SINCE 2026-08-14. THE COOLDOWN VALUE DID NOT CHANGE -- the
+	COUPLING did, and the coupling was the defect.
+
+	MEASURED CAUSE. This gate read ONE marker keyed by date alone, so a launch
+	for ANY sport started the 1800s clock for EVERY sport, and it returned True
+	for the whole tick before `_apply_pregame_sport_cadence` (which is already
+	per-sport, and correct) ever ran. On refresh-worker 2026-08-14 that produced
+	launch gaps of 30.0/30.5/39.5/30.5 min -- the cooldown, exactly -- with the
+	sports ROTATING across launches, so MLB rode only every 2nd-4th one:
+
+	    13:08:30 mlb | 14:40:00 nfl,wnba | 15:10:00 mlb,soccer
+	    15:40:30 wnba | 16:20:00 mlb     | 16:50:30 nfl
+
+	MLB's own capture cadence came out at 121.6 min (verified independently in
+	the quote shard: bursts at 13:09:08, 15:10:44, 16:20:38, each ~20-40s after
+	its launch). So the board served MLB prices up to two hours old, which is
+	what put candidates on it that were no longer bettable.
+
+	The retry-storm protection this gate exists for (2026-07-16, cold pregame
+	pipelines relaunching before a 20-30 min attempt finished) is UNCHANGED:
+	each sport still gets the full cooldown against its own last launch. What is
+	removed is one sport's launch silencing the others.
+
+	Fail-open, matching every other rule in this file: no sport list, an
+	unreadable marker, or a different date all mean "not blocked" rather than a
+	guessed block. A sport with no entry of its own inherits the legacy global
+	`epoch`, so the first tick after this deploys behaves exactly as before
+	instead of releasing every sport at once.
+	"""
 	cooldown = _pregame_relaunch_cooldown_seconds()
 	if cooldown <= 0:
 		return False
 	last = _read_last_pregame_launch()
-	last_epoch = float(last.get("epoch") or 0.0)
 	last_date = str(last.get("date") or "")
-	return last_epoch > 0.0 and last_date == date_str and (now_epoch - last_epoch) < cooldown
+	if last_date != date_str:
+		return False
+	try:
+		legacy_epoch = float(last.get("epoch") or 0.0)
+	except (TypeError, ValueError):
+		legacy_epoch = 0.0
+	candidates = [str(sport).strip().lower() for sport in (sports or []) if str(sport).strip()]
+	if not candidates:
+		# No candidate list resolved: fall back to the exact pre-2026-08-14
+		# global behaviour rather than inventing a per-sport answer.
+		return legacy_epoch > 0.0 and (now_epoch - legacy_epoch) < cooldown
+	per_sport = last.get("sports") if isinstance(last.get("sports"), dict) else {}
+	for sport in candidates:
+		try:
+			sport_epoch = float(per_sport.get(sport) or 0.0)
+		except (TypeError, ValueError):
+			sport_epoch = 0.0
+		if sport_epoch <= 0.0:
+			sport_epoch = legacy_epoch
+		if sport_epoch <= 0.0 or (now_epoch - sport_epoch) >= cooldown:
+			# One sport being due is enough to let the tick proceed. Which
+			# sports actually launch is then decided by the per-sport filter
+			# that already exists, not here.
+			return False
+	return True
 
 
 def _hot_artifact_publish_watermark_path() -> Path:
@@ -4584,7 +4659,20 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			meta["skipped"] = True
 			meta["error"] = "odds refresh deferred: MLB daily sim is still running (avoid stacking two heavy pipelines in the same container)"
 			skip_launch = True
-	if not skip_launch and effective_phase == "pregame" and _pregame_relaunch_blocked(now_epoch=tick_started_epoch, date_str=selected_date):
+	# Resolved the same way the cadence filter below resolves it, so the gate
+	# and the filter judge the SAME set. Falls back to None on any problem,
+	# which `_pregame_relaunch_blocked` treats as the old global behaviour.
+	try:
+		_cooldown_candidate_sports = (
+			[piece for piece in str(launch_sports).split(",") if piece]
+			if launch_sports
+			else list(_live_refresh_loop_effective_sports(selected_date))
+		)
+	except Exception:
+		_cooldown_candidate_sports = None
+	if not skip_launch and effective_phase == "pregame" and _pregame_relaunch_blocked(
+		now_epoch=tick_started_epoch, date_str=selected_date, sports=_cooldown_candidate_sports
+	):
 		meta["ok"] = False
 		meta["skipped"] = True
 		meta["error"] = "pregame refresh relaunch blocked by cooldown (previous attempt still within cooldown window)"
@@ -4702,7 +4790,20 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			print(f"[live_refresh_loop] PREGAME_CADENCE_FILTER_FAILED error={type(exc).__name__}: {exc}", flush=True)
 	if not skip_launch:
 		if effective_phase == "pregame":
-			_record_pregame_launch(tick_started_epoch, selected_date)
+			# Stamp ONLY the sports in THIS launch. `launch_sports` is the
+			# post-filter set by this point; None still means "resolve the
+			# active set", so resolve it the same way rather than stamping
+			# nothing and leaving every sport permanently due -- which would
+			# turn the cooldown off entirely instead of making it per-sport.
+			try:
+				_launched_sports = (
+					[piece for piece in str(launch_sports).split(",") if piece]
+					if launch_sports
+					else list(_live_refresh_loop_effective_sports(selected_date))
+				)
+			except Exception:
+				_launched_sports = None
+			_record_pregame_launch(tick_started_epoch, selected_date, _launched_sports)
 		# Fail-closed (#25): record the ATTEMPT before launching, not the
 		# success after. These markers are what the interval gates read to
 		# decide "did we already refresh recently", and they used to be

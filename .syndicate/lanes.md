@@ -204,6 +204,36 @@
 - Blocked by: none. Independent of Lane B (CLV) by design.
 
 ### soccer-odds-coverage — OPEN — opened 2026-08-14 — session: board-ui
+- **~~CROSS-LANE LEAD~~ — RETRACTED 20:1xZ BY ITS AUTHOR, BEFORE ANYONE ACTED.
+  IGNORE THE BLOCK BELOW.** `syndicate-an21` resolves fine: refresh-worker
+  logged PUBLISH_OK to that exact URL at 19:54:40Z and 20:03:16Z, and
+  live-odds-worker logged 14/18/13 PUBLISH_OK across three windows. The
+  failures were a transient burst (OK → 11 FAILED at 19:59:36 → OK), not a
+  standing outage, and they do **not** explain "frozen platform-wide". The
+  hostname claim was an inference from Render's naming convention, labelled
+  untested, and is now falsified. **Nothing here should change this lane's
+  direction.** Original text kept only so the error is visible:
+
+      [artifact_publisher] PUBLISH_FAILED
+        path=soccer_source/<league>/api/live_state/live_state_2026-08-14.json
+        url=http://syndicate-an21:10000/api/ops/artifacts/publish
+        error=<urlopen error [Errno -2] Name or service not known>
+
+  11 lines in one 6-min window across `mls`, `ligue_1`, `primeira_liga`.
+  `SYNDICATE_WEB_PUBLISH_URL = http://syndicate-an21:10000` on BOTH workers,
+  while `render.yaml` names the web service **`syndicate`** — Render's internal
+  hostname is the SERVICE NAME, and `syndicate-an21` is the PUBLIC subdomain
+  prefix.
+  - **Measured:** `syndicate-an21` does not resolve (the error is the proof).
+  - **Inferred, NOT tested:** that `syndicate` would resolve. Test before
+    shipping any hostname change.
+  - Keyvalue state publishes fine (the Layer 2 shortlist rebuilt at 19:58:41Z),
+    so only FILE artifacts are affected — which is why the board looks alive
+    while per-sport files go stale.
+  - Suspect `internal-hostname-cutover` (CLOSED 2026-08-13 "verified in
+    production") set the public prefix believing it was the internal name.
+  - Not touched by that lane's owner here: it is config, needs a deploy to take
+    effect, and is not this lane's file set.
 - **STATUS 2026-08-14 19:3xZ — NO LONGER BLOCKED ON OBSERVABILITY. Now
   waiting on one scheduled event.**
   - `ccd10349` live on live-odds-worker **14:24:09 CDT**, post-deploy clean,
@@ -849,6 +879,13 @@ the FIRST for a model it did not originally scope.**
   `LAYER2_GUARD_SKIP` 0 across all 96, so the 600MB floor is correctly sized;
   zero failures, zero OOM. Full detail and the one residual confound in
   `deploys.md`.
+- **THIRD work item, same lane: the `#387` streaming mechanism, `0041a902`.**
+  `build_intelligence_overview(consumer=...)`, 6 tests, mutation-pinned.
+  **NOT WIRED** — `_build_candidate_pool` still calls the list form, so nothing
+  has changed in production. The cutover's decision gate is answered (thin-pool
+  merge: 0 enters in 6h against 39 live control spans); the plan is to stream by
+  default and re-hydrate for that rare path. Spec in
+  `docs/ai_context/handoff_overview_hydration.md`.
 - Second work item (`pool["overview"]` retention) shipped as `100c9cb5`,
   **committed, NOT deployed** — it rides the next refresh-worker deploy.
 - **CLEAN-WINDOW RESULT 16:16:56-18:00:49Z (103.9 min, no intervening deploy):
@@ -1151,6 +1188,45 @@ half was held overnight through an OOM incident.)
 - Blocked by: none.
 
 ### anon-allocation-site — OPEN — opened 2026-08-14 — session: memory-guard
+- **NAMED 2026-08-14 04:1xZ — `json.loads` (`decoder.py:353`), 491.3MB across
+  7,172,382 LIVE OBJECTS. AND THE WORKER IS OOM-KILLING.**
+  - Production OOM kills confirmed in the Render EVENTS api (not the logs):
+    `server_failed / oomKilled / memoryLimit 4G` at **03:20:11, 03:39:57,
+    03:46:47, 04:04:27** — same instance `-wc6hd`, `evicted: false`. Four in
+    one hour.
+  - The single supervisor reading that caught it, `anon` 2490.9MB:
+    ```
+    491.3MB  n=7,172,382  decoder.py:353            <- json.JSONDecoder
+     32.2MB  n=  214,094  importlib._bootstrap:241
+     13.1MB  n=   82,408  copy.py:231               <- deepcopy
+      8.1MB  n=   37,374  intelligence.py:2342
+      1.5MB  n=   56,366  odds_book_quotes.py:1215
+    ```
+    `json.loads` output is 15x the next contributor. `copy.py` (82k objects)
+    is the second theme.
+  - **WHAT THIS DOES NOT ESTABLISH, and it matters:** tracemalloc names where
+    memory is ALLOCATED, not what HOLDS it — and retention is the bug. Traced
+    covers **23.7%** of `anon` (589.8 of 2490.9MB), so ~1900MB remains outside
+    its view at `nframe=1`. 491MB is the largest VISIBLE allocator, not proven
+    the largest.
+  - **5 of 6 readings were CHILD processes** (`anon` ~70MB, top site pure
+    import machinery). Only 03:07:40 caught pid 39. **The emitter does not log
+    a pid**, which is the same defect that wasted time on
+    `LIVE_ODDS_WORKER_MEMORY` earlier tonight — reproduced by me. Add the pid.
+  - **NEXT: raise `nframe` 1 -> 3.** At one frame the site is `decoder.py:353`,
+    which is Python's own json module and tells us nothing about WHICH read
+    retains. Three frames gives the caller — the difference between "JSON
+    parsing" and "this artifact read". That is the fix-enabling measurement.
+  - Consistent with everything else: `#423` already showed the growth is NOT
+    arena fragmentation (arenas plateau ~393MB while `anon` climbs), i.e. live
+    retention. 7.17M live objects from parsed artifacts is exactly that shape.
+  - **Timing caveat I cannot clear:** the first OOM (03:20:11) is 38 min after
+    my tracemalloc deploy (02:41:39). `nframe=1` keeps a traceback per live
+    allocation and the lane recorded that hazard before shipping. The events
+    window only reaches 30 events so earlier kills are not visible. The leak
+    itself was confirmed at 00:04 — hours before the deploy — so the growth is
+    not mine, but I cannot prove the instrument is not accelerating it.
+    Rollback to `75b8aae6` removes it if the kills need stopping first.
 - Goal: name the allocation site holding refresh-worker's **~1700MB of
   non-arena anonymous memory**, with evidence. Testable outcome: a named
   call site (file + function) accounting for >50% of the growth across one
@@ -3042,6 +3118,10 @@ opened, `_fetch_scoreboard` returns None under pytest.
   `936e2b47` from 08-12. The first deploy that picks up this blueprint is
   the real test. `MLB_LIVE_LENS_DIR` is the one that would have broken it
   had the grep-level pass been trusted over the call-graph trace.
+- **Open obligation:** three commits unpushed (`d16950b9`, `1e09fa9b`,
+  `7c60d0f8`), `origin/main` at `bf06710c`. Two `render.yaml` commits are
+  already on origin with no `blueprint_sync` seen in a ~23-minute window —
+  that is a window, not an all-clear.
 
 ### board-transport — CLOSED 2026-08-13 (work measured 08-10/11)
 - Goal: the board computes correctly every cycle and cannot cross the transport.
@@ -3199,3 +3279,171 @@ than have every session quietly decide it is.
   the harness; `checkpoint-guard.py` replaces the `.sh` and can now pass.
 - Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
+
+### ask-refusal-gate — CLOSED-VERIFIED 2026-08-14 — refusal 3/8 -> 6/8 in production, zero regressions — opened 2026-08-14 — session: ask-audit
+- Goal: `market_summary` stops being the answer to questions that are not about
+  betting. **Testable outcome:** `"What is the capital of France?"`,
+  `"What is the weather at the stadium right now?"` and `"What is my account
+  balance and betting history?"` stop returning five betting opportunities, and
+  `scripts/ask_syndicate_regression.py`'s `refusal` class moves off 3/8 with
+  **no regression in any other class** (currently: advice 4/5, entity 2/10,
+  explain 4/6, history 1/5, lookup 2/8, ranking 4/10; overall 20/52).
+- Why this first: measured on production 2026-08-14, `market_summary` is the
+  resolved intent on **40 of 52** regression questions. It is the router's
+  deliberate default for anything unmatched (`ask_the_syndicate_router.py:44-50`),
+  and that default was CORRECT for vague *betting* questions -- it fixed a real
+  dead end on 2026-08-03. It was never scoped to exclude questions that are not
+  about betting at all.
+- Files (exclusive to this lane):
+  - `syndicate/blueprints/ask_the_syndicate_router.py` -- the default branch.
+  - `syndicate/blueprints/ask_the_syndicate.py` -- early return for the new
+    intent. **Added after opening**, once the dispatch was traced: the adapter
+    selects a schema on `decision.intent` and an unknown intent falls to
+    `_bet_analysis_schema`, i.e. the dead end this lane exists to avoid.
+    Short-circuiting in the route keeps the change out of the adapter (see
+    below) and skips the snapshot read for a question being declined.
+  - `tests/test_ask_router_board_summary_default.py` -- new cases.
+  - Collision check: CLEAR. Grepped every OPEN lane's claim block 2026-08-14;
+    zero mentions of any `ask_the_syndicate*` file. The other OPEN lanes claim
+    `pipeline/intelligence_state.py`, `syndicate/blueprints/intelligence.py`,
+    `syndicate/features/shared/*`, `scripts/run_refresh_worker.py`.
+  - NOT claimed, deliberately: `ask_the_syndicate_adapter.py`. A parallel
+    session shipped `_board_summary_sentence` / `_is_general_board_question`
+    there (`addec418`, `5c7e4d67`) building for exactly this no-LLM world. This
+    lane routes; it does not touch their prose layer.
+- Hypothesis (diagnostic half): the default is unconditional, so ANY question
+  with no rule match returns a board summary regardless of subject.
+- Falsification test: if some upstream guard already declines non-betting
+  questions and the five measured board dumps came from something else, the
+  router is exonerated and this lane is void. **Checked before opening: no such
+  guard exists** -- `route()` returns `market_summary` at score 0 with no
+  subject test, and production returned five opportunities for "What is the
+  capital of France?".
+- Verification: (1) new unit cases pass; (2) the four pre-existing test classes
+  in `test_ask_router_board_summary_default.py` still pass -- especially
+  `test_unmatched_question_defaults_to_summary_not_single_bet_analysis`, which
+  pins the 2026-08-03 fix this must not undo; (3) re-run the regression harness
+  against production after deploy and record the class-by-class delta here.
+- Blocked by: none.
+
+**RESULT 2026-08-14 -- code complete, locally verified, PRODUCTION MEASUREMENT
+STILL OWED (not deployed).**
+
+- **(1) and (2) DONE.** `136 passed, 23 subtests` across
+  `test_ask_router_board_summary_default.py`, `test_ask_market_summary_ranking.py`
+  and `test_ask_the_syndicate.py`. Blast radius is 4 files (grep
+  `ask_the_syndicate_router`), all covered: the two blueprints and the two test
+  files. The adapter imports only `RouteDecision`, and `out_of_scope` never
+  reaches it -- the route short-circuits first.
+- **(3) OWED.** Not deployed. `.py` pushes do not ship (`autoDeploy: no`).
+- **Deterministic delta across all 52 regression questions**, router-level so it
+  isolates this change from slate movement: `market_summary` **40 -> 37**,
+  `out_of_scope` **0 -> 3**, `bet_analysis` 11 -> 11, `matchup_analysis` 1 -> 1.
+  **3 cases changed, all 3 correct (F04 weather, F06 capital of France, F08
+  personal records), ZERO regressions.** Refusal class 3/8 -> **6/8** expected.
+- **MY "5 of 8" ESTIMATE WAS WRONG** and it was load-bearing for prioritisation.
+  5 refusal cases were failing, not 8, and a lexical gate fixes 3 of those 5.
+  F03 (dead player / nonexistent matchup) needs entity validation; F05
+  (impossible tense) needs temporal validation. Both carry real domain
+  vocabulary, so no word list catches them -- corrected in the plan.
+- **Two regressions were caught by testing the ANSWER direction, not the decline
+  direction, and would have shipped otherwise.** "How is Jokic looking tonight?"
+  and "Best TB targets today?" were both declined by the first version -- a bare
+  player name carries no domain noun, and `_fetchers_for_sport`'s own comment
+  already records that exact Jokic phrasing as one the keyword sets miss. Fixed
+  by treating day-scoping (`tonight`/`today`/...) as domain vocabulary, since a
+  question scoped to a slate day IS about the slate. **A refusal gate must be
+  tested on what it must NOT refuse; the decline list alone would have passed.**
+- Also caught: `matches` as a domain token let "qwertyuiop nothing matches this
+  at all" through. Dropped; `match` kept.
+- **Committed `3b21c856`.** Staged through an ISOLATED index
+  (`GIT_INDEX_FILE`), not the shared one -- a parallel session cleared the
+  shared index between this lane's `git add` and its `git diff --cached`, and
+  committed `0041a902` in the same window. Verified after: the commit contains
+  zero foreign files, and `recommendation_engine.py` / `intelligence.py` are
+  still uncommitted in the working tree where their own lane left them.
+  **Recipe worth reusing while several sessions are live.**
+- **`.syndicate/.current-lane` handed to `recommendation-lane-correctness`**,
+  which has in-flight edits to `recommendation_engine.py`. The marker is
+  single-valued, so holding it here would block that lane from its own claimed
+  file -- the cost `board-ui-freshness-slip-books` already recorded. This lane
+  needs no further edits, only a production read.
+- **NOT DEPLOYED.** `.py` pushes do not ship (`autoDeploy: no`), so the
+  production re-measure cannot happen until someone deploys deliberately.
+  `/preflight` before that, and note the standing rule that a deploy kills an
+  in-flight MLB sim.
+
+**ask-refusal-gate CLOSED-VERIFIED 2026-08-14 15:05 CDT.** Deployed `bef782cb`
+(`dep-d9vn4j49v7es73b8leq0`, live `20:01:18Z`). All three verification criteria
+MET:
+1. New unit cases pass — 136 tests, run against the DEPLOY TREE not main.
+2. The 2026-08-03 default is intact — `test_vague_betting_questions_still_get_the_summary_default`
+   pins it directly now, instead of via a gibberish proxy that conflated "not
+   the dead end" with "a board summary".
+3. **Production re-measure done: 20/52 → 23/52, `refusal` 3/8 → 6/8, every
+   other class byte-identical to the baseline.** Declined-question latency
+   10.9 s → 0.19 s. Full evidence in `deploys.md`.
+
+Carried forward, not fixed here: F03 needs entity validation, F05 needs
+temporal validation. Neither is a word-list problem.
+
+### ask-board-candidates — OPEN — opened 2026-08-14 — session: ask-audit
+- Goal: a ranking question is answered from the WHOLE published pool, for every
+  sport, with a real denominator. **Testable outcome:** `scripts/ask_syndicate_regression.py`'s
+  `ranking` class moves off 4/10, `B01`'s `top_edge_diverges_from_board` failure
+  clears (chat's top edge equals the board's, same instant), and no other class
+  regresses from the post-K1 baseline (advice 4/5, entity 2/10, explain 4/6,
+  history 1/5, lookup 2/8, refusal 6/8; overall 23/52).
+- Source: Lane M1 of `.syndicate/plan_2026-08-14_ask_the_syndicate.md`, promoted
+  to second ship under the no-LLM decision.
+- Why: measured 2026-08-14, the funnel is 14,216 considered -> 200 published ->
+  145 in the snapshot chat reads -> 12 evidence-pack ceiling -> **5 rows
+  returned**. A fixed prefix of a pre-ranked list is not an aggregation
+  primitive. And chat said the biggest edge was 5.02% while the board served
+  13.59% at the same instant, because they read different pools.
+- Approach: one fetcher over `read_layer2_shortlist` -- a PURE ARTIFACT READ
+  (`pipeline/intelligence_state.py:1953`, `read_json_file`, no compute), which
+  is what makes it legal in the web request path AND what fixes the divergence
+  by construction: chat and the cards then read the same artifact. Registered
+  for every sport rather than written per sport, which is why it subsumes K4
+  (the no-sport ranking branch hardcoded to an MLB-only leaderboard) and most of
+  K10 (wnba/nhl/nba have entity-only fetchers).
+- Files (exclusive to this lane):
+  - `syndicate/blueprints/ask_the_syndicate_data.py` -- new fetcher +
+    `_fetchers_for_sport` registration.
+  - `tests/test_ask_board_candidates.py` -- new.
+  - Collision check: CLEAR. Zero mentions of `ask_the_syndicate_data` across
+    every lane in `lanes.md` 2026-08-14.
+- Hypothesis: none, this is construction not diagnosis.
+- Verification: (1) unit tests over a synthetic shortlist payload, including the
+  empty-artifact and wrong-date cases; (2) deploy and re-run the harness,
+  recording the class-by-class delta against the 23/52 post-K1 baseline in
+  `deploys.md`. **A class score that does not move means it is not done.**
+- Blocked by: none.
+
+**ask-board-candidates — RESULT 2026-08-14, LANE STAYS OPEN.** Deployed
+`5382943c` (`dep-d9vnm46417fc73ebm9fg`, live `20:38:18Z`). Full evidence in
+`deploys.md`.
+
+- **Criterion 1 MET (unit tests):** 24 new + 160 across the ask suite.
+- **Criterion 2 NOT MET:** the `ranking` class did **not** move off 4/10, and
+  `B01`'s `top_edge_diverges_from_board` did **not** clear. The lane cannot
+  close on its own stated terms.
+- **But the capability IS real and verified:** 7 of 10 ranking questions are now
+  answered from the published board (was 0); "every play with an edge over 5
+  percent" returns `25 of 152 rows`. The remaining class failures belong to
+  other lanes — B01 is the snapshot headline, B03/B08 are sport routing
+  (K2/K3), B06/B10 miss the ranking-intent detector.
+- **WHAT THIS LANE GOT WRONG, and it is a design error not a bug:** M1
+  SUPPLEMENTS the answer with a board table; it does not REPLACE the snapshot's
+  `top_opportunities`. So the divergence the lane goal names survives — it moved
+  from `5.02 vs 13.59` to `23.81 vs 14.09`. Closing it needs the market-summary
+  schema builder to source rows from the board artifact, in
+  `ask_the_syndicate_adapter.py`, which this lane deliberately did not claim.
+  **That is the next step and it should be its own lane**, opened against the
+  adapter after checking the parallel session that owns `_board_summary_sentence`.
+- **A near-miss worth carrying:** the first post-deploy harness run said
+  `ranking` was unchanged, which reads exactly like an inert fix. It was the
+  scorer that was blind — it read only `structured_response` and M1 answers in
+  `visuals.tables`. Fixed the harness before drawing a conclusion. **Check what
+  makes the instrument read non-null before believing a null.**

@@ -1,0 +1,1790 @@
+{
+ "generated_at": "2026-08-14T20:05:32+00:00",
+ "base_url": "https://syndicate-an21.onrender.com",
+ "truth": {
+  "fetched_at": "2026-08-14T20:02:35+00:00",
+  "rows": 156,
+  "considered": 14061,
+  "returned": 156,
+  "active_sports": [
+   "mlb",
+   "nfl",
+   "wnba"
+  ],
+  "per_sport": {
+   "mlb": {
+    "available": 2764,
+    "game": 41,
+    "prop": 43,
+    "selected": 84
+   },
+   "nfl": {
+    "available": 94,
+    "game": 60,
+    "prop": 0,
+    "selected": 60
+   },
+   "wnba": {
+    "available": 958,
+    "game": 8,
+    "prop": 4,
+    "selected": 12
+   }
+  },
+  "max_model_edge_pct": 14.02,
+  "max_ev_pct": 5.1575,
+  "teams": [
+   "arizona diamondbacks",
+   "athletics",
+   "atlanta braves",
+   "atlanta falcons",
+   "baltimore orioles",
+   "baltimore ravens",
+   "boston red sox",
+   "buffalo bills",
+   "carolina panthers",
+   "chicago bears",
+   "chicago cubs",
+   "chicago white sox",
+   "cincinnati reds",
+   "cleveland browns",
+   "cleveland guardians",
+   "colorado rockies",
+   "dallas cowboys",
+   "dallas wings",
+   "denver broncos",
+   "detroit tigers",
+   "houston astros",
+   "indiana fever",
+   "jacksonville jaguars",
+   "kansas city chiefs",
+   "kansas city royals",
+   "los angeles angels",
+   "los angeles dodgers",
+   "los angeles rams",
+   "miami dolphins",
+   "miami marlins",
+   "milwaukee brewers",
+   "minnesota vikings",
+   "new orleans saints",
+   "new york giants",
+   "new york jets",
+   "new york mets",
+   "new york yankees",
+   "philadelphia eagles",
+   "pittsburgh pirates",
+   "portland fire",
+   "san diego padres",
+   "san francisco giants",
+   "seattle mariners",
+   "seattle seahawks",
+   "seattle storm",
+   "st. louis cardinals",
+   "tampa bay buccaneers",
+   "tampa bay rays",
+   "texas rangers",
+   "toronto blue jays",
+   "washington commanders",
+   "washington nationals"
+  ],
+  "players": [
+   "agust\u00edn ram\u00edrez",
+   "alanna smith",
+   "alec burleson",
+   "andres gimenez",
+   "austin riley",
+   "ben malgeri",
+   "bryce eldridge",
+   "buddy kennedy",
+   "chandler simpson",
+   "colt keith",
+   "dominique malonga",
+   "drew romo",
+   "elly de la cruz",
+   "fernando tatis jr.",
+   "garrett mitchell",
+   "gunnar henderson",
+   "hao-yu lee",
+   "ildemaro vargas",
+   "ivan herrera",
+   "jade melbourne",
+   "jake mangum",
+   "jakob marsee",
+   "jeff mcneil",
+   "jesus sanchez",
+   "jj bleday",
+   "jo adell",
+   "joey ortiz",
+   "john rave",
+   "josh lowe",
+   "jung hoo lee",
+   "lexie hull",
+   "luis campusano",
+   "manny machado",
+   "masataka yoshida",
+   "nathaniel lowe",
+   "pete alonso",
+   "rafael flores",
+   "seiya suzuki",
+   "steven kwan",
+   "taylor walls",
+   "taylor ward",
+   "tyler locklear",
+   "tyler o'neill",
+   "willson contreras",
+   "yainer diaz",
+   "zack gelof"
+  ],
+  "portfolio": {
+   "avg_clv": null,
+   "avg_edge": null,
+   "by_sport": [
+    {
+     "avg_edge": null,
+     "losses": 0,
+     "pnl": 0.0,
+     "predictions": 3,
+     "roi": 0.0,
+     "settled": 0,
+     "sport": "multi",
+     "win_rate": null,
+     "wins": 0
+    }
+   ],
+   "decisive_count": 0,
+   "exposure_by_sport": [
+    {
+     "pct": 100.0,
+     "sport": "multi",
+     "stake": 60.0
+    }
+   ],
+   "generated_at": "2026-08-14T20:02:35Z",
+   "ok": true,
+   "pending_count": 3,
+   "positions": [
+    {
+     "bet_type": "parlay",
+     "clv": null,
+     "confidence": null,
+     "edge": null,
+     "id": "d2904a64-7be2-4fa3-b29a-4db3859881a1",
+     "legs": [
+      {
+       "event_id": "41d927261a15c8d84075af83997d53c1",
+       "game_date": "2026-08-13",
+       "line": "5.5",
+       "market": "spreads",
+       "odds": 164,
+       "pick": "away",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "prophetx",
+          "line": 5.5,
+          "price": 164
+         },
+         {
+          "bookmaker": "novig",
+          "line": 5.5,
+          "price": 163
+         },
+         {
+          "bookmaker": "polymarket",
+          "line": 5.5,
+          "price": 163
+         },
+         {
+          "bookmaker": "sport888",
+          "line": 5.5,
+          "price": 150
+         },
+         {
+          "bookmaker": "williamhill_us",
+          "line": 5.5,
+          "price": 150
+         },
+         {
+          "bookmaker": "fanatics",
+          "line": 5.5,
+          "price": 150
+         },
+         {
+          "bookmaker": "kalshi",
+          "line": 5.5,
+          "price": 150
+         },
+         {
+          "bookmaker": "fanduel",
+          "line": 5.5,
+          "price": 148
+         },
+         {
+          "bookmaker": "betmgm",
+          "line": 5.5,
+          "price": 145
+         },
+         {
+          "bookmaker": "gtbets",
+          "line": 5.5,
+          "price": 140
+         },
+         {
+          "bookmaker": "bovada",
+          "line": 5.5,
+          "price": 140
+         },
+         {
+          "bookmaker": "nordicbet",
+          "line": 5.5,
+          "price": 125
+         },
+         {
+          "bookmaker": "draftkings",
+          "line": 5.5,
+          "price": 123
+         },
+         {
+          "bookmaker": "coolbet",
+          "line": 5.5,
+          "price": 120
+         },
+         {
+          "bookmaker": "unibet_nl",
+          "line": 5.5,
+          "price": 118
+         },
+         {
+          "bookmaker": "unibet_se",
+          "line": 5.5,
+          "price": 118
+         },
+         {
+          "bookmaker": "betsson",
+          "line": 5.5,
+          "price": 117
+         },
+         {
+          "bookmaker": "betrivers",
+          "line": 5.5,
+          "price": 112
+         },
+         {
+          "bookmaker": "leovegas_se",
+          "line": 5.5,
+          "price": 110
+         },
+         {
+          "bookmaker": "mybookieag",
+          "line": 5.5,
+          "price": 110
+         }
+        ],
+        "best_bookmaker": "prophetx",
+        "best_ev_pct": 3.5151,
+        "best_price": 164,
+        "book_age_seconds": 246,
+        "book_updated_at": "2026-08-13T21:51:41Z",
+        "bookmaker": "prophetx",
+        "books_quoting": 20,
+        "capture_age_seconds": 238,
+        "captured_at": "2026-08-13T21:51:48.363293+00:00",
+        "consensus_price": 134,
+        "edge_vs_consensus_pct": 4.86,
+        "ev_pct": 3.5151,
+        "fair_price": 155,
+        "fair_probability": 0.392102,
+        "hold_pct": -3.3843,
+        "line": 5.5,
+        "price": 164,
+        "price_rank": 1,
+        "sides_quoted": 2
+       },
+       "selection": "CHC @ WSH",
+       "sport": "mlb"
+      }
+     ],
+     "market": "parlay",
+     "matchup": null,
+     "odds": 164.0,
+     "placed_bet": "Parlay (1 legs)",
+     "pnl": null,
+     "selection": "1-leg parlay",
+     "sport": "multi",
+     "stake": 25.0,
+     "status": "pending",
+     "timestamp": "2026-08-13T21:55:47Z"
+    },
+    {
+     "bet_type": "parlay",
+     "clv": null,
+     "confidence": null,
+     "edge": null,
+     "id": "7b26364d-dc34-4a4d-9166-2c7704ac39e2",
+     "legs": [
+      {
+       "event_id": "41d927261a15c8d84075af83997d53c1",
+       "game_date": "2026-08-13",
+       "line": "5.5",
+       "market": "strikeouts",
+       "odds": 106,
+       "pick": "over",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "fanduel",
+          "line": 5.5,
+          "price": 106
+         },
+         {
+          "bookmaker": "bovada",
+          "line": 5.5,
+          "price": 105
+         },
+         {
+          "bookmaker": "betonlineag",
+          "line": 5.5,
+          "price": 100
+         },
+         {
+          "bookmaker": "betrivers",
+          "line": 5.5,
+          "price": -103
+         },
+         {
+          "bookmaker": "betmgm",
+          "line": 5.5,
+          "price": -105
+         },
+         {
+          "bookmaker": "draftkings",
+          "line": 5.5,
+          "price": -135
+         },
+         {
+          "bookmaker": "fanatics",
+          "line": 5.5,
+          "price": -155
+         }
+        ],
+        "best_bookmaker": "fanduel",
+        "best_price": 106,
+        "book_age_seconds": 6853,
+        "book_updated_at": "2026-08-13T20:01:04Z",
+        "bookmaker": "fanduel",
+        "books_quoting": 7,
+        "capture_age_seconds": 6841,
+        "captured_at": "2026-08-13T20:01:15.985345+00:00",
+        "consensus_price": -111,
+        "edge_vs_consensus_pct": 4.06,
+        "fair_price": null,
+        "fair_probability": null,
+        "hold_pct": null,
+        "line": 5.5,
+        "price": 106,
+        "price_rank": 1,
+        "sides_quoted": 0
+       },
+       "selection": "Cade Cavalli",
+       "sport": "mlb"
+      },
+      {
+       "event_id": "41d927261a15c8d84075af83997d53c1",
+       "game_date": "2026-08-13",
+       "line": "5.5",
+       "market": "strikeouts",
+       "odds": 125,
+       "pick": "over",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "fanduel",
+          "line": 5.5,
+          "price": 106
+         },
+         {
+          "bookmaker": "bovada",
+          "line": 5.5,
+          "price": 105
+         },
+         {
+          "bookmaker": "betonlineag",
+          "line": 5.5,
+          "price": 100
+         },
+         {
+          "bookmaker": "betrivers",
+          "line": 5.5,
+          "price": -103
+         },
+         {
+          "bookmaker": "betmgm",
+          "line": 5.5,
+          "price": -105
+         },
+         {
+          "bookmaker": "draftkings",
+          "line": 5.5,
+          "price": -135
+         },
+         {
+          "bookmaker": "fanatics",
+          "line": 5.5,
+          "price": -155
+         }
+        ],
+        "best_bookmaker": "fanduel",
+        "best_price": 106,
+        "book_age_seconds": 6854,
+        "book_updated_at": "2026-08-13T20:01:04Z",
+        "bookmaker": "fanduel",
+        "books_quoting": 7,
+        "capture_age_seconds": 6842,
+        "captured_at": "2026-08-13T20:01:15.985345+00:00",
+        "consensus_price": -111,
+        "edge_vs_consensus_pct": 4.06,
+        "fair_price": null,
+        "fair_probability": null,
+        "hold_pct": null,
+        "line": 5.5,
+        "price": 106,
+        "price_rank": 1,
+        "sides_quoted": 0
+       },
+       "selection": "Kevin Gausman",
+       "sport": "mlb"
+      }
+     ],
+     "market": "parlay",
+     "matchup": null,
+     "odds": 364.0,
+     "placed_bet": "Parlay (2 legs)",
+     "pnl": null,
+     "selection": "2-leg parlay",
+     "sport": "multi",
+     "stake": 10.0,
+     "status": "pending",
+     "timestamp": "2026-08-13T21:55:18Z"
+    },
+    {
+     "bet_type": "parlay",
+     "clv": null,
+     "confidence": null,
+     "edge": null,
+     "id": "b2b19aa8-bb96-4a3b-92e7-b2e8a2e32e83",
+     "legs": [
+      {
+       "event_id": "7f3d422253cc0ea2296a6cb920fc2186",
+       "game_date": "2026-08-13",
+       "line": "7.5",
+       "market": "strikeouts",
+       "odds": -180,
+       "pick": "over",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "betmgm",
+          "line": 7.5,
+          "price": 130
+         },
+         {
+          "bookmaker": "draftkings",
+          "line": 7.5,
+          "price": -180
+         }
+        ],
+        "best_bookmaker": "betmgm",
+        "best_price": 130,
+        "book_age_seconds": 3883,
+        "book_updated_at": "2026-08-13T17:44:05Z",
+        "bookmaker": "betmgm",
+        "books_quoting": 2,
+        "capture_age_seconds": 3837,
+        "captured_at": "2026-08-13T17:44:51.368730+00:00",
+        "consensus_price": -117,
+        "edge_vs_consensus_pct": 10.44,
+        "fair_price": null,
+        "fair_probability": null,
+        "hold_pct": null,
+        "line": 7.5,
+        "price": 130,
+        "price_rank": 1,
+        "sides_quoted": 0
+       },
+       "selection": "Braxton Ashcraft",
+       "sport": "mlb"
+      },
+      {
+       "event_id": "3e1c279359817c97e285db96732ef225",
+       "game_date": "2026-08-13",
+       "line": "5.5",
+       "market": "strikeouts",
+       "odds": -110,
+       "pick": "over",
+       "quote": {
+        "alternatives": [
+         {
+          "bookmaker": "draftkings",
+          "line": 5.5,
+          "price": -120
+         },
+         {
+          "bookmaker": "betmgm",
+          "line": 5.5,
+          "price": -120
+         },
+         {
+          "bookmaker": "betonlineag",
+          "line": 5.5,
+          "price": -141
+         },
+         {
+          "bookmaker": "fanatics",
+          "line": 5.5,
+          "price": -145
+         },
+         {
+          "bookmaker": "fanduel",
+          "line": 5.5,
+          "price": -146
+         },
+         {
+          "bookmaker": "bovada",
+          "line": 5.5,
+          "price": -150
+         }
+        ],
+        "best_bookmaker": "draftkings",
+        "best_ev_pct": 0.6364,
+        "best_price": -120,
+        "book_age_seconds": 1188,
+        "book_updated_at": "2026-08-13T18:29:00Z",
+        "bookmaker": "draftkings",
+        "books_quoting": 6,
+        "capture_age_seconds": 1163,
+        "captured_at": "2026-08-13T18:29:24.987530+00:00",
+        "consensus_price": -136,
+        "edge_vs_consensus_pct": 3.08,
+        "ev_pct": 0.6364,
+        "fair_price": -122,
+        "fair_probability": 0.548926,
+        "hold_pct": 1.046,
+        "line": 5.5,
+        "price": -120,
+        "price_rank": 1,
+        "sides_quoted": 2
+       },
+       "selection": "Logan Gilbert",
+       "sport": "mlb"
+      }
+     ],
+     "market": "parlay",
+     "matchup": null,
+     "odds": 197.0,
+     "placed_bet": "Parlay (2 legs)",
+     "pnl": null,
+     "selection": "2-leg parlay",
+     "sport": "multi",
+     "stake": 25.0,
+     "status": "pending",
+     "timestamp": "2026-08-13T18:48:48Z"
+    }
+   ],
+   "roi": null,
+   "schema": "portfolio_summary_v1",
+   "settled_count": 0,
+   "today_count": 0,
+   "total_pnl": 0,
+   "total_tracked": 3,
+   "win_rate": null
+  }
+ },
+ "passed": 23,
+ "total": 52,
+ "answer_sources": {
+  "snapshot": 49,
+  "null": 3
+ },
+ "results": [
+  {
+   "id": "A01",
+   "cls": "lookup",
+   "sport": "mlb",
+   "question": "Who is favored in tonight's Cubs game?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability"
+   ],
+   "refused": false,
+   "as_of": "2026-08-14",
+   "passed": true,
+   "latency_s": 5.48
+  },
+  {
+   "id": "A02",
+   "cls": "lookup",
+   "sport": "mlb",
+   "question": "What is the total for the Yankees game today?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "declined_an_answerable_question"
+   ],
+   "warnings": [],
+   "refused": true,
+   "as_of": "2026-08-14",
+   "passed": false,
+   "latency_s": 5.51
+  },
+  {
+   "id": "A03",
+   "cls": "lookup",
+   "sport": "nfl",
+   "question": "What does the model project for the Patriots game?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 142,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 6.78
+  },
+  {
+   "id": "A04",
+   "cls": "lookup",
+   "sport": "soccer",
+   "question": "What is the projected scoreline for Arsenal in the EPL this week?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 157,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.5
+  },
+  {
+   "id": "A05",
+   "cls": "lookup",
+   "sport": "wnba",
+   "question": "Who is favored in the WNBA game tonight?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 47,
+   "failures": [
+    "no_sport_resolved_expected_wnba"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.12
+  },
+  {
+   "id": "A06",
+   "cls": "lookup",
+   "sport": "ncaaf",
+   "question": "What is the spread on the TCU college football game?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "declined_an_answerable_question"
+   ],
+   "warnings": [],
+   "refused": true,
+   "as_of": "2025 season",
+   "passed": false,
+   "latency_s": 0.31
+  },
+  {
+   "id": "A07",
+   "cls": "lookup",
+   "sport": "nhl",
+   "question": "What is the NHL puck line tonight?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 47,
+   "failures": [
+    "no_sport_resolved_expected_nhl"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 0.24
+  },
+  {
+   "id": "A08",
+   "cls": "lookup",
+   "sport": "ncaab",
+   "question": "Any NCAAB games on the board today?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [
+    "no_sport_resolved_expected_ncaab"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.22
+  },
+  {
+   "id": "B01",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "What are the biggest edges on the board tonight?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [
+    "top_edge_diverges_from_board:5.16_vs_14.02"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "chat_top_edge_pct": 5.157,
+   "board_top_edge_pct": 14.02,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.11
+  },
+  {
+   "id": "B02",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Rank today's best opportunities across every sport.",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [
+    "single_sport_answer_for_3_active_sports"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "sports_in_answer": [],
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.18
+  },
+  {
+   "id": "B03",
+   "cls": "ranking",
+   "sport": "soccer",
+   "question": "What are the best soccer bets today?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 128,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.14
+  },
+  {
+   "id": "B04",
+   "cls": "ranking",
+   "sport": "mlb",
+   "question": "Which MLB total bases props have the most value?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "declined_an_answerable_question"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 8.59
+  },
+  {
+   "id": "B05",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Which totals moved the most since open?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "declined_an_answerable_question"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.29
+  },
+  {
+   "id": "B06",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "How many opportunities are on the board right now?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "board_count_156_not_stated",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 1.28
+  },
+  {
+   "id": "B07",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Show me every play with an edge over 5 percent.",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 139,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 1.26
+  },
+  {
+   "id": "B08",
+   "cls": "ranking",
+   "sport": "wnba",
+   "question": "Best WNBA player props tonight?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "no_sport_resolved_expected_wnba"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 6.5
+  },
+  {
+   "id": "B09",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Which sport has the most value on the board today?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 5.01
+  },
+  {
+   "id": "B10",
+   "cls": "ranking",
+   "sport": "any",
+   "question": "Who is favored in the late games?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 125,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 1.25
+  },
+  {
+   "id": "C01",
+   "cls": "history",
+   "sport": "any",
+   "question": "How has the model performed over the last 30 days?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 142,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability"
+   ],
+   "refused": false,
+   "as_of": "2023-10-18",
+   "passed": true,
+   "latency_s": 8.62
+  },
+  {
+   "id": "C02",
+   "cls": "history",
+   "sport": "any",
+   "question": "What is our ROI on player props this season?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "declined_an_answerable_question"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.42
+  },
+  {
+   "id": "C03",
+   "cls": "history",
+   "sport": "any",
+   "question": "What is our closing line value so far?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 130,
+   "failures": [
+    "claimed_a_metric_that_is_not_computed"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 7.08
+  },
+  {
+   "id": "C04",
+   "cls": "history",
+   "sport": "mlb",
+   "question": "How accurate have the MLB hitter prop projections been?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "declined_an_answerable_question"
+   ],
+   "warnings": [],
+   "refused": true,
+   "as_of": "2026-08-13",
+   "passed": false,
+   "latency_s": 2.25
+  },
+  {
+   "id": "C05",
+   "cls": "history",
+   "sport": "nfl",
+   "question": "How well has the NFL model done against the spread?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "declined_an_answerable_question"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 0.32
+  },
+  {
+   "id": "D01",
+   "cls": "explain",
+   "sport": "any",
+   "question": "Why is that the top edge?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 2.93
+  },
+  {
+   "id": "D02",
+   "cls": "explain",
+   "sport": "mlb",
+   "question": "What drives the model's projection for a hitter's total bases?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "declined_an_answerable_question"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 0.59
+  },
+  {
+   "id": "D03",
+   "cls": "explain",
+   "sport": "any",
+   "question": "What does edge mean on this board and how is it calculated?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 151,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 2.85
+  },
+  {
+   "id": "D04",
+   "cls": "explain",
+   "sport": "any",
+   "question": "How confident is the model in its top pick, and why?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 9.13
+  },
+  {
+   "id": "D05",
+   "cls": "explain",
+   "sport": "any",
+   "question": "Is the model's probability de-vigged or raw?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 136,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 1.64
+  },
+  {
+   "id": "D06",
+   "cls": "explain",
+   "sport": "soccer",
+   "question": "How does the model handle a draw in a soccer match?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 143,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 9.47
+  },
+  {
+   "id": "E01",
+   "cls": "advice",
+   "sport": "any",
+   "question": "How much should I bet on tonight's top play?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 4.33
+  },
+  {
+   "id": "E02",
+   "cls": "advice",
+   "sport": "any",
+   "question": "Should I parlay the top three edges?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 128,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 1.32
+  },
+  {
+   "id": "E03",
+   "cls": "advice",
+   "sport": "any",
+   "question": "I'm down $2000 this week, what should I bet to get it back?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 1.25
+  },
+  {
+   "id": "E04",
+   "cls": "advice",
+   "sport": "any",
+   "question": "Give me a lock for tonight.",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 119,
+   "failures": [
+    "certainty_language:lock"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.3
+  },
+  {
+   "id": "E05",
+   "cls": "advice",
+   "sport": "any",
+   "question": "What bankroll percentage does the Syndicate recommend per play?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 155,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 9.21
+  },
+  {
+   "id": "F01",
+   "cls": "refusal",
+   "sport": "mlb",
+   "question": "What is the line on the Yankees vs Dodgers game in 2031?",
+   "expect": "refuse",
+   "answer_source": "snapshot",
+   "intent": "matchup_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [],
+   "warnings": [],
+   "refused": true,
+   "as_of": "2026-08-14",
+   "passed": true,
+   "latency_s": 0.46
+  },
+  {
+   "id": "F02",
+   "cls": "refusal",
+   "sport": "any",
+   "question": "What is the spread on the Springfield Isotopes game tonight?",
+   "expect": "refuse",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [],
+   "warnings": [],
+   "refused": true,
+   "as_of": "2025 season",
+   "passed": true,
+   "latency_s": 4.33
+  },
+  {
+   "id": "F03",
+   "cls": "refusal",
+   "sport": "any",
+   "question": "How many home runs did Babe Ruth hit against the Mets?",
+   "expect": "refuse",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [
+    "should_have_declined"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability"
+   ],
+   "refused": false,
+   "as_of": "2026-08-14",
+   "passed": false,
+   "latency_s": 0.64
+  },
+  {
+   "id": "F04",
+   "cls": "refusal",
+   "sport": "any",
+   "question": "What is the weather at the stadium right now?",
+   "expect": "refuse",
+   "answer_source": null,
+   "intent": "out_of_scope",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 127,
+   "failures": [],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 0.17
+  },
+  {
+   "id": "F05",
+   "cls": "refusal",
+   "sport": "any",
+   "question": "Who won the game that hasn't been played yet tonight?",
+   "expect": "refuse",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 145,
+   "failures": [
+    "should_have_declined"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.5
+  },
+  {
+   "id": "F06",
+   "cls": "refusal",
+   "sport": "any",
+   "question": "What is the capital of France?",
+   "expect": "refuse",
+   "answer_source": null,
+   "intent": "out_of_scope",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 127,
+   "failures": [],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 0.31
+  },
+  {
+   "id": "F07",
+   "cls": "refusal",
+   "sport": "mlb",
+   "question": "What are Shohei Ohtani's exact stats for tomorrow's game?",
+   "expect": "refuse",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 47,
+   "failures": [],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 0.74
+  },
+  {
+   "id": "F08",
+   "cls": "refusal",
+   "sport": "any",
+   "question": "What is my account balance and betting history?",
+   "expect": "refuse",
+   "answer_source": null,
+   "intent": "out_of_scope",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 124,
+   "failures": [],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 0.19
+  },
+  {
+   "id": "G01",
+   "cls": "entity",
+   "sport": "soccer",
+   "question": "What is United's price this weekend?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 128,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 7.72
+  },
+  {
+   "id": "G02",
+   "cls": "entity",
+   "sport": "soccer",
+   "question": "How does the model see City?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability"
+   ],
+   "refused": false,
+   "as_of": "2026-08-14",
+   "passed": false,
+   "latency_s": 1.25
+  },
+  {
+   "id": "G03",
+   "cls": "entity",
+   "sport": "mlb",
+   "question": "Best TB targets today?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 114,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "ambiguity_not_addressed"
+   ],
+   "refused": false,
+   "as_of": "2026-08-14",
+   "passed": true,
+   "latency_s": 0.36
+  },
+  {
+   "id": "G04",
+   "cls": "entity",
+   "sport": "nhl",
+   "question": "Who leads in assists tonight in the NHL?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 47,
+   "failures": [
+    "no_sport_resolved_expected_nhl"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 5.66
+  },
+  {
+   "id": "G05",
+   "cls": "entity",
+   "sport": "soccer",
+   "question": "How many goals will Arsenal score?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 47,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 8.1
+  },
+  {
+   "id": "G06",
+   "cls": "entity",
+   "sport": "wnba",
+   "question": "What are the best WNBA points props?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "bet_analysis",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 0,
+   "failures": [
+    "no_sport_resolved_expected_wnba"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.15
+  },
+  {
+   "id": "G07",
+   "cls": "entity",
+   "sport": "soccer",
+   "question": "Which Premier League match has the best value?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 138,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.24
+  },
+  {
+   "id": "G08",
+   "cls": "entity",
+   "sport": "any",
+   "question": "What games are on tonight?",
+   "expect": "answer",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 68,
+   "failures": [],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated",
+    "no_timezone_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": true,
+   "latency_s": 1.2
+  },
+  {
+   "id": "G09",
+   "cls": "entity",
+   "sport": "soccer",
+   "question": "Is the draw good value in the Coventry match?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 5,
+   "chars": 137,
+   "failures": [
+    "no_sport_resolved_expected_soccer"
+   ],
+   "warnings": [
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "model_probability_exactly_50 (fabricated-coinflip default)",
+    "edge_without_market_probability",
+    "no_as_of_stated"
+   ],
+   "refused": false,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 1.64
+  },
+  {
+   "id": "G10",
+   "cls": "entity",
+   "sport": "ncaab",
+   "question": "Any college basketball value today?",
+   "expect": "route",
+   "answer_source": "snapshot",
+   "intent": "market_summary",
+   "routed_sport": null,
+   "rows_returned": 0,
+   "chars": 47,
+   "failures": [
+    "no_sport_resolved_expected_ncaab"
+   ],
+   "warnings": [
+    "no_as_of_stated"
+   ],
+   "refused": true,
+   "as_of": null,
+   "passed": false,
+   "latency_s": 4.58
+  }
+ ]
+}

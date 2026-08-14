@@ -271,6 +271,49 @@ verify presence (counts inflate on substring containment), and note results come
 back **oldest-first regardless of `direction`**.
 
 
+### 2026-08-13 — A safety gate answers ITS question, not the one you were asked
+
+- What we believed: `scripts/deploy_preflight.py` returning `CLEAR` meant it
+  was time to deploy `#419`. A monitor was armed on exactly that.
+- What was actually true: the user's condition was **"after tonight's slate
+  clears."** The gate's condition is **"would a deploy kill a job right now."**
+  Those are different, and the gap is most of a day. It fired `CLEAR` at
+  **13:07 CDT, mid-slate**, with games at 14:08 / 15:06 / 18:30 / 21:08 / 21:10
+  still to come — it had simply caught a lull between sims, `in_flight: 0`.
+  Acting on it would have restarted refresh-worker during live games.
+- The rule going forward: **when a human states a condition, encode THAT
+  condition, not the nearest existing check.** A pre-built guard is evidence
+  about its own predicate only. Before arming any watcher, write down the
+  instruction's condition and the instrument's condition as two separate
+  sentences; if they are not the same sentence, the instrument is not
+  sufficient and needs the missing clause added explicitly.
+- Sibling of "a criterion has a DIRECTION": there the fault was not asking
+  which way a check pushes; here it is not asking what the check is *about*.
+- Cost: none — caught by reading the clock in the gate output before acting.
+  The scheduled-task version had the right condition (00:00–04:59 window) only
+  because the window was written from the instruction rather than the tool.
+
+### 2026-08-13 — "Identical to origin" does not mean "absent from the commit"
+
+- What we believed: a cherry-picked deploy candidate excluded another lane's
+  undeployed `#417` fix, because `memory_observability.py` was byte-identical
+  to `origin/main`.
+- What was actually true: `#417` was **already on `origin/main`** via an
+  earlier commit, so identical meant "my commit did not touch this file" —
+  the fix was present the whole time. The candidate contained it.
+- The sharper point: a diff against a base is a statement about the DELTA, and
+  it was read as a statement about the CONTENT. Two different questions:
+  "did I change this file" (`git diff base..target`) versus "what is in this
+  file" (`git rev-parse target:path`, or read it).
+- Direction of the error matters here: the wrong inference was *pessimistic*
+  and got written into a lane as reassurance about scope, which is the shape
+  that survives review. It was only caught because the live commit moved and
+  forced a re-measure.
+- The rule going forward: **to claim a change is ABSENT from a deploy, compare
+  the target against what is LIVE, not against the branch you built on.** The
+  live commit is the only baseline the deploy actually acts on, and it moves
+  under you while you work.
+
 ### 2026-08-13 — "Who reads this env var" is a grep question; "does this service read it" is not
 - What we believed: an env key whose only readers live in `scripts/` or
   `vendor/` is dead on the web service, because web's startCommand is gunicorn.

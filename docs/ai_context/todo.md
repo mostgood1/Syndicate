@@ -1,6 +1,56 @@
 # Syndicate TODO — canonical cross-session list
 
 ### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** OPEN, UNOWNED, split out of `#387` 2026-08-14
+### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** PARTLY CLOSED 2026-08-14 — timed on current code, estimator hardened, split out of `#387` 2026-08-14
+
+**MEASURED 2026-08-14 18:0xZ ON THE DEPLOYED CODE (`294f9ca9`), refresh-worker,
+4h window. This is the end-to-end timing the ticket asked for, taken from the
+instrumentation that already existed — no new spans, per the ticket's own
+warning.**
+
+```
+COLLECT_SPAN_EXIT collect_candidates   n=39  p50=0.00  p90=146.19  max=209.66
+  of those >= 1s:                      n=9   p50=138.30           max=209.66
+  >= 60s: 23.1%      >= 600s: 0.0%
+BUILD_SPAN_EXIT candidate_collection_with_fallback
+                                       n=38  p50=0.00  p90=260.28  max=434.26
+```
+
+**A CURRENT BOARD BUILD IS ~2-4 MINUTES, NOT ~23.** Nothing in a 4h window came
+within 3x of the 23-minute figure. That figure is not "unsourced" as this ticket
+originally claimed — `_expected_build_seconds`'s own docstring sources it to a
+real 22.9-minute build — but it **predates `#414`** (21.5x on the quote-join
+identity scan) and describes a board that no longer exists.
+
+**ITEM 1 OF THE REVISED NEXT ACTION WAS ALREADY DONE.** The ticket said
+`_expected_build_seconds` "must stop using a central measure". It never used
+one — it has always returned `max(...)`, with a well-argued docstring on why the
+asymmetry demands it. Verify before fixing.
+
+**ITEM 2 IS DONE, AND IT WAS REAL.** ~77% of `COLLECT_SPAN_EXIT` values are
+sub-second empty-pool short-circuits. MAX defends a MIXED sample; it is
+undefended against a sample that is entirely short-circuits, because the max of
+twelve zeros is zero. `_expected_build_seconds` now excludes sub-second
+non-builds before taking the max and falls back to a conservative 210s (never
+~0) when the window holds none. Tests:
+`tests/test_deploy_safety_build_estimate.py`, 9 passed, mutation-pinned.
+
+**NOT A LIVE FAILURE, and the distinction is kept deliberately.** Running the
+gate returned `a build takes ~2.3min` throughout. `_render_logs(..., limit=12)`
+returns rows **oldest-first regardless of `direction`** (a Render API quirk
+already in `learnings.md`), so the twelve it samples are not the twelve a
+ranking picks. The exposure was latent — likely at 77%, not certain. It was
+nearly written up as a live defect off the ranked-twelve calculation; running
+the program instead of reimplementing its logic is what caught that.
+
+**ITEM 3 — the 23-minute comment.** Left in place deliberately, now with the
+measurement beside it. It is the historical worst case and the asymmetry
+argument still holds; retiring it on one 4h window would be the same
+over-generalisation this ticket's own history records twice.
+
+**STILL OPEN:** `candidate_collection_with_fallback` is a wrapper and the
+138-210s is somewhere INSIDE it. The existing spans do not decompose further.
+That decomposition is the only place new instrumentation would earn its cost.
 
 **Filed because `#387`'s local run produced the first end-to-end timing of the
 overview stage and it belongs in its own ticket rather than buried in a memory
@@ -10134,118 +10184,15 @@ worker-computed, web-read summary — which is what the architecture says anyway
 Note the second, independent problem visible in the same numbers: **0 settled of
 8,276 records**, and the autorun has not run since 08-06.
 
-### #288 — RESOLVED for the manifest half: the gate is now tested for what it does, and a silent skip is now a greppable line
+### #288 — CLOSED 2026-08-13, archived to [`todo_closed.md`](todo_closed.md)
 
-`tests/test_candidate_pool_manifest_gate.py`, 9 tests, plus one production log
-line. The rest of #288 (the four unrelated mock/API-drift failures below) is
-still open.
+Both halves are done: the manifest gate is tested for what it does
+(`tests/test_candidate_pool_manifest_gate.py`), and the four remaining
+`tests/test_intelligence_state.py` failures are fixed (`bd227fa3`) — that file
+now runs **224 passed, 0 failed**. Full record in the archive.
 
-**The gate, stated once so nobody has to re-derive it:** a sport reaches the
-candidate pool **if and only if** it has a readable manifest at
-`reports_root()/manifests/<slug>.json`. `_available_sport_manifests` silently
-`continue`s a sport whose manifest is missing, and the loop consuming it
-(`intelligence_state.py:3201`) is the **only** place candidates are matched to a
-sport — so a candidate for an unmanifested sport is discarded with no iteration
-ever touching it.
-
-**The property the old test lacked, verified by mutation rather than asserted:**
-
-```
-real gate      -> keys ['mlb']         MANIFEST_GATE_SKIPPED_SPORTS logged: True
-gate removed   -> keys ['mlb','nba']   logged: False
-=> test_a_sport_without_a_manifest_is_dropped FAILS under the mutation
-```
-
-The old test **passed with the gate deleted.** This one cannot. And nothing in
-the new file reads `data/`, so the machine-dependent `18` is gone by
-construction rather than by being updated to a different constant.
-
-The test worth knowing about is
-`test_the_drop_is_attributable_to_the_manifest_and_nothing_else`: both sports are
-identical in the overview and the only difference is which manifest file exists;
-deleting mlb's and adding nba's flips which survives. **That is exactly the flaw
-that made the old NBA arm prove nothing** — it returned 0 for want of data, not
-for want of a manifest, and no assertion could tell the two apart.
-
-**`MANIFEST_GATE_SKIPPED_SPORTS date=… skipped=nba,nhl kept=mlb`** — one line per
-build, only when something is skipped, nothing at all on a fully-manifested
-slate, one line rather than one per sport. All three pinned as tests: a
-diagnostic that fires on a healthy slate is noise, and this worker already
-prints hundreds of lines a cycle. It converts the archetype from unobservable to
-greppable **for this one gate**: absent-legitimately and absent-silently stop
-producing the identical output. Establishing why each of the five missing sports
-was missing cost a cross-provider audit today; this covers the manifest half of
-that question for free, forever.
-
-**Scope, honestly:** this does not make every silent absence visible. It makes
-*this* gate's silent absence visible. NFL's was a garbage `context_label` reaching
-ESPN (`1de982be`), NCAAF's is something else again — each gate needs its own
-line, and that is the shape of the work rather than a reason to skip it.
-
-### #288 — `tests/test_intelligence_state.py` failures: stale fixtures, NOT a reproduction of #286. Not fixed
-
-The thesis that these were the cheap local instrument for the production zero is
-**refuted**. Measured on `main` in this worktree:
-
-- **5 failures now, not 8** (`8 failed, 214 passed` was the earlier reading;
-  today `5 failed, 210 passed, 10 subtests passed` running the file alone).
-- `test_build_candidate_pool_skips_sports_without_manifests` asserts
-  `candidate_count == 1` and gets **18**, not 0. The trace is a *healthy*
-  pipeline: 60 MLB candidates generated → 32 survive dedup → 18 survive
-  exposure budgets. This matches the earlier reconciliation entry in this file
-  and **contradicts the later "gets 0, with `candidate_scoring output_count: 0`
-  upstream" note** — that reading is not reproducible here and should not be
-  built on.
-- The other four are mock/API drift, none related: `IndexError` at
-  `:2556`; `0 not greater than or equal to 1`; a `refresh_state_store` lambda
-  that "got an unexpected keyword argument 'ex'"; and one asserting a
-  `latest_key` promotion that **#124 deliberately refuses for sport-scoped
-  payloads** (`LATEST_KEY_PROMOTION_SKIPPED_SPORT_SCOPED` in its own captured
-  stdout). That last one is a test encoding behaviour the code intentionally
-  changed.
-
-Genuine fixture drift from several sessions' legitimate feature work, worth
-fixing, but it was never going to produce the production zero. **Cost of the
-guess:** the earlier note reasoned from `candidate_count 0` appearing in two
-places and assumed one cause; the two zeros have nothing to do with each other.
-
-
-
-#### What `test_build_candidate_pool_skips_sports_without_manifests` is ACTUALLY telling us
-
-Worth its own paragraph, because it is plausibly the only automated check in the
-repo aimed at per-sport manifest divergence, and **it stopped checking that some
-time ago without going green-for-the-wrong-reason — it went red for the wrong
-reason, which hid it just as well.**
-
-The test patches `syndicate.features.intelligence.collect_all_recommendations`
-to return exactly two rows (one MLB, one NBA) and expects the manifest gate to
-drop NBA, leaving 1. **That patch is a total no-op:** `pipeline/intelligence_state.py`
-does not reference `collect_all_recommendations` anywhere. Generation now runs a
-per-sport path that reads real artifacts, so the trace shows `generated=60` for
-mlb off `data/mlb_source/data/daily/sims/2026-06-10/` — **git-tracked**, so the
-number is a function of what that mirror holds on the machine running it.
-60 → 32 after dedup → 18 after exposure budgets, against an expected 1.
-
-So it is **both** stale *and* local-mirror dependent, and worse: **its NBA arm
-proves nothing.** NBA returned `generated=0` because there is no NBA data for
-2026-06-10, not because the manifest was missing — so deleting the manifest gate
-entirely would not change this test's NBA half at all. The one check we have for
-this class of defect has not been exercising it.
-
-This is the lead's network-dependent-test shape in a second costume: not "passes
-because the network is absent" but "the assertion's subject was replaced and
-nobody noticed, because the test kept producing *a* number". **Rebuilding it
-should start from what it is meant to assert, not from updating `1` to `18`** —
-an updated constant would re-freeze a test that is measuring the wrong thing.
-
-**Checked for the network-dependent shape in the other failures, per the lead:**
-the two `test_intelligence.py` query failures both run under
-`_patch_build_intelligence_overview(...)` with a fully synthetic fixture and no
-network or mirror reads — one fails `4.5 != '4.5'` (a float/str coercion drift),
-the other `False is not true`. Neither is data-dependent and neither is network-
-dependent. The blotter failure asserts a literal `<th>Odds</th><th>Projected</th><th>Live</th>`
-against a template that is now JS-rendered from `initial-intelligence-response`.
+**The durable half is NOT in the archive** — see "A test can be stale and
+mirror-dependent at once" under *Operational notes worth not rediscovering*.
 
 
 ### 2026-08-08 — The rule is easy to state and evidently not easy to apply under momentum
@@ -30560,6 +30507,47 @@ avoid repeating a mistake, the lesson is filed in the wrong place — promote it
 ---
 
 ## Operational notes worth not rediscovering
+
+### A test can be stale and mirror-dependent at once — and fixing one instance is not sweeping the class (`#288`, 2026-08-13)
+
+`#288` removed `test_build_candidate_pool_skips_sports_without_manifests`
+because it patched `syndicate.features.intelligence.collect_all_recommendations`
+— a symbol `pipeline/intelligence_state.py` does not reference anywhere. The
+patch was a no-op, so the test silently ran against whatever git-tracked mirror
+data sat in `data/mlb_source/.../2026-06-10/`.
+
+**Three screens below it, `test_build_candidate_pool_does_not_embed_full_odds_
+history_payload` patched the same dead symbol and survived that pass.** It went
+red two months later for the calendar reason rather than the code reason: every
+real candidate from that date now trips `_candidate_is_final`, the sport is
+skipped by `if not sport_candidates: continue`, and the pool lookup `KeyError`s.
+
+Three rules, in order of how much they cost:
+
+1. **When you remove a test for a defect, grep for the defect, not the test.**
+   `grep -n "collect_all_recommendations" tests/` was one command and would have
+   found the second instance the same day. A defect class that is *named in a
+   closed ticket* is the cheapest possible sweep and the easiest to skip.
+2. **A patch target that the module under test never imports is a silent
+   no-op.** `mock.patch` does not verify anyone calls it. Before trusting an
+   injection point, grep the module under test for the symbol — if it is absent,
+   the test is running against production data and reporting it as a fixture.
+3. **A test whose fixture date is in the past is a countdown, not a fixture.**
+   Two of the four failures were pure date rot: one against a two-month-old
+   mirror slate, one against a two-day staleness cap
+   (`_stale_within_threshold`). Both were repaired by pinning the clock or the
+   injection point, **never** by moving the date forward — a fresh hardcoded
+   date just restarts the countdown.
+
+**And the reason the rot went unnoticed for weeks:** the test's headline
+assertion, `mocked_loader.call_count == 2`, **passes against a completely empty
+pool** — the manifest loop loads the shard before it looks at candidates. So the
+test kept producing *a* green assertion while the object it existed to inspect
+did not exist. Sibling of the `#288` original, which "went red for the wrong
+reason, which hid it just as well". Assert liveness (the pool is populated)
+*before* asserting shape, or the shape assertions are vacuous and nothing says
+so. Verify by mutation: break the source deliberately and confirm the test goes
+red for the right reason.
 
 ### Build-duration deltas: 4 wrong claims in one night, 4 different lanes (2026-08-13)
 

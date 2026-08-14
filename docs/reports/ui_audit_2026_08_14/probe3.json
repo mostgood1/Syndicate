@@ -1,0 +1,182 @@
+{
+ "ncaaf": {
+  "tabs": {
+   "panelIds": [
+    "identity",
+    "context",
+    "coverage",
+    "details"
+   ],
+   "tabTargets": [
+    "game",
+    "context",
+    "details"
+   ],
+   "log": [
+    {
+     "tab": "Game",
+     "target": "game",
+     "activePanelsAfterClick": [],
+     "visibleChars": 0
+    },
+    {
+     "tab": "Team Context",
+     "target": "context",
+     "activePanelsAfterClick": [
+      "context"
+     ],
+     "visibleChars": 455
+    },
+    {
+     "tab": "Details",
+     "target": "details",
+     "activePanelsAfterClick": [
+      "details"
+     ],
+     "visibleChars": 496
+    }
+   ]
+  }
+ },
+ "wnba": {
+  "tabs": {
+   "panelIds": [
+    "game",
+    "box",
+    "props"
+   ],
+   "log": [
+    {
+     "tab": "Game",
+     "attrs": "class=cards-tab is-active type=button data-card-tab=game data-card-target=039bf012a0015d3c6753cc0b21100866e",
+     "activePanelsAfterClick": [
+      "game"
+     ]
+    },
+    {
+     "tab": "Box Score",
+     "attrs": "class=cards-tab  type=button data-card-tab=box data-card-target=039bf012a0015d3c6753cc0b21100866e",
+     "activePanelsAfterClick": [
+      "game"
+     ]
+    },
+    {
+     "tab": "Props",
+     "attrs": "class=cards-tab  type=button data-card-tab=props data-card-target=039bf012a0015d3c6753cc0b21100866e",
+     "activePanelsAfterClick": [
+      "game"
+     ]
+    }
+   ]
+  }
+ },
+ "soccer": {
+  "overflow": {
+   "docW": 1440,
+   "scrollW": 1468,
+   "wider": [
+    {
+     "tag": "header",
+     "cls": "standalone-app-header",
+     "w": 1458,
+     "left": 10,
+     "boxSizing": "content-box",
+     "padL": "16px",
+     "padR": "16px",
+     "width": "1424px"
+    },
+    {
+     "tag": "article",
+     "cls": "feature-game-card cards-game-card",
+     "w": 1448,
+     "left": 10,
+     "boxSizing": "content-box",
+     "padL": "13px",
+     "padR": "13px",
+     "width": "1420px"
+    }
+   ],
+   "bodyBoxSizing": "content-box",
+   "starRule": "content-box"
+  }
+ },
+ "nfl": {
+  "overflow": {
+   "docW": 1440,
+   "scrollW": 1468,
+   "wider": [
+    {
+     "tag": "header",
+     "cls": "standalone-app-header",
+     "w": 1458,
+     "left": 10,
+     "boxSizing": "content-box",
+     "padL": "16px",
+     "padR": "16px",
+     "width": "1424px"
+    },
+    {
+     "tag": "article",
+     "cls": "feature-game-card cards-game-card",
+     "w": 1448,
+     "left": 10,
+     "boxSizing": "content-box",
+     "padL": "13px",
+     "padR": "13px",
+     "width": "1420px"
+    },
+    {
+     "tag": "article",
+     "cls": "feature-game-card cards-game-card",
+     "w": 1448,
+     "left": 10,
+     "boxSizing": "content-box",
+     "padL": "13px",
+     "padR": "13px",
+     "width": "1420px"
+    },
+    {
+     "tag": "article",
+     "cls": "feature-game-card cards-game-card",
+     "w": 1448,
+     "left": 10,
+     "boxSizing": "content-box",
+     "padL": "13px",
+     "padR": "13px",
+     "width": "1420px"
+    },
+    {
+     "tag": "article",
+     "cls": "feature-game-card cards-game-card",
+     "w": 1448,
+     "left": 10,
+     "boxSizing": "content-box",
+     "padL": "13px",
+     "padR": "13px",
+     "width": "1420px"
+    },
+    {
+     "tag": "article",
+     "cls": "feature-game-card cards-game-card",
+     "w": 1448,
+     "left": 10,
+     "boxSizing": "content-box",
+     "padL": "13px",
+     "padR": "13px",
+     "width": "1420px"
+    }
+   ],
+   "bodyBoxSizing": "content-box",
+   "starRule": "content-box"
+  }
+ },
+ "mlb": {
+  "overflow": {
+   "docW": 1440,
+   "scrollW": 1440,
+   "wider": [],
+   "bodyBoxSizing": "border-box",
+   "starRule": "border-box"
+  }
+ }
+}

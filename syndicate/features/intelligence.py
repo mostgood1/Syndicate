@@ -2595,12 +2595,80 @@ def _overview_headroom_exhausted(*, next_sport: str, sports_done: int, sports_to
     return True
 
 
+def _log_overview_sport_counts(row: dict[str, Any], effective_date: str) -> None:
+    """Per-sport overview counts, emitted AS EACH SPORT FINISHES.
+
+    Was a second pass over the completed list. `build_intelligence_overview`'s
+    own comment calls that out as a defect -- a process that dies while
+    building sport N logged nothing about sports 1..N -- and a streamed
+    overview cannot do a second pass at all, because the rows are gone.
+    Same lines, same values, emitted earlier.
+    """
+    # Emitted for EVERY sport, not just WNBA. These four counts are the
+    # only view of what candidate generation is handed -- _collect_candidates
+    # reads dashboard_games and home_rails straight off these dicts, so a
+    # sport with zero here can never produce a candidate no matter what
+    # the downstream filters do.
+    #
+    # This was wnba-only, which actively misled a 2026-07-25 investigation
+    # into an almost-empty board: the single visible "dashboard_games_count:
+    # 0" line was WNBA's, on an All-Star day with one game, and was briefly
+    # read as evidence about MLB. Scoping diagnostics to one sport makes the
+    # other six look like whatever the instrumented one happens to be doing.
+    slug = _safe_text(row.get("slug"), "sport").lower()
+    # #229 step 4: read the NAMED opportunity source rather than the rail.
+    # A rail is a presentation shape; reading it as the data feed is the
+    # inversion the one-opportunity-pipeline plan exists to remove. Rails
+    # remain as a fallback only for overviews built before
+    # prop_opportunities existed.
+    opportunities = row.get("prop_opportunities") if isinstance(row.get("prop_opportunities"), dict) else {}
+    home_rails = row.get("home_rails") if isinstance(row.get("home_rails"), dict) else {}
+    pregame_items = opportunities.get("pregame")
+    if not isinstance(pregame_items, list):
+        pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
+    live_items = opportunities.get("live")
+    if not isinstance(live_items, list):
+        live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
+    dashboard_games = row.get("dashboard_games") if isinstance(row.get("dashboard_games"), list) else []
+    _intel_trace(
+        "overview_counts",
+        sport=slug,
+        context_label=_safe_text(row.get("context_label"), effective_date),
+        pregame_count=len(pregame_items),
+        live_count=len(live_items),
+        dashboard_games_count=len(dashboard_games),
+        data_health=_safe_text(row.get("data_health"), "unknown"),
+    )
+
+
 def build_intelligence_overview(
     *,
     selected_date: str | None = None,
     force_refresh: bool = False,
     skip_game_hydration: bool = False,
+    consumer: Any = None,
 ) -> list[dict[str, Any]]:
+    # `consumer`: PEAK = MAX INSTEAD OF SUM.
+    #
+    # The comment below states the cost's shape -- "every sport's fully hydrated
+    # overview is held simultaneously, so peak is the SUM across sports, not the
+    # max" -- and MLB's pass alone was measured at +2.9GB
+    # (`_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`). Passing a callable here makes each
+    # sport's row available to the caller and then DROPS IT before the next
+    # sport hydrates, so the process holds one sport at a time instead of eight.
+    #
+    # The returned list is then EMPTY BY CONSTRUCTION when a consumer is given.
+    # That is the whole point and it is not a degraded return: a caller that
+    # wanted the list would not have passed a consumer. Returning the rows as
+    # well would reinstate exactly the retention this exists to remove.
+    #
+    # The list-building path below is expressed THROUGH the same consumer
+    # mechanism (`_append`), so there is one loop, not two that can drift. Every
+    # guard, log line and memory checkpoint applies identically either way --
+    # which is what makes this safe to adopt incrementally.
+    #
+    # Measured 2026-08-14: the hydrated pass runs 9x per 5h and hydrates all
+    # eight sports each time, four of them out of season.
     # skip_game_hydration: CANDIDATE GENERATION (_collect_candidates) reads
     # dashboard_games/home_rails directly off each sport dict returned here
     # -- never pass True for any overview that feeds candidate collection,
@@ -2626,6 +2694,27 @@ def build_intelligence_overview(
     # logger.info never reaches Render's collector, which is a large part of
     # why this stayed invisible.
     overview: list[dict[str, Any]] = []
+    # `sports_done` is COUNTED rather than read off `len(overview)`: with a
+    # consumer the list stays empty, and the guard below would then be told
+    # "0 sports done" on every sport. A guard fed a constant is not a guard.
+    # The counter makes the streamed and list paths report identically.
+    sports_done = 0
+    streaming = callable(consumer)
+
+    def _emit(row: dict[str, Any]) -> None:
+        nonlocal sports_done
+        sports_done += 1
+        # Counts are emitted HERE, per sport, not in a second pass over the
+        # finished list. The comment above records why that second pass was a
+        # defect in its own right -- "a process that dies while building sport
+        # N logs nothing at all about sports 1..N". Streaming forces the fix
+        # the comment was already asking for.
+        _log_overview_sport_counts(row, effective_date)
+        if streaming:
+            consumer(row)
+        else:
+            overview.append(row)
+
     for sport in sports:
         if not isinstance(sport, dict):
             continue
@@ -2637,7 +2726,7 @@ def build_intelligence_overview(
         # worse failure than the one being prevented.
         if not skip_game_hydration and _overview_headroom_exhausted(
             next_sport=sport_slug,
-            sports_done=len(overview),
+            sports_done=sports_done,
             sports_total=len([item for item in sports if isinstance(item, dict)]),
         ):
             break
@@ -2661,53 +2750,23 @@ def build_intelligence_overview(
                 flush=True,
             )
             raise
-        overview.append(sport_row)
+        _emit(sport_row)
+        # DROP THE LOCAL REFERENCE BEFORE THE NEXT SPORT HYDRATES. Without it
+        # the streamed path still holds the previous sport alive through
+        # `sport_row` for the whole of the next iteration -- one sport short of
+        # the SUM this exists to remove, and the expensive one (MLB, +2.9GB)
+        # runs FIRST.
+        sport_row = None
         try:
             log_container_memory(
                 "overview_sport_end",
                 sport=sport_slug,
-                sports_done=len(overview),
+                sports_done=sports_done,
                 sports_total=len([item for item in sports if isinstance(item, dict)]),
             )
         except Exception:
             pass
         print(f"[intelligence] OVERVIEW_SPORT_END sport={sport_slug}", flush=True)
-    for sport_overview in overview:
-        # Emitted for EVERY sport, not just WNBA. These four counts are the
-        # only view of what candidate generation is handed -- _collect_candidates
-        # reads dashboard_games and home_rails straight off these dicts, so a
-        # sport with zero here can never produce a candidate no matter what
-        # the downstream filters do.
-        #
-        # This was wnba-only, which actively misled a 2026-07-25 investigation
-        # into an almost-empty board: the single visible "dashboard_games_count:
-        # 0" line was WNBA's, on an All-Star day with one game, and was briefly
-        # read as evidence about MLB. Scoping diagnostics to one sport makes the
-        # other six look like whatever the instrumented one happens to be doing.
-        slug = _safe_text(sport_overview.get("slug"), "sport").lower()
-        # #229 step 4: read the NAMED opportunity source rather than the rail.
-        # A rail is a presentation shape; reading it as the data feed is the
-        # inversion the one-opportunity-pipeline plan exists to remove. Rails
-        # remain as a fallback only for overviews built before
-        # prop_opportunities existed.
-        opportunities = sport_overview.get("prop_opportunities") if isinstance(sport_overview.get("prop_opportunities"), dict) else {}
-        home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}
-        pregame_items = opportunities.get("pregame")
-        if not isinstance(pregame_items, list):
-            pregame_items = home_rails.get("pregame", {}).get("items") if isinstance(home_rails.get("pregame"), dict) else []
-        live_items = opportunities.get("live")
-        if not isinstance(live_items, list):
-            live_items = home_rails.get("live", {}).get("items") if isinstance(home_rails.get("live"), dict) else []
-        dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
-        _intel_trace(
-            "overview_counts",
-            sport=slug,
-            context_label=_safe_text(sport_overview.get("context_label"), effective_date),
-            pregame_count=len(pregame_items),
-            live_count=len(live_items),
-            dashboard_games_count=len(dashboard_games),
-            data_health=_safe_text(sport_overview.get("data_health"), "unknown"),
-        )
     return overview
 
 
@@ -10267,6 +10326,7 @@ def collect_candidates_with_fallback_merge(
     apply_thin_pool_merge: bool = True,
     apply_empty_pool_fallback: bool = True,
     advanced_by_sport: dict[str, list[dict[str, Any]]] | None = None,
+    precollected_candidates: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     """Single collect-with-fallback entry point, extracted from
     IntelligenceStateService._build_candidate_pool so every caller gets the
@@ -10300,7 +10360,23 @@ def collect_candidates_with_fallback_merge(
     fallback above still applies for these callers -- a pool with zero
     candidates is never intentional.
     """
-    raw_candidates = _collect_span("collect_candidates", collect_candidates, overview, preferences, odds_history_by_sport)
+    # `precollected_candidates`: the caller already ran collection PER SPORT and
+    # released each sport's hydrated overview before the next one built (the
+    # `#387` SUM -> MAX cutover). Skipping the call here is the whole point --
+    # re-running it would need the whole overview back, which is the retention
+    # being removed.
+    #
+    # Everything below is unchanged and still applies: the edge filter, the
+    # thin-pool merge and the empty-pool fallback all operate on the pool, not
+    # on the overview. In streamed mode `overview` arrives as None, and
+    # `collect_all_recommendations` REBUILDS it for itself when it is None --
+    # so the two rare fallbacks re-hydrate on demand instead of forcing every
+    # cycle to carry eight sports just in case. Measured 2026-08-14: the
+    # thin-pool merge fired 0 times in 6h against 39 live collection spans.
+    if precollected_candidates is not None:
+        raw_candidates = list(precollected_candidates)
+    else:
+        raw_candidates = _collect_span("collect_candidates", collect_candidates, overview, preferences, odds_history_by_sport)
     if not raw_candidates and not apply_empty_pool_fallback:
         # `#385`. The empty-pool fallback exists to REFILL this pool. When
         # Layer 2 is primary the pool is not what gets served, so refilling it
@@ -10402,6 +10478,8 @@ def collect_candidates_with_fallback_merge(
             raw_candidates = []
     elif apply_edge_filter:
         if advanced_by_sport is None:
+            # Streamed callers pass this in, accumulated per sport, precisely
+            # because `overview` is gone by now.
             tracked = _tracked_repo_files()
             advanced_by_sport = {
                 _safe_text(sport_row.get("slug"), "sport").lower(): _advanced_input_rows_for_sport(sport_row, tracked)

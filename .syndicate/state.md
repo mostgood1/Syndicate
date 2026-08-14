@@ -945,6 +945,7 @@ Nothing new is convicted. Four candidates are struck off, which narrows it.
   record notes two query failures and a blotter failure in other files; those
   were never in its scope and were **not re-measured** on 08-13.
   `[unverified 08-13]`
+
 ## Board live tier (layer1-live-tier lane)
 
 - **The live prop join was matching 0 of 1385 rows** — keyed on `market`, which
