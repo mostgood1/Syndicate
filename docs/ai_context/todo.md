@@ -51,6 +51,8 @@ do the NFL rows carry `model_edge_pct: null` alongside a non-null `projected`?
 - **no** -> the model edge is present and being out-weighted by EV in the
   ranking, which is a scoring-weight defect in the board itself.
 These are opposite fixes. **Do not start work before this is read.**
+**-> SUPERSEDED: the measurement was taken and neither branch was right.
+See MEASURED below.**
 
 **WHY THIS CONNECTS TO `#423` AND `#417`, which is the part worth holding onto.**
 The memory leak stops the board building at all; `#417`'s guard was refusing
@@ -64,6 +66,60 @@ that is this ticket.
 as independent "opportunities" with no indication they are a pair. Even once
 ranking is correct, a user cannot act on both and should not see them as two
 finds. They want pairing, or one-per-market suppression.
+
+**MEASURED 2026-08-14 02:5xZ — THE HYPOTHESIS IS FALSIFIED AND THE SCOPE IS
+LARGER. Read this before anything above.**
+
+Served payload, `GET https://syndicate-an21.onrender.com/api/board/layer2-shortlist`
+(note the host: `syndicate.onrender.com` 404s on every board route; the working
+public host is **`syndicate-an21`**. Positive control: `/api/board/layer1`
+returns 200 on the same host).
+
+```
+date 2026-08-13, rows 200
+(model_edge_pct present, projection present) -> (False, False): 200
+```
+
+**All 200 rows carry `model_edge_pct: None`. Every single one.** And the score
+object names the mechanism outright:
+
+```
+score: {ev_component: 5.0, sim_component: None, value_pct: 5.0,
+        freshness_factor: 0.9, book_confidence: 1.0, score: 4.5}
+```
+
+**`sim_component` is None on every row.** The score is
+`ev_component x freshness x book_confidence` and nothing else. **The simulation
+contributes ZERO to ranking, board-wide** — every sport, every market, not just
+NFL totals. That is why Over 54.5 outranks Under 54.5 against a 36.3
+projection: nothing in the ranking ever consulted a projection.
+
+**Three corrections to this ticket's own filing:**
+
+1. **`_MODEL_EDGE_MAX_POINTS` is NOT the mechanism.** The guard drops an edge
+   that is implausibly large; it cannot be dropping an input that is absent.
+   The row field is `projection` (singular) and it is `None`. **The projection
+   never reaches the shortlist row at all.** Both branches this ticket named —
+   "fix the projections" vs "fix the scoring weight" — were wrong; the answer
+   is a third thing, upstream of both.
+2. **It is not NFL-specific, and not preseason-specific.** 200 of 200 rows,
+   all sports.
+3. **The UI is sourcing `projected` / `actual` from somewhere the ranker never
+   sees.** The screenshot shows `projected 36.3, actual 41` on a row whose
+   shortlist record has `projection: None`. The board DISPLAYS a projection it
+   did not RANK on — worse than showing none, because it reads as though the
+   model was consulted.
+
+**NEW FIRST QUESTION, replacing the one above:** where is `projection` /
+`sim_component` supposed to be populated on the shortlist row, and what makes it
+None for 200/200? Start at `_build_candidate_pool` in
+`pipeline/intelligence_state.py` (the rows are built there and persisted; the
+API is a pure read), and at whatever the UI joins to for its `projected` column
+— those two disagree, and the UI's source is the one that has the data.
+
+**This sharpens the `#423`/`#417` connection rather than softening it.** A
+perfectly healthy, fast-building board still ranks on pure market arbitrage.
+Memory work buys a board that builds; it does not buy one that is intelligent.
 
 **Caveats on this filing, stated so nobody over-reads it.** The numbers are read
 off a screenshot of the served board plus a code trace; the local
