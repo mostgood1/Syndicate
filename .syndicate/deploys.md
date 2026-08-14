@@ -686,3 +686,251 @@ people learn to route around. Run the gate, read it, then deploy.
   with `gap1_check.py` rather than reported.
 - Rollback: redeploy `2e4e2544` (read the live commit first) and set
   `SYNDICATE_TRACEMALLOC_DIAG=1` if its owner wants the instrument back.
+
+## DEPLOYED 2026-08-14 10:42 CDT — `530fc5d8` refresh-worker — Layer 2 shortlist off the Layer 1 floor — MEASUREMENT OPEN
+
+- **Preflight 2026-08-14 10:24 CDT (15:24Z): PASS on scope, HOLD on timing.**
+- **1. Scope — PASS, exactly one substantive change.** Live is `2d6f7a2f`
+  (finished 14:58:09Z, re-read inside this step — it had moved twice since this
+  session started). `2d6f7a2f..530fc5d8` is my commit plus `99de8070` and
+  `87108ff4`, both todo/docs. **Zero other production `.py`.** An earlier read
+  of this same question said 22 commits / 872 insertions across 7 `.py` files;
+  that was true against the then-live `2e4e2544` and was stale within the hour.
+- **2. Expected effect, as a number and a window.** Over the 3h after the
+  deploy, on refresh-worker: combined `LAYER2_SHORTLIST` + `LAYER2_FAST_REFRESH`
+  count **rises above 5** (the pre-change figure for 11:39-14:39Z), and the
+  longest gap between them **falls below 30 min** from the measured 104.7.
+  `MEMORY_GUARD_ABORT` count should be **unchanged** — this weakens no existing
+  guard — and `LAYER2_GUARD_SKIP` should be near 0 if the 600MB floor is sized
+  right. **A high `LAYER2_GUARD_SKIP` count is the falsifier**: it means the
+  shortlist is not as cheap as four builds suggested.
+- **3. Measurement — assigned to this session (`layer2-freshness`).** The same
+  query that produced the baseline: count by marker over a 3h window on
+  `srv-d91dpertqb8s73co8ls0`, plus an OOM check in the Render **events** API
+  (`#423` records that kills are invisible in the logs). Re-run at **T+3h**.
+- **4. Blast radius.** refresh-worker only. Persistent disk, so stop-then-start
+  with downtime and no instance overlap. **It kills in-flight jobs — 7 at the
+  time of this preflight**, including `run_mlb_daily_sim_job.py` and its
+  `daily_update.py --workflow ui-daily` children.
+- **5. Rollback.** Redeploy `2d6f7a2f` via the Render API. The env kill-switch
+  `SYNDICATE_LAYER2_FAST_REFRESH_ENABLED=false` also disables the new path, but
+  **a restart does not re-inject env vars** — setting it requires its own
+  deploy, so it is not the faster rollback. Use the redeploy.
+- **6. Ledger check.** No `FORBIDDEN` rule applies. The `handoff_overview_
+  hydration.md` do-not #1 (never lower the 3000MB floor) is respected and
+  **pinned by a test** that also pins the 1900MB floor. No OPEN lane claims
+  `pipeline/intelligence_state.py` or `tests/test_layer2_fast_refresh.py`
+  (checked against the live `lane-guard.py` by stdin probe and against the
+  nearest-preceding-header map).
+- **7. Verdict: HELD, not deployed.** `deploy_preflight.py --service
+  refresh-worker --target-commit 530fc5d8` returns `HOLD: 7 job(s) in flight`.
+  Child pids rotated 1180 -> 1391 between two samples, so the sim is
+  progressing, not hung. Pushed to `origin/main` (free — no `render.yaml` in
+  the commit, verified) and waiting on the gate.
+- **MEASUREMENT: (empty — deploy has not happened)**
+- **REMINDER: re-read the live SHA inside the deploying step. It moved twice
+  during this session's preflight alone.**
+
+### `#430`/`#431`/`#432` — the L1 board's odds age, rail and book columns (web only)
+- Deployed: 2026-08-14 10:3x CDT — **row written BEFORE the deploy fired.**
+- Commit: `b98f5ed7` (cherry-picked onto `origin/main` `0c3165b9`; local `main`
+  is 31 commits divergent and pushing it would have carried four other lanes).
+- Service: **web only** (`srv-d88ahvrbc2fs73eodu30`). refresh-worker and
+  live-odds-worker are NOT redeployed, so the "a deploy kills an in-flight MLB
+  sim" rule does not apply to this one — the sim runs on refresh-worker.
+- Change: `/api/board/layer1` serves an odds-observation timestamp derived from
+  the rows' seen-age and re-anchored to `generated_at`; the board renders it
+  beside the build age; the bet-slip rail gets its stylesheet, a collapse and a
+  per-row Ask button; book columns default to 11 with an All-books toggle.
+- **PRE-DEPLOY DELTA ENUMERATED, and it is not only my change.** `2d6f7a2f`
+  (live web) -> `b98f5ed7` is 9 files, of which 4 are production code:
+
+      syndicate/blueprints/intelligence.py         +51    mine
+      syndicate/features/shared/layer1_board.py    +89    mine
+      syndicate/templates/shared/layer1_board.html +355   mine
+      pipeline/intelligence_state.py               +237   NOT MINE
+
+  The fourth is `layer2-board-freshness`'s Layer 2 memory-floor change, which
+  landed on `origin/main` while this was in flight. **Judged inert on web, on
+  two checks rather than on recollection:** (1) the live web service carries
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` — read from
+  `/v1/services/.../env-vars` today, 73 keys, not from `state.md`; (2) the diff
+  touches `_abort_if_memory_critical` and `IntelligenceStateService` build
+  methods only, and does NOT touch `read_layer2_shortlist` or
+  `read_intelligence_board_state`, which are the two functions web's route
+  actually imports. That change becomes live when its OWN lane deploys
+  refresh-worker, and its measurement obligation stays with that lane.
+- Expected effect, as a number and a window:
+  1. Within 5 minutes of the deploy, `/api/board/layer1?sport=mlb` returns a
+     non-null `odds_freshness.odds_observed_at`, and `views` other than `all`
+     return it too (the bug the API test caught).
+  2. The served board's odds age is **> 120 min** on the current MLB slate and
+     the build age is **< 15 min** — i.e. the two numbers visibly disagree,
+     which is the whole point. If they agree, either the capture recovered
+     (good, and a separate fact) or the derivation is wrong.
+  3. Default MLB book columns = 11, not 36.
+- Measurement: me, immediately after the deploy reaches `status=live`, by
+  fetching the API and re-reading the board. Written into this row.
+- Rollback: redeploy `2d6f7a2f` on web — **re-read the live commit first**, it
+  moved five times in one evening and a stale SHA nearly shipped a rollback.
+- Ledger check: no `learnings.md` FORBIDDEN/EXONERATED rule covers this. No
+  `render.yaml` change, so no `blueprint_sync`. No OPEN lane claims any of the
+  three files I wrote.
+- Measured: 2026-08-14 10:33-10:37 CDT, deploy `live` at 15:33:06Z, commit
+  `b98f5ed7` confirmed on the service (status AND commit, not the 201).
+  1. **PASS.** `odds_freshness.odds_observed_at` is served and non-null on
+     `view=all` AND `view=pregame` — the partition bug the API test caught is
+     not present in production. `view=live` returns `null` with 0 games and
+     `rows_with_seen_age=0`, which is the unknown path behaving correctly.
+     MLB carries 2,319 rows with a seen-age and 218 without; the 218 are
+     counted and excluded rather than treated as fresh.
+  2. **PREDICTION NOT MET, and the prediction was wrong rather than the
+     code.** I predicted odds age > 120 min. Measured 23.0 min: built 10:30
+     CDT, freshest observation 10:10 CDT. **The capture recovered between the
+     10:18 reading and the 10:36 one** — the 2h10m stall I measured twice this
+     morning had already broken by the time the deploy landed. So the two ages
+     do still disagree (23.0m odds vs 3.7m build, and the amber threshold at
+     15m fires), but not by the margin I wrote down. Recording it as a miss:
+     the number I committed to was a property of the outage, not of the change,
+     and I should not have stated it as the deploy's expected effect.
+  3. **PASS.** The served page ships exactly the 11 chosen books in the chosen
+     order, plus `board_cards.css`, `ask_bar.js`, the rail toggle and the
+     odds-age renderer.
+  - Cross-sport, same instant: mlb 23.5m, wnba 54.0m, nfl 53.1m, soccer 12.9m,
+    ncaaf/nba null (0 games, out of season). **Tens of minutes is the normal
+    state, not an MLB anomaly** — which is the fact the board could not
+    previously express at all.
+  - No OOM kill and no `server_failed` on web after the deploy.
+- Verdict: **shipped and verified.** The board now states its odds age. The
+  capture gap that motivated it is a separate, still-open question — see the
+  `odds-capture-stall` lane.
+
+- **DEPLOYED. `dep-d9vjbr6gekts73fqr2f0`, `status=live`, commit `530fc5d8`,
+  finished 2026-08-14T15:42:29Z.** Verified as `status=live` AND the commit,
+  not from the POST response — it sat `build_in_progress` for ~5 min first, and
+  `state.md` records one that sat there 33+ minutes while being reported shipped.
+- **ZERO JOBS KILLED, and this took work.** The gate returned `HOLD` on every
+  read from 15:24 to 15:36 — 7-10 MLB sim jobs in flight, near-continuously.
+  A first `CLEAR` at 15:25:09 was **a lull between sims, not the end of work**:
+  a new `run_mlb_daily_sim_job.py` (pid 1743) started ~60s later, which three
+  spaced confirming samples caught. `learnings.md` already records that exact
+  trap ("it had simply caught a lull between sims, `in_flight: 0`"). Deploying
+  on the first CLEAR would have killed a sim that had just started.
+  The deploy was instead fired from inside a detected lull by a 10s-interval
+  poll that ran the POST in the same step as the CLEAR — 15:36:11 CLEAR,
+  15:36:12 POST.
+- **Post-deploy smoke, 15:42:29-15:43:15Z: no tracebacks, `BOOTED` present.**
+  The only `Error` lines are pre-existing `PROCESS_ENUM_DEBUG
+  psutil_unavailable:ImportError` with a procfs fallback — not from this change.
+  **All marker counts in that window are ZERO and mean nothing yet: the window
+  is 46 seconds against a ~71s board tick.** Do not read them as a result.
+- **MEASUREMENT: OPEN.** Due at T+3h ~= 2026-08-14 18:45Z / 13:45 CDT.
+  Read on `srv-d91dpertqb8s73co8ls0` over a 3h window:
+  1. `LAYER2_SHORTLIST` + `LAYER2_FAST_REFRESH` combined count — **PASS if > 5**
+     (the pre-change figure over 11:39-14:39Z).
+  2. Longest gap between any two of them — **PASS if < 30 min** (was 104.7).
+  3. `MEMORY_GUARD_ABORT` — should be roughly unchanged; this weakens no
+     existing guard. A large DROP is not a win here, it is a sign the worker
+     rebooted and the comparison is boot-confounded.
+  4. `LAYER2_GUARD_SKIP` — **the falsifier. If this is high, the 600MB floor is
+     too tight and the shortlist is not as cheap as four builds suggested.**
+  5. OOM kills in the **events** API (`server_failed`/`oomKilled`), not the
+     logs — `#423` records that kills are invisible in logs.
+- **CONFOUND, stated now so it is not discovered later: the deploy restarted
+  the worker.** `anon` drops to a few hundred MB on boot, so the guard will not
+  abort for a while and `LAYER2_FAST_REFRESH` may correctly be ZERO early on.
+  Its absence early is expected, not a failure — the fast path only fires when
+  the Layer 1 guard refuses. A clean read needs `anon` back at plateau
+  (~35 min post-restart, per `state.md`).
+
+### `#15` cadence — MLB pregame odds sweep 2h -> 1h (env only, live-odds-worker)
+- Deployed: 2026-08-14 ~11:0x CDT — **row written BEFORE the change fired.**
+- Requested explicitly by the user after the `odds-capture-stall` lane closed
+  as "not a defect, that IS the cadence".
+- Change: set `SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB=3600` on
+  `live-odds-worker` (`srv-d91dpertqb8s73co8lt0`). Read by
+  `_pregame_sweep_interval_seconds` (`live_refresh_loop.py:3958`), which falls
+  back to `_PREGAME_SWEEP_INTERVAL_FALLBACK = 2*3600` when unset. **No code
+  change.**
+- **Service selection, measured not assumed:** in a 90-minute log sample
+  live-odds-worker emitted 5 `PREGAME_CADENCE_DETAIL` and 0 sim tokens;
+  refresh-worker emitted 0 cadence and 3 `MLB_DAILY_SIM_TRIGGERED` / 3
+  `MLB_DAILY_SIM_END`. The cadence lives on live-odds-worker and the MLB sim
+  lives on refresh-worker, so **"a deploy kills an in-flight sim" does not
+  apply to this deploy** — different service. (All 3 sims had also ended.)
+- **Blast radius held to env by pinning the commit.** live-odds-worker is live
+  on `83e3e5f2` from 2026-08-13 23:43Z; the repo tip is ~20h ahead. The deploy
+  is fired with `commitId=83e3e5f2` — the SAME code it is already running — so
+  the only delta is the env var. Deploying at tip would have shipped a day of
+  four other lanes' work to pick up a one-key config change.
+- **No `render.yaml` edit, therefore no `blueprint_sync`.** The key is
+  undeclared and set live-only. Per the measured sync semantics in `state.md`
+  (refresh-worker went 92 -> 93 keys while the blueprint declared 84), a sync
+  upserts declared keys and leaves live-only keys alone, so this will NOT be
+  silently reverted by a future sync. It IS undeclared drift, and declaring it
+  is a separate decision that applies to production on push.
+- Expected effect: within one tick after the deploy, `PREGAME_CADENCE_DETAIL`
+  prints `mlb:...interval_s=3600` (not 7200), and the MLB gap between
+  consecutive quote observations falls from ~7,200s to ~3,600s. The board's
+  `odds N old` should therefore top out near 1h instead of near 2h.
+- **Cost, stated as what I actually know:** MLB pregame sweeps double. I did
+  NOT measure the absolute OddsAPI call cost per sweep — the local
+  `odds_control_plane` artifact is a 08-11 mirror and carries no call counts —
+  so "2x MLB pregame sweeps" is the honest figure and "N calls/day" would be
+  invented. Against the 5M cap (`#OddsAPI budget`), and MLB only: nfl/wnba stay
+  at 7200s and soccer at 28800s.
+- Rollback: `DELETE /v1/services/srv-d91dpertqb8s73co8lt0/env-vars/SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB`
+  then redeploy pinned at the then-live commit; the code fallback returns it to
+  7200. Re-read the live commit first.
+- Measured: `<pending>`
+
+### `#429` — HRR mean derived from its components — WEB + REFRESH-WORKER `214f5151`
+- Web `dep-d9vjlc0u01pc738a78jg`, refresh-worker `dep-d9vjlc7qj5pc73dp71mg`,
+  both **live 2026-08-14 11:00:29 CDT (15:59:55Z)**. No sim killed —
+  `sim_run_status state=finished` read before the POST.
+- Per-service delta was re-read AT DEPLOY TIME and it mattered: live had moved
+  on BOTH services in the 25 minutes since the previous read
+  (`2d6f7a2f` -> web `b98f5ed7`, worker `530fc5d8`). That turned the blast
+  radius from "20 commits, four sessions" into **web: `prop_projections.py`
+  alone**; worker additionally carried `layer1_board.py` + `intelligence.py`,
+  already proven on web since 15:33.
+- Change: `batter_hits_runs_rbis` projected a constant `0.0` slate-wide. HRR is
+  Hits+Runs+RBIs — a SUM of three primitives the sim models separately — so the
+  mean is now derived as `h_mean + r_mean + rbi_mean`. Exact by linearity of
+  expectation, which holds despite the three being heavily correlated; means
+  only, never probabilities.
+- MEASURED on a post-deploy board rebuild, 11:01:30 CDT:
+
+      hrr rows           88
+      with a value       88     derived 88, blanked 0
+      distinct values    85     <- was 1
+      range              1.363 .. 3.833   (market line 1.5)
+      degenerate groups  NONE   <- #425 no longer flags this market
+
+- **THE VALIDATION LIMIT RECORDED IN `#429` IS NOW CLOSED, on production.**
+  That ticket said the derivation could not be cross-checked against the sim's
+  own `p_hrr_2plus`, because every local artifact has that probability dead at
+  0.0 (checked 05-28, 06-06, 07-09) while production has real ones. Production
+  carries BOTH on the same 88 rows, so the test is available and it is a real
+  test — the two numbers come from different places and nothing forces them to
+  agree unless the derivation measures the same quantity:
+
+      TEST     corr(derived mean, sim P(2+))  = 0.9267
+      CONTROL  corr(market line,  sim P(2+))  = 0.1156
+
+  Monotonic across the whole range, no inversions:
+  `1.363-1.754 -> 0.416`, `1.996-2.182 -> 0.526`, `2.388-2.573 -> 0.594`,
+  `3.113-3.833 -> 0.676`. Tails are baseball-sane (Yordan Alvarez, CJ Abrams
+  high; bench bats low). The control is what makes the 0.93 meaningful — the
+  near-constant line correlates at 0.12, so this is not everything correlating
+  with everything.
+- **A CLOSED LOOP WORTH NOTING:** `#425`'s degeneracy detector found this defect
+  unprompted on its first live board, and now reports the market clean. The
+  instrument found the bug and then confirmed its own fix.
+- **NOT FIXED, and deliberately so:** the sim still writes `hrr_mean: 0.0`. That
+  producer was never located; this reconstructs at read time and stands aside
+  automatically if the sim is ever repaired (a test pins that a real `hrr_mean`
+  is never overridden). Worth fixing at source; nothing on the board depends on
+  it now.
+- Rollback: redeploy `b98f5ed7` (web) / `530fc5d8` (worker) — but re-read the
+  live commit first, it moved twice in 25 minutes today.
