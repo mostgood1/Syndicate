@@ -57,6 +57,12 @@ _HITTER_BUCKETS: dict[str, tuple[str, str]] = {
 }
 
 _HR_MARKET = "batter_home_runs"
+_HRR_MARKET = "batter_hits_runs_rbis"
+
+# `#429`. HRR is not an independently simulated stat -- it is Hits + Runs +
+# RBIs, a SUMMATION of three primitives the sim already models separately.
+# These are the component mean fields, in the spelling the daily summary uses.
+_HRR_COMPONENT_MEANS: tuple[str, ...] = ("h_mean", "r_mean", "rbi_mean")
 
 
 def _norm_name(value: Any) -> str:
@@ -222,6 +228,52 @@ class PropProjectionIndex:
             if name:
                 self._hitters[(name, "hr_1plus")] = dict(row)
 
+    def _derived_hrr_mean(self, name: str) -> float | None:
+        """Hits + Runs + RBIs, summed from the components the sim DOES write.
+
+        `#429`. The sim writes `hrr_mean: 0.0` for every hitter while writing
+        genuine per-player probabilities (`p_hrr_2plus`, 75 distinct values on
+        a live board) and genuine `pa_mean`/`ab_mean`. Measured on
+        `daily_summary_2026_07_09.json`: `hrr_mean` present on 936 of 936 rows,
+        **nonzero on 0 of them**. The producer of that field was not located;
+        this reconstructs the value from data already in hand rather than
+        serving a fabricated 0.0.
+
+        WHY THIS IS EXACT AND NOT AN APPROXIMATION. Expectation is linear:
+
+            E[H + R + RBI] = E[H] + E[R] + E[RBI]
+
+        That holds no matter how strongly the three are correlated -- and they
+        are heavily correlated, since a home run is 1 hit + 1 run + 1 RBI. That
+        correlation would wreck a variance or a probability derived this way;
+        it leaves the MEAN untouched. So this composes means and deliberately
+        never composes probabilities: `model_prob_over` still comes from the
+        sim's own `p_hrr_*` field.
+
+        WHY THE COMPONENTS ARE AVAILABLE HERE. They arrive on DIFFERENT bucket
+        rows (`h_mean` on hits_*, `r_mean` on runs_*, `rbi_mean` on rbi_*),
+        which is why an hits_runs_rbis row looks bare. `ingest_game` already
+        folds every `*_mean` it sees into `_hitter_means[name]` regardless of
+        which bucket carried it, so by scoring time all three are in memory.
+        Measured on the same artifact: all three present for **234 of 234**
+        players, deriving to 1.79-2.47 against a market line of 1.5 -- the
+        right magnitude, which a wrong-field or wrong-scale join would not be.
+
+        ALL THREE OR NOTHING. A partial sum is silently too low and would be
+        worse than a blank, because it looks like a real projection. Missing
+        any component returns None and the cell stays empty.
+        """
+        means = self._hitter_means.get(name) or {}
+        total = 0.0
+        for key in _HRR_COMPONENT_MEANS:
+            value = means.get(key)
+            if not isinstance(value, (int, float)):
+                return None
+            total += float(value)
+        # A zero sum means the components are dead too -- do not swap one
+        # fabricated 0.0 for another.
+        return round(total, 3) if total > 0 else None
+
     # -- query ----------------------------------------------------------
     def game_payloads(self, *, sport: Any, home_team: Any, away_team: Any) -> dict[str, Any] | None:
         """Segment payloads for a game, matched on the TEAM PAIR.
@@ -319,12 +371,29 @@ class PropProjectionIndex:
             projected = row.get(mean_key)
             if projected is None:
                 projected = (self._hitter_means.get(name) or {}).get(mean_key)
-            return {
+            derived_from = None
+            if market_key == _HRR_MARKET and not projected:
+                # The stored mean is the known-dead 0.0 (`#429`). Try to
+                # reconstruct it; if that is not possible, BLANK IT rather than
+                # letting the 0.0 through. A player in a "2+ HRR" bucket cannot
+                # truly project 0.0, so serving it is the fabricated number this
+                # whole ticket is about -- and a blank is the stated acceptable
+                # outcome where a real value cannot be had.
+                projected = self._derived_hrr_mean(name)
+                if projected is not None:
+                    derived_from = "h_mean+r_mean+rbi_mean"
+            payload = {
                 "projected": round(float(projected), 3) if projected is not None else None,
                 "model_prob_over": round(float(prob), 4) if prob is not None else None,
                 "source": "hitter_threshold",
                 "basis": bucket,
             }
+            if derived_from:
+                # Say that the number was DERIVED rather than simulated. Same
+                # rule the rest of this board follows: a value a consumer
+                # cannot tell the provenance of is worse than a labelled one.
+                payload["projected_derived_from"] = derived_from
+            return payload
 
         return None
 
