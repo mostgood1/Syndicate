@@ -31585,6 +31585,71 @@ remains is the underlying producer.
    So a correct value for this exact market demonstrably exists in the
    pipeline. **The fix may be a join, not a model.**
 
+#### TRACED 2026-08-14 — root cause LOCALISED to the producer, and THREE hypotheses in this ticket are FALSIFIED
+
+**Both leads above are WRONG. Struck through rather than deleted, because the
+next person will otherwise re-run them.**
+
+~~Lead 1, `box_score_stats.py` missing key~~ — that dict serves ACTUALS, not
+projections. Different path entirely.
+
+~~Lead 2, "the real mean never reaches the structured field"~~ — the field IS
+reached. It is present and ZERO, which is a different defect from missing, and
+the distinction is the whole thing: `prop_projections` line 319-323 reads
+`row.get("hrr_mean")` and renders `None` as a BLANK. A missing mean would
+already show as an empty cell. Only a present `0.0` produces what the board shows.
+
+~~A third idea, formed during the trace: derive the mean from the sim's own
+distribution (`_dist_mean` already does this for pitchers).~~ **Falsified by
+the artifact — there are NO `*_dist` keys on these rows at all.**
+
+**THE MEASUREMENT (`daily_summary_2026_07_09.json`, the artifact
+`load_prop_projections` actually reads, at `outputs[*].hitter_props_likelihood_topn`):**
+
+    hits_runs_rbis topn rows        936
+    hrr_mean    present=936  absent=0  nonzero=0  distinct=1   value 0.0
+    ab_mean, pa_mean                present, real values
+    p_hrr_2plus / p_hrr_2plus_cal   present, real probabilities
+    *_dist keys on these rows       NONE
+
+**And on the served board the same day:** 88 rows, `source hitter_threshold`,
+`model_prob_over` populated on **88 of 88 with 75 DISTINCT values (0.335 ..
+0.749)** while `projected` is a flat `0.0`.
+
+**So the row is real and only ONE field is dead.** The sim produces genuine
+per-player probabilities and genuine opportunity means (`pa_mean`, `ab_mean`)
+and writes `hrr_mean: 0.0` for every hitter. The consumer is EXONERATED — its
+handling of both present and absent is correct.
+
+**LONGSTANDING, not a regression.** Present in the 2026-07-09 artifact, so at
+least five weeks old and almost certainly since the market was wired.
+
+**ALREADY MITIGATED — do not add a second suppression.** `#425` gap 2 marks all
+of these rows `degenerate: true` with an attributable reason, so the board no
+longer asserts a fabricated 0.0 silently. What is left is the producer.
+
+#### WHERE IT IS NOT, AND WHERE IT MUST BE
+
+Not in `syndicate/**`. The chain is:
+
+    sim -> hitter_props record            (writes hrr_mean 0.0)
+    -> daily_update_multi_profile.py:4409-4432 copies *_mean into the topn rec
+       (only `if isinstance(value, (int, float))`, so a real 0.0 propagates)
+    -> daily_summary outputs[*].hitter_props_likelihood_topn
+    -> prop_projections._HITTER_BUCKETS -> projected
+
+**NOT FOUND, and this is the remaining work:** the line that computes
+`hrr_mean` in the sim. It is not reachable by grepping `"hrr_mean":` — the only
+literal writers in the tree are `eval_sim_day_vs_actual.py` (an eval tool, and
+it computes the value CORRECTLY from `hrr_sum`, which is worth reading as the
+reference implementation) and display specs. Whatever builds `sim.hitter_props`
+either defaults the key to 0.0 or sums into a counter that is never populated.
+
+**Note the shape:** `h_mean` and `tb_mean` are ABSENT from these same rows
+while `hrr_mean` is present-and-zero. That asymmetry is a clue — a field that
+is absent was never written; a field that is 0.0 was written by something. Find
+what writes it.
+
 #### First step
 
 Do not start in the model. Take one player on today's slate, find their
