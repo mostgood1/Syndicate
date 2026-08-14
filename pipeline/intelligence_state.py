@@ -3950,6 +3950,62 @@ class IntelligenceStateService:
             "pregame": max(0, total - live_count),
         }
 
+    @staticmethod
+    def _overview_live_summary(overview: Any) -> list[dict[str, Any]]:
+        """Per-sport live COUNTS, so the pool need not retain the hydrated overview.
+
+        `_build_candidate_pool` used to embed every sport's FULLY HYDRATED
+        overview in the pool it returns -- `dashboard_games`, `home_rails`,
+        `prop_opportunities`, the lot -- which was then cached up to
+        `_max_snapshots` (12) deep and JSON round-tripped on every build AND
+        every cache hit. Its only consumer is `_live_pipeline_summary`, and that
+        function reads it for exactly the five values computed here: two counts,
+        a distinct-id count, an existence flag derived from those, and one
+        timestamp.
+
+        Retaining megabytes of hydrated cards to recompute five integers is the
+        `pointer, not payload` rule this file already applies to
+        `odds_history_shard_key` two hundred lines below, applied to the other
+        big payload on the same dict.
+
+        It is also a PREREQUISITE, not just a saving: the handoff's
+        architectural fix turns the overview's peak from SUM-across-sports into
+        MAX-of-one-sport by releasing each sport before the next hydrates. That
+        is impossible while anything downstream holds the whole list alive, and
+        this was the last thing that did.
+
+        Computed here rather than in the consumer so it is derived from the LIVE
+        overview at build time -- the whole point is that the hydrated rows are
+        gone by the time the consumer runs.
+        """
+        summary: list[dict[str, Any]] = []
+        for row in overview or []:
+            if not isinstance(row, Mapping):
+                continue
+            home_rails = row.get("home_rails") if isinstance(row.get("home_rails"), dict) else {}
+            live_block = home_rails.get("live") if isinstance(home_rails.get("live"), dict) else {}
+            live_items = [item for item in (live_block.get("items") or []) if isinstance(item, Mapping)]
+            dashboard_games = row.get("dashboard_games") if isinstance(row.get("dashboard_games"), list) else []
+            live_games = [game for game in dashboard_games if isinstance(game, Mapping) and bool(game.get("is_live"))]
+            summary.append(
+                {
+                    "slug": _safe_text(row.get("slug"), "sport").lower(),
+                    "live_games": len(live_games),
+                    "live_prop_items": len(live_items),
+                    "live_odds_game_ids": len(
+                        {
+                            str(item.get("game_id") or item.get("event_id") or item.get("id") or "").strip()
+                            for item in live_items
+                            if str(item.get("game_id") or item.get("event_id") or item.get("id") or "").strip()
+                        }
+                    ),
+                    # Computed over the SAME concatenation the consumer used, so
+                    # the value is identical rather than merely similar.
+                    "live_mirror_timestamp": _latest_item_timestamp([*live_games, *live_items]),
+                }
+            )
+        return summary
+
     def _live_pipeline_summary(
         self,
         *,
@@ -3961,10 +4017,18 @@ class IntelligenceStateService:
         selected_date: str | None,
         sport: str | None,
     ) -> dict[str, Any]:
-        overview = candidate_pool.get("overview") if isinstance(candidate_pool.get("overview"), list) else []
+        # Prefer the compact summary. FALL BACK to deriving it from a hydrated
+        # `overview`, because `run_intelligence_query` embeds the whole pool in
+        # a response that gets PERSISTED -- a snapshot written before this
+        # change still carries the old shape, and reading it must not silently
+        # produce zeros. Absent-and-unknown is not the same as measured-zero,
+        # which is the failure this file's own ledger keeps recording.
+        summary_rows = candidate_pool.get("overview_summary")
+        if not isinstance(summary_rows, list):
+            summary_rows = self._overview_live_summary(candidate_pool.get("overview") or [])
         overview_by_slug = {
             _safe_text(row.get("slug"), "sport").lower(): row
-            for row in overview
+            for row in summary_rows
             if isinstance(row, Mapping)
         }
         sport_slugs = sorted({*overview_by_slug.keys(), *{str(candidate.get("sport") or candidate.get("sport_slug") or "").strip().lower() for candidate in candidates if str(candidate.get("sport") or candidate.get("sport_slug") or "").strip()}})
@@ -3973,27 +4037,29 @@ class IntelligenceStateService:
         board_cards = board_contract.get("cards") if isinstance(board_contract.get("cards"), list) else []
 
         for sport_slug in sport_slugs:
-            sport_overview = overview_by_slug.get(sport_slug) or {}
-            home_rails = sport_overview.get("home_rails") if isinstance(sport_overview.get("home_rails"), dict) else {}
-            live_items = (home_rails.get("live") or {}).get("items") if isinstance(home_rails.get("live"), dict) else []
-            live_items = [item for item in live_items if isinstance(item, Mapping)]
-            dashboard_games = sport_overview.get("dashboard_games") if isinstance(sport_overview.get("dashboard_games"), list) else []
-            live_games = [game for game in dashboard_games if isinstance(game, Mapping) and bool(game.get("is_live"))]
+            sport_summary = overview_by_slug.get(sport_slug) or {}
+            # Counts now, not the rows they were counted from. A sport absent
+            # from the summary reads as 0/0, exactly as an absent overview row
+            # did before.
+            live_games_count = int(sport_summary.get("live_games") or 0)
+            live_items_count = int(sport_summary.get("live_prop_items") or 0)
+            live_odds_game_ids = int(sport_summary.get("live_odds_game_ids") or 0)
+            live_mirror_timestamp = sport_summary.get("live_mirror_timestamp")
             sport_candidates = [row for row in candidates if _safe_text(row.get("sport") or row.get("sport_slug"), "").lower() == sport_slug]
             sport_ranked = [row for row in top_candidates if _safe_text(row.get("sport") or row.get("sport_slug"), "").lower() == sport_slug]
             sport_selected = [row for row in top_opportunities if _safe_text(row.get("sport") or row.get("sport_slug"), "").lower() == sport_slug]
             sport_board = [card for card in board_cards if isinstance(card, Mapping) and _safe_text(card.get("sport") or card.get("sport_slug"), "").lower() == sport_slug]
             by_sport[sport_slug] = {
-                "live_games": len(live_games),
-                "live_props": len(live_items),
-                "live_prop_items": len(live_items),
-                "live_odds_game_ids": len({str(item.get("game_id") or item.get("event_id") or item.get("id") or "").strip() for item in live_items if str(item.get("game_id") or item.get("event_id") or item.get("id") or "").strip()}),
+                "live_games": live_games_count,
+                "live_props": live_items_count,
+                "live_prop_items": live_items_count,
+                "live_odds_game_ids": live_odds_game_ids,
                 "live_candidates": sum(1 for row in sport_candidates if bool(row.get("is_live"))),
                 "live_recommendations": sum(1 for row in sport_selected if bool(row.get("is_live"))),
                 "board_live_count": sum(1 for row in sport_board if bool(row.get("is_live"))),
                 "top_live_opportunities": sum(1 for row in sport_selected if bool(row.get("is_live"))),
-                "live_mirror_exists": bool(live_games or live_items),
-                "live_mirror_timestamp": _latest_item_timestamp([*live_games, *live_items]),
+                "live_mirror_exists": bool(live_games_count or live_items_count),
+                "live_mirror_timestamp": live_mirror_timestamp,
             }
 
         live_games = sum(item["live_games"] for item in by_sport.values())
@@ -4746,7 +4812,19 @@ class IntelligenceStateService:
         pool = {
             "selected_date": selected_date,
             "source_fingerprint": source_fingerprint,
-            "overview": [dict(item) for item in overview if isinstance(item, Mapping)],
+            # POINTER, NOT PAYLOAD -- the same contract `odds_history_shard_key`
+            # follows below, applied to the other big object on this dict.
+            #
+            # This used to be `[dict(item) for item in overview ...]`: every
+            # sport's FULLY HYDRATED overview, cached up to `_max_snapshots`
+            # (12) deep and JSON round-tripped on every build and every cache
+            # hit. `_live_pipeline_summary` is its only consumer and reads it
+            # for five derived values per sport, all computed here instead.
+            #
+            # Dropping it is also what makes the handoff's SUM -> MAX overview
+            # fix possible at all: a per-sport overview cannot be released
+            # before the next one hydrates while this dict holds the whole list.
+            "overview_summary": self._overview_live_summary(overview),
             "candidate_count": len(global_pool),
             "layer2_shortlist": layer2_shortlist,
             "candidate_pools": {
