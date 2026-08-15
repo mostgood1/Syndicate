@@ -1538,3 +1538,16 @@ ratios 0.59 and 1.29 while an n=9 group on the same page gave 0.09; the fit now
 requires **n >= 5**. Across one evening the same metric read reliable/54px,
 unreliable, unreliable, then unfittable as the slate churned — **one reading of
 it is not a baseline.** `[measured]`
+
+## Soccer card - the producer now publishes half-by-half periods `[measured 08-15 22:0xZ]`
+
+Served `/soccer/epl/api/cards` carries `sim.periods` = `h1`, `h2`. The card
+renders `1st Half` / `2nd Half` / `Full Game` (3 lens rows, 3 total rows), with
+the Full Game row carrying `ATS ARS -1.5 | Total 2.5` and
+`ATS +0.0 | Total +0.8`. The `-` on the two half rows is deliberate contract
+design - only a full-game row is compared against the full-game line.
+
+**Therefore the stand-in-row fix (`6e9e6107`) is NOT currently exercised on
+production soccer**, and production soccer is no longer evidence for it. It
+remains correct and tested and fires for any sport publishing no periods.
+`[measured]`
