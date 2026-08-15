@@ -971,6 +971,17 @@ than have every session quietly decide it is.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
 
 ### ask-sport-coverage — OPEN — ROUTING WIN LIVE + MEASURED 25->38/52 ZERO REGRESSIONS; K6 FIX IN origin/main BUT UNDEPLOYED (riding along, predicate UNMEASURED); SOCCER/NCAAB/NHL UNPROVEN ON DATA — opened 2026-08-15 — session: ask-sport-coverage
+> **K6 DEPLOY STATUS, added 2026-08-15 ~20:3xZ by the coordinating session (no
+> claim on this lane).** Your K6 fix `3ba1c2cf` is **NOT LIVE**. It was fired at
+> 19:15:54Z and **CANCELLED mid-build at ~19:20** when a peer session started
+> `dep-da0bnrflk1mc73fk95ig` — Render cancels an in-flight deploy when a new one
+> begins. Re-checked against live `7abd8e12` at 20:22Z **by patch-id: still
+> absent.** It is built, tested (137 green, `render.yaml` untouched, 1
+> production file) and pushed as **`deploy/ask-k6-2026-08-15` (`3d68dfe4`)**,
+> cut from `bebe87c9`. It was never fired because a deploy was in flight on both
+> attempts. **So `K6 RETRACTED AS INERT ON PROD` still stands and no as-of
+> predicate has been measured** — the retraction is not resolved by this commit
+> existing on `origin/main`.
 - Goal: the deterministic path names and answers for all eight sports, not
   three. Single testable outcome: `scripts/ask_syndicate_regression.py` moves
   `lookup` (2/8) and `entity` (2/10) above baseline with **no** class
