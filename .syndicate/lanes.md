@@ -6,7 +6,34 @@
 
 ## OPEN
 
-### clv-without-settlement — OPEN — RECORDER LIVE, JOINER BUILT; FIRST CLV NUMBERS EXIST AND ARE ALL BOOK-BIASED — opened 2026-08-14 — session: model-audit
+### clv-without-settlement — OPEN — BOTH HALVES BUILT; THE FIRST CLV NUMBER WAS RETRACTED; NONE IS THE HONEST ANSWER — opened 2026-08-14 — session: model-audit
+- **STATUS 2026-08-14 19:50 CDT.** Recorder LIVE (`2b14fbeb`) + `book_prices`
+  LIVE (`96e3a9b7`). Joiner is **library-only, no call site, NOT deployed**
+  (`deploy/clv-joiner-guards-r2`, `2f596260`). 42 tests green.
+- **THE `-5.215` SAME-BOOK AVERAGE IS RETRACTED. Do not resurrect it.** It came
+  from 25 rows and looked right — it even had the OPPOSITE SIGN to the biased
+  scopes, which is what a genuine bias correction looks like. Two independent
+  defects, now refused by name:
+  - `line_mismatch` / `line_unverifiable` — history keys carry no line, the
+    point's `line` block does; `home -5.0` was being differenced against a
+    `home -1.5` close.
+  - `close_precedes_open` — **25 of 25** closes were captured BEFORE their
+    openings. **This is a PRODUCTION condition**, not a backfill artifact: it
+    fires whenever a market is first published after the last pregame
+    observation of it.
+- **Current honest output on real data:** `same_book_n=0`, `avg_clv_pct=None`,
+  `unresolved={close_precedes_open: 38, no_market_in_history: 14,
+  no_pregame_observation: 23, line_mismatch: 1}`.
+- **NEXT ACTION — the first clean measurement is 2026-08-15 (Central).**
+  Production's 08-14 openings only began at 18:32 CDT, so tonight's file is
+  late-loaded and its closes mostly predate its openings. Tomorrow, run
+  `compute_clv_for_date('2026-08-15', sport)` per sport and read
+  `same_book_n` + `avg_clv_pct`. **If `same_book_n` is still 0, the blocker is
+  odds-history breadth** (median 2 books per event-market vs the board's best
+  of ~13), not the joiner.
+- **Known gaps, measured, each its own lane if pursued:** NFL and WNBA resolve
+  0 — their odds-history artifact for 08-14 has no markets at all. MLB
+  `_alt`/`_lay`/`3_way` families are absent from history entirely.
 - **JOINER BUILT 22:5xZ** — `syndicate/features/shared/clv_join.py`, branch
   `deploy/clv-joiner` (`57e32a04`, off `2b14fbeb`). **Library only, no call
   site, NOT deployed** — it ships no production behaviour.
@@ -119,7 +146,23 @@ does not hold.** `[measured 08-14]`
   `layer2-board-freshness`, so that lane must be consulted first.**
 - Files: none claimed yet, deliberately.
 
-### recommendation-lane-correctness — OPEN — 4 SHIPPED+VERIFIED, 1 HELD BACK, 1 UNMEASURED — opened 2026-08-14 — session: model-audit
+### recommendation-lane-correctness — OPEN — ALL MEASUREMENT DEBT CLEARED; 1 HELD BACK BY CHOICE — opened 2026-08-14 — session: model-audit
+- **UPDATE 2026-08-14 19:50 CDT — the two unmeasured deploys are now measured.**
+  - **A1/A2 P3 CLOSED** `[23:01:39Z]`: `FILTER_CANDIDATES sport=all in=476
+    out=377 rejected={"edge_below_threshold": 99}`. Also closes the `7b1f3fdc`
+    instrument deploy. **Headline is NEGATIVE: `no_model_probability` does not
+    appear — A1's exclusion is INERT in production** (0 of 476). What changed is
+    that the 99 rejections are now honest; they were previously computed off
+    `score/100`. Do not credit A1 with an effect it does not have.
+  - **Audit §7 #7 SHIPPED** (`098877e1`, live 00:22Z): 24 MLB prop rows now
+    serve measured skill. Controls A and B passed; **control C was
+    mis-specified by me** (asserted non-mlb zero with no baseline; the 53 rows
+    are NFL's own, corr -0.047/0.269, seasons 2023-2025).
+- **STILL HELD BACK BY CHOICE:** `28291eb6` (score monotonicity,
+  corr(reliability, score) = -0.8312 on 156 negative-value rows vs +0.8560
+  control). **Do not deploy without a pool-side counter** — its effect is on
+  SELECTION and is invisible in the served shortlist, which returns survivors
+  only.
 - **CHECKPOINT 2026-08-14 21:3xZ — STATUS BY ITEM:**
   - **A3 uninformative-EV — CLOSED-VERIFIED.** web `ea1d2ed6` + worker
     `29ed6de1`. 5/5 predictions held at 19:58:41Z incl. the control.
@@ -4009,3 +4052,62 @@ halves of `#387` — most recently 00:41:16Z, 26 min after the second half.
 - Successor work is NOT this lane: it is `build_cards_page_context` running
   hydrated on the worker for a 15-game MLB slate. Filed as `#435`.
 - Lane CLOSED — read-only throughout, no files touched, no deploy.
+
+### mlb-hydration-oom-435 — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: `#435` step one — establish, at THREE separate OOM kills, which call
+  site the worker was inside. Confirm or refute `build_cards_page_context`
+  running hydrated for a 15-game MLB slate.
+- Files: none claimed — READ-ONLY. A fix is a separate lane and a separate deploy.
+- Hypothesis: the same MLB game-hydration call site is on the stack at every
+  kill, and it is `build_cards_page_context` (or something it calls), per the
+  2026-08-07 guard comment and `handoff_refresh_worker_oom.md`'s ~3.7GB
+  measurement of the same call on 2026-07-26.
+- Method note: a SIGKILLed process emits no traceback, so the stack is inferred
+  from the last instrumented lines. `CONTAINER_MEMORY` payloads carry DIFFERENT
+  extra keys per call site (`game_count`, `game_pk_count`, `actual_game_count` +
+  `is_today`, `betting_game_count`) — those keys are the fingerprint. Map them
+  to call sites in code FIRST, then read the kills, so the mapping is not
+  invented to fit.
+- Falsification test: the three kills fingerprint to DIFFERENT call sites, or to
+  a site with no relation to MLB game hydration. Either way it is recorded.
+- Verification: three kills, each with its last-lines fingerprint and the code
+  location that emits it.
+- Blocked by: none.
+
+- **DEPLOYED AND MEASURED 2026-08-15 00:50:23Z** as web `932a1f71`
+  (`deploy/board-contract-absent`, pinned to web's own live commit). Soccer's
+  draw segment 0 -> 1; bar/text/tiles agree; ten routes 200. The one
+  surviving 50/50 on NFL is **real**: Denver @ Kansas City, projected 22.5 vs
+  22.1, a 0.4-point margin — the producer's `home_win_rate`, not a default.
+  Full row in `deploys.md`. F1 and F2 are CLOSED-VERIFIED; **F3 (one null
+  placeholder) and F4 (sweep for the absent-becomes-neutral shape) remain
+  OPEN in this lane.**
+
+#### mlb-hydration-oom-435 — CLOSED 2026-08-15 01:0xZ — HYPOTHESIS REFUTED AS STATED
+Six kills sampled (not three — three would have produced a clean wrong answer):
+
+    kill      last instrumented stage before death        memory at that sample
+    00:41:16  cards_context_end            mlb  g=15      anon 4047.6MB  100.0%
+    00:04:47  cards_context_page_cache_hit                anon  537.5MB   22.7%  (2.6s before death)
+    23:51:04  board_contract_games_normalized  nfl g=16    anon 3443.5MB   99.1%
+    23:34:15  (ALL_PROCESS_MEMORY)                        pid39 3755.5MB   99.6%
+    23:11:56  board_contract_games_normalized  soccer g=9  anon 4062.4MB  100.0%
+    22:48:35  (ALL_PROCESS_MEMORY)                        pid39 1389.7MB   71.9%  (19s before death)
+
+- **REFUTED: "the same MLB call site at every kill".** `build_cards_page_context`
+  is present at 2 of 6. Two others are per-sport `board_contract_games_normalized`
+  — and for **soccer and NFL, not MLB.** The lane's own falsification test fired.
+- **CONFIRMED, narrowly:** `build_cards_page_context` IS on the stack at real
+  kills, and `#435`'s framing of it as "the" cause is too strong.
+- **The common factor is the hydrated per-sport board build inside pid 39**
+  reaching ~4GB. Whichever stage happens to be running when it crosses gets
+  blamed. At every sample where a stage is visible at >=99%, memory was ALREADY
+  at the ceiling — **these lines identify the victim, not the allocator.**
+- **THE MOST ACTIONABLE FINDING IS THE BLIND SPOT.** 2 of 6 kills show the
+  process at **22.7%** and **71.9%** seconds before death — multi-GB excursions
+  happening BETWEEN stage samples. The instrumentation samples at stage
+  BOUNDARIES, so an allocation inside a single stage is invisible, and those two
+  kills are precisely the ones that would name the allocator.
+- Next step is therefore NOT a fix: it is sampling on a TIMER (or inside the
+  loaders) rather than at stage boundaries. Recorded on `#435`.
+- Read-only lane. No files touched, no deploy.

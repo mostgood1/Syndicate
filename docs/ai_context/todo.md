@@ -32248,3 +32248,35 @@ process that is dying elsewhere.
 **Do not repeat the mistake that hid this for a whole session:** OOM kills are in
 `/v1/services/<id>/events`. A log grep for "oomKilled" returns 0 and means
 nothing — the process is dead and cannot log its own death.
+
+#### `#435` STEP ONE DONE 2026-08-15 01:0xZ — and it corrects this ticket's own framing
+
+Six kills sampled for the last instrumented stage before death:
+
+    00:41:16  cards_context_end                mlb    g=15   anon 4047.6MB 100.0%
+    00:04:47  cards_context_page_cache_hit                    anon  537.5MB  22.7%  (2.6s before)
+    23:51:04  board_contract_games_normalized  nfl    g=16   anon 3443.5MB  99.1%
+    23:34:15  (ALL_PROCESS_MEMORY)                            pid39 3755.5MB 99.6%
+    23:11:56  board_contract_games_normalized  soccer g=9    anon 4062.4MB 100.0%
+    22:48:35  (ALL_PROCESS_MEMORY)                            pid39 1389.7MB 71.9%  (19s before)
+
+**`build_cards_page_context` is on the stack at 2 of 6, NOT all of them.** Two
+others are `board_contract_games_normalized` for **soccer and NFL**. This ticket
+said "it is MLB game hydration in the main worker"; the MLB part is too strong.
+What is true: the hydrated PER-SPORT BOARD BUILD in pid 39 reaches ~4GB, and the
+stage that happens to be running when it crosses is the one that gets logged.
+
+**Every >=99% line names the VICTIM, not the ALLOCATOR.** Memory was already at
+the ceiling when those stages were entered.
+
+**THE REAL BLOCKER IS AN INSTRUMENTATION BLIND SPOT.** Two of six kills show the
+process at **22.7%** and **71.9%** seconds before dying. Samples are taken at
+stage BOUNDARIES, so a multi-GB allocation inside one stage is invisible — and
+those two kills are exactly the ones that would name the allocator.
+
+**NEXT STEP, and it is not a fix:** sample on a TIMER (a watchdog thread emitting
+every ~2s while a build is in flight), or add samples inside the loaders between
+`cards_context_page_cache_hit` and `cards_context_summary_loaded`. Until an
+excursion is caught in progress, any fix is a guess. Do NOT start by making
+`build_cards_page_context` cheaper — 4 of 6 kills would not have been prevented
+by that, on this evidence.
