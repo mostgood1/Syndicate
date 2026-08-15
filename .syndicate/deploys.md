@@ -4256,3 +4256,94 @@ i.e. most of the remaining headline.
 **Also on main as `ae0bc968`.**
 
 **Obligation closed.**
+
+## 2026-08-15 22:33:20Z — live-odds-worker `e5b03f7f` — live MLB prop COVERAGE — **MEASURED, PASSES, PARTIALLY**
+
+| field | value |
+|---|---|
+| service | live-odds-worker `srv-d91dpertqb8s73co8lt0` |
+| deploy | `dep-da0ef83l550s73d8tht0`, live **22:33:20Z** |
+| commit | `e5b03f7f` = same two files rebuilt on `25774aaf` |
+| read | board artifact `generated_at 22:36:24Z` (post-deploy), 436 live rows, 3 live games |
+| rollback | `POST .../deploys {"commitId":"25774aafd11c..."}` |
+
+**`cc4afae2` WENT STALE IN 40 MINUTES AND WAS NOT FORCED.** live-odds-worker
+moved `191a001b` -> `25774aaf` at 22:09:15Z under another session, so the earlier
+build would have rolled that work back. Rebuilt on the new SHA; divergence
+re-checked (`git rev-list --count cc4afae2..25774aaf -- <file>` = 0 for both).
+
+| metric | baseline 20:12Z | after 22:36Z | verdict |
+|---|---|---|---|
+| live rows overlaid | 57 / 638 (**8.9%**) | 83 / 436 (**19.0%**) | **PASS** |
+| of live PROP rows | — | 83 / 325 (**25.5%**) | |
+| `batter_home_runs` | **0 of 116** | **29** | **PASS — new-code marker** |
+| `batter_hits_runs_rbis` | **0 of 79** | **13** | **PASS — new-code marker** |
+| straddling proj/prob | 7 of 13 | **0 of 83** | PASS (holds at 6x the rows) |
+| `model_prob_over` null + reason | 0 | 83 of 83 | PASS |
+
+**THE TWO ZERO MARKETS ARE THE PROOF, NOT THE HEADLINE PERCENTAGE.** Neither can
+appear under the old code at all: `batter_hits_runs_rbis` was absent from
+`_LIVE_HITTER_MARKET_KEYS`, and every `batter_home_runs` row is rejected by the
+selector's `-200` favourite cap. 42 rows across the two of them is the branch
+executing, independent of any coverage ratio.
+
+**THE AGGREGATE IS DRAGGED BY GAME STATE, AND ONE GAME IS STILL AT ZERO:**
+
+| game | state | overlaid | missed | coverage |
+|---|---|---|---|---|
+| BAL @ TB | TOP 2 | **70** | 48 | **59.3%** |
+| WSH @ NYM | BOT 8 | 13 | 80 | 14.0% |
+| MIA @ CIN | TOP 1 | **0** | 114 | **0%** |
+
+**On the one game with a warm pipeline, coverage is 59.3%.** MIA @ CIN at TOP 1
+has **zero** — the snapshot carries nothing for a just-started game. **NOT
+DIAGNOSED, and not claimed as either a defect or as expected**; it needs a read
+of the snapshot for a TOP-1 game, which is still unreadable from web.
+WSH @ NYM at BOT 8 is low, consistent with substituted players having no sim row,
+also unverified.
+
+**CEILING ON THIS SLATE: 52 of 325 live prop rows (16%) sit at an alternate line
+for a (player, market) pair -> ~84% reachable, not 100%.** The 90.2% figure was
+for the 20:12Z slate; the ceiling moves with the slate and must be recomputed per
+read, not carried.
+
+**STILL TRUE AND UNCHANGED BY THIS DEPLOY:** the ~75% of live rows with no
+overlay keep showing a PREGAME projection against a live market with no staleness
+marker. That is a separate fix the user was offered and declined.
+**`blueprints/intelligence.py` is still undeployed**, so `live_projections`
+remains absent from the API and its absence is not evidence.
+
+## 2026-08-15 ~22:4xZ — refresh-worker ← Drop 3 (`758a89fa`) — FIRING, claim held
+**Lane:** `live-game-line-projection`. **Deploy claim ACQUIRED** —
+`scripts/deploy_claim.py acquire --service refresh-worker --holder
+live-game-line-projection`, token `a4c2192e69f764e5`, ttl 2700s. All four
+services read `free` before acquiring. **This mechanism exists and I had not
+used it on the two earlier deploys tonight** — `deploy_preflight` prints
+`deploy claim none -- acquire one before deploying` and I had not read that line.
+
+**Why refresh-worker and not web:** this service BUILDS the book-grid artifact,
+which is where the join runs. Web only reads it. Deploying web would have been
+inert — the same class of error as the allowlist near-miss earlier.
+
+**KNOWN COST, accepted on the user's explicit instruction:** a refresh-worker
+deploy **resets `#435`'s memory measurement window** and kills the in-flight MLB
+sim (3 jobs at gate time, incl. `run_mlb_daily_sim_job.py`). The gate is polled
+to TWO consecutive CLEARs and the cut is made INSIDE the fire loop, so the
+parent cannot go stale between turns.
+
+**Divergence checked before overlaying:** `board_enrichment.py` and
+`book_grid_artifact.py` are byte-identical between `758a89fa^` and the live
+`6f512ffa`, so no other session's work is reverted. `live_gameline_join.py` is
+new (its 265-line "deletion" in the diff is its absence at the base, not a
+conflict).
+
+**PREDICATE, written BEFORE the deploy so it cannot be retrofitted:** the
+book-grid artifact grows a `live_gamelines` block carrying
+`rows_live_gameline_{considered,projected,priceable,edged,withheld}` and
+`withheld_by_reason`. **`rows_live_gameline_edged` may legitimately be 0** — at
+120 sims the 2-sigma bar is ~9.1 pp at p=0.5. **The real pass is
+`rows_live_gameline_considered > 0` with every withheld row naming a reason.**
+A zero considered means the join never saw a live h2h row and IS a failure.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit
+6f512ffa --allow-rollback`, then release the claim.
