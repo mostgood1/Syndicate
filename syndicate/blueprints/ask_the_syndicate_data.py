@@ -2824,26 +2824,107 @@ def _nfl_team_branding_rows() -> list[dict[str, Any]]:
         return []
 
 
+def _nfl_name_aliases() -> list[tuple[str, str]]:
+    """(normalized alias, canonical display_name) for every way an NFL team is
+    actually named, longest alias first.
+
+    WHY THIS EXISTS AND WHY IT IS SAFE HERE BUT NOT IN NCAAF -- the difference
+    is the data, not the care taken. Measured 2026-08-14: matching only the
+    full `display_name` meant `"Patriots vs Seahawks projection"` -> `[]` while
+    `"New England Patriots vs Seattle Seahawks"` -> both teams, and
+    `_nfl_matchup_evidence` returns `None` at `len(teams) < 2` before it ever
+    opens an artifact. Nobody types the full name, so NFL produced zero
+    evidence for every question asked of it.
+
+    `_ncaaf_teams_in_question` excludes mascots deliberately and MUST KEEP
+    doing so -- with ~680 FBS/FCS schools, "Wildcats"/"Tigers" are shared by
+    dozens, so a mascot match there is ambiguous by construction. NFL is the
+    opposite case and it is checked, not assumed: 32 teams, and the
+    uniqueness test below is computed from the branding rows every call
+    rather than hardcoded, so a future relocation/rename that collides
+    silently DROPS the ambiguous alias instead of resolving it to the wrong
+    team.
+
+    Three alias kinds:
+      * full `display_name` -- unchanged, still matched first (longest wins).
+      * mascot (`display_name` minus `location`) -- only when unique across
+        the league. Measured: 32/32 unique today.
+      * `location` -- only when it maps to exactly ONE team. Measured: "Los
+        Angeles" (Rams, Chargers) and "New York" (Giants, Jets) map to two
+        each, so both are excluded and "the New York game" resolves to
+        nothing rather than to a coin flip.
+    """
+    rows = _nfl_team_branding_rows()
+
+    mascot_by_display: dict[str, str] = {}
+    location_counts: dict[str, int] = {}
+    mascot_counts: dict[str, int] = {}
+    for row in rows:
+        display = str(row.get("display_name") or "").strip()
+        location = str(row.get("location") or "").strip()
+        if not display:
+            continue
+        if location:
+            normalized_location = _normalize_ncaaf_name(location)
+            location_counts[normalized_location] = location_counts.get(normalized_location, 0) + 1
+        # Mascot is the remainder after the location prefix. Guarded on the
+        # prefix actually being present rather than assuming the CSV's two
+        # columns agree -- if they ever stop agreeing this yields no mascot
+        # alias for that team instead of a garbage slice.
+        if location and display.lower().startswith(location.lower()):
+            mascot = display[len(location):].strip()
+            if mascot:
+                mascot_by_display[display] = mascot
+                normalized_mascot = _normalize_ncaaf_name(mascot)
+                mascot_counts[normalized_mascot] = mascot_counts.get(normalized_mascot, 0) + 1
+
+    aliases: list[tuple[str, str]] = []
+    seen_alias: set[str] = set()
+
+    def _add(alias: str, display: str) -> None:
+        normalized = _normalize_ncaaf_name(alias)
+        # Same >=3 floor the full-name match already used.
+        if len(normalized) < 3 or normalized in seen_alias:
+            return
+        seen_alias.add(normalized)
+        aliases.append((normalized, display))
+
+    for row in rows:
+        display = str(row.get("display_name") or "").strip()
+        if display:
+            _add(display, display)
+    for display, mascot in mascot_by_display.items():
+        if mascot_counts.get(_normalize_ncaaf_name(mascot), 0) == 1:
+            _add(mascot, display)
+    for row in rows:
+        display = str(row.get("display_name") or "").strip()
+        location = str(row.get("location") or "").strip()
+        if display and location and location_counts.get(_normalize_ncaaf_name(location), 0) == 1:
+            _add(location, display)
+
+    # Longest alias first so "New England Patriots" is tried before
+    # "Patriots", and so a location that is a prefix of a full name can never
+    # shadow it.
+    return sorted(aliases, key=lambda item: len(item[0]), reverse=True)
+
+
 def _nfl_teams_in_question(question: str) -> list[str]:
     """Real full team names (e.g. "Kansas City Chiefs") plausibly referenced
     by the question -- bounded whole-phrase substring match, same approach
     _ncaaf_teams_in_question uses (and for the same reason: NFL team names
     are always City/State + Mascot, so no NCAAF-style shared-word collision
     risk, but a plain word-set overlap check would still be needlessly
-    fragile). Only 32 real teams, so no short-acronym edge case either."""
+    fragile). Only 32 real teams, so no short-acronym edge case either.
+
+    Matches full names, unique mascots and unambiguous locations -- see
+    `_nfl_name_aliases`. Always returns canonical `display_name` values, so
+    every caller downstream is unchanged by the widening.
+    """
     normalized_question = f" {_normalize_ncaaf_name(question)} "
-    names = sorted(
-        {str(row.get("display_name") or "").strip() for row in _nfl_team_branding_rows() if row.get("display_name")},
-        key=len,
-        reverse=True,
-    )
     matches: list[str] = []
-    for name in names:
-        normalized_name = _normalize_ncaaf_name(name)
-        if len(normalized_name) < 3:
-            continue
-        if f" {normalized_name} " in normalized_question and name not in matches:
-            matches.append(name)
+    for normalized_alias, display in _nfl_name_aliases():
+        if f" {normalized_alias} " in normalized_question and display not in matches:
+            matches.append(display)
     return matches[:4]
 
 
@@ -3512,12 +3593,35 @@ def _entity_fetchers_for_sport(sport: str, question: str) -> list:
             lambda q, c: _basketball_last10_evidence(q, c, "wnba"),
         ]
     if sport == "nba":
-        return [
-            lambda q, c: _basketball_last10_evidence(q, c, "nba"),
-            _wnba_focused_evidence,
-        ]
+        # `_wnba_focused_evidence` USED TO BE LISTED HERE and was removed
+        # (`K4`). It is not a generic basketball fetcher despite running for
+        # both: it reads `_wnba_processed_dirs()` exclusively, so on an NBA
+        # question it could only ever answer with WNBA players and games. It
+        # was reachable because `wnba` was a keyword inside `nba` in
+        # `_SPORT_HINTS`, so WNBA questions routed here -- both halves of that
+        # are now fixed, and `wnba` is its own routed sport above.
+        return [lambda q, c: _basketball_last10_evidence(q, c, "nba")]
     if sport == "nhl":
         return [_nhl_last10_evidence]
+    if sport in {"soccer", "ncaab"}:
+        # DELIBERATELY EMPTY, and that is the honest state (`K2`/`K11`).
+        #
+        # Neither sport has ANY entity fetcher in this module -- there is no
+        # soccer player/fixture fetcher and no ncaab one to call. Before
+        # `M1` this branch did not exist at all and both fell through to
+        # `return []` below, which looked identical but meant something
+        # different: they were also unroutable, because neither had a
+        # `_SPORT_HINTS` entry, so a soccer question could not even be
+        # identified as soccer.
+        #
+        # What changed is upstream, not here: with soccer now routable,
+        # `_fetchers_for_sport` prepends `_board_candidates_evidence`, which
+        # filters the published board to `sport=soccer` exactly. Soccer is
+        # 100 of 200 published rows, so that is a real answer rather than a
+        # placeholder. This branch is written out instead of left to fall
+        # through so the absence is visibly intentional and so the next
+        # person adding a soccer fetcher has somewhere obvious to put it.
+        return []
     if sport == "ncaaf":
         return [_ncaaf_matchup_projection_evidence, _ncaaf_team_profile_evidence, _ncaaf_ats_evidence]
     if sport == "nfl":

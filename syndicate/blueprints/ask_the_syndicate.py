@@ -30,12 +30,34 @@ _REFRESH_QUEUE_LOCK = threading.Lock()
 _REFRESH_QUEUE_DEDUPE_SECONDS = 15.0
 _REFRESH_QUEUE_STATE: dict[str, float] = {}
 
-_SPORT_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+# (sport, IDENTIFIERS, HINTS) -- and the split between the two columns is the
+# whole point, not decoration.
+#
+# THE BUG THIS REPLACES. The old table was a flat keyword list and
+# `_infer_sport` returned on the FIRST tuple that matched any keyword, so a
+# question's sport was decided by the order the sports happened to be written
+# in. Three measured consequences:
+#
+#   * `wnba` was a keyword INSIDE `nba`, so every WNBA question routed to NBA.
+#   * `assists` sat in both `nba` and `nhl`, and `goals`/`shots` in `nhl`, so
+#     those questions were resolved by list position rather than by evidence.
+#   * `ncaaf` had to be physically placed above `nfl` to stop generic football
+#     vocabulary stealing college questions -- a correct fix held together by
+#     a comment telling future editors not to sort the list.
+#
+# IDENTIFIERS name the competition and are near-conclusive ("wnba", "epl").
+# HINTS are stat/market nouns that a sport uses but does not own ("assists",
+# "goals"). `_infer_sport` scores identifiers far above hints and takes the
+# best total, so "wnba points props" resolves on `wnba` even though `points`
+# is an NBA hint, and `ncaaf` beats `nfl` on "college football" by evidence
+# rather than by position. Ties still fall back to table order, which is why
+# `ncaaf` is still written above `nfl` -- but that is now a tie-breaker of
+# last resort, not the mechanism.
+_SPORT_HINTS: tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...] = (
     (
         "mlb",
+        ("mlb", "baseball"),
         (
-            "baseball",
-            "mlb",
             "strikeout",
             "strikeouts",
             "k's",
@@ -57,57 +79,102 @@ _SPORT_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ),
     ),
     (
+        # `wnba` is NO LONGER a keyword inside `nba` -- it is its own sport
+        # below. Leaving it here is why WNBA questions were answered with NBA
+        # routing, and it is also why `_fetchers_for_sport`'s `nba` branch
+        # still lists `_wnba_focused_evidence`.
         "nba",
-        (
-            "points",
-            "rebounds",
-            "assists",
-            "pra",
-            "basketball",
-            "nba",
-            "wnba",
-        ),
+        ("nba",),
+        ("points", "rebounds", "assists", "pra", "basketball"),
+    ),
+    (
+        "wnba",
+        ("wnba",),
+        ("caitlin clark", "aces", "liberty", "fever"),
     ),
     (
         "nhl",
-        (
-            "shots",
-            "saves",
-            "goals",
-            "assists",
-            "hockey",
-            "nhl",
-        ),
+        ("nhl", "hockey"),
+        ("shots", "saves", "goals", "assists", "puck", "power play"),
     ),
     (
-        # Must come before "nfl" below -- _infer_sport returns on the first
-        # tuple match, and "nfl"'s keyword list (passing/rushing/receiving/
-        # touchdowns/tds/football) is generic football vocabulary a college
-        # football question uses just as often. Keep these terms distinctive
-        # to college ball specifically -- no team/school names here (a name
-        # list would risk colliding with NBA/NFL/NHL team names that are
-        # also city/state names); team identification for NCAAF questions
-        # happens inside the fetchers themselves via the team registry.
+        # Kept ABOVE "nfl" as a tie-breaker only. The real separation is now
+        # that "college football"/"ncaaf"/"cfb" are IDENTIFIERS while
+        # "football"/"passing"/"rushing" are only NFL HINTS, so a college
+        # question wins on score and no longer depends on this position. No
+        # team/school names here -- they collide with NBA/NFL/NHL city names;
+        # team identification happens inside the fetchers via the registry.
         "ncaaf",
-        (
-            "college football",
-            "ncaaf",
-            "cfb",
-            "fbs",
-            "heisman",
-        ),
+        ("college football", "ncaaf", "cfb", "fbs"),
+        ("heisman",),
     ),
     (
         "nfl",
+        ("nfl",),
+        ("passing", "rushing", "receiving", "touchdowns", "tds", "football"),
+    ),
+    (
+        # NEW. Soccer is 100 of 200 published board rows and was previously
+        # unnameable -- no entry here at all, so `_infer_sport` returned None
+        # and the board fetcher could never filter to it. League names carry
+        # the identification because club names are too many and too
+        # collision-prone to list.
+        "soccer",
         (
-            "passing",
-            "rushing",
-            "receiving",
-            "touchdowns",
-            "tds",
-            "football",
-            "nfl",
+            "soccer",
+            "epl",
+            "premier league",
+            "la liga",
+            "bundesliga",
+            "serie a",
+            "ligue 1",
+            "mls",
+            "champions league",
+            "ucl",
+            "europa league",
         ),
+        (
+            "goals",
+            "goalscorer",
+            "clean sheet",
+            "corners",
+            "nil",
+            "draw",
+            "fixture",
+            "fixtures",
+            # Club shorthands. "United"/"City" are how these teams are ACTUALLY
+            # named ("What is United's price?"), and without them a soccer
+            # question carrying only "goals" loses the tie to NHL, which shares
+            # that hint. They are the one real collision risk in this table, so
+            # both are guarded rather than listed bare:
+            #   * "city" must not fire on "Kansas City" -- that is an NFL team,
+            #     and NFL questions frequently carry no other NFL vocabulary
+            #     at all ("What does the model project for the Kansas City
+            #     game?"), so an unguarded "city" would silently route them to
+            #     soccer. Salt Lake City and Oklahoma City are excluded for the
+            #     same reason.
+            #   * "united" must not fire on "United States".
+            # These stay HINTS, not identifiers: they are weak evidence that
+            # should lose to any explicit league or sport name.
+            r"re:(?<!kansas )(?<!salt lake )(?<!oklahoma )\bcity\b",
+            r"re:\bunited\b(?! states)",
+            "arsenal",
+            "liverpool",
+            "chelsea",
+            "tottenham",
+            "everton",
+            "real madrid",
+            "barcelona",
+            "bayern",
+            "juventus",
+            "psg",
+        ),
+    ),
+    (
+        # NEW, same gap as soccer -- no entry meant no routing and no branch.
+        "ncaab",
+        ("college basketball", "ncaab", "cbb", "march madness"),
+        ("bracket", "final four"),
     ),
 )
 
@@ -117,27 +184,60 @@ def _coerce_context(payload: dict[str, Any]) -> dict[str, Any]:
     return dict(context) if isinstance(context, dict) else {}
 
 
+# An identifier is worth more than any realistic number of hints, so a single
+# "wnba" beats "points rebounds assists" pointing at NBA. Not infinity: two
+# identifiers still beat one, which is what makes "college football" (2 words,
+# 1 identifier) lose to nothing and win against NFL's bare "football" hint.
+_SPORT_IDENTIFIER_WEIGHT = 100
+_SPORT_HINT_WEIGHT = 1
+
+
+def _sport_keyword_matches(keyword: str, normalized_question: str) -> bool:
+    """Whether a `_SPORT_HINTS` term fires.
+
+    Terms are plain words and are escaped, so a keyword can never accidentally
+    behave as a pattern. The `re:` prefix is a deliberate, narrow escape hatch
+    for the handful of terms that need a guard the plain form cannot express --
+    today only soccer's "city"/"united", which must not fire on "Kansas City"
+    or "United States". Kept explicit so a raw pattern is always visible as one
+    at the call site rather than being inferred from the string's contents.
+    """
+    if keyword.startswith("re:"):
+        return bool(re.search(keyword[3:], normalized_question))
+    return bool(re.search(rf"\b{re.escape(keyword.lower())}\b", normalized_question))
+
+
+def _sport_scores(question: str) -> list[tuple[str, int, tuple[str, ...]]]:
+    """(sport, score, matched terms) for every sport with any evidence,
+    best first. Ties keep `_SPORT_HINTS` order -- `sorted` is stable."""
+    normalized_question = f" {str(question or '').lower()} "
+    scored: list[tuple[str, int, tuple[str, ...]]] = []
+    for sport, identifiers, hints in _SPORT_HINTS:
+        matched: list[str] = []
+        score = 0
+        for keyword in identifiers:
+            if _sport_keyword_matches(keyword, normalized_question):
+                score += _SPORT_IDENTIFIER_WEIGHT
+                matched.append(keyword)
+        for keyword in hints:
+            if _sport_keyword_matches(keyword, normalized_question):
+                score += _SPORT_HINT_WEIGHT
+                matched.append(keyword)
+        if score:
+            scored.append((sport, score, tuple(matched)))
+    return sorted(scored, key=lambda item: item[1], reverse=True)
+
+
 def _infer_sport(question: str, context: dict[str, Any]) -> str | None:
     explicit = str(context.get("sport_slug") or context.get("sport") or payload_value(context, "sport") or "").strip().lower()
     if explicit:
         return explicit
-    normalized_question = f" {str(question or '').lower()} "
-    for sport, keywords in _SPORT_HINTS:
-        for keyword in keywords:
-            pattern = rf"\b{re.escape(keyword.lower())}\b"
-            if re.search(pattern, normalized_question):
-                return sport
-    return None
+    scored = _sport_scores(question)
+    return scored[0][0] if scored else None
 
 
 def _detect_sports(question: str) -> list[str]:
-    normalized_question = str(question or "").strip().lower()
-    detected: list[str] = []
-    for sport, keywords in _SPORT_HINTS:
-        if any(re.search(rf"\b{re.escape(keyword.lower())}\b", normalized_question) for keyword in keywords):
-            if sport not in detected:
-                detected.append(sport)
-    return detected
+    return [sport for sport, _score, _matched in _sport_scores(question)]
 
 
 def payload_value(payload: dict[str, Any], key: str) -> Any:
@@ -552,18 +652,67 @@ def ask_the_syndicate_query_api():
 
     response["answer_source"] = "snapshot"
 
+    # `K5`. What the router ASSUMED, surfaced. This was `None` on 52 of 52
+    # regression questions, so neither a user nor the regression harness could
+    # see which sport an answer had been scoped to -- which made every routing
+    # bug invisible from the outside, including `wnba` resolving to `nba`.
+    # Reported as `None` when nothing matched rather than omitted, because
+    # "the router picked no sport" is itself the answer to why a cross-sport
+    # answer came back.
+    #
+    # WRITTEN IN THREE PLACES ON PURPOSE, and the two nested ones are the ones
+    # that matter. `context` and `routing_context` were served as `{}` on every
+    # answer, and they are where a consumer already looks for the routed sport
+    # -- `scripts/ask_syndicate_regression.py` reads exactly
+    # `context.sport` / `routing_context.sport`, so a top-level key alone
+    # would have left the field as invisible as it was before. Existing keys
+    # are preserved rather than overwritten: this fills a blank, it does not
+    # claim ownership of those dicts.
+    _routed_sport = str(shaped_payload.get("sport") or "").strip().lower() or None
+    response["routed_sport"] = _routed_sport
+    for _key in ("context", "routing_context"):
+        _existing = response.get(_key)
+        _block = dict(_existing) if isinstance(_existing, dict) else {}
+        if _routed_sport and not _block.get("sport"):
+            _block["sport"] = _routed_sport
+        response[_key] = _block
+
     # Question-specific sim evidence (tables/charts) is deterministic and
     # renders even when the LLM path is unavailable.
     request_context = dict(shaped_payload)
     request_context.update(_coerce_context(shaped_payload))
     focused_evidence = collect_focused_evidence(question, request_context)
-    if isinstance(focused_evidence, dict):
-        response["visuals"] = {
-            "tables": focused_evidence.get("tables") or [],
-            "charts": focused_evidence.get("charts") or [],
-            "as_of": focused_evidence.get("as_of"),
-            "sport": focused_evidence.get("sport"),
-        }
+
+    # `K6`. AN AS-OF ON EVERY ANSWER, not only the ones a sport branch matched.
+    #
+    # `visuals` used to be written ONLY inside `if isinstance(focused_evidence,
+    # dict)`, so an answer with no matching fetcher carried no timestamp of any
+    # kind -- 41 of 52 measured answers. On a product whose entire subject is
+    # live odds, an answer that does not say how old it is is not a safe
+    # answer, and it is exactly the unrouted questions (the ones with no
+    # evidence) where a user has least other signal about staleness.
+    #
+    # The as-of is sourced from the snapshot's own `freshness`, so it describes
+    # THE DATA THE ANSWER WAS BUILT FROM rather than the moment the request was
+    # served -- a served-at stamp on a 2-hour-old snapshot would be actively
+    # misleading. Evidence `as_of` wins when present because it is more
+    # specific. If neither exists the key stays None: an absent timestamp is
+    # honest, a fabricated one is not.
+    _snapshot_as_of = None
+    for _source in (response.get("freshness"), result.get("freshness") if isinstance(result, dict) else None):
+        if isinstance(_source, dict):
+            _snapshot_as_of = _source.get("computed_at") or _source.get("as_of")
+            if _snapshot_as_of:
+                break
+
+    _evidence = focused_evidence if isinstance(focused_evidence, dict) else {}
+    response["visuals"] = {
+        "tables": _evidence.get("tables") or [],
+        "charts": _evidence.get("charts") or [],
+        "as_of": _evidence.get("as_of") or _snapshot_as_of or None,
+        "sport": _evidence.get("sport") or _routed_sport,
+    }
+    response["as_of"] = response["visuals"]["as_of"]
 
     if has_snapshot:
         briefing_payload = generate_briefing(
