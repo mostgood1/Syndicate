@@ -7,19 +7,20 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 78 rules `[generated]`
+## Index — 83 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
 > are append-only and are never touched. **FORBIDDEN** = never do this
 > again. **EXONERATED** = ruled out, stop re-investigating.
 
-**FORBIDDEN — 4**
+**FORBIDDEN — 5**
 
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname)
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers the obligation, not the content](#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content)
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session)
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, and I had this rule already](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
+- [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the measuring](#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring)
 
 **EXONERATED — 3**
 
@@ -27,7 +28,7 @@
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 
-**Rules and corrections — 71**
+**Rules and corrections — 75**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -100,6 +101,10 @@
 - [2026-08-14 — "it cannot fit" from one sample, when the same shape runs fine twice](#2026-08-14-it-cannot-fit-from-one-sample-when-the-same-shape-runs-fine-twice)
 - [2026-08-15 — a threshold is calibrated against a SPAN; changing what the span contains invalidates it without touching the constant](#2026-08-15-a-threshold-is-calibrated-against-a-span-changing-what-the-span-contains-invalidates-it-without-touching-the-constant)
 - [2026-08-15 — the kill is MLB game hydration in pid 39, not the overview pass](#2026-08-15-the-kill-is-mlb-game-hydration-in-pid-39-not-the-overview-pass)
+- [2026-08-15 — Pinned deploys do not merge; they REPLACE, so they have to be stacked](#2026-08-15-pinned-deploys-do-not-merge-they-replace-so-they-have-to-be-stacked)
+- [2026-08-15 — The lane marker is repo-global, so only one session can hold it](#2026-08-15-the-lane-marker-is-repo-global-so-only-one-session-can-hold-it)
+- [2026-08-15 — a fix on `main` is not a fix in production: check the DEPLOYED tree](#2026-08-15-a-fix-on-main-is-not-a-fix-in-production-check-the-deployed-tree)
+- [2026-08-15 — A COUNT OF DEFINITIONS IS NOT A COUNT OF PRODUCERS, and the one it missed was the live bug](#2026-08-15-a-count-of-definitions-is-not-a-count-of-producers-and-the-one-it-missed-was-the-live-bug)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -717,7 +722,6 @@ back **oldest-first regardless of `direction`**.
   production is about the *risk* that a sync fires; it is not a guarantee that
   one *has*. Both errors are available, in opposite directions.
 - Cost: none yet. Caught while preflighting an unrelated web deploy.
-
 
 ### 2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session
 
@@ -2213,3 +2217,321 @@ the fix shipped. The 2026-08-07 guard comment said so in plain words and was
 right: *"This is a circuit breaker around MLB's cost, NOT a fix for it. The real
 work is making `build_cards_page_context` cheaper or not running it hydrated on
 the worker at all."*
+
+## 2026-08-14 — OVERTURNED: a number that corrects a known bias is the easiest one to believe
+
+**Believed:** the joiner's first same-book CLV, `avg_clv_pct = -5.215` over 25
+rows (beat-close 9/25), was the first honest measurement of our closing-line
+value. It was the number the whole lane existed to produce.
+
+**Why it was so convincing — this is the part worth keeping.** It was not
+merely plausible, it was *diagnostically* plausible: it had the **opposite
+sign** to the book-biased scopes (+7.0 and +4.8), which is exactly what a real
+bias correction is supposed to look like. Every structural property checked out
+— same event, same market, same book, same line, a real price at each end. The
+number arrived immediately after building the machinery designed to produce it.
+
+**Measured:** two independent defects, either alone sufficient to invalidate it.
+1. The LINE was never compared. Odds-history keys carry no line; the point's
+   `line` block does. A board row at `home -5.0` was being differenced against
+   a `home -1.5` close.
+2. **25 of 25 closes were captured BEFORE their openings.** Openings at
+   00:46:53Z against "closes" from 22:12–23:16 the previous evening.
+
+**The tell was a magnitude, not a structure.** Two rows read `spreads home -1.5`
+moving `-122 -> +162` and `-238 -> +135`. A spread does not move 28 probability
+points. Everything checkable by schema passed; only domain knowledge caught it.
+
+**How to apply:**
+- When a new instrument produces the number you built it to produce, and that
+  number *confirms* your prior, spend the next step trying to break it — not
+  reporting it. Confirmation is when scrutiny is cheapest to skip.
+- Sanity-check the MAGNITUDE of every derived quantity against what the domain
+  permits. Schema-valid and physically possible are different tests.
+- For any two-timestamp quantity, assert the arrow of time explicitly. Nothing
+  else will: the pairing is well-formed in every other respect.
+Related: [[feedback_gate_on_the_output_not_the_input]],
+[[feedback_unknown_must_not_default_permissive]].
+
+## 2026-08-14 — a control with no baseline is a guess wearing a control's clothes
+
+Shipping audit §7 #7, I pre-registered "non-mlb rows must carry zero measured
+skill" as CONTROL C. It failed: 53 of 66 non-mlb rows had a skill correlation.
+I investigated it as a possible leak of MLB calibration onto other sports — the
+worst outcome that change could have had.
+
+It was not a leak. The 53 are NFL's own producer (corr -0.047 / 0.269, seasons
+**2023-2025**), unrelated to the MLB window (2026-08-01..08-14), and they
+predate the deploy. **I had baselined the MLB props before deploying and never
+baselined non-mlb** — so the control's expected value was assumed, not measured.
+
+**How to apply:** a control needs a PRE-CHANGE READING, not an intuition about
+what "should" be true. An unbaselined control fails in both directions: it
+raises false alarms, and it would have waved a real regression through just as
+easily. Related: [[feedback_a_rate_not_count]].
+
+## 2026-08-14 — read the system's clock, not the wall clock
+
+Called "the date rolled over to 2026-08-15" from a UTC `date -u`. The system
+roots dates in **Central** (`central_today_iso()`), and the board reported
+`date: 2026-08-14` at the same moment. An MLB slate spans two UTC dates and one
+Central date — which is precisely why the repo chose Central.
+
+The cost was not cosmetic: I deferred the same-book CLV test to "tomorrow" on
+that basis. Running it immediately (as the corrected clock implied) is what
+exposed both joiner defects above. **A wrong clock deferred a test that found
+two real bugs.** Related: [[feedback_report_local_time_not_utc]].
+
+### 2026-08-15 — Pinned deploys do not merge; they REPLACE, so they have to be stacked
+- What we believed: pinning a deploy branch to the service's own live commit
+  is the safe pattern, full stop. It is what this repo does to avoid shipping
+  four other lanes' code, and it works — as long as only one lane deploys.
+- What was actually true: two lanes deploying the same service within minutes
+  is enough to break it. My branch was pinned to `932a1f71`; another session
+  was mid-deploy with `d9a39ce8`, its own commit stacked on that same base.
+  Firing mine after theirs would have served a tree that never contained
+  their route — a silent revert with a green deploy, no conflict, no warning.
+- How we found out: a pre-flight check that listed in-flight deploys before
+  POSTing and refused when one was running. It cost one API call.
+- The rule going forward: **before firing a pinned deploy, re-read the
+  service's live commit AND check for an in-flight deploy; then pin onto
+  whatever is live at that moment, not onto what was live when the branch was
+  built.** A pinned branch is a snapshot with an expiry date, and the expiry
+  is the next deploy by anyone. Where two lanes are shipping the same service,
+  stack — cherry-pick onto their commit — rather than racing from a shared
+  base.
+- Cost: none, caught pre-flight. Recorded because the failure is invisible
+  after the fact: the deploy succeeds, the service is healthy, and the only
+  symptom is a feature quietly missing.
+
+### 2026-08-15 — The lane marker is repo-global, so only one session can hold it
+- What we believed: `.syndicate/.current-lane` identifies "the lane I am
+  working". The `/lane open` flow writes it and the guard reads it.
+- What was actually true: it is ONE file in a tree shared by many sessions.
+  Another session overwrote it with `memory-watchdog-435` while my lane was
+  open, and the guard then blocked me from a file **my own OPEN lane
+  claims** — reporting it as a cross-lane violation, which is exactly
+  backwards. Whoever wrote the marker last can work; everyone else is
+  blocked out of their own files.
+- How we found out: a PreToolUse BLOCK on `game_board_contract.py` naming my
+  own lane as the claimant and `memory-watchdog-435` as "current".
+- The rule going forward, until the marker is per-session: **if the guard
+  blocks a file your own lane claims, read `.current-lane` before assuming a
+  real collision.** Take the marker, make the edit, and put back the value
+  you found — and tell the session whose slug it was, because their next edit
+  will be blocked by yours. Do not "fix" it by closing their lane.
+- Cost: one blocked edit, plus the risk of a session concluding it had a lane
+  conflict it did not have and working around a file it legitimately owns.
+
+## 2026-08-14 — a "targeted regression" that omits the changed function's own test file is not a regression run
+
+Changed `compute_team_ratings` (required `as_of`). Ran what I called a targeted
+regression — `test_build_soccer_artifacts`, `test_soccer_adapter`,
+`test_soccer_projections`, plus my new file — got **19 green**, reported "no
+regressions", and committed and pushed.
+
+**`tests/test_soccer_feature_loaders.py` was not in that list. It is the file
+that directly tests `compute_team_ratings`.** A full `-k soccer` run, which I
+had started earlier and let go to background, came back **4 failed, 519
+passed** — all four in that file, all `TypeError: missing keyword-only argument
+'as_of'`.
+
+I picked the targeted set by *topic* ("soccer artifacts", "adapter") instead of
+by *blast radius* (who calls the symbol I changed). `grep -rn compute_team_ratings`
+would have named the file in one command, and I had already run that grep
+earlier in the same task to find the CALL SITES — I just never turned it on the
+tests.
+
+**How to apply:** before running a subset, enumerate callers of every symbol
+whose signature changed and make sure a test file for each is in the subset.
+When a signature becomes stricter (a new required argument), the failure mode is
+a hard `TypeError` at import/call time, so it is cheap to find and inexcusable
+to miss. If a full suite is too slow to run before committing, say the run was
+partial rather than saying "no regressions".
+
+**The second-order cost is what makes this worth writing down.** The 4 failures
+were not just stale tests. Chasing them exposed that
+`fetch_asa_mls_team_history` returns **undated season aggregates**, so the
+change silently emptied MLS ratings in PRODUCTION — and, worse, that MLS cannot
+be backtested from that source at all, because a season average is contaminated
+by construction and no as-of date can repair it. **A test I dismissed as
+"fixture predates the parameter" was reporting a real production regression and
+a real modelling limit.** Related: [[feedback_confirm_the_code_ran]],
+[[feedback_gate_on_the_output_not_the_input]].
+
+## 2026-08-15 — RULE: a session census MUST pass `include_archived: true`
+
+**What went wrong.** `state.md`'s 20:4xZ census concluded "only
+`recommendation-lane-correctness` has a live session". It was wrong about
+`memory-cutover-ship`, which was live and shipping the whole time. The census was
+built from a default `list_sessions` call, which **silently omits archived
+sessions**. A session that ENDED and a session that NEVER EXISTED both read as
+"absent", and the census could not tell them apart — so it under-counted the live
+owners and over-counted the orphans in the same pass.
+
+**The sharper half.** Liveness is not a property you can read once. During the
+2026-08-15 02:0x cleanup, `board-ui-defects` was present and running at 02:07Z and
+archived by 02:10Z — it archived *between two calls in the same census*, four
+minutes after being asked to confirm its holdings, without answering. A census
+taken at 02:07 and acted on at 02:15 would have been wrong in the other direction.
+
+**How to apply.**
+- Never take a session roster without `include_archived: true`, and read
+  `isRunning` and `isArchived` as two separate facts. Absent-from-default is
+  three states collapsed into one.
+- Re-read the roster IMMEDIATELY before you act on it, not once at the start.
+- Do not infer lane ownership from session TITLES. `board-ui` and
+  `board-ui-defects` are different sessions with near-identical titles and
+  disjoint lanes; the only reliable link found was the literal
+  `/lane open <slug>` request in the owning session's transcript.
+- Asking the owner is not a substitute for measuring: two of three sessions
+  messaged during this cleanup never replied, and one of those had archived.
+
+**Related:** this is the session-roster instance of the standing rule that a null
+result must carry its window. "Not in the list" is a statement about the LIST.
+
+## 2026-08-15 — RULE: `git status` is not `git diff --cached`
+
+A staged revert is invisible in the working tree. Found 2026-08-15 02:0xZ: the
+shared index held **6 files / 4993 deletions** undoing `b16eb1f7`, while every
+one of those files was present on disk and byte-identical to `HEAD`. Nothing in
+the tree, nothing in a file read, and nothing in a test run would show it — only
+`git diff --cached`. Any session running a bare `git commit` would have shipped
+the revert while believing it was committing its own work.
+
+**How to apply.** Before ANY commit in this repo, run `git diff --cached --stat`
+and confirm every path listed is yours. This is the same failure family as
+"never chain `git add` and `git commit`" — with N sessions the index is shared
+mutable state, and it can hold a change nobody in the room authored.
+
+### 2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the measuring
+
+- **What we believed:** wiring the existing `allocation_snapshot()` to fire from
+  the memory watchdog would name the allocator at the next excursion. The dump
+  already existed; only the trigger was new.
+- **What was actually true:** `tracemalloc.take_snapshot()` walks every live
+  traced allocation in C **holding the GIL**. On this heap that is millions of
+  objects, so the single call the trigger makes blocked the sampler thread
+  outright. Measured:
+
+      01:18-01:38  tracing OFF   567 MEMORY_WATCHDOG samples
+      02:11-02:16  tracing ON    ZERO samples after the START line, then dead
+      kill cadence ~16-22 min -> 02:03:48, 02:06:54, 02:16:41
+
+- **How we found out:** the absence of samples, not the presence of an error.
+  The dump prints AFTER the snapshot returns, so a dump still running looks
+  EXACTLY like a trigger that never fired. I read it as "the trigger missed" and
+  went looking for a threshold bug.
+- **The rule going forward:** a diagnostic that can block must run off the
+  thread that observes, as a daemon, so that never finishing is survivable. And
+  when an instrument goes quiet, the first hypothesis is that the instrument is
+  stuck -- not that there was nothing to report. Silence is a state of the
+  EMITTER.
+- **Cost:** ~25 minutes of production made materially worse (kill cadence 3-10
+  min against 16-22), one wasted diagnostic window, and a false read of my own
+  trigger logic. Reverted by env + a deploy; `548ded38` moves the dump
+  off-thread with a test that fails if it is ever moved back.
+
+### 2026-08-15 — a fix on `main` is not a fix in production: check the DEPLOYED tree
+
+`#423` established that tracemalloc must trace at `nframe=3`, because at one
+frame the top site is `decoder.py:353` -- Python's own json module, 491.3MB
+across 7,172,382 objects -- which names the ALLOCATOR, not the CALLER. It passed
+`3` and the ticket was closed.
+
+**Production was running `start_allocation_tracing(1)`.** The worker said so in
+its own boot log the moment tracing was switched on:
+`TRACEMALLOC_INIT {"nframe": 1, "reason": null, "started": true}`. The `#423`
+fix landed on a lineage this service never ran, and local `main` vs the deployed
+lineage have diverged by 149/121 commits.
+
+So the dump would have produced the one answer already known to be worthless,
+and it would have been reported as a result.
+
+**How to apply:** before relying on a fix, grep the tree at the LIVE SHA, not the
+working copy. `git grep <token> <live-sha> -- <path>` costs one command. This
+repo has now been bitten in both directions -- changes live in production and
+absent from `main` (2026-08-14 `333af428`), and changes in `main` and absent from
+production (this one).
+
+## 2026-08-15 — RULE: WEB DOES NOT RUN `main`. Parent a deploy on the LIVE SHA.
+
+**The fact.** Web's live commit `a86eb4ed` is **not an ancestor of
+`origin/main`**. It sits on `origin/deploy/null-placeholder`, which diverged
+from main at `b98f5ed7` (08-14 10:18). The deploy branch carries **10 commits
+main does not have**; main carries **199** it does not.
+
+**What that costs if you miss it.** `git diff --stat a86eb4ed <any-main-commit>`
+= 199 commits, 82 files — and `syndicate/features/shared/clv_join.py` (542
+lines) and `clv_opening_ledger.py` (326) appear as **pure deletions**, because
+they exist only on the deploy branch. Deploying "the latest main" to web would
+have silently reverted another lane's live CLV code plus the board-contract
+probability fix, the ncaaf central-day fix, the ask refusal gate, and M1.
+
+**`render_deploy.py`'s rollback guard does NOT catch this.** That guard asks
+whether the target is a descendant of the live SHA. A main commit is not a
+descendant — but it is not flagged as a *rollback* either; it is simply a
+different branch, which the guard has no opinion about. The guard protects
+against going backwards on one line of history, not against switching lines.
+
+**The M1 corollary — an ancestry check can give a false negative.** M1 is
+`b16eb1f7` on main and `5382943c` on the deploy branch: same change,
+cherry-picked, different SHA. `git merge-base --is-ancestor b16eb1f7 a86eb4ed`
+returns false while the code is demonstrably live. **Test deployment by CONTENT
+(grep the symbol in `git show <live-sha>:<path>`), not by ancestry**, wherever
+cherry-picking between branches is in play.
+
+**How to apply.**
+1. Read the live SHA from the Render API, never from the ledger.
+2. `git merge-base --is-ancestor <live> origin/main` — if false, web is on a
+   deploy branch and main is NOT your base.
+3. Build the deploy commit as a direct child of the LIVE SHA (plumbing:
+   `read-tree <live>` into a temp `GIT_INDEX_FILE`, `update-index` your paths,
+   `commit-tree -p <live>`). This also keeps the shared working tree and index
+   untouched while other sessions are live.
+4. `git diff --stat <live> <target>` must show ONLY your files. That is the
+   scope answer preflight asks for, and it is the check that caught this.
+
+
+### 2026-08-15 — A COUNT OF DEFINITIONS IS NOT A COUNT OF PRODUCERS, and the one it missed was the live bug
+
+- **What we believed.** The board-engine audit's "**42 sites define or convert a
+  probability** — 18 prob↔odds, 9 `implied_probability`, 11 `confidence`, 4
+  `fair_probability`" was the surface. Tier 3a was scoped to differential-test
+  *those*.
+- **What was actually true.** The 42 came from grepping for **definitions**
+  (`^def <name>`). The single confirmed **live** misprice was produced by code
+  that has no definition to grep for: `pipeline/intelligence_state.py:1816`
+  carries the prob→american formula **inline**, inside
+  `_backfill_layer2_board_columns`. It was not in the 42, and it publishes the
+  `fair_price` the board renders. Two other module-level converters are nested
+  **inside function bodies**, so they are invisible to a `^def` sweep as well.
+- **How we found out.** Not by grepping harder. By taking the **user-visible
+  field** (`fair_price`) and asking who writes it — which returned **four**
+  producers where the definition count had three, one unclamped and correct and
+  three clamped.
+- **The second half, and it is the more surprising one.** A duplication count
+  reads like a defect count and is not. **All 26 `american→probability`
+  implementations agree to ten decimal places on every VALID American price.**
+  The odds arithmetic is not wrong anywhere. **100% of the divergence is at the
+  boundary** — `0`, `None`, `""`, a string price, a float price — which is
+  exactly what a missing or malformed quote looks like. Had the pass been costed
+  as "26 copies of one formula, consolidate them", it would have found nothing;
+  the value was entirely in the inputs nobody's caller happens to send.
+- **The rule going forward.**
+  1. **Trace the FIELD, not the definition.** Before trusting any "N sites do X"
+     count, take one user-visible output of X and enumerate its writers. If that
+     number exceeds the grep's, the grep is measuring the wrong population.
+  2. **A duplication count justifies a differential, not a fix.** Run the
+     duplicates over the boundary inputs before costing a consolidation — the
+     bug is where they disagree, and they may agree everywhere that matters.
+  3. **Ownership is settled by named requirements, not by cluster size.**
+     "The biggest cluster wins" is a vote. Fifteen implementations tied
+     behaviourally here; the deciding requirement (refuse a `50.0` percent-scale
+     probability rather than clamp it to a plausible `-4900`) was met by exactly
+     one implementation of its concept.
+- **Cost:** none this time — the pass was scoped to test-and-measure and the
+  inline copy was found before any consolidation was proposed. Had Tier 3a gone
+  straight to "consolidate the 42", the clamp would have survived the cleanup
+  untouched and looked fixed. Related: [[feedback_read_the_field_you_already_have]],
+  [[feedback_presence_is_not_reachability]], [[feedback_rate_not_count]].
