@@ -3955,3 +3955,57 @@ explains the first post-fix pass hydrating all eight sports without ever printin
 `BOARD_OVERVIEW_READY`: that deploy restarted the loop mid-build
 (`BACKGROUND_LOOP_START` 00:22:46Z), so the build never published. Denominator
 stated: 1 post-fix build vs 5 pre-fix `sports=1`.
+
+### mlb-oom-outlier-2003z — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: explain why the hydrated overview pass at 2026-08-14 20:02:26Z took the
+  container from anon 522MB to a 4096MB SIGKILL in 25 seconds, when the SAME
+  pass shape ran at 613.1MB and 804.2MB peak twice later the same evening
+  (22:36:48 and 22:49:19, pre-cutover code) and four times since at ~1.0-1.5GB.
+  Until this is explained the 3000MB floor in front of MLB cannot be lowered.
+- Files: none claimed — READ-ONLY diagnosis. If it produces a fix, that is a
+  separate lane and a separate deploy.
+- **HYPOTHESES, WRITTEN BEFORE TESTING:**
+  - **H1 — concurrent children, not the overview.** `oomKilled` is a CONTAINER
+    limit over ALL processes; every peak figure I have quoted tonight is
+    `memory_anon_mb` for the cgroup, but the excursion may be a CHILD (MLB
+    `daily_update.py` / sim spawn) that happened to overlap the pass. The
+    surviving 22:37 and 22:49 passes may simply have run in a quieter moment.
+  - **H2 — cold caches.** A deploy landed 19:49Z (`29ed6de1`), so 20:02 is ~13
+    min into a fresh process with `_BOOK_QUOTES_CACHE` refilling toward its
+    500MB budget; the 22:xx passes were 18-30 min into a warm one.
+  - **H3 — a data condition specific to that pass.** 20:02 carried `mlb:g=14`
+    against `g=13` later, and 18 live / 28 pregame; live-game hydration at that
+    hour may be categorically more expensive.
+  - **H4 — the 522MB baseline is the wrong process.** `#423` records that 5 of
+    the first 6 memory readings came from short-lived CHILDREN, not pid 39. If
+    522MB was a child's reading, "no floor to accumulate" is unfounded and the
+    process may have already been heavy.
+- **Falsification tests:** H1 dies if `ALL_PROCESS_MEMORY` in 20:00-20:03 shows
+  children summing to a few hundred MB. H2 dies if the 22:xx passes show the
+  same or larger cache-fill activity. H3 dies if a later pass with comparable
+  live counts is cheap. H4 dies if the 20:02 samples carry pid 39 explicitly.
+- Verification: a named mechanism supported by production numbers, plus an
+  explicit statement of which hypotheses were FALSIFIED (recorded either way —
+  exoneration is a result).
+- Blocked by: none.
+
+#### mlb-oom-outlier-2003z — ANSWERED 2026-08-15 00:5xZ — the question was malformed
+**There is no 20:03:11Z outlier.** It is one of SIXTEEN OOM kills on 2026-08-14
+(events API), running at ~1 per 15-20 min all evening and CONTINUING after both
+halves of `#387` — most recently 00:41:16Z, 26 min after the second half.
+- **H1 (concurrent children) — FALSIFIED.** At 20:02:59, `process_count=2`. At
+  the 00:41:16 kill children held 166MB + 95MB while **pid 39 went 1612 -> 3079MB
+  in 28 seconds.** It is the main worker, not a child.
+- **H2 (cold caches) — NOT NEEDED.** The premise it explained (a uniquely
+  expensive pass) does not exist.
+- **H3 (data condition) — SUPPORTED, but for a different stage.** The kill
+  payloads carry `game_count: 15` / `game_pk_count: 15`: MLB game hydration.
+- **H4 (wrong process for the 522MB baseline) — MOOT and worse than moot.** At
+  20:02:59 the container was at **1179.3MB / 28.8%** with
+  `stage=post_build_overview`. The overview had FINISHED. The "522MB worker died
+  in 25s inside the pass" story describes a pass that had already completed.
+- **RETRACTED IN THE SAME BREATH:** this session's own "oomKilled 0 since 22:55Z"
+  was a log grep and is false. See `learnings.md` FORBIDDEN 2026-08-15.
+- Successor work is NOT this lane: it is `build_cards_page_context` running
+  hydrated on the worker for a 15-game MLB slate. Filed as `#435`.
+- Lane CLOSED — read-only throughout, no files touched, no deploy.

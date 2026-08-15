@@ -2004,3 +2004,36 @@ STILL OPEN, and recorded so it is not lost: the 20:03:11Z kill is NOT explained.
 The handoff's "peak = SUM crosses 4GiB on its own" was falsified by two 8-sport
 passes at 613/804MB on the OLD code. Something made MLB cost +3.5GB in that one
 pass. **The guard in front of MLB keeps its full 3000MB until that is known.**
+
+### RETRACTION 2026-08-15 00:5xZ — "oomKilled 0" IN THE 00:36Z ENTRY ABOVE IS FALSE
+
+That entry, its lane closure and `state.md` all claimed `oomKilled` 0 since
+22:55Z as verification. **The claim came from a LOG grep. Kills are EVENTS.**
+
+`/v1/services/srv-d91dpertqb8s73co8ls0/events` — 16 kills on 2026-08-14:
+
+    20:03:11  20:14:30  21:07:32  21:16:50  21:25:48  21:35:08  21:46:51
+    21:57:53  22:14:39  22:36:06  22:48:35  |  23:11:56  23:34:15  23:51:04
+    00:04:47  |  00:41:16
+
+    before the cutover (20:03-22:55, 172 min):   11 kills = 1 per 15.6 min
+    cutover only     (22:55-00:15,  80 min):      4 kills = 1 per 19.9 min
+    both halves      (00:15-00:52,  37 min):      1 kill  = 1 per 37 min  (n=1)
+
+**Neither half of `#387` stopped the OOM kills, and the rate is not
+distinguishable at these sample sizes.**
+
+WHAT SURVIVES, because it was sourced independently: `BOARD_OVERVIEW_READY
+sports=8` against 5 consecutive `sports=1`, and the overview pass peaking at
+1404.5MB and falling to 1172MB as MLB releases. **The coverage fix is real. The
+memory claim was not.**
+
+WHAT THE KILL ACTUALLY IS (00:41:16, best instrumented):
+pid 39 — the MAIN worker — 1612MB -> 3079MB in 28 seconds, children small
+(`daily_update.py` 166MB, soccer refresh 95MB), payloads tagged
+`game_count: 15`. MLB game hydration, not the overview. At the handoff's
+canonical 20:03:11 kill the container was at **28.8%** twelve seconds prior with
+`stage=post_build_overview` — the overview had already finished.
+
+CONSEQUENCE FOR THE 3000MB FLOOR: leave it. It guards the wrong stage, but
+lowering it now would only let more work into a process that is dying elsewhere.

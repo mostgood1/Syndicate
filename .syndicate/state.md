@@ -12,7 +12,26 @@
 read it for Tiers 1-6, NOT for the memory item. `.syndicate/plan_2026-08-14_program.md`
 for sequencing.
 
-**MEMORY / `#387` IS SHIPPED AND VERIFIED — it took TWO commits, not one.**
+**`#387` FIXED BOARD COVERAGE. IT DID NOT FIX THE OOM, AND THE WORKER IS STILL
+BEING KILLED EVERY ~15-20 MINUTES.** `refresh-worker` was OOM-killed **16 times
+on 2026-08-14**, five of them inside the window this file previously called
+clean, the last at **00:41:16Z — 26 minutes after both halves were live**.
+Source: `/v1/services/<id>/events`, NOT the logs (a killed process cannot log
+its own death; the log grep that returned 0 is worthless for this question).
+
+**THE KILL IS MLB GAME HYDRATION IN pid 39, NOT THE OVERVIEW.** At 00:41:16 the
+main worker went 1612MB -> 3079MB in 28s with children small (166MB, 95MB) and
+payloads tagged `game_count: 15`. At the handoff's canonical 20:03:11 kill the
+container was at **28.8%** twelve seconds prior, `stage=post_build_overview` —
+the overview had already finished. The 2026-08-07 guard comment had this right:
+it is a circuit breaker around MLB's cost, not a fix for it, and the real work is
+`build_cards_page_context` running HYDRATED on the worker.
+
+**Leave the 3000MB floor in front of MLB alone.** It guards the wrong stage, but
+lowering it only admits more work to a process that is dying elsewhere.
+
+**MEMORY / `#387` SHIPPED — TWO commits, and what it actually delivered is
+BOARD COVERAGE, not memory.**
 - `cfee9c6e` — the streaming cutover, rebased onto the then-live SHA. Live
   22:55:35Z. Now carried inside `96e3a9b7` and `705eeefc`.
 - `705eeefc` — **the other half.** Live 00:15:08Z. Without it the cutover
@@ -24,7 +43,9 @@ for sequencing.
   actually live, because this one moved 90 seconds after mine went live.
 - VERIFIED 00:28:50Z, re-read 00:43Z: `BOARD_OVERVIEW_READY sports=8` on **1
   build**, against **5 consecutive `sports=1`** before the fix.
-  `OVERVIEW_STOPPED_FOR_MEMORY` 0 since 00:15:08Z, `oomKilled` 0 since 22:55Z,
+  `OVERVIEW_STOPPED_FOR_MEMORY` 0 since 00:15:08Z. **~~`oomKilled` 0 since
+  22:55Z~~ RETRACTED 00:5xZ — false, and it came from a log grep; there were
+  five kills in that window. See the retraction in `deploys.md`.**
   peak anon **1404.5MB = 34.3%** of the ceiling with the trace falling
   1404 -> 1172MB as MLB is released. Layer 2 unaffected (142 rows / 12,826
   considered). **The pre-fix baseline is the strong half — one post-fix build is

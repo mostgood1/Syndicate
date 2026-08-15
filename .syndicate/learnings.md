@@ -2058,3 +2058,58 @@ streaming" — streaming caps the transient, it did not explain the outlier.
 Consequence, deliberate: the guard in front of MLB keeps its full 3000MB floor.
 The seven cheap sports were relaxed to 1500MB because their cost is measured
 (+1.7MB for five of them); MLB's tail is not.
+
+### 2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, and I had this rule already
+
+- **What we believed:** I reported "`oomKilled` 0 since 22:55Z" three times, and
+  put it in `deploys.md`, `state.md` and a lane closure as verification that the
+  `#387` work was holding.
+- **What was actually true:** refresh-worker was OOM-killed **16 times on
+  2026-08-14**, including FIVE times inside the window I called clean —
+  23:11:56, 23:34:15, 23:51:04, 00:04:47 and **00:41:16, twenty-six minutes
+  after my own fix went live.**
+- **How we found out:** `/v1/services/<id>/events` returns
+  `server_failed {'reason': {'oomKilled': {'memoryLimit': '4Gi'}}}`. Grepping
+  the LOGS for the string "oomKilled" returns 0 matches because the container
+  runtime records the kill, not the process — the process is dead and cannot log
+  its own death. **`learnings.md` already carried this exact rule** ("OOM kills
+  live in the Render events API, not logs"). I had it, quoted the adjacent rule
+  about env changes earlier in the same session, and still ran the log grep.
+- **The rule going forward:** a negative result about process death MUST come
+  from the events API. `scripts/render_logs.py` cannot answer this question and
+  a 0-match result from it is not evidence. Absence of a log line is evidence
+  about the EMITTER, and a killed process emits nothing.
+- **Cost:** a false all-clear on the headline claim of the session. The coverage
+  result (`sports=8`) was real and independently sourced; the memory result was
+  not, and I would have handed over "the OOM is fixed" if the checkpoint had not
+  re-read production.
+
+### 2026-08-15 — the kill is MLB game hydration in pid 39, not the overview pass
+
+Measured at the 00:41:16 kill, the best-instrumented one:
+
+    00:40:14  container 3357.8MB (82.0%)   pid 39 = 1612.1MB   7 processes
+    00:40:42  container 4095.8MB (100.0%)  pid 39 = 3079.6MB   10 processes
+    00:40:58  anon 3941.6 -> 4047.6MB in 1.2s, game_count 15, unreclaimable 4058MB
+    00:41:16  server_failed oomKilled 4Gi
+
+**pid 39 — the main worker — grew ~1.47GB in 28 seconds** while its children
+stayed small (`daily_update.py` 166.6MB, soccer odds refresh 95.5MB). The
+payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
+hydration path, NOT the overview.
+
+And at the handoff's canonical kill:
+
+    20:02:59  container 1179.3MB (28.8%)  process_count 2  stage=post_build_overview
+    20:03:11  server_failed oomKilled 4Gi
+
+**28.8% twelve seconds before the kill, with the overview already FINISHED.**
+
+So `#387`'s premise — that the eight-sport hydrated overview is what crosses
+4GiB — is falsified from three directions now: the same pass ran at 613/804MB
+twice, the container was at 28.8% seconds before the canonical kill with the
+overview complete, and the kills continue at the same rate after both halves of
+the fix shipped. The 2026-08-07 guard comment said so in plain words and was
+right: *"This is a circuit breaker around MLB's cost, NOT a fix for it. The real
+work is making `build_cards_page_context` cheaper or not running it hydrated on
+the worker at all."*

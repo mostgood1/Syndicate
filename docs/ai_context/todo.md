@@ -32210,3 +32210,41 @@ span") will not be read at the moment it matters. What is missing is mechanical:
 **Not urgent, genuinely valuable:** items 1 and 2 would have caught this in
 minutes rather than 80. Item 3 prevents a measurement error that already
 produced one wrong number tonight.
+
+### `#435` — OPEN, HIGH. refresh-worker is OOM-killed every ~15-20 min, and it is MLB game hydration in the main worker
+
+**MEASURED 2026-08-15 00:5xZ from the EVENTS API** (`server_failed` /
+`oomKilled` / `memoryLimit 4Gi`). 16 kills on 2026-08-14:
+
+    20:03:11 20:14:30 21:07:32 21:16:50 21:25:48 21:35:08 21:46:51 21:57:53
+    22:14:39 22:36:06 22:48:35 23:11:56 23:34:15 23:51:04 00:04:47 00:41:16
+
+`#387` (both halves) did NOT change this. Rate before 1/15.6min, after 1/19.9min,
+after both 1/37min (n=1) — not distinguishable.
+
+**THE STAGE IS NAMED, and it is not the overview.** At the best-instrumented
+kill (00:41:16):
+
+    00:40:14  container 3357.8MB (82.0%)   pid 39 = 1612.1MB   7 procs
+    00:40:42  container 4095.8MB (100.0%)  pid 39 = 3079.6MB  10 procs
+    00:40:58  anon 3941.6 -> 4047.6MB in 1.2s, game_count 15, unreclaimable 4058MB
+
+pid 39 is `scripts/run_refresh_worker.py` itself. Children were small
+(`daily_update.py` 166.6MB, soccer odds refresh 95.5MB). Payloads carry
+`game_count: 15` / `game_pk_count: 15` — the MLB game hydration path.
+
+**This is the work the 2026-08-07 guard comment already named** and nobody has
+done: *"a circuit breaker around MLB's cost, NOT a fix for it. The real work is
+making `build_cards_page_context` cheaper or not running it hydrated on the
+worker at all"* — `handoff_refresh_worker_oom.md` measured the same call at
+~3.7GB on 2026-07-26.
+
+**First step, and it is cheap:** the kills are periodic and well-instrumented, so
+pick three and confirm `build_cards_page_context` is on the stack each time
+before touching anything. Do NOT lower `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` to
+"help" — it guards a different stage, and relaxing it admits more work to a
+process that is dying elsewhere.
+
+**Do not repeat the mistake that hid this for a whole session:** OOM kills are in
+`/v1/services/<id>/events`. A log grep for "oomKilled" returns 0 and means
+nothing — the process is dead and cannot log its own death.
