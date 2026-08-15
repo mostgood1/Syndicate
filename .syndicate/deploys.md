@@ -3626,3 +3626,98 @@ web `f475c775` (Drops 1+2), live-odds-worker `ccd10349` (**neither**).
 - **NOTE ON THE MEASUREMENT WINDOW:** the trigger is a LIVE game, so the exact
   row will move. A post-deploy read that finds no out-of-clamp probability is
   **INCONCLUSIVE, not success** — it is the same reading a quiet slate gives.
+
+## 2026-08-15 — web — `b9ea0f0a` — per-sport quote-feed thresholds — PENDING
+- **What:** cherry-pick of `9e100444` onto web's live `f85a36d7`. 2 files,
+  +213/-20. Candidate: 32 tests pass; carries all three of this session's
+  changes (alarm, NFL guard, per-sport table); boots, 360 routes.
+- **Metric (mine alone):** `/api/ops/quote-feed-age` returns **four DISTINCT**
+  `threshold_seconds` — nfl 7200, mlb 10800, wnba 21600, soccer 25200 — plus a
+  new `thresholds_by_sport` map, where it previously returned the single 10800.
+- **Expected side effect, predicted before the read: soccer flips `stale` ->
+  `ok`.** That is the CORRECTION, not a regression: soccer's p50 is 173 min so
+  the old 180 min global flagged it on ~half of normal operation.
+- **Falsifier:** all four thresholds still equal ⇒ the per-sport table is not
+  being consulted (e.g. `SYNDICATE_QUOTE_FEED_STALE_SECONDS` is set in web's
+  env and outranks it by design). Check the env before blaming the code.
+- **Blast radius:** web only. No worker restart — `#435` NOT disturbed.
+- **Rollback:** redeploy `f85a36d7` by commitId.
+- **Direct deploy of `9e100444` would have rolled web back 116 commits.**
+  Fourth deploy this session, fourth rollback caught by preflight (109/118/114/116).
+- **MEASURED `[2026-08-15 21:05Z, deploy live 21:04:29Z]` — METRIC MET.**
+  Running commit `b9ea0f0a858b` confirmed from `/api/ops/version`. HTTP 200.
+  `threshold_seconds: null` at top level (per-sport, as designed) and
+  `thresholds_by_sport: {mlb 10800, nfl 7200, soccer 25200, wnba 21600}` —
+  **four distinct values where one used to be.**
+
+      mlb      age   7.5 min  thr 180 min  ok
+      nfl      age   7.4 min  thr 120 min  ok
+      soccer   age 437.5 min  thr 420 min  STALE
+      wnba     age 219.1 min  thr 360 min  ok
+
+- **MY PREDICTED SIDE EFFECT DID NOT HAPPEN.** I predicted soccer would flip
+  `stale` -> `ok`. It did not: the feed AGED FURTHER while I worked
+  (340.9 min at 19:28Z -> **437.5 min** at 21:05Z, ~1.6 h of drift in ~1.6 h of
+  wall-clock, i.e. still not capturing) and now exceeds even the loosened 7 h
+  threshold. **The loosening did not silence a real problem** — soccer is stale
+  on its OWN baseline now (437.5 min is above its p90 of 248 and heading for its
+  max of 558), which is a far stronger claim than the old global could make.
+- **THE CHANGE'S REAL EFFECT IS VISIBLE ON WNBA, not soccer.** WNBA at
+  **219.1 min reads `ok` under its own 360 min threshold** and would have read
+  `stale` under the old 180 min global. That is one false alarm suppressed, on
+  a feed whose measured p50 is 122 min.
+- **Falsifier did NOT fire:** the four thresholds are distinct, so the per-sport
+  table is being consulted and no global env is overriding it.
+- **NET:** the alarm now distinguishes a genuinely dead soccer feed from a
+  normally-slow WNBA one. Under the old single threshold both read `stale` and
+  neither was actionable.
+
+## 2026-08-15 20:56:08Z — live-odds-worker `ccd10349` -> `191a001b` (Drops 1+2) — MEASURED: NEGATIVE
+**Deploy** `dep-da0d1o0u01pc738t3ang`, fired 20:49:36Z on the user's instruction
+after 76 min of gate-holding; killed soccer's in-flight run (recorded in
+`lanes.md`). Cut from this service's own live SHA.
+
+**RESULT: the fix did not produce the effect. `live_mc` is still 0.**
+
+    baseline (20:0xZ, re-confirmed 20:5xZ)   rows=60 live_mc=0 carried=0
+    PASS1  ~21:00Z (4 live)                  rows=60 live_mc=0 carried=0
+    PASS2  ~21:02Z (3 live)                  rows=60 live_mc=0 carried=0
+    PASS3   21:04Z (3 live, web healthy)     rows=60 live_mc=0 carried=0
+
+**What IS established, so the next session does not re-derive it:**
+- **The deployed tree carries Drop 1** — content-checked on the live SHA, 5 hits.
+- **Web carried Drop 2 throughout** — `f475c775`, `f85a36d7`, `befc70b8`,
+  `b9ea0f0a` all content-check with Drop2=2. **No revert confounded this.**
+- **The Monte Carlo IS running for live games.** Post-deploy `LIVE_MC_BAIL`:
+  36 `Preview`, 4 `Final`, **zero `Live`**. `_live_mc_projection` is not
+  refusing on the live games.
+- **The loop is healthy:** `TICK_COMPLETE results={'mlb': True, ...}` 21:01:10.
+- **Web is rebuilding, and carry-forward finds nothing** (`generatedAt` 21:04:12Z
+  = web's own rebuild; `carried=0`). So the keyvalue snapshot itself lacks
+  `live_mc` — Drop 2 is working correctly on an empty input.
+- **`source` survives the report->snapshot transform** — `_with_market_fallback_lenses`
+  does `dict(lens)` and `_lens_rows` only filters. Not the loss point.
+
+**RETRACTED IN THE SAME BREATH:** I briefly took the keyvalue snapshot growing
+1,384,264 -> 3,763,811 bytes as evidence the lens had landed. **It is not** —
+`archivedLiveProps` went 77 -> 142 and props 220 -> 274 in the same window and
+can account for it. A size delta is not a field.
+
+**LEADING HYPOTHESIS, NOT CONFIRMED — Drop 1 is correct but BYPASSED.**
+`live_lens_loop` calls `_mlb_build(date_str)` with **`persist=False`**
+(`live_lens_loop.py:82`), so
+`should_refresh_report = _live_lens_report_needs_refresh(...)`. When that reads
+fresh, the builder takes `load_json_file(report_path)` and **never calls
+`_persist_live_lens_report` — the function my fix lives in.** A report file kept
+fresh by another writer would therefore route around Drop 1 entirely, and the
+snapshot would inherit whatever that file has. This is the
+`presence != reachability` shape again.
+
+**Next diagnostic is a READ, not a deploy:** establish which writer touches
+`live_lens_report_path()` on live-odds-worker and how often, and whether
+`_persist_live_lens_report` runs on a loop tick at all. `_tally_mlb_live_mc_sources`
+(`live_lens_loop.py:473`) already computes the exact answer per tick into
+`meta["liveMcSources"]` — it is **not printed and its artifact is not
+allowlisted**, so making it observable is the cheapest instrument in reach.
+
+**No rollback taken.** Both drops are inert-but-harmless in this state.
