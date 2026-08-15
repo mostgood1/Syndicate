@@ -59,7 +59,35 @@ under `#435`):**
    (`miss_no_market_alias`, `snapshot_live_prob_seen`, `unmatched_samples`) were
    only readable off a raw artifact file on the worker's disk.
 
-**STILL OPEN, and deliberately not claimed:**
+**UPDATE 2026-08-15 — THE COVERAGE GAP IS NOW FIXED IN CODE (`3a476001`).** The
+section below was written when it was not, and is kept because its reasoning was
+right: the alias table was never the cause, and no cause was claimed without
+reading the data. Read from the EMITTER instead of the join, it was **four**
+causes, not one:
+
+1. `batter_hits_runs_rbis` was in `_MLB_HITTER_PROP_DIST_CONFIG` and not in
+   `_LIVE_HITTER_MARKET_KEYS` — 0 of 79.
+2. `_select_bounded_live_side` is a BET SELECTOR and its rejections were dropped,
+   so the board sourced a projection set from a pick list — `batter_home_runs`
+   0 of 116 (mean ~0.15 vs a 0.5 line: over on the wrong side, under past the
+   -200 favourite cap).
+3. A pitcher market already past its line was skipped outright — Boyd on 7 ER
+   against 2.5 emitted nothing, so the board kept showing the pregame 3.242.
+4. `_live_pitcher_prop_row_actionable` drops pulled-starter rows, **which made
+   `f4cd2bc8`'s settle-to-actual fix inert in the snapshot path.**
+
+Fixed behind `include_projection_only` (default False; only
+`live_prop_rows_for_game` opts in, so the game-detail pick rail is unchanged).
+**CEILING, MEASURED: 48 of 492 live prop rows (9.8%) sit at an alternate line, so
+if the snapshot holds one line per market the reachable maximum is 90.2%, not
+100%.** 15 new tests, six behaviours mutation-verified. NOT DEPLOYED; the
+predicate is in lane `mlb-live-pitcher-projection`.
+
+**The named candidate in the section below was CORRECT but was one of four** —
+alone it would have left both zero-coverage markets and the pulled starter
+untouched. Recorded so a partially-right hypothesis is not banked as the answer.
+
+**WAS OPEN, and deliberately not claimed at the time:**
 - **The cause of the 435 unmatched live rows is NOT diagnosed.** Per
   `learnings.md` 2026-08-15 ("never read a joiner zero as a data-quality verdict
   until the reader has been shown to SEE the data"), the published lens snapshot
