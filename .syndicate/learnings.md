@@ -1874,3 +1874,39 @@ mattered:** with the reader fixed, the honest same-book CLV is **-0.07% at a
 - Timing is part of a CLV reading: `-0.0711` was taken at 14:38 CDT, before
   first pitch, so most "closes" were not closes. State the clock or the number
   is not interpretable.
+
+### 2026-08-15 — MY SUCCESS CRITERION CONTAINED A TERM THE BASELINE ALREADY SATISFIED, AND MY INSTRUMENT RULE INVERTED BECAUSE OF MY OWN FIX
+
+Two errors in one verification design, both caught only by taking a **pre-deploy
+baseline**, both of which would have produced a confident wrong verdict.
+
+**1. A vacuous conjunct.** I wrote the pass condition as *"`source: live_mc` AND
+a non-null `modelHomeWinProb`"*. Measured at baseline: **60 of 60 rows already
+carried a non-null `modelHomeWinProb`** — `_build_game_lens` stamps one on the
+`first1/3/5` lanes from `_live_margin_win_prob` over a segment interpolation.
+
+The galling part: I had *already* identified this trap. The code deliberately
+discriminates on `source == "live_mc"` **because** `modelHomeWinProb` does not
+separate the two, there is a test named for it, and the commit message explains
+it. I then wrote the useless half into the criterion anyway. **Knowing a field is
+non-discriminating in the CODE does not stop you putting it in the CRITERION.**
+
+**2. An instrument rule that my own change inverted.** I wrote, repeatedly and in
+`deploys.md`, *"read the published artifact, NEVER `/mlb/api/live-lens`, it is
+structurally blind."* True when written — it was blind precisely because web's
+rebuild DESTROYED the lens. **Drop 2 fixed exactly that, so the moment it
+deployed, the forbidden instrument became the correct one and the recommended one
+became useless** — the published artifact is the slim shape and has no `gameLens`
+key at all, so it reads 0 forever.
+
+**How to apply.**
+- **Take the baseline BEFORE the deploy, and read every term of your criterion
+  against it.** Any term already satisfied at baseline is decoration; delete it.
+  A criterion is only worth what its *discriminating* terms are worth.
+- **After a fix that changes how data flows, re-derive which instrument is
+  valid.** An instrument rule is a claim about the system's CURRENT plumbing. A
+  fix to the plumbing can silently promote a blind instrument to a good one, or
+  demote a good one — and the rule will still be sitting in the ledger, phrased
+  as timeless.
+- **A "never use X" rule inherited from before your change is a hypothesis, not a
+  constraint.** Check whether the thing that made X blind is the thing you fixed.
