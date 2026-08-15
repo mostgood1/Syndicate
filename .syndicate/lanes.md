@@ -82,6 +82,7 @@
 
 
 ### probability-clamp-removal-2 — CLOSED-VERIFIED 2026-08-15 — ALL THREE clamp sites now fixed; shipped `7bb74c95`; 6 apparent regressions bisected to ANOTHER session's uncommitted file — opened 2026-08-15 — session: probability-differential
+### probability-clamp-removal-2 — OPEN — opened 2026-08-15 — session: probability-differential
 - Goal: finish Tier 3a's fix. The **last two** `max(0.02, min(0.98, p))` clamp
   sites delegate to `opportunity_signals.american_price`, so no board column
   publishes a fair price for a probability the market never implied.
@@ -846,6 +847,7 @@
 - **DOES NOT CLOSE THE LANE.** This unblocks the measurement; it does not
   produce `clv_pct`. Breadth remains untested.
 
+### clv-without-settlement — OPEN — BOTH HALVES BUILT; THE FIRST CLV NUMBER WAS RETRACTED; NONE IS THE HONEST ANSWER — opened 2026-08-14 — session: model-audit
 - **STATUS 2026-08-14 19:50 CDT.** Recorder LIVE (`2b14fbeb`) + `book_prices`
   LIVE (`96e3a9b7`). Joiner is **library-only, no call site, NOT deployed**
   (`deploy/clv-joiner-guards-r2`, `2f596260`). 42 tests green.
@@ -2338,6 +2340,100 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
 ### tabular-figures-actually-applied — CLOSED-VERIFIED 2026-08-15 — deployed twice, all four sports measured to ZERO — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: the tabular-figures fix covers the classes users actually watch, and
+  the probe can no longer report a pass for a class it never found. Testable:
+  `ui_layout_probe.py` FAILS on any numeric class with 0 elements on a sport
+  serving >0 cards; and on production MLB, the classes carrying digits compute
+  `tabular-nums`, not `normal`.
+- Files (exclusive to this lane):
+  - `scripts/ui_layout_probe.py` — absent-class must fail, not vanish.
+  - `docs/reports/ui_audit_2026_08_14/README.md` — the third method caveat.
+  - `syndicate/static/mlb/cards_exact.css` — MLB's real numeric classes.
+  - `syndicate/static/shared/dense_cards.css`
+  - `syndicate/static/nba/cards_source.css`
+  - `syndicate/static/wnba/cards-parity.css`
+  - Collision check RUN (lane-guard's own `_claims()` over `lanes.md`, not a
+    read): 25 claimed paths across 5 OPEN lanes; NONE is a stylesheet, the
+    probe, or the audit README. `soccer-model-coverage` claims
+    `syndicate/features/soccer` — a different tree from `syndicate/static`.
+- Hypothesis: Lane E's "do-now" tabular-figures item was verified with
+  `querySelector` over 3 class names that MLB's `cards_source.js` renderer
+  does not emit, so the check has NEVER measured MLB. Absent key -> no branch
+  in `summarize()` -> reads as a pass.
+- Falsification test: if MLB's numeric leaves already compute `tabular-nums`
+  under an all-elements probe, the fix landed and only the instrument is
+  blind.
+- **HYPOTHESIS PARTLY FALSIFIED, 2026-08-15, and by my own instrument.** The
+  claim was that the three `NUMERIC_CLASSES` match ZERO elements on MLB, so
+  the check had never run there. Re-measured through the probe itself against
+  production `c774fe1a`, /mlb/cards, http 200, 15 cards:
+
+      .cards-data-pair strong   count=495  {tabular-nums: 495}
+      .cards-market-main        count= 60  {tabular-nums: 60}
+      .cards-mini-metric strong count= 30  {tabular-nums: 30}
+
+  They are all there and all correct. **Lane E's tabular fix DID land on MLB.**
+  My `{}` reading came from a one-off that sampled 600ms after load — MLB
+  renders through `cards_source.js`, so the elements did not exist yet. A
+  single early read of an async render, which is a rule I already hold
+  (`watcher over spot check`). The stale-class defect is REAL but it is on
+  NCAAF, not MLB: `.cards-market-main` count=0 on a sport serving 16 cards.
+- **What survives, and it is the larger finding.** The three-class list covers
+  a small share of the digits on screen. Name-independent sweep, production,
+  leaves rendering a digit at `font-variant-numeric: normal`:
+
+      mlb    1388   top (no class) 349, cards-chip 233, cards-mini-copy 150
+      nfl     468   top cards-callout-copy 210, (no class) 48, cards-subcopy 48
+      ncaaf   432   top cards-callout-copy 224, cards-table-kicker 96
+      soccer   60   top cards-callout-copy 23, cards-table-row-value 8
+
+  So the plan's "four lines in four stylesheets" did what it said and the
+  jitter it was aimed at is still on screen everywhere.
+- Verification: the probe's own output, before and after, on production and
+  then locally; a class-coverage line per sport so "0 elements" is visible
+  rather than absent. Production numbers only after a web deploy, which is a
+  separate `/preflight`-gated decision and the user's call.
+- Blocked by: none.
+
+#### live-game-line-projection — DROP 1 SHIPPED TO GIT 2026-08-15 as `0e0b0aa1` (NOT DEPLOYED)
+- **Change:** `syndicate/features/mlb/live_lens.py` +57/-0, three hunks, zero
+  deletions. New `_lens_rows_have_live_state_signal` (discriminates on
+  `source == "live_mc"`) plus ONE added disjunct in `should_use_projection_lens`.
+  `tests/test_mlb_live_game_line_lens.py` new, 14 tests.
+- **Why `source`, not `modelHomeWinProb`:** `_build_game_lens` stamps a
+  probability on its `first1/3/5` lanes too (`_live_margin_win_prob` over a
+  segment interpolation), so a probability-presence discriminator is satisfied by
+  a lens the re-sim never touched — and would ship a silent DOWNGRADE when the MC
+  bails, replacing the card lens with an interpolation. Pinned by
+  `test_live_game_keeps_the_card_lens_when_the_resim_bailed`.
+- **MUTATION-PINNED, not merely green.** Neutering the discriminator only where
+  the merge calls it fails **exactly 2** tests (live, final); the other 12 pass,
+  including pregame-unchanged, resim-bailed, and a fixture guard asserting the
+  card lens really does satisfy the old predicate (without which the suite would
+  pin nothing).
+- **Regression: 311 passed** across 10 live-lens-surface files.
+- **TWO PRE-EXISTING FAILURES, NOT MINE — dated, not assumed:**
+  - `test_mlb_refresh_runner::test_live_lens_payload_refreshes_card_before_game_lens`
+    — `TypeError: fake_build_game_lens() got an unexpected keyword argument
+    'live_mc_projection'`. Kwarg landed **2026-08-12** (`2caa8eac`); the test file
+    was last touched **2026-08-01**. Broken 3 days before this session, in the
+    vendored path this change does not touch.
+  - `test_slate_date_timezone_discipline` — flags `artifact_publisher.py`,
+    `artifact_retention.py`, `shadow_candidate_ledger.py` for `date.today()`.
+    **None touched here**; all three carry another session's uncommitted edits.
+    **Whoever owns them should see this.**
+- **DROP 2 RE-SCOPED — my original statement of it was aimed at the WRONG
+  ARTIFACT.** `/mlb/api/live-lens` serves a report **web writes itself**: it reads
+  the worker's keyvalue snapshot and, if it judges it stale, DISCARDS it and
+  rebuilds locally, where the MC is hard-refused by
+  `refuse_if_compute_in_request_path`. Max age **60 s** vs a **60 s** worker tick.
+  Drop 2 is therefore "the fallback recompute must not destroy live-state signal
+  it already holds", not "carry `gameLens` through the slim path". Same shape as
+  `#124`'s `prop_row_counts=[0]*9`. **Not designed, not agreed, not started.**
+- **`0e0b0aa1` is NOT observable in production on its own.** It is a precondition
+  for Drop 2, not a shippable user-visible change. No deploy fired.
+
+### tabular-figures-actually-applied — BOTH HALVES BUILT; CSS HALF AWAITING A WEB DEPLOY TO BE MEASURED — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the tabular-figures fix covers the classes users actually watch, and
   the probe can no longer report a pass for a class it never found. Testable:
   `ui_layout_probe.py` FAILS on any numeric class with 0 elements on a sport
@@ -4748,3 +4844,25 @@ a rebase, so it is filed as a request rather than raced for —
 `.syndicate/deploy/requests/2026-08-15T2350Z-smaps-reconciliation.md`.
 Until it lands the reader reports `reconciles: false` on every read. Cosmetic;
 the breakdown itself is correct.
+#### DEPLOY COORDINATION SENT 2026-08-15 ~22:0xZ — to `Syndicate plan assessment and sessions`
+- Recipient `local_82a0a2fe-b386-4615-b783-7a532cbd254f`, running, active seconds
+  before the send. **Messaged ONE session, deliberately** — `learnings.md`
+  FORBIDS waking many idle sessions at once, it stalls them.
+- **Held commits: `1322d0a8` (line), `d348e040` (market_key), `4ae71c4a`
+  (player_name).** All on local main, 218/218, nothing deployed.
+- Asked three things I cannot answer from here: who owns the refresh-worker
+  measurement window opened by `846bb74e` at 21:45:20Z; whether a worker deploy
+  train is forming these can ride; and if not, whether to just land it.
+- **I am NOT using the message as a gate.** `state.md` records that a
+  cross-session message cannot gate a deploy — it waits for the target's turn to
+  end while a deploy takes seconds, and every hold sent today arrived after the
+  deploy it was meant to stop. This works the other way round: the deploy is
+  held indefinitely and the message is what would RELEASE it, so latency cannot
+  hurt. Default if no reply: keep holding; any worker deploy cut above these
+  commits picks them up for free.
+- Also handed over, unrelated to my lane: the phantom-staged `docs/ai_context/
+  todo.md` index entry (blobs backed up, deliberately not disarmed), and the
+  identified CAUSE of the recurring `deploys.md` armed revert — a chained
+  `git restore --staged` inheriting a live `GIT_INDEX_FILE`.
+- **Web moved again while I was writing this**: `edfc0174` at 21:48:17Z,
+  superseding the `4316c907` I read at 21:41. Re-read per service, always.

@@ -685,6 +685,55 @@ def _movement_direction(delta: float | None) -> str:
     return "up" if delta > 0 else "down"
 
 
+def _apply_closing_stamp(
+    market_state: dict,
+    *,
+    previous_line: float | None,
+    previous_odds: float | None,
+    previous_snapshot_ts: str | None,
+    now: str,
+) -> None:
+    """Record the pregame close on an observed pregame->live transition.
+
+    Extracted from the refresh loop so it can be tested directly: the caller is
+    a multi-hundred-line loop over every market, and a stamp this easy to get
+    subtly wrong should not only be reachable through it.
+
+    **THE PRICE IS FROM THE PREVIOUS TICK, SO THE STAMP MUST BE TOO.** This
+    wrote `now` -- the moment the transition was DETECTED -- beside a price
+    observed one sweep earlier. On a ~2h pregame cadence those differ by up to
+    that whole interval, and detection necessarily happens after kickoff, so the
+    stamp routinely post-dated first pitch.
+
+    Measured mlb 2026-08-15: every stamped close had `close_age_seconds < 0` --
+    e.g. `20:34:26Z` against a `19:08Z` first pitch, 86 minutes late -- while the
+    price itself was a genuine pregame number. A correct price looked like an
+    in-play one and was excluded from the CLV headline by `close_timing`.
+
+    Idempotent on `closing_line`, not on `seen_live_market_keys` (which is
+    rebuilt empty every call and so cannot prove "first ever" across ticks);
+    `market_state` persists in the shard file, so this is the only check that
+    actually holds. Records nothing when `previous_line` is None -- a market
+    first observed already live has no real pregame value, and no closing line
+    is better than a wrong one.
+    """
+    if market_state.get("closing_line") is not None or previous_line is None:
+        return
+    market_state["closing_line"] = previous_line
+    market_state["closing_price"] = previous_odds
+    # `previous_snapshot_ts` is the observation time of the very price being
+    # recorded. Left UNSET when unknown rather than falling back to `now`: an
+    # unknown time must not be dressed up as a known one, and downstream
+    # `_close_timing` maps a missing age to `unknown`, which does not take the
+    # permissive branch.
+    if previous_snapshot_ts:
+        market_state["closing_captured_at"] = previous_snapshot_ts
+    # Detection time is still worth having -- it is what proves the transition
+    # was observed rather than inferred -- but under a name that says what it
+    # is, so no reader can mistake it for the price's timestamp again.
+    market_state["closing_detected_at"] = now
+
+
 def _percent_change(current_line: float | None, previous_line: float | None) -> float | None:
     if current_line is None or previous_line in (None, 0):
         return None
@@ -1596,10 +1645,14 @@ def _sync_odds_history_for_refresh(*, sport: str, source_root: Path, date_str: s
                 # makes the stamp idempotent. Left unset (never backfilled)
                 # when previous_line is None -- e.g. a market first observed
                 # already live has no real pregame value to record.
-                if was_confirmed_pregame and market_state.get("closing_line") is None and previous_line is not None:
-                    market_state["closing_line"] = previous_line
-                    market_state["closing_price"] = previous_odds
-                    market_state["closing_captured_at"] = now
+                if was_confirmed_pregame:
+                    _apply_closing_stamp(
+                        market_state,
+                        previous_line=previous_line,
+                        previous_odds=previous_odds,
+                        previous_snapshot_ts=previous_snapshot_ts,
+                        now=now,
+                    )
             elif is_final_row:
                 event_type = "final"
             elif previous_market_type is not None and str(normalized_entry.get("market_type") or "").strip().lower() != previous_market_type:

@@ -11,12 +11,20 @@ from syndicate.features.soccer.features.team_names import canonical_team_name
 from syndicate.features.soccer.features.team_names import match_team_name
 
 
+# `compute_team_ratings` requires an as-of date (audit §7 #6) and drops rows it
+# cannot date, so these fixtures carry real dates. They had none before -- the
+# function had no notion of time at all, which is what let the backtest score a
+# March match with May results.
+_AS_OF = "2026-06-01"
+
+
 def _team_rows() -> list[dict]:
     rows = []
-    for _ in range(10):
-        rows.append({"team": "Manchester City", "xg_for": 2.3, "xg_against": 0.8, "ppda": 9.0})
-        rows.append({"team": "Everton", "xg_for": 1.1, "xg_against": 2.2, "ppda": 13.0})
-        rows.append({"team": "Arsenal", "xg_for": 2.0, "xg_against": 0.9, "ppda": 10.0})
+    for index in range(10):
+        day = f"2026-03-{index + 1:02d}"
+        rows.append({"team": "Manchester City", "date": day, "xg_for": 2.3, "xg_against": 0.8, "ppda": 9.0})
+        rows.append({"team": "Everton", "date": day, "xg_for": 1.1, "xg_against": 2.2, "ppda": 13.0})
+        rows.append({"team": "Arsenal", "date": day, "xg_for": 2.0, "xg_against": 0.9, "ppda": 10.0})
     return rows
 
 
@@ -93,7 +101,7 @@ class BuildSoccerPlayerFeaturesTests(unittest.TestCase):
 
 class TeamRatingTests(unittest.TestCase):
     def test_ratings_are_relative_to_league_mean(self) -> None:
-        ratings = compute_team_ratings(_team_rows())
+        ratings = compute_team_ratings(_team_rows(), as_of=_AS_OF)
 
         self.assertGreater(ratings["Manchester City"]["attack_rating"], 0.0)
         self.assertGreater(ratings["Manchester City"]["defense_rating"], 0.0)
@@ -104,10 +112,16 @@ class TeamRatingTests(unittest.TestCase):
     def test_window_limits_rows(self) -> None:
         rows = _team_rows()
         # Append a late collapse for City; a short window should see only it.
-        for _ in range(5):
-            rows.append({"team": "Manchester City", "xg_for": 0.5, "xg_against": 2.5, "ppda": 14.0})
-        full = compute_team_ratings(rows)
-        recent = compute_team_ratings(rows, window=5)
+        # Dated AFTER the base rows (March) and before `_AS_OF`, because the
+        # window now selects the most recent rows *that predate as_of* -- undated
+        # rows are dropped, which is what makes the leak un-reintroducible.
+        for index in range(5):
+            rows.append({
+                "team": "Manchester City", "date": f"2026-04-{index + 1:02d}",
+                "xg_for": 0.5, "xg_against": 2.5, "ppda": 14.0,
+            })
+        full = compute_team_ratings(rows, as_of=_AS_OF)
+        recent = compute_team_ratings(rows, as_of=_AS_OF, window=5)
         self.assertLess(recent["Manchester City"]["attack_rating"], full["Manchester City"]["attack_rating"])
 
     def test_team_rows_from_match_history(self) -> None:
@@ -124,7 +138,7 @@ class TeamRatingTests(unittest.TestCase):
 
 class SimulationInputBuilderTests(unittest.TestCase):
     def test_build_input_matches_ratings_and_players(self) -> None:
-        ratings = compute_team_ratings(_team_rows())
+        ratings = compute_team_ratings(_team_rows(), as_of=_AS_OF)
         player_rows = [
             {"player_id": "p1", "player_name": "City Striker", "team": "Man City", "position": "FW",
              "shots_per90": 3.5, "xg_per90": 0.6, "xa_per90": 0.2, "expected_minutes_share": 0.9},
@@ -154,7 +168,7 @@ class SimulationInputBuilderTests(unittest.TestCase):
         self.assertEqual(simulation_input.metadata["simulations"], 25)
 
     def test_unrated_team_gets_neutral_rating_and_flag(self) -> None:
-        ratings = compute_team_ratings(_team_rows())
+        ratings = compute_team_ratings(_team_rows(), as_of=_AS_OF)
         simulation_input = build_soccer_simulation_input(
             league="epl",
             date="2026-08-21",

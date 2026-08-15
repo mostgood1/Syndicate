@@ -3892,3 +3892,41 @@ body[data-viewport='phone'] .cards-scoreboard {
 .cards-strip-score {
   font-variant-numeric: tabular-nums;
 }
+
+/* Every digit on the card, not an enumerated list of the classes that carry
+   them. The 2026-08-14 "tabular figures" fix named three classes and was
+   correct about all three; measured through `scripts/ui_layout_probe.py`
+   against production on 2026-08-15, the digits it did NOT reach were
+   mlb 1388, nfl 468, ncaaf 432, soccer 60 leaf elements still computing
+   `font-variant-numeric: normal` -- `.cards-chip`, `.cards-callout-copy`,
+   `.cards-subcopy`, `.cards-linescore-stat` and a long tail below them.
+
+   A hand-maintained class list is the wrong shape for this: it went stale
+   against NCAAF (`.cards-market-main`, 0 elements on a sport serving 16
+   cards) inside one day, and it goes stale again at every renderer fork.
+   `font-variant-numeric` inherits and affects only digit glyphs, so setting
+   it once on the card subtree covers anything a future template adds and
+   changes nothing about the prose it passes through. The board repaints on a
+   30s poll; proportional digits re-flow on every repaint. */
+.cards-game-card,
+.cards-strip-card {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Form controls do not inherit font properties: the UA stylesheet sets a
+   `font:` shorthand on <button>/<input>/<select>, which resets
+   `font-variant-numeric` to normal. Measured on production 2026-08-15 after
+   the rule above went live: `.cards-game-card` and `.cards-prop-filter-shell`
+   both computed `tabular-nums`, and `button.cards-filter-pill` inside them
+   computed `normal` with fontFamily `Arial` -- the UA shorthand winning. That
+   accounted for all 143 remaining non-tabular digits on MLB
+   (`.cards-prop-filter-count`, the count inside each filter pill), and MLB is
+   the only sport with in-card filter pills that carry counts. */
+.cards-game-card button,
+.cards-game-card input,
+.cards-game-card select,
+.cards-strip-card button,
+.cards-strip-card input,
+.cards-strip-card select {
+  font-variant-numeric: inherit;
+}

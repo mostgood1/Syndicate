@@ -118,7 +118,25 @@ class TotalRowTests(unittest.TestCase):
         # Production rendered a full-width empty track labelled "Full Game"
         # and captioned "EPL" -- the caption being the stand-in row's
         # `subtitle`, i.e. `game.detail`, which is not a total at all.
-        self.assertEqual(_normalize_game(_soccer_game())["shared_total_rows"], [])
+        #
+        # `sim` is cleared here deliberately. This test originally used the
+        # default fixture, which DOES carry `sim.score`, and passed only
+        # because the stand-in row ignored it -- the exact gap that left
+        # soccer's card with no market line and no edge anywhere. With the
+        # score read, that fixture has a real projected total and correctly
+        # gets a bar (see the test below), so pinning "no total" needs a game
+        # that genuinely has none.
+        game = _soccer_game(sim={"win_probability": {"home": 0.773, "draw": 0.14, "away": 0.087}})
+        self.assertEqual(_normalize_game(game)["shared_total_rows"], [])
+
+    def test_a_projected_total_derivable_from_the_score_gets_its_bar(self) -> None:
+        # Measured on production 2026-08-15: `sim.score` {away 0.78, home 2.46}
+        # was present while the row's subtitle read "EPL" and the bar was
+        # dropped for having no bins.
+        rows = _normalize_game(_soccer_game())["shared_total_rows"]
+        self.assertEqual(len(rows), 1)
+        self.assertIn("Projected total", rows[0]["summary"])
+        self.assertTrue(rows[0]["bins"])
 
     def test_a_real_projected_total_still_gets_its_bar(self) -> None:
         game = _soccer_game(
@@ -130,6 +148,53 @@ class TotalRowTests(unittest.TestCase):
         rows = _normalize_game(game)["shared_total_rows"]
         self.assertTrue(rows)
         self.assertTrue(all(row["bins"] for row in rows))
+
+
+class StandInRowMarketTests(unittest.TestCase):
+    """The stand-in row must read `betting`, not guess at metric labels.
+
+    Measured on production `/soccer/epl/api/cards` 2026-08-15: the Full Game
+    row read `Market —` / `Best edge —` while the SAME game carried
+    `betting.home_spread` -1.5, `betting.total` 2.5 and `sim.score`
+    {away 0.78, home 2.46}. The row asked `_metric_lookup` for "Spread" /
+    "Total" / "Edge"; soccer publishes "Home win", "Draw", "Away win",
+    "Total goals", "BTTS", "Over 2.5". Nothing matched, so a card with a market
+    line and a computable edge displayed neither, anywhere.
+    """
+
+    def _with_market(self):
+        return _soccer_game(betting={"home_spread": -1.5, "total": 2.5, "p_home_win": 0.8108})
+
+    def test_market_comes_from_betting_not_from_a_label_lookup(self) -> None:
+        row = _normalize_game(self._with_market())["shared_period_rows"][0]
+        self.assertIn("ATS ARS -1.5", row["market"])
+        self.assertIn("Total 2.5", row["market"])
+
+    def test_edge_is_computed_against_the_projection(self) -> None:
+        # score 0.8 @ 2.5 -> margin 1.7, total 3.3; line -1.5 and 2.5.
+        row = _normalize_game(self._with_market())["shared_period_rows"][0]
+        self.assertIn("ATS +0.2", row["best_edge"])
+        self.assertIn("Total +0.8", row["best_edge"])
+
+    def test_the_lens_panel_returns_once_the_row_has_something_to_say(self) -> None:
+        """The G3 gate is on CONTENT, so this needs no change in _build_lens_rows."""
+        self.assertEqual(_normalize_game(_soccer_game())["shared_lens_rows"], [])
+        rows = _normalize_game(self._with_market())["shared_lens_rows"]
+        self.assertEqual(len(rows), 1)
+
+    def test_no_betting_still_suppresses_rather_than_inventing_a_market(self) -> None:
+        row = _normalize_game(_soccer_game())["shared_period_rows"][0]
+        self.assertEqual(row["market"], NULL_PLACEHOLDER)
+        self.assertEqual(row["best_edge"], NULL_PLACEHOLDER)
+
+    def test_a_line_with_no_projection_states_the_market_and_no_edge(self) -> None:
+        game = _soccer_game(
+            betting={"home_spread": -1.5, "total": 2.5},
+            sim={"win_probability": {"home": 0.773, "draw": 0.14, "away": 0.087}},
+        )
+        row = _normalize_game(game)["shared_period_rows"][0]
+        self.assertIn("ATS ARS -1.5", row["market"])
+        self.assertEqual(row["best_edge"], NULL_PLACEHOLDER)
 
 
 class RepeatedCopyTests(unittest.TestCase):

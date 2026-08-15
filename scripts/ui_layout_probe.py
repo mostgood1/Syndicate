@@ -126,7 +126,50 @@ TYPE_CLASSES = [
 # forks; `numericSweep` below finds elements by what they RENDER instead.
 NUMERIC_CLASSES = [".cards-data-pair strong", ".cards-market-main", ".cards-mini-metric strong"]
 
+# Classes a sport's design legitimately does not have, DECLARED BY NAME with a
+# reason -- the same opt-out shape as OUT_OF_SEASON, and for the same reason.
+# Silent absence is the bug this file exists to prevent; declared absence is a
+# design fact, and writing it down is what keeps the two apart.
+#
+# An entry here is a claim that can rot, so it is checked in BOTH directions:
+# absent-and-exempt passes quietly, but present-and-exempt is reported, because
+# that means the sport grew the class and the exemption is now a lie.
+NUMERIC_CLASS_EXEMPT: dict[str, dict[str, str]] = {
+    "ncaaf": {
+        ".cards-market-main": (
+            "the ncaaf card has no market tile row at all -- `_game_card.html` "
+            "sends `ncaaf_main` to `_game_card_ncaaf.html`, which contains zero "
+            "`cards-market` markup and presents the same numbers as "
+            "`.cards-data-pair` inside panels. Verified 2026-08-15. NOTE: "
+            "`ncaaf/cards.py` does build `market_tiles`, but they are "
+            "publication metadata (Coverage/Tier/Status/Priority), not market "
+            "data, and they are consumed by `home.py` -- not dead, do not delete."
+        ),
+    },
+}
+
 WCAG_TARGET_PX = 44
+
+# How far a card may sit from the `chrome + k * units` height model before the
+# run fails, and it is a MEASURED number, not a guess. Baseline taken on
+# production 2026-08-15 with the render fully settled, across every group the
+# model called reliable:
+#
+#     mlb mobile  Live     n= 3   residual   6px
+#     mlb mobile  Preview  n=10   residual  54px
+#     mlb desktop Live     n= 3   residual  18px
+#
+# 150px is ~3x the worst clean reading. Wide enough that ordinary content
+# churn does not trip it, narrow enough that a card rendering an extra block
+# (~62px per pair on mobile, and every panel is larger than that) shows up.
+# Re-derive it if the card design changes; do not widen it to silence a run.
+LAYOUT_RESIDUAL_BUDGET_PX = 150
+
+# How long to wait for the first card to attach before calling the render
+# failed. Generous on purpose: it is only ever paid in full by a sport that is
+# genuinely serving nothing, and the cost of being stingy is a false zero on
+# the sport with the most traffic.
+CARD_WAIT_MS = 20000
 
 # Sports whose season has not opened, where 0 cards is the correct answer and
 # not a failure. Measured 2026-08-14: NBA, NHL and NCAAB served 0 cards, so
@@ -142,6 +185,162 @@ MEASURE_JS = """
   const cards = [...document.querySelectorAll('.cards-game-card, .cards-strip-card')];
   const gameCards = [...document.querySelectorAll('.cards-game-card')];
   const heights = gameCards.map((c) => Math.round(c.getBoundingClientRect().height));
+
+  // Spread WITHIN a game state, because the overall number is dominated by how
+  // many games happen to be live. Measured on production /mlb/cards at 390px,
+  // 15 cards, 2026-08-15:
+  //
+  //     Preview  n=10  2929-3009px  spread   80px
+  //     Final    n= 2  2833-2915px  spread   82px
+  //     Live     n= 3  3156-4549px  spread 1393px
+  //     overall                     spread 1716px
+  //
+  // The layout is tight to ~80px inside a state; the whole 1716 is live-game
+  // content. So the overall figure swung 796 -> 1716 between two runs with no
+  // code change, which makes it useless for catching a layout regression -- it
+  // reports the slate, not the CSS. Per-state is the comparable number.
+  const byState = {};
+  gameCards.forEach((c) => {
+    const badge = c.querySelector('.cards-status-badge');
+    const state = ((badge && badge.textContent) || 'unknown').trim() || 'unknown';
+    const h = Math.round(c.getBoundingClientRect().height);
+    (byState[state] = byState[state] || []).push(h);
+  });
+  const cardHeightByState = {};
+  Object.keys(byState).forEach((k) => {
+    const v = byState[k].slice().sort((a, b) => a - b);
+    cardHeightByState[k] = {n: v.length, min: v[0], max: v[v.length - 1], spread: v[v.length - 1] - v[0]};
+  });
+
+  // ...and even WITHIN a state the spread is mostly content volume, not layout.
+  // Measured on production /mlb/cards at 390px, 10 Preview cards, 2026-08-15:
+  // height tracks `.cards-data-pair` count almost linearly --
+  //
+  //     33 pairs -> 3100px      45 pairs -> 3830-3846px
+  //     41 pairs -> 3591px      49 pairs -> 4101-4121px      53 pairs -> 4317-4345px
+  //
+  // i.e. ~62px per pair, and the same Preview group measured 80px of spread
+  // twenty minutes earlier when every game carried the same amount of data.
+  // So the height figures answer "how much data does this game have", and a
+  // reader cannot tell a layout regression from a busy slate WITHOUT the
+  // content count next to it. That is what this reports.
+  const unitCounts = gameCards.map((c) => c.querySelectorAll('.cards-data-pair').length).sort((a, b) => a - b);
+  const contentUnits = unitCounts.length
+    ? {min: unitCounts[0], max: unitCounts[unitCounts.length - 1],
+       spread: unitCounts[unitCounts.length - 1] - unitCounts[0]}
+    : null;
+
+  // THE LAYOUT SIGNAL. Card height is `chrome + k * units`, so the residual
+  // from that fit is what stays flat while the slate churns and moves when the
+  // layout actually changes.
+  //
+  // `height / units` is the obvious form and it is WRONG, measurably: fitted
+  // over 10 production MLB Preview cards (33-53 pairs, 3100-4345px) the
+  // intercept is **1051px** of fixed chrome -- head, market tiles, tab rail --
+  // against a slope of 62.1px per pair. A ratio would read 94px/pair on the
+  // 33-pair card and 82px/pair on the 53-pair card and call that a 15% layout
+  // difference. It is not a difference; it is the constant, and it would have
+  // made the metric worse than the raw number on exactly the sport it is for.
+  //
+  // Residuals on that same slate: [1, -5, -14, 2, 8, 28, -24, 4] px -- a spread
+  // of 52px against a raw height spread of 1245px.
+  // FIT PER GAME STATE, not across the slate, and that is a measured decision.
+  // A single line over all 15 MLB cards gave a residual spread of 668px; the
+  // same fit restricted to the 10 Preview cards gave 52px. A live card carries
+  // content this unit does not count (the live lens), so mixing states breaks
+  // the linearity and the residual stops being a layout signal. Fitting inside
+  // a state is what makes it one.
+  function fitGroup(pts) {
+    // A line costs 2 parameters, so n=3 leaves ONE degree of freedom and the
+    // residual is noise. Measured on the same slate, same instant: Live n=3
+    // gave fit ratio 0.59 and 1.29 while Preview n=9 gave 0.09 -- the small
+    // groups were not detecting anything, they were fitting themselves. n>=5
+    // is the floor; below it there is no fit rather than a bad one.
+    if (pts.length < 5 || new Set(pts.map((p) => p.u)).size < 2) return null;
+    const n = pts.length;
+    const sx = pts.reduce((a, p) => a + p.u, 0);
+    const sy = pts.reduce((a, p) => a + p.h, 0);
+    const sxx = pts.reduce((a, p) => a + p.u * p.u, 0);
+    const sxy = pts.reduce((a, p) => a + p.u * p.h, 0);
+    const denom = n * sxx - sx * sx;
+    if (denom === 0) return null;
+    const slope = (n * sxy - sx * sy) / denom;
+    const intercept = (sy - slope * sx) / n;
+    const res = pts.map((p) => p.h - (intercept + slope * p.u));
+    const worst = pts
+      .map((p, i) => ({u: p.u, h: p.h, residual: Math.round(res[i])}))
+      .sort((a, b) => Math.abs(b.residual) - Math.abs(a.residual))[0];
+    const residualSpread = Math.round(Math.max(...res) - Math.min(...res));
+    // How much of the height range the model actually accounts for. The model
+    // assumes each unit adds a ROW, which is true where the summary grid
+    // stacks single-column and false where it wraps into columns. Measured
+    // 2026-08-15 on the same MLB slate: mobile Preview residual 54px against
+    // ~1000px explained (5%), desktop Preview 201px against ~261px (77%). Same
+    // cards, same instant -- the desktop grid simply is not linear in pairs.
+    // Reporting that as a layout alarm would make this permanently red on a
+    // healthy board, so a poor fit is declared UNRELIABLE instead.
+    const uRange = Math.max(...pts.map((p) => p.u)) - Math.min(...pts.map((p) => p.u));
+    const explained = Math.abs(slope) * uRange;
+    const fitRatio = explained > 0 ? residualSpread / explained : null;
+    const groupHeightSpread = Math.max(...pts.map((p) => p.h)) - Math.min(...pts.map((p) => p.h));
+    // Content-INDEPENDENT is a third state, and mistaking it for "no signal"
+    // was this metric's bug. At 1440 the summary grid wraps into columns, so an
+    // extra pair adds WIDTH, not height: measured slope **0.4-5.5 px/pair** on
+    // desktop against **62 px/pair** on mobile, same cards, same instant. The
+    // model then explains almost nothing and `fitRatio` calls it unreliable --
+    // true, and the wrong conclusion. Where content does not drive height, the
+    // RAW spread is already a clean layout signal and needs no model.
+    //
+    // 50px is the cutoff: content accounting for less than that across the
+    // whole observed range is not driving height. Desktop groups measured
+    // 10-38px explained; mobile Preview measured 745px.
+    const contentIndependent = explained < 50;
+    return {
+      n,
+      pxPerUnit: Math.round(slope * 10) / 10,
+      chromePx: Math.round(intercept),
+      residualSpread,
+      maxAbsResidual: Math.round(Math.max(...res.map(Math.abs))),
+      explainedPx: Math.round(explained),
+      groupHeightSpread,
+      fitRatio: fitRatio === null ? null : Math.round(fitRatio * 100) / 100,
+      contentIndependent,
+      reliable: fitRatio !== null && fitRatio <= 0.25,
+      worstCard: worst,
+    };
+  }
+
+  const ptsByState = {};
+  gameCards.forEach((c) => {
+    const badge = c.querySelector('.cards-status-badge');
+    const state = ((badge && badge.textContent) || 'unknown').trim() || 'unknown';
+    (ptsByState[state] = ptsByState[state] || []).push({
+      u: c.querySelectorAll('.cards-data-pair').length,
+      h: Math.round(c.getBoundingClientRect().height),
+    });
+  });
+  const heightModelByState = {};
+  Object.keys(ptsByState).forEach((k) => {
+    const m = fitGroup(ptsByState[k]);
+    if (m) heightModelByState[k] = m;
+  });
+  // The reported figure is the WORST state that could be fitted. States with
+  // too few cards are absent rather than passing -- `statesUnfitted` says which,
+  // so "no signal" never reads as "clean".
+  // Rank states by the figure that will actually be REPORTED for them -- the
+  // raw spread where content does not drive height, the residual where it
+  // does. Ranking everything by residual would hide a content-independent
+  // state with a large spread behind a well-fitted one with a small residual.
+  const reported = (m) => (m.contentIndependent ? m.groupHeightSpread : m.residualSpread);
+  const fittedStates = Object.keys(heightModelByState);
+  const worstState = fittedStates.length
+    ? fittedStates.reduce((a, b) =>
+        reported(heightModelByState[a]) >= reported(heightModelByState[b]) ? a : b)
+    : null;
+  const heightModel = worstState
+    ? Object.assign({state: worstState}, heightModelByState[worstState])
+    : null;
+  const statesUnfitted = Object.keys(ptsByState).filter((k) => !heightModelByState[k]);
 
   // Tab/panel id agreement, per card. A tab whose target has no panel blanks
   // the card when clicked (NCAAF, measured 2026-08-14); a panel with no tab is
@@ -283,6 +482,16 @@ MEASURE_JS = """
     cardHeightMin: heights.length ? Math.min(...heights) : null,
     cardHeightMax: heights.length ? Math.max(...heights) : null,
     cardHeightSpread: heights.length ? Math.max(...heights) - Math.min(...heights) : null,
+    cardHeightByState,
+    contentUnits,
+    heightModel,
+    heightModelByState,
+    statesUnfitted,
+    // The least-confounded figure available: the worst spread inside any one
+    // game state. Still not a pure layout signal -- read it with contentUnits.
+    cardHeightSpreadWithinState: Object.keys(cardHeightByState).length
+      ? Math.max(...Object.keys(cardHeightByState).map((k) => cardHeightByState[k].spread))
+      : null,
     tabsWithoutPanel: [...new Set(tabsWithoutPanel)],
     panelsWithoutTab: [...new Set(panelsWithoutTab)],
     typeScale,
@@ -296,6 +505,43 @@ MEASURE_JS = """
   };
 }
 """
+
+
+SETTLE_POLL_MS = 400
+SETTLE_MAX_MS = 12000
+
+_FINGERPRINT_JS = """() => document.querySelectorAll('.cards-game-card').length * 100000
+  + document.querySelectorAll('.cards-data-pair').length * 100
+  + document.querySelectorAll('.cards-callout').length"""
+
+
+def _settle(page) -> dict[str, Any]:
+    """Wait until the card DOM stops growing, not until the first card exists.
+
+    `wait_for_selector` proves a card ATTACHED. It does not prove the render
+    finished, and on MLB those are seconds apart. Measured on production
+    /mlb/cards at 390px, 2026-08-15, total `.cards-data-pair` across 15 cards:
+
+        +0ms 482   +600ms 530   +1200ms 590   +2000ms 683   +3000ms 719   +4500ms 719
+
+    The old fixed 600ms settle measured MLB at **74% of its final content**, so
+    every MLB height, spread and content figure this probe produced was taken
+    mid-render -- including the ones used to argue about the height model. Two
+    consecutive equal fingerprints is the signal; a timeout is REPORTED, never
+    silently treated as settled.
+    """
+    last = None
+    stable = 0
+    waited = 0
+    while waited < SETTLE_MAX_MS:
+        fp = page.evaluate(_FINGERPRINT_JS)
+        stable = stable + 1 if fp == last else 0
+        last = fp
+        if stable >= 2:
+            return {"settledMs": waited, "settled": True}
+        page.wait_for_timeout(SETTLE_POLL_MS)
+        waited += SETTLE_POLL_MS
+    return {"settledMs": waited, "settled": False}
 
 
 def _tab_click_through(page, sport: str) -> list[dict[str, Any]]:
@@ -356,12 +602,40 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
                         # no cards and does not overflow. A probe that passes
                         # on an error page is worse than no probe.
                         response = page.goto(f"{base_url}{route}", timeout=timeout_ms, wait_until="load")
-                        page.wait_for_timeout(400)
+                        status = response.status if response is not None else None
+                        # Wait on CONTENT, not on a timer. Seven of the eight
+                        # sports render server-side and are complete at `load`;
+                        # MLB renders through `cards_source.js` AFTER it, so a
+                        # fixed delay races the renderer. Measured 2026-08-15:
+                        # the same production URL returned 0 cards and 15 cards
+                        # minutes apart, and a 600ms read found 0 elements for
+                        # classes a 2500ms read found 495 of. That false zero
+                        # reached a written claim before it was caught.
+                        #
+                        # A timeout here is NOT a 0-card slate. It is recorded
+                        # as its own state so an unfinished render can never be
+                        # read as an empty one -- the same rule this file
+                        # applies to a missing selector and a 502.
+                        card_wait_timed_out = False
+                        settle: dict[str, Any] = {}
+                        if status is not None and status < 400:
+                            try:
+                                page.wait_for_selector(
+                                    ".cards-game-card, .cards-strip-card",
+                                    timeout=min(timeout_ms, CARD_WAIT_MS),
+                                    state="attached",
+                                )
+                                settle = _settle(page)
+                            except Exception:
+                                card_wait_timed_out = True
                         measured = page.evaluate(
                             MEASURE_JS,
                             {"typeClasses": TYPE_CLASSES, "numericClasses": NUMERIC_CLASSES},
                         )
-                        measured["httpStatus"] = response.status if response is not None else None
+                        measured["httpStatus"] = status
+                        measured["cardWaitTimedOut"] = card_wait_timed_out
+                        measured["settledMs"] = settle.get("settledMs")
+                        measured["renderSettled"] = settle.get("settled")
                         measured["touchTargetFailures"] = [
                             box
                             for box in measured.pop("tabBoxes", [])
@@ -384,6 +658,10 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
     lines: list[str] = []
     ok = True
     out_of_season = set(report.get("outOfSeason") or ())
+    # `spread` is the worst spread WITHIN a game state, not across the slate --
+    # see the note in MEASURE_JS. The across-slate figure is still in the JSON
+    # as `cardHeightSpread`, but it is not what gets printed, because it moves
+    # with how many games are live and cannot be compared between runs.
     header = f"{'sport':8} {'width':8} {'cards':>5} {'overflow':>9} {'spread':>7}  tabs"
     lines.append(header)
     lines.append("-" * len(header))
@@ -395,7 +673,9 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 ok = False
                 continue
             overflow = measured.get("overflowPx")
-            spread = measured.get("cardHeightSpread")
+            spread = measured.get("cardHeightSpreadWithinState")
+            if spread is None:
+                spread = measured.get("cardHeightSpread")
             cards = measured.get("cards") or 0
             issues = []
             if overflow:
@@ -426,11 +706,27 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             # the honest state of the measurement is "unknown", not "fine".
             if cards:
                 figures = measured.get("tabularFigures") or {}
-                unmeasured = [s for s, v in figures.items() if not (v or {}).get("count")]
+                exempt = NUMERIC_CLASS_EXEMPT.get(sport, {})
+                unmeasured = [
+                    s for s, v in figures.items()
+                    if not (v or {}).get("count") and s not in exempt
+                ]
                 if unmeasured:
                     issues.append(
                         "numeric class not found (measurement did NOT run): "
                         + ",".join(s.replace(".cards-", "") for s in unmeasured)
+                    )
+                    ok = False
+                # The exemption is a CLAIM about the sport's markup, so it is
+                # checked in the other direction too. If the class turns up, the
+                # sport grew a surface the exemption says it does not have, and
+                # the entry is now hiding a real measurement.
+                stale_exempt = [s for s in exempt if (figures.get(s) or {}).get("count")]
+                if stale_exempt:
+                    issues.append(
+                        "STALE EXEMPTION (class now exists, remove it from "
+                        "NUMERIC_CLASS_EXEMPT): "
+                        + ",".join(s.replace(".cards-", "") for s in stale_exempt)
                     )
                     ok = False
                 proportional = [
@@ -459,6 +755,70 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             if empties:
                 total = sum(e["emptyCopy"] + e["placeholders"] + e["emptyBars"] for e in empties)
                 issues.append(f"{total} empty slot(s) in {len(empties)} panel(s)")
+            # Print the content range next to the spread whenever cards differ
+            # in how much data they carry, so nobody reads a busy slate as a
+            # layout regression. MLB's spread is ~62px per `.cards-data-pair`.
+            units = measured.get("contentUnits") or {}
+            if units.get("spread"):
+                issues.append(f"content varies {units['min']}-{units['max']} pairs/card")
+            # The layout signal: deviation from `chrome + k * units`. Printed
+            # whenever it exists, and FAILED only against a baseline that was
+            # measured rather than guessed -- see LAYOUT_RESIDUAL_BUDGET_PX.
+            model = measured.get("heightModel") or {}
+            # Report EVERY fitted state, not only the worst. Measured: mobile
+            # Preview (n=9) was a clean 68px/ratio-0.09 signal while Live (n=3,
+            # since excluded) ranked "worst" at ratio 0.59 -- so the one real
+            # signal on the page was hidden behind noise from a group too small
+            # to fit. A summary that shows only the worst row can suppress the
+            # only row that was working.
+            by_state = measured.get("heightModelByState") or {}
+            healthy = [s for s, m in by_state.items() if m.get("reliable") and not m.get("contentIndependent")]
+            if healthy and (model or {}).get("state") not in healthy:
+                for s in sorted(healthy):
+                    m2 = by_state[s]
+                    issues.append(f"layout residual {m2['residualSpread']}px in {s} (reliable)")
+            if model:
+                # Three states, not two. Treating the middle one as "no signal"
+                # was this metric's own bug -- see the note in fitGroup.
+                if model.get("contentIndependent"):
+                    # Content is not driving height here, so the RAW spread is
+                    # already the layout signal and the budget applies to it.
+                    signal = model["groupHeightSpread"]
+                    issues.append(
+                        f"layout spread {signal}px in {model['state']} "
+                        f"(content-independent: {model['explainedPx']}px explained "
+                        f"at {model['pxPerUnit']}px/pair)"
+                    )
+                    if signal > LAYOUT_RESIDUAL_BUDGET_PX:
+                        issues.append(
+                            f"LAYOUT SPREAD OVER BUDGET ({signal}px > "
+                            f"{LAYOUT_RESIDUAL_BUDGET_PX}px) with content not "
+                            "driving height -- this is a layout difference"
+                        )
+                        ok = False
+                elif not model.get("reliable"):
+                    issues.append(
+                        f"layout model UNRELIABLE in {model['state']} "
+                        f"(fit ratio {model['fitRatio']}, {model['explainedPx']}px "
+                        "explained) -- no layout signal here"
+                    )
+                else:
+                    issues.append(
+                        f"layout residual {model['residualSpread']}px in {model['state']} "
+                        f"({model['chromePx']}px chrome + {model['pxPerUnit']}px/pair)"
+                    )
+                    if model["residualSpread"] > LAYOUT_RESIDUAL_BUDGET_PX:
+                        issues.append(
+                            f"LAYOUT RESIDUAL OVER BUDGET ({model['residualSpread']}px > "
+                            f"{LAYOUT_RESIDUAL_BUDGET_PX}px): a card is off the height "
+                            f"model -- worst {model['worstCard']['residual']:+}px at "
+                            f"{model['worstCard']['u']} pairs"
+                        )
+                        ok = False
+                # Absence of a fit is absence of a signal, never a pass.
+                unfitted = measured.get("statesUnfitted") or []
+                if unfitted:
+                    issues.append("no layout fit for: " + ",".join(unfitted))
             conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
             if conflated:
                 issues.append("type conflated: " + ",".join(c.lstrip(".") for c in conflated))
@@ -471,7 +831,28 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             # out-of-season sport is a legitimate 0, so it is opt-out by name
             # rather than silently tolerated -- which is what makes a 0 on a
             # sport you EXPECTED to have cards fail the run.
-            if not cards:
+            # A render that never produced a card is NOT an empty slate, and
+            # conflating the two is what let MLB report `0 cards` on a slate of
+            # 15. This branch runs before the 0-card one so the timeout gets
+            # named as the cause, and it fails even for an out-of-season sport:
+            # "nothing to show" should resolve fast, so a 20s timeout there is
+            # itself the anomaly.
+            # A render still growing when we measured it makes every number on
+            # the row provisional -- MLB was measured at 74% of its content
+            # under the old fixed settle. Fail rather than footnote it.
+            if measured.get("renderSettled") is False:
+                issues.append(
+                    f"RENDER NEVER SETTLED in {SETTLE_MAX_MS // 1000}s -- "
+                    "every figure on this row was taken mid-render"
+                )
+                ok = False
+            if measured.get("cardWaitTimedOut"):
+                issues.append(
+                    f"NO CARD ATTACHED in {CARD_WAIT_MS // 1000}s -- render did not "
+                    "finish; this is NOT a 0-card slate"
+                )
+                ok = False
+            elif not cards:
                 issues.append("0 cards served -- NOT a pass, re-measure in season")
                 if sport not in out_of_season:
                     ok = False
@@ -512,6 +893,62 @@ class _SilentRequestHandler(WSGIRequestHandler):
         return
 
 
+# Metrics that are a property of the CODE. A deploy can move them; an evening
+# of games cannot. If one of these differs between two runs and nothing shipped
+# to the card surface, the harness is measuring something it does not
+# understand -- that is the finding, not the number.
+STABLE_METRICS = ("overflowPx", "tabsWithoutPanel", "panelsWithoutTab", "unstyledLinks")
+
+# Metrics that legitimately move with the slate. Printed for context, never
+# failed. Established the hard way: card-height spread read 796 / 1716 / 1583 /
+# 1125 px across one evening with no code change.
+SLATE_METRICS = ("cards", "cardHeightSpread", "cardHeightSpreadWithinState", "contentUnits")
+
+
+def _cmp_value(v):
+    if isinstance(v, list):
+        return len(v)
+    if isinstance(v, dict):
+        return v.get("spread", v.get("max"))
+    return v
+
+
+def compare(baseline: dict[str, Any], current: dict[str, Any]) -> tuple[list[str], bool]:
+    """Diff two reports, separating code-driven drift from slate movement."""
+    lines = ["comparison vs baseline", "-" * 60]
+    ok = True
+    for sport, cur_sport in current.get("sports", {}).items():
+        base_sport = (baseline.get("sports") or {}).get(sport) or {}
+        for width in VIEWPORTS:
+            cur = cur_sport.get(width) or {}
+            base = base_sport.get(width) or {}
+            if not base:
+                lines.append(f"{sport:8} {width:8} NEW -- not in baseline, nothing to compare")
+                continue
+            if (cur.get("httpStatus") or 0) >= 400 or (base.get("httpStatus") or 0) >= 400:
+                lines.append(f"{sport:8} {width:8} SKIPPED -- an HTTP error on one side is not a comparison")
+                ok = False
+                continue
+            drift = []
+            for key in STABLE_METRICS:
+                b, c = _cmp_value(base.get(key)), _cmp_value(cur.get(key))
+                if b != c:
+                    drift.append(f"{key} {b} -> {c}")
+            moved = []
+            for key in SLATE_METRICS:
+                b, c = _cmp_value(base.get(key)), _cmp_value(cur.get(key))
+                if b != c:
+                    moved.append(f"{key} {b} -> {c}")
+            if drift:
+                ok = False
+                lines.append(f"{sport:8} {width:8} CODE-DRIVEN DRIFT: " + "; ".join(drift))
+            else:
+                lines.append(f"{sport:8} {width:8} stable metrics unchanged")
+            if moved:
+                lines.append(f"{'':17} slate moved: " + "; ".join(moved))
+    return lines, ok
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base-url", default=None, help="Probe a running server instead of serving in-process.")
@@ -524,6 +961,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="Print the full report as JSON.")
     parser.add_argument("--write", default=None, help="Write the full JSON report to this path.")
+    parser.add_argument(
+        "--compare",
+        default=None,
+        help="Diff this run against a baseline JSON. Code-driven drift fails; slate movement is printed.",
+    )
     args = parser.parse_args(argv)
 
     sports = [s.strip() for s in args.sports.split(",") if s.strip()]
@@ -545,6 +987,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         path = Path(args.write)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if args.compare:
+        baseline_path = Path(args.compare)
+        if not baseline_path.exists():
+            # A missing baseline is not a clean comparison, and this file's
+            # whole discipline is that absent must not read as fine.
+            print(f"BASELINE NOT FOUND: {baseline_path} -- nothing was compared")
+            return 1
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        cmp_lines, cmp_ok = compare(baseline, report)
+        lines = lines + ["", *cmp_lines]
+        ok = ok and cmp_ok
+
     if args.json:
         print(json.dumps(report, indent=2))
     else:

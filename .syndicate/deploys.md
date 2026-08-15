@@ -687,6 +687,7 @@ people learn to route around. Run the gate, read it, then deploy.
 - Rollback: redeploy `2e4e2544` (read the live commit first) and set
   `SYNDICATE_TRACEMALLOC_DIAG=1` if its owner wants the instrument back.
 
+## DEPLOYED 2026-08-14 10:42 CDT — `530fc5d8` refresh-worker — Layer 2 shortlist off the Layer 1 floor — MEASUREMENT OPEN
 ## DEPLOYED 2026-08-14 10:42 CDT — `530fc5d8` refresh-worker — Layer 2 shortlist off the Layer 1 floor — **MEASURED, CRITERIA MET**
 
 - **Preflight 2026-08-14 10:24 CDT (15:24Z): PASS on scope, HOLD on timing.**
@@ -882,6 +883,7 @@ people learn to route around. Run the gate, read it, then deploy.
 - Rollback: `DELETE /v1/services/srv-d91dpertqb8s73co8lt0/env-vars/SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB`
   then redeploy pinned at the then-live commit; the code fallback returns it to
   7200. Re-read the live commit first.
+- Measured: `<pending>`
 - Measured: 2026-08-14 11:20-11:29 CDT. Deploy `live` 16:04:20Z at commit
   `83e3e5f2` — status AND commit checked, not the 201.
   - **The gate's own output at 16:20:30Z is the primary evidence:**
@@ -1703,6 +1705,7 @@ measurement, not a regression of this one.
   explicit key list and `clv_openings` was not added to it. Readable via the
   Render logs API, which works; not readable on the wire.
 - **Rollback:** redeploy `7b1f3fdc` on `srv-d91dpertqb8s73co8ls0` by commitId.
+- **MEASUREMENT: _______**
 - **MEASURED `[22:32:02Z, refresh-worker logs]` — 3 of 4 PREDICTIONS HELD, 1 PENDING.**
 
       [clv_opening_ledger] OPENINGS date=2026-08-14 rows_in=150 written=150
@@ -3373,6 +3376,7 @@ Rollback if needed: redeploy pinned to `bebe87c9`.
   its own fix. This is the documented boot-confound: every deploy reboots, so
   every fix looks good for five minutes.
 - **Rollback:** redeploy `c67f7373` by commitId.
+- **MEASUREMENT:** _(pending — needs a LIVE NFL slate, not just status=live)_
 - **DEPLOY LANDED 2026-08-15T20:00:19Z, `status=live`, commit `dca39fad`.**
 - **THE FIX'S EFFECT IS UNVERIFIED. BOTH HALVES. Do not read the deploy as the
   fix.** `[checked 20:11Z, 11 min after live]`
