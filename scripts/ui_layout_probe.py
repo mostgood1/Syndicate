@@ -126,6 +126,28 @@ TYPE_CLASSES = [
 # forks; `numericSweep` below finds elements by what they RENDER instead.
 NUMERIC_CLASSES = [".cards-data-pair strong", ".cards-market-main", ".cards-mini-metric strong"]
 
+# Classes a sport's design legitimately does not have, DECLARED BY NAME with a
+# reason -- the same opt-out shape as OUT_OF_SEASON, and for the same reason.
+# Silent absence is the bug this file exists to prevent; declared absence is a
+# design fact, and writing it down is what keeps the two apart.
+#
+# An entry here is a claim that can rot, so it is checked in BOTH directions:
+# absent-and-exempt passes quietly, but present-and-exempt is reported, because
+# that means the sport grew the class and the exemption is now a lie.
+NUMERIC_CLASS_EXEMPT: dict[str, dict[str, str]] = {
+    "ncaaf": {
+        ".cards-market-main": (
+            "the ncaaf card has no market tile row at all -- `_game_card.html` "
+            "sends `ncaaf_main` to `_game_card_ncaaf.html`, which contains zero "
+            "`cards-market` markup and presents the same numbers as "
+            "`.cards-data-pair` inside panels. Verified 2026-08-15. NOTE: "
+            "`ncaaf/cards.py` does build `market_tiles`, but they are "
+            "publication metadata (Coverage/Tier/Status/Priority), not market "
+            "data, and they are consumed by `home.py` -- not dead, do not delete."
+        ),
+    },
+}
+
 WCAG_TARGET_PX = 44
 
 # How long to wait for the first card to attach before calling the render
@@ -459,11 +481,27 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             # the honest state of the measurement is "unknown", not "fine".
             if cards:
                 figures = measured.get("tabularFigures") or {}
-                unmeasured = [s for s, v in figures.items() if not (v or {}).get("count")]
+                exempt = NUMERIC_CLASS_EXEMPT.get(sport, {})
+                unmeasured = [
+                    s for s, v in figures.items()
+                    if not (v or {}).get("count") and s not in exempt
+                ]
                 if unmeasured:
                     issues.append(
                         "numeric class not found (measurement did NOT run): "
                         + ",".join(s.replace(".cards-", "") for s in unmeasured)
+                    )
+                    ok = False
+                # The exemption is a CLAIM about the sport's markup, so it is
+                # checked in the other direction too. If the class turns up, the
+                # sport grew a surface the exemption says it does not have, and
+                # the entry is now hiding a real measurement.
+                stale_exempt = [s for s in exempt if (figures.get(s) or {}).get("count")]
+                if stale_exempt:
+                    issues.append(
+                        "STALE EXEMPTION (class now exists, remove it from "
+                        "NUMERIC_CLASS_EXEMPT): "
+                        + ",".join(s.replace(".cards-", "") for s in stale_exempt)
                     )
                     ok = False
                 proportional = [

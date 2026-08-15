@@ -2463,3 +2463,94 @@ the STRICT reading. That fail-closed default is now pinned by a test.
 **No deploy.** The probe is a dev-time script; it runs in nobody's request path.
 
 - **FINAL:** shipped, verified, closed. Nothing of this lane uncommitted.
+
+### ncaaf-market-main-expectation — CLOSED-VERIFIED 2026-08-15 — ncaaf run OK; exemption checked in both directions — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: the harness stops reporting a failure for a class NCAAF's design does
+  not have, without reintroducing "absent reads as a pass". Testable: a clean
+  ncaaf run passes; and if `.cards-market-main` ever DOES appear on ncaaf, the
+  run reports that the exemption is stale.
+- Files (exclusive to this lane):
+  - `scripts/ui_layout_probe.py`
+  - `tests/test_ui_layout_probe.py`
+  - Collision check RUN (lane-guard `_claims()` over `lanes.md`): 32 claimed
+    paths; both of mine free. **`syndicate/blueprints/home.py` IS claimed by
+    OPEN lane `market-key-blank-not-absent`** — not edited; finding handed over.
+- Hypothesis (traced, not assumed): `.cards-market-main` == 0 on ncaaf is
+  CORRECT, not a defect. `_game_card.html` dispatches `ncaaf_main` to
+  `_game_card_ncaaf.html`, which contains **zero** `cards-market` markup;
+  NCAAF presents the same numbers as `.cards-data-pair` inside panels.
+- **Traced further, and it overturned my first plan.** `ncaaf/cards.py` builds
+  `market_tiles` at 3 sites and the ncaaf template never renders them, so they
+  looked like dead code to delete. They are NOT dead: `home.py:6381` iterates
+  `market_tiles` GENERICALLY and renders `"{label}: {title}"`. NCAAF's tiles
+  are publication metadata (Coverage / Tier / Status / Priority), so deleting
+  them would change home-page output. **Not deleted.**
+- Falsification test: if `.cards-market-main` is found on ncaaf at any count,
+  the premise is wrong and the exemption must go.
+- Verification: probe run on production ncaaf passes; new tests cover both the
+  exempt-and-absent (pass) and exempt-but-present (report) directions.
+- Blocked by: none.
+
+#### NOTICE to `soccer-model-coverage` — I KILLED YOUR IN-FLIGHT REFRESH RUN, 2026-08-15 20:49:36Z
+**On the user's explicit instruction ("fire into the run"), after surfacing the
+cost and holding for 76 minutes.** Recording it rather than letting you find it.
+
+**What was killed** (captured at 20:49:27Z, 9 s before the deploy POST):
+
+    pid  747  run_refresh_odds_job.py
+    pid  748  refresh_odds_sources.py          <- the run parent
+    pid 1028  build_soccer_artifacts.py --league primeira_liga   <- in progress
+
+The run began at boot after the 20:03:41 `earlyExit` restart and had reached
+`primeira_liga`, having already walked `championship`. **Deploy
+`dep-da0d1o0u01pc738t3ang`, live-odds-worker `ccd10349` -> `191a001b`.**
+
+**Why the hold was abandoned, stated honestly.** 76 min of polling produced
+**one** CLEAR (never two consecutive). The gate is closed from boot because a
+refresh run launches on start, and these runs outlive their own 4 h autorun
+cadence — so two consecutive CLEARs may effectively never occur on this service.
+Waiting was not converging.
+
+**The cost is smaller than it looks, but it is NOT zero.** This service
+`earlyExit`s roughly every 6.5 h (01:37, 08:05, 14:34, 20:03 today), which kills
+whatever run is in flight anyway. So the deploy cost one partial run, not a
+unique one. **That is an argument about magnitude, not permission.**
+
+**What you should re-check:** whether the killed run had already written
+`primeira_liga` artifacts, and whether the lock cleared correctly on the deploy
+restart — the instance-identity branch says it will (see the correction above),
+and this is a free chance to confirm that prediction against production.
+
+#### ncaaf-market-main-expectation — CLOSED-VERIFIED 2026-08-15
+
+**The reported defect was not a defect.** `.cards-market-main` == 0 on NCAAF is
+CORRECT: `_game_card.html` dispatches `ncaaf_main` to `_game_card_ncaaf.html`,
+which contains **zero** `cards-market` markup. NCAAF presents the same numbers
+as `.cards-data-pair` inside panels. The harness was asserting a design NCAAF
+does not have.
+
+Fixed by DECLARING the absence — `NUMERIC_CLASS_EXEMPT`, per sport, per class,
+with a written reason — the same opt-out shape as `OUT_OF_SEASON`. Silent
+absence still fails; declared absence does not. **And the exemption is checked
+in the other direction:** if the class ever appears on ncaaf, the run reports
+`STALE EXEMPTION` and fails, so the entry cannot quietly start hiding a real
+measurement.
+
+    ncaaf 1440/390, 16 cards, production: OK (was "numeric class not found")
+    nfl   unchanged and still fails if ITS market-main goes missing (test)
+
+**A near-miss worth keeping.** `ncaaf/cards.py` builds `market_tiles` at three
+sites that the ncaaf template never renders, which read as textbook dead code —
+I was one step from deleting them. They are NOT dead: `home.py:6381` iterates
+`market_tiles` **generically** and renders `"{label}: {title}"`. NCAAF's tiles
+are publication metadata (Coverage / Tier / Status / Priority), so deleting
+them would have changed home-page output. Tracing the second consumer, not the
+first, is what caught it.
+
+**HANDED OFF, not fixed — `home.py` is claimed by OPEN lane
+`market-key-blank-not-absent`.** That generic loop renders NCAAF's publication
+metadata into a list built from `_game_market_recommendation_strings` — so
+"Coverage: 0.850" and "Status: Publishable" can appear where market
+recommendations are expected. Their file, their call; told them.
+
+- **FINAL:** shipped, verified, closed. 12 tests in `tests/test_ui_layout_probe.py`.

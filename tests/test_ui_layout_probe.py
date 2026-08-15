@@ -117,6 +117,40 @@ def test_numeric_class_matching_nothing_fails_rather_than_vanishing():
     assert "measurement did NOT run" in text
 
 
+def test_declared_exemption_passes_when_the_class_is_absent():
+    """NCAAF has no market tile row; asserting one is asserting a design it lacks.
+
+    This is opt-out BY NAME with a reason, the same shape as OUT_OF_SEASON --
+    silent absence stays a failure, declared absence does not.
+    """
+    text, ok = _summarize(
+        _report(sport="ncaaf", tabularFigures={".cards-market-main": {"count": 0, "values": {}}})
+    )
+    assert ok, text
+    assert "measurement did NOT run" not in text
+
+
+def test_declared_exemption_is_checked_in_the_other_direction_too():
+    """An exemption is a claim that can rot. If the class appears, say so."""
+    text, ok = _summarize(
+        _report(
+            sport="ncaaf",
+            tabularFigures={".cards-market-main": {"count": 4, "values": {"tabular-nums": 4}}},
+        )
+    )
+    assert not ok
+    assert "STALE EXEMPTION" in text
+
+
+def test_exemption_is_scoped_to_its_sport():
+    """The same absent class on a sport that DOES have the row still fails."""
+    text, ok = _summarize(
+        _report(sport="nfl", tabularFigures={".cards-market-main": {"count": 0, "values": {}}})
+    )
+    assert not ok
+    assert "measurement did NOT run" in text
+
+
 def test_proportional_digits_fail():
     text, ok = _summarize(
         _report(tabularFigures={".cards-market-main": {"count": 4, "values": {"normal": 4}}})
