@@ -150,6 +150,31 @@ body.cards-body *::after {
      .cards-scoreboard override below), so the two together mean a full name
      wraps between words instead of through them. */
   overflow-wrap: break-word;
+  color: var(--cards-text);
+}
+
+/* `_game_card_generic.html` wraps the name in an <a> when the sport publishes
+   a team href, and only soccer does today (`_team_roster_href` in
+   soccer/cards.py). The class above set no colour, so the anchor fell through
+   to the user-agent default and rendered rgb(0, 0, 238) underlined against a
+   #0a1522 card -- measured on production 2026-08-15, both card-head names.
+   The `color` above fixes new sports by default; this rule carries the rest
+   of the reset and the hover affordance that replaces the underline.
+
+   NOTE for anyone re-reading the audit: this is NOT the "13px team names"
+   finding. That number came from the FIRST `.cards-head-team-name` in the
+   DOM, which on soccer is the bespoke strip below and on every other sport
+   is the shared one. The card head has always been 16px. Do not "raise" the
+   strip's 13px on the strength of that line -- see the rule under it. */
+a.cards-head-team-name {
+  color: var(--cards-text);
+  text-decoration: none;
+}
+
+a.cards-head-team-name:hover,
+a.cards-head-team-name:focus-visible {
+  color: var(--cards-accent-strong);
+  text-decoration: underline;
 }
 
 /* Soccer's compact scoreboard strip only (.cards-strip-card--soccer,
@@ -381,6 +406,15 @@ body.cards-body *::after {
   display: grid;
   grid-template-columns: minmax(0, 1.55fr) minmax(300px, 0.95fr);
   gap: 12px;
+}
+
+/* The game-lens panel is suppressed when the sport published no per-period
+   sim (see `shared_lens_rows`), which leaves the probability/top-plays stack
+   as the only child. Without this it would sit in the 1.55fr column and leave
+   the 0.95fr one blank -- i.e. it would replace one empty region with
+   another. */
+.cards-overview-grid--single {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .cards-panel-card {

@@ -1,10 +1,18 @@
 <article class="feature-game-card cards-game-card" id="game-{{ game.gamePk }}">
   {% set live_state = game.shared_is_live if game.shared_is_live is defined else false %}
   {% set period_rows = game.shared_period_rows if game.shared_period_rows is defined else [] %}
+  {#- The period rows that earned a panel. `shared_period_rows` still carries
+      the stand-in row a sport with no `sim.periods` gets, because the
+      probability bar is built from it -- but a stand-in has nothing
+      period-specific to SHOW, and rendering it produced soccer's 582px panel
+      of restatements (measured on production 2026-08-15). A section renders
+      only when its required field is present. -#}
+  {% set lens_rows = game.shared_lens_rows if game.shared_lens_rows is defined else period_rows %}
   {% set probability_rows = game.shared_probability_rows if game.shared_probability_rows is defined else [] %}
   {% set total_rows = game.shared_total_rows if game.shared_total_rows is defined else [] %}
   {% set box_sections = game.shared_box_sections if game.shared_box_sections is defined else [] %}
   {% set prop_rows = game.shared_prop_rows if game.shared_prop_rows is defined else [] %}
+  {% set prop_status_rows = game.shared_prop_status_rows if game.shared_prop_status_rows is defined else prop_rows %}
   {% set top_play_rows = game.shared_top_play_rows if game.shared_top_play_rows is defined else [] %}
   {% set metrics = game.metrics if game.metrics is defined and game.metrics else [] %}
 
@@ -57,11 +65,16 @@
   <div class="cards-score-ribbon">
     <div class="cards-score-meta">
       <div class="cards-live-line">{{ game.summary }}</div>
-      {% if period_rows %}
-        <div class="cards-sim-line">{{ period_rows[0].subtitle }}</div>
-      {% endif %}
-      {% if game.shared_tab_game_title is defined %}
-        <div class="cards-mini-copy">{{ game.shared_tab_game_title }}</div>
+      {#- Both of these lines were unconditional restatements on any sport with
+          no per-period sim. On soccer the sim line rendered "EPL" -- the
+          stand-in row's `subtitle` is `game.detail`, already shown as Slate
+          context in the head -- and the mini copy echoed the title of a panel
+          two rows down. Tie them to the lens, which is the thing they caption. -#}
+      {% if lens_rows %}
+        <div class="cards-sim-line">{{ lens_rows[0].subtitle }}</div>
+        {% if game.shared_tab_game_title is defined %}
+          <div class="cards-mini-copy">{{ game.shared_tab_game_title }}</div>
+        {% endif %}
       {% endif %}
     </div>
   </div>
@@ -148,14 +161,15 @@
   </div>
 
   <section class="cards-panel is-active" data-panel-id="game" id="panel-{{ card_dom_id }}-game" role="tabpanel" aria-labelledby="tab-{{ card_dom_id }}-game" tabindex="0">
-    <div class="cards-overview-grid">
+    <div class="cards-overview-grid{% if not lens_rows %} cards-overview-grid--single{% endif %}">
+      {% if lens_rows %}
       <div class="cards-panel-card cards-panel-card--overview-main">
         <div class="cards-box-head">
           <div class="cards-table-title"><strong>{{ game.shared_tab_game_title if game.shared_tab_game_title is defined else 'Game lens' }}</strong></div>
           <span class="cards-overview-badge">{{ 'Live' if live_state else 'Pregame' }}</span>
         </div>
         <div class="cards-live-lens-grid">
-          {% for row in period_rows[:4] %}
+          {% for row in lens_rows[:4] %}
             <div class="cards-live-lens-card">
               <div class="cards-box-head">
                 <div>
@@ -174,6 +188,7 @@
           {% endfor %}
         </div>
       </div>
+      {% endif %}
       <div class="cards-panel-stack">
         <div class="cards-panel-card">
           <div class="cards-box-head">
@@ -208,6 +223,11 @@
               </div>
             {% endfor %}
           </div>
+          {#- The contract now drops a total row with no bins rather than
+              emitting an empty track, so this block is normally empty or
+              absent entirely. The `is-empty` class stays for a producer that
+              hands us bins summing to zero. -#}
+          {% if total_rows %}
           <div class="cards-prob-grid">
             {% for row in total_rows %}
               <div class="cards-prob-row">
@@ -221,6 +241,7 @@
               </div>
             {% endfor %}
           </div>
+          {% endif %}
         </div>
 
         <div class="cards-panel-card">
@@ -236,7 +257,12 @@
               {% for row in top_play_rows[:5] %}
                 <div class="cards-callout">
                   <strong>{{ row.name }}</strong>
-                  <span class="cards-callout-copy">{{ row.detail or row.heading }}</span>
+                  {#- `row.detail or row.heading` fell back to the PANEL TITLE,
+                      which is a constant across the list -- so a five-row list
+                      printed the same caption five times, directly under the
+                      panel head already showing it. A row with no detail of
+                      its own gets no caption. -#}
+                  {% if row.detail %}<span class="cards-callout-copy">{{ row.detail }}</span>{% endif %}
                 </div>
               {% endfor %}
             </div>
@@ -294,7 +320,7 @@
             {% for row in prop_rows[:8] %}
               <div class="cards-callout">
                 <strong>{{ row.name }}</strong>
-                <span class="cards-callout-copy">{{ row.detail or row.heading }}</span>
+                {% if row.detail %}<span class="cards-callout-copy">{{ row.detail }}</span>{% endif %}
               </div>
             {% endfor %}
           </div>
@@ -302,15 +328,22 @@
           <div class="cards-empty-copy">No playable props were linked for this game.</div>
         {% endif %}
       </div>
+      {#- The status table reads the SAME rows as the list above it. When those
+          rows were scraped off a display panel rather than built from
+          `prop_recommendations`, every heading and every value on it is a panel
+          constant, so the table is the list again with nothing added --
+          measured on production soccer 2026-08-15 as five rows rendered twice.
+          `shared_prop_status_rows` is the subset that carries a real per-row
+          tier/line/price. -#}
+      {% if prop_status_rows %}
       <div class="cards-panel-card">
         <div class="cards-box-head">
           <div class="cards-table-title"><strong>{{ 'Live props status' if live_state else 'Official props status' }}</strong></div>
           <span class="cards-chip">{{ 'Live' if live_state else 'Pregame' }}</span>
         </div>
-        {% if prop_rows %}
           <div class="cards-table-wrap">
             <div class="cards-table-list">
-              {% for row in prop_rows[:8] %}
+              {% for row in prop_status_rows[:8] %}
                 <div class="cards-table-row">
                   <div class="cards-table-row-main">
                     <span class="cards-table-row-name">{{ row.heading }}</span>
@@ -321,10 +354,8 @@
               {% endfor %}
             </div>
           </div>
-        {% else %}
-          <div class="cards-empty-copy">This sport has not surfaced a dedicated prop lane for this matchup yet.</div>
-        {% endif %}
       </div>
+      {% endif %}
     </div>
   </section>
 

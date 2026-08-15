@@ -15,16 +15,36 @@ What it measures, per sport, at both widths:
                                   one panel active and a card taller than its
                                   header strip
   * touch targets                 tab width/height against WCAG 2.5.5's 44x44
-  * type scale                    computed font-size/weight per named class
+  * type scale                    computed font-size/weight per named class,
+                                  reported PER SURFACE (card vs scoreboard
+                                  strip) -- see the second caveat below
   * tabular figures               computed font-variant-numeric on the classes
                                   carrying odds and projections
+  * unstyled links                any anchor inside a card still rendering the
+                                  user-agent's default link colour
+  * repeated copy                 the same string rendered more than once in
+                                  one card, per panel
+  * empty regions                 empty-state blocks, `—` placeholder cells and
+                                  zero-bin distribution bars, per panel
 
-METHOD CAVEAT, and it is not optional reading. The original audit's tab
+METHOD CAVEAT 1, and it is not optional reading. The original audit's tab
 results were produced with synthetic `el.click()` and one of them was WRONG
 and had to be retracted (WNBA's tabs were reported broken; they work). Only
 Playwright's `locator.click()` -- a real input event through the browser's own
 dispatch -- is trusted here. If you extend this script, do not reach for
 `page.evaluate("el.click()")` to save a scroll.
+
+METHOD CAVEAT 2, added 2026-08-15 after this script produced its own wrong
+number. The type-scale table was built with `document.querySelector(selector)`
+-- the FIRST match on the page. `.cards-head-team-name` is used by both the
+scoreboard strip and the game card, and soccer ships a bespoke strip that
+deliberately sets 13px. So the table read "soccer 13px / NFL 16px" and the
+audit turned that into a defect ("raise soccer's team names to 16px") for an
+element that had been 16px all along, against a rule Lane E had just written
+down for the OTHER element. One class, two surfaces, one sample. The table is
+now keyed by surface, and a class appearing on more than one surface at
+different sizes is reported as `conflated`, not silently collapsed to its
+first hit. Any per-class table over a shared stylesheet needs this.
 
 A sport that serves zero cards is reported as `cards: 0`, NOT as a pass. NBA,
 NHL and NCAAB were out of season on 2026-08-14 and their rows in the audit's
@@ -97,6 +117,13 @@ NUMERIC_CLASSES = [".cards-data-pair strong", ".cards-market-main", ".cards-mini
 
 WCAG_TARGET_PX = 44
 
+# Sports whose season has not opened, where 0 cards is the correct answer and
+# not a failure. Measured 2026-08-14: NBA, NHL and NCAAB served 0 cards, so
+# their rows in the audit's divergence matrix are code-only. REVIEW THIS LIST
+# IN OCTOBER -- leaving a sport here after its season opens turns a real
+# outage into a green run. Override on the command line with --expect-cards.
+OUT_OF_SEASON = {"nba", "nhl", "ncaab"}
+
 
 MEASURE_JS = """
 (spec) => {
@@ -121,13 +148,73 @@ MEASURE_JS = """
     });
   });
 
+  // Per SURFACE, not per page. See METHOD CAVEAT 2: one `querySelector` per
+  // class reported soccer's strip size as the card's and produced a defect
+  // that did not exist.
+  const surfaceOf = (el) => el.closest('.cards-strip-card') ? 'strip'
+                          : el.closest('.cards-game-card') ? 'card'
+                          : 'other';
   const typeScale = {};
   (spec.typeClasses || []).forEach((selector) => {
-    const el = document.querySelector(selector);
-    if (!el) return;
-    const cs = getComputedStyle(el);
-    typeScale[selector] = cs.fontSize + '/' + cs.fontWeight;
+    const bySurface = {};
+    document.querySelectorAll(selector).forEach((el) => {
+      const cs = getComputedStyle(el);
+      const key = surfaceOf(el);
+      if (!bySurface[key]) bySurface[key] = new Set();
+      bySurface[key].add(cs.fontSize + '/' + cs.fontWeight);
+    });
+    const entry = {};
+    Object.keys(bySurface).forEach((k) => { entry[k] = [...bySurface[k]].sort(); });
+    if (Object.keys(entry).length) {
+      const all = new Set(Object.keys(entry).map((k) => entry[k]).flat());
+      typeScale[selector] = all.size > 1 ? Object.assign({conflated: true}, entry) : entry;
+    }
   });
+
+  // An anchor inside a card that nobody restyled. rgb(0, 0, 238) is Chromium's
+  // default link colour; measured on soccer's card-head team names 2026-08-15,
+  // underlined, against a #0a1522 card.
+  const unstyledLinks = [...document.querySelectorAll('.cards-game-card a, .cards-strip-card a')]
+    .map((a) => {
+      const cs = getComputedStyle(a);
+      return {text: a.textContent.trim().slice(0, 40), cls: String(a.className || ''),
+              color: cs.color, decoration: cs.textDecorationLine};
+    })
+    .filter((a) => a.color === 'rgb(0, 0, 238)' || a.color === 'rgb(85, 26, 139)');
+
+  // Repeated copy: the same rendered string appearing more than once inside a
+  // single card. Soccer carried its projected-score sentence six times.
+  const firstCard = document.querySelector('.cards-game-card');
+  const repeatedCopy = [];
+  const emptyRegions = [];
+  if (firstCard) {
+    const counts = new Map();
+    firstCard.querySelectorAll('*').forEach((el) => {
+      if (el.children.length) return;
+      const t = (el.textContent || '').trim();
+      if (t.length < 12) return;
+      const panel = el.closest('.cards-panel');
+      const hit = counts.get(t) || {text: t.slice(0, 70), count: 0, panels: []};
+      hit.count += 1;
+      hit.panels.push(panel ? panel.getAttribute('data-panel-id') : '(head)');
+      counts.set(t, hit);
+    });
+    [...counts.values()].filter((h) => h.count > 1)
+      .sort((a, b) => b.count - a.count).slice(0, 8)
+      .forEach((h) => repeatedCopy.push(h));
+
+    firstCard.querySelectorAll('.cards-panel[data-panel-id]').forEach((p) => {
+      const emptyCopy = p.querySelectorAll('.cards-empty-copy').length;
+      const placeholders = [...p.querySelectorAll('*')]
+        .filter((e) => !e.children.length && e.textContent.trim() === '—').length;
+      const emptyBars = [...p.querySelectorAll('.cards-run-dist-bar')]
+        .filter((b) => b.children.length === 0).length;
+      if (emptyCopy || placeholders || emptyBars) {
+        emptyRegions.push({panel: p.getAttribute('data-panel-id'),
+                           emptyCopy, placeholders, emptyBars});
+      }
+    });
+  }
 
   const tabularFigures = {};
   (spec.numericClasses || []).forEach((selector) => {
@@ -145,7 +232,9 @@ MEASURE_JS = """
   // team-name box narrower than the longest word it has to render.
   const nameBoxes = [...document.querySelectorAll('.cards-head-team-name')].map((el) => ({
     text: el.textContent.trim(),
+    surface: surfaceOf(el),
     width: Math.round(el.getBoundingClientRect().width),
+    fontSize: getComputedStyle(el).fontSize,
     wrap: getComputedStyle(el).overflowWrap,
   }));
 
@@ -165,6 +254,9 @@ MEASURE_JS = """
     tabularFigures,
     tabBoxes,
     nameBoxes: nameBoxes.slice(0, 8),
+    unstyledLinks,
+    repeatedCopy,
+    emptyRegions,
   };
 }
 """
@@ -221,12 +313,19 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
                     context = browser.new_context(viewport=viewport)
                     page = context.new_page()
                     try:
-                        page.goto(f"{base_url}{route}", timeout=timeout_ms, wait_until="load")
+                        # The status is not decoration. Run against a 502ing
+                        # production on 2026-08-15 this script printed a clean
+                        # table and exit code 0: every sport measured 0 cards
+                        # and 0px of overflow, because Render's error page has
+                        # no cards and does not overflow. A probe that passes
+                        # on an error page is worse than no probe.
+                        response = page.goto(f"{base_url}{route}", timeout=timeout_ms, wait_until="load")
                         page.wait_for_timeout(400)
                         measured = page.evaluate(
                             MEASURE_JS,
                             {"typeClasses": TYPE_CLASSES, "numericClasses": NUMERIC_CLASSES},
                         )
+                        measured["httpStatus"] = response.status if response is not None else None
                         measured["touchTargetFailures"] = [
                             box
                             for box in measured.pop("tabBoxes", [])
@@ -248,6 +347,7 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
 def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
     lines: list[str] = []
     ok = True
+    out_of_season = set(report.get("outOfSeason") or ())
     header = f"{'sport':8} {'width':8} {'cards':>5} {'overflow':>9} {'spread':>7}  tabs"
     lines.append(header)
     lines.append("-" * len(header))
@@ -277,8 +377,38 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 ok = False
             if label == "mobile" and measured.get("touchTargetFailures"):
                 issues.append(f"{len(measured['touchTargetFailures'])} tabs < 44px")
+            # An anchor left on the user-agent's default link colour is
+            # unambiguous and cheap to fix, so it fails the run.
+            if measured.get("unstyledLinks"):
+                issues.append(f"{len(measured['unstyledLinks'])} unstyled link(s)")
+                ok = False
+            # These two are REPORTED, not failed. They are counts that should
+            # trend down; hard-failing them on day one across seven sports
+            # would make the harness something people skip rather than run.
+            repeats = measured.get("repeatedCopy") or []
+            if repeats:
+                worst = max(r["count"] for r in repeats)
+                issues.append(f"copy repeated up to {worst}x")
+            empties = measured.get("emptyRegions") or []
+            if empties:
+                total = sum(e["emptyCopy"] + e["placeholders"] + e["emptyBars"] for e in empties)
+                issues.append(f"{total} empty slot(s) in {len(empties)} panel(s)")
+            conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
+            if conflated:
+                issues.append("type conflated: " + ",".join(c.lstrip(".") for c in conflated))
+            status = measured.get("httpStatus")
+            if status is not None and status >= 400:
+                issues.append(f"HTTP {status} -- NOTHING BELOW IS A MEASUREMENT")
+                ok = False
+            # This used to be reported and then passed: the docstring said "0
+            # cards is NOT a pass" and the exit code said 0 anyway. An
+            # out-of-season sport is a legitimate 0, so it is opt-out by name
+            # rather than silently tolerated -- which is what makes a 0 on a
+            # sport you EXPECTED to have cards fail the run.
             if not cards:
                 issues.append("0 cards served -- NOT a pass, re-measure in season")
+                if sport not in out_of_season:
+                    ok = False
             lines.append(
                 f"{sport:8} {label:8} {cards:>5} {str(overflow) + 'px':>9} {str(spread) + 'px':>7}  "
                 + ("; ".join(issues) if issues else "ok")
@@ -321,6 +451,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--base-url", default=None, help="Probe a running server instead of serving in-process.")
     parser.add_argument("--sports", default=",".join(SPORT_ROUTES), help="Comma-separated sport slugs.")
     parser.add_argument("--timeout-ms", type=int, default=30000)
+    parser.add_argument(
+        "--expect-cards",
+        default="",
+        help=f"Comma-separated sports that MUST serve cards even though they are in {sorted(OUT_OF_SEASON)}.",
+    )
     parser.add_argument("--json", action="store_true", help="Print the full report as JSON.")
     parser.add_argument("--write", default=None, help="Write the full JSON report to this path.")
     args = parser.parse_args(argv)
@@ -336,6 +471,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         with LocalServer() as server:
             report = probe(server.base_url, sports, args.timeout_ms)
 
+    expect_cards = {s.strip() for s in args.expect_cards.split(",") if s.strip()}
+    report["outOfSeason"] = sorted(OUT_OF_SEASON - expect_cards)
     lines, ok = summarize(report)
     report["ok"] = ok
     if args.write:
