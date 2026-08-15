@@ -3721,3 +3721,44 @@ snapshot would inherit whatever that file has. This is the
 allowlisted**, so making it observable is the cheapest instrument in reach.
 
 **No rollback taken.** Both drops are inert-but-harmless in this state.
+
+## 2026-08-15 21:11:54Z — web `e831263e` — the ±4900 clamp — **DEPLOYED. MEASUREMENT INCONCLUSIVE.**
+
+- **DEPLOYED AND VERIFIED PRESENT.** `dep-da0d8vnlk1mc73fn8ta0`, live
+  21:11:54Z. Deployed tree checked **by CONTENT, not ancestry**:
+  `layer2_board.py` **0**, `pipeline/intelligence_state.py` **0** occurrences of
+  `max(0.02`. The fix is running.
+- **THE FIX IS NOT VERIFIED IN PRODUCTION. Do not record it as such.**
+  Post-deploy read at 21:12:22Z: `out_of_clamp=0`,
+  p=[0.058458, 0.780325] -> `no_trigger`. **The triggering row left the slate
+  while the deploy built.** `no_trigger` is the SAME reading a quiet slate gave
+  before the deploy, so it discriminates nothing.
+- **Why `out_of_clamp=0` is not evidence the fix worked, which is the easy
+  misread:** that count comes from the WORKER's artifact and is independent of
+  my web-side change. My fix alters the PRICE published for an extreme
+  probability, not whether such a probability exists. The slate simply has none
+  right now.
+- **BEFORE (real, captured 20:45:56Z, reproduced at 20:58:11Z):**
+  nfl `h2h_3_way` away, JAX @ NO live, `fair_probability` **0.007934**
+  published **+4900**, correct **+12503**, off by **7603 points**; 14 of 1686
+  served `fair_price` at the clamp, 0 beyond.
+  `reports/clamp_watch/trigger_20260815T204556+0000.json`.
+- **WHAT WOULD SETTLE IT:** the watcher is running again. Its next trigger is
+  now the VERIFICATION, not the hunt. `POST_FIX_OK` = fixed.
+  **`PRE_FIX_MISPRICE` while a fix-carrying SHA is live = the fix does NOT
+  work**, and that is a real falsification, not a retry.
+- **THREE CUTS TO LAND ONE DEPLOY, and the guards earned their keep.**
+  `7abd8e12` -> `f85a36d7` -> `b9ea0f0a`; web took **6 deploys in ~50 minutes**
+  from concurrent sessions.
+  - Cut 1 (`64075d02`): `render_deploy.py` **REFUSED** it — web had moved during
+    the ~10 min build+test, and it would have reverted 6 files / 189 deletions.
+  - Cut 2 (`befc70b8`): Render **CANCELED** it 0.4s after a concurrent deploy
+    started (20:57:30.540Z vs .933Z).
+  - Cut 3 (`e831263e`): landed. **`--allow-rollback` was never used.**
+- **Safety gate said NOT CLEAR and was OUT OF SCOPE** — established by reading
+  env: `check_deploy_safety.py` has no `--service` flag and its blockers (MLB
+  sim, odds refresh, board build) are refresh-worker work, while web runs **no
+  background loops** (all three loop flags `false` on the live service). No sim
+  was killed. `deploy_preflight.py` = `UNKNOWN` (memory sample 26h stale);
+  accepted deliberately, web being display-only.
+- **Rollback:** `py -3 scripts/render_deploy.py --service web --commit b9ea0f0a --allow-rollback`
