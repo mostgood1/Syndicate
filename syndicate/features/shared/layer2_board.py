@@ -50,6 +50,7 @@ from typing import Any, Iterable, Mapping
 from syndicate.features.shared import opportunity_gate
 from syndicate.features.shared.book_margin_model import market_family as _market_family
 from syndicate.features.shared.opportunity_signals import (
+    american_price,
     blended_score,
     consensus_fair_probability,
     devig,
@@ -59,6 +60,39 @@ from syndicate.features.shared.opportunity_signals import (
 # Identity carried from the market row onto every candidate. Kept explicit
 # rather than copying the whole row: the grid row holds `cells` (every book x
 # every side), which is large and has no business in a shortlist payload.
+def _side_line_from_cells(row: Mapping[str, Any], side: str) -> float | None:
+    """The handicap THIS side is actually priced at, read off the book cells.
+
+    Returns None when the cells cannot answer — no cells, no line on them, or
+    the books disagree — so the caller keeps the row's own value rather than
+    substituting a guess. Books disagreeing is a real production condition
+    (`board_cross_book._complementary` documents it from 2026-08-07,
+    `spreads_alt`: betmgm quoting `away -1.5` against betrivers' `away +1.5`),
+    and it did NOT occur in the 525 cells measured on 2026-08-15 — but a silent
+    majority-vote across a genuine disagreement would be exactly the kind of
+    quiet wrong number this module refuses elsewhere.
+    """
+    values: set[float] = set()
+    for cell in (row.get("cells") or {}).values():
+        if not isinstance(cell, Mapping):
+            continue
+        leg = cell.get(side)
+        if not isinstance(leg, Mapping):
+            continue
+        raw = leg.get("line")
+        if raw is None:
+            continue
+        try:
+            values.add(float(raw))
+        except (TypeError, ValueError):
+            continue
+    if len(values) != 1:
+        return None
+    return next(iter(values))
+
+
+# Identity carried from the market row onto every candidate. `line` is
+# OVERWRITTEN per side below -- see `_side_line_from_cells`.
 _IDENTITY_FIELDS = (
     "sport",
     "event_id",
@@ -859,6 +893,29 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
 
             candidate: dict[str, Any] = {field: row.get(field) for field in _IDENTITY_FIELDS}
             candidate["side"] = side
+            # THE ROW'S `line` IS THE AWAY HANDICAP, NOT THIS SIDE'S.
+            #
+            # Measured on `/api/board/book-grid`, mlb 2026-08-15, **525 book
+            # cells across 33 spreads rows**: `cell.home.line == -row["line"]` on
+            # **525 of 525**, and every book's own home/away lines summed to zero
+            # (525/525), so `cell.away.line == row["line"]` exactly. Away rows
+            # were therefore already right; HOME rows published the away
+            # handicap beside the home price.
+            #
+            # What that cost, both measured: in the CLV join a home `-1.5`
+            # opening was differenced against a home `+1.5` close, producing a
+            # `-29.90`/`+30.428` mirror pair on a market that never moved; and
+            # `_board_row_selection` in the Ask adapter renders `f"{side} {line}"`,
+            # so a home spread in the chat headline showed the wrong handicap.
+            #
+            # Taken from the SAME cell the price comes from rather than by
+            # negating: negation would encode "row.line is always away", which is
+            # an observation about one sport on one date, not an invariant. Cells
+            # carry their own line, so read it. This is a NO-OP for away rows
+            # (they already agree) and for h2h/props (no line at all).
+            side_line = _side_line_from_cells(row, side)
+            if side_line is not None:
+                candidate["line"] = side_line
             candidate["quote"] = quote
             if game:
                 candidate["game"] = dict(game)
@@ -1276,16 +1333,29 @@ def _implied_book_total_pct(ev_pct: Any) -> float | None:
 
 
 def _american_from_probability(probability: Any) -> float | None:
-    """Fair American price from a no-vig probability. Mirrors
-    `wnba/cards.py::_american_from_prob` rather than inventing a second
-    convention, including its 2%-98% clamp."""
-    prob = _as_float(probability)
-    if prob is None:
-        return None
-    prob = max(0.02, min(0.98, prob))
-    if prob >= 0.5:
-        return round(-100.0 * prob / max(0.001, 1.0 - prob), 0)
-    return round(100.0 * (1.0 - prob) / max(0.001, prob), 0)
+    """Fair American price from a no-vig probability.
+
+    Delegates to `opportunity_signals.american_price`, the owner of this concept
+    established by the Tier 3a differential
+    (`.syndicate/audit_2026-08-15_probability_differential.md`) -- the only one
+    of five implementations that met every requirement, and the only one that
+    round-trips 9/9.
+
+    **The 2%-98% clamp this used to carry was published wrong prices.** Measured
+    on production 2026-08-15: `/api/intelligence/query` served 1346 `fair_price`
+    values, 24 sitting exactly on +/-4900 with **not one beyond it**, and a
+    row-wise join found mlb totals under at `fair_probability` 0.992056
+    published as **-4900** where the correct price is **-12488**. A clamp is not
+    a guard: it answers an out-of-range probability with a confident wrong
+    number instead of refusing. `american_price` returns None instead, and
+    `_layer2_board_columns` omits the column -- absent renders as absent, per
+    the board contract shipped as web `932a1f71`.
+
+    The percent-scale case is why this matters beyond the tails: `confidence` is
+    stored 0-100 and probability 0-1 in the same rows, and the clamp turned a
+    `50.0` unit error into a plausible-looking -4900 rather than a blank.
+    """
+    return american_price(_as_float(probability))
 
 
 def _layer2_board_columns(
