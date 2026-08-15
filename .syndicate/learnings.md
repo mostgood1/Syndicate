@@ -1954,3 +1954,163 @@ right number; I compared against memory instead of against the ledger.
 - Cost: none. Caught in Pass 1 because the census returned 1 byte-identical
   group where the brief implied 2, and the discrepancy was chased rather than
   explained away.
+
+### 2026-08-14 — the Render logs API returns the NEWEST N in a window; paging forward silently reports a peak over a sliver
+
+I wrote a pager that walked a time window by advancing `startTime` past the last
+line of each page. The API does not work that way: it returns the newest `limit`
+lines inside `[startTime, endTime]`, presented oldest-first (`deploy_preflight.
+newest_log`'s own docstring says so and I did not read it). Advancing startTime
+re-reads the same tail and terminates.
+
+Result: it printed `PEAK 606.2 MB ... samples 99` for a 51-second pass while
+having covered **1.2 seconds** of it. The number was plausible, labelled with a
+sample count, and wrong. Re-run paging BACKWARD (lower `endTime` to the oldest
+line seen) over the same window: 267 samples, peak 613.1MB — and for the other
+pass 198 samples and 804.2MB, not the 792.8MB the truncated read gave.
+
+**How to apply:** page backward, and make the tool print the window it ACTUALLY
+covered next to the window it was asked for. A peak over an unstated span is not
+a measurement. The sample count did not reveal the truncation — 99 samples looks
+like coverage; 99 samples inside 1.2s of a 51s window is the tell, and only
+printing both makes it visible.
+
+### 2026-08-14 — a before/after is void if the change moved work INSIDE the measured span
+
+The `#387` streaming cutover was measured as "peak anon during
+`OVERVIEW_SPORT_BEGIN mlb` -> pass end". The change also moves per-sport
+candidate collection INTO that pass. So the after-span contains work the
+before-span did not, and "peak went UP" is partly definitional, not behavioural.
+
+Worse, a memory GUARD samples inside that same span (`_overview_headroom_
+exhausted`, 3000MB, sized 2026-08-07). Moving work inside the span changed what
+the guard sees without anyone editing the guard: it now trips after sport 1 of 8
+(`BOARD_OVERVIEW_READY sports=1`, where every build in the preceding 3h read
+`sports=8`).
+
+**How to apply:** before deploying, ask what else reads the window you are
+changing the contents of. A threshold calibrated against a span is invalidated by
+a change to that span's definition, and nothing in the diff mentions the
+threshold. State the before/after spans explicitly and confirm they contain the
+same work; if they cannot, say the comparison is void rather than reporting a
+delta.
+
+### 2026-08-14 — "it cannot fit" from one sample, when the same shape runs fine twice
+
+A handoff carried, as its single next action, a fix whose justification was one
+OOM: eight sports hydrated at once, "peak = SUM is sufficient on its own to
+cross 4GiB", "the floor plays no part". I deployed it, then measured two
+pre-deploy passes of the IDENTICAL shape from the same evening: 8 sports
+hydrated, peaks 804MB and 613MB, 15-20% of the ceiling, no death.
+
+The 25-second kill was real; "the pass alone crosses 4GiB" was an inference from
+it that the surrounding data contradicts. The floor was excluded by an argument
+about elapsed time (13 minutes uptime), not by measuring it.
+
+**How to apply:** the cheapest possible check on an incident diagnosis is to find
+the same event shape that did NOT fail and compare. It costs one log query. Do it
+BEFORE the deploy, not after — I had the whole evening's logs available and
+queried them only when the post-deploy number looked wrong.
+
+### 2026-08-15 — a threshold is calibrated against a SPAN; changing what the span contains invalidates it without touching the constant
+
+- **What we believed:** `#387`'s streaming cutover was a self-contained memory
+  change. Its diff touches `pipeline/intelligence_state.py` and
+  `syndicate/features/intelligence.py`; its risk, per its own commit message,
+  was an EMPTY board via `OVERVIEW_STREAM_FELL_BACK_TO_LIST`. That marker read 0
+  in production, so the change looked clean.
+- **What was actually true:** the cutover moved per-sport candidate collection
+  INSIDE the window `_overview_headroom_exhausted` samples. That guard's 3000MB
+  floor was sized 2026-08-07 against a different question ("does the NEXT sport
+  fit ON TOP of every sport already held"). Same constant, same code, new
+  meaning — and it began refusing the seven cheap sports on a number sized for
+  MLB, AFTER MLB had already been paid for. Five consecutive builds returned
+  `BOARD_OVERVIEW_READY sports=1` where the preceding three hours read
+  `sports=8`. A coverage outage presenting as a successful memory fix.
+- **How we found out:** by reading `BOARD_OVERVIEW_READY` before AND after,
+  rather than only checking the failure mode the commit message named. The
+  deploy's own success criteria (no OOM, marker 0, worker healthy) were ALL MET
+  while the board was serving one sport of eight.
+- **The rule going forward:** before deploying, ask what else READS the window
+  whose contents you are changing — thresholds, guards, timeouts, caches sized
+  against "a pass". Grep the span's own markers for constants that mention it. A
+  threshold invalidated this way appears in NO diff, so review cannot catch it;
+  only asking the question can.
+- **Cost:** ~80 minutes of a one-sport board (22:57Z-00:15Z), a second
+  deploy+measurement cycle, and it came within one ledger entry of being
+  recorded as a clean fix. Both halves are now shipped and verified
+  (`deploys.md` 00:36Z: `sports=8`, peak 1404.5MB = 34.3% of ceiling).
+
+### 2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"
+
+The `#387` handoff carried this as settled, from the 20:03:11Z kill: peak = SUM
+across eight sports "is sufficient on its own to cross 4GiB", and "the floor
+plays no part". Measured on the SAME evening, on the pre-cutover code:
+
+    22:36:48 -> 22:37:43   8 sports hydrated   PEAK 804.2 MB anon  (19.6%)
+    22:49:19 -> 22:49:50   8 sports hydrated   PEAK 613.1 MB anon  (15.0%)
+
+The shape that "cannot fit" ran twice, twenty minutes apart, at a fifth of the
+ceiling. **The eight-sport pass is exonerated as a sufficient cause.** The
+20:03:11Z kill remains UNEXPLAINED: something made MLB cost +3.5GB in that pass
+against +1.0GB measured four times since. Do not close `#387` as "solved by
+streaming" — streaming caps the transient, it did not explain the outlier.
+
+Consequence, deliberate: the guard in front of MLB keeps its full 3000MB floor.
+The seven cheap sports were relaxed to 1500MB because their cost is measured
+(+1.7MB for five of them); MLB's tail is not.
+
+### 2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, and I had this rule already
+
+- **What we believed:** I reported "`oomKilled` 0 since 22:55Z" three times, and
+  put it in `deploys.md`, `state.md` and a lane closure as verification that the
+  `#387` work was holding.
+- **What was actually true:** refresh-worker was OOM-killed **16 times on
+  2026-08-14**, including FIVE times inside the window I called clean —
+  23:11:56, 23:34:15, 23:51:04, 00:04:47 and **00:41:16, twenty-six minutes
+  after my own fix went live.**
+- **How we found out:** `/v1/services/<id>/events` returns
+  `server_failed {'reason': {'oomKilled': {'memoryLimit': '4Gi'}}}`. Grepping
+  the LOGS for the string "oomKilled" returns 0 matches because the container
+  runtime records the kill, not the process — the process is dead and cannot log
+  its own death. **`learnings.md` already carried this exact rule** ("OOM kills
+  live in the Render events API, not logs"). I had it, quoted the adjacent rule
+  about env changes earlier in the same session, and still ran the log grep.
+- **The rule going forward:** a negative result about process death MUST come
+  from the events API. `scripts/render_logs.py` cannot answer this question and
+  a 0-match result from it is not evidence. Absence of a log line is evidence
+  about the EMITTER, and a killed process emits nothing.
+- **Cost:** a false all-clear on the headline claim of the session. The coverage
+  result (`sports=8`) was real and independently sourced; the memory result was
+  not, and I would have handed over "the OOM is fixed" if the checkpoint had not
+  re-read production.
+
+### 2026-08-15 — the kill is MLB game hydration in pid 39, not the overview pass
+
+Measured at the 00:41:16 kill, the best-instrumented one:
+
+    00:40:14  container 3357.8MB (82.0%)   pid 39 = 1612.1MB   7 processes
+    00:40:42  container 4095.8MB (100.0%)  pid 39 = 3079.6MB   10 processes
+    00:40:58  anon 3941.6 -> 4047.6MB in 1.2s, game_count 15, unreclaimable 4058MB
+    00:41:16  server_failed oomKilled 4Gi
+
+**pid 39 — the main worker — grew ~1.47GB in 28 seconds** while its children
+stayed small (`daily_update.py` 166.6MB, soccer odds refresh 95.5MB). The
+payloads carry `game_count: 15` / `game_pk_count: 15`, i.e. the MLB game
+hydration path, NOT the overview.
+
+And at the handoff's canonical kill:
+
+    20:02:59  container 1179.3MB (28.8%)  process_count 2  stage=post_build_overview
+    20:03:11  server_failed oomKilled 4Gi
+
+**28.8% twelve seconds before the kill, with the overview already FINISHED.**
+
+So `#387`'s premise — that the eight-sport hydrated overview is what crosses
+4GiB — is falsified from three directions now: the same pass ran at 613/804MB
+twice, the container was at 28.8% seconds before the canonical kill with the
+overview complete, and the kills continue at the same rate after both halves of
+the fix shipped. The 2026-08-07 guard comment said so in plain words and was
+right: *"This is a circuit breaker around MLB's cost, NOT a fix for it. The real
+work is making `build_cards_page_context` cheaper or not running it hydrated on
+the worker at all."*

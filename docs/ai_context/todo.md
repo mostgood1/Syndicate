@@ -32176,3 +32176,142 @@ compared them. A same-quantity-two-surfaces equality assertion is now the
 closing evidence in `deploys.md` and could be a standing check.
 
 **Not started. No owner. Not blocked by anything.**
+
+### `#434` — OPEN. A guard can truncate the board silently, and nothing compares `sports_done` to `sports_total`
+
+**FILED FROM A REAL 80-MINUTE OUTAGE, 2026-08-14 22:57Z-00:15Z.** The `#387`
+streaming cutover changed what the overview memory guard's span contains. The
+guard's 3000MB floor was unchanged and uneditted, and it began stopping the
+hydrated pass after ONE of eight sports. Five consecutive builds emitted
+`BOARD_OVERVIEW_READY sports=1` where the preceding three hours read `sports=8`.
+
+**Every success signal the deploy was watching stayed green throughout:** no
+`oomKilled`, `OVERVIEW_STREAM_FELL_BACK_TO_LIST` = 0, worker healthy, Layer 2
+serving 150 rows. It was found only because someone diffed `sports=` before
+against `sports=` after, which was not part of any checklist.
+
+**THE ASK IS A CHECK, NOT A RULE.** A prose rule ("consider what else reads your
+span") will not be read at the moment it matters. What is missing is mechanical:
+
+1. **A post-deploy coverage assertion.** Compare the last `BOARD_OVERVIEW_READY
+   sports=N` before the deploy against the first one after. A drop is a
+   regression even when memory looks better — that is the whole shape of this
+   incident. Cheapest home: a `--since <deploy-id>` mode on
+   `scripts/deploy_preflight.py`'s sibling, or a small `scripts/board_coverage_
+   check.py`.
+2. **Make the truncation loud as a RATE.** `OVERVIEW_STOPPED_FOR_MEMORY` already
+   carries `sports_done` and `sports_total`. Nothing turns `1/8` into an alert.
+   See `learnings.md` "a rate, not a count".
+3. **The log-paging helper should be durable.** This session wrote one that
+   pages the Render logs API BACKWARD and prints the window it ACTUALLY covered
+   next to the window requested. The forward-paging version silently reported a
+   peak over 1.2s of a 51s pass. Living in a scratchpad, it will be rewritten
+   wrong by the next session. Promote it to `scripts/`.
+
+**Not urgent, genuinely valuable:** items 1 and 2 would have caught this in
+minutes rather than 80. Item 3 prevents a measurement error that already
+produced one wrong number tonight.
+
+### `#435` — OPEN, HIGH. refresh-worker is OOM-killed every ~15-20 min, and it is MLB game hydration in the main worker
+
+**MEASURED 2026-08-15 00:5xZ from the EVENTS API** (`server_failed` /
+`oomKilled` / `memoryLimit 4Gi`). 16 kills on 2026-08-14:
+
+    20:03:11 20:14:30 21:07:32 21:16:50 21:25:48 21:35:08 21:46:51 21:57:53
+    22:14:39 22:36:06 22:48:35 23:11:56 23:34:15 23:51:04 00:04:47 00:41:16
+
+`#387` (both halves) did NOT change this. Rate before 1/15.6min, after 1/19.9min,
+after both 1/37min (n=1) — not distinguishable.
+
+**THE STAGE IS NAMED, and it is not the overview.** At the best-instrumented
+kill (00:41:16):
+
+    00:40:14  container 3357.8MB (82.0%)   pid 39 = 1612.1MB   7 procs
+    00:40:42  container 4095.8MB (100.0%)  pid 39 = 3079.6MB  10 procs
+    00:40:58  anon 3941.6 -> 4047.6MB in 1.2s, game_count 15, unreclaimable 4058MB
+
+pid 39 is `scripts/run_refresh_worker.py` itself. Children were small
+(`daily_update.py` 166.6MB, soccer odds refresh 95.5MB). Payloads carry
+`game_count: 15` / `game_pk_count: 15` — the MLB game hydration path.
+
+**This is the work the 2026-08-07 guard comment already named** and nobody has
+done: *"a circuit breaker around MLB's cost, NOT a fix for it. The real work is
+making `build_cards_page_context` cheaper or not running it hydrated on the
+worker at all"* — `handoff_refresh_worker_oom.md` measured the same call at
+~3.7GB on 2026-07-26.
+
+**First step, and it is cheap:** the kills are periodic and well-instrumented, so
+pick three and confirm `build_cards_page_context` is on the stack each time
+before touching anything. Do NOT lower `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` to
+"help" — it guards a different stage, and relaxing it admits more work to a
+process that is dying elsewhere.
+
+**Do not repeat the mistake that hid this for a whole session:** OOM kills are in
+`/v1/services/<id>/events`. A log grep for "oomKilled" returns 0 and means
+nothing — the process is dead and cannot log its own death.
+
+#### `#435` STEP ONE DONE 2026-08-15 01:0xZ — and it corrects this ticket's own framing
+
+Six kills sampled for the last instrumented stage before death:
+
+    00:41:16  cards_context_end                mlb    g=15   anon 4047.6MB 100.0%
+    00:04:47  cards_context_page_cache_hit                    anon  537.5MB  22.7%  (2.6s before)
+    23:51:04  board_contract_games_normalized  nfl    g=16   anon 3443.5MB  99.1%
+    23:34:15  (ALL_PROCESS_MEMORY)                            pid39 3755.5MB 99.6%
+    23:11:56  board_contract_games_normalized  soccer g=9    anon 4062.4MB 100.0%
+    22:48:35  (ALL_PROCESS_MEMORY)                            pid39 1389.7MB 71.9%  (19s before)
+
+**`build_cards_page_context` is on the stack at 2 of 6, NOT all of them.** Two
+others are `board_contract_games_normalized` for **soccer and NFL**. This ticket
+said "it is MLB game hydration in the main worker"; the MLB part is too strong.
+What is true: the hydrated PER-SPORT BOARD BUILD in pid 39 reaches ~4GB, and the
+stage that happens to be running when it crosses is the one that gets logged.
+
+**Every >=99% line names the VICTIM, not the ALLOCATOR.** Memory was already at
+the ceiling when those stages were entered.
+
+**THE REAL BLOCKER IS AN INSTRUMENTATION BLIND SPOT.** Two of six kills show the
+process at **22.7%** and **71.9%** seconds before dying. Samples are taken at
+stage BOUNDARIES, so a multi-GB allocation inside one stage is invisible — and
+those two kills are exactly the ones that would name the allocator.
+
+**NEXT STEP, and it is not a fix:** sample on a TIMER (a watchdog thread emitting
+every ~2s while a build is in flight), or add samples inside the loaders between
+`cards_context_page_cache_hit` and `cards_context_summary_loaded`. Until an
+excursion is caught in progress, any fix is a guess. Do NOT start by making
+`build_cards_page_context` cheaper — 4 of 6 kills would not have been prevented
+by that, on this evidence.
+
+#### `#435` STEP TWO DONE 2026-08-15 01:38:48Z — the excursion is captured, and it changes the plan
+
+Watchdog live 01:16:54Z; kill at 01:38:48Z with **567 samples** before it. Full
+trace in `deploys.md`. Four findings, each of which redirects this ticket:
+
+1. **Death signature = `inactive_file` -> 0.** anon 1700 -> 4038MB in 35s
+   (~67MB/s) while page cache is evicted 1734 -> 0MB to pay for it. The kill
+   lands the instant there is no cache left to reclaim.
+2. **No single allocator.** The climb crosses `board_contract_games_normalized`,
+   three `cards_context_*` stages and `build_live_state_payload_fallback_return`
+   in 35 seconds, `seconds_since_stage` 0.1-4.2s throughout. anon never falls
+   between stages. **Do not pursue "make `build_cards_page_context` cheaper"** —
+   anon rose just as fast through `cards_context_page_cache_hit`, the CHEAP path.
+3. **`memory_pct_of_max` is a broken alarm metric.** It reads 100.0% for the
+   final 27 seconds AND during healthy operation, because `memory.current`
+   counts evictable cache. Anything gating on current/pct is blind by
+   construction. Use `memory_anon_mb` / `memory_unreclaimable_mb`, already
+   computed at every emitter. **Audit existing guards for this** — a guard on
+   pct cannot tell 88.5%-and-fine from 100%-and-dying.
+4. **New suspect stage:** `build_live_state_payload_fallback_return`, appearing
+   twice in the steepest segment (3428 -> 3831MB). The word `fallback` in a hot
+   path 3 seconds before an OOM deserves a read.
+
+**NEXT STEP — trigger tracemalloc FROM the watchdog.** The machinery already
+exists (`start_allocation_tracing`, `SYNDICATE_TRACEMALLOC_DIAG`, nframe=3, built
+by the now-orphaned `anon-allocation-site` lane) but is default OFF and, when on,
+samples on a 600s timer — so it has never once fired during an excursion. The
+watchdog now knows when one is happening: anon climbing >N MB/s above a floor.
+Have it call the existing dump at that moment. That turns "anon climbs 67MB/s
+across five stages" into a list of allocation sites, which is the last unknown.
+
+Cost note: tracemalloc keeps a traceback per live allocation and the process is
+already at its ceiling — arm it to fire ONCE per boot, on the excursion only.

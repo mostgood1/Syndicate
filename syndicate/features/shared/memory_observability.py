@@ -686,6 +686,22 @@ def log_container_memory(stage: str, **extra: Any) -> dict[str, Any]:
     figure is the part that cannot be reclaimed and is therefore the part that
     kills the container.
     """
+    payload = container_memory_payload(stage, **extra)
+    _note_stage_seen(payload.get("stage"))
+    print(f"CONTAINER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
+    return payload
+
+
+def container_memory_payload(stage: str, **extra: Any) -> dict[str, Any]:
+    """The `CONTAINER_MEMORY` payload, WITHOUT printing it.
+
+    Split out of `log_container_memory` for `#435`'s watchdog. The docstring
+    above records that `memory_reclaimable_mb` was once computed a second time
+    independently, so a fix to the guard left the line humans read quietly
+    contradicting the decision it explained. A sampler that rebuilt this payload
+    would reintroduce exactly that -- on the one reading taken while the process
+    is dying. One builder, two callers.
+    """
     memory_current_bytes = _read_container_memory_current_bytes()
     memory_max_bytes = _read_container_memory_max_bytes()
     payload = {
@@ -720,8 +736,267 @@ def log_container_memory(stage: str, **extra: Any) -> dict[str, Any]:
             if isinstance(memory_max_bytes, int) and memory_max_bytes > 0:
                 payload["memory_unreclaimable_pct_of_max"] = round(100.0 * unreclaimable_bytes / memory_max_bytes, 1)
     payload.update(extra)
-    print(f"CONTAINER_MEMORY {json.dumps(payload, default=str, sort_keys=True)}", file=sys.stderr, flush=True)
     return payload
+
+
+# `#435`. THE WATCHDOG, AND WHY A TIMER RATHER THAN MORE STAGE MARKERS.
+#
+# Six OOM kills were sampled on 2026-08-14/15 for the last instrumented line
+# before death:
+#
+#     00:41:16  cards_context_end               mlb     anon 4047.6MB  100.0%
+#     00:04:47  cards_context_page_cache_hit            anon  537.5MB   22.7%  <-
+#     23:51:04  board_contract_games_normalized nfl     anon 3443.5MB   99.1%
+#     23:34:15  (ALL_PROCESS_MEMORY)                    pid39 3755.5MB  99.6%
+#     23:11:56  board_contract_games_normalized soccer  anon 4062.4MB  100.0%
+#     22:48:35  (ALL_PROCESS_MEMORY)                    pid39 1389.7MB  71.9%  <-
+#
+# Every existing sample is taken at a stage BOUNDARY, so the two marked kills --
+# 22.7% and 71.9% seconds before death -- are invisible: multi-GB allocations
+# INSIDE one stage, which are precisely the ones that would name the allocator.
+# Adding more boundary markers cannot fix that; only sampling on a clock can.
+#
+# The lines at >=99% name the VICTIM, not the allocator. That is the whole point
+# of `last_stage` + `seconds_since_stage` below: they turn "4GB at 00:40:59" into
+# "the excursion began N seconds into stage X", which is the sentence nobody has
+# been able to write about this bug.
+#
+# COST, because `learnings.md` says worker periodic work is never free (`#241`
+# put the worker in a restart loop): one cgroup file read per tick, and the
+# EMIT is gated -- silent below the floor unless the number is moving. At rest
+# this is a sleeping thread and two file reads every few seconds. It is a daemon
+# thread so it can never hold the process open, and every path is wrapped: an
+# instrument must not be the reason a worker dies.
+_WATCHDOG_STATE: dict[str, Any] = {"thread": None, "last_stage": None, "last_stage_at": None}
+
+
+def _note_stage_seen(stage: Any) -> None:
+    """Record the most recent stage label, for the watchdog to attribute to."""
+    try:
+        _WATCHDOG_STATE["last_stage"] = stage
+        _WATCHDOG_STATE["last_stage_at"] = time.monotonic()
+    except Exception:  # pragma: no cover - defensive, must never raise
+        pass
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        raw = os.environ.get(name, "").strip()
+        return float(raw) if raw else default
+    except Exception:
+        return default
+
+
+def memory_watchdog_enabled() -> bool:
+    """Default ON, with a kill-switch.
+
+    Deliberately not opt-in. An opt-in diagnostic needs an env change to take
+    effect, and on Render that means a single-key write AND a deploy (a restart
+    does not re-inject env vars) -- i.e. the instrument arrives one incident
+    later than the incident. Default-on ships with the code; `=0` disables it
+    without one.
+    """
+    raw = os.environ.get("SYNDICATE_MEMORY_WATCHDOG", "").strip().lower()
+    return raw not in {"0", "false", "no", "off"}
+
+
+def _watchdog_should_emit(payload: dict[str, Any], last_emitted_mb: float | None) -> bool:
+    """Emit above the floor, or when the number has MOVED by the delta.
+
+    Two triggers because the two failure shapes differ: a slow ratchet is caught
+    by the floor, and the 22.7%-to-dead-in-2.6s shape is caught by the delta
+    before it ever reaches the floor.
+    """
+    floor_pct = _env_float("SYNDICATE_MEMORY_WATCHDOG_FLOOR_PCT", 60.0)
+    delta_mb = _env_float("SYNDICATE_MEMORY_WATCHDOG_DELTA_MB", 200.0)
+    metric = payload.get("memory_unreclaimable_mb")
+    if metric is None:
+        metric = payload.get("memory_anon_mb")
+    pct = payload.get("memory_pct_of_max")
+    if metric is None:
+        # TWO DIFFERENT UNKNOWNS, and conflating them floods the log.
+        #
+        # Split unreadable but `memory.current` fine -> a real anomaly on a real
+        # cgroup, and the sample matters most exactly then: emit.
+        #
+        # NOTHING readable -> not a cgroup at all (any dev machine). Emitting
+        # every tick forever is noise, not evidence, and it would bury the
+        # signal this instrument exists to surface. Say so ONCE and go quiet.
+        if pct is None:
+            if _WATCHDOG_STATE.get("unmeasurable_reported"):
+                return False
+            _WATCHDOG_STATE["unmeasurable_reported"] = True
+            return True
+        return True
+    if isinstance(pct, (int, float)) and pct >= floor_pct:
+        return True
+    if last_emitted_mb is None:
+        return False
+    return abs(float(metric) - last_emitted_mb) >= delta_mb
+
+
+def watchdog_excursion_climb_mb_per_s(previous_mb: float | None, current_mb: float | None,
+                                      elapsed_s: float | None) -> float | None:
+    """Climb rate between two watchdog samples, or None if it cannot be computed."""
+    if previous_mb is None or current_mb is None:
+        return None
+    if not isinstance(elapsed_s, (int, float)) or elapsed_s <= 0:
+        return None
+    return (float(current_mb) - float(previous_mb)) / float(elapsed_s)
+
+
+def watchdog_should_dump_allocations(*, climb_mb_per_s: float | None, anon_mb: float | None,
+                                     already_dumped: bool) -> bool:
+    """Fire the tracemalloc dump ONCE, while the excursion is actually happening.
+
+    `#435`. The dump already exists and has never once fired during an excursion:
+    it is on a 600s timer, and the excursion measured 2026-08-15 01:38 lasted 35
+    seconds end to end. A timer cannot catch that; a climb detector can.
+
+    ONCE PER BOOT, deliberately. tracemalloc keeps a traceback per live
+    allocation and this process is at its ceiling -- a dump per sample would
+    become the thing that kills it, and the first dump is the one taken while
+    anon is climbing, which is the one worth having.
+    """
+    if already_dumped:
+        return False
+    if climb_mb_per_s is None or anon_mb is None:
+        return False
+    floor_mb = _env_float("SYNDICATE_MEMORY_WATCHDOG_DUMP_FLOOR_MB", 2000.0)
+    rate_mb_s = _env_float("SYNDICATE_MEMORY_WATCHDOG_DUMP_RATE_MB_S", 25.0)
+    # BOTH conditions. Rate alone fires on ordinary warm-up; floor alone fires on
+    # a process sitting high but stable, which is the state this worker is in for
+    # most of its life and is NOT the moment worth a traceback dump.
+    return float(anon_mb) >= floor_mb and float(climb_mb_per_s) >= rate_mb_s
+
+
+def _watchdog_maybe_dump_allocations(payload: dict[str, Any], climb_mb_per_s: float | None) -> None:
+    """Emit the allocation-site census if we are inside an excursion."""
+    try:
+        anon_mb = payload.get("memory_unreclaimable_mb")
+        if anon_mb is None:
+            anon_mb = payload.get("memory_anon_mb")
+        if not watchdog_should_dump_allocations(
+            climb_mb_per_s=climb_mb_per_s,
+            anon_mb=anon_mb,
+            already_dumped=bool(_WATCHDOG_STATE.get("allocations_dumped")),
+        ):
+            return
+        _WATCHDOG_STATE["allocations_dumped"] = True
+        if not allocation_tracing_enabled():
+            # Say so ONCE, with the numbers that would have been captured. An
+            # instrument that is off must announce it at the moment it would
+            # have fired -- otherwise its silence reads as "nothing to report".
+            print(
+                f"[memory_observability] WATCHDOG_EXCURSION_NO_TRACING "
+                f"anon_mb={anon_mb} climb_mb_per_s={round(climb_mb_per_s, 1)} "
+                f"last_stage={payload.get('last_stage')} "
+                f"(set SYNDICATE_TRACEMALLOC_DIAG=1 to capture sites)",
+                flush=True,
+            )
+            return
+        snapshot = allocation_snapshot()
+        print(
+            f"WATCHDOG_EXCURSION_ALLOCATIONS "
+            f"{json.dumps({'climb_mb_per_s': round(climb_mb_per_s, 1), 'anon_mb': anon_mb, 'last_stage': payload.get('last_stage'), 'snapshot': snapshot}, default=str, sort_keys=True)}",
+            file=sys.stderr,
+            flush=True,
+        )
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] WATCHDOG_ALLOCATION_DUMP_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _watchdog_loop(interval_seconds: float) -> None:  # pragma: no cover - thread body
+    last_emitted_mb: float | None = None
+    previous_mb: float | None = None
+    previous_at: float | None = None
+    while True:
+        try:
+            time.sleep(interval_seconds)
+            payload = container_memory_payload("watchdog")
+            last_stage = _WATCHDOG_STATE.get("last_stage")
+            last_stage_at = _WATCHDOG_STATE.get("last_stage_at")
+            payload["last_stage"] = last_stage
+            payload["seconds_since_stage"] = (
+                round(time.monotonic() - last_stage_at, 1)
+                if isinstance(last_stage_at, (int, float))
+                else None
+            )
+            # Climb rate is computed on EVERY sample, before the emit gate --
+            # the excursion must be detectable even in the ticks the gate
+            # suppresses, or the dump trigger inherits the gate's blind spots.
+            current_mb = payload.get("memory_unreclaimable_mb")
+            if current_mb is None:
+                current_mb = payload.get("memory_anon_mb")
+            now = time.monotonic()
+            climb = watchdog_excursion_climb_mb_per_s(
+                previous_mb,
+                current_mb,
+                (now - previous_at) if isinstance(previous_at, (int, float)) else None,
+            )
+            if climb is not None:
+                payload["climb_mb_per_s"] = round(climb, 1)
+            _watchdog_maybe_dump_allocations(payload, climb)
+            if current_mb is not None:
+                previous_mb = float(current_mb)
+                previous_at = now
+            if not _watchdog_should_emit(payload, last_emitted_mb):
+                continue
+            metric = current_mb
+            if metric is not None:
+                last_emitted_mb = float(metric)
+            print(
+                f"MEMORY_WATCHDOG {json.dumps(payload, default=str, sort_keys=True)}",
+                file=sys.stderr,
+                flush=True,
+            )
+        except Exception:
+            # Never die, never spin. A crashed sampler would remove the only
+            # instrument that can see the excursion, silently.
+            try:
+                time.sleep(interval_seconds)
+            except Exception:
+                return
+
+
+def start_memory_watchdog(interval_seconds: float | None = None) -> bool:
+    """Start the sampler once. Returns True if a thread is running because of us."""
+    try:
+        if not memory_watchdog_enabled():
+            print("[memory_observability] MEMORY_WATCHDOG_DISABLED", flush=True)
+            return False
+        if _WATCHDOG_STATE.get("thread") is not None:
+            return False
+        import threading
+
+        interval = interval_seconds if interval_seconds is not None else _env_float(
+            "SYNDICATE_MEMORY_WATCHDOG_INTERVAL_SECONDS", 2.0
+        )
+        interval = max(0.5, interval)
+        thread = threading.Thread(
+            target=_watchdog_loop,
+            args=(interval,),
+            name="memory-watchdog",
+            daemon=True,
+        )
+        _WATCHDOG_STATE["thread"] = thread
+        thread.start()
+        print(
+            f"[memory_observability] MEMORY_WATCHDOG_STARTED interval_s={interval} "
+            f"floor_pct={_env_float('SYNDICATE_MEMORY_WATCHDOG_FLOOR_PCT', 60.0)} "
+            f"delta_mb={_env_float('SYNDICATE_MEMORY_WATCHDOG_DELTA_MB', 200.0)}",
+            flush=True,
+        )
+        return True
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] MEMORY_WATCHDOG_START_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
 
 
 # #327. The ring buffer behind /api/ops/intelligence/memory-diagnostics.

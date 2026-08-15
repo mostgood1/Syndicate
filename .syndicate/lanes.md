@@ -7,6 +7,89 @@
 ## OPEN
 
 ### clv-without-settlement — OPEN — DIAGNOSIS DONE, DESIGN BLOCKED ON ONE DECISION — opened 2026-08-14 — session: model-audit
+### clv-without-settlement — OPEN — BOTH HALVES BUILT; THE FIRST CLV NUMBER WAS RETRACTED; NONE IS THE HONEST ANSWER — opened 2026-08-14 — session: model-audit
+- **STATUS 2026-08-14 19:50 CDT.** Recorder LIVE (`2b14fbeb`) + `book_prices`
+  LIVE (`96e3a9b7`). Joiner is **library-only, no call site, NOT deployed**
+  (`deploy/clv-joiner-guards-r2`, `2f596260`). 42 tests green.
+- **THE `-5.215` SAME-BOOK AVERAGE IS RETRACTED. Do not resurrect it.** It came
+  from 25 rows and looked right — it even had the OPPOSITE SIGN to the biased
+  scopes, which is what a genuine bias correction looks like. Two independent
+  defects, now refused by name:
+  - `line_mismatch` / `line_unverifiable` — history keys carry no line, the
+    point's `line` block does; `home -5.0` was being differenced against a
+    `home -1.5` close.
+  - `close_precedes_open` — **25 of 25** closes were captured BEFORE their
+    openings. **This is a PRODUCTION condition**, not a backfill artifact: it
+    fires whenever a market is first published after the last pregame
+    observation of it.
+- **Current honest output on real data:** `same_book_n=0`, `avg_clv_pct=None`,
+  `unresolved={close_precedes_open: 38, no_market_in_history: 14,
+  no_pregame_observation: 23, line_mismatch: 1}`.
+- **THE MEASUREMENT IS NOW EXECUTABLE (shipped 2026-08-14 ~20:05 CDT).** It was
+  not before: the joiner had no call site and the openings were unreadable off
+  the worker. `GET /api/ops/clv/report?sport=<s>[&date=<d>][&rows=1]` is live on
+  web (`d9a39ce8`); the worker publishes the openings (`d70f70d8`).
+- **NEXT ACTION — the first clean measurement is 2026-08-15 (Central).**
+  Production's 08-14 openings only began at 18:32 CDT, so tonight's file is
+  late-loaded and its closes mostly predate its openings. Tomorrow, run
+  `compute_clv_for_date('2026-08-15', sport)` per sport and read
+  `same_book_n` + `avg_clv_pct`. **If `same_book_n` is still 0, the blocker is
+  odds-history breadth** (median 2 books per event-market vs the board's best
+  of ~13), not the joiner.
+- **Known gaps, measured, each its own lane if pursued:** NFL and WNBA resolve
+  0 — their odds-history artifact for 08-14 has no markets at all. MLB
+  `_alt`/`_lay`/`3_way` families are absent from history entirely.
+- **JOINER BUILT 22:5xZ** — `syndicate/features/shared/clv_join.py`, branch
+  `deploy/clv-joiner` (`57e32a04`, off `2b14fbeb`). **Library only, no call
+  site, NOT deployed** — it ships no production behaviour.
+- **THE FIRST CLV NUMBERS THIS SYSTEM HAS EVER PRODUCED, on 150 real openings:**
+
+      scope                  n    avg_clv   beat_close
+      different_book_close  32     +6.206    29/32 (91%)
+      book_agnostic_close   27     +2.716    18/27 (67%)
+      same_book              0         --       --
+
+  **`avg_clv_pct` is None and that is the correct answer.** A +6.2-pt average
+  at a 91% beat rate is a SELECTION EFFECT, not skill: the board publishes the
+  BEST price across books by construction, so pairing that opening with another
+  book's close compares a best-of-N draw to a single draw. The headline counts
+  same-book rows only; biased scopes are reported beside it, never blended.
+- **What the join can and cannot reach** `[measured, mlb 78 openings]`:
+  - props **28/28 matched (100%)**
+  - `no_market_in_history` 18 — `h2h_lay`, `totals_alt`, `h2h_3_way`,
+    `spreads_alt` are absent from odds history entirely (capture-side gap)
+  - 32 game rows matched only via a DIFFERENT book
+  - **NFL 0/60 and WNBA 0/12** — their odds-history artifact for 2026-08-14 has
+    no markets at all. Capture-side, not a join defect. **Own lane.**
+- **THE CHEAP FIX FOR SAME-BOOK CLV, and the next action:** have the opening
+  ledger record a MAINSTREAM-book price alongside the best-book one. Odds
+  history tracks fanduel/betmgm/draftkings; the board picks polymarket /
+  prophetx / betfair_ex. One extra field on each opening makes an unbiased
+  same-book comparison possible from tomorrow. Without it the headline stays
+  None no matter how good the joiner gets.
+- **Recorder is LIVE and verified** — refresh-worker `2b14fbeb`,
+  `OPENINGS rows_in=150 written=150 ... truncated=False` at 22:32:02Z.
+  Idempotence on the production disk (`written=0 already=150`) is STILL
+  unconfirmed; builds are ~21 min apart.
+- **UPDATE 22:3xZ — option (a) chosen by the user and SHIPPED.** refresh-worker
+  `2b14fbeb`, live 22:20Z. `[clv_opening_ledger] OPENINGS ... rows_in=150
+  written=150 already=0 duplicate=0 unkeyable=0 truncated=False` at 22:32:02Z.
+  Openings are now being recorded; they were being lost on every build before.
+- **OWED, in order:** (1) read a SECOND `OPENINGS` line to confirm idempotence
+  in production (`written=0 already=150`) — builds are ~21 min apart; (2) build
+  the joiner. (3) optional: put `clv_openings` on
+  `/api/board/layer2-shortlist`, which currently omits it (log-only).
+- **THE JOINER'S KNOWN PROBLEM, inherited deliberately:** odds history is keyed
+  `event_id|home_team|away_team|market|bookmaker` with **no side and no line**;
+  the side lives as `entity` INSIDE the history points. The opening ledger keys
+  on `event_id|market|player|segment|side|line|bookmaker`. Mapping `side` ->
+  `entity` is the unsolved half and must be measured against real data, not
+  assumed — the settlement join already failed exactly here (4,560
+  `no_key_match` of 8,276).
+- **The close is the easy half and is already available:** stamped
+  `closing_line` on only ~1.7% of markets, but `history_points > 0` on 100%, so
+  derive it from the last pregame observation and LABEL which one was used
+  (`observed_transition` vs `last_pregame_quote`) plus `close_age_seconds`.
 - Goal: audit §7 ranked fix **#1** — produce `clv_pct` per recommendation with
   no dependency on grading, outcomes or `settle_result`. The audit calls this
   the one measurement that unblocks §4's threshold, §6's cadence decision, and
@@ -69,6 +152,23 @@ does not hold.** `[measured 08-14]`
 - Files: none claimed yet, deliberately.
 
 ### recommendation-lane-correctness — OPEN — 4 SHIPPED+VERIFIED, 1 HELD BACK, 1 UNMEASURED — opened 2026-08-14 — session: model-audit
+### recommendation-lane-correctness — OPEN — ALL MEASUREMENT DEBT CLEARED; 1 HELD BACK BY CHOICE — opened 2026-08-14 — session: model-audit
+- **UPDATE 2026-08-14 19:50 CDT — the two unmeasured deploys are now measured.**
+  - **A1/A2 P3 CLOSED** `[23:01:39Z]`: `FILTER_CANDIDATES sport=all in=476
+    out=377 rejected={"edge_below_threshold": 99}`. Also closes the `7b1f3fdc`
+    instrument deploy. **Headline is NEGATIVE: `no_model_probability` does not
+    appear — A1's exclusion is INERT in production** (0 of 476). What changed is
+    that the 99 rejections are now honest; they were previously computed off
+    `score/100`. Do not credit A1 with an effect it does not have.
+  - **Audit §7 #7 SHIPPED** (`098877e1`, live 00:22Z): 24 MLB prop rows now
+    serve measured skill. Controls A and B passed; **control C was
+    mis-specified by me** (asserted non-mlb zero with no baseline; the 53 rows
+    are NFL's own, corr -0.047/0.269, seasons 2023-2025).
+- **STILL HELD BACK BY CHOICE:** `28291eb6` (score monotonicity,
+  corr(reliability, score) = -0.8312 on 156 negative-value rows vs +0.8560
+  control). **Do not deploy without a pool-side counter** — its effect is on
+  SELECTION and is invisible in the served shortlist, which returns survivors
+  only.
 - **CHECKPOINT 2026-08-14 21:3xZ — STATUS BY ITEM:**
   - **A3 uninformative-EV — CLOSED-VERIFIED.** web `ea1d2ed6` + worker
     `29ed6de1`. 5/5 predictions held at 19:58:41Z incl. the control.
@@ -1298,7 +1398,15 @@ half was held overnight through an OOM incident.)
   projections must NOT flag.
 - Blocked by: none.
 
-### anon-allocation-site — OPEN — opened 2026-08-14 — session: memory-guard
+### anon-allocation-site — ORPHANED-REASSIGNED 2026-08-15 — file claims released to `memory-watchdog-435`; the lane's OWN FINDINGS ARE NOT CLOSED — opened 2026-08-14 — session: memory-guard
+> **STATUS IS NOT "DONE".** The owning `memory-guard` session no longer exists
+> (absent from the live session list 2026-08-15 01:0xZ; `state.md`'s 20:4xZ
+> census already recorded this lane as orphaned). Its file claims blocked `#435`
+> step two, and the owner authorised a cross-lane override. Only the CLAIMS are
+> released. Nothing below is verified by that override, and the tracemalloc
+> helpers and `malloc_trim`/arena machinery this lane built were deliberately
+> left untouched. If this lane resumes, re-take the files — the `#435` change is
+> additive and does not contradict its findings.
 - **NAMED 2026-08-14 04:1xZ — `json.loads` (`decoder.py:353`), 491.3MB across
   7,172,382 LIVE OBJECTS. AND THE WORKER IS OOM-KILLING.**
   - Production OOM kills confirmed in the Render EVENTS api (not the logs):
@@ -1495,7 +1603,12 @@ Run against the REAL program, not the guard functions. 105 tests pass.
   out-of-season run look like an outage).
 - Blocked by: none.
 
-### refresh-worker-anon-leak — OPEN — opened 2026-08-13 — session: memory-guard
+### refresh-worker-anon-leak — ORPHANED-REASSIGNED 2026-08-15 — file claims released to `memory-watchdog-435`; the leak itself IS STILL UNEXPLAINED — opened 2026-08-13 — session: memory-guard
+> **STATUS IS NOT "DONE", and this one matters more than most.** The anon growth
+> this lane opened on is still real and still unexplained — `#435` measured 16
+> OOM kills on 2026-08-14 alone. Owning session gone (see the note on
+> `anon-allocation-site`); owner authorised the override so `#435` step two could
+> proceed. CLAIMS released, findings untouched, conclusions unaffected.
 - Goal: name what allocates ~300MB/hour of ANONYMOUS memory on refresh-worker,
   with evidence, so the board stops needing a restart every ~4 hours.
   Testable outcome: `anon` growth over a full evening window attributed to a
@@ -3560,6 +3673,7 @@ temporal validation. Neither is a word-list problem.
   makes the instrument read non-null before believing a null.**
 
 ### board-ui-visible-defects — OPEN — opened 2026-08-14 — session: board-ui-defects
+### board-ui-visible-defects — CLOSED-VERIFIED 2026-08-14 — deployed as web `aadcde77`, every criterion measured in production — opened 2026-08-14 — session: board-ui-defects
 - Goal: Lane E + the "do now" bundle of `plan_2026-08-14_ui.md`. Testable
   outcome, all four generic-board sports (nfl, ncaaf, ncaab, soccer) at 1440
   and 390: `documentElement.scrollWidth == clientWidth` (today 1468 vs 1440);
@@ -3747,3 +3861,346 @@ Saturday-evening kickoff buckets to Sunday.
   `aadcde77` = its own prior live commit + the fix, deploy
   `dep-d9vokalbedkc73erc9bg`, live 21:42:56Z. Nothing of this lane remains in
   the working tree. Marker `.syndicate/.current-lane` cleared.
+
+### memory-cutover-ship — OPEN — opened 2026-08-14 — session: memory-cutover-ship
+- Goal: the `#387` one-sport-at-a-time overview cutover is RUNNING on
+  refresh-worker, and peak anon on one hydrated `OVERVIEW_SPORT_BEGIN mlb` ->
+  board_contract pass is measured against the 20:03:11Z kill baseline
+  (522MB -> dead in 25s at 4GiB).
+- **CORRECTION TO THE HANDOFF, measured before starting:** the handoff says
+  "ship `086702ae`". That commit CANNOT be deployed as-is — the live
+  refresh-worker SHA is `2b14fbeb` (clv-opening-ledger, finished
+  2026-08-14T22:19:23Z), which is NOT an ancestor of `086702ae`. Deploying it
+  would roll back that lane's 560 lines, and `render_deploy.py` refuses a
+  non-descendant. It is also THREE commits, not one:
+  `c39569ef` -> `946d77e3` -> `086702ae`; live carries none of them
+  (`OVERVIEW_STREAM_FELL_BACK_TO_LIST` absent from `2b14fbeb`, and the
+  `consumer=` streaming mechanism absent too).
+- Files (on a deploy branch off `2b14fbeb`; the main working tree is NOT edited):
+  - `pipeline/intelligence_state.py`, `syndicate/features/intelligence.py`
+  - `tests/test_overview_summary_retention.py`, `tests/test_overview_streaming.py`
+  - Collision check 2026-08-14: `layer2-board-freshness` (the lane that wrote
+    this branch) is CLOSED-VERIFIED and its header names this branch as its
+    undeployed follow-on, so both source files are free. `clv-without-settlement`
+    plans to claim `pipeline/intelligence_state.py` as a writer but records
+    "Files: none claimed yet, deliberately". No other OPEN lane claims either file.
+- Hypothesis: peak is SUM-of-eight-sports inside one hydrated pass, so
+  MAX-of-one-sport keeps the worker under 4GiB with no floor argument needed.
+- Falsification test: after the deploy, an `OVERVIEW_SPORT_BEGIN mlb` -> pass
+  end excursion that still approaches 4GiB, or an OOM inside the same pass.
+- Verification: (1) deployed SHA == the new tip; (2) `OVERVIEW_SPORT_BEGIN` for
+  all eight sports NOT clustered in one 10s window; (3) peak anon over one
+  hydrated pass; (4) `OVERVIEW_STREAM_FELL_BACK_TO_LIST` count == 0 in prod;
+  (5) candidate pool non-empty after the cutover (the empty-board failure mode
+  the commit message names).
+- Blocked by: none. Deploy gate reads HOLD (7 jobs); ship on a polled CLEAR.
+
+#### memory-cutover-ship — STATUS 2026-08-14 23:1xZ — SHIPPED, MEASURED, FIX NOT DEMONSTRATED
+- `cfee9c6e` live on refresh-worker 22:55:35Z. Zero jobs killed (polled the gate
+  to a confirmed CLEAR and fired in the next step).
+- Criteria from the lane header: (1) deployed SHA MET. (2) sports NOT clustered
+  MET — but for the wrong reason: the stream STOPPED after sport 1.
+  (3) peak 1384-1486MB — HIGHER than the old code's 804MB over eight sports.
+  (4) `OVERVIEW_STREAM_FELL_BACK_TO_LIST` = 0 MET. (5) Layer 2 shortlist alive,
+  150 rows / 12,304 considered MET.
+- **The falsification test I wrote fired.** Not as an OOM — as the other
+  direction: coverage collapsed 8 sports -> 1 via the pre-existing 3000MB
+  `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` guard, whose span this change redefined.
+- Full evidence in `deploys.md` under the 22:5xZ row. Rollback armed, not taken.
+- OPEN QUESTION FOR THE OWNER: roll back, hold, or recalibrate the guard. The
+  measurement that would settle it is only obtainable in the ~2 min after a boot,
+  because at steady state (container 2790MB) the guard refuses every pass.
+
+### board-contract-absent-not-neutral — OPEN — opened 2026-08-14 — session: board-ui-defects
+- Goal: Lane F of `plan_2026-08-14_ui.md`. No board surface renders a
+  fabricated neutral for missing data. Testable outcome, on the served board:
+  **zero** rows carry `away_pct == home_pct == 50.0` unless a real model says
+  so, soccer shows ONE home-win number rather than two, and a game with no
+  probability anywhere renders an explicit empty state instead of a centred
+  bar.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/game_board_contract.py` — the fabrication sites.
+  - `syndicate/features/soccer/cards.py` — carry the sim's three-way win
+    probability through to the contract.
+  - `syndicate/templates/shared/_game_card_generic.html` — suppress the bar
+    when unknown; draw segment.
+  - `syndicate/static/shared/dense_cards.css` — draw segment styling.
+  - `tests/test_board_contract_absent.py` (new).
+  - Collision check RUN (lane-guard's own `_claims()` over `lanes.md`, not a
+    read): none of these is claimed by another OPEN lane. The generic template
+    and `dense_cards.css` were claimed by `board-ui-visible-defects`, which
+    this same session closes in the edit above.
+- **The plan says two sites; there are SEVEN**, and the audit's line numbers
+  (303-304) are only one pair. `game_board_contract.py` fabricates 50.0 at
+  222/223 and 256/257 (score-mean total is zero), 303/304 (no
+  `p_home_win`/`p_away_win`), 319 and 336/337. Two of those use `or 50.0` on a
+  float, so **a genuine 0.0 probability also renders as a coin flip** — the
+  same defect for a different input.
+- **The soccer "two conflicting numbers" is NOT a rounding artifact, and the
+  plan's framing would have led to the wrong fix.** The tiles show the SIM's
+  three-way win probability (`match.win_probability`, home/draw/away). The bar
+  shows `betting.p_home_win`, which `_market_data_for_match` builds from the
+  picks rows' `market_probability` — the MARKET's implied probability. They
+  are two different quantities, both correct, displayed under the same words
+  ~250px apart. The draw side is never captured into `betting` at all, which
+  is why the two-way number looks wrong on a three-way market.
+- Hypothesis: none needed for F1/F3 (read off the code). For F2 the claim to
+  test is that preferring the sim's three-way probability for the bar makes
+  the bar agree with the tiles on every soccer card.
+- Falsification test: if a soccer card still shows two different home-win
+  numbers after the bar is sourced from `win_probability`, the tiles are
+  reading something else again and the join is the defect, not the source.
+- Verification: count `away_pct == home_pct == 50.0` rows in the served board
+  context before and after (`data/live/*_cards_context_*.json` is the
+  contract's own output, so the fabrication is already visible there); plus a
+  rendered check that a no-probability game shows an empty state, not a bar.
+- Blocked by: none. **Cross-plan:** model plan A1 owns `_fair_probability`'s
+  0.5 fallback, the same defect one layer up. Told that lane; not editing it.
+
+#### board-contract-absent-not-neutral — RESULT 2026-08-14 — fixed and tested, NOT deployed
+
+**What the contract actually did, measured by driving `apply_game_board_contract`
+with known games rather than by reading it:**
+
+    projected 21.0-24.0, no win probability -> away_pct 46.67 / home_pct 53.33
+    the same game WITH p_home_win = 0.62    -> bar still 53.33, text 62.0%
+    nothing at all                          -> 50.0 / 50.0
+    a genuine 0.0 home win probability      -> 50.0 / 50.0  (the `or 50.0` trap)
+
+46.67/53.33 is the share of projected POINTS. It was rendered in
+`.cards-prob-bar` under a panel headed "Period win probabilities". A 3-point
+favourite is not a 53.3% favourite.
+
+**CORRECTION TO MY OWN HEADLINE, and it matters.** Mid-work I wrote that "the
+win-probability bar has never shown a win probability". That is TOO STRONG and
+the measurement that would have supported it does not. On production's own
+NFL cards, **0 of 16 bars equal the points share** — those bars come from
+producer-supplied `probability_rows`, which pass straight through the
+`existing` branch and never touch the period-derived path. So the
+points-share defect is REAL and REPRODUCIBLE in the contract, and its
+frequency on today's production slate is UNMEASURED. A second probe
+(bar-vs-text agreement) matched 1 row platform-wide, so it settles nothing
+either — a null from an instrument that barely fires is not evidence.
+
+**Fixed, all seven fabrication sites in `game_board_contract.py`:**
+- The period rows and the aggregate row now carry the WIN PROBABILITY or
+  `None`, never a scoreline recast as a split.
+- `_safe_float(...) or 50.0` -> an `is None` test, so a genuine 0.0 survives.
+- The `_build_probability_rows` fallback carries `None` through instead of
+  substituting 50.0.
+- New `_game_win_probabilities()` prefers the SIM's three-way split over
+  `betting.p_home_win`. That is the soccer "two conflicting numbers" fix: the
+  tiles read the sim (77.3%) and the bar read the market's implied number
+  (81.1%) — two different quantities under one label. Reproduced with the
+  audit's own numbers and now agreeing at 77.3% in bar, text and tiles, with
+  the draw carried at 14.0% instead of renormalised away.
+- `soccer/cards.py` publishes `sim.win_probability` so the contract can see it.
+- The template draws no bar at all when there is no probability, and shows
+  "No win probability was published for this <row>" instead. The CSS `50%`
+  fallbacks on `--away-pct`/`--home-pct` are gone — they were a second, quieter
+  copy of the same fabrication.
+
+**Verified:** 10 new tests in `tests/test_board_contract_absent.py`; 49 + 158
+existing tests across the contract, card, home and market-board suites;
+`tests.test_archives` 383 pass. Locally served boards render 0 fabricated
+50/50 bars, and soccer renders a real three-way bar with a draw segment
+(production today: NFL 1 fabricated 50/50 bar of 16, soccer 0 draw segments).
+
+**Not deployed.** Other sessions were mid-deploy on refresh-worker when this
+landed, and this is a visible change to every sport's card — it deserves its
+own decision and its own measurement window, not a ride on someone else's.
+
+**Still open in this lane:** F3 (one null placeholder platform-wide) and F4
+(grep the codebase for the absent-becomes-neutral shape and write it into the
+engineer agent's notes). F4 already has two confirmed instances beyond this
+file: the model layer's `_fair_probability` 0.5 (model plan A1, another lane's
+file) and the CSS fallbacks removed above.
+
+#### memory-cutover-ship — CLOSED-VERIFIED 2026-08-15 00:36Z
+Outcome: `#387` shipped in TWO halves and verified in production — `cfee9c6e`
+(streaming cutover) + `705eeefc` (the guard's floor becomes two floors).
+`BOARD_OVERVIEW_READY sports=8`, `OVERVIEW_STOPPED_FOR_MEMORY` 0, `oomKilled` 0
+in 1h40m, peak anon 1404.5MB (34.3% of the 4096MB ceiling) with the trace
+showing 1404 -> 1172MB as MLB is released. Three deploys, zero jobs killed.
+All five lane criteria met. Postmortem written (two `learnings.md` entries:
+the span/threshold rule, and the 8-sport pass EXONERATED as a sufficient cause).
+Follow-up check filed as `#434`. NOT closed by this lane: the 20:03:11Z kill
+remains unexplained, and the 3000MB floor in front of MLB stays until it is.
+
+#### memory-cutover-ship — CHECKPOINT ADDENDUM 00:43Z (lane stays CLOSED-VERIFIED)
+Re-read at checkpoint rather than re-asserted, and it changed one fact: the live
+SHA is `098877e1` (live 00:22:24Z), not `705eeefc`. The verified `sports=8` build
+at 00:28:50Z ran on `098877e1`, which has `705eeefc` as an ancestor and carries
+the two-floor marker — verification stands, attribution corrected. It also
+explains the first post-fix pass hydrating all eight sports without ever printing
+`BOARD_OVERVIEW_READY`: that deploy restarted the loop mid-build
+(`BACKGROUND_LOOP_START` 00:22:46Z), so the build never published. Denominator
+stated: 1 post-fix build vs 5 pre-fix `sports=1`.
+
+### mlb-oom-outlier-2003z — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: explain why the hydrated overview pass at 2026-08-14 20:02:26Z took the
+  container from anon 522MB to a 4096MB SIGKILL in 25 seconds, when the SAME
+  pass shape ran at 613.1MB and 804.2MB peak twice later the same evening
+  (22:36:48 and 22:49:19, pre-cutover code) and four times since at ~1.0-1.5GB.
+  Until this is explained the 3000MB floor in front of MLB cannot be lowered.
+- Files: none claimed — READ-ONLY diagnosis. If it produces a fix, that is a
+  separate lane and a separate deploy.
+- **HYPOTHESES, WRITTEN BEFORE TESTING:**
+  - **H1 — concurrent children, not the overview.** `oomKilled` is a CONTAINER
+    limit over ALL processes; every peak figure I have quoted tonight is
+    `memory_anon_mb` for the cgroup, but the excursion may be a CHILD (MLB
+    `daily_update.py` / sim spawn) that happened to overlap the pass. The
+    surviving 22:37 and 22:49 passes may simply have run in a quieter moment.
+  - **H2 — cold caches.** A deploy landed 19:49Z (`29ed6de1`), so 20:02 is ~13
+    min into a fresh process with `_BOOK_QUOTES_CACHE` refilling toward its
+    500MB budget; the 22:xx passes were 18-30 min into a warm one.
+  - **H3 — a data condition specific to that pass.** 20:02 carried `mlb:g=14`
+    against `g=13` later, and 18 live / 28 pregame; live-game hydration at that
+    hour may be categorically more expensive.
+  - **H4 — the 522MB baseline is the wrong process.** `#423` records that 5 of
+    the first 6 memory readings came from short-lived CHILDREN, not pid 39. If
+    522MB was a child's reading, "no floor to accumulate" is unfounded and the
+    process may have already been heavy.
+- **Falsification tests:** H1 dies if `ALL_PROCESS_MEMORY` in 20:00-20:03 shows
+  children summing to a few hundred MB. H2 dies if the 22:xx passes show the
+  same or larger cache-fill activity. H3 dies if a later pass with comparable
+  live counts is cheap. H4 dies if the 20:02 samples carry pid 39 explicitly.
+- Verification: a named mechanism supported by production numbers, plus an
+  explicit statement of which hypotheses were FALSIFIED (recorded either way —
+  exoneration is a result).
+- Blocked by: none.
+
+#### mlb-oom-outlier-2003z — ANSWERED 2026-08-15 00:5xZ — the question was malformed
+**There is no 20:03:11Z outlier.** It is one of SIXTEEN OOM kills on 2026-08-14
+(events API), running at ~1 per 15-20 min all evening and CONTINUING after both
+halves of `#387` — most recently 00:41:16Z, 26 min after the second half.
+- **H1 (concurrent children) — FALSIFIED.** At 20:02:59, `process_count=2`. At
+  the 00:41:16 kill children held 166MB + 95MB while **pid 39 went 1612 -> 3079MB
+  in 28 seconds.** It is the main worker, not a child.
+- **H2 (cold caches) — NOT NEEDED.** The premise it explained (a uniquely
+  expensive pass) does not exist.
+- **H3 (data condition) — SUPPORTED, but for a different stage.** The kill
+  payloads carry `game_count: 15` / `game_pk_count: 15`: MLB game hydration.
+- **H4 (wrong process for the 522MB baseline) — MOOT and worse than moot.** At
+  20:02:59 the container was at **1179.3MB / 28.8%** with
+  `stage=post_build_overview`. The overview had FINISHED. The "522MB worker died
+  in 25s inside the pass" story describes a pass that had already completed.
+- **RETRACTED IN THE SAME BREATH:** this session's own "oomKilled 0 since 22:55Z"
+  was a log grep and is false. See `learnings.md` FORBIDDEN 2026-08-15.
+- Successor work is NOT this lane: it is `build_cards_page_context` running
+  hydrated on the worker for a 15-game MLB slate. Filed as `#435`.
+- Lane CLOSED — read-only throughout, no files touched, no deploy.
+
+### mlb-hydration-oom-435 — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: `#435` step one — establish, at THREE separate OOM kills, which call
+  site the worker was inside. Confirm or refute `build_cards_page_context`
+  running hydrated for a 15-game MLB slate.
+- Files: none claimed — READ-ONLY. A fix is a separate lane and a separate deploy.
+- Hypothesis: the same MLB game-hydration call site is on the stack at every
+  kill, and it is `build_cards_page_context` (or something it calls), per the
+  2026-08-07 guard comment and `handoff_refresh_worker_oom.md`'s ~3.7GB
+  measurement of the same call on 2026-07-26.
+- Method note: a SIGKILLed process emits no traceback, so the stack is inferred
+  from the last instrumented lines. `CONTAINER_MEMORY` payloads carry DIFFERENT
+  extra keys per call site (`game_count`, `game_pk_count`, `actual_game_count` +
+  `is_today`, `betting_game_count`) — those keys are the fingerprint. Map them
+  to call sites in code FIRST, then read the kills, so the mapping is not
+  invented to fit.
+- Falsification test: the three kills fingerprint to DIFFERENT call sites, or to
+  a site with no relation to MLB game hydration. Either way it is recorded.
+- Verification: three kills, each with its last-lines fingerprint and the code
+  location that emits it.
+- Blocked by: none.
+
+- **DEPLOYED AND MEASURED 2026-08-15 00:50:23Z** as web `932a1f71`
+  (`deploy/board-contract-absent`, pinned to web's own live commit). Soccer's
+  draw segment 0 -> 1; bar/text/tiles agree; ten routes 200. The one
+  surviving 50/50 on NFL is **real**: Denver @ Kansas City, projected 22.5 vs
+  22.1, a 0.4-point margin — the producer's `home_win_rate`, not a default.
+  Full row in `deploys.md`. F1 and F2 are CLOSED-VERIFIED; **F3 (one null
+  placeholder) and F4 (sweep for the absent-becomes-neutral shape) remain
+  OPEN in this lane.**
+
+#### mlb-hydration-oom-435 — CLOSED 2026-08-15 01:0xZ — HYPOTHESIS REFUTED AS STATED
+Six kills sampled (not three — three would have produced a clean wrong answer):
+
+    kill      last instrumented stage before death        memory at that sample
+    00:41:16  cards_context_end            mlb  g=15      anon 4047.6MB  100.0%
+    00:04:47  cards_context_page_cache_hit                anon  537.5MB   22.7%  (2.6s before death)
+    23:51:04  board_contract_games_normalized  nfl g=16    anon 3443.5MB   99.1%
+    23:34:15  (ALL_PROCESS_MEMORY)                        pid39 3755.5MB   99.6%
+    23:11:56  board_contract_games_normalized  soccer g=9  anon 4062.4MB  100.0%
+    22:48:35  (ALL_PROCESS_MEMORY)                        pid39 1389.7MB   71.9%  (19s before death)
+
+- **REFUTED: "the same MLB call site at every kill".** `build_cards_page_context`
+  is present at 2 of 6. Two others are per-sport `board_contract_games_normalized`
+  — and for **soccer and NFL, not MLB.** The lane's own falsification test fired.
+- **CONFIRMED, narrowly:** `build_cards_page_context` IS on the stack at real
+  kills, and `#435`'s framing of it as "the" cause is too strong.
+- **The common factor is the hydrated per-sport board build inside pid 39**
+  reaching ~4GB. Whichever stage happens to be running when it crosses gets
+  blamed. At every sample where a stage is visible at >=99%, memory was ALREADY
+  at the ceiling — **these lines identify the victim, not the allocator.**
+- **THE MOST ACTIONABLE FINDING IS THE BLIND SPOT.** 2 of 6 kills show the
+  process at **22.7%** and **71.9%** seconds before death — multi-GB excursions
+  happening BETWEEN stage samples. The instrumentation samples at stage
+  BOUNDARIES, so an allocation inside a single stage is invisible, and those two
+  kills are precisely the ones that would name the allocator.
+- Next step is therefore NOT a fix: it is sampling on a TIMER (or inside the
+  loaders) rather than at stage boundaries. Recorded on `#435`.
+- Read-only lane. No files touched, no deploy.
+
+### memory-watchdog-435 — BLOCKED ON A LANE COLLISION — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: `#435` step two — sample memory on a TIMER while a build is in flight, so
+  the multi-GB excursion that kills the worker is caught IN PROGRESS. Two of six
+  kills show 22.7% and 71.9% seconds before death; the current instrumentation
+  samples at stage BOUNDARIES only, so the allocator is invisible.
+- Design (written, not implemented): extract the payload builder out of
+  `log_container_memory` so the watchdog cannot become a second copy of the
+  reclaimable expression (that exact drift is called out in its own docstring);
+  a daemon thread sampling every ~2s; emits only above a pct floor or on a
+  delta, so it is near-silent at rest and dense exactly during an excursion;
+  records the last stage seen plus seconds-since, which is what turns
+  "4GB at 00:40:59" into "the excursion began N seconds into stage X".
+  Default ON with an env KILL-SWITCH rather than opt-in, so a code deploy alone
+  can enable it and disabling needs no code — `learnings.md` "worker periodic
+  work is never free" (`#241` restart loop) is why the emit is gated at all.
+- **BLOCKED. `anon-allocation-site` (OPEN, session `memory-guard`) claims the
+  EXACT file set:** `syndicate/features/shared/memory_observability.py`,
+  `scripts/run_refresh_worker.py`, `tests/test_memory_observability.py`,
+  `tests/test_refresh_worker.py`. `refresh-worker-anon-leak` (OPEN, same session)
+  names both source files too.
+- **The owner session no longer exists** — `memory-guard` is absent from the
+  session list at 01:0xZ; only `UI plan`, `Audit models (fork)`, `Nfl autorun`,
+  `417 24h read` and `Deploy 419` remain. `state.md`'s 20:4xZ census already
+  recorded both lanes as orphaned.
+- **Not overriding unilaterally.** Closing or overriding another lane's claim is
+  the owner's call, these are the most memory-sensitive files in the repo, and
+  both lanes carry unfinished measurement obligations that a rewrite here could
+  invalidate. Surfaced for a decision instead.
+
+#### memory-watchdog-435 — UNBLOCKED 2026-08-15 01:1xZ — CROSS-LANE OVERRIDE, logged
+- **Override authorised by the owner (user) after the collision was surfaced.**
+  Evidence it rests on: the `memory-guard` session is ABSENT from the live
+  session list at 01:0xZ, and `state.md`'s 20:4xZ census already recorded
+  `anon-allocation-site` and `refresh-worker-anon-leak` as orphaned.
+- Files TAKEN from those two lanes: `memory_observability.py`,
+  `run_refresh_worker.py`, `tests/test_memory_observability.py`,
+  `tests/test_refresh_worker.py`.
+- **Deliberately NOT touched, so those lanes' findings survive:** the tracemalloc
+  helpers, the `malloc_trim`/arena machinery, and every existing emitter's
+  behaviour. This change is ADDITIVE — one extracted payload builder (so the
+  reclaimable expression is not copied a second time), one daemon sampler, one
+  start call.
+- Status: OPEN — implementing.
+
+- **ADJACENT FIX, taken on the user's instruction ("we are rooted to central
+  time not UTC") and shipped 2026-08-15 01:17:56Z as web `1ac485c0`:**
+  `ncaaf/betting_card.py:_kickoff_date_and_label` filed every kickoff under
+  its UTC day. **28 of 157 real 2026 kickoffs were on the wrong date**;
+  production's week-1 card lost its bogus "Sunday, August 30" group and those
+  games now sit under Saturday. Swept the tree for the same shape: the two
+  other NCAAF sites are administrative dates (transfer portal, coach hires)
+  where a day boundary carries no meaning and were left alone; five other
+  call sites already convert through Central explicitly. Four tests, one of
+  which asserts an afternoon kickoff does NOT move.
