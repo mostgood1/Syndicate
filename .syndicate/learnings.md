@@ -2184,3 +2184,69 @@ accident and failed the moment I tidied it into one call.**
   before.
 - **Cost:** none realised. The exposure was a shared-contract change reaching
   production with a third of its blast radius unexamined.
+
+### 2026-08-15 — I PROPOSED ALLOWLISTING A READ PATH WITHOUT CHECKING THE WRITE PATH. It would have 404'd forever
+
+Near-miss, caught one step before shipping. The tally I needed
+(`meta["liveMcSources"]`) lives in
+`reports/live_lens_loop/latest_live_lens_tick.json`.
+`/api/ops/artifacts/stream` returned **403 not-allowlisted**, so the fix looked
+obvious and one line: add the path to the allowlist. I proposed exactly that,
+and was told to do it.
+
+**It would have been inert.** `_KEYVALUE_EXCLUDED_PATH_MARKERS` is only
+`("migration_runs/",)`, so on any service with the keyvalue backend — all three —
+that path is keyvalue-backed, and `write_json_file` writes to Redis and
+**returns before any disk write**. `/api/ops/artifacts/stream` gates on
+`target.is_file()`. The file exists on no disk. Allowlisting turns a 403 into a
+404 and nothing else.
+
+**Why the 403 was so misleading.** It is a *permission-shaped* error for an
+*existence-shaped* problem. "This path is not allowed" invites "then allow it" —
+and the allowlist check runs BEFORE the file check, so the more informative
+error is unreachable while the path is unlisted. The endpoint cannot tell you
+the thing it already knows.
+
+**The general shape: an allowlist governs the READ path; whether the bytes exist
+is a property of the WRITE path.** Different code, usually different files,
+often different services. A 403 tells you nothing about the second.
+
+**How to apply.**
+- Before exposing any path, **find its writer** and confirm the bytes land where
+  the reader looks. Here: `write_json_file` → `_keyvalue_backed()` → the
+  exclusion tuple. Three greps, versus a deploy that proves nothing.
+- **Keyvalue-backed and disk-backed are different worlds here and the path
+  string looks identical in both.** `reports/**` is keyvalue unless excluded;
+  `data/**` is disk. Reading one with the other's API returns "missing", never
+  "wrong backend".
+- Prefer a route using `read_json_file` (backend-aware) over widening the
+  artifact allowlist whenever the payload is *state* rather than a data artifact.
+- Pin the reasoning in a test. `TestTheAllowlistFixWouldHaveBeenInert` asserts
+  the exclusion tuple and the backing, so if the path ever becomes disk-backed
+  the cheaper fix surfaces loudly instead of never.
+
+### 2026-08-15 — A HOOK THAT BLOCKS A `Bash` CALL DISCARDS EVERY SIDE EFFECT IN IT, INCLUDING THE HEREDOCS
+
+Compound cost, twice in one checkpoint. I wrote ledger prose with
+`cat >> file <<'EOF'` and the commit in the SAME `Bash` call. `commit-guard`
+blocked the call. **Nothing in it ran** — not the append, not the `cat > $MSG`
+that wrote the commit message.
+
+Two failures followed, and neither pointed at the cause:
+1. Every retry printed "lost race" because my loop had `2>/dev/null` on the
+   commit; the real error was `fatal: could not read log file ... No such file`.
+   **An error handler that assumes one failure mode reports that mode for all of
+   them.**
+2. The learnings entry was silently absent. The *next* commit still showed
+   `learnings.md | 50 +++++`, because another session's edits were sitting in the
+   worktree — **so the stat line looked like my content landing and was somebody
+   else's.** I only caught it by grepping HEAD for my own string at checkpoint.
+
+**How to apply.**
+- **Never put a file write and a guarded git operation in one `Bash` call.**
+  Write the content, verify it, then commit in a separate call.
+- **Do not suppress stderr on a commit inside a retry loop.** Print it, and
+  distinguish "guard blocked", "missing message file", and "index race".
+- **A `--stat` line is not proof your content committed** on a shared worktree.
+  Grep HEAD for a string only you wrote. That check is the entire reason this
+  was caught rather than shipped as a checkpoint that silently lost its lesson.
