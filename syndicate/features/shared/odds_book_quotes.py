@@ -58,6 +58,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Mapping
 
+from syndicate.features.shared.opportunity_signals import consensus_vigged_price
 from syndicate.features.shared.refresh_state_store import data_root
 
 # Kept deliberately flat and uniform across sports. A consumer that can read
@@ -1140,11 +1141,14 @@ def quote_ref(
     # Mean implied probability across books, converted back to a price-like
     # number. Averaging American odds directly is meaningless (the scale is
     # discontinuous at +/-100); averaging implied probability is not.
-    mean_implied = sum(_implied_probability(int(row["price"])) for row in ranked) / len(ranked)
-    consensus_price = (
-        int(round(-100.0 * mean_implied / (1.0 - mean_implied))) if mean_implied >= 0.5
-        else int(round(100.0 * (1.0 - mean_implied) / mean_implied))
-    )
+    #
+    # Owned by `opportunity_signals` since 2026-08-15. This was hand-rolled here
+    # AND in `book_grid`, and both copies disagreed with the owning converter at
+    # the boundary (-100 vs +100 at exactly even money; ZeroDivisionError where
+    # `american_price` refuses). Note this is the VIGGED average -- the no-vig
+    # fair for the same market is `fair_fields` immediately below, and the two
+    # must never be read as the same number.
+    consensus_price = consensus_vigged_price(row["price"] for row in ranked)
 
     # #238: no-vig fair value, when the opposing side(s) were supplied. Absent
     # rather than guessed when they were not -- a one-sided "fair" price is just
@@ -1174,7 +1178,13 @@ def quote_ref(
         "best_price": int(ranked[0]["price"]),
         "best_bookmaker": ranked[0].get("bookmaker"),
         "consensus_price": consensus_price,
-        "edge_vs_consensus_pct": round((_implied_probability(consensus_price) - _implied_probability(price)) * 100, 2),
+        # Absent, not zero, when the consensus refused -- a 0.0 would read as
+        # "the best price IS the consensus", the opposite of "no consensus".
+        "edge_vs_consensus_pct": (
+            round((_implied_probability(consensus_price) - _implied_probability(price)) * 100, 2)
+            if consensus_price is not None
+            else None
+        ),
         "alternatives": [
             {"bookmaker": row.get("bookmaker"), "price": int(row["price"]), "line": row.get("line")}
             for row in ranked

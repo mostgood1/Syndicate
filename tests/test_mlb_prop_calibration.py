@@ -56,9 +56,26 @@ def test_unknown_market_is_not_given_a_number():
 
 def test_the_note_is_small_because_it_lands_on_every_row():
     """`#374`: extraHitterProps reached 68% of the MLB live-lens payload at 117
-    keys per record. The full numbers live in the module, not on the row."""
+    keys per record. The full numbers live in the module, not on the row.
+
+    Grew to five keys for `D4` (2026-08-15): every verdict says "until
+    de-biased" and that de-biasing is in-sample, so the row has to carry its own
+    validation state or a reader trusts it by default. The ceiling is still the
+    point of this test -- adding a SIXTH key needs the same argument made again,
+    not a quiet edit here.
+    """
     note = skill_note("batter_hits")
-    assert set(note) == {"sample_games", "seasons", "correlation", "verdict"}
+    assert set(note) == {
+        "sample_games", "seasons", "correlation", "verdict", "debias_validation",
+    }
+
+
+def test_the_row_declares_the_debias_is_in_sample():
+    """`D4`. The published improvement is a fit, not a prediction, until the
+    out-of-sample split in `scripts/backtest_mlb_props.py` is run against
+    production. A row asserting the verdict without this is overstating."""
+    for market in ("batter_hits", "batter_total_bases", "batter_stolen_bases"):
+        assert skill_note(market)["debias_validation"] == "in_sample"
 
 
 def test_verdicts_do_not_claim_skill_the_data_does_not_support():

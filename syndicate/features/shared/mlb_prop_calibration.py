@@ -38,6 +38,20 @@ anyone told otherwise will be surprised. Fix opportunity first because it sits
 upstream of every market, then re-measure; per-market calibration will still be
 needed.
 
+**THE DE-BIASED COLUMN IS IN-SAMPLE. `D4`, 2026-08-15.** `mean_bias` is
+estimated from the same 2,487 player-games it is then used to correct, and the
+constant baseline is the mean of the same actuals it is scored against. So
+"remove the mean error and 5 of 7 beat the baseline" is a statement about a FIT,
+not a prediction, and it is optimistic by an unmeasured amount. This is the same
+shape as the soccer leakage that retired `*_backtest_*.csv` (`D1`) -- milder,
+because both sides of the comparison leak equally, but the direction is the same.
+`corr` is unaffected (nothing is fitted to produce it) and the BIASED-NOT-BLIND
+headline does not rest on the de-biasing; the size of the improvement does.
+`scripts/backtest_mlb_props.py` now always computes an out-of-sample split (bias
+fit on the earlier dates, scored on the later ones) and reports it beside the
+in-sample number. **It has not been re-run against production yet, so no
+out-of-sample figure exists and every number below is still the in-sample one.**
+
 SCOPE AND LIMITS, so this block is not read as more than it is:
   * 2,487 player-games over 14 dates (2026-08-01..2026-08-14), one season, one
     stretch of one season. It is a real sample, not a long one.
@@ -59,6 +73,11 @@ from typing import Any
 
 SAMPLE_PLAYER_GAMES = 2487
 SAMPLE_DATES = "2026-08-01..2026-08-14"
+
+# `in_sample` until `scripts/backtest_mlb_props.py` is re-run against production
+# and the out-of-sample figures replace the ones below. Flipping this string is
+# not the fix -- producing the number is.
+DEBIAS_VALIDATION = "in_sample"
 
 # Keyed by the market as it appears on board rows. `batter_home_runs` and
 # `batter_hits_runs_rbis` are deliberately absent -- not measured, so they stay
@@ -136,4 +155,12 @@ def skill_note(market: Any) -> dict[str, Any] | None:
         "seasons": SAMPLE_DATES,
         "correlation": entry["correlation"],
         "verdict": entry["verdict"],
+        # The fifth key, added against this function's own size rule (`D4`).
+        # Every verdict above says "until de-biased", and that de-biasing was
+        # fit on the games it was scored on. A row carrying the claim without
+        # carrying its validation state is the row a reader trusts by default --
+        # which is precisely the failure `#425` made `unmeasured` first-class to
+        # avoid. One short constant string on prop rows only is the cheapest
+        # honest version; it goes away when the out-of-sample number lands.
+        "debias_validation": DEBIAS_VALIDATION,
     }

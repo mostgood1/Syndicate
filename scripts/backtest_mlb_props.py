@@ -53,6 +53,7 @@ import urllib.request
 from datetime import date as date_cls, datetime, timedelta, timezone
 from pathlib import Path
 from statistics import fmean
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BASE = "https://syndicate-an21.onrender.com"
@@ -176,6 +177,12 @@ def main() -> int:
     parser.add_argument("--end", default="", help="last date (YYYY-MM-DD), default today")
     parser.add_argument("--min-games", type=int, default=100,
                         help="per-MARKET minimum before a skill number is emitted")
+    # D4. The out-of-sample split is ALWAYS attempted -- there is no flag to
+    # turn it off, because the in-sample number is the one that gets published
+    # by accident and an opt-in check is a check nobody runs. This only sets how
+    # many dates each half needs before the split is worth reporting.
+    parser.add_argument("--min-holdout-dates", type=int, default=3,
+                        help="minimum dates per half before an out-of-sample number is emitted")
     args = parser.parse_args()
 
     token = _admin_token()
@@ -183,7 +190,7 @@ def main() -> int:
     end = date_cls.fromisoformat(args.end) if args.end else date_cls.today()
     dates = [(end - timedelta(days=i)).isoformat() for i in range(args.limit)]
 
-    pairs: list[tuple[dict, dict]] = []
+    pairs: list[tuple[dict, dict, str]] = []
     no_proj, no_box, dnp = [], [], 0
     for i, day in enumerate(dates, 1):
         proj = projections_for(day, token, cache)
@@ -204,7 +211,7 @@ def main() -> int:
             if int(batting.get("plateAppearances") or 0) <= 0:
                 dnp += 1
                 continue
-            pairs.append((means, batting))
+            pairs.append((means, batting, day))
         print(f"  ...{i}/{len(dates)} dates, {len(pairs)} player-games")
 
     print("\nCOVERAGE")
@@ -231,8 +238,8 @@ def main() -> int:
                "markets": {}}
 
     for mean_key, stat_key in MARKETS.items():
-        pred, act_vals = [], []
-        for means, batting in pairs:
+        pred, act_vals, pair_dates = [], [], []
+        for means, batting, pair_day in pairs:
             value = means.get(mean_key)
             if value is None:
                 continue
@@ -247,6 +254,7 @@ def main() -> int:
                 actual = int(actual)
             pred.append(float(value))
             act_vals.append(float(actual))
+            pair_dates.append(pair_day)
 
         label = mean_key.replace("_mean", "")
         if len(pred) < args.min_games:
@@ -280,6 +288,60 @@ def main() -> int:
         m_debiased = mae([p - bias for p in pred], act_vals)
         debiased_beats = m_debiased < m_base
 
+        # D4. THE ABOVE IS IN-SAMPLE AND MUST NOT BE PUBLISHED AS A RESULT.
+        #
+        # `bias` is estimated from the same player-games it is then used to
+        # correct, and `baseline` is the mean of the same actuals it is scored
+        # against. Both leak, so "de-biased beats the baseline" is a statement
+        # about a fit, not a prediction. The soccer lane retired an entire
+        # validation set for exactly this shape (`D1`), and the difference here
+        # is only one of degree.
+        #
+        # So: fit the correction on the EARLIER dates and score it on the LATER
+        # ones. `dates` is built newest-first, so the fit half is the TAIL.
+        # Temporal order matters -- fitting on the later half and scoring the
+        # earlier one would be a lookahead, which is the defect being fixed, not
+        # a symmetric alternative.
+        #
+        # BOTH numbers are reported. The in-sample one is not deleted, because a
+        # reader comparing them learns how much of the de-biasing was real; a
+        # reader shown only one number learns nothing about the gap.
+        oos: dict[str, Any] = {"available": False, "reason": None}
+        ordered_dates = sorted(set(pair_dates))
+        if len(ordered_dates) < 2 * args.min_holdout_dates:
+            oos["reason"] = (f"needs >= {2 * args.min_holdout_dates} distinct dates, "
+                             f"have {len(ordered_dates)}")
+        else:
+            cut = len(ordered_dates) // 2
+            fit_dates = set(ordered_dates[:cut])       # earlier
+            score_dates = set(ordered_dates[cut:])     # later
+            fit_idx = [i for i, d in enumerate(pair_dates) if d in fit_dates]
+            score_idx = [i for i, d in enumerate(pair_dates) if d in score_dates]
+            if len(fit_idx) < args.min_games or len(score_idx) < args.min_games:
+                oos["reason"] = (f"split leaves {len(fit_idx)}/{len(score_idx)} player-games, "
+                                 f"below --min-games {args.min_games}")
+            else:
+                # Everything the correction knows comes from the fit half only.
+                fit_bias = fmean(pred[i] - act_vals[i] for i in fit_idx)
+                fit_baseline = fmean(act_vals[i] for i in fit_idx)
+                s_pred = [pred[i] for i in score_idx]
+                s_act = [act_vals[i] for i in score_idx]
+                oos_model = mae(s_pred, s_act)
+                oos_base = mae([fit_baseline] * len(s_act), s_act)
+                oos_debiased = mae([p - fit_bias for p in s_pred], s_act)
+                oos = {
+                    "available": True, "reason": None,
+                    "fit_dates": f"{ordered_dates[0]}..{ordered_dates[cut - 1]}",
+                    "score_dates": f"{ordered_dates[cut]}..{ordered_dates[-1]}",
+                    "n_fit": len(fit_idx), "n_score": len(score_idx),
+                    "bias_fit_on_earlier": round(fit_bias, 4),
+                    "mae_model": oos_model,
+                    "mae_constant_baseline": oos_base,
+                    "mae_debiased": oos_debiased,
+                    "debiased_beats_baseline": oos_debiased < oos_base,
+                    "correlation": corr(s_pred, s_act),
+                }
+
         if beats:
             verdict = f"beats baseline by {round(m_base - m_model, 4)}"
         elif debiased_beats:
@@ -302,7 +364,20 @@ def main() -> int:
             "beats_constant_baseline": beats,
             "debiased_beats_baseline": debiased_beats,
             "inflation_pct_of_baseline": inflation, "verdict": verdict,
+            # Explicit, so no consumer can mistake the block above for a
+            # prediction. Everything outside `out_of_sample` is a FIT.
+            "validation": "in_sample",
+            "out_of_sample": oos,
         }
+        if oos.get("available"):
+            print(f"  {'':10s} {oos['n_score']:5d} {str(oos['correlation']):>8s} "
+                  f"{oos['mae_model']:>10.4f} {oos['mae_constant_baseline']:>9.4f} "
+                  f"{oos['mae_debiased']:>10.4f} {'':>8s} {'':>7s} "
+                  f"OUT-OF-SAMPLE (fit {oos['fit_dates']}, scored {oos['score_dates']})"
+                  f" -- de-biased {'BEATS' if oos['debiased_beats_baseline'] else 'LOSES TO'} baseline")
+        else:
+            print(f"  {'':10s} {'':5s} {'':>8s} {'':>10s} {'':>9s} {'':>10s} "
+                  f"{'':>8s} {'':>7s} out-of-sample NOT COMPUTED: {oos['reason']}")
 
     print("\n" + "=" * 72)
     print("MEASURED_SKILL block:")
