@@ -468,6 +468,33 @@ def build_book_grid(
                 )
 
             first = sides_rows[0]
+            # `#435`. `commence_time` is REVISED during a slate -- measured on
+            # the MLB 2026-08-09 shard, 12 of 15 events carried more than one
+            # value, spread up to 7 minutes. Taking it off `sides_rows[0]` meant
+            # taking whichever report happened to be iterated first, which in an
+            # append-only shard is the OLDEST. Same hazard the `line` comment
+            # above records for `#262`, left in place for this field.
+            #
+            # It is not cosmetic: `closing_quotes` keeps rows with
+            # `observed < commence`, so a stale-early start time DISCARDS quotes
+            # that were genuinely pregame.
+            #
+            # FROM THE FRESHEST OBSERVATION, not the largest value. The first
+            # attempt here took `max()` of the commence values and was wrong for
+            # the case that matters: a start time revised EARLIER (measured
+            # 18:20:00 -> 18:16:30) makes the largest value a stale one. What is
+            # wanted is "what does the most recent report say", and ties break on
+            # the value so the result never depends on iteration order.
+            commence_time = str(
+                max(
+                    sides_rows,
+                    key=lambda row: (
+                        _observed_at(row),
+                        str(row.get("commence_time") or ""),
+                    ),
+                ).get("commence_time")
+                or ""
+            ) or None
             grid.append(
                 {
                     "sport": key[0],
@@ -482,7 +509,7 @@ def build_book_grid(
                     "line": anchor_key,
                     "home_team": first.get("home_team"),
                     "away_team": first.get("away_team"),
-                    "commence_time": first.get("commence_time"),
+                    "commence_time": commence_time,
                     # LEAGUE, carried rather than keyed (`#330`). All ten soccer
                     # leagues share the `soccer` sport slug and the
                     # `soccer_source` tree, so `sport` cannot express which

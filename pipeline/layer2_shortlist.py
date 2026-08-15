@@ -63,7 +63,7 @@ def build_layer2_shortlist(
                 attach_projections,
             )
             from syndicate.features.shared.book_grid import build_book_grid
-            from syndicate.features.shared.odds_book_quotes import read_book_quotes, read_quote_last_seen
+            from syndicate.features.shared.odds_book_quotes import read_book_quotes_latest, read_quote_last_seen
 
             # WINDOW-SCOPED, NOT SINGLE-DATE (`#379`).
             #
@@ -89,7 +89,15 @@ def build_layer2_shortlist(
             dates_with_rows: list[str] = []
             for window_date in window_dates:
                 try:
-                    chunk = read_book_quotes(sport, window_date)
+                    # `#435`. LATEST-PER-KEY. `build_book_grid` below already
+                    # keeps only the freshest row per key (`book_grid.py:156`,
+                    # `:225`) and its reduce key equals `_KEY_FIELDS`, so the
+                    # grid cannot tell this from the full shard -- verified
+                    # byte-for-byte against the real 207MB 2026-08-09 shard.
+                    #
+                    # This loop is why it matters here most: it EXTENDS across a
+                    # window, so NFL accumulated five shards at once.
+                    chunk = read_book_quotes_latest(sport, window_date)
                 except Exception:
                     continue
                 if chunk:
