@@ -89,6 +89,24 @@ Product decisions, not engineering ones. Do not re-take them.
    than something to walk back. **This is the current focus.**
 6. **The sharp reference price is Pinnacle, and we already have it** — see the
    section below. Model Lane C needs NO sourcing work.
+7. **SOCCER: ship the three correctness fixes, HOLD the 3-way de-vig.**
+   `[2026-08-15 ~11:5x CDT]` **This SUPERSEDES decision 3's "build the model".**
+   The model was then unmeasured; it is now measured and it **LOSES to the
+   market** — multiclass Brier **0.5875 vs 0.5737**, worse in **8 of 9 leagues**
+   (sign test p = 0.039), under-dispersed (stdev 0.1575 vs 0.1811), on the first
+   leak-free backtest this repo has had (1,112 matches, ratings recomputed per
+   match day, benchmarked against de-vigged closing odds on identical matches).
+   - **SHIP:** seed bootstrap (unblocks 107 of 123 board rows), accent join
+     (9 clubs / 5 leagues), as-of date parsing (fixes leakage + two live
+     production-ratings bugs). The as-of half is landed: `0b0d44d9` + `f05a21c4`.
+   - **HOLD:** the 3-way de-vig. It is a correct removal, but it makes an
+     untrustworthy number visible.
+   - **The reason the hold matters, and the part most likely to be lost in
+     summary: the model's errors sit on the FAVOURITES, so published
+     `model_edge_pct` would systematically point edges at underdogs.**
+   - So soccer stays at ~0 published EV rows **because the model is not good
+     enough**, not because the data is missing. That is a different and more
+     honest reason than the one decision 3 was taken under.
 
 **Nothing is currently owed by the user.**
 
@@ -302,6 +320,21 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   | 21:48→02:53 | full live slate | **~1 min, continuous** |
   **121.6 is exact and it is the EMPTY-SLATE PREGAME number only.** The same
   pipeline samples 122× faster once games are live. Never quote it unqualified.
+- **SUPERSEDED IN PART — there is a THIRD regime, and it dominates.
+  `[measured 08-15 16:38-17:00Z, deploy-free window, 22 samples]`**
+  On 08-15 the pregame beat was **~60 min, not 121.6**, and then MLB capture
+  starved for **5.8 h**. Cause is neither the tick nor the cooldown: a chain of
+  back-to-back refresh **run-locks** (`JOB_CAP_THROTTLED active=1 max=1`), each
+  held ~25 min with ~2 min free — **~92% occupancy, traced 11:39→17:00Z**.
+  17 consecutive ticks refused by `pid=4047`; the ONE tick that got through at
+  16:56:26 took end-to-end from **20,880 s to 32 s**, then `pid=5681` retook it.
+  **End-to-end is BIMODAL: ~32 s or hours, never in between.** In the starved
+  regime the number rises exactly 1 s/s — it is a clock, not a latency.
+  **`PREGAME_RELAUNCH_COOLDOWN_SKIPPED` fired ONCE in 5.75 h** (counted on
+  live-odds-worker, the correct emitter, with a liveness control), so **Tier 0's
+  `0.1` would NOT have prevented this** and is not the Tier 5 prerequisite the
+  program plan calls it. Full working:
+  `.syndicate/tier5_quote_to_ui_WINDOW2_2026-08-15.md`.
 - **WHY 60s BECOMES ~7,300s, two multipliers, both measured `[08-14 17:0xZ]`:**
   1. `SYNDICATE_LIVE_ODDS_REFRESH_INTERVAL_SECONDS=60` is the TICK interval,
      never the launch interval.
@@ -685,10 +718,14 @@ generalise but are not current state. `#377`, `#425`, `#429`.
 
 **The LLM is off by decision. The deterministic snapshot path is the product.**
 
-- **Baseline: 23/52** (advice 4/5, entity 2/10, explain 4/6, history 1/5,
-  lookup 2/8, ranking 4/10, refusal 6/8), measured 20:45Z, in
-  `reports/ask_regression/post_m1_fixed_2026_08_14.json`. `answer_source:
-  snapshot` 52/52 is now the EXPECTED source, not a finding.
+- **CURRENT BASELINE: 38/52** (advice 4/5, entity 9/10, explain 4/6, history 2/5,
+  lookup 8/8, ranking 7/10, refusal 4/8), measured 16:52Z on live `0bf866c3`, in
+  `reports/ask_regression/post_ask_sport_coverage_2026_08_15.json`.
+  `answer_source: snapshot` is the EXPECTED source, not a finding.
+  **Judge every future change against 38/52, and RE-MEASURE the baseline before
+  trusting it** — the previous recorded figure (23/52) was two deploys stale by
+  the time it was used, and had it been trusted a `refusal` regression from a
+  different lane would have been inherited as the new lane's own.
 - **K1 SHIPPED AND VERIFIED** (`bef782cb`, live 20:01:18Z): 20/52 → 23/52,
   `refusal` 3/8 → 6/8, every other class byte-identical, declined-question
   latency 10.9s → 0.19s. **A refusal gate must be tested on what it must NOT
@@ -696,13 +733,26 @@ generalise but are not current state. `#377`, `#425`, `#429`.
 - **M1 SHIPPED** (`b16eb1f7`) but **SUPPLEMENTS rather than REPLACES**: it adds
   `visuals.tables` while `structured_response` survives, so both pools disagree
   (23.81 vs 14.09). Successor lane `ask-headline-from-board`.
-- **MLB proves the deterministic path can be genuinely good and seven sports get
-  almost none of it** — mlb 4/4 questions producing evidence (14 tables, 4
-  charts), ncaaf 2/2, nba 1/1, and **nfl / wnba / soccer / nhl / ncaab 0/9**,
-  including with an explicit sport context. Three distinct causes: soccer and
-  ncaab have **no branch at all**; NFL's matcher requires the **full** team name
-  (`"Patriots vs Seahawks"` → `[]`); wnba/nhl/nba have **entity-only fetchers**
-  and a ranking question names no entity. `[measured 08-14]`
+- **SPORT COVERAGE FIXED AND MEASURED** (`0bf866c3`, live 16:49:28Z) — the
+  08-14 finding above (soccer/ncaab had no branch, NFL required the FULL team
+  name, wnba was a keyword inside nba) is CLOSED on the routing axis:
+  **25/52 → 38/52, zero regressions, `no_sport_resolved_expected_*` 15 → 0.**
+  entity 2/10 → 9/10, lookup 4/8 → 8/8, ranking 5/10 → 7/10. Board composition
+  identical at both instants (150 rows, wnba 18 / nfl 42 / mlb 90), which is
+  what makes the diff attributable. `[measured 08-15 16:52Z]`
+- **BUT soccer / ncaab / nhl coverage is UNPROVEN ON DATA.** The board carried
+  **zero rows** for all three at both measurement instants, so those cases pass
+  on ROUTING only. Whether the new fetcher branches return anything useful on a
+  real slate is NOT established — re-measure when soccer is on the board.
+- **NFL nickname matching must NOT be copied to NCAAF.**
+  `_ncaaf_teams_in_question` excludes mascots deliberately (~680 schools share
+  "Wildcats"/"Tigers"). NFL is safe only because its 32 nicknames are unique
+  (verified). `[from-code + measured 08-15]`
+- **K6 is HALF DONE.** `routed_sport` and `visuals.as_of` are now populated, but
+  `warn:no_as_of_stated` is **24 → 24, unmoved** — the harness warns on the
+  ANSWER TEXT, which still states no as-of. `[measured 08-15]`
+- **K3's `build_evidence_pack` sport-filter item is DEAD CODE** — reachable only
+  from the LLM engine, which never executes by standing decision. `[from-code]`
 - **Chat reads the shortlist ARTIFACT directly**, so chat staleness IS artifact
   age. `[from-code]`
 - **The system prompt's rules 5–8 (surface uncertainty, distinguish fact from
@@ -728,6 +778,48 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   the rest running on purpose.
 - **The core MLB path is SEVERED, not scaffolding** — a complete pipeline cut at
   one merge line. See THE PUBLISHED SHORTLIST above.
+- **CORRECTED 2026-08-15: "no live GAME-LINE projection exists" is true of what
+  is PUBLISHED and FALSE of what is COMPUTED.** *(Restored 2026-08-15 — these
+  lines were committed as `fd23c6bc`, then dropped by the 74KB→64KB collapse at
+  `7f7d8d88`, which left this section asserting the refuted claim. Do not
+  re-collapse without re-reading.)* `estimate_live(LiveSituation(...))` runs in
+  production on every live-lens tick, **120 sims per live game**, off the current
+  inning/half/outs/bases/score/batter/pitcher, returning `homeWinProb`,
+  `awayWinProb`, projected `total` and `homeMargin`
+  (`vendor/.../flask_frontend.py:16573`, wired into `_build_game_lens`:16806).
+  **Proof it runs:** `LIVE_MC_BAIL` instruments every failure exit;
+  live-odds-worker logged exactly **9 bails/tick across 11 consecutive ticks, all
+  `status_not_live`**, against a slate of **9 Final / 5 Live** — the live games
+  never bail. One exit (`away_score is None`) is uninstrumented, so this is proof
+  by exhaustion with one named hole. `[measured 08-15 03:0x–03:2xZ]`
+- **It dies in THREE places, and the middle one was re-scoped after measurement:**
+  1. `mlb/live_lens.py:1094` — the merge rejected the MC lens for exactly the live
+     games (the card's text-derived lens already satisfies
+     `_lens_rows_have_projection_signal`); same shape as the prop sever at :1109,
+     fifteen lines earlier. **FIXED in git as `0e0b0aa1`, NOT DEPLOYED.**
+  2. **`/mlb/api/live-lens` serves a report WEB WRITES ITSELF.** It reads the
+     worker's keyvalue snapshot and, when it judges it stale, DISCARDS it and
+     rebuilds locally with the MC hard-refused by
+     `refuse_if_compute_in_request_path`. Max age **60 s** vs a **60 s** worker
+     tick. **There are THREE live-lens artifacts, not two**, and the published
+     disk copy is not the one the surface reads. *(This supersedes my own earlier
+     "the published report is the slim shape, so fixing (1) alone changes
+     nothing" — that named the wrong artifact. The conclusion that (1) alone is
+     not user-visible survives; the reason changed.)*
+  3. `live_projection_join` is **entirely prop-shaped** — there is no game-line
+     join at all, so nothing prices a live game line even once it is published.
+  **`predictions.full` IS pregame at source** — the vendored payload sets
+  `"predictions": card.get("predictions")` verbatim, so no merge line downstream
+  can make it live. Served surface confirmed the effect before the fix: 56
+  `gameLens` rows, lanes `first1/first3/first5` only, `source: None`, **0 with
+  `modelHomeWinProb`**.
+- **The compute cost of a live game-line projection is ALREADY BEING PAID** — the
+  MC runs on both workers today regardless. Publishing it is not new periodic
+  work, which is what makes this cheap against the `#435` memory constraint.
+  **The open question is precision, not existence:** 120 sims puts the standard
+  error on a win probability near **4.6 pp** at p=0.5, which is display-grade and
+  not edge-grade. `MLB_LIVE_GAME_MC_SIMS` is env-tunable (min 20).
+  Full spec: `.syndicate/spec_live_game_line_projection.md`.
 - **`live/nfl_live_lens.json` and `live/soccer_live_lens.json` are built every
   tick and NEVER published to web.** `live_lens_loop.py:150` builds five sports
   (`mlb, nba, wnba, soccer, nfl`); `artifact_publisher.py:433-435` allowlists

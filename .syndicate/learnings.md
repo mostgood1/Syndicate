@@ -1361,3 +1361,200 @@ which that revert gets there without anyone doing anything wrong.
 - A handoff carried, as its single next action, a fix whose justification was one
 - *(evidence in `learnings_evidence.md`)*
 
+## 2026-08-15 — FORBIDDEN: never read `same_book_n=0` (or any joiner zero) as a data-quality verdict until the reader has been shown to SEE the data
+
+`clv-without-settlement`'s next action said, in advance and in good faith: "If
+`same_book_n` is still 0, the blocker is odds-history breadth, not the joiner."
+Run as written on 2026-08-15 it returned `same_book_n=0, avg_clv_pct=None` for
+all 8 sports, and that rule would have converted a blind instrument into a
+finding about the odds market.
+
+**The truth at that instant:** refresh-worker had **490 openings recorded for
+that same date** (`[clv_opening_ledger] OPENINGS ... already=490`, 20 log lines
+in 14h). `/api/ops/clv/report` runs on **web**; `load_openings` is a
+`path.exists()` on a local file; web's disk held **0 bytes** of
+`reports/intelligence/clv_openings/*.jsonl`. The endpoint returned `ok: true`
+the whole time.
+
+**Why this is its own rule and not just another instance of instrument
+blindness:** the zero was PREDICTED IN ADVANCE and assigned a meaning in
+advance. A pre-registered decision rule feels like rigour, and it is — but only
+for the branch it anticipated. This one had no branch for "the reader is on the
+wrong side of a disk boundary", so the unanticipated failure was silently
+routed into the anticipated explanation. **A decision rule that maps every zero
+onto a substantive cause is a rule with no null branch.**
+
+**How to apply:**
+- Before believing a zero, demand a NON-ZERO reading from the same instrument on
+  some input. Here that took one call: the same endpoint for 2026-08-14, a date
+  the lane itself measured at 150 openings, also returned 0. Two dates, both
+  known non-empty, both 0 — the instrument, not the data.
+- Read the SIBLING fields before the headline. `unresolved_reasons: {}` and
+  `by_book_scope: {}` were empty in the very first payload. Under the breadth
+  hypothesis they are necessarily NON-empty (that is what breadth failures look
+  like). The refutation was already on screen.
+- **Cross-service reads: name the service that runs the code and the service
+  that owns the file, every time.** Deployed and reachable is not the same as
+  able to read. `#208`'s lesson again: an allowlisted pattern PERMITS a
+  transfer, it does not make one happen.
+- A read-only report whose "no data" and "cannot see data" look identical is a
+  defect in the report. Zero openings and 490 openings must not share a
+  response shape.
+
+**Standing until:** the join is run from a service that can read the ledger, or
+the ledger is published where the endpoint can reach it. Until then
+`same_book_n` from `/api/ops/clv/report` carries no information about breadth.
+
+### 2026-08-15 — A BASELINE IS A MEASUREMENT, NOT A CONSTANT. Re-measure it before you judge anything against it
+
+**The belief:** the number handed to me in the brief — "post-M1 baseline 23/52,
+that is the number every change is judged against" — was a fact about the system.
+
+**What was true.** Live production measured **25/52**, not 23/52. Two deploys had
+landed in between (`7e334509`, `c774fe1a`), and one of them had moved `refusal`
+**6/8 → 4/8**. The brief's per-class table was wrong in four of seven classes.
+
+**Why it matters more than the arithmetic.** Had I trusted it, I would have
+deployed onto a board that already carried someone else's regression, then
+diffed against a number that never described the tree I was changing. `refusal`
+would have read as 4/8 "after my change" against 6/8 "before", and I would have
+reported — and believed — that I broke it. The stale baseline does not just
+mis-score the work; **it silently reassigns another lane's regression to you**,
+and there is no signal in the diff that says so.
+
+**Why a stale baseline is especially dangerous in THIS repo.** Deployed SHAs move
+several times an evening across parallel sessions, and `state.md` already records
+that. A baseline written at 20:45Z on 08-14 and used at 03:2xZ on 08-15 spans an
+unknown number of other people's deploys.
+
+**The rule.** Before judging a change against a baseline, RE-RUN the baseline
+against the currently-live commit, and record which commit it was measured on.
+A baseline without a SHA attached is an anecdote. If re-running is impossible,
+say the comparison is confounded rather than reporting the diff as attribution.
+
+**The corollary that paid off here.** Also control for the DATA the measurement
+ran on. ~13h of wall clock separated the two runs, which would normally void the
+comparison; it survived only because the board was independently checked at both
+instants and was identical (150 rows, wnba 18 / nfl 42 / mlb 90). **Check the
+slate, or the diff is not attribution.** And where the data was ABSENT — soccer,
+ncaab and nhl had zero rows both times — the passing cases prove ROUTING and
+nothing else. Record that as unproven rather than banking it as coverage.
+
+**Related:** `feedback_measure_same_instant`, `feedback_rate_not_count`,
+`feedback_confirm_the_code_ran` (the code was verified to have run here:
+`routed_sport: 'soccer'`, previously `None` on 52/52).
+
+### 2026-08-15 — A JOB THAT ONLY FLUSHES ON COMPLETION CANNOT SURVIVE A SESSION BOUNDARY, AND I LAUNCHED TWO
+
+- What we believed: a ~100-minute backtest running in the background was
+  progress being made. It had been launched detached, so the session was free
+  to do other work while it ran.
+- What was actually true: it wrote its output **only at the end**. The session
+  ended while it was still simulating, the process was killed, and it left
+  **zero** bytes — no partial dump, no resumable state, no way to tell how far
+  it got. ~70 minutes of compute produced nothing. The first, shorter run of
+  the same script had already survived only by luck of timing.
+- How we found out: the reconciliation pass at session end. `ls` showed the
+  per-match JSONL simply absent, and the summary file's mtime proved it was the
+  EARLIER run's output, untouched.
+- The rule going forward: **before launching a long job, ask what it writes if
+  it is killed at the 90% mark.** If the answer is "nothing", that is a defect
+  in the job, not a risk to accept — append per unit of work (per league, per
+  day) so the run is resumable and partial results are still results. A
+  progress-free, output-free job is indistinguishable from a hung one while it
+  runs and from a job never launched after it dies.
+- The second-order error, which is the more useful one: I let the *answer to a
+  question the session needed* depend on a job the session could not outlive. A
+  detached job is the right tool for work whose result the NEXT session can
+  pick up; it is the wrong tool when the current session must reason about the
+  output. Sequence it accordingly, or scope it down to something that finishes.
+- Cost: the dispersion-vs-discrimination question stayed open, and the fitter
+  and AUC diagnostic built to answer it have still never run on real data —
+  code that exists but has never been executed against production data, which
+  is exactly the kind of thing a later reader mistakes for a finished result.
+
+
+### 2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. It UNDER-reports, and that is the dangerous direction
+
+- **What we believed.** The protocol says to collision-check "via `lane-guard.py`'s
+  own `_claims()`, not by grep". Several lanes, mine included, recorded their
+  collision check as CLEAR on that basis and treated it as authoritative.
+- **What is actually true.** `_claims()` only continues a `Files:` block on lines
+  whose stripped text starts with `-`. A block written with **comma
+  continuation** loses every path after the first line:
+
+  ```
+  - Files: `syndicate/features/shared/odds_book_quotes.py`,
+    `pipeline/layer2_shortlist.py`, `tests/test_odds_book_quotes*.py`.
+  ```
+
+  Measured directly against the live ledger: `guard sees odds_book_quotes: True`,
+  `guard sees layer2_shortlist: False`. The `quote-shard-latest-index` lane
+  (OPEN) has claimed `pipeline/layer2_shortlist.py` since it opened, and the
+  guard has never protected it.
+- **Why this is the bad direction.** The 2026-08-14 learning was about a regex
+  inverting "NOT claimed" into "claimed" — noisy, but it fails toward refusing.
+  **This one fails toward permitting.** A claimed file reports CLEAR, the guard
+  raises no PreToolUse block, and a second session edits a file another lane
+  owns believing it did the check correctly. Related:
+  [[feedback_unknown_must_not_default_permissive]].
+- **How we found out.** Not from the guard. From running a blast-radius test set,
+  finding 6 failures, bisecting them on a clean control worktree to another
+  session's uncommitted `pipeline/layer2_shortlist.py`, then going to read WHO
+  owns that file — and discovering a lane claimed it while `_claims()` returned
+  False for it.
+- **The rule going forward.**
+  1. **A CLEAR from `_claims()` is necessary, not sufficient.** Confirm every
+     file you intend to edit by READING each OPEN lane's `Files:` block, and
+     distinguish a claim from prose — "read-only dependency", "NOT this lane's
+     files", and "Files: none claimed yet, deliberately" are all non-claims that
+     look like hits to a grep.
+  2. **Write your own `Files:` block as nested bullets, one path per `-` line.**
+     That is the only format the parser handles, and it is what 7 of 8 lanes
+     already use. A comma-continuation block silently leaves your work
+     unguarded.
+  3. Until the parser is fixed, **the guard's silence is not evidence.**
+- **Cost:** none realised yet — my two files were genuinely unclaimed when
+  re-checked textually, so commit `7bb74c95` is safe. But the lane whose claim
+  was dropped had its files unprotected for the whole day, and the protocol was
+  actively recommending the method that missed it.
+
+### 2026-08-15 — A COMMITTED LEDGER FACT IS NOT A DURABLE ONE. Re-read it at archive time, or the file will quietly go back to the claim you refuted
+
+Two ledger losses in one session, both silent, both found only by re-reading:
+
+1. `fd23c6bc` wrote 36 measured lines into `state.md`'s Tier 5 section. Another
+   session's housekeeping commit `7f7d8d88` ("archive the two sections that are
+   not live state — 74KB → 64KB") dropped them. The section was left asserting
+   **"No live GAME-LINE projection exists"** — precisely the claim those 36 lines
+   had refuted with production evidence (`estimate_live` running 120 sims per
+   live game, 9 bails/tick across 11 ticks against 9 Final / 5 Live).
+2. An append to `lanes.md` vanished from a **clean working tree** — a concurrent
+   session rewrote the file from a stale copy. `git status` showed nothing,
+   because after the overwrite the worktree matched HEAD.
+
+**Why the usual defences do not catch this.** The isolated-index discipline
+protects the COMMIT. It says nothing about whether the content survives the next
+session's edit of the same shared file. A checkpoint that ends "committed as
+`<sha>`" is true and is not evidence the fact is still readable. And a
+size-reducing collapse is the single most dangerous edit shape on these files:
+it is authored by someone optimising for bytes, who has not read what the bytes
+say, against a file whose whole purpose is to be read.
+
+**The asymmetry that makes it expensive.** Losing an append leaves NO trace. But
+`state.md`'s job is to hold the current truth, so a lost correction does not
+degrade to silence — it **reverts to the superseded claim**, which then reads as
+current and carries the ledger's authority. Loss and misinformation are the same
+event here.
+
+**How to apply.**
+- At archive/checkpoint time, **grep the ledger for your own load-bearing strings
+  and confirm they are still there.** Not `git log` — the file. A commit is proof
+  you wrote it, never proof it is still readable.
+- When restoring a dropped fact, restore the **current** version, not the one you
+  originally committed. Mine had been re-scoped in between (`428fbb6e`); replaying
+  the commit verbatim would have re-introduced a wrong artifact reference under a
+  "restored" label — a correction that reintroduces an error is worse than the gap.
+- Leave a note at the restore site naming the commit that dropped it, so the next
+  collapse re-reads instead of repeating.
+- **Never `cat >` a shared ledger file.** Append, or edit the specific lines.
