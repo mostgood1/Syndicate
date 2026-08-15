@@ -164,7 +164,7 @@
   sits on ±4900 any more.
 
 
-### closing-stamp-is-detection-time — OPEN — **HYPOTHESIS SUPERSEDED BY A WORSE DEFECT: `observed_transition` IS SIDE-BLIND. `closing_price` IS ALWAYS THE HOME PRICE (18/18), SO EVERY AWAY-SIDE OPENING IS PAIRED WITH THE WRONG SIDE'S CLOSE** — opened 2026-08-15 — session: lane-cleanup
+### closing-stamp-is-detection-time — OPEN — **FIX ON MAIN `325b2822`, DEPLOY HELD (worker; sim + board build in flight). Stamp now = the price's observation time; detection kept as `closing_detected_at`. FORWARD-ONLY — today's stamps are unrecoverable** — opened 2026-08-15 — session: lane-cleanup
 - **DISCRIMINATOR RUN 2026-08-15 22:0xZ on the `-186 -> +168` row. RESULT: NEITHER
   ORIGINAL BRANCH. The price is not stale and the clock is not the main problem —
   IT IS THE WRONG SIDE'S PRICE.**
@@ -321,6 +321,44 @@
   before it ships, not after.
 
 ### spread-line-sign-convention — OPEN — **ANSWERED: THE FEED IS CORRECT AND THE BOARD'S HOME-SPREAD `line` SIGN IS INVERTED — 16 of 17 book/event pairs across 15 EVENTS violate no-arbitrage. POSSIBLE USER-FACING MISLABEL, NOT A CLV-ONLY BUG** — opened 2026-08-15 — session: lane-cleanup
+- **TEMPLATE QUESTION ANSWERED 2026-08-15 23:2xZ. THE CONVENTION IS
+  `row["line"] == THE AWAY HANDICAP`, AND ONLY THE HOME SIDE IS BROKEN.**
+  - From the 525-cell result: `cell.home.line == -row.line` and (per-book
+    internal consistency) `cell.home.line == -cell.away.line`. Therefore
+    **`cell.away.line == row.line`, exactly.**
+  - So: **away-side rows are CORRECT** — their price and `row["line"]` describe
+    the same bet. **Home-side rows are INVERTED** — `layer2_board.py:852` pairs
+    `cell["home"]["price"]` with `row["line"]`, which is the away handicap.
+  - That is why the no-arb violation showed up only when comparing a home `-1.5`
+    opening against a home `+1.5` one: both were home rows.
+- **NO TEMPLATE CONSUMES THE SHORTLIST — but chat does, because I wired it there
+  tonight.** `grep` over `templates/` and `static/` for `layer2-shortlist`:
+  **zero hits**; the board still renders `ranked_all`. The one consumer on a
+  user-facing path is `ask_the_syndicate_adapter.py:599`
+  (`_board_top_opportunities`), shipped this session as web `c774fe1a`, whose
+  `_board_row_selection` renders `f"{side} {line}"`.
+  - **Verified live**: the chat headline served
+    `'away -1.5 (San Diego Padres @ Cleveland Guardians)'` — an AWAY row, which
+    is the correct case. **A HOME spreads row in that list would display the
+    away handicap beside the home price.**
+  - **So the user-facing blast radius is: home-side spread selections appearing
+    in the Ask headline.** Narrow, real, and created by my own change tonight —
+    before `c774fe1a` the shortlist had no user-facing consumer at all.
+- **SEVERITY, stated so it is not over- or under-called:** not a board-wide
+  mislabel (the board does not read these rows), not zero either. It also
+  corrupts every home-side spread row in the CLV join, which is where it was
+  found.
+- **FIX IMPLEMENTED, TESTED, ON MAIN AS `edbbee9d` — DEPLOY HELD.**
+  `_side_line_from_cells` reads the handicap from the same cell as the price;
+  no-op for away/h2h/props; returns None (caller keeps the row value) when books
+  disagree on the sign. 8 new tests, 71 green across board + CLV suites.
+  **Not deployed: it needs REFRESH-WORKER, and an MLB sim (pid 79) plus a board
+  build were in flight.** Forward-only — today's openings keep the bad lines.
+  Ship when the slate is quiet, then re-run the 525-cell invariant.
+- **FIX unchanged and now fully justified:** at `layer2_board.py:852` take the
+  line from the same cell as the price. Away is already right, so the change
+  must not touch it — negate only for the home side, or carry
+  `cell[side]["line"]` per book.
 - **SAME-BOOK TEST RUN 2026-08-15 23:1xZ on `/api/board/book-grid` (mlb, 33
   spreads rows, 525 book-cells). THIS IS THE DECISIVE MEASUREMENT and it is
   UNIFORM, not statistical:**
@@ -4563,3 +4601,26 @@ whole-numbered is the one that should move, and `market_key`/`player_name` at
   absence" section. `line` numeric 84/101 with 7 whole-numbered is the ONLY one
   that should move. `market_key` and `player_name` at 0/101 must NOT change —
   if they do, something other than this work did it.
+
+#### CARRY REQUEST SENT 2026-08-15 ~23:0xZ — a ready commit, not a favour to arrange
+- **Their first deploy landed WITHOUT my work, and their next one would too.**
+  Measured by CONTENT, not assumed: refresh-worker `846bb74e` -> **`b0ab37a1`**
+  at 22:40:56Z — all four fixes **MISSING**. Their pending target
+  **`1f36d718`** — all four **MISSING**. They are cutting from the service's own
+  live SHA and cherry-picking, exactly as `state.md` instructs. **So waiting
+  cannot land my work.** That is now a measurement, not a prediction.
+- **Timing worth remembering:** their deploy finished 22:40:56Z, BEFORE I read
+  the claim at 22:37 and started building a watcher for it. I was preparing to
+  wait for an event that had already happened. **Read the live SHA first; the
+  claim tells you about the NEXT deploy, not the last one.**
+- **Built and pushed `4273839d`** (branch `deploy/rw-carry-red-intel-2026-08-15`),
+  **parent = their own `1f36d718`**, so carrying it costs them one changed
+  commitId and nothing else. Tree verified against `1f36d718` before the commit
+  existed: exactly 5 files, +217/-6, asserted to contain zero `#387` /
+  per-sport / force_refresh content, zero overlap with their Drop 3 files.
+- **Claim NOT forced.** The harness blocked it and I would not have wanted it:
+  forcing a live peer mid-build is how the 19:20 cancellation happened.
+- **Owed on landing, by whoever fires it:** patch-id check that my content is on
+  the new live SHA — a deploy reporting `live` is not evidence a passenger rode —
+  then re-read the four numbers in state.md's "Candidate field absence" section.
+  `line` 84/101 with 7 whole-numbered is the ONLY one that should move.
