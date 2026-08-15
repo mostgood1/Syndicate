@@ -211,6 +211,47 @@
   `odds_refresh_tracking.py:1602` still writes `closing_captured_at = now`
   (detection time), which is why a 19:08Z first pitch carries a 20:34Z stamp.
   That file is still claimed here and untouched.
+- **THE `-29.90` ROW IS EXPLAINED, 2026-08-15 22:2xZ. IT IS NOT A MARKET MOVE.
+  THE ODDS-HISTORY FEED SWAPPED ITS `home_line`/`away_line` LABELS DURING THE
+  DAY, so the same two prices appear under opposite labels.** Event
+  `69928d29…` = Seattle Mariners @ **Houston Astros**, FanDuel spreads:
+
+      history_first 06:02:51Z   away_line -1.5 away_odds +168 | home_line  1.5 home_odds -205
+      history_last  21:26:47Z   away_line  1.5 away_odds -205 | home_line -1.5 home_odds +168
+
+  **Identical prices (-205 / +168). The line labels are transposed.** The market
+  did not move at all — `-205` and `+168` are the two sides of ONE run line.
+- **Why the guard could not catch it.** `_price_for_side` checks the line by
+  NUMERIC EQUALITY (`abs(point_line - opening_line) > 1e-6`). With the labels
+  flipped, opening `home -1.5` matches the close's `home_line -1.5` — which by
+  then is the OTHER bet. The guard is doing exactly what it was written to do
+  and is defeated by an unstable label, not by a missing one. **Equality of a
+  label is not identity of a bet when the label's convention is not stable.**
+- **The openings look self-consistent; the history does not.** Three opening
+  records for that event's spreads: `home +1.5 @ +178` (05:07, kalshi),
+  `home -1.5 @ -183` (07:06, onexbet), `home +1.5 @ +186` (20:40, betopenly) —
+  +1.5 is plus money at both ends of the day. The 06:02 history point calls
+  `home +1.5` **-205**, contradicting them.
+- **SCOPE, measured rather than assumed — and it is NOT the headline killer it
+  looks like:**
+
+      same_book subset        n     mean      median   |clv|>10
+      spreads (line-bearing)  42   +0.515    +0.000       2
+      h2h / totals           128   -0.521    -0.246       0
+
+  The two extreme rows are a **mirror pair from this one event** (`+30.428` on
+  `home +1.5`, `-29.900` on `home -1.5`), because BOTH openings were recorded
+  and each got the other's close. **They nearly cancel**, which is why the
+  spreads mean reads a benign `+0.515` on a median of exactly `0.000`.
+  So: **severe per row, self-cancelling in aggregate.** It corrupts any
+  per-recommendation CLV, any variance or CI, and any "worst bets" list — while
+  leaving the headline roughly intact. h2h and totals are clean (0 of 128).
+- **NOT FIXED, and deliberately not fixed from here.** The defect is upstream of
+  `clv_join.py` (an unstable label in the odds-history feed), the mirror-pair
+  cancellation means it is not urgent for the headline, and a numeric-equality
+  guard cannot be patched into correctness without deciding which source owns
+  the sign convention. **That decision is the next lane**, and it should start
+  from: does the board's published `line` sign agree with the feed's, per sport?
 - **OPEN THREAD, NOT MINE TO CLOSE:** one row survives at `clv_pct -29.90`
   (`open -205`, `close 168.0`, side **home**, source **last_pregame_quote**) —
   side-aware path, not a side mismatch. Real move or a third defect, unknown.
@@ -2089,7 +2130,7 @@ baseline now recorded in `deploys.md` and in
 
 Deploy `dep-da09dv1t0dsc7397er6g`. Measurement owed and NOT yet taken.
 
-### quote-shard-latest-index — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+### quote-shard-latest-index — CLOSED-VERIFIED 2026-08-15 — `#435` shipped: 5 OOM kills → 0, peak anon 4,018.5 → 3,572.4 MB, 13.1x fewer rows — opened 2026-08-15 — session: memory-cutover-ship
 - Goal: `#435`'s fix. The board path stops holding a whole day of quote
   OBSERVATIONS and holds latest-per-key instead. Target: the ~1,162MB resident
   cost of one 184.5MB MLB shard drops ~13x, and the OOM ramp with it.
@@ -3720,7 +3761,7 @@ NOT CLOSED BY THIS LANE, and the next reader should not think otherwise:
   for part of a watcher's life, and the resulting 400 reads exactly like "all
   clear".** Derive the window from the poll's own clock.
 
-### board-contract-normalize-cost — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+### board-contract-normalize-cost — CLOSED 2026-08-15 — STAGE EXONERATED: 0.0 MB median over 5,958 builds; the target is the chronic FLOOR — opened 2026-08-15 — session: memory-cutover-ship
 - Goal: establish what `_normalize_games` actually COSTS, per sport, and whether
   `board_contract_games_normalized` is the allocator at the remaining 3,572MB
   peak or only the stage that happens to be running when the ceiling is reached.
@@ -3950,7 +3991,7 @@ Read-only lane; no files touched, no deploy.
   theirs to take:** `846bb74e` was built ON TOP of `dca39fad`, so that fix is
   still deployed. I have not taken their measurement.
 
-### desktop-grid-rows-unit — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+### desktop-grid-rows-unit — CLOSED-NEGATIVE 2026-08-15 — hypothesis FALSIFIED; goal NOT met; three real fixes shipped anyway — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: a layout signal at 1440, where the height model currently reports
   UNRELIABLE. Testable: MLB desktop yields a figure that a regression would
   move and a busy slate would not.
@@ -3984,3 +4025,118 @@ Read-only lane; no files touched, no deploy.
 - Verification: desktop raw spread across settled runs, against the ncaaf/nfl
   controls whose content is uniform.
 - Blocked by: none.
+
+#### desktop-grid-rows-unit — CLOSED-NEGATIVE 2026-08-15 — the goal was NOT met, and that is the result
+
+**The requested build does not work, and the measurement says why.** Grid rows
+as the unit cannot help: within a group rows are proportional to pairs, so
+refitting in rows is an affine reparametrization. Same production slate, same
+instant, both fits:
+
+    desktop Final    n=3   PAIRS residual  11px    ROWS residual  11px
+    mobile  Live     n=3   PAIRS residual 139px    ROWS residual 139px
+    mobile  Preview  n=9   PAIRS residual  52px    ROWS residual  52px
+
+Identical every time; only the slope rescales (62.1 -> 124.2). **A unit change
+can never improve a fit when the units are proportional.** Killed before a line
+of the intended change was written.
+
+**The second hypothesis also failed on the data.** "Desktop is
+content-INDEPENDENT, so its raw spread is the signal" — the branch is built and
+tested, but desktop measured **105-197px explained** at 16-26px/pair, above the
+50px cutoff, so it does not fire. Desktop height is neither driven by this
+content unit nor independent of it.
+
+**So MLB desktop still has NO layout signal.** Honest reason: card height there
+varies for causes this unit does not capture, on groups of n<=10 that change
+every ~20 minutes. Four readings of the same metric across one evening:
+reliable/54px, UNRELIABLE/1.05, UNRELIABLE/1.01, then no fit at all. **I was
+tuning a model against a moving target and stopped.**
+
+**Shipped anyway, because each was a real defect found on the way:**
+1. **n>=5 floor for a fit.** A line costs 2 parameters, so n=3 leaves ONE
+   residual degree of freedom. Live (n=3) produced ratios 0.59 and 1.29 while
+   Preview (n=9) produced 0.09 on the same page — the small groups were fitting
+   themselves, not detecting anything.
+2. **Report EVERY fitted state, not just the worst.** Mobile Preview was a
+   clean 68px/ratio-0.09 signal that the summary HID behind Live's n=3 noise,
+   because only the worst-ranked state was printed. A summary that shows one
+   row can suppress the only row that was working.
+3. **Content-independent as a third state** (raw spread becomes the signal),
+   with the budget applied to it. Correct and tested; simply does not fire on
+   MLB.
+
+**What would actually work, unbuilt and unmeasured:** the unit has to capture
+what varies on a desktop card — panel COUNT and callout/table-row counts, not
+summary pairs. Or drop the model at 1440 and assert per-card height bounds
+instead. Neither is attempted here.
+
+- **FINAL:** hypothesis falsified, goal not met, 22 tests, no deploy. The
+  carried-forward item "the desktop unit should be grid rows" is now CLOSED as
+  wrong — do not pick it up again.
+
+### memory-floor-at-rest — CLOSED 2026-08-15 — FLOOR DECOMPOSED: 42% outside pymalloc, 36% live, 22% arena retention; no deploy needed — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: name what holds the ~2,350MB chronic floor that is resident BETWEEN
+  builds. `#423` called it "chronic, UNNAMED" and it still is; the stage hunt
+  just closed with 0.0MB medians, which proves the floor is not accrued by any
+  stage on the board path.
+- Files: `syndicate/features/shared/memory_observability.py` (checked 21:5xZ —
+  claimed by NO open lane; `anon-allocation-site` was released, and
+  `quote-feed-age-alarm` holds `odds_book_quotes.py`, not this).
+- **Hypothesis:** the floor is live application data retained across cycles —
+  the same shape `#435` found (22.3M small objects, 1,638MB live in pymalloc),
+  but persisting rather than transient.
+- **Why a code change is unavoidable here:** all three censuses trigger on a
+  CLIMB (`_watchdog_should_heap_census` needs a rising anon), so none has ever
+  sampled the quiet state. This is the third time in this investigation an
+  instrument could not see the thing it was built for. The change is to the
+  TRIGGER only — no new census, no new walk.
+- **Falsification test:** if a rest-state census reports total live bytes far
+  BELOW the ~2,350MB floor, the floor is not live Python objects and the search
+  moves below Python — the same fork `#435` faced. If it reports ~2,350MB live,
+  the holder is nameable from the type/size distribution.
+- Verification: one rest-state `HEAP_CENSUS` + `UNTRACKED_BYTES_CENSUS` +
+  `PYMALLOC_STATS` triple taken while anon is FLAT, with the flatness shown
+  (climb rate ~0 across N consecutive samples), not asserted.
+- Blocked by: none.
+
+#### memory-floor-at-rest — CLOSED 2026-08-15 22:1xZ — MEASURED, AND NO DEPLOY WAS NEEDED
+**MY OWN LANE PREMISE WAS WRONG, AND CHECKING IT SAVED A POINTLESS DEPLOY.** I
+opened this saying "all three censuses trigger on a CLIMB, so none has sampled
+the quiet state". False: `watchdog_should_heap_census` gates on
+`anon_mb >= 1500` ONLY — no climb term. Only the tracemalloc dump needed a climb.
+The rest-state data was already in production; I nearly shipped a trigger change
+to enable something that was never disabled.
+
+**THE FLOOR, at 21:58:09Z, anon 1,607.1MB:**
+
+    outside pymalloc entirely      673.1 MB   42%   <- largest component
+    live small objects (pymalloc)  583.7 MB   36%
+    arenas held but NOT live       350.3 MB   22%   (934 arenas, 239.3 unused pools)
+
+    str/bytes reachable one hop     82.0 MB    5%   (1,001,678 distinct;
+                                                     dict holds 57.2MB of it)
+
+**HYPOTHESIS PARTIALLY FALSIFIED.** I predicted the floor was live application
+data retained across cycles. Only **36%** is. The largest single component is
+**673MB that pymalloc never allocated** — i.e. allocations over 512 bytes (glibc
+malloc), numpy/pandas buffers, thread stacks, C-extension memory.
+
+**AND `#435` IS VISIBLE IN THE TREND:**
+
+                        03:45Z (pre-fix)   21:58Z (post-fix)
+    arenas                 1,688              934
+    live blocks          1,638.5 MB         583.7 MB
+    pymalloc retention      49.5 MB         350.3 MB
+
+Live Python data fell by 1,055MB — the shard rows. Retention ROSE 49.5 -> 350.3MB,
+which is the expected aftermath: freeing millions of small objects leaves arenas
+partially occupied, and pymalloc returns an arena only when it is COMPLETELY
+empty. That 350MB is not a leak and not reclaimable by a trim.
+
+**NEXT TARGET IS THE 673MB OUTSIDE PYMALLOC**, not the live set. Note the earlier
+glibc reading is blind to it — `MALLOC_ARENA` reported `arena_coverage_pct` 13.9%
+and labelled itself `arena_not_representative`, so that instrument cannot answer
+this either. This needs a different measurement, and it should be chosen BEFORE
+any more code is written.
+Read-only lane. No files touched, no deploy.

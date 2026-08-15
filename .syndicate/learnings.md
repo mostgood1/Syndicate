@@ -2483,3 +2483,153 @@ result away by reading it too early.
 - **A negative result taken near a deploy is provisional until re-read cold.**
   Re-read before writing it into `state.md`; that file is where wrong facts do
   the most damage.
+
+
+### 2026-08-15 - A UNIT CHANGE CANNOT FIX A FIT WHEN THE UNITS ARE PROPORTIONAL, AND I ALMOST BUILT IT ANYWAY
+
+- **What we believed:** the height model reported UNRELIABLE at 1440 because
+  the unit was wrong — desktop's summary grid wraps into columns, so height
+  should be linear in ROWS (`ceil(pairs/columns)`) rather than in pairs. It was
+  written into a lane as carried-forward work and into a checkpoint as the next
+  action.
+- **What was actually true:** within any one group, rows are proportional to
+  pairs, so fitting in rows is the same regression reparametrized. Measured
+  both ways on the same cards at the same instant: residuals **11/11, 139/139,
+  52/52 px** — identical to the pixel, with only the slope rescaling. The
+  change could not have moved the number it was supposed to fix.
+- **How we found out:** measuring both fits BEFORE editing, because the lane
+  demanded a falsification test. Ten minutes of probing killed an hour of
+  building.
+- **The rule going forward:** before changing the unit of a regression, ask
+  whether the new unit is an affine function of the old one. If it is, the fit
+  is identical and the problem is elsewhere — in the model's form, the grouping,
+  or the sample size. This generalises: re-expressing a variable never improves
+  a linear fit, so "use a better unit" is only ever a fix when the relationship
+  to the outcome changes SHAPE.
+- **Second finding, from the same session:** the deeper problem was sample
+  size and slate churn, not units. n=3 groups (2 fitted parameters, 1 degree of
+  freedom) produced fit ratios of 0.59 and 1.29 while an n=9 group on the same
+  page produced 0.09. Four readings of the metric across one evening went
+  reliable -> unreliable -> unreliable -> unfittable. **Tuning a model against a
+  target that moves every 20 minutes is not measurement.** I stopped and
+  reported the negative result.
+- **Cost:** none shipped wrong. The lane closed NEGATIVE with the goal unmet,
+  which is the honest outcome, and three real defects found on the way were
+  fixed.
+
+### 2026-08-15 — FORBIDDEN: never deploy a fix without first reading WHICH SERVICE runs the code it changes. The env decides, not the repo.
+
+One commit carried two files. `live_projection_join.py` runs during the board
+build on **refresh-worker**; `cards.py`'s live-prop emitter runs inside
+`live_lens_loop`, and `MLB_ENABLE_LIVE_LENS_LOOP` is **false on refresh-worker
+and true on live-odds-worker**. I shipped both to refresh-worker, wrote one
+predicate for each half, and **the coverage predicate could not have been
+satisfied by the service I deployed to.** The probability half passed; the
+coverage half was inert and read as a failed fix.
+
+**Nothing in the code says where it runs.** Both workers import
+`start_live_lens_loop`; only the env var separates them, and it is per-sport
+(`MLB_ENABLE_LIVE_LENS_LOOP`), not the service-level
+`SYNDICATE_ENABLE_LIVE_LENS_LOOP` which is `true` on both. Reading the imports
+would have told me the opposite of the truth.
+
+**How to apply:** before writing a deploy predicate, resolve the owning service
+for EACH changed file — `render.yaml` startCommand for the entrypoint, then the
+env vars on every candidate service for the gate. Then state the predicate as
+"on service X". A predicate that does not name a service is not falsifiable.
+Same family as [[which-service-runs-the-code]] and the `#414`-inert finding.
+
+### 2026-08-15 — FORBIDDEN: a scratch index seeded with `git read-tree HEAD` snapshots the WHOLE TREE, and `git diff --cached --numstat` cannot see it go stale
+
+The isolated-`GIT_INDEX_FILE` recipe is correct and I still lost 35 lines with
+it. `git read-tree HEAD` snapshots **every path in the repo**, not just the ones
+being staged. HEAD advanced during staging (six live sessions), another session
+had committed 35 lines to `.syndicate/deploys.md` in that window, and the commit
+wrote them back out as a deletion — in a file never opened, never named in a
+pathspec, and absent from every diff I ran.
+
+**`git diff --cached --numstat` read perfectly clean: 4 deletions, all mine, all
+predicted.** It compares the index to the HEAD it was SEEDED FROM, not the HEAD
+the commit will land on. It is blind to this by construction. This is the same
+instrument-blindness family as the rest of this file: a healthy reading produced
+by something unrelated to what is being measured.
+
+Recovery was free (`git show HEAD~1:<file>`; the working tree never lost them)
+and was committed as its own repair, `6da01dd3`, rather than amended away.
+
+**Second half, same incident:** after that commit the SHARED index held a
+complete revert of it — my four files at `3/95`, `1/46`, `0/19`, `24/85`, plus a
+**deletion of a new test file while it sat on disk**. `commit-guard.py` caught
+the deletion. `git reset HEAD -- <only your paths>` disarms it index-only and
+leaves every other session's staged work intact.
+
+**How to apply:**
+- Re-read `git rev-parse HEAD` immediately before `git commit` and ABORT if it
+  moved since `read-tree`. **Git's own ref lock is the real backstop** — a later
+  commit this session failed with `cannot lock ref 'HEAD': is at X but expected
+  Y`, which is this exact race refusing instead of silently reverting.
+- After ANY scratch-index commit: `git reset HEAD -- <your paths>`, then confirm
+  `git diff --cached --diff-filter=D --name-only` is empty.
+- `git show --stat HEAD` right after committing. **A file you never touched
+  appearing in the list is the signature.**
+- Extract hunks in BYTES, never text mode: cp1252 mojibaked every UTF-8 em-dash
+  inside a patch, which then applied cleanly and corrupted 8 lines of `lanes.md`.
+  Select hunks by a content MARKER, not by `@@` line numbers — those renumber
+  under an isolated index and `replace(..., 1)` will silently hit the wrong one
+  (a mutation test read green for exactly that reason and was redone, not banked).
+
+### 2026-08-15 — A TIMESTAMP WHERE A SIGNAL STOPS IS NOT WHERE THE FAULT IS
+
+- **What I believed:** soccer's quote feed stopped at 13:47:17Z, so something
+  happened at 13:47:17Z. I wrote four hypotheses, all aimed at that instant, and
+  the user reasonably asked me to investigate it.
+- **What is true:** 13:47:17 is where the **10:21 autorun's run finished
+  writing** — a successful run ending normally. The fault is at **14:22:29**,
+  the next scheduled attempt, refused by a lock. Nothing happened at 13:47.
+- **The rule:** for a POLLED producer, the last-output timestamp marks the end of
+  the last SUCCESS, not the onset of failure. The fault lives at the next
+  scheduled attempt. Before investigating the stop time, find the producer's
+  cadence and look at the first attempt AFTER it — `02:14 / 06:17 / 10:21 /
+  14:22 / 18:22` made the answer obvious and took one log query.
+- **What made it findable:** enumerating every `SOCCER_PREGAME_AUTORUN` line for
+  the whole day rather than reading a window around the stop. The window around
+  13:47 contained nothing, correctly, and four hypotheses died there.
+- **Cost of the wrong frame:** four hypotheses and several log queries aimed at
+  an instant where, by construction, there was nothing to find.
+
+### 2026-08-15 — A HARDCODED ABSOLUTE `startTime` IS A FUTURE TIMESTAMP FOR PART OF A WATCHER'S LIFE
+
+- A watcher hardcoding `startTime=2026-08-15T21:30:00Z` began polling at 21:23.
+  For four polls the window START WAS IN THE FUTURE; Render's logs API returned
+  **HTTP 400**, and the script reported `autorun_events=0`.
+- **A broken query and a quiet system are the same reading.** The zeros were
+  indistinguishable from "no attempt yet".
+- **What caught it:** running the identical query shape against a window
+  containing a KNOWN log line and confirming it returned that line. Do this
+  before trusting any watcher's zeros — a control on the instrument, not on the
+  system.
+- Derive a watcher's window from the poll's own clock. Related: the same fixed
+  `startTime` is why later 429s only DELAYED detection instead of losing the
+  event — each poll re-scans the whole window. Cumulative windows are the right
+  design; just don't let them start in the future.
+
+### 2026-08-15 — check whether the instrument is already firing BEFORE building a way to make it fire
+
+- **What we believed:** the floor could not be measured because all three
+  censuses trigger on a rising `anon`, so none had ever sampled the quiet state.
+  I opened a lane on that premise and was about to change the trigger and deploy.
+- **What was actually true:** `watchdog_should_heap_census` gates on
+  `anon_mb >= 1500` and nothing else. No climb term. Only the tracemalloc dump
+  required a climb, and I generalised from it to all three. The rest-state
+  census had been firing in production for hours — 12 `HEAP_CENSUS` lines since
+  18:11 — and the answer was already sitting in the logs.
+- **How we found out:** by grepping production for the census output before
+  editing the gate, rather than after.
+- **The rule going forward:** before building a way to make an instrument fire,
+  grep for its output. This is the mirror image of the rule this same
+  investigation already learned twice — an absent signal is a fact about the
+  EMITTER — and it fails the same way in reverse: assuming silence when the
+  thing is talking. One grep answers it.
+- **Cost:** none, because the check came first. It would have been one
+  unnecessary deploy to a worker whose deploys kill in-flight sims, plus a
+  measurement window spent proving something already proven.
