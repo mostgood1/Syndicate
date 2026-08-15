@@ -7,7 +7,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 117 rules `[generated]`
+## Index — 118 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -34,7 +34,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 103**
+**Rules and corrections — 104**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -139,6 +139,7 @@
 - [2026-08-15 — RULE: deploy to where the artifact is BUILT, not where it is served](#2026-08-15-rule-deploy-to-where-the-artifact-is-built-not-where-it-is-served)
 - [2026-08-15 — OVERTURNED: p50 is the wrong statistic to set an alarm floor from, and my own test caught it](#2026-08-15-overturned-p50-is-the-wrong-statistic-to-set-an-alarm-floor-from-and-my-own-test-caught-it)
 - [2026-08-15 — A FALLBACK ARGUMENT IS A REQUEST, NOT A GUARANTEE. `_safe_text(x, None)` RETURNS `""`, 43 TIMES OVER](#2026-08-15-a-fallback-argument-is-a-request-not-a-guarantee-_safe_textx-none-returns-43-times-over)
+- [2026-08-15 — THE SHARED-INDEX REPAIR MUST RUN IN A SHELL WITH NO `GIT_INDEX_FILE`, OR IT REPAIRS THE WRONG INDEX](#2026-08-15-the-shared-index-repair-must-run-in-a-shell-with-no-git_index_file-or-it-repairs-the-wrong-index)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -2101,3 +2102,35 @@ whose signature invites a value it cannot return.
 - Related, same day, same shape one layer over: `line` flattened by an
   unconditional write-back loop. Both are "unknown rendered as a value that
   reads like an answer".
+
+### 2026-08-15 — THE SHARED-INDEX REPAIR MUST RUN IN A SHELL WITH NO `GIT_INDEX_FILE`, OR IT REPAIRS THE WRONG INDEX
+
+`learnings.md` already says: after an isolated-index commit, run
+`git restore --staged <paths>` or the shared index is left staging a deletion of
+what you just committed. That rule is right and I followed it. **It is not
+enough, and the way it fails is silent.**
+
+`GIT_INDEX_FILE` is exported for the whole shell. Chaining the repair onto the
+end of the same Bash call —
+
+    export GIT_INDEX_FILE=C:/tmp/idx-x && git read-tree HEAD && git add -- P \
+      && git commit ... ; git restore --staged P     # <-- STILL isolated
+
+— points `restore` at the **isolated** index. It succeeds, prints nothing
+alarming, and the shared index keeps the pre-commit blob. Measured today: my
+`#438` commit added 34 lines to `todo_closed.md`, the chained repair "ran", and
+the shared index sat staging **0 insertions / 34 deletions** of exactly that
+commit, with `HEAD == worktree` at 2092 lines. Two earlier commits the same
+session were repaired correctly — because their repair happened to be a
+SEPARATE Bash call, which is a new shell with no export. **The habit worked by
+accident and failed the moment I tidied it into one call.**
+
+**How to apply.**
+- Run the repair as its own Bash call, and **prove the shell is clean** first:
+  `echo "${GIT_INDEX_FILE:-<unset>}"` must print `<unset>`.
+- Then verify the outcome rather than the command's exit code:
+  `git diff --cached --numstat | awk '$1==0 && $2>0'` must print nothing.
+  A `git restore` that targeted the wrong index still exits 0.
+- Generalises past git: **any repair chained into the shell that set the
+  hazardous variable inherits it.** The verification has to read the shared
+  state, not the command's return.
