@@ -522,9 +522,16 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   **Its discriminator is the PROBABILITY being outside the band, not the price
   being at ±4900** — `american_price(0.98)` is legitimately −4900, so the naive
   check reports a misprice against correct post-fix output.
-- **NEXT:** on a `PRE_FIX_MISPRICE` record, that IS the before-measurement; cut a
-  branch from the then-live web SHA, deploy, re-read. Until then the fix is
-  correct-and-unproven, which is not the same as working.
+- **NEXT:** on a `PRE_FIX_MISPRICE` record, that IS the before-measurement.
+  **The user has standing-authorised the deploy on trigger (2026-08-15), and the
+  full procedure is `.syndicate/runbook_clamp_deploy.md` — execute that, do not
+  improvise it.** `/preflight` is NOT waived; it can fail at trigger time for
+  reasons that do not exist now. **The likely outcome is INCONCLUSIVE, not
+  success:** the board rebuilds ~every 25 min, so if the triggering row leaves
+  the slate before the post-deploy read, `no_trigger` proves nothing — it is the
+  same reading the pre-deploy slate gave. Only a match on the recorded ROW
+  IDENTITY counts. Until then the fix is correct-and-unproven, which is not the
+  same as working.
 
 ## THE PUBLISHED SHORTLIST — edges, EV, CLV
 
