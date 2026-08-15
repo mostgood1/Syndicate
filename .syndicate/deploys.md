@@ -2789,3 +2789,47 @@ and had never run. `log_heap_census` had one call site behind a threshold it
 never met; `log_untracked_bytes_census` had to be written but only because
 `gc.get_objects()`'s blindness to str/bytes was never accounted for. Both
 answered within 60 seconds of being triggered ON THE CONDITION.
+
+### `#435` SOLVED TO THE OBJECT LEVEL, 2026-08-15 03:45:36Z
+
+`984e48c8` live 03:44:16Z. `PYMALLOC_STATS` fired 80s later:
+
+    arenas_currently_allocated  1688      arena_mb            1688.0
+    bytes_in_allocated_blocks   1638.5MB  unused_pools_mb       25.8
+    retained_by_pymalloc_mb       49.5    <- fragmentation is 3%
+    arenas: 2538 total, 850 RECLAIMED, highwater 1719, current 1688
+
+**IT IS NOT FRAGMENTATION AND NOT GARBAGE. 1638.5MB is LIVE.** The allocator is
+working correctly -- it has reclaimed 850 arenas. There is nothing for a trim to
+reclaim, which is why `MALLOC_TRIM` only ever released 68-140MB.
+
+**THE SIZE-CLASS TABLE NAMES THE MEMORY:**
+
+    size   blocks in use     total
+     64 B    13,719,058      838 MB   <- dominant
+    400 B       614,024      234 MB
+     80 B     2,787,789      213 MB
+     96 B     1,041,857       95 MB
+     32 B     3,065,952       94 MB
+    128 B       603,680       74 MB
+                    ~22.3 MILLION live small objects, ~1597MB accounted
+
+64 bytes is a short `str` (<=~15 ASCII chars), a 1-2 element tuple, or similar --
+the shape of parsed odds/quote rows. 400B x 614k is the row-object class.
+
+**RETRACTED: MY OWN "85% OF ANON IS NOT REACHABLE PYTHON DATA" (03:33Z entry).**
+It was a measurement artifact. `log_untracked_bytes_census` walks ONE LEVEL:
+`str`/`bytes` **directly referenced** by a GC-tracked object. Anything nested --
+dict -> list -> tuple -> str -- was never counted, and CPython untracks tuples of
+immutables so they leave `gc.get_objects()` altogether. The 271MB it and the
+heap census found was the reachable-in-one-hop surface, not the heap.
+
+**So the allocator-retention hypothesis I gave the owner is WRONG**, along with
+the two before it. The memory is exactly what the naive reading would have said:
+live application data, ~22M small objects.
+
+**NEXT, and it is now a narrow search:** find what holds ~13.7M 64-byte objects.
+`_BOOK_QUOTES_CACHE` carries a 500MB budget of parsed quote JSON and is the first
+place to look; the 400B/614k class looks like row objects built beside it. The
+question is finally the ordinary one -- which structure holds 13.7M small
+objects, and does it need to.
