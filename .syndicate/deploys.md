@@ -4139,3 +4139,80 @@ between samples is not independence from the transient you are sitting in.
   production**, not confirmed working.
 - **soccer and wnba report `liveMcSources: null`** — MLB-only instrumentation.
 - **`rows` went 60 → 66** because the slate changed, not because of the fix.
+
+## 2026-08-15 22:1xZ — web `c8810f45` — stamped close is side-aware
+
+**PREFLIGHT: PASS.** Parent `edfc0174`, the LIVE web commit. Diff: 3 files,
++194/-1 (one file is a 4-line fixture update).
+
+1. **Expected effect** on `/api/ops/clv/report?date=2026-08-15&sport=mlb`:
+   a new `stamped_close_skipped` map with a LARGE count (that is the fix
+   working, not a failure); `by_close_source` shifts away from
+   `observed_transition` toward `last_pregame_quote`; away-side rows that were
+   differenced against the home close get real closes, so `avg_clv_pct` moves.
+   `in_play_excluded_n` should FALL, because the late-stamped rows were the
+   stamped-path rows.
+2. **Verification**: fetch `rows=1`, confirm (a) `stamped_close_skipped` is
+   populated, (b) no row has `close_source=observed_transition` with a side
+   differing from its market entity, (c) the `-27.72` row for event `dbbb481a`
+   is gone or repriced. Recompute the headline from rows at the same instant.
+3. **Checked before shipping, because this refuses data:** all **1011** published
+   openings for 2026-08-15 carry both `home_team` and `away_team`, so the
+   entity match attributes rather than refusing everything. A fix that silently
+   refused every stamp would look identical in the headline to one that worked.
+4. **`check_deploy_safety` NOT CLEAR — board build in flight on refresh-worker**
+   (started 21:49:53Z). Proceeding deliberately: **web-only deploy, which does
+   not restart refresh-worker.** Odds refresh idle.
+5. **Rollback.** `py -3 scripts/render_deploy.py --service web --commit edfc0174 --allow-rollback`
+6. **Ledger.** `clv_join.py` + both tests claimed by `clv-without-settlement`
+   (this session); CLEAR of every other OPEN lane. `odds_refresh_tracking.py`
+   NOT touched — the clock defect stays with lane
+   `closing-stamp-is-detection-time`. No `render.yaml` change.
+7. **This demotes `4316c907`'s stated rationale**, which is recorded there.
+8. **MEASUREMENT: pending.**
+
+### MEASURED 2026-08-15 21:46:06Z — `846bb74e` on refresh-worker — **HALF THE FIX LANDED, AND THE OTHER HALF WAS ON THE WRONG SERVICE**
+
+Read: served `/api/board/book-grid?sport=mlb&date=2026-08-15`, artifact
+`generated_at 21:46:06Z` (deploy went live **21:45:20Z**, so the artifact is
+post-deploy), **430 live rows present** — a valid window, not a dark board.
+
+| metric | baseline 20:12Z | after | verdict |
+|---|---|---|---|
+| live-lens rows carrying `sim_model_prob_over` | 0 (field did not exist) | **21 of 21** | **NEW CODE CONFIRMED RUNNING** |
+| rows with proj and prob on opposite sides of the line | 7 of 13 | **0 of 21** | **PASS** |
+| `model_prob_over` null + named reason on unpriced rows | 0 | 21 of 21 | PASS |
+| live rows carrying a live projection | 57 / 638 (8.9%) | 21 / 430 (**4.9%**) | **FAIL** |
+| `batter_home_runs` overlaid | 0 of 116 | **0 of 78** | **FAIL** |
+| `batter_hits_runs_rbis` overlaid | 0 of 79 | **0 of 52** | **FAIL** |
+
+**THE PROBABILITY FIX IS VERIFIED, AND NOT BY THE OUTCOME ALONE.** `sim_model_prob_over`
+is a field the old code cannot emit; 21 of 21 rows carry it, so the branch ran.
+The straddle count is 0. (Row sets are not like-for-like — the afternoon slate
+was ending, 13 live pitcher rows became 2 — but the straddle is now impossible
+by construction, since `model_prob_over` is null whenever there is no live
+probability. The marker field, not the count, is what proves it.)
+
+**THE COVERAGE FIX WAS SHIPPED TO A SERVICE THAT DOES NOT RUN IT.** The MLB
+live-lens snapshot — the artifact the board joins against — is built by
+`live_lens_loop`, and the env decides where:
+
+    MLB_ENABLE_LIVE_LENS_LOOP   refresh-worker = false    live-odds-worker = true
+
+So `cards.py`'s emitter half is INERT on refresh-worker. `live_projection_join.py`
+runs during the board build there and is why the probability half worked. **One
+commit, two files, two different owning services — and nothing in the code says
+so; only the env does.** This is `project_which_service_runs_the_code` again and
+it should have been checked BEFORE the deploy, not after: the predicate was
+written for a service that could not satisfy it.
+
+**BUILT AND PUSHED, NOT DEPLOYED: `cc4afae2`** on
+`deploy/mlb-live-prop-coverage-lo-20260815`, the same two files rebuilt on
+`191a001b` — live-odds-worker's OWN live SHA. Deploying `846bb74e` there would
+have rolled it back 3 commits including `191a001b` itself, the
+`live-game-line-projection` lane's Drop 2. Divergence re-checked: 0 commits touch
+either file between the two SHAs. **The Render deploy call for live-odds-worker
+was BLOCKED by the permission classifier; the user has been asked to decide.**
+
+**Rollback for the refresh-worker half (if wanted):**
+`POST /v1/services/srv-d91dpertqb8s73co8ls0/deploys {"commitId":"dca39fad7442..."}`
