@@ -3264,10 +3264,26 @@ def main() -> int:
     # failure mode as the gc census, reached a different way. Default OFF
     # (`SYNDICATE_TRACEMALLOC_DIAG`); it keeps a traceback per live allocation on
     # a process that hits its ceiling hourly.
+    #
+    # `#423`/`#435`: nframe=3, NOT 1, AND THIS LINE HAS BEEN WRONG IN PRODUCTION
+    # THE WHOLE TIME. At one frame the top site comes back as `decoder.py:353` --
+    # Python's own json module, measured at 491.3MB across 7,172,382 live
+    # objects -- which names the ALLOCATOR and not the CALLER, i.e. "JSON
+    # parsing" instead of "this read, from this caller". `#423` fixed that by
+    # passing 3, and the fix landed on a lineage that never reached this
+    # service: production ran `start_allocation_tracing(1)` and confirmed it in
+    # its own boot log (`TRACEMALLOC_INIT {"nframe": 1}`, 2026-08-15 01:59:08Z).
+    # Found by reading the deployed tree rather than `main` -- the same
+    # main-vs-deployed divergence that has bitten this repo before.
+    #
+    # Three frames costs more memory per live allocation on a process already at
+    # its ceiling. Accepted deliberately and temporarily: it is gated behind
+    # `SYNDICATE_TRACEMALLOC_DIAG`, which is ON only while `#435` names the
+    # allocator, and the dump now fires once per boot from the watchdog.
     try:
         from syndicate.features.shared.memory_observability import start_allocation_tracing
 
-        start_allocation_tracing(1)
+        start_allocation_tracing(3)
     except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop boot
         print(f"[refresh_worker] TRACEMALLOC_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     _diag_log_all_process_memory("boot")
