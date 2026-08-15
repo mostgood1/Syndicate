@@ -1729,3 +1729,32 @@ event here.
   before.
 - **Cost:** none realised. The exposure was a shared-contract change reaching
   production with a third of its blast radius unexamined.
+
+### 2026-08-15 - I APPLIED "ONE SAMPLE OF A MOVING QUANTITY" TO PRODUCTION AND NOT TO MY OWN MEASUREMENT
+
+- **What we believed:** MLB's card-height spread was fully explained by game
+  state. Measured once: Preview n=10 spread **80px**, Final n=2 spread 82px,
+  Live n=3 spread 1393px. Clean story - the layout is tight inside a state and
+  the whole number is live-game content. I wrote it into a lane as the finding.
+- **What was actually true:** the same page, 20 minutes later, no code change:
+  Preview spread **797px** (3020-3817px). The tightness was an artifact of the
+  moment. Measured properly across all 10 Preview cards at once, height tracks
+  `.cards-data-pair` count at ~62px per pair, 20-57 pairs per card - the spread
+  is CONTENT VOLUME, and grouping by state does not remove it because content
+  varies inside a state too.
+- **How we found out:** re-running the probe after changing it, and noticing
+  the number I had just explained had moved.
+- **The rule going forward:** I already hold this rule for production
+  quantities (`learnings.md`, three wrong root causes in one session from a
+  single sample). It applies with equal force to a measurement I take MYSELF to
+  explain something. Before writing "X explains Y", take the reading twice, or
+  measure the whole population once - here, ten cards against their content
+  counts settled in one pass what two timed samples could not.
+- **Second-order rule, and the useful one:** when a metric cannot separate the
+  thing you care about (layout) from a confound (content volume), report the
+  confound alongside it rather than refining the metric. `content varies 20-57
+  pairs/card` next to a 1583px spread is interpretable; the spread alone is
+  not, and no amount of grouping was going to make it so.
+- **Cost:** one wrong explanation written into a lane and reported to the user,
+  corrected within the hour. The EXONERATION it accompanied was and remains
+  correct.

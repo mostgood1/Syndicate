@@ -173,6 +173,29 @@ def test_missing_out_of_season_key_fails_closed():
     assert not ok
 
 
+def test_printed_spread_is_the_within_state_figure_not_the_slate_wide_one():
+    """MLB's across-slate spread swung 796 -> 1716px with no code change.
+
+    Measured on production 2026-08-15, 15 cards at 390px: Preview n=10 spread
+    80px, Final n=2 spread 82px, Live n=3 spread 1393px. The layout is tight
+    inside a state; the overall number reports how many games are live, so it
+    cannot catch a layout regression.
+    """
+    text, _ = _summarize(
+        _report(cardHeightSpread=1716, cardHeightSpreadWithinState=82)
+    )
+    assert "82px" in text
+    assert "1716px" not in text
+
+
+def test_printed_spread_falls_back_when_no_state_breakdown_exists():
+    report = _report(cardHeightSpread=40)
+    for label in ("desktop", "mobile"):
+        report["sports"]["mlb"][label].pop("cardHeightSpreadWithinState", None)
+    text, _ = _summarize(report)
+    assert "40px" in text
+
+
 def test_card_wait_constant_is_generous_enough_for_a_js_render():
     """Guards the regression directly: MLB needed >600ms and got 400."""
     assert probe.CARD_WAIT_MS >= 10000

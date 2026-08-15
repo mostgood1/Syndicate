@@ -2731,3 +2731,45 @@ Carried forward, unowned:
   market-recommendation list - handed to `market-key-blank-not-absent`, and
   explicitly NOT measured in production.
 - soccer's remaining 4x repeated string is a boxscore label, pre-existing.
+
+#### card-height-spread-by-state — CLOSED-VERIFIED 2026-08-15, WITH A CORRECTION TO THIS LANE'S OWN FINDING
+
+**EXONERATED first, and that part held:** the MLB card-height movement is not
+`6e9e6107` and not any layout change. The contract rows were byte-identical
+across that commit (0/15 games).
+
+**But this lane's opening finding was WRONG, and its own instrument falsified
+it 20 minutes later.** I measured Preview n=10 at 2929-3009px, spread **80px**,
+and concluded "the layout is tight within a state; the whole spread is live
+games". Second reading, same page, no code change:
+
+    Preview n=10   first read  2929-3009px  spread   80px
+                   second read 3020-3817px  spread  797px
+
+One sample of a moving quantity, presented as an explanation. **I have this
+rule already** (`learnings.md`: three wrong root causes in one session from
+exactly this shape) and applied it to production effects but not to my own
+measurement.
+
+**What actually drives it, measured across all 10 Preview cards at once:**
+height tracks `.cards-data-pair` count almost linearly, ~62px per pair.
+
+    33 pairs -> 3100px    41 -> 3591px    45 -> 3830-3846px
+    49 -> 4101-4121px     53 -> 4317-4345px
+
+Production now reports `content varies 20-57 pairs/card` on MLB. So the
+card-height spread on MLB answers **"how much data does this game have"**, not
+"is the layout stable" — and no per-state grouping fixes that, because content
+varies inside a state too.
+
+**What shipped:** `cardHeightByState` + `cardHeightSpreadWithinState` (the
+printed figure, least-confounded available) and `contentUnits`, printed as
+`content varies N-M pairs/card` whenever cards differ. The discriminating
+comparison now works — MLB carries the content line and 1583px; **ncaaf 45/53px
+and soccer 0px carry no content line at all**, because their cards are uniform.
+A reader can finally tell a busy slate from a broken layout.
+
+**Honest limit:** there is still no pure layout signal for MLB. Height per unit
+of content would be one; nobody has built it, and this lane does not claim to.
+
+- **FINAL:** shipped, verified, closed. 14 tests. No deploy — dev tooling.

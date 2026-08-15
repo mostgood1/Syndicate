@@ -171,6 +171,50 @@ MEASURE_JS = """
   const gameCards = [...document.querySelectorAll('.cards-game-card')];
   const heights = gameCards.map((c) => Math.round(c.getBoundingClientRect().height));
 
+  // Spread WITHIN a game state, because the overall number is dominated by how
+  // many games happen to be live. Measured on production /mlb/cards at 390px,
+  // 15 cards, 2026-08-15:
+  //
+  //     Preview  n=10  2929-3009px  spread   80px
+  //     Final    n= 2  2833-2915px  spread   82px
+  //     Live     n= 3  3156-4549px  spread 1393px
+  //     overall                     spread 1716px
+  //
+  // The layout is tight to ~80px inside a state; the whole 1716 is live-game
+  // content. So the overall figure swung 796 -> 1716 between two runs with no
+  // code change, which makes it useless for catching a layout regression -- it
+  // reports the slate, not the CSS. Per-state is the comparable number.
+  const byState = {};
+  gameCards.forEach((c) => {
+    const badge = c.querySelector('.cards-status-badge');
+    const state = ((badge && badge.textContent) || 'unknown').trim() || 'unknown';
+    const h = Math.round(c.getBoundingClientRect().height);
+    (byState[state] = byState[state] || []).push(h);
+  });
+  const cardHeightByState = {};
+  Object.keys(byState).forEach((k) => {
+    const v = byState[k].slice().sort((a, b) => a - b);
+    cardHeightByState[k] = {n: v.length, min: v[0], max: v[v.length - 1], spread: v[v.length - 1] - v[0]};
+  });
+
+  // ...and even WITHIN a state the spread is mostly content volume, not layout.
+  // Measured on production /mlb/cards at 390px, 10 Preview cards, 2026-08-15:
+  // height tracks `.cards-data-pair` count almost linearly --
+  //
+  //     33 pairs -> 3100px      45 pairs -> 3830-3846px
+  //     41 pairs -> 3591px      49 pairs -> 4101-4121px      53 pairs -> 4317-4345px
+  //
+  // i.e. ~62px per pair, and the same Preview group measured 80px of spread
+  // twenty minutes earlier when every game carried the same amount of data.
+  // So the height figures answer "how much data does this game have", and a
+  // reader cannot tell a layout regression from a busy slate WITHOUT the
+  // content count next to it. That is what this reports.
+  const unitCounts = gameCards.map((c) => c.querySelectorAll('.cards-data-pair').length).sort((a, b) => a - b);
+  const contentUnits = unitCounts.length
+    ? {min: unitCounts[0], max: unitCounts[unitCounts.length - 1],
+       spread: unitCounts[unitCounts.length - 1] - unitCounts[0]}
+    : null;
+
   // Tab/panel id agreement, per card. A tab whose target has no panel blanks
   // the card when clicked (NCAAF, measured 2026-08-14); a panel with no tab is
   // markup shipped to the browser that no user can reach.
@@ -311,6 +355,13 @@ MEASURE_JS = """
     cardHeightMin: heights.length ? Math.min(...heights) : null,
     cardHeightMax: heights.length ? Math.max(...heights) : null,
     cardHeightSpread: heights.length ? Math.max(...heights) - Math.min(...heights) : null,
+    cardHeightByState,
+    contentUnits,
+    // The least-confounded figure available: the worst spread inside any one
+    // game state. Still not a pure layout signal -- read it with contentUnits.
+    cardHeightSpreadWithinState: Object.keys(cardHeightByState).length
+      ? Math.max(...Object.keys(cardHeightByState).map((k) => cardHeightByState[k].spread))
+      : null,
     tabsWithoutPanel: [...new Set(tabsWithoutPanel)],
     panelsWithoutTab: [...new Set(panelsWithoutTab)],
     typeScale,
@@ -439,6 +490,10 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
     lines: list[str] = []
     ok = True
     out_of_season = set(report.get("outOfSeason") or ())
+    # `spread` is the worst spread WITHIN a game state, not across the slate --
+    # see the note in MEASURE_JS. The across-slate figure is still in the JSON
+    # as `cardHeightSpread`, but it is not what gets printed, because it moves
+    # with how many games are live and cannot be compared between runs.
     header = f"{'sport':8} {'width':8} {'cards':>5} {'overflow':>9} {'spread':>7}  tabs"
     lines.append(header)
     lines.append("-" * len(header))
@@ -450,7 +505,9 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 ok = False
                 continue
             overflow = measured.get("overflowPx")
-            spread = measured.get("cardHeightSpread")
+            spread = measured.get("cardHeightSpreadWithinState")
+            if spread is None:
+                spread = measured.get("cardHeightSpread")
             cards = measured.get("cards") or 0
             issues = []
             if overflow:
@@ -530,6 +587,12 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             if empties:
                 total = sum(e["emptyCopy"] + e["placeholders"] + e["emptyBars"] for e in empties)
                 issues.append(f"{total} empty slot(s) in {len(empties)} panel(s)")
+            # Print the content range next to the spread whenever cards differ
+            # in how much data they carry, so nobody reads a busy slate as a
+            # layout regression. MLB's spread is ~62px per `.cards-data-pair`.
+            units = measured.get("contentUnits") or {}
+            if units.get("spread"):
+                issues.append(f"content varies {units['min']}-{units['max']} pairs/card")
             conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
             if conflated:
                 issues.append("type conflated: " + ",".join(c.lstrip(".") for c in conflated))

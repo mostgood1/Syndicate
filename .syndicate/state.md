@@ -1295,3 +1295,21 @@ than failing the run, and the declaration is checked in both directions.
 56 -> 197px desktop / 112 -> 1887px mobile across the 19:0x-21:2x window, and
 empty slots 8 -> 1. Not the contract (rows byte-identical, 0/15). Presumed the
 slate moving; **nobody has actually looked.** `[unverified]`
+
+## MLB card-height spread - it measures CONTENT, not layout `[measured 08-15 22:xxZ]`
+
+**Do not read MLB's card-height spread as a layout signal.** Height tracks
+`.cards-data-pair` count at ~62px per pair, and MLB serves **20-57 pairs per
+card**, so the figure reports how much data each game has. It moved 796 ->
+1716 -> 1583px across three readings with no code change. Grouping by game
+state does not fix it - Preview alone measured 80px and 797px twenty minutes
+apart. `[measured]`
+
+`scripts/ui_layout_probe.py` now prints `content varies N-M pairs/card`
+alongside the spread whenever cards differ, so the two can be told apart.
+**NCAAF (45/53px) and soccer (0px) carry no content line** - their cards are
+uniform and their spreads ARE layout signals. MLB's is not. `[measured]`
+
+**EXONERATED:** the MLB height movement flagged at the 21:2xZ checkpoint is not
+`6e9e6107` and not any layout change - the contract rows were byte-identical
+across it (0/15 games). `[measured]`
