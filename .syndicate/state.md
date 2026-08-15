@@ -58,8 +58,13 @@ always `git diff --cached --stat` first.** A parallel session cleared the shared
 index between one lane's `git add` and its `git diff --cached`. A complete revert
 of shipped work once sat staged in the shared index with the working tree clean —
 a bare `git commit` would have un-shipped it without touching a file.
-**That specific revert is DISARMED** (`git diff --cached` empty, `HEAD`
-`bd40056c`) `[measured 08-15 02:3xZ]`, but the mechanism is live.
+**THE MECHANISM IS NOT RARE — it fired TWICE in one session on 2026-08-15**,
+the second time holding a revert of ledger work committed ~20 minutes earlier
+(staged `lanes.md`/`state.md` missing lines that were present in BOTH `HEAD` and
+the worktree). Each was disarmed with a path-scoped `git reset`, which touches
+no file. **Run `git diff --cached --numstat` before EVERY commit and read the
+DELETION column** — a stale index shows up as deletions-only against a HEAD that
+moved past it. `[measured 08-15, 2 occurrences]`
 
 ---
 
@@ -103,6 +108,15 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **Sharp coverage on PROPS is 0%.** Prop CLV therefore stays a soft-consensus
   measurement and **must be labelled as such**; game-line CLV can be taken
   against a genuine sharp close.
+- **THERE IS ALREADY A PER-SPORT LEVER FOR THE PROP GAP, and NHL uses it.**
+  `syndicate/local_nhl_odds.py:542` defaults
+  `PROPS_ODDSAPI_BOOKMAKERS = "fanduel,draftkings,pinnacle"` — Pinnacle is
+  explicitly requested for NHL props. `vendor/nhl_betting_repo/.../odds_api.py`
+  carries it in a book list too. So closing the 0% on other sports' props is a
+  **config change on an existing knob**, not a build. `[from-code 08-15]`
+  **Cost it before flipping it:** every added book spends OddsAPI credits
+  against a cap already at **92.8% projected burn**, and props are the highest-
+  volume market family. Measure the per-call delta on one sport first.
 - **This removes the standing caveat on the whole CLV program** — "beating a
   closing consensus of eleven soft books can read positive where no exploitable
   edge exists" no longer applies to game lines.
@@ -399,6 +413,15 @@ refresh-worker memory, `pipeline/intelligence_state.py`, or the board-build loop
   only `mean_implied` left outside worktree copies is in
   `tests/test_devig_unification.py`, which reproduces the legacy arithmetic on
   purpose to prove valid prices did not move.
+- **`edge_vs_consensus_pct` is now ABSENT rather than `0.0` when the consensus
+  refuses, and that is verified no-break** across 6 consumer suites (92 green),
+  including `tests/test_quote_ref.py`, which asserts the field directly.
+  **The only real `book_grid` consumer is `nfl/preseason_cards.py`, reached
+  through `read_book_grid_artifact` — an ARTIFACT HOP, so it does not import
+  `book_grid` and an importer search cannot find it.** It already tolerated a
+  `None` side, because `consensus[side] = None` was reachable before this change
+  via the empty-prices branch. `prop_projections`' `consensus` key is a
+  different producer's. `[measured 08-15]`
 - **`/preflight` now prints the deployed commit of ALL THREE services** (D5),
   degrading a per-service read failure to that row rather than to the gate.
 - **MLB prop skill numbers are IN-SAMPLE and now say so** (`debias_validation`).
@@ -1010,3 +1033,100 @@ Read `.syndicate/audit_2026-08-14_board_engine_SYNTHESIS.md` first.
   deliberate fix, not a defect. The card head renders 16px and always did. Any
   claim of the form "class X is N px on sport Y" from before 2026-08-15 was
   measured with a first-match `querySelector` and needs re-reading per surface.
+
+## Soccer model — VERIFIED 2026-08-15 02:4x-03:0xZ (lane `soccer-model-coverage`)
+
+**SUPERSEDES the "8,456 rows / 2,504 projected = 29.6%" figure wherever it
+appears, and the framing that layer1 and layer2 run different joins.**
+
+- **There is ONE soccer projection join**, `board_enrichment.py:595`. The 250x
+  disagreement was two different GRIDS. `[measured]`
+  `layer1?sport=soccer` = **123 rows / 4 games / 12 projected**, date-scoped;
+  `layer2-shortlist` `per_sport_ingest.soccer` = **8,515 rows over SIX dates
+  (08-14..08-20) / 434 scheduled games / 109 projected**. The layer1 figure of
+  8,456 rows is **not reproducible** and should not be quoted again.
+- **`matches_in_source: 4` is CORRECT, not an empty source.** There were 4
+  soccer fixtures on 2026-08-14, one per league, and the sim produced all four.
+  `unmatched_match_rows: 8,396` is dominated by later-date fixtures, because
+  `load_soccer_projections(roots, selected_date)` loads ONE date by design.
+  Future-date recommendation files DO exist on prod (08-15: 6 leagues,
+  08-16: 6, 08-17: 4).
+- **THE SOCCER SIM PUBLISHES ZERO PLAYER PROJECTIONS.** All four production
+  artifacts read `matches=1, player_props=0`. **107 of the 123 soccer board
+  rows are player props and every one is unprojected**; all 12 projections are
+  game rows. Root cause: **live-odds-worker builds the soccer artifacts** (its
+  own `ALL_PROCESS_MEMORY` carries `scripts/build_soccer_artifacts.py` at
+  02:25:48Z, matching the four `generated_at` stamps) and its entrypoint
+  `run_live_odds_refresh_worker.py` ran **no seed bootstrap**, so its disk never
+  received the committed `players_*.csv`. refresh-worker HAS them
+  (`SOCCER_SEED_CENSUS ... already_present=[all 10 leagues]`, 02:11:05Z) and is
+  not doing the work. `#145` recurring on a fourth service.
+- **`compute_team_ratings`'s as-of filter is INERT for 9 of 10 leagues**, and
+  this contradicts `soccer-backtest-leakage` being closed as fixing the leak.
+  It compares dates as raw TEXT; `history/*.csv` is **DD/MM/YYYY** for all 9
+  non-MLS leagues (only Understat `team_history/*.csv` is ISO), and
+  `'17/05/2026' >= '2026-08-14'` is **False**. eredivisie returns an identical
+  **923 match-rows** at every as-of from 2023 to 2026. The four leagues in
+  season (eredivisie, primeira_liga, championship, belgian_pro_league) are
+  `history`-only and had NO protection. Two further bugs, same cause, live in
+  PRODUCTION ratings: matches on the 30th/31st dropped as "future", and the
+  text sort behind `rows[-window:]` making "most recent 45" mean "the 45 latest
+  in the MONTH". Fixed locally in `loaders._as_iso_day`; **not deployed.**
+- **The 3-way h2h edge refusal is STALE, not a safety property.**
+  `_no_vig_over_probability` has handled the draw leg since `95305cab`
+  (08-07 13:13 CDT); `#263` wrote the refusal at 23:43 the SAME DAY. Verified
+  by running the real function on the live board's 4 h2h rows (Telstar
+  133/255/183 -> fair 0.4033 on a 6.4% hold).
+- **Soccer's model is well calibrated in AGGREGATE and under-dispersed.**
+  Across all 166 probabilities in the 54 production recommendation files: mean
+  P(home) **0.4525** / draw **0.2382** / away **0.3093**, against real base
+  rates of ~44-46 / ~25-27 / ~28-30. **stdev of P(home) is only 0.1364**
+  (max 0.80). It is NOT biased toward the away side — it shrinks toward the base
+  rate, so it disagrees with the market by 28-50 points on heavy favourites.
+  Contributing: `adapters._DEFAULT_SIMULATIONS = 300` = **±2.9pp of Monte Carlo
+  noise** on every published probability (0.0025 quantisation is visible in the
+  artifacts).
+- **Soccer's binding constraint on PUBLISHED EV is still the odds, not the
+  model.** `[measured]` soccer `margin_model`: `one_sided_rows` **8,189**,
+  `pct_modelled` **100.0** — one book quoting, so every row is
+  `book_margin_model` and the uninformative-EV filter drops all of them.
+  A perfect model publishes zero rows until two-sided quotes return.
+- **SOCCER BACKTEST ACCURACY IS NOW MEASURED, AND THE MODEL LOSES TO THE
+  CLOSING LINE.** `[measured 2026-08-15, first leak-free number this repo has
+  ever had]` `scripts/backtest_soccer_h2h_calibration.py`, **1,112 matches
+  across 9 leagues**, ratings recomputed per match day with `as_of` set to that
+  day (only meaningful at all because `_as_iso_day` fixed the inert filter):
+
+        MODEL  multiclass Brier  0.5875
+        MARKET multiclass Brier  0.5737   (proportionally de-vigged closing odds, same matches)
+        gap                     +0.0139   lower is better, so the MODEL LOSES
+
+  **Worse than the closing line in 8 of 9 leagues** (two-sided sign test
+  p = 0.039). The only exception is belgian_pro_league at -0.0011, which is
+  noise at n=120. Per league (n / model / market / gap): eredivisie
+  126/.5211/.5064/+.0147, primeira_liga 125/.5722/.5405/+.0317, championship
+  126/.6158/.6061/+.0097, belgian_pro_league 120/.6045/.6056/-.0011, epl
+  120/.5794/.5572/+.0222, la_liga 123/.5947/.5846/+.0101, bundesliga
+  126/.5840/.5653/+.0187, serie_a 120/.5970/.5869/+.0101, ligue_1
+  126/.6201/.6117/+.0084.
+- **The under-dispersion diagnosis is independently confirmed by the backtest.**
+  Mean model stdev(P home) **0.1575** vs market **0.1811**, and the model is
+  narrower in **8 of 9** leagues. eredivisie's reliability curve shows the
+  model is too TIMID at both extremes: predicted 0.144 -> actual 0.000, and
+  predicted 0.823 -> actual 1.000.
+- **CONSEQUENCE, and it is the load-bearing one for the board: soccer's model
+  must NOT be used to publish `model_edge_pct` yet.** A model that loses to the
+  closing line on 1,112 matches produces edges that are noise against a
+  better-informed price. The 3-way de-vig fix removes a stale BLOCK; it does
+  not make the resulting number publishable. Sharpening the distribution and
+  raising `adapters._DEFAULT_SIMULATIONS` from 300 (±2.9pp of Monte Carlo
+  noise) are the two named, cheap levers — neither is done.
+- Coverage, per the `data/**` rule: eredivisie 918 history rows spanning
+  2023-08-11..2026-05-17, with result 918, with complete closing odds 918,
+  **intersection 918** — this result does not rest on a narrow join. Matches
+  are skipped where either side has fewer than 20 prior as-of matches, so
+  early-season rows are not scored as if the model had an opinion.
+- The retired `data/soccer_source/*/validation/*_backtest_*.csv` remain **not
+  citable**. `SoccerSimulationOutput` still ships
+  `calibration.win_probability.brier = None` — the harness exists but is not
+  wired into the sim's own evaluation slot.

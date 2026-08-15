@@ -5042,7 +5042,7 @@ after the single global `.current-lane` blocked three edits to this lane's OWN
 claimed files. Backward compatible — the global file is still read when no
 per-session file exists. See `learnings.md` 2026-08-15.
 
-### model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done, both shipped as `2ac3c6bc` (committed, NOT deployed); D4 HALF DONE, blocked on data — opened 2026-08-15 — session: model-audit-fork-2
+### model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, consumers re-verified post-close `9dc6632e`); D4 HALF DONE, the out-of-sample number is BLOCKED ON PRODUCTION DATA — opened 2026-08-15 — session: model-audit-fork-2
 - Goal: audit §7 ranked **#5** (one devig ordering, one central statistic, all
   call sites converted) plus plan **D4** and **D5**. Testable outcomes:
   (a) exactly one function in the board path turns a set of book prices into a

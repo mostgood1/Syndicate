@@ -2845,6 +2845,41 @@ in the chain supported.
   silent: the files exist, the tests pass, production is correct, and only the
   index disagrees.
 
+### 2026-08-15 — a scoped search answers a scoped question. I shipped a field's semantics on one, and the unscoped search later named the test that guards it
+
+- **What we believed:** I had found every consumer of `edge_vs_consensus_pct`.
+  I ran a scoped `Grep` over `syndicate/`, got two hits, both of them producers,
+  and concluded the field had no external readers. The unscoped repo-wide search
+  had timed out at 120s and I moved on without it.
+- **What was actually true:** `tests/test_quote_ref.py` asserts that exact field
+  in both directions (`< 0` and `> 0`). It was never in my test run. I changed
+  the field from always-numeric to absent-when-the-consensus-refuses and
+  committed (`2ac3c6bc`) without ever executing its guard. A second consumer,
+  `nfl/preseason_cards.py`, reads `book_grid`'s `consensus` through
+  `read_book_grid_artifact` — an ARTIFACT hop, which is why a search for
+  `book_grid` importers did not surface it.
+- **How we found out:** the background search finished after the checkpoint. The
+  change turned out to be safe — 92 further tests green, and `consensus[side] =
+  None` was already reachable through the empty-prices branch, so the consumer
+  already tolerated it. **But safety was established after shipping, not
+  before.** A null result from a timed-out search is not a null result.
+- **The rule going forward:**
+  1. **A scoped search bounds the answer to the scope.** `syndicate/` does not
+     contain `tests/`. When changing a field's SEMANTICS, search `tests/`
+     explicitly — the guard for a served field usually lives there and nowhere
+     else.
+  2. **Follow the artifact hop.** Consumers that read a producer's output
+     through an artifact reader (`read_*_artifact`) never import the producer,
+     so an importer search cannot see them. Search the FIELD NAME, not the
+     module.
+  3. **If a search times out, say so and treat it as unknown**, or re-run it
+     scoped and narrow. Do not let an abandoned search read as coverage. The
+     unscoped variant here also needed `.claude/worktrees/` excluded — those
+     hold full repo copies and triple-count every hit.
+- **Cost:** none in production (nothing deployed) and none in correctness. The
+  cost was epistemic: for about an hour the ledger recorded a verified-safe
+  change that had not been verified.
+
 ### 2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Each Bash call is a NEW shell, and an absent index file is an EMPTY one, not an error
 
 - **What we believed:** `export GIT_INDEX_FILE=/c/tmp/idx-lane-$$` is the
@@ -2920,3 +2955,78 @@ leave SHARED state describing a change nobody intended. Isolation bounds your
 blast radius; it does not bound the blast radius of what you leave behind.
 Related: `project_shared_index_can_hold_a_revert` — this is the mechanism by
 which that revert gets there without anyone doing anything wrong.
+
+### 2026-08-15 — A DATE TEST WRITTEN IN THE FORMAT THE CODE ALREADY HANDLES CANNOT DETECT THAT IT ONLY HANDLES THAT FORMAT
+
+- What we believed: `soccer-backtest-leakage` was CLOSED-VERIFIED. It made
+  `as_of` required, was double-mutation tested, and ran 526 green.
+- What was actually true: **the filter was inert for nine of ten leagues**,
+  including all four in season. `compute_team_ratings` compared
+  `str(row["date"])[:10] >= cutoff` as raw TEXT, and `history/*.csv` is
+  `DD/MM/YYYY` for every non-MLS league. `'17/05/2026' >= '2026-08-14'` is
+  **False** because '1' sorts before '2', so no row was ever excluded.
+  eredivisie returned an identical **923 match-rows** at every as-of from 2023
+  to 2026 — a September 2023 rating built from May 2026 results.
+- How we found out: not by reading the code — by asserting a PROPERTY over the
+  real committed files. Ratings as-of an early date must select FEWER rows than
+  as-of a late one. They selected the same, at every date.
+- Why the tests could not have caught it: `tests/test_soccer_team_ratings_as_of.py`
+  builds its fixtures in ISO, which is the one format the comparison handles.
+  It tested the branch, not the parse. **The fixture format WAS the assumption
+  under test, and it was supplied as a given.**
+- The rule going forward: **when a test exercises parsing or comparison of an
+  external format, write the fixture in the format the SOURCE ships, not the
+  format the code prefers — and confirm what the source ships by reading it.**
+  One `head -1` of each committed file would have shown two formats. Also:
+  a same-shape bug hid two more (30th/31st dropped as "future"; the text sort
+  behind `rows[-window:]` selecting "latest in the month" rather than "most
+  recent"), so a format mismatch is rarely one bug.
+- Cost: a closed lane's central claim was false for a day, its successor lane
+  nearly published a backtest number off leaked ratings, and every rating for
+  the four in-season leagues was built from a biased sample of the season.
+
+### 2026-08-15 — A GUARD'S STATED REASON IS A CLAIM ABOUT ANOTHER FUNCTION, AND IT ROTS WITHOUT TOUCHING EITHER FILE
+
+- What we believed: soccer refused an edge on all 3-way markets because
+  "`_no_vig_over_probability` pairs home against away and would silently drop
+  the draw". That reads as a safety property and had stood since `#263`.
+- What was actually true: that function learned the draw leg in `95305cab` at
+  **13:13 CDT on 2026-08-07**, and the refusal was written at **23:43 the same
+  day** — false when it was written, and `git merge-base --is-ancestor`
+  confirms the ordering. It suppressed every h2h edge soccer had, on its
+  flagship market, for a week.
+- How we found out: by calling the real `_no_vig_over_probability` on the live
+  board's four h2h rows instead of trusting the comment. It returned a correct
+  three-leg de-vig (Telstar 133/255/183 -> .4292/.2817/.3534, sum 1.0643, fair
+  .4033).
+- The rule going forward: **a comment that justifies a refusal by describing
+  what ANOTHER function does is a dated assertion about a file that can change
+  without this one being touched. Re-run the named function before trusting
+  it.** Neither file's history shows anything suspicious — the rot is in the
+  relationship, so no diff review of either file would surface it.
+- Corollary that nearly cost more than the finding: **removing a stale guard is
+  not the same as the result being safe to publish.** Once the edges appeared
+  they were -27.7 and -49.9 points, which reads as alpha and is actually
+  under-dispersion (model stdev 0.1364 against a market pricing a -500
+  favourite at 0.779). Unblocking a number and validating it are two tasks.
+
+### 2026-08-15 — I QUOTED THE "A BRANCH CUT FOR ONE SERVICE IS A ROLLBACK FOR ANOTHER" RULE, THEN BROKE IT ONE NOTE LATER
+
+- What we believed: my change stacks on the unmerged `as_of` work, so the
+  commit should branch from `fix/soccer-backtest-leakage`. I wrote that into
+  the lane as a recipe.
+- What was actually true: `git diff --stat origin/main fix/soccer-backtest-leakage`
+  is **127 files, 3,618 insertions, 33,673 DELETIONS**. The branch predates a
+  full day of many sessions' work, and is 114 lines behind `origin/main` on
+  `run_live_odds_refresh_worker.py` — the very file I had just edited.
+- How we found out: the checkpoint's own `git diff --stat` step, which is there
+  precisely to ground the summary in reality rather than memory.
+- The rule going forward: **before naming any branch as a commit base, diff it
+  against `origin/main` in BOTH directions and read the deletion count.**
+  "It has the prerequisite I need" says nothing about what it is missing. The
+  right shape for an unmerged prerequisite is to rebase it onto the current
+  tip, never to rejoin the tree at the old one.
+- The transferable half: I had quoted this exact rule from `state.md` earlier
+  in the same session. Knowing a rule and applying it to the artefact in front
+  of you are different acts, and the cheap mechanical check is what closes the
+  gap.
