@@ -516,6 +516,31 @@ def _row_value_pct(row: Mapping[str, Any]) -> float | None:
     return _as_float(score.get("value_pct")) if isinstance(score, Mapping) else None
 
 
+def _row_ev_is_hold_restatement(row: Mapping[str, Any]) -> bool:
+    """True when this row's `ev_pct` is arithmetically the book's own margin.
+
+    `book_margin_model` prices a one-sided market as `fair = implied x (1-hold)`,
+    and `expected_value_pct(price, fair)` is `fair/implied - 1`, so the price
+    cancels and the EV is `-hold` for every such row regardless of the bet.
+    Ranking on it ranks on which book quoted, not on value.
+
+    Keyed on `fair_method` rather than on a numeric closeness test between
+    `ev_pct` and `assumed_hold_pct`. The method is the STATED provenance and is
+    exact; a tolerance would be a magnitude test that drifts with the 4-dp
+    rounding of `fair` (which at longshot probabilities is what turned three
+    holds into nineteen apparent EV values in production).
+
+    A row carrying a model view is NOT uninformative -- `blended_score` folds
+    `model_edge` into `value`, so it ranks on the sim's disagreement rather than
+    on the margin. That is the one thing that makes such a row explicable.
+    """
+    quote = row.get("quote")
+    method = quote.get("fair_method") if isinstance(quote, Mapping) else None
+    if str(method or "").strip() != "book_margin_model":
+        return False
+    return _as_float(row.get("model_edge_pct")) is None
+
+
 def _row_quote_age_seconds(row: Mapping[str, Any]) -> float | None:
     """How stale is our OBSERVATION of this quote (`#370`).
 
@@ -806,6 +831,30 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                     ((row.get("modelled_fair") or {}).get(side) or {}).get("assumed_hold_pct")
                 ),
                 "suspect_stale": bool(side_best.get("suspect_stale")),
+                # EVERY BOOK'S PRICE FOR THIS SIDE, so CLV can be measured
+                # same-book later. `best` is one book by definition, and pairing
+                # a best-of-N opening against a different book's close is biased
+                # upward -- measured at +6.2 pts and a 91% beat rate, which is
+                # the selection effect, not skill.
+                #
+                # Same-book needs OUR price at a book the close is recorded for,
+                # and we cannot know which that is at write time: odds history
+                # keeps a **median of 2 books per (event, market)** while the
+                # board picks the best of ~13. Measured 2026-08-14, mlb: the
+                # exact (event, market, best_book) triple existed in history for
+                # **3 of 55** game rows. Recording every book we saw makes the
+                # overlap near-certain instead of a 1-in-6 guess.
+                #
+                # Flat {book: price}, not the whole cell: the ledger needs the
+                # number, and a nested dict per book would put age/stale/rank on
+                # every row of an artifact that is already mostly market data.
+                "book_prices": {
+                    str(book): cell[side]["price"]
+                    for book, cell in (row.get("cells") or {}).items()
+                    if isinstance(cell, Mapping)
+                    and isinstance(cell.get(side), Mapping)
+                    and cell[side].get("price") is not None
+                },
             }
 
             candidate: dict[str, Any] = {field: row.get(field) for field in _IDENTITY_FIELDS}
@@ -1442,6 +1491,7 @@ def select_shortlist(
     beyond_quote_age = 0
     implausible_book = 0
     stale_kickoff = 0
+    uninformative_ev = 0
     for row in opportunities:
         if not _within_horizon(row, reference_now, horizon_days):
             beyond_horizon += 1
@@ -1493,6 +1543,36 @@ def select_shortlist(
         market_text = str(row.get("market") or "").strip().lower()
         if excluded_markets and any(token in market_text for token in excluded_markets):
             excluded_market += 1
+            continue
+        # A0/A3, model audit 2026-08-14: AN EV THAT IS A RESTATEMENT OF THE HOLD
+        # IS NOT A MEASUREMENT, AND MUST NOT SEAT A ROW.
+        #
+        # `book_margin_model` fills fair value on ONE-SIDED rows as
+        # `fair = implied x (1 - hold)`. Substitute that into
+        # `expected_value_pct` and the price cancels: `ev_pct` is identically
+        # `-assumed_hold_pct`. It says nothing about the bet -- only what that
+        # book charges on that market family.
+        #
+        # MEASURED on the served shortlist 2026-08-14: all 100 soccer rows were
+        # this, every one with `books_quoting: 1`. Predicting `ev_pct` from
+        # `round(implied x (1-h), 4) / implied - 1` reproduced the served value
+        # on **100 of 100 rows, 0 mismatches, max abs error 0.0100pt** -- and
+        # that residual is the 4-dp rounding of `fair`, which is also why THREE
+        # distinct holds presented as NINETEEN distinct `ev_pct` values and
+        # looked like a spread. All 100 carried a negative score.
+        #
+        # The value floor cannot catch them: `_measured_floor_for_pool` derives
+        # it from the same modelled hold, so soccer's floor was
+        # `-8.1425 = -1.25 x 6.514` against rows whose EV IS -6.514. A filter
+        # and its input moving together is not a filter.
+        #
+        # Excluded only when the row has NO model view. With a projection the
+        # `sim_component` is a real signal and the row ranks on something other
+        # than the book's margin -- which is the whole distinction. Placed with
+        # the other pre-bucket rules so `kind_floor`/`per_sport` cannot re-seat
+        # what this rejected.
+        if _row_ev_is_hold_restatement(row):
+            uninformative_ev += 1
             continue
         sport = str(row.get("sport") or "unknown").strip().lower() or "unknown"
         by_sport.setdefault(sport, []).append(row)
@@ -1620,6 +1700,14 @@ def select_shortlist(
         "rows_per_game": rows_per_game,
         "rows_excluded_market": excluded_market,
         "excluded_markets": list(excluded_markets),
+        # A3. Rows whose `ev_pct` was a restatement of the book's own hold and
+        # which carried no model view. Added in the SAME commit as the rule that
+        # produces it -- `#397`'s discipline, after three rounds of shipping a
+        # working filter with a counter nobody could read. It ALSO has to be
+        # added to `/api/board/layer2-shortlist`'s explicit key list in
+        # `syndicate/blueprints/intelligence.py`, which is held by another lane;
+        # see this lane's entry in `lanes.md`.
+        "rows_uninformative_ev": uninformative_ev,
         # `#369`: named separately from the value floor, because "the book is
         # impossible" and "this row is priced below our floor" are different
         # rejections and collapsing them would hide a feed problem as taste.

@@ -1898,6 +1898,59 @@ def api_ops_reset_lineup_gate() -> Any:
     return jsonify({"ok": True, "path": str(path)})
 
 
+@ops_bp.get("/api/ops/clv/report")
+def api_ops_clv_report() -> Any:
+    """CLV for a date, joined from the recorded openings (audit §7 #1).
+
+    Read-only. Needs no grading, no outcomes, no `settle_result`, and never
+    touches `evaluation_ledger_chunks` — the 367MB path whose 2026-08-05 chunk
+    is already SKIPPED at read time against a 256MB ceiling.
+
+    ON WEB, deliberately, and it is not a violation of the no-compute rule: the
+    openings are a ~90KB published artifact and the join is over a few hundred
+    rows against an odds-history payload this blueprint already loads for
+    `/api/ops/odds-history/inspect` right below. That is display-side
+    transformation, not the 1.3GB book-grid pivot the split exists to keep out.
+
+    **`avg_clv_pct` COUNTS SAME-BOOK ROWS ONLY AND IS OFTEN None.** The board
+    publishes the best price across ~13 books; pairing that opening with some
+    other book's close compares a best-of-N draw to a single draw and reads
+    +6.2pts at a 91% beat rate, which is the selection effect and not skill.
+    Biased scopes are reported separately under `by_book_scope`. A None here
+    means "no unbiased comparison was available", never "no edge".
+
+    `unresolved_reasons` is the other half of the answer and should be read
+    every time: `close_precedes_open` and `line_mismatch` are the two defects
+    that made this endpoint's first number (-5.215) wrong, and they are now
+    counted rather than silently folded into an average.
+    """
+    # Protected endpoint: requires admin token (enforced by before_request).
+    date = str(request.args.get("date") or "").strip()
+    sport = str(request.args.get("sport") or "").strip().lower()
+    if not date:
+        from syndicate.features.shared.timezone import central_today_iso
+
+        # CENTRAL, not UTC. An MLB slate spans two UTC dates and one Central
+        # one, and the openings are bucketed by the board's own Central date --
+        # defaulting to a UTC today would ask for a file that does not exist
+        # for five hours every evening.
+        date = central_today_iso()
+    if not sport:
+        return jsonify({"ok": False, "error": "sport parameter required."}), 400
+    include_rows = str(request.args.get("rows") or "").strip().lower() in {"1", "true", "yes"}
+    try:
+        from syndicate.features.shared.clv_join import compute_clv_for_date
+
+        report = compute_clv_for_date(date, sport)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+    if not include_rows:
+        # Summary by default; the per-row detail is large and only wanted when
+        # someone is chasing a specific pairing.
+        report = {key: value for key, value in report.items() if key != "rows"}
+    return jsonify({"ok": True, **report})
+
+
 @ops_bp.get("/api/ops/odds-history/inspect")
 def api_ops_odds_history_inspect() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request).
