@@ -348,6 +348,52 @@ class CandidateGameDateTests(unittest.TestCase):
         )
         self.assertEqual(with_key["market_key"], "player_threes")
 
+    def test_prop_dashboard_row_emits_absent_player_name_as_none_not_blank(self) -> None:
+        # `#438a`'s named half, same mechanism as market_key above.
+        #
+        # Held back once, then checked instead of assumed: the comment at this
+        # call site records `player_name: null` cards as a defect this function
+        # was already fixed for, which reads as a reason not to touch it.
+        # `42902ee6` (`#221`) shows only `+` lines for the key -- it was ABSENT
+        # from the reconstructed dict, so rows that DID have a name serialized
+        # without one and 0 of 14 top_props could join to a price. `null` was
+        # the symptom of the omission, not a chosen value, and this test pins
+        # the distinction so the next reader does not have to re-derive it.
+        sport = {"slug": "nba", "name": "NBA", "context_label": "2026-06-05"}
+        item = {
+            "name": "Julian Champagnie Over 1.5 3PM",
+            "market": "3PM",
+            "pick": "Over 1.5",
+            "matchup": "SAS at PHX",
+            "projected": 2.3,
+            "line": 1.5,
+            "odds": "+108",
+        }
+
+        # No player identity anywhere on the source -> absent, not blank.
+        self.assertIsNone(
+            _build_prop_dashboard_row(sport, item, default_surface="Pregame props")["player_name"]
+        )
+
+        # THE CASE `#221` WAS ABOUT: a source that carries a name still gets it,
+        # under each of the three accepted spellings. This is the regression
+        # that must never come back.
+        for key in ("player_name", "player", "entity"):
+            row = _build_prop_dashboard_row(
+                sport, {**item, key: "Julian Champagnie"}, default_surface="Pregame props"
+            )
+            self.assertEqual(row["player_name"], "Julian Champagnie", f"lost identity from {key!r}")
+
+        # `name` is the display label and must never be promoted into the
+        # identity slot -- the comment at the call site says so explicitly.
+        self.assertIsNone(
+            _build_prop_dashboard_row(sport, item, default_surface="Pregame props")["player_name"]
+        )
+        self.assertEqual(
+            _build_prop_dashboard_row(sport, item, default_surface="Pregame props")["name"],
+            "Julian Champagnie Over 1.5 3PM",
+        )
+
     def test_response_aliases_derive_market_key_when_the_slot_is_blank(self) -> None:
         # The consumer half of the same defect, pinned separately because either
         # side alone leaves a producer able to reintroduce it. A blank slot must

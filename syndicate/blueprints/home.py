@@ -3057,7 +3057,16 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         # function produced had player_name: null, which is why 0 of 14
         # top_props rows could be joined to a price. `name` is the display
         # label ("Ryan Johnson Walks Allowed") and is not a substitute.
-        "player_name": _safe_text(item.get("player_name") or item.get("player") or item.get("entity"), None),
+        #
+        # `or None` for the same reason as `market_key` below: `_safe_text` ends
+        # `return ""`, so the `None` written here was unreachable and a row with
+        # no player identity emitted `""`. Note this does NOT reopen the defect
+        # the paragraph above describes -- `42902ee6` shows only `+` lines for
+        # this key, i.e. the field was ABSENT from the reconstructed dict and
+        # rows that DID have a name serialized without one. `null` was the
+        # symptom of omission, never a chosen value. Rows reaching the `or None`
+        # branch have no player to join on in either spelling.
+        "player_name": _safe_text(item.get("player_name") or item.get("player") or item.get("entity"), "") or None,
         "player_id": item.get("player_id"),
         # The canonical, sport-agnostic market key where the source has one
         # (MLB prop rows carry prop="batter_total_bases"). `market` below is a
