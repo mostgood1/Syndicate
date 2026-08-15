@@ -59,12 +59,13 @@ index between one lane's `git add` and its `git diff --cached`. A complete rever
 of shipped work once sat staged in the shared index with the working tree clean —
 a bare `git commit` would have un-shipped it without touching a file.
 **THE MECHANISM IS NOT RARE — it fired TWICE in one session on 2026-08-15**,
-the second time holding a revert of ledger work committed ~20 minutes earlier
+and a THIRD time within a minute of the commit it would have reverted, holding
+a revert of ledger work committed ~20 minutes earlier on the second occasion
 (staged `lanes.md`/`state.md` missing lines that were present in BOTH `HEAD` and
 the worktree). Each was disarmed with a path-scoped `git reset`, which touches
 no file. **Run `git diff --cached --numstat` before EVERY commit and read the
 DELETION column** — a stale index shows up as deletions-only against a HEAD that
-moved past it. `[measured 08-15, 2 occurrences]`
+moved past it. `[measured 08-15, **3 occurrences in one session**; the third re-appeared SECONDS after a clean commit, so a single disarm is not a fix — re-check immediately before each commit]`
 
 ---
 
