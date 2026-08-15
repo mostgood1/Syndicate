@@ -1106,6 +1106,122 @@ def watchdog_should_heap_census(*, anon_mb: float | None, already_censused: bool
     return float(anon_mb) >= _env_float("SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB", 1500.0)
 
 
+_PYMALLOC_STATS_MAX_PER_PROCESS = 3
+_PYMALLOC_STATS_STATE: dict[str, int] = {"count": 0}
+
+
+def log_pymalloc_arena_stats(reason: str) -> dict[str, Any] | None:
+    """PYMALLOC's arena accounting -- the last place the missing anon can be.
+
+    `#435`, and this is the measurement the other three point at. Established:
+
+      anon                              1858.3 MB
+      GC-tracked containers              ~135 MB  (415,596 objects)
+      str/bytes hanging off them         ~136 MB  (1,704,754 strings, avg 84B)
+      glibc `malloc_info` system_current  237.5 MB, coverage 13.9%, and the
+                                          binding itself reads
+                                          "arena_not_representative"
+
+    So ~85% of anon is neither reachable Python data nor glibc arena memory.
+    pymalloc is what is left: it serves every allocation under 512 bytes -- which
+    is ALL 2.1M of the small objects above -- from 1MB arenas it takes by mmap,
+    invisible to `malloc_info`. An arena is only returned to the OS when it is
+    COMPLETELY empty, so a burst of millions of short-lived JSON strings that
+    leaves one survivor per arena pins the lot.
+
+    `sys._debugmallocstats()` prints the arena counts to stderr. It is the only
+    supported way to see this; there is no structured API. Parsed loosely here
+    and the raw table left in the log, because the derived number
+    (`arenas * 1MB` against live bytes) is the whole answer and a parse that
+    silently misses a line must not turn into a confident zero.
+    """
+    if _PYMALLOC_STATS_STATE["count"] >= _PYMALLOC_STATS_MAX_PER_PROCESS:
+        return None
+    try:
+        import os
+        import re
+        import tempfile
+
+        _PYMALLOC_STATS_STATE["count"] += 1
+        # FD-LEVEL CAPTURE, and the first version of this got it wrong.
+        # `_debugmallocstats` writes from C to fd 2, so `redirect_stderr` (which
+        # only rebinds `sys.stderr`) captured NOTHING -- measured
+        # `captured_chars: 0` locally before this shipped. Only dup2 sees it.
+        #
+        # This briefly points the process's fd 2 at a temp file, so a concurrent
+        # thread logging in that window lands there instead of the collector.
+        # The window is milliseconds and the alternative is no measurement at
+        # all; worth knowing if a sample looks missing around a PYMALLOC_STATS.
+        text = ""
+        sys.stderr.flush()
+        saved_fd = os.dup(2)
+        try:
+            with tempfile.TemporaryFile(mode="w+b") as tmp:
+                os.dup2(tmp.fileno(), 2)
+                try:
+                    sys._debugmallocstats()
+                finally:
+                    sys.stderr.flush()
+                    os.dup2(saved_fd, 2)
+                tmp.seek(0)
+                text = tmp.read().decode("utf-8", errors="replace")
+        finally:
+            os.close(saved_fd)
+
+        def _num(value: str) -> int | None:
+            try:
+                return int(value.replace(",", "").strip())
+            except Exception:
+                return None
+
+        arenas = None
+        arena_bytes = None
+        bytes_in_use = None
+        unused_pool_bytes = None
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# arenas allocated current"):
+                arenas = _num(stripped.split("=")[-1])
+            elif "bytes/arena" in stripped and "=" in stripped:
+                # `2 arenas * 1048576 bytes/arena  =  2,097,152` -- the total
+                # comes straight off the line, so the arena SIZE never has to be
+                # assumed (it changed between CPython versions).
+                arena_bytes = _num(stripped.split("=")[-1])
+            elif stripped.startswith("# bytes in allocated blocks"):
+                bytes_in_use = _num(stripped.split("=")[-1])
+            elif re.match(r"^\d+ unused pools \*", stripped) and "=" in stripped:
+                unused_pool_bytes = _num(stripped.split("=")[-1])
+        arena_mb = _bytes_to_mb(arena_bytes) if isinstance(arena_bytes, int) else None
+        live_mb = _bytes_to_mb(bytes_in_use) if isinstance(bytes_in_use, int) else None
+        payload = {
+            "reason": str(reason or "")[:80],
+            "stats_index": _PYMALLOC_STATS_STATE["count"],
+            "arenas_currently_allocated": arenas,
+            "arena_mb": arena_mb,
+            "bytes_in_allocated_blocks_mb": live_mb,
+            "unused_pools_mb": (
+                _bytes_to_mb(unused_pool_bytes) if isinstance(unused_pool_bytes, int) else None
+            ),
+            # THE NUMBER. Arenas held minus bytes live = memory pymalloc is
+            # sitting on that no Python object is using.
+            "retained_by_pymalloc_mb": (
+                round(arena_mb - live_mb, 1)
+                if isinstance(arena_mb, float) and isinstance(live_mb, float)
+                else None
+            ),
+            "captured_chars": len(text),
+        }
+        print(f"PYMALLOC_STATS {json.dumps(payload, default=str)}", flush=True)
+        if text:
+            # The raw table, once. A loose parse that misses a renamed line must
+            # not be the only record -- the counts above are derived, this is not.
+            print("PYMALLOC_STATS_RAW\n" + text[:4000], flush=True)
+        return payload
+    except Exception as exc:
+        print(f"PYMALLOC_STATS_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def _run_censuses(reason: str) -> None:
     """Both censuses, in order, on one thread. Neither may stop the other.
 
@@ -1123,6 +1239,10 @@ def _run_censuses(reason: str) -> None:
         log_untracked_bytes_census(reason)
     except Exception as exc:  # pragma: no cover - defensive
         print(f"[memory_observability] UNTRACKED_CENSUS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+    try:
+        log_pymalloc_arena_stats(reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[memory_observability] PYMALLOC_STATS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
 def _watchdog_maybe_heap_census(payload: dict[str, Any]) -> None:

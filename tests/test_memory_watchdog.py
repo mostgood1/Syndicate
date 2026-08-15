@@ -393,3 +393,56 @@ def test_a_failing_tracked_census_does_not_skip_the_untracked_one():
     ) as untracked:
         mo._run_censuses("unit-test")
     untracked.assert_called_once()
+
+
+# --- #435 step six: pymalloc arenas -------------------------------------------
+
+
+def test_pymalloc_stats_parse_real_cpython_labels():
+    """Parsed off ACTUAL `sys._debugmallocstats()` output, commas and all.
+
+    The first version of this used `contextlib.redirect_stderr` and captured
+    NOTHING (`captured_chars: 0`) because `_debugmallocstats` writes from C to
+    fd 2. It now dup2s the fd. This test pins the label format so a CPython
+    rename shows up as a failure rather than as a confident null.
+    """
+    out = mo.log_pymalloc_arena_stats("unit-test")
+    assert out is not None
+    assert isinstance(out["arenas_currently_allocated"], int), out
+    assert isinstance(out["arena_mb"], float), out
+    assert isinstance(out["bytes_in_allocated_blocks_mb"], float), out
+    # arenas held can never be less than the bytes live inside them
+    assert out["arena_mb"] >= out["bytes_in_allocated_blocks_mb"] - 0.5, out
+    assert out["captured_chars"] > 0, "fd-level capture returned nothing"
+
+
+def test_pymalloc_stats_measure_real_retention():
+    """CALIBRATION, because an uncalibrated instrument is how tonight produced
+    three wrong answers. 2M distinct ~130B strings held then freed:
+
+        HELD   251 arenas / 251.0 MB, 248.2 MB live
+        FREED    7 arenas /   7.0 MB,   4.1 MB live
+
+    So pymalloc DOES return arenas when they empty -- which is what makes a high
+    arena count against low live bytes in production meaningful rather than
+    normal.
+    """
+    import gc
+
+    mo._PYMALLOC_STATS_STATE["count"] = 0
+    junk = [str(i) + "x" * 70 for i in range(400_000)]
+    held = mo.log_pymalloc_arena_stats("unit-held")
+    del junk
+    gc.collect()
+    mo._PYMALLOC_STATS_STATE["count"] = 0
+    freed = mo.log_pymalloc_arena_stats("unit-freed")
+    assert held["arena_mb"] > freed["arena_mb"], (held, freed)
+
+
+def test_pymalloc_stats_capped_per_process():
+    saved = mo._PYMALLOC_STATS_STATE["count"]
+    try:
+        mo._PYMALLOC_STATS_STATE["count"] = mo._PYMALLOC_STATS_MAX_PER_PROCESS
+        assert mo.log_pymalloc_arena_stats("unit-capped") is None
+    finally:
+        mo._PYMALLOC_STATS_STATE["count"] = saved
