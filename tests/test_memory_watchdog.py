@@ -183,7 +183,7 @@ def test_tracing_off_announces_itself_at_the_moment_it_would_have_fired(capfd):
     mo._WATCHDOG_STATE.pop("allocations_dumped", None)
     try:
         with patch.object(mo, "allocation_tracing_enabled", return_value=False):
-            mo._watchdog_maybe_dump_allocations(
+            mo._watchdog_dump_allocations_now(
                 {"memory_anon_mb": 2500.27, "last_stage": "board_contract_games_normalized"},
                 133.2,
             )
@@ -200,7 +200,7 @@ def test_tracing_on_emits_the_allocation_census(capfd):
         with patch.object(mo, "allocation_tracing_enabled", return_value=True), patch.object(
             mo, "allocation_snapshot", return_value={"traced_mb": 1234.5, "top": ["site-a"]}
         ):
-            mo._watchdog_maybe_dump_allocations(
+            mo._watchdog_dump_allocations_now(
                 {"memory_anon_mb": 2500.27, "last_stage": "cards_context_sim_games_loaded"},
                 133.2,
             )
@@ -217,7 +217,41 @@ def test_a_failing_snapshot_never_escapes(capfd):
         with patch.object(mo, "allocation_tracing_enabled", return_value=True), patch.object(
             mo, "allocation_snapshot", side_effect=RuntimeError("boom")
         ):
-            mo._watchdog_maybe_dump_allocations({"memory_anon_mb": 2500.27}, 133.2)
+            mo._watchdog_dump_allocations_now({"memory_anon_mb": 2500.27}, 133.2)
         assert "WATCHDOG_ALLOCATION_DUMP_FAILED" in capfd.readouterr().out
+    finally:
+        mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+
+
+def test_the_dump_never_runs_on_the_sampler_thread():
+    """MEASURED 2026-08-15 02:11-02:16: with tracing at nframe=3 the worker
+    emitted its START line and then ZERO samples before dying 5.5 minutes later,
+    where the previous build emitted 567. `take_snapshot()` walks every live
+    traced allocation in C holding the GIL, so the one call the trigger makes
+    starved the sampler -- and since the print happens after the snapshot
+    returns, it looked like the trigger had never fired.
+
+    So: the scheduler must hand off and return, never call the dump inline.
+    """
+    mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+    started = {}
+
+    class _FakeThread:
+        def __init__(self, target=None, args=(), name=None, daemon=None):
+            started["target"] = target
+            started["daemon"] = daemon
+            started["name"] = name
+
+        def start(self):
+            started["started"] = True
+
+    try:
+        with patch.object(mo, "allocation_tracing_enabled", return_value=True), patch.object(
+            mo, "allocation_snapshot", side_effect=AssertionError("must not run inline")
+        ), patch("threading.Thread", _FakeThread):
+            mo._watchdog_maybe_dump_allocations({"memory_anon_mb": 2500.27}, 133.2)
+        assert started.get("started") is True
+        assert started.get("daemon") is True
+        assert started.get("target") is mo._watchdog_dump_allocations_now
     finally:
         mo._WATCHDOG_STATE.pop("allocations_dumped", None)

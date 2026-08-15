@@ -883,6 +883,47 @@ def _watchdog_maybe_dump_allocations(payload: dict[str, Any], climb_mb_per_s: fl
         ):
             return
         _WATCHDOG_STATE["allocations_dumped"] = True
+        # THE DUMP MUST NOT RUN ON THE SAMPLER THREAD. Measured the hard way
+        # 2026-08-15 02:11-02:16: with tracing at nframe=3 the worker emitted
+        # its MEMORY_WATCHDOG_STARTED line and then **not one sample** before
+        # dying 5.5 minutes later, where the previous build emitted 567. The
+        # kill cadence went from ~16-22 min to 3-10 min across the same change.
+        # `tracemalloc.take_snapshot()` walks every live traced allocation in C
+        # holding the GIL; on this heap that is millions of objects, so the
+        # sampler was starved by the one call it makes -- and because the print
+        # happens AFTER the snapshot returns, it looked like the trigger had
+        # simply never fired. An instrument that blocks its own measurement is
+        # worse than no instrument, because its silence reads as "nothing
+        # happened".
+        #
+        # Off-thread and daemon: if it never finishes, it dies with the process
+        # and the sampler keeps sampling either way.
+        try:
+            import threading
+
+            threading.Thread(
+                target=_watchdog_dump_allocations_now,
+                args=(dict(payload), climb_mb_per_s),
+                name="memory-watchdog-dump",
+                daemon=True,
+            ).start()
+            return
+        except Exception:
+            pass  # fall through and do it inline rather than lose the dump
+        _watchdog_dump_allocations_now(payload, climb_mb_per_s)
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] WATCHDOG_ALLOCATION_DUMP_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def _watchdog_dump_allocations_now(payload: dict[str, Any], climb_mb_per_s: float | None) -> None:
+    """The dump itself. Always called with the decision already made."""
+    try:
+        anon_mb = payload.get("memory_unreclaimable_mb")
+        if anon_mb is None:
+            anon_mb = payload.get("memory_anon_mb")
         if not allocation_tracing_enabled():
             # Say so ONCE, with the numbers that would have been captured. An
             # instrument that is off must announce it at the moment it would
