@@ -7,7 +7,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 137 rules `[generated]`
+## Index — 140 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -36,7 +36,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 121**
+**Rules and corrections — 124**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -159,6 +159,9 @@
 - [2026-08-15 — A HARDCODED ABSOLUTE `startTime` IS A FUTURE TIMESTAMP FOR PART OF A WATCHER'S LIFE](#2026-08-15-a-hardcoded-absolute-starttime-is-a-future-timestamp-for-part-of-a-watchers-life)
 - [2026-08-15 — check whether the instrument is already firing BEFORE building a way to make it fire](#2026-08-15-check-whether-the-instrument-is-already-firing-before-building-a-way-to-make-it-fire)
 - [2026-08-15 — MY OWN WATCHERS FAILED THREE TIMES IN ONE EVENING. Hand-run the gate before trusting a poller.](#2026-08-15-my-own-watchers-failed-three-times-in-one-evening-hand-run-the-gate-before-trusting-a-poller)
+- [2026-08-15 — THE CONFIDENCE INTERVAL BELONGS TO THE ESTIMATE, NOT TO THE THRESHOLD. My own test asserted otherwise and failed](#2026-08-15-the-confidence-interval-belongs-to-the-estimate-not-to-the-threshold-my-own-test-asserted-otherwise-and-failed)
+- [2026-08-15 — ACQUIRING THE DEPLOY CLAIM BLINDS THE DEPLOY GATE. The safety mechanism disabled the safety check](#2026-08-15-acquiring-the-deploy-claim-blinds-the-deploy-gate-the-safety-mechanism-disabled-the-safety-check)
+- [2026-08-15 — ANCESTRY CANNOT TELL YOU YOUR WORK IS PUBLISHED, AND A BROKEN GREP LOOKS EXACTLY LIKE A DELETION](#2026-08-15-ancestry-cannot-tell-you-your-work-is-published-and-a-broken-grep-looks-exactly-like-a-deletion)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -2768,3 +2771,37 @@ better: claim-then-poll blinds you; poll-then-claim races.
   a steady cadence look exactly like a healthy hold.
 - Treat a foreign claim as an ABORT, not a hold — someone else is mid-deploy and
   polling past it is how two sessions cancel each other's deploys.
+
+### 2026-08-15 — ANCESTRY CANNOT TELL YOU YOUR WORK IS PUBLISHED, AND A BROKEN GREP LOOKS EXACTLY LIKE A DELETION
+
+Two failures of the same kind in one push, minutes apart: **an instrument
+returned a confident answer about content while measuring something else.**
+
+**1. `git merge-base --is-ancestor <mine> origin/main` says nothing about
+content.** Nine of my commits were ancestors of `origin/main`, which reads as
+"already pushed, nothing to do". Ancestry is a statement about the DAG; it
+cannot tell you a later commit did not overwrite your lines — and on a contended
+ledger, whole-file commits from stale copies do exactly that routinely (see
+`6ccc4779`, another session repairing 30 `deploys.md` + 26 `lanes.md` lines its
+own checkpoint deleted). Only `git show origin/main:<path> | grep <token>`
+settled it: three of four code changes were genuinely there, one was not.
+**Ask "is the CONTENT in the tree", never "is the COMMIT in the history".**
+
+**2. A shell loop over `origin/main:<path>` refs silently measured nothing.**
+Git Bash on Windows path-converted `origin/main:.syndicate/learnings.md` into
+`origin\main;.syndicate\learnings.md`; `git show` failed to stderr, the pipeline
+still ran, and `grep -c` dutifully reported **0** for every token. **A zero from
+a broken command is indistinguishable from a zero from a real absence** — I was
+one step from reporting "another session overwrote all three of my learnings
+rules." They were all present. The tell was that EVERY token returned 0,
+including ones I had just written and could see on disk.
+
+**How to apply.**
+- When a check returns the alarming answer, **prove the check can return the
+  other answer** before believing it. A token you know is present is the
+  control, and it costs one line.
+- `export MSYS_NO_PATHCONV=1` before any `git show <rev>:<path>` on Windows, and
+  redirect to a file with one invocation per path rather than looping — the loop
+  is what hid the stderr.
+- Uniform zeros across independent tokens are a tool failure until proven
+  otherwise. Real content loss is almost never that tidy.

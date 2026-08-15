@@ -1721,9 +1721,13 @@ these four numbers; that is the measurement.**
   (`_attach_intelligence_response_aliases`, 5 call sites in the web blueprint)
   is the `market_key` fix — the one measuring 0 rows. **A web-only deploy of
   this work is inert.**
-- Commits ready and HELD: `1322d0a8` (line), `d348e040` (market_key),
-  `4ae71c4a` (player_name). `4ae71c4a` is LOCAL ONLY; the other two are on
-  `origin/main`.
+- **ALL THREE FIXES ARE ON `origin/main` AS OF `89c3d947`** `[pushed 08-15 ~22:4xZ,
+  verified BY CONTENT in origin's tree, not by ancestry]`. `1322d0a8` (line),
+  `d348e040` (market_key) and `4ae71c4a` (player_name). **Not deployed to any
+  service.** A deploy attempt at ~22:5xZ did not fire: the refresh-worker
+  deploy claim is HELD by `live-game-line-projection` and the worker had 7 JOB
+  processes in flight (MLB sim + MLS artifact build). The claim holder has been
+  asked to CARRY `89c3d947` rather than release it.
 - `/api/board/layer2-shortlist` is the WRONG surface for this check — its rows
   carry no `market_key` at all (84/84 absent) and its `line` is the shortlist's
   own field, not the recommendation's display value.

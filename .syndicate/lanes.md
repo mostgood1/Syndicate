@@ -321,6 +321,93 @@
   before it ships, not after.
 
 ### spread-line-sign-convention — OPEN — **ANSWERED: THE FEED IS CORRECT AND THE BOARD'S HOME-SPREAD `line` SIGN IS INVERTED — 16 of 17 book/event pairs across 15 EVENTS violate no-arbitrage. POSSIBLE USER-FACING MISLABEL, NOT A CLV-ONLY BUG** — opened 2026-08-15 — session: lane-cleanup
+- **SAME-BOOK TEST RUN 2026-08-15 23:1xZ on `/api/board/book-grid` (mlb, 33
+  spreads rows, 525 book-cells). THIS IS THE DECISIVE MEASUREMENT and it is
+  UNIFORM, not statistical:**
+
+      1. each book's OWN home/away lines sum to zero    525/525  consistent
+      2. cell's home line vs the ROW's `line`             0/525  agree
+                                                        525/525  OPPOSITE SIGN
+      3. no-arb per book (implied home + implied away)  median 1.0483, none < 1.0
+
+- **`book_prices` IS NOT MIXING BOOKS. Every book agrees with every other book
+  and with itself.** The 2026-08-07 `_complementary` condition (*"books inside a
+  single grid row disagree on the SIGN"*) is real but is **NOT** what is
+  happening on this data. My previous entry blamed book-vs-book mixing; that is
+  now refuted — 100% agreement between books.
+- **THE ACTUAL DEFECT, and it is deterministic:** the ROW's `line` is the
+  NEGATION of the cell's `home.line`, in every single case. So
+  `layer2_board.py:852` building `book_prices = {book: cell["home"]["price"]}`
+  and publishing it beside `row["line"]` pairs **the home team's price with the
+  opposite handicap**. Every home-side spread opening is therefore recorded as
+  `side=home, line=L, price=<home price at -L>`.
+- **THIS PARTIALLY REINSTATES THE FINDING I WITHDREW, with a corrected
+  mechanism.** The 16-of-17 no-arbitrage violations were REAL; my second reading
+  ("confounded by book mixing") was wrong. It is not mixing — it is a uniform
+  row-vs-cell convention mismatch. **Third revision of this attribution; this
+  one is measured on 525 cells with 100% agreement rather than inferred from a
+  neighbouring module's comment.** The sequence, so nobody re-treads it:
+  feed transposes labels (WRONG) -> books disagree so `book_prices` mixes
+  (WRONG) -> row.line is uniformly the negation of the cell's home line (this,
+  measured).
+- **STILL NOT ESTABLISHED — the user-facing question, now sharper.** `row["line"]`
+  being the away handicap may be the board's INTENDED convention, in which case
+  the cards are fine and only the home-side flattening at `:852` is wrong. The
+  test is narrow: **does any template render `row.line` beside a HOME selection?**
+  Read the card template before assigning any user-facing severity.
+- **FIX, now well-specified:** at `layer2_board.py:852`, take the line from the
+  same cell as the price (`cell[side]["line"]`) rather than inheriting
+  `row["line"]` — either by carrying it per book or by negating for the home
+  side. Do NOT "fix" the sign at the CLV end; the pairing is wrong where it is
+  built, and every other consumer of `book_prices` inherits it.
+- **TRACED 2026-08-15 23:0xZ. THE LINE IS SET AT `layer2_board.py:852-858`, AND
+  THE DEFECT IS A DROPPED FIELD, NOT AN INVERTED SIGN.**
+
+      "book_prices": {
+          str(book): cell[side]["price"]        # <- price kept
+          for book, cell in (row.get("cells") or {}).items()
+          ...                                    # <- cell[side]["line"] DROPPED
+      }
+
+  Full chain: fetcher (`fetch_mlb_oddsapi_local.py`, EXONERATED — derives
+  `home_line = -away_line` per lane) -> book grid (`book_grid.py:304`, passes
+  `row.get("line")` through) -> `layer2_board` flattens each cell to a bare
+  price -> `record_openings` stores that flat map -> `clv_join`'s same-book
+  override reads `book_prices[book]` and pairs it with the ROW's line.
+- **THIS REPO ALREADY KNEW, IN A NEIGHBOURING MODULE, AND SAID SO.**
+  `board_cross_book.py` tags each quote with *"the CELL's own line, which is not
+  always the row's line … this is the pairing guard"*, and `_complementary`
+  documents the measured reason (production 2026-08-07, `spreads_alt`, first5):
+
+      betmgm     away -1.5 (+210)   home +1.5 (-295)
+      betrivers  away +1.5 (-240)   home -1.5 (+180)
+
+  **Books inside ONE grid row disagree on the SIGN of the line.** That module
+  refuses such pairings ("*spreads are signed per side*", postmortem §2.6, after
+  a false +250.88% arbitrage). `layer2_board`'s `book_prices` drops the very
+  field that guard depends on — and the comment above it says so deliberately:
+  *"Flat {book: price}, not the whole cell."* The choice was made for artifact
+  size; its cost is that sign information is unrecoverable downstream.
+- **SO MY PREVIOUS CONCLUSION IS WRONG AND I AM WITHDRAWING IT.** I reported "the
+  BOARD's home-spread `line` sign is inverted, 16 of 17 — possible user-facing
+  mislabel". **That test was confounded by exactly this mixing:** it compared
+  `book_prices` across books for one row-level line, and those books were not
+  all quoting the same side. The 16/17 measures **sign disagreement BETWEEN
+  BOOKS**, which is a known and expected market fact — not a board defect.
+  **There is no evidence of a user-facing mislabel. Do not act on that claim.**
+- **What IS established:** `book_prices` silently mixes books quoting opposite
+  sides of a spread, so ANY consumer reading it for a spread selection can get
+  the opposite bet's price. `clv_join`'s same-book override is one such consumer;
+  that is the `-29.90`/`+30.428` mirror pair.
+- **What is NOT established, and needs a same-book test to settle:** whether the
+  ROW's own `line`+`price` (anchor book) are correct. My attempt was confounded —
+  the two openings had DIFFERENT anchor books (onexbet, betopenly), and since
+  books disagree on sign, an anchor-vs-anchor comparison proves nothing. The
+  clean test is one book quoting both lines of one event.
+- **REVISED FIX (do not ship before the same-book test):** carry the cell's line
+  alongside its price — `{book: {"price": …, "line": …}}` — or refuse a same-book
+  join whose book line is unknown. The size objection in that comment is real and
+  should be answered with a line-only companion field, not by dropping the guard.
 - **DISCRIMINATOR RUN 2026-08-15 22:4xZ. It trusts NEITHER label**, which is what
   makes it decisive: for one team, `-1.5` (win by 2+) is strictly harder than
   `+1.5`, so `implied(-1.5) < implied(+1.5)` is a no-arbitrage fact regardless of
@@ -4455,3 +4542,24 @@ live SHA (a deploy reporting `live` is not evidence my commit is in it), then
 re-read the four baseline numbers in `state.md` — `line` numeric 84/101 with 7
 whole-numbered is the one that should move, and `market_key`/`player_name` at
 0/101 should NOT change, because those two fixes have no production incidence.
+
+#### red-intelligence-tests family — PUSHED `89c3d947`, DEPLOY STILL NOT FIRED `[2026-08-15 ~22:5xZ]`
+- **All three fixes are on `origin/main` (`89c3d947`)**, verified by content in
+  origin's tree. Local `main` is 201 behind / 27 ahead, deliberately — the
+  commit was built with `commit-tree -p origin/main`, never a force push, and
+  did NOT sweep the 16 unpushed commits of other sessions.
+- **Only `player_name` + its test were actually missing from origin.** The other
+  three changes were already there by content, carried by another session's
+  push. Ancestry said all nine of my commits were "on origin" and was useless
+  for answering this — see the `learnings.md` entry.
+- **Deploy blocked, twice over, and NOT forced:** claim HELD by
+  `live-game-line-projection` (7.3 min at checkpoint), and 7 JOB processes in
+  flight including an MLB sim and an MLS artifact build.
+- **NEXT ACTION FOR WHOEVER PICKS THIS UP:** do not re-derive any of this. Watch
+  for the claim holder's worker deploy, then (1) confirm `89c3d947` is present
+  on the new live SHA **by patch-id** — a deploy reporting `live` is not evidence
+  my commit rode along, and if they cut from `846bb74e` without cherry-picking
+  it did not; (2) re-read the four numbers in `state.md`'s "Candidate field
+  absence" section. `line` numeric 84/101 with 7 whole-numbered is the ONLY one
+  that should move. `market_key` and `player_name` at 0/101 must NOT change —
+  if they do, something other than this work did it.
