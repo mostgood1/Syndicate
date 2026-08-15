@@ -1598,3 +1598,41 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
   `scripts/backtest_mlb_props.py`.** `lanes_closed.md` has the header and the
   early body but NOT the `#5 RESULT`, `SHIPPED`, or `POST-CLOSE VERIFICATION`
   blocks. Whoever owns the archive pass should reconcile those, not delete them.
+
+#### live-game-line-projection — DROP 1 SHIPPED TO GIT 2026-08-15 as `0e0b0aa1` (NOT DEPLOYED)
+- **Change:** `syndicate/features/mlb/live_lens.py` +57/-0, three hunks, zero
+  deletions. New `_lens_rows_have_live_state_signal` (discriminates on
+  `source == "live_mc"`) plus ONE added disjunct in `should_use_projection_lens`.
+  `tests/test_mlb_live_game_line_lens.py` new, 14 tests.
+- **Why `source`, not `modelHomeWinProb`:** `_build_game_lens` stamps a
+  probability on its `first1/3/5` lanes too (`_live_margin_win_prob` over a
+  segment interpolation), so a probability-presence discriminator is satisfied by
+  a lens the re-sim never touched — and would ship a silent DOWNGRADE when the MC
+  bails, replacing the card lens with an interpolation. Pinned by
+  `test_live_game_keeps_the_card_lens_when_the_resim_bailed`.
+- **MUTATION-PINNED, not merely green.** Neutering the discriminator only where
+  the merge calls it fails **exactly 2** tests (live, final); the other 12 pass,
+  including pregame-unchanged, resim-bailed, and a fixture guard asserting the
+  card lens really does satisfy the old predicate (without which the suite would
+  pin nothing).
+- **Regression: 311 passed** across 10 live-lens-surface files.
+- **TWO PRE-EXISTING FAILURES, NOT MINE — dated, not assumed:**
+  - `test_mlb_refresh_runner::test_live_lens_payload_refreshes_card_before_game_lens`
+    — `TypeError: fake_build_game_lens() got an unexpected keyword argument
+    'live_mc_projection'`. Kwarg landed **2026-08-12** (`2caa8eac`); the test file
+    was last touched **2026-08-01**. Broken 3 days before this session, in the
+    vendored path this change does not touch.
+  - `test_slate_date_timezone_discipline` — flags `artifact_publisher.py`,
+    `artifact_retention.py`, `shadow_candidate_ledger.py` for `date.today()`.
+    **None touched here**; all three carry another session's uncommitted edits.
+    **Whoever owns them should see this.**
+- **DROP 2 RE-SCOPED — my original statement of it was aimed at the WRONG
+  ARTIFACT.** `/mlb/api/live-lens` serves a report **web writes itself**: it reads
+  the worker's keyvalue snapshot and, if it judges it stale, DISCARDS it and
+  rebuilds locally, where the MC is hard-refused by
+  `refuse_if_compute_in_request_path`. Max age **60 s** vs a **60 s** worker tick.
+  Drop 2 is therefore "the fallback recompute must not destroy live-state signal
+  it already holds", not "carry `gameLens` through the slim path". Same shape as
+  `#124`'s `prop_row_counts=[0]*9`. **Not designed, not agreed, not started.**
+- **`0e0b0aa1` is NOT observable in production on its own.** It is a precondition
+  for Drop 2, not a shippable user-visible change. No deploy fired.
