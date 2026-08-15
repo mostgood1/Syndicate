@@ -324,6 +324,72 @@ def test_census_never_runs_on_the_sampler_thread():
             mo._watchdog_maybe_heap_census({"memory_anon_mb": 2242.8})
         assert started.get("started") is True
         assert started.get("daemon") is True
-        assert started.get("target") is mo.log_heap_census
+        # Both censuses, via the one runner -- see `_run_censuses`.
+        assert started.get("target") is mo._run_censuses
     finally:
         mo._WATCHDOG_STATE.pop("heap_censused", None)
+
+
+# --- #435 step five: the UNTRACKED (str/bytes) census -------------------------
+#
+# The tracked census measured 415,596 objects / ~135MB shallow while anon was
+# 1709MB. gc.get_objects() cannot see str/bytes at all -- they hold no
+# references -- so in a JSON pipeline it is blind to the actual bytes.
+
+
+def test_untracked_census_finds_strings_held_off_a_container():
+    holder = {"payloads": ["x" * 1_000_000 for _ in range(40)]}  # ~40MB
+    try:
+        out = mo.log_untracked_bytes_census("unit-test")
+        assert out is not None
+        assert out["str_bytes_total_mb"] >= 35, out["str_bytes_total_mb"]
+        holders = dict((name, mb) for name, mb, _count in out["top_holders_mb"])
+        assert holders.get("list", 0) >= 35, out["top_holders_mb"]
+    finally:
+        del holder
+
+
+def test_untracked_census_deduplicates_shared_strings():
+    # Interned and shared strings are referenced from many places. Counting each
+    # reference would inflate the total past the container size -- which would
+    # look like an answer and be arithmetic.
+    shared = "y" * 2_000_000
+    holder = [shared, shared, shared, shared, shared]  # one object, five refs
+    try:
+        out = mo.log_untracked_bytes_census("unit-test-dedupe")
+        assert out is not None
+        # 5 references to a single ~2MB string must contribute ~2MB, not ~10MB.
+        listed = dict((name, mb) for name, mb, _c in out["top_holders_mb"]).get("list", 0)
+        assert listed < 6, listed
+    finally:
+        del holder, shared
+
+
+def test_untracked_census_reports_what_fraction_of_anon_it_explains():
+    out = mo.log_untracked_bytes_census("unit-test-pct")
+    assert out is not None
+    # Off-cgroup there is no anon to compare against; the key must still exist
+    # rather than being silently dropped, because its ABSENCE is the signal that
+    # the memory is below Python entirely.
+    assert "explained_pct_of_anon" in out
+    assert "anon_mb" in out
+
+
+def test_untracked_census_is_capped_per_process():
+    saved = mo._UNTRACKED_CENSUS_STATE["count"]
+    try:
+        mo._UNTRACKED_CENSUS_STATE["count"] = mo._UNTRACKED_CENSUS_MAX_PER_PROCESS
+        assert mo.log_untracked_bytes_census("unit-test-capped") is None
+    finally:
+        mo._UNTRACKED_CENSUS_STATE["count"] = saved
+
+
+def test_a_failing_tracked_census_does_not_skip_the_untracked_one():
+    # The two answer different halves of one question and the FORK between them
+    # is what the next fix depends on, so the first must not be able to eat the
+    # second.
+    with patch.object(mo, "log_heap_census", side_effect=RuntimeError("boom")), patch.object(
+        mo, "log_untracked_bytes_census"
+    ) as untracked:
+        mo._run_censuses("unit-test")
+    untracked.assert_called_once()

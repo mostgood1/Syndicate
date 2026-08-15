@@ -990,6 +990,102 @@ def _watchdog_dump_allocations_now(payload: dict[str, Any], climb_mb_per_s: floa
         )
 
 
+_UNTRACKED_CENSUS_MAX_PER_PROCESS = 3
+_UNTRACKED_CENSUS_STATE: dict[str, int] = {"count": 0}
+
+
+def log_untracked_bytes_census(reason: str) -> dict[str, Any] | None:
+    """Size the `str`/`bytes` the heap census CANNOT see, attributed to holders.
+
+    `#435`. `log_heap_census` measured 415,596 GC-tracked objects totalling
+    ~135MB shallow while `anon` was 1709MB. That is not a near miss, it is three
+    orders of magnitude, and the reason is structural: `gc.get_objects()` returns
+    only CYCLIC-GC-TRACKED objects, and `str`/`bytes`/`int`/`float` hold no
+    references so they are never tracked. In a JSON pipeline those ARE the bytes.
+
+    So this walks the tracked objects and sizes their `str`/`bytes` REFERENTS --
+    the strings hanging off dicts and lists -- which is where parsed JSON lives.
+
+    DEDUPLICATED BY id(). Interned and shared strings are referenced from many
+    places; counting each reference would inflate the total to something
+    comfortably larger than the container, which would look like an answer and
+    be arithmetic.
+
+    Attribution is by HOLDER TYPE, not by string content, because the actionable
+    question is which structure is holding them. The biggest individual strings
+    are named separately -- one 400MB blob and four million 100-byte quote keys
+    are different bugs with different fixes.
+    """
+    if _UNTRACKED_CENSUS_STATE["count"] >= _UNTRACKED_CENSUS_MAX_PER_PROCESS:
+        return None
+    try:
+        import gc
+
+        _UNTRACKED_CENSUS_STATE["count"] += 1
+        gc.collect()
+        seen: set[int] = set()
+        by_holder: dict[str, list[int]] = {}
+        biggest: list[tuple[int, str, str]] = []
+        total_bytes = 0
+        scanned = 0
+
+        for obj in gc.get_objects():
+            try:
+                holder = type(obj).__name__
+                for ref in gc.get_referents(obj):
+                    if not isinstance(ref, (str, bytes, bytearray)):
+                        continue
+                    ident = id(ref)
+                    if ident in seen:
+                        continue
+                    seen.add(ident)
+                    size = sys.getsizeof(ref)
+                    total_bytes += size
+                    scanned += 1
+                    bucket = by_holder.setdefault(holder, [0, 0])
+                    bucket[0] += size
+                    bucket[1] += 1
+                    # 1MB, not 50MB: at this scale the interesting object is a
+                    # cached payload, not a monolith. Ten of these is a lead.
+                    if size > 1 * _BYTES_PER_MB:
+                        biggest.append((size, holder, repr(ref)[:160]))
+            except Exception:
+                continue
+
+        anon_mb = None
+        stat = _read_container_memory_stat()
+        if stat and "anon" in stat:
+            anon_mb = _bytes_to_mb(stat.get("anon"))
+        total_mb = round(total_bytes / _BYTES_PER_MB, 1)
+        payload = {
+            "reason": str(reason or "")[:80],
+            "census_index": _UNTRACKED_CENSUS_STATE["count"],
+            "anon_mb": anon_mb,
+            "str_bytes_total_mb": total_mb,
+            # THE HEADLINE NUMBER. If this is small, the memory is not in Python
+            # objects at all and the next look is C-level (numpy/pandas buffers,
+            # allocator retention) rather than anywhere in this file.
+            "explained_pct_of_anon": (
+                round(100.0 * total_mb / anon_mb, 1) if anon_mb else None
+            ),
+            "distinct_str_bytes": scanned,
+            "top_holders_mb": sorted(
+                ((name, round(v[0] / _BYTES_PER_MB, 1), v[1]) for name, v in by_holder.items()),
+                key=lambda row: row[1],
+                reverse=True,
+            )[:15],
+            "biggest_individual": [
+                (round(size / _BYTES_PER_MB, 1), holder, text)
+                for size, holder, text in sorted(biggest, reverse=True)[:10]
+            ],
+        }
+        print(f"UNTRACKED_BYTES_CENSUS {json.dumps(payload, default=str)}", flush=True)
+        return payload
+    except Exception as exc:
+        print(f"UNTRACKED_BYTES_CENSUS_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 def watchdog_should_heap_census(*, anon_mb: float | None, already_censused: bool) -> bool:
     """Fire ONE heap census once the process is holding the memory in question.
 
@@ -1010,6 +1106,25 @@ def watchdog_should_heap_census(*, anon_mb: float | None, already_censused: bool
     return float(anon_mb) >= _env_float("SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB", 1500.0)
 
 
+def _run_censuses(reason: str) -> None:
+    """Both censuses, in order, on one thread. Neither may stop the other.
+
+    The tracked census answers "is it Python containers" (measured: no, 135MB of
+    415k objects against 1709MB anon) and the untracked one answers "is it the
+    strings hanging off them". Run together they either account for the anon or
+    prove it is below Python entirely -- and that is the fork the next fix
+    depends on, so a failure in the first must not skip the second.
+    """
+    try:
+        log_heap_census(reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[memory_observability] HEAP_CENSUS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+    try:
+        log_untracked_bytes_census(reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[memory_observability] UNTRACKED_CENSUS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
 def _watchdog_maybe_heap_census(payload: dict[str, Any]) -> None:
     """Census the heap once we are holding the memory we are trying to explain."""
     try:
@@ -1027,7 +1142,7 @@ def _watchdog_maybe_heap_census(payload: dict[str, Any]) -> None:
         import threading
 
         threading.Thread(
-            target=log_heap_census,
+            target=_run_censuses,
             args=(f"watchdog_anon_{int(float(anon_mb))}mb",),
             name="memory-watchdog-census",
             daemon=True,
