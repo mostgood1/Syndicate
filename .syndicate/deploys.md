@@ -2833,3 +2833,48 @@ live application data, ~22M small objects.
 place to look; the 400B/614k class looks like row objects built beside it. The
 question is finally the ordinary one -- which structure holds 13.7M small
 objects, and does it need to.
+
+### `#435` ROOT CAUSE, 2026-08-15 15:4xZ — the quote shard is append-only and 92% superseded
+
+**MECHANISM, end to end:**
+
+1. `data/<sport>_source/tracking/book_quotes/<date>.jsonl` is APPEND-ONLY. Every
+   refresh appends a row per quote observation (17 fields, carries `snapshot_ts`).
+2. It therefore grows all day. Measured from production `CACHE_EVICT` records,
+   MLB on 2026-08-14: **89.9 -> 97.8 -> 108.8 -> 121.5 -> 133.2 -> 150.3 ->
+   165.2 -> 174.5 -> 184.5 MB**, then resets to 2.2MB at the date rollover and
+   climbs again (2.2 -> 4.2 -> 5.0 -> 7.6 -> 8.8 ...).
+3. A read costs 6.3x file bytes resident (the module's own measured constant).
+   At 184.5MB that is **1,162 MB for ONE cached entry**, against a 500MB budget.
+4. `_evict_book_quotes_over_budget` is `while len(cache) > 1 and ...` -- **a
+   single oversized entry can never be evicted.** When it is not alone it gets
+   evicted and re-read, re-allocating ~1.1GB of small objects each time.
+
+**THIS IS THE 22.3M OBJECTS.** 478,782 rows x 17 fields is exactly the measured
+census: 614k 400-byte dicts and 13.7M 64-byte values.
+
+**IT EXPLAINS THE TIME PATTERN, which nothing else did.** Kills clustered in the
+evening (shard at maximum) and **stopped at 05:02:59Z** -- the date rolled over
+and the shard reset to 2.2MB. Not a leak; a daily ramp.
+
+**THE GUARD'S PREMISE IS STALE.** The sizing comment says "production's MLB shard
+is ~90MB, so ONE cached copy is ~570MB". It reached **184.5MB / 1,162MB** on
+2026-08-14 -- 2.05x the number the budget was reasoned from.
+
+**HOW MUCH OF IT IS NEEDED (measured, 2026-08-09 shard, 207.4MB):**
+
+    rows        478,782
+    distinct     36,424   (latest per event/book/market/selection/line/player/segment)
+    superseded  442,358 = **92.4% of the file**
+    shrink        13.1x
+
+**FIX, and the trap in it:** the lookup path (`quote_ref_for_bet`, which the
+module says walks ~122k rows per candidate) needs LATEST-PER-KEY -- 36k rows,
+~89MB resident instead of ~1.16GB. But **do not compact the file**: opening
+prices and line movement are exactly the superseded rows, and
+`clv-without-settlement` depends on them. The fix is a latest-per-key INDEX for
+the lookup path, leaving history intact for the CLV/movement consumers that read
+it differently.
+
+Secondary, cheap, independent: let the evictor drop the last entry, so one
+oversized shard cannot sit above budget indefinitely.
