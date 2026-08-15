@@ -2018,3 +2018,41 @@ network or mirror reads — one fails `4.5 != '4.5'` (a float/str coercion drift
 the other `False is not true`. Neither is data-dependent and neither is network-
 dependent. The blotter failure asserts a literal `<th>Odds</th><th>Projected</th><th>Live</th>`
 against a template that is now JS-rendered from `initial-intelligence-response`.
+
+## Closed 2026-08-15 — `UniversalCandidate.to_dict` flattened `line` to a float for nine days (`#436`)
+
+**Status: fixed and committed `1322d0a8`, local only. NOT DEPLOYED.** Opened and
+closed the same day from two red tests in `tests/test_intelligence.py` reported
+by the user, not from a planned item.
+
+**The real one.** `to_dict` writes the contract's normalised values back onto the
+candidate payload. `1f47b2d6` (2026-07-28, "Fix candidate field corruption")
+caught `odds` flattening the display text `"+124"` to `124.0` on every candidate
+and gave it a condition, with eleven lines explaining the rule. `1f6c27b9`
+(2026-08-06) then added `line` to the `for field_name in (...)` loop **twelve
+lines below that comment** — the loop writes unconditionally, so `"4.5"` became
+`4.5` platform-wide. Before `1f6c27b9`, `to_dict` never wrote `line` at all.
+
+**The user-visible cost, which the failing test did not name.** The intelligence
+board's `displayLine()` does a bare `String(line)`, so a JSON `2.0` renders as
+`2`. Every whole-numbered line lost its decimal for nine days.
+
+**Fix:** `line` leaves the loop and is written only when the slot holds no
+parseable number (`_parse_float(payload.get("line")) is None`). `self.line` and
+`sport_context["line"]` stay floats, so the CLV join `1f6c27b9` built is intact.
+
+**The other red test was stale, and was verified so before being touched.**
+`#240`/`#243` moved the blotter headers into the sortable `BLOTTER_COLUMNS`
+array; all three columns and cells are present. The assertion now pins each
+column's definition and its rendered cell, mutation-checked.
+
+**Left open, NOT mine:** `test_intelligence.py::...resolves_typo_subject_and_
+three_point_market` fails on `market_key != "threes"`. Exonerated by re-running
+it with HEAD's unconditional line-write monkeypatched back on top — fails
+identically, patched branch confirmed taken 875/875 times. **A third
+pre-existing red, unowned.**
+
+**Operational note promoted to `learnings.md` (`948e91ef`):** a field added to an
+unconditional write-back loop silently loses the condition its neighbours were
+given, and the comment explaining the rule is attached to the field that
+escaped the loop, not to the loop.
