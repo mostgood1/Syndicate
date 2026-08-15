@@ -38,19 +38,39 @@ anyone told otherwise will be surprised. Fix opportunity first because it sits
 upstream of every market, then re-measure; per-market calibration will still be
 needed.
 
-**THE DE-BIASED COLUMN IS IN-SAMPLE. `D4`, 2026-08-15.** `mean_bias` is
-estimated from the same 2,487 player-games it is then used to correct, and the
-constant baseline is the mean of the same actuals it is scored against. So
-"remove the mean error and 5 of 7 beat the baseline" is a statement about a FIT,
-not a prediction, and it is optimistic by an unmeasured amount. This is the same
-shape as the soccer leakage that retired `*_backtest_*.csv` (`D1`) -- milder,
-because both sides of the comparison leak equally, but the direction is the same.
-`corr` is unaffected (nothing is fitted to produce it) and the BIASED-NOT-BLIND
-headline does not rest on the de-biasing; the size of the improvement does.
-`scripts/backtest_mlb_props.py` now always computes an out-of-sample split (bias
-fit on the earlier dates, scored on the later ones) and reports it beside the
-in-sample number. **It has not been re-run against production yet, so no
-out-of-sample figure exists and every number below is still the in-sample one.**
+**THE SPLIT HAS NOW RUN. `D4` CLOSED 2026-08-15.** The de-biased column above
+is IN-SAMPLE -- `mean_bias` was estimated from the same 2,487 player-games it
+corrects -- so it was a statement about a fit. `scripts/backtest_mlb_props.py`
+now fits the correction on **2026-08-01..08-06** (n=1,246) and scores it on
+**08-07..08-13** (n=1,241), and each market carries the result as
+`oos_debiased_beats_baseline`.
+
+**"Remove the mean error and 5 of 7 beat the baseline" becomes 5 of 7 out of
+sample -- but it is not the same five.** Exactly one verdict flips, and it is
+the market quoted first above:
+
+    market   in-sample margin   out-of-sample margin
+    hits           +0.0007            **-0.0081**      <- flips, does NOT survive
+    tb             +0.0256              +0.0313
+    rbi            +0.0210              +0.0285
+    runs           +0.0243              +0.0289
+    2b             +0.0009              +0.0044
+    3b             -0.0014              -0.0010
+    sb             +0.0047              +0.0040
+
+`hits` never was a result: **+0.0007 is smaller than the 4-dp rounding of the
+table above it.** Out of sample the de-biasing does not rescue it.
+
+**The leakage was NOT inflating everything, which is worth knowing before
+assuming the same of other backtests here.** Four markets IMPROVE out of sample.
+It manufactured a win in the one market whose margin was already
+indistinguishable from zero, and left the rest roughly where they were.
+
+**The BIASED-NOT-BLIND headline survives.** Correlations fall consistently and
+stay positive (hits .1607->.1487, tb .1523->.1262, rbi .1316->.1156, runs
+.1620->.1520, sb .1605->.1322): the ranking signal is real and somewhat weaker
+than the full-window figures suggest. The two stacked causes below are unchanged
+-- they were never derived from the de-biasing.
 
 SCOPE AND LIMITS, so this block is not read as more than it is:
   * 2,487 player-games over 14 dates (2026-08-01..2026-08-14), one season, one
@@ -74,10 +94,14 @@ from typing import Any
 SAMPLE_PLAYER_GAMES = 2487
 SAMPLE_DATES = "2026-08-01..2026-08-14"
 
-# `in_sample` until `scripts/backtest_mlb_props.py` is re-run against production
-# and the out-of-sample figures replace the ones below. Flipping this string is
-# not the fix -- producing the number is.
-DEBIAS_VALIDATION = "in_sample"
+# MEASURED 2026-08-15. The de-bias correction is now fitted on 2026-08-01..08-06
+# and scored on 08-07..08-13, so `oos_debiased_beats_baseline` below is a
+# prediction rather than a fit. The descriptive figures (`correlation`,
+# `mean_bias`, `inflation_pct`, the MAEs) remain full-window -- nothing is
+# fitted to produce them.
+DEBIAS_VALIDATION = "out_of_sample"
+OOS_FIT_DATES = "2026-08-01..2026-08-06"
+OOS_SCORE_DATES = "2026-08-07..2026-08-13"
 
 # Keyed by the market as it appears on board rows. `batter_home_runs` and
 # `batter_hits_runs_rbis` are deliberately absent -- not measured, so they stay
@@ -86,36 +110,45 @@ _MARKET_SKILL: dict[str, dict[str, Any]] = {
     "batter_hits": {
         "correlation": 0.1607, "mae_model": 0.7321, "mae_constant_baseline": 0.6978,
         "mae_debiased": 0.6971, "mean_bias": 0.2371, "inflation_pct": 28.6,
-        "verdict": "biased high ~29%; real ranking signal, loses to the mean until de-biased",
+        "oos_debiased_beats_baseline": False, "oos_margin": -0.0081, "oos_correlation": 0.1487,
+        "verdict": ("biased high ~29%; real ranking signal (r=0.15 out of sample), but "
+                    "de-biasing does NOT rescue it -- it still loses to the mean on dates "
+                    "it was not fitted on"),
     },
     "batter_total_bases": {
         "correlation": 0.1523, "mae_model": 1.3652, "mae_constant_baseline": 1.3167,
         "mae_debiased": 1.2911, "mean_bias": 0.2391, "inflation_pct": 17.7,
+        "oos_debiased_beats_baseline": True, "oos_margin": 0.0313, "oos_correlation": 0.1262,
         "verdict": "biased high ~18%; real ranking signal, loses to the mean until de-biased",
     },
     "batter_rbis": {
         "correlation": 0.1316, "mae_model": 0.6394, "mae_constant_baseline": 0.6040,
         "mae_debiased": 0.5830, "mean_bias": 0.1283, "inflation_pct": 30.5,
+        "oos_debiased_beats_baseline": True, "oos_margin": 0.0285, "oos_correlation": 0.1156,
         "verdict": "biased high ~31%; real ranking signal, loses to the mean until de-biased",
     },
     "batter_runs_scored": {
         "correlation": 0.1620, "mae_model": 0.5799, "mae_constant_baseline": 0.5698,
         "mae_debiased": 0.5455, "mean_bias": 0.1148, "inflation_pct": 25.9,
+        "oos_debiased_beats_baseline": True, "oos_margin": 0.0289, "oos_correlation": 0.152,
         "verdict": "biased high ~26%; real ranking signal, loses to the mean until de-biased",
     },
     "batter_doubles": {
         "correlation": 0.0278, "mae_model": 0.2793, "mae_constant_baseline": 0.2468,
         "mae_debiased": 0.2459, "mean_bias": 0.0463, "inflation_pct": 32.5,
+        "oos_debiased_beats_baseline": True, "oos_margin": 0.0044, "oos_correlation": 0.0247,
         "verdict": "almost no signal (r=0.03) and biased high ~33%",
     },
     "batter_triples": {
         "correlation": 0.0179, "mae_model": 0.0303, "mae_constant_baseline": 0.0254,
         "mae_debiased": 0.0268, "mean_bias": 0.0052, "inflation_pct": 40.1,
+        "oos_debiased_beats_baseline": False, "oos_margin": -0.001, "oos_correlation": 0.0265,
         "verdict": "no measured skill (r=0.02); loses to the mean even de-biased",
     },
     "batter_stolen_bases": {
         "correlation": 0.1605, "mae_model": 0.1151, "mae_constant_baseline": 0.1336,
         "mae_debiased": 0.1289, "mean_bias": -0.0159, "inflation_pct": -22.2,
+        "oos_debiased_beats_baseline": True, "oos_margin": 0.004, "oos_correlation": 0.1322,
         "verdict": "the only market that beats the mean as-published; biased LOW ~22%",
     },
 }

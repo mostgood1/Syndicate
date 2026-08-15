@@ -423,12 +423,28 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   different producer's. `[measured 08-15]`
 - **`/preflight` now prints the deployed commit of ALL THREE services** (D5),
   degrading a per-service read failure to that row rather than to the gate.
-- **MLB prop skill numbers are IN-SAMPLE and now say so** (`debias_validation`).
-  The bias was fit and scored on the same 2,487 player-games. The out-of-sample
-  split is written into `scripts/backtest_mlb_props.py` but **HAS NEVER RUN** —
-  the 08-01..08-14 window is absent from the checkout (864 `daily_summary`
-  files, all 05-28..07-12). **Until it runs, the published improvement is a fit,
-  not a prediction.**
+- **MLB prop skill numbers are now OUT-OF-SAMPLE. `D4` CLOSED `[measured 08-15]`.**
+  Fitted on 2026-08-01..08-06 (n=1,246), scored on 08-07..08-13 (n=1,241), from
+  production artifacts via `/api/ops/artifacts/stream` — **the checkout cannot
+  do this** (864 `daily_summary` files, all 05-28..07-12, zero in August).
+  Harness validated first: every in-sample figure reproduces the published table
+  exactly, so the split reads the same data the module was built from.
+  - **6 of 7 in-sample becomes 5 of 7 out of sample, and EXACTLY ONE verdict
+    flips — `batter_hits`, the market the module quotes first.** In-sample
+    margin **+0.0007**, which is smaller than the 4-dp rounding of its own
+    published table; out of sample it LOSES by 0.0081. It never was a result.
+  - **The leakage was NOT inflating everything** — four markets IMPROVE out of
+    sample (`tb` +0.0256→+0.0313, `rbi` +0.0210→+0.0285, `r` +0.0243→+0.0289,
+    `2b` +0.0009→+0.0044). It manufactured a win only where the margin was
+    already indistinguishable from zero. **Do not assume the same shape of every
+    other backtest here; measure it.**
+  - **The BIASED-NOT-BLIND headline SURVIVES.** Correlations fall consistently
+    and stay positive (hits .1607→.1487, tb .1523→.1262, rbi .1316→.1156, r
+    .1620→.1520, sb .1605→.1322).
+  - Each market carries `oos_debiased_beats_baseline` / `oos_margin` /
+    `oos_correlation`; the served row's `debias_validation` is `out_of_sample`.
+  - `hrr` is still a degenerate constant 0.0 in this window, so its absence from
+    `_MARKET_SKILL` remains correct and `unmeasured` remains the truth.
 
 ---
 
