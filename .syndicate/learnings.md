@@ -7,14 +7,14 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 128 rules `[generated]`
+## Index — 137 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
 > are append-only and are never touched. **FORBIDDEN** = never do this
 > again. **EXONERATED** = ruled out, stop re-investigating.
 
-**FORBIDDEN — 11**
+**FORBIDDEN — 13**
 
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, and I had this rule already](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the measuring](#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring)
@@ -27,6 +27,8 @@
 - [2026-08-15 — FORBIDDEN: never judge a pinned deploy by ANCESTRY alone. Patch-id is the test.](#2026-08-15-forbidden-never-judge-a-pinned-deploy-by-ancestry-alone-patch-id-is-the-test)
 - [2026-08-15 — FORBIDDEN: never wake many idle sessions at once. It stalls them.](#2026-08-15-forbidden-never-wake-many-idle-sessions-at-once-it-stalls-them)
 - [2026-08-15 — FORBIDDEN: never gate a DEPLOY with a cross-session message. It always arrives late.](#2026-08-15-forbidden-never-gate-a-deploy-with-a-cross-session-message-it-always-arrives-late)
+- [2026-08-15 — FORBIDDEN: never deploy a fix without first reading WHICH SERVICE runs the code it changes. The env decides, not the repo.](#2026-08-15-forbidden-never-deploy-a-fix-without-first-reading-which-service-runs-the-code-it-changes-the-env-decides-not-the-repo)
+- [2026-08-15 — FORBIDDEN: a scratch index seeded with `git read-tree HEAD` snapshots the WHOLE TREE, and `git diff --cached --numstat` cannot see it go stale](#2026-08-15-forbidden-a-scratch-index-seeded-with-git-read-tree-head-snapshots-the-whole-tree-and-git-diff---cached---numstat-cannot-see-it-go-stale)
 
 **EXONERATED — 3**
 
@@ -34,7 +36,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 114**
+**Rules and corrections — 121**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -150,6 +152,13 @@
 - [2026-08-15 — AN OCCURRENCE COUNT IS NOT A ROW COUNT, and I published three numbers that could be read as either](#2026-08-15-an-occurrence-count-is-not-a-row-count-and-i-published-three-numbers-that-could-be-read-as-either)
 - [2026-08-15 — A PINNED-DEPLOY SERVICE SILENTLY REVERTS PEERS. VERIFY YOUR COMMIT AFTER IT GOES LIVE.](#2026-08-15-a-pinned-deploy-service-silently-reverts-peers-verify-your-commit-after-it-goes-live)
 - [2026-08-15 — Render's git mirror is PER SERVICE and only refreshes at build time](#2026-08-15-renders-git-mirror-is-per-service-and-only-refreshes-at-build-time)
+- [2026-08-15 - `wait_for_selector` PROVES ATTACHMENT, NOT COMPLETION, AND I HAD ALREADY "FIXED" THIS ONCE](#2026-08-15---wait_for_selector-proves-attachment-not-completion-and-i-had-already-fixed-this-once)
+- [2026-08-15 — TWO READS INSIDE ONE WARM-UP WINDOW ARE ONE READ. I declared a working fix dead](#2026-08-15-two-reads-inside-one-warm-up-window-are-one-read-i-declared-a-working-fix-dead)
+- [2026-08-15 - A UNIT CHANGE CANNOT FIX A FIT WHEN THE UNITS ARE PROPORTIONAL, AND I ALMOST BUILT IT ANYWAY](#2026-08-15---a-unit-change-cannot-fix-a-fit-when-the-units-are-proportional-and-i-almost-built-it-anyway)
+- [2026-08-15 — A TIMESTAMP WHERE A SIGNAL STOPS IS NOT WHERE THE FAULT IS](#2026-08-15-a-timestamp-where-a-signal-stops-is-not-where-the-fault-is)
+- [2026-08-15 — A HARDCODED ABSOLUTE `startTime` IS A FUTURE TIMESTAMP FOR PART OF A WATCHER'S LIFE](#2026-08-15-a-hardcoded-absolute-starttime-is-a-future-timestamp-for-part-of-a-watchers-life)
+- [2026-08-15 — check whether the instrument is already firing BEFORE building a way to make it fire](#2026-08-15-check-whether-the-instrument-is-already-firing-before-building-a-way-to-make-it-fire)
+- [2026-08-15 — MY OWN WATCHERS FAILED THREE TIMES IN ONE EVENING. Hand-run the gate before trusting a poller.](#2026-08-15-my-own-watchers-failed-three-times-in-one-evening-hand-run-the-gate-before-trusting-a-poller)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -2633,3 +2642,58 @@ leaves every other session's staged work intact.
 - **Cost:** none, because the check came first. It would have been one
   unnecessary deploy to a worker whose deploys kill in-flight sims, plus a
   measurement window spent proving something already proven.
+
+### 2026-08-15 — MY OWN WATCHERS FAILED THREE TIMES IN ONE EVENING. Hand-run the gate before trusting a poller.
+
+- What we believed: automating "wait for a lull, then fire" is strictly better
+  than doing it by hand, because the lull is 60-90s and easy to miss.
+- What was actually true: three consecutive automated watchers failed, each
+  differently. (1) An unhandled `HTTPError` on the deploy POST killed the
+  process, discarding a lull it had waited 8 minutes to find. (2) The rewrite
+  timed out after 55 minutes without ever firing. (3) The third sat in "waiting
+  for lull" while `deploy_preflight.py`, run by hand in the same seconds,
+  returned **CLEAR** — it was blind to an open window. Firing the two steps
+  manually took 11 minutes and worked first time.
+- How we found out: ran the gate by hand instead of believing the watcher's
+  silence, and the two answers disagreed.
+- The rule going forward: **a watcher's silence is not evidence the condition is
+  absent — it is evidence about the watcher.** Before waiting on any poller,
+  run the same check by hand once and confirm the two agree. If a window is
+  confirmed open and the automation has not fired, stop the automation and act
+  manually. This is the same shape as the standing rule about absent log lines,
+  and it cost roughly 90 minutes of a production regression staying live.
+- Cost: the prop `0.5` fix sat reverted on refresh-worker for ~45 extra minutes
+  while a poller waited for a lull that was already there.
+
+### 2026-08-15 — THE CONFIDENCE INTERVAL BELONGS TO THE ESTIMATE, NOT TO THE THRESHOLD. My own test asserted otherwise and failed
+
+Building Drop 3's precision gate, I wrote a test that varied the MODEL
+probability while holding the edge fixed, and asserted a constant "bar". It
+failed, and it was right to.
+
+`sqrt(p(1-p)/n)` is widest at p=0.5 and narrows toward the tails. At n=120 the
+2-sigma bar is **9.13 pp at p=0.5** and **5.48 pp at p=0.90**. So a 7-point edge
+is REFUSED on a coin-flip game and PUBLISHED on a lopsided one — from the same
+sim count, the same gate, the same code. That looks inconsistent and is correct:
+the interval is a property of the estimate being published, so moving `p` moves
+the bar underneath any assertion that treats it as a constant.
+
+**The test was wrong in the informative direction.** It encoded "a threshold is
+a number" when the threshold is a function of the thing being tested. Had I
+"fixed" it by pinning the SE at 0.5, the gate would have published tail edges it
+should refuse and refused centre edges it should allow — and every unit test
+would have been green.
+
+**How to apply.**
+- When a gate compares a quantity to its own uncertainty, **hold the quantity
+  fixed and vary the other side.** I now vary the MARKET price with the model
+  pinned; that makes "the bar" meaningful.
+- **A surprising test failure in a statistical gate is evidence about the
+  statistics before it is evidence about the test.** Ask what the estimator's
+  variance actually depends on before touching the assertion.
+- Pin the counter-intuitive behaviour explicitly so a future reader does not
+  "fix" it: `test_the_bar_moves_with_the_model_probability` asserts the p=0.5
+  refusal and the p=0.90 publication side by side, with the two bars named.
+- **State it in the module docstring too.** A reader comparing two live rows
+  will see a 7-point edge published on one game and withheld on another and
+  reasonably suspect a bug; the docstring is where that stops being a ticket.
