@@ -4516,3 +4516,57 @@ decision working at 120 sims.
 **The prop family's `rows_live_edged: 0` beside it is the control** — a different
 join, a different lane, and it must NOT move as a result of this deploy. If it
 does, this change touched something it should not have.
+
+## 2026-08-15 23:02:14Z — refresh-worker `1f36d718` — DROP 3 RESULT: the join works, and it named TWO defects I did not predict
+
+**Deploy:** `dep-da0esf9t0dsc739ide90`, live 23:01:29Z, cut from `b0ab37a1`
+(which had moved from `6f512ffa` while the gate held — cutting inside the fire
+loop is what stopped this being a rollback). **Zero jobs killed**: gate polled to
+two consecutive CLEARs at 22:54:40 and 22:54:46.
+
+### THE MEASUREMENT `[post-deploy artifact, generated_at 23:02:14Z]`
+
+    rows_live_gameline_considered   36     (baseline predicted ~32; slate grew)
+    rows_live_gameline_projected    12
+    rows_live_gameline_priceable     0
+    rows_live_gameline_edged         0
+    rows_live_gameline_withheld     36
+    withheld_by_reason  sim_count_unusable          12
+                        no_live_gameline_projection 24
+    index_size                       3
+
+**PREDICATE MET.** It was `considered > 0` with every withheld row naming a
+reason: 36 considered, 12 + 24 = 36 attributed, none silent. The join runs on the
+worker, sees the live h2h rows, and refuses by name.
+
+**MY PREDICTION OF *WHICH* REASON WAS WRONG, and that is the finding.** I
+expected refusals under `prob_interval_swamps_edge` — the 120-sim precision gate.
+**Zero rows reached it.** All 12 projected rows died one step earlier.
+
+### TWO UPSTREAM DEFECTS, both measured, neither in Drop 3
+
+1. **`simsRun` IS NEVER STAMPED ON THE LENS — the key is ABSENT, not null.**
+   Served lens row keys: `actualSegment, baselineHomeWinProb, closed, key, label,
+   markets, modelHomeWinProb, progress, projection, source`. **No `simsRun`.**
+   `_live_mc_projection` RETURNS `simsRun`, and `_build_game_lens` does not copy
+   it through. So `prob_std_err` returns None and every projected row is refused
+   `sim_count_unusable`. **The precision gate is unreachable, so the recorded
+   "publish, refuse to price" decision is not being exercised at all** — the
+   rows are refused for a plumbing gap that merely looks like the decision.
+2. **Only 3 of 9 live games carry a `live_mc` lens.** 6 `live_mc` lanes ÷ 2 lanes
+   per game = 3 games = `index_size: 3`, and the other 6 games' rows are the 24
+   `no_live_gameline_projection`. The re-sim is covering a THIRD of the live
+   slate, which the earlier `live_mc: 6` reading looked healthy against because
+   nobody divided by the number of live games.
+
+### CONTROL HELD
+`live_projections` (the prop family) is unchanged and still
+`rows_live_edged: 0` — a different join in a different lane, unmoved by this
+deploy, as required.
+
+### WHAT THIS BUYS
+`0 edges` went from one mysterious number to **two named, distinct, separately
+fixable causes with counts**. Fixing (1) is a one-field copy in
+`_build_game_lens`; fixing (2) is a coverage question about why the re-sim
+reaches 3 of 9 games. **Neither is a Drop 3 change**, and neither was visible
+before this deploy.
