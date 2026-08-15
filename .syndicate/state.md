@@ -187,16 +187,38 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **`git push` from this checkout is not scoped to your own commits.** Read
   `git log origin/main..HEAD` first. `[from-git 08-13]`
 
-**WEB DEPLOYS ARE NOT SERIALISED AND PEERS CANCEL EACH OTHER
-`[measured 08-15 19:1x-20:2xZ]`.** Web took **five deploys in twenty-one
-minutes from four sessions**; the 19:20 deploy **cancelled the 19:15 one
-mid-build** and its owner was not told by anything. **A cross-session message
-cannot gate this** — it waits for the target's turn to end while a deploy takes
-seconds; every hold sent arrived after the deploy it was meant to stop.
-**Consequence for anyone deploying: after your deploy reports `live`, re-read
-the live SHA and confirm YOUR commit is present BY PATCH-ID.** `3ba1c2cf`
-(ask K6) was cancelled at 19:20 and was still absent from live at 20:22.
-Ready and unfired: `deploy/ask-k6-2026-08-15` (`3d68dfe4`).
+**DEPLOYS ARE NOT SERIALISED, AND PEERS BOTH CANCEL AND REVERT EACH OTHER
+`[measured 08-15 19:1x-21:4xZ]`.** Two distinct failures, both measured:
+- **CANCEL (web):** five deploys in twenty-one minutes from four sessions; the
+  19:20 one cancelled the 19:15 one mid-build and its owner was never told.
+- **SILENT REVERT (refresh-worker):** the prop `0.5` fix went live at 21:36:59Z
+  as `0fa44322`, verified additive and content-checked. **By 21:45:20Z the
+  service was `846bb74e`, which does NOT have `0fa44322` as an ancestor**, and
+  the deployed prop scripts were back to 7 and 8 reachable `or 0.5` sites. A
+  peer had cut from an earlier live SHA. Two "successful" deploys, one silently
+  undone, no warning anywhere.
+**A cross-session message cannot gate this** — it waits for the target's turn
+while a deploy takes seconds. **So: after your deploy reports `live`, re-verify
+BY CONTENT some minutes later, not at the moment it lands.** On a pinned-deploy
+service "live" is a lease, not a fact. The durable fix is one deployer per
+service, or trains — not per-lane deploys.
+
+**ROUTE ONE — how to deploy a commit Render says does not exist.**
+`POST /deploys` 404s with `"service <id> does not have a commit <sha>"` for any
+commit pushed AFTER that service's last deploy: **Render's git mirror is PER
+SERVICE and only refreshes at build time.** Persistent, not transient (3
+attempts). Fix: deploy the service's OWN current live commit (a no-op in code)
+to force a fetch, then deploy the target. Measured on refresh-worker: the sha
+that had 404'd three times fired **41s** after the warm deploy landed. Two
+restarts, so take both inside detected lulls.
+
+**`main` IS NOT A SUPERSET OF THE WORKERS — do not "just deploy main".**
+`memory_observability.py` is **0 insertions / 366 DELETIONS** from
+refresh-worker's live `dca39fad` to `origin/main`. Building on main would strip
+`#435` instrumentation off production. Whether main's smaller file is the
+INTENDED state is an open question with the memory lane; merging the worker
+lineage into main conflicts in **30 hunks across 6 files** of two other lanes'
+live code.
 
 **Repo state `[measured 08-15 20:3xZ]`:** the shared tree is **13 AHEAD / 151
 BEHIND** `origin/main`. Being behind is a read-your-own-staleness problem; being
@@ -980,14 +1002,17 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   1. `mlb/live_lens.py:1094` — the merge rejected the MC lens for exactly the live
      games (the card's text-derived lens already satisfies
      `_lens_rows_have_projection_signal`); same shape as the prop sever at :1109,
-     fifteen lines earlier. **FIXED as `0e0b0aa1`. BOTH DROPS ARE NOW DEPLOYED
-     ON BOTH SERVICES — live-odds-worker `191a001b`, web `f475c775`,
-     content-checked — AND `live_mc` IS STILL 0.** `[measured 08-15 20:56 and
-     ~21:04Z]` Two passes on `/mlb/api/live-lens` against a baseline taken twice
-     (20:0x and re-based ~20:5x), all four reads `rows=60 live_mc=0 carried=0`;
-     the slate moved between passes (live 4→3, final 1→2), so they are
-     independent. **The deploy landed and the number did not move. The severed
-     link is NOT (or not only) the merge condition.**
+     fifteen lines earlier. **FIXED as `0e0b0aa1`. BOTH DROPS DEPLOYED AND
+     WORKING — `live_mc` 0 → 6, CONFIRMED END TO END.** `[measured 08-15 21:49Z]`
+     The worker's own per-tick tally reads
+     `liveMcSources = {live_mc: 6, segment_projection: 52, unknown: 8}` and web
+     SERVES `rows=66 live_mc=6`. **Six and six — the producer's count and the
+     served count match**, which is what makes it end-to-end.
+     **RETRACTED: my earlier "both drops live and `live_mc` still 0, a clean
+     negative" was PREMATURE.** Those passes ran 3 and 8 minutes after the worker
+     restarted at 20:56:07Z, inside the live-lens loop's warm-up. **Two reads
+     inside one warm-up window are ONE read** — the slate moving between them
+     made them independent of each other, not independent of the transient.
   2. **`/mlb/api/live-lens` serves a report WEB WRITES ITSELF.** It reads the
      worker's keyvalue snapshot and, when it judges it stale, DISCARDS it and
      rebuilds locally with the MC hard-refused by

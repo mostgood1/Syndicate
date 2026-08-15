@@ -164,6 +164,110 @@
   sits on ±4900 any more.
 
 
+### closing-stamp-is-detection-time — OPEN — **HYPOTHESIS SUPERSEDED BY A WORSE DEFECT: `observed_transition` IS SIDE-BLIND. `closing_price` IS ALWAYS THE HOME PRICE (18/18), SO EVERY AWAY-SIDE OPENING IS PAIRED WITH THE WRONG SIDE'S CLOSE** — opened 2026-08-15 — session: lane-cleanup
+- **DISCRIMINATOR RUN 2026-08-15 22:0xZ on the `-186 -> +168` row. RESULT: NEITHER
+  ORIGINAL BRANCH. The price is not stale and the clock is not the main problem —
+  IT IS THE WRONG SIDE'S PRICE.**
+  - Event `dbbb481a…` = **New York Yankees @ Toronto Blue Jays**, first pitch
+    19:08Z. FanDuel h2h `history_first` 06:02:51Z carries
+    `line={away_odds: -186, home_odds: +156}` — our opening of `-186` is the
+    AWAY side, correctly recorded.
+  - The stamped close is `closing_price = 168.0`. In that market's own history
+    the scalar `odds`/`line` field tracks **`entity`**, and `entity` is
+    **`Toronto Blue Jays` — the HOME team**. `+168` is a HOME price (betrivers
+    independently shows home `+165` at the same 20:34 tick).
+  - **So the joiner differenced an AWAY opening against a HOME close.** That is
+    the entire `-27.72`. It is not CLV, not a stale price, and not a late clock.
+  - **Measured across every stamped market, not just this one: `entity ==
+    home_team` on 18 of 18.** So `closing_price` is ALWAYS the home price.
+- **THE DEFECT, in code:** `resolve_close` path 1 takes
+  `market_state.get("closing_price")` as a **side-blind scalar**. Path 2
+  (`last_pregame_quote`) reads the `line` dict and picks `away_odds`/`home_odds`
+  by side — which is exactly why the 100%/100% split fell where it did. The file's
+  own docstring already knew: *"Game keys carry NO side — `entity` names one team
+  … the history point's `line` dict carries BOTH."* Path 2 acts on that; path 1
+  does not.
+  - Consequence: **home-side openings get a CORRECT close; away-side openings get
+    a garbage one.** Whether a given row is wrong depends only on its side, which
+    is why the contaminated bucket had no consistent sign.
+  - `totals` markets carry `home_odds/away_odds = None` entirely (6 of the 18),
+    so over/under has no side resolution on this path at all.
+- **MY SHIPPED FIX WAS RIGHT BY ACCIDENT, AND IT OVER-EXCLUDES. Stated plainly.**
+  Web `4316c907` drops `close_age_seconds < 0` rows from the CLV headline. Those
+  are exactly the `observed_transition` rows, so it removed the side-mismatched
+  ones — **but for a reason that is not the real one**, and it also drops the
+  HOME-side rows on that path, whose closes were fine. The exclusion stays (it is
+  net-correct and named), but its stated rationale in `deploys.md` is now known to
+  be secondary.
+- **The timestamp claim is NOT refuted, just demoted:** `closing_captured_at`
+  20:34:26Z against a 19:08Z first pitch is still 86 minutes late, and
+  `odds_refresh_tracking.py:1602` still writes `now`. Fix the side first; the
+  clock is a smaller, separable error.
+- **REVISED FIX, for whoever takes this:** make path 1 side-aware — resolve
+  `closing_price` through the same `line`-dict logic path 2 uses, and REFUSE
+  (named, counted) when the side cannot be determined rather than returning the
+  entity's price. Then re-run this discriminator and re-derive
+  `in_play_excluded_n`.
+
+- Goal: `closing_captured_at` means the time the CLOSING PRICE WAS OBSERVED, or
+  it is renamed to say what it is. Testable outcome: for every market carrying
+  a closing stamp, `closing_captured_at <= commence_time`, OR the field is split
+  into an observation time and a detection time and every reader is updated.
+- **WHY THIS IS ITS OWN LANE AND NOT AN EDIT INSIDE `clv-without-settlement`:**
+  the fix is in the PRODUCER (`odds_refresh_tracking.py`), the CLV joiner is only
+  a consumer, and `clv_join.py` is claimed by that lane. Changing a stamp that
+  persists in shard files is also a data-shape change, not a display change.
+- **WHAT IS ALREADY MEASURED (2026-08-15, do not re-derive):**
+  - `/api/ops/clv/report` mlb 2026-08-15: **48 of 179 same-book rows** carry
+    `close_age_seconds < 0`, i.e. a closing stamp AFTER first pitch.
+  - Clean 100%/100% split by source: every contaminated row is
+    `close_source=observed_transition`; every clean row is `last_pregame_quote`.
+  - One event: opened `-186`, closing price recorded `+168`, stamped
+    `20:34:26Z` against a `19:08Z` first pitch — 86 minutes late.
+- **I GOT THE MECHANISM WRONG ONCE ALREADY. The correction is the starting
+  point of this lane, not a footnote.** I told the user the recorded price "is
+  already live". **Reading `odds_refresh_tracking.py:1600-1602` says the
+  opposite**: the stamp is guarded on `was_confirmed_pregame` and deliberately
+  records `previous_line`/`previous_odds` — "the value observed the tick BEFORE
+  this one -- not current_line/current_odds, which is already the in-play
+  number." So the PRICE is intended to be the last pregame price. Only
+  `closing_captured_at = now` is the detection tick.
+- Hypothesis: **`closing_captured_at` is the DETECTION time, not the observation
+  time of the price it accompanies.** The price comes from tick N-1 and the
+  timestamp from tick N, so on a ~2h sweep cadence the stamp can post-date the
+  price by a full interval and land after commence. If true, `close_age_seconds`
+  systematically overstates lateness and says nothing about whether the PRICE
+  was pregame.
+- Falsification test: if the recorded `closing_price` for the late-stamped rows
+  is genuinely an IN-PLAY price (not a stale pregame one), then the stamp is
+  honest and the defect is in the `was_confirmed_pregame` gate instead — a
+  different fix in a different place. **Discriminator:** compare each late row's
+  `closing_price` against that market's own history points before commence. If
+  it matches a pregame point, the price is fine and only the clock is wrong. The
+  `-186 -> +168` swing is the case to run first; it is large enough that "stale
+  pregame price" and "in-play price" make visibly different predictions.
+- **THIS LANE CAN INVALIDATE PART OF MY OWN SHIPPED FIX, stated up front so
+  nobody has to discover it.** Web `4316c907` excludes `close_age_seconds < 0`
+  from the CLV headline. If the hypothesis holds, some of those 48 rows carry
+  legitimate pregame prices and are being excluded on a bad clock — the headline
+  would be right to distrust the timestamp but wrong to drop the row. The
+  exclusion stays until this is resolved (a wrong-but-named exclusion beats a
+  silent contamination), but it is **provisional**.
+- Verification: (1) the discriminator above run on at least 10 late rows, with
+  the split reported; (2) whichever fix follows lands with a test pinning
+  `closing_captured_at <= commence_time`; (3) `/api/ops/clv/report` re-read and
+  `in_play_excluded_n` re-interpreted against the finding.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/odds_refresh_tracking.py` — the single write site
+    (`:1602`). Collision check RUN via `lane-guard.py`'s own `_claims()`: CLEAR.
+  - `tests/test_odds_closing_stamp.py` (new). CLEAR.
+  - **NOT claimed:** `syndicate/features/shared/clv_join.py` (held by
+    `clv-without-settlement`) and `syndicate/blueprints/ops.py` (consumer only).
+    If the fix needs either, coordinate rather than edit across the lane.
+- Blocked by: none. **No deploy from this lane without `/preflight`** — a change
+  to a stamp that persists in shard files needs its backfill story decided
+  before it ships, not after.
+
 ### clv-without-settlement — OPEN — **PUBLISH FIXED AND MEASURED (web `bebe87c9`, live 19:36:45Z): `same_book_n` 0 → 144, FIRST UNBIASED CLV = -0.07% AT A 27.1% BEAT RATE (PRELIMINARY, TAKEN PRE-FIRST-PITCH). THE LANE'S BREADTH HYPOTHESIS IS REFUTED** — opened 2026-08-14 — session: lane-cleanup
 - **RESULT 2026-08-15 19:38Z — the publish fix landed and it changed the answer.**
   `PUBLISH_FAILED`×8/16h (`HTTP 403 FORBIDDEN`, last 19:32:50Z) → `PUBLISH_OK`×2
@@ -271,6 +375,20 @@
 - Files (claimed 2026-08-15 22:0xZ, collision check CLEAR via `lane-guard.py`'s
   own `_claims()`): `syndicate/features/shared/clv_join.py`,
   `tests/test_clv_close_timing.py` (new).
+- **DEFECT FIXED AND VERIFIED — web `4316c907` live 21:41:18Z, main `a68e1ce0`.**
+  Headline now counts same-book AND pregame closes only. Verified by recomputing
+  the mean from the rows at the same instant: `-0.3077` both ways, n=131,
+  `in_play_excluded_n=48`, 374/374 rows carry `close_timing`.
+  - **The in-play bucket flipped sign between readings** — strongly negative at
+    21:1xZ, **`+0.7937` (n=48, beat 54.2%) at 21:4xZ**. The old code would now
+    publish `-0.0124`. **The contamination is noise, not a fixed bias**, and it
+    could have manufactured a "CLV is improving" story out of game-state drift.
+  - Clean series moved 0.04 pts across 2.5h (`-0.346` -> `-0.3077`); dirty series
+    moved 0.66 pts (`-0.672` -> `-0.0124`).
+  - `clv_join.py` was **entirely absent from main** until `a68e1ce0` (600
+    insertions), the same "lives only on a deploy branch" pattern as the
+    allowlist entry.
+- **OLD, kept for the record:**
 - **THE DEFECT TO FIX (its own change, not done here):** `compute_clv_for_date`
   labels post-commence closes but still counts them in the headline
   `avg_clv_pct`. The docstring already anticipates this — *"a caller that wants
@@ -1212,6 +1330,15 @@ than have every session quietly decide it is.
   re-write it before editing the adapter.
 
 ### soccer-model-coverage — OPEN — BACKTEST DELIVERED (MODEL LOSES TO MARKET, 1,112 matches, gap +0.0139); 4 FIXES BUILT + TESTED, NONE COMMITTED; #2 DELIBERATELY HELD; CALIBRATION HARNESS NEVER RUN ON REAL DATA — opened 2026-08-15 — session: soccer-model
+> **CROSS-LANE, added 2026-08-15 ~21:5xZ by the coordinating session (no claim).**
+> The soccer **as-of pair** (`0b0d44d9` + `f05a21c4`, audit §7 #6) is on
+> `origin/main` and is built into `deploy/low-props-soccer-asof-2026-08-15`
+> (`25774aaf`) together with the prop `0.5` fix — but **it is NOT deployed**.
+> live-odds-worker has been `HOLD` for 26+ minutes (odds refresh + rolling
+> soccer builds) so no lull was found. **Take both commits or neither**:
+> `50fd7fe2`, the first half, once emptied MLS ratings in production on its own.
+> Route one (warm the mirror, then deploy) is armed for that service and is the
+> proven technique — see `state.md`.
 > **CLAIMS RELEASED 2026-08-15 AT SESSION ARCHIVE — the lane is NOT done.**
 > Owning session `soccer-model` is being archived deliberately, so its file
 > claims are released rather than left as an orphaned lock. This is the same
@@ -3540,3 +3667,96 @@ NOT CLOSED BY THIS LANE, and the next reader should not think otherwise:
   `quote-feed-age-alarm`'s claim on `odds_book_quotes.py`. Attribution rests on
   kill count, peak anon, and eviction churn going 10 -> 0 — strong and
   independent, but not the branch announcing itself.
+
+### height-per-content-unit — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: a card-height metric that is a LAYOUT signal on MLB — one that stays
+  flat while content volume changes, and moves when the layout does. Testable:
+  on production MLB the metric's spread is small (tens of px) while the raw
+  height spread is >1000px, and a synthetic card given extra height at constant
+  content is flagged.
+- Files (exclusive to this lane): `scripts/ui_layout_probe.py`,
+  `tests/test_ui_layout_probe.py`, `docs/reports/ui_audit_2026_08_14/README.md`.
+  Collision check RUN: all three free.
+- **The naive form is WRONG and the data says so.** `height / units` assumes
+  the line passes through the origin. Fitted over the 10 production Preview
+  cards (33-53 pairs, 3100-4345px): **intercept 1051px** of fixed chrome —
+  head, tiles, tab rail — against a slope of 62.1px per pair. A ratio would
+  read 94px/pair on the 33-pair card and 82px/pair on the 53-pair card and
+  call that a 15% layout difference. It is not; it is the constant.
+- Hypothesis: card height is `chrome + k * units`, one line per sport per
+  width, and the RESIDUAL from that fit is the layout signal.
+- **Pre-validated on the already-measured cards:** slope 62.1, intercept 1051,
+  residuals [1, -5, -14, 2, 8, 28, -24, 4] px, **residual spread 52px against a
+  raw height spread of 1245px** — 24x tighter.
+- Falsification test: if residual spread on a healthy production slate is not
+  small relative to raw spread, height is not linear in this content unit and
+  the unit is wrong.
+- Verification: production MLB, residual spread vs raw spread; plus a
+  fabricated card that is tall at constant content, which must be flagged.
+  **No threshold will be invented — today's number becomes the recorded
+  baseline.**
+- Blocked by: none.
+- **WATCHER INSTRUMENT NOTE `[21:45Z]` — 4 of the first 11 polls were BLIND, not
+  quiet.** The script hardcodes `startTime=2026-08-15T21:30:00Z` but began
+  polling at 21:23, so for polls 0-3 the window START WAS IN THE FUTURE and
+  Render's logs API returned **HTTP 400**. `autorun_events=0` during those polls
+  carried no information. Self-resolved once the clock passed 21:30.
+  **Verified by control before trusting the zeros:** the identical query shape
+  against `startTime=18:00Z` returns the known `18:22:34 SOCCER_PREGAME_AUTORUN_FAILED`
+  line (HTTP 200, 1 line), and the live query now returns HTTP 200 with 0 lines
+  — a genuine zero. Also seen: 1x 429, 1x 502, both transient.
+  **Rule this re-teaches: a hardcoded absolute startTime is a future timestamp
+  for part of a watcher's life, and the resulting 400 reads exactly like "all
+  clear".** Derive the window from the poll's own clock.
+
+### board-contract-normalize-cost — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: establish what `_normalize_games` actually COSTS, per sport, and whether
+  `board_contract_games_normalized` is the allocator at the remaining 3,572MB
+  peak or only the stage that happens to be running when the ceiling is reached.
+  `#435` closed the quote shard; this is the next lead, not a restatement of it.
+- Files: none claimed — READ-ONLY. Production logs plus a code read. A fix, if
+  one is warranted, is a separate lane and a separate deploy.
+- **HYPOTHESES, WRITTEN BEFORE MEASURING:**
+  - **H1 — `_normalize_games` doubles the games list.** Line 807 is a list
+    comprehension building a NEW list of NEW dicts from every game
+    (`normalize_publication_game(_normalize_game(game))`), while `games` is still
+    referenced by the caller's context. Both live simultaneously, so peak is 2x
+    the games structure for the duration.
+  - **H2 — it is the VICTIM, not the allocator.** Every >=99% reading tonight and
+    last night was already at the ceiling when this stage was entered. The stage
+    turns over in ~0.1-4s and may simply be the one holding the pin.
+  - **H3 — the cost is per-sport and MLB dominates**, matching every other
+    memory finding in this system.
+- **Falsification test, and it needs NO deploy:** `board_contract_begin` and
+  `board_contract_games_normalized` are BOTH already emitted, with `game_count`.
+  The delta between them IS the stage's own cost. H1 predicts a delta that scales
+  with `game_count`; H2 predicts a delta near zero with the level already high
+  before `begin`.
+- Verification: per-sport delta table from production, with the number of builds
+  each figure rests on. A single sample is not a measurement — that rule has
+  already cost this investigation three wrong root causes.
+- Blocked by: none.
+
+#### live-game-line-projection — PASS 2026-08-15 21:49Z — `live_mc` 0 → 6, AND MY NEGATIVE RESULT IS RETRACTED
+- **Drops 1 and 2 WORK.** Worker tally `liveMcSources = {live_mc: 6,
+  segment_projection: 52, unknown: 8}`; web serves `rows=66 live_mc=6`.
+  **Producer count == served count == 6**, so this is end-to-end, not two
+  unrelated numbers. Baseline was `rows=60 live_mc=0`.
+- **Deployed:** live-odds-worker `191a001b`, web `edfc0174` (the ops route, cut
+  from `4316c907`). Ops regression **131 passed** — the run interrupted at
+  checkpoint has now completed clean.
+- **RETRACTION, recorded because it was written into three ledger files:** my
+  "clean negative — both drops live and `live_mc` still 0" was **premature**. The
+  worker landed at 20:56:07Z; I measured at ~20:59 and ~21:04, inside the
+  live-lens loop's warm-up. **Two reads inside one warm-up window are ONE read.**
+  I had written the guard for exactly this and then ignored it because two
+  samples *felt* independent — the slate moved between them, which proves they
+  were independent of each other and says nothing about the transient.
+- **STILL OPEN, and do not let the PASS hide them:**
+  - **`unknown: 8`** of 66 lanes carry an unrecognised source. Unexamined.
+  - **`carried: 0`** — Drop 2's carry-forward has NEVER been observed firing. It
+    is idle by design while web serves a fresh snapshot, so it is **untested in
+    production**, not confirmed.
+  - **soccer / wnba report `liveMcSources: null`** — the tally is MLB-only.
+  - **Drop 3 (the game-line join) is untouched**; `rows_live_edged` stays 0 for
+    game lines regardless of this PASS.

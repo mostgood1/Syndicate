@@ -4092,3 +4092,50 @@ have destroyed their work.
 
 That is the owning sessions' call, not mine. Nothing is lost either way: the
 commits are on origin, and the working-tree edits are untouched.
+
+## 2026-08-15 21:48:28Z — web `edfc0174` — THE MEASUREMENT PASSES, AND IT RETRACTS MY OWN NEGATIVE RESULT
+
+**Deploy:** `dep-da0dq2m7bikc73etu3d0`, cut from web's own live SHA `4316c907`
+after waiting out an in-flight deploy. Adds `GET /api/ops/live-lens/status`.
+Regression that was interrupted at checkpoint has now RUN: **131 passed**
+(`test_ops.py` + `test_ops_live_lens_status.py`).
+
+### THE RESULT — PASS `[measured 21:49Z]`
+
+    worker's own per-tick tally   liveMcSources = {live_mc: 6,
+    (latestStatus.results.mlb)                    segment_projection: 52,
+                                                  unknown: 8}
+    what web SERVES               rows=66  live_mc=6  carried=0
+    baseline (pre-deploy, x2)     rows=60  live_mc=0  carried=0
+
+**6 and 6. The worker's count and the served count match exactly**, which is
+what makes this end-to-end and not two unrelated numbers. `live_mc` moved
+**0 → 6**. **Drops 1 and 2 work.**
+
+### RETRACTION — "a clean negative result" was PREMATURE AND WRONG
+
+I recorded in `state.md`, `lanes.md` and the session log that both drops were
+live and `live_mc` was still 0, calling it "a clean negative" and concluding
+"the fix is correct and was not the binding constraint." **That is retracted.**
+
+The worker landed `191a001b` at **20:56:07Z**. My two passes ran ~20:59 and
+~21:04 — **3 and 8 minutes after a worker restart**, before the live-lens loop
+had produced a snapshot the fix could act on. I even wrote the guard for this
+("the worker needs a tick or two after restart... I'd treat a single zero as
+inconclusive") and then treated a double zero as conclusive, because two reads
+felt like independent evidence. **They were two samples inside the same warm-up
+window, which is one sample.** The slate moving between them (live 4→3) proved
+the reads were independent of each other and said nothing about whether the
+system had converged.
+
+**The rule: two reads inside one warm-up window are one read.** Independence
+between samples is not independence from the transient you are sitting in.
+
+### Residual, NOT explained
+- **`unknown: 8`** — 8 of 66 lanes carry a source the tally does not recognise.
+  Unexamined. Not a failure; not understood either.
+- **`carried: 0`** — Drop 2's carry-forward has not been observed firing. It is
+  correctly idle while web serves a fresh snapshot, so this is **untested in
+  production**, not confirmed working.
+- **soccer and wnba report `liveMcSources: null`** — MLB-only instrumentation.
+- **`rows` went 60 → 66** because the slate changed, not because of the fix.
