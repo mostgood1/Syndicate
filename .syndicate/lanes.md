@@ -3727,7 +3727,7 @@ instead. Neither is attempted here.
   carried-forward item "the desktop unit should be grid rows" is now CLOSED as
   wrong — do not pick it up again.
 
-### ui-probe-baseline-and-rerun — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+### ui-probe-baseline-and-rerun — CLOSED-VERIFIED 2026-08-15 — baseline committed, --compare shipped, re-run SCHEDULED for 08-16 09:00 CT — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: tomorrow's probe run is COMPARABLE to today's, without anyone
   remembering what today's numbers were. Testable: a committed baseline exists,
   `--compare <baseline>` prints per-metric deltas, and a scheduled run fires
@@ -3745,3 +3745,34 @@ instead. Neither is attempted here.
   something it does not understand.
 - Verification: the comparison output itself, run against tomorrow's slate.
 - Blocked by: none.
+
+#### ui-probe-baseline-and-rerun — CLOSED-VERIFIED 2026-08-15 — closing before this session is archived
+
+All three deliverables exist and are on `origin/main` (`8ad1a7d2`, `e235e284`):
+`reports/ui_layout/baseline_2026-08-15.json`, `--compare`, and a one-shot
+scheduled task `ui-probe-rerun-compare` firing **2026-08-16 09:00 CT**.
+
+**The lane's own question got a first answer, from a dry run of the scheduled
+command 30 minutes after the baseline:** all 8 rows `stable metrics unchanged`,
+while the slate moved (`cardHeightSpread` 1412 -> 1944 mobile, `contentUnits`
+20 -> 37). The stable/slate split held on its first test. And the height model
+held with it — mlb mobile Preview residual **82 -> 84px**, slope **64.3 ->
+64.7px/pair**, while the raw number it replaces moved 532px. First evidence the
+`n >= 5` floor fixed today's earlier instability.
+
+**Weak interval, stated as such:** 30 minutes on a slate that had not turned
+over, so the two runs share most of their games. Tomorrow's fire against a
+different slate is the real test.
+
+**CLOSED DELIBERATELY, WITH ITS VERIFICATION IN THE FUTURE.** The lane is closed
+rather than left open because this session is being archived, and an OPEN lane
+belonging to an archived session is an active lock on its files, not a note —
+`learnings.md` 2026-08-14 has that rule and this ledger already carries three
+ORPHANED-CLAIMS-RELEASED lanes from it. `scripts/ui_layout_probe.py`,
+`tests/test_ui_layout_probe.py` and `reports/ui_layout/` are hereby RELEASED.
+
+**Owed to nobody in particular, so whoever sees the task notification owns it:**
+read the comparison block, and if a STABLE metric moved with no deploy touching
+the card surface, that is a finding about the harness, not about the board.
+
+- **FINAL:** shipped, closed, nothing uncommitted.
