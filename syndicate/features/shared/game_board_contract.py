@@ -186,6 +186,8 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
     home_abbr = _safe_text(_team_side(game, "home").get("abbr"), "HME")
     betting_total = _safe_float(betting.get("total"))
     betting_home_spread = _safe_float(betting.get("home_spread"))
+    betting_p_home_win = betting.get("p_home_win")
+    betting_p_away_win = betting.get("p_away_win")
     # betting_total/betting_home_spread are the game's ONE full-game market
     # line -- when periods is per-quarter/half sim data (e.g. WNBA's
     # q1/q2/q3/q4), comparing each individual period's much-smaller
@@ -218,10 +220,28 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
         if home_mean is not None:
             aggregate_home_mean += home_mean
             has_aggregate = True
-        total = (away_mean or 0.0) + (home_mean or 0.0)
-        away_pct = ((away_mean or 0.0) / total * 100.0) if total > 0 else 50.0
-        home_pct = ((home_mean or 0.0) / total * 100.0) if total > 0 else 50.0
+        # MEASURED 2026-08-14 by driving this function with a known game: a
+        # 21.0-24.0 projection produced away_pct 46.67 / home_pct 53.33 --
+        # exactly the share of projected POINTS -- and the template renders
+        # that pair in `.cards-prob-bar`, under a panel titled "Period win
+        # probabilities". A 3-point favourite is not a 53.3% favourite; a real
+        # win probability there is nearer 60%. Worse, when the game DID carry
+        # p_home_win = 0.62 the bar still drew 53.3% while the row's own
+        # `home_win` text said 62.0% -- the two-numbers-on-one-card defect the
+        # UI audit found on soccer, in the shared contract, on every sport.
+        #
+        # So the pair is now the WIN PROBABILITY or nothing. A projection with
+        # no probability attached renders no bar (the template suppresses it),
+        # which is the point of this lane: absent renders as absent, and a
+        # quantity is never displayed under another quantity's name.
         p_home_win = _safe_float(value.get("p_home_win"))
+        p_away_win = _safe_float(value.get("p_away_win"))
+        if p_away_win is None and p_home_win is not None:
+            p_away_win = 1.0 - p_home_win
+        if p_home_win is None and p_away_win is not None:
+            p_home_win = 1.0 - p_away_win
+        away_pct = (p_away_win * 100.0) if p_away_win is not None else None
+        home_pct = (p_home_win * 100.0) if p_home_win is not None else None
         market_value = "-"
         best_edge_value = "-"
         if single_period_is_full_game:
@@ -253,8 +273,18 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
         aggregate_total = round(aggregate_away_mean + aggregate_home_mean, 3)
         aggregate_margin = round(aggregate_home_mean - aggregate_away_mean, 3)
         aggregate_total_pct = aggregate_away_mean + aggregate_home_mean
-        away_pct = (aggregate_away_mean / aggregate_total_pct * 100.0) if aggregate_total_pct > 0 else 50.0
-        home_pct = (aggregate_home_mean / aggregate_total_pct * 100.0) if aggregate_total_pct > 0 else 50.0
+        # Same correction as the per-period rows above: this pair fed the win
+        # bar with a share of projected points. The game-level probability, if
+        # one exists, is on `betting` -- read it there rather than inventing a
+        # split from the scoreline.
+        aggregate_p_home = _safe_float(betting_p_home_win)
+        aggregate_p_away = _safe_float(betting_p_away_win)
+        if aggregate_p_away is None and aggregate_p_home is not None:
+            aggregate_p_away = 1.0 - aggregate_p_home
+        if aggregate_p_home is None and aggregate_p_away is not None:
+            aggregate_p_home = 1.0 - aggregate_p_away
+        away_pct = (aggregate_p_away * 100.0) if aggregate_p_away is not None else None
+        home_pct = (aggregate_p_home * 100.0) if aggregate_p_home is not None else None
         market_bits = []
         edge_bits = []
         if betting_home_spread is not None:
@@ -270,7 +300,10 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
                 "subtitle": f"Projected total {_format_num(aggregate_total)}",
                 "away_pct": away_pct,
                 "home_pct": home_pct,
-                "home_win": _format_pct(home_pct / 100.0) if aggregate_total_pct > 0 else "-",
+                # Was `home_pct / 100.0` -- i.e. the share of projected points
+                # printed as "Home win NN%". It is a probability or it is
+                # absent; it is never a scoreline in disguise.
+                "home_win": _format_pct(home_pct / 100.0) if home_pct is not None else "-",
                 "market": " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-"),
                 "best_edge": " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or "-"),
             }
@@ -285,13 +318,7 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
         # here means "betting %" only ever reads blank when there's truly no
         # market/model probability anywhere on the game, not whenever periods
         # happens to be empty.
-        betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
-        p_home_win = _safe_float(betting.get("p_home_win"))
-        p_away_win = _safe_float(betting.get("p_away_win"))
-        if p_home_win is None and p_away_win is not None:
-            p_home_win = 1.0 - p_away_win
-        if p_away_win is None and p_home_win is not None:
-            p_away_win = 1.0 - p_home_win
+        p_home_win, p_away_win, p_draw = _game_win_probabilities(game)
         home_win_text = _format_pct(p_home_win) if p_home_win is not None else (
             _metric_lookup(game.get("metrics", []), "Home win") or _metric_lookup(game.get("metrics", []), "Win prob") or "-"
         )
@@ -300,8 +327,9 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
                 "label": "Full Game",
                 "main": away_score or game.get("summary") or "Game outlook unavailable",
                 "subtitle": game.get("detail") or game.get("status") or "-",
-                "away_pct": (p_away_win * 100.0) if p_away_win is not None else 50.0,
-                "home_pct": (p_home_win * 100.0) if p_home_win is not None else 50.0,
+                "away_pct": (p_away_win * 100.0) if p_away_win is not None else None,
+                "home_pct": (p_home_win * 100.0) if p_home_win is not None else None,
+                "draw_pct": (p_draw * 100.0) if p_draw is not None else None,
                 "home_win": home_win_text,
                 "market": _metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-",
                 "best_edge": _metric_lookup(game.get("metrics", []), "Edge") or "-",
@@ -310,19 +338,67 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
+def _game_win_probabilities(game: dict[str, Any]) -> tuple[float | None, float | None, float | None]:
+    """(home, away, draw) win probability for the game, or Nones.
+
+    Order matters and it is the fix for the UI audit's "two conflicting
+    home-win numbers on one soccer card". Those two numbers were not a
+    rounding artifact: the TILES show the sim's three-way win probability
+    (`sim.win_probability`, home/draw/away) while the BAR showed
+    `betting.p_home_win`, which soccer's `_market_data_for_match` builds from
+    the picks rows' `market_probability` -- the MARKET's implied number. Two
+    different quantities, both correct, ~250px apart under the same word.
+
+    The sim is preferred here so the bar agrees with the tiles above it, and
+    the market number is the fallback for sports that publish no sim split.
+    A three-way market keeps its draw rather than being renormalised into a
+    two-way one, which is what made the soccer bar disagree by ~4 points even
+    when both sides were "right".
+    """
+    sim = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+    win = sim.get("win_probability") if isinstance(sim.get("win_probability"), dict) else {}
+    p_home = _safe_float(win.get("home"))
+    p_away = _safe_float(win.get("away"))
+    p_draw = _safe_float(win.get("draw"))
+    if p_home is None and p_away is None:
+        betting = game.get("betting") if isinstance(game.get("betting"), dict) else {}
+        p_home = _safe_float(betting.get("p_home_win"))
+        p_away = _safe_float(betting.get("p_away_win"))
+        p_draw = _safe_float(betting.get("p_draw"))
+    # Complete a two-way pair only when there is no draw in play. Doing this
+    # on a three-way market is exactly how a 77.3% home win became 81.1%.
+    if p_draw is None:
+        if p_home is None and p_away is not None:
+            p_home = 1.0 - p_away
+        if p_away is None and p_home is not None:
+            p_away = 1.0 - p_home
+    return p_home, p_away, p_draw
+
+
 def _build_probability_rows(game: dict[str, Any], period_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     existing = game.get("probability_rows") if isinstance(game.get("probability_rows"), list) else []
     rows: list[dict[str, Any]] = []
     for row in existing:
         if not isinstance(row, dict):
             continue
-        away_pct = _safe_float(row.get("away_pct")) or 50.0
-        home_pct = _safe_float(row.get("home_pct")) or max(0.0, 100.0 - away_pct)
+        # `_safe_float(...) or 50.0` mapped a genuine 0.0 onto 50.0 as well as
+        # a missing value -- measured: a row carrying a real 0% home win came
+        # out of the period path as a 50/50 while the probability path kept
+        # the 0.0, so one card disagreed with itself. `is None` is the test,
+        # not falsiness.
+        away_pct = _safe_float(row.get("away_pct"))
+        home_pct = _safe_float(row.get("home_pct"))
+        if home_pct is None and away_pct is not None:
+            home_pct = max(0.0, 100.0 - away_pct)
+        if away_pct is None and home_pct is not None:
+            away_pct = max(0.0, 100.0 - home_pct)
+        draw_pct = _safe_float(row.get("draw_pct"))
         rows.append(
             {
                 "label": _safe_text(row.get("label"), "Full Game"),
                 "away_pct": away_pct,
                 "home_pct": home_pct,
+                "draw_pct": draw_pct,
                 "summary": _safe_text(row.get("summary"), "Probability split unavailable"),
             }
         )
@@ -330,11 +406,15 @@ def _build_probability_rows(game: dict[str, Any], period_rows: list[dict[str, An
         return rows
     fallback: list[dict[str, Any]] = []
     for row in period_rows:
+        # Carries the period rows' pair through as-is, including None. A row
+        # with no probability produces no bar rather than a centred one; see
+        # the note on the period rows above.
         fallback.append(
             {
                 "label": row.get("label") or "Full Game",
-                "away_pct": float(row.get("away_pct") or 50.0),
-                "home_pct": float(row.get("home_pct") or 50.0),
+                "away_pct": _safe_float(row.get("away_pct")),
+                "home_pct": _safe_float(row.get("home_pct")),
+                "draw_pct": _safe_float(row.get("draw_pct")),
                 "summary": f"Home win {row.get('home_win') or '-'}",
             }
         )

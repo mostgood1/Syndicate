@@ -529,6 +529,19 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
         "sim": {
             "score": {"away_mean": team_projection.get("away_mean"), "home_mean": team_projection.get("home_mean")},
             "periods": periods,
+            # The same three-way split the tiles below render. Published here
+            # so game_board_contract's probability bar reads the SIM rather
+            # than falling through to betting.p_home_win, which is the
+            # market's implied number -- the UI audit measured the card
+            # showing both, ~250px apart, both labelled "home win"
+            # (HOME WIN 77.3% in the tiles vs Home win 81.1% in the bar).
+            # Carrying the draw is what stops the bar renormalising a
+            # three-way market into a two-way one.
+            "win_probability": {
+                "home": win_prob.get("home"),
+                "draw": win_prob.get("draw"),
+                "away": win_prob.get("away"),
+            },
         },
         "betting": _market_data_for_match(league, str(match.get("date") or "")[:10], home_team, away_team),
         "metrics": [

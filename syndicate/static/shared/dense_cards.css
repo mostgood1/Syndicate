@@ -828,13 +828,26 @@ body.cards-body *::after {
   overflow: hidden;
 }
 
+/* The `50%` fallbacks are deliberately gone. They were a second, quieter
+   copy of the contract's 50/50 default: if the width variable never got set,
+   the bar still rendered a confident centred split. 0% renders nothing, which
+   is what an unset probability should look like. The template no longer emits
+   the bar at all in that case, so this is the belt to that pair of braces. */
 .cards-prob-away {
-  width: var(--away-pct, 50%);
+  width: var(--away-pct, 0%);
   background: linear-gradient(135deg, rgba(255, 107, 107, 0.95), rgba(255, 138, 91, 0.9));
 }
 
+/* Three-way markets (soccer). Without a draw segment the bar had to
+   renormalise a home/draw/away split into two sides, which is how one card
+   came to show HOME WIN 77.3% in the tiles and Home win 81.1% in the bar. */
+.cards-prob-draw {
+  width: var(--draw-pct, 0%);
+  background: linear-gradient(135deg, rgba(147, 169, 188, 0.85), rgba(110, 133, 153, 0.8));
+}
+
 .cards-prob-home {
-  width: var(--home-pct, 50%);
+  width: var(--home-pct, 0%);
   background: linear-gradient(135deg, rgba(154, 243, 222, 0.95), rgba(78, 205, 196, 0.9));
 }
 

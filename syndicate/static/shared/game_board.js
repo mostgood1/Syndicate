@@ -6,6 +6,12 @@
       const homePct = Number(bar.getAttribute('data-home-pct') || '0');
       bar.style.setProperty('--away-pct', String(awayPct) + '%');
       bar.style.setProperty('--home-pct', String(homePct) + '%');
+      // Three-way markets carry a draw segment. Absent on two-way sports, in
+      // which case the variable stays unset and the segment is not rendered.
+      const drawAttr = bar.getAttribute('data-draw-pct');
+      if (drawAttr !== null && drawAttr !== '') {
+        bar.style.setProperty('--draw-pct', String(Number(drawAttr)) + '%');
+      }
     });
     scope.querySelectorAll('.cards-run-dist-bin[data-bin-width]').forEach(function (bin) {
       const width = Number(bin.getAttribute('data-bin-width') || '0');
