@@ -1,0 +1,91 @@
+"""The prop producers must REPORT the null-win_prob rate, not just avoid 0.5.
+
+Why this test exists: the fix that removed `... or 0.5` writes `win_prob=None`
+instead, and emitted nothing. Measured on production 2026-08-15, the live WNBA
+artifact had 15 win_prob rows and ZERO price-missing rows -- so "0 fabricated"
+was indistinguishable from "never exercised", and grepping the producer log
+returned nothing because there was nothing to find. NBA was worse: out of
+season, no artifact at all.
+
+So the assertions here are about OBSERVABILITY, not arithmetic:
+  * both branches are counted, so the denominator is real;
+  * the counter sits on the chokepoint, so a future call site is counted
+    automatically rather than silently missed;
+  * the line is emitted even when everything is zero, because `null=0` with no
+    `rows` cannot be read -- it means "the fix held" or "nothing ran", and those
+    demand opposite responses.
+"""
+
+from __future__ import annotations
+
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+PRODUCERS = {
+    "wnba": SCRIPTS / "refresh_wnba_oddsapi_props.py",
+    "nba": SCRIPTS / "refresh_nba_oddsapi_props.py",
+}
+
+
+def _load(name: str):
+    spec = importlib.util.spec_from_file_location(f"_producer_{name}", PRODUCERS[name])
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    module._WIN_PROB_STATS.update(rows=0, null_no_price=0)
+    return module
+
+
+@pytest.mark.parametrize("sport", sorted(PRODUCERS))
+def test_chokepoint_counts_both_branches(sport):
+    m = _load(sport)
+    m._clamp_probability(0.62)
+    m._clamp_probability(None)
+    m._clamp_probability(1.4)
+    m._clamp_probability(None)
+    assert m._WIN_PROB_STATS == {"rows": 4, "null_no_price": 2}
+
+
+@pytest.mark.parametrize("sport", sorted(PRODUCERS))
+def test_clamp_behaviour_is_unchanged(sport):
+    """Counting must not alter what the producer publishes."""
+    m = _load(sport)
+    assert m._clamp_probability(None) is None
+    assert m._clamp_probability(1.4) == 1.0
+    assert m._clamp_probability(-0.2) == 0.0
+    assert m._clamp_probability(0.5) == 0.5  # a REAL 0.5 still survives
+
+
+@pytest.mark.parametrize("sport", sorted(PRODUCERS))
+def test_emits_a_rate_with_a_denominator(sport, capsys):
+    m = _load(sport)
+    m._clamp_probability(None)
+    m._clamp_probability(0.7)
+    m._emit_win_prob_stats()
+    line = capsys.readouterr().out
+    assert "WIN_PROB_NULL_NO_PRICE" in line
+    assert "null=1" in line and "rows=2" in line, "a count without a denominator is unreadable"
+    assert "pct=50.0" in line
+
+
+@pytest.mark.parametrize("sport", sorted(PRODUCERS))
+def test_emits_even_when_nothing_ran(sport, capsys):
+    """The all-zero run is the one that distinguishes 'held' from 'never ran'."""
+    m = _load(sport)
+    m._emit_win_prob_stats()
+    out = capsys.readouterr().out
+    assert "null=0 rows=0" in out
+
+
+@pytest.mark.parametrize("sport", sorted(PRODUCERS))
+def test_no_win_prob_branch_bypasses_the_chokepoint(sport):
+    """A bare `else None` would be invisible to the counter -- pin that it is gone."""
+    src = PRODUCERS[sport].read_text(encoding="utf-8")
+    import re
+
+    bypass = re.findall(r"if implied_prob is not None\s*\n(?:\s*#[^\n]*\n)*\s*else None", src)
+    assert not bypass, f"{len(bypass)} win_prob branch(es) skip _clamp_probability and would not be counted"
