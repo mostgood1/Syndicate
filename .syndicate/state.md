@@ -1234,3 +1234,29 @@ me a false claim that a shipped fix had never run]`
 **A `deactivated` pinned deploy means SUPERSEDED, not reverted.** Whether your
 work survived is a separate question answered only by ancestry or a measurement.
 Held twice on 2026-08-15; enforced by nothing but the person deploying.
+
+## Card surface - tabular figures CLOSED `[measured 08-15 20:0xZ]`
+
+**All four generic-board sports render tabular digits. Verified in production
+after two pinned deploys.** `numericSweep` (leaf elements rendering a digit at
+`font-variant-numeric: normal`): mlb **1388 -> 0**, nfl **468 -> 0**, ncaaf
+**432 -> 0**, soccer **60 -> 0**. MLB confirmed on desktop at 15 cards with 146
+filter pills all `tabular-nums`. Live: `f475c775` (20:00:58Z), preserved by
+content in the next deploy `7abd8e12`.
+
+**`font-variant-numeric` inherits everywhere EXCEPT into form controls.** The UA
+stylesheet's `font:` shorthand on `<button>`/`<input>`/`<select>` resets it -
+measured live: card `tabular-nums`, `button.cards-filter-pill` `normal`,
+`fontFamily` `Arial`. Both rules are now in all four stylesheets. MLB was the
+only sport affected because it is the only one with in-card filter pills
+carrying counts. `[measured]`
+
+**A pinned deploy is NOT on main's lineage, so ancestry is the WRONG test for
+"did my work survive".** `454af741` and `1bb8cf9f` both read as non-ancestors of
+the very deploy that carries them; the four CSS blobs are byte-identical. Test
+deployment by CONTENT. `[measured 08-15 - this exact check]`
+
+**`scripts/ui_layout_probe.py` still waits on a fixed delay and WILL report
+`mlb: 0 cards` spuriously.** It did so mid-verification today. Any MLB reading
+must wait on `.cards-game-card`, not a timer. Fixing that wait is the next
+change to the probe. `[measured]`

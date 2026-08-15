@@ -1653,7 +1653,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
-### tabular-figures-actually-applied — OPEN — BOTH HALVES BUILT AND PUSHED; CSS HALF UNDEPLOYED, SO ITS 4 NUMBERS ARE STILL TRUE OF PRODUCTION — opened 2026-08-15 — session: ui-plan-lane-gh
+### tabular-figures-actually-applied — CLOSED-VERIFIED 2026-08-15 — deployed twice, all four sports measured to ZERO — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the tabular-figures fix covers the classes users actually watch, and
   the probe can no longer report a pass for a class it never found. Testable:
   `ui_layout_probe.py` FAILS on any numeric class with 0 elements on a sport
@@ -2328,3 +2328,37 @@ new (22 tests), `tests/test_mlb_refresh_runner.py` +8/-4 (one pinned kwarg).
 - **STILL OPEN: Drop 3, the join.** `live_projection_join` is entirely
   prop-shaped; nothing prices a live game line even once it is published, so
   `rows_live_edged` stays 0 for game-line markets until it exists.
+
+#### tabular-figures-actually-applied - CLOSED-VERIFIED 2026-08-15 - deployed twice, measured to ZERO on all four sports
+
+Both halves done. Instrument: `33e7d7a8`. CSS: `1bb8cf9f` + `454af741`.
+Deploys `d7c2ca7d` (live 19:43:59Z, pinned `bebe87c9`) and `f475c775`
+(live 20:00:58Z, pinned `9b88d05b`), each pinned on web's OWN live commit.
+
+    numericSweep   audit   after 1bb8cf9f   after 454af741
+    mlb             1388             143                0
+    nfl              468               0                0
+    ncaaf            432               0                0
+    soccer            60               0                0
+
+The lane's Goal is met on both clauses: the probe now FAILS on a numeric class
+with 0 elements on a card-serving sport (ncaaf `market-main`, still reported),
+and production MLB computes `tabular-nums` - confirmed on desktop at 15 cards,
+146 filter pills, `nonTabular: []`.
+
+**MLB's residual was a form-control inheritance boundary, not a selector gap.**
+`font-variant-numeric` does not cross into `<button>`; the UA `font:` shorthand
+resets it. Measured live before the fix: card tabular-nums, button normal,
+button fontFamily Arial. MLB was the only sport affected because it is the only
+one with in-card filter pills carrying counts.
+
+**Carried forward, NOT fixed:**
+- `scripts/ui_layout_probe.py` still waits on a fixed delay and flaked on MLB
+  during this very verification (`0 cards`). Waiting on `.cards-game-card` is
+  the next change to that file.
+- soccer `.cards-data-pair` 9 -> 0 - a producer change, card otherwise healthy
+  (same fixture, 4 tiles, 1 prob bar, 0 empty-copy). For `soccer-model-coverage`.
+- ncaaf `.cards-market-main` 0 elements on 16 cards - the stale-class defect the
+  instrument now names. Real, unowned, one class.
+
+- **FINAL:** shipped, measured, closed. Nothing of this lane uncommitted.
