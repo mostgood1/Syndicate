@@ -287,3 +287,102 @@ class TestIndexAndAttach:
         cov = attach_live_gamelines([self._row()], {})
         assert cov["index_size"] == 0
         assert cov["withheld_by_reason"] == {REASON_NO_LIVE_PROJECTION: 1}
+
+
+class TestSimsRunReachesTheGate:
+    """`simsRun` and `source` must be stamped by the SAME predicate.
+
+    The Drop 3 deploy measured `sim_count_unusable: 12` -- every projected row
+    refused a step BEFORE the precision gate, because `_build_game_lens` never
+    copied `simsRun` onto the lens row. The key was ABSENT, not null. These pin
+    the contract from the join's side: a lens claiming `live_mc` must carry a
+    usable sim count, and a segment lens must never be indexed regardless.
+    """
+
+    def _lens(self, source, sims):
+        row = {"key": "live", "source": source, "modelHomeWinProb": 0.775,
+               "projection": {"total": 8.5, "homeMargin": 0.7}}
+        if sims is not None:
+            row["simsRun"] = sims
+        return [row]
+
+    def test_a_live_mc_lens_without_simsRun_is_refused_by_name(self):
+        """The production defect, reproduced: not priceable, and it SAYS why."""
+        got = live_gameline_from_lens(self._lens("live_mc", None))
+        assert got is not None and got["sims_run"] is None
+        v = price_moneyline(model_prob=got["home_win_prob"], market_prob=0.50, sims=got["sims_run"])
+        assert v["priceable"] is False
+        assert v["withheld_reason"] == REASON_UNUSABLE_SIMS
+
+    def test_the_same_lens_WITH_simsRun_reaches_the_precision_gate(self):
+        """The fix's payload: the refusal stops being a plumbing gap and becomes
+        the actual product decision, which is the whole reason to fix it."""
+        got = live_gameline_from_lens(self._lens("live_mc", 120))
+        assert got["sims_run"] == 120
+        v = price_moneyline(model_prob=got["home_win_prob"], market_prob=0.50, sims=got["sims_run"])
+        assert v["withheld_reason"] != REASON_UNUSABLE_SIMS
+        assert v["prob_std_err"] == pytest.approx(prob_std_err(0.775, 120))
+        # 0.775 vs 0.50 is 27.5 pp against a ~8.4 pp bar, so it prices.
+        assert v["priceable"] is True
+
+    def test_a_segment_lens_is_never_indexed_even_carrying_simsRun(self):
+        """If a later change stamps simsRun on segment lanes too, `source` must
+        still be the thing that keeps them out of the index."""
+        assert live_gameline_from_lens(self._lens("segment_projection", 120)) is None
+
+
+class TestBuildGameLensStampsSimsRun:
+    """Pins the PRODUCER side of the contract, in the vendored builder itself.
+
+    The tests above pin what the join does GIVEN a lens. They would all still
+    pass with the vendor fix reverted, because they construct their own lens
+    rows -- which is exactly how the original defect survived: every unit test
+    agreed with every other unit test, and none of them built the real lens.
+    This one calls `_build_game_lens` for real.
+    """
+
+    def _call(self, mc):
+        from vendor.mlb_bettingv2.tools.web.flask_frontend import _build_game_lens
+
+        card = {"status": {"abstract": "Live", "detailed": "In Progress"},
+                "predictions": {}, "markets": {}}
+        snapshot = {"status": {"abstractGameState": "Live", "detailedState": "In Progress"},
+                    "teams": {"away": {"totals": {"R": 1}}, "home": {"totals": {"R": 2}}}}
+        sim_context = {"found": True, "predicted": {"away": 4.1, "home": 4.6}}
+        return _build_game_lens(card, snapshot, sim_context, None,
+                                date_str="2026-08-15", live_mc_projection=mc)
+
+    _MC = {"away": 3.4, "home": 4.1, "total": 7.5, "homeMargin": 0.7,
+           "homeWinProb": 0.775, "awayWinProb": 0.225, "closed": False,
+           "source": "live_mc", "simsRun": 120}
+
+    def test_live_mc_lanes_carry_both_source_and_simsRun(self):
+        rows = {r["key"]: r for r in self._call(dict(self._MC))}
+        for lane in ("live", "full"):
+            assert rows[lane]["source"] == "live_mc"
+            assert rows[lane]["simsRun"] == 120, f"{lane} lost its sim count"
+
+    def test_segment_lanes_get_no_sim_count(self):
+        """A default here would make an interpolation look exactly as precise as
+        a real re-sim, which is the one substitution that would defeat the gate."""
+        rows = {r["key"]: r for r in self._call(dict(self._MC))}
+        for lane in ("first1", "first3", "first5", "first7"):
+            assert rows[lane]["source"] == "segment_projection"
+            assert rows[lane]["simsRun"] is None
+
+    def test_the_two_fields_never_disagree(self):
+        """The invariant the hoisted predicate exists to guarantee: a lane is
+        live_mc if and only if it carries a sim count."""
+        for mc in (dict(self._MC), None):
+            for row in self._call(mc):
+                assert (row["source"] == "live_mc") == (row["simsRun"] is not None)
+
+    def test_end_to_end_a_real_lens_now_reaches_the_precision_gate(self):
+        """The whole point, in one assertion: build a REAL lens, run it through
+        the join's reader and pricer, and confirm it is no longer refused for a
+        missing sim count."""
+        rows = self._call(dict(self._MC))
+        got = live_gameline_from_lens(rows)
+        assert got is not None and got["sims_run"] == 120
+        v = price_moneyline(model_prob=got["home_win_prob"], market_prob=0.50, sims=got["sims_run"])
+        assert v["withheld_reason"] != REASON_UNUSABLE_SIMS

@@ -16922,6 +16922,28 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
             snapshot=snapshot,
         )
 
+        # ONE predicate for `source` AND `simsRun`, deliberately hoisted.
+        #
+        # `estimate_live` returns `simsRun` and this row never carried it, so the
+        # published lens had `source: "live_mc"` and NO sim count at all -- the
+        # key was absent, not null. Measured 2026-08-15 on the served snapshot:
+        # lens keys were `actualSegment, baselineHomeWinProb, closed, key, label,
+        # markets, modelHomeWinProb, progress, projection, source`. Drop 3's join
+        # sizes the estimator's interval as `sqrt(p(1-p)/n)`, so with `n` missing
+        # it refused all 12 projected rows `sim_count_unusable` and the
+        # precision gate -- the whole "publish, refuse to price" decision -- was
+        # never reached. The refusal merely LOOKED like the decision working.
+        #
+        # The two fields must be decided by the SAME expression. If they drift, a
+        # lane advertises itself as a live re-sim while carrying no sim count, or
+        # a borrowed one, and the gate silently refuses or silently passes. A
+        # segment lane gets None rather than a default: stamping 120 there would
+        # make an interpolation look exactly as precise as a real re-sim.
+        lane_is_live_mc = bool(
+            is_live
+            and lane["key"] in {"live", "full"}
+            and isinstance(live_mc_projection, dict)
+        )
         rows.append(
             {
                 "key": lane["key"],
@@ -16932,7 +16954,8 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
                 "progress": progress,
                 "baselineHomeWinProb": baseline_home_prob,
                 "modelHomeWinProb": model_home_prob,
-                "source": str(live_mc_projection.get("source") or "live_projection") if is_live and lane["key"] in {"live", "full"} and isinstance(live_mc_projection, dict) else ("segment_projection" if lane["key"] != "live" else "live_projection"),
+                "simsRun": (live_mc_projection.get("simsRun") if lane_is_live_mc else None),
+                "source": str(live_mc_projection.get("source") or "live_projection") if lane_is_live_mc else ("segment_projection" if lane["key"] != "live" else "live_projection"),
                 "markets": {
                     "moneyline": moneyline_market,
                     "spread": spread_market,

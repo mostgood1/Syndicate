@@ -604,7 +604,12 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         def fake_supplement(card: dict[str, object], d: str, *, feed=None) -> None:
             card["status"] = {"abstract": "Live", "detailed": "In Progress"}
 
-        def fake_build_game_lens(card, snapshot, sim_context, market_row, *, date_str=None):
+        # `live_mc_projection` landed on the real signature in `2caa8eac`
+        # (2026-08-12) and this fake was last touched 2026-08-01, so the patch
+        # raised TypeError and this test had been red for three days. Accepted
+        # here rather than ignored: a fake that does not track the signature it
+        # replaces turns a green suite into a claim about nothing.
+        def fake_build_game_lens(card, snapshot, sim_context, market_row, *, date_str=None, live_mc_projection=None):
             captured["status"] = dict(card.get("status") or {})
             captured["date_str"] = date_str
             return []
