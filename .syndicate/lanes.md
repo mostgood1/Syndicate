@@ -1879,3 +1879,70 @@ and do not block a session on it — that is exactly how this one lost the run.
   it reports the ages I measured independently today; (3) route returns per-sport
   JSON. Production deploy NOT part of this lane — no-deploy instruction stands.
 - Blocked by: none.
+
+#### quote-feed-age-alarm — UPDATE 2026-08-15 — BUILT, TESTED, COMMITTED `8b6f7773`; DEPLOY OWED
+
+- **Committed `8b6f7773`**, local only. 3 files, 556 insertions, 0 deletions,
+  isolated `GIT_INDEX_FILE`; shared index disarmed afterwards.
+- **Falsification test PASSED on real data**: O(1) tail read recovered
+  `2026-08-15T11:07:48.411313+00:00` from the 10.4 MB production shard and a
+  full scan agreed exactly. The approach is not wrong, so the lane did not have
+  to fall back to reading the manifest.
+- **14 tests, mutation-pinned.** Flipping the initial status
+  `STATUS_UNKNOWN -> STATUS_OK` turns exactly the 4 fail-closed tests red and
+  leaves the 10 threshold/tail tests green — predicted in the test docstring
+  before running.
+- **Lane goal was WRONG and is corrected in place**: it would report `ok` at
+  14:00Z (age 10,332 s < 10,800 s), firing at **14:07:48Z**. Detection lag
+  **3.0 h**, lit for 2.8 h of the 5.8 h outage. Tightening it false-alarms on
+  the 123-min healthy pregame gap; per-regime thresholds are the real answer and
+  need a regime signal that does not exist yet (`anyLive` was true with zero
+  live rows on the board today).
+- **Bonus fix, one line:** `/api/ops/wnba/refresh-decision` raised `NameError`
+  on every request (`central_today_iso` not in scope). **Confirmed 500 against
+  production**, 200 after. Found incidentally.
+- **Pre-existing red test flagged, NOT mine:**
+  `test_intelligence.py::...mlb_top_props_artifact_for_requested_pitcher_subject`
+  fails identically with `ops.py` reverted to HEAD. Verified rather than assumed.
+- **Verification 3 OWED**: production deploy + confirm the route reports real
+  per-sport ages. No-deploy instruction stands.
+
+**PREREQUISITE 2 (run-lock contention) DELIBERATELY NOT BUILT.** Diagnosis and
+three options handed over in
+`.syndicate/tier5_quote_to_ui_WINDOW2_2026-08-15.md`. Short version: the lock is
+`ops_refresh.py:669` (per-lane), **not** `JOB_CAP_THROTTLED` — I published the
+wrong mechanism first and corrected it in three files. Raising the job cap would
+not have helped and would double concurrent memory on the worker `#435` is
+investigating (3,227 MB of 4,096 during this window). The lock is one clock for
+all eight sports — the same defect `ea8fad58` fixed for the cooldown, in a
+second place. Files are claimed by `live-game-line-projection` and `#435`.
+
+#### quote-shard-latest-index — COLLISION NOTICE 2026-08-15 18:1xZ (for `quote-feed-age-alarm`, session `tier5-live-read`)
+**Written here because that session is UNATTENDED and cannot receive a message.**
+It claims `odds_book_quotes.py`; the guard blocked me and I backed off without
+editing it further. But a change to that file is DEPLOYING now, so read this
+before building on the current version.
+
+SHIPPING as `c67f7373` (rebased onto the LIVE sha `984e48c8`, not main):
+- NEW `read_book_quotes_latest()` — reduces to latest-per-key AS IT STREAMS —
+  plus `reduce_to_latest_per_key()` and a second cache with its own byte budget
+  whose evictor CAN drop the last entry.
+- `pipeline/layer2_shortlist.py` now calls the new reader.
+- `book_grid.py`: `commence_time` comes from the FRESHEST observation, not
+  `sides_rows[0]`.
+- **UNCHANGED: `read_book_quotes`, `iter_book_quotes`, `append_book_quotes`,
+  `read_quote_last_seen`, `quote_key`.** Added, not modified — history stays
+  reachable because CLV's openings depend on it.
+
+FOR THE AGE ALARM SPECIFICALLY:
+1. `read_quote_last_seen` is untouched. If the alarm reads newest-sample age
+   from there, nothing changes.
+2. If it instead scans rows, `read_book_quotes_latest` is a better source — the
+   latest-per-key row IS the newest observation of each quote, at 13.1x fewer
+   rows. It is WRONG for movement or openings, which need the full history.
+
+AND ONE THING TO CHECK BEFORE ATTRIBUTING THE 11:07→16:56Z STARVATION: that lane
+records every instrument green throughout. The 6.3x read cost and the evening
+OOM ramp live in this same file family, so worker restarts could be part of the
+starvation rather than a separate fault. Last kill was 05:02:59Z so probably not
+today's window — but it is worth ruling out rather than assuming.
