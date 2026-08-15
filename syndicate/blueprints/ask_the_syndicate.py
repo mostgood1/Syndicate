@@ -692,18 +692,43 @@ def ask_the_syndicate_query_api():
     # answer, and it is exactly the unrouted questions (the ones with no
     # evidence) where a user has least other signal about staleness.
     #
-    # The as-of is sourced from the snapshot's own `freshness`, so it describes
-    # THE DATA THE ANSWER WAS BUILT FROM rather than the moment the request was
-    # served -- a served-at stamp on a 2-hour-old snapshot would be actively
-    # misleading. Evidence `as_of` wins when present because it is more
-    # specific. If neither exists the key stays None: an absent timestamp is
+    # The as-of is sourced from the snapshot's own freshness block, so it
+    # describes THE DATA THE ANSWER WAS BUILT FROM rather than the moment the
+    # request was served -- a served-at stamp on a 2-hour-old snapshot would be
+    # actively misleading. Evidence `as_of` wins when present because it is more
+    # specific. If nothing exists the key stays None: an absent timestamp is
     # honest, a fabricated one is not.
+    #
+    # THREE BLOCK NAMES, NOT ONE, AND THAT IS THE WHOLE BUG THIS FIXES.
+    # The first version read only `freshness` and was INERT IN PRODUCTION while
+    # passing locally, because `read_latest_intelligence_state` has four return
+    # paths whose payload SHAPES differ:
+    #   - the combined-board path (`read_combined_intelligence_response`) carries
+    #     **`state_meta` and NO `freshness` key at all** -- measured, its
+    #     `state_meta.computed_at` was a valid `2026-08-15T18:36:33Z`;
+    #   - the board_snapshot / state paths carry `freshness` at top level.
+    # Production runs the combined path (`SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE`
+    # and `SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT` are both `true` on web,
+    # despite the comment at that call site claiming the flag is "default off, so
+    # this is a no-op today"). This box takes the other path, so a local test
+    # CANNOT reproduce it -- `as_of` was correct locally and None on production
+    # for 24 of 52 questions.
+    #
+    # The key order matches `pipeline/intelligence_state.py`'s own scan
+    # (`for key in ("state_meta", "freshness", "state_freshness")`) so the two
+    # readers cannot disagree about which block wins.
     _snapshot_as_of = None
-    for _source in (response.get("freshness"), result.get("freshness") if isinstance(result, dict) else None):
-        if isinstance(_source, dict):
-            _snapshot_as_of = _source.get("computed_at") or _source.get("as_of")
-            if _snapshot_as_of:
-                break
+    for _container in (response, result if isinstance(result, dict) else None):
+        if not isinstance(_container, dict):
+            continue
+        for _key in ("state_meta", "freshness", "state_freshness"):
+            _source = _container.get(_key)
+            if isinstance(_source, dict):
+                _snapshot_as_of = _source.get("computed_at") or _source.get("as_of")
+                if _snapshot_as_of:
+                    break
+        if _snapshot_as_of:
+            break
 
     _evidence = focused_evidence if isinstance(focused_evidence, dict) else {}
     response["visuals"] = {

@@ -190,6 +190,51 @@ class ResponseContractTests(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             return response.get_json()
 
+    def test_as_of_survives_the_PRODUCTION_snapshot_shape_state_meta_only(self) -> None:
+        """THE REGRESSION THIS CLASS EXISTS FOR.
+
+        `read_latest_intelligence_state` has four return paths and their payload
+        SHAPES differ. The combined-board path -- the one production actually
+        runs -- returns `state_meta` and **no `freshness` key at all**. The first
+        K6 implementation read only `freshness`, so it was inert on production
+        (`as_of` None on 24 of 52 questions) while passing on this box, which
+        takes a path that does carry `freshness`.
+
+        A test that posts a question and reads whatever the local artifacts
+        happen to produce CANNOT catch that -- it passed throughout. So this
+        test injects the production shape directly and asserts the timestamp
+        still comes out. No local data is involved, so it cannot rot with the
+        mirror and it fails on any box if the fallback narrows again.
+        """
+        combined_shape = {
+            "ok": True,
+            "candidate_count": 3,
+            "top_opportunities": [],
+            "recommendations": [],
+            # exactly what read_combined_intelligence_response returns:
+            # state_meta present, freshness absent.
+            "state_meta": {
+                "source": "combined",
+                "computed_at": "2026-08-15T18:36:33Z",
+                "age_seconds": 12,
+                "is_fresh": True,
+            },
+        }
+        original = ask_module.read_latest_intelligence_state
+        ask_module.read_latest_intelligence_state = lambda payload=None: dict(combined_shape)
+        try:
+            payload = self._post("Is the model's probability de-vigged or raw?")
+        finally:
+            ask_module.read_latest_intelligence_state = original
+
+        self.assertEqual(
+            (payload.get("visuals") or {}).get("as_of"),
+            "2026-08-15T18:36:33Z",
+            "as_of must be sourced from state_meta when freshness is absent -- "
+            "the production payload shape has no freshness key",
+        )
+        self.assertEqual(payload.get("as_of"), "2026-08-15T18:36:33Z")
+
     def test_routed_sport_is_visible_where_consumers_read_it(self) -> None:
         payload = self._post("What are the best soccer bets tonight?")
         self.assertEqual(payload.get("routed_sport"), "soccer")
