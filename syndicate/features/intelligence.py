@@ -223,9 +223,21 @@ def _attach_intelligence_response_aliases(response: dict[str, Any]) -> dict[str,
         # engine recommendations only carry the raw odds text.
         if payload.get("american_odds") is None:
             payload["american_odds"] = _american_odds_value(payload.get("odds"))
-        if payload.get("subject_key") is None:
+        # `is None` is the wrong absence test for these two, and it failed
+        # silently for as long as it has existed. `_build_prop_dashboard_row`
+        # (home.py) derives `market_key` through `_safe_text(..., None)`, and
+        # _safe_text CANNOT return None -- its last line is `return ""`. So a
+        # source with no canonical key ships `market_key: ""`, `"" is None` is
+        # False, and the derivation below never runs. Unknown took the
+        # permissive branch and the row went out claiming an empty key.
+        #
+        # Measured 2026-08-15 on the NBA rail: `market_focuses` correctly held
+        # `['threes']` and `_candidate_market_key` would have returned "threes"
+        # on the first line of its body -- it was simply never called.
+        # A blank string is not an answer, so treat it as the absence it is.
+        if not _safe_text(payload.get("subject_key"), ""):
             payload["subject_key"] = _candidate_subject_key(payload)
-        if payload.get("market_key") is None:
+        if not _safe_text(payload.get("market_key"), ""):
             payload["market_key"] = _candidate_market_key(payload)
         # _candidate_rationale builds the narrative sentence(s) from the raw
         # candidate fields (live projection vs line, edge, confidence, ...);
