@@ -176,65 +176,63 @@ read `origin/main`.
 
 ---
 
-## MEMORY — refresh-worker `#435` / `#423`, OPEN
+## MEMORY — refresh-worker `#435` / `#423` — ROOT CAUSE FOUND `[measured 08-15 15:4xZ]`
 
-**Owner: session "Ship refresh-worker branch". Nobody else touches
-refresh-worker memory, `pipeline/intelligence_state.py`, or the board-build loop.**
+**ROOT CAUSE: the book_quotes shard is APPEND-ONLY, and the whole day of it is
+read into memory.**
 
-- **`#387` FIXED BOARD COVERAGE. IT DID NOT FIX THE OOM.** refresh-worker was
-  OOM-killed **16 times on 2026-08-14**, the last 26 minutes after both halves
-  were live. Source: `/v1/services/<id>/events`, **NOT the logs** — a killed
-  process cannot log its own death, so a log grep for `oomKilled` is worthless
-  for this question and produced a retracted "0 kills" claim. `[measured 08-15]`
-- **`#387` shipped in TWO halves** — `cfee9c6e` (streaming cutover) +
-  `705eeefc` (the guard's floor becomes two floors). Without the second, the
-  first truncated the board to ONE sport for 80 minutes. Verified on
-  `098877e1`: `BOARD_OVERVIEW_READY sports=8` on 1 build against **5 consecutive
-  `sports=1`** before; `OVERVIEW_STOPPED_FOR_MEMORY` 0; peak anon 1404.5 MB =
-  34.3% of ceiling. **One post-fix build is a result, not yet a rate.** `[measured 08-15 00:28Z]`
-- **THE KILL IS MLB GAME HYDRATION, NOT THE OVERVIEW.** At 00:41:16 the main
-  worker went 1612 MB → 3079 MB in 28s with children small and payloads tagged
-  `game_count: 15`. At the canonical 20:03:11 kill the container was at 28.8%
-  twelve seconds prior, `stage=post_build_overview` — the overview had already
-  finished. The real work is `build_cards_page_context` running HYDRATED on the
-  worker. `[measured 08-15]`
-- **Leave the 3000 MB floor in front of MLB alone.** It guards the wrong stage,
-  but lowering it only admits more work to a process dying elsewhere.
-- **THE 20:03:11Z KILL IS UNEXPLAINED** and the diagnosis that explained it is
-  FALSIFIED: "eight hydrated sports cannot fit in 4 GiB" — the same 8-sport pass
-  ran twice that evening at 613 MB and 804 MB. Streaming caps the transient; it
-  did not explain the outlier. `[learnings.md 08-15 EXONERATED]`
-- **GOAL #1 HAS TWO QUANTITIES; do not trade them off.** **PEAK** (acute) is what
-  crosses the 4 GiB ceiling — a ~1873 MB excursion, cause named and now
-  streamed. **FLOOR** (chronic, ~1400–2000 MB `anon`) is UNNAMED; reducing it
-  buys headroom but is not what kills the process.
-- **`#423` — the leak is NOT glibc arena fragmentation.** Ten readings at `anon`
-  ~2031 MB: arena coverage 11.0–24.4%, `system_current` **plateaus at ~393 MB
-  while `anon` climbs**. **Stop tuning the allocator.** Both flushes are already
-  deployed and measured; `malloc_trim` returns 0.0–2.9 MB at guard time, so the
-  residual is live objects, not free-but-unreturned. **Do not propose "add a
-  flush".** `[measured 08-14 02:18Z]`
-- **It is not in GC-tracked Python objects either** — `HEAP_CENSUS` at
-  `container_mb 2150` counts 325,653 gc-tracked objects; millions would be
-  needed. Remaining hypothesis, NOT a finding: large allocations neither
-  gc-tracked nor in glibc arenas (NumPy/Monte Carlo buffers). `[measured 08-14]`
-- **`tracemalloc` made production MEASURABLY WORSE and is OFF
-  (`SYNDICATE_TRACEMALLOC_DIAG=0`).** With tracing on, the sampler emitted
-  **zero** samples and kill cadence went 16–22 min → 3–10 min:
-  `take_snapshot()` walks every live traced allocation holding the GIL and
-  blocked the sampler thread. Production was also tracing at **nframe=1**, which
-  names `decoder.py` — the allocator, not the caller — so even a successful dump
-  would have produced a known-worthless answer. `[measured 08-15 02:1xZ]`
+- `data/<sport>_source/tracking/book_quotes/<date>.jsonl` gains a row per quote
+  OBSERVATION (17 fields). It grows all day and resets at the date rollover.
+  Production `CACHE_EVICT` records, MLB 2026-08-14: **89.9 → 108.8 → 133.2 →
+  165.2 → 184.5 MB**, then 2.2 MB the next morning.
+- A read costs **6.3x file bytes** resident (the module's own measured constant),
+  so the 184.5 MB shard is **~1,162 MB for ONE cache entry** against a 500 MB
+  budget. `_evict_book_quotes_over_budget` is `while len(cache) > 1`, so a single
+  oversized entry **can never be evicted**; when it is not alone it is evicted
+  and re-read, re-allocating ~1.1 GB each time.
+- **92.4% of that file is superseded.** Measured on the 207 MB 2026-08-09 shard:
+  478,782 rows collapse to **36,424** distinct quote keys — a **13.1x** shrink.
+- **THE FIX IS AN INDEX, NOT COMPACTION.** The lookup path needs latest-per-key
+  (~89 MB instead of ~1.16 GB). The superseded rows ARE the opening prices and
+  line movement that `clv-without-settlement` depends on — do not delete them.
+  Second, independent, cheap: let the evictor drop the last entry.
+- The guard's sizing comment is stale by 2.05x — it reasons from "~90 MB, so one
+  copy is ~570 MB".
+
+**IT IS A DAILY RAMP, NOT A LEAK.** Kills cluster in the evening with the shard
+at maximum and **stopped at 05:02:59Z** when the date rolled over. This is why
+every retention and allocator hypothesis failed.
+
+**What the memory IS, measured `[08-15 03:45Z]`:** pymalloc holds 1,688 arenas =
+1,688 MB, of which **1,638.5 MB is LIVE** (`bytes in allocated blocks`);
+fragmentation is 49.5 MB (3%) and 850 arenas had been reclaimed. Size classes:
+**13,719,058 x 64 B (838 MB)** and **614,024 x 400 B (234 MB)** — ~22.3M objects,
+which is exactly 478k rows x 17 fields.
+
+**RETRACTED, all measured wrong earlier in the same session:** (1) "85% of anon
+is not reachable Python data" — an artifact of a ONE-LEVEL census that summed
+only `str`/`bytes` DIRECTLY referenced by a tracked object, missing everything
+nested; (2) allocator retention — glibc coverage is 13.9% and its own binding
+reads `arena_not_representative`, and pymalloc retention is 3%; (3) cache
+retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
+
+**Still true and still load-bearing:**
+- **Kills are EVENTS, not logs.** `/v1/services/<id>/events`. A killed process
+  cannot log its own death; a log grep for `oomKilled` produced a retracted
+  "0 kills" claim. `[08-15]`
+- **`#387` shipped in TWO halves** — `cfee9c6e` + `705eeefc`. It fixed BOARD
+  COVERAGE (`sports=8` against 5 consecutive `sports=1`), not the OOM.
+- **Leave the 3000 MB floor in front of MLB alone.** It guards the wrong stage.
+- **`tracemalloc` is OFF and is RULED OUT on this process at any frame count.**
+  With tracing on the sampler emitted ZERO samples and kill cadence went 16-22
+  min → 3-10 min. It never once returned an answer in production. `[08-15 02:1xZ]`
+- **Instrumentation that now exists and fires on CONDITION:** `MEMORY_WATCHDOG`
+  (2s sampler, gated), `HEAP_CENSUS`, `UNTRACKED_BYTES_CENSUS`, `PYMALLOC_STATS`.
+  All capped per process. `scripts/render_logs.py` pages the logs API BACKWARD
+  and prints the window it actually covered.
 - **`#253`'s worker cache bound was applied to MLB ONLY.** NBA/WNBA/soccer have
-  no worker variant (`= 32` unconditional) and the 32-entry limit is never
-  reached, so **every context built is retained for the life of the process**.
-  Magnitude NOT established — those sports are out of season or small. Do not
-  quote it as MB until somebody sizes a context. `[measured 08-14 18:5xZ]`
-- **The MLB cards-context cache EARNS its retention — 22.9% hit rate. Do not
-  zero it.** The "mathematically zero hit rate, safe to zero" claim is retracted
-  at source. `[measured 08-14]`
-- **Instrument gap:** `_log_cards_context_memory` exists ONLY in MLB's cards
-  module. Zero `[wnba_cards]` lines is a fact about the emitter, not the cache.
+  no worker variant. Magnitude NOT established. `[08-14 18:5xZ]`
+- **The MLB cards-context cache EARNS its retention — 22.9% hit rate.**
 
 ---
 
