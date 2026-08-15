@@ -2134,3 +2134,53 @@ accident and failed the moment I tidied it into one call.**
 - Generalises past git: **any repair chained into the shell that set the
   hazardous variable inherits it.** The verification has to read the shared
   state, not the command's return.
+
+
+### 2026-08-15 - A LABEL-MATCHED LOOKUP IS NOT A SUBSTITUTE FOR THE FIELD, AND ITS FAILURE IS SILENT
+
+- **What we believed:** soccer's card losing its `.cards-data-pair` rows was
+  either the producer publishing less or my own G3 suppression gate misfiring.
+  I asserted both, in that order, and both were wrong.
+- **What was actually true:** `sim.periods` is `{}`, so the board contract
+  builds a stand-in Full Game row, and that row sourced its market and edge via
+  `_metric_lookup(metrics, "Spread") or _metric_lookup(metrics, "Total")`.
+  Soccer publishes `Home win`, `Draw`, `Away win`, `Total goals`, `BTTS`,
+  `Over 2.5`. **Nothing matched**, both fields became the null placeholder, and
+  the G3 gate then correctly dropped a row on which every value was a
+  placeholder or a restatement. Meanwhile `betting.home_spread` (-1.5),
+  `betting.total` (2.5) and `sim.score` sat on the same game, and the branch 90
+  lines above already built `ATS ... | Total ...` from exactly those fields.
+  **The card displayed its market line and its edge nowhere, on a game that had
+  both.**
+- **How we found out:** fetching the served JSON and reading `metrics` next to
+  `betting`, instead of reasoning about which of my two suspects it was.
+- **The rule going forward:** when a value can be read from a FIELD, read the
+  field; a lookup keyed on a human-facing label is a guess about another
+  team's vocabulary and it fails silently, producing a placeholder that looks
+  exactly like genuinely-absent data. If a label lookup must exist, it is the
+  fallback, never the primary. And: **a suppression gate doing its job is not
+  evidence its input is healthy** - the gate was right, its input was starved,
+  and the visible symptom was identical either way.
+- **Cost:** two wrong public attributions; a week of soccer cards with no
+  market line. The fix was 30 lines and the data was always there.
+
+### 2026-08-15 - ENUMERATE EVERY SPORT THAT REACHES A CHANGED BRANCH *BEFORE* DEPLOYING
+
+- **What we believed:** stating a blast radius of "nfl does not reach this
+  branch (0/16), ncaaf reaches it but is inert (0/16 rows changed)" was a
+  measured blast radius. It was measured - it just was not complete.
+- **What was actually true:** **MLB reaches the same branch on 15/15 games**
+  and was never checked. It is inert there too (0/15 rows changed), so nothing
+  broke, but that was luck rather than method: the check happened AFTER the
+  deploy was live.
+- **How we found out:** the probe's MLB card-height spread moved in the
+  post-deploy run, which forced the question "does MLB even reach this code?"
+  - a question that should have been asked while the change was still local.
+- **The rule going forward:** when changing a shared contract, enumerate the
+  branch predicate across **every** sport that calls it and write the counts
+  down, before the deploy. "The two I thought of" is not an enumeration. The
+  cheap form is one loop over each sport's served payload testing the
+  predicate - it took under a minute afterwards and would have cost the same
+  before.
+- **Cost:** none realised. The exposure was a shared-contract change reaching
+  production with a third of its blast radius unexamined.
