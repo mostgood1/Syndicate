@@ -6,6 +6,63 @@
 
 ## OPEN
 
+### clamp-trigger-watcher — CLOSED-VERIFIED 2026-08-15 — shipped `4ead8eac`; self-test 5/5, live `no_trigger`, RUNNING in background — opened 2026-08-15 — session: probability-differential
+- Goal: the `/preflight` FAIL on `7bb74c95` said the fix is unverifiable until a
+  slate carries a `fair_probability` outside [0.02, 0.98]. This makes that
+  condition **detected rather than waited for**, and captures the discriminating
+  measurement at the moment it becomes available.
+  **Testable outcome:** a committed poller that, on a triggering slate, writes an
+  evidence record classifying production as `PRE_FIX_MISPRICE` or `POST_FIX_OK`
+  — a verdict it can only reach when the condition actually exists.
+- Why a watcher and not a reminder: the trigger is transient. Both occurrences
+  today (mlb totals, p=0.992056 / 0.007944) were gone within hours, and the
+  current slate is nowhere near an edge (min 0.05846, max 0.63833).
+- Files (exclusive to this lane):
+  - `scripts/watch_clamp_trigger.py` (new).
+  - `reports/clamp_watch/` (new, generated output).
+  - Collision check: `_claims()` CLEAR, **and** re-verified textually against
+    every OPEN lane's `Files:` block, because `_claims()` under-reports
+    (today's FORBIDDEN). No lane mentions a watcher or `scripts/watch*`.
+- Hypothesis: n/a — instrumentation.
+- Falsification test: if the watcher reports `PRE_FIX_MISPRICE` while the live
+  web SHA already carries the fix, the classifier is reading the wrong producer
+  and the verdict is worthless — check `fair_price` provenance before trusting
+  it.
+- Verification: run `--once` against production and confirm it (a) correctly
+  reports `no_trigger` on today's slate, and (b) returns the intended exit code.
+  Its trigger path is exercised against a synthetic payload, since production
+  cannot be made to produce one on demand.
+- Blocked by: none. Read-only against production. **No deploy.**
+
+#### clamp-trigger-watcher — RESULT 2026-08-15 — both criteria MET, and it is RUNNING
+- **Shipped `4ead8eac`** — `scripts/watch_clamp_trigger.py` +
+  `reports/clamp_watch/observations.jsonl`. No deploy (read-only against prod).
+- **RUNNING NOW** in this session's background: `--interval 900 --max-checks 48`
+  = a 12h window, oversampling the ~25 min board rebuild. **Exits 10 on trigger**,
+  which re-invokes the session. **If this session dies, the watch dies** — the
+  script survives, the process does not. Whoever picks this up: just re-run it.
+- **Verified (a):** live `--once` -> `no_trigger`, 108 rows,
+  p=[0.058458, 0.638325], exit 0. **(b)** exit codes as specified.
+- **Verified (c) — the branch production cannot produce on demand.** `--self-test`
+  5/5. Without it, the classifier's most important path would first execute at
+  the exact moment it was needed. Cases: out-of-clamp priced AT the clamp ->
+  `PRE_FIX_MISPRICE`; priced BEYOND -> `POST_FIX_OK`; no price published ->
+  `POST_FIX_OK_COLUMN_ABSENT`; **p exactly 0.98 -> NOT a misprice** (the fixed
+  `american_price(0.98)` is legitimately -4900, so the discriminator is the
+  PROBABILITY being outside the band, not the price being at it);
+  `correct_price(0.992056) = -12488`.
+- **The falsification test is built in.** The verdict is derived from PUBLISHED
+  CONTENT, not from a deployed SHA, so it cannot be fooled by a deploy that did
+  not carry the fix. Prices are joined per row, never compared as two
+  populations. A failed confirming read reports `TRIGGER_UNCONFIRMED`, not a
+  verdict — a failed read is not a result.
+- **`no_trigger` is stamped as NOT evidence of correctness** in every record.
+  That is the whole design: a quiet run is the instrument saying it cannot see.
+- **NEXT:** on exit 10, read `reports/clamp_watch/trigger_*.json`. A
+  `PRE_FIX_MISPRICE` verdict is the discriminating before-measurement that turns
+  the `/preflight` FAIL on `7bb74c95` into a PASS.
+
+
 ### probability-clamp-removal-2 — CLOSED-VERIFIED 2026-08-15 — ALL THREE clamp sites now fixed; shipped `7bb74c95`; 6 apparent regressions bisected to ANOTHER session's uncommitted file — opened 2026-08-15 — session: probability-differential
 - Goal: finish Tier 3a's fix. The **last two** `max(0.02, min(0.98, p))` clamp
   sites delegate to `opportunity_signals.american_price`, so no board column
@@ -1896,7 +1953,7 @@ and do not block a session on it — that is exactly how this one lost the run.
 - **Lane stays OPEN.** Drop 1 alone does not close the goal, which is a live
   game-line projection on the published board.
 
-### quote-feed-age-alarm — OPEN — opened 2026-08-15 — session: tier5-live-read
+### quote-feed-age-alarm — CLOSED-VERIFIED 2026-08-15 — deployed web `0c65a832`, 404→200, caught soccer STALE at 340.9 min on the first read — opened 2026-08-15 — session: tier5-live-read
 - Goal: the age of the newest quote sample is readable per sport, independent of
   whether any board built, and says `stale` when it is stale. Single testable
   outcome: had this existed today it would have fired on MLB at **14:07:48Z**
