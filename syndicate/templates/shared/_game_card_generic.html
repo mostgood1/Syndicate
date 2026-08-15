@@ -184,13 +184,26 @@
             <span class="cards-chip">Bars</span>
           </div>
           <div class="cards-prob-grid">
+            {#- A bar is drawn only when there IS a probability. It used to be
+                drawn always, because the contract handed it 50.0/50.0 for a
+                game with no model -- a centred, confident-looking split that
+                a reader cannot tell from a real coin-flip game. Absent renders
+                as absent. -#}
             {% for row in probability_rows %}
               <div class="cards-prob-row">
                 <div class="cards-prob-label">{{ row.label }}</div>
-                <div class="cards-prob-bar" data-away-pct="{{ row.away_pct }}" data-home-pct="{{ row.home_pct }}">
-                  <span class="cards-prob-away"></span>
-                  <span class="cards-prob-home"></span>
-                </div>
+                {% if row.home_pct is not none and row.away_pct is not none %}
+                  <div class="cards-prob-bar{% if row.draw_pct is not none %} cards-prob-bar--three-way{% endif %}"
+                       data-away-pct="{{ row.away_pct }}"
+                       data-home-pct="{{ row.home_pct }}"
+                       {% if row.draw_pct is not none %}data-draw-pct="{{ row.draw_pct }}"{% endif %}>
+                    <span class="cards-prob-away"></span>
+                    {% if row.draw_pct is not none %}<span class="cards-prob-draw"></span>{% endif %}
+                    <span class="cards-prob-home"></span>
+                  </div>
+                {% else %}
+                  <div class="cards-empty-copy">No win probability was published for this {{ row.label|lower }}.</div>
+                {% endif %}
                 <div class="cards-subcopy">{{ row.summary }}</div>
               </div>
             {% endfor %}
