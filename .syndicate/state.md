@@ -65,7 +65,8 @@ a revert of ledger work committed ~20 minutes earlier on the second occasion
 the worktree). Each was disarmed with a path-scoped `git reset`, which touches
 no file. **Run `git diff --cached --numstat` before EVERY commit and read the
 DELETION column** — a stale index shows up as deletions-only against a HEAD that
-moved past it. `[measured 08-15, **3 occurrences in one session**; the third re-appeared SECONDS after a clean commit, so a single disarm is not a fix — re-check immediately before each commit]`
+moved past it. `[measured 08-15, **4 occurrences in one session**; the third re-appeared SECONDS after a clean commit, so a single disarm is not a fix — re-check immediately before each commit. **The FOURTH held a revert of a MEASURED result** — `DEBIAS_VALIDATION` back to `in_sample`, restoring a `batter_hits` verdict the backtest had just retired, plus 201 lines of the ledger reconcile. A bare `git commit` by any session would have un-shipped a measurement with the worktree clean]`
+- **`git diff` without `--cached` compares the worktree to the INDEX, not to `HEAD`.** Against a stale shared index that reads as "my committed work is missing from the worktree", which is alarming and wrong. **Ask `git diff HEAD` when the question is "did my commit land".** `[08-15, cost one false alarm]`
 
 ---
 
@@ -324,7 +325,9 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   `[measured 08-15 16:38-17:00Z, deploy-free window, 22 samples]`**
   On 08-15 the pregame beat was **~60 min, not 121.6**, and then MLB capture
   starved for **5.8 h**. Cause is neither the tick nor the cooldown: a chain of
-  back-to-back refresh **run-locks** (`JOB_CAP_THROTTLED active=1 max=1`), each
+  back-to-back refresh **run-locks** (`ops_refresh.py:669`, per-lane, NOT the
+  separate `JOB_CAP_THROTTLED` job cap -- an earlier version of this line
+  conflated them; raising the job cap would not have helped), each
   held ~25 min with ~2 min free — **~92% occupancy, traced 11:39→17:00Z**.
   17 consecutive ticks refused by `pid=4047`; the ONE tick that got through at
   16:56:26 took end-to-end from **20,880 s to 32 s**, then `pid=5681` retook it.
