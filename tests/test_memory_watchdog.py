@@ -276,3 +276,54 @@ def test_stopping_tracing_never_raises_and_reports_what_it_did(capfd):
     mo.stop_allocation_tracing("unit-test")
     out = capfd.readouterr().out
     assert "TRACEMALLOC_STOPPED" in out and "unit-test" in out
+
+
+# --- #435 step four: the heap census ------------------------------------------
+#
+# `log_heap_census` is the RIGHT instrument for "what is in the anon" -- it walks
+# gc.get_objects() rather than instrumenting allocations, so it does not have
+# tracemalloc's cost. It had never fired in production: its only call site sits
+# inside `_build_candidate_pool` behind min_container_mb=1200, and five hours of
+# logs contained zero HEAP_CENSUS lines. These pin the condition-trigger.
+
+
+def test_census_fires_once_the_process_holds_the_memory_in_question():
+    # The worker sits at ~2200MB anon between excursions -- that is the state the
+    # owner asked about ("what is in the 1GB that sits around and grows").
+    assert mo.watchdog_should_heap_census(anon_mb=2242.8, already_censused=False) is True
+
+
+def test_census_does_not_fire_on_a_light_process():
+    assert mo.watchdog_should_heap_census(anon_mb=400.0, already_censused=False) is False
+
+
+def test_census_is_once_per_boot_at_this_layer():
+    assert mo.watchdog_should_heap_census(anon_mb=2242.8, already_censused=True) is False
+
+
+def test_census_threshold_is_env_tunable():
+    with patch.dict("os.environ", {"SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB": "300"}):
+        assert mo.watchdog_should_heap_census(anon_mb=400.0, already_censused=False) is True
+
+
+def test_census_never_runs_on_the_sampler_thread():
+    # Same rule as the allocation dump, for the same measured reason: a walk of
+    # millions of objects holds the GIL, and a blocked sampler reads as calm.
+    mo._WATCHDOG_STATE.pop("heap_censused", None)
+    started = {}
+
+    class _FakeThread:
+        def __init__(self, target=None, args=(), name=None, daemon=None):
+            started.update(target=target, daemon=daemon)
+
+        def start(self):
+            started["started"] = True
+
+    try:
+        with patch("threading.Thread", _FakeThread):
+            mo._watchdog_maybe_heap_census({"memory_anon_mb": 2242.8})
+        assert started.get("started") is True
+        assert started.get("daemon") is True
+        assert started.get("target") is mo.log_heap_census
+    finally:
+        mo._WATCHDOG_STATE.pop("heap_censused", None)

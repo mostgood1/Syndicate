@@ -990,6 +990,55 @@ def _watchdog_dump_allocations_now(payload: dict[str, Any], climb_mb_per_s: floa
         )
 
 
+def watchdog_should_heap_census(*, anon_mb: float | None, already_censused: bool) -> bool:
+    """Fire ONE heap census once the process is holding the memory in question.
+
+    `#435`. `log_heap_census` is the RIGHT instrument for "what is in the anon"
+    and it has never fired in production: its only call site is inside
+    `_build_candidate_pool` behind `min_container_mb=1200`, and five hours of
+    logs contain zero `HEAP_CENSUS` lines. Waiting on a call site is what kept it
+    silent, so this triggers on the CONDITION instead -- the same change that
+    made the watchdog itself work.
+
+    Unlike tracemalloc (ruled out 2026-08-15: it silenced this sampler at both
+    nframe=3 and nframe=2) a census is a ONE-SHOT walk, not per-allocation
+    bookkeeping. It holds the GIL once for the walk rather than taxing every
+    allocation, and `_HEAP_CENSUS_MAX_PER_PROCESS` already caps it.
+    """
+    if already_censused or anon_mb is None:
+        return False
+    return float(anon_mb) >= _env_float("SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB", 1500.0)
+
+
+def _watchdog_maybe_heap_census(payload: dict[str, Any]) -> None:
+    """Census the heap once we are holding the memory we are trying to explain."""
+    try:
+        anon_mb = payload.get("memory_unreclaimable_mb")
+        if anon_mb is None:
+            anon_mb = payload.get("memory_anon_mb")
+        if not watchdog_should_heap_census(
+            anon_mb=anon_mb, already_censused=bool(_WATCHDOG_STATE.get("heap_censused"))
+        ):
+            return
+        _WATCHDOG_STATE["heap_censused"] = True
+        # OFF-THREAD, for the reason the dump is: a walk of millions of objects
+        # holds the GIL, and a blocked sampler is indistinguishable from a calm
+        # system. Measured 2026-08-15 02:11-02:55.
+        import threading
+
+        threading.Thread(
+            target=log_heap_census,
+            args=(f"watchdog_anon_{int(float(anon_mb))}mb",),
+            name="memory-watchdog-census",
+            daemon=True,
+        ).start()
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] WATCHDOG_HEAP_CENSUS_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _watchdog_loop(interval_seconds: float) -> None:  # pragma: no cover - thread body
     last_emitted_mb: float | None = None
     previous_mb: float | None = None
@@ -1021,6 +1070,7 @@ def _watchdog_loop(interval_seconds: float) -> None:  # pragma: no cover - threa
             if climb is not None:
                 payload["climb_mb_per_s"] = round(climb, 1)
             _watchdog_maybe_dump_allocations(payload, climb)
+            _watchdog_maybe_heap_census(payload)
             if current_mb is not None:
                 previous_mb = float(current_mb)
                 previous_at = now
