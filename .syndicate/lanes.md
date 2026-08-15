@@ -320,6 +320,121 @@
   to a stamp that persists in shard files needs its backfill story decided
   before it ships, not after.
 
+### spread-line-sign-convention — OPEN — **ANSWERED: THE FEED IS CORRECT AND THE BOARD'S HOME-SPREAD `line` SIGN IS INVERTED — 16 of 17 book/event pairs across 15 EVENTS violate no-arbitrage. POSSIBLE USER-FACING MISLABEL, NOT A CLV-ONLY BUG** — opened 2026-08-15 — session: lane-cleanup
+- **DISCRIMINATOR RUN 2026-08-15 22:4xZ. It trusts NEITHER label**, which is what
+  makes it decisive: for one team, `-1.5` (win by 2+) is strictly harder than
+  `+1.5`, so `implied(-1.5) < implied(+1.5)` is a no-arbitrage fact regardless of
+  whose naming is right.
+
+      source                          respects invariant   violates
+      BOARD (published openings)            1 of 17          16
+      FEED  (odds-history lanes)            2 of 2            0
+
+  Board pairs span **15 distinct events** and many books; junk quotes
+  (`novig -100000`) excluded. The single exception is `nordicbet -1.5=117 /
+  +1.5=111` — implied 0.461 vs 0.474, a 1.3-point gap on a near-pick'em, i.e.
+  inside the vig and not evidence of correctness.
+- **The feed, on the same event, is internally right both times:** home `+1.5`
+  at `-205` (implied 0.672, the easier bet, minus money) and home `-1.5` at
+  `+168` (implied 0.373, the harder bet, plus money).
+- **SO: `fetch_mlb_oddsapi_local.py` IS EXONERATED. The bug is downstream, where
+  a published home-spread selection gets its `line`.** The hypothesis in this
+  lane's header is CONFIRMED and the falsification branch (lane-collapse only)
+  is REFUTED — lane collapse is real but cannot explain a systematic sign
+  violation across 15 events.
+- **MY EARLIER ATTRIBUTION IS NOW DOUBLY CORRECTED, and this is the final
+  version.** First I wrote that the FEED "transposed its labels" (in
+  `learnings.md`). Then I corrected that to "each point is internally
+  consistent; the market state holds one lane at a time". **Measured, it is
+  neither: the feed is correct and the BOARD is inverted.** The learnings entry
+  from earlier tonight describes the right FAILURE MODE (a label whose
+  convention is not stable across sources) but names the wrong culprit.
+- **THIS IS BIGGER THAN CLV AND MUST NOT SHIP AS A CLV FIX.** These openings are
+  recorded FROM published board rows, so if the board serves `side=home,
+  line=-1.5` while the price is the `+1.5` price, **users are being shown the
+  wrong side of the run line.** That is a correctness problem on the product
+  surface; CLV merely made it visible.
+- **UNVERIFIED, and it decides the severity — DO THIS BEFORE ANY FIX:** I have
+  NOT checked what the rendered card/API actually displays. Two possibilities and
+  they need different fixes: (a) the board's `line` field is genuinely inverted at
+  the point of publication -> user-facing defect; (b) the board's `line` means
+  something other than the home team's handicap (e.g. it carries the away line,
+  or the market line) and only the CLV join misreads it -> internal-only. **The
+  price data cannot tell these apart; only reading the publisher and the template
+  can.**
+- Next step, concrete: find where a spreads selection's `line` is set on the
+  published row (start from `pipeline/layer2_shortlist.py` and the per-sport
+  `cards.py`), and read what the card template renders beside it. Then decide (a)
+  vs (b). **Still no deploy** — and generality beyond MLB is still unmeasured.
+
+- Goal: for a spread, ONE source owns the sign of `line` and every consumer
+  agrees with it. Testable outcome: for every same-book spreads row in
+  `/api/ops/clv/report`, the opening's `(side, line, price)` and the close's
+  `(side, line, price)` describe the SAME bet — checked by an assertion that does
+  not itself rely on the label (see below) — and a test pins the convention per
+  source.
+- **WHY: a `-29.90` CLV on a market that never moved.** Event `69928d29…`
+  (Seattle @ Houston), FanDuel spreads. The opening recorded `home -1.5 @ -205`;
+  the close resolved `home -1.5 @ +168`. `-205` and `+168` are the two sides of
+  ONE run line, so the "30-point move" is a bet differenced against its opposite.
+- **REFINEMENT FROM READING THE FETCHER — my first framing was too strong and is
+  corrected here before anyone acts on it.** I wrote in `learnings.md` that the
+  feed "transposed its labels". **Each history point is internally consistent:**
+  `fetch_mlb_oddsapi_local.py:505-525` derives `home_line = -away_line` and keys
+  each lane by the home line, so `{away -1.5 / home +1.5}` and
+  `{away +1.5 / home -1.5}` are both correct — they are **two different lanes of
+  the same spreads market**.
+  - **The real mechanism is that the odds-history market key carries NO line**
+    (`event_id|home_team|away_team|market|bookmaker`), which `clv_join.py`'s own
+    docstring already states. So every spread lane collapses into ONE market
+    state and the last writer wins. At 06:02Z that state held the home `+1.5`
+    lane; at 21:26Z it held home `-1.5`.
+  - **What is still genuinely unresolved, and is this lane's question:** the
+    opening says `home -1.5` costs `-205`; the 06:02 history says `home +1.5`
+    costs `-205`. Same price, opposite line. **One of the two is using the
+    opposite sign convention for a home spread, and I do not yet know which.**
+- Hypothesis: the board's published `line` for `side=home` carries the OPPOSITE
+  sign to the feed's `home_line`. If so every home spread opening is joined to
+  the wrong lane, and away rows are joined correctly by accident.
+- Falsification test: if the board and feed signs agree, then the mismatch is
+  purely lane-collapse (the state simply held a different lane than the opening),
+  the sign is exonerated, and the fix is to key history by line rather than to
+  change any sign.
+  - **Discriminator that does NOT trust either label:** for one event, take the
+    published `book_prices` for the home `-1.5` selection and the feed's two
+    lanes at the same instant. The lane whose `home_odds` EQUALS the published
+    price identifies which line the board meant. Prices are the invariant here;
+    labels are the thing under test.
+- **SCOPE ALREADY MEASURED, so nobody re-derives it:** mlb 2026-08-15 same-book —
+  spreads n=42, mean `+0.515`, median **exactly 0.000**, only 2 rows |clv|>10 and
+  those two are a **mirror pair from this one event** (`+30.428` / `-29.900`),
+  because both openings were recorded and each got the other's close. h2h/totals
+  n=128, **zero** |clv|>10. **Severe per row, near-cancelling in aggregate** —
+  so this corrupts per-recommendation CLV, variance, CIs and any "worst bets"
+  list, while leaving the headline roughly intact. **It is NOT a headline
+  emergency and must not be deployed like one.**
+- Files (exclusive to this lane):
+  - `scripts/fetch_mlb_oddsapi_local.py` — where `home_line`/`away_line` and the
+    lane key are derived. Collision check RUN via `lane-guard.py`'s own
+    `_claims()`: CLEAR.
+  - `tests/test_spread_line_sign_convention.py` (new). CLEAR.
+  - **NOT claimed, held by other OPEN lanes — coordinate, do not edit across:**
+    `syndicate/features/shared/odds_refresh_tracking.py`
+    (`closing-stamp-is-detection-time`) and
+    `syndicate/features/shared/clv_join.py` (`clv-without-settlement`). Both are
+    this session's lanes, so the marker can simply be moved if the fix lands
+    there — but the claim must be updated first, not bypassed.
+- Verification: (1) the discriminator run on >= 5 events across >= 2 books, with
+  the winning convention named per source; (2) a test pinning it; (3) the
+  spreads |clv|>10 count re-derived and the mirror pair gone.
+- **Generality is UNMEASURED and must be established before any fix ships:** all
+  of the above is ONE event, ONE date, MLB, FanDuel. NFL/NCAAF spreads and other
+  books are untested, and MLB run lines are the asymmetric case that makes the
+  error visible — symmetric `-110/-110` spreads would hide it entirely.
+- Blocked by: none. **No deploy without `/preflight`**, and not before generality
+  is measured — a sign flip applied to a source that was already correct would
+  invert every spread join instead of fixing it.
+
 ### clv-without-settlement — OPEN — **PUBLISH FIXED AND MEASURED (web `bebe87c9`, live 19:36:45Z): `same_book_n` 0 → 144, FIRST UNBIASED CLV = -0.07% AT A 27.1% BEAT RATE (PRELIMINARY, TAKEN PRE-FIRST-PITCH). THE LANE'S BREADTH HYPOTHESIS IS REFUTED** — opened 2026-08-14 — session: lane-cleanup
 - **RESULT 2026-08-15 19:38Z — the publish fix landed and it changed the answer.**
   `PUBLISH_FAILED`×8/16h (`HTTP 403 FORBIDDEN`, last 19:32:50Z) → `PUBLISH_OK`×2
@@ -4308,3 +4423,35 @@ the card surface, that is a finding about the harness, not about the board.
 - **UNVERIFIED, do not promote:** that `rows_live_gameline_edged` > 0 in
   production; that the coverage block reaches the served payload (nothing has
   read it back from a built artifact); that totals withhold correctly in the wild.
+
+#### DEPLOY ATTEMPTED 2026-08-15 ~22:5xZ — BLOCKED BY TWO REAL GATES, NOT BY CAUTION
+User instructed "deploy it", reversing the earlier hold. Proceeded, and the
+deploy did not fire because two independent gates said no:
+
+1. **The refresh-worker deploy CLAIM is HELD** by `live-game-line-projection`
+   (4.0 min old, `scripts/deploy_claim.py status`). That session is live and
+   staging its own Drop 3 worker deploy. `deploy_claim.py` offers `--force`;
+   **I did not use it.** Forcing a live peer's claim is exactly the
+   "silently working around a concurrent session" failure the ledger warns about,
+   and the claim mechanism is worthless the first time someone overrides it.
+2. **The worker is NOT clear.** `deploy_preflight.py` shows an in-flight MLB sim
+   (`run_mlb_daily_sim_job.py` pid 344), `daily_update.py --workflow ui-daily`,
+   `refresh_odds_sources.py`, and `build_soccer_artifacts.py --league mls`
+   (pid 421). **A deploy right now kills an MLB sim AND a soccer league build
+   mid-run.** The precedent for firing into a live run exists but required an
+   explicit user instruction after the cost was surfaced.
+
+**Action taken instead:** asked the claim holder to CARRY `89c3d947` rather than
+release. My work is already on `origin/main`, so if their target is cut from
+current `origin/main` they have it for free; if they cut from refresh-worker's
+own live SHA (`846bb74e`) per the stacking rule, they need one cherry-pick.
+5 files, +246/-1, **zero overlap** with their Drop 3 files.
+
+**This is the deploy train `state.md` asks for** — one worker restart carrying
+two lanes instead of two restarts resetting everyone's windows twice.
+
+**Owed when it lands:** verify by PATCH-ID that `89c3d947` is present on the new
+live SHA (a deploy reporting `live` is not evidence my commit is in it), then
+re-read the four baseline numbers in `state.md` — `line` numeric 84/101 with 7
+whole-numbered is the one that should move, and `market_key`/`player_name` at
+0/101 should NOT change, because those two fixes have no production incidence.
