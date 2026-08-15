@@ -107,3 +107,62 @@ def test_reader_is_capped_per_process():
         assert mo.log_smaps_anon_breakdown("unit-test") is None
     finally:
         mo._SMAPS_STATE["count"] = saved
+
+
+# --- the reconciliation fix -----------------------------------------------
+#
+# The first production read returned `reconciles: false` at 27.0%. The parse was
+# right; the COMPARISON was a category error -- a per-process total against
+# cgroup `anon`, which counts the container. This worker runs 8-10 children
+# holding ~504MB, so that guard would have fired on every read forever, and a
+# guard that always fires is a guard nobody reads.
+
+
+def test_reconciles_against_the_process_not_the_container(monkeypatch, tmp_path):
+    smaps = tmp_path / "smaps"
+    smaps.write_text(SMAPS, encoding="utf-8")
+    monkeypatch.setattr(mo, "_PROCFS_ROOT", tmp_path.parent)
+    monkeypatch.setattr(type(smaps), "exists", lambda self: True, raising=False)
+    monkeypatch.setattr(mo, "parse_smaps", lambda text: {"total_anon_mb": 615.1, "by_kind_mb": {}})
+    # process anon agrees; container is far larger because of children
+    monkeypatch.setattr(mo, "_process_rss_anon_bytes", lambda: int(615.1 * 1024 * 1024))
+    monkeypatch.setattr(mo, "_read_container_memory_stat", lambda: {"anon": int(1516.5 * 1024 * 1024)})
+    monkeypatch.setattr(mo.Path, "read_text", lambda self, **kw: SMAPS, raising=False)
+    mo._SMAPS_STATE["count"] = 0
+    out = mo.log_smaps_anon_breakdown("unit-test")
+    assert out is not None
+    assert out["reconciles"] is True, out
+    assert out["reconciles_within_pct"] == 0.0
+    # the container figure is kept, but named so it cannot be subtracted blindly
+    assert out["cgroup_anon_mb_CONTAINER_SCOPE"] == 1516.5
+    assert out["other_processes_anon_mb"] == round(1516.5 - 615.1, 1)
+
+
+def test_a_real_parse_mismatch_still_fails_the_check(monkeypatch):
+    """The guard must stay CAPABLE OF FAILING, or the fix merely disabled it.
+
+    Exercises the real function with a parse that under-reports by 64%, rather
+    than asserting the threshold arithmetic inline -- a guard test that never
+    calls the guard proves nothing, which is the same defect this whole
+    investigation keeps finding in its own instruments.
+    """
+    monkeypatch.setattr(mo, "parse_smaps", lambda text: {"total_anon_mb": 400.0, "by_kind_mb": {}})
+    monkeypatch.setattr(mo, "_process_rss_anon_bytes", lambda: int(1100.0 * 1024 * 1024))
+    monkeypatch.setattr(mo, "_read_container_memory_stat", lambda: {})
+    monkeypatch.setattr(mo.Path, "exists", lambda self: True, raising=False)
+    monkeypatch.setattr(mo.Path, "read_text", lambda self, **kw: SMAPS, raising=False)
+    mo._SMAPS_STATE["count"] = 0
+    out = mo.log_smaps_anon_breakdown("unit-test-mismatch")
+    assert out["reconciles"] is False, out
+    assert out["reconciles_within_pct"] == 63.6
+
+
+def test_rss_anon_is_read_not_vm_rss(tmp_path, monkeypatch):
+    # VmRSS includes file-backed pages, which the cgroup counts under `file`.
+    status = tmp_path / "self"
+    status.mkdir()
+    (status / "status").write_text(
+        "VmRSS:\t 2000000 kB\nRssAnon:\t 1106900 kB\nRssFile:\t  893100 kB\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(mo, "_PROCFS_ROOT", tmp_path)
+    assert mo._process_rss_anon_bytes() == 1106900 * 1024

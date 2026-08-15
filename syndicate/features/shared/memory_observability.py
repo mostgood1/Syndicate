@@ -1207,6 +1207,24 @@ def parse_smaps(text: str) -> dict[str, Any]:
     }
 
 
+def _process_rss_anon_bytes() -> int | None:
+    """This process's anonymous RSS, from `/proc/self/status`.
+
+    `RssAnon` specifically, NOT `VmRSS`: VmRSS includes file-backed pages, which
+    the cgroup accounts under `file` rather than `anon`. Comparing an anon total
+    against a figure that includes file pages is the same class of error as
+    comparing it against the container.
+    """
+    try:
+        with open(_PROCFS_ROOT / "self" / "status", encoding="utf-8", errors="ignore") as handle:
+            for line in handle:
+                if line.startswith("RssAnon:"):
+                    return int(line.split()[1]) * _BYTES_PER_KB
+    except Exception:
+        return None
+    return None
+
+
 def log_smaps_anon_breakdown(reason: str) -> dict[str, Any] | None:
     """Read `/proc/self/smaps` and report where the anon actually lives.
 
@@ -1227,18 +1245,39 @@ def log_smaps_anon_breakdown(reason: str) -> dict[str, Any] | None:
         payload["reason"] = str(reason or "")[:80]
         payload["smaps_index"] = _SMAPS_STATE["count"]
 
-        # RECONCILIATION, and it is the point rather than a nicety. smaps and the
-        # cgroup are INDEPENDENT kernel accountings of the same bytes. If they
-        # disagree materially the parse is wrong, and a breakdown that does not
-        # add up must not be read as attribution -- this investigation has twice
-        # acted on a number that was internally consistent and wrong.
+        # RECONCILE AGAINST THE PROCESS, NOT THE CGROUP.
+        #
+        # The first version compared this per-process total against cgroup `anon`
+        # and reported `reconciles: false` at 27.0% on its very first production
+        # read. The parse was fine; the COMPARISON was a category error. cgroup
+        # `anon` counts the whole container and this worker runs 8-10 children
+        # (`daily_update.py`, odds jobs, multiprocessing spawns) holding ~504MB.
+        # A guard that fires on every read while any child exists is a guard
+        # nobody reads.
+        #
+        # `RssAnon` in `/proc/self/status` is the kernel's own per-process
+        # anonymous total -- the same scope and the same bytes smaps sums here,
+        # counted a different way, which is what makes it a real check.
+        process_anon_bytes = _process_rss_anon_bytes()
+        process_anon_mb = _bytes_to_mb(process_anon_bytes)
+        payload["process_rss_anon_mb"] = process_anon_mb
+        if process_anon_mb:
+            delta = payload["total_anon_mb"] - process_anon_mb
+            payload["reconciles_within_pct"] = round(100.0 * abs(delta) / process_anon_mb, 1)
+            # Tight, because these are two views of ONE process: they differ only
+            # by mappings changing under the read. The cgroup comparison needed a
+            # loose bound precisely because it was measuring something else.
+            payload["reconciles"] = abs(delta) <= max(16.0, 0.03 * process_anon_mb)
+
+        # Container scope, kept for CONTEXT and explicitly labelled so nobody
+        # subtracts it from a per-process figure again. The gap is the children,
+        # not a mystery -- that mistake produced a retracted "673MB outside
+        # pymalloc" on 2026-08-15.
         stat = _read_container_memory_stat()
         cgroup_anon_mb = _bytes_to_mb(stat.get("anon")) if stat and "anon" in stat else None
-        payload["cgroup_anon_mb"] = cgroup_anon_mb
-        if cgroup_anon_mb:
-            delta = payload["total_anon_mb"] - cgroup_anon_mb
-            payload["reconciles_within_pct"] = round(100.0 * abs(delta) / cgroup_anon_mb, 1)
-            payload["reconciles"] = abs(delta) <= max(64.0, 0.10 * cgroup_anon_mb)
+        payload["cgroup_anon_mb_CONTAINER_SCOPE"] = cgroup_anon_mb
+        if cgroup_anon_mb and process_anon_mb:
+            payload["other_processes_anon_mb"] = round(cgroup_anon_mb - process_anon_mb, 1)
         print(f"SMAPS_ANON {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
         return payload
     except Exception as exc:
