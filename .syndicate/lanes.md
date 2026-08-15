@@ -789,7 +789,7 @@ than have every session quietly decide it is.
 - Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
 
-### ask-sport-coverage — OPEN — CODE APPLIED + LOCALLY MEASURED 8->21/52; PRODUCTION RE-MEASURE OWED (needs a deploy) — opened 2026-08-15 — session: ask-sport-coverage
+### ask-sport-coverage — OPEN — DEPLOYED + MEASURED IN PRODUCTION 25->38/52, ZERO REGRESSIONS; K6 HALF DONE, SOCCER/NCAAB/NHL UNPROVEN ON DATA — opened 2026-08-15 — session: ask-sport-coverage
 - Goal: the deterministic path names and answers for all eight sports, not
   three. Single testable outcome: `scripts/ask_syndicate_regression.py` moves
   `lookup` (2/8) and `entity` (2/10) above baseline with **no** class
@@ -1672,7 +1672,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - **`0e0b0aa1` is NOT observable in production on its own.** It is a precondition
   for Drop 2, not a shippable user-visible change. No deploy fired.
 
-### tabular-figures-actually-applied — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+### tabular-figures-actually-applied — BOTH HALVES BUILT; CSS HALF AWAITING A WEB DEPLOY TO BE MEASURED — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the tabular-figures fix covers the classes users actually watch, and
   the probe can no longer report a pass for a class it never found. Testable:
   `ui_layout_probe.py` FAILS on any numeric class with 0 elements on a sport
@@ -1782,3 +1782,150 @@ Deploy `dep-da09dv1t0dsc7397er6g`. Measurement owed and NOT yet taken.
 - Verification: (1) grid equality on a real shard; (2) row-count and resident
   measurement locally; (3) production `PYMALLOC_STATS` arenas after deploy.
 - Blocked by: none.
+
+#### tabular-figures-actually-applied — INSTRUMENT HALF DONE 2026-08-15, CSS HALF NOT TAKEN
+
+**Done and verified — `33e7d7a8` on `origin/main`, no deploy (the probe and the
+README do not run in production, so nothing is owed a measurement window).**
+The probe's own output is the verification: it now FAILS where it passed.
+
+    ncaaf, 16 cards served:
+      before   (no mention -- the key was dropped)
+      after    numeric class not found (measurement did NOT run): market-main
+    numeric leaves rendering a digit at font-variant-numeric: normal
+      mlb 1388   nfl 468   ncaaf 432   soccer 60
+
+**NOT taken, and deliberately: the CSS half of this lane's own Goal.** The
+lane says "on production MLB, the classes carrying digits compute
+`tabular-nums`". They do not, and closing that is a visible change to every
+sport on the platform. The plan calls tabular figures a "do now" exception to
+its own defer-typography rule *because it is four lines* -- but the four lines
+that were written cover three class names, and the tail above is mostly prose
+classes (`.cards-callout-copy` 224 on ncaaf, `.cards-chip` 233 on mlb).
+Covering it means either one rule on the card container (which also makes
+running prose use tabular digits) or a longer hand-maintained class list --
+which is the exact artifact that just went stale. That is a design call with a
+real tradeoff, so it goes to the user, the same way Lane E sent the 52px team
+-name box rather than restyling four sports unilaterally.
+
+**Correction carried inside this lane, not buried:** the hypothesis that
+started it -- "the check has never measured MLB" -- was FALSE, and my own
+instrument overturned it. See the lane's hypothesis block and README caveat 5.
+The stale-class defect is real; it is on NCAAF, and it is one class, not a
+platform-wide blindness.
+
+#### tabular-figures-actually-applied — CSS HALF BUILT 2026-08-15, DEPLOY HELD FOR COORDINATION
+
+User chose "one rule per stylesheet" over extending the class list or deferring
+to I5. Shipped to `origin/main` as `1bb8cf9f`; `.cards-game-card,
+.cards-strip-card { font-variant-numeric: tabular-nums; }` in all four sheets.
+
+**Measured LOCALLY, and only two of the four sports are honest evidence** —
+the comparison holds where the card count is equal on both sides:
+
+    ncaaf   16 cards -> 16 cards   sweep 432 -> 0    <- clean
+    soccer   1 card  ->  1 card    sweep  60 -> 0    <- clean
+    mlb     15 cards ->  0 cards   sweep 1388 -> 0   <- MEANINGLESS, nothing rendered
+    nfl     16 cards ->  1 card    sweep 468 -> 0    <- thin, not evidence
+
+The local mirror is lossy (CLAUDE.md says so); MLB timed out and served 0 cards
+locally. **MLB carries 1388 of the ~2350 and is the sport this was for, and it
+is the one that is unproven.** If the production sweep does not go to 0 on mlb,
+the rule is not reaching `cards_source.js`'s subtree and the fix missed exactly
+the sport that needed it.
+
+**DEPLOY NOT FIRED — held deliberately.** `/preflight` PASS (scope 1 change,
+web only, no worker restarted, rollback = pin `0bf866c3`, no OPEN lane claims
+any stylesheet — collision check re-run, 26 paths, 0 hits). Held because
+`0bf866c3..origin/main` is **245 commits** from ~8 sessions, so the pin is
+load-bearing, and because a visible type change on every sport deserves its own
+measurement window rather than a ride on someone else's. Coordinating with the
+`Syndicate plan assessment and sessions` session first.
+
+**Obligation on whoever fires it:** pin `0bf866c3` + `1bb8cf9f`, nothing else,
+then re-run `scripts/ui_layout_probe.py --base-url <prod> --sports
+mlb,nfl,ncaaf,soccer` and write the sweep numbers to `deploys.md`. Until then
+this lane has a BUILT half, not a VERIFIED one.
+
+#### tabular-figures-actually-applied — CSS HALF BUILT 2026-08-15, DEPLOY HELD FOR COORDINATION
+
+User chose "one rule per stylesheet" over extending the class list or deferring
+to I5. Shipped to `origin/main` as `1bb8cf9f`; `.cards-game-card,
+.cards-strip-card { font-variant-numeric: tabular-nums; }` in all four sheets.
+
+**Measured LOCALLY, and only two of the four sports are honest evidence** —
+the comparison holds where the card count is equal on both sides:
+
+    ncaaf   16 cards -> 16 cards   sweep 432 -> 0    <- clean
+    soccer   1 card  ->  1 card    sweep  60 -> 0    <- clean
+    mlb     15 cards ->  0 cards   sweep 1388 -> 0   <- MEANINGLESS, nothing rendered
+    nfl     16 cards ->  1 card    sweep 468 -> 0    <- thin, not evidence
+
+The local mirror is lossy (CLAUDE.md says so); MLB timed out and served 0 cards
+locally. **MLB carries 1388 of the ~2350 and is the sport this was for, and it
+is the one that is unproven.** If the production sweep does not go to 0 on mlb,
+the rule is not reaching `cards_source.js`'s subtree and the fix missed exactly
+the sport that needed it.
+
+**DEPLOY NOT FIRED — held deliberately.** `/preflight` PASS (scope 1 change,
+web only, no worker restarted, rollback = pin `0bf866c3`, no OPEN lane claims
+any stylesheet — collision check re-run, 26 paths, 0 hits). Held because
+`0bf866c3..origin/main` is **245 commits** from ~8 sessions, so the pin is
+load-bearing, and because a visible type change on every sport deserves its own
+measurement window rather than a ride on someone else's. Coordinating with the
+`Syndicate plan assessment and sessions` session first.
+
+**Obligation on whoever fires it:** pin `0bf866c3` + `1bb8cf9f`, nothing else,
+then re-run `scripts/ui_layout_probe.py --base-url <prod> --sports
+mlb,nfl,ncaaf,soccer` and write the sweep numbers to `deploys.md`. Until then
+this lane has a BUILT half, not a VERIFIED one.
+
+#### soccer-model-coverage — RECONCILIATION AT SESSION END 2026-08-15
+
+**THE SECOND BACKTEST RUN PRODUCED NOTHING. Do not look for its output.**
+A `--limit 300` run was launched to support a train/test split; the session
+ended while it was still simulating and it was killed. It writes only on
+completion, so `reports/soccer_backtest/per_match_2026-08-15.jsonl` **does not
+exist** and no partial data survived. Verified at session end: the directory
+holds two files with **identical md5** (`55b92ece...`) — the unsuffixed
+`h2h_calibration_2026-08-15.json` was never overwritten, so the 1,112-match
+result is intact and the precautionary copy was not needed.
+
+**THE HEADLINE NUMBER RE-DERIVES FROM DISK** `[re-checked at session end]`:
+9 leagues, **1,112 matches, model 0.5875, market 0.5737, gap +0.0139.** That
+finding stands exactly as recorded in `state.md`.
+
+**WHAT IS BUILT AND TESTED BUT HAS NEVER RUN ON REAL DATA — say it this way,
+because the code existing is not the same as the question being answered:**
+- `scripts/fit_soccer_probability_calibration.py` — temperature scaling
+  (`p**(1/T)` renormalised), fitted on a CHRONOLOGICAL train slice and scored
+  only on held-out later matches, with a per-league mode. **Never executed
+  against production or backtest data.**
+- The AUC discrimination diagnostic inside it. **Never executed on real data.**
+- `--dump-matches` on `backtest_soccer_h2h_calibration.py`, which is what would
+  feed both. **Smoke-tested on 12 matches only.**
+- 16 tests, all passing, two mutation-verified (a no-op `sharpen` turns 5 red;
+  an index-based split turns the straddle test red).
+
+**SO THE DISPERSION-VS-DISCRIMINATION QUESTION IS OPEN, NOT ANSWERED.** The
+only observation is a 12-match smoke set where sharpening moved stdev toward
+the market while making Brier WORSE. **n=12 is not evidence** and must not be
+cited as a lead; it is recorded only so nobody mistakes it for one later.
+
+**WHY THAT QUESTION IS WORTH THE NEXT SESSION'S FIRST HOUR.** Temperature
+scaling is the cheap UPPER BOUND on any pure-dispersion fix, because it
+stretches the distribution optimally while leaving the model's ordering alone,
+and AUC is invariant to it. So one run decides where the expensive work goes:
+model AUC ~= market AUC means sweep `_RATING_SCALE`/`_RATING_CAP`; model AUC <
+market AUC means the ranking is the defect, no rescaling can fix it, and the
+rating sweep would be wasted compute.
+
+**TO RESUME, one command, then the fitter is instant forever after:**
+
+    python scripts/backtest_soccer_h2h_calibration.py --all --limit 300 \
+      --simulations 300 --out reports/soccer_backtest/h2h_calibration_<date>.json \
+      --dump-matches reports/soccer_backtest/per_match_<date>.jsonl
+
+**Budget it: ~2.2 s/match, so ~2,700 matches is ~100 minutes.** Run it detached
+and do not block a session on it — that is exactly how this one lost the run.
+**Use a NEW dated filename**; the unsuffixed one is cited by `state.md`.
