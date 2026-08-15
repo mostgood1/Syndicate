@@ -34,6 +34,11 @@ guard: it answers an out-of-range input with a number instead of refusing.
    during the build. Run `py -3 scripts/watch_clamp_trigger.py --interval 900`;
    its next trigger IS the verdict. `POST_FIX_OK` closes this.
    **`PRE_FIX_MISPRICE` against a fix-carrying SHA is a falsification.**
+   **A SCHEDULED TASK NOW DOES THIS — `clamp-fix-verification-watch`, every 2h**
+   (`~/.claude/scheduled-tasks/clamp-fix-verification-watch/SKILL.md`). It runs
+   `--once`, stays SILENT on `no_trigger`, and notifies only on a real verdict.
+   It only runs while the app is open. If it is gone, re-run the instrument by
+   hand — nothing is lost, there is no state to restore.
 2. **`market_lines:_prob_to_american` is deliberately NOT fixed** — fails all 5
    requirements but has one caller fed medians strictly inside (0,1). Triage,
    recorded in the test.
