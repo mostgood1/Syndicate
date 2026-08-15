@@ -2056,3 +2056,37 @@ pre-existing red, unowned.**
 unconditional write-back loop silently loses the condition its neighbours were
 given, and the comment explaining the rule is attached to the field that
 escaped the loop, not to the loop.
+
+## Closed 2026-08-15 — a blank `market_key` read as an answer, and `_safe_text` cannot return `None` (`#438`)
+
+**Status: fixed and committed `d348e040`, local only. NOT DEPLOYED.** The third
+of three reds in `tests/test_intelligence.py`; `#436` closed the other two and
+recorded this one as unowned. `tests/test_intelligence.py` is now **218 passed**.
+
+**Both sides of one field were wrong.**
+
+- Producer: `_build_prop_dashboard_row` (home.py) wrote
+  `_safe_text(... or item.get("stat"), None)`. **`_safe_text`'s last statement
+  is `return ""`,** so neither the `None` fallback nor the comment above it
+  ("the canonical key WHERE THE SOURCE HAS ONE") could be honoured. A source
+  with no canonical key emitted `market_key: ""`.
+- Consumer: `_attach_intelligence_response_aliases` guarded its repair with
+  `if payload.get("market_key") is None`. `""` is not `None`, so
+  `_candidate_market_key` never ran — and it would have returned `"threes"` from
+  the `market_focuses` already on that row. The adjacent `subject_key` line had
+  the identical test and is fixed with it.
+
+**`#438a` — LEFT OPEN, deliberately, and worth someone's lane.** **43 other
+`_safe_text(..., None)` call sites** carry the same impossible fallback,
+`player_name` among them on this very dict. Not swept: consumer semantics differ
+per field, and `player_name: null` cards are a defect `_build_prop_dashboard_row`
+was fixed for once already, so a blanket change could resurrect it. Each site
+needs its consumer checked. **The count is the finding — 43, not "a few".**
+
+**Not a measurement failure.** The `missing_market_key` metric `1f6c27b9` built
+counts with `bool(_text(...))`, so it read `""` as missing and reported this
+correctly the whole time. Nothing was listening to it.
+
+**Operational note promoted to `learnings.md`:** a fallback argument is a
+*request*, not a guarantee — a helper whose every return path is a `str` cannot
+honour a `None` default, and the call site reads as though it does.
