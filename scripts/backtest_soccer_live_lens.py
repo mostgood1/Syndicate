@@ -44,15 +44,41 @@ _LEAGUE_SEASON_WINDOWS = [
 _NEUTRAL_RATING = {"attack_rating": 0.0, "defense_rating": 0.0}
 
 
-def _load_team_ratings(league: str) -> dict[str, dict[str, float]]:
+def _load_history_rows(league: str) -> tuple[list[dict], int | None]:
+    """The raw history, NOT ratings (audit §7 #6).
+
+    This used to return finished ratings computed from the whole season, and
+    `run_backtest` applied them to every match inside that season -- so a March
+    match was scored with ratings built partly from May results. Ratings are
+    now derived per match, as of that match's own date, so the rows have to come
+    back unaggregated.
+    """
     if league == "mls":
-        return compute_team_ratings(fetch_asa_mls_team_history(2026))
+        return list(fetch_asa_mls_team_history(2026)), None
     history_dir = REPO_ROOT / "data" / "soccer_source" / league / "team_history"
     frames = [pd.read_csv(path) for path in sorted(history_dir.glob("teams_*.csv"))]
     if frames:
-        rows = pd.concat(frames, ignore_index=True).to_dict("records")
-        return compute_team_ratings(rows, window=45)
-    return {}
+        return pd.concat(frames, ignore_index=True).to_dict("records"), 45
+    return [], 45
+
+
+def _ratings_as_of(
+    rows: list[dict],
+    window: int | None,
+    as_of: str,
+    _cache: dict[str, dict[str, dict[str, float]]],
+) -> dict[str, dict[str, float]]:
+    """Ratings from matches strictly before `as_of`, memoised per DAY.
+
+    Recomputing per match is O(matches x rows), and many matches share a date,
+    so the cache turns that back into O(distinct_days x rows). Keyed by day
+    because that is exactly the granularity `compute_team_ratings` filters on --
+    a finer key would be a cache that never hits.
+    """
+    day = str(as_of or "")[:10]
+    if day not in _cache:
+        _cache[day] = compute_team_ratings(rows, as_of=day, window=window)
+    return _cache[day]
 
 
 def run_backtest(league: str, *, max_matches: int, cutoff_minute: int, simulations: int, out_path: Path | None) -> int:
@@ -64,12 +90,20 @@ def run_backtest(league: str, *, max_matches: int, cutoff_minute: int, simulatio
         completed = [completed[int(i * step)] for i in range(max_matches)]
     print(f"backtesting {len(completed)} matches, cutoff at minute {cutoff_minute}")
 
-    ratings = _load_team_ratings(league)
+    # POINT-IN-TIME BY CONSTRUCTION (audit §7 #6). The history is loaded once;
+    # the RATINGS are derived per match, as of that match's own date, so no
+    # match is ever scored using a result that had not happened yet.
+    history_rows, rating_window = _load_history_rows(league)
+    ratings_cache: dict[str, dict[str, dict[str, float]]] = {}
     profile = get_league_profile(league)
     cutoff_seconds = cutoff_minute * 60.0
 
     rows: list[dict] = []
     for event in completed:
+        # Ratings for THIS match's date. Recomputed (memoised per day) rather
+        # than hoisted, which is the entire fix -- hoisting it is what made
+        # every number in the previous backtest CSVs unusable.
+        ratings = _ratings_as_of(history_rows, rating_window, str(event.get("date") or ""), ratings_cache)
         try:
             summary = fetch_match_summary(league, event["event_id"])
         except Exception as exc:
