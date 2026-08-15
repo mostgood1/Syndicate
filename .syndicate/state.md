@@ -1247,6 +1247,17 @@ the place to read it, and it carries the guard on its two shortlists.
   **218 passed / 6 failed** (measured at `2b14fbeb`). **Gate against the lineage
   you are shipping, not against `main`.** `[measured 08-14/15]`
 - It costs **~15 minutes**, so it is not a quick check.
+- **`tests/test_intelligence.py` is 218 passed / 0 failed on committed `main`**
+  `[measured 08-15 ~21:5xZ, lane red-intelligence-tests]`. It was **216/2** at
+  the start of that session and 217/1 mid-way. All three reds were real, and
+  **two of the three were product defects, not stale tests** — see
+  `todo_closed.md` `#436`/`#438`. **It costs ~37 minutes**, single-threaded;
+  `pytest-xdist` is NOT installed, so there is no faster path today.
+- **The "526 passed, 0 failed" line below is NOT contradicted by that, but it is
+  narrower than it reads.** Three `test_intelligence.py` failures existed on
+  committed code at 08-15 21:00Z, so whatever that full-suite run covered, it
+  either predates them or did not include this file. Treat it as unverified for
+  `test_intelligence.py` specifically; the line above is the direct measurement.
 - Full suite: **526 passed, 0 failed** after the soccer `as_of` fix `[08-15]`.
 - `tests.test_archives` (what CI runs) — 383 pass.
 
@@ -1556,3 +1567,32 @@ uniform and their spreads ARE layout signals. MLB's is not. `[measured]`
 **EXONERATED:** the MLB height movement flagged at the 21:2xZ checkpoint is not
 `6e9e6107` and not any layout change - the contract rows were byte-identical
 across it (0/15 games). `[measured]`
+
+## Candidate field absence — the served payload TODAY `[measured 08-15 ~21:5xZ, lane market-key-blank-not-absent]`
+
+Baseline taken from live `/api/intelligence/query`, 101 recommendations, BEFORE
+any of this session's three fixes are deployed. **Whoever deploys them re-reads
+these four numbers; that is the measurement.**
+
+    market_key blank      0 / 101
+    player_name blank     0 / 101
+    line as a number     84 / 101   <- of which 7 whole-numbered
+    line as a string      0 / 101
+
+- **The `market_key` and `player_name` fixes change NOTHING on production today.**
+  They are correctness work: real defects, zero current incidence. Do not claim
+  a production effect for them.
+- **The only live defect is `line`.** `displayLine()` does a bare `String(line)`,
+  so a JSON `2.0` renders as `2` — 7 rows are missing their decimal right now.
+- **It is a refresh-worker fix, NOT a web one.** `UniversalCandidate.to_dict`
+  runs inside `collect_candidates` (worker-owned) and the served rows come from
+  cached worker state. The serve-time half
+  (`_attach_intelligence_response_aliases`, 5 call sites in the web blueprint)
+  is the `market_key` fix — the one measuring 0 rows. **A web-only deploy of
+  this work is inert.**
+- Commits ready and HELD: `1322d0a8` (line), `d348e040` (market_key),
+  `4ae71c4a` (player_name). `4ae71c4a` is LOCAL ONLY; the other two are on
+  `origin/main`.
+- `/api/board/layer2-shortlist` is the WRONG surface for this check — its rows
+  carry no `market_key` at all (84/84 absent) and its `line` is the shortlist's
+  own field, not the recommendation's display value.
