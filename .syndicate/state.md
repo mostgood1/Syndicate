@@ -187,30 +187,43 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **`git push` from this checkout is not scoped to your own commits.** Read
   `git log origin/main..HEAD` first. `[from-git 08-13]`
 
-**DEPLOYS ARE NOT SERIALISED, AND PEERS BOTH CANCEL AND REVERT EACH OTHER
-`[measured 08-15 19:1x-21:4xZ]`.** Two distinct failures, both measured:
-- **CANCEL (web):** five deploys in twenty-one minutes from four sessions; the
-  19:20 one cancelled the 19:15 one mid-build and its owner was never told.
-- **SILENT REVERT (refresh-worker):** the prop `0.5` fix went live at 21:36:59Z
-  as `0fa44322`, verified additive and content-checked. **By 21:45:20Z the
-  service was `846bb74e`, which does NOT have `0fa44322` as an ancestor**, and
-  the deployed prop scripts were back to 7 and 8 reachable `or 0.5` sites. A
-  peer had cut from an earlier live SHA. Two "successful" deploys, one silently
-  undone, no warning anywhere.
-**A cross-session message cannot gate this** — it waits for the target's turn
-while a deploy takes seconds. **So: after your deploy reports `live`, re-verify
-BY CONTENT some minutes later, not at the moment it lands.** On a pinned-deploy
-service "live" is a lease, not a fact. The durable fix is one deployer per
-service, or trains — not per-lane deploys.
+**DEPLOYS ARE NOT SERIALISED BY DEFAULT — THERE IS NOW A CLAIM `[08-15 22:3xZ]`.**
+Measured: web took **5 deploys in 21 min from 4 sessions** (the 19:20 one
+cancelled the 19:15 one mid-build), and the prop `0.5` fix was **silently
+reverted 8 minutes after going live** by a peer cutting from a stale live SHA.
+Messages cannot gate this — every hold sent arrived after the deploy it meant to
+stop, and three sessions ARCHIVED mid-coordination.
 
-**ROUTE ONE — how to deploy a commit Render says does not exist.**
+**USE IT (`scripts/deploy_claim.py`, shipped `a5366a72`):**
+
+    py -3 scripts/deploy_claim.py status
+    py -3 scripts/deploy_claim.py acquire --service <svc> --holder <lane>
+    py -3 scripts/deploy_preflight.py --service <svc> --holder <lane>
+
+`/preflight` returns **CLAIMED (exit 3)** for a foreign holder — distinct from
+HOLD, because HOLD means "wait for a lull" and CLAIMED means "not yours". Claims
+carry a token, `--force` records whose claim was broken, and a **45-min TTL**
+stops an archived session wedging a service. **A claim only binds sessions whose
+checkout has the tool — they must `git pull` first.**
+
+**STILL TRUE AND STILL THE HABIT THAT MATTERS: cut from the service's CURRENT
+live SHA, and re-verify BY CONTENT after it lands.** "live" is a lease.
+
+**ROUTE ONE — deploying a commit Render says does not exist. PROVEN TWICE.**
 `POST /deploys` 404s with `"service <id> does not have a commit <sha>"` for any
 commit pushed AFTER that service's last deploy: **Render's git mirror is PER
-SERVICE and only refreshes at build time.** Persistent, not transient (3
-attempts). Fix: deploy the service's OWN current live commit (a no-op in code)
-to force a fetch, then deploy the target. Measured on refresh-worker: the sha
-that had 404'd three times fired **41s** after the warm deploy landed. Two
-restarts, so take both inside detected lulls.
+SERVICE and refreshes only at build time.** Persistent, not transient. Fix:
+deploy the service's own current live commit (a no-op in code) to force a fetch,
+then deploy the target. live-odds-worker: 36 min of HOLD, then warm -> target
+fired 2s later. refresh-worker: same, no 404. Two restarts, so take them in a
+lull. **Fire the two steps BY HAND** — see `learnings.md` on watchers.
+
+**PROP `0.5` FIX IS LIVE ON BOTH WORKERS `[measured 08-15 22:2xZ, by content]`**
+refresh-worker `6f512ffa`, live-odds-worker `25774aaf`; reachable `... or 0.5`
+**0 and 0** in both prop scripts (was 7 and 8). Predecessors are ancestors of
+both, so no peer work was dropped. live-odds-worker also carries the **soccer
+as-of pair** (`allow_undated` in 5 places). **The ARTIFACT effect is still
+UNMEASURED** — content is verified, the rate of price-missing rows is not.
 
 **`main` IS NOT A SUPERSET OF THE WORKERS — do not "just deploy main".**
 `memory_observability.py` is **0 insertions / 366 DELETIONS** from
@@ -1071,8 +1084,19 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
     **`source == "live_mc"` is the only discriminator.**
   - **BASELINE for the pending worker deploy** (`/mlb/api/live-lens`, 15 games /
     4 live): `gameLens rows 60`, **`live_mc` 0**, `liveStateCarriedForward` 0.
-  3. `live_projection_join` is **entirely prop-shaped** — there is no game-line
-     join at all, so nothing prices a live game line even once it is published.
+  3. ~~`live_projection_join` is entirely prop-shaped; there is no game-line
+     join at all.~~ **BUILT AND WIRED as `758a89fa` (Drop 3), DEPLOYED NOWHERE.**
+     `shared/live_gameline_join.py` + one call site in `build_book_grid_artifact`
+     emitting a `live_gamelines` coverage block, kept separate from
+     `live_projections` so one family's zero cannot look like the other's.
+     Joined on FULL TEAM NAMES, which match exactly (`matchup.home.name` ==
+     `home_team`, verified in production) — **no alias table, deliberately**,
+     since the prop join's 91% miss is a market-NAME aliasing failure.
+     **refresh-worker builds this artifact and carries NEITHER Drop 1 nor Drop 2
+     (`6f512ffa`), so Drop 3 needs a refresh-worker deploy** — `#435` holds it.
+     **Expect `rows_live_gameline_edged: 0` at first and do not call it a
+     defect:** at 120 sims the 2-sigma bar is ~9.1 pp at p=0.5, so a balanced
+     slate refuses by design (recorded decision, spec §8.1).
 - **WHERE THE HUNT STANDS AFTER BOTH DROPS `[measured 08-15 21:1xZ]`. Two
   hypotheses are DEAD — do not re-run them:**
   - **"Drop 1 is bypassed; `_persist_live_lens_report` never runs on a tick" —
@@ -1298,16 +1322,34 @@ the place to read it, and it carries the guard on its two shortlists.
   (`bebe87c9`; also `baec34a8` on main — it had existed on NO main branch)
   flipped `PUBLISH_FAILED`×8/16h to `PUBLISH_OK` 15s after deploy, zero failures
   since. MLB 2026-08-15: `openings 0→520`, `resolved 0→293`, `same_book_n 0→144`.
-- **The board does NOT beat the close on the honest comparison — two readings,
-  both negative, trending down.** MLB 2026-08-15 same-book: `-0.0711` at a 27.1%
-  beat rate (n=144, 19:38Z, 0 of 14 games started), then `-0.668` at 29.3%
-  (n=167, 20:4xZ, 4 of 14). The BIASED scope reads `+2.84` at 83.5% over the same
-  rows — **never quote `book_agnostic_close` or `different_book_close` as CLV**;
-  the selection effect inverts the sign. **NOT SETTLED**: last first pitch is
-  2026-08-16T01:40Z, so most "closes" were still latest observations.
-- **REFUTED, do not re-derive:** "if `same_book_n` is 0 the blocker is
-  odds-history breadth". It went 0→144 with no change to odds history. Breadth
-  constrains `resolved` (`no_market_in_history: 172`), not `same_book_n`.
+- **CLV ON 2026-08-15 IS `-0.2714` (n=151, beat 27.2%), MLB, same-book AND
+  pregame.** Web `c8810f45` live 21:58:19Z. Verified by recomputing the mean from
+  the served rows at the same instant (`-0.2714` both ways). **PRELIMINARY —
+  taken 21:5xZ, before the last first pitch (2026-08-16T01:40Z). NOT the settled
+  number; the settled read was never taken (see OWED, below).**
+- **THREE JOIN DEFECTS FOUND AND TWO FIXED, in order of severity:**
+  1. **FIXED — `observed_transition` was side-blind.** `closing_price` is
+     `entity`'s price and **`entity == home_team` on 18/18** stamped markets, so
+     every away-side opening was differenced against the HOME close. A stamp is
+     now used only when the opening IS the entity's side, else it falls through
+     to the side-aware `last_pregame_quote` path. Measured: 20 refusals,
+     `observed_transition` 48 -> 22, `same_book_n` 131 -> **151** (rows that were
+     being discarded now resolve correctly).
+  2. **FIXED — the headline counted in-play prices.** `close_age_seconds` is
+     `(commence - stamp)`; negative means post-first-pitch. Now excluded and
+     reported as `by_close_timing`. **The in-play bucket flipped sign between
+     readings (-ve at 21:1xZ, `+0.7937` at 21:4xZ), so it was NOISE, not a bias**
+     — the old code would have published `-0.0124` at 21:4xZ.
+  3. **NOT FIXED — the odds-history feed transposes `home_line`/`away_line`.**
+     Event `69928d29…` FanDuel spreads carried identical prices (`-205`/`+168`)
+     under OPPOSITE labels at 06:02Z and 21:26Z. The line guard checks numeric
+     equality, so it matched the wrong bet. **Severe per row, self-cancelling in
+     aggregate** (the two extremes are a mirror pair; spreads n=42 mean `+0.515`
+     median `0.000`; h2h/totals n=128 have zero |clv|>10). Corrupts
+     per-recommendation CLV, variance, CIs and any "worst bets" list.
+- **`clv_pct` per recommendation is NOT built** — the lane's original goal. The
+  ledger's `PredictionResult.clv_pct` field exists and is never populated, which
+  is why `/api/portfolio/summary` returns `avg_clv: null`.
 
 - **Lane markers are per-session as of 2026-08-15.** `lane-guard.py` reads
   `.syndicate/.current-lane.<session_id>` first and falls back to the shared
