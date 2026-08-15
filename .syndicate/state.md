@@ -1260,3 +1260,38 @@ deployment by CONTENT. `[measured 08-15 - this exact check]`
 `mlb: 0 cards` spuriously.** It did so mid-verification today. Any MLB reading
 must wait on `.cards-game-card`, not a timer. Fixing that wait is the next
 change to the probe. `[measured]`
+
+## Card surface - soccer shows its market line and edge `[measured 08-15 21:2xZ]`
+
+**Live `bb23c8f9` (21:18:38Z).** Soccer's card carries `.cards-data-pair` 3
+(was 0), `market` `ATS ARS -1.5 | Total 2.5` and `best_edge`
+`ATS +0.2 | Total +0.7`, read off the served card. `[measured]`
+
+**A sport with no `sim.periods` gets a stand-in Full Game row, and that row now
+reads `betting` + `sim.score` before falling back to a metric-label lookup.**
+The lookup asks for "Spread"/"Total"/"Edge"; soccer publishes "Total goals" and
+friends, so it matched nothing and the card showed its market line NOWHERE
+while `betting.home_spread` and `betting.total` sat on the game. **A
+label-matched lookup is not a substitute for the field.** `[measured]`
+
+**Which sports reach that branch** (`sim.periods` empty), measured 08-15:
+soccer 1/1, **mlb 15/15**, **ncaaf 16/16**, nfl 0/16. MLB and NCAAF are inert
+through it today only because their games carry no `betting` spread/total in
+that shape - that is a data fact, not a structural guarantee, and it can change
+without anyone touching this code. `[measured]`
+
+**`scripts/ui_layout_probe.py` waits on CONTENT, not a timer.** Five
+consecutive production runs returned 15 MLB cards on all 10 readings; the old
+fixed 400ms delay returned 0 on at least one of three. A render that never
+attaches a card is reported as `cardWaitTimedOut`, which is NOT a 0-card slate
+and fails even out of season. `[measured]`
+
+**NCAAF has no market tile row and that is by design** - `_game_card_ncaaf.html`
+contains zero `cards-market` markup. Declared in `NUMERIC_CLASS_EXEMPT` rather
+than failing the run, and the declaration is checked in both directions.
+`[measured]`
+
+**UNEXPLAINED, do not inherit as a regression:** MLB card-height spread
+56 -> 197px desktop / 112 -> 1887px mobile across the 19:0x-21:2x window, and
+empty slots 8 -> 1. Not the contract (rows byte-identical, 0/15). Presumed the
+slate moving; **nobody has actually looked.** `[unverified]`

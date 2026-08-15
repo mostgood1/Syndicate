@@ -2715,3 +2715,19 @@ Full row, including the MLB card-height movement that is NOT attributable to
 this deploy, in `deploys.md`.
 
 - **FINAL:** shipped, measured, closed.
+
+#### ui-plan-lane-gh session close 2026-08-15 - three lanes closed, one deployed
+
+`probe-mlb-content-wait` and `ncaaf-market-main-expectation` are dev-tooling
+only (`c61f859b`, `f5c16cc9`) - no deploy, nobody's request path.
+`soccer-fallback-row-market` shipped as web `bb23c8f9` and is measured on the
+served card.
+
+Carried forward, unowned:
+- **MLB card-height spread 56 -> 197px desktop, 112 -> 1887px mobile**, and
+  empty slots 8 -> 1, across 19:0x-21:2x. NOT the contract (0/15 rows changed).
+  Presumed slate movement, **never actually investigated.**
+- `home.py`'s generic `market_tiles` loop rendering publication metadata into a
+  market-recommendation list - handed to `market-key-blank-not-absent`, and
+  explicitly NOT measured in production.
+- soccer's remaining 4x repeated string is a boxscore label, pre-existing.
