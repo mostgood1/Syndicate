@@ -130,18 +130,37 @@ def cmd_acquire(args: argparse.Namespace) -> int:
             "acquired_at_iso": existing.get("acquired_at_iso"),
         }
 
-    tmp = _path(args.service).with_suffix(".tmp")
+    # Write straight into the O_EXCL handle. There is NO temp-file rename here,
+    # deliberately: the first version wrote a temp then `Path.replace`d it, and
+    # on 2026-08-15 that raised
+    #   PermissionError: [WinError 5] Access is denied: refresh-worker.tmp -> .json
+    # because this repo lives under OneDrive, which locks files mid-sync. It left
+    # a ZERO-BYTE claim plus an orphaned .tmp holding the real payload -- i.e. the
+    # claim tool failed at the exact moment it was being relied on. O_CREAT|O_EXCL
+    # already gives the property the rename was there for (one winner among racing
+    # acquires), so the rename was never buying anything.
+    blob = json.dumps(payload, indent=2)
+    path = _path(args.service)
     try:
-        # O_EXCL on the real path is what makes two racing acquires produce one
-        # winner. Write to a temp first so a crash cannot leave a half-file.
-        fd = os.open(str(_path(args.service)), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        os.close(fd)
+        fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
     except FileExistsError:
         if not (existing and (args.force or age_and_expiry(existing)[1])):
             print("HELD -- lost the race to another session. Not acquiring.")
             return 1
-    tmp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    tmp.replace(_path(args.service))
+        # Ours to take (forced or expired): truncate in place, still no rename.
+        fd = os.open(str(path), os.O_WRONLY | os.O_TRUNC)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(blob)
+    except OSError as exc:
+        # Never leave a zero-byte file behind pretending to be a claim: an
+        # unreadable claim reads as EXPIRED, which does not block, which is the
+        # safe direction -- but say so loudly rather than reporting success.
+        path.unlink(missing_ok=True)
+        print(f"ACQUIRE FAILED writing the claim ({exc}). Nothing is held.")
+        return 1
+    # Sweep any .tmp left by the pre-2026-08-15 implementation.
+    path.with_suffix(".tmp").unlink(missing_ok=True)
     print(f"ACQUIRED {args.service} by {args.holder}")
     print(f"token {token}   ttl {args.ttl}s")
     return 0
