@@ -379,6 +379,41 @@ def api_ops_keyvalue_diagnostics() -> Any:
     return jsonify(diagnostics)
 
 
+@ops_bp.get("/api/ops/live-lens/status")
+def api_ops_live_lens_status() -> Any:
+    # Lane `live-game-line-projection`, 2026-08-15. `_tally_mlb_live_mc_sources`
+    # (live_lens_loop.py:473) counts live_mc / live_projection /
+    # segment_projection per gameLens lane on the snapshot the loop just built,
+    # once per tick, into `meta["liveMcSources"]` -- the only signal that
+    # survives `estimate_live`'s bare-except, per its own docstring. Its
+    # plumbing terminated in nothing: `live_lens_loop_status_payload()` had ZERO
+    # callers and no route, so the answer was computed every tick in production
+    # and discarded.
+    #
+    # WHY A ROUTE AND NOT AN ALLOWLIST ENTRY. The obvious fix -- adding
+    # `reports/live_lens_loop/latest_live_lens_tick.json` to the hot-artifact
+    # allowlist -- is INERT, and measurably so. `_KEYVALUE_EXCLUDED_PATH_MARKERS`
+    # is only `("migration_runs/",)`, so this path is keyvalue-backed on every
+    # service; `write_json_file` writes it to Redis and returns without ever
+    # touching disk, while `/api/ops/artifacts/stream` gates on
+    # `target.is_file()`. Allowlisting it would 404 forever. This route reads
+    # through `read_json_file`, which IS keyvalue-aware, so it crosses the
+    # service boundary and returns the WORKER's tick from web.
+    #
+    # READ `enabled` AND `threadAlive` AS THIS SERVICE'S, NOT THE WORKER'S.
+    # They are computed from the local process, so on web they are False by
+    # design and say nothing about the loop. Only `latestStatus` / `latestTick`
+    # are shared state. The flag below makes that explicit rather than leaving
+    # a false negative for the next reader to trip over.
+    from syndicate.features.shared.live_lens_loop import live_lens_loop_status_payload
+
+    payload = live_lens_loop_status_payload()
+    if isinstance(payload, dict):
+        payload = dict(payload)
+        payload["_localFieldsAreThisServiceOnly"] = ["enabled", "intervalSeconds", "threadAlive"]
+    return jsonify(payload)
+
+
 def _stale_after_days_param() -> int:
     raw = str(request.args.get("stale_after_days") or "").strip()
     try:
