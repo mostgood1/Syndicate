@@ -1119,7 +1119,7 @@ than have every session quietly decide it is.
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
-### nfl-live-edge-suppression — OPEN — CODE COMMITTED `1d15686b` + TESTED; PRODUCTION RE-MEASURE OWED (needs a deploy) — opened 2026-08-15 — session: tier5-live-read
+### nfl-live-edge-suppression — CLOSED-VERIFIED 2026-08-15 — deployed refresh-worker `dca39fad` (cherry-pick of `1d15686b`); **LIVE NFL rows with `model_edge_pct` 5 → 0** on 12 live rows, pregame edges intact (2 retained), 10 rows carry the policy's exact reason string so the branch is ASSERTED not inferred — opened 2026-08-15 — session: tier5-live-read
 - Goal: an NFL row whose game is live or final carries **no** `model_edge_pct`
   on the published shortlist, for the same reason and with the same wording MLB
   already uses. Single testable outcome: the 5 live NFL `smartsim2_total_normal`
@@ -2380,3 +2380,72 @@ log query, not a deploy.
 - Disarmed twice; blobs at `C:/tmp/index-blob-backup-2026-08-15/`. **I am not
   policing this further** — a session that commits `deploys.md` needs to add the
   repair, or the next bare `git commit` in this tree un-ships a measurement.
+
+### market-key-blank-not-absent — OPEN — opened 2026-08-15 — session: red-intelligence-tests
+- Goal: the THIRD pre-existing red,
+  `test_intelligence.py::...resolves_typo_subject_and_three_point_market`, is
+  green, and a candidate whose source carries no canonical market key stops
+  shipping `market_key: ""` — the value that makes "unknown" read as "known".
+- Files (exclusive to this lane):
+  - `syndicate/blueprints/home.py` — `_build_prop_dashboard_row`, the ONE
+    `market_key` line (~L3065). Not the enrich/profiler region.
+  - `syndicate/features/intelligence.py` — the `market_key` guard inside
+    `_attach_intelligence_response_aliases._normalize_opportunity_item` (~L226).
+  - `tests/test_intelligence_contracts.py` — regression test (already this
+    session's file, `1322d0a8`).
+- Collision check RUN as a text grep over the whole of `lanes.md`, attributing
+  every mention to its enclosing `###` heading and parsing that heading's
+  status: **4 mentions of these two files, ALL under headings that do not
+  parse as OPEN** (`quote-join-enrich-cost`, `memory-guard-reclaimable`, both
+  "detail below, kept for the file/line map"). One of the four is an explicit
+  **"NOT claimed, deliberately"** disclaimer on `features/intelligence.py`.
+  Both files are also **clean in `git status`** — nobody is mid-edit. The
+  nearest live claim, `quote-join-enrich-cost` on `home.py`, is scoped to
+  "segment/profiler code only" at L2872/L2926; my line is ~L3065.
+- Hypothesis: `_build_prop_dashboard_row` writes
+  `_safe_text(item.get("market_key") or ... or item.get("stat"), None)`.
+  **`_safe_text` can never return `None`** — its last line is `return ""` — so
+  the `None` fallback the author passed, and the comment above it ("the
+  canonical key WHERE THE SOURCE HAS ONE"), do not survive. An NBA rail item
+  with no canonical key therefore ships `market_key: ""`. The aliasing guard
+  then reads `if payload.get("market_key") is None`, and `""` is not `None`, so
+  the derivation from `market_focuses` (which correctly holds `['threes']`)
+  never runs. Unknown took the permissive branch.
+- Falsification test: if forcing the producer's `""` to `None` leaves the test
+  red, the blank is not the cause and the market-focus derivation is.
+  **ALREADY RUN, and it did not falsify:** patched in-process, failures
+  1 -> 0, with the conversion confirmed taken **6/6** rather than assumed.
+- Verification: the named test green; the FULL `tests/test_intelligence.py` at
+  **218 passed** (it is 217/1 today, and this is the 1); `test_home.py` and the
+  contract suites still green; and each of the two edits measured for its OWN
+  contribution rather than shipped as a pair on one green run.
+- Blocked by: none. NO DEPLOY.
+
+#### live-game-line-projection — CHECKPOINT 2026-08-15 ~20:2xZ — WEB DEPLOYED, WORKER NOT
+- **Deploy state, content-checked (not ancestry):** web `f475c775` carries BOTH
+  drops (mine `9b88d05b` live 19:54:18Z, superseded by `f475c775` which descends
+  from it — verified, not a revert). **live-odds-worker `ccd10349`, NEITHER drop.**
+- **The worker deploy never fired.** `191a001b` is built, pushed
+  (`origin/deploy/live-lens-drops-lodw`) and ancestry-checked against `ccd10349`.
+  The gate held 19:33–20:17 continuously with **one** CLEAR window at 19:55:44
+  that closed inside a minute. A poll-and-fire runs in ONE process (fire moved
+  inside the loop; polling across turns loses this gate), plus a chained
+  land-and-measure watcher.
+- **BASELINE RECORDED so the pending measurement means something** —
+  `/mlb/api/live-lens`, 15 games / 4 live: `gameLens rows 60`, **`live_mc` 0**,
+  `carriedForward` 0, `modelHomeWinProb` 60 (**vacuous**).
+- **PASS = live rows flip to `source: live_mc`. Nothing else.**
+- **TWO INSTRUMENT CORRECTIONS, both mine, both in `deploys.md` and `state.md`:**
+  the published `mlb_source/data/live_lens/` artifact is the SLIM shape with no
+  `gameLens` key and can never show the effect; and "never use
+  `/mlb/api/live-lens`" inverted the moment Drop 2 landed, because that fix
+  removed the thing making it blind.
+- **RISK IF THIS SESSION ENDS:** the watchers die with it. `191a001b` then sits
+  pushed and undeployed, and web carries a Drop 2 that preserves something
+  nothing produces — **inert, not wrong.** Nothing to roll back.
+- **The slate is the perishable input.** `_live_mc_projection` bails on
+  `status_not_live`; if the deploy lands after the last game finals, the
+  measurement reads `live_mc 0` for a legitimate reason and is **VOID, not a
+  failure**. Re-run on the next live slate.
+- **STILL OPEN: Drop 3, the game-line join.** `rows_live_edged` stays 0 for
+  game-line markets regardless of these two drops.

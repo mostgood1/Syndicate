@@ -513,7 +513,17 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   predicted this for WNBA on 08-10 ("WNBA never got it", 128 of 128 live rows
   edged) and the rule was centralised so every sport could depend on it — NFL
   still doesn't.**
-- **FIXED IN CODE, NOT DEPLOYED — `1d15686b`, lane `nfl-live-edge-suppression`.**
+- **FIXED, DEPLOYED AND VERIFIED IN PRODUCTION — refresh-worker `dca39fad`,
+  live 2026-08-15T20:00:19Z. `[measured 20:15Z]`** On the first post-deploy
+  build: **12 live NFL rows, 0 carrying `model_edge_pct`** (baseline 5), 12
+  pregame rows with 2 real edges retained, and **10 rows carrying the policy's
+  exact reason string** — which is the proof the branch ran, since nothing else
+  writes it. **It had to go to refresh-worker, not web:** the shortlist is a
+  plain artifact read and the edges are baked in at build time
+  (`book_grid_artifact.py:221`); a web deploy would have been inert.
+  So "zero live edges have ever been published" — Tier 5's founding premise —
+  was false, and what was published is now correctly suppressed.
+- **(superseded) fixed in code `1d15686b`, not deployed.**
   Guard applied at the single stamp point in `attach_nfl_game_projections`, so it
   covers h2h/totals/spreads and any future branch; ordered AFTER the projection
   is stamped so `live_aware` still ADMITS a genuinely live model (which matters
@@ -524,8 +534,18 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   production until that number is read. **A reading of 0 taken while the board
   carries no live rows at all is NON-EVIDENCE** — window 2 produced exactly that
   and it proves nothing. Re-measure on a live NFL slate.
-- **QUOTE-FEED AGE ALARM EXISTS — `8b6f7773`, committed, NOT DEPLOYED.
-  `[built 08-15, tested locally only]`** `shared/quote_feed_age.py` (O(1)
+- **QUOTE-FEED AGE ALARM IS DEPLOYED AND MEASURED — web `0c65a832`, live
+  2026-08-15 19:27:27Z. `[measured 19:28Z]`** `GET /api/ops/quote-feed-age`
+  went **404 → 200**; running commit confirmed from `/api/ops/version`.
+  First read: mlb ok 33.7 min, nfl ok 2.5 min, wnba ok 122.6 min,
+  **soccer STALE 340.9 min** — it caught a real stale feed on a sport nobody
+  was watching. **Threshold is 10,800 s and that is a real limitation:** WNBA's
+  122.6 min pregame cadence must read `ok`, so today's 5.8 h MLB starvation
+  would have been caught only ~3 h in. Env-tunable via
+  `SYNDICATE_QUOTE_FEED_STALE_SECONDS`; per-regime thresholds are the next step.
+  Deployed from a branch cut off web's OWN live SHA — `8b6f7773` deployed
+  directly would have rolled web back **109 commits**.
+- **(superseded) built `8b6f7773`, committed.** `shared/quote_feed_age.py` (O(1)
   tail-read of the quote shard → `newest_captured_at`, age, status
   `ok`/`stale`/`unknown`) + `GET /api/ops/quote-feed-age`.
   **Unknown never maps onto `ok`** — a missing or unparseable shard reports
@@ -799,21 +819,21 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   `_ncaaf_teams_in_question` excludes mascots deliberately (~680 schools share
   "Wildcats"/"Tigers"). NFL is safe only because its 32 nicknames are unique
   (verified). `[from-code + measured 08-15]`
-- **K6 IS INERT ON PRODUCTION, not "half done"** (an earlier line here said the
-  harness warns on the answer TEXT — that was wrong; it checks the FIELD first,
-  `ask_syndicate_regression.py:473`). `as_of` is populated **28/52 both before
-  and after — unchanged.** `routed_sport` DID ship and works. The freshness
-  fallback does not fire on production: A04 returns `as_of: None` there and
-  `'2026-08-15T17:07:33Z'` LOCALLY on identical code, and a production A04
-  response carries **no timestamp-bearing field anywhere**. The data exists on
-  the box — `/api/intelligence/status` has
-  `freshness.computed_at = 2026-08-15T05:21:08Z` — so the ask route's
-  `read_latest_intelligence_state` is not resolving to it. Suspect (NOT
-  confirmed): `_hydrate_intelligence_snapshot_payload` hoists
-  `top_opportunities`/`recommendations` from a nested `response` block but never
-  hoists `freshness`; the local box takes a path with freshness already at top
-  level, so it cannot reproduce. **Instrument which path resolves on production
-  before changing the hoist.** `[measured 08-15 17:1xZ]`
+- **K6 CAUSE CONFIRMED AND FIXED IN `origin/main`, BUT NOT DEPLOYED.**
+  `routed_sport` shipped and works; the as-of did not. `as_of` is populated
+  **28/52** and `warn:no_as_of_stated` is **24** on the live tree — unmeasured
+  and unmoved until `0050d1c4` reaches production. **Do not mark K6 closed.**
+  **Cause (measured, not suspected):** production web runs
+  `SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE = true` AND
+  `SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT = true`, **while the comment at
+  that call site still says the flag is "default off, so this is a no-op
+  today".** That path (`read_combined_intelligence_response`) returns
+  `state_meta` and **no `freshness` key at all** (`state_meta.computed_at` was a
+  valid `2026-08-15T18:36:33Z`). `read_latest_intelligence_state` has FOUR return
+  paths with DIFFERENT payload shapes, so anything reading `freshness` off the
+  snapshot works on a dev box and is inert in production. The fix scans
+  `("state_meta", "freshness", "state_freshness")`, matching
+  `pipeline/intelligence_state.py`'s own order. `[measured 08-15 18:3xZ]`
 - **K3's `build_evidence_pack` sport-filter item is DEAD CODE** — reachable only
   from the LLM engine, which never executes by standing decision. `[from-code]`
 - **Chat reads the shortlist ARTIFACT directly**, so chat staleness IS artifact
@@ -859,16 +879,38 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   1. `mlb/live_lens.py:1094` — the merge rejected the MC lens for exactly the live
      games (the card's text-derived lens already satisfies
      `_lens_rows_have_projection_signal`); same shape as the prop sever at :1109,
-     fifteen lines earlier. **FIXED in git as `0e0b0aa1`, NOT DEPLOYED.**
+     fifteen lines earlier. **FIXED as `0e0b0aa1`. DEPLOYED ON WEB, WHERE IT IS
+     INERT; NOT on live-odds-worker, which is where it matters.** `[content-checked
+     08-15 20:1xZ]` The MC is hard-refused in-request on web, so the fixed
+     condition never has a `live_mc` lens to keep. live-odds-worker still runs
+     `ccd10349` and carries neither drop; the deploy commit `191a001b` is built,
+     pushed and ancestry-checked, and **the gate has not opened** — held
+     continuously 19:33–20:17 by a long `refresh_odds_sources.py` soccer walk,
+     with one window at 19:55:44 that closed inside a minute.
   2. **`/mlb/api/live-lens` serves a report WEB WRITES ITSELF.** It reads the
      worker's keyvalue snapshot and, when it judges it stale, DISCARDS it and
      rebuilds locally with the MC hard-refused by
      `refuse_if_compute_in_request_path`. Max age **60 s** vs a **60 s** worker
      tick. **There are THREE live-lens artifacts, not two**, and the published
-     disk copy is not the one the surface reads. *(This supersedes my own earlier
-     "the published report is the slim shape, so fixing (1) alone changes
-     nothing" — that named the wrong artifact. The conclusion that (1) alone is
-     not user-visible survives; the reason changed.)*
+     disk copy is not the one the surface reads. **FIXED as `4bd7dbb3`, DEPLOYED
+     ON WEB** (`9b88d05b` live 19:54:18Z; superseded by `f475c775`, which
+     content-checks as carrying both drops and descends from it, so not a
+     revert). Carry-forward is bounded 300 s, refused on unreadable age, refused
+     on a settled game, stamped with a non-resettable `liveStateAsOf`.
+- **INSTRUMENT, corrected twice — read this before verifying anything here.**
+  `[measured 08-15 20:0xZ]`
+  - **`mlb_source/data/live_lens/…` CANNOT show the lens, ever.** It is the SLIM
+    shape from `scripts/refresh_mlb_oddsapi.py`; a game row's keys are exactly
+    `{gamePk, startTime, status}` and **`gameLens` is not a key at all**. Earlier
+    guidance in this file naming it as the instrument was wrong.
+  - **`/mlb/api/live-lens` WAS blind and is now the CORRECT instrument** — it was
+    blind because web's rebuild destroyed the lens, and `4bd7dbb3` removed
+    exactly that. The rule inverted when the fix landed.
+  - **`modelHomeWinProb` is NOT a valid signal: 60 of 60 rows carry one at
+    baseline**, stamped on the `first1/3/5` lanes by `_live_margin_win_prob`.
+    **`source == "live_mc"` is the only discriminator.**
+  - **BASELINE for the pending worker deploy** (`/mlb/api/live-lens`, 15 games /
+    4 live): `gameLens rows 60`, **`live_mc` 0**, `liveStateCarriedForward` 0.
   3. `live_projection_join` is **entirely prop-shaped** — there is no game-line
      join at all, so nothing prices a live game line even once it is published.
   **`predictions.full` IS pregame at source** — the vendored payload sets
