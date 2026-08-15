@@ -566,7 +566,42 @@
   is measured — a sign flip applied to a source that was already correct would
   invert every spread join instead of fixing it.
 
-### clv-without-settlement — OPEN — **PUBLISH FIXED AND MEASURED (web `bebe87c9`, live 19:36:45Z): `same_book_n` 0 → 144, FIRST UNBIASED CLV = -0.07% AT A 27.1% BEAT RATE (PRELIMINARY, TAKEN PRE-FIRST-PITCH). THE LANE'S BREADTH HYPOTHESIS IS REFUTED** — opened 2026-08-14 — session: lane-cleanup
+### clv-without-settlement — OPEN — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
+- **MEASURED BEFORE BUILDING, and it stopped the build:**
+  - `/api/portfolio/summary`: **3 prediction records**, all sport `multi`,
+    `settled: 0`, `avg_clv: null`. That is the whole ledger.
+  - Same instant, published recommendations: **11,864 opportunities considered**,
+    ~600 openings recorded for the date.
+  - So `PredictionResult.clv_pct` — the field that exists and is never populated
+    — sits on a table with **3 rows**. Filling it would make
+    `/api/portfolio/summary.avg_clv` a real number computed over 3
+    records: **a metric with no denominator, which is worse than null** because
+    null is honestly empty and a number invites use.
+- **`clv_pct` PER RECOMMENDATION IS ALREADY PRODUCED.** `compute_clv_for_date`
+  emits one row per published opening, each carrying `clv_pct`, `beat_close`,
+  `close_source`, `close_timing`, `model_edge_pct` and `ev_pct`, keyed by
+  `event_id|market|player|segment|side|line|bookmaker`. **An opening IS a
+  published recommendation** — that key is the recommendation's identity.
+  Reachable now: `/api/ops/clv/report?date=...&sport=...&rows=1` (179 same-book
+  rows today).
+- **THE REAL GAP, stated precisely:** the per-recommendation CLV exists only on
+  an ops diagnostic endpoint. Nothing a user or the board reads carries it. The
+  work is EXPOSURE, not computation — and that is a different, smaller job than
+  the lane's original wording implies.
+- **THREE SUBSTRATES, materially different work — needs a decision, not a
+  default:**
+  1. **Attach at artifact build** (`layer2_shortlist`) — every published row
+     carries its own `clv_pct`. Truest home; costs a WORKER deploy and only
+     applies to rows built after it ships.
+  2. **Join at serve time** on web — `/api/board/layer2-shortlist` merges the
+     joiner's rows by key. Web-only deploy, works on today's data immediately,
+     but recomputes per request (the joiner is a pure read, so it is legal).
+  3. **Backfill the prediction ledger** — REJECTED on the evidence above until
+     something actually writes recommendations into it at volume.
+- **NOT STARTED. No files claimed for this.** Recorded so the next session does
+  not rebuild what exists or build onto the 3-row table.
+
+ — OPEN — **PUBLISH FIXED AND MEASURED (web `bebe87c9`, live 19:36:45Z): `same_book_n` 0 → 144, FIRST UNBIASED CLV = -0.07% AT A 27.1% BEAT RATE (PRELIMINARY, TAKEN PRE-FIRST-PITCH). THE LANE'S BREADTH HYPOTHESIS IS REFUTED** — opened 2026-08-14 — session: lane-cleanup
 - **RESULT 2026-08-15 19:38Z — the publish fix landed and it changed the answer.**
   `PUBLISH_FAILED`×8/16h (`HTTP 403 FORBIDDEN`, last 19:32:50Z) → `PUBLISH_OK`×2
   at 19:37:00Z and 19:38:10Z, 15s after the deploy; zero failures since. Web now
@@ -4425,7 +4460,7 @@ Read-only lane. No files touched, no deploy.
 - **ALSO OWED:** a WEB deploy for `blueprints/intelligence.py` — until then
   `live_projections` stays absent from the API and its absence is NOT evidence.
 
-### smaps-anon-breakdown — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+### smaps-anon-breakdown — CLOSED 2026-08-15 — HYPOTHESIS CONFIRMED (anon is 91% mmap, 8.7% brk heap); the 673MB it chased was a SCOPE ERROR and is retracted; reconciliation fix `c7747a29` AWAITING DEPLOY — opened 2026-08-15 — session: memory-cutover-ship
 - Goal: decompose the **673MB of anon that pymalloc never allocated** (42% of the
   1,607MB rest-state floor) by MAPPING, using the kernel's own accounting — the
   same accounting that decides the OOM kill.
@@ -4686,3 +4721,30 @@ whole-numbered is the one that should move, and `market_key`/`player_name` at
   (target `037eb356`, since 23:35:01Z), which still carries both sites.
   `send_message` is unavailable from this scheduled-task session, so the claim
   was NOT taken and no coordination message could be sent. Waiting for release.
+
+#### smaps-anon-breakdown — CLOSED 2026-08-15 23:5xZ
+**HYPOTHESIS CONFIRMED.** pid 39 anon is **91% mmap** (1,007.2 of 1,106.9MB)
+against only **95.9MB of brk `[heap]`**. Falsification was "if `[heap]` dominates,
+`mallinfo2`'s `arena` is the follow-up rather than `hblkhd`" — it does not.
+
+**AND THE LANE'S PREMISE WAS RETRACTED BY ITS OWN INSTRUMENT.** The "673MB
+outside pymalloc" this lane was opened to chase was cgroup `anon` (1,607MB,
+CONTAINER) minus pymalloc arenas (934MB, pid 39 ONLY). Different scopes. The
+smaps reader's reconciliation check refused its first production read
+(`reconciles: false`, 27.0%) and that refusal was the finding. Per-process the
+residue is **~173MB**; ~410MB was always just the 8-10 child processes.
+
+**CONSEQUENCE: `mallinfo2` IS NOT THE NEXT STEP.** I recommended it two hours
+ago. The question it was for has largely dissolved, and with pymalloc holding
+~934MB of arenas the mmap total is very nearly pymalloc itself — a duller answer
+than a mystery, and the right one.
+
+**SHIPPED:** `b0ab37a1` (reader) live 22:41:04Z, minimal — live sha + 1 commit,
+not converged main, which would have moved production 330 commits for an
+instrument.
+**NOT SHIPPED:** `c7747a29` (reconcile against the process, not the container).
+Three sessions held the deploy claim in 70 min and the live sha moved twice under
+a rebase, so it is filed as a request rather than raced for —
+`.syndicate/deploy/requests/2026-08-15T2350Z-smaps-reconciliation.md`.
+Until it lands the reader reports `reconciles: false` on every read. Cosmetic;
+the breakdown itself is correct.
