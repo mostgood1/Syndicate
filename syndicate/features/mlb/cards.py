@@ -341,6 +341,14 @@ def _apply_source_live_prop_ranking_scores(rows: list[dict[str, Any]]) -> list[d
     scored_rows: list[dict[str, Any]] = []
     for row in rows:
         item = dict(row)
+        # A PROJECTION-ONLY ROW IS NOT A PICK, so it gets no ranking score --
+        # both because scoring it would imply it is one, and because the
+        # predictor runs per row on the live-lens tick and this set is now the
+        # full live board rather than the handful that passed the bet selector.
+        # Worker periodic work is never free here (`#241` cost a restart loop).
+        if bool(item.get("projection_only")):
+            scored_rows.append(item)
+            continue
         if item.get("ranking_score") is None and predictor is not None and isinstance(cfg, dict):
             try:
                 probability = predictor(item, cfg, prop_key=str(item.get("prop") or ""))
@@ -2799,6 +2807,14 @@ _LIVE_HITTER_MARKET_KEYS: dict[str, tuple[str, str]] = {
     "rbis": ("batter_rbis", "RBIs"),
     "total_bases": ("batter_total_bases", "Total Bases"),
     "home_runs": ("batter_home_runs", "Home Runs"),
+    # `batter_hits_runs_rbis` was in `_MLB_HITTER_PROP_DIST_CONFIG` (added by the
+    # 2026-08-01 board audit) and NOT here, so the sim could price it and the
+    # live rail never emitted a row for it. Measured on the served board
+    # 2026-08-15: the live join matched **0 of 79** `batter_hits_runs_rbis`
+    # rows, against `batter_hits` 19 of 77 -- a clean zero next to a partial,
+    # which is the signature of a missing key rather than a failing match.
+    # The two tables are the same fact and must not disagree again.
+    "hits_runs_rbis": ("batter_hits_runs_rbis", "Hits+Runs+RBIs"),
 }
 
 
@@ -3330,13 +3346,71 @@ def _live_pitcher_prop_row_actionable(row: dict[str, Any], actual_payload: dict[
     )
 
 
-def _bounded_live_pitcher_projection(actual_value: float | None, model_mean: float | None, progress_fraction: float) -> float | None:
+def _bounded_live_pitcher_projection(
+    actual_value: float | None,
+    model_mean: float | None,
+    progress_fraction: float,
+    *,
+    outs_mean: float | None = None,
+    outs_recorded: float | None = None,
+    pitcher_removed: bool = False,
+) -> float | None:
+    """Project a starter's final counting stat from the CURRENT game state.
+
+    Opportunity-based, matching `_bounded_live_hitter_projection` below: a
+    hitter's remaining chances are `ab_mean - actual_ab`, and a pitcher's are
+    `outs_mean - outs_recorded`. The pitcher path did not have that and used
+    `_live_progress_fraction` -- the fraction of the GAME played, total outs
+    over 54 -- which is the wrong clock by roughly a factor of three, since a
+    starter is expected to record ~15-18 of those 54.
+
+    Measured on the served board 2026-08-15 20:12:48Z, all three failure modes
+    live on one game (STL @ CHC, Top 7):
+
+      * Matthew Boyd was OUT of the game -- 5.1 IP, 2 K, 7 ER, two relievers
+        behind him -- and was still projected to finish with 4.057 K and 3.242
+        ER, because nothing here asked whether he was still pitching.
+      * Michael McGreevy had 18 outs recorded and was projected for 17.136 --
+        BELOW an already-banked actual, which is impossible for a monotone
+        counting stat and is the clearest proof the live number was not read.
+      * `max(mean - actual, 0.0)` floors the residual, so a pitcher ahead of his
+        pregame mean projected to add exactly nothing for the rest of his start.
+        Strikeouts only go up; this biased precisely the pitchers most likely to
+        go over.
+
+    `progress_fraction` is retained as the fallback for when the sim ships no
+    `outs_mean` (or the box score no outs), so a thin payload degrades to the
+    previous behaviour rather than to nothing.
+    """
     mean = _safe_float(model_mean)
     actual = _safe_float(actual_value)
     if mean is None:
         return actual
     if actual is None:
         return mean
+
+    # ONCE HE IS PULLED, THE COUNT IS FINAL. No clock and no rate can add to a
+    # line that has stopped moving. `_starter_removed_from_actual_payload` is
+    # the same predicate the starter-ladder path at `_live_pitcher_ladder_*`
+    # already uses to bail -- it existed, and this path simply never asked it.
+    if pitcher_removed:
+        return round(float(actual), 3)
+
+    starter_outs = _safe_float(outs_mean)
+    recorded = _safe_float(outs_recorded)
+    if starter_outs is not None and recorded is not None and float(starter_outs) > 0.0:
+        # The pitcher's OWN remaining workload, and his own per-out rate. For
+        # the `outs` market itself this is an identity (rate 1.0), which is why
+        # it also correctly floors at the actual once he is past his mean rather
+        # than projecting backwards through it.
+        remaining_outs = max(float(starter_outs) - float(recorded), 0.0)
+        rate_per_out = float(mean) / float(starter_outs)
+        return round(float(actual) + (remaining_outs * rate_per_out), 3)
+
+    # FALLBACK ONLY -- no `outs_mean` or no recorded outs. Deliberately left as
+    # it was, including the zero floor: without an opportunity denominator there
+    # is nothing better to say, and changing it here would move rows this lane
+    # cannot measure.
     remaining_fraction = max(0.0, min(1.0, 1.0 - float(progress_fraction)))
     return round(float(actual) + max(float(mean) - float(actual), 0.0) * remaining_fraction, 3)
 
@@ -3382,7 +3456,25 @@ _MLB_HITTER_PROP_DIST_CONFIG: dict[str, dict[str, str]] = {
 }
 
 
-def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, Any] | None, actual_payload: dict[str, Any] | None) -> list[dict[str, Any]]:
+def _current_live_pitcher_prop_rows(
+    selected_date: str,
+    sim_payload: dict[str, Any] | None,
+    actual_payload: dict[str, Any] | None,
+    *,
+    include_projection_only: bool = False,
+) -> list[dict[str, Any]]:
+    """See `_synth_live_hitter_prop_rows` for what `include_projection_only`
+    changes and why. Two extra drops live on this path and both are lifted by
+    the flag:
+
+    * a market whose actual has already PASSED the line was skipped outright,
+      so a starter sitting on 7 earned runs against a 2.5 line produced no live
+      row at all and the board went on showing the pregame 3.242. The join
+      already has the right words for that state ("the over is already decided,
+      so the market is settled") -- it just never got a row to say them about.
+    * `_select_bounded_live_side(..., min_edge=0.03)`, same selector as the
+      hitters.
+    """
     if not isinstance(sim_payload, dict) or not isinstance(actual_payload, dict):
         return []
     refreshed_at = central_now().isoformat(timespec="seconds")
@@ -3425,6 +3517,22 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
         actual_row = (actual_context or {}).get("stats") if isinstance(actual_context, dict) else None
         if not isinstance(model_row, dict) or not isinstance(market_entry, dict):
             continue
+        # THE OPPORTUNITY INPUTS, read once per pitcher rather than per market.
+        # The starter-ladder path already asked `_starter_removed_from_actual_payload`
+        # and bailed; this path -- the one that feeds the BOARD -- never did, so
+        # a pulled starter kept accruing projected strikeouts to the final out.
+        # Removal is NOT a reason to drop the row here (unlike the ladder, whose
+        # rungs are forward-looking bets): the board still wants to show what he
+        # finished with, so it is passed down and the projection settles to the
+        # actual.
+        pitcher_removed = _starter_removed_from_actual_payload(
+            actual_payload,
+            side=side,
+            starter_id=pitcher_id,
+            starter_name=pitcher_name,
+        )
+        outs_mean = _safe_float(model_row.get("outs_mean"))
+        outs_recorded = _actual_pitcher_stat_value(actual_row, "outs")
         side_rows: list[dict[str, Any]] = []
         for prop_key, cfg in config.items():
             market = market_entry.get(prop_key)
@@ -3434,11 +3542,19 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
             if line_value is None:
                 continue
             actual_value = _actual_pitcher_stat_value(actual_row, prop_key)
-            if actual_value is not None and float(actual_value) > float(line_value):
+            already_decided = actual_value is not None and float(actual_value) > float(line_value)
+            if already_decided and not include_projection_only:
                 continue
             model_mean = _safe_float(model_row.get(cfg["mean_key"]))
             model_prob_over = _dist_prob_over_line(model_row.get(cfg["dist_key"]), float(line_value))
-            live_projection = _bounded_live_pitcher_projection(actual_value, model_mean, progress_fraction)
+            live_projection = _bounded_live_pitcher_projection(
+                actual_value,
+                model_mean,
+                progress_fraction,
+                outs_mean=outs_mean,
+                outs_recorded=outs_recorded,
+                pitcher_removed=pitcher_removed,
+            )
             side_pick = _select_bounded_live_side(
                 model_prob_over=model_prob_over,
                 line_value=float(line_value),
@@ -3447,10 +3563,22 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
                 live_projection=live_projection,
                 min_edge=0.03,
             )
-            if side_pick is None:
+            if side_pick is None and not include_projection_only:
                 continue
+            projection_only = side_pick is None or already_decided
+            if projection_only and model_prob_over is None and live_projection is None:
+                continue
+            side_pick = side_pick or {}
             side_rows.append(
                 {
+                    "projection_only": projection_only,
+                    "projection_only_reason": (
+                        "the over is already decided, so there is no bet left -- the "
+                        "projection is carried so the board can show the settled state"
+                        if already_decided
+                        else "the live model has a projection for this market but no bet "
+                        "passed the live-rail selector"
+                    ) if projection_only else None,
                     "market": "pitcher_props",
                     "prop": prop_key,
                     "market_label": cfg["label"],
@@ -3584,6 +3712,15 @@ def _actual_hitter_stat_value(actual_row: dict[str, Any] | None, prop_key: str) 
         "total_bases": "totalBases",
         "home_runs": "homeRuns",
     }
+    # COMPOSITE, so it has no single box-score field. Summed rather than mapped,
+    # and only from components that are actually present -- returning None
+    # because one leg is missing would report "nothing banked yet" for a hitter
+    # who already has a hit, which is the wrong direction on a market whose
+    # whole point is that it is easy to clear.
+    if str(prop_key) == "hits_runs_rbis":
+        parts = [_safe_int(actual_row.get(key)) for key in ("hits", "runs", "rbi")]
+        present = [int(part) for part in parts if part is not None]
+        return float(sum(present)) if present else None
     stat_key = stat_map.get(str(prop_key))
     return float(_safe_int(actual_row.get(stat_key))) if stat_key and _safe_int(actual_row.get(stat_key)) is not None else None
 
@@ -3762,7 +3899,31 @@ def _synth_live_hitter_prop_rows(
     sim_payload: dict[str, Any] | None,
     actual_payload: dict[str, Any] | None,
     existing_rows: list[dict[str, Any]],
+    *,
+    include_projection_only: bool = False,
 ) -> list[dict[str, Any]]:
+    """Live hitter prop rows from the pregame distribution + the live box score.
+
+    `include_projection_only` IS THE COVERAGE FIX, and the distinction it draws
+    is the whole point. `_select_bounded_live_side` is a BET SELECTOR: it wants a
+    two-way price, a non-favourite (`max_favorite_odds=-200`), the projection on
+    the right side of the line by 0.08 (over) / 0.18 (under), AND a market edge
+    over 0.05. Every row failing any of those was DROPPED -- so the live-lens
+    snapshot, which the betting board consumes as its source of live
+    PROJECTIONS, was actually a pick list.
+
+    Measured on the served board 2026-08-15 20:12:48Z: 57 of 638 live rows (8.9%)
+    carried a live projection, and `batter_home_runs` matched 0 of 116 -- a HR
+    mean near 0.15 against a 0.5 line puts the over on the wrong side and the
+    under's price past the -200 favourite cap, so the selector rejects every one
+    of them while the sim has a perfectly good number for all of them.
+
+    With the flag, a row the selector rejects is still emitted, carrying its
+    projection and `projection_only: True` with the reason. Default stays False,
+    so the game-detail pick rail is unchanged -- only
+    `live_prop_rows_for_game` (the snapshot builder's entrypoint, and its ONLY
+    caller) opts in.
+    """
     refreshed_at = central_now().isoformat(timespec="seconds")
     sim_section = _sim_section_from_payload(sim_payload)
     hitter_models = sim_section.get("hitter_props") if isinstance(sim_section.get("hitter_props"), dict) else {}
@@ -3830,8 +3991,16 @@ def _synth_live_hitter_prop_rows(
                 under_odds=market.get("under_odds"),
                 live_projection=live_projection,
             )
-            if side_pick is None:
+            if side_pick is None and not include_projection_only:
                 continue
+            # A rejected row still has a projection; it just has no BET. Emitted
+            # with every pricing field null rather than zeroed, so a consumer
+            # cannot mistake "no pick here" for "a pick with no edge".
+            projection_only = side_pick is None
+            if projection_only and (model_prob_over is None and live_projection is None):
+                # Nothing to carry. This is the one honest drop.
+                continue
+            side_pick = side_pick or {}
             item = {
                 "market": "hitter_props",
                 "prop": prop_key,
@@ -3840,6 +4009,12 @@ def _synth_live_hitter_prop_rows(
                 "player_name": hitter_name,
                 "team": team,
                 "team_side": team_side,
+                "projection_only": projection_only,
+                "projection_only_reason": (
+                    "the live model has a projection for this market but no bet passed "
+                    "the live-rail selector (two-way price, non-favourite, projection "
+                    "clear of the line, market edge over the floor)"
+                ) if projection_only else None,
                 "selection": side_pick.get("selection"),
                 "market_line": float(line_value),
                 "actual": actual_value,
@@ -4030,6 +4205,8 @@ def _live_prop_rows_computed(
     sim_payload: dict[str, Any] | None,
     actual_payload: dict[str, Any] | None,
     live_lens_row: dict[str, Any] | None,
+    *,
+    include_projection_only: bool = False,
 ) -> list[dict[str, Any]]:
     """The real live-props pipeline: registry-tracked snapshots (actual
     line/odds movement over time) plus box-score-driven synthesis
@@ -4059,9 +4236,12 @@ def _live_prop_rows_computed(
                 if str(row.get("market") or "").strip().lower() != "pitcher_props"
             ]
     if is_live_game:
-        live_prop_rows.extend(_synth_live_hitter_prop_rows(selected_date, int(game_pk), sim_payload, actual_payload, live_prop_rows))
+        live_prop_rows.extend(_synth_live_hitter_prop_rows(selected_date, int(game_pk), sim_payload, actual_payload, live_prop_rows, include_projection_only=include_projection_only))
     if not is_historical_date and is_live_game:
-        same_day_hitter_synth = _synth_live_hitter_prop_rows(selected_date, int(game_pk), sim_payload, actual_payload, [])
+        # SAME FLAG ON BOTH CALLS, or the signature set below is computed from a
+        # narrower row set than the one it filters and every projection-only
+        # hitter row is dropped by its own de-duplication pass.
+        same_day_hitter_synth = _synth_live_hitter_prop_rows(selected_date, int(game_pk), sim_payload, actual_payload, [], include_projection_only=include_projection_only)
         synth_signatures = {_live_prop_signature(row) for row in same_day_hitter_synth}
         live_prop_rows = [
             row for row in live_prop_rows
@@ -4071,8 +4251,19 @@ def _live_prop_rows_computed(
         for row in live_prop_rows:
             if str(row.get("market") or "").strip().lower() == "hitter_props":
                 row["source"] = "current_market"
-        live_prop_rows.extend(_current_live_pitcher_prop_rows(selected_date, sim_payload, actual_payload))
-        live_prop_rows = [row for row in live_prop_rows if _live_pitcher_prop_row_actionable(row, actual_payload)]
+        live_prop_rows.extend(_current_live_pitcher_prop_rows(selected_date, sim_payload, actual_payload, include_projection_only=include_projection_only))
+        # A PULLED STARTER'S ROW IS NOT ACTIONABLE AND IS STILL THE ANSWER.
+        # `_live_pitcher_prop_row_actionable` drops every row for a starter who
+        # has left the game -- correct for a pick rail, and it is exactly why
+        # Matthew Boyd had no live row on 2026-08-15 while the board went on
+        # showing his pregame 4.057 strikeouts against an actual 2. Under
+        # `include_projection_only` the row survives, and the settle-to-actual in
+        # `_bounded_live_pitcher_projection` is what makes it correct rather than
+        # merely present. Without this the pulled-starter fix is inert here.
+        live_prop_rows = [
+            row for row in live_prop_rows
+            if bool(row.get("projection_only")) or _live_pitcher_prop_row_actionable(row, actual_payload)
+        ]
     ranking_rows = live_prop_rows
     if is_live_game:
         ranking_rows = _annotate_source_live_prop_rows_with_state(live_prop_rows, actual_payload, live_lens_row)
@@ -4085,11 +4276,25 @@ def live_prop_rows_for_game(selected_date: str, game_pk: int) -> list[dict[str, 
     game, same pipeline the game-detail sim panel uses. Cheap for the
     handful of currently-live games a live-lens tick actually needs this
     for -- not the whole slate.
+
+    `include_projection_only=True` HERE AND NOWHERE ELSE. This is the snapshot
+    the BETTING BOARD joins against, and the board wants a projection for every
+    live row it can get one for; the game-detail sim panel next door wants
+    actionable picks and reaches `_live_prop_rows_computed` directly, so it is
+    unaffected. Sourcing a projection set from a pick list is what held live
+    coverage at 8.9% (57 of 638 rows, measured 2026-08-15 20:12:48Z).
     """
     sim_payload = _daily_sim_by_game(selected_date, [int(game_pk)]).get(int(game_pk))
     actual_payload = _daily_actual_by_game(selected_date, [int(game_pk)]).get(int(game_pk))
     live_lens_row = _live_lens_game_row(selected_date, int(game_pk))
-    return _live_prop_rows_computed(selected_date, int(game_pk), sim_payload, actual_payload, live_lens_row)
+    return _live_prop_rows_computed(
+        selected_date,
+        int(game_pk),
+        sim_payload,
+        actual_payload,
+        live_lens_row,
+        include_projection_only=True,
+    )
 
 
 def _source_sim_detail(selected_date: str, game_pk: int, sim_payload: dict[str, Any] | None, actual_payload: dict[str, Any] | None = None, live_lens_row: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -4929,7 +5134,18 @@ def _live_starter_ladder_badges_for_side(
             continue
         actual_value = _actual_pitcher_stat_value(actual_row, prop_key)
         model_mean = _safe_float(model_row.get(cfg["mean_key"]))
-        live_projection = _bounded_live_pitcher_projection(actual_value, model_mean, progress_fraction)
+        # `pitcher_removed` is not passed: this function has already returned []
+        # above if the starter was pulled, so it is False by construction here.
+        # The outs clock still applies -- a starter who is IN the game but past
+        # his expected workload has little left to accrue, and the game-progress
+        # fallback consistently over-credits him.
+        live_projection = _bounded_live_pitcher_projection(
+            actual_value,
+            model_mean,
+            progress_fraction,
+            outs_mean=_safe_float(model_row.get("outs_mean")),
+            outs_recorded=_actual_pitcher_stat_value(actual_row, "outs"),
+        )
         supported_totals: list[int] = []
         last_supported_prob: float | None = None
         base_over_total = int(base_line) + 1

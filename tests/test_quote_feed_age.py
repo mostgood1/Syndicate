@@ -200,3 +200,111 @@ def test_bad_or_nonpositive_threshold_falls_back_to_the_default(monkeypatch):
     for bad in ("", "abc", "0", "-5"):
         monkeypatch.setenv("SYNDICATE_QUOTE_FEED_STALE_SECONDS", bad)
         assert stale_threshold_seconds() == 10800
+
+
+# --- per-sport thresholds (2026-08-15) ---------------------------------------
+#
+# The single global 3 h threshold was BOTH too slow and too tight, because the
+# feeds' normal cadences span 173x. Measured on production shards 2026-08-15
+# (distinct `captured_at` gaps, read from the artifacts, not the logs):
+#
+#     nfl  p50 1.0 min | mlb p50 31.0 | wnba p50 122.0 | soccer p50 173.0
+#
+# Defaults are set ABOVE each sport's measured healthy gaps, NOT off p50. The
+# first attempt used ~3x p50 and `test_healthy_pregame_gap_does_not_false_alarm`
+# went red -- it pins the real 123-min MLB pregame gap, which a 2 h MLB
+# threshold fires on. p50 is the right base for comparing feeds and the wrong
+# one for setting a floor: these distributions have long quiet tails and the
+# alarm must clear the tail, not the middle.
+#
+# MUTATION PIN, run 2026-08-15. Replacing `_DEFAULT_STALE_SECONDS_BY_SPORT`
+# with an empty dict (the old single-global behaviour) turns exactly these RED:
+#     test_thresholds_differ_by_sport
+#     test_nfl_detects_faster_than_the_old_global
+#     test_soccer_is_looser_than_the_old_global
+#     test_report_does_not_publish_a_scalar_threshold_it_is_not_using
+# and leaves 18 GREEN -- env precedence, the fail-safe on garbage input, the
+# unknown-sport fallback, and the whole original MLB outage timeline, all of
+# which must hold under BOTH designs and are therefore the regression net
+# rather than evidence this change works.
+#
+# I predicted three and got four. The fourth is legitimately table-dependent
+# (it asserts mlb 10800 and nfl 7200 are DIFFERENT numbers), so the
+# discrimination is correct and my enumeration was incomplete -- recorded
+# rather than quietly amended, since an unstated miss is how a mutation pin
+# turns into decoration.
+
+from syndicate.features.shared import quote_feed_age as qfa
+
+
+def test_thresholds_differ_by_sport():
+    """The whole point: one number cannot serve a 1-minute and a 173-minute feed."""
+    seen = {s: qfa.stale_threshold_seconds(s) for s in ("nfl", "mlb", "wnba", "soccer")}
+    assert len(set(seen.values())) > 1, seen
+    # ordered by each feed's measured p50
+    assert seen["nfl"] < seen["mlb"] < seen["soccer"] <= seen["wnba"]
+
+
+def test_nfl_detects_faster_than_the_old_global():
+    """NFL's feed runs at ~1 min; a 3 h alarm on it was ~180x too slow."""
+    assert qfa.stale_threshold_seconds("nfl") < 10800
+
+
+def test_soccer_is_looser_than_the_old_global_but_not_by_much():
+    """Pinned against BOTH ways this constant has been wrong in one day.
+
+    v1 was 7 h, from a p50 of 173 min computed over the whole shard. The soccer
+    shard is keyed by FIXTURE date, so `2026-08-15.jsonl` spans TEN calendar
+    days and that p50 was measuring overnight boundaries, not cadence.
+    Today-only: p50 40 min, max 198 min.
+
+    Upper bound is the real guard here. At 7 h this threshold would have called
+    a 437-min silence -- 11x soccer's own beat -- merely "ok".
+    """
+    thr = qfa.stale_threshold_seconds("soccer")
+    assert thr > 10800, "must still clear soccer's genuine multi-hour quiet spells"
+    assert thr <= 14400, "7 h was derived from a fixture-date shard and hid a real outage"
+
+
+def test_unknown_sport_falls_back_to_the_old_global():
+    """A sport with no measured entry must behave exactly as it did before."""
+    assert qfa.stale_threshold_seconds("cricket") == qfa._DEFAULT_STALE_SECONDS
+    assert qfa.stale_threshold_seconds(None) == qfa._DEFAULT_STALE_SECONDS
+
+
+def test_per_sport_env_beats_everything(monkeypatch):
+    monkeypatch.setenv("SYNDICATE_QUOTE_FEED_STALE_SECONDS", "999")
+    monkeypatch.setenv("SYNDICATE_QUOTE_FEED_STALE_SECONDS_MLB", "4242")
+    assert qfa.stale_threshold_seconds("mlb") == 4242
+    # ...and the global still applies to a sport without its own key
+    assert qfa.stale_threshold_seconds("wnba") == 999
+
+
+def test_global_env_beats_the_measured_defaults(monkeypatch):
+    """An operator flattening every sport during an incident must win over a
+    constant compiled in from last week's measurements."""
+    monkeypatch.setenv("SYNDICATE_QUOTE_FEED_STALE_SECONDS", "60")
+    assert qfa.stale_threshold_seconds("soccer") == 60
+    assert qfa.stale_threshold_seconds("nfl") == 60
+
+
+def test_garbage_env_does_not_disable_the_alarm(monkeypatch):
+    """Fail-safe: an unparseable or non-positive override must fall through to a
+    real threshold, never to 0 (which would mark every feed stale) or to a crash.
+    """
+    for bad in ("", "abc", "0", "-5"):
+        monkeypatch.setenv("SYNDICATE_QUOTE_FEED_STALE_SECONDS_MLB", bad)
+        assert qfa.stale_threshold_seconds("mlb") == 10800, bad
+
+
+def test_report_does_not_publish_a_scalar_threshold_it_is_not_using():
+    """Reporting one number while four are in use is the defect this module
+    exists to catch, one layer up."""
+    report = qfa.feed_age_report(["mlb", "nfl"], "2026-08-15")
+    assert report["threshold_seconds"] is None
+    assert report["thresholds_by_sport"]["mlb"] == 10800
+    assert report["thresholds_by_sport"]["nfl"] == 7200
+    # an explicit override is still reported as the scalar it is
+    forced = qfa.feed_age_report(["mlb", "nfl"], "2026-08-15", threshold_seconds=123)
+    assert forced["threshold_seconds"] == 123
+    assert set(forced["thresholds_by_sport"].values()) == {123}

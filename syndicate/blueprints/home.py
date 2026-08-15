@@ -3062,7 +3062,20 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         # The canonical, sport-agnostic market key where the source has one
         # (MLB prop rows carry prop="batter_total_bases"). `market` below is a
         # display string ("Walks Allowed") and must never be used as a key.
-        "market_key": _safe_text(item.get("market_key") or item.get("prop") or item.get("prop_market_key") or item.get("stat"), None),
+        #
+        # `or None` because "WHERE THE SOURCE HAS ONE" was not what this line
+        # did. `_safe_text`'s last statement is `return ""`, so the `None`
+        # fallback written here could never be produced and a source with no
+        # canonical key emitted `""` instead. That is not a harmless variant of
+        # absent: a downstream `if payload.get("market_key") is None` reads `""`
+        # as an answer and skips its own derivation, which is exactly what
+        # shipped an NBA prop with `market_key: ""` while `market_focuses`
+        # already held `['threes']` (measured 2026-08-15). Absent must serialise
+        # as absent. Deliberately NOT applied to the sibling `_safe_text(...,
+        # None)` fields on this dict -- `player_name: null` cards are a defect
+        # this function was fixed for once already, so that one needs its own
+        # look, not a sweep.
+        "market_key": _safe_text(item.get("market_key") or item.get("prop") or item.get("prop_market_key") or item.get("stat"), "") or None,
         "headshot_url": _safe_text(item.get("headshot_url") or item.get("photo"), None),
         "market": _safe_text(item.get("market"), heading),
         "pick": _safe_text(item.get("pick"), detail.split("|")[0].strip() if detail else heading),

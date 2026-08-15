@@ -350,6 +350,7 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
     matched = 0
     edged = 0
     edge_blocked = 0
+    prob_withheld = 0
     considered = 0
     miss_no_player = 0
     miss_no_market_alias = 0
@@ -405,12 +406,38 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         projection.setdefault("sim_projected", projection.get("projected"))
         projection.setdefault("sim_basis", projection.get("basis"))
         projection.setdefault("sim_source", projection.get("source"))
+        # THE DISPLAYED PROBABILITY FOLLOWS THE DISPLAYED PROJECTION, or it goes
+        # absent. It used to be stamped from `hit["model_prob_over"]`, which
+        # `build_live_prop_index` fills from the lens' `modelProbOver` -- the
+        # PREGAME number (`live_lens.py:541` falls that chain through to
+        # `estimatedWinProb`, and :549 documents that this is deliberate and
+        # that the live value lives under its own key). So `projected` moved to
+        # the live re-sim's number while the probability beside it did not, and
+        # the row asserted both at once.
+        #
+        # THE EDGE WAS NEVER WRONG -- it has always read `live_prob_over` only,
+        # and refuses to price without it. This is the DISPLAY half of the same
+        # rule, which was missed because the edge is the thing that gets audited.
+        # Measured on the served board 2026-08-15 20:12:48Z: of 13 live pitcher
+        # rows, 7 carried a projection and a probability on OPPOSITE sides of
+        # the line -- Brad Lord `outs` 16.77 projected against an 11.5 line at
+        # P(over) 0.18; Logan Webb `earned_runs` 1.87 against 2.5 at P(over)
+        # 0.90. Against 10 of 81 on the pregame path, all of those near-line
+        # ties (mean-vs-median skew on a skewed distribution), which is the
+        # honest version of the same shape.
+        #
+        # Absent, not substituted: same rule as `#414`'s edge and WNBA's refusal
+        # to invent P(over) from a mean. The pregame number is preserved under
+        # `sim_model_prob_over` beside `sim_projected`, so nothing is lost and
+        # the two are never again read as one.
+        projection.setdefault("sim_model_prob_over", projection.get("model_prob_over"))
+        live_prob_over = hit.get("live_prob_over")
         projection.update(
             {
                 "basis": "live_resim",
                 "projected": hit["live_projection"],
                 "live_projected": hit["live_projection"],
-                "model_prob_over": hit.get("model_prob_over"),
+                "model_prob_over": live_prob_over,
                 "actual_so_far": hit.get("actual_so_far"),
                 "source": "mlb_live_lens_monte_carlo",
                 # The policy reads THIS, not the game state -- a live projection
@@ -418,6 +445,18 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
                 "live_aware": True,
             }
         )
+        if live_prob_over is None:
+            # A blank probability must say why, for the same reason a blank edge
+            # does: "the re-sim could not price this" and "the join failed" are
+            # the same empty cell otherwise.
+            projection["model_prob_over_unavailable_reason"] = (
+                "the live re-sim produced no probability for this market; the "
+                "pregame probability is kept as `sim_model_prob_over` and is "
+                "deliberately not shown as a live number"
+            )
+            prob_withheld += 1
+        else:
+            projection.pop("model_prob_over_unavailable_reason", None)
         # `row` is a live dict in the grid; the caller owns persistence.
         row["projection"] = projection  # type: ignore[index]
         matched += 1
@@ -538,6 +577,12 @@ def attach_live_projections(grid: Sequence[Mapping[str, Any]], indexed: Mapping[
         # attached, so "we chose not to price this" never again reads the same
         # as "the join failed".
         "rows_live_edged": edged,
+        # THE DISPLAY HALF, counted separately from the edge half. A row can
+        # carry an honest live projection and no live probability, and that is
+        # now a stated act rather than a silently inherited pregame number.
+        # `rows_live_prob_withheld == rows_live_projected` means the re-sim
+        # priced nothing this tick; a gap between them means it priced some.
+        "rows_live_prob_withheld": prob_withheld,
         "rows_live_edge_withheld": edge_blocked,
         "live_games_in_snapshot": indexed.get("live_games"),
         "snapshot_rows_seen": indexed.get("rows_seen"),

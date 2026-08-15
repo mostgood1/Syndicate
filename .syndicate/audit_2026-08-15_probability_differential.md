@@ -33,8 +33,16 @@ exactly what a missing or malformed quote looks like.
 | mlb | totals | over | 0.007944 | **+4900** | +12488 |
 
 Source: `/api/intelligence/query` on `syndicate-an21.onrender.com`, 1346
-`fair_price` values served, **24 of them sitting exactly on ±4900 and not one
-beyond it**, joined row-wise to the `fair_probability` that produced them. The
+`fair_price` **occurrences** served, **24 of them sitting exactly on ±4900 and
+not one beyond it**, joined row-wise to the `fair_probability` that produced
+them.
+
+**Read those as OCCURRENCES, not markets.** The served payload echoes one
+logical row into several sections, so the 24 are **2 distinct market sides**
+(the two rows in the table above), not 24 broken markets. The distinction was
+implicit here and was later mis-quotable; `scripts/watch_clamp_trigger.py` now
+reports `..._occurrences` and `mispriced_rows` as separate fields so the two can
+never be confused again. The
 cause is a `max(0.02, min(0.98, p))` clamp copied into three places (and a
 fourth inline). A clamp is not a guard: it converts an out-of-range input into
 a confident wrong number instead of a refusal.
