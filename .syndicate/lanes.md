@@ -3905,3 +3905,36 @@ Read-only lane; no files touched, no deploy.
   `git restore --staged` inheriting a live `GIT_INDEX_FILE`.
 - **Web moved again while I was writing this**: `edfc0174` at 21:48:17Z,
   superseding the `4316c907` I read at 21:41. Re-read per service, always.
+
+#### live-game-line-projection — DROP 3 FILES CLAIMED 2026-08-15 (collision-checked via `_claims()`)
+- `syndicate/features/shared/live_gameline_join.py` (new) — the game-line join.
+- `syndicate/features/shared/book_grid_artifact.py` — one call site + counters.
+- `tests/test_live_gameline_join.py` (new).
+- **NOT taken:** `syndicate/features/shared/live_projection_join.py` — claimed by
+  OPEN `mlb-live-pitcher-projection`. That is the PROP join and this lane does
+  not need it. **`rows_live_edged` is theirs and this lane does not move it.**
+- Built to the **recorded user decision on spec §8.1: PUBLISH, REFUSE TO PRICE**
+  at 120 sims with `probStdErr` and a `priceable` gate.
+
+#### mlb-live-pitcher-projection — DEPLOY HELD PENDING COORDINATION 2026-08-15 ~22:0xZ
+- **`cc4afae2` (branch `deploy/mlb-live-prop-coverage-lo-20260815`) is BUILT,
+  TESTED, PUSHED AND DELIBERATELY NOT DEPLOYED.** It carries the coverage fix to
+  **live-odds-worker**, built on that service's OWN live SHA `191a001b`.
+  **Do not deploy it from another session without saying so here** — it restarts
+  the odds source of truth.
+- Held for two independent reasons: (1) the Render deploy call was blocked by a
+  permission classifier and is with the user; (2) coordination request sent to
+  session **"Syndicate plan assessment and sessions"**
+  (`local_82a0a2fe-b386-4615-b783-7a532cbd254f`) asking for a deploy window —
+  3 web deploys + 1 refresh-worker deploy landed inside 30 minutes from other
+  sessions, and web 502s on every route during each, which makes any board
+  measurement taken in that window NON-EVIDENCE.
+- **refresh-worker `846bb74e` IS deployed and measured** (live 21:45:20Z; see
+  `deploys.md`). The probability half PASSED on a new-code marker
+  (`sim_model_prob_over` on 21/21 rows, straddles 7/13 -> 0). The coverage half
+  is INERT there — `MLB_ENABLE_LIVE_LENS_LOOP` is false on refresh-worker and
+  true on live-odds-worker, so the emitter never runs on the service it shipped
+  to. That is what `cc4afae2` fixes.
+- **`nfl-live-edge-suppression`'s owed measurement is UNAFFECTED and still
+  theirs to take:** `846bb74e` was built ON TOP of `dca39fad`, so that fix is
+  still deployed. I have not taken their measurement.
