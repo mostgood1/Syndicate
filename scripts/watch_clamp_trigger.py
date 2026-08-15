@@ -130,31 +130,78 @@ def _walk_fair_prices(node: Any, found: list[float]) -> None:
             _walk_fair_prices(item, found)
 
 
-def _joined_pairs(payload: Any) -> list[tuple[float, float]]:
-    """(fair_probability, fair_price) pairs from the served payload.
+def _joined_pairs(payload: Any) -> list[dict[str, Any]]:
+    """(fair_probability, fair_price) pairs from the served payload, with identity.
 
     Joined on the row rather than compared as two populations -- the whole
     finding rests on knowing WHICH probability produced WHICH price.
-    """
-    pairs: list[tuple[float, float]] = []
 
-    def walk(node: Any) -> None:
+    Returns OCCURRENCES, not rows. The served payload echoes the same logical row
+    into several sections, so one mispriced market can appear a dozen times.
+    `_dedupe` collapses them; both counts are reported, because they answer
+    different questions and only one of them is a count of broken markets.
+    """
+    pairs: list[dict[str, Any]] = []
+
+    def walk(node: Any, identity: dict[str, Any]) -> None:
         if isinstance(node, dict):
+            # Identity is inherited downward: `fair_price` often sits on a nested
+            # node that carries no sport/market of its own.
+            here = dict(identity)
+            for field in ("sport", "market", "side"):
+                if isinstance(node.get(field), str):
+                    here[field] = node[field]
+            game = node.get("game")
+            if isinstance(game, dict) and isinstance(game.get("matchup"), str):
+                here["matchup"] = game["matchup"]
+
             price = node.get("fair_price")
             quote = node.get("quote") if isinstance(node.get("quote"), dict) else {}
             probability = node.get("fair_probability")
             if probability is None:
                 probability = quote.get("fair_probability")
-            if isinstance(price, (int, float)) and isinstance(probability, (int, float)):
-                pairs.append((float(probability), float(price)))
+            if isinstance(price, (int, float)) and not isinstance(price, bool) \
+                    and isinstance(probability, (int, float)) and not isinstance(probability, bool):
+                pairs.append({**here,
+                              "fair_probability": float(probability),
+                              "fair_price": float(price)})
             for value in node.values():
-                walk(value)
+                walk(value, here)
         elif isinstance(node, list):
             for item in node:
-                walk(item)
+                walk(item, identity)
 
-    walk(payload)
+    walk(payload, {})
     return pairs
+
+
+def _row_key(entry: dict[str, Any]) -> tuple:
+    """Identity of a logical market row.
+
+    Includes the identity fields so two genuinely different markets that happen
+    to share a price are NOT collapsed into one -- the failure mode that would
+    turn an under-count into a claim of correctness.
+    """
+    return (
+        round(entry["fair_probability"], 9),
+        entry["fair_price"],
+        entry.get("sport"),
+        entry.get("market"),
+        entry.get("side"),
+        entry.get("matchup"),
+    )
+
+
+def _dedupe(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse repeated occurrences of one row, keeping the repeat count."""
+    seen: dict[tuple, dict[str, Any]] = {}
+    for entry in entries:
+        key = _row_key(entry)
+        if key in seen:
+            seen[key]["occurrences"] += 1
+        else:
+            seen[key] = {**entry, "occurrences": 1}
+    return list(seen.values())
 
 
 def correct_price(probability: float) -> float:
@@ -164,22 +211,38 @@ def correct_price(probability: float) -> float:
     return 100.0 * (1.0 - probability) / probability
 
 
-def classify(out_of_clamp: list[dict[str, Any]], pairs: list[tuple[float, float]]) -> dict[str, Any]:
-    """Decide what production is doing, from published content alone."""
-    at_clamp = [(p, v) for p, v in pairs if abs(v) == CLAMP_PRICE and (p < CLAMP_LOW or p > CLAMP_HIGH)]
-    beyond = [(p, v) for p, v in pairs if abs(v) > CLAMP_PRICE]
+def classify(out_of_clamp: list[dict[str, Any]], pairs: list[dict[str, Any]]) -> dict[str, Any]:
+    """Decide what production is doing, from published content alone.
+
+    `pairs` are OCCURRENCES; the evidence array is DEDUPED to logical rows, so a
+    reader cannot mistake one repeated market for a dozen broken ones.
+    """
+    at_clamp = _dedupe([e for e in pairs
+                        if abs(e["fair_price"]) == CLAMP_PRICE
+                        and (e["fair_probability"] < CLAMP_LOW or e["fair_probability"] > CLAMP_HIGH)])
+    beyond = _dedupe([e for e in pairs if abs(e["fair_price"]) > CLAMP_PRICE])
+
+    def _identity(entry: dict[str, Any]) -> dict[str, Any]:
+        return {k: entry[k] for k in ("sport", "market", "side", "matchup") if entry.get(k)}
 
     if at_clamp:
         verdict = "PRE_FIX_MISPRICE"
         detail = [{
-            "fair_probability": round(p, 6),
-            "published_fair_price": v,
-            "correct_fair_price": round(correct_price(p)),
-            "error_points": round(abs(correct_price(p) - v)),
-        } for p, v in at_clamp]
+            **_identity(e),
+            "fair_probability": round(e["fair_probability"], 6),
+            "published_fair_price": e["fair_price"],
+            "correct_fair_price": round(correct_price(e["fair_probability"])),
+            "error_points": round(abs(correct_price(e["fair_probability"]) - e["fair_price"])),
+            "occurrences_in_payload": e["occurrences"],
+        } for e in at_clamp]
     elif beyond:
         verdict = "POST_FIX_OK"
-        detail = [{"fair_probability": round(p, 6), "published_fair_price": v} for p, v in beyond]
+        detail = [{
+            **_identity(e),
+            "fair_probability": round(e["fair_probability"], 6),
+            "published_fair_price": e["fair_price"],
+            "occurrences_in_payload": e["occurrences"],
+        } for e in beyond]
     else:
         # The probability exists but no price was published for it. The fixed
         # code omits the column rather than faking one, so this is the expected
@@ -190,8 +253,13 @@ def classify(out_of_clamp: list[dict[str, Any]], pairs: list[tuple[float, float]
     return {
         "verdict": verdict,
         "out_of_clamp_rows": out_of_clamp,
+        # DEDUPED to logical rows. `occurrences_in_payload` on each entry is how
+        # many times the served payload echoed it.
         "evidence": detail,
-        "pairs_joined": len(pairs),
+        "evidence_rows": len(detail),
+        "pairs_joined_occurrences": len(pairs),
+        "pairs_joined_rows": len(_dedupe(pairs)),
+        "mispriced_rows": len(at_clamp),
     }
 
 
@@ -238,9 +306,13 @@ def check_once(*, confirm: bool = True) -> dict[str, Any]:
 
     prices: list[float] = []
     _walk_fair_prices(served, prices)
-    record["served_fair_price_count"] = len(prices)
-    record["served_at_clamp_price"] = sum(1 for v in prices if abs(v) == CLAMP_PRICE)
-    record["served_beyond_clamp_price"] = sum(1 for v in prices if abs(v) > CLAMP_PRICE)
+    # OCCURRENCE counts -- the payload echoes one row into several sections, so
+    # these are NOT counts of broken markets. The `_rows` figures in classify()
+    # are. Named explicitly because the old `served_at_clamp_price` read like a
+    # row count and was quoted as one.
+    record["served_fair_price_occurrences"] = len(prices)
+    record["served_at_clamp_price_occurrences"] = sum(1 for v in prices if abs(v) == CLAMP_PRICE)
+    record["served_beyond_clamp_price_occurrences"] = sum(1 for v in prices if abs(v) > CLAMP_PRICE)
     record.update(classify(out_of_clamp, _joined_pairs(served)))
     return record
 
@@ -265,10 +337,17 @@ def _summarize(record: dict[str, Any]) -> str:
     if verdict == "no_trigger":
         return head + "  -> no_trigger (proves nothing)"
     line = head + f"  -> {verdict}"
+    rows = record.get("evidence_rows")
+    if rows is not None:
+        line += (f" ({rows} distinct row(s); "
+                 f"{record.get('served_at_clamp_price_occurrences', 0)} clamp-priced "
+                 f"occurrences of {record.get('served_fair_price_occurrences', 0)})")
     for item in record.get("evidence") or []:
-        line += (f"\n      p={item['fair_probability']} published={item['published_fair_price']}"
+        who = " ".join(str(item[k]) for k in ("sport", "market", "side", "matchup") if item.get(k))
+        line += (f"\n      {who}  p={item['fair_probability']} published={item['published_fair_price']}"
                  + (f" correct={item['correct_fair_price']} off_by={item['error_points']}"
-                    if "correct_fair_price" in item else ""))
+                    if "correct_fair_price" in item else "")
+                 + f"  (x{item.get('occurrences_in_payload', 1)} in payload)")
     return line
 
 
@@ -280,23 +359,83 @@ def _self_test() -> int:
     is needed -- and an untested classifier is worth nothing at the moment it
     finally fires.
     """
+    def pair(p: float, v: float, **identity: Any) -> dict[str, Any]:
+        return {"fair_probability": p, "fair_price": v, **identity}
+
     checks: list[tuple[str, str, dict[str, Any]]] = []
 
-    pre = classify([{"fair_probability": 0.992056}], [(0.992056, -4900.0), (0.4, 150.0)])
+    pre = classify([{"fair_probability": 0.992056}], [pair(0.992056, -4900.0), pair(0.4, 150.0)])
     checks.append(("out-of-clamp priced AT the clamp", "PRE_FIX_MISPRICE", pre))
 
-    post = classify([{"fair_probability": 0.992056}], [(0.992056, -12488.0), (0.4, 150.0)])
+    post = classify([{"fair_probability": 0.992056}], [pair(0.992056, -12488.0), pair(0.4, 150.0)])
     checks.append(("out-of-clamp priced BEYOND the clamp", "POST_FIX_OK", post))
 
-    absent = classify([{"fair_probability": 0.992056}], [(0.4, 150.0)])
+    absent = classify([{"fair_probability": 0.992056}], [pair(0.4, 150.0)])
     checks.append(("out-of-clamp with no price published", "POST_FIX_OK_COLUMN_ABSENT", absent))
 
     # p=0.98 is ON the edge, and `american_price(0.98)` is legitimately -4900.
     # Fixed code produces this, so it must NOT read as a misprice.
-    edge = classify([], [(0.98, -4900.0)])
+    edge = classify([], [pair(0.98, -4900.0)])
     checks.append(("p exactly AT the edge is legitimately -4900", "POST_FIX_OK_COLUMN_ABSENT", edge))
 
     failures = 0
+
+    # --- dedupe, the bug this section exists to prevent recurring ---------
+    # One row echoed 14 times through the payload must read as ONE broken market.
+    echoed = classify(
+        [{"fair_probability": 0.007934}],
+        [pair(0.007934, 4900.0, sport="nfl", market="h2h_3_way", side="away", matchup="JAX @ NO")] * 14
+        + [pair(0.4, 150.0, sport="mlb", market="totals", side="over", matchup="A @ B")],
+    )
+    ok = echoed["evidence_rows"] == 1 and echoed["mispriced_rows"] == 1 \
+        and echoed["evidence"][0]["occurrences_in_payload"] == 14 \
+        and echoed["pairs_joined_occurrences"] == 15 and echoed["pairs_joined_rows"] == 2
+    failures += 0 if ok else 1
+    print(f"  [{'PASS' if ok else 'FAIL'}] one row echoed 14x reads as 1 row, 14 occurrences: "
+          f"rows={echoed['evidence_rows']} mispriced={echoed['mispriced_rows']} "
+          f"occ={echoed['evidence'][0]['occurrences_in_payload'] if echoed['evidence'] else None} "
+          f"joined={echoed['pairs_joined_occurrences']}/{echoed['pairs_joined_rows']}")
+
+    # The opposite error, and the dangerous one: two DIFFERENT markets that
+    # happen to share a price must NOT collapse into one, or a real misprice
+    # disappears into a dedupe and the instrument under-reports.
+    distinct = classify(
+        [{"fair_probability": 0.007934}],
+        [pair(0.007934, 4900.0, sport="nfl", market="h2h_3_way", side="away", matchup="JAX @ NO"),
+         pair(0.007934, 4900.0, sport="nfl", market="h2h_3_way", side="away", matchup="KC @ DEN")],
+    )
+    ok = distinct["mispriced_rows"] == 2
+    failures += 0 if ok else 1
+    print(f"  [{'PASS' if ok else 'FAIL'}] two different games at the same price stay 2 rows: "
+          f"{distinct['mispriced_rows']}")
+
+    # A pair requires the price and the probability to be CO-LOCATED on one
+    # node (`fair_price` beside `fair_probability`, or beside `quote`). That is
+    # deliberate and conservative: inheriting a probability downward the way
+    # identity is inherited would happily pair it with an unrelated nested
+    # price and invent a misprice. Identity is safe to inherit; the numbers are
+    # not.
+    real_shape = _joined_pairs({"structured_response": {"top_opportunities": [
+        {"sport": "nfl", "market": "h2h_3_way", "side": "away",
+         "game": {"matchup": "JAX @ NO"},
+         "quote": {"fair_probability": 0.007934},
+         "fair_price": 4900.0}]}})
+    ok = (len(real_shape) == 1 and real_shape[0].get("sport") == "nfl"
+          and real_shape[0].get("matchup") == "JAX @ NO"
+          and real_shape[0]["fair_price"] == 4900.0)
+    failures += 0 if ok else 1
+    print(f"  [{'PASS' if ok else 'FAIL'}] identity is captured on a real-shaped row: "
+          f"{ {k: v for k, v in (real_shape[0] if real_shape else {}).items() if k != 'fair_probability'} }")
+
+    # The conservative half, asserted so nobody 'fixes' it into inheriting:
+    # price and probability on SEPARATE sibling nodes must yield NO pair.
+    split = _joined_pairs({"row": {"quote": {"fair_probability": 0.007934},
+                                   "card": {"fair_price": 4900.0}}})
+    ok = len(split) == 0
+    failures += 0 if ok else 1
+    print(f"  [{'PASS' if ok else 'FAIL'}] a split price/probability yields NO invented pair: "
+          f"{len(split)} pair(s)")
+
     for name, expected, got in checks:
         ok = got["verdict"] == expected
         failures += 0 if ok else 1

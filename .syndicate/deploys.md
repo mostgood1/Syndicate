@@ -3741,7 +3741,10 @@ allowlisted**, so making it observable is the cheapest instrument in reach.
 - **BEFORE (real, captured 20:45:56Z, reproduced at 20:58:11Z):**
   nfl `h2h_3_way` away, JAX @ NO live, `fair_probability` **0.007934**
   published **+4900**, correct **+12503**, off by **7603 points**; 14 of 1686
-  served `fair_price` at the clamp, 0 beyond.
+  served `fair_price` **occurrences** at the clamp, 0 beyond.
+  **That is ONE market row echoed 14 times through the payload, not 14 broken
+  markets** (`out_of_clamp_count: 1`). The watcher now dedupes its evidence
+  array and reports `mispriced_rows` alongside the occurrence counts.
   `reports/clamp_watch/trigger_20260815T204556+0000.json`.
 - **WHAT WOULD SETTLE IT:** the watcher is running again. Its next trigger is
   now the VERIFICATION, not the hunt. `POST_FIX_OK` = fixed.
@@ -3807,3 +3810,122 @@ read-only change that needs no worker deploy and makes the tally visible; or
 (2) add `_live_mc_bail("no_score_in_snapshot")` to the silent exit, which is one
 line and closes the last blind spot in a function whose whole purpose is naming
 its failures. **Do not deploy another guess before one of these lands.**
+
+### 2026-08-15 21:18:38Z — web `bb23c8f9` (pinned `e831263e` + `6e9e6107`) — SOCCER'S MARKET LINE AND EDGE ARE ON THE CARD
+
+Deploy `dep-da0dc9k9v7es7394gbg0`. Pinned on web's own live commit; waited out
+an in-flight deploy (`e831263e`) rather than racing it, and re-read the live
+SHA between building the tree and POSTing. Neither worker touched.
+
+**Every predicted value confirmed on the SERVED card, not inferred:**
+
+    /soccer/epl/api/cards      before          after
+      shared_lens_rows              0              1
+      shared_total_rows             0              1
+      market                        —   ATS ARS -1.5 | Total 2.5
+      best_edge                     —   ATS +0.2 | Total +0.7
+      subtitle                    EPL   Projected total 3.2
+
+    rendered card, http 200
+      .cards-data-pair              0              3
+      .cards-live-lens-card         0              1
+      .cards-run-dist-bar           0              1
+      .cards-empty-copy             0              0   (no empty state reappeared)
+      pairs: "Home win 77.3%" / "Market ATS ARS -1.5 | Total 2.5"
+             / "Best edge ATS +0.2 | Total +0.7"
+
+**Blast radius measured on all four sports, both directions.** The branch fires
+only when `sim.periods` is empty:
+
+    nfl     0/16 games reach it      — unreachable
+    ncaaf  16/16 reach it, 0/16 rows changed
+    mlb    15/15 reach it, 0/15 rows changed
+    soccer  1/1  reach it,  1/1  changed
+
+MLB and NCAAF are inert because those games carry no `betting` spread/total in
+the shape the branch reads, so every new path falls through to the old lookup.
+**I had verified NFL and NCAAF before deploying and NOT MLB — that gap was
+closed after the fact, by running the live MLB payload through both versions of
+the file loaded straight from git.** It should have been closed first.
+
+**NOT attributable to this deploy, stated so nobody inherits it as a
+regression:** MLB card-height spread moved 56 -> 197px desktop and 112 ->
+1887px mobile between the 19:0xZ and 21:2xZ reads. The contract rows are
+byte-identical across the change (0/15), and the MLB slate moves through the
+evening. `.cards-empty-copy` on MLB also went 8 slots/3 panels -> 1 slot/1
+panel in the same window. Same cause, same non-attribution.
+
+**Probe, all four sports, both widths: OK.** 0px overflow everywhere; ncaaf
+(45/53px spread, 5x repeat, 3 slots) and nfl (14/50px, 4x, 1 slot) identical to
+their pre-deploy readings — the controls hold. Soccer no longer reports
+`numeric class not found: data-pair strong`, because the class is back.
+
+Rollback if needed: redeploy pinned to `e831263e`.
+
+## 2026-08-15 — web — `8b010dac` — soccer threshold 7h -> 4h — PENDING
+- **What:** cherry-pick of `3760e59e` **code only** onto web's live `bb23c8f9`
+  (the ledger file in that commit was excluded; it conflicted, was dropped, and
+  the result verified free of conflict markers). 2 files, +21/-8. 22 tests pass.
+- **Why:** the 7 h value came from a p50 of 173 min computed across a shard that
+  spans **10 calendar days** — soccer's is keyed by FIXTURE date. Today-only p50
+  is 40 min, max 198. mlb/nfl/wnba unaffected (shards span 1-2 days).
+- **Metric:** `thresholds_by_sport.soccer` 25200 -> **14400**.
+- **EXPECTED: soccer's STATUS DOES NOT CHANGE.** It is ~7.7 h stale, past both
+  the old 7 h and the new 4 h thresholds. **So this deploy fixes a blind spot,
+  it does not fix a reading** — the value would only have differed during a
+  4-7 h outage, which is exactly the band the bad statistic was hiding.
+- **Falsifier:** soccer flips to `ok` ⇒ the constant went the wrong way.
+- **Blast radius:** web only. No worker restart.
+- **Rollback:** redeploy `bb23c8f9` by commitId.
+- **Direct deploy of `3760e59e` would have rolled web back 119 commits.** Fifth
+  deploy, fifth rollback caught by preflight (109/118/114/116/119).
+- **MEASURED `[2026-08-15 21:33Z, live 21:33:13Z]` — METRIC MET.** Running
+  commit `8b010dac74e4` confirmed from `/api/ops/version`.
+  `thresholds_by_sport: {mlb 10800, nfl 7200, soccer 14400, wnba 21600}` —
+  soccer corrected 25200 -> **14400**.
+
+      mlb      age   6.6 min  thr 180 min  ok
+      nfl      age   6.5 min  thr 120 min  ok
+      soccer   age 466.1 min  thr 240 min  STALE
+      wnba     age 247.8 min  thr 360 min  ok
+
+- **Soccer's status did NOT change, exactly as predicted.** It is 7.8 h stale,
+  past both the old 7 h and the new 4 h. **This deploy closed a blind spot
+  rather than fixing a reading** — the two values only differ across the 4-7 h
+  band, which is precisely the range the bad statistic was hiding.
+- **Falsifier did NOT fire:** soccer did not flip to `ok`.
+- Incidental: WNBA at 247.8 min still reads `ok` under its own 360 min
+  threshold — it would have been a false alarm under the original single 180 min
+  global. That remains the clearest demonstration of why per-sport was needed.
+
+## 2026-08-15 21:3xZ — web `4316c907` — CLV headline stops counting in-play prices
+
+**PREFLIGHT: PASS, with one unknown stated rather than glossed.**
+
+1. **Scope.** Parent `8b010dac`, the LIVE web commit (waited out a concurrent
+   deploy rather than racing it). Diff vs live: 2 files, +197/-5 — `clv_join.py`
+   aggregation plus a new test file.
+2. **Expected effect**, on `/api/ops/clv/report?date=2026-08-15&sport=mlb`:
+   new keys `by_close_timing`, `same_book_all_n`, `in_play_excluded_n`,
+   `unknown_timing_excluded_n`; every row carries `close_timing`; and
+   `avg_clv_pct` becomes LESS negative because the in-play tail is out.
+   **Verification is same-instant self-consistency, not a remembered number:**
+   fetch `rows=1` and recompute the pregame-only mean by hand; the headline must
+   equal it. The slate is still moving, so any figure from 21:1xZ is stale as a
+   target.
+3. **`check_deploy_safety` NOT CLEAR — and the reason is an UNKNOWN, not a
+   known conflict:** `Board build state UNKNOWN (HTTP Error 429)`. It could not
+   reach the state at all. Proceeding deliberately because the item it cannot
+   confirm is a **refresh-worker** job and this is a **web-only** deploy, which
+   does not restart that service. Odds refresh reported idle. Live games ARE in
+   progress, so the cost is ~1-2 min of web 502s.
+4. **Blast radius.** The changed function is read by the ops CLV endpoint. It is
+   a diagnostic surface, not the board — no user-facing page reads it.
+   **`avg_clv_pct` will move**, by design; that is the fix, and the old value is
+   recorded in this file as retracted.
+5. **Rollback.** `py -3 scripts/render_deploy.py --service web --commit 8b010dac --allow-rollback`
+6. **Ledger check.** `clv_join.py` + the new test are claimed by
+   `clv-without-settlement` (this session) and CLEAR of every other OPEN lane
+   via `lane-guard.py`'s own `_claims()`. No `render.yaml` change, so
+   `blueprint_sync` cannot fire.
+7. **MEASUREMENT: pending.**
