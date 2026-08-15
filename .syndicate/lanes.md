@@ -4140,3 +4140,78 @@ and labelled itself `arena_not_representative`, so that instrument cannot answer
 this either. This needs a different measurement, and it should be chosen BEFORE
 any more code is written.
 Read-only lane. No files touched, no deploy.
+
+#### mlb-live-pitcher-projection — CHECKPOINT 2026-08-15 ~22:1xZ — HALF VERIFIED IN PRODUCTION, HALF NEVER RUN
+- **DURABLE:** 8 commits, all confirmed in HEAD (`f4cd2bc8` `3a476001` code;
+  `6da01dd3` repair; `a7ad6aed` `265884c0` `9eb5b7bc` `dc85bfeb` `f96a00fd`
+  ledger). 36 new tests, six behaviours mutation-verified. Survived another lane
+  shipping Drop 3 (`758a89fa`) with no file overlap.
+- **VERIFIED IN PRODUCTION:** the proj/prob contradiction (refresh-worker
+  `846bb74e`, live 21:45:20Z; `sim_model_prob_over` on 21/21 = new-code marker;
+  straddles 7/13 -> 0).
+- **NEVER RUN ANYWHERE:** the coverage fix. Inert on refresh-worker
+  (`MLB_ENABLE_LIVE_LENS_LOOP=false` there, `true` on live-odds-worker),
+  undeployed on live-odds-worker. Its four causes are code-derived plus measured
+  zeros — the MECHANISM IS NOT PROVEN.
+- **NOT IN SCOPE, STILL BROKEN:** 89% of live rows show a pregame projection
+  against a live market with no staleness marker. The user was offered that fix
+  (option 1) and did not select it. The screenshotted McGreevy/Boyd rows are in
+  this bucket.
+- **NEXT ACTION, SINGLE:** deploy `cc4afae2`
+  (`deploy/mlb-live-prop-coverage-lo-20260815`, built on live-odds-worker's own
+  `191a001b`) to **live-odds-worker `srv-d91dpertqb8s73co8lt0`**, then re-read
+  `/api/board/book-grid?sport=mlb&date=2026-08-15` on a LIVE slate. Predicate:
+  coverage off 8.9% (ceiling **90.2%**, not 100%); `batter_home_runs` and
+  `batter_hits_runs_rbis` both off zero. **HELD** — blocked by a permission
+  classifier AND awaiting a deploy window from session "Syndicate plan
+  assessment and sessions" (`local_82a0a2fe-...`). Do not fire from elsewhere.
+- **ALSO OWED:** a WEB deploy for `blueprints/intelligence.py` — until then
+  `live_projections` stays absent from the API and its absence is NOT evidence.
+
+### smaps-anon-breakdown — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: decompose the **673MB of anon that pymalloc never allocated** (42% of the
+  1,607MB rest-state floor) by MAPPING, using the kernel's own accounting — the
+  same accounting that decides the OOM kill.
+- Files: `syndicate/features/shared/memory_observability.py`,
+  `tests/test_smaps_breakdown.py` (new). Claim checked 22:1xZ: no OPEN lane
+  holds either.
+- **Why this instrument and not another:** `malloc_info` is already bound and
+  reports `arena_coverage_pct` 13.9%, labelling itself
+  `arena_not_representative` — it sees arena bookkeeping only, not mmap'd chunks.
+  The Python censuses cannot see non-Python allocations at all. smaps needs no
+  assumption about who allocated what.
+- **Hypothesis:** the 673MB is dominated by anonymous mmap regions rather than
+  the brk `[heap]`, because glibc routes allocations over `MMAP_THRESHOLD`
+  (128KB) straight to mmap and large numpy/pandas buffers and big `bytes`
+  payloads all land there.
+- **Falsification test:** if `[heap]` dominates instead, the hypothesis is wrong
+  and `mallinfo2`'s `arena` is the follow-up rather than `hblkhd`. Either way the
+  NEXT instrument is chosen by this result, not before it.
+- **Deliberately NOT doing `mallinfo2` in the same pass.** Choosing the second
+  instrument before reading the first is the mistake this investigation made
+  twice today. Also `mallinfo2` needs glibc >= 2.33; the older `mallinfo()`
+  returns int fields that SILENTLY OVERFLOW above 2GB — wrong numbers at exactly
+  the sizes in question, presented as valid.
+- Verification: total anon from smaps must reconcile with cgroup `anon` (they are
+  independent kernel accountings of the same thing); a large mismatch means the
+  parse is wrong and the breakdown must not be believed.
+- Blocked by: none.
+
+### ui-probe-baseline-and-rerun — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: tomorrow's probe run is COMPARABLE to today's, without anyone
+  remembering what today's numbers were. Testable: a committed baseline exists,
+  `--compare <baseline>` prints per-metric deltas, and a scheduled run fires
+  tomorrow and reports them.
+- Files (exclusive to this lane): `scripts/ui_layout_probe.py`,
+  `tests/test_ui_layout_probe.py`, `reports/ui_layout/baseline_2026-08-15.json`
+  (new). Collision check RUN: all free.
+- Hypothesis: the metrics that moved across today's four readings (card-height
+  spread, fit reliability) are slate-driven and will keep moving; the ones that
+  did not (overflow, tab wiring, touch targets, tabular figures, unstyled
+  links) are code-driven and should be identical tomorrow. **Which is which is
+  the actual open question this lane answers.**
+- Falsification test: if a code-driven metric moves overnight with no deploy
+  touching the card surface, it is not code-driven and the harness is measuring
+  something it does not understand.
+- Verification: the comparison output itself, run against tomorrow's slate.
+- Blocked by: none.
