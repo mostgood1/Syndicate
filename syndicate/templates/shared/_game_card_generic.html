@@ -80,15 +80,15 @@
       <div class="cards-summary-grid">
         <div class="cards-data-pair">
           <span>Coverage</span>
-          <strong>{% if game.coverage_score is defined %}{{ '%.3f'|format(game.coverage_score|float) }}{% else %}-{% endif %}</strong>
+          <strong>{% if game.coverage_score is defined %}{{ '%.3f'|format(game.coverage_score|float) }}{% else %}—{% endif %}</strong>
         </div>
         <div class="cards-data-pair">
           <span>Publication Tier</span>
-          <strong>{{ game.coverage_tier if game.coverage_tier is defined else '-' }}</strong>
+          <strong>{{ game.coverage_tier if game.coverage_tier is defined else '—' }}</strong>
         </div>
         <div class="cards-data-pair">
           <span>Publication Status</span>
-          <strong>{{ game.publication_status if game.publication_status is defined else '-' }}</strong>
+          <strong>{{ game.publication_status if game.publication_status is defined else '—' }}</strong>
         </div>
       </div>
       {% if game.publication_priority is defined %}
@@ -141,7 +141,7 @@
       {% for metric in metrics[:3] %}
         <div class="cards-mini-metric">
           <span>{{ metric.label }}</span>
-          <strong>{{ metric.value }}</strong>
+          <strong>{{ metric.value | default('—', true) }}</strong>
         </div>
       {% endfor %}
     </div>
@@ -166,9 +166,9 @@
               </div>
               <div class="cards-subcopy">{{ row.subtitle }}</div>
               <div class="cards-summary-grid">
-                <div class="cards-data-pair"><span>Home win</span><strong>{{ row.home_win }}</strong></div>
-                <div class="cards-data-pair"><span>Market</span><strong>{{ row.market }}</strong></div>
-                <div class="cards-data-pair"><span>Best edge</span><strong>{{ row.best_edge }}</strong></div>
+                <div class="cards-data-pair"><span>Home win</span><strong>{{ row.home_win | default('—', true) }}</strong></div>
+                <div class="cards-data-pair"><span>Market</span><strong>{{ row.market | default('—', true) }}</strong></div>
+                <div class="cards-data-pair"><span>Best edge</span><strong>{{ row.best_edge | default('—', true) }}</strong></div>
               </div>
             </div>
           {% endfor %}
@@ -266,7 +266,7 @@
                       <span class="cards-table-row-name">{{ row.name }}</span>
                       {% if row.detail %}<span class="cards-table-copy">{{ row.detail }}</span>{% endif %}
                     </div>
-                    <div class="cards-table-row-value">{{ row.value }}</div>
+                    <div class="cards-table-row-value">{{ row.value | default('—', true) }}</div>
                   </div>
                 {% endfor %}
               </div>
@@ -316,7 +316,7 @@
                     <span class="cards-table-row-name">{{ row.heading }}</span>
                     <span class="cards-table-copy">{{ row.name }}</span>
                   </div>
-                  <div class="cards-table-row-value">{{ row.value }}</div>
+                  <div class="cards-table-row-value">{{ row.value | default('—', true) }}</div>
                 </div>
               {% endfor %}
             </div>

@@ -114,3 +114,55 @@ to the internet and back, billed both ways" is a rule.
 - Let a session end without a checkpoint when real work happened.
 
 Push back plainly and say what would change your answer.
+
+
+## House pattern to refuse: an absent value substituted with a neutral midpoint
+
+Added 2026-08-14 after the same defect was found independently in the view
+contract and the model layer within a day of each other. Treat it as a
+pattern to prevent, not as bugs to fix one at a time.
+
+**The shape.** A value is missing, so the code substitutes the midpoint of
+its range — `0.5` for a probability, `50.0` for a percentage, a centred bar,
+a coin flip. It is the most dangerous possible default, because the midpoint
+is also a legitimate value: once written, nothing downstream can distinguish
+"the model said 50%" from "the model said nothing". Every other default at
+least announces itself.
+
+**Confirmed instances, measured not guessed:**
+- `game_board_contract.py` — SEVEN sites. Two of them (`_safe_float(x) or
+  50.0`) also mapped a genuine `0.0` onto the midpoint, so one card
+  contradicted itself. Two others fed the win-probability bar the share of
+  projected POINTS: a 21.0-24.0 projection drew 46.67/53.33 under a heading
+  reading "Period win probabilities". FIXED 2026-08-14, deployed as web
+  `932a1f71`.
+- `dense_cards.css` — `var(--away-pct, 50%)`. A second, quieter copy: if the
+  variable never got set, the bar still rendered centred and confident.
+  FIXED.
+- The model layer's `_fair_probability` 0.5 fallback (model plan A1) — OPEN,
+  another lane's file.
+- **`scripts/refresh_nba_oddsapi_props.py` and
+  `scripts/refresh_wnba_oddsapi_props.py` — roughly ten sites EACH**, of the
+  form `(_american_price_to_prob(price) or 0.5)` and `_margin_win_prob(...)
+  or 0.5`. NOT FIXED and not trivial: these feed EV and edge arithmetic, not
+  only display, so a naive change moves published numbers. **They are also
+  upstream of every consumer-side guard** — a literal 0.5 arriving from a
+  producer is indistinguishable from a real one, which is precisely why the
+  contract-level fix cannot cover them.
+- Corroboration that this is already recognised:
+  `scripts/ask_syndicate_regression.py` treats `probability in (50.0, 0.5)`
+  as a suspicious value in its own regression harness.
+
+**The rule.** When a value is absent, propagate the absence — `None`, and a
+renderer that shows an explicit empty state. Never substitute a midpoint. If
+a caller genuinely cannot handle `None`, make it say so at the boundary
+rather than inventing a number to keep the arithmetic quiet.
+
+**How to check a suspect quickly:** drive the function with (a) the value
+present, (b) the value missing, and (c) the value present and equal to the
+midpoint. If (b) and (c) produce the same output, the code has destroyed the
+distinction and no downstream guard can recover it.
+
+**Related:** the falsy-`or` variant is the same bug with a different trigger
+— `x or DEFAULT` fires on `0`, `0.0`, `""` and `False`, all of which are
+real values for most fields. Test `is None`.

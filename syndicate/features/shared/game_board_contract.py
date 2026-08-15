@@ -24,7 +24,23 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
-def _safe_text(value: Any, fallback: str = "-") -> str:
+# ONE null placeholder for every board surface. Measured 2026-08-14: the same
+# missing value rendered as "-" on NCAAF (11 template sites), as an EMPTY CELL
+# on the generic card (Jinja's silent undefined), and as "-" in MLB's JS
+# renderer -- so "no data" looked like three different things depending on
+# which fork you were looking at, and one of the three looked like nothing at
+# all. The em dash is what `intelligence.html` already treats as the null
+# marker (it reads both forms), so this converges on what the platform
+# half-had rather than inventing a fourth.
+#
+# Deliberately NOT a general "-" ban: `-` stays correct as a minus sign, as a
+# scoreline separator, and inside any per-sport producer whose own consumers
+# compare against it (`wnba/cards.py`, `soccer/team.py` and the bespoke JS
+# renderers all do). This constant governs the SHARED CONTRACT's output.
+NULL_PLACEHOLDER = "—"
+
+
+def _safe_text(value: Any, fallback: str = NULL_PLACEHOLDER) -> str:
     text = str(value or "").strip()
     return text or fallback
 
@@ -138,19 +154,19 @@ def _infer_live_state(game: dict[str, Any]) -> bool:
 
 def _format_pct(value: float | None) -> str:
     if value is None:
-        return "-"
+        return NULL_PLACEHOLDER
     return f"{value * 100:.1f}%"
 
 
 def _format_num(value: float | None) -> str:
     if value is None:
-        return "-"
+        return NULL_PLACEHOLDER
     return f"{value:.1f}"
 
 
 def _format_signed_num(value: float | None) -> str:
     if value is None:
-        return "-"
+        return NULL_PLACEHOLDER
     return f"{value:+.1f}"
 
 
@@ -195,7 +211,7 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
     # nonsensical "edge" on every row (a ~40-point quarter projection
     # diffed against a ~165-point full-game total). Only a period whose own
     # projection already represents the whole game should be compared
-    # against the market line; every individual sub-period gets "-" for
+    # against the market line; every individual sub-period gets NULL_PLACEHOLDER for
     # market/best_edge instead, and a genuine full-game aggregate row
     # (summed across all periods) is appended below so there's still
     # exactly one row with a valid sim-vs-line comparison.
@@ -242,8 +258,8 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
             p_home_win = 1.0 - p_away_win
         away_pct = (p_away_win * 100.0) if p_away_win is not None else None
         home_pct = (p_home_win * 100.0) if p_home_win is not None else None
-        market_value = "-"
-        best_edge_value = "-"
+        market_value = NULL_PLACEHOLDER
+        best_edge_value = NULL_PLACEHOLDER
         if single_period_is_full_game:
             market_bits: list[str] = []
             edge_bits: list[str] = []
@@ -255,8 +271,8 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
                 market_bits.append(f"Total {_format_num(betting_total)}")
                 if total_mean is not None:
                     edge_bits.append(f"Total {_format_signed_num(total_mean - betting_total)}")
-            market_value = " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-")
-            best_edge_value = " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or "-")
+            market_value = " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or NULL_PLACEHOLDER)
+            best_edge_value = " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or NULL_PLACEHOLDER)
         rows.append(
             {
                 "label": _period_label(str(key)),
@@ -303,9 +319,9 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
                 # Was `home_pct / 100.0` -- i.e. the share of projected points
                 # printed as "Home win NN%". It is a probability or it is
                 # absent; it is never a scoreline in disguise.
-                "home_win": _format_pct(home_pct / 100.0) if home_pct is not None else "-",
-                "market": " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-"),
-                "best_edge": " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or "-"),
+                "home_win": _format_pct(home_pct / 100.0) if home_pct is not None else NULL_PLACEHOLDER,
+                "market": " | ".join(market_bits) if market_bits else (_metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or NULL_PLACEHOLDER),
+                "best_edge": " | ".join(edge_bits) if edge_bits else (_metric_lookup(game.get("metrics", []), "Edge") or NULL_PLACEHOLDER),
             }
         )
     if not rows:
@@ -320,19 +336,19 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
         # happens to be empty.
         p_home_win, p_away_win, p_draw = _game_win_probabilities(game)
         home_win_text = _format_pct(p_home_win) if p_home_win is not None else (
-            _metric_lookup(game.get("metrics", []), "Home win") or _metric_lookup(game.get("metrics", []), "Win prob") or "-"
+            _metric_lookup(game.get("metrics", []), "Home win") or _metric_lookup(game.get("metrics", []), "Win prob") or NULL_PLACEHOLDER
         )
         rows.append(
             {
                 "label": "Full Game",
                 "main": away_score or game.get("summary") or "Game outlook unavailable",
-                "subtitle": game.get("detail") or game.get("status") or "-",
+                "subtitle": game.get("detail") or game.get("status") or NULL_PLACEHOLDER,
                 "away_pct": (p_away_win * 100.0) if p_away_win is not None else None,
                 "home_pct": (p_home_win * 100.0) if p_home_win is not None else None,
                 "draw_pct": (p_draw * 100.0) if p_draw is not None else None,
                 "home_win": home_win_text,
-                "market": _metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or "-",
-                "best_edge": _metric_lookup(game.get("metrics", []), "Edge") or "-",
+                "market": _metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or NULL_PLACEHOLDER,
+                "best_edge": _metric_lookup(game.get("metrics", []), "Edge") or NULL_PLACEHOLDER,
             }
         )
     return rows
@@ -457,7 +473,7 @@ def _rows_from_table_groups(table_groups: list[dict[str, Any]], *, limit: int = 
                     "heading": heading,
                     "name": _safe_text(row.get("name"), "Play"),
                     "detail": _safe_text(row.get("detail"), ""),
-                    "value": _safe_text(row.get("value"), "-"),
+                    "value": _safe_text(row.get("value"), NULL_PLACEHOLDER),
                 }
             )
             if len(rows) >= limit:
@@ -499,7 +515,7 @@ def _build_prop_rows(game: dict[str, Any]) -> list[dict[str, str]]:
                     "team": team_abbr,
                     "name": _safe_text(row.get("player") or row.get("display_pick"), "Prop"),
                     "detail": _safe_text(row.get("display_pick") or row.get("market"), ""),
-                    "value": _safe_text(row.get("tier") or row.get("line") or row.get("price"), "-"),
+                    "value": _safe_text(row.get("tier") or row.get("line") or row.get("price"), NULL_PLACEHOLDER),
                     "photo": row.get("photo") or row.get("player_photo") or row.get("headshot_url"),
                     "headshot_url": row.get("headshot_url") or row.get("photo") or row.get("player_photo"),
                     "pick": _safe_text(row.get("display_pick") or row.get("pick") or row.get("selection"), ""),
