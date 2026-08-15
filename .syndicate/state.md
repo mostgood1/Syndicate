@@ -971,14 +971,14 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
   1. `mlb/live_lens.py:1094` — the merge rejected the MC lens for exactly the live
      games (the card's text-derived lens already satisfies
      `_lens_rows_have_projection_signal`); same shape as the prop sever at :1109,
-     fifteen lines earlier. **FIXED as `0e0b0aa1`. DEPLOYED ON WEB, WHERE IT IS
-     INERT; NOT on live-odds-worker, which is where it matters.** `[content-checked
-     08-15 20:1xZ]` The MC is hard-refused in-request on web, so the fixed
-     condition never has a `live_mc` lens to keep. live-odds-worker still runs
-     `ccd10349` and carries neither drop; the deploy commit `191a001b` is built,
-     pushed and ancestry-checked, and **the gate has not opened** — held
-     continuously 19:33–20:17 by a long `refresh_odds_sources.py` soccer walk,
-     with one window at 19:55:44 that closed inside a minute.
+     fifteen lines earlier. **FIXED as `0e0b0aa1`. BOTH DROPS ARE NOW DEPLOYED
+     ON BOTH SERVICES — live-odds-worker `191a001b`, web `f475c775`,
+     content-checked — AND `live_mc` IS STILL 0.** `[measured 08-15 20:56 and
+     ~21:04Z]` Two passes on `/mlb/api/live-lens` against a baseline taken twice
+     (20:0x and re-based ~20:5x), all four reads `rows=60 live_mc=0 carried=0`;
+     the slate moved between passes (live 4→3, final 1→2), so they are
+     independent. **The deploy landed and the number did not move. The severed
+     link is NOT (or not only) the merge condition.**
   2. **`/mlb/api/live-lens` serves a report WEB WRITES ITSELF.** It reads the
      worker's keyvalue snapshot and, when it judges it stale, DISCARDS it and
      rebuilds locally with the MC hard-refused by
@@ -1005,6 +1005,41 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
     4 live): `gameLens rows 60`, **`live_mc` 0**, `liveStateCarriedForward` 0.
   3. `live_projection_join` is **entirely prop-shaped** — there is no game-line
      join at all, so nothing prices a live game line even once it is published.
+- **WHERE THE HUNT STANDS AFTER BOTH DROPS `[measured 08-15 21:1xZ]`. Two
+  hypotheses are DEAD — do not re-run them:**
+  - **"Drop 1 is bypassed; `_persist_live_lens_report` never runs on a tick" —
+    FALSIFIED.** `_live_projection_enhancement_payload` has **exactly one
+    caller**, `mlb/live_lens.py:1384`, inside that function, and it is the only
+    in-process import of the vendored `_live_lens_payload` in the MLB path. The
+    `LIVE_MC_BAIL` lines prove it executes.
+  - **"the MC bails on live games" — FALSIFIED.** 100 log samples,
+    time-contiguous 21:05:27–21:11:04 across multiple whole ticks, **100%
+    `status_not_live`** (90 Preview, 10 Final). A live game cannot emit that
+    reason and none of the other six appears. **NB: my first evidence for this
+    was a saturated 40-of-40 sample and was worthless — re-query
+    time-contiguous, and check `hits == limit`.**
+  - **REMAINING HYPOTHESIS, NOT A FINDING:** the MC takes the ONE uninstrumented
+    exit, `if away_score is None or home_score is None: return None`
+    (`flask_frontend.py:16611`), which emits nothing. It is the only silent path
+    left. **Nothing has observed it.**
+- **THE MEASUREMENT THAT SETTLES IT IS COMPUTED EVERY TICK AND WAS DISCARDED.**
+  `_tally_mlb_live_mc_sources` (`live_lens_loop.py:473`) counts
+  `live_mc / live_projection / segment_projection` per lane into
+  `meta["liveMcSources"]`. `live_lens_loop_status_payload()` had **zero
+  callers**. A route now exists — `GET /api/ops/live-lens/status` (`09b345ee`),
+  **committed, NOT deployed, and its broader ops regression was interrupted and
+  never ran.** Read `enabled`/`threadAlive` from it as the CALLING service's,
+  not the worker's.
+- **Allowlisting `reports/live_lens_loop/latest_live_lens_tick.json` is INERT —
+  do not try it.** `_KEYVALUE_EXCLUDED_PATH_MARKERS` is only
+  `("migration_runs/",)`, so the path is keyvalue-backed on every service and
+  `write_json_file` returns before any disk write, while
+  `/api/ops/artifacts/stream` gates on `target.is_file()`. It would turn a 403
+  into a 404.
+- **live-odds-worker `earlyExit`s roughly every 6.5 h** — `server_failed`,
+  `evicted: False`, at 01:37 / 08:05 / 14:34 / 20:03 on 08-15 (**events API**,
+  not logs). A refresh run launches on boot, so **this service's deploy gate is
+  closed almost continuously**: 76 min of polling yielded one sub-minute CLEAR.
   **`predictions.full` IS pregame at source** — the vendored payload sets
   `"predictions": card.get("predictions")` verbatim, so no merge line downstream
   can make it live. Served surface confirmed the effect before the fix: 56
@@ -1175,19 +1210,25 @@ the place to read it, and it carries the guard on its two shortlists.
 - **NHL and soccer market anchoring** make those engines' market-relative
   evaluation partly circular. Quantify before believing any CLV number for them.
 
-- **`/api/ops/clv/report` CANNOT SEE THE OPENINGS. Its zeros carry no
-  information.** Measured 2026-08-15 16:5xZ. The route and `clv_join.py` ARE in
-  the live web commit `0bf866c3`, and it returns `ok: true` — but it runs on
-  **web**, while `load_openings` is a `path.exists()` on a LOCAL file
-  (`reports/intelligence/clv_openings/<date>.jsonl`) and web's disk holds
-  **0 bytes** of it (`/api/ops/artifacts/export?pattern=...clv_openings/*.jsonl`
-  → `count: 0`). It returned `openings: 0` for all 8 sports on 08-15 **and for
-  08-14, a date with 150 known openings**. The data is fine: refresh-worker
-  logged `[clv_opening_ledger] OPENINGS date=2026-08-15 ... already=490` across
-  20 lines in 14h — **490 real openings exist**. The allowlist in
-  `artifact_publisher.py` PERMITS the transfer; it is not happening.
-  Do not read `same_book_n=0` from this endpoint as evidence about odds-history
-  breadth — breadth remains untested.
+- **`/api/ops/clv/report` WORKS AS OF 2026-08-15 19:36:45Z, and it produced this
+  system's first unbiased CLV number.** It had been blind: the route runs on
+  **web**, `load_openings` is a `path.exists()` on a local file, and web was
+  answering refresh-worker's publish with `HTTP 403 FORBIDDEN` because web's
+  `HOT_ARTIFACT_PATTERNS` lacked `reports/intelligence/clv_openings/*.jsonl`
+  while the worker's had it. Shipping that one allowlist line to web
+  (`bebe87c9`; also `baec34a8` on main — it had existed on NO main branch)
+  flipped `PUBLISH_FAILED`×8/16h to `PUBLISH_OK` 15s after deploy, zero failures
+  since. MLB 2026-08-15: `openings 0→520`, `resolved 0→293`, `same_book_n 0→144`.
+- **The board does NOT beat the close on the honest comparison — two readings,
+  both negative, trending down.** MLB 2026-08-15 same-book: `-0.0711` at a 27.1%
+  beat rate (n=144, 19:38Z, 0 of 14 games started), then `-0.668` at 29.3%
+  (n=167, 20:4xZ, 4 of 14). The BIASED scope reads `+2.84` at 83.5% over the same
+  rows — **never quote `book_agnostic_close` or `different_book_close` as CLV**;
+  the selection effect inverts the sign. **NOT SETTLED**: last first pitch is
+  2026-08-16T01:40Z, so most "closes" were still latest observations.
+- **REFUTED, do not re-derive:** "if `same_book_n` is 0 the blocker is
+  odds-history breadth". It went 0→144 with no change to odds history. Breadth
+  constrains `resolved` (`no_market_in_history: 172`), not `same_book_n`.
 
 - **Lane markers are per-session as of 2026-08-15.** `lane-guard.py` reads
   `.syndicate/.current-lane.<session_id>` first and falls back to the shared
@@ -1395,3 +1436,39 @@ deployment by CONTENT. `[measured 08-15 - this exact check]`
 `mlb: 0 cards` spuriously.** It did so mid-verification today. Any MLB reading
 must wait on `.cards-game-card`, not a timer. Fixing that wait is the next
 change to the probe. `[measured]`
+
+
+## Card surface - soccer shows its market line and edge `[measured 08-15 21:2xZ]`
+
+**Live `bb23c8f9` (21:18:38Z).** Soccer's card carries `.cards-data-pair` 3
+(was 0), `market` `ATS ARS -1.5 | Total 2.5` and `best_edge`
+`ATS +0.2 | Total +0.7`, read off the served card. `[measured]`
+
+**A sport with no `sim.periods` gets a stand-in Full Game row, and that row now
+reads `betting` + `sim.score` before falling back to a metric-label lookup.**
+The lookup asks for "Spread"/"Total"/"Edge"; soccer publishes "Total goals" and
+friends, so it matched nothing and the card showed its market line NOWHERE
+while `betting.home_spread` and `betting.total` sat on the game. **A
+label-matched lookup is not a substitute for the field.** `[measured]`
+
+**Which sports reach that branch** (`sim.periods` empty), measured 08-15:
+soccer 1/1, **mlb 15/15**, **ncaaf 16/16**, nfl 0/16. MLB and NCAAF are inert
+through it today only because their games carry no `betting` spread/total in
+that shape - that is a data fact, not a structural guarantee, and it can change
+without anyone touching this code. `[measured]`
+
+**`scripts/ui_layout_probe.py` waits on CONTENT, not a timer.** Five
+consecutive production runs returned 15 MLB cards on all 10 readings; the old
+fixed 400ms delay returned 0 on at least one of three. A render that never
+attaches a card is reported as `cardWaitTimedOut`, which is NOT a 0-card slate
+and fails even out of season. `[measured]`
+
+**NCAAF has no market tile row and that is by design** - `_game_card_ncaaf.html`
+contains zero `cards-market` markup. Declared in `NUMERIC_CLASS_EXEMPT` rather
+than failing the run, and the declaration is checked in both directions.
+`[measured]`
+
+**UNEXPLAINED, do not inherit as a regression:** MLB card-height spread
+56 -> 197px desktop / 112 -> 1887px mobile across the 19:0x-21:2x window, and
+empty slots 8 -> 1. Not the contract (rows byte-identical, 0/15). Presumed the
+slate moving; **nobody has actually looked.** `[unverified]`

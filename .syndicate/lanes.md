@@ -168,6 +168,133 @@
   The biased scopes say the board crushes the close; the honest one says it is
   flat-to-negative and beats the close **27%** of the time. Supersedes the
   retracted `-5.215`.
+- **THE LANE'S GOAL WAS ALREADY MET — `clv_pct` PER RECOMMENDATION EXISTS AND
+  SHIPS. Do not build it.** Checked 2026-08-15 21:1xZ before writing any code:
+  `/api/ops/clv/report?date=...&sport=mlb&rows=1` returns **355 rows, 355 of
+  them carrying `clv_pct`**, plus `beat_close`, `close_book_scope`,
+  `model_edge_pct` (291/355) and `ev_pct` — no grading, no outcome, no
+  `settle_result`, exactly as the goal specifies. `clv_join.py` has done this
+  since it was written; it was invisible only because of the 403 publish bug
+  fixed earlier today. **The build was already done and the lane did not know.**
+  - **The prediction ledger is NOT the recommendation stream and must not be
+    used as one** — `/api/portfolio/summary` reports **3 predictions, 0
+    settled, `avg_clv: null`** for a single pseudo-sport `multi`, against 636
+    MLB openings recorded today. `record_result()` is also the wrong door: it
+    computes `clv_pct` only via the settlement path this lane is defined to
+    avoid.
+- **WHAT WAS ACTUALLY MISSING IS THE SEGMENTATION THE AUDIT WANTED IT FOR.
+  Computed below on the 172 unbiased same-book rows — biased scopes excluded.**
+- **§4, THE THRESHOLD QUESTION: model edge DOES buy CLV, and the honest
+  threshold is far higher than 2%.**
+
+      model_edge bucket    n     avg_clv    beat_close
+      edge < 0            69     -0.419        26.1%
+      0-2%                25     -1.772        24.0%
+      2-5%                17     -1.245        29.4%
+      5-10%               25     -0.112        32.0%
+      10%+                12     +1.396        41.7%
+
+  Monotone in BOTH columns from `0-2%` up, and **only the 10%+ bucket is
+  positive**. On this evidence a 2% threshold publishes rows that lose CLV.
+  **Unexplained and left unexplained:** `edge < 0` (-0.419) beats `0-2%`
+  (-1.772). Do not build a story on it; n is small.
+- **THE HEADLINE LOSS IS ONE BOOK-MARKET CELL, NOT A BROAD PROBLEM.** Two
+  findings looked separate ("h2h is bad", "fanduel is bad"); cross-tabbing
+  showed they are one:
+
+      cell                        n      avg_clv    beat
+      ALL same_book             172      -0.672     27.9%
+      FanDuel h2h ONLY           54      -2.648     20.4%
+      EVERYTHING ELSE           118      +0.232     31.4%
+
+  FanDuel h2h is **31.4% of rows and 124% of the total loss** — remove it and
+  the board's CLV is **positive**. It is not h2h generally (DraftKings h2h
+  `+0.488`, n=24) and not FanDuel generally (FanDuel totals `+0.122`, spreads
+  `+0.132`).
+- **ANSWERED 2026-08-15 21:5xZ — AND MY OWN "FanDuel h2h" HEADLINE IS RETRACTED.
+  IT IS NOT A FANDUEL PROBLEM AND NOT AN h2h PROBLEM.**
+  - **The cause: rows whose "close" was sampled AFTER FIRST PITCH.**
+    `close_age_seconds = (commence - stamp)` (`clv_join.py:216,254`), so a
+    NEGATIVE value means the close observation is POST-COMMENCE — an in-play
+    price, not a close. **37 of 172 same-book rows (21.5%) are post-commence,
+    and they carry 60% of the entire loss.**
+  - **The worst four rows are one event.** `dbbb481a…` h2h away: open `-186`,
+    "close" `+168`, stamped 20:34:26Z against a 19:08Z first pitch — 86 minutes
+    into the game. That is a team going behind early, priced live. It is not
+    CLV. Four published openings (kalshi, polymarket, betopenly, betfair_ex_eu)
+    all matched that same FanDuel pair, so one bad close entered the mean four
+    times at ~-27 points each.
+  - **CLEANED, THE FANDUEL CELL IS UNREMARKABLE AND DRAFTKINGS IS WORSE:**
+
+        cell                              n     avg_clv    beat
+        ALL same_book (as I reported)   172     -0.672    27.9%
+        EXCLUDING post-commence closes  135     -0.346    25.2%
+          FanDuel h2h, cleaned           47     -0.616    23.4%
+          DraftKings h2h, cleaned        21     -1.378    14.3%
+
+    **"Strip FanDuel h2h and CLV is positive" does not survive cleaning. Do not
+    act on it.** The board's honest same-book CLV on this date is about
+    **-0.35**, not -0.67, and it is not concentrated in one book-market cell.
+  - **How I got it wrong, recorded because the shape repeats:** I read a
+    negative `close_age_seconds` as "close precedes open" WITHOUT reading the
+    field's definition, then built an attribution on it. The guard for
+    close-precedes-open (`:430`) was never the issue — it correctly did not
+    fire, because `close > open` on all 37 rows. **Two different defects can
+    both produce a negative number in a field you did not define.**
+  - **H4 (favourite asymmetry) and H2 (stale openings) are REFUTED by data:**
+    FanDuel vs DraftKings h2h open-price medians 102 vs 115.5, favourite share
+    41% vs 29%, `close_age` medians 8025s vs 8265s — comparable on every axis.
+    **H3 stays refuted at the code level.** What remains of H1 is small and is
+    NOT FanDuel-specific.
+  - **`n=172` IS NOT 172 INDEPENDENT OBSERVATIONS.** The same book's open/close
+    pair is reused for every published opening on that event/market/side, so one
+    pair can enter the mean many times. Any confidence interval over these rows
+    is overstated until that fan-out is collapsed.
+- Files (claimed 2026-08-15 22:0xZ, collision check CLEAR via `lane-guard.py`'s
+  own `_claims()`): `syndicate/features/shared/clv_join.py`,
+  `tests/test_clv_close_timing.py` (new).
+- **THE DEFECT TO FIX (its own change, not done here):** `compute_clv_for_date`
+  labels post-commence closes but still counts them in the headline
+  `avg_clv_pct`. The docstring already anticipates this — *"a caller that wants
+  only gold data can filter on them"* — but the headline IS that caller and does
+  not filter. Either exclude `close_age_seconds < 0` from the headline or report
+  it as a separate scope beside `same_book`, the way book scopes already are.
+- **HYPOTHESES FOR THE FanDuel-h2h CELL, WRITTEN BEFORE TESTING (2026-08-15 21:3xZ):**
+  - **H3 — join artifact (best-of-N open vs FanDuel close). REFUTED AT THE CODE
+    LEVEL BEFORE ANY DATA WAS PULLED.** `clv_join.py:380` sets
+    `open_price_override = book_prices.get(book)` whenever it matches a
+    same-book close, and `:435` prefers that override over
+    `opening.get("price")`. So within `same_book`, open and close are the SAME
+    book's prices. The best-of-N price only survives as `open_price_best_book`,
+    which is not what `clv_pct` is computed from. **This candidate is dead;
+    do not re-raise it without new evidence.**
+  - **H1 — real movement.** FanDuel h2h genuinely drifts against the sides we
+    publish. Falsified if open/close timing and price levels look like
+    DraftKings h2h, which is `+0.488` over the same events.
+  - **H2 — stale openings.** Our recorded FanDuel opening is old relative to its
+    close, so we are comparing a price nobody could still get. Falsified if
+    `open_captured_at` / `close_age_seconds` for the FD cell match the rest.
+  - **H4 — favourite/underdog asymmetry (NEW, and the arithmetic favours it).**
+    `clv_pct` is in probability POINTS, and `_implied_from_american` is convex:
+    the same relative move is worth more points at -250 (71.4%) than at +150
+    (40%). If the FD h2h rows sit systematically on heavy favourites, the cell
+    can read negative from the METRIC's scale rather than from worse prices.
+    Falsified if the FD and DK h2h price distributions are comparable.
+  - **H5 — side selection.** We publish one side (the value side); if that side
+    is systematically the one that drifts out at FanDuel, the cell is real but
+    is a statement about our selection, not about FanDuel.
+  - **Sign convention, stated so nobody re-derives it backwards:** `clv_pct =
+    (closing_implied - original_implied) * 100`. **Negative means the close is
+    LONGER than the price we took** -- we took a short price and it drifted out.
+- **CAUSE OF THE FanDuel-h2h CELL IS NOT ESTABLISHED.** Candidates not
+  discriminated: FanDuel moneyline closes genuinely moving against us; our
+  openings at FanDuel being stale relative to its close; or a `matched_bookmaker`
+  artifact in the join. **Do not act on this until one is measured** — its own
+  lane.
+- **ALL OF THE ABOVE IS PRELIMINARY, same caveat as the headline:** rows fetched
+  ~21:1xZ with roughly 10 of 14 MLB games unstarted, so most "closes" are latest
+  observations. One date, one sport. Several buckets are n < 25. Re-run after
+  the settled read before anything is promoted to a threshold change.
 - **SECOND READING 2026-08-15 20:4xZ (4 of 14 MLB games started) — THE NUMBER IS
   MOVING, AND DOWNWARD.** Same endpoint, same date, ~1h later:
 
@@ -2840,7 +2967,7 @@ recommendations are expected. Their file, their call; told them.
 
 - **FINAL:** shipped, verified, closed. 12 tests in `tests/test_ui_layout_probe.py`.
 
-### soccer-fallback-row-market — CLOSED 2026-08-15 — fix VERIFIED against the live payload; PRODUCTION RE-MEASURE OWED (needs a web deploy) — opened 2026-08-15 — session: ui-plan-lane-gh
+### soccer-fallback-row-market — CLOSED-VERIFIED 2026-08-15 — deployed as web `bb23c8f9`, every value read off the SERVED card — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the soccer card shows its market line and its edge, which it currently
   shows NOWHERE. Testable, on the served `/soccer/epl/api/cards`: the Full Game
   row carries a real `market` and `best_edge` (not `—`), and the rendered card
@@ -3280,3 +3407,32 @@ Carried forward, unowned:
   `batter_hits_runs_rbis` both off zero; Boyd-shaped rows showing the actual.
   **refresh-worker writes this artifact and its deployed commit has STILL not
   been read** — a re-measure taken after a web-only deploy is non-evidence.
+
+#### live-game-line-projection — CHECKPOINT 2026-08-15 ~21:3xZ — BOTH DROPS LIVE, `live_mc` STILL 0
+- **Deploy state, content-checked:** live-odds-worker `191a001b`, web
+  `f475c775`. **Both drops in production on both services.**
+- **THE RESULT IS A CLEAN NEGATIVE.** Four reads — baseline 20:0x, re-baseline
+  ~20:5x, PASS1 20:56, PASS2 ~21:04 — all `rows=60 live_mc=0 carried=0`. The
+  slate moved between passes (live 4→3, final 1→2), so they are independent
+  samples, not one cached answer. **The fix is correct and was not the binding
+  constraint.**
+- **TWO HYPOTHESES DEAD, do not re-run:** `_persist_live_lens_report` DOES run on
+  the tick (one caller, inside it — the bails prove execution); live games do NOT
+  bail (100 samples, time-contiguous, 100% `status_not_live`, none of the other
+  six reasons). **My first evidence for the second was a saturated 40-of-40
+  sample and was worthless.**
+- **ONE HYPOTHESIS LEFT, unobserved:** the MC takes the single uninstrumented
+  exit (`away_score is None`), which emits nothing.
+- **NEXT ACTION, and it is an INSTRUMENT not a guess:** deploy `09b345ee`
+  (`GET /api/ops/live-lens/status`) and read `latestTick.liveMcSources`. It
+  reports `live_mc` vs `segment_projection` per lane from the worker's own tick.
+  **Its broader ops regression (`test_ops.py` and siblings) was INTERRUPTED and
+  never ran — run it before deploying.** The 7 new tests pass.
+- **DO NOT allowlist the tick artifact instead** — measured inert: keyvalue-backed,
+  never on disk, and `artifacts/stream` gates on `target.is_file()`.
+- **A deploy of this service costs a soccer run.** The gate is closed almost
+  continuously (76 min → one sub-minute CLEAR) because a refresh run launches on
+  boot, and the service `earlyExit`s every ~6.5 h. I killed one run at 20:49 on
+  the user's explicit instruction; that notice is above.
+- **Drop 3 (the game-line join) remains untouched** — `rows_live_edged` stays 0
+  for game lines regardless.
