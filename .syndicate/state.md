@@ -493,6 +493,39 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
 
 ---
 
+
+### The ±4900 fair-price clamp — FIXED IN CODE, ONE THIRD LIVE, MEASUREMENT OWED
+
+- **All three `max(0.02, min(0.98, p))` sites are gone from `main`** (`de0c367f`
+  WNBA, `7bb74c95` `layer2_board` + the INLINE copy in
+  `pipeline/intelligence_state.py`). All now delegate to
+  `opportunity_signals.american_price`. Harness scores each **5/5**;
+  `probability_to_american` collapsed **4 behaviour clusters -> 3**.
+- **ONLY the WNBA third is LIVE** `[measured 08-15 18:1xZ by CONTENT on
+  `1e44e1da`, not by ancestry]`. `7bb74c95` is **committed, not deployed**.
+- **The clamp published wrong prices** `[measured 08-15 ~03Z]`:
+  `/api/intelligence/query` served 1346 `fair_price` with **24 exactly on ±4900,
+  none beyond**; mlb totals under `p=0.992056` published **−4900** vs correct
+  **−12488**.
+- **`/preflight` on `7bb74c95` = FAIL, and the change is not the problem.** The
+  defect is only observable when a slate carries `fair_probability` outside
+  [0.02, 0.98], and it does not today (108 rows, p=[0.058, 0.638]). A deploy
+  would move 0 → 0. **Do not deploy it as a standalone "verified" fix.**
+- **`fair_price` is stamped at SERVE time, not in the artifact** — 0 of 108
+  shortlist rows carry it against 1800 served. So this is a **web-only** deploy:
+  no refresh-worker restart, no in-flight sim at risk.
+- **THE INSTRUMENT EXISTS. Do not re-derive it:**
+  `python scripts/watch_clamp_trigger.py --once` (add `--interval 900` to poll).
+  Exits **10** on a triggering slate and classifies production from PUBLISHED
+  CONTENT — `PRE_FIX_MISPRICE` / `POST_FIX_OK` / `no_trigger`. **`no_trigger` is
+  stamped NOT-evidence** in every record. Log: `reports/clamp_watch/`.
+  **Its discriminator is the PROBABILITY being outside the band, not the price
+  being at ±4900** — `american_price(0.98)` is legitimately −4900, so the naive
+  check reports a misprice against correct post-fix output.
+- **NEXT:** on a `PRE_FIX_MISPRICE` record, that IS the before-measurement; cut a
+  branch from the then-live web SHA, deploy, re-read. Until then the fix is
+  correct-and-unproven, which is not the same as working.
+
 ## THE PUBLISHED SHORTLIST — edges, EV, CLV
 
 **Owner: `recommendation-lane-correctness` (model-audit session).**
@@ -1276,3 +1309,30 @@ me a false claim that a shipped fix had never run]`
 **A `deactivated` pinned deploy means SUPERSEDED, not reverted.** Whether your
 work survived is a separate question answered only by ancestry or a measurement.
 Held twice on 2026-08-15; enforced by nothing but the person deploying.
+
+
+## Card surface - tabular figures CLOSED `[measured 08-15 20:0xZ]`
+
+**All four generic-board sports render tabular digits. Verified in production
+after two pinned deploys.** `numericSweep` (leaf elements rendering a digit at
+`font-variant-numeric: normal`): mlb **1388 -> 0**, nfl **468 -> 0**, ncaaf
+**432 -> 0**, soccer **60 -> 0**. MLB confirmed on desktop at 15 cards with 146
+filter pills all `tabular-nums`. Live: `f475c775` (20:00:58Z), preserved by
+content in the next deploy `7abd8e12`.
+
+**`font-variant-numeric` inherits everywhere EXCEPT into form controls.** The UA
+stylesheet's `font:` shorthand on `<button>`/`<input>`/`<select>` resets it -
+measured live: card `tabular-nums`, `button.cards-filter-pill` `normal`,
+`fontFamily` `Arial`. Both rules are now in all four stylesheets. MLB was the
+only sport affected because it is the only one with in-card filter pills
+carrying counts. `[measured]`
+
+**A pinned deploy is NOT on main's lineage, so ancestry is the WRONG test for
+"did my work survive".** `454af741` and `1bb8cf9f` both read as non-ancestors of
+the very deploy that carries them; the four CSS blobs are byte-identical. Test
+deployment by CONTENT. `[measured 08-15 - this exact check]`
+
+**`scripts/ui_layout_probe.py` still waits on a fixed delay and WILL report
+`mlb: 0 cards` spuriously.** It did so mid-verification today. Any MLB reading
+must wait on `.cards-game-card`, not a timer. Fixing that wait is the next
+change to the probe. `[measured]`
