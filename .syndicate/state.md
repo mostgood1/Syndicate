@@ -794,9 +794,42 @@ Read `.syndicate/audit_2026-08-14_board_engine_SYNTHESIS.md` first.
 - **91 of 390 modules branch on liveness; there is no single pregame/live
   boundary** — it is a cross-cutting conditional, not a seam. 16 modules are
   named `live` against **zero live edges ever published**.
-- **No live GAME-LINE projection exists.** `predictions.full` is the PREGAME sim
-  — all 6 final games carried pregame win probabilities. Only PROPS have a live
-  tier, and `rows_live_edged` is 0 on every build to date.
+- **CORRECTED 2026-08-15: "no live GAME-LINE projection exists" is true of what
+  is PUBLISHED and FALSE of what is COMPUTED.** `estimate_live(LiveSituation(...))`
+  runs in production on every live-lens tick, **120 sims per live game**, off the
+  current inning/half/outs/bases/score/batter/pitcher, and returns `homeWinProb`,
+  `awayWinProb`, projected `total` and `homeMargin`
+  (`vendor/.../flask_frontend.py:16573`, wired into `_build_game_lens`:16806).
+  **Proof it runs:** `LIVE_MC_BAIL` instruments every failure exit;
+  live-odds-worker logged exactly **9 bails/tick across 11 consecutive ticks, all
+  `status_not_live`**, against a slate of **9 Final / 5 Live** — the live games
+  never bail. One exit (`away_score is None`) is uninstrumented, so this is proof
+  by exhaustion with one named hole. `[measured 08-15 03:0x–03:2xZ]`
+  **It dies in three places:** (1) `mlb/live_lens.py:1094` — the merge rejects the
+  MC lens for exactly the live games, because the card's text-derived lens already
+  satisfies `_lens_rows_have_projection_signal`; same shape as the prop sever at
+  :1109, fifteen lines earlier. (2) the PUBLISHED report is the **slim** HTTP shape
+  from `scripts/refresh_mlb_oddsapi.py`, which carries no `gameLens` field at all —
+  so fixing (1) alone changes nothing that crosses to web. (3) `live_projection_join`
+  is **entirely prop-shaped**; there is no game-line join. Served surface confirms
+  the effect: 56 `gameLens` rows, lanes `first1/first3/first5` only, `source: None`,
+  **0 with `modelHomeWinProb`**. **`predictions.full` IS pregame at source** —
+  the vendored payload sets `"predictions": card.get("predictions")` verbatim, so
+  nothing is discarding a live value there.
+  **Therefore Tier 5 is publication + plumbing + a precision decision, NOT a
+  modelling build.** The precision decision: 120 sims → **±4.56 pp SE** at p=0.5
+  (~20× too coarse to price against Pinnacle; 2,500 sims needed for 1 pp), and with
+  `seed=gamePk` fixed the error is a **state-correlated bias, not jitter that
+  averages out.** Spec: `.syndicate/spec_live_game_line_projection.md` (`9067b606`).
+- **`rows_live_edged` is a PROP counter and the game-line work does NOT move it.**
+  Its zero is the :1109 sever + a 91% alias miss. Game lines need their own
+  `rows_live_gameline_*` counters. Do not conflate them.
+- **`0.1` (per-sport cooldown) is NOT a prerequisite for the LIVE product.**
+  Re-derived: on deployed `ccd10349`, `live_refresh_loop.py:4587` reaches the 1800s
+  cooldown only when `effective_phase == "pregame"` (:4429), and production reads
+  `adaptive: true, anyLive: true, phase: "live"` on a live slate, tick 60 s. The
+  121.6-min beat is the empty-slate pregame regime. `0.1` remains the right fix for
+  the PREGAME board on its own merits. `[measured 08-15 03:3xZ]`
 - **Web's `/mlb/api/live-lens` cannot observe the live Monte Carlo**
   (`simContextAvailable: False` on all games). Do not verify live-sim work
   through it.
