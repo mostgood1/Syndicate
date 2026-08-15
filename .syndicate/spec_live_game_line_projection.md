@@ -139,8 +139,47 @@ gameLens rows: 0        modelHomeWinProb: 0
 ```
 
 **Fixing Drop 1 alone changes nothing that crosses to web**, because this path
-carries no `gameLens` field to carry it in. Both must be fixed, or the live lens
-must be published by the path that actually has it.
+carries no `gameLens` field to carry it in.
+
+### Drop 2, RE-SCOPED 2026-08-15 — the binding drop is web's own recompute
+
+**The fix I originally proposed here ("carry `gameLens` through the slim path")
+was aimed at the wrong artifact.** Found while implementing Drop 1; recorded
+rather than quietly re-planned. There are **three** live-lens artifacts, not two:
+
+| # | artifact | writer | carries the MC lens? |
+|---|---|---|---|
+| 1 | `live/mlb_live_lens.json` (**keyvalue**, 1,384,264 B) | worker `live_lens_loop` → `_persist_live_lens_report` → the merge | **yes, after Drop 1** |
+| 2 | `mlb_source/data/live_lens/live_lens_report_*.json` (disk, published) | `scripts/refresh_mlb_oddsapi.py`, slim + prop-enriched | no `gameLens` field at all |
+| 3 | `mlb_source/source_artifacts/data/live_lens/live_lens_report_*.json` | **web itself**, on request | no — MC is refused in-request |
+
+**`/mlb/api/live-lens` serves #3.** Measured: its `source_path` is the
+`source_artifacts` path and its `generatedAt` tracks web's own rebuild
+(22:20:51 → 22:24:03 → 22:36:33), not the worker's tick.
+
+The mechanism is `_live_lens_snapshot_needs_refresh` → `read_latest_live_lens_api_payload`
+(:1449): web reads the keyvalue snapshot (#1), and **if it judges it stale,
+discards it and rebuilds locally** via `build_live_lens_snapshot_internal`,
+where `_live_projection_enhancement_payload` is hard-refused by
+`refuse_if_compute_in_request_path`. So web's rebuild **structurally cannot**
+carry the MC. `_LIVE_LENS_REPORT_MAX_AGE_DEFAULT_SECONDS` is **60 s** against a
+**60 s** worker tick, so it is a coin-flip every request.
+
+**This is the same failure `#124` already documented in this file for
+`liveProps`** — "refresh-worker's recompute had `prop_row_counts=[0]*9` across 9
+real live games" — and the comment at :1412 records that the fix was to trust the
+snapshot's own `generatedAt`. It fixed the *staleness test* and not the
+*replacement semantics*: when the recompute does fire, it still REPLACES rather
+than merges, and a rebuild that cannot produce live-state signal silently
+discards it.
+
+**So Drop 2 is: web's fallback recompute must not destroy live-state signal it
+already holds.** The shape (not yet designed, not yet agreed): on the fallback
+path, merge the live-state lens forward from the snapshot being replaced rather
+than dropping it — the same "never downgrade a richer row" rule the prop branch
+of `_enhance_card_row_with_live_projection` already applies. Artifact #2's
+missing `gameLens` field is then a **separate, lower-priority** question about
+what the published disk copy should carry, not the thing blocking the surface.
 
 ### Drop 3 — nothing downstream consumes a live game-line projection
 
