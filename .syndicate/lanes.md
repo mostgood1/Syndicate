@@ -5755,3 +5755,87 @@ parameter.
   120 sims carrying `probStdErr` and a `priceable` gate; do not raise the sim
   count now. Zero added compute; leaves the raise available once §6.2 measures
   what a sim costs on live-odds-worker (84–89% of 2 GB).
+
+#### soccer-model-coverage — THE OWED NUMBER, DELIVERED 2026-08-15. THE MODEL LOSES TO THE MARKET.
+
+**First leak-free soccer backtest number this repo has ever had.**
+`scripts/backtest_soccer_h2h_calibration.py`, **1,112 matches / 9 leagues**,
+ratings recomputed per match day with `as_of` set to that day — only
+meaningful because `_as_iso_day` repaired the inert filter first.
+
+    MODEL  multiclass Brier  0.5875
+    MARKET multiclass Brier  0.5737   (proportionally de-vigged closing odds, same matches)
+    gap                     +0.0139   lower is better -> THE MODEL LOSES
+
+    league               n   model   market     gap   m_stdev  mkt_stdev
+    eredivisie         126  0.5211   0.5064  +0.0147   0.1886   0.2257
+    primeira_liga      125  0.5722   0.5405  +0.0317   0.1596   0.2088
+    championship       126  0.6158   0.6061  +0.0097   0.1237   0.1540
+    belgian_pro_league 120  0.6045   0.6056  -0.0011   0.1484   0.1696
+    epl                120  0.5794   0.5572  +0.0222   0.1617   0.2021
+    la_liga            123  0.5947   0.5846  +0.0101   0.1518   0.1545
+    bundesliga         126  0.5840   0.5653  +0.0187   0.1898   0.1861
+    serie_a            120  0.5970   0.5869  +0.0101   0.1574   0.1724
+    ligue_1            126  0.6201   0.6117  +0.0084   0.1367   0.1566
+
+**Worse in 8 of 9 leagues; two-sided sign test p = 0.039.** The lone exception
+(belgian_pro_league, -0.0011) is noise at n=120 and must not be reported as a
+win.
+
+**THE UNDER-DISPERSION DIAGNOSIS IS CONFIRMED BY AN INDEPENDENT ROUTE.** Mean
+model stdev(P home) **0.1575** vs market **0.1811**, narrower in **8 of 9**
+leagues. eredivisie's reliability curve shows the model too TIMID at both
+ends: predicted 0.144 -> actual 0.000; predicted 0.823 -> actual 1.000. The
+production-artifact stdev (0.1364 over 166 rows) and this backtest stdev
+(0.1575 over 1,112) agree on the shape.
+
+**THE DECISION THIS FORCES.** Soccer's model must NOT publish `model_edge_pct`
+yet. A model that loses to the closing line over 1,112 matches emits edges that
+are noise against a better-informed price — and its errors are systematically
+on the favourites, so those edges point at underdogs. **Fix #2 removes a stale
+BLOCK; it does not make the number publishable.** Ship #1 (seeds), #3 (accent
+join) and #4 (as-of) freely — they are correctness fixes with no such hazard.
+
+**Coverage, per the `data/**` rule:** eredivisie 918 history rows spanning
+2023-08-11..2026-05-17; with result 918; with complete closing odds 918;
+**intersection 918**. This does not rest on a narrow join. Matches are skipped
+where either side has <20 prior as-of matches (eredivisie: 180 skipped, 126
+scored at `--limit 120`), so early-season rows are not scored as though the
+model had an opinion.
+
+**Named, cheap levers, neither done:** sharpen the distribution, and raise
+`adapters._DEFAULT_SIMULATIONS` from 300 (±2.9pp of pure Monte Carlo noise).
+`SoccerSimulationOutput.evaluation.calibration.win_probability.brier` is still
+`None` — the harness exists but is not wired into the sim's own slot.
+Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
+
+- **POST-CLOSE VERIFICATION 2026-08-15 — a gap I shipped through, now closed
+  with no break found.** Two background searches finished AFTER `2ac3c6bc` and
+  named consumers of `edge_vs_consensus_pct` / `consensus` that I had not
+  checked before committing. Re-verified:
+  - **`tests/test_quote_ref.py` exercises `edge_vs_consensus_pct` directly**
+    (asserts `< 0` and `> 0`) and **was not in my original test run.** It
+    passes. So does `test_nfl_preseason_cards.py`,
+    `test_book_grid_artifact_enrichment.py`, `test_prop_projections.py`,
+    `test_nfl_preseason_market_board_live_odds.py`,
+    `test_nfl_live_edge_policy.py` — **92 further green.**
+  - **The one real board_grid consumer is
+    `syndicate/features/nfl/preseason_cards.py`**, via
+    `read_book_grid_artifact("nfl", ...)` → `row.get("consensus")`. It tolerates
+    a `None` side by construction (`entry.setdefault("home_moneyline",
+    consensus.get("home"))`), and **`consensus[side] = None` was ALREADY
+    reachable before my change** (the empty-`all_prices` branch). My change adds
+    a second path to None, it does not introduce the state.
+  - `prop_projections.py:695` reads a `consensus` key from a MARKET-BOARD row,
+    not from `book_grid` — different producer, unaffected.
+  - **Noted, not fixed, belongs to the NFL surface:** `setdefault` means the
+    FIRST row for a matchup wins, so a refused consensus on that row sticks even
+    if a later row has a real price. Pre-existing; my change marginally raises
+    its likelihood. Requires an unusable price, of which Tier 3a found **zero**
+    in a 105-row production window.
+- **THE PROCESS LESSON, worth more than the result:** I ran a scoped consumer
+  search, got impatient when the unscoped one timed out, and shipped on the
+  scoped answer. The unscoped search later named a test that directly asserts
+  the field I changed. **The change was safe, but I did not know that when I
+  committed it.** Finish the consumer search before shipping a field's
+  semantics, or say plainly that you have not.
