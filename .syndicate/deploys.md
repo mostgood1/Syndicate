@@ -4347,3 +4347,71 @@ A zero considered means the join never saw a live h2h row and IS a failure.
 
 **Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit
 6f512ffa --allow-rollback`, then release the claim.
+
+## 2026-08-15 22:5xZ — refresh-worker `edbbee9d` — **PREFLIGHT: HOLD. NOT DEPLOYED.**
+
+Candidate-line fix (`layer2_board.py`) is committed to main and tested (8 new,
+71 green) but **deliberately not shipped.**
+
+1. **It requires a REFRESH-WORKER deploy, unlike everything else tonight.**
+   `layer2_board` BUILDS the shortlist artifact; web only reads it. A web deploy
+   would change nothing, so the usual "web-only, the in-flight job is on another
+   service" reasoning does NOT apply here.
+2. **`check_deploy_safety` is genuinely blocking, and I am honouring it:**
+   - MLB sim **RUNNING** on refresh-worker (pid 79, `tip_off_window`, started
+     22:41:33Z) — a deploy kills it, and a scoped resim has no ETA.
+   - Board build **IN FLIGHT** on refresh-worker (started 22:46:55Z).
+   - Odds refresh running on live-odds-worker.
+3. **Severity does not justify it.** The defect is confined to HOME-side spread
+   candidates: it corrupts their CLV rows, and can show the wrong handicap in the
+   Ask headline. Away rows, h2h and props are unaffected. Nothing is being made
+   worse by waiting for the slate to finish.
+4. **KNOWN LIMIT — the fix is forward-only.** It corrects artifacts BUILT after
+   it ships. **Today's openings ledger already contains home-spread rows with
+   the away handicap**, so 2026-08-15 CLV stays contaminated for those rows even
+   after deploy. Any backfill is a separate decision.
+5. **Ship it when the slate is quiet** (last first pitch 2026-08-16T01:40Z; sims
+   run past that), re-run `check_deploy_safety`, then verify:
+   `/api/board/layer2-shortlist` home spread rows have `line` equal to the
+   book-grid cell's `home.line`, and re-run the 525-cell invariant.
+
+### SMAPS READER DEPLOYED 2026-08-15 22:41:04Z — `b0ab37a1` — AND IT REFUSED ITS OWN FIRST READING
+
+Deployed the MINIMAL change, not converged main: `b0ab37a1` is the live sha plus
+ONE commit (2 files, +253 lines). Converged `main` (`fb448d60`) would have moved
+production **330 commits** — an instrument is not worth that blast radius, and
+convergence had already removed the reason to deploy from main.
+Fired on a confirmed CLEAR; zero jobs killed.
+
+**FIRST READING, 22:49:18Z — `reconciles: false`, 27.0% apart. The guard fired
+and the breakdown must not be read as attribution.**
+
+    by_kind_mb      anon_mmap 1,007.2 | heap 95.9 | file_backed 3.6 | stack 0.1
+    anon mmap       >64MB 613.6 | 8-64MB 288.3 | 1-8MB 104.5
+    total_anon_mb   1,106.9        cgroup_anon_mb 1,516.5     413 regions
+    largest         144.7, 120.1, 106.3, [heap] 95.9, 90.6, 87.0, 65.0, 42.0 MB
+
+**THE 27% GAP IS THE FINDING, NOT A BUG.** smaps is PER-PROCESS; cgroup `anon`
+is PER-CONTAINER. `ALL_PROCESS_MEMORY` at the same minute: 10 processes, pid 39
+at 1,140.8MB, children ~504.3MB. 1,106.9 + children ~= 1,516.5.
+
+**SO THE "673MB OUTSIDE PYMALLOC" IS RETRACTED.** It was cgroup anon (1,607,
+container) minus pymalloc arenas (934, pid 39 only) — two different scopes.
+Per-process the residue is **~173MB**, not 673MB, and ~410MB of what looked like
+a mystery is simply the children the worker spawns.
+
+**WHAT SURVIVES, scoped to pid 39:** anon is **91% mmap** (1,007.2 of 1,106.9)
+against only **95.9MB of brk heap**. The lane's hypothesis — mmap dominates, not
+`[heap]` — is CONFIRMED. With pymalloc holding ~934MB of arenas, the mmap total
+is very nearly pymalloc itself, which is a much duller answer than a 673MB
+mystery and is the correct one.
+
+**NEXT, and it is smaller than it was:** ~173MB of per-process residue is not
+worth another instrument. `mallinfo2`'s `hblkhd` is NO LONGER the priority — the
+question it was meant to answer has mostly dissolved. The real remaining lever is
+the CHILDREN (~504MB) and the fact that pymalloc holds 934MB of arenas for
+583.7MB of live objects (350.3MB retention, 21:58).
+
+**FIX OWED IN THE READER:** it must reconcile against the PROCESS, not the
+cgroup. As written it will report `reconciles: false` on every read while any
+child exists, and a guard that always fires is a guard nobody reads.

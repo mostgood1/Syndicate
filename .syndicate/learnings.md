@@ -2805,3 +2805,29 @@ including ones I had just written and could see on disk.
   is what hid the stderr.
 - Uniform zeros across independent tokens are a tool failure until proven
   otherwise. Real content loss is almost never that tidy.
+
+### 2026-08-15 — a cgroup number minus a per-process number is not a difference, it is a category error
+
+- **What we believed:** 673MB of the refresh-worker's anon was memory pymalloc
+  never allocated — computed as cgroup `anon` 1,607.1MB minus pymalloc arenas
+  934.0MB. It was reported as the largest component of the floor and became the
+  next investigation target.
+- **What was actually true:** cgroup `anon` counts the CONTAINER — parent plus
+  every child process. `PYMALLOC_STATS` reports the calling process only. The
+  worker runs 8-10 children (`daily_update.py`, odds jobs, multiprocessing
+  spawns) holding ~504MB. Subtracting one from the other measures nothing.
+  Per-process the residue is **~173MB**, not 673MB.
+- **How we found out:** the smaps reader's own reconciliation check refused the
+  reading — `reconciles: false`, 27.0% apart — because it compared a
+  per-process total against the cgroup. That refusal was the finding.
+  `ALL_PROCESS_MEMORY` then confirmed it independently: pid 39 at 1,140.8MB with
+  ~504MB in children, against a smaps per-process anon of 1,106.9MB.
+- **The rule going forward:** every memory number carries a SCOPE — container,
+  process, or thread — and only same-scope numbers may be subtracted. Write the
+  scope next to the figure. `memory.current`/`anon` and `oomKilled` are
+  container; `smaps`, `PYMALLOC_STATS`, `HEAP_CENSUS`, `mallinfo` and
+  `getsizeof` are process; a container with children makes them differ by
+  hundreds of MB.
+- **Cost:** one wrong headline figure that stood for about an hour and set the
+  next target. Caught before any code was written against it, and caught by a
+  guard written into the instrument rather than by review.
