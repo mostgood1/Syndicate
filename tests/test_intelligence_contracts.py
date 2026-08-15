@@ -271,6 +271,46 @@ class CandidateGameDateTests(unittest.TestCase):
             "2026-07-27",
         )
 
+    def test_to_dict_keeps_the_producer_line_text_and_only_fills_an_empty_slot(self) -> None:
+        # This defect has now landed twice at this exact spot. `odds` was
+        # flattened from "+124" to 124.0 (fixed 2026-07-28, 1f47b2d6, "Fix
+        # candidate field corruption"); `line` was flattened from "4.5" to 4.5
+        # nine days later (1f6c27b9, 2026-08-06) because the field was added to
+        # a loop that writes unconditionally, sitting twelve lines below the
+        # comment explaining why that is wrong. Neither had a test HERE -- the
+        # second was caught only by a distant MLB blueprint test.
+        #
+        # The rule: self.line is the join-normalised float and stays that way
+        # on the dataclass and in sport_context. payload["line"] is the
+        # producer's display text and is overwritten ONLY when it holds no
+        # parseable number.
+        base = {
+            "sport": "mlb",
+            "type": "prop",
+            "selection": "Over 4.5",
+            "market_key": "strikeouts",
+            "entity_name": "Brandon Young",
+            "event_id": "776",
+        }
+
+        kept = UniversalCandidate.from_raw({**base, "line": "4.5"})
+        self.assertEqual(kept.to_dict()["line"], "4.5")
+        self.assertEqual(kept.line, 4.5)
+
+        # The case that makes this more than cosmetic: the intelligence board's
+        # displayLine() does a bare String(line), so a JSON 2.0 renders as "2"
+        # and the half-point precision the column exists for is gone.
+        whole = UniversalCandidate.from_raw({**base, "line": "2.0"})
+        self.assertEqual(whole.to_dict()["line"], "2.0")
+
+        # A placeholder is not a display value -- fill it from market_line.
+        placeholder = UniversalCandidate.from_raw({**base, "line": "-", "market_line": 7.5})
+        self.assertEqual(placeholder.to_dict()["line"], 7.5)
+
+        # Absent entirely: fill it from prop_line.
+        absent = UniversalCandidate.from_raw({**base, "prop_line": 2.5})
+        self.assertEqual(absent.to_dict()["line"], 2.5)
+
 
 if __name__ == "__main__":
     unittest.main()

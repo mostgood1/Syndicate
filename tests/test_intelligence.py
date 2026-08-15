@@ -7206,9 +7206,24 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         # the live-only gating comment as a guard against silently
         # dropping them again in a future edit -- the real behavioral
         # verification was done via Playwright against a running server.
+        #
+        # 2026-08-15: the original assertion pinned the literal
+        # "<th>Odds</th><th>Projected</th><th>Live</th>" and went red without
+        # anything being dropped -- #240/#243 made the blotter sortable, so the
+        # headers are now generated from BLOTTER_COLUMNS instead of written out
+        # as literal cells. Checked before rewriting: all three columns are
+        # present and all three cells still render. The guard now asserts the
+        # column DEFINITION and the rendered CELL for each of the three, which
+        # is what "did someone drop this column" actually means and does not
+        # re-break the next time the header markup is restructured.
         template_path = Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html"
         source = template_path.read_text(encoding="utf-8")
-        self.assertIn("<th>Odds</th><th>Projected</th><th>Live</th>", source)
+        self.assertIn('{ key: "odds", label: "Odds"', source)
+        self.assertIn('{ key: "projected", label: "Projected"', source)
+        self.assertIn('{ key: "live", label: "Live"', source)
+        self.assertIn('<td data-label="Odds">', source)
+        self.assertIn('<td data-label="Projected">', source)
+        self.assertIn('<td data-label="Live proj.">', source)
         self.assertIn('itemState === "live" ? displayLiveProjection(item) : null', source)
 
     def test_intelligence_page_renders_game_cards_container(self) -> None:

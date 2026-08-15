@@ -509,7 +509,23 @@ class UniversalCandidate(MutableMapping[str, Any]):
         payload["is_live"] = self.is_live
         if self.timestamp is not None:
             payload["timestamp"] = self.timestamp
-        for field_name in ("market_key", "market_label", "segment", "line", "entity_id",
+        # `line` is deliberately NOT in the loop below. self.line is the
+        # join-normalised float; payload["line"] is the display string the
+        # producer formatted (`f"{line_value:.1f}"` -> "4.5"), and writing the
+        # float over it is the same corruption the odds block above fixed on
+        # 2026-07-28 -- missed here because this field sits inside a loop.
+        # It is not cosmetic: the intelligence board's displayLine() does a
+        # bare String(line), so a JSON 2.0 renders as "2", dropping the half-
+        # point precision the whole column exists to convey.
+        #
+        # Only fill the slot when it holds no parseable number. from_raw
+        # prefers payload["line"] itself when deriving self.line, so whenever
+        # the display string IS a number the two agree and keeping the string
+        # loses nothing; when it is "-"/""/absent, self.line came from
+        # market_line/prop_line and is strictly better than the placeholder.
+        if self.line is not None and _parse_float(payload.get("line")) is None:
+            payload["line"] = self.line
+        for field_name in ("market_key", "market_label", "segment", "entity_id",
                            "entity_name", "event_id", "game_date", "home_team", "away_team"):
             value = getattr(self, field_name)
             if value is not None:
