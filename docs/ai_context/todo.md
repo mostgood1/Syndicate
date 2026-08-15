@@ -32280,3 +32280,37 @@ every ~2s while a build is in flight), or add samples inside the loaders between
 excursion is caught in progress, any fix is a guess. Do NOT start by making
 `build_cards_page_context` cheaper — 4 of 6 kills would not have been prevented
 by that, on this evidence.
+
+#### `#435` STEP TWO DONE 2026-08-15 01:38:48Z — the excursion is captured, and it changes the plan
+
+Watchdog live 01:16:54Z; kill at 01:38:48Z with **567 samples** before it. Full
+trace in `deploys.md`. Four findings, each of which redirects this ticket:
+
+1. **Death signature = `inactive_file` -> 0.** anon 1700 -> 4038MB in 35s
+   (~67MB/s) while page cache is evicted 1734 -> 0MB to pay for it. The kill
+   lands the instant there is no cache left to reclaim.
+2. **No single allocator.** The climb crosses `board_contract_games_normalized`,
+   three `cards_context_*` stages and `build_live_state_payload_fallback_return`
+   in 35 seconds, `seconds_since_stage` 0.1-4.2s throughout. anon never falls
+   between stages. **Do not pursue "make `build_cards_page_context` cheaper"** —
+   anon rose just as fast through `cards_context_page_cache_hit`, the CHEAP path.
+3. **`memory_pct_of_max` is a broken alarm metric.** It reads 100.0% for the
+   final 27 seconds AND during healthy operation, because `memory.current`
+   counts evictable cache. Anything gating on current/pct is blind by
+   construction. Use `memory_anon_mb` / `memory_unreclaimable_mb`, already
+   computed at every emitter. **Audit existing guards for this** — a guard on
+   pct cannot tell 88.5%-and-fine from 100%-and-dying.
+4. **New suspect stage:** `build_live_state_payload_fallback_return`, appearing
+   twice in the steepest segment (3428 -> 3831MB). The word `fallback` in a hot
+   path 3 seconds before an OOM deserves a read.
+
+**NEXT STEP — trigger tracemalloc FROM the watchdog.** The machinery already
+exists (`start_allocation_tracing`, `SYNDICATE_TRACEMALLOC_DIAG`, nframe=3, built
+by the now-orphaned `anon-allocation-site` lane) but is default OFF and, when on,
+samples on a 600s timer — so it has never once fired during an excursion. The
+watchdog now knows when one is happening: anon climbing >N MB/s above a floor.
+Have it call the existing dump at that moment. That turns "anon climbs 67MB/s
+across five stages" into a list of allocation sites, which is the last unknown.
+
+Cost note: tracemalloc keeps a traceback per live allocation and the process is
+already at its ceiling — arm it to fire ONCE per boot, on the excursion only.

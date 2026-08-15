@@ -2185,3 +2185,105 @@ commit on top of `d9a39ce8`, and deployed that. Both changes are live.
   outcomes are: a trace naming the stage and climb rate; a FLAT trace (excursion
   faster than the 2s tick -> shorten the interval or sample in-loader); or no
   lines at all (gating wrong or thread dead). All three are results.
+
+### 2026-08-14 20:38 CDT — the OOM cluster, and where my deploys sit in it
+
+**The worker has been OOM-killed 18 times today. Raised by the user, not
+caught by me — I had read "no board build in 30 min" as a cadence question.**
+
+- **THE FACT THAT DOES NOT FAVOUR ME, stated first.** The deploy-free window
+  **16:16:56 -> 19:49:15 (3h32m) had ZERO OOMs**, and the cluster begins at
+  **20:03:11 — 14 minutes after my first worker deploy of the night**
+  (`29ed6de1`, 19:49:15). The previous OOM was 04:04:27, sixteen hours earlier.
+  I cannot exonerate my deploys on timing and have not tried to.
+- **THE SHAPE ARGUES IT IS NOT ANY ONE COMMIT.** 18 kills across **7 distinct
+  instances**, each instance dying REPEATEDLY at a ~11-15 minute period:
+
+      ...xnxxv  n=2  20:03->20:14  (~1 per 11 min)
+      ...zqxft  n=7  21:07->22:14  (~1 per 11 min)
+      ...cb9mt  n=3  23:34->00:04  (~1 per 15 min)
+      ...xtvq2  n=2  00:41->00:57  (~1 per 15 min)
+
+  That is a restart LOOP inside an instance — a periodic workload crossing 4GB
+  — not a per-deploy kill. **It survived `7b1f3fdc`, whose entire content is a
+  `print` statement.** A code path cannot be the differentiator when the loop is
+  unchanged across a no-op commit. The likelier reading is the deploy storm
+  (10+ deploys tonight across three sessions) forcing repeated cold rebuilds on
+  top of the memory problem the two OPEN lanes already track.
+- **MY ONE MEMORY-INCREASING CHANGE, quantified rather than excused:**
+  `book_prices` adds a ~5-entry dict per quote, ~**5-20MB** across ~14k
+  candidates. It also went live at **23:17, AFTER the 20:03 onset**, so it
+  cannot have caused it. Offered for revert; not reverted unilaterally.
+- **ACTION TAKEN: ALL FURTHER WORKER DEPLOYS HELD.** Each one reboots the
+  container and forces a fresh heavy rebuild.
+- **NOT MY LANE.** Another session deployed `c9378c91` (`#435` "sample memory on
+  a CLOCK, because the kills happen between samples") at 01:16 and it is LIVE.
+  Let that instrumentation produce a reading before anyone adds changes on top.
+
+### Same moment — the CLV publish design limit is now CONFIRMED, not theoretical
+
+- Worker **is** alive enough to build boards (`written_at 2026-08-15T01:35:34Z`),
+  so `record_openings` has been running and ~150+ openings for 2026-08-14 exist
+  **on the worker disk**.
+- `/api/ops/clv/report` returns **`openings=0` for mlb, nfl and wnba**.
+- **Cause, as predicted:** the publish fires only when `written > 0`, and every
+  2026-08-14 market was first-seen before the publish code shipped. First-
+  sighting-only then guarantees `written == 0` forever for that date, so the
+  file is **STRANDED on the worker**. It self-heals on the next genuinely new
+  market (the push sends the whole file), which is unlikely this late.
+- **Tomorrow is unaffected** — a new date creates a new file whose first write
+  publishes it. **A one-shot publish per worker boot is the proper fix and is
+  NOT built**, deliberately: it needs a worker deploy, and worker deploys are
+  held.
+
+### `#435` MEASURED 2026-08-15 01:38:48Z — THE INSTRUMENT WORKED, AND THE MECHANISM IS NOW VISIBLE
+
+Kill at **01:38:48.164Z**, 22 min after the watchdog went live. **567
+`MEMORY_WATCHDOG` lines** preceded it. The excursion, sampled every ~2s:
+
+    time      anon MB   inactive_file MB   pct    since   last_stage
+    01:38:11   1700.3        1575.1        88.5   28.7s   board_contract_games_normalized
+    01:38:16   1700.3        1621.9        89.7   33.5s   board_contract_games_normalized
+    01:38:19   1700.3        1733.7        92.4   35.9s   board_contract_games_normalized
+    01:38:21   1930.3        1770.8       100.0   37.9s   board_contract_games_normalized
+    01:38:23   2184.2        1352.3       100.0   39.9s   board_contract_games_normalized
+    01:38:25   2500.3         944.5       100.0   42.3s   board_contract_games_normalized
+    01:38:28   2712.9         474.8       100.0   45.2s   board_contract_games_normalized
+    01:38:30   2798.5         384.3       100.0    0.1s   cards_context_betting_games_loaded
+    01:38:32   2951.9         230.4       100.0    1.9s   cards_context_sim_games_loaded
+    01:38:34   3226.2         608.4        96.1    0.1s   cards_context_page_cache_hit
+    01:38:36   3354.3         639.6       100.0    2.2s   cards_context_page_cache_hit
+    01:38:38   3428.3         566.6       100.0    4.2s   cards_context_page_cache_hit
+    01:38:40   3648.9         196.9       100.0    1.6s   build_live_state_payload_fallback_return
+    01:38:42   3831.5          14.7       100.0    3.6s   build_live_state_payload_fallback_return
+    01:38:46   4037.9           0.0        99.2    3.3s   board_contract_games_normalized
+    01:38:48   SIGKILL
+
+**FINDING 1 — THE DEATH SIGNATURE IS `inactive_file` REACHING ZERO.** anon climbs
+1700 -> 4038MB (+2338MB in 35s, ~67MB/s) and the kernel evicts page cache in
+lockstep to pay for it: 1734 -> 0MB. The container is killed the moment there is
+no cache left to reclaim. Nobody has seen this before because nobody was
+sampling between stage boundaries.
+
+**FINDING 2 — IT IS NOT ONE ALLOCATOR IN ONE STAGE.** The climb crosses
+`board_contract_games_normalized` -> `cards_context_betting_games_loaded` ->
+`cards_context_sim_games_loaded` -> `cards_context_page_cache_hit` ->
+`build_live_state_payload_fallback_return` -> back to `board_contract_games_
+normalized`, with `seconds_since_stage` of 0.1-4.2s throughout. **The stages are
+turning over every couple of seconds and anon never comes back down.** This kills
+the "make `build_cards_page_context` cheaper" plan on its own: anon rose through
+a `page_cache_hit` (the CHEAP path) as fast as anywhere else.
+
+**FINDING 3, AND IT IS THE OPERATIONALLY IMPORTANT ONE — `memory_pct_of_max`
+SATURATES 27 SECONDS BEFORE DEATH AND STAYS THERE.** It reads 100.0% from
+01:38:21 while the container is still fine, because `memory.current` counts the
+page cache that is about to be evicted. **Any guard or alarm reading
+current/pct cannot discriminate — it is pinned at 100% during both healthy and
+fatal states.** `memory_anon_mb` / `memory_unreclaimable_mb` is the metric with
+signal, and the code already computes it everywhere.
+
+**FINDING 4 — a stage never previously implicated:**
+`build_live_state_payload_fallback_return`, present twice during the steepest
+part of the climb (3428 -> 3831MB).
+
+NOT A FIX. Nothing about the kill rate changed and nothing was expected to.
