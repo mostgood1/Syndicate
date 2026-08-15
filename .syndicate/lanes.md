@@ -2554,3 +2554,137 @@ metadata into a list built from `_game_market_recommendation_strings` — so
 recommendations are expected. Their file, their call; told them.
 
 - **FINAL:** shipped, verified, closed. 12 tests in `tests/test_ui_layout_probe.py`.
+
+### soccer-fallback-row-market — CLOSED 2026-08-15 — fix VERIFIED against the live payload; PRODUCTION RE-MEASURE OWED (needs a web deploy) — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: the soccer card shows its market line and its edge, which it currently
+  shows NOWHERE. Testable, on the served `/soccer/epl/api/cards`: the Full Game
+  row carries a real `market` and `best_edge` (not `—`), and the rendered card
+  regains `.cards-data-pair` (0 today) WITH real values rather than placeholders.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/game_board_contract.py` — the no-periods
+    fallback row in `_build_period_rows`.
+  - `tests/test_soccer_card_surface.py`
+  - Collision check RUN (lane-guard `_claims()` over `lanes.md`): both free.
+    `soccer-model-coverage` claims `syndicate/features/soccer` — a different
+    tree; I am not touching the producer.
+- **Hypothesis, measured not assumed.** `.cards-data-pair` 9 -> 0 on soccer is
+  NOT the producer regressing and NOT my G3 gate misfiring. Served JSON:
+  `sim.periods` is `{}`, so the contract takes its synthesized-fallback path;
+  that row sets `market`/`best_edge` from `_metric_lookup(metrics, "Spread" /
+  "Total" / "Edge")`, and soccer's metric labels are `Home win`, `Draw`,
+  `Away win`, `Total goals`, `BTTS`, `Over 2.5` — **none of them match**, so
+  both fields become `—`. `_build_lens_rows` then correctly drops a row whose
+  every field is a placeholder or a restatement, and the panel disappears.
+- **The data it needed was already on the game.** `betting.home_spread` -1.5,
+  `betting.total` 2.5, `sim.score` `{away_mean 0.78, home_mean 2.46}` -> total
+  3.24, margin 1.68. The single-period branch 90 lines above builds `ATS ... |
+  Total ...` from exactly these; the fallback branch ignores them and asks the
+  metrics list instead.
+- Falsification test: if the fallback row still reads `—` after sourcing from
+  `betting`, the values are not on the game and the producer is the defect
+  after all.
+- Verification: drive `apply_game_board_contract` with the production payload
+  before/after; then the served card, `.cards-data-pair` count and the actual
+  strings; plus the probe for regressions on the other three sports.
+- Blocked by: none.
+
+#### mlb-live-pitcher-projection — STATUS 2026-08-15 — 3 FIXES SHIPPED TO GIT (`f4cd2bc8`), NOT DEPLOYED, PRODUCTION RE-MEASURE OWED
+- **Committed `f4cd2bc8`.** `cards.py` (opportunity-based pitcher projection +
+  pulled-starter settle), `live_projection_join.py` (`model_prob_over` follows
+  the live projection or goes absent with a reason; pregame preserved as
+  `sim_model_prob_over`; new `rows_live_prob_withheld`), `blueprints/intelligence.py`
+  (serve `live_projections` / `live_game_state`), `tests/test_mlb_live_pitcher_projection.py`.
+- **TESTS: 21 new, MUTATION-VERIFIED.** Three mutations, three distinct red sets:
+  reverting the probability stamp → 4 red; disabling the pulled-starter
+  short-circuit → 2 red; disabling the outs-opportunity branch → 3 red.
+  Blast radius `-k "live or book_grid or board_enrichment or cards"`:
+  **1436 passed, 4 failed — all 4 reproduce identically on clean HEAD**, so zero
+  regressions. Those 4 are pre-existing and UNOWNED:
+  `test_mlb_refresh_runner::test_live_lens_payload_refreshes_card_before_game_lens`,
+  `test_wnba_live_lens_worker::test_snapshot_builder_limits_rank_cards_to_fifty`,
+  `test_wnba_refresh_runner::{test_main_prefers_existing_refresh_outputs_before_source_job,
+  test_main_refreshes_live_snapshots_even_when_reusing_existing_outputs}`.
+- **ONE TEST IS A REGRESSION GUARD, NOT A FIX TEST, AND IS LABELLED AS SUCH
+  HERE:** `test_projection_never_falls_below_an_already_recorded_actual` passed
+  under ALL THREE mutations. The old formula already satisfied it, because the
+  McGreevy 17.136-against-18-outs row **never reached this function** — it is
+  served by `prop_projections.py:361`, a pure pregame lookup, and reached the
+  board only because the live overlay never matched it. Do not read that test as
+  evidence the McGreevy case is fixed. **IT IS NOT FIXED.**
+- **WHAT IS AND IS NOT FIXED BY THIS LANE:**
+  - FIXED, pending deploy: the proj/prob contradiction on the 57 overlaid rows;
+    the pitcher formula's clock, pulled-starter blindness and zero floor; the
+    unreadable live-join counters.
+  - **NOT FIXED: 89% of live rows still display a pregame projection against a
+    live market.** That needed either the coverage fix or a rule that a live row
+    may not show a pregame number as current — the latter was offered to the
+    user as option 1 and NOT selected.
+- **PRODUCTION RE-MEASURE OWED — NOTHING HERE IS PROVEN.** Baseline in the lane
+  header (20:12:48Z, web `f475c775`): 638 live rows / 57 overlaid / 0 edged /
+  **7 of 13 live pitcher rows straddling the line**. Predicate after deploy:
+  straddle count → **0**, and `live_projections` present in the API response.
+  **refresh-worker writes this artifact and its deployed commit has NOT been
+  read** — a re-measure taken against a web-only deploy would be non-evidence.
+- **INCIDENT, SELF-INFLICTED, FULLY RECOVERED (`6da01dd3`):** `f4cd2bc8` also
+  reverted 35 lines of another session's `.syndicate/deploys.md`. Cause: the
+  scratch index was seeded `git read-tree HEAD` and **HEAD advanced during
+  staging**, so the index held a stale snapshot of the WHOLE TREE, not just of
+  my files. `git diff --cached --numstat` read clean (4 deletions, all mine, all
+  predicted) and is blind to this by construction — it compares against the HEAD
+  it was seeded from, not the one the commit lands on. Restored from `HEAD~1`;
+  working tree never lost them. Also disarmed, index-only: the SHARED index held
+  a complete revert of `f4cd2bc8` including a DELETION of the new test file
+  while it sat on disk (`commit-guard.py` caught it). **Rule now applied: re-read
+  HEAD immediately before committing and abort if it moved.**
+
+#### soccer-fallback-row-market — RESULT 2026-08-15 — verified on the production payload, NOT yet deployed
+
+**The `.cards-data-pair` 9 -> 0 drop was NOT a producer regression and NOT the
+G3 gate misfiring.** Both of my earlier readings were right and neither
+explained it. Served `/soccer/epl/api/cards`: `sim.periods` is `{}`, so the
+contract builds its stand-in row, and that row sourced market/edge from
+`_metric_lookup(metrics, "Spread"/"Total"/"Edge")`. Soccer's metric labels are
+`Home win`, `Draw`, `Away win`, `Total goals`, `BTTS`, `Over 2.5` — **nothing
+matched**, both fields became `—`, and `_build_lens_rows` then correctly
+dropped a row on which every value was a placeholder or a restatement.
+
+**So the card displayed its market line and its edge NOWHERE, on a game that
+had both.** `betting.home_spread` -1.5, `betting.total` 2.5, `sim.score`
+{away 0.78, home 2.46}. The single-period branch 90 lines above already builds
+`ATS ... | Total ...` from exactly those fields; the stand-in branch ignored
+them and asked the metrics list instead. **A label-matched lookup is not a
+substitute for the field.**
+
+Driven with the real production payload, before (production's own output) and
+after (same payload, new code):
+
+    shared_lens_rows     0  ->  1        .cards-data-pair   0  ->  3
+    shared_total_rows    0  ->  1 (1 bin)
+    market       —  ->  ATS ARS -1.5 | Total 2.5
+    best_edge    —  ->  ATS +0.2 | Total +0.7
+    subtitle    "EPL"  ->  "Projected total 3.2"
+
+`is_synthesized` still marks the row's provenance, and **`_build_lens_rows` was
+not touched** — the G3 gate is on CONTENT, so the panel comes back on its own
+the moment the row has something to say. That was the stated design and this is
+the first time it has been exercised in the "comes back" direction.
+
+**Blast radius measured, not reasoned.** The changed branch fires only when
+`sim.periods` is empty: NFL 0/16 games, NCAAF 16/16. Ran the live NCAAF payload
+through both versions — **0 of 16 rows changed**, because those games carry no
+`betting` spread/total and no `sim.score`, so every new path falls through to
+the old lookup. The change is inert for NCAAF and unreachable for NFL.
+
+**One existing test changed, and it was pinning the bug.**
+`test_a_total_row_with_no_projected_total_is_not_emitted` used the default
+fixture, which DOES carry `sim.score` — it passed only because the row ignored
+it. The rule it pins is right, so the fixture now genuinely has no score, and a
+new test pins that a derivable total DOES get its bar.
+
+**Tests:** 25 in `test_soccer_card_surface.py` (6 new), 34 across the contract /
+board-UI / probe suites, `tests.test_archives` 383 pass.
+
+**NOT DEPLOYED.** `.py` does not autodeploy. Production still shows 0 data
+pairs; the numbers above are the payload driven through the new code, not a
+served reading. **Owed: a web deploy pinned on the live SHA, then
+`.cards-data-pair` and the two strings read off the served card.**
