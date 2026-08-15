@@ -2287,3 +2287,59 @@ signal, and the code already computes it everywhere.
 part of the climb (3428 -> 3831MB).
 
 NOT A FIX. Nothing about the kill rate changed and nothing was expected to.
+
+### 2026-08-15 — web `a86eb4ed` — one null placeholder (F3) + the pattern rule (F4) — **MEASURED**
+
+Deploy `dep-d9vs4ebl550s73c09sp0`, live 01:41:43Z. Pinned onto `1ac485c0`,
+the commit live at the moment of firing — not onto the base the branch was
+built from. Pre-flight confirmed no in-flight deploy first.
+
+Production, same routes before and after:
+
+    route                em-dash   "<strong>-</strong>"   empty cell
+    /ncaaf/cards  before       0                    48            0
+    /ncaaf/cards  after      144                     0            0
+    /nfl/cards    before       0                     4            0
+    /nfl/cards    after        4                     0            0
+    /soccer/epl   after        2                     0            0
+
+Seven board/market routes 200 afterwards.
+
+The empty-cell count reads 0 both times, and that is a WEAK reading, not a
+clean one: `<strong></strong>` only catches a bare empty element, and a cell
+containing whitespace or a nested span would not match it. The em-dash counts
+are the load-bearing measurement here.
+
+### 2026-08-15 02:11-02:29Z — `#435` TRACING WINDOW: SELF-INFLICTED REGRESSION, REVERTED
+
+Sequence, stated plainly because I made production worse and then misread it:
+
+    01:58:54Z  ae7318a2 live  (dump trigger) + SYNDICATE_TRACEMALLOC_DIAG 0 -> 1
+    01:59:08Z  TRACEMALLOC_INIT {"nframe": 1}   <- #423's nframe=3 was NEVER on this lineage
+    02:03:48Z  oomKilled
+    02:06:54Z  oomKilled                        <- cadence 3 min, against 16-22
+    02:10:37Z  934b3b81 live  (nframe 1 -> 3)
+    02:11:02Z  MEMORY_WATCHDOG_STARTED ... then ZERO samples
+    02:16:41Z  oomKilled
+    02:23:41Z  548ded38 deployed (dump off-thread) + DIAG 1 -> 0
+    02:29:40Z  548ded38 live
+    02:30:15Z  TRACEMALLOC_INIT {"nframe": 3, "reason": "disabled", "started": false}
+    02:31:18Z  sampler emitting again, climb -2.9 / 0.1 / -0.5 MB/s (stable)
+
+**CAUSE:** `take_snapshot()` walks every live traced allocation in C holding the
+GIL. The one call the trigger makes starved the sampler. Because the dump prints
+AFTER the snapshot returns, a dump still running is indistinguishable from a
+trigger that never fired -- and I read it as the latter.
+
+**COST:** ~25 min of a 3-10 min kill cadence instead of 16-22, one wasted
+diagnostic window, zero allocation sites obtained.
+
+**KEPT FROM THE WINDOW, and it is worth the cost on its own:** production was
+tracing at `nframe=1`. `#423` fixed that to 3 and the fix never reached this
+service. Any future dump here would have named `json/decoder.py` -- the
+allocator, not the caller -- and been recorded as an answer.
+
+**STATE NOW:** `548ded38` live, tracing OFF, watchdog sampling normally, dump
+wired off-thread behind a test that fails if it is moved back inline.
+**Kill cadence must be re-read before anything is concluded from it** -- the
+last four kills all sit inside the tracing window and are not a clean baseline.
