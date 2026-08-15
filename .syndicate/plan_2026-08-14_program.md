@@ -121,12 +121,70 @@ implementation, identified by evidence rather than by preference.
 This turns a cleanup into a bug hunt and produces the one thing the glossary
 needs: an owner per concept, established rather than asserted.
 
-### 3b. Then the invariant
+### 3a — DONE 2026-08-15. Three corrections it sends back up.
+
+Harness `scripts/probability_differential.py` + written table
+`.syndicate/audit_2026-08-15_probability_differential.md` (`d448a100`); first
+clamp fix `de0c367f`. Both **committed, neither deployed.** Re-runnable with no
+slate and no deploy.
+
+- **31 implementations, 3 concepts, 8 disagreements (D1–D8). One owner per
+  concept, established by scorecard rather than preference:**
+  `american_to_probability` → `opportunity_signals.implied_probability`;
+  `american_to_decimal` → `live_lens_local._american_to_decimal`;
+  `probability_to_american` → `opportunity_signals.american_price` (the **unique**
+  survivor, 1 of 5).
+- **"Any disagreement is a live pricing bug" held, with one load-bearing
+  qualification.** On **valid** prices (±100, ±150, ±10000) **all 26
+  `american_to_probability` implementations agree to ten decimal places.** The
+  odds arithmetic is not wrong anywhere. **100% of the divergence is at the
+  boundary** — `0`, `None`, `""`, a string price, a float price. Anyone costing
+  3a as "26 copies of one formula, consolidate them" would have found nothing.
+- **THE MEASURED LIVE DEFECT:** `/api/intelligence/query` served **1,346
+  `fair_price` values, 24 sitting exactly on ±4900 and not one beyond.** MLB
+  totals under `p=0.992056` published **−4900** where correct is **−12488**.
+  Cause is `max(0.02, min(0.98, p))`. **A clamp is not a guard — it answers an
+  out-of-range input with a confident number instead of refusing.** Same family
+  as the 0.5 substitution.
+- **D1 is a landmine, not a fire.** Five converters return `0.0` for price `0`,
+  the worst possible substitution since `model_prob − 0.0` manufactures the
+  largest edge on the board — but **no zero price was found in production**
+  (105 live rows: 0 zeros, 0 floats, 0 strings). One 105-row window is not
+  proof of absence; do not over-prioritise it over the clamp.
+
+**CORRECTION TO THE "42 SITES" INPUT, and it is the same methodological error
+twice.** The 42 came from grepping **definitions**. The one confirmed live
+misprice is produced by an **inline** copy at `pipeline/intelligence_state.py:1816`
+with no `def` to grep for, and two further converters are nested inside function
+bodies. Tracing the user-visible **field** (`fair_price`) to its writers returned
+**four** producers where the definition count had three. **A count of definitions
+is not a count of producers.**
+
+### 3b. Then the invariant — **RE-SCOPE BEFORE BUILDING**
 
 *A probability, edge or EV not computed from data must be `None`, never a
-number.* Enforce at `game_board_contract` — 28 importers, the one choke point
-every card passes through — plus one test that a `None` probability reaches the
-card as `None`.
+number.* Plus one test that a `None` probability reaches the card as `None`.
+
+**The proposed enforcement point needs confirming first.** This tier said to
+enforce at `game_board_contract` — "28 importers, the one choke point every card
+passes through". **That claim rests on the same import/definition-counting method
+that just undercounted the producers in 3a.** Trace a field end-to-end from a
+card back to its writers and confirm the choke point empirically before building
+enforcement on it; an invariant enforced at a chokepoint that is not one is
+exactly the inert fix this program keeps producing.
+
+**Head start already in hand:** 3a's 5-requirement scorecard is an executable
+form of this invariant for the converter layer, and the harness enforces it in
+CI-able form — including a coverage sweep that fails if a new converter-shaped
+function is neither registered nor excused in writing, so implementation 32
+cannot land unnoticed.
+
+**Three clamp sites, only one fixed — the rest are OWNERSHIP-blocked, not
+effort-blocked:** `wnba/cards.py` FIXED (scorecard 2/5 → 5/5);
+`pipeline/intelligence_state.py:1816` held by the memory lane;
+`shared/layer2_board.py` held by `model-audit-devig-and-hygiene`. Also stale and
+flagged rather than edited across a lane: `layer2_board.py:1280`'s docstring
+still claims it mirrors the WNBA function "including its 2%-98% clamp".
 
 ---
 
