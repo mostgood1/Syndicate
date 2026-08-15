@@ -349,9 +349,49 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
                 "home_win": home_win_text,
                 "market": _metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or NULL_PLACEHOLDER,
                 "best_edge": _metric_lookup(game.get("metrics", []), "Edge") or NULL_PLACEHOLDER,
+                # This row is a STAND-IN: the sport published no `sim.periods`,
+                # so there is no per-period lens to show and every field above
+                # is either the game-level number or a restatement of the card
+                # ribbon. The row still has to exist -- the probability path
+                # below reads it, and it is where soccer's three-way bar comes
+                # from -- but a consumer that renders a "period" panel needs to
+                # be able to tell it apart from a real one. See _build_lens_rows.
+                "is_synthesized": True,
             }
         )
     return rows
+
+
+def _build_lens_rows(game: dict[str, Any], period_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The period rows that have something period-specific to show.
+
+    Measured on production `/soccer/epl/cards`, 2026-08-15: the generic card's
+    "Period odds and game lens" panel was 582px tall and contained, in full,
+    the ribbon's projected-score sentence repeated verbatim, the competition
+    name ("EPL") already shown as Slate context, a home-win percentage already
+    shown in the tiles AND in the bar 250px to the right, and `Market —` /
+    `Best edge —`. Not one value on it was unique to the panel, because soccer
+    publishes no `sim.periods` and the panel was rendering the stand-in row.
+
+    A row qualifies as a lens row when it is a real period, or when the
+    stand-in carries a market or edge that the rest of the card does not.
+    Gate on the CONTENT, not on the sport: the day soccer publishes per-half
+    sim output, its panel comes back with no code change here.
+    """
+    out: list[dict[str, Any]] = []
+    summary = _safe_text(game.get("summary"), "").strip()
+    for row in period_rows:
+        if not isinstance(row, dict):
+            continue
+        if not row.get("is_synthesized"):
+            out.append(row)
+            continue
+        has_market = str(row.get("market") or NULL_PLACEHOLDER) != NULL_PLACEHOLDER
+        has_edge = str(row.get("best_edge") or NULL_PLACEHOLDER) != NULL_PLACEHOLDER
+        restates_summary = bool(summary) and str(row.get("main") or "").strip() == summary
+        if has_market or has_edge or not restates_summary:
+            out.append(row)
+    return out
 
 
 def _game_win_probabilities(game: dict[str, Any]) -> tuple[float | None, float | None, float | None]:
@@ -449,11 +489,20 @@ def _build_total_rows(period_rows: list[dict[str, Any]]) -> list[dict[str, Any]]
     for idx, row in enumerate(period_rows):
         total = numeric_totals[idx] if idx < len(numeric_totals) else 0.0
         width = (total / max_total * 100.0) if max_total > 0 else 0.0
+        if width <= 0:
+            # A distribution bar with no bins is an MLB-shaped slot rendered for
+            # a sport that published nothing into it. Measured on production
+            # soccer 2026-08-15: a full-width empty track captioned "EPL" --
+            # the caption being `subtitle`, which on the stand-in period row is
+            # `game.detail`, i.e. the competition name, not a total at all.
+            # Absent renders as absent (Lane F), and that applies to a whole
+            # row, not just to the value inside one.
+            continue
         out.append(
             {
                 "label": row.get("label") or "Full Game",
                 "summary": row.get("subtitle") or "Projected total unavailable",
-                "bins": [{"width": width, "total": _format_num(total), "pct": f"{width:.1f}"}] if width > 0 else [],
+                "bins": [{"width": width, "total": _format_num(total), "pct": f"{width:.1f}"}],
             }
         )
     return out
@@ -494,7 +543,19 @@ def _build_top_play_rows(game: dict[str, Any]) -> list[dict[str, str]]:
             item_text = _safe_text(item, "")
             if not item_text:
                 continue
-            rows.append({"heading": heading, "name": item_text, "detail": _safe_text(panel.get("body"), ""), "value": heading})
+            # `detail` used to be the PANEL BODY, stamped onto every item of the
+            # panel. Measured on production soccer 2026-08-15: one 3-item panel
+            # whose body is the projected-score sentence printed that sentence
+            # three times down the Top Plays list, and the card carried it six
+            # times in all. The body belongs to the panel and is already
+            # rendered once on the Details panel; the item's own detail is the
+            # half after the colon, which is exactly how `_game_card_generic`'s
+            # Details panel has always split these same strings.
+            item_name, _, item_detail = item_text.partition(":")
+            if item_detail.strip():
+                rows.append({"heading": heading, "name": item_name.strip(), "detail": item_detail.strip(), "value": heading})
+            else:
+                rows.append({"heading": heading, "name": item_text, "detail": "", "value": heading})
             if len(rows) >= 6:
                 break
         if len(rows) >= 6:
@@ -550,10 +611,51 @@ def _build_prop_rows(game: dict[str, Any]) -> list[dict[str, str]]:
             item_text = _safe_text(item, "")
             if not item_text:
                 continue
-            rows.append({"heading": _safe_text(panel.get("title"), "Props"), "name": item_text, "detail": _safe_text(panel.get("body"), ""), "value": _safe_text(panel.get("eyebrow"), "Props")})
+            # Same defect as the one in _build_top_play_rows above, in the
+            # sibling function: the PANEL BODY stamped onto every item. Soccer's
+            # props panel printed "Highest anytime-goalscorer probability
+            # players from the simulated player-props pass." five times down one
+            # panel (measured on production 2026-08-15). Fixing one of the two
+            # and not the other would leave the same string repeating on the
+            # same card through a different function.
+            item_name, _, item_detail = item_text.partition(":")
+            has_detail = bool(item_detail.strip())
+            rows.append(
+                {
+                    "heading": _safe_text(panel.get("title"), "Props"),
+                    "name": item_name.strip() if has_detail else item_text,
+                    "detail": item_detail.strip() if has_detail else "",
+                    "value": _safe_text(panel.get("eyebrow"), "Props"),
+                    # Scraped off a display panel, not built from
+                    # `prop_recommendations`. `heading` and `value` are panel
+                    # constants, so a per-row STATUS table over these rows has
+                    # nothing per-row in it -- see _build_prop_status_rows.
+                    "is_synthesized": True,
+                }
+            )
             if len(rows) >= 8:
                 return rows
     return rows
+
+
+def _build_prop_status_rows(prop_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The prop rows that have a per-row status worth a second table.
+
+    The generic card's Props panel is two cards: the playable list on the left
+    and "Official props status" on the right. Both read `shared_prop_rows`, so
+    when those rows came from the panel-scraping fallback the right-hand table
+    is the left-hand list again with two panel constants either side of it.
+    Measured on production soccer 2026-08-15: five rows rendered twice, with
+    the panel title as every row's heading and the panel eyebrow as every
+    row's value -- the single worst repetition on the card, ahead of the
+    projected-score sentence this lane was opened for.
+
+    Same rule as _build_lens_rows and for the same reason: the section renders
+    when it has something of its own to say. A sport that publishes real
+    `prop_recommendations` keeps the table, because those rows carry a tier,
+    line or price per row.
+    """
+    return [row for row in prop_rows if isinstance(row, dict) and not row.get("is_synthesized")]
 
 
 def _build_box_sections(game: dict[str, Any]) -> list[dict[str, Any]]:
@@ -614,10 +716,17 @@ def _normalize_game(game: dict[str, Any]) -> dict[str, Any]:
     normalized.setdefault("market_tiles", [{"label": metric.get("label"), "title": metric.get("value"), "sub": f"{_safe_text(_team_side(normalized, 'away').get('abbr'), 'AWY')} @ {_safe_text(_team_side(normalized, 'home').get('abbr'), 'HME')}"} for metric in metrics[:4]])
     normalized["shared_is_live"] = _infer_live_state(normalized)
     normalized["shared_period_rows"] = period_rows
+    # Additive on purpose: `shared_period_rows` keeps carrying the stand-in row
+    # because the probability path below reads it, and that row is where
+    # soccer's three-way draw bar comes from (Lane F, `932a1f71`). Only the
+    # LENS is gated -- see _build_lens_rows for what a row has to have to earn
+    # a panel.
+    normalized["shared_lens_rows"] = _build_lens_rows(normalized, period_rows)
     normalized["shared_probability_rows"] = _build_probability_rows(normalized, period_rows)
     normalized["shared_total_rows"] = _build_total_rows(period_rows)
     normalized["shared_box_sections"] = _build_box_sections(normalized)
     normalized["shared_prop_rows"] = _build_prop_rows(normalized)
+    normalized["shared_prop_status_rows"] = _build_prop_status_rows(normalized["shared_prop_rows"])
     # Real bug found 2026-07-23: this used to unconditionally overwrite
     # shared_top_play_rows with the generic panels-derived version, even
     # when the sport's own cards.py already built a real one from

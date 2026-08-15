@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from syndicate.features.shared.game_board_contract import _normalize_game
+from syndicate.features.shared.game_board_contract import NULL_PLACEHOLDER, _normalize_game
 
 
 class GameBoardContractPropTeamTests(unittest.TestCase):
@@ -93,15 +93,21 @@ class GameBoardContractPropTeamTests(unittest.TestCase):
         quarter_rows = [row for row in period_rows if row.get("label") != "Full Game"]
         self.assertEqual(len(quarter_rows), 4)
         for row in quarter_rows:
-            self.assertEqual(row["market"], "-")
-            self.assertEqual(row["best_edge"], "-")
+            # Was a literal "-". `a86eb4ed` made NULL_PLACEHOLDER an em dash
+            # platform-wide and left this assertion behind, so this test was
+            # red on `main` and on `origin/main` (reproduced against a clean
+            # HEAD worktree, 2026-08-15) until it was updated here. Assert the
+            # CONSTANT, not the glyph, so the next placeholder change cannot
+            # break the test it is supposed to be verified by.
+            self.assertEqual(row["market"], NULL_PLACEHOLDER)
+            self.assertEqual(row["best_edge"], NULL_PLACEHOLDER)
 
         full_game_rows = [row for row in period_rows if row.get("label") == "Full Game"]
         self.assertEqual(len(full_game_rows), 1)
         full_game = full_game_rows[0]
-        self.assertNotEqual(full_game["market"], "-")
+        self.assertNotEqual(full_game["market"], NULL_PLACEHOLDER)
         self.assertIn("165.5", full_game["market"])
-        self.assertNotEqual(full_game["best_edge"], "-")
+        self.assertNotEqual(full_game["best_edge"], NULL_PLACEHOLDER)
         # away totals 82, home totals 86 -> full-game total 168, margin 4
         self.assertIn("168", full_game["subtitle"])
 
