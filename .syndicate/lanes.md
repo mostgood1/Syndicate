@@ -2362,3 +2362,104 @@ one with in-card filter pills carrying counts.
   instrument now names. Real, unowned, one class.
 
 - **FINAL:** shipped, measured, closed. Nothing of this lane uncommitted.
+
+### probe-mlb-content-wait — CLOSED-VERIFIED 2026-08-15 — 10/10 MLB readings at 15 cards; timeout path proven to fail, not pass — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: `ui_layout_probe.py` cannot report a spurious `0 cards` on a
+  JS-rendered sport. Testable: run it against production /mlb/cards 5 times and
+  get 15 cards every time (today it returned 0 on at least 1 of 3), and a
+  render that genuinely never produces cards is reported as a TIMEOUT, distinct
+  from an out-of-season 0.
+- Files (exclusive to this lane):
+  - `scripts/ui_layout_probe.py` — the goto/wait block and its summary line.
+  - Collision check RUN (lane-guard's own `_claims()` over `lanes.md`): 31
+    claimed paths across the OPEN lanes; NONE is this file or anything in
+    `scripts/` that this touches.
+- Hypothesis: `page.wait_for_timeout(400)` after `wait_until="load"` is enough
+  for the seven server-rendered sports and NOT for MLB, which renders through
+  `cards_source.js` after load. Measured today: the same URL returned 0 cards
+  and 15 cards minutes apart, and a 600ms one-off returned 0 elements for
+  classes that a 2500ms read found 495 of.
+- Falsification test: if MLB still returns 0 cards with a content wait in
+  place, the render is not merely late and the fix is wrong.
+- Verification: 5 consecutive production runs of `--sports mlb`, card count
+  each time; plus one run against a deliberately bad route to confirm the
+  timeout path reports rather than passes.
+- Blocked by: none.
+
+#### CORRECTION to my own soccer lead — THE LOCK IS RELEASED ON `earlyExit`. My stale-lock mechanism is FALSIFIED `[from-code, deployed tree ccd10349, 2026-08-15]`
+I filed "a run killed mid-flight may leave the lock held, which is exactly what
+the 14:22 and 18:22 autoruns hit." **That is wrong. Reading the code that runs
+in production settles it against me.**
+
+`_refresh_run_still_active` (`shared/ops_refresh.py`) has an explicit
+previous-instance branch:
+
+```python
+if same_service:
+    launcher_instance_id = str(manifest.get("launcherInstanceId") or "").strip()
+    this_instance_id = _this_instance_identity()
+    if launcher_instance_id and this_instance_id and launcher_instance_id != this_instance_id:
+        return False
+```
+
+`RENDER_SERVICE_ID` survives a restart; **`RENDER_INSTANCE_ID` does not.** So a
+manifest written by the pre-`earlyExit` instance returns `False`, and the caller
+self-heals:
+
+```python
+if state == "running" and not _refresh_run_still_active(...):
+    _update_latest_state(state="failed", ...)   # lock released
+```
+
+The pid-reuse trap I was implicitly worried about **was already found and fixed**
+— the comment records that low pids get reoccupied fast in a fresh container and
+`_process_matches_expected_command` fails OPEN, so a coincidentally-alive pid
+"silently looked like the original run in production." That is why the identity
+check exists and why pid liveness is not reached in this case.
+
+**What this means for the two AUTORUN_FAILED events — the opposite of my lead.**
+They were **genuine, not stale**: the guard only raises when the run really is
+alive in the same instance. And the pids DIFFER (7114 at 14:22, 8200 at 18:22),
+with a restart at 14:34:36 between them — so these are **two different runs, each
+still alive ~4h after starting.**
+
+**The surviving hypothesis is therefore about DURATION, not locking: soccer
+refresh runs overrun their own 4-hour autorun cadence, so the next autorun is
+correctly skipped.** Combined with `earlyExit` every ~6.5h, a run that needs >4h
+has a narrow window to ever finish. **Still a lead** — I have not timed a run
+end-to-end or confirmed one has ever completed since 08-10.
+
+**Do not spend time on a stale-lock bug. There isn't one.**
+
+#### probe-mlb-content-wait — CLOSED-VERIFIED 2026-08-15
+
+`page.wait_for_timeout(400)` -> `wait_for_selector('.cards-game-card,
+.cards-strip-card')` + a 600ms settle, gated on `httpStatus < 400`, with
+`CARD_WAIT_MS = 20000`.
+
+**Both halves of the stated Verification ran.**
+
+1. Five consecutive production runs, `--sports mlb`, desktop and mobile:
+   **15 cards on all 10 readings.** Before this change the same URL returned 0
+   on at least one of three runs, and a 600ms read found 0 elements for classes
+   a 2500ms read found 495 of.
+2. The timeout path REPORTS rather than passes, proven end-to-end against a
+   real 200-with-no-cards page (`/` at a 6s wait), not just in a unit test:
+
+       httpStatus 200  cards 0  cardWaitTimedOut True  ok False
+       "NO CARD ATTACHED in 6s -- render did not finish; this is NOT a 0-card slate"
+
+   It failed **even with mlb marked out-of-season**, which is the intended rule:
+   "nothing to show" resolves fast, so a long timeout is an anomaly regardless.
+
+**`tests/test_ui_layout_probe.py` is new — 9 tests, and the file had none.**
+Every case is a failure this harness actually produced against production: the
+502 that printed a clean table, the MLB false zero, the numeric class that
+vanished from the report. One of them **failed on first run and the code was
+right**: `out_of_season` travels on the REPORT (so `--expect-cards` can
+override it per run), not as a module constant, so a caller omitting it gets
+the STRICT reading. That fail-closed default is now pinned by a test.
+
+**No deploy.** The probe is a dev-time script; it runs in nobody's request path.
+
+- **FINAL:** shipped, verified, closed. Nothing of this lane uncommitted.

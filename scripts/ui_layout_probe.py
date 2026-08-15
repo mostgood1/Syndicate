@@ -128,6 +128,12 @@ NUMERIC_CLASSES = [".cards-data-pair strong", ".cards-market-main", ".cards-mini
 
 WCAG_TARGET_PX = 44
 
+# How long to wait for the first card to attach before calling the render
+# failed. Generous on purpose: it is only ever paid in full by a sport that is
+# genuinely serving nothing, and the cost of being stingy is a false zero on
+# the sport with the most traffic.
+CARD_WAIT_MS = 20000
+
 # Sports whose season has not opened, where 0 cards is the correct answer and
 # not a failure. Measured 2026-08-14: NBA, NHL and NCAAB served 0 cards, so
 # their rows in the audit's divergence matrix are code-only. REVIEW THIS LIST
@@ -356,12 +362,39 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
                         # no cards and does not overflow. A probe that passes
                         # on an error page is worse than no probe.
                         response = page.goto(f"{base_url}{route}", timeout=timeout_ms, wait_until="load")
-                        page.wait_for_timeout(400)
+                        status = response.status if response is not None else None
+                        # Wait on CONTENT, not on a timer. Seven of the eight
+                        # sports render server-side and are complete at `load`;
+                        # MLB renders through `cards_source.js` AFTER it, so a
+                        # fixed delay races the renderer. Measured 2026-08-15:
+                        # the same production URL returned 0 cards and 15 cards
+                        # minutes apart, and a 600ms read found 0 elements for
+                        # classes a 2500ms read found 495 of. That false zero
+                        # reached a written claim before it was caught.
+                        #
+                        # A timeout here is NOT a 0-card slate. It is recorded
+                        # as its own state so an unfinished render can never be
+                        # read as an empty one -- the same rule this file
+                        # applies to a missing selector and a 502.
+                        card_wait_timed_out = False
+                        if status is not None and status < 400:
+                            try:
+                                page.wait_for_selector(
+                                    ".cards-game-card, .cards-strip-card",
+                                    timeout=min(timeout_ms, CARD_WAIT_MS),
+                                    state="attached",
+                                )
+                                # Children (filter pills, lens rows) can lag the
+                                # first card; settle briefly once it exists.
+                                page.wait_for_timeout(600)
+                            except Exception:
+                                card_wait_timed_out = True
                         measured = page.evaluate(
                             MEASURE_JS,
                             {"typeClasses": TYPE_CLASSES, "numericClasses": NUMERIC_CLASSES},
                         )
-                        measured["httpStatus"] = response.status if response is not None else None
+                        measured["httpStatus"] = status
+                        measured["cardWaitTimedOut"] = card_wait_timed_out
                         measured["touchTargetFailures"] = [
                             box
                             for box in measured.pop("tabBoxes", [])
@@ -471,7 +504,19 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             # out-of-season sport is a legitimate 0, so it is opt-out by name
             # rather than silently tolerated -- which is what makes a 0 on a
             # sport you EXPECTED to have cards fail the run.
-            if not cards:
+            # A render that never produced a card is NOT an empty slate, and
+            # conflating the two is what let MLB report `0 cards` on a slate of
+            # 15. This branch runs before the 0-card one so the timeout gets
+            # named as the cause, and it fails even for an out-of-season sport:
+            # "nothing to show" should resolve fast, so a 20s timeout there is
+            # itself the anomaly.
+            if measured.get("cardWaitTimedOut"):
+                issues.append(
+                    f"NO CARD ATTACHED in {CARD_WAIT_MS // 1000}s -- render did not "
+                    "finish; this is NOT a 0-card slate"
+                )
+                ok = False
+            elif not cards:
                 issues.append("0 cards served -- NOT a pass, re-measure in season")
                 if sport not in out_of_season:
                     ok = False
