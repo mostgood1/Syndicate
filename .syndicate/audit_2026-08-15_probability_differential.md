@@ -192,11 +192,46 @@ not the biggest cluster, which would be a vote.
 
 ---
 
+## STATUS UPDATE — 2026-08-15, lane `probability-clamp-removal`
+
+**One of the three clamp sites is fixed. The other two are blocked on lane
+ownership, not on effort or agreement.**
+
+| clamp site | holder | status |
+|---|---|---|
+| `wnba/cards.py::_american_from_prob` | unclaimed | **FIXED** — delegates to `american_price`; harness scores it **5/5**, was 2/5 |
+| `pipeline/intelligence_state.py:1816` (inline) | `memory-cutover-ship` | handoff sent, NOT edited |
+| `shared/layer2_board.py::_american_from_probability` | `model-audit-devig-and-hygiene` | handoff sent, NOT edited |
+
+`recommendation-lane-correctness` closed and released `layer2_board.py`, but the
+new OPEN lane `model-audit-devig-and-hygiene` claimed it the same day — so the
+file was never free. That lane's goal (a) is "exactly one function turns book
+prices into a fair probability", which makes it the right owner rather than a
+detour.
+
+**One stale comment left behind, and it will mislead:**
+`layer2_board.py:1280`'s docstring says it "Mirrors `wnba/cards.py::_american_from_prob`
+... including its 2%-98% clamp". The WNBA copy no longer clamps. Flagged to the
+owning lane; not editable from here.
+
+**Behaviour change worth stating plainly:** a WNBA moneyline derived from a
+degenerate model probability (exactly 0.0 or 1.0) now renders **blank** instead
+of ±4900. That is the board contract ("absent renders as absent", web
+`932a1f71` / `a86eb4ed`) and is asserted as intended in
+`tests/test_wnba_fair_price_unclamped.py`, so a future reader finds it recorded
+rather than mistaking it for a regression. Also, at exactly p=0.5 the price is
+now `+100` rather than `-100` — same probability, and `+100` is the convention.
+
+---
+
 ## Recommendation
 
 Ordered by evidence, not by size of diff.
 
-1. **Fix the clamp (D2). This is the only confirmed live misprice.** Replace the
+1. ~~**Fix the clamp (D2). This is the only confirmed live misprice.**~~
+   **1 of 3 done (WNBA); 2 blocked on lane ownership — see the status table.**
+   Original text:
+   **Fix the clamp (D2). This is the only confirmed live misprice.** Replace the
    `max(0.02, min(0.98, p))` clamp in `layer2_board`, `wnba/cards` and the
    inline copy in `pipeline/intelligence_state.py` with `american_price`, which
    refuses out-of-domain input. Two MLB totals rows are wrong on the board right

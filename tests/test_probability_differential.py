@@ -66,10 +66,14 @@ KNOWN_FAILING = {
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_decimal",
     },
     "probability_to_american": {
+        # `wnba.cards:_american_from_prob` was here until 2026-08-15. It now
+        # delegates to `american_price` and passes 5/5, so it is deliberately
+        # NOT listed: leaving a fixed implementation in this set would let it
+        # silently regress back to a clamp. Two clamp sites remain, both held by
+        # other OPEN lanes -- see the lane block for the handover.
         "pipeline.intelligence_state:_backfill_layer2_board_columns",
         "syndicate.features.nhl.sim_engine.hockeysim.features.market_lines:_prob_to_american",
         "syndicate.features.shared.layer2_board:_american_from_probability",
-        "syndicate.features.wnba.cards:_american_from_prob",
     },
 }
 
