@@ -4415,3 +4415,104 @@ the CHILDREN (~504MB) and the fact that pymalloc holds 934MB of arenas for
 **FIX OWED IN THE READER:** it must reconcile against the PROCESS, not the
 cgroup. As written it will report `reconciles: false` on every read while any
 child exists, and a guard that always fires is a guard nobody reads.
+
+## 2026-08-15 22:5xZ — worker `325b2822` — **PREFLIGHT: HOLD. NOT DEPLOYED.**
+
+Closing-stamp clock fix (`odds_refresh_tracking.py`). On main, 7 new tests, 109
+green. **Held for the same reason as `edbbee9d`, and they should ship together.**
+
+1. **Needs a WORKER deploy.** The stamp is written during odds refresh —
+   `check_deploy_safety` shows that lane on **live-odds-worker** (pid 215). Web
+   only reads the result, so a web deploy changes nothing.
+2. **Gate is blocking, honoured:** MLB sim RUNNING (pid 79, `tip_off_window`,
+   12m), odds refresh RUNNING (live-odds-worker), board build IN FLIGHT on
+   refresh-worker. A deploy kills them; a scoped resim has no ETA.
+3. **FORWARD-ONLY, and this one cannot be backfilled.** The fix corrects stamps
+   written after it ships. **Every close stamped today already carries the
+   detection time**, and the true observation time was never recorded — it is
+   not recoverable from the artifact, only from history points if they survive.
+   2026-08-15 CLV keeps its late stamps regardless.
+4. **Interaction with the shipped `close_timing` guard, stated so it is not a
+   surprise:** that guard excludes `close_age_seconds < 0`. Once this fix lands,
+   stamps stop post-dating first pitch, so **`in_play_excluded_n` should fall
+   toward zero for `observed_transition` rows** and previously-excluded genuine
+   pregame closes will re-enter the headline. Expect `same_book_n` to RISE and
+   the headline to move. That is the fix working, not a regression.
+5. **Ship with `edbbee9d`** (the candidate-line fix) in one worker deploy when
+   the slate is quiet — two worker restarts for two one-file changes is worse
+   than one. Verify after: a fresh stamped close has
+   `closing_captured_at <= commence_time` and a populated `closing_detected_at`.
+
+## QUEUED DEPLOY — `edbbee9d` + `325b2822` to the WORKERS — armed 2026-08-15 22:5xZ
+
+**AUTHORISED by the user ("deploy both when the slate is quiet"). Waiting on the
+gate, not on permission.** Any session may execute this; it is written out so it
+survives this one.
+
+**Condition to start:** past **2026-08-16T01:40Z** (last first pitch) AND
+`py -3 scripts/check_deploy_safety.py` reports CLEAR — specifically no MLB sim,
+no board build in flight, no odds refresh running.
+
+**Which services.** Both changes are artifact PRODUCERS, so web is NOT involved:
+- `layer2_board.py` (`edbbee9d`) — builds the shortlist -> **refresh-worker**
+  (`srv-d91dpertqb8s73co8ls0`).
+- `odds_refresh_tracking.py` (`325b2822`) — writes the closing stamp during odds
+  refresh -> **live-odds-worker** (`srv-d91dpertqb8s73co8lt0`). Confirm from the
+  safety output, which names the lane owner.
+Ship ONE commit carrying both to each service it needs; do not do four deploys.
+
+**Recipe (do NOT skip 1-2 — both bit this session on web):**
+1. Read each service's LIVE commit from
+   `/v1/services/<id>/deploys?limit=1`. **Parent on that**, not on `main` —
+   services run deploy branches and live SHAs are repeatedly NOT descendants of
+   the previous one.
+2. Confirm no deploy is already `build_in_progress` on that service; if there is,
+   wait it out and re-parent afterwards.
+3. Blob-stage against the live tree (never `git add`; the shared index holds other
+   sessions' work):
+   `git read-tree <LIVE>` then `git update-index --add --cacheinfo` for
+   `syndicate/features/shared/layer2_board.py`,
+   `syndicate/features/shared/odds_refresh_tracking.py`,
+   `tests/test_layer2_book_prices_line.py`, `tests/test_odds_closing_stamp.py`.
+4. `git diff --stat <LIVE> <TREE>` must show **exactly those 4 files**.
+5. `py -3 scripts/render_deploy.py --service <name> --commit <sha>`; poll to
+   terminal.
+
+**Verification — all four, or it is not done:**
+1. A newly stamped close has `closing_captured_at <= commence_time` and a
+   populated `closing_detected_at`.
+2. `/api/board/layer2-shortlist` home spread rows: `line` equals the book-grid
+   cell's `home.line` (re-run the 525-cell invariant; expect 0 opposite-sign).
+3. `/api/ops/clv/report`: `in_play_excluded_n` falls toward zero for
+   `observed_transition` rows, `same_book_n` RISES, `avg_clv_pct` moves.
+   **That is the fix working — do not report it as a regression.**
+4. No new `stamped_close_is_*_side` skips beyond the away-row baseline.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service <name> --commit <LIVE> --allow-rollback`
+
+**Forward-only.** Neither fix repairs 2026-08-15 data: today's openings keep the
+away handicap on home spreads, and today's stamps keep detection times that were
+never recorded elsewhere.
+
+### BASELINE for Drop 3, taken BEFORE it landed `[2026-08-15 22:56:08Z artifact]`
+Read from the built artifact itself (`mlb_source/data/book_grid/book_grid_2026-08-15.json`,
+10.4 MB), not from a served endpoint:
+
+    generated_at    2026-08-15T22:56:08Z    (still the pre-Drop-3 builder)
+    version         2      rows_total 3473
+    live_gamelines  null                    <-- the key does not exist yet
+    live h2h rows   32                      <-- what Drop 3 will CONSIDER
+
+    live_projections (the PROP family, unchanged and NOT this lane's):
+      rows_live_considered 1461 | rows_live_projected 204 | rows_live_edged 0
+      rows_live_edge_withheld 204 | live_games_in_snapshot 8
+
+**So the predicate now has a number attached: `rows_live_gameline_considered`
+should land near 32, not merely above 0.** A value of 0 means the join never saw
+a live h2h row despite 32 being present, which is a real failure. A value near 32
+with most rows withheld under `prob_interval_swamps_edge` is the recorded
+decision working at 120 sims.
+
+**The prop family's `rows_live_edged: 0` beside it is the control** — a different
+join, a different lane, and it must NOT move as a result of this deploy. If it
+does, this change touched something it should not have.
