@@ -66,14 +66,24 @@ KNOWN_FAILING = {
         "syndicate.features.nhl.sim_engine.hockeysim.adapters:american_to_decimal",
     },
     "probability_to_american": {
-        # `wnba.cards:_american_from_prob` was here until 2026-08-15. It now
-        # delegates to `american_price` and passes 5/5, so it is deliberately
-        # NOT listed: leaving a fixed implementation in this set would let it
-        # silently regress back to a clamp. Two clamp sites remain, both held by
-        # other OPEN lanes -- see the lane block for the handover.
-        "pipeline.intelligence_state:_backfill_layer2_board_columns",
+        # ALL THREE `max(0.02, min(0.98, p))` clamp sites are now fixed and are
+        # deliberately NOT listed -- `wnba.cards:_american_from_prob`
+        # (`de0c367f`), then `layer2_board:_american_from_probability` and the
+        # inline copy in `pipeline.intelligence_state`. Leaving a fixed
+        # implementation in this set would let it silently regress to a clamp,
+        # which is the exact defect that published -4900 against a correct
+        # -12488 on the live board.
+        #
+        # `market_lines:_prob_to_american` stays, and stays UNFIXED on purpose.
+        # It fails all five requirements, but it has exactly ONE caller
+        # (`_consensus_american`), which feeds it the median of
+        # `_american_to_prob` outputs -- strictly inside (0, 1) by construction,
+        # since every invalid price is filtered to None first. None of the five
+        # failing inputs can reach it. Converting it to return Optional would
+        # force None-handling onto six call sites for a case that cannot occur,
+        # so this is triage, not an oversight: it is a sim-internal anchor, not
+        # a published price.
         "syndicate.features.nhl.sim_engine.hockeysim.features.market_lines:_prob_to_american",
-        "syndicate.features.shared.layer2_board:_american_from_probability",
     },
 }
 

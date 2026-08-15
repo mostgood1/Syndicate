@@ -50,6 +50,7 @@ from typing import Any, Iterable, Mapping
 from syndicate.features.shared import opportunity_gate
 from syndicate.features.shared.book_margin_model import market_family as _market_family
 from syndicate.features.shared.opportunity_signals import (
+    american_price,
     blended_score,
     consensus_fair_probability,
     devig,
@@ -1227,16 +1228,29 @@ def _implied_book_total_pct(ev_pct: Any) -> float | None:
 
 
 def _american_from_probability(probability: Any) -> float | None:
-    """Fair American price from a no-vig probability. Mirrors
-    `wnba/cards.py::_american_from_prob` rather than inventing a second
-    convention, including its 2%-98% clamp."""
-    prob = _as_float(probability)
-    if prob is None:
-        return None
-    prob = max(0.02, min(0.98, prob))
-    if prob >= 0.5:
-        return round(-100.0 * prob / max(0.001, 1.0 - prob), 0)
-    return round(100.0 * (1.0 - prob) / max(0.001, prob), 0)
+    """Fair American price from a no-vig probability.
+
+    Delegates to `opportunity_signals.american_price`, the owner of this concept
+    established by the Tier 3a differential
+    (`.syndicate/audit_2026-08-15_probability_differential.md`) -- the only one
+    of five implementations that met every requirement, and the only one that
+    round-trips 9/9.
+
+    **The 2%-98% clamp this used to carry was published wrong prices.** Measured
+    on production 2026-08-15: `/api/intelligence/query` served 1346 `fair_price`
+    values, 24 sitting exactly on +/-4900 with **not one beyond it**, and a
+    row-wise join found mlb totals under at `fair_probability` 0.992056
+    published as **-4900** where the correct price is **-12488**. A clamp is not
+    a guard: it answers an out-of-range probability with a confident wrong
+    number instead of refusing. `american_price` returns None instead, and
+    `_layer2_board_columns` omits the column -- absent renders as absent, per
+    the board contract shipped as web `932a1f71`.
+
+    The percent-scale case is why this matters beyond the tails: `confidence` is
+    stored 0-100 and probability 0-1 in the same rows, and the clamp turned a
+    `50.0` unit error into a plausible-looking -4900 rather than a blank.
+    """
+    return american_price(_as_float(probability))
 
 
 def _layer2_board_columns(
