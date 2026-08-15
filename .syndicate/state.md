@@ -187,11 +187,20 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **`git push` from this checkout is not scoped to your own commits.** Read
   `git log origin/main..HEAD` first. `[from-git 08-13]`
 
-**Repo state `[measured 08-15 02:3xZ]`:** `origin/main` is `be5efcbf`; the shared
-tree has **ZERO commits not upstream** and is **128 BEHIND**. Being behind is a
-read-your-own-staleness problem; being ahead is a lost-work problem. Anyone
-reading local `git log` for lineage is reading a stale tree — `git fetch` and
-read `origin/main`.
+**Repo state `[measured 08-15 17:5xZ]`:** the shared tree is **13 AHEAD / 143
+BEHIND** `origin/main`. Being behind is a read-your-own-staleness problem; being
+ahead is a **lost-work** problem. `git fetch` and read `origin/main` for lineage.
+
+**THE DIVERGENCE RECURS ON A TIMESCALE OF HOURS AND IS STRUCTURAL, NOT A LAPSE.**
+Reconciled at 17:0xZ as `6822d539` — local `main` was 33 ahead / 136 behind with
+**32 commits genuinely unpushed by patch-id** across six lanes. It was 13 ahead
+again within the hour. **Cause: sessions commit to local `main`, while every
+deploy-shaped push goes to `origin` through a throwaway worktree**, so the two
+lineages separate continuously. Until that workflow changes, assume unpushed
+work exists and check `git cherry origin/main main` before any reset, checkout
+or fast-forward. A snapshot of the uncommitted tree is on branch
+`safety/worktree-snapshot-2026-08-15` (`ad504d57`) — five files were genuinely
+unsaved anywhere.
 
 ---
 
@@ -512,7 +521,19 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   suite mutation-pinned 5-red/5-green exactly as predicted.
   **PRODUCTION RE-MEASURE OWED:** baseline **5** live NFL rows with
   `model_edge_pct` at 02:37Z → expect **0**. Do not call this fixed in
-  production until that number is read.
+  production until that number is read. **A reading of 0 taken while the board
+  carries no live rows at all is NON-EVIDENCE** — window 2 produced exactly that
+  and it proves nothing. Re-measure on a live NFL slate.
+- **QUOTE-FEED AGE ALARM EXISTS — `8b6f7773`, committed, NOT DEPLOYED.
+  `[built 08-15, tested locally only]`** `shared/quote_feed_age.py` (O(1)
+  tail-read of the quote shard → `newest_captured_at`, age, status
+  `ok`/`stale`/`unknown`) + `GET /api/ops/quote-feed-age`.
+  **Unknown never maps onto `ok`** — a missing or unparseable shard reports
+  `unknown` with a reason, so a broken join cannot read as a healthy feed.
+  Built because the 5.8 h starvation above was invisible to every existing
+  signal: the boards kept building and serving confidently on stale quotes.
+  `tests/test_quote_feed_age.py` 14 passed, mutation-pinned. **Production
+  behaviour UNVERIFIED.**
 - **MLB live PROP edges are 0 for a different, fully diagnosed reason.
   `[measured 08-15 02:41Z]`** From `book_grid_2026-08-14.json`'s own counters:
   `rows_live_considered 989 / rows_live_projected 86 / rows_live_edged 0 /
@@ -733,9 +754,36 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   `refusal` 3/8 → 6/8, every other class byte-identical, declined-question
   latency 10.9s → 0.19s. **A refusal gate must be tested on what it must NOT
   refuse** — two regressions were caught only by testing the answer direction.
-- **M1 SHIPPED** (`b16eb1f7`) but **SUPPLEMENTS rather than REPLACES**: it adds
-  `visuals.tables` while `structured_response` survives, so both pools disagree
-  (23.81 vs 14.09). Successor lane `ask-headline-from-board`.
+- **CURRENT PRODUCTION SCORE IS 38/52 `[measured 08-15 17:5xZ, live 1e44e1da]`.**
+  Pre-deploy control **25/52** (`reports/ask_regression/prebaseline_c774fe1a_2026_08_15.json`).
+  entity **2/10 → 9/10**, lookup **4/8 → 8/8**, ranking **5/10 → 7/10**;
+  advice 4/5, explain 4/6, history 2/5, refusal 4/8 all flat. **Zero classes
+  regressed.**
+  - **ATTRIBUTION: the gain is the `ask-sport-coverage` deploy**
+    (`b6f1a2e6`/`0bf866c3`), NOT the web train that followed it. The train
+    reproduced 38/52 and added the WNBA clamp and MLB live lens on top. Do not
+    credit the train with 13 points.
+  - **THE "23/52" BASELINE IS DEAD.** `post_m1_fixed_2026_08_14.json` is a
+    ranking-only run with `total: 10`; that number existed only in prose and was
+    propagated into three briefs. Use 25/52 as the pre-deploy control, or a run
+    you took yourself.
+  - Slate caveat, so a flat class is not misread as a failed fix: production was
+    **nfl 60 / mlb 39 / wnba 6, zero soccer / ncaab / nhl**, so the soccer
+    classes could not move on this measurement whatever the code does.
+- **THE TWO-POOL DIVERGENCE IS CLOSED** — web `c774fe1a` (live 2026-08-15
+  03:29:56Z), lane `ask-headline-from-board` CLOSED-VERIFIED. `M1`
+  (`b16eb1f7`) only SUPPLEMENTED (`visuals.tables`) and left the headline on
+  the snapshot, so chat and the board still read 23.81 vs 14.09.
+  `_market_summary_schema` now sources `top_opportunities` from
+  `read_layer2_shortlist` — the same artifact `/api/board/layer2-shortlist`
+  serves. **Measured same-instant: chat 6.35 vs board 6.35, |delta| 0.000**,
+  fingerprinted 5/5 rows carrying `source="layer2_shortlist"`.
+  Two guards were bought with a rollback and must not be removed:
+  the board REPLACES a non-empty `recommendations` pool and never CREATES one
+  (an empty pool is the engine DECLINING — sourcing unconditionally answered an
+  Ohtani stats question with NFL totals, refusal 4/8 → 3/8), and board rows
+  carry explicit `edge_pct` because `edge` is a FRACTION on snapshot rows and a
+  PERCENT on board rows (`Best edge 635.0%` served for 14 min).
 - **SPORT COVERAGE FIXED AND MEASURED** (`0bf866c3`, live 16:49:28Z) — the
   08-14 finding above (soccer/ncaab had no branch, NFL required the FULL team
   name, wnba was a keyword inside nba) is CLOSED on the routing axis:
@@ -751,9 +799,21 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   `_ncaaf_teams_in_question` excludes mascots deliberately (~680 schools share
   "Wildcats"/"Tigers"). NFL is safe only because its 32 nicknames are unique
   (verified). `[from-code + measured 08-15]`
-- **K6 is HALF DONE.** `routed_sport` and `visuals.as_of` are now populated, but
-  `warn:no_as_of_stated` is **24 → 24, unmoved** — the harness warns on the
-  ANSWER TEXT, which still states no as-of. `[measured 08-15]`
+- **K6 IS INERT ON PRODUCTION, not "half done"** (an earlier line here said the
+  harness warns on the answer TEXT — that was wrong; it checks the FIELD first,
+  `ask_syndicate_regression.py:473`). `as_of` is populated **28/52 both before
+  and after — unchanged.** `routed_sport` DID ship and works. The freshness
+  fallback does not fire on production: A04 returns `as_of: None` there and
+  `'2026-08-15T17:07:33Z'` LOCALLY on identical code, and a production A04
+  response carries **no timestamp-bearing field anywhere**. The data exists on
+  the box — `/api/intelligence/status` has
+  `freshness.computed_at = 2026-08-15T05:21:08Z` — so the ask route's
+  `read_latest_intelligence_state` is not resolving to it. Suspect (NOT
+  confirmed): `_hydrate_intelligence_snapshot_payload` hoists
+  `top_opportunities`/`recommendations` from a nested `response` block but never
+  hoists `freshness`; the local box takes a path with freshness already at top
+  level, so it cannot reproduce. **Instrument which path resolves on production
+  before changing the hoist.** `[measured 08-15 17:1xZ]`
 - **K3's `build_evidence_pack` sport-filter item is DEAD CODE** — reachable only
   from the LLM engine, which never executes by standing decision. `[from-code]`
 - **Chat reads the shortlist ARTIFACT directly**, so chat staleness IS artifact
@@ -981,6 +1041,20 @@ the place to read it, and it carries the guard on its two shortlists.
 - **NHL and soccer market anchoring** make those engines' market-relative
   evaluation partly circular. Quantify before believing any CLV number for them.
 
+- **`/api/ops/clv/report` CANNOT SEE THE OPENINGS. Its zeros carry no
+  information.** Measured 2026-08-15 16:5xZ. The route and `clv_join.py` ARE in
+  the live web commit `0bf866c3`, and it returns `ok: true` — but it runs on
+  **web**, while `load_openings` is a `path.exists()` on a LOCAL file
+  (`reports/intelligence/clv_openings/<date>.jsonl`) and web's disk holds
+  **0 bytes** of it (`/api/ops/artifacts/export?pattern=...clv_openings/*.jsonl`
+  → `count: 0`). It returned `openings: 0` for all 8 sports on 08-15 **and for
+  08-14, a date with 150 known openings**. The data is fine: refresh-worker
+  logged `[clv_opening_ledger] OPENINGS date=2026-08-15 ... already=490` across
+  20 lines in 14h — **490 real openings exist**. The allowlist in
+  `artifact_publisher.py` PERMITS the transfer; it is not happening.
+  Do not read `same_book_n=0` from this endpoint as evidence about odds-history
+  breadth — breadth remains untested.
+
 - **Lane markers are per-session as of 2026-08-15.** `lane-guard.py` reads
   `.syndicate/.current-lane.<session_id>` first and falls back to the shared
   `.syndicate/.current-lane`. Write your slug to YOUR file; the global one is
@@ -990,10 +1064,22 @@ the place to read it, and it carries the guard on its two shortlists.
 
 ## Web card surfaces — soccer, 2026-08-15 03:1xZ `[measured]`
 
-- **Live web SHA is `7e334509`** (`dep-d9vtjklg1s2s73bs6ib0`, triggered
-  03:15:30Z) = the previously live `a86eb4ed` **+ one commit**. It is a PINNED
-  deploy, so **the next web deploy must stack on `7e334509`** or it silently
-  drops the soccer card work. Same commit is on `origin/main` as `9b6a48e7`.
+- **Live web SHA is `1e44e1da`** `[measured 08-15 18:1xZ via the deploys API]`
+  (`dep-da0a5rlg1s2s73cm43kg`, finished 17:40:30Z). **Supersedes `7e334509`,
+  which was 14h stale and is what a session reading this line would have stacked
+  on.** Live refresh-worker is `c67f7373` (18:11:41Z); live-odds-worker
+  `ccd10349`. Deploys are still PINNED, so **stack on the target service's own
+  live SHA** and re-read it — it moved 3 times today.
+- **`SYNDICATE_BOARD_L2A_ENABLED` = `"true"` on the live web service**
+  `[measured 08-15 18:1xZ]`, although it defaults **False** in code and is
+  **absent from `render.yaml`**. The serve-time L2-A fallback path
+  (`_layer2_fallback_recommendations` -> `_backfill_layer2_board_columns`) is
+  therefore LIVE. Absent =/= off, and here the code default is the misleading one.
+- **`fair_price` is stamped at SERVE time, not in the artifact**
+  `[measured 08-15 18:1xZ]`: the shortlist artifact carries it on **0 of 108**
+  rows while `/api/intelligence/query` serves 1800. So board-column fixes of
+  this kind are a **web-only** deploy — no refresh-worker restart, no sim at
+  risk.
 - **`origin/main` is NOT deployable to web as-is.** It was 131 commits ahead of
   live and contains `ad4b0a3a`, which was deployed successfully at 02:46:23Z
   and then **deliberately reverted** by redeploying `a86eb4ed` at 03:00:19Z
@@ -1115,3 +1201,36 @@ appears, and the framing that layer1 and layer2 run different joins.**
   citable**. `SoccerSimulationOutput` still ships
   `calibration.win_probability.brier = None` — the harness exists but is not
   wired into the sim's own evaluation slot.
+
+
+## UI / card surface — verified 2026-08-15 (session `ui-plan-lane-gh`)
+
+**Lane G (soccer card) is LIVE and has survived three web deploys.** Shipped as
+`7e334509` (live 03:21:35Z); superseded by `c774fe1a` then `1e44e1da`, both of
+which carry it as an ancestor. Verified by ancestry AND by re-measuring the live
+service, not by either alone. Production, `httpStatus` 200: soccer unstyled
+links 2 -> 0, empty slots 3 -> 0, projected-score sentence 5 -> 1 on the default
+tab, 0px overflow. NCAAF control unmoved. `[measured]`
+
+**`scripts/ui_layout_probe.py` is the harness for this surface and it now fails
+closed.** A selector matching nothing used to be dropped from the report
+entirely — NCAAF serves 16 cards and matches ZERO `.cards-market-main`, and that
+read as a pass. It now reports `count: 0` and FAILS. It also carries
+`numericSweep`, which finds digit-rendering elements by what they render rather
+than by class name. `[measured]` `33e7d7a8`
+
+**Tabular figures: the 2026-08-14 fix is correct and incomplete.** The three
+named classes are right on MLB in production (495 / 60 / 30, all
+`tabular-nums`). The digits it does NOT reach: **mlb 1388, nfl 468, ncaaf 432,
+soccer 60** leaf elements at `font-variant-numeric: normal`. `[measured]`
+The container-rule fix is built and pushed (`1bb8cf9f`) but **NOT DEPLOYED**, so
+those four numbers are still true of production.
+
+**MLB renders through `cards_source.js` and is the only sport whose DOM is not
+stable at load.** A fixed short delay returns a confident zero. Any probe of
+`/mlb/cards` must wait on content, not on a timer. `[measured — this rule cost
+me a false claim that a shipped fix had never run]`
+
+**A `deactivated` pinned deploy means SUPERSEDED, not reverted.** Whether your
+work survived is a separate question answered only by ancestry or a measurement.
+Held twice on 2026-08-15; enforced by nothing but the person deploying.
