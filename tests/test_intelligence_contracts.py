@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 
 from pipeline.intelligence_models import IntelligenceResult
+from syndicate.blueprints.home import _build_prop_dashboard_row
+from syndicate.features.intelligence import _attach_intelligence_response_aliases
 from syndicate.features.intelligence import _candidate_summary
 from syndicate.features.intelligence.scoring.edge import get_top_live_opportunities
 from syndicate.features.shared.intelligence_contracts import build_intelligence_evaluation_record
@@ -270,6 +272,150 @@ class CandidateGameDateTests(unittest.TestCase):
             resolve_candidate_game_date({"commence_time": "not-a-date"}, fallback="2026-07-27"),
             "2026-07-27",
         )
+
+    def test_to_dict_keeps_the_producer_line_text_and_only_fills_an_empty_slot(self) -> None:
+        # This defect has now landed twice at this exact spot. `odds` was
+        # flattened from "+124" to 124.0 (fixed 2026-07-28, 1f47b2d6, "Fix
+        # candidate field corruption"); `line` was flattened from "4.5" to 4.5
+        # nine days later (1f6c27b9, 2026-08-06) because the field was added to
+        # a loop that writes unconditionally, sitting twelve lines below the
+        # comment explaining why that is wrong. Neither had a test HERE -- the
+        # second was caught only by a distant MLB blueprint test.
+        #
+        # The rule: self.line is the join-normalised float and stays that way
+        # on the dataclass and in sport_context. payload["line"] is the
+        # producer's display text and is overwritten ONLY when it holds no
+        # parseable number.
+        base = {
+            "sport": "mlb",
+            "type": "prop",
+            "selection": "Over 4.5",
+            "market_key": "strikeouts",
+            "entity_name": "Brandon Young",
+            "event_id": "776",
+        }
+
+        kept = UniversalCandidate.from_raw({**base, "line": "4.5"})
+        self.assertEqual(kept.to_dict()["line"], "4.5")
+        self.assertEqual(kept.line, 4.5)
+
+        # The case that makes this more than cosmetic: the intelligence board's
+        # displayLine() does a bare String(line), so a JSON 2.0 renders as "2"
+        # and the half-point precision the column exists for is gone.
+        whole = UniversalCandidate.from_raw({**base, "line": "2.0"})
+        self.assertEqual(whole.to_dict()["line"], "2.0")
+
+        # A placeholder is not a display value -- fill it from market_line.
+        placeholder = UniversalCandidate.from_raw({**base, "line": "-", "market_line": 7.5})
+        self.assertEqual(placeholder.to_dict()["line"], 7.5)
+
+        # Absent entirely: fill it from prop_line.
+        absent = UniversalCandidate.from_raw({**base, "prop_line": 2.5})
+        self.assertEqual(absent.to_dict()["line"], 2.5)
+
+    def test_prop_dashboard_row_emits_absent_market_key_as_none_not_blank(self) -> None:
+        # `_safe_text`'s last statement is `return ""`, so the `None` fallback
+        # written at this call site could never be produced: a source with no
+        # canonical key emitted `market_key: ""`. That is not a harmless variant
+        # of absent -- `_attach_intelligence_response_aliases` tested
+        # `payload.get("market_key") is None` before deriving one, so a blank
+        # took the permissive branch and the row shipped claiming an empty key
+        # while `market_focuses` already held the right answer.
+        #
+        # Measured 2026-08-15 on the NBA rail fixture: an item whose only market
+        # information is the display string "3PM" produced `market_key: ""` and
+        # `market_focuses: ['threes']` on the same row.
+        sport = {"slug": "nba", "name": "NBA", "context_label": "2026-06-05"}
+        item = {
+            "name": "Julian Champagnie Over 1.5 3PM",
+            "market": "3PM",
+            "pick": "Over 1.5",
+            "matchup": "SAS at PHX",
+            "projected": 2.3,
+            "line": 1.5,
+            "odds": "+108",
+        }
+
+        # Absent must serialise as absent, so an `is None` reader sees the truth.
+        no_key = _build_prop_dashboard_row(sport, item, default_surface="Pregame props")
+        self.assertIsNone(no_key["market_key"])
+        # And the display string must NOT be promoted into the key slot.
+        self.assertEqual(no_key["market"], "3PM")
+
+        # A source that does carry a canonical key is untouched.
+        with_key = _build_prop_dashboard_row(
+            sport, {**item, "prop": "player_threes"}, default_surface="Pregame props"
+        )
+        self.assertEqual(with_key["market_key"], "player_threes")
+
+    def test_prop_dashboard_row_emits_absent_player_name_as_none_not_blank(self) -> None:
+        # `#438a`'s named half, same mechanism as market_key above.
+        #
+        # Held back once, then checked instead of assumed: the comment at this
+        # call site records `player_name: null` cards as a defect this function
+        # was already fixed for, which reads as a reason not to touch it.
+        # `42902ee6` (`#221`) shows only `+` lines for the key -- it was ABSENT
+        # from the reconstructed dict, so rows that DID have a name serialized
+        # without one and 0 of 14 top_props could join to a price. `null` was
+        # the symptom of the omission, not a chosen value, and this test pins
+        # the distinction so the next reader does not have to re-derive it.
+        sport = {"slug": "nba", "name": "NBA", "context_label": "2026-06-05"}
+        item = {
+            "name": "Julian Champagnie Over 1.5 3PM",
+            "market": "3PM",
+            "pick": "Over 1.5",
+            "matchup": "SAS at PHX",
+            "projected": 2.3,
+            "line": 1.5,
+            "odds": "+108",
+        }
+
+        # No player identity anywhere on the source -> absent, not blank.
+        self.assertIsNone(
+            _build_prop_dashboard_row(sport, item, default_surface="Pregame props")["player_name"]
+        )
+
+        # THE CASE `#221` WAS ABOUT: a source that carries a name still gets it,
+        # under each of the three accepted spellings. This is the regression
+        # that must never come back.
+        for key in ("player_name", "player", "entity"):
+            row = _build_prop_dashboard_row(
+                sport, {**item, key: "Julian Champagnie"}, default_surface="Pregame props"
+            )
+            self.assertEqual(row["player_name"], "Julian Champagnie", f"lost identity from {key!r}")
+
+        # `name` is the display label and must never be promoted into the
+        # identity slot -- the comment at the call site says so explicitly.
+        self.assertIsNone(
+            _build_prop_dashboard_row(sport, item, default_surface="Pregame props")["player_name"]
+        )
+        self.assertEqual(
+            _build_prop_dashboard_row(sport, item, default_surface="Pregame props")["name"],
+            "Julian Champagnie Over 1.5 3PM",
+        )
+
+    def test_response_aliases_derive_market_key_when_the_slot_is_blank(self) -> None:
+        # The consumer half of the same defect, pinned separately because either
+        # side alone leaves a producer able to reintroduce it. A blank slot must
+        # be treated as absent and re-derived, not accepted as an answer.
+        response = {
+            "recommendations": [
+                {
+                    "name": "Julian Champagnie Over 1.5 3PM",
+                    "market": "3PM",
+                    "pick": "Over 1.5",
+                    "sport_slug": "nba",
+                    "candidate_type": "prop",
+                    "market_key": "",
+                    "subject_key": "",
+                }
+            ]
+        }
+
+        aliased = _attach_intelligence_response_aliases(response)
+        item = (aliased.get("recommendations") or [{}])[0]
+        self.assertEqual(item.get("market_key"), "threes")
+        self.assertEqual(item.get("subject_key"), "julian champagnie")
 
 
 if __name__ == "__main__":

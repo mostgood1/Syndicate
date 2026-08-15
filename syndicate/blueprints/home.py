@@ -3057,12 +3057,34 @@ def _build_prop_dashboard_row(sport: dict[str, Any], item: dict[str, Any], *, de
         # function produced had player_name: null, which is why 0 of 14
         # top_props rows could be joined to a price. `name` is the display
         # label ("Ryan Johnson Walks Allowed") and is not a substitute.
-        "player_name": _safe_text(item.get("player_name") or item.get("player") or item.get("entity"), None),
+        #
+        # `or None` for the same reason as `market_key` below: `_safe_text` ends
+        # `return ""`, so the `None` written here was unreachable and a row with
+        # no player identity emitted `""`. Note this does NOT reopen the defect
+        # the paragraph above describes -- `42902ee6` shows only `+` lines for
+        # this key, i.e. the field was ABSENT from the reconstructed dict and
+        # rows that DID have a name serialized without one. `null` was the
+        # symptom of omission, never a chosen value. Rows reaching the `or None`
+        # branch have no player to join on in either spelling.
+        "player_name": _safe_text(item.get("player_name") or item.get("player") or item.get("entity"), "") or None,
         "player_id": item.get("player_id"),
         # The canonical, sport-agnostic market key where the source has one
         # (MLB prop rows carry prop="batter_total_bases"). `market` below is a
         # display string ("Walks Allowed") and must never be used as a key.
-        "market_key": _safe_text(item.get("market_key") or item.get("prop") or item.get("prop_market_key") or item.get("stat"), None),
+        #
+        # `or None` because "WHERE THE SOURCE HAS ONE" was not what this line
+        # did. `_safe_text`'s last statement is `return ""`, so the `None`
+        # fallback written here could never be produced and a source with no
+        # canonical key emitted `""` instead. That is not a harmless variant of
+        # absent: a downstream `if payload.get("market_key") is None` reads `""`
+        # as an answer and skips its own derivation, which is exactly what
+        # shipped an NBA prop with `market_key: ""` while `market_focuses`
+        # already held `['threes']` (measured 2026-08-15). Absent must serialise
+        # as absent. Deliberately NOT applied to the sibling `_safe_text(...,
+        # None)` fields on this dict -- `player_name: null` cards are a defect
+        # this function was fixed for once already, so that one needs its own
+        # look, not a sweep.
+        "market_key": _safe_text(item.get("market_key") or item.get("prop") or item.get("prop_market_key") or item.get("stat"), "") or None,
         "headshot_url": _safe_text(item.get("headshot_url") or item.get("photo"), None),
         "market": _safe_text(item.get("market"), heading),
         "pick": _safe_text(item.get("pick"), detail.split("|")[0].strip() if detail else heading),
