@@ -3726,3 +3726,22 @@ instead. Neither is attempted here.
 - **FINAL:** hypothesis falsified, goal not met, 22 tests, no deploy. The
   carried-forward item "the desktop unit should be grid rows" is now CLOSED as
   wrong — do not pick it up again.
+
+### ui-probe-baseline-and-rerun — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: tomorrow's probe run is COMPARABLE to today's, without anyone
+  remembering what today's numbers were. Testable: a committed baseline exists,
+  `--compare <baseline>` prints per-metric deltas, and a scheduled run fires
+  tomorrow and reports them.
+- Files (exclusive to this lane): `scripts/ui_layout_probe.py`,
+  `tests/test_ui_layout_probe.py`, `reports/ui_layout/baseline_2026-08-15.json`
+  (new). Collision check RUN: all free.
+- Hypothesis: the metrics that moved across today's four readings (card-height
+  spread, fit reliability) are slate-driven and will keep moving; the ones that
+  did not (overflow, tab wiring, touch targets, tabular figures, unstyled
+  links) are code-driven and should be identical tomorrow. **Which is which is
+  the actual open question this lane answers.**
+- Falsification test: if a code-driven metric moves overnight with no deploy
+  touching the card surface, it is not code-driven and the harness is measuring
+  something it does not understand.
+- Verification: the comparison output itself, run against tomorrow's slate.
+- Blocked by: none.

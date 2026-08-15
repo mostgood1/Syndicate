@@ -893,6 +893,62 @@ class _SilentRequestHandler(WSGIRequestHandler):
         return
 
 
+# Metrics that are a property of the CODE. A deploy can move them; an evening
+# of games cannot. If one of these differs between two runs and nothing shipped
+# to the card surface, the harness is measuring something it does not
+# understand -- that is the finding, not the number.
+STABLE_METRICS = ("overflowPx", "tabsWithoutPanel", "panelsWithoutTab", "unstyledLinks")
+
+# Metrics that legitimately move with the slate. Printed for context, never
+# failed. Established the hard way: card-height spread read 796 / 1716 / 1583 /
+# 1125 px across one evening with no code change.
+SLATE_METRICS = ("cards", "cardHeightSpread", "cardHeightSpreadWithinState", "contentUnits")
+
+
+def _cmp_value(v):
+    if isinstance(v, list):
+        return len(v)
+    if isinstance(v, dict):
+        return v.get("spread", v.get("max"))
+    return v
+
+
+def compare(baseline: dict[str, Any], current: dict[str, Any]) -> tuple[list[str], bool]:
+    """Diff two reports, separating code-driven drift from slate movement."""
+    lines = ["comparison vs baseline", "-" * 60]
+    ok = True
+    for sport, cur_sport in current.get("sports", {}).items():
+        base_sport = (baseline.get("sports") or {}).get(sport) or {}
+        for width in VIEWPORTS:
+            cur = cur_sport.get(width) or {}
+            base = base_sport.get(width) or {}
+            if not base:
+                lines.append(f"{sport:8} {width:8} NEW -- not in baseline, nothing to compare")
+                continue
+            if (cur.get("httpStatus") or 0) >= 400 or (base.get("httpStatus") or 0) >= 400:
+                lines.append(f"{sport:8} {width:8} SKIPPED -- an HTTP error on one side is not a comparison")
+                ok = False
+                continue
+            drift = []
+            for key in STABLE_METRICS:
+                b, c = _cmp_value(base.get(key)), _cmp_value(cur.get(key))
+                if b != c:
+                    drift.append(f"{key} {b} -> {c}")
+            moved = []
+            for key in SLATE_METRICS:
+                b, c = _cmp_value(base.get(key)), _cmp_value(cur.get(key))
+                if b != c:
+                    moved.append(f"{key} {b} -> {c}")
+            if drift:
+                ok = False
+                lines.append(f"{sport:8} {width:8} CODE-DRIVEN DRIFT: " + "; ".join(drift))
+            else:
+                lines.append(f"{sport:8} {width:8} stable metrics unchanged")
+            if moved:
+                lines.append(f"{'':17} slate moved: " + "; ".join(moved))
+    return lines, ok
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--base-url", default=None, help="Probe a running server instead of serving in-process.")
@@ -905,6 +961,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--json", action="store_true", help="Print the full report as JSON.")
     parser.add_argument("--write", default=None, help="Write the full JSON report to this path.")
+    parser.add_argument(
+        "--compare",
+        default=None,
+        help="Diff this run against a baseline JSON. Code-driven drift fails; slate movement is printed.",
+    )
     args = parser.parse_args(argv)
 
     sports = [s.strip() for s in args.sports.split(",") if s.strip()]
@@ -926,6 +987,18 @@ def main(argv: Sequence[str] | None = None) -> int:
         path = Path(args.write)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    if args.compare:
+        baseline_path = Path(args.compare)
+        if not baseline_path.exists():
+            # A missing baseline is not a clean comparison, and this file's
+            # whole discipline is that absent must not read as fine.
+            print(f"BASELINE NOT FOUND: {baseline_path} -- nothing was compared")
+            return 1
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        cmp_lines, cmp_ok = compare(baseline, report)
+        lines = lines + ["", *cmp_lines]
+        ok = ok and cmp_ok
+
     if args.json:
         print(json.dumps(report, indent=2))
     else:

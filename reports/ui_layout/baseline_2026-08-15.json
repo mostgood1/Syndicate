@@ -1,0 +1,2930 @@
+{
+  "baseUrl": "https://syndicate-an21.onrender.com",
+  "sports": {
+    "mlb": {
+      "route": "/mlb/cards",
+      "desktop": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 15,
+        "stripCards": 15,
+        "cardHeightMin": 914,
+        "cardHeightMax": 1248,
+        "cardHeightSpread": 334,
+        "cardHeightByState": {
+          "Live": {
+            "n": 4,
+            "min": 1056,
+            "max": 1248,
+            "spread": 192
+          },
+          "Preview": {
+            "n": 8,
+            "min": 914,
+            "max": 1217,
+            "spread": 303
+          },
+          "Final": {
+            "n": 3,
+            "min": 1052,
+            "max": 1052,
+            "spread": 0
+          }
+        },
+        "contentUnits": {
+          "min": 37,
+          "max": 57,
+          "spread": 20
+        },
+        "heightModel": {
+          "state": "Preview",
+          "n": 8,
+          "pxPerUnit": 8.6,
+          "chromePx": 736,
+          "residualSpread": 277,
+          "maxAbsResidual": 175,
+          "explainedPx": 138,
+          "groupHeightSpread": 303,
+          "fitRatio": 2.01,
+          "contentIndependent": false,
+          "reliable": false,
+          "worstCard": {
+            "u": 41,
+            "h": 914,
+            "residual": -175
+          }
+        },
+        "heightModelByState": {
+          "Preview": {
+            "n": 8,
+            "pxPerUnit": 8.6,
+            "chromePx": 736,
+            "residualSpread": 277,
+            "maxAbsResidual": 175,
+            "explainedPx": 138,
+            "groupHeightSpread": 303,
+            "fitRatio": 2.01,
+            "contentIndependent": false,
+            "reliable": false,
+            "worstCard": {
+              "u": 41,
+              "h": 914,
+              "residual": -175
+            }
+          }
+        },
+        "statesUnfitted": [
+          "Live",
+          "Final"
+        ],
+        "cardHeightSpreadWithinState": 303,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": {
+            "strip": [
+              "10px/400"
+            ],
+            "other": [
+              "10px/400"
+            ],
+            "card": [
+              "10px/400"
+            ]
+          },
+          ".cards-market-label": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-market-main": {
+            "card": [
+              "12px/400"
+            ]
+          },
+          ".cards-market-sub": {
+            "card": [
+              "10px/400"
+            ]
+          },
+          ".cards-tab": {
+            "card": [
+              "9px/800"
+            ]
+          },
+          ".cards-data-pair span": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-data-pair strong": {
+            "card": [
+              "13px/700"
+            ]
+          }
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": {
+            "count": 695,
+            "values": {
+              "tabular-nums": 695
+            }
+          },
+          ".cards-market-main": {
+            "count": 60,
+            "values": {
+              "tabular-nums": 60
+            }
+          },
+          ".cards-mini-metric strong": {
+            "count": 30,
+            "values": {
+              "tabular-nums": 30
+            }
+          }
+        },
+        "numericSweep": [],
+        "nameBoxes": [],
+        "unstyledLinks": [],
+        "repeatedCopy": [
+          {
+            "text": "Segment closed",
+            "count": 8,
+            "panels": [
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "Odds updated 8/15, 5:21 PM",
+            "count": 6,
+            "panels": [
+              "(head)",
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "Segment decided",
+            "count": 4,
+            "panels": [
+              "overview",
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "No active recommendation",
+            "count": 4,
+            "panels": [
+              "overview",
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "Michael Lorenzen",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "boxscore",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Hitter live lens",
+            "count": 3,
+            "panels": [
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "Drew Gilbert",
+            "count": 3,
+            "panels": [
+              "overview",
+              "boxscore",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Model mean 0",
+            "count": 3,
+            "panels": [
+              "overview",
+              "overview",
+              "overview"
+            ]
+          }
+        ],
+        "emptyRegions": [
+          {
+            "panel": "overview",
+            "emptyCopy": 1,
+            "placeholders": 0,
+            "emptyBars": 0
+          }
+        ],
+        "httpStatus": 200,
+        "cardWaitTimedOut": false,
+        "settledMs": 6000,
+        "renderSettled": true,
+        "touchTargetFailures": [
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          },
+          {
+            "w": 54,
+            "h": 25
+          },
+          {
+            "w": 88,
+            "h": 25
+          },
+          {
+            "w": 59,
+            "h": 25
+          }
+        ],
+        "tabClickThrough": [
+          {
+            "tab": "overview",
+            "activePanels": [
+              "overview"
+            ],
+            "cardHeight": 1131,
+            "ok": true
+          },
+          {
+            "tab": "boxscore",
+            "activePanels": [
+              "boxscore"
+            ],
+            "cardHeight": 1222,
+            "ok": true
+          },
+          {
+            "tab": "props",
+            "activePanels": [
+              "props"
+            ],
+            "cardHeight": 895,
+            "ok": true
+          }
+        ]
+      },
+      "mobile": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 15,
+        "stripCards": 15,
+        "cardHeightMin": 3365,
+        "cardHeightMax": 4777,
+        "cardHeightSpread": 1412,
+        "cardHeightByState": {
+          "Live": {
+            "n": 4,
+            "min": 3898,
+            "max": 4777,
+            "spread": 879
+          },
+          "Preview": {
+            "n": 8,
+            "min": 3365,
+            "max": 4422,
+            "spread": 1057
+          },
+          "Final": {
+            "n": 3,
+            "min": 3660,
+            "max": 3965,
+            "spread": 305
+          }
+        },
+        "contentUnits": {
+          "min": 37,
+          "max": 57,
+          "spread": 20
+        },
+        "heightModel": {
+          "state": "Preview",
+          "n": 8,
+          "pxPerUnit": 64.3,
+          "chromePx": 1008,
+          "residualSpread": 82,
+          "maxAbsResidual": 42,
+          "explainedPx": 1028,
+          "groupHeightSpread": 1057,
+          "fitRatio": 0.08,
+          "contentIndependent": false,
+          "reliable": true,
+          "worstCard": {
+            "u": 53,
+            "h": 4373,
+            "residual": -42
+          }
+        },
+        "heightModelByState": {
+          "Preview": {
+            "n": 8,
+            "pxPerUnit": 64.3,
+            "chromePx": 1008,
+            "residualSpread": 82,
+            "maxAbsResidual": 42,
+            "explainedPx": 1028,
+            "groupHeightSpread": 1057,
+            "fitRatio": 0.08,
+            "contentIndependent": false,
+            "reliable": true,
+            "worstCard": {
+              "u": 53,
+              "h": 4373,
+              "residual": -42
+            }
+          }
+        },
+        "statesUnfitted": [
+          "Live",
+          "Final"
+        ],
+        "cardHeightSpreadWithinState": 1057,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": {
+            "strip": [
+              "11px/400"
+            ],
+            "other": [
+              "11px/400"
+            ],
+            "card": [
+              "11px/400"
+            ]
+          },
+          ".cards-market-label": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-market-main": {
+            "card": [
+              "14px/400"
+            ]
+          },
+          ".cards-market-sub": {
+            "card": [
+              "11px/400"
+            ]
+          },
+          ".cards-tab": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-data-pair span": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-data-pair strong": {
+            "conflated": true,
+            "card": [
+              "13px/700",
+              "15px/700"
+            ]
+          }
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": {
+            "count": 695,
+            "values": {
+              "tabular-nums": 695
+            }
+          },
+          ".cards-market-main": {
+            "count": 60,
+            "values": {
+              "tabular-nums": 60
+            }
+          },
+          ".cards-mini-metric strong": {
+            "count": 30,
+            "values": {
+              "tabular-nums": 30
+            }
+          }
+        },
+        "numericSweep": [],
+        "nameBoxes": [],
+        "unstyledLinks": [],
+        "repeatedCopy": [
+          {
+            "text": "Segment closed",
+            "count": 8,
+            "panels": [
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "Odds updated 8/15, 5:21 PM",
+            "count": 6,
+            "panels": [
+              "(head)",
+              "overview",
+              "overview",
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "Segment decided",
+            "count": 4,
+            "panels": [
+              "overview",
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "No active recommendation",
+            "count": 4,
+            "panels": [
+              "overview",
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "Michael Lorenzen",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "boxscore",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Hitter live lens",
+            "count": 3,
+            "panels": [
+              "overview",
+              "overview",
+              "overview"
+            ]
+          },
+          {
+            "text": "Drew Gilbert",
+            "count": 3,
+            "panels": [
+              "overview",
+              "boxscore",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Model mean 0",
+            "count": 3,
+            "panels": [
+              "overview",
+              "overview",
+              "overview"
+            ]
+          }
+        ],
+        "emptyRegions": [
+          {
+            "panel": "overview",
+            "emptyCopy": 1,
+            "placeholders": 0,
+            "emptyBars": 0
+          }
+        ],
+        "httpStatus": 200,
+        "cardWaitTimedOut": false,
+        "settledMs": 3600,
+        "renderSettled": true,
+        "touchTargetFailures": [
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          }
+        ]
+      }
+    },
+    "nfl": {
+      "route": "/nfl/cards",
+      "desktop": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 16,
+        "stripCards": 16,
+        "cardHeightMin": 856,
+        "cardHeightMax": 870,
+        "cardHeightSpread": 14,
+        "cardHeightByState": {
+          "Week 1": {
+            "n": 16,
+            "min": 856,
+            "max": 870,
+            "spread": 14
+          }
+        },
+        "contentUnits": {
+          "min": 3,
+          "max": 3,
+          "spread": 0
+        },
+        "heightModel": null,
+        "heightModelByState": {},
+        "statesUnfitted": [
+          "Week 1"
+        ],
+        "cardHeightSpreadWithinState": 14,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": {
+            "conflated": true,
+            "strip": [
+              "12px/400"
+            ],
+            "card": [
+              "12px/400",
+              "12px/700"
+            ]
+          },
+          ".cards-market-label": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-market-main": {
+            "card": [
+              "15px/400"
+            ]
+          },
+          ".cards-market-sub": {
+            "card": [
+              "16px/400"
+            ]
+          },
+          ".cards-tab": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-head-team-name": {
+            "strip": [
+              "16px/700"
+            ],
+            "card": [
+              "16px/700"
+            ]
+          },
+          ".cards-data-pair span": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-data-pair strong": {
+            "card": [
+              "15px/700"
+            ]
+          }
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": {
+            "count": 48,
+            "values": {
+              "tabular-nums": 48
+            }
+          },
+          ".cards-market-main": {
+            "count": 64,
+            "values": {
+              "tabular-nums": 64
+            }
+          },
+          ".cards-mini-metric strong": {
+            "count": 96,
+            "values": {
+              "tabular-nums": 96
+            }
+          }
+        },
+        "numericSweep": [],
+        "nameBoxes": [
+          {
+            "text": "New England Patriots",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Seattle Seahawks",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "San Francisco 49ers",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "LA",
+            "surface": "strip",
+            "width": 19,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Chicago Bears",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Carolina Panthers",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Tampa Bay Buccaneers",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Cincinnati Bengals",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          }
+        ],
+        "unstyledLinks": [],
+        "repeatedCopy": [
+          {
+            "text": "Projected spread",
+            "count": 4,
+            "panels": [
+              "(head)",
+              "(head)",
+              "game",
+              "panels"
+            ]
+          },
+          {
+            "text": "Seattle Seahawks by 0.3",
+            "count": 4,
+            "panels": [
+              "(head)",
+              "(head)",
+              "game",
+              "panels"
+            ]
+          },
+          {
+            "text": "Projected total 43.9",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "game",
+              "game"
+            ]
+          },
+          {
+            "text": "Win probability",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "game",
+              "panels"
+            ]
+          },
+          {
+            "text": "New England Patriots",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Seattle Seahawks",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "SmartSim 2.0",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "panels"
+            ]
+          },
+          {
+            "text": "Period odds and game lens",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "game"
+            ]
+          }
+        ],
+        "emptyRegions": [
+          {
+            "panel": "props",
+            "emptyCopy": 1,
+            "placeholders": 0,
+            "emptyBars": 0
+          }
+        ],
+        "httpStatus": 200,
+        "cardWaitTimedOut": false,
+        "settledMs": 800,
+        "renderSettled": true,
+        "touchTargetFailures": [
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          }
+        ],
+        "tabClickThrough": [
+          {
+            "tab": "game",
+            "activePanels": [
+              "game"
+            ],
+            "cardHeight": 856,
+            "ok": true
+          },
+          {
+            "tab": "boxscore",
+            "activePanels": [
+              "boxscore"
+            ],
+            "cardHeight": 581,
+            "ok": true
+          },
+          {
+            "tab": "props",
+            "activePanels": [
+              "props"
+            ],
+            "cardHeight": 450,
+            "ok": true
+          },
+          {
+            "tab": "panels",
+            "activePanels": [
+              "panels"
+            ],
+            "cardHeight": 711,
+            "ok": true
+          }
+        ]
+      },
+      "mobile": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 16,
+        "stripCards": 16,
+        "cardHeightMin": 1785,
+        "cardHeightMax": 1835,
+        "cardHeightSpread": 50,
+        "cardHeightByState": {
+          "Week 1": {
+            "n": 16,
+            "min": 1785,
+            "max": 1835,
+            "spread": 50
+          }
+        },
+        "contentUnits": {
+          "min": 3,
+          "max": 3,
+          "spread": 0
+        },
+        "heightModel": null,
+        "heightModelByState": {},
+        "statesUnfitted": [
+          "Week 1"
+        ],
+        "cardHeightSpreadWithinState": 50,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": {
+            "conflated": true,
+            "strip": [
+              "12px/400"
+            ],
+            "card": [
+              "12px/400",
+              "12px/700"
+            ]
+          },
+          ".cards-market-label": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-market-main": {
+            "card": [
+              "15px/400"
+            ]
+          },
+          ".cards-market-sub": {
+            "card": [
+              "16px/400"
+            ]
+          },
+          ".cards-tab": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-head-team-name": {
+            "strip": [
+              "16px/700"
+            ],
+            "card": [
+              "16px/700"
+            ]
+          },
+          ".cards-data-pair span": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-data-pair strong": {
+            "card": [
+              "15px/700"
+            ]
+          }
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": {
+            "count": 48,
+            "values": {
+              "tabular-nums": 48
+            }
+          },
+          ".cards-market-main": {
+            "count": 64,
+            "values": {
+              "tabular-nums": 64
+            }
+          },
+          ".cards-mini-metric strong": {
+            "count": 96,
+            "values": {
+              "tabular-nums": 96
+            }
+          }
+        },
+        "numericSweep": [],
+        "nameBoxes": [
+          {
+            "text": "New England Patriots",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Seattle Seahawks",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "San Francisco 49ers",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "LA",
+            "surface": "strip",
+            "width": 19,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Chicago Bears",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Carolina Panthers",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Tampa Bay Buccaneers",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Cincinnati Bengals",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          }
+        ],
+        "unstyledLinks": [],
+        "repeatedCopy": [
+          {
+            "text": "Projected spread",
+            "count": 4,
+            "panels": [
+              "(head)",
+              "(head)",
+              "game",
+              "panels"
+            ]
+          },
+          {
+            "text": "Seattle Seahawks by 0.3",
+            "count": 4,
+            "panels": [
+              "(head)",
+              "(head)",
+              "game",
+              "panels"
+            ]
+          },
+          {
+            "text": "Projected total 43.9",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "game",
+              "game"
+            ]
+          },
+          {
+            "text": "Win probability",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "game",
+              "panels"
+            ]
+          },
+          {
+            "text": "New England Patriots",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Seattle Seahawks",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "SmartSim 2.0",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "panels"
+            ]
+          },
+          {
+            "text": "Period odds and game lens",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "game"
+            ]
+          }
+        ],
+        "emptyRegions": [
+          {
+            "panel": "props",
+            "emptyCopy": 1,
+            "placeholders": 0,
+            "emptyBars": 0
+          }
+        ],
+        "httpStatus": 200,
+        "cardWaitTimedOut": false,
+        "settledMs": 800,
+        "renderSettled": true,
+        "touchTargetFailures": []
+      }
+    },
+    "ncaaf": {
+      "route": "/ncaaf/cards",
+      "desktop": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 16,
+        "stripCards": 16,
+        "cardHeightMin": 526,
+        "cardHeightMax": 571,
+        "cardHeightSpread": 45,
+        "cardHeightByState": {
+          "Week 1": {
+            "n": 16,
+            "min": 526,
+            "max": 571,
+            "spread": 45
+          }
+        },
+        "contentUnits": {
+          "min": 16,
+          "max": 16,
+          "spread": 0
+        },
+        "heightModel": null,
+        "heightModelByState": {},
+        "statesUnfitted": [
+          "Week 1"
+        ],
+        "cardHeightSpreadWithinState": 45,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": {
+            "conflated": true,
+            "strip": [
+              "12px/400"
+            ],
+            "card": [
+              "12px/400",
+              "12px/700"
+            ]
+          },
+          ".cards-tab": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-head-team-name": {
+            "strip": [
+              "16px/700"
+            ],
+            "card": [
+              "16px/700"
+            ]
+          },
+          ".cards-data-pair span": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-data-pair strong": {
+            "card": [
+              "15px/700"
+            ]
+          }
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": {
+            "count": 256,
+            "values": {
+              "tabular-nums": 256
+            }
+          },
+          ".cards-market-main": {
+            "count": 0,
+            "values": {}
+          },
+          ".cards-mini-metric strong": {
+            "count": 80,
+            "values": {
+              "tabular-nums": 80
+            }
+          }
+        },
+        "numericSweep": [],
+        "nameBoxes": [
+          {
+            "text": "North Carolina",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "TCU",
+            "surface": "strip",
+            "width": 30,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "San Jos\u00e9 State",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "USC",
+            "surface": "strip",
+            "width": 31,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "NC State",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Virginia",
+            "surface": "strip",
+            "width": 58,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Jacksonville State",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "North Dakota State",
+            "surface": "strip",
+            "width": 64,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          }
+        ],
+        "unstyledLinks": [],
+        "repeatedCopy": [
+          {
+            "text": "SmartSim 2.0",
+            "count": 5,
+            "panels": [
+              "identity",
+              "(head)",
+              "details",
+              "details",
+              "details"
+            ]
+          },
+          {
+            "text": "North Carolina",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "identity",
+              "identity"
+            ]
+          },
+          {
+            "text": "Aviva Stadium",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "identity",
+              "details"
+            ]
+          },
+          {
+            "text": "Sat Aug 29, 11:00 AM CDT",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "identity"
+            ]
+          },
+          {
+            "text": "Projected total",
+            "count": 2,
+            "panels": [
+              "identity",
+              "details"
+            ]
+          },
+          {
+            "text": "Win probability",
+            "count": 2,
+            "panels": [
+              "identity",
+              "details"
+            ]
+          },
+          {
+            "text": "Projected spread",
+            "count": 2,
+            "panels": [
+              "identity",
+              "details"
+            ]
+          },
+          {
+            "text": "Projection source",
+            "count": 2,
+            "panels": [
+              "identity",
+              "details"
+            ]
+          }
+        ],
+        "emptyRegions": [
+          {
+            "panel": "identity",
+            "emptyCopy": 0,
+            "placeholders": 2,
+            "emptyBars": 0
+          },
+          {
+            "panel": "coverage",
+            "emptyCopy": 0,
+            "placeholders": 1,
+            "emptyBars": 0
+          }
+        ],
+        "httpStatus": 200,
+        "cardWaitTimedOut": false,
+        "settledMs": 800,
+        "renderSettled": true,
+        "touchTargetFailures": [
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          },
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 125,
+            "h": 28
+          },
+          {
+            "w": 93,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          }
+        ],
+        "tabClickThrough": [
+          {
+            "tab": "identity",
+            "activePanels": [
+              "identity"
+            ],
+            "cardHeight": 556,
+            "ok": true
+          },
+          {
+            "tab": "context",
+            "activePanels": [
+              "context"
+            ],
+            "cardHeight": 483,
+            "ok": true
+          },
+          {
+            "tab": "coverage",
+            "activePanels": [
+              "coverage"
+            ],
+            "cardHeight": 419,
+            "ok": true
+          },
+          {
+            "tab": "details",
+            "activePanels": [
+              "details"
+            ],
+            "cardHeight": 548,
+            "ok": true
+          }
+        ]
+      },
+      "mobile": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 16,
+        "stripCards": 16,
+        "cardHeightMin": 1345,
+        "cardHeightMax": 1398,
+        "cardHeightSpread": 53,
+        "cardHeightByState": {
+          "Week 1": {
+            "n": 16,
+            "min": 1345,
+            "max": 1398,
+            "spread": 53
+          }
+        },
+        "contentUnits": {
+          "min": 16,
+          "max": 16,
+          "spread": 0
+        },
+        "heightModel": null,
+        "heightModelByState": {},
+        "statesUnfitted": [
+          "Week 1"
+        ],
+        "cardHeightSpreadWithinState": 53,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": {
+            "conflated": true,
+            "strip": [
+              "12px/400"
+            ],
+            "card": [
+              "12px/400",
+              "12px/700"
+            ]
+          },
+          ".cards-tab": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-head-team-name": {
+            "strip": [
+              "16px/700"
+            ],
+            "card": [
+              "16px/700"
+            ]
+          },
+          ".cards-data-pair span": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-data-pair strong": {
+            "card": [
+              "15px/700"
+            ]
+          }
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": {
+            "count": 256,
+            "values": {
+              "tabular-nums": 256
+            }
+          },
+          ".cards-market-main": {
+            "count": 0,
+            "values": {}
+          },
+          ".cards-mini-metric strong": {
+            "count": 80,
+            "values": {
+              "tabular-nums": 80
+            }
+          }
+        },
+        "numericSweep": [],
+        "nameBoxes": [
+          {
+            "text": "North Carolina",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "TCU",
+            "surface": "strip",
+            "width": 30,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "San Jos\u00e9 State",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "USC",
+            "surface": "strip",
+            "width": 31,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "NC State",
+            "surface": "strip",
+            "width": 67,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Virginia",
+            "surface": "strip",
+            "width": 58,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Jacksonville State",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "North Dakota State",
+            "surface": "strip",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          }
+        ],
+        "unstyledLinks": [],
+        "repeatedCopy": [
+          {
+            "text": "SmartSim 2.0",
+            "count": 5,
+            "panels": [
+              "identity",
+              "(head)",
+              "details",
+              "details",
+              "details"
+            ]
+          },
+          {
+            "text": "North Carolina",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "identity",
+              "identity"
+            ]
+          },
+          {
+            "text": "Aviva Stadium",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "identity",
+              "details"
+            ]
+          },
+          {
+            "text": "Sat Aug 29, 11:00 AM CDT",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "identity"
+            ]
+          },
+          {
+            "text": "Projected total",
+            "count": 2,
+            "panels": [
+              "identity",
+              "details"
+            ]
+          },
+          {
+            "text": "Win probability",
+            "count": 2,
+            "panels": [
+              "identity",
+              "details"
+            ]
+          },
+          {
+            "text": "Projected spread",
+            "count": 2,
+            "panels": [
+              "identity",
+              "details"
+            ]
+          },
+          {
+            "text": "Projection source",
+            "count": 2,
+            "panels": [
+              "identity",
+              "details"
+            ]
+          }
+        ],
+        "emptyRegions": [
+          {
+            "panel": "identity",
+            "emptyCopy": 0,
+            "placeholders": 2,
+            "emptyBars": 0
+          },
+          {
+            "panel": "coverage",
+            "emptyCopy": 0,
+            "placeholders": 1,
+            "emptyBars": 0
+          }
+        ],
+        "httpStatus": 200,
+        "cardWaitTimedOut": false,
+        "settledMs": 800,
+        "renderSettled": true,
+        "touchTargetFailures": []
+      }
+    },
+    "soccer": {
+      "route": "/soccer/epl/cards",
+      "desktop": {
+        "scrollWidth": 1440,
+        "clientWidth": 1440,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 1,
+        "stripCards": 1,
+        "cardHeightMin": 1074,
+        "cardHeightMax": 1074,
+        "cardHeightSpread": 0,
+        "cardHeightByState": {
+          "Fri, Aug 21 \u00b7 2:00 PM CT": {
+            "n": 1,
+            "min": 1074,
+            "max": 1074,
+            "spread": 0
+          }
+        },
+        "contentUnits": {
+          "min": 9,
+          "max": 9,
+          "spread": 0
+        },
+        "heightModel": null,
+        "heightModelByState": {},
+        "statesUnfitted": [
+          "Fri, Aug 21 \u00b7 2:00 PM CT"
+        ],
+        "cardHeightSpreadWithinState": 0,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": {
+            "conflated": true,
+            "strip": [
+              "12px/400"
+            ],
+            "card": [
+              "12px/400",
+              "12px/700"
+            ]
+          },
+          ".cards-market-label": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-market-main": {
+            "card": [
+              "15px/400"
+            ]
+          },
+          ".cards-market-sub": {
+            "card": [
+              "16px/400"
+            ]
+          },
+          ".cards-tab": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-head-team-name": {
+            "conflated": true,
+            "strip": [
+              "13px/700"
+            ],
+            "card": [
+              "16px/700"
+            ]
+          },
+          ".cards-data-pair span": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-data-pair strong": {
+            "card": [
+              "15px/700"
+            ]
+          }
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": {
+            "count": 9,
+            "values": {
+              "tabular-nums": 9
+            }
+          },
+          ".cards-market-main": {
+            "count": 4,
+            "values": {
+              "tabular-nums": 4
+            }
+          },
+          ".cards-mini-metric strong": {
+            "count": 3,
+            "values": {
+              "tabular-nums": 3
+            }
+          }
+        },
+        "numericSweep": [],
+        "nameBoxes": [
+          {
+            "text": "Coventry City",
+            "surface": "strip",
+            "width": 87,
+            "fontSize": "13px",
+            "wrap": "normal"
+          },
+          {
+            "text": "Arsenal",
+            "surface": "strip",
+            "width": 47,
+            "fontSize": "13px",
+            "wrap": "normal"
+          },
+          {
+            "text": "Coventry City",
+            "surface": "card",
+            "width": 135,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Arsenal",
+            "surface": "card",
+            "width": 78,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          }
+        ],
+        "unstyledLinks": [],
+        "repeatedCopy": [
+          {
+            "text": "Arsenal \u00b7 F M S",
+            "count": 4,
+            "panels": [
+              "boxscore",
+              "boxscore",
+              "boxscore",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Projected total 1.5",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "game",
+              "game"
+            ]
+          },
+          {
+            "text": "Coventry City",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Projected Coventry City 0.9 @ Arsenal 2.4 (total 3.3). Win prob: Arsen",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "panels"
+            ]
+          },
+          {
+            "text": "Period odds and game lens",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "game"
+            ]
+          },
+          {
+            "text": "Projected total 1.8",
+            "count": 2,
+            "panels": [
+              "game",
+              "game"
+            ]
+          },
+          {
+            "text": "Projected total 3.3",
+            "count": 2,
+            "panels": [
+              "game",
+              "game"
+            ]
+          },
+          {
+            "text": "Projected score",
+            "count": 2,
+            "panels": [
+              "game",
+              "panels"
+            ]
+          }
+        ],
+        "emptyRegions": [
+          {
+            "panel": "game",
+            "emptyCopy": 2,
+            "placeholders": 6,
+            "emptyBars": 0
+          }
+        ],
+        "httpStatus": 200,
+        "cardWaitTimedOut": false,
+        "settledMs": 800,
+        "renderSettled": true,
+        "touchTargetFailures": [
+          {
+            "w": 60,
+            "h": 28
+          },
+          {
+            "w": 98,
+            "h": 28
+          },
+          {
+            "w": 66,
+            "h": 28
+          },
+          {
+            "w": 78,
+            "h": 28
+          }
+        ],
+        "tabClickThrough": [
+          {
+            "tab": "game",
+            "activePanels": [
+              "game"
+            ],
+            "cardHeight": 1074,
+            "ok": true
+          },
+          {
+            "tab": "boxscore",
+            "activePanels": [
+              "boxscore"
+            ],
+            "cardHeight": 768,
+            "ok": true
+          },
+          {
+            "tab": "props",
+            "activePanels": [
+              "props"
+            ],
+            "cardHeight": 664,
+            "ok": true
+          },
+          {
+            "tab": "panels",
+            "activePanels": [
+              "panels"
+            ],
+            "cardHeight": 1086,
+            "ok": true
+          }
+        ]
+      },
+      "mobile": {
+        "scrollWidth": 390,
+        "clientWidth": 390,
+        "overflowPx": 0,
+        "boxSizing": "border-box",
+        "cards": 1,
+        "stripCards": 1,
+        "cardHeightMin": 2377,
+        "cardHeightMax": 2377,
+        "cardHeightSpread": 0,
+        "cardHeightByState": {
+          "Fri, Aug 21 \u00b7 2:00 PM CT": {
+            "n": 1,
+            "min": 2377,
+            "max": 2377,
+            "spread": 0
+          }
+        },
+        "contentUnits": {
+          "min": 9,
+          "max": 9,
+          "spread": 0
+        },
+        "heightModel": null,
+        "heightModelByState": {},
+        "statesUnfitted": [
+          "Fri, Aug 21 \u00b7 2:00 PM CT"
+        ],
+        "cardHeightSpreadWithinState": 0,
+        "tabsWithoutPanel": [],
+        "panelsWithoutTab": [],
+        "typeScale": {
+          ".cards-mini-copy": {
+            "conflated": true,
+            "strip": [
+              "12px/400"
+            ],
+            "card": [
+              "12px/400",
+              "12px/700"
+            ]
+          },
+          ".cards-market-label": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-market-main": {
+            "card": [
+              "15px/400"
+            ]
+          },
+          ".cards-market-sub": {
+            "card": [
+              "16px/400"
+            ]
+          },
+          ".cards-tab": {
+            "card": [
+              "10px/800"
+            ]
+          },
+          ".cards-head-team-name": {
+            "conflated": true,
+            "strip": [
+              "13px/700"
+            ],
+            "card": [
+              "16px/700"
+            ]
+          },
+          ".cards-data-pair span": {
+            "card": [
+              "10px/700"
+            ]
+          },
+          ".cards-data-pair strong": {
+            "card": [
+              "15px/700"
+            ]
+          }
+        },
+        "tabularFigures": {
+          ".cards-data-pair strong": {
+            "count": 9,
+            "values": {
+              "tabular-nums": 9
+            }
+          },
+          ".cards-market-main": {
+            "count": 4,
+            "values": {
+              "tabular-nums": 4
+            }
+          },
+          ".cards-mini-metric strong": {
+            "count": 3,
+            "values": {
+              "tabular-nums": 3
+            }
+          }
+        },
+        "numericSweep": [],
+        "nameBoxes": [
+          {
+            "text": "Coventry City",
+            "surface": "strip",
+            "width": 87,
+            "fontSize": "13px",
+            "wrap": "normal"
+          },
+          {
+            "text": "Arsenal",
+            "surface": "strip",
+            "width": 47,
+            "fontSize": "13px",
+            "wrap": "normal"
+          },
+          {
+            "text": "Coventry City",
+            "surface": "card",
+            "width": 90,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          },
+          {
+            "text": "Arsenal",
+            "surface": "card",
+            "width": 78,
+            "fontSize": "16px",
+            "wrap": "break-word"
+          }
+        ],
+        "unstyledLinks": [],
+        "repeatedCopy": [
+          {
+            "text": "Arsenal \u00b7 F M S",
+            "count": 4,
+            "panels": [
+              "boxscore",
+              "boxscore",
+              "boxscore",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Projected total 1.5",
+            "count": 3,
+            "panels": [
+              "(head)",
+              "game",
+              "game"
+            ]
+          },
+          {
+            "text": "Coventry City",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "boxscore"
+            ]
+          },
+          {
+            "text": "Projected Coventry City 0.9 @ Arsenal 2.4 (total 3.3). Win prob: Arsen",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "panels"
+            ]
+          },
+          {
+            "text": "Period odds and game lens",
+            "count": 2,
+            "panels": [
+              "(head)",
+              "game"
+            ]
+          },
+          {
+            "text": "Projected total 1.8",
+            "count": 2,
+            "panels": [
+              "game",
+              "game"
+            ]
+          },
+          {
+            "text": "Projected total 3.3",
+            "count": 2,
+            "panels": [
+              "game",
+              "game"
+            ]
+          },
+          {
+            "text": "Projected score",
+            "count": 2,
+            "panels": [
+              "game",
+              "panels"
+            ]
+          }
+        ],
+        "emptyRegions": [
+          {
+            "panel": "game",
+            "emptyCopy": 2,
+            "placeholders": 6,
+            "emptyBars": 0
+          }
+        ],
+        "httpStatus": 200,
+        "cardWaitTimedOut": false,
+        "settledMs": 800,
+        "renderSettled": true,
+        "touchTargetFailures": []
+      }
+    }
+  },
+  "outOfSeason": [
+    "nba",
+    "ncaab",
+    "nhl"
+  ],
+  "ok": true
+}

@@ -280,6 +280,55 @@ def test_the_residual_budget_is_not_wide_enough_to_hide_an_extra_block():
     assert probe.LAYOUT_RESIDUAL_BUDGET_PX < 300
 
 
+def _compare(base, cur):
+    lines, ok = probe.compare(base, cur)
+    return "\n".join(lines), ok
+
+
+def test_slate_movement_alone_does_not_fail_a_comparison():
+    """Card-height spread read 796/1716/1583/1125px in one evening, no deploy."""
+    base = _report(cardHeightSpread=796, cards=15)
+    cur = _report(cardHeightSpread=1716, cards=12)
+    text, ok = _compare(base, cur)
+    assert ok, text
+    assert "slate moved" in text
+    assert "cardHeightSpread 796 -> 1716" in text
+    assert "stable metrics unchanged" in text
+
+
+def test_code_driven_drift_fails_the_comparison():
+    """Overflow is a property of the CSS. An evening of games cannot move it."""
+    base = _report(overflowPx=0)
+    cur = _report(overflowPx=28)
+    text, ok = _compare(base, cur)
+    assert not ok
+    assert "CODE-DRIVEN DRIFT" in text
+    assert "overflowPx 0 -> 28" in text
+
+
+def test_tab_wiring_drift_is_code_driven_too():
+    base = _report(panelsWithoutTab=[])
+    cur = _report(panelsWithoutTab=["coverage", "identity"])
+    text, ok = _compare(base, cur)
+    assert not ok
+    assert "panelsWithoutTab 0 -> 2" in text
+
+
+def test_an_http_error_on_either_side_is_not_a_comparison():
+    base = _report()
+    cur = _report(httpStatus=502, cards=0)
+    text, ok = _compare(base, cur)
+    assert not ok
+    assert "SKIPPED" in text
+
+
+def test_a_sport_absent_from_the_baseline_is_named_not_silently_passed():
+    base = _report(sport="mlb")
+    cur = _report(sport="nfl")
+    text, _ = _compare(base, cur)
+    assert "NEW -- not in baseline" in text
+
+
 def test_card_wait_constant_is_generous_enough_for_a_js_render():
     """Guards the regression directly: MLB needed >600ms and got 400."""
     assert probe.CARD_WAIT_MS >= 10000
