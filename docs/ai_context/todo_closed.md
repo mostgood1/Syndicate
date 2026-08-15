@@ -2090,3 +2090,39 @@ correctly the whole time. Nothing was listening to it.
 **Operational note promoted to `learnings.md`:** a fallback argument is a
 *request*, not a guarantee — a helper whose every return path is a `str` cannot
 honour a `None` default, and the call site reads as though it does.
+
+## Closed 2026-08-15 — `#438a` player_name, and a preflight that held its own deploy
+
+**Status: fixed and committed `4ae71c4a`, local only. NOT DEPLOYED — held on the
+user's explicit call after preflight measured production.** `#438a` was filed as
+"43 `_safe_text(..., None)` sites"; the two **identity** fields are now done
+(`market_key` in `d348e040`, `player_name` here) and the remaining 41 are
+**deliberately not recommended** — display fields where `""` and `None` are
+identical to every reader.
+
+**The held-back reason was wrong, and reading the commit is what overturned it.**
+The call site's comment records `player_name: null` cards as an already-fixed
+defect. `42902ee6` (`#221`) shows only `+` lines for the key: the field was
+ABSENT from the reconstructed dict, so rows that DID carry a name serialized
+without one. `null` was the symptom of omission, never a chosen value.
+
+### The preflight is the durable part
+
+Asked to "commit and deploy", the gate measured production BEFORE deciding, and
+the measurement inverted the plan. Live `/api/intelligence/query`, 101 rows:
+
+    market_key blank    0/101     these fixes change nothing on prod today
+    player_name blank   0/101
+    line as a number   84/101, 7 whole-numbered   <- the only live defect
+
+**A web-only deploy would have been INERT for the only number that moves.** The
+`line` flattening lives in `UniversalCandidate.to_dict` inside
+`collect_candidates` (worker-owned); the serve-time half is the `market_key`
+fix, which measures 0 rows. The deploy that WOULD work is refresh-worker, which
+resets every session's measurement window — for 7 rows regaining a decimal
+point, with 5 deploys already owing measurements and a peer having deployed that
+service ~1 minute earlier.
+
+**Reusable:** "which service runs the code" and "what does this change on
+production TODAY" are preflight questions, not post-deploy ones. Both were
+answerable by reading, in minutes, before touching anything.

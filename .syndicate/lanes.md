@@ -3324,7 +3324,7 @@ WRONG and is withdrawn.** Against soccer's real 40-min beat, 340.9 min was ~8x
 normal — the alarm's first catch was legitimate. I corrected a true finding into
 a false one using a statistic I had not checked the provenance of.
 
-### player-name-blank-not-absent — OPEN — opened 2026-08-15 — session: red-intelligence-tests
+### player-name-blank-not-absent — CLOSED-VERIFIED 2026-08-15 — shipped `4ae71c4a`; `test_intelligence.py` 218/218; DEPLOY HELD ON THE USER'S CALL — opened 2026-08-15 — session: red-intelligence-tests
 - Goal: `#438a`'s named half. `_build_prop_dashboard_row` stops emitting
   `player_name: ""` for a source that has no player, for the same reason and by
   the same means as `market_key` in `d348e040`. Single testable outcome: a row
@@ -3668,7 +3668,7 @@ NOT CLOSED BY THIS LANE, and the next reader should not think otherwise:
   kill count, peak anon, and eviction churn going 10 -> 0 — strong and
   independent, but not the branch announcing itself.
 
-### height-per-content-unit — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+### height-per-content-unit — CLOSED-VERIFIED 2026-08-15 — built, baselined, and it found that every MLB figure was taken mid-render — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: a card-height metric that is a LAYOUT signal on MLB — one that stays
   flat while content volume changes, and moves when the layout does. Testable:
   on production MLB the metric's spread is small (tens of px) while the raw
@@ -3760,3 +3760,90 @@ NOT CLOSED BY THIS LANE, and the next reader should not think otherwise:
   - **soccer / wnba report `liveMcSources: null`** — the tally is MLB-only.
   - **Drop 3 (the game-line join) is untouched**; `rows_live_edged` stays 0 for
     game lines regardless of this PASS.
+
+#### height-per-content-unit — CLOSED-VERIFIED 2026-08-15
+
+Ships `heightModelByState` (fit `height = chrome + k * units` per game state),
+`fitRatio`/`reliable`, `contentUnits`, and `LAYOUT_RESIDUAL_BUDGET_PX = 150`
+derived from measurement, not guessed. Production, settled:
+
+    mlb mobile  Live n=3  residual  6px    Preview n=10 residual 54px
+    mlb desktop Live n=3  residual 18px    Preview      UNRELIABLE (grid)
+    ncaaf / nfl / soccer  uniform content -> no fit attempted, raw spread IS
+                          their layout signal (45/53, 14/50, 0px)
+
+**Three design decisions, each forced by a measurement that contradicted the
+obvious choice:**
+1. **Not a ratio.** The fit has a 1051px intercept; `height/units` would read a
+   15% "layout difference" that is entirely the constant.
+2. **Per state, not per slate.** One line over 15 cards: residual 668px. The
+   same fit over 10 Preview cards: 52px. Live cards carry content the unit does
+   not count.
+3. **A poor fit reports UNRELIABLE, it does not alarm.** Desktop's grid wraps
+   into columns so height is linear in ROWS, not pairs — 201px residual against
+   261px explained, on the same cards at the same instant as mobile's 54px
+   against ~1000px. Failing on that makes the run permanently red on a healthy
+   board, which is how a guard gets ignored.
+
+**THE FINDING THAT MATTERS MOST IS NOT THE MODEL.** Building it exposed that
+**every MLB figure this probe has produced was taken mid-render.**
+`wait_for_selector` proves a card ATTACHED; MLB keeps filling in for seconds
+after. Total `.cards-data-pair` across 15 cards at 390px: 482 at +0ms, **530 at
++600ms (the probe's old settle)**, 590 at +1200, 683 at +2000, 719 at +3000,
+stable thereafter. **74% of final content.** So today's earlier readings —
+including the ones I used to argue about content vs layout — were all taken on
+a partially-rendered page. `_settle()` now polls a DOM fingerprint until stable
+across two samples, records `settledMs`, and FAILS if it never settles. MLB
+settles at 3.6-4.0s; every other sport at 0.8s.
+
+**Carried forward, NOT fixed:** the desktop unit should be grid ROWS
+(`ceil(pairs / columns)`), which would make the model reliable at 1440 too.
+Not built; the metric honestly reports no signal there instead.
+
+- **FINAL:** shipped, verified, closed. 20 tests. No deploy — dev tooling.
+
+#### player-name-blank-not-absent — CLOSED-VERIFIED 2026-08-15, and the PREFLIGHT is the part worth reading
+- **Shipped `4ae71c4a`.** `tests/test_intelligence.py` **218 passed**;
+  `test_home.py` + `test_intelligence_contracts.py` 140; a 114-test
+  identity/price-join batch. Mutation-pinned in both directions.
+- **The reason I held this back in `#438` was WRONG, and reading the commit is
+  what overturned it.** The call-site comment records `player_name: null` cards
+  as an already-fixed defect, which reads as "do not touch". `42902ee6` (`#221`)
+  shows **only `+` lines** for the key — the field was ABSENT from the
+  reconstructed dict, so rows that DID carry a name serialized without one.
+  `null` was the symptom of omission, never a chosen value. **A warning comment
+  is a pointer to a commit, not a substitute for reading it.**
+
+#### PREFLIGHT RUN 2026-08-15 ~21:5xZ — **DEPLOY HELD**, and the numbers are why
+User asked to "commit and deploy"; preflight measured production first and the
+measurement changed the decision, which was then the user's to make and was made:
+**commit only, hold the deploy.**
+
+**Live served payload, `/api/intelligence/query`, 101 recommendations:**
+
+    market_key blank      0 / 101      <- this fix changes NOTHING on prod today
+    player_name blank     0 / 101      <- same
+    line as a number     84 / 101, of which 7 whole-numbered
+                                       <- the ONLY live defect: renders "2" not "2.0"
+
+- **Web-only would have been INERT for the one number that moves.** The `line`
+  flattening is `UniversalCandidate.to_dict` inside `collect_candidates` —
+  worker-owned — and the served rows come from cached worker state. The
+  serve-time half (`_attach_intelligence_response_aliases`, 5 call sites in the
+  web blueprint) is the `market_key` fix, i.e. the one measuring **0 rows**.
+- **Cost of the deploy that WOULD work:** refresh-worker is stop-then-start and
+  resets EVERY session's measurement window; 5 deploys already owe measurements;
+  another session deployed refresh-worker at **21:45:20Z**, ~1 min before I
+  looked. Sim check was CLEAR (infra processes only) but the rule is two
+  consecutive CLEARs immediately before firing.
+- **Rollback if it is ever fired:** pinned redeploy of `web 4316c907` /
+  `refresh-worker 846bb74e` (re-read both — they moved 3+ times today).
+- **Recommendation standing: let this ride the next worker deploy someone else
+  runs.** 7 rows regaining a decimal point does not justify resetting every
+  live session's measurement window.
+
+#### `#438a` — CLOSED as far as it should go; 41 sites remain and I do NOT recommend them
+Both **identity** fields (`market_key`, `player_name`) are fixed — the two a
+price join depends on. The remaining `_safe_text(..., None)` sites are display
+fields (`confidence`, `edge`, `matchup`, `detail`) where `""` and `None` are
+identical to every reader. Churn without a defect behind it.
