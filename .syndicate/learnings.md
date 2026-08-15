@@ -4,6 +4,109 @@
 > `FORBIDDEN` = never do this again. `EXONERATED` = ruled out, stop
 > re-investigating.
 
+
+<!-- LEARNINGS-INDEX:START -->
+
+## Index — 82 rules `[generated]`
+
+> Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
+> This block is the ONLY part of this file that is rewritten; rule bodies
+> are append-only and are never touched. **FORBIDDEN** = never do this
+> again. **EXONERATED** = ruled out, stop re-investigating.
+
+**FORBIDDEN — 5**
+
+- [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname)
+- [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers the obligation, not the content](#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content)
+- [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session)
+- [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, and I had this rule already](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
+- [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the measuring](#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring)
+
+**EXONERATED — 3**
+
+- [2026-08-12 — EXONERATED: the soccer window is not the egress cause](#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause)
+- [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
+- [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
+
+**Rules and corrections — 74**
+
+- [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
+- [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
+- [2026-08-12 — Parallel sessions on one problem need lane discipline](#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline)
+- [2026-08-13 — A guard can measure a number that moves without the system moving](#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving)
+- [2026-08-13 — A criterion has a DIRECTION, and checking it is free](#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free)
+- [2026-08-13 — A grep excerpt is not the file](#2026-08-13-a-grep-excerpt-is-not-the-file)
+- [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero)
+- [2026-08-13 — A pooled denominator can make a measurement unreadable](#2026-08-13-a-pooled-denominator-can-make-a-measurement-unreadable)
+- [2026-08-13 — `git log --format=%an` is zero evidence in this repo](#2026-08-13-git-log---formatan-is-zero-evidence-in-this-repo)
+- [2026-08-10 — a briefed premise is a hypothesis, not a starting condition](#2026-08-10-a-briefed-premise-is-a-hypothesis-not-a-starting-condition)
+- [2026-08-10 — an instrument's blind spot will be mistaken for a finding](#2026-08-10-an-instruments-blind-spot-will-be-mistaken-for-a-finding)
+- [2026-08-10 — segment on process boundaries before any neighbour-based test](#2026-08-10-segment-on-process-boundaries-before-any-neighbour-based-test)
+- [2026-08-10 — counts are the wrong denominator when the cost is bytes](#2026-08-10-counts-are-the-wrong-denominator-when-the-cost-is-bytes)
+- [2026-08-13 — Presence is not reachability: verify the PATH, not the symbol](#2026-08-13-presence-is-not-reachability-verify-the-path-not-the-symbol)
+- [2026-08-13 — A safety gate answers ITS question, not the one you were asked](#2026-08-13-a-safety-gate-answers-its-question-not-the-one-you-were-asked)
+- [2026-08-13 — "Identical to origin" does not mean "absent from the commit"](#2026-08-13-identical-to-origin-does-not-mean-absent-from-the-commit)
+- [2026-08-13 — "Who reads this env var" is a grep question; "does this service read it" is not](#2026-08-13-who-reads-this-env-var-is-a-grep-question-does-this-service-read-it-is-not)
+- [2026-08-13 — A guard that has never once PASSED is not a guard](#2026-08-13-a-guard-that-has-never-once-passed-is-not-a-guard)
+- [2026-08-13 — A discriminator that is only emitted on FAILURE cannot confirm a fix](#2026-08-13-a-discriminator-that-is-only-emitted-on-failure-cannot-confirm-a-fix)
+- [2026-08-13 — A watcher's headline can contradict its own body](#2026-08-13-a-watchers-headline-can-contradict-its-own-body)
+- [2026-08-13 — A guard's "is this mine" input must not default to the locked state](#2026-08-13-a-guards-is-this-mine-input-must-not-default-to-the-locked-state)
+- [2026-08-13 — A path one toolchain resolves and another cannot makes a guard pass silently](#2026-08-13-a-path-one-toolchain-resolves-and-another-cannot-makes-a-guard-pass-silently)
+- [2026-08-13 — A free-text status field cannot be a predicate; test guards against the ledger, not against synthetics](#2026-08-13-a-free-text-status-field-cannot-be-a-predicate-test-guards-against-the-ledger-not-against-synthetics)
+- [2026-08-13 — A discriminator that only emits on FAILURE cannot confirm success](#2026-08-13-a-discriminator-that-only-emits-on-failure-cannot-confirm-success)
+- [2026-08-13 — A watcher's LABEL must be entailed by its exit CONDITION](#2026-08-13-a-watchers-label-must-be-entailed-by-its-exit-condition)
+- [2026-08-13 — "Pushed to origin" is not "applied to production"](#2026-08-13-pushed-to-origin-is-not-applied-to-production)
+- [2026-08-13 — The enforcement layer cannot protect itself, and a lane is one deletable line](#2026-08-13-the-enforcement-layer-cannot-protect-itself-and-a-lane-is-one-deletable-line)
+- [2026-08-13 — A FAILED READ RENDERS AS A RESULT. Five instances, one session, five different tools](#2026-08-13-a-failed-read-renders-as-a-result-five-instances-one-session-five-different-tools)
+- [2026-08-13 — The stale-read rule failed on its second application, in a form it did not cover](#2026-08-13-the-stale-read-rule-failed-on-its-second-application-in-a-form-it-did-not-cover)
+- [2026-08-13 — A guard has TWO failure directions, and fixing the loud one is where the silent one survives](#2026-08-13-a-guard-has-two-failure-directions-and-fixing-the-loud-one-is-where-the-silent-one-survives)
+- [2026-08-13 — Cite the SHA that will exist on origin, not the one your clone minted](#2026-08-13-cite-the-sha-that-will-exist-on-origin-not-the-one-your-clone-minted)
+- [2026-08-13 — MY OWN DISPLAY TRUNCATION BECAME A FINDING, AND THEN A LANE'S PREMISE](#2026-08-13-my-own-display-truncation-became-a-finding-and-then-a-lanes-premise)
+- [2026-08-13 — A BROKEN GUARD CAN MASK THE REAL PROBLEM. Fixing it is how you find out](#2026-08-13-a-broken-guard-can-mask-the-real-problem-fixing-it-is-how-you-find-out)
+- [2026-08-13 — Symptom relief resets the clock that would have proved the cause](#2026-08-13-symptom-relief-resets-the-clock-that-would-have-proved-the-cause)
+- [2026-08-13 — Check whether the obvious fix was already tried, BEFORE building an instrument](#2026-08-13-check-whether-the-obvious-fix-was-already-tried-before-building-an-instrument)
+- [2026-08-13 — I RETRACTED POINT-SAMPLING, THEN BUILT A HEADLINE ON IT ANYWAY](#2026-08-13-i-retracted-point-sampling-then-built-a-headline-on-it-anyway)
+- [2026-08-13 — A habit that fails silently needs a tool, not more care](#2026-08-13-a-habit-that-fails-silently-needs-a-tool-not-more-care)
+- [2026-08-14 — A TROUGH THAT CLEARS AN EARLIER PEAK IS A RATCHET. That is the test](#2026-08-14-a-trough-that-clears-an-earlier-peak-is-a-ratchet-that-is-the-test)
+- [2026-08-14 — I RE-READ THE DEPLOYED SHA BEFORE EVERY *READ* AND SKIPPED IT BEFORE A *WRITE*](#2026-08-14-i-re-read-the-deployed-sha-before-every-read-and-skipped-it-before-a-write)
+- [2026-08-13 — A "PURE READ" endpoint is a reader you will not find by grepping the attach](#2026-08-13-a-pure-read-endpoint-is-a-reader-you-will-not-find-by-grepping-the-attach)
+- [2026-08-13 — A CONSTANT that reproduces exactly is a data outage, not a weak model](#2026-08-13-a-constant-that-reproduces-exactly-is-a-data-outage-not-a-weak-model)
+- [2026-08-13 — A FIXTURE THAT OMITS A MARKER FILE TESTS A DIFFERENT DIRECTORY, AND SCORES IT AS A DEFECT](#2026-08-13-a-fixture-that-omits-a-marker-file-tests-a-different-directory-and-scores-it-as-a-defect)
+- [2026-08-13 — CLOSING A TICKET IS A SCOPE DECISION, AND WHOLESALE CLOSURE SILENTLY RETIRES THE PART NOBODY WORKED](#2026-08-13-closing-a-ticket-is-a-scope-decision-and-wholesale-closure-silently-retires-the-part-nobody-worked)
+- [2026-08-14 — A PLATEAU IS A STRONGER SIGNAL THAN A PERCENTAGE](#2026-08-14-a-plateau-is-a-stronger-signal-than-a-percentage)
+- [2026-08-14 — I MEASURED A STAGE WITHOUT THE THING THAT DOMINATES IT, AND ALMOST SHIPPED THE FIX](#2026-08-14-i-measured-a-stage-without-the-thing-that-dominates-it-and-almost-shipped-the-fix)
+- [2026-08-14 — A guard's floor is a claim about ONE stage; refusing everything downstream of it is a separate bug](#2026-08-14-a-guards-floor-is-a-claim-about-one-stage-refusing-everything-downstream-of-it-is-a-separate-bug)
+- [2026-08-14 — A CADENCE IS NOT AN OUTAGE, AND I ESCALATED ONE AS THE OTHER](#2026-08-14-a-cadence-is-not-an-outage-and-i-escalated-one-as-the-other)
+- [2026-08-14 — A CONSTANT THAT REPRODUCES EXACTLY FROM AN EMPTY INPUT IS A DATA OUTAGE, NOT A WEAK MODEL](#2026-08-14-a-constant-that-reproduces-exactly-from-an-empty-input-is-a-data-outage-not-a-weak-model)
+- [2026-08-14 — A LANE LEFT OPEN AFTER ITS WORK SHIPS IS AN ACTIVE LOCK, NOT A STALE NOTE](#2026-08-14-a-lane-left-open-after-its-work-ships-is-an-active-lock-not-a-stale-note)
+- [2026-08-14 — `git add <paths>` SCOPES THE INDEX; ONLY A PATHSPEC ON `commit` SCOPES THE COMMIT](#2026-08-14-git-add-paths-scopes-the-index-only-a-pathspec-on-commit-scopes-the-commit)
+- [2026-08-14 — DECOMPOSE BIAS BEFORE PUBLISHING A SKILL VERDICT](#2026-08-14-decompose-bias-before-publishing-a-skill-verdict)
+- [2026-08-14 — A GUARD MUST COUNT THE ROWS THE STATISTIC USES, NOT THE ROWS THE JOIN PRODUCED](#2026-08-14-a-guard-must-count-the-rows-the-statistic-uses-not-the-rows-the-join-produced)
+- [2026-08-14 — THREE wrong root causes in one session, one shape: a single sample of a moving quantity](#2026-08-14-three-wrong-root-causes-in-one-session-one-shape-a-single-sample-of-a-moving-quantity)
+- [2026-08-14 — I CALLED A CORRELATION A PROOF, TWICE IN ONE SESSION](#2026-08-14-i-called-a-correlation-a-proof-twice-in-one-session)
+- [2026-08-14 — A HEALTHY-LOOKING SIBLING MASKED A PLATFORM-WIDE OUTAGE](#2026-08-14-a-healthy-looking-sibling-masked-a-platform-wide-outage)
+- [2026-08-14 — A fallback CHAIN has a rung that fires; find it before costing the fix](#2026-08-14-a-fallback-chain-has-a-rung-that-fires-find-it-before-costing-the-fix)
+- [2026-08-14 — A MANGLED SHELL ARGUMENT NEARLY BECAME "THE LEDGER LOST MY WORK"](#2026-08-14-a-mangled-shell-argument-nearly-became-the-ledger-lost-my-work)
+- [2026-08-14 — A watcher that compares TIMESTAMPS to identify a thing will misidentify it by microseconds](#2026-08-14-a-watcher-that-compares-timestamps-to-identify-a-thing-will-misidentify-it-by-microseconds)
+- [2026-08-14 — I PREDICTED FILE OWNERSHIP INSTEAD OF PROBING IT, TWICE](#2026-08-14-i-predicted-file-ownership-instead-of-probing-it-twice)
+- [2026-08-14 — PINNED DEPLOYS PUT CODE IN PRODUCTION THAT WAS NEVER ON MAIN](#2026-08-14-pinned-deploys-put-code-in-production-that-was-never-on-main)
+- [2026-08-14 — Separating `add` from `commit` is not enough if you chain them with `&&`](#2026-08-14-separating-add-from-commit-is-not-enough-if-you-chain-them-with)
+- [2026-08-14 — A saturated log window proves nothing, and the untouched sibling is the control](#2026-08-14-a-saturated-log-window-proves-nothing-and-the-untouched-sibling-is-the-control)
+- [2026-08-14 — A regex over a hand-written ledger inverts "NOT claimed" into "claimed"](#2026-08-14-a-regex-over-a-hand-written-ledger-inverts-not-claimed-into-claimed)
+- [2026-08-14 — An audit's CAUSAL claim is a hypothesis; its MEASUREMENT is evidence](#2026-08-14-an-audits-causal-claim-is-a-hypothesis-its-measurement-is-evidence)
+- [2026-08-14 — A COUNT can rise because the population grew, not because the property got worse](#2026-08-14-a-count-can-rise-because-the-population-grew-not-because-the-property-got-worse)
+- [2026-08-14 — An audit brief's "known already" inputs are claims, not axioms](#2026-08-14-an-audit-briefs-known-already-inputs-are-claims-not-axioms)
+- [2026-08-14 — the Render logs API returns the NEWEST N in a window; paging forward silently reports a peak over a sliver](#2026-08-14-the-render-logs-api-returns-the-newest-n-in-a-window-paging-forward-silently-reports-a-peak-over-a-sliver)
+- [2026-08-14 — a before/after is void if the change moved work INSIDE the measured span](#2026-08-14-a-beforeafter-is-void-if-the-change-moved-work-inside-the-measured-span)
+- [2026-08-14 — "it cannot fit" from one sample, when the same shape runs fine twice](#2026-08-14-it-cannot-fit-from-one-sample-when-the-same-shape-runs-fine-twice)
+- [2026-08-15 — a threshold is calibrated against a SPAN; changing what the span contains invalidates it without touching the constant](#2026-08-15-a-threshold-is-calibrated-against-a-span-changing-what-the-span-contains-invalidates-it-without-touching-the-constant)
+- [2026-08-15 — the kill is MLB game hydration in pid 39, not the overview pass](#2026-08-15-the-kill-is-mlb-game-hydration-in-pid-39-not-the-overview-pass)
+- [2026-08-15 — Pinned deploys do not merge; they REPLACE, so they have to be stacked](#2026-08-15-pinned-deploys-do-not-merge-they-replace-so-they-have-to-be-stacked)
+- [2026-08-15 — The lane marker is repo-global, so only one session can hold it](#2026-08-15-the-lane-marker-is-repo-global-so-only-one-session-can-hold-it)
+- [2026-08-15 — a fix on `main` is not a fix in production: check the DEPLOYED tree](#2026-08-15-a-fix-on-main-is-not-a-fix-in-production-check-the-deployed-tree)
+
+<!-- LEARNINGS-INDEX:END -->
+
 ---
 
 ### 2026-08-12 — EXONERATED: the soccer window is not the egress cause
@@ -2349,3 +2452,437 @@ working copy. `git grep <token> <live-sha> -- <path>` costs one command. This
 repo has now been bitten in both directions -- changes live in production and
 absent from `main` (2026-08-14 `333af428`), and changes in `main` and absent from
 production (this one).
+
+## 2026-08-15 — RULE: WEB DOES NOT RUN `main`. Parent a deploy on the LIVE SHA.
+
+**The fact.** Web's live commit `a86eb4ed` is **not an ancestor of
+`origin/main`**. It sits on `origin/deploy/null-placeholder`, which diverged
+from main at `b98f5ed7` (08-14 10:18). The deploy branch carries **10 commits
+main does not have**; main carries **199** it does not.
+
+**What that costs if you miss it.** `git diff --stat a86eb4ed <any-main-commit>`
+= 199 commits, 82 files — and `syndicate/features/shared/clv_join.py` (542
+lines) and `clv_opening_ledger.py` (326) appear as **pure deletions**, because
+they exist only on the deploy branch. Deploying "the latest main" to web would
+have silently reverted another lane's live CLV code plus the board-contract
+probability fix, the ncaaf central-day fix, the ask refusal gate, and M1.
+
+**`render_deploy.py`'s rollback guard does NOT catch this.** That guard asks
+whether the target is a descendant of the live SHA. A main commit is not a
+descendant — but it is not flagged as a *rollback* either; it is simply a
+different branch, which the guard has no opinion about. The guard protects
+against going backwards on one line of history, not against switching lines.
+
+**The M1 corollary — an ancestry check can give a false negative.** M1 is
+`b16eb1f7` on main and `5382943c` on the deploy branch: same change,
+cherry-picked, different SHA. `git merge-base --is-ancestor b16eb1f7 a86eb4ed`
+returns false while the code is demonstrably live. **Test deployment by CONTENT
+(grep the symbol in `git show <live-sha>:<path>`), not by ancestry**, wherever
+cherry-picking between branches is in play.
+
+**How to apply.**
+1. Read the live SHA from the Render API, never from the ledger.
+2. `git merge-base --is-ancestor <live> origin/main` — if false, web is on a
+   deploy branch and main is NOT your base.
+3. Build the deploy commit as a direct child of the LIVE SHA (plumbing:
+   `read-tree <live>` into a temp `GIT_INDEX_FILE`, `update-index` your paths,
+   `commit-tree -p <live>`). This also keeps the shared working tree and index
+   untouched while other sessions are live.
+4. `git diff --stat <live> <target>` must show ONLY your files. That is the
+   scope answer preflight asks for, and it is the check that caught this.
+
+
+### 2026-08-15 — A COUNT OF DEFINITIONS IS NOT A COUNT OF PRODUCERS, and the one it missed was the live bug
+
+- **What we believed.** The board-engine audit's "**42 sites define or convert a
+  probability** — 18 prob↔odds, 9 `implied_probability`, 11 `confidence`, 4
+  `fair_probability`" was the surface. Tier 3a was scoped to differential-test
+  *those*.
+- **What was actually true.** The 42 came from grepping for **definitions**
+  (`^def <name>`). The single confirmed **live** misprice was produced by code
+  that has no definition to grep for: `pipeline/intelligence_state.py:1816`
+  carries the prob→american formula **inline**, inside
+  `_backfill_layer2_board_columns`. It was not in the 42, and it publishes the
+  `fair_price` the board renders. Two other module-level converters are nested
+  **inside function bodies**, so they are invisible to a `^def` sweep as well.
+- **How we found out.** Not by grepping harder. By taking the **user-visible
+  field** (`fair_price`) and asking who writes it — which returned **four**
+  producers where the definition count had three, one unclamped and correct and
+  three clamped.
+- **The second half, and it is the more surprising one.** A duplication count
+  reads like a defect count and is not. **All 26 `american→probability`
+  implementations agree to ten decimal places on every VALID American price.**
+  The odds arithmetic is not wrong anywhere. **100% of the divergence is at the
+  boundary** — `0`, `None`, `""`, a string price, a float price — which is
+  exactly what a missing or malformed quote looks like. Had the pass been costed
+  as "26 copies of one formula, consolidate them", it would have found nothing;
+  the value was entirely in the inputs nobody's caller happens to send.
+- **The rule going forward.**
+  1. **Trace the FIELD, not the definition.** Before trusting any "N sites do X"
+     count, take one user-visible output of X and enumerate its writers. If that
+     number exceeds the grep's, the grep is measuring the wrong population.
+  2. **A duplication count justifies a differential, not a fix.** Run the
+     duplicates over the boundary inputs before costing a consolidation — the
+     bug is where they disagree, and they may agree everywhere that matters.
+  3. **Ownership is settled by named requirements, not by cluster size.**
+     "The biggest cluster wins" is a vote. Fifteen implementations tied
+     behaviourally here; the deciding requirement (refuse a `50.0` percent-scale
+     probability rather than clamp it to a plausible `-4900`) was met by exactly
+     one implementation of its concept.
+- **Cost:** none this time — the pass was scoped to test-and-measure and the
+  inline copy was found before any consolidation was proposed. Had Tier 3a gone
+  straight to "consolidate the 42", the clamp would have survived the cleanup
+  untouched and looked fixed. Related: [[feedback_read_the_field_you_already_have]],
+  [[feedback_presence_is_not_reachability]], [[feedback_rate_not_count]].
+
+### 2026-08-15 — A field nobody reads is the same as the `None` it replaced
+
+**What happened.** Two plan items in one lane — `K5` (surface `routed_sport`)
+and `K6` (put an as-of on every answer) — were implemented as new TOP-LEVEL keys
+on the `/api/syndicate/query` response. Both worked. Both were invisible.
+`scripts/ask_syndicate_regression.py` reads the routed sport from
+`context.sport` / `routing_context.sport`, and the as-of from `visuals.as_of`.
+The served payload had `routed_sport: "soccer"` at the top level while
+`context: {}` sat right beside it, and the harness went on reporting
+`no_sport_resolved_expected_soccer` on 8 cases and `no_as_of_stated` on 40.
+
+**Why it nearly shipped.** The in-process probe passed, the served payload
+showed the value, and the field name matched the plan's wording exactly. Every
+check I ran was a check of MY field. The plan's own sentence contained the
+answer and I read past it: K6 says "`visuals.as_of` only populates when a sport
+branch matches" — that names the location, not just the symptom.
+
+**The rule.** When the task is "expose X so a consumer can see it", the
+acceptance test is the CONSUMER reading it, not the producer emitting it. Find
+the reader first and write to where it already looks. Adding a second, tidier
+location is not a fix; it is a second place for the value to be right while the
+product stays broken.
+
+**How it was caught.** By reading the harness's `_score()` — the thing that
+defines the predicate — rather than by trusting the response I had just built.
+Cost: two extra measurement cycles. Recovered: `no_as_of_stated` 40 -> 3,
+routing failures 15 -> 0, `entity` 0/10 -> 7/10.
+
+Related: `feedback_read_the_field_you_already_have`, and the older rule that a
+deployed fix can be inert.
+
+### 2026-08-15 — A single-slot lock in a five-session worktree blocks the RIGHT work
+
+**What happened.** `.syndicate/.current-lane` is one file that every session
+writes, and `lane-guard.py` blocks an edit when the file is claimed by an OPEN
+lane whose slug != that marker. With five live sessions the marker names
+whoever wrote last, so three consecutive edits were blocked on files THIS
+session's own OPEN lane exclusively claimed. No cross-lane conflict existed in
+any of them — the collision check had already returned 19 claims across 4 lanes
+with zero overlap.
+
+**Why it matters more than the lost minutes.** The guard was firing on marker
+contention rather than on the thing it exists to catch, and the obvious
+workaround — reclaim the marker immediately before each edit — steals it from
+whichever session is mid-edit, so every session degrades the others. A guard
+that blocks correct work is one people route around, and then it protects
+nothing. The file's own docstring admitted the assumption: "lower value while
+running a single session".
+
+**The fix, and the shape to copy.** `.current-lane.<session_id>` from the hook
+payload, with the global file still read when no per-session file exists. The
+fallback is what makes it safe: a session that never opts in behaves EXACTLY as
+before, so shared tooling could change under four live sessions without
+coordinating a stop. Verified all three paths before relying on it — global-only
+still blocks, per-session allows own lane, per-session naming a DIFFERENT lane
+still blocks (the guard still does its real job).
+
+**Rule.** Before adding a mutual-exclusion token, ask how many writers exist. If
+more than one, it must be keyed per writer. And when patching shared tooling
+mid-flight, make the new behaviour opt-in via presence of a new file, never via
+a change to the default path.
+
+---
+
+## 2026-08-15 — A CADENCE IS A DISTRIBUTION ACROSS REGIMES, NOT A CONSTANT
+
+**The belief.** "MLB quote capture runs on a metronomic ~121.6-minute beat." It
+sat in `state.md` with a proper measurement behind it (seven captures in 18h,
+read from the artifact rather than the logs — good method), it was carried into
+the program plan as a hard floor on the Tier 5 measurement, and it was the
+premise of a standing freeze on 23 movement implementations, `movement_velocity`
+and the steam detector.
+
+**What was actually true.** The same read, taken over the FULL day instead of a
+daytime window — all 371,567 rows of the shard, bucketed by distinct
+`captured_at` — shows three regimes:
+
+    07:03→15:10  pregame, nothing live   121 / 121 / 123 / 121 min
+    16:20→18:25  first games start        70 / 61 / 64 min
+    18:36→20:54  ramping                  11–12 min
+    21:48→02:53  full live slate          ~1 min, continuous
+
+121.6 is exact **and it is the empty-slate pregame number only**. The same
+pipeline samples 122× faster once games are live, because the 1800s cooldown is
+reached only through `effective_phase == "pregame"` and is bypassed entirely
+while `anyLive` is true.
+
+**Why the original was not a sloppy measurement.** It sampled a real regime
+correctly. The error was in the *quantifier*, not the number: a rate measured in
+one regime was promoted to a property of the system. The window was daytime, and
+the system's behaviour is defined by whether a slate is live — a variable the
+window held constant without anyone choosing to.
+
+**The second-order cost, which was the expensive part.** The wrong constant
+propagated into a plan as a *prerequisite* — "0.1 is a prerequisite for the
+measurement meaning anything" — so a measurement that could have been taken any
+evening was deferred behind a deploy that does not gate it.
+
+**And the freeze it justified was aimed at the wrong thing.** The movement
+family is not computing on a 2-hour signal; it samples at ~1/min. Its real
+constraint is `_ODDS_HISTORY_LIMIT = 20`: 3,130 of 3,582 markets sit exactly at
+the cap, so the retained window is ~18 minutes, and the code's own comment
+already conceded that is "narrower than the steam detector's stated 45-min
+window." A movement calculation is structurally blind to whether the previous
+sweep was 1 minute or 2 hours earlier — the pregame→live transition, the largest
+move of the day, falls out of the buffer within 20 minutes of first pitch.
+
+**Rules.**
+
+1. **Before quoting a rate, name the regime it was measured in and say whether
+   the system has others.** "Sampled every N" is a claim about a distribution.
+   If the driver is a state variable (live/pregame, in-season/out, peak/off-peak),
+   one window that holds it constant measures one regime, not the system.
+2. **When a plan makes fix X a prerequisite for measurement Y, check that X is
+   actually on Y's path before deferring Y.** Here the gate was guarded by a
+   phase condition that was false for the entire measurement window.
+3. **A freeze on a whole family of work is a large claim and deserves its own
+   measurement.** "Nothing in that family should be trusted until the real
+   sampling interval is known" was right to demand a number and wrong about
+   which number. The binding constraint was buffer DEPTH, not sample RATE — and
+   depth was a constant in the source with a comment already admitting the
+   problem.
+
+---
+
+## 2026-08-15 — ANCESTRY OF `origin/main` IS NOT DEPLOYMENT; READ THE DEPLOYED TREE
+
+**The near-miss.** Asked whether the per-sport pregame cooldown had shipped, the
+first check was `git merge-base --is-ancestor ea8fad58 origin/main` → **yes**.
+On a repo where `autoDeploy = no`, that answer means nothing about production,
+and taken alone it would have reported a fix as live that is not.
+
+The commit had also been *rebased* — the plan named `9ec20a06`, which is NOT an
+ancestor of `origin/main`, while its rebased twin `ea8fad58` is. So the two
+obvious checks disagreed with each other, and both were the wrong question.
+
+**What settled it.** Read the file out of each deployed commit and look at the
+signature:
+
+    git show 548ded38:syndicate/features/shared/live_refresh_loop.py \
+      | grep "def _pregame_relaunch_blocked"
+
+→ `def _pregame_relaunch_blocked(*, now_epoch: float, date_str: str) -> bool:`,
+no `sports` kwarg, on **both** worker commits. Not deployed, decisively, on the
+services that matter — independent of branch topology, rebases, cherry-picks and
+force-pushes.
+
+**Rule.** To answer "is this fix running", read the changed SYMBOL out of the
+deployed SHA — `git show <deployed-sha>:<path>` — not the commit's presence in
+any branch. Branch membership answers "is it merged". Those are different
+questions on every service with `autoDeploy` off, and they are different
+questions on every repo where commits get rebased. This is the same family as
+`test the fix's predicate, not its deploy state` — the predicate here is the
+function signature, which is cheap and unambiguous.
+
+## 2026-08-15 — RULE: a "baseline" is a FILE you diffed, not a number you quoted
+
+Two errors in one measurement, both from treating remembered numbers as data.
+
+**1. The baseline file was a different shape than the prose said.** Every lane
+tonight baselines against "post-M1 **23/52**" citing
+`reports/ask_regression/post_m1_fixed_2026_08_14.json`. That file contains
+**10 results and reads `passed: 4`** — a `--classes ranking` run. The 23/52
+exists only in prose. A diff script printed `baseline 4/10 -> now 24/52` and
+that mismatch is the only reason it was caught. **Load the baseline and print
+its `total` before comparing anything to it.**
+
+**2. The causal probe read a field that does not exist.** To attribute a refusal
+regression I read `payload["recommendations"]`, got `0` three times, and
+reported "fully attributed". `build_syndicate_query_response` **does not return
+a `recommendations` key** — the reads were `None`, not zero. Against a real
+same-slate control the regression was **1 case, not 3**. The mechanism was
+right and the magnitude was 3x wrong, stated with more confidence than anything
+in the chain supported.
+
+**How to apply.**
+- Before quoting a baseline, open it and assert its shape (`total`, class list,
+  `base_url`, `generated_at`). A ranking-only run and a full run are not
+  comparable and nothing in the filename says which it is.
+- A control must be measured on the SAME SLATE. This board changes by the
+  minute; a number from four hours ago is a different experiment, not a
+  baseline. The honest control here cost one 8-case run against the rolled-back
+  deploy, and it changed the finding.
+- When a probe returns a suspiciously clean `0` for every case, check the key
+  EXISTS before building an attribution on it. `dict.get` cannot tell absent
+  from zero, and neither can a conclusion drawn from it.
+
+### 2026-08-15 — A PER-CLASS MEASUREMENT OVER A SHARED STYLESHEET IS A PER-SURFACE MEASUREMENT, OR IT IS WRONG
+
+- **What we believed:** soccer renders team names at 13px where NFL renders
+  them at 16px. It was in the audit as a measured defect, and it became plan
+  item **G1**: "raise 13px to match the 16px used elsewhere." Lane E then
+  recorded it as a CONFLICT, because 13px + `nowrap` + ellipsis is the
+  *deliberate* fix it had just documented for club names breaking mid-word in a
+  ~52px box. Two lanes, one flagged contradiction, an explicit instruction to
+  "decide deliberately."
+- **What was actually true:** there was nothing to decide. The two lanes were
+  describing **two different elements that share one class**. Measured on
+  production, all four `.cards-head-team-name` on the page:
+
+      strip  <div>  13px  rgb(237,244,251) = --cards-text  no underline
+      strip  <div>  13px  rgb(237,244,251)                 no underline
+      card   <a>    16px  rgb(0,0,238)                     underline
+
+  The card head had been 16px the whole time. The 13px belongs to
+  `.cards-strip-card--soccer` and is correct. The real defect was a COLOUR one
+  the audit had noted separately and never connected: an anchor with no colour
+  rule, falling through to the user agent's default link blue.
+- **How we found out:** the probe's type table used
+  `document.querySelector(selector)` — the **first** match on the page. Soccer
+  ships a bespoke scoreboard strip and every other sport ships the generic one,
+  so "the first `.cards-head-team-name`" is a *different surface per sport*.
+  The comparison was never between sports; it was between a strip and a card.
+- **The rule going forward:** a shared stylesheet exists precisely so one class
+  renders in more than one place, so **one sample per class is not a
+  measurement of that class** — key the table by surface and report a class
+  whose computed value differs across surfaces as CONFLATED rather than
+  collapsing it to its first hit. `scripts/ui_layout_probe.py` now does this
+  and the whole story is in `docs/reports/ui_audit_2026_08_14/README.md`,
+  because the wrong number outlived the probe that produced it and got written
+  into two plans.
+- **Cost:** one plan item specified backwards, and it would have been shipped
+  as an instruction to undo a correct fix — the "conflict" existed only because
+  both sides were right about different elements. Second retraction from this
+  audit's probes; the first was the synthetic `el.click()` that reported WNBA's
+  working tabs as broken.
+
+### 2026-08-15 — A PROBE THAT PASSES ON AN ERROR PAGE. Attach the liveness check to the SAME fetch
+
+- **What we believed:** `scripts/ui_layout_probe.py` printing a full table of
+  `0px overflow` and exit code **0** meant the pages were clean.
+- **What was actually true:** every route on production was returning **HTTP
+  502** — a 223KB Render error page. It has no cards, so `cards: 0`; it does not
+  overflow, so `overflowPx: 0`. Every single metric read healthy *because* the
+  app was down. The script's own docstring said "0 cards is NOT a pass" and its
+  exit code said pass anyway.
+- **How we found out:** three sports going from 16, 16 and 1 cards to zero
+  simultaneously — a coincidence too large to be data. `curl -w "%{http_code}"`
+  settled it in one call. The probe had the `Response` object in its hand the
+  whole time and never looked at `.status`.
+- **The rule going forward:** an instrument that derives its numbers from a
+  fetched document must assert the FETCH before it reads the document, in the
+  same call — not in a separate health check that can pass at a different
+  instant. And a "not present" count needs a named reason to be allowed: the
+  probe now fails on `>= 400`, and fails on 0 cards unless the sport is in an
+  explicit `OUT_OF_SEASON` set that carries a review date. An exemption with a
+  name is auditable; a tolerated zero is not.
+- **Cost:** one wasted before/after window, and about ten minutes spent
+  believing production had lost every card on the platform. Note the deploy
+  history explained it exactly — the 502s sat inside another session's
+  02:53-03:00 deploy — which is the second time this week that "read the events
+  API, not the symptom" was the shortest path.
+
+### 2026-08-15 — DE-DUPLICATING A FIELD IS NOT DE-DUPLICATING THE OUTPUT. Look at what the fallback renders
+
+- **What we believed:** the card repeated one sentence because the contract
+  stamped `panel.body` onto every item of a panel. Remove that and the
+  repetition goes away.
+- **What was actually true:** the template renders `row.detail or row.heading`.
+  Emptying `detail` handed the fallback the wheel, and `heading` is the panel
+  TITLE — also a constant across the list, and also rendered in the panel's own
+  head. The measured worst-repeat went **6x to 11x**. I made the metric worse
+  with a change I was confident about, and only knew because the metric was
+  being read on every iteration.
+- **How we found out:** the harness number moved the wrong way. Nothing in the
+  code review would have caught it — the diff removes a duplicated string.
+- **The rule going forward:** when you remove a value that was being repeated,
+  render the result before believing it. `a or b` means deleting `a` PROMOTES
+  `b`, and in a list `b` is usually the more constant of the two. The real fix
+  was structural: the section repeating the data had nothing of its own to say,
+  so it was gated out entirely rather than fed a different string.
+- **Cost:** one wrong iteration, caught in minutes because the before/after
+  probe was already wired. Worth stating plainly: the reason this is a cheap
+  lesson and not a shipped regression is that the instrument came first.
+
+### 2026-08-15 — `GIT_INDEX_FILE` PROTECTS YOUR COMMIT AND LEAVES THE SHARED INDEX HOLDING A REVERT OF IT
+
+- **What we believed:** committing through an isolated index is the safe recipe
+  on this tree. It is — for the commit. We treated that as the end of the
+  obligation.
+- **What was actually true:** the isolated index is the only one that learns
+  about your commit. The SHARED index still holds the pre-commit blobs for
+  those paths, and the moment `HEAD` advances past your commit, those stale
+  entries stop being "nothing staged" and become **a staged revert of your own
+  work**. Found at checkpoint, 30 minutes after the deploy:
+
+      git diff --cached --name-only   ->  exactly my 7 files, nothing else
+      git diff --cached --stat        ->  30 insertions, 710 deletions
+                                          (my commit was 710 / 30)
+      git status (worktree)           ->  clean for those paths
+
+  Two of the seven were NEW files, so they were staged as **deletions** while
+  sitting on disk as `??`. Any session running a bare `git commit` would have
+  shipped the removal of a lane that was live in production.
+- **How we found out:** `git status -sb` at checkpoint, which the skill demands
+  before writing anything. It would not have shown up in a file read, a test
+  run, a probe, or the deployed service — all of which were green.
+- **The rule going forward:** the isolated-index recipe has a second half.
+  After committing with `GIT_INDEX_FILE`, run
+  `git reset -- <the same paths>` against the SHARED index so it matches the
+  new `HEAD`. Check `git diff --cached --name-only` first: if other paths are
+  staged, they are someone else's and a path-scoped reset is the only safe
+  form. This is the same family as "`git status` is not `git diff --cached`",
+  but the causal direction is the part that was missing — **we generated the
+  revert ourselves, by following the recipe.**
+- **Cost:** none this time, caught at checkpoint. The exposure window was ~30
+  minutes across a tree with nine live sessions, and the loss would have been
+  silent: the files exist, the tests pass, production is correct, and only the
+  index disagrees.
+
+### 2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Each Bash call is a NEW shell, and an absent index file is an EMPTY one, not an error
+
+- **What we believed:** `export GIT_INDEX_FILE=/c/tmp/idx-lane-$$` is the
+  isolated-index recipe `state.md` mandates for this shared worktree. It looked
+  right, and the staging call it was used in behaved perfectly — `git diff
+  --cached --numstat` showed exactly the 10 intended files.
+- **What was actually true:** `$$` is the shell's PID, and **every Bash tool
+  call is a different shell**. The staging call and the commit call therefore
+  pointed `GIT_INDEX_FILE` at two DIFFERENT paths. The commit's path did not
+  exist — and git treats a missing index file as an **empty index**, silently,
+  with no error. So `git commit` recorded the empty tree:
+  **`37448 files changed, 73368097 deletions(-)`**, deleting the entire
+  repository including `.claude/hooks/`, on `main`.
+- **How we found out:** the commit output was 5.1 MB of `delete mode` lines. It
+  announced itself only because it was catastrophic. **A partial version of this
+  — a stale index holding a subset — would have printed a plausible stat line
+  and been indistinguishable from a correct commit.**
+- **Why it was recoverable:** it was never pushed (`origin/main` was
+  `3a4de87b`), so `git reset --soft HEAD~1` restored the branch pointer without
+  touching the index or the working tree. **`--soft`, never `--hard`:** seven
+  sessions' uncommitted work was in that tree, including one deliberately
+  held-back change. A reflex `--hard` here would have destroyed all of it and
+  would NOT have been recoverable.
+- **The rule going forward:**
+  1. `GIT_INDEX_FILE` must be a **literal, stable path** (`C:/tmp/idx-<lane>`),
+     never interpolated from anything shell-local.
+  2. **Do the whole read-tree → add → verify → commit sequence in ONE Bash
+     call.** Splitting it across calls is what let the two paths diverge.
+  3. **Guard the commit, do not just eyeball it.** Abort on file count and on
+     total deletions before `git commit` runs, in the same shell:
+     `test "$DEL" -le 100 || exit 1`. `git diff --cached --stat` read by a human
+     one call earlier describes a DIFFERENT index than the one about to commit.
+- **Second thing this cost, and it is the more dangerous one:** the same commit
+  would have swept in **A3a (score monotonicity)**, which sits uncommitted in
+  the shared tree's `opportunity_signals.py` and which `state.md` holds back
+  pending a pool-side counter. Staging a file wholesale in this worktree stages
+  whatever seven other sessions have left in it. The fix is to stage a
+  **HEAD-blob plus your own hunk** (`git show HEAD:<path>` → splice → `git
+  hash-object -w` → `git update-index --cacheinfo`) and assert
+  `out.replace(mine, "") == base` so any other drift aborts the build.
+- **Cost:** one bad commit on local `main`, ~10 minutes, no lost work.

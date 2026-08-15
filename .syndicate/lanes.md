@@ -6,7 +6,7 @@
 
 ## OPEN
 
-### probability-clamp-removal — OPEN — WNBA SITE FIXED AND SCORED 5/5; the other TWO sites are held by other OPEN lanes and were NOT taken — opened 2026-08-15 — session: probability-differential
+### probability-clamp-removal — CLOSED-VERIFIED 2026-08-15 — WNBA site fixed, scored 5/5, shipped as `de0c367f`; the other TWO sites are held by other OPEN lanes and were NOT taken — opened 2026-08-15 — session: probability-differential
 - Goal: the `max(0.02, min(0.98, p))` clamp stops producing a price where a
   refusal belongs. **Testable outcome:** `wnba/cards.py::_american_from_prob`
   delegates to `opportunity_signals.american_price`, so it refuses `0.0`, `1.0`
@@ -95,6 +95,33 @@
 - **No deploy.** Nothing here has been shipped to Render; `/preflight` gates that
   and it is the owner's call, not this lane's.
 
+
+
+#### probability-clamp-removal — CLOSE-OUT 2026-08-15 — the 3 sweep failures are PRE-EXISTING, proved on a control
+- **Committed `de0c367f`** — 4 files, pathspec-scoped. **NOT deployed.**
+- **Full `-k wnba` sweep: 561 passed / 3 failed** (366s).
+  `test_wnba_live_lens_worker::test_snapshot_builder_limits_rank_cards_to_fifty`,
+  and two in `test_wnba_refresh_runner` (`..._prefers_existing_refresh_outputs...`,
+  `..._refreshes_live_snapshots_even_when_reusing...`).
+- **They are NOT mine, and that was PROVED rather than argued from topic.** Built
+  a detached control worktree at `854e6172` (clamp still present at
+  `cards.py:848`, i.e. pre-change) and ran the same three node ids: **3 failed,
+  identically.** Live-lens worker + refresh runner, untouched by this lane.
+  Leftover dir `C:/tmp/wt-clampctl` — deregistered from `git worktree`, files
+  locked on delete; disposable scratch.
+- **TWO SHARED-TREE HAZARDS HIT, both worth the next session knowing:**
+  - `fatal: cannot lock ref 'HEAD'` — HEAD moved **between my `git add` and my
+    `git commit`** (854e6172 → 3585be6d). The commit simply failed; nothing was
+    lost. Sessions are committing to this tree within seconds of each other.
+  - **`tests/test_devig_unification.py` is staged as a DELETION in the shared
+    index** — the `model-audit-devig-and-hygiene` lane's own new test, right
+    after their `3585be6d` landed. **Not mine, not consumed:** I committed with
+    a pathspec and re-checked that the deletion survived. Flagged to that
+    session. `git status` alone does not show it; `git diff --cached` does.
+  - Related: the whole-repo `git diff --cached --stat` that briefly looked like
+    a catastrophic index was benign — file counts were HEAD 37448 / index 37449
+    (my one new test), and **staged deletions were 0** at that moment. Count the
+    trees before concluding an index is corrupt.
 
 ### probability-differential-test — CLOSED-VERIFIED 2026-08-15 — harness + table + owners shipped as `d448a100`; ONE live misprice CONFIRMED in production — opened 2026-08-15 — session: probability-differential
 - Goal: program plan Tier 3a. Every PURE American-odds converter in the live
@@ -4963,7 +4990,7 @@ after the single global `.current-lane` blocked three edits to this lane's OWN
 claimed files. Backward compatible — the global file is still read when no
 per-session file exists. See `learnings.md` 2026-08-15.
 
-### model-audit-devig-and-hygiene — OPEN — opened 2026-08-15 — session: model-audit-fork-2
+### model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done, both shipped as `2ac3c6bc` (committed, NOT deployed); D4 HALF DONE, blocked on data — opened 2026-08-15 — session: model-audit-fork-2
 - Goal: audit §7 ranked **#5** (one devig ordering, one central statistic, all
   call sites converted) plus plan **D4** and **D5**. Testable outcomes:
   (a) exactly one function in the board path turns a set of book prices into a
@@ -5388,3 +5415,42 @@ sim. No `render.yaml` change -> no `blueprint_sync`, no env rewrite.
 `deploy/ask-sport-coverage` from `a86eb4ed`, cherry-pick both commits, push;
 (3) deploy that branch; (4) re-run the harness and diff per class against
 `post_m1_fixed_2026_08_14.json`.
+
+- **SHIPPED (committed, NOT deployed) 2026-08-15: `2ac3c6bc`.** 10 files,
+  +1664/-26. `.py` pushes do not deploy (`autoDeploy: no`), so this is on the
+  lineage and live on nothing. **Not pushed yet** — `origin/main` moved to
+  `3a4de87b` while this ran.
+  - **#5 — DONE, as the falsification plus the real collapse.** Both vigged-mean
+    copies now call `opportunity_signals.consensus_vigged_price`.
+  - **D5 — DONE.** `/preflight` prints the deployed commit of all three
+    services; a per-service read failure degrades that row, never the gate.
+    3 new tests.
+  - **D4 — HALF DONE, and the half that is blocked is the number.** The
+    out-of-sample split is written into `scripts/backtest_mlb_props.py` (bias
+    fit on the earlier dates, scored on the later; always attempted, no opt-out
+    flag) and the served note now carries `debias_validation: in_sample`.
+    **BLOCKED ON DATA, measured not assumed:** the backtest window
+    2026-08-01..2026-08-14 is entirely absent from the checkout — 864
+    `daily_summary_*.json` files on disk, all 2026-05-28..07-xx, **zero in
+    August**. Per CLAUDE.md this needs production artifacts (`ADMIN_TOKEN` +
+    `/api/ops/...`), not the mirror. **Until it is run, every published MLB prop
+    skill number is still the in-sample one.**
+- **A3a WAS ALMOST SHIPPED BY ACCIDENT and was excluded deliberately.** It sits
+  uncommitted in the shared tree's `opportunity_signals.py`; staging that file
+  wholesale would have put a held-back change on main's lineage. Staged as
+  HEAD-blob + one function instead, asserted byte-exact. See `learnings.md`
+  2026-08-15 FORBIDDEN (`GIT_INDEX_FILE` / `$$`).
+- **Test state:** 173 green across the touched suites (devig 9, preflight 12,
+  calibration 21, book_grid/odds/opportunity 94, skill consumers 51). The **9
+  `test_layer2_board.py` failures are PRE-EXISTING** — reproduced identically on
+  a pristine HEAD worktree carrying none of this lane's changes, so they are the
+  stale-fixture problem `recommendation-lane-correctness` already recorded, not
+  a regression here.
+- **NOT DONE, and why:**
+  - **Lane B (CLV) — not advanced.** Its writer `pipeline/intelligence_state.py`
+    is claimed by FOUR OPEN lanes and the `#435` session has asked that the
+    board-build loop be left alone. This needs a cross-session decision, not
+    code. **The first real CLV number remains ~24h out; `avg_clv_pct` is None
+    and that is the honest answer.**
+  - Audit #2 (grading), #8, #9, #10 — untouched.
+  - The `power` devig adopt-or-record-why-not item under B3 — untouched.
