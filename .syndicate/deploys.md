@@ -3227,3 +3227,54 @@ web `f475c775` (Drops 1+2), live-odds-worker `ccd10349` (**neither**).
 
 **PASS after live-odds-worker gets `191a001b`:** live rows flip to
 `source: live_mc`. Nothing else changes meaning.
+
+### 2026-08-15 21:18:38Z — web `bb23c8f9` (pinned `e831263e` + `6e9e6107`) — SOCCER'S MARKET LINE AND EDGE ARE ON THE CARD
+
+Deploy `dep-da0dc9k9v7es7394gbg0`. Pinned on web's own live commit; waited out
+an in-flight deploy (`e831263e`) rather than racing it, and re-read the live
+SHA between building the tree and POSTing. Neither worker touched.
+
+**Every predicted value confirmed on the SERVED card, not inferred:**
+
+    /soccer/epl/api/cards      before          after
+      shared_lens_rows              0              1
+      shared_total_rows             0              1
+      market                        —   ATS ARS -1.5 | Total 2.5
+      best_edge                     —   ATS +0.2 | Total +0.7
+      subtitle                    EPL   Projected total 3.2
+
+    rendered card, http 200
+      .cards-data-pair              0              3
+      .cards-live-lens-card         0              1
+      .cards-run-dist-bar           0              1
+      .cards-empty-copy             0              0   (no empty state reappeared)
+      pairs: "Home win 77.3%" / "Market ATS ARS -1.5 | Total 2.5"
+             / "Best edge ATS +0.2 | Total +0.7"
+
+**Blast radius measured on all four sports, both directions.** The branch fires
+only when `sim.periods` is empty:
+
+    nfl     0/16 games reach it      — unreachable
+    ncaaf  16/16 reach it, 0/16 rows changed
+    mlb    15/15 reach it, 0/15 rows changed
+    soccer  1/1  reach it,  1/1  changed
+
+MLB and NCAAF are inert because those games carry no `betting` spread/total in
+the shape the branch reads, so every new path falls through to the old lookup.
+**I had verified NFL and NCAAF before deploying and NOT MLB — that gap was
+closed after the fact, by running the live MLB payload through both versions of
+the file loaded straight from git.** It should have been closed first.
+
+**NOT attributable to this deploy, stated so nobody inherits it as a
+regression:** MLB card-height spread moved 56 -> 197px desktop and 112 ->
+1887px mobile between the 19:0xZ and 21:2xZ reads. The contract rows are
+byte-identical across the change (0/15), and the MLB slate moves through the
+evening. `.cards-empty-copy` on MLB also went 8 slots/3 panels -> 1 slot/1
+panel in the same window. Same cause, same non-attribution.
+
+**Probe, all four sports, both widths: OK.** 0px overflow everywhere; ncaaf
+(45/53px spread, 5x repeat, 3 slots) and nfl (14/50px, 4x, 1 slot) identical to
+their pre-deploy readings — the controls hold. Soccer no longer reports
+`numeric class not found: data-pair strong`, because the class is back.
+
+Rollback if needed: redeploy pinned to `e831263e`.

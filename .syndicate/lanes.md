@@ -2555,7 +2555,7 @@ recommendations are expected. Their file, their call; told them.
 
 - **FINAL:** shipped, verified, closed. 12 tests in `tests/test_ui_layout_probe.py`.
 
-### soccer-fallback-row-market — CLOSED 2026-08-15 — fix VERIFIED against the live payload; PRODUCTION RE-MEASURE OWED (needs a web deploy) — opened 2026-08-15 — session: ui-plan-lane-gh
+### soccer-fallback-row-market — CLOSED-VERIFIED 2026-08-15 — deployed as web `bb23c8f9`, every value read off the SERVED card — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the soccer card shows its market line and its edge, which it currently
   shows NOWHERE. Testable, on the served `/soccer/epl/api/cards`: the Full Game
   row carries a real `market` and `best_edge` (not `—`), and the rendered card
@@ -2688,3 +2688,30 @@ board-UI / probe suites, `tests.test_archives` 383 pass.
 pairs; the numbers above are the payload driven through the new code, not a
 served reading. **Owed: a web deploy pinned on the live SHA, then
 `.cards-data-pair` and the two strings read off the served card.**
+
+#### soccer-fallback-row-market — CLOSED-VERIFIED 2026-08-15 — deployed and measured
+
+`bb23c8f9` = web's live `e831263e` + `6e9e6107`, deploy
+`dep-da0dc9k9v7es7394gbg0`, live 21:18:38Z. The production re-measure this lane
+owed is DONE and every number came off the served card:
+
+    .cards-data-pair   0 -> 3     lens cards 0 -> 1     totals bar 0 -> 1
+    market      —  ->  ATS ARS -1.5 | Total 2.5
+    best_edge   —  ->  ATS +0.2 | Total +0.7
+
+Controls held: ncaaf and nfl identical on every probe axis, 0px overflow
+platform-wide, no empty state reappeared on soccer.
+
+**A gap in my own method, closed after the fact rather than before.** I stated
+"NFL unreachable, NCAAF inert" as the blast radius and never checked MLB —
+which turns out to reach the branch on 15/15 games. It is inert there too
+(0/15 rows changed, measured by loading both versions of the file from git and
+driving the live payload through each), so the claim survives. But the check
+was retrospective, and had it gone the other way the fix would already have
+been in production. **Enumerate every sport that reaches a changed branch
+BEFORE deploying, not the two that came to mind.**
+
+Full row, including the MLB card-height movement that is NOT attributable to
+this deploy, in `deploys.md`.
+
+- **FINAL:** shipped, measured, closed.
