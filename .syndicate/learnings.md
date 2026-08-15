@@ -7,7 +7,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 140 rules `[generated]`
+## Index — 143 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -36,7 +36,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 124**
+**Rules and corrections — 127**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -162,6 +162,9 @@
 - [2026-08-15 — THE CONFIDENCE INTERVAL BELONGS TO THE ESTIMATE, NOT TO THE THRESHOLD. My own test asserted otherwise and failed](#2026-08-15-the-confidence-interval-belongs-to-the-estimate-not-to-the-threshold-my-own-test-asserted-otherwise-and-failed)
 - [2026-08-15 — ACQUIRING THE DEPLOY CLAIM BLINDS THE DEPLOY GATE. The safety mechanism disabled the safety check](#2026-08-15-acquiring-the-deploy-claim-blinds-the-deploy-gate-the-safety-mechanism-disabled-the-safety-check)
 - [2026-08-15 — ANCESTRY CANNOT TELL YOU YOUR WORK IS PUBLISHED, AND A BROKEN GREP LOOKS EXACTLY LIKE A DELETION](#2026-08-15-ancestry-cannot-tell-you-your-work-is-published-and-a-broken-grep-looks-exactly-like-a-deletion)
+- [2026-08-15 — a cgroup number minus a per-process number is not a difference, it is a category error](#2026-08-15-a-cgroup-number-minus-a-per-process-number-is-not-a-difference-it-is-a-category-error)
+- [2026-08-15 — A DEPLOY CLAIM IS ADVISORY. It binds participants, not the fleet.](#2026-08-15-a-deploy-claim-is-advisory-it-binds-participants-not-the-fleet)
+- [2026-08-15 — NEVER PIPE A COMMAND WHOSE EXIT CODE YOU DEPEND ON](#2026-08-15-never-pipe-a-command-whose-exit-code-you-depend-on)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -2831,3 +2834,162 @@ including ones I had just written and could see on disk.
 - **Cost:** one wrong headline figure that stood for about an hour and set the
   next target. Caught before any code was written against it, and caught by a
   guard written into the instrument rather than by review.
+
+## 2026-08-15 — FORBIDDEN: never treat "the code is deployed" as "the artifact is fixed", for any producer
+
+Both worker fixes went live at 23:16:39Z / 23:17:42Z with zero tracebacks after
+the boundary (3 before, 0 after). Nothing on disk changed. `layer2_board` and
+`odds_refresh_tracking` are artifact PRODUCERS: the last `LAYER2_SHORTLIST` ran
+at 23:12:20Z, four minutes BEFORE the deploy, so every row a consumer could read
+was still old-code output. A verification run in that window would have reported
+the old numbers and been read as "the fix did not work" — or, worse, a
+`no-change` result would have been banked as a measurement.
+
+**The rule:** for a producer, the deploy is the START of the wait, not the end.
+Verify against an artifact whose BUILD began after the deploy went live, and
+prove that by its own timestamp (`written_at`/`generated_at`), not by the clock
+on your request.
+
+**Corollary that bit the same session twice:** "no errors in the logs" is not
+evidence a fix works. It is evidence nothing crashed. Those are different
+claims, and only one of them was measured here.
+
+## 2026-08-15 — CORRECTION: a chain of three wrong attributions on one number, and what actually ended it
+
+The `-29.90` CLV row was attributed, in order:
+1. "an in-play price" — WRONG; the write site deliberately records the previous
+   tick's price.
+2. "the odds-history feed transposed its labels" — WRONG; each history point is
+   internally consistent (`home_line = -away_line`).
+3. "books disagree, so `book_prices` mixes signs" — WRONG; 525/525 cells agreed
+   with each other.
+4. **RIGHT:** the grid ROW's `line` is the away handicap, and home candidates
+   inherited it — `cell.home.line == -row["line"]` on 525 of 525.
+
+Each of 1-3 was plausible, cited real code or a real prior incident, and was
+stated with more confidence than the evidence carried. What ended it was not
+more reasoning but a **labelling-independent invariant**: for one team, `-1.5`
+is strictly harder than `+1.5`, so `implied(-1.5) < implied(+1.5)` must hold
+whatever anyone's naming convention is.
+
+**How to apply:** when two sources disagree about a label, stop comparing labels.
+Find the physical constraint the data must satisfy regardless of naming — a
+no-arbitrage relation, a conservation law, a sum-to-one — and test that. And
+**note that an aggregate can hide it**: these errors arrived as a mirror pair
+(`+30.428` / `-29.900`) that nearly cancelled, leaving a mean of `+0.515` on a
+median of exactly `0.000`. A median of exactly zero on a noisy quantity is a
+tell, not a comfort.
+
+## 2026-08-15 — FORBIDDEN: never verify a fix by measuring the INPUT it was never meant to change
+
+Armed a watcher to confirm the `layer2_board` line fix in production. Its
+predicate compared `row["line"]` against `cell.home.line` on
+`/api/board/book-grid` and would PASS only when they stopped being opposite.
+
+**That could never happen, and not because the fix failed.** The grid row's
+`line` IS the away handicap and the cells carry their own — that opposition is
+the INPUT SHAPE, correct and untouched by the fix. The fix changes what the
+SHORTLIST CANDIDATE records. The watcher was pointed at the wrong artifact
+entirely, and would have reported `opposite=573 / FAIL` forever.
+
+**Why it is worth a rule and not just a correction:** the failure is
+self-confirming in the dangerous direction. A never-passing check produces
+exactly the output a genuinely broken fix produces, so the natural next move is
+to go debug working code — or to roll back a correct change. The `-29.90` chain
+in the entry above cost three wrong attributions; this would have added a
+fourth, against my own fix.
+
+**How to apply:**
+- Before arming any verification, state which artifact the change WRITES, and
+  measure that one. "Related endpoint that shows the same concept" is not it.
+- Ask the falsification question about the CHECK, not just the fix: *what
+  reading would this produce if the fix worked perfectly?* If the answer is the
+  same as the failure reading, the check is broken.
+- Gate on the artifact's own `written_at` against the deploy time, so "not
+  rebuilt yet" and "rebuilt and wrong" can never be confused. The first version
+  conflated them too.
+
+**This is the same rule as "gate on the output, not the input" (2026-08-xx),
+arrived at from the opposite direction — there the guard encoded an assumption
+about HOW something fails; here the check measured something the fix does not
+touch. Both produce a signal that cannot move.**
+
+### 2026-08-15 — A DEPLOY CLAIM IS ADVISORY. It binds participants, not the fleet.
+
+- What we believed: a claim file checked by `/preflight` would serialise deploys.
+- What was actually true: both outcomes happened within one hour on the same
+  service. It WORKED once -- `live-game-line-projection` held refresh-worker, an
+  acquire was refused, and no collision occurred, the first time all evening two
+  sessions wanted one service and neither clobbered the other. It was IGNORED
+  once -- a peer fired `129395cc` over a held claim at 23:09:54, because the
+  claim only binds a session that has PULLED the tool and RUNS
+  `/preflight --holder` before deploying.
+- How we found out: held the claim, watched a peer deploy appear anyway, and
+  aborted rather than firing into their build.
+- The rule going forward: **treat the claim as a courtesy that makes collisions
+  VISIBLE, never as a lock that makes them impossible.** Concretely: still cut
+  from the service's CURRENT live SHA, still re-verify by content after landing,
+  and never fire into an in-flight deploy even when you hold the claim -- holding
+  a token is not a licence to cancel a peer's build. The durable fix remains one
+  deployer per service; the claim only shortens the argument about who that is.
+- Cost: none this time, because the abort was correct. The value was real: the
+  same mechanism stopped ME taking a service while a peer was mid-measurement.
+
+### 2026-08-15 — NEVER PIPE A COMMAND WHOSE EXIT CODE YOU DEPEND ON
+
+- What we believed: `git cherry-pick X 2>&1 | tail -1 && next-step` is a tidy way
+  to keep output short in a chained command.
+- What was actually true: a pipeline's exit status is the LAST stage's, so
+  `tail` returning 0 made a FAILED cherry-pick read as success and the `&&`
+  chain continued. Compounded by `git worktree add` failing in the same command,
+  which made `cd` fail silently, so every later step ran **in the shared repo
+  working tree on local `main`** -- whose HEAD was another session's commit. The
+  result was a branch pushed under my name containing THEIR commit, and a test
+  run that measured their tree while reporting my change was green.
+- How we found out: the pushed tip did not match the expected diff -- 54 files
+  instead of 2 -- so the content, not the exit codes, exposed it.
+- The rule going forward: **check `rc=$?` directly on any command whose failure
+  should stop the chain, and assert the postcondition** -- the worktree exists,
+  HEAD actually moved, the diff is the size you expect. Cheap asserts turn a
+  silent wrong-tree operation into an immediate stop.
+- Cost: a misleading branch pushed and deleted, a meaningless test run, and ~10
+  minutes; no production impact, and the shared tree was verified undamaged.
+
+### 2026-08-15 — THE DEPLOY CLAIM IS ADVISORY, AND IT LOST A RACE IT LOOKED LIKE IT WOULD WIN
+
+I acquired `deploy_claim` on live-odds-worker (`token dbb88556`, ttl 3600s,
+`target=49797f4b`), held it, and fired. **My deploy was CANCELED anyway**:
+another session fired `c422f79a` at **23:42:32** and mine went in at
+**23:42:33** — one second later, so Render cancelled mine.
+
+**The claim binds nobody who does not run `deploy_preflight`.** It is a file
+plus a convention; nothing in `render_deploy.py` or the Render API consults it.
+Holding it changed exactly one thing — it made MY OWN preflight report
+`CLAIMED` instead of `HOLD`/`CLEAR`, which is the opposite of protection
+(see the entry below on the claim blinding the gate). So the claim is a
+courtesy signal to humans reading the ledger, **not** a lock.
+
+**Two things this does NOT mean.** It is not evidence the other session did
+anything wrong — they may never have run the gate, and nothing forced them to.
+And it is not an argument to skip the claim: it still records who to ask, which
+is the only reason I could tell within a minute that the cancel was a race and
+not a failure.
+
+**What the cancel actually costs.** `render_deploy.py` returned a clean 201 and
+`status: build_in_progress`. **The cancellation appears only in the deploys
+list, as a separate row, ~1 second later.** A session that fires and reports
+success without re-reading would state, truthfully and wrongly, that the deploy
+was shipping. `state.md` already says a fired deploy is not a landed deploy;
+this is the sharpest instance yet, because the window between them was one
+second.
+
+**How to apply.**
+- **After firing, re-read the deploys list and confirm YOUR commit is the one
+  building.** Not the 201, not the status in the POST response.
+- **Check whether the superseding commit carries your change before re-firing.**
+  Mine did not (`lane_is_live_mc` count 0), so the work was genuinely not in
+  production. If it had, re-firing would have been pure churn.
+- **Re-cut from the winner, never re-fire the cancelled commit.** The cancelled
+  parent is now behind; re-firing it is a rollback of the session that beat you.
+- Expect the gate to CLOSE right after someone else's deploy lands on
+  live-odds-worker: the restart launches a refresh run on boot.
