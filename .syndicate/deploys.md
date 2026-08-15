@@ -3591,3 +3591,38 @@ web `f475c775` (Drops 1+2), live-odds-worker `ccd10349` (**neither**).
 - **Web's code now contains the guard** (verified pre-deploy by content: the
   candidate carried both fixes), so the latent hole is closed regardless of
   which path a future request takes.
+
+## 2026-08-15 20:5xZ — web `64075d02` — the ±4900 fair-price clamp — **BLOCKED AT THE DEPLOY CALL, NOT DEPLOYED**
+
+- **STATUS: ready and unshipped.** Branch `deploy/clamp-on-live` is pushed to
+  origin at `64075d02`, a direct descendant of the live web SHA `7abd8e12`.
+  `scripts/render_deploy.py --service web --commit 64075d02` was **denied by the
+  permission classifier**. Not retried and not worked around — the user decides.
+- **Service:** web `srv-d88ahvrbc2fs73eodu30` **only**.
+- **Change:** `layer2_board._american_from_probability` + the INLINE copy in
+  `pipeline/intelligence_state._backfill_layer2_board_columns` delegate to
+  `opportunity_signals.american_price`. **35 tests green ON THE DEPLOY TREE**
+  (not on `main` — the tree that would actually run).
+- **BEFORE (measured 20:45:56Z, re-confirmed ~21:0xZ — STILL LIVE):**
+  `PRE_FIX_MISPRICE`. nfl `h2h_3_way` away, **JAX @ NO live**,
+  `fair_probability` **0.007934** published **+4900**, correct **+12503**,
+  **off by 7603 points**. 1686 `fair_price` served, **14 exactly at the clamp,
+  0 beyond**. Evidence: `reports/clamp_watch/trigger_20260815T204556+0000.json`.
+- **The safety gate said NOT CLEAR, and it is OUT OF SCOPE — established by
+  reading env, not by assuming.** `check_deploy_safety.py` has no `--service`
+  flag; its blockers (MLB sim pid=1381, odds refresh, board build) and its
+  `--drain` are all **refresh-worker** work. Web runs **no background loops**:
+  `MLB_ENABLE_LIVE_LENS_LOOP=false`,
+  `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`,
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`. A web restart
+  kills no sim and interrupts no live-lens tick or prop hydration.
+  **Cost is ~2 min of 502s on every route, during live NFL games.**
+- **`deploy_preflight.py` = `UNKNOWN`** (memory sample 93083s stale). An UNKNOWN
+  is not a CLEAR; it was accepted deliberately because web is display-only and
+  the change is allocation-neutral.
+- **AFTER:** not taken — nothing was deployed.
+- **Rollback if it is later shipped:**
+  `py -3 scripts/render_deploy.py --service web --commit 7abd8e12 --allow-rollback`
+- **NOTE ON THE MEASUREMENT WINDOW:** the trigger is a LIVE game, so the exact
+  row will move. A post-deploy read that finds no out-of-clamp probability is
+  **INCONCLUSIVE, not success** — it is the same reading a quiet slate gives.
