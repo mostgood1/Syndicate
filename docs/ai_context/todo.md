@@ -32175,3 +32175,38 @@ compared them. A same-quantity-two-surfaces equality assertion is now the
 closing evidence in `deploys.md` and could be a standing check.
 
 **Not started. No owner. Not blocked by anything.**
+
+### `#434` — OPEN. A guard can truncate the board silently, and nothing compares `sports_done` to `sports_total`
+
+**FILED FROM A REAL 80-MINUTE OUTAGE, 2026-08-14 22:57Z-00:15Z.** The `#387`
+streaming cutover changed what the overview memory guard's span contains. The
+guard's 3000MB floor was unchanged and uneditted, and it began stopping the
+hydrated pass after ONE of eight sports. Five consecutive builds emitted
+`BOARD_OVERVIEW_READY sports=1` where the preceding three hours read `sports=8`.
+
+**Every success signal the deploy was watching stayed green throughout:** no
+`oomKilled`, `OVERVIEW_STREAM_FELL_BACK_TO_LIST` = 0, worker healthy, Layer 2
+serving 150 rows. It was found only because someone diffed `sports=` before
+against `sports=` after, which was not part of any checklist.
+
+**THE ASK IS A CHECK, NOT A RULE.** A prose rule ("consider what else reads your
+span") will not be read at the moment it matters. What is missing is mechanical:
+
+1. **A post-deploy coverage assertion.** Compare the last `BOARD_OVERVIEW_READY
+   sports=N` before the deploy against the first one after. A drop is a
+   regression even when memory looks better — that is the whole shape of this
+   incident. Cheapest home: a `--since <deploy-id>` mode on
+   `scripts/deploy_preflight.py`'s sibling, or a small `scripts/board_coverage_
+   check.py`.
+2. **Make the truncation loud as a RATE.** `OVERVIEW_STOPPED_FOR_MEMORY` already
+   carries `sports_done` and `sports_total`. Nothing turns `1/8` into an alert.
+   See `learnings.md` "a rate, not a count".
+3. **The log-paging helper should be durable.** This session wrote one that
+   pages the Render logs API BACKWARD and prints the window it ACTUALLY covered
+   next to the window requested. The forward-paging version silently reported a
+   peak over 1.2s of a 51s pass. Living in a scratchpad, it will be rewritten
+   wrong by the next session. Promote it to `scripts/`.
+
+**Not urgent, genuinely valuable:** items 1 and 2 would have caught this in
+minutes rather than 80. Item 3 prevents a measurement error that already
+produced one wrong number tonight.

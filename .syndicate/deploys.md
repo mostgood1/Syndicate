@@ -1434,7 +1434,32 @@ people learn to route around. Run the gate, read it, then deploy.
   **1,830 MB**. Second worker reboot inside the hour — again boot-confounds the
   two OPEN memory lanes.
 - **Rollback:** redeploy `29ed6de1` on `srv-d91dpertqb8s73co8ls0` by commitId.
-- **DEPLOYED AND LIVE 20:13Z. MEASUREMENT: NOT OBTAINED — do not read this as a pass.**
+- **MEASURED 2026-08-14 23:01:39Z — P1, P2 and P3 now all have readings.**
+
+      [recommendation_engine] FILTER_CANDIDATES sport=all in=476 out=377
+                              rejected={"edge_below_threshold": 99}
+
+  - **P3 VERIFIED.** The instrument fired. This ALSO closes the separate
+    `7b1f3fdc` instrument deploy (21:01Z), which was live and unmeasured — the
+    line exists only because the `if rejected:` guard was removed.
+  - **THE HEADLINE FINDING, and it is a NEGATIVE one worth stating plainly:
+    `no_model_probability` does NOT appear in the rejected map.** Zero of 476
+    candidates lacked a model probability. A1's exclusion is **INERT in
+    production** — exactly as the pre-deploy 145/145 measurement predicted.
+    The fix is correct and changes nothing by itself. Do not credit it with an
+    effect it does not have.
+  - **What DID change is the truthfulness of the 99 rejections.** Under the old
+    code those rows were rejected under `edge_below_threshold` on an edge
+    derived from `score/100` — a reason that claimed an edge had been measured
+    when no model had run. They are now rejected on a real
+    model-vs-no-vig-fair comparison. Same label, different and now-honest
+    meaning, ~99 rows per cycle.
+  - Pass rate 377/476 = 79.2%.
+  - **Caveat on the search, not the finding:** all 12 log windows read were
+    saturated at the 100-line cap, so this is ONE positive observation, not a
+    complete census. A positive sighting is what was needed; absence still
+    could not have been proven from these windows.
+- **Superseded note (kept — it named the trap that nearly cost the reading):**
   - `recommendation_count` reads **145**, identical to pre-deploy. **That number
     is STALE and proves nothing:** `snapshot_generated_at = 2026-08-14T16:39:14Z`
     — ~3.6 HOURS old and long before the deploy. The intelligence state has not
@@ -1678,4 +1703,304 @@ measurement, not a regression of this one.
   explicit key list and `clv_openings` was not added to it. Readable via the
   Render logs API, which works; not readable on the wire.
 - **Rollback:** redeploy `7b1f3fdc` on `srv-d91dpertqb8s73co8ls0` by commitId.
-- **MEASUREMENT: _______**
+- **MEASURED `[22:32:02Z, refresh-worker logs]` — 3 of 4 PREDICTIONS HELD, 1 PENDING.**
+
+      [clv_opening_ledger] OPENINGS date=2026-08-14 rows_in=150 written=150
+                           already=0 duplicate=0 unkeyable=0 truncated=False
+      [intelligence_state] LAYER2_SHORTLIST date=2026-08-14 rows=150
+                           considered=13888 sports=['mlb','nfl','wnba']
+
+  - **P1 PASS** — the instrument fired on the first build after deploy.
+  - **P2 PASS** — `written=150` of `rows_in=150`, `already=0`. Every published
+    row's opening price is now recorded. The openings that were being lost on
+    every build are being kept.
+  - **P4 PASS** — `unkeyable_rows=0` AND `duplicate_in_batch=0`. This is the
+    fixed key confirmed in production: the pre-fix key collapsed 17 of these
+    same 150 rows onto 7 keys.
+  - **P3 PENDING — idempotence on a real disk is NOT yet confirmed.** It needs a
+    SECOND build (`written=0`, `already=150`) and none has run: builds are
+    ~21 min apart (22:11:09 -> 22:32:02) and 9 minutes of polling caught none.
+    Unit tests pin it and the offline run over this same production payload
+    wrote 0 on its second pass — but neither is the production disk. **Do not
+    record this lane closed until that second line is read.**
+  - **Neither revert trigger fired:** `truncated=False`, and no
+    `clv_openings_error` on the served payload.
+- **A BUILD HAD NOT RUN FOR THE FIRST 18 MINUTES AFTER DEPLOY**, and the absence
+  of the line during that time meant nothing. Confirmed by the discriminator
+  rather than assumed: 0 `LAYER2_SHORTLIST` lines across nine consecutive 2-min
+  windows, served `written_at` 22:11:09Z (pre-deploy), `MEMORY_GUARD_ABORT=0`.
+  Checking whether the CODE RAN before judging its output is the only reason
+  this was not written up as a broken deploy.
+
+## 2026-08-14 23:11Z — refresh-worker `96e3a9b7` — CLV same-book (`book_prices`)
+
+- **Lane:** `clv-without-settlement`. Branch `deploy/clv-same-book-r2`.
+- **PREFLIGHT CAUGHT A ROLLBACK, AGAIN, AND IT WAS A DIFFERENT ONE.** The
+  branch was cut from `57e32a04` (off `2b14fbeb`), but by deploy time
+  refresh-worker had moved to **`cfee9c6e`** — another session shipped `#387`
+  (3 commits: board build holds ONE sport, per-sport overview streaming, pool
+  retention). `merge-base --is-ancestor` said NO. Deploying as-cut would have
+  dropped all three.
+  - **`cfee9c6e` DOES contain `2b14fbeb`**, so the CLV recorder was never
+    rolled back — checked before assuming.
+  - Resolved by REBASING onto `cfee9c6e` (clean, no conflicts) and re-running:
+    99 passed. Ancestry then verified YES.
+  - Pushed as `-r2` rather than force-pushing the rebased branch. A force-push
+    was refused and a new name is the right answer anyway — the old ref stays
+    intact as a record of what was actually tested pre-rebase.
+- **Sim gate held once, then cleared.** 23:07:49Z showed
+  `run_mlb_daily_sim_job.py` + the `daily_update` tree; polled to 23:11:04Z
+  (process_count 9 -> 7, blockers NONE) and deployed inside that window.
+- **WHAT SHIPS:** `book_prices` ({book: price}) rides the quote from the grid's
+  `cells` onto every opening, and the joiner prefers a genuine same-book pair
+  (our price at a book history recorded, vs THAT book's close) before the
+  labelled fallback.
+- **PREDICTIONS:**
+  1. `OPENINGS` lines continue; `written` per build unchanged in shape.
+  2. Openings recorded after this deploy carry a non-empty `book_prices`.
+  3. **The one that matters:** on a date whose openings were recorded WITH
+     `book_prices`, `compute_clv_for_date` returns `same_book_n > 0` and a
+     non-None `avg_clv_pct`. Measured basis for expecting it: on the real grid,
+     rows whose (event, market) exists in history matched the BEST book alone
+     18 times vs **128** for ANY book we quoted (7.1x).
+  4. **CONTROL:** `avg_clv_pct` must still be None for 2026-08-14's already
+     recorded openings — they predate `book_prices` and must not acquire a
+     same-book pair retroactively.
+- **KNOWN:** today's openings are already written without `book_prices`, and
+  first-sighting-only means they will NOT be rewritten. The first date with
+  same-book CLV is **2026-08-15**. That is the contract working as designed,
+  not a defect.
+- **Rollback:** redeploy `cfee9c6e` by commitId.
+- **MEASURED 23:27:45Z (first post-deploy build). P1 and P2 VERIFIED; P3 owed.**
+  - **P2: `book_prices` on 150/150 served rows.** books/row min=1 median=4
+    max=35. Self-consistency: the best bookmaker appears inside its own
+    `book_prices` on **150/150** — so the map and the headline quote cannot
+    disagree about which book was picked.
+    Sample: best `fanatics@290` beside `{betmgm 230, betrivers 230, fanduel 220,
+    kalshi 285}` — 290 is correctly the best price for a plus-money away side.
+  - **P1:** the recorder kept running across the change; board rows unaffected.
+  - **P3 (same_book_n > 0 and a non-None avg_clv_pct) IS STILL OWED.** It needs
+    openings that were RECORDED with `book_prices`. Today's were written before
+    23:19Z without it, and first-sighting-only means they will not be rewritten,
+    so today's date can only produce same-book pairs for markets first seen
+    AFTER the deploy. **The first clean date is 2026-08-15.**
+  - **The CONTROL still holds and matters:** 2026-08-14's pre-deploy openings
+    must NOT retroactively acquire a same-book pair. They cannot — the field is
+    absent on them — and that is the first-sighting contract behaving correctly,
+    not data loss.
+
+### MEASUREMENT for the row above — 2026-08-14 23:12Z — MIXED, AND IT DOES NOT CONFIRM THE FIX
+
+DEPLOY: `cfee9c6e` live 2026-08-14T22:55:35Z (`dep-d9vpmoqjnfac73c7ip4g`, trigger=api).
+Fired on a confirmed CLEAR — **zero jobs killed**, which is the first thing this
+session got right and the handoff said was hard.
+
+WHAT IS VERIFIED
+- No `oomKilled` in the 17 min since. Worker healthy (pid 39, jobs running).
+- `OVERVIEW_STREAM_FELL_BACK_TO_LIST` = **0**. The empty-board failure mode the
+  commit message names as the risk of this change did NOT occur.
+- Layer 2 shortlist alive and unaffected: `LAYER2_SHORTLIST rows=150
+  considered=12304 sports=['mlb','nfl','wnba']` at 23:04:05Z.
+
+WHAT IS NOT VERIFIED — AND WHAT CONTRADICTS THE HANDOFF
+1. **The handoff's premise does not survive contact with more than one sample.**
+   It says peak = SUM-across-eight "is sufficient on its own to cross 4GiB" and
+   "the floor plays no part". Two pre-deploy hydrated 8-sport passes on the OLD
+   code, measured tonight:
+
+       22:36:48 -> 22:37:43   8 sports hydrated   PEAK  804.2 MB anon  (19.6%)
+       22:49:19 -> 22:49:50   8 sports hydrated   PEAK  613.1 MB anon  (15.0%)
+
+   The identical pass shape that "cannot fit" ran twice, 20 minutes apart, at a
+   fifth of the ceiling. The 20:03:11Z kill had an ingredient the handoff ruled
+   out on one sample. **The diagnosis this deploy rests on is not established.**
+2. **The first post-deploy hydrated pass was WORSE on both axes:**
+
+       22:56:16 -> 22:57:29   1 sport hydrated    PEAK 1384-1486 MB anon (33.8%)
+
+   More memory for ONE sport than the old code spent on EIGHT, and the
+   pre-existing 3000MB guard then stopped the stream:
+   `OVERVIEW_STOPPED_FOR_MEMORY next_sport=nba sports_done=1 sports_total=8
+   headroom_mb=2900.7 min_required_mb=3000.0` -> `BOARD_OVERVIEW_READY sports=1`,
+   where every pre-deploy build in the preceding 3h read `sports=8`.
+3. **MECHANISM, proposed not proven:** streaming moves per-sport candidate
+   collection INSIDE the guarded span. The 3000MB floor was sized (2026-08-07)
+   against a span that no longer means the same thing, so it now trips one sport
+   in. The guard is pre-existing and fired 4x BEFORE this deploy (20:33-20:45,
+   `sports_done=0` -> `sports=0`), so it is not new — but its interaction is.
+4. **CONFOUNDED, honestly:** the post-deploy pass ran 40s after a boot (cold
+   caches, `_BOOK_QUOTES_CACHE` filling to its 500MB budget); the two pre-deploy
+   passes were 18 and 30 min warm. Cold-vs-warm plausibly explains part of the
+   1384 vs 804. I cannot separate them from this data.
+5. **AND THE EXPERIMENT CANNOT CONTINUE ON ITS OWN.** At 23:04 the container is
+   at 2790MB / headroom 1305MB, so the 3000MB guard will refuse every further
+   hydrated pass outright. **The only window in which this measurement is
+   obtainable is the ~2 minutes after a boot.** No second post-deploy pass has
+   occurred in 17 min (pre-deploy cadence was 7-12 min).
+
+VERDICT: deployed, safe so far, **fix NOT demonstrated**. Do not record this as
+a working fix. Rollback stays armed:
+`py -3 scripts/render_deploy.py --service refresh-worker --commit 2b14fbeb --allow-rollback`
+
+## 2026-08-14 23:2xZ — refresh-worker — the overview floor becomes two floors — PENDING DEPLOY
+
+- Target: `77938bff` on `deploy/overview-floor-two-tier`, descends from the live
+  `cfee9c6e` (no rollback). Owner decision: recalibrate rather than roll back.
+- WHY: the cutover did not change the guard, but it changed what the guard's
+  span contains, and the guard is what decided the outcome. Both post-cutover
+  hydrated passes stopped at `sports_done=1` with headroom 2900.7 / 2587.3MB
+  against a 3000MB floor -> `BOARD_OVERVIEW_READY sports=1` where every build in
+  the preceding 3h read `sports=8`.
+- CHANGE: `mlb` and any UNRECOGNISED slug keep the full 3000MB floor; the seven
+  measured-cheap sports get 1500MB. `floor=` added to the refusal line because
+  one message now has two meanings.
+- SIZING EVIDENCE (production, tonight): five sports hydrated in 171ms for
+  +1.7MB (627.4 -> 629.1MB); an entire eight-sport hydrated pass on the OLD code
+  moved anon 444.6 -> 804.2MB; MLB alone moved +987MB anon / +1543MB container.
+- NOT RELAXED: the gate in front of MLB. 20:03:11Z showed a +3.5GB MLB excursion
+  against tonight's +1.0GB, and that variance is unexplained.
+- GATE: 29 passed (guard + streaming + layer2_fast_refresh, which pins the
+  3000MB constant left untouched). `test_intelligence_state.py` 225 passed with
+  the SAME 6 failures that fail on `2b14fbeb` without any of this.
+- EXPECTED: next hydrated pass reaches `sports_done=8` /
+  `BOARD_OVERVIEW_READY sports=8`, peak anon stays under 2500MB, no oomKilled.
+- MEASUREMENT: <pending — owed by session memory-cutover-ship>
+- Deploy gate has read HOLD continuously since 23:24Z (a long MLB
+  `daily_update.py` run). Waiting for a confirmed CLEAR rather than killing it.
+
+- **CORRECTION 23:4xZ — the target moved, and the rollback guard is why I know.**
+  While the gate was HOLD, `Audit 2026-08-14 models` deployed `96e3a9b7`
+  (23:11:10Z, live 23:17:20Z), which deactivated `cfee9c6e`. My
+  `py -3 scripts/render_deploy.py --commit 77938bff` was then REFUSED: 77938bff
+  descends from `cfee9c6e`, not from the new live SHA. **`render_deploy.py`'s
+  descendant check caught a concurrent-session race that a raw curl would have
+  shipped as a silent 850-line rollback** — the exact scenario it was written
+  for on 2026-08-14, now paid for a second time.
+  - I nearly missed it too: I piped the deploy output through `json.load`, which
+    raised on empty stdin and hid the refusal message. Read the tool's own
+    output before deciding what happened.
+  - **`96e3a9b7` CONTAINS the cutover** (`cfee9c6e` is an ancestor, marker
+    present) — they built on top of it rather than around it, so nothing was
+    lost. Verified by ancestry AND by grepping the marker, not by reading the
+    commit subject.
+  - New target: **`705eeefc`** on `deploy/overview-floor-two-tier-v2` =
+    `96e3a9b7` + the same one commit. The two files are byte-identical to the
+    tested `77938bff`; 29 tests re-run green on the new base.
+
+## 2026-08-14 23:4xZ — refresh-worker `9972977f` — audit §7 #7: serve the MLB prop skill numbers
+
+- **Lane:** `recommendation-lane-correctness`. Branch `deploy/mlb-prop-skill` —
+  `aac18260` cherry-picked onto `96e3a9b7` (live SHA re-read at deploy time,
+  fast-forward verified). 40 tests pass.
+- **PREMISE CHECKED, NOT TRUSTED.** The audit says `aac18260` is committed and
+  absent from the deployed tree. Verified both halves: it IS on `origin/main`
+  and `merge-base --is-ancestor aac18260 96e3a9b7` says NO.
+- **BLAST RADIUS: LABEL-ONLY.** Read the diff rather than the commit message.
+  `_attach_measured_skill` sets `payload["model_skill"]` and nothing else — no
+  projection, mean, or edge is modified. A field appears; no number moves.
+  It also fills only where `model_skill` is ABSENT, so it cannot overwrite a
+  producer's own verdict.
+- **BASELINE, captured before deploying** (board 23:44:59Z): 29 mlb prop rows,
+  `model_skill` status `{unmeasured: 25, None: 4}`. Markets: batter_rbis 8,
+  batter_total_bases 5, batter_runs_scored 5, batter_hits 3,
+  batter_hits_runs_rbis 3, outs 1, hits_allowed 2, earned_runs 2.
+- **PREDICTIONS:**
+  1. The four measured batter markets — rbis(8), total_bases(5),
+     runs_scored(5), hits(3) = **21 rows** — gain a `model_skill` carrying
+     `correlation` and a `verdict`.
+  2. **CONTROL A:** `batter_hits_runs_rbis` (3 rows) stays **unmeasured**. It
+     was the degenerate 0.0 `#429` fixed on 2026-08-14, so it cannot be
+     measured from that window and must not inherit a neighbour's number.
+     `skill_note` returns None for it — checked directly before deploying.
+  3. **CONTROL B:** the pitcher markets `outs`(1), `hits_allowed`(2),
+     `earned_runs`(2) stay unmeasured — the calibration covers batter markets
+     only, so a note appearing there means the join is too loose.
+  4. **CONTROL C:** `model_edge_pct` / `projection` values are NOT expected to
+     change. This is label-only; if edges move, the change is doing more than
+     advertised and should be reverted.
+- **What the notes say** (read before shipping, because publishing a verdict is
+  a product statement): 4 batter markets read "real ranking signal, loses to
+  the mean until de-biased" with bias +18% to +31%; doubles "almost no signal
+  (r=0.03)"; triples "no measured skill (r=0.02)"; stolen_bases "the only
+  market that beats the mean as-published; biased LOW ~22%".
+- **Rollback:** redeploy `96e3a9b7` by commitId. (Superseded — see re-cut below.)
+- **RE-CUT AND SHIPPED as `098877e1` on branch `deploy/mlb-prop-skill-r2`,
+  LIVE 00:22Z.** The first attempt (`9972977f`) was **CANCELED at 00:08:31Z —
+  not by me**: another session triggered `705eeefc` (`#387` overview floor) one
+  second earlier and Render cancels an in-flight deploy when a new one starts.
+  - **I did not retry into it.** Re-triggering would have canceled THEIR build
+    and started a deploy war. Checked first that `705eeefc` CONTAINS `96e3a9b7`
+    (it does — no CLV work lost), waited for theirs to go live, then
+    cherry-picked `aac18260` onto it and re-verified fast-forward.
+  - The deploy loop now HOLDS when another deploy is in flight instead of
+    firing into it.
+- **MEASURED 2026-08-15T00:35:56Z (first post-deploy build):**
+  - **PREDICTION 1 HOLDS — 24 rows now MEASURED**: batter_rbis 12,
+    batter_total_bases 6, batter_hits 3, batter_runs_scored 3. Sample
+    (`batter_total_bases`, Wilyer Abreu): `correlation 0.1523,
+    sample_games 2487, seasons 2026-08-01..2026-08-14, status measured,
+    verdict "biased high ~18%; real ranking signal, loses to the mean until
+    de-biased"`.
+  - **CONTROL A PASS** — `batter_hits_runs_rbis` still unmeasured/None. It must
+    not inherit a neighbour's number and it did not.
+  - **CONTROL B PASS** — pitcher market `outs` still None.
+  - **CONTROL C FAILED, AND THE CONTROL WAS WRONG, NOT THE CODE.** It flagged
+    53 of 66 non-mlb rows carrying a skill correlation. Investigated as a
+    possible leak of MLB numbers onto other sports — a fabricated skill claim
+    would be the worst outcome this change could have. It is not one: all 53
+    are **NFL, correlations -0.047 and 0.269, seasons "2023-2025"** — NFL's own
+    producer, from the `projection-skill-declaration` lane closed earlier today.
+    None matches the MLB calibration set {0.1607, 0.1523, 0.1316, 0.162,
+    0.0278, 0.0179, 0.1605} or its 2026-08 window.
+    **My error: I asserted "non-mlb must be zero" without taking a pre-deploy
+    baseline for non-mlb.** I baselined only the MLB props. A control whose
+    expected value was never measured is a guess wearing a control's clothes —
+    it cost an investigation and could just as easily have been waved through
+    as a real regression.
+
+### MEASUREMENT — 2026-08-15 00:36Z — `705eeefc` VERIFIED IN PRODUCTION
+
+DEPLOY: `705eeefc` live 2026-08-15T00:15:08Z (`dep-d9vqrvlg1s2s73blnt90`).
+Fired on a confirmed CLEAR — **zero jobs killed**, third for three tonight.
+
+BEFORE (5 consecutive builds, `cfee9c6e` then `96e3a9b7`):
+
+    22:57:22  headroom 2900.7  |  23:14:32  2587.3  |  23:19:50  2602.0
+    23:36:46  2706.4           |  23:53:54  2490.5
+    every one:  min_required 3000.0 -> STOPPED next_sport=nba sports_done=1
+    every one:  BOARD_OVERVIEW_READY sports=1 mlb:g=13,r=3
+
+AFTER:
+
+    BOARD_OVERVIEW_READY date=2026-08-14 sports=8
+      mlb:g=13,r=3 nba:g=0,r=3 wnba:g=1,r=3 nfl:g=10,r=3
+      ncaaf:g=0,r=3 ncaab:g=0,r=3 nhl:g=0,r=3 soccer:g=55,r=3
+    OVERVIEW_STOPPED_FOR_MEMORY since the deploy:  0
+    oomKilled since the cutover shipped (1h40m):   0
+    LAYER2_SHORTLIST rows=142 considered=12826 sports=['mlb','nfl','wnba']
+
+AND THE TRACE SHOWS THE MECHANISM, not just the outcome. Peak anon over the
+verified 8-sport pass, 346 samples paged BACKWARD over 00:23:05..00:28:55:
+
+    00:23:40   617.6      <- pass begins
+    00:25:30  1404.5      <- PEAK, at MLB's OVERVIEW_SPORT_END
+    00:25:40  1172.5      <- MLB RELEASED; the other seven run under this
+    00:27:40  1173.5      <- flat for two minutes while seven sports hydrate
+
+**34.3% of the 4096MB ceiling, and the peak is a SINGLE-SPORT peak that comes
+back DOWN before the next sport starts.** That is `#387`'s stated goal --
+peak = MAX-of-one-sport, not SUM-of-eight -- visible in the memory trace rather
+than argued from a diff.
+
+SCOREBOARD FOR THE PAIR:
+- `cfee9c6e` (cutover): stops the OOM, but on its own it truncated the board to
+  one sport. **Shipping it alone would have been a coverage outage** presenting
+  as a memory fix, and the ledger would have recorded a success.
+- `705eeefc` (two floors): restores all eight at a third of the ceiling.
+- Neither is a fix for MLB's cost, which is untouched and still the whole story:
+  MLB is ~800MB of the 900MB excursion, seven sports are ~1.7MB.
+
+STILL OPEN, and recorded so it is not lost: the 20:03:11Z kill is NOT explained.
+The handoff's "peak = SUM crosses 4GiB on its own" was falsified by two 8-sport
+passes at 613/804MB on the OLD code. Something made MLB cost +3.5GB in that one
+pass. **The guard in front of MLB keeps its full 3000MB until that is known.**

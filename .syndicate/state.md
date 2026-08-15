@@ -5,20 +5,47 @@
 > **Seeded 2026-08-13 from prior session notes. Lines marked `[unverified]`
 > must be confirmed against the dashboard before anyone relies on them.**
 
-## >>> START HERE — HANDOFF FOR THE NEXT SESSION (2026-08-14 ~21:30Z) <<<
+## >>> START HERE — HANDOFF (2026-08-15 00:36Z, supersedes the 21:30Z one) <<<
 
-**`docs/ai_context/handoff_tier0_and_board_engine.md`** — self-contained, written
-for a cold start. Then `.syndicate/plan_2026-08-14_program.md` for sequencing.
+**THE 21:30Z "single next action" IS DONE, AND TWO OF ITS CLAIMS WERE WRONG.**
+`docs/ai_context/handoff_tier0_and_board_engine.md` is still the program map;
+read it for Tiers 1-6, NOT for the memory item. `.syndicate/plan_2026-08-14_program.md`
+for sequencing.
 
-**Single next action: ship `086702ae` (branch `memory/overview-sum-to-max`).**
-refresh-worker OOM-killed at 20:03:11Z and nothing is deployed to stop the next
-one. A 522MB worker died in 25s inside one 8-sport hydrated pass. Gate: 223
-passed, the one failure proven pre-existing. There is no idle window — poll the
-deploy gate every 10s and fire the POST in the same step as the CLEAR.
+**MEMORY / `#387` IS SHIPPED AND VERIFIED — it took TWO commits, not one.**
+- `cfee9c6e` — the streaming cutover, rebased onto the then-live SHA. Live
+  22:55:35Z. Now carried inside `96e3a9b7` and `705eeefc`.
+- `705eeefc` — **the other half.** Live 00:15:08Z. Without it the cutover
+  truncated the board to ONE sport for 80 minutes.
+- VERIFIED 00:36Z: `BOARD_OVERVIEW_READY sports=8`, `OVERVIEW_STOPPED_FOR_MEMORY`
+  0, `oomKilled` 0 in 1h40m, peak anon **1404.5MB = 34.3%** of the ceiling, and
+  the trace shows the peak falling 1404 -> 1172MB as MLB is released. Layer 2
+  unaffected throughout (142 rows / 12,826 considered). Full working in
+  `deploys.md` under the 00:36Z entry.
 
-Deployed and verified: `530fc5d8` only. Held on branches: `086702ae` (memory),
-`9ec20a06` (odds cadence — needs `soccer-odds-coverage` sign-off and an OddsAPI
-spend call). Local only: `0ddecded`.
+**CORRECTION 1 — `086702ae` was never deployable.** It is not a descendant of
+any SHA that was live after 22:12Z; deploying it would have rolled back
+`clv-opening-ledger`. It was also THREE commits, not one. Rebase, do not deploy
+a branch tip that has sat while others shipped.
+
+**CORRECTION 2 — the diagnosis it rested on is FALSIFIED.** "Eight hydrated
+sports cannot fit in 4GiB / the floor plays no part" — the same 8-sport pass ran
+twice that evening at 613MB and 804MB. **The 20:03:11Z kill is UNEXPLAINED.**
+See `learnings.md` 2026-08-15 EXONERATED. Streaming caps the transient; it did
+not explain the outlier, and the 3000MB floor in front of MLB stays until
+someone does.
+
+**CORRECTION 3 — the test baseline in the old handoff is for the wrong lineage.**
+`tests/test_intelligence_state.py` carries **6 pre-existing failures** on the
+deployed lineage (measured at `2b14fbeb`: 218 passed / 6 failed), not the "223
+passed, 1 failure" of `main`. Gate against the lineage you are shipping.
+
+**Deploy method that worked 3/3 with ZERO jobs killed:** poll
+`deploy_preflight.py` every 10-12s, require TWO consecutive CLEARs, fire in the
+next step. Windows are rare (~30 min of HOLD is normal) but they do come.
+
+Still held on branches: `9ec20a06` (odds cadence — needs `soccer-odds-coverage`
+sign-off and an OddsAPI spend call). Local only: `0ddecded`.
 
 
 ## BOARD / INTELLIGENCE ENGINE AUDIT — notes exist, ~70% of the brief `[measured 08-14 21:xxZ]`
@@ -1693,3 +1720,27 @@ this is an env var, and A3 changed no env var and no publish code.**
   instrument — it reproduced the audit's before-numbers against the unchanged
   service, which is what makes its after-numbers a reading rather than a
   belief. Re-run it before trusting any future claim about card layout.
+
+- **The `main` divergence is RESOLVED IN A COMMIT THAT IS NOT YET PUSHED.
+  `[measured 08-14 22:0xZ]`** Local branch `reconcile/main-divergence` =
+  `abe4355f`, a merge of local `main` (at `dac86ada`) into `origin/main` (at
+  `ee590ed5`). Worktree `C:/tmp/wt-reconcile` still holds it. **The push was
+  blocked by the session's permission layer, not by git** — one command
+  finishes it:
+  `git -C C:/tmp/wt-reconcile push origin HEAD:main`.
+- **What the divergence actually WAS, measured not guessed:** of 148 local
+  commits ahead, **102 were already upstream by patch-id** (cherry-pick copies
+  made by every session's pinned-deploy workflow) and **45 were not** — real
+  work, some of it running in production, that never reached `origin/main` in
+  any form. Of 121 origin commits, only **19** were new to local, and they
+  touch no `syndicate/` production code at all. `[measured 08-14]`
+- **`render.yaml` is byte-identical on both branches**, so reconciling carries
+  no config change and cannot fire a `blueprint_sync`. Check this FIRST on any
+  future reconciliation; it is the one file where a push is a production
+  change. `[measured 08-14]`
+- **Two tests in `tests/test_intelligence_state.py` fail on BOTH branches** —
+  `..._fallback_merge_falls_back_on_empty_pool` and
+  `..._recomputes_when_cached_snapshot_is_stale` — verified by swapping each
+  side's `pipeline/intelligence_state.py` + test file into one worktree and
+  re-running. Pre-existing, not merge-induced. `bd227fa3` claimed this file
+  was "224 green"; it is 222/2 today on both sides. `[measured 08-14]`

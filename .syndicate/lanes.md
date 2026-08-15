@@ -6,7 +6,58 @@
 
 ## OPEN
 
-### clv-without-settlement — OPEN — DIAGNOSIS DONE, DESIGN BLOCKED ON ONE DECISION — opened 2026-08-14 — session: model-audit
+### clv-without-settlement — OPEN — RECORDER LIVE, JOINER BUILT; FIRST CLV NUMBERS EXIST AND ARE ALL BOOK-BIASED — opened 2026-08-14 — session: model-audit
+- **JOINER BUILT 22:5xZ** — `syndicate/features/shared/clv_join.py`, branch
+  `deploy/clv-joiner` (`57e32a04`, off `2b14fbeb`). **Library only, no call
+  site, NOT deployed** — it ships no production behaviour.
+- **THE FIRST CLV NUMBERS THIS SYSTEM HAS EVER PRODUCED, on 150 real openings:**
+
+      scope                  n    avg_clv   beat_close
+      different_book_close  32     +6.206    29/32 (91%)
+      book_agnostic_close   27     +2.716    18/27 (67%)
+      same_book              0         --       --
+
+  **`avg_clv_pct` is None and that is the correct answer.** A +6.2-pt average
+  at a 91% beat rate is a SELECTION EFFECT, not skill: the board publishes the
+  BEST price across books by construction, so pairing that opening with another
+  book's close compares a best-of-N draw to a single draw. The headline counts
+  same-book rows only; biased scopes are reported beside it, never blended.
+- **What the join can and cannot reach** `[measured, mlb 78 openings]`:
+  - props **28/28 matched (100%)**
+  - `no_market_in_history` 18 — `h2h_lay`, `totals_alt`, `h2h_3_way`,
+    `spreads_alt` are absent from odds history entirely (capture-side gap)
+  - 32 game rows matched only via a DIFFERENT book
+  - **NFL 0/60 and WNBA 0/12** — their odds-history artifact for 2026-08-14 has
+    no markets at all. Capture-side, not a join defect. **Own lane.**
+- **THE CHEAP FIX FOR SAME-BOOK CLV, and the next action:** have the opening
+  ledger record a MAINSTREAM-book price alongside the best-book one. Odds
+  history tracks fanduel/betmgm/draftkings; the board picks polymarket /
+  prophetx / betfair_ex. One extra field on each opening makes an unbiased
+  same-book comparison possible from tomorrow. Without it the headline stays
+  None no matter how good the joiner gets.
+- **Recorder is LIVE and verified** — refresh-worker `2b14fbeb`,
+  `OPENINGS rows_in=150 written=150 ... truncated=False` at 22:32:02Z.
+  Idempotence on the production disk (`written=0 already=150`) is STILL
+  unconfirmed; builds are ~21 min apart.
+- **UPDATE 22:3xZ — option (a) chosen by the user and SHIPPED.** refresh-worker
+  `2b14fbeb`, live 22:20Z. `[clv_opening_ledger] OPENINGS ... rows_in=150
+  written=150 already=0 duplicate=0 unkeyable=0 truncated=False` at 22:32:02Z.
+  Openings are now being recorded; they were being lost on every build before.
+- **OWED, in order:** (1) read a SECOND `OPENINGS` line to confirm idempotence
+  in production (`written=0 already=150`) — builds are ~21 min apart; (2) build
+  the joiner. (3) optional: put `clv_openings` on
+  `/api/board/layer2-shortlist`, which currently omits it (log-only).
+- **THE JOINER'S KNOWN PROBLEM, inherited deliberately:** odds history is keyed
+  `event_id|home_team|away_team|market|bookmaker` with **no side and no line**;
+  the side lives as `entity` INSIDE the history points. The opening ledger keys
+  on `event_id|market|player|segment|side|line|bookmaker`. Mapping `side` ->
+  `entity` is the unsolved half and must be measured against real data, not
+  assumed — the settlement join already failed exactly here (4,560
+  `no_key_match` of 8,276).
+- **The close is the easy half and is already available:** stamped
+  `closing_line` on only ~1.7% of markets, but `history_points > 0` on 100%, so
+  derive it from the last pregame observation and LABEL which one was used
+  (`observed_transition` vs `last_pregame_quote`) plus `close_age_seconds`.
 - Goal: audit §7 ranked fix **#1** — produce `clv_pct` per recommendation with
   no dependency on grading, outcomes or `settle_result`. The audit calls this
   the one measurement that unblocks §4's threshold, §6's cadence decision, and
@@ -3541,7 +3592,7 @@ temporal validation. Neither is a word-list problem.
   `visuals.tables`. Fixed the harness before drawing a conclusion. **Check what
   makes the instrument read non-null before believing a null.**
 
-### board-ui-visible-defects — OPEN — opened 2026-08-14 — session: board-ui-defects
+### board-ui-visible-defects — CLOSED-VERIFIED 2026-08-14 — deployed as web `aadcde77`, every criterion measured in production — opened 2026-08-14 — session: board-ui-defects
 - Goal: Lane E + the "do now" bundle of `plan_2026-08-14_ui.md`. Testable
   outcome, all four generic-board sports (nfl, ncaaf, ncaab, soccer) at 1440
   and 390: `documentElement.scrollWidth == clientWidth` (today 1468 vs 1440);
@@ -3729,3 +3780,168 @@ Saturday-evening kickoff buckets to Sunday.
   `aadcde77` = its own prior live commit + the fix, deploy
   `dep-d9vokalbedkc73erc9bg`, live 21:42:56Z. Nothing of this lane remains in
   the working tree. Marker `.syndicate/.current-lane` cleared.
+
+### memory-cutover-ship — OPEN — opened 2026-08-14 — session: memory-cutover-ship
+- Goal: the `#387` one-sport-at-a-time overview cutover is RUNNING on
+  refresh-worker, and peak anon on one hydrated `OVERVIEW_SPORT_BEGIN mlb` ->
+  board_contract pass is measured against the 20:03:11Z kill baseline
+  (522MB -> dead in 25s at 4GiB).
+- **CORRECTION TO THE HANDOFF, measured before starting:** the handoff says
+  "ship `086702ae`". That commit CANNOT be deployed as-is — the live
+  refresh-worker SHA is `2b14fbeb` (clv-opening-ledger, finished
+  2026-08-14T22:19:23Z), which is NOT an ancestor of `086702ae`. Deploying it
+  would roll back that lane's 560 lines, and `render_deploy.py` refuses a
+  non-descendant. It is also THREE commits, not one:
+  `c39569ef` -> `946d77e3` -> `086702ae`; live carries none of them
+  (`OVERVIEW_STREAM_FELL_BACK_TO_LIST` absent from `2b14fbeb`, and the
+  `consumer=` streaming mechanism absent too).
+- Files (on a deploy branch off `2b14fbeb`; the main working tree is NOT edited):
+  - `pipeline/intelligence_state.py`, `syndicate/features/intelligence.py`
+  - `tests/test_overview_summary_retention.py`, `tests/test_overview_streaming.py`
+  - Collision check 2026-08-14: `layer2-board-freshness` (the lane that wrote
+    this branch) is CLOSED-VERIFIED and its header names this branch as its
+    undeployed follow-on, so both source files are free. `clv-without-settlement`
+    plans to claim `pipeline/intelligence_state.py` as a writer but records
+    "Files: none claimed yet, deliberately". No other OPEN lane claims either file.
+- Hypothesis: peak is SUM-of-eight-sports inside one hydrated pass, so
+  MAX-of-one-sport keeps the worker under 4GiB with no floor argument needed.
+- Falsification test: after the deploy, an `OVERVIEW_SPORT_BEGIN mlb` -> pass
+  end excursion that still approaches 4GiB, or an OOM inside the same pass.
+- Verification: (1) deployed SHA == the new tip; (2) `OVERVIEW_SPORT_BEGIN` for
+  all eight sports NOT clustered in one 10s window; (3) peak anon over one
+  hydrated pass; (4) `OVERVIEW_STREAM_FELL_BACK_TO_LIST` count == 0 in prod;
+  (5) candidate pool non-empty after the cutover (the empty-board failure mode
+  the commit message names).
+- Blocked by: none. Deploy gate reads HOLD (7 jobs); ship on a polled CLEAR.
+
+#### memory-cutover-ship — STATUS 2026-08-14 23:1xZ — SHIPPED, MEASURED, FIX NOT DEMONSTRATED
+- `cfee9c6e` live on refresh-worker 22:55:35Z. Zero jobs killed (polled the gate
+  to a confirmed CLEAR and fired in the next step).
+- Criteria from the lane header: (1) deployed SHA MET. (2) sports NOT clustered
+  MET — but for the wrong reason: the stream STOPPED after sport 1.
+  (3) peak 1384-1486MB — HIGHER than the old code's 804MB over eight sports.
+  (4) `OVERVIEW_STREAM_FELL_BACK_TO_LIST` = 0 MET. (5) Layer 2 shortlist alive,
+  150 rows / 12,304 considered MET.
+- **The falsification test I wrote fired.** Not as an OOM — as the other
+  direction: coverage collapsed 8 sports -> 1 via the pre-existing 3000MB
+  `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` guard, whose span this change redefined.
+- Full evidence in `deploys.md` under the 22:5xZ row. Rollback armed, not taken.
+- OPEN QUESTION FOR THE OWNER: roll back, hold, or recalibrate the guard. The
+  measurement that would settle it is only obtainable in the ~2 min after a boot,
+  because at steady state (container 2790MB) the guard refuses every pass.
+
+### board-contract-absent-not-neutral — OPEN — opened 2026-08-14 — session: board-ui-defects
+- Goal: Lane F of `plan_2026-08-14_ui.md`. No board surface renders a
+  fabricated neutral for missing data. Testable outcome, on the served board:
+  **zero** rows carry `away_pct == home_pct == 50.0` unless a real model says
+  so, soccer shows ONE home-win number rather than two, and a game with no
+  probability anywhere renders an explicit empty state instead of a centred
+  bar.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/game_board_contract.py` — the fabrication sites.
+  - `syndicate/features/soccer/cards.py` — carry the sim's three-way win
+    probability through to the contract.
+  - `syndicate/templates/shared/_game_card_generic.html` — suppress the bar
+    when unknown; draw segment.
+  - `syndicate/static/shared/dense_cards.css` — draw segment styling.
+  - `tests/test_board_contract_absent.py` (new).
+  - Collision check RUN (lane-guard's own `_claims()` over `lanes.md`, not a
+    read): none of these is claimed by another OPEN lane. The generic template
+    and `dense_cards.css` were claimed by `board-ui-visible-defects`, which
+    this same session closes in the edit above.
+- **The plan says two sites; there are SEVEN**, and the audit's line numbers
+  (303-304) are only one pair. `game_board_contract.py` fabricates 50.0 at
+  222/223 and 256/257 (score-mean total is zero), 303/304 (no
+  `p_home_win`/`p_away_win`), 319 and 336/337. Two of those use `or 50.0` on a
+  float, so **a genuine 0.0 probability also renders as a coin flip** — the
+  same defect for a different input.
+- **The soccer "two conflicting numbers" is NOT a rounding artifact, and the
+  plan's framing would have led to the wrong fix.** The tiles show the SIM's
+  three-way win probability (`match.win_probability`, home/draw/away). The bar
+  shows `betting.p_home_win`, which `_market_data_for_match` builds from the
+  picks rows' `market_probability` — the MARKET's implied probability. They
+  are two different quantities, both correct, displayed under the same words
+  ~250px apart. The draw side is never captured into `betting` at all, which
+  is why the two-way number looks wrong on a three-way market.
+- Hypothesis: none needed for F1/F3 (read off the code). For F2 the claim to
+  test is that preferring the sim's three-way probability for the bar makes
+  the bar agree with the tiles on every soccer card.
+- Falsification test: if a soccer card still shows two different home-win
+  numbers after the bar is sourced from `win_probability`, the tiles are
+  reading something else again and the join is the defect, not the source.
+- Verification: count `away_pct == home_pct == 50.0` rows in the served board
+  context before and after (`data/live/*_cards_context_*.json` is the
+  contract's own output, so the fabrication is already visible there); plus a
+  rendered check that a no-probability game shows an empty state, not a bar.
+- Blocked by: none. **Cross-plan:** model plan A1 owns `_fair_probability`'s
+  0.5 fallback, the same defect one layer up. Told that lane; not editing it.
+
+#### board-contract-absent-not-neutral — RESULT 2026-08-14 — fixed and tested, NOT deployed
+
+**What the contract actually did, measured by driving `apply_game_board_contract`
+with known games rather than by reading it:**
+
+    projected 21.0-24.0, no win probability -> away_pct 46.67 / home_pct 53.33
+    the same game WITH p_home_win = 0.62    -> bar still 53.33, text 62.0%
+    nothing at all                          -> 50.0 / 50.0
+    a genuine 0.0 home win probability      -> 50.0 / 50.0  (the `or 50.0` trap)
+
+46.67/53.33 is the share of projected POINTS. It was rendered in
+`.cards-prob-bar` under a panel headed "Period win probabilities". A 3-point
+favourite is not a 53.3% favourite.
+
+**CORRECTION TO MY OWN HEADLINE, and it matters.** Mid-work I wrote that "the
+win-probability bar has never shown a win probability". That is TOO STRONG and
+the measurement that would have supported it does not. On production's own
+NFL cards, **0 of 16 bars equal the points share** — those bars come from
+producer-supplied `probability_rows`, which pass straight through the
+`existing` branch and never touch the period-derived path. So the
+points-share defect is REAL and REPRODUCIBLE in the contract, and its
+frequency on today's production slate is UNMEASURED. A second probe
+(bar-vs-text agreement) matched 1 row platform-wide, so it settles nothing
+either — a null from an instrument that barely fires is not evidence.
+
+**Fixed, all seven fabrication sites in `game_board_contract.py`:**
+- The period rows and the aggregate row now carry the WIN PROBABILITY or
+  `None`, never a scoreline recast as a split.
+- `_safe_float(...) or 50.0` -> an `is None` test, so a genuine 0.0 survives.
+- The `_build_probability_rows` fallback carries `None` through instead of
+  substituting 50.0.
+- New `_game_win_probabilities()` prefers the SIM's three-way split over
+  `betting.p_home_win`. That is the soccer "two conflicting numbers" fix: the
+  tiles read the sim (77.3%) and the bar read the market's implied number
+  (81.1%) — two different quantities under one label. Reproduced with the
+  audit's own numbers and now agreeing at 77.3% in bar, text and tiles, with
+  the draw carried at 14.0% instead of renormalised away.
+- `soccer/cards.py` publishes `sim.win_probability` so the contract can see it.
+- The template draws no bar at all when there is no probability, and shows
+  "No win probability was published for this <row>" instead. The CSS `50%`
+  fallbacks on `--away-pct`/`--home-pct` are gone — they were a second, quieter
+  copy of the same fabrication.
+
+**Verified:** 10 new tests in `tests/test_board_contract_absent.py`; 49 + 158
+existing tests across the contract, card, home and market-board suites;
+`tests.test_archives` 383 pass. Locally served boards render 0 fabricated
+50/50 bars, and soccer renders a real three-way bar with a draw segment
+(production today: NFL 1 fabricated 50/50 bar of 16, soccer 0 draw segments).
+
+**Not deployed.** Other sessions were mid-deploy on refresh-worker when this
+landed, and this is a visible change to every sport's card — it deserves its
+own decision and its own measurement window, not a ride on someone else's.
+
+**Still open in this lane:** F3 (one null placeholder platform-wide) and F4
+(grep the codebase for the absent-becomes-neutral shape and write it into the
+engineer agent's notes). F4 already has two confirmed instances beyond this
+file: the model layer's `_fair_probability` 0.5 (model plan A1, another lane's
+file) and the CSS fallbacks removed above.
+
+#### memory-cutover-ship — CLOSED-VERIFIED 2026-08-15 00:36Z
+Outcome: `#387` shipped in TWO halves and verified in production — `cfee9c6e`
+(streaming cutover) + `705eeefc` (the guard's floor becomes two floors).
+`BOARD_OVERVIEW_READY sports=8`, `OVERVIEW_STOPPED_FOR_MEMORY` 0, `oomKilled` 0
+in 1h40m, peak anon 1404.5MB (34.3% of the 4096MB ceiling) with the trace
+showing 1404 -> 1172MB as MLB is released. Three deploys, zero jobs killed.
+All five lane criteria met. Postmortem written (two `learnings.md` entries:
+the span/threshold rule, and the 8-sport pass EXONERATED as a sufficient cause).
+Follow-up check filed as `#434`. NOT closed by this lane: the 20:03:11Z kill
+remains unexplained, and the 3000MB floor in front of MLB stays until it is.
