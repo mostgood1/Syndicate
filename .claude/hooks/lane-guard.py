@@ -31,6 +31,41 @@ FIELD_RE = re.compile(r"^-\s*\w")
 PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
 
 
+# A bullet inside a `- Files:` block that DISCLAIMS a path rather than claiming
+# it. Measured 2026-08-15: `ask-sport-coverage` wrote
+# "**NOT claimed, deliberately:** `ask_the_syndicate_adapter.py` -- held by OPEN
+# lane `ask-headline-from-board`" and this parser turned that sentence into a
+# CLAIM of that file, blocking the lane that actually owned it from editing it.
+# The reverse fired at the same time between the same two lanes. `state.md`
+# already recorded the defect ("a regex over a hand-written ledger read 'NOT
+# claimed, deliberately' as a claim. Read the block, not a pattern match over
+# it.") -- this is that fix.
+#
+# Deliberately matched on INTENT WORDS rather than on formatting: the ledger is
+# hand-written and the same disclaimer appears as `**NOT claimed:**`,
+# `NOT claimed, deliberately:`, `Collision check: CLEAR`, and
+# `Read-only dependency:`. Erring toward skipping is the safe direction here --
+# a missed claim leaves an edit unguarded, while a phantom claim blocks the
+# lane's own owner and has no override short of editing someone else's ledger.
+_DISCLAIMER_MARKERS = (
+    "not claimed",
+    "collision check",
+    "read-only dependency",
+    "not touched",
+    "held by",
+    "claimed by",
+    "ownership checked",
+    "zero mentions",
+    "no lane",
+)
+
+
+def _is_disclaimer(line):
+    """True when this Files-block bullet talks ABOUT a path instead of claiming it."""
+    text = line.lstrip("- ").strip().strip("*_").lower()
+    return any(marker in text for marker in _DISCLAIMER_MARKERS)
+
+
 def _norm(p):
     return p.replace("\\", "/").strip("/")
 
@@ -84,7 +119,7 @@ def _claims(text):
             if not stripped or (FIELD_RE.match(line) and not line[:1].isspace()):
                 in_files = False
                 continue
-            if open_lane and stripped.startswith("-"):
+            if open_lane and stripped.startswith("-") and not _is_disclaimer(stripped):
                 for f in _paths_in(stripped.lstrip("- ")):
                     yield slug, f
 
