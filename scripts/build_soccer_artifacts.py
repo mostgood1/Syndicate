@@ -63,7 +63,10 @@ def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, 
     """
     if league == "mls":
         rows = fetch_asa_mls_team_history(date_cls.today().year)
-        return compute_team_ratings(rows, as_of=as_of)
+        # MLS rows are SEASON AGGREGATES with no date. Safe here and only
+        # here: this builds for a future date, so no row can postdate `as_of`.
+        # Dropping them would silently empty MLS ratings in production.
+        return compute_team_ratings(rows, as_of=as_of, allow_undated=True)
     if league in _GOALS_BASED_RATING_LEAGUES:
         history_dir = source_root / league / "history"
         frames = [pd.read_csv(path) for path in sorted(history_dir.glob("matches_*.csv"))]
