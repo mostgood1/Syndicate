@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -16,6 +17,9 @@ except Exception:  # pragma: no cover - psutil is optional in some local environ
 _BYTES_PER_MB = 1024 * 1024
 _BYTES_PER_KB = 1024
 _PROCFS_ROOT = Path("/proc")
+# A smaps mapping header: "7f3c-7f4d rw-p 00000000 00:00 0    [heap]".
+# Anchored so a field line ("Anonymous:  12 kB") can never match it.
+_SMAPS_HEADER_RE = re.compile(r"^[0-9a-fA-F]+-[0-9a-fA-F]+\s+\S{4}\s+\S+\s+\S+\s+\d+")
 
 
 def _bytes_to_mb(value: int | float | None) -> float | None:
@@ -1106,6 +1110,142 @@ def watchdog_should_heap_census(*, anon_mb: float | None, already_censused: bool
     return float(anon_mb) >= _env_float("SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB", 1500.0)
 
 
+_SMAPS_MAX_PER_PROCESS = 3
+_SMAPS_STATE: dict[str, int] = {"count": 0}
+
+# Anonymous mmap regions, bucketed by SIZE. pymalloc takes 1MB arenas by mmap and
+# glibc routes anything over MMAP_THRESHOLD (128KB default) the same way, so the
+# size distribution is what separates them -- there is no name to key on.
+#
+# Deliberately NOT "regions of exactly 1MB are pymalloc arenas": the kernel
+# COALESCES adjacent anonymous mappings with identical flags into one VMA, so 934
+# arenas can appear as far fewer, much larger regions. Buckets describe what is
+# there; they do not assert who allocated it.
+_SMAPS_BUCKETS_BYTES = (
+    (64 * 1024, "<64KB"),
+    (1024 * 1024, "64KB-1MB"),
+    (8 * 1024 * 1024, "1-8MB"),
+    (64 * 1024 * 1024, "8-64MB"),
+    (float("inf"), ">64MB"),
+)
+
+
+def parse_smaps(text: str) -> dict[str, Any]:
+    """Group `/proc/self/smaps` anonymous bytes by mapping kind.
+
+    `#435` step: 673MB of a 1,607MB rest-state floor is anon that pymalloc never
+    allocated (arenas 934MB against anon 1,607MB). `malloc_info` cannot see it --
+    it reported `arena_coverage_pct` 13.9% and labelled itself
+    `arena_not_representative`, because it reports arena bookkeeping and not
+    mmap'd chunks. The Python censuses cannot see non-Python allocations at all.
+
+    This asks the kernel instead, using the same accounting that decides the OOM
+    kill. `Anonymous:` per mapping is the field that matters; `Rss` includes
+    file-backed pages that the cgroup counts under `file`, not `anon`, and
+    conflating them is how a page-cache plateau once got called a leak.
+
+    Split out from the reader so it can be tested on a fixture rather than only
+    against a live process -- every other instrument in this investigation was
+    calibrated before it was trusted, and the two that were not produced wrong
+    answers.
+    """
+    totals: dict[str, int] = {}
+    buckets: dict[str, int] = {}
+    regions: list[tuple[int, str]] = []
+    current_path = ""
+    current_size = 0
+    current_anon = 0
+    seen_header = False
+
+    def _flush() -> None:
+        nonlocal current_anon, current_size, current_path
+        if not seen_header or current_anon <= 0:
+            return
+        path = current_path
+        if path in {"[heap]", "[stack]"}:
+            kind = path.strip("[]")
+        elif path.startswith("["):
+            kind = "special"
+        elif path:
+            kind = "file_backed"
+        else:
+            kind = "anon_mmap"
+            for limit, label in _SMAPS_BUCKETS_BYTES:
+                if current_size < limit:
+                    buckets[label] = buckets.get(label, 0) + current_anon
+                    break
+        totals[kind] = totals.get(kind, 0) + current_anon
+        regions.append((current_anon, path or f"anon:{round(current_size / _BYTES_PER_MB, 1)}MB"))
+
+    for line in text.splitlines():
+        if _SMAPS_HEADER_RE.match(line):
+            _flush()
+            seen_header = True
+            parts = line.split(None, 5)
+            current_path = parts[5].strip() if len(parts) > 5 else ""
+            span = parts[0].split("-")
+            try:
+                current_size = int(span[1], 16) - int(span[0], 16)
+            except Exception:
+                current_size = 0
+            current_anon = 0
+        elif line.startswith("Anonymous:"):
+            try:
+                current_anon = int(line.split()[1]) * _BYTES_PER_KB
+            except Exception:
+                current_anon = 0
+    _flush()
+
+    return {
+        "by_kind_mb": {k: round(v / _BYTES_PER_MB, 1) for k, v in sorted(totals.items(), key=lambda kv: -kv[1])},
+        "anon_mmap_by_size_mb": {k: round(v / _BYTES_PER_MB, 1) for k, v in sorted(buckets.items(), key=lambda kv: -kv[1])},
+        "total_anon_mb": round(sum(totals.values()) / _BYTES_PER_MB, 1),
+        "region_count": len(regions),
+        "largest_regions_mb": [
+            (round(anon / _BYTES_PER_MB, 1), path[:70]) for anon, path in sorted(regions, reverse=True)[:8]
+        ],
+    }
+
+
+def log_smaps_anon_breakdown(reason: str) -> dict[str, Any] | None:
+    """Read `/proc/self/smaps` and report where the anon actually lives.
+
+    Cost: the kernel walks page tables to answer this, so it is not free -- but
+    it is a single read with no per-allocation bookkeeping, which is the property
+    `tracemalloc` lacked when it silenced the sampler at both nframe=3 and 2.
+    Capped per process like the other censuses, and run off the sampler thread.
+    """
+    if _SMAPS_STATE["count"] >= _SMAPS_MAX_PER_PROCESS:
+        return None
+    try:
+        path = _PROCFS_ROOT / "self" / "smaps"
+        if not path.exists():
+            print("[memory_observability] SMAPS_UNAVAILABLE (not a Linux procfs)", flush=True)
+            return None
+        _SMAPS_STATE["count"] += 1
+        payload = parse_smaps(path.read_text(encoding="utf-8", errors="ignore"))
+        payload["reason"] = str(reason or "")[:80]
+        payload["smaps_index"] = _SMAPS_STATE["count"]
+
+        # RECONCILIATION, and it is the point rather than a nicety. smaps and the
+        # cgroup are INDEPENDENT kernel accountings of the same bytes. If they
+        # disagree materially the parse is wrong, and a breakdown that does not
+        # add up must not be read as attribution -- this investigation has twice
+        # acted on a number that was internally consistent and wrong.
+        stat = _read_container_memory_stat()
+        cgroup_anon_mb = _bytes_to_mb(stat.get("anon")) if stat and "anon" in stat else None
+        payload["cgroup_anon_mb"] = cgroup_anon_mb
+        if cgroup_anon_mb:
+            delta = payload["total_anon_mb"] - cgroup_anon_mb
+            payload["reconciles_within_pct"] = round(100.0 * abs(delta) / cgroup_anon_mb, 1)
+            payload["reconciles"] = abs(delta) <= max(64.0, 0.10 * cgroup_anon_mb)
+        print(f"SMAPS_ANON {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
+        return payload
+    except Exception as exc:
+        print(f"SMAPS_ANON_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
 _PYMALLOC_STATS_MAX_PER_PROCESS = 3
 _PYMALLOC_STATS_STATE: dict[str, int] = {"count": 0}
 
@@ -1243,6 +1383,10 @@ def _run_censuses(reason: str) -> None:
         log_pymalloc_arena_stats(reason)
     except Exception as exc:  # pragma: no cover - defensive
         print(f"[memory_observability] PYMALLOC_STATS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+    try:
+        log_smaps_anon_breakdown(reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[memory_observability] SMAPS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
 
 
 def _watchdog_maybe_heap_census(payload: dict[str, Any]) -> None:
