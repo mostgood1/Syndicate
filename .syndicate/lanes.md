@@ -89,7 +89,51 @@
   sits on ±4900 any more.
 
 
-### clv-without-settlement — OPEN — BOTH HALVES BUILT; THE FIRST CLV NUMBER WAS RETRACTED; NONE IS THE HONEST ANSWER — opened 2026-08-14 — session: model-audit
+### clv-without-settlement — OPEN — TAKEN 2026-08-15 by session `lane-cleanup` (was orphaned; `model-audit` is gone) — **ROOT CAUSE OF THE ZERO IS FOUND AND IT IS A VERSION SKEW, NOT A DEFECT** — opened 2026-08-14 — session: lane-cleanup
+- **THE PUBLISH FAILURE IS DIAGNOSED. Every link measured 2026-08-15 19:0xZ,
+  no link inferred.**
+  1. **Recorder healthy.** refresh-worker: `[clv_opening_ledger] OPENINGS
+     date=2026-08-15 ... already=490`. **490 real openings exist.**
+  2. **Sender tries.** refresh-worker (live `c67f7373`) HAS
+     `reports/intelligence/clv_openings/*.jsonl` in `HOT_ARTIFACT_PATTERNS`, so
+     it calls `publish_hot_artifact` — but only `if written:`, which is why the
+     attempts are sparse rather than per-tick.
+  3. **Receiver refuses: `HTTP Error 403: FORBIDDEN`**, 8 times in 16h.
+     `_write_published_artifact` returns 403 on exactly one condition —
+     `if not is_hot_artifact_relative_path(relative_path)` (`ops.py:1100-1101`).
+  4. **Web's copy does not have the pattern.** Live web `0bf866c3` →
+     0 occurrences of `clv_openings`.
+  5. **Not a transport, token or size problem, and this was checked rather than
+     assumed:** soccer `live_state` artifacts logged `PUBLISH_OK` to the SAME
+     url with the SAME token at 19:11:25Z, seconds after a clv `PUBLISH_FAILED`.
+     Zero `SKIP_NOT_CONFIGURED` lines. The file is ~286KB against a 4MiB stream
+     threshold, so it takes the proven JSON-envelope path.
+- **CORRECTION TO MY OWN FIRST READING, made before acting on it.** I said the
+  entry was "on origin/main" and that web had merely fallen behind. **It is NOT
+  on main.** Blob for `artifact_publisher.py` is `aff59302` on BOTH web
+  `0bf866c3` and `origin/main`; the worker carries `ee94fe6b`. I had grepped the
+  WORKING FILE and reported it as main. The entry exists only on the worker's
+  deploy branch and in the working tree — it has never been committed to main,
+  so it is one `git checkout` away from being lost.
+- **THE FIX IS A DEPLOY, NOT A CODE CHANGE.** Diff between web's blob and the
+  worker's is a single pure addition: the comment plus
+  `"reports/intelligence/clv_openings/*.jsonl"`. The working tree is
+  byte-identical to the worker's deployed blob (`ee94fe6b`), so shipping it to
+  web makes sender and receiver agree.
+- Files (exclusive to this lane): `syndicate/features/shared/artifact_publisher.py`.
+  Collision check RUN via `lane-guard.py`'s own `_claims()`: CLEAR.
+  **NOT claimed:** `syndicate/blueprints/ops.py` (held by `quote-feed-age-alarm`)
+  — no edit needed there, the receiver logic is already correct.
+- Falsification test: if web still 403s after the allowlist ships, the 403 is
+  NOT coming from the allowlist branch and `ops.py:1100` is the wrong line —
+  re-read the receiver before changing anything else.
+- Verification: (1) a `PUBLISH_OK` line for a `clv_openings` path in
+  refresh-worker's log; (2) `/api/ops/artifacts/export?pattern=...clv_openings/*.jsonl`
+  returns `count >= 1, bytes > 0`; (3) `/api/ops/clv/report?date=2026-08-15&sport=mlb`
+  returns `openings > 0`. **All three, or it is not fixed.**
+- **DOES NOT CLOSE THE LANE.** This unblocks the measurement; it does not
+  produce `clv_pct`. Breadth remains untested.
+
 - **STATUS 2026-08-14 19:50 CDT.** Recorder LIVE (`2b14fbeb`) + `book_prices`
   LIVE (`96e3a9b7`). Joiner is **library-only, no call site, NOT deployed**
   (`deploy/clv-joiner-guards-r2`, `2f596260`). 42 tests green.
@@ -837,7 +881,7 @@ than have every session quietly decide it is.
 - Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
 
-### ask-sport-coverage — OPEN — DEPLOYED + MEASURED IN PRODUCTION 25->38/52, ZERO REGRESSIONS; K6 HALF DONE, SOCCER/NCAAB/NHL UNPROVEN ON DATA — opened 2026-08-15 — session: ask-sport-coverage
+### ask-sport-coverage — OPEN — DEPLOYED + MEASURED 25->38/52, ZERO REGRESSIONS; K6 RETRACTED AS INERT ON PROD (my verification of it was invalid); SOCCER/NCAAB/NHL UNPROVEN ON DATA — opened 2026-08-15 — session: ask-sport-coverage
 - Goal: the deterministic path names and answers for all eight sports, not
   three. Single testable outcome: `scripts/ask_syndicate_regression.py` moves
   `lookup` (2/8) and `entity` (2/10) above baseline with **no** class
@@ -986,7 +1030,7 @@ than have every session quietly decide it is.
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
-### nfl-live-edge-suppression — OPEN — opened 2026-08-15 — session: tier5-live-read
+### nfl-live-edge-suppression — OPEN — CODE COMMITTED `1d15686b` + TESTED; PRODUCTION RE-MEASURE OWED (needs a deploy) — opened 2026-08-15 — session: tier5-live-read
 - Goal: an NFL row whose game is live or final carries **no** `model_edge_pct`
   on the published shortlist, for the same reason and with the same wording MLB
   already uses. Single testable outcome: the 5 live NFL `smartsim2_total_normal`
@@ -1274,7 +1318,15 @@ coverage-reporting) was running at checkpoint time. Until it reports, soccer
 backtest accuracy remains **unmeasured** — and `SoccerSimulationOutput`
 still ships `calibration.win_probability.brier = None`.
 
-### live-game-line-projection — OPEN — DROP 1 SHIPPED TO GIT (`0e0b0aa1`), NOT DEPLOYED, NOT OBSERVABLE ALONE; DROP 2 RE-SCOPED AND UNDESIGNED — opened 2026-08-15 — session: live-game-line-projection
+### live-game-line-projection — OPEN — DROP 1 DEPLOYED **TO THE WRONG SERVICE** (web, where it is INERT); DROP 2 BUILT (`4bd7dbb3`) AND ON NO SERVICE; DROP 3 UNBUILT — opened 2026-08-15 — session: live-game-line-projection
+> **STATUS LINE CORRECTED 2026-08-15 ~18:0xZ by the coordinating session.** It
+> read "NOT DEPLOYED" and that is no longer true: `0e0b0aa1` rode the web train
+> and is in the deployed tree (`dep-da0a5rlg1s2s73cm43kg`, live 17:40:30Z).
+> **This does NOT discharge the lane's measurement obligation.** By this lane's
+> own commit message the change publishes nothing on its own — the visible
+> effect needs Drop 2 — so "deployed" here means *present*, not *proven*. No
+> production predicate was declared for it and none was measured. Do not read
+> the deploy as evidence the lens now serves a live win probability.
 - Goal: MLB game lines carry a projection computed from the CURRENT game state
   rather than the pregame sim. **Testable outcome:** on a live MLB slate, a
   published artifact carries a live win probability per live game whose value
@@ -1542,7 +1594,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
-### tabular-figures-actually-applied — BOTH HALVES BUILT; CSS HALF AWAITING A WEB DEPLOY TO BE MEASURED — opened 2026-08-15 — session: ui-plan-lane-gh
+### tabular-figures-actually-applied — OPEN — BOTH HALVES BUILT AND PUSHED; CSS HALF UNDEPLOYED, SO ITS 4 NUMBERS ARE STILL TRUE OF PRODUCTION — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the tabular-figures fix covers the classes users actually watch, and
   the probe can no longer report a pass for a class it never found. Testable:
   `ui_layout_probe.py` FAILS on any numeric class with 0 elements on a sport
@@ -1946,3 +1998,180 @@ records every instrument green throughout. The 6.3x read cost and the evening
 OOM ramp live in this same file family, so worker restarts could be part of the
 starvation rather than a separate fault. Last kill was 05:02:59Z so probably not
 today's window — but it is worth ruling out rather than assuming.
+
+#### ask-sport-coverage — K6 fix HELD FOR COORDINATION 2026-08-15 19:0xZ
+
+`3ba1c2cf` (on `deploy/ask-sport-coverage`, cut from live `1e44e1da`) is built,
+pushed and **deliberately not deployed**. Deploy coordination request sent to
+session "Syndicate plan assessment and sessions" (`local_82a0a2fe`); awaiting
+go/no-go. That session is currently **idle** (`isRunning: false`, last activity
+17:45Z), so the message is queued rather than delivered live.
+
+Two reasons for holding rather than firing:
+1. A web deploy 502s every route for ~2 min, and two sessions were active
+   minutes ago ("Fix two red tests", "Tier 5 pre-work"). An outage mid-run
+   corrupts anything either is measuring against production.
+2. This is a WARNING-level fix (`no_as_of_stated`), predicted to leave class
+   scores at 38/52. It does not justify its own outage if a batch deploy is
+   coming — better to ride along.
+
+My own deploy API call was refused by the permission classifier, so a human or
+another session must fire it regardless.
+
+**Baseline is current as of the hold:** live `1e44e1da`, 38/52, `as_of` 28/52,
+`warn:no_as_of_stated` 24. If live moves before this ships, RE-BASELINE — that
+rule was written this session after the handed-down 23/52 turned out to be two
+deploys stale.
+
+#### nfl-live-edge-suppression — CHECKPOINT 2026-08-15 (session end)
+- **Committed `1d15686b`, in HEAD, verified by content** (2 files, +233, 0
+  deletions, isolated `GIT_INDEX_FILE`). Nothing of this lane is uncommitted.
+- **NOT DEPLOYED.** Neither `1d15686b` nor `8b6f7773` is an ancestor of the live
+  web (`1e44e1da`) or refresh-worker (`c67f7373`) SHAs, re-read at checkpoint.
+- **The one thing owed:** count NFL rows on `/api/board/layer2-shortlist` with
+  `is_live` AND `model_edge_pct is not None`. Baseline **5** (02:37Z).
+  Expect **0**. **Must be taken on a live NFL slate** — window 2's 0 was read
+  with zero live rows on the board and is non-evidence.
+- Falsifier if it stays 5: the edges are not from `attach_nfl_game_projections`;
+  discriminator is `basis: smartsim2_total_normal` / `source: nfl_smartsim2`.
+
+#### quote-feed-age-alarm — NO LANE WAS OPENED (recorded, not hidden)
+- `8b6f7773` (3 files, +556) shipped without its own `/lane open`. The
+  `nfl-live-edge-suppression` lane was the only one held. Recorded here rather
+  than backdated. Files touched — `shared/quote_feed_age.py` (new),
+  `blueprints/ops.py`, `tests/test_quote_feed_age.py` (new) — none claimed by
+  any OPEN lane at the time (checked: `odds_book_quotes.py` IS claimed by
+  `quote-shard-latest-index`, which is why the alarm does not live there).
+- **Prerequisite 2 (job cap / run-lock) deliberately NOT attempted.**
+  `live_refresh_loop.py` is claimed by OPEN `live-game-line-projection`; the cap
+  is in `scripts/run_refresh_worker.py` (unset → default 1); raising it doubles
+  concurrent memory on the 4 GiB worker `#435` is debugging, and it is the WRONG
+  lock anyway (`ops_refresh.py:669` is the one that refused the ticks).
+  Handover, not a to-do: the run-lock has a documented false-positive mode at
+  `ops_refresh.py:654-665` — a lingering wrapper past a terminal manifest state.
+
+#### tabular-figures-actually-applied — CHECKPOINT 2026-08-15 17:4xZ — PIN TARGET HAS MOVED TWICE
+
+`1bb8cf9f` is pushed and still NOT deployed. Nothing of this lane is
+uncommitted; all six source files hash-match `origin/main`.
+
+**The rollback/stack SHA in the earlier preflight is STALE.** Web has moved
+under the held deploy twice:
+
+    0bf866c3  16:49:28Z  ask tests: assert the as-of CONTRACT     (deactivated)
+    1e44e1da  17:40:30Z  mlb live lens: a live-state lens ...     (LIVE now)
+
+So: **pin `1e44e1da` + `1bb8cf9f`**, re-read the live SHA at deploy time because
+it may have moved again, and never deploy `origin/main`'s tip — it is ~143
+commits ahead of production across many sessions.
+
+**Lane G is unaffected and still live:** `1e44e1da` carries `7e334509` as an
+ancestor (checked, not assumed).
+
+**The one thing to measure after the deploy**, and the reason this is not
+closeable yet: `py -3 scripts/ui_layout_probe.py --base-url <prod> --sports
+mlb,nfl,ncaaf,soccer`, then write the `numericSweep` totals to `deploys.md`.
+Expect mlb 1388 -> 0 and nfl 468 -> 0. **Those two are the unproven ones** —
+locally MLB served 0 cards and NFL 1, so only ncaaf (432 -> 0) and soccer
+(60 -> 0) are honest evidence today. If mlb does not reach 0, the rule is not
+reaching `cards_source.js`'s subtree and the fix missed the sport it was for.
+
+### red-intelligence-tests — OPEN — opened 2026-08-15 — session: red-intelligence-tests
+- Goal: `python -m pytest tests/test_intelligence.py -q -k "mlb_top_props_artifact or blotter_view_includes_odds"` is green on committed code, with each failure's CAUSE named before it is touched — no assertion weakened to fit a real defect.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/intelligence_contracts.py` — `UniversalCandidate.to_dict`, the `line` write only.
+  - `tests/test_intelligence.py` — the two failing assertions only.
+- Collision check RUN as a TEXT GREP over the whole of `lanes.md` (not
+  `lane-guard._claims()`, which under-reports — 2026-08-15 FORBIDDEN entry):
+  zero mentions of `intelligence_contracts.py`; the only `test_intelligence.py`
+  mention is `quote-feed-age-alarm` FLAGGING failure (1) as pre-existing and
+  not-mine, which is a hand-off, not a claim. `syndicate/templates/intelligence.html`
+  and `syndicate/blueprints/intelligence.py` are NOT claimed by any OPEN lane
+  either, and are NOT edited by this lane — the template is READ ONLY here.
+  Both are ALSO checked dirty-vs-clean: `intelligence.py` carries another
+  session's uncommitted `rows_uninformative_ev` hunk, untouched by me.
+- `.current-lane` TAKEN from `quote-shard-latest-index` at 2026-08-15. One
+  single-valued file, N sessions — that session must re-take it to edit.
+- Hypothesis (1): the recommendation's `line` is the DISPLAY string `"4.5"`
+  when `_mlb_prop_candidate_from_artifact_row` builds it (`f"{line_value:.1f}"`),
+  and `UniversalCandidate.to_dict` clobbers it with the join-normalised FLOAT
+  in its `for field_name in (... "line" ...)` loop — added 2026-08-06 by
+  `1f6c27b9`. This is the SAME defect `1f47b2d6` ("Fix candidate field
+  corruption", 2026-07-28) fixed for `odds` twelve lines above, whose comment
+  states the rule; `line` was missed because it sits inside the loop.
+- Hypothesis (2): the three blotter columns were NOT dropped. `#240`/`#243`
+  moved the headers from literal `<th>Odds</th>...` into the sortable
+  `BLOTTER_COLUMNS` array, so the string-match assertion is stale while the
+  feature is intact. The test's own comment says Playwright did the real
+  verification and this is only a drop-guard.
+- Falsification test (1): if reverting ONLY the `line` write in `to_dict`
+  leaves the test red, the flattening is not the cause and the candidate
+  builder is. (2): if `BLOTTER_COLUMNS` has no `Odds`/`Projected`/`Live`
+  entries, or the row template renders no such cells, the columns really
+  were dropped and the fix is to restore them, not to update the assertion.
+- Verification: both named tests green; then the FULL `tests/test_intelligence.py`
+  file green, plus every other test that reads a candidate `line`, to prove the
+  contract change broke nothing that depended on the float.
+- Blocked by: none. NO DEPLOY — instruction stands.
+
+#### red-intelligence-tests — CLAIM WIDENED 2026-08-15
+- ADDS `tests/test_intelligence_contracts.py` — one new regression test pinning
+  `to_dict`'s line rule. Zero mentions in `lanes.md` (text grep, whole file),
+  clean in `git status`. Reason for widening: the repo has now hit this exact
+  defect twice (`odds`, 2026-07-28 `1f47b2d6`; `line`, 2026-08-06 `1f6c27b9`)
+  and neither had a test at the contract layer — the only thing that caught the
+  second one was a distant MLB blueprint test, 9 days late.
+
+#### live-game-line-projection — DROP 2 BUILT + A DEPLOY-TARGET CORRECTION 2026-08-15
+**`4bd7dbb3`** — `mlb/live_lens.py` +155, `tests/test_mlb_live_state_carry_forward.py`
+new (22 tests), `tests/test_mlb_refresh_runner.py` +8/-4 (one pinned kwarg).
+
+- **DROP 1 WAS DEPLOYED TO WEB AND IS INERT THERE. Verified by CONTENT, not
+  ancestry `[measured 2026-08-15 ~18:1xZ]`:**
+
+  | service | live SHA | Drop 1 | Drop 2 |
+  |---|---|---|---|
+  | web | `1e44e1da` (and `0c65a832` building) | **present** | absent |
+  | refresh-worker | `c67f7373` | **absent** | absent |
+  | live-odds-worker | `ccd10349` (08-14 19:24Z) | **absent** | absent |
+
+  **Drop 1 fixes a merge that only ever has something to merge where the Monte
+  Carlo RAN.** On web the MC is hard-refused in-request
+  (`refuse_if_compute_in_request_path`), so there is never a `live_mc` lens for
+  the fixed condition to keep — the new disjunct cannot fire. **Drop 1's target
+  is `live-odds-worker`** (it runs `live_lens_loop` and produces the MC);
+  **Drop 2's target is web** (it owns the destructive rebuild). Deploying either
+  to the other service alone changes nothing. This is `presence != reachability`
+  / "a deployed fix can be inert" — the coordinating session was right that
+  "deployed means present, not proven", and the stronger statement is that on
+  web it cannot even be present in the reachable sense.
+- **DESIGN DECISION, made and stated:** carry-forward, NOT a bigger max age.
+  Raising the threshold only makes the destruction rarer and leaves it for the
+  case that matters most — a stalled worker, which is measured (Layer 2 sat 60+
+  min with no alarm). `#124` already tuned that threshold once.
+- **The carried lens is bounded and stamped, because an unbounded carry IS the
+  `#414` harm.** Refused past 300 s
+  (`MLB_LIVE_STATE_CARRY_FORWARD_MAX_AGE_SECONDS`, `0` = kill switch); refused
+  when the age is unreadable rather than defaulting permissive; refused for a
+  game that has gone final; stamped `liveStateAsOf` with the instant the re-sim
+  actually ran and **never re-stamped**, so a second hop cannot reset the clock
+  and make a stale lens read as permanently fresh. `liveStateLensCarriedForward`
+  counts it so a served payload can be asked "real re-sim this tick, or last
+  one?" without diffing two snapshots.
+- **Mutation-pinned:** neutering the merge fails **exactly the 3 carry
+  assertions**; all **9 refusal cases stay green** (a no-op cannot violate a
+  refusal, which is why the refusals needed their own pin). **333 passed** across
+  the live-lens surface.
+- **`tests/test_mlb_refresh_runner.py` was unclaimed and is now touched by this
+  lane** — it pinned `build_live_lens_snapshot_internal`'s exact kwargs and my
+  new `previous_snapshot` broke it. Updated to pin the new kwarg **deliberately**
+  rather than loosened to ANY: passing the already-read snapshot instead of
+  re-reading a ~1.4 MB keyvalue payload inside is what keeps this off the request
+  path's I/O budget, so the kwarg is load-bearing. That file is back to its
+  single known pre-existing failure (`2caa8eac`, 2026-08-12).
+- **NOT DEPLOYED BY THIS SESSION, and a web deploy `0c65a832` was in flight at
+  the time of writing** — it does NOT carry Drop 2. Deploy races are real; check
+  before firing.
+- **STILL OPEN: Drop 3, the join.** `live_projection_join` is entirely
+  prop-shaped; nothing prices a live game line even once it is published, so
+  `rows_live_edged` stays 0 for game-line markets until it exists.
