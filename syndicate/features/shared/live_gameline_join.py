@@ -263,3 +263,114 @@ def record(coverage: dict[str, Any], verdict: Mapping[str, Any], *, projected: b
     reason = str(verdict.get("withheld_reason") or "unspecified")
     by_reason = coverage.setdefault("withheld_by_reason", {})
     by_reason[reason] = int(by_reason.get(reason, 0)) + 1
+
+
+def _norm_team(value: Any) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def build_live_gameline_index(snapshot: Any) -> dict[tuple[str, str], dict[str, Any]]:
+    """(away_team, home_team) -> the live moneyline projection.
+
+    JOINED ON FULL TEAM NAMES, WHICH MATCH EXACTLY. Verified against production
+    2026-08-15: the snapshot carries `matchup.home.name` "San Francisco Giants"
+    and the grid row carries `home_team` "San Francisco Giants". **No alias
+    table is involved, and that is deliberate** -- the prop join's 91% miss
+    (`miss_no_market_alias` 903 of 989) comes from aliasing market NAMES, and
+    reproducing that machinery here would import its failure mode for no gain.
+    If this join ever starts missing, the counter says so by name rather than
+    silently returning zero coverage.
+    """
+    index: dict[tuple[str, str], dict[str, Any]] = {}
+    if not isinstance(snapshot, Mapping):
+        return index
+    games = snapshot.get("games")
+    if not isinstance(games, list):
+        return index
+    for game in games:
+        if not isinstance(game, Mapping):
+            continue
+        matchup = game.get("matchup") if isinstance(game.get("matchup"), Mapping) else {}
+        away = matchup.get("away") if isinstance(matchup.get("away"), Mapping) else {}
+        home = matchup.get("home") if isinstance(matchup.get("home"), Mapping) else {}
+        key = (_norm_team(away.get("name")), _norm_team(home.get("name")))
+        if not key[0] or not key[1]:
+            continue
+        projection = live_gameline_from_lens(game.get("gameLens"))
+        if projection is None:
+            continue
+        projection = dict(projection)
+        projection["game_pk"] = game.get("gamePk")
+        index[key] = projection
+    return index
+
+
+def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str, Any]]) -> dict[str, Any]:
+    """Overlay the live game-line projection on live moneyline rows.
+
+    Mirrors `attach_live_projections`' contract deliberately: a row the join
+    MISSES keeps whatever suppression it already had rather than silently
+    gaining an edge, and a row it hits is marked `live_aware` so
+    `live_edge_policy` stops refusing it for being live. The precision gate is
+    applied ON TOP of that -- being allowed to price is not the same as being
+    precise enough to.
+
+    FINAL GAMES ARE NOT TOUCHED. The policy refuses them even when live-aware,
+    and re-deciding that here would put two rules on one question.
+    """
+    coverage = new_coverage()
+    coverage["index_size"] = len(index)
+    if not isinstance(grid, (list, tuple)):
+        return coverage
+
+    for row in grid:
+        if not isinstance(row, Mapping):
+            continue
+        game = row.get("game") if isinstance(row.get("game"), Mapping) else {}
+        if str(game.get("state") or "").strip().lower() not in {"live", "in_progress"}:
+            continue
+        if str(row.get("kind") or "") != "game":
+            continue
+        if str(row.get("market") or "").strip().lower() != "h2h":
+            continue
+
+        key = (_norm_team(row.get("away_team")), _norm_team(row.get("home_team")))
+        hit = index.get(key)
+        if hit is None:
+            record(coverage, {"priceable": False, "withheld_reason": REASON_NO_LIVE_PROJECTION}, projected=False)
+            continue
+
+        projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+        verdict = price_moneyline(
+            model_prob=hit.get("home_win_prob"),
+            # `market_fair_prob_over` is the de-vigged HOME probability on an
+            # h2h row -- confirmed against production: home -21759 -> 0.9954,
+            # away +3878 -> 0.0251, sum 1.0205, 0.9954/1.0205 = 0.9754, which is
+            # the value the row carries. Reading it rather than re-de-vigging
+            # keeps one devig ordering in the board path.
+            market_prob=projection.get("market_fair_prob_over"),
+            sims=hit.get("sims_run"),
+        )
+
+        if isinstance(row, dict):
+            block = dict(verdict)
+            block["game_pk"] = hit.get("game_pk")
+            block["home_win_prob"] = hit.get("home_win_prob")
+            block["sims_run"] = hit.get("sims_run")
+            block["total_mean"] = hit.get("total_mean")
+            block["as_of"] = hit.get("as_of")
+            block["carried_forward"] = hit.get("carried_forward")
+            row["live_gameline"] = block
+            updated = dict(projection)
+            updated["live_aware"] = True
+            if verdict.get("priceable"):
+                updated["edge_vs_market_pct"] = verdict.get("edge_pp")
+                updated["edge_unavailable_reason"] = None
+            else:
+                updated["edge_vs_market_pct"] = None
+                updated["edge_unavailable_reason"] = verdict.get("withheld_reason")
+            row["projection"] = updated
+
+        record(coverage, verdict, projected=True)
+
+    return coverage

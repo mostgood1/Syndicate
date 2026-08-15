@@ -21,6 +21,8 @@ from syndicate.features.shared.live_gameline_join import (
     REASON_NO_MARKET_PRICE,
     REASON_TOTALS_MEAN,
     REASON_UNUSABLE_SIMS,
+    attach_live_gamelines,
+    build_live_gameline_index,
     live_gameline_from_lens,
     new_coverage,
     price_moneyline,
@@ -203,3 +205,85 @@ class TestCoverageCounters:
             record(cov, price_moneyline(model_prob=p, market_prob=0.5, sims=120), projected=True)
         assert (cov["rows_live_gameline_edged"] + cov["rows_live_gameline_withheld"]
                 == cov["rows_live_gameline_considered"])
+
+
+class TestIndexAndAttach:
+    """The join itself, against the shapes measured in production 2026-08-15."""
+
+    def _snapshot(self, prob=0.6842, source="live_mc", sims=120):
+        return {"games": [{
+            "gamePk": 823184,
+            "status": {"abstract": "Live"},
+            "matchup": {"away": {"name": "Colorado Rockies", "abbr": "COL"},
+                        "home": {"name": "San Francisco Giants", "abbr": "SF"}},
+            "gameLens": [{"key": "live", "source": source, "modelHomeWinProb": prob,
+                          "simsRun": sims, "projection": {"total": 8.5, "homeMargin": 0.7}}],
+        }]}
+
+    def _row(self, state="live", market="h2h", kind="game", market_prob=0.50):
+        return {"kind": kind, "market": market,
+                "away_team": "Colorado Rockies", "home_team": "San Francisco Giants",
+                "game": {"state": state},
+                "projection": {"market_fair_prob_over": market_prob,
+                               "edge_unavailable_reason": "game is live: a pregame projection cannot be priced against a live market",
+                               "edge_vs_market_pct": None}}
+
+    def test_index_keys_on_full_team_names(self):
+        idx = build_live_gameline_index(self._snapshot())
+        assert ("colorado rockies", "san francisco giants") in idx
+        assert idx[("colorado rockies", "san francisco giants")]["game_pk"] == 823184
+
+    def test_a_segment_only_game_is_not_indexed(self):
+        assert build_live_gameline_index(self._snapshot(source="segment_projection")) == {}
+
+    def test_attach_prices_a_big_live_edge_and_clears_the_pregame_reason(self):
+        grid = [self._row(market_prob=0.50)]
+        cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot(prob=0.6842)))
+        assert cov["rows_live_gameline_edged"] == 1
+        row = grid[0]
+        assert row["projection"]["live_aware"] is True
+        assert row["projection"]["edge_unavailable_reason"] is None
+        assert row["projection"]["edge_vs_market_pct"] == pytest.approx(18.42, abs=0.01)
+        assert row["live_gameline"]["game_pk"] == 823184
+
+    def test_attach_withholds_a_small_edge_but_still_marks_live_aware(self):
+        """live_aware is about the MODEL knowing the score; priceable is about
+        precision. Conflating them would either refuse everything or price noise."""
+        grid = [self._row(market_prob=0.67)]
+        cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot(prob=0.6842)))
+        assert cov["rows_live_gameline_edged"] == 0
+        assert cov["withheld_by_reason"] == {REASON_NOT_PRICEABLE: 1}
+        row = grid[0]
+        assert row["projection"]["live_aware"] is True
+        assert row["projection"]["edge_vs_market_pct"] is None
+        assert row["projection"]["edge_unavailable_reason"] == REASON_NOT_PRICEABLE
+
+    @pytest.mark.parametrize("kw", [{"state": "pregame"}, {"state": "final"},
+                                    {"kind": "prop"}, {"market": "totals"}])
+    def test_rows_outside_scope_are_untouched(self, kw):
+        """A pregame, final, prop or totals row must not be considered at all --
+        final in particular is live_edge_policy's call, not this module's."""
+        grid = [self._row(**kw)]
+        before = dict(grid[0]["projection"])
+        cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
+        assert cov["rows_live_gameline_considered"] == 0
+        assert grid[0]["projection"] == before
+        assert "live_gameline" not in grid[0]
+
+    def test_an_unmatched_row_keeps_its_existing_suppression(self):
+        """The miss must not silently grant an edge, and must be countable."""
+        grid = [self._row()]
+        grid[0]["home_team"] = "Some Other Team"
+        cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
+        assert cov["rows_live_gameline_considered"] == 1
+        assert cov["rows_live_gameline_projected"] == 0
+        assert cov["withheld_by_reason"] == {REASON_NO_LIVE_PROJECTION: 1}
+        assert "live_aware" not in grid[0]["projection"]
+        assert grid[0]["projection"]["edge_unavailable_reason"].startswith("game is live")
+
+    def test_empty_grid_and_empty_index_are_safe(self):
+        assert attach_live_gamelines([], {})["rows_live_gameline_considered"] == 0
+        assert attach_live_gamelines(None, {})["rows_live_gameline_considered"] == 0
+        cov = attach_live_gamelines([self._row()], {})
+        assert cov["index_size"] == 0
+        assert cov["withheld_by_reason"] == {REASON_NO_LIVE_PROJECTION: 1}
