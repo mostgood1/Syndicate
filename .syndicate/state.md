@@ -1500,3 +1500,21 @@ uniform and their spreads ARE layout signals. MLB's is not. `[measured]`
 **EXONERATED:** the MLB height movement flagged at the 21:2xZ checkpoint is not
 `6e9e6107` and not any layout change - the contract rows were byte-identical
 across it (0/15 games). `[measured]`
+
+## UI probe - the height model and the settle rule `[measured 08-15 23:xxZ]`
+
+**`scripts/ui_layout_probe.py` now reports a LAYOUT signal for MLB**, not a
+content one: it fits `height = chrome + k * content_units` per game state and
+reports the residual. Baseline, settled: mlb mobile Live 6px / Preview 54px,
+mlb desktop Live 18px. Budget `LAYOUT_RESIDUAL_BUDGET_PX = 150` (~3x worst
+clean reading). Desktop Preview is declared UNRELIABLE — its grid wraps into
+columns, so height is linear in ROWS not pairs. `[measured]`
+
+**MLB RENDERS PROGRESSIVELY FOR ~4 SECONDS AND `wait_for_selector` DOES NOT
+COVER IT.** Total `.cards-data-pair` across 15 cards at 390px: 482 at +0ms,
+530 at +600ms, 590 at +1200, 683 at +2000, **719 at +3000 and stable**. Any
+probe of `/mlb/cards` must wait for the DOM to stop changing, not for the first
+card to attach. The probe does this now (`_settle`), records `settledMs`, and
+FAILS if the render never settles. MLB 3.6-4.0s; every other sport 0.8s.
+**Every MLB figure produced before this was taken at ~74% of final content.**
+`[measured]`

@@ -3636,3 +3636,44 @@ NOT CLOSED BY THIS LANE, and the next reader should not think otherwise:
   `quote-feed-age-alarm`'s claim on `odds_book_quotes.py`. Attribution rests on
   kill count, peak anon, and eviction churn going 10 -> 0 — strong and
   independent, but not the branch announcing itself.
+
+#### height-per-content-unit — CLOSED-VERIFIED 2026-08-15
+
+Ships `heightModelByState` (fit `height = chrome + k * units` per game state),
+`fitRatio`/`reliable`, `contentUnits`, and `LAYOUT_RESIDUAL_BUDGET_PX = 150`
+derived from measurement, not guessed. Production, settled:
+
+    mlb mobile  Live n=3  residual  6px    Preview n=10 residual 54px
+    mlb desktop Live n=3  residual 18px    Preview      UNRELIABLE (grid)
+    ncaaf / nfl / soccer  uniform content -> no fit attempted, raw spread IS
+                          their layout signal (45/53, 14/50, 0px)
+
+**Three design decisions, each forced by a measurement that contradicted the
+obvious choice:**
+1. **Not a ratio.** The fit has a 1051px intercept; `height/units` would read a
+   15% "layout difference" that is entirely the constant.
+2. **Per state, not per slate.** One line over 15 cards: residual 668px. The
+   same fit over 10 Preview cards: 52px. Live cards carry content the unit does
+   not count.
+3. **A poor fit reports UNRELIABLE, it does not alarm.** Desktop's grid wraps
+   into columns so height is linear in ROWS, not pairs — 201px residual against
+   261px explained, on the same cards at the same instant as mobile's 54px
+   against ~1000px. Failing on that makes the run permanently red on a healthy
+   board, which is how a guard gets ignored.
+
+**THE FINDING THAT MATTERS MOST IS NOT THE MODEL.** Building it exposed that
+**every MLB figure this probe has produced was taken mid-render.**
+`wait_for_selector` proves a card ATTACHED; MLB keeps filling in for seconds
+after. Total `.cards-data-pair` across 15 cards at 390px: 482 at +0ms, **530 at
++600ms (the probe's old settle)**, 590 at +1200, 683 at +2000, 719 at +3000,
+stable thereafter. **74% of final content.** So today's earlier readings —
+including the ones I used to argue about content vs layout — were all taken on
+a partially-rendered page. `_settle()` now polls a DOM fingerprint until stable
+across two samples, records `settledMs`, and FAILS if it never settles. MLB
+settles at 3.6-4.0s; every other sport at 0.8s.
+
+**Carried forward, NOT fixed:** the desktop unit should be grid ROWS
+(`ceil(pairs / columns)`), which would make the model reliable at 1440 too.
+Not built; the metric honestly reports no signal there instead.
+
+- **FINAL:** shipped, verified, closed. 20 tests. No deploy — dev tooling.

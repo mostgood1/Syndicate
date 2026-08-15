@@ -196,6 +196,63 @@ def test_printed_spread_falls_back_when_no_state_breakdown_exists():
     assert "40px" in text
 
 
+def _model(**over):
+    base = {"state": "Preview", "n": 10, "pxPerUnit": 62.5, "chromePx": 1029,
+            "residualSpread": 54, "maxAbsResidual": 28, "fitRatio": 0.05,
+            "reliable": True, "worstCard": {"u": 45, "h": 3846, "residual": 28}}
+    base.update(over)
+    return base
+
+
+def test_a_healthy_slate_passes_the_layout_model():
+    """Production baseline 2026-08-15: mlb mobile Preview residual 54px."""
+    text, ok = _summarize(_report(heightModel=_model()))
+    assert ok, text
+    assert "layout residual 54px in Preview" in text
+
+
+def test_a_card_off_the_height_model_fails():
+    """The falsification case: tall at constant content is a layout defect."""
+    text, ok = _summarize(_report(heightModel=_model(
+        residualSpread=420, maxAbsResidual=390,
+        worstCard={"u": 45, "h": 4266, "residual": 390})))
+    assert not ok
+    assert "LAYOUT RESIDUAL OVER BUDGET" in text
+    assert "+390px at 45 pairs" in text
+
+
+def test_an_unreliable_fit_is_neither_an_alarm_nor_a_pass():
+    """Desktop's grid is not linear in pairs: 201px residual over 261px range.
+
+    Failing on that would make the run permanently red on a healthy board,
+    which is how a guard gets ignored. It reports having no signal instead.
+    """
+    text, ok = _summarize(_report(heightModel=_model(
+        state="Preview", residualSpread=201, fitRatio=0.77, reliable=False)))
+    assert ok, text
+    assert "UNRELIABLE" in text
+    assert "no layout signal here" in text
+    assert "OVER BUDGET" not in text
+
+
+def test_a_render_that_never_settles_fails():
+    """MLB was measured at 74% of its content under the old fixed settle."""
+    text, ok = _summarize(_report(renderSettled=False))
+    assert not ok
+    assert "RENDER NEVER SETTLED" in text
+    assert "mid-render" in text
+
+
+def test_states_that_could_not_be_fitted_are_named_not_silent():
+    text, _ = _summarize(_report(heightModel=_model(), statesUnfitted=["Final"]))
+    assert "no layout fit for: Final" in text
+
+
+def test_the_residual_budget_is_not_wide_enough_to_hide_an_extra_block():
+    """~62px per pair on mobile; every real panel is larger than that."""
+    assert probe.LAYOUT_RESIDUAL_BUDGET_PX < 300
+
+
 def test_card_wait_constant_is_generous_enough_for_a_js_render():
     """Guards the regression directly: MLB needed >600ms and got 400."""
     assert probe.CARD_WAIT_MS >= 10000

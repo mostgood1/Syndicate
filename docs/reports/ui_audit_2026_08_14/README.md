@@ -126,3 +126,55 @@ default tab addressed a panel id that did not exist, so the card collapsed to a
 NBA, NHL and NCAAB served **0 cards** on 2026-08-14 — out of season. Their rows
 in the report's divergence matrix are read off the code, not off a rendered
 page. Re-measure when those seasons open before relying on anything in them.
+
+
+---
+
+## The height model: what the `layout residual` figure is
+
+Raw card-height spread is **not** a layout signal on MLB. It tracks how much
+data each game has: height is `chrome + k * content`, and MLB serves 41-57
+`.cards-data-pair` per card, so the raw number moved 796 -> 1716 -> 1583 ->
+1125px across four readings with no code change.
+
+The probe fits `height = chrome + k * units` **per game state** and reports the
+RESIDUAL from that fit. Baseline, production 2026-08-15, render fully settled:
+
+    mlb mobile   Live     n= 3   residual   6px   (832px chrome + 68.2px/pair)
+    mlb mobile   Preview  n=10   residual  54px  (1029px chrome + 62.5px/pair)
+    mlb desktop  Live     n= 3   residual  18px
+
+`LAYOUT_RESIDUAL_BUDGET_PX = 150` is ~3x the worst clean reading. Re-derive it
+if the card design changes; **do not widen it to silence a run.**
+
+### Three things that were learned building it, all the hard way
+
+**1. `height / units` is the obvious form and it is wrong.** The fit has a
+**1051px intercept** — head, market tiles, tab rail. A ratio reads 94px/pair on
+a 33-pair card and 82px/pair on a 53-pair one and calls that a 15% layout
+difference. It is not a difference; it is the constant.
+
+**2. Fit inside a game state, not across the slate.** One line over all 15 MLB
+cards gave a residual of **668px**; the same fit restricted to the 10 Preview
+cards gave **52px**. A live card carries content the unit does not count.
+
+**3. The model is only valid where the summary grid stacks single-column.** On
+mobile it does, and the residual is 6-54px. On desktop the grid wraps into
+columns, so height is linear in ROWS, not pairs — same cards, same instant,
+residual 201px against 261px of explained range. A poor fit is declared
+`UNRELIABLE` and reports having no signal, rather than firing an alarm that
+would make the run permanently red on a healthy board.
+
+### And the measurement bug it exposed
+
+Building this found that **every MLB figure this probe had produced was taken
+mid-render.** `wait_for_selector` proves a card ATTACHED, not that the render
+finished. Total `.cards-data-pair` across 15 MLB cards at 390px:
+
+    +0ms 482   +600ms 530   +1200ms 590   +2000ms 683   +3000ms 719   +4500ms 719
+
+The old fixed 600ms settle measured MLB at **74% of its final content**. The
+probe now polls a DOM fingerprint until it is stable across two consecutive
+samples (`_settle`), records `settledMs`, and **fails** if the render never
+settles — because a still-growing page makes every figure on that row
+provisional. MLB settles at 3.6-4.0s; every other sport at 0.8s.

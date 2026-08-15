@@ -2350,3 +2350,35 @@ Use `MSYS_NO_PATHCONV=1` on Windows or git mangles `rev:path` into a filename.
 - **Cost:** none realised — caught before anyone quoted it, and corrected in
   `audit_2026-08-15_probability_differential.md` and `deploys.md`. Related:
   [[feedback_rate_not_count]], [[feedback_read_the_field_you_already_have]].
+
+### 2026-08-15 - `wait_for_selector` PROVES ATTACHMENT, NOT COMPLETION, AND I HAD ALREADY "FIXED" THIS ONCE
+
+- **What we believed:** the MLB render race was closed. Earlier today I replaced
+  a fixed 400ms delay with `wait_for_selector('.cards-game-card')`, measured
+  15 cards on 10 consecutive readings, and wrote the rule down as "wait on
+  CONTENT, not a timer".
+- **What was actually true:** waiting on the first card only proves the first
+  card exists. MLB keeps populating for **seconds** afterwards. Total
+  `.cards-data-pair` across 15 cards at 390px:
+
+      +0ms 482   +600ms 530   +1200ms 590   +2000ms 683   +3000ms 719   +4500ms 719
+
+  The 600ms settle I added measured MLB at **74% of its final content**, so
+  every MLB height, spread, content-unit and model figure produced today came
+  off a partially-rendered page -- including the numbers I used to argue that
+  the spread was content rather than layout. That conclusion survived
+  re-measurement; it was not entitled to.
+- **How we found out:** the height model reported MLB mobile Preview as
+  unfittable while a hand check at 2500ms showed 10 cards with 5 distinct
+  content counts. The instrument disagreeing with a manual check is what
+  exposed it -- not any failure in the output, which looked entirely healthy.
+- **The rule going forward:** for a page that renders progressively, wait for
+  the DOM to STOP CHANGING -- poll a cheap fingerprint until it is stable
+  across two consecutive samples, cap it, and FAIL if it never stabilises. A
+  render still growing when you measure it makes every figure on that row
+  provisional, so it is a failure, not a footnote. And the meta-rule: "I fixed
+  the timing bug" is a claim about a threshold, and the next threshold is
+  usually also wrong. Verify by watching the quantity settle, not by getting a
+  plausible number once.
+- **Cost:** a day of MLB probe figures that were directionally right and
+  numerically wrong, and one conclusion that was lucky rather than earned.

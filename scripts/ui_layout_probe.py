@@ -150,6 +150,21 @@ NUMERIC_CLASS_EXEMPT: dict[str, dict[str, str]] = {
 
 WCAG_TARGET_PX = 44
 
+# How far a card may sit from the `chrome + k * units` height model before the
+# run fails, and it is a MEASURED number, not a guess. Baseline taken on
+# production 2026-08-15 with the render fully settled, across every group the
+# model called reliable:
+#
+#     mlb mobile  Live     n= 3   residual   6px
+#     mlb mobile  Preview  n=10   residual  54px
+#     mlb desktop Live     n= 3   residual  18px
+#
+# 150px is ~3x the worst clean reading. Wide enough that ordinary content
+# churn does not trip it, narrow enough that a card rendering an extra block
+# (~62px per pair on mobile, and every panel is larger than that) shows up.
+# Re-derive it if the card design changes; do not widen it to silence a run.
+LAYOUT_RESIDUAL_BUDGET_PX = 150
+
 # How long to wait for the first card to attach before calling the render
 # failed. Generous on purpose: it is only ever paid in full by a sport that is
 # genuinely serving nothing, and the cost of being stingy is a false zero on
@@ -214,6 +229,94 @@ MEASURE_JS = """
     ? {min: unitCounts[0], max: unitCounts[unitCounts.length - 1],
        spread: unitCounts[unitCounts.length - 1] - unitCounts[0]}
     : null;
+
+  // THE LAYOUT SIGNAL. Card height is `chrome + k * units`, so the residual
+  // from that fit is what stays flat while the slate churns and moves when the
+  // layout actually changes.
+  //
+  // `height / units` is the obvious form and it is WRONG, measurably: fitted
+  // over 10 production MLB Preview cards (33-53 pairs, 3100-4345px) the
+  // intercept is **1051px** of fixed chrome -- head, market tiles, tab rail --
+  // against a slope of 62.1px per pair. A ratio would read 94px/pair on the
+  // 33-pair card and 82px/pair on the 53-pair card and call that a 15% layout
+  // difference. It is not a difference; it is the constant, and it would have
+  // made the metric worse than the raw number on exactly the sport it is for.
+  //
+  // Residuals on that same slate: [1, -5, -14, 2, 8, 28, -24, 4] px -- a spread
+  // of 52px against a raw height spread of 1245px.
+  // FIT PER GAME STATE, not across the slate, and that is a measured decision.
+  // A single line over all 15 MLB cards gave a residual spread of 668px; the
+  // same fit restricted to the 10 Preview cards gave 52px. A live card carries
+  // content this unit does not count (the live lens), so mixing states breaks
+  // the linearity and the residual stops being a layout signal. Fitting inside
+  // a state is what makes it one.
+  function fitGroup(pts) {
+    // Two distinct unit counts define a line; the third point is the first one
+    // that can DISAGREE with it. Below that a residual of 0 is arithmetic.
+    if (pts.length < 3 || new Set(pts.map((p) => p.u)).size < 2) return null;
+    const n = pts.length;
+    const sx = pts.reduce((a, p) => a + p.u, 0);
+    const sy = pts.reduce((a, p) => a + p.h, 0);
+    const sxx = pts.reduce((a, p) => a + p.u * p.u, 0);
+    const sxy = pts.reduce((a, p) => a + p.u * p.h, 0);
+    const denom = n * sxx - sx * sx;
+    if (denom === 0) return null;
+    const slope = (n * sxy - sx * sy) / denom;
+    const intercept = (sy - slope * sx) / n;
+    const res = pts.map((p) => p.h - (intercept + slope * p.u));
+    const worst = pts
+      .map((p, i) => ({u: p.u, h: p.h, residual: Math.round(res[i])}))
+      .sort((a, b) => Math.abs(b.residual) - Math.abs(a.residual))[0];
+    const residualSpread = Math.round(Math.max(...res) - Math.min(...res));
+    // How much of the height range the model actually accounts for. The model
+    // assumes each unit adds a ROW, which is true where the summary grid
+    // stacks single-column and false where it wraps into columns. Measured
+    // 2026-08-15 on the same MLB slate: mobile Preview residual 54px against
+    // ~1000px explained (5%), desktop Preview 201px against ~261px (77%). Same
+    // cards, same instant -- the desktop grid simply is not linear in pairs.
+    // Reporting that as a layout alarm would make this permanently red on a
+    // healthy board, so a poor fit is declared UNRELIABLE instead.
+    const uRange = Math.max(...pts.map((p) => p.u)) - Math.min(...pts.map((p) => p.u));
+    const explained = Math.abs(slope) * uRange;
+    const fitRatio = explained > 0 ? residualSpread / explained : null;
+    return {
+      n,
+      pxPerUnit: Math.round(slope * 10) / 10,
+      chromePx: Math.round(intercept),
+      residualSpread,
+      maxAbsResidual: Math.round(Math.max(...res.map(Math.abs))),
+      fitRatio: fitRatio === null ? null : Math.round(fitRatio * 100) / 100,
+      reliable: fitRatio !== null && fitRatio <= 0.25,
+      worstCard: worst,
+    };
+  }
+
+  const ptsByState = {};
+  gameCards.forEach((c) => {
+    const badge = c.querySelector('.cards-status-badge');
+    const state = ((badge && badge.textContent) || 'unknown').trim() || 'unknown';
+    (ptsByState[state] = ptsByState[state] || []).push({
+      u: c.querySelectorAll('.cards-data-pair').length,
+      h: Math.round(c.getBoundingClientRect().height),
+    });
+  });
+  const heightModelByState = {};
+  Object.keys(ptsByState).forEach((k) => {
+    const m = fitGroup(ptsByState[k]);
+    if (m) heightModelByState[k] = m;
+  });
+  // The reported figure is the WORST state that could be fitted. States with
+  // too few cards are absent rather than passing -- `statesUnfitted` says which,
+  // so "no signal" never reads as "clean".
+  const fittedStates = Object.keys(heightModelByState);
+  const heightModel = fittedStates.length
+    ? Object.assign(
+        {state: fittedStates.reduce((a, b) =>
+          heightModelByState[a].residualSpread >= heightModelByState[b].residualSpread ? a : b)},
+        heightModelByState[fittedStates.reduce((a, b) =>
+          heightModelByState[a].residualSpread >= heightModelByState[b].residualSpread ? a : b)])
+    : null;
+  const statesUnfitted = Object.keys(ptsByState).filter((k) => !heightModelByState[k]);
 
   // Tab/panel id agreement, per card. A tab whose target has no panel blanks
   // the card when clicked (NCAAF, measured 2026-08-14); a panel with no tab is
@@ -357,6 +460,9 @@ MEASURE_JS = """
     cardHeightSpread: heights.length ? Math.max(...heights) - Math.min(...heights) : null,
     cardHeightByState,
     contentUnits,
+    heightModel,
+    heightModelByState,
+    statesUnfitted,
     // The least-confounded figure available: the worst spread inside any one
     // game state. Still not a pure layout signal -- read it with contentUnits.
     cardHeightSpreadWithinState: Object.keys(cardHeightByState).length
@@ -375,6 +481,43 @@ MEASURE_JS = """
   };
 }
 """
+
+
+SETTLE_POLL_MS = 400
+SETTLE_MAX_MS = 12000
+
+_FINGERPRINT_JS = """() => document.querySelectorAll('.cards-game-card').length * 100000
+  + document.querySelectorAll('.cards-data-pair').length * 100
+  + document.querySelectorAll('.cards-callout').length"""
+
+
+def _settle(page) -> dict[str, Any]:
+    """Wait until the card DOM stops growing, not until the first card exists.
+
+    `wait_for_selector` proves a card ATTACHED. It does not prove the render
+    finished, and on MLB those are seconds apart. Measured on production
+    /mlb/cards at 390px, 2026-08-15, total `.cards-data-pair` across 15 cards:
+
+        +0ms 482   +600ms 530   +1200ms 590   +2000ms 683   +3000ms 719   +4500ms 719
+
+    The old fixed 600ms settle measured MLB at **74% of its final content**, so
+    every MLB height, spread and content figure this probe produced was taken
+    mid-render -- including the ones used to argue about the height model. Two
+    consecutive equal fingerprints is the signal; a timeout is REPORTED, never
+    silently treated as settled.
+    """
+    last = None
+    stable = 0
+    waited = 0
+    while waited < SETTLE_MAX_MS:
+        fp = page.evaluate(_FINGERPRINT_JS)
+        stable = stable + 1 if fp == last else 0
+        last = fp
+        if stable >= 2:
+            return {"settledMs": waited, "settled": True}
+        page.wait_for_timeout(SETTLE_POLL_MS)
+        waited += SETTLE_POLL_MS
+    return {"settledMs": waited, "settled": False}
 
 
 def _tab_click_through(page, sport: str) -> list[dict[str, Any]]:
@@ -450,6 +593,7 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
                         # read as an empty one -- the same rule this file
                         # applies to a missing selector and a 502.
                         card_wait_timed_out = False
+                        settle: dict[str, Any] = {}
                         if status is not None and status < 400:
                             try:
                                 page.wait_for_selector(
@@ -457,9 +601,7 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
                                     timeout=min(timeout_ms, CARD_WAIT_MS),
                                     state="attached",
                                 )
-                                # Children (filter pills, lens rows) can lag the
-                                # first card; settle briefly once it exists.
-                                page.wait_for_timeout(600)
+                                settle = _settle(page)
                             except Exception:
                                 card_wait_timed_out = True
                         measured = page.evaluate(
@@ -468,6 +610,8 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
                         )
                         measured["httpStatus"] = status
                         measured["cardWaitTimedOut"] = card_wait_timed_out
+                        measured["settledMs"] = settle.get("settledMs")
+                        measured["renderSettled"] = settle.get("settled")
                         measured["touchTargetFailures"] = [
                             box
                             for box in measured.pop("tabBoxes", [])
@@ -593,6 +737,35 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             units = measured.get("contentUnits") or {}
             if units.get("spread"):
                 issues.append(f"content varies {units['min']}-{units['max']} pairs/card")
+            # The layout signal: deviation from `chrome + k * units`. Printed
+            # whenever it exists, and FAILED only against a baseline that was
+            # measured rather than guessed -- see LAYOUT_RESIDUAL_BUDGET_PX.
+            model = measured.get("heightModel") or {}
+            if model:
+                if not model.get("reliable"):
+                    # Not an alarm and not a pass: the model does not describe
+                    # this layout, so it has nothing to say about it.
+                    issues.append(
+                        f"layout model UNRELIABLE in {model['state']} "
+                        f"(fit ratio {model['fitRatio']}) -- no layout signal here"
+                    )
+                else:
+                    issues.append(
+                        f"layout residual {model['residualSpread']}px in {model['state']} "
+                        f"({model['chromePx']}px chrome + {model['pxPerUnit']}px/pair)"
+                    )
+                # Absence of a fit is absence of a signal, never a pass.
+                unfitted = measured.get("statesUnfitted") or []
+                if unfitted:
+                    issues.append("no layout fit for: " + ",".join(unfitted))
+                if model.get("reliable") and model["residualSpread"] > LAYOUT_RESIDUAL_BUDGET_PX:
+                    issues.append(
+                        f"LAYOUT RESIDUAL OVER BUDGET ({model['residualSpread']}px > "
+                        f"{LAYOUT_RESIDUAL_BUDGET_PX}px): a card is off the height "
+                        f"model -- worst {model['worstCard']['residual']:+}px at "
+                        f"{model['worstCard']['u']} pairs"
+                    )
+                    ok = False
             conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
             if conflated:
                 issues.append("type conflated: " + ",".join(c.lstrip(".") for c in conflated))
@@ -611,6 +784,15 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             # named as the cause, and it fails even for an out-of-season sport:
             # "nothing to show" should resolve fast, so a 20s timeout there is
             # itself the anomaly.
+            # A render still growing when we measured it makes every number on
+            # the row provisional -- MLB was measured at 74% of its content
+            # under the old fixed settle. Fail rather than footnote it.
+            if measured.get("renderSettled") is False:
+                issues.append(
+                    f"RENDER NEVER SETTLED in {SETTLE_MAX_MS // 1000}s -- "
+                    "every figure on this row was taken mid-render"
+                )
+                ok = False
             if measured.get("cardWaitTimedOut"):
                 issues.append(
                     f"NO CARD ATTACHED in {CARD_WAIT_MS // 1000}s -- render did not "
