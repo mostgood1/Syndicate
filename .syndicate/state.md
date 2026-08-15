@@ -1518,3 +1518,23 @@ card to attach. The probe does this now (`_settle`), records `settledMs`, and
 FAILS if the render never settles. MLB 3.6-4.0s; every other sport 0.8s.
 **Every MLB figure produced before this was taken at ~74% of final content.**
 `[measured]`
+
+## UI probe height model - MLB DESKTOP HAS NO LAYOUT SIGNAL, and grid-rows will not give it one `[measured 08-15]`
+
+**CLOSED AS WRONG:** the carried-forward idea that the desktop unit should be
+grid ROWS. Rows are proportional to pairs within a group, so the fit is an
+affine reparametrization — measured both ways on the same cards, residuals
+identical to the pixel (11/11, 139/139, 52/52 px). Do not pick this up again.
+`[measured]`
+
+**MLB desktop height is neither driven by the summary-pair unit nor
+independent of it** (105-197px explained at 16-26px/pair), so neither the
+residual branch nor the content-independent branch produces a signal there. Any
+future attempt needs a unit that captures panel COUNT and callout/table rows,
+or per-card height bounds instead of a model. `[measured]`
+
+**The model is only stable where a group is large enough.** n=3 groups gave fit
+ratios 0.59 and 1.29 while an n=9 group on the same page gave 0.09; the fit now
+requires **n >= 5**. Across one evening the same metric read reliable/54px,
+unreliable, unreliable, then unfittable as the slate churned — **one reading of
+it is not a baseline.** `[measured]`

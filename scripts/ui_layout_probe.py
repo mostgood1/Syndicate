@@ -251,9 +251,12 @@ MEASURE_JS = """
   // the linearity and the residual stops being a layout signal. Fitting inside
   // a state is what makes it one.
   function fitGroup(pts) {
-    // Two distinct unit counts define a line; the third point is the first one
-    // that can DISAGREE with it. Below that a residual of 0 is arithmetic.
-    if (pts.length < 3 || new Set(pts.map((p) => p.u)).size < 2) return null;
+    // A line costs 2 parameters, so n=3 leaves ONE degree of freedom and the
+    // residual is noise. Measured on the same slate, same instant: Live n=3
+    // gave fit ratio 0.59 and 1.29 while Preview n=9 gave 0.09 -- the small
+    // groups were not detecting anything, they were fitting themselves. n>=5
+    // is the floor; below it there is no fit rather than a bad one.
+    if (pts.length < 5 || new Set(pts.map((p) => p.u)).size < 2) return null;
     const n = pts.length;
     const sx = pts.reduce((a, p) => a + p.u, 0);
     const sy = pts.reduce((a, p) => a + p.h, 0);
@@ -279,13 +282,29 @@ MEASURE_JS = """
     const uRange = Math.max(...pts.map((p) => p.u)) - Math.min(...pts.map((p) => p.u));
     const explained = Math.abs(slope) * uRange;
     const fitRatio = explained > 0 ? residualSpread / explained : null;
+    const groupHeightSpread = Math.max(...pts.map((p) => p.h)) - Math.min(...pts.map((p) => p.h));
+    // Content-INDEPENDENT is a third state, and mistaking it for "no signal"
+    // was this metric's bug. At 1440 the summary grid wraps into columns, so an
+    // extra pair adds WIDTH, not height: measured slope **0.4-5.5 px/pair** on
+    // desktop against **62 px/pair** on mobile, same cards, same instant. The
+    // model then explains almost nothing and `fitRatio` calls it unreliable --
+    // true, and the wrong conclusion. Where content does not drive height, the
+    // RAW spread is already a clean layout signal and needs no model.
+    //
+    // 50px is the cutoff: content accounting for less than that across the
+    // whole observed range is not driving height. Desktop groups measured
+    // 10-38px explained; mobile Preview measured 745px.
+    const contentIndependent = explained < 50;
     return {
       n,
       pxPerUnit: Math.round(slope * 10) / 10,
       chromePx: Math.round(intercept),
       residualSpread,
       maxAbsResidual: Math.round(Math.max(...res.map(Math.abs))),
+      explainedPx: Math.round(explained),
+      groupHeightSpread,
       fitRatio: fitRatio === null ? null : Math.round(fitRatio * 100) / 100,
+      contentIndependent,
       reliable: fitRatio !== null && fitRatio <= 0.25,
       worstCard: worst,
     };
@@ -308,13 +327,18 @@ MEASURE_JS = """
   // The reported figure is the WORST state that could be fitted. States with
   // too few cards are absent rather than passing -- `statesUnfitted` says which,
   // so "no signal" never reads as "clean".
+  // Rank states by the figure that will actually be REPORTED for them -- the
+  // raw spread where content does not drive height, the residual where it
+  // does. Ranking everything by residual would hide a content-independent
+  // state with a large spread behind a well-fitted one with a small residual.
+  const reported = (m) => (m.contentIndependent ? m.groupHeightSpread : m.residualSpread);
   const fittedStates = Object.keys(heightModelByState);
-  const heightModel = fittedStates.length
-    ? Object.assign(
-        {state: fittedStates.reduce((a, b) =>
-          heightModelByState[a].residualSpread >= heightModelByState[b].residualSpread ? a : b)},
-        heightModelByState[fittedStates.reduce((a, b) =>
-          heightModelByState[a].residualSpread >= heightModelByState[b].residualSpread ? a : b)])
+  const worstState = fittedStates.length
+    ? fittedStates.reduce((a, b) =>
+        reported(heightModelByState[a]) >= reported(heightModelByState[b]) ? a : b)
+    : null;
+  const heightModel = worstState
+    ? Object.assign({state: worstState}, heightModelByState[worstState])
     : null;
   const statesUnfitted = Object.keys(ptsByState).filter((k) => !heightModelByState[k]);
 
@@ -741,31 +765,60 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             # whenever it exists, and FAILED only against a baseline that was
             # measured rather than guessed -- see LAYOUT_RESIDUAL_BUDGET_PX.
             model = measured.get("heightModel") or {}
+            # Report EVERY fitted state, not only the worst. Measured: mobile
+            # Preview (n=9) was a clean 68px/ratio-0.09 signal while Live (n=3,
+            # since excluded) ranked "worst" at ratio 0.59 -- so the one real
+            # signal on the page was hidden behind noise from a group too small
+            # to fit. A summary that shows only the worst row can suppress the
+            # only row that was working.
+            by_state = measured.get("heightModelByState") or {}
+            healthy = [s for s, m in by_state.items() if m.get("reliable") and not m.get("contentIndependent")]
+            if healthy and (model or {}).get("state") not in healthy:
+                for s in sorted(healthy):
+                    m2 = by_state[s]
+                    issues.append(f"layout residual {m2['residualSpread']}px in {s} (reliable)")
             if model:
-                if not model.get("reliable"):
-                    # Not an alarm and not a pass: the model does not describe
-                    # this layout, so it has nothing to say about it.
+                # Three states, not two. Treating the middle one as "no signal"
+                # was this metric's own bug -- see the note in fitGroup.
+                if model.get("contentIndependent"):
+                    # Content is not driving height here, so the RAW spread is
+                    # already the layout signal and the budget applies to it.
+                    signal = model["groupHeightSpread"]
+                    issues.append(
+                        f"layout spread {signal}px in {model['state']} "
+                        f"(content-independent: {model['explainedPx']}px explained "
+                        f"at {model['pxPerUnit']}px/pair)"
+                    )
+                    if signal > LAYOUT_RESIDUAL_BUDGET_PX:
+                        issues.append(
+                            f"LAYOUT SPREAD OVER BUDGET ({signal}px > "
+                            f"{LAYOUT_RESIDUAL_BUDGET_PX}px) with content not "
+                            "driving height -- this is a layout difference"
+                        )
+                        ok = False
+                elif not model.get("reliable"):
                     issues.append(
                         f"layout model UNRELIABLE in {model['state']} "
-                        f"(fit ratio {model['fitRatio']}) -- no layout signal here"
+                        f"(fit ratio {model['fitRatio']}, {model['explainedPx']}px "
+                        "explained) -- no layout signal here"
                     )
                 else:
                     issues.append(
                         f"layout residual {model['residualSpread']}px in {model['state']} "
                         f"({model['chromePx']}px chrome + {model['pxPerUnit']}px/pair)"
                     )
+                    if model["residualSpread"] > LAYOUT_RESIDUAL_BUDGET_PX:
+                        issues.append(
+                            f"LAYOUT RESIDUAL OVER BUDGET ({model['residualSpread']}px > "
+                            f"{LAYOUT_RESIDUAL_BUDGET_PX}px): a card is off the height "
+                            f"model -- worst {model['worstCard']['residual']:+}px at "
+                            f"{model['worstCard']['u']} pairs"
+                        )
+                        ok = False
                 # Absence of a fit is absence of a signal, never a pass.
                 unfitted = measured.get("statesUnfitted") or []
                 if unfitted:
                     issues.append("no layout fit for: " + ",".join(unfitted))
-                if model.get("reliable") and model["residualSpread"] > LAYOUT_RESIDUAL_BUDGET_PX:
-                    issues.append(
-                        f"LAYOUT RESIDUAL OVER BUDGET ({model['residualSpread']}px > "
-                        f"{LAYOUT_RESIDUAL_BUDGET_PX}px): a card is off the height "
-                        f"model -- worst {model['worstCard']['residual']:+}px at "
-                        f"{model['worstCard']['u']} pairs"
-                    )
-                    ok = False
             conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
             if conflated:
                 issues.append("type conflated: " + ",".join(c.lstrip(".") for c in conflated))

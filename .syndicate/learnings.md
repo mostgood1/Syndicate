@@ -2382,3 +2382,35 @@ Use `MSYS_NO_PATHCONV=1` on Windows or git mangles `rev:path` into a filename.
   plausible number once.
 - **Cost:** a day of MLB probe figures that were directionally right and
   numerically wrong, and one conclusion that was lucky rather than earned.
+
+### 2026-08-15 - A UNIT CHANGE CANNOT FIX A FIT WHEN THE UNITS ARE PROPORTIONAL, AND I ALMOST BUILT IT ANYWAY
+
+- **What we believed:** the height model reported UNRELIABLE at 1440 because
+  the unit was wrong — desktop's summary grid wraps into columns, so height
+  should be linear in ROWS (`ceil(pairs/columns)`) rather than in pairs. It was
+  written into a lane as carried-forward work and into a checkpoint as the next
+  action.
+- **What was actually true:** within any one group, rows are proportional to
+  pairs, so fitting in rows is the same regression reparametrized. Measured
+  both ways on the same cards at the same instant: residuals **11/11, 139/139,
+  52/52 px** — identical to the pixel, with only the slope rescaling. The
+  change could not have moved the number it was supposed to fix.
+- **How we found out:** measuring both fits BEFORE editing, because the lane
+  demanded a falsification test. Ten minutes of probing killed an hour of
+  building.
+- **The rule going forward:** before changing the unit of a regression, ask
+  whether the new unit is an affine function of the old one. If it is, the fit
+  is identical and the problem is elsewhere — in the model's form, the grouping,
+  or the sample size. This generalises: re-expressing a variable never improves
+  a linear fit, so "use a better unit" is only ever a fix when the relationship
+  to the outcome changes SHAPE.
+- **Second finding, from the same session:** the deeper problem was sample
+  size and slate churn, not units. n=3 groups (2 fitted parameters, 1 degree of
+  freedom) produced fit ratios of 0.59 and 1.29 while an n=9 group on the same
+  page produced 0.09. Four readings of the metric across one evening went
+  reliable -> unreliable -> unreliable -> unfittable. **Tuning a model against a
+  target that moves every 20 minutes is not measurement.** I stopped and
+  reported the negative result.
+- **Cost:** none shipped wrong. The lane closed NEGATIVE with the goal unmet,
+  which is the honest outcome, and three real defects found on the way were
+  fixed.

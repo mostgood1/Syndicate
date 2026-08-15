@@ -3677,3 +3677,52 @@ settles at 3.6-4.0s; every other sport at 0.8s.
 Not built; the metric honestly reports no signal there instead.
 
 - **FINAL:** shipped, verified, closed. 20 tests. No deploy — dev tooling.
+
+#### desktop-grid-rows-unit — CLOSED-NEGATIVE 2026-08-15 — the goal was NOT met, and that is the result
+
+**The requested build does not work, and the measurement says why.** Grid rows
+as the unit cannot help: within a group rows are proportional to pairs, so
+refitting in rows is an affine reparametrization. Same production slate, same
+instant, both fits:
+
+    desktop Final    n=3   PAIRS residual  11px    ROWS residual  11px
+    mobile  Live     n=3   PAIRS residual 139px    ROWS residual 139px
+    mobile  Preview  n=9   PAIRS residual  52px    ROWS residual  52px
+
+Identical every time; only the slope rescales (62.1 -> 124.2). **A unit change
+can never improve a fit when the units are proportional.** Killed before a line
+of the intended change was written.
+
+**The second hypothesis also failed on the data.** "Desktop is
+content-INDEPENDENT, so its raw spread is the signal" — the branch is built and
+tested, but desktop measured **105-197px explained** at 16-26px/pair, above the
+50px cutoff, so it does not fire. Desktop height is neither driven by this
+content unit nor independent of it.
+
+**So MLB desktop still has NO layout signal.** Honest reason: card height there
+varies for causes this unit does not capture, on groups of n<=10 that change
+every ~20 minutes. Four readings of the same metric across one evening:
+reliable/54px, UNRELIABLE/1.05, UNRELIABLE/1.01, then no fit at all. **I was
+tuning a model against a moving target and stopped.**
+
+**Shipped anyway, because each was a real defect found on the way:**
+1. **n>=5 floor for a fit.** A line costs 2 parameters, so n=3 leaves ONE
+   residual degree of freedom. Live (n=3) produced ratios 0.59 and 1.29 while
+   Preview (n=9) produced 0.09 on the same page — the small groups were fitting
+   themselves, not detecting anything.
+2. **Report EVERY fitted state, not just the worst.** Mobile Preview was a
+   clean 68px/ratio-0.09 signal that the summary HID behind Live's n=3 noise,
+   because only the worst-ranked state was printed. A summary that shows one
+   row can suppress the only row that was working.
+3. **Content-independent as a third state** (raw spread becomes the signal),
+   with the budget applied to it. Correct and tested; simply does not fire on
+   MLB.
+
+**What would actually work, unbuilt and unmeasured:** the unit has to capture
+what varies on a desktop card — panel COUNT and callout/table-row counts, not
+summary pairs. Or drop the model at 1440 and assert per-card height bounds
+instead. Neither is attempted here.
+
+- **FINAL:** hypothesis falsified, goal not met, 22 tests, no deploy. The
+  carried-forward item "the desktop unit should be grid rows" is now CLOSED as
+  wrong — do not pick it up again.

@@ -199,7 +199,9 @@ def test_printed_spread_falls_back_when_no_state_breakdown_exists():
 def _model(**over):
     base = {"state": "Preview", "n": 10, "pxPerUnit": 62.5, "chromePx": 1029,
             "residualSpread": 54, "maxAbsResidual": 28, "fitRatio": 0.05,
-            "reliable": True, "worstCard": {"u": 45, "h": 3846, "residual": 28}}
+            "explainedPx": 745, "groupHeightSpread": 797,
+            "contentIndependent": False, "reliable": True,
+            "worstCard": {"u": 45, "h": 3846, "residual": 28}}
     base.update(over)
     return base
 
@@ -219,6 +221,31 @@ def test_a_card_off_the_height_model_fails():
     assert not ok
     assert "LAYOUT RESIDUAL OVER BUDGET" in text
     assert "+390px at 45 pairs" in text
+
+
+def test_content_independent_reports_the_raw_spread_as_the_signal():
+    """At 1440 the summary grid wraps, so a pair adds width not height.
+
+    Measured: slope 0.4-5.5px/pair on desktop against 62px/pair on mobile, same
+    cards same instant. Where content does not drive height the raw spread IS
+    the layout signal -- calling that "no signal" was this metric's own bug.
+    """
+    text, ok = _summarize(_report(heightModel=_model(
+        state="Final", pxPerUnit=0.4, explainedPx=10, groupHeightSpread=95,
+        residualSpread=11, fitRatio=2.0, reliable=False, contentIndependent=True)))
+    assert ok, text
+    assert "layout spread 95px in Final" in text
+    assert "content-independent" in text
+    assert "UNRELIABLE" not in text
+
+
+def test_content_independent_over_budget_fails():
+    text, ok = _summarize(_report(heightModel=_model(
+        state="Final", pxPerUnit=0.4, explainedPx=10, groupHeightSpread=420,
+        residualSpread=11, fitRatio=2.0, reliable=False, contentIndependent=True)))
+    assert not ok
+    assert "LAYOUT SPREAD OVER BUDGET" in text
+    assert "content not driving height" in text
 
 
 def test_an_unreliable_fit_is_neither_an_alarm_nor_a_pass():
