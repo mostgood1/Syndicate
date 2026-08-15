@@ -63,7 +63,7 @@ def build_layer2_shortlist(
                 attach_projections,
             )
             from syndicate.features.shared.book_grid import build_book_grid
-            from syndicate.features.shared.odds_book_quotes import read_book_quotes, read_quote_last_seen
+            from syndicate.features.shared.odds_book_quotes import read_book_quotes_latest, read_quote_last_seen
 
             # WINDOW-SCOPED, NOT SINGLE-DATE (`#379`).
             #
@@ -89,7 +89,15 @@ def build_layer2_shortlist(
             dates_with_rows: list[str] = []
             for window_date in window_dates:
                 try:
-                    chunk = read_book_quotes(sport, window_date)
+                    # `#435`. LATEST-PER-KEY. `build_book_grid` below already
+                    # keeps only the freshest row per key (`book_grid.py:156`,
+                    # `:225`) and its reduce key equals `_KEY_FIELDS`, so the
+                    # grid cannot tell this from the full shard -- verified
+                    # byte-for-byte against the real 207MB 2026-08-09 shard.
+                    #
+                    # This loop is why it matters here most: it EXTENDS across a
+                    # window, so NFL accumulated five shards at once.
+                    chunk = read_book_quotes_latest(sport, window_date)
                 except Exception:
                     continue
                 if chunk:
@@ -295,4 +303,38 @@ def build_layer2_shortlist(
     except Exception as exc:
         shortlist["cards"] = []
         shortlist["cards_error"] = f"{type(exc).__name__}: {exc}"
+
+    # RECORD THE OPENING PRICE OF EVERY ROW WE ARE ABOUT TO PUBLISH (audit §7 #1).
+    #
+    # The comment above says settlement needs a record of what was RECOMMENDED.
+    # It does, and until now that record existed in exactly one place --
+    # `evaluation_ledger_chunks/<date>.jsonl` -- which is unreadable in
+    # practice. Measured 2026-08-14: its 2026-08-05 chunk is 367,229,260 bytes
+    # and refresh-worker SKIPS it (`SKIP_OVERSIZED_LEDGER_CHUNK ...
+    # ceiling=256000000`), and 19 of the 21 dates in the window do not exist at
+    # all. Meanwhile the CLOSE for those same markets is recoverable for ~100%
+    # of them from odds history. So the opening was the missing half, and every
+    # build that published rows without recording them lost that day's CLV
+    # permanently. Unrecorded is unrecoverable.
+    #
+    # HERE rather than in `intelligence_state`, because both the heavy path and
+    # `_refresh_layer2_shortlist_only` reach the board through this function --
+    # wiring the two call sites separately is how one of them silently stops
+    # recording. First-sighting-only, so this appends the number of NEW markets
+    # per day (kilobytes), not one row per tick.
+    #
+    # Never raises, per this function's contract: a board that already works
+    # must not be taken down by instrumentation added beside it.
+    try:
+        from syndicate.features.shared.clv_opening_ledger import (
+            opening_ledger_enabled,
+            record_openings,
+        )
+
+        if opening_ledger_enabled():
+            shortlist["clv_openings"] = record_openings(
+                shortlist.get("rows") or [], date=str(selected_date or "")
+            )
+    except Exception as exc:
+        shortlist["clv_openings_error"] = f"{type(exc).__name__}: {exc}"
     return shortlist

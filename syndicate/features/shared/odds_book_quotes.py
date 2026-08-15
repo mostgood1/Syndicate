@@ -827,6 +827,138 @@ def read_book_quotes(sport: str, date_str: str) -> list[dict[str, Any]]:
     return rows
 
 
+# `#435`. THE SHARD IS APPEND-ONLY AND 92.4% OF IT IS SUPERSEDED.
+#
+# `book_quotes/<date>.jsonl` gains a row per quote OBSERVATION and grows all day.
+# Measured from production `CACHE_EVICT` records, MLB 2026-08-14:
+#
+#     89.9 -> 108.8 -> 133.2 -> 165.2 -> 184.5 MB, then 2.2 MB next morning
+#
+# At 6.3x file bytes resident, the 184.5MB end-of-day shard is ~1,162MB for ONE
+# cache entry against a 500MB budget -- which is the whole OOM. Measured on the
+# 207MB 2026-08-09 shard: 478,782 rows collapse to 36,424 distinct quote keys,
+# a **13.1x** shrink.
+#
+# WHY REDUCING IS SAFE, established before this was written rather than after:
+# `build_book_grid` ALREADY keeps only the freshest row per key
+# (`book_grid.py:156` and `:225`), and its reduce key --
+# `_INSTANCE_FIELDS + line + bookmaker + selection` -- is exactly the field set
+# in `_KEY_FIELDS`. Feeding it latest-per-key rows therefore produces an
+# identical grid, which `test_reduced_rows_produce_an_identical_grid` pins
+# against a real shard rather than a fixture.
+#
+# THIS DOES NOT DELETE HISTORY. `read_book_quotes` and `iter_book_quotes` are
+# unchanged and still see every observation. The superseded rows ARE the opening
+# prices and line movement that CLV depends on; this is a reader for the
+# LOOKUP path, which only ever wanted the current price.
+_BOOK_QUOTES_LATEST_CACHE: "OrderedDict[tuple[str, int, int], list[dict[str, Any]]]" = OrderedDict()
+
+# Estimated resident bytes per REDUCED row. Deliberately not derived from
+# `_BOOK_QUOTES_RSS_PER_FILE_BYTE`: that constant is per FILE BYTE, and the
+# whole point here is that file bytes and retained rows are not proportional --
+# 92.4% of the file does not survive the reduce. Sized from the 2026-08-15
+# production census: 614,024 x 400B dicts plus ~22 small objects each, i.e.
+# ~2.6KB resident per row all-in. Revise it with a measurement, not a guess.
+_BOOK_QUOTES_LATEST_RSS_PER_ROW_BYTES = 2600
+
+_BOOK_QUOTES_LATEST_MAX_RSS_BYTES = 250 * 1024 * 1024
+
+
+def _latest_observed_at(row: Mapping[str, Any]) -> str:
+    """The grid's freshness precedence, not `closing_quotes`'.
+
+    `book_grid._observed_at` prefers `book_updated_at`; `closing_quotes` uses
+    `snapshot_ts`/`captured_at` only. They disagree, and picking the wrong one
+    would select a different row than the grid would have -- silently, and only
+    for books that report their own update time.
+    """
+    return str(
+        row.get("book_updated_at") or row.get("snapshot_ts") or row.get("captured_at") or ""
+    )
+
+
+def _evict_latest_cache_over_budget() -> None:
+    """Evict LRU until inside budget -- INCLUDING the last entry.
+
+    `_evict_book_quotes_over_budget` stops at `len > 1`, so a single shard
+    larger than the whole budget can never be evicted; at 184.5MB that was one
+    entry pinning ~1,162MB indefinitely. That floor exists there to avoid
+    re-reading a huge file mid-build. It is not needed here: a reduced shard is
+    ~13x smaller, so re-reading one is cheap, and the budget is the thing that
+    has to hold.
+    """
+    while _BOOK_QUOTES_LATEST_CACHE:
+        estimated = sum(len(rows) for rows in _BOOK_QUOTES_LATEST_CACHE.values()) * _BOOK_QUOTES_LATEST_RSS_PER_ROW_BYTES
+        if estimated <= _BOOK_QUOTES_LATEST_MAX_RSS_BYTES:
+            return
+        evicted_key, evicted_rows = _BOOK_QUOTES_LATEST_CACHE.popitem(last=False)
+        print(
+            "[odds_book_quotes] LATEST_CACHE_EVICT "
+            + json.dumps(
+                {
+                    "evicted_path": str(evicted_key[0]),
+                    "evicted_rows": len(evicted_rows),
+                    "entries_after": len(_BOOK_QUOTES_LATEST_CACHE),
+                    "budget_mb": round(_BOOK_QUOTES_LATEST_MAX_RSS_BYTES / (1024 * 1024), 1),
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+
+
+def reduce_to_latest_per_key(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Keep only the freshest observation of each quote key.
+
+    Separated from the reader so the equality test can drive it over the same
+    rows the unreduced path sees.
+    """
+    freshest: dict[str, dict[str, Any]] = {}
+    for row in rows or ():
+        if not isinstance(row, Mapping):
+            continue
+        key = _quote_key(row)
+        current = freshest.get(key)
+        # `>=` not `>`, matching `book_grid`: on equal stamps the LAST row wins,
+        # which is the later line in an append-only file.
+        if current is None or _latest_observed_at(row) >= _latest_observed_at(current):
+            freshest[key] = row if isinstance(row, dict) else dict(row)
+    return list(freshest.values())
+
+
+def read_book_quotes_latest(sport: str, date_str: str) -> list[dict[str, Any]]:
+    """Latest-per-key rows for a sport/date shard, STREAMED then cached.
+
+    The peak matters as much as the plateau. This reduces as it streams
+    (`iter_book_quotes`), so the whole-file list never materialises -- the
+    ~1,162MB transient that `read_book_quotes` creates for one end-of-day MLB
+    shard simply does not happen, whether or not the result is cached.
+
+    Returns the cached list itself, not a copy, on the same read-only contract
+    `read_book_quotes` documents.
+    """
+    path = resolve_book_quotes_path(sport, date_str)
+    cache_key = _book_quotes_cache_key(path)
+    if cache_key is not None:
+        cached = _BOOK_QUOTES_LATEST_CACHE.get(cache_key)
+        if cached is not None:
+            _BOOK_QUOTES_LATEST_CACHE.move_to_end(cache_key)
+            return cached
+
+    try:
+        rows = reduce_to_latest_per_key(iter_book_quotes(sport, date_str))
+    except Exception:
+        # Same rule as `read_book_quotes`: a partial read from a transient IO
+        # error must never be cached and served as complete.
+        return []
+
+    if cache_key is not None and _book_quotes_cache_key(path) == cache_key:
+        _BOOK_QUOTES_LATEST_CACHE[cache_key] = rows
+        _BOOK_QUOTES_LATEST_CACHE.move_to_end(cache_key)
+        _evict_latest_cache_over_budget()
+    return rows
+
+
 def closing_quotes(rows: Iterable[Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
     """The last observation of each quote key strictly before its own
     commence_time -- the textbook closing line, as a lookup rather than the
@@ -1246,7 +1378,12 @@ def _quote_shard_index(rows: list[dict[str, Any]], cache_key: tuple[str, int, in
         return cached
     index = _build_quote_shard_index(rows)
     _BOOK_QUOTES_INDEX_CACHE[cache_key] = index
-    for stale in [key for key in _BOOK_QUOTES_INDEX_CACHE if key not in _BOOK_QUOTES_CACHE]:
+    # `#435`. Follows the cache this index's POSITIONS point into, which is now
+    # the reduced one. This read `_BOOK_QUOTES_CACHE`, and leaving it that way
+    # after the caller switched readers would have marked every entry stale the
+    # instant it was inserted -- rebuilding the index on every call and quietly
+    # undoing `#414`.
+    for stale in [key for key in _BOOK_QUOTES_INDEX_CACHE if key not in _BOOK_QUOTES_LATEST_CACHE]:
         _BOOK_QUOTES_INDEX_CACHE.pop(stale, None)
     return index
 
@@ -1290,7 +1427,15 @@ def quote_ref_for_bet(
     not OddsAPI's ("moneyline" vs "h2h", a team name vs "home") and narrowing
     to nothing on a vocabulary difference would throw away a correct match.
     """
-    rows = read_book_quotes(str(sport or ""), str(date_str or ""))
+    # `#435`. LATEST-PER-KEY, not every observation. This function answers "what
+    # is the current price for this bet", so superseded snapshots of the same
+    # quote key could never be the answer -- and holding them is what made one
+    # end-of-day MLB shard cost ~1,162MB resident.
+    #
+    # `_quote_shard_index` below caches POSITIONS into this exact list, so the
+    # two must not diverge: it is keyed on the shard's (path, mtime, size), it
+    # has one call site, and that site is here.
+    rows = read_book_quotes_latest(str(sport or ""), str(date_str or ""))
     if not rows:
         return None
 

@@ -153,14 +153,17 @@ def test_quote_ref_for_bet_reads_the_shard_once_across_many_rows(tmp_path, monke
     )
     _point_at(monkeypatch, path)
 
+    # `#435` moved this caller onto the LATEST-PER-KEY reader, so the counter
+    # follows it. `#252`'s claim is unchanged and is still what is asserted
+    # below: the reader is called per row, and the FILE is parsed once.
     calls = {"count": 0}
-    real_read = odds_book_quotes.read_book_quotes
+    real_read = odds_book_quotes.read_book_quotes_latest
 
     def counting_read(sport, date_str):
         calls["count"] += 1
         return real_read(sport, date_str)
 
-    monkeypatch.setattr(odds_book_quotes, "read_book_quotes", counting_read)
+    monkeypatch.setattr(odds_book_quotes, "read_book_quotes_latest", counting_read)
 
     opens = {"count": 0}
     real_open = type(path).open
