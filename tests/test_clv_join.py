@@ -11,6 +11,12 @@ Shapes here are copied from the real 2026-08-14 payload, not invented:
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
+# Openings must predate the closes these fixtures use, or the joiner's
+# arrow-of-time guard refuses them -- which is the point of that guard.
+_OPEN_AT = datetime(2026, 8, 14, 18, 0, tzinfo=timezone.utc)
+
 from syndicate.features.shared.clv_join import (
     clv_pct_from_prices,
     compute_clv_for_date,
@@ -149,7 +155,7 @@ def test_compute_pairs_openings_and_reports_every_unresolved_reason(tmp_path):
         {**_game_opening(), "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None},
         {**_game_opening(side="away"), "quote": {"price": 110, "bookmaker": "betmgm"}, "line": None},
     ]
-    record_openings(rows, date="2026-08-14", root=tmp_path)
+    record_openings(rows, date="2026-08-14", now=_OPEN_AT, root=tmp_path)
 
     key = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
            "away_team=Miami Marlins|market=h2h|bookmaker=betmgm")
@@ -168,7 +174,7 @@ def test_an_opening_with_no_matching_market_is_counted_not_dropped(tmp_path):
     from syndicate.features.shared.clv_opening_ledger import record_openings
 
     record_openings([{**_game_opening(), "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
-                    date="2026-08-14", root=tmp_path)
+                    date="2026-08-14", now=_OPEN_AT, root=tmp_path)
     report = compute_clv_for_date("2026-08-14", "mlb", root=tmp_path, history_payload={"markets": {}})
     assert report["resolved"] == 0
     assert report["unresolved_reasons"] == {"no_market_in_history": 1}
@@ -186,7 +192,7 @@ def test_a_different_books_close_is_used_but_labelled(tmp_path):
     record_openings(
         [{**_game_opening(bookmaker="polymarket"),
           "quote": {"price": -120, "bookmaker": "polymarket"}, "line": None}],
-        date="2026-08-14", root=tmp_path,
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
     )
     other_book = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
                   "away_team=Miami Marlins|market=h2h|bookmaker=fanduel")
@@ -206,7 +212,7 @@ def test_the_fallback_never_crosses_events_or_markets(tmp_path):
     record_openings(
         [{**_game_opening(bookmaker="polymarket"),
           "quote": {"price": -120, "bookmaker": "polymarket"}, "line": None}],
-        date="2026-08-14", root=tmp_path,
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
     )
     wrong_event = ("event_id=DIFFERENT|home_team=Chicago Cubs|away_team=St. Louis Cardinals|"
                    "market=h2h|bookmaker=fanduel")
@@ -229,7 +235,7 @@ def test_a_same_book_close_is_still_preferred_when_it_exists(tmp_path):
     record_openings(
         [{**_game_opening(bookmaker="betmgm"),
           "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
-        date="2026-08-14", root=tmp_path,
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
     )
     same = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
             "away_team=Miami Marlins|market=h2h|bookmaker=betmgm")
@@ -259,7 +265,7 @@ def test_the_headline_clv_excludes_book_biased_rows(tmp_path):
     record_openings(
         [{**_game_opening(bookmaker="polymarket"),
           "quote": {"price": -120, "bookmaker": "polymarket"}, "line": None}],
-        date="2026-08-14", root=tmp_path,
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
     )
     other = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
              "away_team=Miami Marlins|market=h2h|bookmaker=fanduel")
@@ -281,7 +287,7 @@ def test_a_same_book_row_does_reach_the_headline(tmp_path):
     record_openings(
         [{**_game_opening(bookmaker="betmgm"),
           "quote": {"price": -120, "bookmaker": "betmgm"}, "line": None}],
-        date="2026-08-14", root=tmp_path,
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
     )
     same = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
             "away_team=Miami Marlins|market=h2h|bookmaker=betmgm")
@@ -307,7 +313,7 @@ def test_a_same_book_pair_is_preferred_and_uses_that_books_own_opening(tmp_path)
           "quote": {"price": -120, "bookmaker": "polymarket",
                     "book_prices": {"polymarket": -120, "fanduel": -135}},
           "line": None}],
-        date="2026-08-14", root=tmp_path,
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
     )
     tracked = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
                "away_team=Miami Marlins|market=h2h|bookmaker=fanduel")
@@ -331,7 +337,7 @@ def test_without_our_price_at_that_book_it_stays_a_biased_fallback(tmp_path):
           "quote": {"price": -120, "bookmaker": "polymarket",
                     "book_prices": {"polymarket": -120}},
           "line": None}],
-        date="2026-08-14", root=tmp_path,
+        date="2026-08-14", now=_OPEN_AT, root=tmp_path,
     )
     tracked = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
                "away_team=Miami Marlins|market=h2h|bookmaker=fanduel")
@@ -341,3 +347,90 @@ def test_without_our_price_at_that_book_it_stays_a_biased_fallback(tmp_path):
     )
     assert report["rows"][0]["close_book_scope"] == "different_book_close"
     assert report["avg_clv_pct"] is None
+
+
+def test_a_different_line_is_a_different_bet(tmp_path):
+    """The defect that produced a -5.01 same-book average.
+
+    History keys carry no line; the point's `line` block does. Ignoring it
+    compared `home -5.0` against a `home -1.5` close and called the difference
+    CLV -- producing rows like open=-238 close=+135 (clv -27.9). A spread does
+    not move 28 probability points.
+    """
+    opening = _game_opening(market="spreads", side="home", line=-5.0, price=-122)
+    state = _state([_point("2026-08-14T22:30:00+00:00",
+                           line={"home_line": -1.5, "home_odds": "+162",
+                                 "away_line": 1.5, "away_odds": "-190"})])
+    out = resolve_close(opening, state)
+    assert out["close_price"] is None
+    assert out["unresolved_reason"] == "line_mismatch"
+
+
+def test_the_same_line_still_resolves(tmp_path):
+    opening = _game_opening(market="spreads", side="home", line=-1.5, price=-122)
+    state = _state([_point("2026-08-14T22:30:00+00:00",
+                           line={"home_line": -1.5, "home_odds": "+162",
+                                 "away_line": 1.5, "away_odds": "-190"})])
+    out = resolve_close(opening, state)
+    assert out["close_price"] == 162.0
+
+
+def test_an_unverifiable_line_is_refused_not_assumed():
+    """Unknown must not fall to the permissive branch."""
+    opening = _game_opening(market="spreads", side="home", line=-1.5, price=-122)
+    state = _state([_point("2026-08-14T22:30:00+00:00",
+                           line={"home_odds": "+162", "away_odds": "-190"})])
+    out = resolve_close(opening, state)
+    assert out["close_price"] is None
+    assert out["unresolved_reason"] == "line_unverifiable"
+
+
+def test_h2h_has_no_line_and_is_unaffected():
+    out = resolve_close(_game_opening(market="h2h", line=None),
+                        _state([_point("2026-08-14T22:30:00+00:00")]))
+    assert out["close_price"] == -150.0
+
+
+def test_a_close_that_precedes_the_opening_is_refused(tmp_path):
+    """25 of 25 on the first real same-book run.
+
+    The pairing is well-formed in every other respect -- same event, market,
+    book, line, a real price at each end -- and produced a confident
+    `avg_clv_pct = -5.215` out of unrelated instants.
+    """
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_game_opening(bookmaker="betmgm"), "quote": {"price": -120, "bookmaker": "betmgm"},
+          "line": None}],
+        date="2026-08-14", now=__import__("datetime").datetime(2026, 8, 14, 22, 0,
+                                                              tzinfo=__import__("datetime").timezone.utc),
+        root=tmp_path,
+    )
+    key = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+           "away_team=Miami Marlins|market=h2h|bookmaker=betmgm")
+    # close observed BEFORE the opening was recorded
+    payload = {"markets": {key: _state([_point("2026-08-14T20:00:00+00:00")])}}
+    report = compute_clv_for_date("2026-08-14", "mlb", root=tmp_path, history_payload=payload)
+    assert report["resolved"] == 0
+    assert report["unresolved_reasons"] == {"close_precedes_open": 1}
+    assert report["avg_clv_pct"] is None
+
+
+def test_a_close_after_the_opening_still_resolves(tmp_path):
+    import datetime as _dt
+    from syndicate.features.shared.clv_opening_ledger import record_openings
+
+    record_openings(
+        [{**_game_opening(bookmaker="betmgm"), "quote": {"price": -120, "bookmaker": "betmgm"},
+          "line": None}],
+        date="2026-08-14", now=_dt.datetime(2026, 8, 14, 20, 0, tzinfo=_dt.timezone.utc),
+        root=tmp_path,
+    )
+    key = ("event_id=2124d4bb5569819a30020e5b907ca202|home_team=Cincinnati Reds|"
+           "away_team=Miami Marlins|market=h2h|bookmaker=betmgm")
+    payload = {"markets": {key: _state([_point("2026-08-14T22:30:00+00:00")])}}
+    report = compute_clv_for_date("2026-08-14", "mlb", root=tmp_path, history_payload=payload)
+    assert report["resolved"] == 1
+    assert report["same_book_n"] == 1
+    assert report["avg_clv_pct"] is not None

@@ -269,9 +269,32 @@ def record_openings(
                 existing_bytes += len(line.encode("utf-8"))
                 written += 1
 
+    # PUSH IT TO WEB, because the worker's disk is not readable from anywhere a
+    # person can look. `#208`: allowlisting in `HOT_ARTIFACT_PATTERNS` only
+    # PERMITS this transfer; this call is what makes one happen. Without it the
+    # allowlist entry is inert and the openings stay invisible — which is
+    # exactly how this lane's own measurement would have been impossible to run
+    # the next day.
+    #
+    # Only when something was actually written: a no-op tick has nothing new to
+    # send, and re-pushing an unchanged ~90KB file every ~20 minutes is the kind
+    # of periodic worker work that is never free on a 4GB container.
+    #
+    # Never raises. Losing the push costs visibility; letting it propagate would
+    # cost the board.
+    published: bool | None = None
+    if written:
+        try:
+            from syndicate.features.shared.artifact_publisher import publish_hot_artifact
+
+            published = bool(publish_hot_artifact(path))
+        except Exception:
+            published = False
+
     report = {
         "date": str(date),
         "path": str(path),
+        "published": published,
         "rows_in": rows_in,
         "openings_written": written,
         "already_recorded": already,

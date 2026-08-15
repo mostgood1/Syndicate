@@ -230,3 +230,49 @@ def test_the_player_is_recorded_as_a_field_not_only_inside_the_key(tmp_path):
     rec = load_openings("2026-08-14", root=tmp_path)[0]
     assert rec["player_name"] == "Jung Hoo Lee"
     assert rec["segment"] == "full"
+
+
+def test_the_openings_path_is_allowlisted_for_publish():
+    """Allowlisting only PERMITS a transfer (`#208`) -- but without it the push
+    is refused outright, so this pins the pattern actually matches the path."""
+    import fnmatch
+    from syndicate.features.shared.artifact_publisher import HOT_ARTIFACT_PATTERNS
+
+    rel = "reports/intelligence/clv_openings/2026-08-15.jsonl"
+    assert any(fnmatch.fnmatch(rel, p) for p in HOT_ARTIFACT_PATTERNS), (
+        "clv_openings is not allowlisted; the worker's file can never reach web"
+    )
+
+
+def test_a_write_attempts_a_publish_and_a_no_op_does_not(tmp_path, monkeypatch):
+    """Re-pushing an unchanged ~90KB file every ~20 min is periodic worker work,
+    and periodic worker work is never free on this container."""
+    from syndicate.features.shared import clv_opening_ledger as mod
+
+    calls = []
+    import syndicate.features.shared.artifact_publisher as pub
+    monkeypatch.setattr(pub, "publish_hot_artifact", lambda p: calls.append(p) or True)
+
+    first = mod.record_openings([_row()], date="2026-08-14", now=_NOW, root=tmp_path)
+    assert first["openings_written"] == 1
+    assert first["published"] is True
+    assert len(calls) == 1
+
+    second = mod.record_openings([_row()], date="2026-08-14", now=_LATER, root=tmp_path)
+    assert second["openings_written"] == 0
+    assert second["published"] is None, "a no-op tick re-pushed the file"
+    assert len(calls) == 1
+
+
+def test_a_publish_failure_never_breaks_the_recorder(tmp_path, monkeypatch):
+    from syndicate.features.shared import clv_opening_ledger as mod
+    import syndicate.features.shared.artifact_publisher as pub
+
+    def boom(_p):
+        raise RuntimeError("network gone")
+
+    monkeypatch.setattr(pub, "publish_hot_artifact", boom)
+    report = mod.record_openings([_row()], date="2026-08-14", now=_NOW, root=tmp_path)
+    assert report["openings_written"] == 1
+    assert report["published"] is False
+    assert len(load_openings("2026-08-14", root=tmp_path)) == 1, "the write was lost to a publish failure"

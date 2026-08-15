@@ -106,6 +106,28 @@ def _start_refresh_job(payload: dict[str, Any], *, mode: str = "fast") -> tuple[
             mode=str(_payload_value(launch_payload, "mode", "fast") or "fast"),
             force_refresh=_coerce_bool(_payload_value(launch_payload, "force_refresh")),
             launch_mode=_payload_value(launch_payload, "launch_mode"),
+            # PER-LEAGUE SCOPE, REACHABLE FROM OPS (`#433`). `launch_refresh_run`
+            # has accepted `soccer_leagues` since `#282` and
+            # `refresh_odds_sources.py` has implemented `--soccer-leagues`, but
+            # this function never passed it -- so every ops-triggered soccer
+            # refresh was all-leagues, all 50 steps, whether the caller wanted
+            # one league or ten.
+            #
+            # That gap had teeth on 2026-08-14. Three leagues' odds were 3.6
+            # days stale with kickoffs two hours out, and the only remedy
+            # reachable through the API was a full ten-league run -- which is
+            # exactly the run that had been dying at step 27 and leaving those
+            # leagues dark in the first place. Scoping to one league turns a
+            # 50-step job into ~6, which finishes long before anything can
+            # truncate it.
+            #
+            # Unknown slugs are rejected loudly by `refresh_odds_sources.py`
+            # itself (`SystemExit` naming the known set), so no validation is
+            # duplicated here -- an unrecognised league must not silently become
+            # "all leagues", which is what passing it through unchecked would
+            # risk if that guard were ever relaxed.
+            soccer_leagues=_payload_value(launch_payload, "soccer_leagues"),
+            soccer_date=_payload_value(launch_payload, "soccer_date"),
         )
     except Exception as exc:
         return job_id, _store_ops_job(
@@ -1402,6 +1424,106 @@ def api_ops_oddsapi_quota() -> Any:
     return jsonify({"ok": True, "quota": normalize_timestamped_payload(read_oddsapi_quota())})
 
 
+@ops_bp.get("/api/ops/oddsapi/sports")
+def api_ops_oddsapi_sports() -> Any:
+    """WHICH COMPETITIONS THE VENDOR IS ACTUALLY OFFERING, right now (`#433`).
+
+    THE QUESTION THIS EXISTS TO ANSWER. On 2026-08-14 three soccer leagues --
+    primeira_liga, championship, belgian_pro_league -- went 3.6 days without a
+    single quote reaching `tracking/book_quotes`, while eredivisie on the same
+    shard, the same fetch script, the same key and the same region kept
+    capturing normally. Every explanation tried from inside the pipeline was
+    falsified: the season gate returns all ten leagues active, a per-league
+    scoped run captured nothing either (so it is not the 50-step run being
+    truncated), and the shard append logged no failure.
+
+    The one input nobody could see is the vendor's own catalogue. If OddsAPI
+    has stopped listing (or stopped marking `active`) those three sport keys,
+    then no cadence, ordering or scoping change in this repo can fix it, and
+    every hour spent inside the pipeline is wasted. That is a big enough fork
+    in the diagnosis to deserve a route.
+
+    STRICTLY READ-ONLY, AND FREE. `/v4/sports` is the vendor's catalogue
+    endpoint: it takes no market or region parameters and returns no prices.
+    Per OddsAPI's own documentation it does not count against the quota --
+    **and this does not take that on trust.** The response's quota headers are
+    recorded through the normal `record_oddsapi_quota` path, so if it ever DOES
+    bill, the burn shows up in `/api/ops/oddsapi/quota` attributed to this
+    endpoint rather than silently inflating some sport's total. Measuring the
+    cost of the thing you added to measure costs is cheap; assuming it is free
+    is how an unattributed line item is born.
+
+    This writes nothing else and triggers no refresh.
+    """
+    # `urllib.parse` explicitly, not relied on as a side effect of importing
+    # `urllib.request` -- that happens to work in CPython and is not a contract.
+    import urllib.parse
+    import urllib.request
+
+    from syndicate.features.shared.oddsapi_quota import record_oddsapi_quota
+
+    api_key = str(os.environ.get("ODDS_API_KEY") or "").strip()
+    if not api_key:
+        # Named explicitly. "unavailable" would leave a caller unable to tell a
+        # missing key from a vendor outage, which is the same
+        # absence-without-a-reason failure the board keeps being fixed for.
+        return jsonify({"ok": False, "error": "ODDS_API_KEY is not set on this service"}), 503
+
+    base = str(os.environ.get("ODDS_API_BASE") or "https://api.the-odds-api.com/v4").rstrip("/")
+    url = f"{base}/sports?apiKey={urllib.parse.quote(api_key)}"
+    try:
+        request = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            payload = json.loads(response.read().decode("utf-8", "replace"))
+            headers = dict(response.headers)
+    except Exception as exc:  # noqa: BLE001
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 502
+
+    try:
+        # `endpoint` carries no apiKey: `_sanitize_endpoint` redacts it, but the
+        # URL is not handed over in the first place.
+        record_oddsapi_quota(headers, sport="ops_catalogue", endpoint=f"{base}/sports")
+    except Exception:  # noqa: BLE001
+        # Telemetry must never fail the read it is describing.
+        pass
+
+    listed = {str(item.get("key")): item for item in payload if isinstance(item, dict)}
+
+    # The join the caller actually wants: OUR league slug -> the vendor's key ->
+    # is it there. Reading a raw 60-entry catalogue and matching slugs by eye is
+    # how the wrong key gets blamed.
+    from scripts.fetch_soccer_oddsapi_odds_local import LEAGUE_SPORT_KEYS
+
+    soccer = []
+    for league, sport_key in sorted(LEAGUE_SPORT_KEYS.items()):
+        entry = listed.get(sport_key)
+        soccer.append(
+            {
+                "league": league,
+                "sport_key": sport_key,
+                # Three distinct states, never collapsed: absent from the
+                # catalogue, present but inactive (out of season), present and
+                # active. Only the third can produce odds.
+                "listed": entry is not None,
+                "active": bool((entry or {}).get("active")) if entry is not None else None,
+                "title": (entry or {}).get("title"),
+                "has_outrights": (entry or {}).get("has_outrights"),
+            }
+        )
+
+    return jsonify(
+        {
+            "ok": True,
+            "server_time": _utc_now(),
+            "catalogue_count": len(listed),
+            "soccer": soccer,
+            # The unfiltered key list, so a sport this repo has not mapped yet
+            # is still discoverable without another deploy.
+            "all_keys": sorted(listed),
+        }
+    )
+
+
 @ops_bp.post("/api/ops/oddsapi/quota/reset")
 def api_ops_oddsapi_quota_reset() -> Any:
     # Protected endpoint: requires admin token (enforced by before_request)
@@ -1774,6 +1896,59 @@ def api_ops_reset_lineup_gate() -> Any:
     path = reports_root() / "live_refresh_loop" / "last_lineup_check.json"
     write_json_file(path, {})
     return jsonify({"ok": True, "path": str(path)})
+
+
+@ops_bp.get("/api/ops/clv/report")
+def api_ops_clv_report() -> Any:
+    """CLV for a date, joined from the recorded openings (audit §7 #1).
+
+    Read-only. Needs no grading, no outcomes, no `settle_result`, and never
+    touches `evaluation_ledger_chunks` — the 367MB path whose 2026-08-05 chunk
+    is already SKIPPED at read time against a 256MB ceiling.
+
+    ON WEB, deliberately, and it is not a violation of the no-compute rule: the
+    openings are a ~90KB published artifact and the join is over a few hundred
+    rows against an odds-history payload this blueprint already loads for
+    `/api/ops/odds-history/inspect` right below. That is display-side
+    transformation, not the 1.3GB book-grid pivot the split exists to keep out.
+
+    **`avg_clv_pct` COUNTS SAME-BOOK ROWS ONLY AND IS OFTEN None.** The board
+    publishes the best price across ~13 books; pairing that opening with some
+    other book's close compares a best-of-N draw to a single draw and reads
+    +6.2pts at a 91% beat rate, which is the selection effect and not skill.
+    Biased scopes are reported separately under `by_book_scope`. A None here
+    means "no unbiased comparison was available", never "no edge".
+
+    `unresolved_reasons` is the other half of the answer and should be read
+    every time: `close_precedes_open` and `line_mismatch` are the two defects
+    that made this endpoint's first number (-5.215) wrong, and they are now
+    counted rather than silently folded into an average.
+    """
+    # Protected endpoint: requires admin token (enforced by before_request).
+    date = str(request.args.get("date") or "").strip()
+    sport = str(request.args.get("sport") or "").strip().lower()
+    if not date:
+        from syndicate.features.shared.timezone import central_today_iso
+
+        # CENTRAL, not UTC. An MLB slate spans two UTC dates and one Central
+        # one, and the openings are bucketed by the board's own Central date --
+        # defaulting to a UTC today would ask for a file that does not exist
+        # for five hours every evening.
+        date = central_today_iso()
+    if not sport:
+        return jsonify({"ok": False, "error": "sport parameter required."}), 400
+    include_rows = str(request.args.get("rows") or "").strip().lower() in {"1", "true", "yes"}
+    try:
+        from syndicate.features.shared.clv_join import compute_clv_for_date
+
+        report = compute_clv_for_date(date, sport)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+    if not include_rows:
+        # Summary by default; the per-row detail is large and only wanted when
+        # someone is chasing a specific pairing.
+        report = {key: value for key, value in report.items() if key != "rows"}
+    return jsonify({"ok": True, **report})
 
 
 @ops_bp.get("/api/ops/odds-history/inspect")

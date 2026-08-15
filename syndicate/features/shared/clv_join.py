@@ -120,6 +120,34 @@ def _price_for_side(point: Mapping[str, Any], opening: Mapping[str, Any]) -> tup
     side = str(opening.get("side") or "").strip().lower()
     line_block = point.get("line") if isinstance(point.get("line"), Mapping) else {}
 
+    # THE LINE MUST MATCH, OR IT IS NOT THE SAME BET.
+    #
+    # The history key carries no line, and the point's `line` block does:
+    # `{"away_line": 1.5, "away_odds": "-235", "home_line": -1.5,
+    # "home_odds": "+180"}`. Ignoring it compared a board row at `home -5.0`
+    # against a close at `home -1.5` and called the difference CLV.
+    #
+    # MEASURED: that produced same-book rows like `spreads home open=-122
+    # close=+162` (clv -16.8) and `open=-238 close=+135` (clv -27.9). A spread
+    # does not move 28 probability points; those are two different bets
+    # subtracted from each other. It is the same class of error as omitting
+    # `player_name` from the opening key, one level down, and it is why the
+    # first same-book average read -5.01.
+    #
+    # An UNVERIFIABLE line is refused, not accepted. When the opening has a
+    # line and the point publishes none, we cannot show they are the same bet,
+    # and `learnings.md` is explicit that unknown must not fall to the
+    # permissive branch. h2h has no line on either side and is unaffected.
+    opening_line = _as_float(opening.get("line"))
+    if opening_line is not None and side in {"home", "away", "over", "under"}:
+        point_line = _as_float(line_block.get(f"{side}_line"))
+        if point_line is None:
+            point_line = _as_float(line_block.get("line"))
+        if point_line is None:
+            return None, "line_unverifiable"
+        if abs(point_line - opening_line) > 1e-6:
+            return None, "line_mismatch"
+
     if side in {"home", "away"}:
         price = _as_float((line_block or {}).get(f"{side}_odds"))
         if price is not None:
@@ -380,6 +408,30 @@ def compute_clv_for_date(
         # When a same-book pair was found, CLV must use OUR price at THAT book,
         # not the best-book headline price -- otherwise the comparison is
         # same-book in name only and carries the same bias it exists to remove.
+        # A CLOSE THAT PRECEDES THE OPENING IS NOT A CLOSE.
+        #
+        # Nothing enforced the arrow of time here, and the pairing looks
+        # perfectly well-formed without it: same event, same market, same book,
+        # same line, a real price at each end. MEASURED 2026-08-14 — on the
+        # first same-book run **25 of 25 rows had a close captured BEFORE the
+        # opening** (openings at 00:46:53Z against "closes" from 22:12–23:16 the
+        # evening before), producing a confident-looking `avg_clv_pct = -5.215`
+        # that was pure subtraction of unrelated instants. Two of those rows
+        # were `spreads home -1.5` moving -122 -> +162 and -238 -> +135, which
+        # is what prompted the check: a spread does not move 28 probability
+        # points.
+        #
+        # This is a PRODUCTION condition, not only a backfill artifact: it fires
+        # whenever a market is first published later than the last pregame
+        # observation of it. Refused by name rather than clamped to zero —
+        # "no valid close" and "the price did not move" are different facts and
+        # must not share a number.
+        open_at = _parse_ts(opening.get("captured_at"))
+        close_at = _parse_ts(resolved.get("close_captured_at"))
+        if open_at and close_at and close_at <= open_at:
+            unresolved["close_precedes_open"] = unresolved.get("close_precedes_open", 0) + 1
+            continue
+
         open_price = resolved.get("open_price_override")
         if open_price is None:
             open_price = opening.get("price")
