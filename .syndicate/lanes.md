@@ -2328,3 +2328,40 @@ line up on their own, so this is a LEAD, not a cause.**
 **Cheap next check for whoever owns this:** pull `SOCCER_PREGAME` over 08-09..08-11
 and see whether `AUTORUN_FAILED` appears at the moment capture stopped. That is a
 log query, not a deploy.
+
+#### red-intelligence-tests — CLOSED-VERIFIED 2026-08-15 — both reds fixed, one was REAL, a THIRD red found and exonerated
+- **Shipped `1322d0a8`** (fix + both tests + a new contract regression test),
+  `948e91ef` (the rule), `a2ae5b90` (`#436` in `todo_closed.md`). Local only.
+  **NOT DEPLOYED** — the instruction stood and was kept.
+- **Verification RAN, and this is its result, not a prediction.** Full
+  `tests/test_intelligence.py`: **1 failed, 217 passed** in 2033s. Also green:
+  `test_intelligence_contracts.py` 13, `test_home.py` 124,
+  `test_prediction_ledger.py` 16.
+- **Hypothesis (1) CONFIRMED.** `UniversalCandidate.to_dict` flattened `line`
+  `"4.5"` -> `4.5`; `1f6c27b9` (2026-08-06) added it to an unconditional loop
+  twelve lines below the comment `1f47b2d6` wrote when it fixed the identical
+  defect for `odds`. Pre-`1f6c27b9` `to_dict` never wrote `line` at all, so the
+  string is the long-standing contract — checked in git, not assumed.
+- **Hypothesis (2) CONFIRMED — nothing was dropped.** All three blotter columns
+  and cells present; `#240`/`#243` moved the headers into `BLOTTER_COLUMNS`.
+  The assertion was stale. **The template was NOT edited.**
+- **THE THIRD RED, and it is NOT mine.**
+  `...resolves_typo_subject_and_three_point_market` fails on
+  `market_key != "threes"`. Exonerated by RE-RUNNING it with HEAD's
+  unconditional line-write monkeypatched back on top: fails identically, and
+  the patched branch was **confirmed taken 875/875 times** rather than assumed
+  reached. **Unowned, still open, worth someone's lane.**
+- **DISARMED an armed revert in the SHARED index, found while repairing it after
+  my own isolated-index commit:** `.syndicate/deploys.md` staged at 3/**385
+  deletions** with `HEAD == worktree` (3411 lines both, index 3029) — the exact
+  signature `state.md` describes. A bare `git commit` by any session would have
+  un-shipped 385 lines of measurements with a clean worktree. Path-scoped
+  `git reset`, touched no file. Three other phantom-staged paths remain
+  (`syndicate-engineer.md`, `log/2026-08-13.md`, `docs/ai_context/todo.md`) —
+  left alone because they stage INSERTIONS that may be a session's only copy;
+  all four index blobs backed up to `C:/tmp/index-blob-backup-2026-08-15/`.
+- **A guard bug worth repeating:** my first ledger-commit guard aborted itself
+  because `grep -c` exits 1 on zero matches — and zero was the PASSING case.
+  It failed closed, which is the right direction, but a guard whose success
+  path is an error exit will eventually be "fixed" by deleting it. Use
+  `| wc -l`.
