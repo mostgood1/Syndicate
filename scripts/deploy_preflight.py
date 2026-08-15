@@ -234,6 +234,43 @@ def live_deploy(service_id: str, key: str) -> dict:
     return {}
 
 
+# The three real services. `SERVICE_IDS` also carries `syndicate` as an alias
+# for `web`, which would double-count the fleet view.
+FLEET = ("web", "refresh-worker", "live-odds-worker")
+
+
+def fleet_live_commits(key: str) -> dict[str, dict]:
+    """Every service's live commit, not just the one being deployed. (D5)
+
+    Deploy drift has now affected FOUR audits. The services are all
+    `branch=main, autoDeploy=no` and yet run off-branch commits on divergent
+    lines, so "what is live" is a per-service question with three different
+    answers -- and a branch cut from the wrong one has already been a ROLLBACK
+    for refresh-worker rather than a deploy. A preflight that reports only the
+    target service cannot show that, which is exactly how the drift kept
+    reaching audits: nobody was looking at the other two.
+
+    A per-service failure degrades to `null` for that row rather than taking
+    down the gate -- this block is context, and it must never be the reason a
+    safe deploy is refused or an unsafe one waved through.
+    """
+    out: dict[str, dict] = {}
+    for name in FLEET:
+        service_id = SERVICE_IDS[name]
+        try:
+            deploy = live_deploy(service_id, key)
+            commit = str((deploy.get("commit") or {}).get("id") or "")
+            out[name] = {
+                "service_id": service_id,
+                "live_commit": commit[:8] or None,
+                "finished_at": deploy.get("finishedAt"),
+            }
+        except Exception as exc:  # noqa: BLE001 - context, never a gate
+            out[name] = {"service_id": service_id, "live_commit": None,
+                         "finished_at": None, "error": f"{type(exc).__name__}: {exc}"}
+    return out
+
+
 def is_ancestor(candidate: str, descendant: str) -> bool | None:
     """True when `candidate` is already contained in `descendant`. None if git cannot say."""
     try:
@@ -263,6 +300,8 @@ def main() -> int:
     live_commit = str((deploy.get("commit") or {}).get("id") or "")
     report["live_commit"] = live_commit[:8]
     report["live_finished_at"] = deploy.get("finishedAt")
+
+    report["fleet"] = fleet_live_commits(key)
 
     redundant = False
     if args.target_commit and live_commit:
@@ -328,6 +367,20 @@ def main() -> int:
         print(f"target commit  {args.target_commit[:8]}   {state}")
     print(f"sample         {report['sample_at'] or 'NONE'}"
           + (f"   age {age:.0f}s" if age is not None else ""))
+
+    # D5. Printed on EVERY run, including CLEAR, for the same reason the process
+    # enumeration is: the number you need is the one for the service you are NOT
+    # deploying. `<-- deploying` marks the target so the other two read as
+    # context rather than as instructions.
+    print("\ndeployed commit per service:")
+    for name in FLEET:
+        row = report["fleet"].get(name) or {}
+        marker = "  <-- deploying" if SERVICE_IDS.get(args.service) == row.get("service_id") else ""
+        if row.get("error"):
+            print(f"  {name:18s} UNREADABLE ({row['error']}){marker}")
+        else:
+            print(f"  {name:18s} {row.get('live_commit') or '?':8s}  "
+                  f"finished {row.get('finished_at') or '?'}{marker}")
     # The enumeration is the point. Print it ALWAYS, including on CLEAR --
     # a verdict with no list is what made the original check misleading.
     print(f"\nprocesses ({report['process_count']} reported):")

@@ -20,6 +20,7 @@ import pytest
 from syndicate.features.shared.mlb_prop_calibration import (
     OPPORTUNITY_BIAS,
     SAMPLE_PLAYER_GAMES,
+    _MARKET_SKILL,
     skill_note,
 )
 
@@ -56,9 +57,51 @@ def test_unknown_market_is_not_given_a_number():
 
 def test_the_note_is_small_because_it_lands_on_every_row():
     """`#374`: extraHitterProps reached 68% of the MLB live-lens payload at 117
-    keys per record. The full numbers live in the module, not on the row."""
+    keys per record. The full numbers live in the module, not on the row.
+
+    Grew to five keys for `D4` (2026-08-15): every verdict says "until
+    de-biased" and that de-biasing is in-sample, so the row has to carry its own
+    validation state or a reader trusts it by default. The ceiling is still the
+    point of this test -- adding a SIXTH key needs the same argument made again,
+    not a quiet edit here.
+    """
     note = skill_note("batter_hits")
-    assert set(note) == {"sample_games", "seasons", "correlation", "verdict"}
+    assert set(note) == {
+        "sample_games", "seasons", "correlation", "verdict", "debias_validation",
+    }
+
+
+def test_the_row_declares_the_debias_is_in_sample():
+    """`D4`, closed 2026-08-15. The split has run: the correction is fitted on
+    2026-08-01..08-06 and scored on 08-07..08-13, so the served verdict is a
+    prediction rather than a fit. Reverting this to `in_sample` means the
+    numbers went back to being fitted on the games they are scored on."""
+    for market in ("batter_hits", "batter_total_bases", "batter_stolen_bases"):
+        assert skill_note(market)["debias_validation"] == "out_of_sample"
+
+
+def test_hits_does_not_claim_an_improvement_that_did_not_survive():
+    """MUTATION PIN, and the whole point of D4. `batter_hits` beat the baseline
+    in-sample by +0.0007 -- less than the 4-dp rounding of its own published
+    table -- and LOSES by 0.0081 on dates it was not fitted on. It is the one
+    verdict that flipped, and it is the market the module quotes first."""
+    entry = _MARKET_SKILL["batter_hits"]
+    assert entry["oos_debiased_beats_baseline"] is False
+    assert entry["oos_margin"] < 0
+    verdict = skill_note("batter_hits")["verdict"].lower()
+    assert "does not rescue" in verdict
+    # It must NOT read like the markets where de-biasing genuinely works.
+    assert "until de-biased" not in verdict
+
+
+def test_the_markets_whose_debias_survived_are_marked_as_such():
+    """Four markets IMPROVE out of sample. The leakage was not inflating
+    everything, and flattening them all to 'unreliable' would be its own
+    overcorrection."""
+    for market in ("batter_total_bases", "batter_rbis", "batter_runs_scored"):
+        entry = _MARKET_SKILL[market]
+        assert entry["oos_debiased_beats_baseline"] is True
+        assert entry["oos_margin"] > 0
 
 
 def test_verdicts_do_not_claim_skill_the_data_does_not_support():
@@ -67,7 +110,9 @@ def test_verdicts_do_not_claim_skill_the_data_does_not_support():
     for market in ("batter_hits", "batter_total_bases", "batter_rbis", "batter_runs_scored"):
         verdict = skill_note(market)["verdict"].lower()
         assert "biased high" in verdict
-        assert "de-biased" in verdict
+        # "de-biased" or "de-biasing" -- the claim must reference the correction
+        # either way, so this cannot pass on a verdict that quietly drops it.
+        assert "de-bias" in verdict
 
 
 def test_the_no_signal_markets_say_so_plainly():

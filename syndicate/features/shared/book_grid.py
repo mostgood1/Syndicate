@@ -37,6 +37,7 @@ from syndicate.features.shared.odds_book_quotes import (
     _line_value,
     market_sides_for_quote,
 )
+from syndicate.features.shared.opportunity_signals import consensus_vigged_price
 
 # The market instance, i.e. everything except which book quoted it and which
 # side it is. Mirrors `market_sides_for_quote`'s own base tuple exactly -- if
@@ -382,12 +383,19 @@ def build_book_grid(
                 for price, book in prices[1:]:
                     if _better(price, top_price):
                         top_price, top_book = price, book
-                mean_implied = sum(_implied_probability(p) for p, _ in prices) / len(prices)
-                side_consensus = (
-                    int(round(-100.0 * mean_implied / (1.0 - mean_implied)))
-                    if mean_implied >= 0.5
-                    else int(round(100.0 * (1.0 - mean_implied) / mean_implied))
-                )
+                # One owner for this statistic (`opportunity_signals`), because
+                # this file and `odds_book_quotes` had hand-rolled the same
+                # mean-of-implied and the same probability->price conversion
+                # separately, and the two copies disagreed with the owner at the
+                # boundary: -100 where `american_price` says +100 at exactly
+                # even money, and ZeroDivisionError where it refuses. The second
+                # is reachable -- `_implied_probability(0)` returns 0.0 rather
+                # than refusing -- so an all-zero side raised inside the build.
+                #
+                # The name says `vigged` on purpose. This is the average price
+                # the market is charging, not a fair value; nothing here de-vigs
+                # and `edge_vs_consensus_pct` below is a price-shopping delta.
+                side_consensus = consensus_vigged_price(p for p, _ in prices)
                 consensus[side] = side_consensus
 
                 # A best price far clear of consensus is usually a STALE line,
@@ -426,8 +434,15 @@ def build_book_grid(
                     "age_seconds": best_age,
                     "seen_age_seconds": best_cell.get("seen_age_seconds"),
                     "lag_behind_freshest_seconds": lag,
-                    "edge_vs_consensus_pct": round(
-                        (_implied_probability(side_consensus) - _implied_probability(top_price)) * 100, 2
+                    # Absent, not zero, when the consensus refused. A 0.0 here
+                    # would read as "the best price IS the consensus", which is
+                    # the opposite of "we could not compute a consensus".
+                    "edge_vs_consensus_pct": (
+                        round(
+                            (_implied_probability(side_consensus) - _implied_probability(top_price)) * 100, 2
+                        )
+                        if side_consensus is not None
+                        else None
                     ),
                     # Not "this is wrong" -- "do not read this as an edge without
                     # looking at when it was posted". After #S1b this can only be

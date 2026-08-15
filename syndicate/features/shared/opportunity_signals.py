@@ -71,6 +71,45 @@ def american_price(probability: Any) -> int | None:
     return round(-100.0 * p / (1.0 - p)) if p > 0.5 else round(100.0 * (1.0 - p) / p)
 
 
+def consensus_vigged_price(prices: Iterable[Any]) -> int | None:
+    """The market's AVERAGE quoted price for ONE side. **Not a fair value.**
+
+    The mean implied probability across the books quoting this side, converted
+    back to a price. The averaging happens in probability space because
+    averaging American odds directly is meaningless -- the scale is
+    discontinuous at +/-100.
+
+    **This is margin-inclusive, and it is not `consensus_fair_probability`.**
+    The two answer different questions and only one of them is value. This one
+    says "what is the typical book charging for this side"; the fair says "what
+    should it cost". A number from here still carries that side's share of the
+    hold, so it is a PRICE-SHOPPING reference -- how far the best book sits from
+    the pack -- and never an edge against true odds. It is also bounded below by
+    zero when compared against the best price, since the best price is by
+    construction the longest of the set being averaged.
+
+    Refuses (None) rather than raising when a price is unusable or the mean
+    lands on 0 or 1. Both hand-rolled copies this replaces raised
+    ZeroDivisionError there, and that is reachable: `odds_book_quotes`'
+    converter maps a price of `0` to probability **0.0** instead of refusing it,
+    so an all-zero side crashed the board build rather than returning a number.
+    Refusing the whole side on one bad price follows `overround` for the same
+    reason it gives -- a partial average is not the market, it is a smaller
+    sample wearing the market's name.
+    """
+    total = 0.0
+    seen = 0
+    for price in prices:
+        implied = implied_probability(price)
+        if implied is None:
+            return None
+        total += implied
+        seen += 1
+    if seen == 0:
+        return None
+    return american_price(total / seen)
+
+
 def overround(prices: Iterable[Any]) -> float | None:
     """Sum of implied probabilities across every side of one market.
 

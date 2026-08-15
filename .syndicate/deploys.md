@@ -2290,3 +2290,594 @@ signal, and the code already computes it everywhere.
 part of the climb (3428 -> 3831MB).
 
 NOT A FIX. Nothing about the kill rate changed and nothing was expected to.
+
+### 2026-08-15 — web `a86eb4ed` — one null placeholder (F3) + the pattern rule (F4) — **MEASURED**
+
+Deploy `dep-d9vs4ebl550s73c09sp0`, live 01:41:43Z. Pinned onto `1ac485c0`,
+the commit live at the moment of firing — not onto the base the branch was
+built from. Pre-flight confirmed no in-flight deploy first.
+
+Production, same routes before and after:
+
+    route                em-dash   "<strong>-</strong>"   empty cell
+    /ncaaf/cards  before       0                    48            0
+    /ncaaf/cards  after      144                     0            0
+    /nfl/cards    before       0                     4            0
+    /nfl/cards    after        4                     0            0
+    /soccer/epl   after        2                     0            0
+
+Seven board/market routes 200 afterwards.
+
+The empty-cell count reads 0 both times, and that is a WEAK reading, not a
+clean one: `<strong></strong>` only catches a bare empty element, and a cell
+containing whitespace or a nested span would not match it. The em-dash counts
+are the load-bearing measurement here.
+
+### 2026-08-15 02:11-02:29Z — `#435` TRACING WINDOW: SELF-INFLICTED REGRESSION, REVERTED
+
+Sequence, stated plainly because I made production worse and then misread it:
+
+    01:58:54Z  ae7318a2 live  (dump trigger) + SYNDICATE_TRACEMALLOC_DIAG 0 -> 1
+    01:59:08Z  TRACEMALLOC_INIT {"nframe": 1}   <- #423's nframe=3 was NEVER on this lineage
+    02:03:48Z  oomKilled
+    02:06:54Z  oomKilled                        <- cadence 3 min, against 16-22
+    02:10:37Z  934b3b81 live  (nframe 1 -> 3)
+    02:11:02Z  MEMORY_WATCHDOG_STARTED ... then ZERO samples
+    02:16:41Z  oomKilled
+    02:23:41Z  548ded38 deployed (dump off-thread) + DIAG 1 -> 0
+    02:29:40Z  548ded38 live
+    02:30:15Z  TRACEMALLOC_INIT {"nframe": 3, "reason": "disabled", "started": false}
+    02:31:18Z  sampler emitting again, climb -2.9 / 0.1 / -0.5 MB/s (stable)
+
+**CAUSE:** `take_snapshot()` walks every live traced allocation in C holding the
+GIL. The one call the trigger makes starved the sampler. Because the dump prints
+AFTER the snapshot returns, a dump still running is indistinguishable from a
+trigger that never fired -- and I read it as the latter.
+
+**COST:** ~25 min of a 3-10 min kill cadence instead of 16-22, one wasted
+diagnostic window, zero allocation sites obtained.
+
+**KEPT FROM THE WINDOW, and it is worth the cost on its own:** production was
+tracing at `nframe=1`. `#423` fixed that to 3 and the fix never reached this
+service. Any future dump here would have named `json/decoder.py` -- the
+allocator, not the caller -- and been recorded as an answer.
+
+**STATE NOW:** `548ded38` live, tracing OFF, watchdog sampling normally, dump
+wired off-thread behind a test that fails if it is moved back inline.
+**Kill cadence must be re-read before anything is concluded from it** -- the
+last four kills all sit inside the tracing window and are not a clean baseline.
+
+## 2026-08-15 02:4xZ — web `ad4b0a3a` — ask headline sourced from the board artifact
+
+**PREFLIGHT: PASS**, and it changed the deploy target. Recorded before the POST.
+
+1. **Scope — ONE substantive change, but only after the target was corrected.**
+   The obvious candidate (`1be6f3c4`, on `main`) would have shipped **199
+   commits / 82 files** and **REVERTED 10 commits that are live on web**,
+   including `clv_join.py` (542 lines) and `clv_opening_ledger.py` (326) —
+   another lane's live work. **Web does not run `main`.** It runs
+   `deploy/null-placeholder`, diverged from main at `b98f5ed7`. The deployed
+   target is instead `ad4b0a3a`, a direct child of the live `a86eb4ed`, whose
+   diff against live is exactly two files:
+   `ask_the_syndicate_adapter.py` (+171) and `tests/test_ask_headline_from_board.py` (new).
+2. **Expected effect — one number, one window.** On the next
+   `ask_syndicate_regression.py` run against production (within 30 min of the
+   deploy going live), B01's `chat_top_edge_pct` equals `board_top_edge_pct`
+   within 0.5, clearing `top_edge_diverges_from_board`. Baseline 20:45Z:
+   **23.81 vs 14.09, FAIL**. No other class falls below its 20:45Z score
+   (advice 4/5, entity 2/10, explain 4/6, history 1/5, lookup 2/8, ranking 4/10,
+   refusal 6/8; overall 23/52).
+3. **Measurement — who reads it.** This session, immediately after the deploy
+   reports `live`: `py -3 scripts/ask_syndicate_regression.py` against
+   `https://syndicate-an21.onrender.com`, diffed class-by-class against
+   `reports/ask_regression/post_m1_fixed_2026_08_14.json`. **Not "tests pass".**
+4. **Blast radius — web only.** `deploy_preflight.py --service web` reports four
+   processes, all gunicorn: no sim, no refresh job, no board build. The
+   `check_deploy_safety.py` NOT-CLEAR items (MLB sim pid 65, odds refresh pid
+   4634, board build in flight) are all on **refresh-worker / live-odds-worker**,
+   which this deploy does not restart. Cost is ~1-2 min of 502s on web, during
+   live games. Web has taken 4 deploys tonight under the same conditions.
+   **CAVEAT, stated not hidden:** the process sample backing that list is
+   **27,774s (7.7h) old**, so preflight returned UNKNOWN on freshness. The
+   "web is display-only" claim rests on architecture and on the 4-process list,
+   not on a fresh reading. I could not re-read web's loop env flags — the
+   env-vars API call was blocked by the permission classifier.
+5. **Rollback — exact, stated now.**
+   `py -3 scripts/render_deploy.py --service web --commit a86eb4ed --allow-rollback`
+   (`--allow-rollback` is REQUIRED: a86eb4ed is the parent, so the guard would
+   otherwise refuse it as a non-descendant.)
+6. **Ledger check.** No `learnings.md` rule is violated: the refresh-worker
+   deploy FREEZE in `state.md` names refresh-worker, not web, and this is not a
+   `render.yaml` change so `blueprint_sync` cannot fire. No OPEN lane claims
+   `ask_the_syndicate_adapter.py` — collision-checked with `lane-guard.py`'s own
+   `_claims()`, and the only mentions of that file anywhere in `lanes.md` are
+   two notes saying it was deliberately left unclaimed for exactly this lane.
+7. **MEASUREMENT: pending.** Reminder 2026-08-15 03:15Z. If this row still has
+   no number by then, this deploy is NOT evidence of anything.
+
+### MEASUREMENT for web `ad4b0a3a` — DEPLOYED 02:46:23Z, **ROLLED BACK 03:00:19Z**
+
+**Verdict: the change did what it was built to do and broke one other thing, so
+it is not live. Net on the harness was +1/-1 plus a visibly wrong number.**
+
+**WHAT IT FIXED (measured, fingerprinted).** B01 `top_edge_diverges_from_board`
+CLEARED. Same-instant A/B against production: chat top edge **6.35**, board top
+edge **6.35**, |delta| **0.000** (tolerance 0.5); baseline was 23.81 vs 14.09.
+Confirmed the deployed code was the code running, not assumed — 5 of 5
+`top_opportunities` carried `source="layer2_shortlist"`, a field only this
+change emits.
+
+**WHAT IT BROKE.**
+1. **`Best edge 635.0%` served to users.** `_board_summary_sentence` does
+   `best_edge * 100`, because snapshot rows carry `edge` as a FRACTION. Board
+   rows carry `model_edge_pct`, already a PERCENT. Mine, unambiguously.
+2. **F07 refusal PASS -> FAIL**, exactly one case. "Ohtani's exact stats for
+   tomorrow" returned 5 board rows instead of declining. An empty
+   `recommendations` list is the engine DECLINING; sourcing from the board
+   created a pool where the absence WAS the answer.
+
+**RETRACTION — I FIRST CLAIMED THIS COST 3 REFUSALS. IT COST 1.**
+The "6/8 -> 3/8" reading compared against a number in lane PROSE from hours
+earlier on a different slate, and my causal probe read
+`payload["recommendations"]`, **a key `build_syndicate_query_response` does not
+return** — so "snapshot_recommendations=0" was three reads of a missing field,
+not evidence. The real control is
+`reports/ask_regression/control_refusal_rolledback_2026_08_15.json`: refusal on
+the ROLLED-BACK code, same slate, is **4/8** — F01/F02/F03/F05 fail with no
+involvement from this change. Only F07 moved. The mechanism I described was
+right; the magnitude was 3x wrong and taken from the wrong instrument.
+
+**ALSO CORRECTED: `post_m1_fixed_2026_08_14.json` is NOT a 52-case baseline.**
+It is a **ranking-only run, 4/10**. The "23/52" figure everywhere in the ledger
+comes from prose, not from that file. Any lane baselining against it is
+comparing 10 cases to 52. A full same-slate 52-case run now exists:
+`reports/ask_regression/post_headline_2026_08_15.json` (24/52) — but it carries
+this reverted change, so it is a record, not a baseline.
+
+**ROLLBACK VERIFIED, not assumed.** Web live on `a86eb4ed` 03:00:19Z;
+`source=layer2_shortlist` count is **0 of 5**, F07 returns 0 rows and refuses.
+
+**STILL OPEN — the fix is 1 line and is BLOCKED.**
+`_market_summary_schema` must source from the board only when
+`recommendations` is non-empty, and the percent/fraction split must be explicit.
+Blocked twice: (a) `lane-guard` reads `ask-sport-coverage`'s
+"**NOT claimed, deliberately:** `ask_the_syndicate_adapter.py`" line as a CLAIM
+of that file — the known ledger-regex defect, surfaced to that session;
+(b) the permission classifier refuses edits to `lane-guard.py`, so the guard
+cannot be fixed from here either.
+
+### 2026-08-15 02:44-03:04Z — `#435` SECOND TRACING WINDOW: SAME FAILURE, NOW A NEGATIVE RESULT
+
+Owner called for one more window after the first went badly. Ran it with three
+safeguards the first lacked: dump off-thread, `nframe=2` not 3, and the dump
+closing the window itself via `stop_allocation_tracing`.
+
+**IT FAILED THE SAME WAY, WHICH MAKES IT A RESULT RATHER THAN A REPEAT:**
+
+    tracing OFF   02:30-02:31   8 MEMORY_WATCHDOG samples per minute
+    nframe=3      02:11-02:16   ZERO samples, OOM 02:16:41
+    nframe=2      02:48-02:55   ZERO samples in 6.7 min, OOM 02:47:54
+
+**CONCLUSION: tracemalloc is unusable on this process at any frame count.** It
+silences the sampler that does work, and it has never once returned an answer in
+production. Not "needs tuning" -- ruled out.
+
+**THE FAILURE SHAPE IS THE DANGEROUS PART.** No samples is indistinguishable
+from no excursion. I reported "no excursion yet" to the owner while the worker
+was dying. That is the third instance tonight of a silent instrument being read
+as a calm system (the others: log-grep for `oomKilled`, and the dump that was
+still running). It is now written at the switch in `run_refresh_worker.py`.
+
+**DEPLOY NOTE, stated because it was a judgement call:** `9be65758` was fired on
+an **UNKNOWN** gate (telemetry 347s stale, limit 180s), not a CLEAR. Stale
+telemetry was itself a symptom of the starved worker, and leaving the harmful
+window open was the worse risk. Live 03:03:31Z;
+`TRACEMALLOC_INIT {"nframe": 2, "reason": "disabled", "started": false}` at
+03:03:55Z confirms the window is shut.
+
+**ALSO OBSERVED, not mine:** a WEB deploy 02:40:21 -> 02:46:23 and another
+starting 02:53:47. Web deploys 502 every route for ~2 min and are the
+user-visible outage in that period; the refresh-worker OOM at 02:47:54 recovered
+in 1 second. Board verified healthy at 02:54Z: HTTP 200 in 0.5s, 105 rows across
+nfl/mlb/wnba, 10,907 considered.
+
+**WHERE THE FIX STANDS:** no allocation site was ever obtained. The remaining
+path costs production nothing -- read the board-build loop for RETENTION, since
+"anon never falls between stages" is the signature and `#387` already proved
+that bug class exists in the overview path.
+
+### CORRECTION 2026-08-15 03:06Z — "anon never falls between stages" IS WRONG
+
+Sampler recovered on the closed-window boot: 35 samples in 76s. The third one
+falsifies the signature I built the retention hypothesis on:
+
+    03:05:56  anon 2242.8  climb   +0.6 MB/s  build_live_state_payload_start
+    03:05:59  anon 2242.9  climb   -0.4 MB/s  board_contract_games_normalized
+    03:06:02  anon 1557.9  climb -285.4 MB/s  build_live_player_lens_payload_start
+
+**685MB released in a single 2.4s tick.** Anon DOES come back down in normal
+operation. What I wrote after the 01:38 excursion -- "anon never falls between
+stages, that is retention" -- was true OF THAT 35-SECOND WINDOW and I stated it
+as a property of the system.
+
+**This reframes the remaining work.** It is not "find what retains forever"; it
+is **"find why release does not keep up during the burst"**. Both hypotheses I
+put to the owner were built on the wrong premise:
+  - RETENTION (caches never releasing) is weakened -- release demonstrably works.
+  - CHURN is not obviously right either; the release here is large and abrupt,
+    which looks like a scope exit or an explicit trim, not steady turnover.
+
+**What the next reader should do:** compare a HEALTHY per-sport cycle against the
+01:38 excursion, using the samples the watchdog is now producing for free. The
+question is what is different about the excursion, not what is expensive in
+general. That needs no deploy and no tracing.
+
+---
+
+## 2026-08-15 03:15Z — web `7e334509` — soccer card Lane G+H — PENDING MEASUREMENT
+
+`dep-d9vtjklg1s2s73bs6ib0`, service `srv-d88ahvrbc2fs73eodu30`, triggered
+03:15:30Z. Lane `soccer-card-end-to-end`.
+
+**Pinned, and it had to be.** `7e334509` = web's own live `a86eb4ed` + the
+single commit `3912f8f2`. **`origin/main`'s tip was NOT deployable**: it is 131
+commits ahead of the live SHA and it contains `ad4b0a3a`, which another session
+deployed successfully at 02:46:23Z and then **deliberately reverted** by
+redeploying `a86eb4ed` at 03:00:19Z. Deploying the tip would have silently
+undone their rollback. Pinned deploys replace rather than merge, so the next
+web deploy has to stack on `7e334509` or it drops this commit.
+Same work is on `origin/main` as `9b6a48e7` for whoever rebases later.
+
+**Preflight, answered:**
+1. *Scope* — one substantive change: the soccer card renders its own data or
+   nothing. 7 files, 710 insertions. No backend, worker, env or `render.yaml`
+   change, so no `blueprint_sync` risk and no in-flight sim at stake (web only).
+2. *Expected effect* — on `/soccer/epl/cards` at 1440 and 390, within one
+   deploy cycle: **unstyled links 2 -> 0**, **empty slots 3 -> 0**,
+   **projected-score sentence 6 -> 2 in the card DOM (5 -> 1 on the default
+   tab)**, worst repeated string 6x -> 4x. On `ncaaf` — the control, same
+   contract and stylesheet — **no change**: 0px overflow, 45/53px card-height
+   spread, 5x repeat, 3 empty slots. On `nfl` — the control that shares the
+   generic TEMPLATE — 0px overflow and 16 cards, with its own 6x repeat
+   expected to persist (different cause, see the lane).
+3. *Measurement* — `py -3 scripts/ui_layout_probe.py --base-url
+   https://syndicate-an21.onrender.com --sports soccer,nfl,ncaaf`. Read by this
+   session, immediately after `finishedAt`. Before-numbers were taken with the
+   same instrument against the same production build, and it reproduced all
+   three defects before anything was touched.
+4. *Blast radius* — web only. Routes 502 for ~2 minutes during the restart
+   (observed on the 02:53-03:00 deploy, which is what a 502 sweep earlier in
+   this session was actually measuring). No persistent-disk service restarts.
+5. *Rollback* — redeploy the live-before SHA:
+   `POST /v1/services/srv-d88ahvrbc2fs73eodu30/deploys {"commitId":"a86eb4ed"}`.
+6. *Ledger* — no `learnings.md` FORBIDDEN or EXONERATED rule covers this. No
+   OPEN lane claims any of the 7 files (lane-guard's own `_claims()` re-run
+   twice; `board-contract-absent-not-neutral` released three of them when it
+   was orphaned).
+7. *Verdict* — **PASS on the change, FAIL on the naive form of it.** Deploying
+   `origin/main` would have been a rollback of another session's rollback. The
+   pinned stack is what was shipped, and the owning session was messaged before
+   the trigger.
+
+**MEASUREMENT: [pending — this session, immediately after finishedAt]**
+
+### `#435` ANSWERED IN PART 2026-08-15 03:20:15Z — THE ANON IS NOT IN PYTHON CONTAINERS
+
+`96f2cfb5` live 03:18:53Z. Census fired 82 seconds later on the CONDITION
+(anon >= 1500MB), where the existing call site had never fired in 5h:
+
+    HEAP_CENSUS reason=watchdog_anon_1709mb  container_mb=2506
+    gc_tracked_objects   415,596
+    top_by_count         dict 240,250 | list 77,637 | function 30,715 | tuple 15,756
+    top_by_shallow_mb    dict 98.5 | list 20.1 | set 4.6 | function 4.5 | type 3.6
+    individually_huge_mb []
+
+**~135MB shallow across 415k objects, against 1709MB anon.** The census's own
+docstring sets the bar -- "2GB of anything must appear as TENS OF MILLIONS of
+objects" -- and this is three orders of magnitude short. No single object over
+50MB either.
+
+**WHAT THIS ELIMINATES:** the per-sport payload caches, the board dictionaries,
+the candidate pool -- every dict/list-shaped hypothesis, including the RETENTION
+one I recommended twice tonight. They are all in that 240k dicts / 98.5MB.
+
+**WHAT IT DOES NOT SEE, AND THIS IS THE POINT.** `gc.get_objects()` returns only
+CYCLIC-GC-TRACKED objects. `str`, `bytes`, `int`, `float` hold no references and
+are NOT tracked; neither are numpy data buffers. In a JSON-heavy pipeline those
+are precisely the bytes in question. **The census did not find the memory; it
+ruled out the place everyone looks first.**
+
+Consistent with `#423`'s `json.loads` at 491.3MB / 7,172,382 allocations, and
+with `_BOOK_QUOTES_CACHE`'s 500MB budget of parsed JSON.
+
+**NEXT, and it needs no new deploy machinery:** measure the UNTRACKED classes --
+walk `gc.get_objects()` and sum `sys.getsizeof` over each object's `referents`
+that are `str`/`bytes`, or size the named caches directly. That distinguishes
+"one cache holding parsed JSON" from "millions of small strings spread across
+the process", which have different fixes.
+
+**METHOD NOTE:** this worked because it triggered on the CONDITION, not a call
+site -- the same change that made the watchdog see what stage-boundary sampling
+could not. The existing instrument was correct and simply never ran.
+
+## 2026-08-15 03:2xZ — web `c774fe1a` — ask headline, second attempt
+
+**PREFLIGHT: PASS.** Recorded before the POST.
+
+1. **Scope.** Parent is `7e334509`, the LIVE commit (the soccer-card lane
+   deployed it at 03:21:36Z — I waited for it rather than racing, per the
+   ledger's own "a concurrent session deployed in between" incident). Diff vs
+   live is exactly 2 files: the adapter and its test.
+2. **Expected effect, two numbers in one window.** Within 30 min: B01
+   `top_edge_diverges_from_board` clears (chat == board within 0.5), AND the
+   refusal class is **>= 4/8**, its same-slate control value — F07 declines
+   again. The first attempt bought B01 at the cost of F07; this must hold both.
+   Also: no served summary contains "635" or any edge over 100%.
+3. **Measurement.** This session, on `live`: the B01 same-instant A/B, then
+   `--classes refusal` against
+   `reports/ask_regression/control_refusal_rolledback_2026_08_15.json` (4/8).
+4. **Blast radius — web only.** `check_deploy_safety` NOT-CLEAR items (odds
+   refresh pid 8417, board build 03:11:06Z) are on live-odds-worker and
+   refresh-worker; a web deploy does not restart either. MLB sim reported
+   FINISHED (exit=0). Cost is ~1-2 min of web 502s during live games — the same
+   cost another session accepted 10 minutes ago.
+5. **Rollback.** `py -3 scripts/render_deploy.py --service web --commit 7e334509 --allow-rollback`
+6. **Ledger check.** The `ask_the_syndicate_adapter.py` phantom claim by
+   `ask-sport-coverage` is resolved — `lane-guard.py` no longer parses a
+   `NOT claimed, deliberately:` bullet as a claim. Re-derived after the fix:
+   the adapter is claimed by `ask-headline-from-board` only, and the guard
+   still returns exit 2 for `ask_the_syndicate_data.py` and
+   `intelligence_state.py`, so it was fixed, not weakened. No `render.yaml`
+   change, so `blueprint_sync` cannot fire.
+7. **MEASUREMENT: pending.**
+
+### MEASUREMENT 2026-08-15 03:2xZ — web `7e334509` live 03:21:35Z — ALL CRITERIA MET
+
+Same instrument, same base URL, same fixture on both sides (soccer EPL Coventry
+@ Arsenal; NFL still showing "Seattle Seahawks by 0.3" / "Projected total 43.9"
+before and after, so **the slate did not move between the two runs** and the
+deltas below are the deploy, not the data). `httpStatus` 200 on every row —
+recorded explicitly, because this session already had one clean-looking table
+that was a 502.
+
+    soccer, 1440 and 390            before   after
+      unstyled links                     2       0
+      empty slots (game panel)           3       0   (2 placeholders + 1 zero-bin bar)
+      projected-score sentence, DOM      6       2   (head ribbon + Details panel)
+      projected-score sentence, tab      5       1
+      "Highest anytime-goalscorer..."    6      <=1
+      "Anytime scorer / shots leaders"   6      <=1
+      "Top prop signals"                 6      <=1
+      horizontal overflow                0       0
+      worst remaining repeat            6x      4x  ("Arsenal - F M S", boxscore,
+                                                     pre-existing, not this lane)
+
+    ncaaf — CONTROL, own template, shared contract + stylesheet
+      overflow 0/0, spread 45/53px, 5x repeat, 3 empty slots in 2 panels
+      IDENTICAL on every axis, both widths. No regression.
+
+    nfl — shares the generic TEMPLATE
+      props panel .cards-empty-copy       2       1
+      worst repeat                       6x      4x
+      card-height spread          17 / 67px   14 / 50px
+
+**I PREDICTED NFL'S REPEAT WOULD NOT MOVE, AND IT DID.** The preflight says
+"nfl's own 6x repeat expected to persist (different cause)". That reasoning was
+that NFL supplies its own `shared_top_play_rows`, so `_build_top_play_rows`
+never runs for it — which is true, and irrelevant. The repeated string was
+*"No stored NFL weekly recommendation snapshot exists for this game."* rendered
+five times down the Top Plays list, and it was coming from the TEMPLATE's
+`row.detail or row.heading` fallback, not from the contract. The template half
+of the fix caught it. So the win is real and larger than claimed, and the
+prediction was wrong because I attributed a symptom to one of two changes
+without checking which. The card-height spread tightening (17->14, 67->50) is
+the same effect: a variable-length empty-state block stopped rendering.
+
+**The one number that went UP, stated rather than buried:** NFL's "Projected
+spread" and "Seattle Seahawks by 0.3" go 3x -> 4x, gaining an occurrence in the
+`game` panel. That is the callout list now showing the row's own `detail` where
+it previously showed a constant. A meaningful value appearing once more is not
+the same defect as a constant repeating five times, but the counter cannot tell
+them apart and the next reader should not have to rediscover that.
+
+**Deploy hygiene:** one deploy, one change, no worker touched, no `render.yaml`,
+no env write. Build 03:15:30Z -> live 03:21:35Z (~6 min; routes 502 during the
+rollout, as always). Rollback remains `{"commitId":"a86eb4ed"}`.
+
+### 2026-08-15 03:29:56Z — web `c774fe1a` supersedes `7e334509` — **THE STACK WAS HONOURED**, Lane G still live
+
+`7e334509` (soccer card, Lane G) shows `deactivated` on the service 8 minutes
+after it went live. That is the expected state for a superseded pinned deploy
+and **not** a loss: `c774fe1a` (`ask: the headline comes from the board`) has
+`7e334509` as an **ancestor**, so the `ask-headline-from-board` session stacked
+rather than replaced. Verified two ways at one instant:
+
+    git merge-base --is-ancestor 7e334509 c774fe1a   -> YES
+    all four Lane G source files, c774fe1a vs 7e334509 -> byte-identical
+
+And re-measured against the LIVE service rather than trusted by ancestry:
+
+    soccer 1440/390   0 unstyled links, 0 empty slots, worst repeat 4x, 0px overflow
+    ncaaf  1440/390   0px overflow, 45/53px spread, 5x, 3 slots  (control, unmoved)
+
+**The obligation this closes:** `state.md` and the lane both carry "the next web
+deploy must stack on `7e334509` or it silently drops the soccer card work." It
+did stack. That line can stop being read as an open risk — but the RULE stands
+for the next pinned deploy, because nothing enforces it except a person reading
+the deploys API first. `deactivated` on a pinned deploy means "superseded", and
+whether the successor kept your work is a separate question that only ancestry
+or a measurement answers.
+
+### MEASUREMENT for web `c774fe1a` — live 03:29:56Z — **BOTH CRITERIA MET, HOLDING**
+
+**1. B01 divergence CLEARED.** Same-instant A/B against production: chat top
+edge **6.35**, board top edge **6.35**, |delta| **0.000** (tolerance 0.5).
+Baseline was 23.81 vs 14.09. Fingerprinted — 5 of 5 `top_opportunities` carry
+`source="layer2_shortlist"`, so the deployed code is the code running.
+
+**2. The regression the first attempt caused is GONE, and did not come back
+anywhere else.** Refusal is **4/8**, matching
+`control_refusal_rolledback_2026_08_15.json` **case for case** — F01/F02/F03/F05
+fail in both (pre-existing, not mine), F04/F06/F07/F08 pass in both. F07 now
+returns 0 rows and "No opportunities are on the board right now."
+
+**3. `635` is gone.** Served summary reads "Best edge 6.3%."
+
+**Full run: 25/52** (`post_headline_fixed_2026_08_15.json`) vs **24/52** for the
+reverted first attempt. Diffed case-by-case, **the only case that differs
+between the two attempts is F07** (FAIL -> PASS). Class scores identical
+otherwise: advice 4/5, entity 2/10, explain 4/6, history 2/5, lookup 4/8,
+ranking 5/10. `warn:selection_not_on_board` fell 185 -> 155, consistent with
+rows now coming from the board rather than the snapshot.
+
+**LIMIT OF THIS EVIDENCE, stated rather than glossed.** A true same-slate
+control on UNCHANGED code exists only for the refusal class (the 8-case run
+against the rolled-back build) and for B01. The other five classes are compared
+between two runs that BOTH carry this change, so what is established for them
+is "the fix did not move them relative to the first attempt", not "this change
+never touched them". The bound on that risk is the code: the only mutation is
+`_market_summary_schema`'s `top_opportunities`, and only when `recommendations`
+is already non-empty.
+
+**Also shipped to `main` as `98900164`** — main previously carried `1be6f3c4`,
+the version with both defects. That is corrected; main and the deploy branch now
+agree on this file.
+
+**Obligation closed.**
+
+### `#435` THE ANSWER, 2026-08-15 03:33:41Z — 85% OF ANON IS NOT REACHABLE PYTHON DATA
+
+`eea7554a` live 03:32:50Z; census fired 51s later.
+
+    UNTRACKED_BYTES_CENSUS reason=watchdog_anon_1657mb
+      anon_mb              1858.27
+      str_bytes_total_mb    136.1      <- 7.3% of anon
+      distinct_str_bytes  1,704,754    <- average 84 BYTES each
+      top_holders_mb      dict 114.1 (1,513,201 strings) | function 7.8 |
+                          list 6.6 | set 6.3
+      biggest_individual  []           <- nothing over 1MB
+
+**THE ARITHMETIC, and it is the whole finding:**
+
+    tracked containers (HEAP_CENSUS)        ~135 MB   415,596 objects
+    str/bytes off them (UNTRACKED_CENSUS)   ~136 MB   1,704,754 strings
+    ------------------------------------------------
+    accounted                               ~271 MB
+    anon                                   1858.3 MB
+    **UNACCOUNTED                          ~1587 MB = 85%**
+
+**THERE IS NOTHING TO RELEASE.** Every "find what retains it" hypothesis is dead,
+including both of mine: the per-sport payload caches, the board dictionaries, the
+candidate pool, and the "millions of small strings" theory -- 1.7M strings exist
+and they are 136MB, not gigabytes.
+
+**WHAT IS LEFT: ALLOCATOR RETENTION.** The process parses ~2.3GB of JSON during
+an excursion (measured 01:38: anon 1700 -> 4038MB in 35s), frees it, and glibc
+keeps the pages instead of returning them. Live objects disappear; `anon` does
+not. This fits everything measured tonight:
+  - the 685MB drop at 03:06:02 -- an explicit trim firing, not natural GC
+  - `MALLOC_TRIM` releasing 112 / 68 / 140MB when it runs, never GBs
+  - `#423` already EXONERATED arena fragmentation as the mechanism, which is a
+    different claim from "the allocator is holding freed pages"
+
+**NEXT MEASUREMENT, and the machinery again already exists and is not wired:**
+`malloc_arena_snapshot()` binds glibc `malloc_info` and reports in_use vs
+free_held. Fire it on the same condition trigger. If free_held is ~1.5GB the
+answer is confirmed and the fix is allocator-side (trim cadence, arena count,
+or cutting the transient peak). If free_held is small, the memory is in C
+extension buffers and the search moves again.
+
+**METHOD NOTE, third time tonight:** the instrument that answered this existed
+and had never run. `log_heap_census` had one call site behind a threshold it
+never met; `log_untracked_bytes_census` had to be written but only because
+`gc.get_objects()`'s blindness to str/bytes was never accounted for. Both
+answered within 60 seconds of being triggered ON THE CONDITION.
+
+### `#435` SOLVED TO THE OBJECT LEVEL, 2026-08-15 03:45:36Z
+
+`984e48c8` live 03:44:16Z. `PYMALLOC_STATS` fired 80s later:
+
+    arenas_currently_allocated  1688      arena_mb            1688.0
+    bytes_in_allocated_blocks   1638.5MB  unused_pools_mb       25.8
+    retained_by_pymalloc_mb       49.5    <- fragmentation is 3%
+    arenas: 2538 total, 850 RECLAIMED, highwater 1719, current 1688
+
+**IT IS NOT FRAGMENTATION AND NOT GARBAGE. 1638.5MB is LIVE.** The allocator is
+working correctly -- it has reclaimed 850 arenas. There is nothing for a trim to
+reclaim, which is why `MALLOC_TRIM` only ever released 68-140MB.
+
+**THE SIZE-CLASS TABLE NAMES THE MEMORY:**
+
+    size   blocks in use     total
+     64 B    13,719,058      838 MB   <- dominant
+    400 B       614,024      234 MB
+     80 B     2,787,789      213 MB
+     96 B     1,041,857       95 MB
+     32 B     3,065,952       94 MB
+    128 B       603,680       74 MB
+                    ~22.3 MILLION live small objects, ~1597MB accounted
+
+64 bytes is a short `str` (<=~15 ASCII chars), a 1-2 element tuple, or similar --
+the shape of parsed odds/quote rows. 400B x 614k is the row-object class.
+
+**RETRACTED: MY OWN "85% OF ANON IS NOT REACHABLE PYTHON DATA" (03:33Z entry).**
+It was a measurement artifact. `log_untracked_bytes_census` walks ONE LEVEL:
+`str`/`bytes` **directly referenced** by a GC-tracked object. Anything nested --
+dict -> list -> tuple -> str -- was never counted, and CPython untracks tuples of
+immutables so they leave `gc.get_objects()` altogether. The 271MB it and the
+heap census found was the reachable-in-one-hop surface, not the heap.
+
+**So the allocator-retention hypothesis I gave the owner is WRONG**, along with
+the two before it. The memory is exactly what the naive reading would have said:
+live application data, ~22M small objects.
+
+**NEXT, and it is now a narrow search:** find what holds ~13.7M 64-byte objects.
+`_BOOK_QUOTES_CACHE` carries a 500MB budget of parsed quote JSON and is the first
+place to look; the 400B/614k class looks like row objects built beside it. The
+question is finally the ordinary one -- which structure holds 13.7M small
+objects, and does it need to.
+
+### `#435` ROOT CAUSE, 2026-08-15 15:4xZ — the quote shard is append-only and 92% superseded
+
+**MECHANISM, end to end:**
+
+1. `data/<sport>_source/tracking/book_quotes/<date>.jsonl` is APPEND-ONLY. Every
+   refresh appends a row per quote observation (17 fields, carries `snapshot_ts`).
+2. It therefore grows all day. Measured from production `CACHE_EVICT` records,
+   MLB on 2026-08-14: **89.9 -> 97.8 -> 108.8 -> 121.5 -> 133.2 -> 150.3 ->
+   165.2 -> 174.5 -> 184.5 MB**, then resets to 2.2MB at the date rollover and
+   climbs again (2.2 -> 4.2 -> 5.0 -> 7.6 -> 8.8 ...).
+3. A read costs 6.3x file bytes resident (the module's own measured constant).
+   At 184.5MB that is **1,162 MB for ONE cached entry**, against a 500MB budget.
+4. `_evict_book_quotes_over_budget` is `while len(cache) > 1 and ...` -- **a
+   single oversized entry can never be evicted.** When it is not alone it gets
+   evicted and re-read, re-allocating ~1.1GB of small objects each time.
+
+**THIS IS THE 22.3M OBJECTS.** 478,782 rows x 17 fields is exactly the measured
+census: 614k 400-byte dicts and 13.7M 64-byte values.
+
+**IT EXPLAINS THE TIME PATTERN, which nothing else did.** Kills clustered in the
+evening (shard at maximum) and **stopped at 05:02:59Z** -- the date rolled over
+and the shard reset to 2.2MB. Not a leak; a daily ramp.
+
+**THE GUARD'S PREMISE IS STALE.** The sizing comment says "production's MLB shard
+is ~90MB, so ONE cached copy is ~570MB". It reached **184.5MB / 1,162MB** on
+2026-08-14 -- 2.05x the number the budget was reasoned from.
+
+**HOW MUCH OF IT IS NEEDED (measured, 2026-08-09 shard, 207.4MB):**
+
+    rows        478,782
+    distinct     36,424   (latest per event/book/market/selection/line/player/segment)
+    superseded  442,358 = **92.4% of the file**
+    shrink        13.1x
+
+**FIX, and the trap in it:** the lookup path (`quote_ref_for_bet`, which the
+module says walks ~122k rows per candidate) needs LATEST-PER-KEY -- 36k rows,
+~89MB resident instead of ~1.16GB. But **do not compact the file**: opening
+prices and line movement are exactly the superseded rows, and
+`clv-without-settlement` depends on them. The fix is a latest-per-key INDEX for
+the lookup path, leaving history intact for the CLV/movement consumers that read
+it differently.
+
+Secondary, cheap, independent: let the evictor drop the last entry, so one
+oversized shard cannot sit above budget indefinitely.

@@ -139,7 +139,12 @@ done
 # The actionable half: closed lanes retained in lanes.md. Archiving them is
 # mechanical and lossless (.syndicate/lanes_closed.md), unlike trimming prose.
 if [ -f .syndicate/lanes.md ]; then
-  CLOSED=$(grep -c '^### .*—[^—]*\(CLOSED\|ORPHANED\|VOID\)' .syndicate/lanes.md 2>/dev/null || echo 0)
+  # `grep -c` PRINTS 0 and EXITS 1 when nothing matches, so `|| echo 0` emitted
+  # a second 0, so the next test saw two zeroes on two lines -- an integer
+  # error on every clean session.
+  # session. `|| true` swallows the exit status and keeps grep's own count.
+  CLOSED=$(grep -c '^### .*—[^—]*\(CLOSED\|ORPHANED\|VOID\)' .syndicate/lanes.md 2>/dev/null || true)
+  CLOSED=${CLOSED:-0}
   [ "${CLOSED:-0}" -gt 12 ] && add "LANE ARCHIVE OWED: $CLOSED closed/orphaned lanes still in lanes.md. Move to lanes_closed.md, leave a one-line pointer each (keep the file/line maps and any ORPHANED 'to resume' notes reachable)."
 fi
 

@@ -116,9 +116,39 @@ def main():
     if rel.startswith(".syndicate") or rel.startswith(".claude"):
         return 0
 
+    # PER-SESSION MARKER, falling back to the global one.
+    #
+    # This file's own docstring said "lower value while running a single
+    # session". Measured 2026-08-15 with FIVE live sessions in this worktree:
+    # `.syndicate/.current-lane` is a single slot every session writes, so it
+    # names whoever wrote last, and the guard then blocks a session from
+    # editing files ITS OWN OPEN LANE claims. Three consecutive edits were
+    # blocked that way in one session while no real cross-lane conflict
+    # existed -- the guard was firing on marker contention, not on the thing
+    # it exists to catch. A guard that blocks correct work is one people
+    # route around, which costs more than the guard was ever worth.
+    #
+    # `.current-lane.<session_id>` gives each session its own slot, so the
+    # marker stops being a contended lock. The global file is still read when
+    # no per-session file exists, so a session that never writes one behaves
+    # EXACTLY as before -- this cannot break a session that has not opted in.
     current = ""
+    session_marker_used = False
+    session_id = str(payload.get("session_id") or "").strip()
+    # Defensive: the id goes into a filename, and it arrives from outside.
+    safe_session_id = re.sub(r"[^A-Za-z0-9._-]", "", session_id)[:128]
+    if safe_session_id:
+        session_marker = os.path.join(root, ".syndicate", f".current-lane.{safe_session_id}")
+        if os.path.exists(session_marker):
+            try:
+                with open(session_marker, encoding="utf-8") as fh:
+                    current = fh.read().strip()
+                session_marker_used = bool(current)
+            except Exception:
+                current = ""
+
     marker = os.path.join(root, ".syndicate", ".current-lane")
-    if os.path.exists(marker):
+    if not current and os.path.exists(marker):
         try:
             with open(marker, encoding="utf-8") as fh:
                 current = fh.read().strip()
@@ -144,9 +174,14 @@ def main():
     if conflict:
         sys.stderr.write(
             f"BLOCKED: {rel} is claimed by OPEN lane '{conflict}'.\n"
-            f"Current lane: '{current or 'none'}'.\n"
+            f"Current lane: '{current or 'none'}'"
+            f"{' (per-session marker)' if session_marker_used else ' (global marker)'}.\n"
             "Close or reassign that lane, or work a different file. "
             "Do not edit across lanes.\n"
+            "If this IS your lane, you are on the shared global marker while "
+            "another session holds it. Write your slug to "
+            f".syndicate/.current-lane.{safe_session_id or '<session_id>'} "
+            "instead -- that slot is yours alone and nothing else rewrites it.\n"
         )
         return 2
     return 0

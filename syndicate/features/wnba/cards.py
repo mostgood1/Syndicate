@@ -30,6 +30,7 @@ from syndicate.features.shared.basketball_market_board import basketball_odds_hi
 from syndicate.features.shared.basketball_market_board import build_basketball_market_board
 from syndicate.features.shared.basketball_market_board import parse_raw_basketball_player_props_rows
 from syndicate.features.shared.memory_observability import log_runtime_memory
+from syndicate.features.shared.opportunity_signals import american_price
 from syndicate.features.shared.request_path_guard import warn_if_compute_in_request_path
 from syndicate.features.shared.refresh_state_store import data_root as _refresh_state_data_root
 from syndicate.features.shared.refresh_state_store import read_json_file as _keyvalue_read_json_file
@@ -842,13 +843,27 @@ def _implied_prob_from_american(price: float | None) -> float | None:
 
 
 def _american_from_prob(probability: float | None) -> float | None:
-    prob = _safe_float(probability)
-    if prob is None:
-        return None
-    prob = max(0.02, min(0.98, prob))
-    if prob >= 0.5:
-        return round(-100.0 * prob / max(0.001, 1.0 - prob), 0)
-    return round(100.0 * (1.0 - prob) / max(0.001, prob), 0)
+    """Fair American price from a probability. Delegates to the canonical
+    implementation rather than carrying a fourth copy of the formula.
+
+    **The old body clamped to `[0.02, 0.98]` and that is what made it wrong.**
+    A clamp is not a guard: it converts an out-of-range input into a confident
+    number instead of a refusal. Measured on the live board (Tier 3a,
+    `d448a100`), the identical clamp in the sibling implementations published
+    `fair_price` -4900 for a `fair_probability` of 0.992056, where the correct
+    price is -12488 -- and turned a `50.0` percent-scale probability, which is a
+    unit error (`confidence` is stored 0-100 beside probability 0-1 in the same
+    rows), into a plausible-looking -4900 rather than declining to price it.
+
+    `american_price` refuses anything outside `0 < p < 1`, which is the board
+    contract's "absent renders as absent" and the reason it was the only one of
+    five implementations to meet every requirement in the differential.
+
+    One deliberate behaviour change beyond the refusals: at exactly p=0.5 this
+    now returns +100 rather than -100. Same probability, and +100 is the
+    convention -- see `american_price`'s own note.
+    """
+    return american_price(probability)
 
 
 def _round_half(value: float | None) -> float | None:

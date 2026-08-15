@@ -139,3 +139,59 @@ class NewestLogOrderingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FleetCommitTests(unittest.TestCase):
+    """D5. The commit you need is the one for the service you are NOT deploying.
+
+    Deploy drift reached four audits because the pre-flight reported a single
+    service. These pin the two properties that make the fleet block trustworthy:
+    it covers all three services exactly once, and a per-service read failure
+    degrades that row instead of taking down the gate.
+    """
+
+    def test_fleet_is_the_three_real_services_not_the_alias(self) -> None:
+        # SERVICE_IDS carries `syndicate` as an alias for `web`; counting both
+        # would report the same container twice and hide one of the workers.
+        self.assertEqual(len(deploy_preflight.FLEET), 3)
+        ids = [deploy_preflight.SERVICE_IDS[n] for n in deploy_preflight.FLEET]
+        self.assertEqual(len(set(ids)), 3, "a service is double-counted")
+
+    def test_every_service_is_reported(self) -> None:
+        calls = []
+
+        def fake_live_deploy(service_id, key):
+            calls.append(service_id)
+            return {"commit": {"id": "abcdef1234567890"}, "finishedAt": "2026-08-15T00:00:00Z"}
+
+        original = deploy_preflight.live_deploy
+        deploy_preflight.live_deploy = fake_live_deploy
+        try:
+            fleet = deploy_preflight.fleet_live_commits("key")
+        finally:
+            deploy_preflight.live_deploy = original
+
+        self.assertEqual(set(fleet), set(deploy_preflight.FLEET))
+        self.assertEqual(len(calls), 3)
+        self.assertEqual(fleet["web"]["live_commit"], "abcdef12")
+
+    def test_one_unreadable_service_does_not_take_down_the_others(self) -> None:
+        """A throttled or failing read must render as UNREADABLE, never as a
+        commit of `None` indistinguishable from 'never deployed'."""
+
+        def flaky_live_deploy(service_id, key):
+            if service_id == deploy_preflight.SERVICE_IDS["refresh-worker"]:
+                raise RuntimeError("429 throttled")
+            return {"commit": {"id": "0" * 40}, "finishedAt": "2026-08-15T00:00:00Z"}
+
+        original = deploy_preflight.live_deploy
+        deploy_preflight.live_deploy = flaky_live_deploy
+        try:
+            fleet = deploy_preflight.fleet_live_commits("key")
+        finally:
+            deploy_preflight.live_deploy = original
+
+        self.assertIn("error", fleet["refresh-worker"])
+        self.assertIsNone(fleet["refresh-worker"]["live_commit"])
+        self.assertEqual(fleet["web"]["live_commit"], "00000000")
+        self.assertNotIn("error", fleet["live-odds-worker"])
