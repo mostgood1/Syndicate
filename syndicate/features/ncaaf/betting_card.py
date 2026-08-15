@@ -17,6 +17,7 @@ from syndicate.features.ncaaf.sources import default_season
 from syndicate.features.ncaaf.sources import format_pct
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
+from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
 
 
 def _kickoff_date_and_label(kickoff: Any) -> tuple[str, str]:
@@ -26,7 +27,20 @@ def _kickoff_date_and_label(kickoff: Any) -> tuple[str, str]:
     schedule rows behind the SmartSim2 standalone path -- both land in the
     same "kickoff" field by the time a card entry is built below). Falls
     back to an untethered "Date TBD" bucket rather than raising or silently
-    dropping the game when a row has no usable kickoff yet."""
+    dropping the game when a row has no usable kickoff yet.
+
+    CENTRAL, not UTC. The kickoff strings are UTC (`...T00:00:00.000Z`), and
+    this used to take `.date()` straight off the parsed value, so the day a
+    game was filed under was its UTC day. Every evening kickoff is the NEXT
+    UTC day: a 7pm Central Saturday game is 00:00Z Sunday, so the card filed
+    Saturday's marquee slate under Sunday and labelled it "Sunday". This is
+    the exact trap `features/shared/timezone.py:central_date_from_iso`
+    documents for WNBA slate filtering, arrived at independently on a second
+    surface -- which is why the conversion belongs at every point a timestamp
+    becomes a calendar day, not at the ones somebody remembered.
+
+    A naive timestamp is treated as already-Central, matching
+    `central_date_from_iso`'s handling, rather than being assumed UTC."""
     text = str(kickoff or "").strip()
     if not text:
         return "", "Date TBD"
@@ -36,10 +50,13 @@ def _kickoff_date_and_label(kickoff: Any) -> tuple[str, str]:
     except Exception:
         date_part = text[:10]
         return date_part, (date_part or "Date TBD")
-    date_part = parsed.date().isoformat()
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=CENTRAL_TIMEZONE)
+    local = parsed.astimezone(CENTRAL_TIMEZONE)
+    date_part = local.date().isoformat()
     # Avoid strftime's %-d/%#d platform split (Windows vs. POSIX) -- build
     # the "Weekday, Month D" label from portable directives only.
-    weekday_label = f"{parsed.strftime('%A')}, {parsed.strftime('%B')} {parsed.day}"
+    weekday_label = f"{local.strftime('%A')}, {local.strftime('%B')} {local.day}"
     return date_part, weekday_label
 
 

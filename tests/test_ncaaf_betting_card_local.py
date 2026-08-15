@@ -43,6 +43,35 @@ class NcaafBettingCardDayGroupingTests(unittest.TestCase):
         self.assertEqual(date_key, "")
         self.assertEqual(weekday_label, "Date TBD")
 
+    def test_an_evening_kickoff_is_filed_on_its_CENTRAL_day(self) -> None:
+        # 00:00Z Sunday is 7pm Central SATURDAY. Taking `.date()` off the
+        # parsed UTC value filed the marquee Saturday slate under Sunday and
+        # labelled it "Sunday" -- measured on the real 2026 schedule, 28 of
+        # 157 kickoffs landed on the wrong day.
+        date_key, weekday_label = _kickoff_date_and_label("2026-08-30T00:00:00.000Z")
+        self.assertEqual(date_key, "2026-08-29")
+        self.assertEqual(weekday_label, "Saturday, August 29")
+
+    def test_a_late_window_kickoff_crosses_back_too(self) -> None:
+        # 02:00Z Sunday is 9pm Central Saturday -- the west-coast window.
+        date_key, weekday_label = _kickoff_date_and_label("2026-08-30T02:00:00.000Z")
+        self.assertEqual(date_key, "2026-08-29")
+        self.assertEqual(weekday_label, "Saturday, August 29")
+
+    def test_a_naive_timestamp_is_treated_as_already_central(self) -> None:
+        # Matches features/shared/timezone.py:central_date_from_iso rather
+        # than assuming UTC, so a naive local string is not shifted a day.
+        date_key, weekday_label = _kickoff_date_and_label("2026-08-29T19:00:00")
+        self.assertEqual(date_key, "2026-08-29")
+        self.assertEqual(weekday_label, "Saturday, August 29")
+
+    def test_an_afternoon_kickoff_is_unchanged(self) -> None:
+        # The case the original test covered: 19:00Z is 2pm Central, same day
+        # either way. The fix must not move games that were already right.
+        date_key, weekday_label = _kickoff_date_and_label("2025-09-04T19:00:00Z")
+        self.assertEqual(date_key, "2025-09-04")
+        self.assertEqual(weekday_label, "Thursday, September 4")
+
     def test_week_with_thursday_friday_saturday_games_produces_three_days_in_order(self) -> None:
         runtime_rows = [
             _engine_row(home_team="Sam Houston", away_team="UNLV", start_date="2025-09-06T19:00:00Z"),
