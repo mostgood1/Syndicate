@@ -1145,3 +1145,35 @@ appears, and the framing that layer1 and layer2 run different joins.**
   citable**. `SoccerSimulationOutput` still ships
   `calibration.win_probability.brier = None` — the harness exists but is not
   wired into the sim's own evaluation slot.
+
+## UI / card surface — verified 2026-08-15 (session `ui-plan-lane-gh`)
+
+**Lane G (soccer card) is LIVE and has survived three web deploys.** Shipped as
+`7e334509` (live 03:21:35Z); superseded by `c774fe1a` then `1e44e1da`, both of
+which carry it as an ancestor. Verified by ancestry AND by re-measuring the live
+service, not by either alone. Production, `httpStatus` 200: soccer unstyled
+links 2 -> 0, empty slots 3 -> 0, projected-score sentence 5 -> 1 on the default
+tab, 0px overflow. NCAAF control unmoved. `[measured]`
+
+**`scripts/ui_layout_probe.py` is the harness for this surface and it now fails
+closed.** A selector matching nothing used to be dropped from the report
+entirely — NCAAF serves 16 cards and matches ZERO `.cards-market-main`, and that
+read as a pass. It now reports `count: 0` and FAILS. It also carries
+`numericSweep`, which finds digit-rendering elements by what they render rather
+than by class name. `[measured]` `33e7d7a8`
+
+**Tabular figures: the 2026-08-14 fix is correct and incomplete.** The three
+named classes are right on MLB in production (495 / 60 / 30, all
+`tabular-nums`). The digits it does NOT reach: **mlb 1388, nfl 468, ncaaf 432,
+soccer 60** leaf elements at `font-variant-numeric: normal`. `[measured]`
+The container-rule fix is built and pushed (`1bb8cf9f`) but **NOT DEPLOYED**, so
+those four numbers are still true of production.
+
+**MLB renders through `cards_source.js` and is the only sport whose DOM is not
+stable at load.** A fixed short delay returns a confident zero. Any probe of
+`/mlb/cards` must wait on content, not on a timer. `[measured — this rule cost
+me a false claim that a shipped fix had never run]`
+
+**A `deactivated` pinned deploy means SUPERSEDED, not reverted.** Whether your
+work survived is a separate question answered only by ancestry or a measurement.
+Held twice on 2026-08-15; enforced by nothing but the person deploying.

@@ -1929,3 +1929,29 @@ rating sweep would be wasted compute.
 **Budget it: ~2.2 s/match, so ~2,700 matches is ~100 minutes.** Run it detached
 and do not block a session on it — that is exactly how this one lost the run.
 **Use a NEW dated filename**; the unsuffixed one is cited by `state.md`.
+
+#### tabular-figures-actually-applied — CHECKPOINT 2026-08-15 17:4xZ — PIN TARGET HAS MOVED TWICE
+
+`1bb8cf9f` is pushed and still NOT deployed. Nothing of this lane is
+uncommitted; all six source files hash-match `origin/main`.
+
+**The rollback/stack SHA in the earlier preflight is STALE.** Web has moved
+under the held deploy twice:
+
+    0bf866c3  16:49:28Z  ask tests: assert the as-of CONTRACT     (deactivated)
+    1e44e1da  17:40:30Z  mlb live lens: a live-state lens ...     (LIVE now)
+
+So: **pin `1e44e1da` + `1bb8cf9f`**, re-read the live SHA at deploy time because
+it may have moved again, and never deploy `origin/main`'s tip — it is ~143
+commits ahead of production across many sessions.
+
+**Lane G is unaffected and still live:** `1e44e1da` carries `7e334509` as an
+ancestor (checked, not assumed).
+
+**The one thing to measure after the deploy**, and the reason this is not
+closeable yet: `py -3 scripts/ui_layout_probe.py --base-url <prod> --sports
+mlb,nfl,ncaaf,soccer`, then write the `numericSweep` totals to `deploys.md`.
+Expect mlb 1388 -> 0 and nfl 468 -> 0. **Those two are the unproven ones** —
+locally MLB served 0 cards and NFL 1, so only ncaaf (432 -> 0) and soccer
+(60 -> 0) are honest evidence today. If mlb does not reach 0, the rule is not
+reaching `cards_source.js`'s subtree and the fix missed the sport it was for.
