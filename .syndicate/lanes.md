@@ -1382,6 +1382,17 @@ than have every session quietly decide it is.
   re-write it before editing the adapter.
 
 ### soccer-model-coverage — OPEN — BACKTEST DELIVERED (MODEL LOSES TO MARKET, 1,112 matches, gap +0.0139); 4 FIXES BUILT + TESTED, NONE COMMITTED; #2 DELIBERATELY HELD; CALIBRATION HARNESS NEVER RUN ON REAL DATA — opened 2026-08-15 — session: soccer-model
+> **DEPLOY STATUS UPDATE 2026-08-15 22:3xZ (coordinating session, no claim).**
+> The **soccer as-of pair IS NOW LIVE** on live-odds-worker (`25774aaf`,
+> 22:09:15Z) — `allow_undated` present in 5 places in
+> `soccer/features/loaders.py`, verified by content in the deployed tree, with
+> `191a001b` an ancestor so nothing was dropped. Both halves shipped together,
+> so `50fd7fe2`'s MLS-emptying regression cannot recur. This supersedes the
+> earlier note here saying it was built but undeployed.
+> **Unchanged:** fixes #1 (seed bootstrap) and #3 (accent join) are still NOT
+> committed by this lane, and **#2 (3-way de-vig) remains deliberately HELD** by
+> user decision — the model measures worse than the market (Brier 0.5875 vs
+> 0.5737, worse in 8 of 9 leagues) and its errors sit on favourites.
 > **CROSS-LANE, added 2026-08-15 ~21:5xZ by the coordinating session (no claim).**
 > The soccer **as-of pair** (`0b0d44d9` + `f05a21c4`, audit §7 #6) is on
 > `origin/main` and is built into `deploy/low-props-soccer-asof-2026-08-15`
@@ -4197,7 +4208,7 @@ Read-only lane. No files touched, no deploy.
   parse is wrong and the breakdown must not be believed.
 - Blocked by: none.
 
-### ui-probe-baseline-and-rerun — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+### ui-probe-baseline-and-rerun — CLOSED-VERIFIED 2026-08-15 — baseline committed, --compare shipped, re-run SCHEDULED for 08-16 09:00 CT — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: tomorrow's probe run is COMPARABLE to today's, without anyone
   remembering what today's numbers were. Testable: a committed baseline exists,
   `--compare <baseline>` prints per-metric deltas, and a scheduled run fires
@@ -4240,3 +4251,60 @@ Read-only lane. No files touched, no deploy.
   `live-game-line-projection`. Handing over with the number attached.
 - Watcher `bsym21jd1` may still be polling; its own recovery check will fire and
   exit. Output `C:\tmp\t5\soccer_watch.jsonl` (outside git).
+
+#### ui-probe-baseline-and-rerun — CLOSED-VERIFIED 2026-08-15 — closing before this session is archived
+
+All three deliverables exist and are on `origin/main` (`8ad1a7d2`, `e235e284`):
+`reports/ui_layout/baseline_2026-08-15.json`, `--compare`, and a one-shot
+scheduled task `ui-probe-rerun-compare` firing **2026-08-16 09:00 CT**.
+
+**The lane's own question got a first answer, from a dry run of the scheduled
+command 30 minutes after the baseline:** all 8 rows `stable metrics unchanged`,
+while the slate moved (`cardHeightSpread` 1412 -> 1944 mobile, `contentUnits`
+20 -> 37). The stable/slate split held on its first test. And the height model
+held with it — mlb mobile Preview residual **82 -> 84px**, slope **64.3 ->
+64.7px/pair**, while the raw number it replaces moved 532px. First evidence the
+`n >= 5` floor fixed today's earlier instability.
+
+**Weak interval, stated as such:** 30 minutes on a slate that had not turned
+over, so the two runs share most of their games. Tomorrow's fire against a
+different slate is the real test.
+
+**CLOSED DELIBERATELY, WITH ITS VERIFICATION IN THE FUTURE.** The lane is closed
+rather than left open because this session is being archived, and an OPEN lane
+belonging to an archived session is an active lock on its files, not a note —
+`learnings.md` 2026-08-14 has that rule and this ledger already carries three
+ORPHANED-CLAIMS-RELEASED lanes from it. `scripts/ui_layout_probe.py`,
+`tests/test_ui_layout_probe.py` and `reports/ui_layout/` are hereby RELEASED.
+
+**Owed to nobody in particular, so whoever sees the task notification owns it:**
+read the comparison block, and if a STABLE metric moved with no deploy touching
+the card surface, that is a finding about the harness, not about the board.
+
+- **FINAL:** shipped, closed, nothing uncommitted.
+
+#### live-game-line-projection — CHECKPOINT 2026-08-15 ~22:1xZ — DROP 3 BUILT AND WIRED, DEPLOYED NOWHERE
+- **`758a89fa`** — `live_gameline_join.py` (new), `board_enrichment.py` +40,
+  `book_grid_artifact.py` +18 (one call site + a `live_gamelines` payload key
+  kept SEPARATE from `live_projections`), `tests/test_live_gameline_join.py`
+  (new, 54 tests). **115 tests pass**, incl. `book_grid`'s byte-equivalence
+  suite and the prop join's own suite.
+- **BUILT TO THE RECORDED DECISION (spec §8.1: PUBLISH, REFUSE TO PRICE).** Every
+  row carries `prob_std_err`; an edge is released only above `PRICEABLE_SIGMA`
+  (2.0) standard errors. Totals join and are ALWAYS withheld
+  (`totals_mean_not_distribution`) — a mean is not a distribution.
+- **DEPLOY STATE:** Drop 3 is on **no service**. **refresh-worker `6f512ffa`
+  builds the book-grid artifact and carries NEITHER Drop 1 nor Drop 2** — so
+  Drop 3 needs a refresh-worker deploy, which `#435` holds. Drops 1+2 remain
+  live and survived two further deploys (live-odds-worker `e5b03f7f`, web
+  `c8810f45`, both `D1=5 D2=2`); served `live_mc=6` on a 4th independent read.
+- **EXPECT ZEROS AT FIRST AND DO NOT CALL THEM A DEFECT.** At 120 sims the bar
+  is ~9.1 pp at p=0.5. `rows_live_gameline_edged: 0` on a balanced slate IS the
+  decision working. The 6 live h2h rows sampled sat at a market of 0.9754, where
+  the bar tightens to ~2.7 pp — those price first if any do.
+- **NEXT ACTION:** deploy `758a89fa` to **refresh-worker** (not web) and read
+  `live_gamelines` off the built book-grid artifact. Every withheld row names
+  its reason, so a zero is diagnosable rather than mysterious.
+- **UNVERIFIED, do not promote:** that `rows_live_gameline_edged` > 0 in
+  production; that the coverage block reaches the served payload (nothing has
+  read it back from a built artifact); that totals withhold correctly in the wild.
