@@ -3945,3 +3945,13 @@ All five lane criteria met. Postmortem written (two `learnings.md` entries:
 the span/threshold rule, and the 8-sport pass EXONERATED as a sufficient cause).
 Follow-up check filed as `#434`. NOT closed by this lane: the 20:03:11Z kill
 remains unexplained, and the 3000MB floor in front of MLB stays until it is.
+
+#### memory-cutover-ship — CHECKPOINT ADDENDUM 00:43Z (lane stays CLOSED-VERIFIED)
+Re-read at checkpoint rather than re-asserted, and it changed one fact: the live
+SHA is `098877e1` (live 00:22:24Z), not `705eeefc`. The verified `sports=8` build
+at 00:28:50Z ran on `098877e1`, which has `705eeefc` as an ancestor and carries
+the two-floor marker — verification stands, attribution corrected. It also
+explains the first post-fix pass hydrating all eight sports without ever printing
+`BOARD_OVERVIEW_READY`: that deploy restarted the loop mid-build
+(`BACKGROUND_LOOP_START` 00:22:46Z), so the build never published. Denominator
+stated: 1 post-fix build vs 5 pre-fix `sports=1`.

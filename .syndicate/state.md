@@ -17,11 +17,18 @@ for sequencing.
   22:55:35Z. Now carried inside `96e3a9b7` and `705eeefc`.
 - `705eeefc` — **the other half.** Live 00:15:08Z. Without it the cutover
   truncated the board to ONE sport for 80 minutes.
-- VERIFIED 00:36Z: `BOARD_OVERVIEW_READY sports=8`, `OVERVIEW_STOPPED_FOR_MEMORY`
-  0, `oomKilled` 0 in 1h40m, peak anon **1404.5MB = 34.3%** of the ceiling, and
-  the trace shows the peak falling 1404 -> 1172MB as MLB is released. Layer 2
-  unaffected throughout (142 rows / 12,826 considered). Full working in
-  `deploys.md` under the 00:36Z entry.
+- **Live SHA at 00:43Z is `098877e1`** (another session's `mlb props`, live
+  00:22:24Z). It has `705eeefc` as an ANCESTOR and carries
+  `_OVERVIEW_MIN_SAFE_HEADROOM_STREAMED_BYTES` — checked by ancestry AND marker.
+  The verified build ran on `098877e1`, not on `705eeefc`; say the SHA that was
+  actually live, because this one moved 90 seconds after mine went live.
+- VERIFIED 00:28:50Z, re-read 00:43Z: `BOARD_OVERVIEW_READY sports=8` on **1
+  build**, against **5 consecutive `sports=1`** before the fix.
+  `OVERVIEW_STOPPED_FOR_MEMORY` 0 since 00:15:08Z, `oomKilled` 0 since 22:55Z,
+  peak anon **1404.5MB = 34.3%** of the ceiling with the trace falling
+  1404 -> 1172MB as MLB is released. Layer 2 unaffected (142 rows / 12,826
+  considered). **The pre-fix baseline is the strong half — one post-fix build is
+  a result, not yet a rate.** Full working in `deploys.md`, 00:36Z entry.
 
 **CORRECTION 1 — `086702ae` was never deployable.** It is not a descendant of
 any SHA that was live after 22:12Z; deploying it would have rolled back
