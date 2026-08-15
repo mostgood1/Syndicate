@@ -2886,3 +2886,37 @@ in the chain supported.
   hash-object -w` → `git update-index --cacheinfo`) and assert
   `out.replace(mine, "") == base` so any other drift aborts the build.
 - **Cost:** one bad commit on local `main`, ~10 minutes, no lost work.
+
+### 2026-08-15 — COMMITTING THROUGH AN ISOLATED INDEX LEAVES THE SHARED INDEX STAGING A DELETION OF THE FILE YOU JUST COMMITTED
+
+**The recommended safety practice creates the exact hazard the guard exists to
+catch, and it does it silently, every time.**
+
+Sequence, reproduced this session:
+
+1. `GIT_INDEX_FILE=<tmp> git read-tree HEAD && git add -- <new file> && git commit`
+   — correct, scoped, exactly what `state.md` tells you to do.
+2. HEAD now contains the new file. **The SHARED index does not** — it was never
+   touched, so its entry for that path is "absent".
+3. Absent-in-index + present-in-HEAD = **a staged DELETION** of the file you just
+   committed. `git diff --cached --stat` in any session now reads
+   `463 deletions(-)`.
+4. Any session running a bare `git commit` un-ships it, working tree clean.
+
+`commit-guard.py` fired and blocked it, which is the system working — but note
+**what** it blocked: my *next, unrelated* commit, because the guard reads the
+SHARED index while my commit was going through an isolated one. The guard cannot
+see your isolated index, so its verdict is always about the shared one.
+
+**How to apply.** After every isolated-index commit, repair the shared index:
+
+    git restore --staged <the paths you just committed>
+
+Index-only; it cannot disturb any session's working-tree edits. Then
+`git diff --cached --stat` should be empty.
+
+**The general shape:** an isolation mechanism that makes YOUR operation safe can
+leave SHARED state describing a change nobody intended. Isolation bounds your
+blast radius; it does not bound the blast radius of what you leave behind.
+Related: `project_shared_index_can_hold_a_revert` — this is the mechanism by
+which that revert gets there without anyone doing anything wrong.
