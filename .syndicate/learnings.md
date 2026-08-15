@@ -7,14 +7,14 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 109 rules `[generated]`
+## Index — 115 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
 > are append-only and are never touched. **FORBIDDEN** = never do this
 > again. **EXONERATED** = ruled out, stop re-investigating.
 
-**FORBIDDEN — 10**
+**FORBIDDEN — 11**
 
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, and I had this rule already](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the measuring](#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring)
@@ -26,6 +26,7 @@
 - [2026-08-15 — FORBIDDEN: never read a background-task wrapper's `exit code 0` as "the tests passed"](#2026-08-15-forbidden-never-read-a-background-task-wrappers-exit-code-0-as-the-tests-passed)
 - [2026-08-15 — FORBIDDEN: never judge a pinned deploy by ANCESTRY alone. Patch-id is the test.](#2026-08-15-forbidden-never-judge-a-pinned-deploy-by-ancestry-alone-patch-id-is-the-test)
 - [2026-08-15 — FORBIDDEN: never wake many idle sessions at once. It stalls them.](#2026-08-15-forbidden-never-wake-many-idle-sessions-at-once-it-stalls-them)
+- [2026-08-15 — FORBIDDEN: never gate a DEPLOY with a cross-session message. It always arrives late.](#2026-08-15-forbidden-never-gate-a-deploy-with-a-cross-session-message-it-always-arrives-late)
 
 **EXONERATED — 3**
 
@@ -33,7 +34,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 96**
+**Rules and corrections — 101**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -131,6 +132,11 @@
 - [2026-08-15 — THE INSTRUMENT THAT DROPPED A MISSING KEY, AND THE CORRECTION IT HANDED ME MID-FIX](#2026-08-15-the-instrument-that-dropped-a-missing-key-and-the-correction-it-handed-me-mid-fix)
 - [2026-08-15 — ON A CONTENDED LEDGER, NEITHER COPY IS AUTHORITATIVE, AND A WHOLE-FILE COMMIT PICKS A WINNER SILENTLY](#2026-08-15-on-a-contended-ledger-neither-copy-is-authoritative-and-a-whole-file-commit-picks-a-winner-silently)
 - [2026-08-15 — A FIELD MOVED INTO AN UNCONDITIONAL LOOP LOSES THE CONDITION ITS NEIGHBOURS WERE GIVEN](#2026-08-15-a-field-moved-into-an-unconditional-loop-loses-the-condition-its-neighbours-were-given)
+- [2026-08-15 — MY SUCCESS CRITERION CONTAINED A TERM THE BASELINE ALREADY SATISFIED, AND MY INSTRUMENT RULE INVERTED BECAUSE OF MY OWN FIX](#2026-08-15-my-success-criterion-contained-a-term-the-baseline-already-satisfied-and-my-instrument-rule-inverted-because-of-my-own-fix)
+- [2026-08-15 - A PINNED DEPLOY IS NOT ON main's LINEAGE, SO ANCESTRY ANSWERS THE WRONG QUESTION](#2026-08-15---a-pinned-deploy-is-not-on-mains-lineage-so-ancestry-answers-the-wrong-question)
+- [2026-08-15 - A FIXED `GIT_INDEX_FILE` NAME COLLIDES ACROSS SESSIONS, AND A FAILED read-tree LEAVES AN EMPTY INDEX THAT STAGES THE WHOLE REPO AS DELETIONS](#2026-08-15---a-fixed-git_index_file-name-collides-across-sessions-and-a-failed-read-tree-leaves-an-empty-index-that-stages-the-whole-repo-as-deletions)
+- [2026-08-15 — OVERTURNED: two throttles with the same symptom, and I named the wrong one as the mechanism](#2026-08-15-overturned-two-throttles-with-the-same-symptom-and-i-named-the-wrong-one-as-the-mechanism)
+- [2026-08-15 — RULE: deploy to where the artifact is BUILT, not where it is served](#2026-08-15-rule-deploy-to-where-the-artifact-is-built-not-where-it-is-served)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -2004,3 +2010,58 @@ key at all, so it reads 0 forever.
 - **This is the deploy-time twin of `presence is not reachability`.** Presence in
   the repo, presence on `main`, and presence on the service that shows the bug
   are three different things, and only the third-from-last is usually checked.
+
+### 2026-08-15 — FORBIDDEN: never gate a DEPLOY with a cross-session message. It always arrives late.
+
+- What we believed: telling the other live sessions "hold, do not fire a web
+  deploy" would serialise deploys well enough to assemble one train.
+- What was actually true: **web took five deploys in twenty-one minutes from
+  four different sessions** (19:15 ask K6 -> 19:20 quote-age alarm -> 19:28 CLV
+  allowlist -> 19:36 tabular digits -> 19:47/19:54/20:22 more). The 19:20 deploy
+  **cancelled the 19:15 one mid-build**, and its owner did not know. Every hold
+  message sent arrived AFTER the deploy it was meant to prevent, because a
+  message waits for the target's current turn to end while firing a deploy takes
+  seconds. Holding politely, per the documented rule, meant never getting a slot
+  at all: two attempts, both blocked by an in-flight build.
+- How we found out: polled `/v1/services/<id>/deploys` around each attempt and
+  read `createdAt` against the cancellation.
+- The rule going forward: **deploy serialisation needs a LOCK, not an
+  announcement.** A message is advisory and asynchronous; a deploy is immediate
+  and destructive to whatever is building. Until a real mutex exists (a claim
+  file checked by the deploy path, or one session designated as the only one
+  that may POST), assume any web deploy may be cancelled by a peer at any moment
+  — so **re-read the live SHA after your deploy reports live, and verify your
+  own commit is present by patch-id** rather than trusting that it landed.
+  `3ba1c2cf` was cancelled at 19:20 and was still absent from live at 20:22.
+- Cost: one fix (ask K6) cancelled and still unshipped; two coordinated trains
+  built, tested and abandoned.
+
+### 2026-08-15 — OVERTURNED: p50 is the wrong statistic to set an alarm floor from, and my own test caught it
+
+- **What I believed:** having measured each quote feed's cadence, ~3x the p50
+  gap was a principled per-sport stale threshold. It is defensible-sounding and
+  I wrote the constants that way.
+- **What refuted it, immediately:** `test_healthy_pregame_gap_does_not_false_alarm`,
+  which I had written HOURS EARLIER, went red. It pins the real 123-min MLB
+  pregame gap (09:06->11:07Z, measured). MLB's p50 is 31 min, so 3x p50 = 93 min
+  fires on a gap that is known-healthy.
+- **The general rule:** p50 describes the middle; an alarm floor lives in the
+  TAIL. These feeds have long quiet tails (overnight, between-slate), so a
+  threshold must clear the largest HEALTHY gap, not a multiple of the typical
+  one. **p50 is the right statistic for comparing feeds and the wrong one for
+  setting a floor.**
+- **Why the test existed to catch it:** it was written to make a tradeoff
+  visible rather than to assert a comfortable answer — "if someone lowers the
+  default, this goes red and the tradeoff is visible instead of silent." The
+  someone was me, four hours later. A test that pins a MEASURED healthy extreme
+  is worth more than one that pins the current behaviour.
+- **Second-order correction it forced:** the `0c65a832` deploy note credits the
+  alarm with "catching soccer STALE at 340.9 min". Soccer's p50 is 173 min, so
+  the old 180 min global flagged that feed on roughly HALF of normal operation.
+  The catch was substantially a threshold artifact. **A first-read success is
+  exactly when to check the false-positive rate**, because that is the reading
+  most likely to be mistaken for validation.
+- **Still unsolved, and named so nobody thinks per-sport finished it:** an
+  age-only alarm cannot distinguish "quiet" from "broken". Clearing the
+  overnight tails is what keeps all four thresholds in hours rather than
+  minutes. The real fix gates on whether the sport has games scheduled.

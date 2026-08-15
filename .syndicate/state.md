@@ -187,7 +187,18 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **`git push` from this checkout is not scoped to your own commits.** Read
   `git log origin/main..HEAD` first. `[from-git 08-13]`
 
-**Repo state `[measured 08-15 17:5xZ]`:** the shared tree is **13 AHEAD / 143
+**WEB DEPLOYS ARE NOT SERIALISED AND PEERS CANCEL EACH OTHER
+`[measured 08-15 19:1x-20:2xZ]`.** Web took **five deploys in twenty-one
+minutes from four sessions**; the 19:20 deploy **cancelled the 19:15 one
+mid-build** and its owner was not told by anything. **A cross-session message
+cannot gate this** — it waits for the target's turn to end while a deploy takes
+seconds; every hold sent arrived after the deploy it was meant to stop.
+**Consequence for anyone deploying: after your deploy reports `live`, re-read
+the live SHA and confirm YOUR commit is present BY PATCH-ID.** `3ba1c2cf`
+(ask K6) was cancelled at 19:20 and was still absent from live at 20:22.
+Ready and unfired: `deploy/ask-k6-2026-08-15` (`3d68dfe4`).
+
+**Repo state `[measured 08-15 20:3xZ]`:** the shared tree is **13 AHEAD / 151
 BEHIND** `origin/main`. Being behind is a read-your-own-staleness problem; being
 ahead is a **lost-work** problem. `git fetch` and read `origin/main` for lineage.
 
@@ -579,10 +590,26 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   went **404 → 200**; running commit confirmed from `/api/ops/version`.
   First read: mlb ok 33.7 min, nfl ok 2.5 min, wnba ok 122.6 min,
   **soccer STALE 340.9 min** — it caught a real stale feed on a sport nobody
-  was watching. **Threshold is 10,800 s and that is a real limitation:** WNBA's
-  122.6 min pregame cadence must read `ok`, so today's 5.8 h MLB starvation
-  would have been caught only ~3 h in. Env-tunable via
-  `SYNDICATE_QUOTE_FEED_STALE_SECONDS`; per-regime thresholds are the next step.
+  was watching — **but see the correction below; that catch is weaker than it
+  reads.** Production still serves the single **10,800 s** threshold.
+- **PER-SPORT THRESHOLDS ARE WRITTEN AND NOT DEPLOYED — `9e100444`.**
+  Measured per-sport cadence (2026-08-15, production shards, distinct
+  `captured_at` gaps, read from the artifacts not the logs):
+  `nfl p50 1.0 min (n=128) | mlb 31.0 (n=16) | wnba 122.0 (n=14) | soccer 173.0
+  (n=91)` — a **173x spread**, which no single global value can serve.
+  New defaults **nfl 2 h / mlb 3 h / wnba 6 h / soccer 7 h**, each set ABOVE its
+  feed's measured healthy gaps. **NOT off p50:** an alarm floor lives in the
+  tail, and 3x p50 put MLB at 93 min, under its measured 123-min healthy
+  pregame gap — refuted by an existing test (`learnings.md`).
+- **CORRECTION — "caught soccer STALE at 340.9 min" was substantially a
+  THRESHOLD ARTIFACT.** Soccer's own p50 is 173 min, so the 180 min global
+  flags that feed on roughly half of NORMAL operation. 340.9 min is above
+  soccer's p90 (248) so the feed was elevated, but this was not a clean catch,
+  and under the new 7 h default it reads `ok`.
+- **KNOWN LIMIT, UNSOLVED:** an age-only alarm cannot distinguish "quiet" from
+  "broken". Every sport's max gap (244-558 min) is overnight or between-slate,
+  and clearing those tails is what keeps all four thresholds in hours rather
+  than minutes. Gating on scheduled games is the real fix.
   Deployed from a branch cut off web's OWN live SHA — `8b6f7773` deployed
   directly would have rolled web back **109 commits**.
 - **(superseded) built `8b6f7773`, committed.** `shared/quote_feed_age.py` (O(1)
@@ -643,14 +670,32 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
   (`28291eb6`; corr(reliability, score) = −0.8312 on 156 negative-value rows vs
   +0.8560 control). **Do not deploy without a pool-side counter** — its effect is
   on SELECTION and is invisible in a shortlist that returns survivors only.
-- **CLV: the opening half is recorded; THERE IS STILL NO VALID CLV NUMBER.**
-  Recorder live (`2b14fbeb`), 584 bytes/record vs the evaluation chunk ledger's
-  40,555; `book_prices` on 150/150 served rows. **`avg_clv_pct` is None and that
-  is the honest answer.** An early `-5.215` was RETRACTED — the line was never
-  checked (`home -5.0` vs a `home -1.5` close) and **25 of 25 closes PRECEDED
-  their openings**. All three now refused by name (`line_mismatch`,
-  `line_unverifiable`, `close_precedes_open`). `close_precedes_open` is a
-  PRODUCTION condition. The joiner is library-only, no call site, NOT deployed.
+- **CLV: A VALID NUMBER NOW EXISTS. `[measured 08-15 19:4xZ, web `bebe87c9`]`**
+  This OVERWRITES the previous "there is still no valid CLV number / avg_clv_pct
+  is None" line, which was true until 19:36:45Z today.
+
+      /api/ops/clv/report?date=2026-08-15&sport=mlb
+        openings     520
+        same_book_n  144      (was 0)
+        avg_clv_pct  -0.0711  (was None)
+
+  **The blocker was a VERSION SKEW, not a defect** — web's receiver 403s any
+  path failing `is_hot_artifact_relative_path`, and web's `artifact_publisher.py`
+  lacked the `clv_openings` pattern the worker had, so 490 openings sat stranded
+  on the worker. Fixed by deploy, not by code. Owner: lane `clv-without-settlement`
+  (`lane-cleanup`), **whose entry carries the fuller reading — 27.1% beat rate,
+  taken PRE-FIRST-PITCH, and the lane's own breadth hypothesis REFUTED. Cite the
+  lane, not this summary.**
+  - **UNVERIFIED:** the `PUBLISH_OK` log line was never observed; the artifact
+    crossing (`export count=1`) is the evidence. **And it is NOT established
+    that this is against a sharp close** — a same-book join pairs a book with
+    itself, which need not be Pinnacle. Do not merge with the game-line
+    sharp-reference finding without checking which book.
+  - Still true and still the reason the headline is same-book only: the earlier
+    `-5.215` was RETRACTED (`home -5.0` differenced against a `home -1.5` close;
+    25 of 25 closes preceded their openings). `close_precedes_open` remains a
+    PRODUCTION condition, refused by name alongside `line_mismatch` and
+    `line_unverifiable`.
 - **The recommendation lane does not price the shortlist.** Every published row
   carries `quote.fair_method` = `consensus` or `book_margin_model`. Fixes to
   `recommendation_engine` should NOT be expected to move the shortlist.
@@ -815,6 +860,13 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   latency 10.9s → 0.19s. **A refusal gate must be tested on what it must NOT
   refuse** — two regressions were caught only by testing the answer direction.
 - **CURRENT PRODUCTION SCORE IS 38/52 `[measured 08-15 17:5xZ, live 1e44e1da]`.**
+  **K6 IS NOT PART OF THAT NUMBER AND IS NOT LIVE.** Its fix `3ba1c2cf`
+  ("source the as-of from `state_meta` too, because production has no
+  `freshness` key") was cancelled mid-build at 19:20Z by a peer's deploy and is
+  **still absent from live `7abd8e12` at 20:22Z, confirmed by patch-id**. It is
+  built, tested and pushed as `deploy/ask-k6-2026-08-15` (`3d68dfe4`), never
+  fired. So the ask lane's own `K6 RETRACTED AS INERT ON PROD` still stands:
+  **no as-of predicate has been measured on production.**
   Pre-deploy control **25/52** (`reports/ask_regression/prebaseline_c774fe1a_2026_08_15.json`).
   entity **2/10 → 9/10**, lookup **4/8 → 8/8**, ranking **5/10 → 7/10**;
   advice 4/5, explain 4/6, history 2/5, refusal 4/8 all flat. **Zero classes
