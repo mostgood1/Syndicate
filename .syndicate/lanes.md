@@ -203,6 +203,17 @@
   20:34:26Z against a 19:08Z first pitch is still 86 minutes late, and
   `odds_refresh_tracking.py:1602` still writes `now`. Fix the side first; the
   clock is a smaller, separable error.
+- **SIDE FIX SHIPPED under `clv-without-settlement` (it owns `clv_join.py`):**
+  web `c8810f45` live 21:58:19Z, main `ae0bc968`. 20 away-side openings now
+  refuse the home stamp; `observed_transition` 48 -> 22; `in_play_excluded_n`
+  48 -> 19; `same_book_n` 131 -> 151; headline `-0.3077` -> `-0.2714`,
+  recompute-verified. **THIS LANE'S REMAINING SCOPE IS THE CLOCK ONLY** —
+  `odds_refresh_tracking.py:1602` still writes `closing_captured_at = now`
+  (detection time), which is why a 19:08Z first pitch carries a 20:34Z stamp.
+  That file is still claimed here and untouched.
+- **OPEN THREAD, NOT MINE TO CLOSE:** one row survives at `clv_pct -29.90`
+  (`open -205`, `close 168.0`, side **home**, source **last_pregame_quote**) —
+  side-aware path, not a side mismatch. Real move or a third defect, unknown.
 - **REVISED FIX, for whoever takes this:** make path 1 side-aware — resolve
   `closing_price` through the same `line`-dict logic path 2 uses, and REFUSE
   (named, counted) when the side cannot be determined rather than returning the
@@ -3938,3 +3949,38 @@ Read-only lane; no files touched, no deploy.
 - **`nfl-live-edge-suppression`'s owed measurement is UNAFFECTED and still
   theirs to take:** `846bb74e` was built ON TOP of `dca39fad`, so that fix is
   still deployed. I have not taken their measurement.
+
+### desktop-grid-rows-unit — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: a layout signal at 1440, where the height model currently reports
+  UNRELIABLE. Testable: MLB desktop yields a figure that a regression would
+  move and a busy slate would not.
+- Files (exclusive to this lane): `scripts/ui_layout_probe.py`,
+  `tests/test_ui_layout_probe.py`, `docs/reports/ui_audit_2026_08_14/README.md`.
+  Collision check RUN: all three free.
+- **HYPOTHESIS FALSIFIED BEFORE A LINE WAS WRITTEN.** The carried-forward
+  premise was "the desktop unit should be grid ROWS (`ceil(pairs/columns)`),
+  which would make the model reliable at 1440". Measured on production, render
+  settled, fitting the same groups both ways:
+
+      desktop Final    n=3   PAIRS residual 11px    ROWS residual 11px
+      mobile  Live     n=3   PAIRS residual 139px   ROWS residual 139px
+      mobile  Preview  n=9   PAIRS residual  52px   ROWS residual  52px
+
+  **Identical, every time.** Within a group rows are proportional to pairs, so
+  refitting in rows is an affine reparametrization — the slope rescales
+  (62.1 -> 124.2) and the residuals cannot move. A unit change can never fix a
+  fit when the two units are proportional.
+- **What is ACTUALLY true about desktop, and it is the useful finding:** height
+  is very nearly content-INDEPENDENT there. Slope **0.4-5.5 px/pair** at 1440
+  against **62 px/pair** at 390, with chrome ~1020-1044px. The summary grid
+  wraps into columns, so adding pairs adds width, not height. `fitRatio` then
+  flags it "unreliable" because the model explains almost nothing — which is
+  true and is the wrong conclusion to draw.
+- Revised hypothesis: where content does not drive height, **the raw spread IS
+  the layout signal** and no model is needed. The probe should say that instead
+  of "no layout signal here".
+- Falsification test: if MLB desktop raw spread swings with the slate the way
+  mobile's does, content is driving it after all and this is wrong.
+- Verification: desktop raw spread across settled runs, against the ncaaf/nfl
+  controls whose content is uniform.
+- Blocked by: none.
