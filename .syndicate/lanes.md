@@ -161,7 +161,7 @@ does not hold.** `[measured 08-14]`
   `layer2-board-freshness`, so that lane must be consulted first.**
 - Files: none claimed yet, deliberately.
 
-### (superseded lane detail — the OPEN body this lane was opened with)
+### (superseded lane detail — the original body this lane was opened with)
 - Goal: name why MLB odds went **2h01m without a single new quote observation**
   on 2026-08-14 while the refresh loop ticked ~8 times through it. Testable
   outcome: the gap is attributed to a named gate/failure with a log line or a
