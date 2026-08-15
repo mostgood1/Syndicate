@@ -282,6 +282,14 @@ def api_ops_wnba_refresh_decision() -> Any:
     Reads the keyvalue store, which crosses the service boundary, rather than a
     path on whichever disk happens to be mounted.
     """
+    # `central_today_iso` is NOT a module global here -- every other user in this
+    # file imports it inside the function. Without this line the route raises
+    # NameError before doing any work: confirmed 500 against production
+    # 2026-08-15, `GET /api/ops/wnba/refresh-decision`. Found incidentally while
+    # adding the quote-feed-age route; fixed rather than filed because it is one
+    # line and the endpoint is dead until it lands.
+    from syndicate.features.shared.timezone import central_today_iso
+
     selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
     try:
         from syndicate.features.shared.refresh_state_store import read_json_file, reports_root
@@ -1412,6 +1420,59 @@ def _artifact_export_budget_bytes() -> int:
     return max(1024 * 1024, value)
 
 
+@ops_bp.get("/api/ops/quote-feed-age")
+def api_ops_quote_feed_age() -> Any:
+    """How old is the newest quote we have, per sport.
+
+    THE FAILURE THIS EXISTS FOR, measured 2026-08-15: MLB quote capture stopped
+    at 11:07:48Z and resumed at 16:56:49Z -- 5.8 hours -- while the tick loop
+    reported ok every 60 s, Layer 2 rebuilt every ~5 min (its healthiest gaps
+    ever measured), and the board served 150 normal-looking rows. Every existing
+    instrument was green because they all report on their OWN work, and their
+    own work was fine; they were promptly processing a frozen input.
+
+    Deliberately NOT derived from the board, the manifest or the tick. Those are
+    the signals that were green. This reads the age of the newest sample in the
+    quote shard itself, which is the only quantity that moves during this
+    failure.
+
+    Safe on web: an O(1) tail read, not a shard parse -- same cost on a 217 MB
+    shard as on a 10 MB one, so it does not violate the no-heavy-compute rule.
+
+    `?sports=mlb,nfl` and `?date=` override the defaults; `?threshold_seconds=`
+    overrides `SYNDICATE_QUOTE_FEED_STALE_SECONDS` for one call, so an operator
+    can ask "what would a tighter alarm have said" without an env change.
+    """
+    from syndicate.features.shared.quote_feed_age import feed_age_report
+    from syndicate.features.shared.timezone import central_today_iso
+
+    selected_date = str(request.args.get("date") or "").strip() or central_today_iso()
+    raw_sports = str(request.args.get("sports") or "").strip()
+    if raw_sports:
+        sports = [s.strip().lower() for s in raw_sports.split(",") if s.strip()]
+    else:
+        configured = str(os.environ.get("SYNDICATE_ACTIVE_SPORTS") or "").strip()
+        sports = (
+            [s.strip().lower() for s in configured.split(",") if s.strip()]
+            if configured
+            else ["mlb", "nfl", "wnba", "soccer", "nba", "nhl", "ncaaf", "ncaab"]
+        )
+
+    threshold_raw = str(request.args.get("threshold_seconds") or "").strip()
+    try:
+        threshold = int(threshold_raw) if threshold_raw else None
+    except ValueError:
+        threshold = None
+
+    try:
+        report = feed_age_report(sports, selected_date, threshold_seconds=threshold)
+    except Exception as exc:
+        # Fail loud. A 500 here is better than a green payload, which is the
+        # exact failure mode this endpoint exists to end.
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+    return jsonify({"ok": True, **report})
+
+
 @ops_bp.get("/api/ops/oddsapi/quota")
 def api_ops_oddsapi_quota() -> Any:
     # Ground truth for OddsAPI credit burn, straight from the counters the
@@ -1896,6 +1957,59 @@ def api_ops_reset_lineup_gate() -> Any:
     path = reports_root() / "live_refresh_loop" / "last_lineup_check.json"
     write_json_file(path, {})
     return jsonify({"ok": True, "path": str(path)})
+
+
+@ops_bp.get("/api/ops/clv/report")
+def api_ops_clv_report() -> Any:
+    """CLV for a date, joined from the recorded openings (audit §7 #1).
+
+    Read-only. Needs no grading, no outcomes, no `settle_result`, and never
+    touches `evaluation_ledger_chunks` — the 367MB path whose 2026-08-05 chunk
+    is already SKIPPED at read time against a 256MB ceiling.
+
+    ON WEB, deliberately, and it is not a violation of the no-compute rule: the
+    openings are a ~90KB published artifact and the join is over a few hundred
+    rows against an odds-history payload this blueprint already loads for
+    `/api/ops/odds-history/inspect` right below. That is display-side
+    transformation, not the 1.3GB book-grid pivot the split exists to keep out.
+
+    **`avg_clv_pct` COUNTS SAME-BOOK ROWS ONLY AND IS OFTEN None.** The board
+    publishes the best price across ~13 books; pairing that opening with some
+    other book's close compares a best-of-N draw to a single draw and reads
+    +6.2pts at a 91% beat rate, which is the selection effect and not skill.
+    Biased scopes are reported separately under `by_book_scope`. A None here
+    means "no unbiased comparison was available", never "no edge".
+
+    `unresolved_reasons` is the other half of the answer and should be read
+    every time: `close_precedes_open` and `line_mismatch` are the two defects
+    that made this endpoint's first number (-5.215) wrong, and they are now
+    counted rather than silently folded into an average.
+    """
+    # Protected endpoint: requires admin token (enforced by before_request).
+    date = str(request.args.get("date") or "").strip()
+    sport = str(request.args.get("sport") or "").strip().lower()
+    if not date:
+        from syndicate.features.shared.timezone import central_today_iso
+
+        # CENTRAL, not UTC. An MLB slate spans two UTC dates and one Central
+        # one, and the openings are bucketed by the board's own Central date --
+        # defaulting to a UTC today would ask for a file that does not exist
+        # for five hours every evening.
+        date = central_today_iso()
+    if not sport:
+        return jsonify({"ok": False, "error": "sport parameter required."}), 400
+    include_rows = str(request.args.get("rows") or "").strip().lower() in {"1", "true", "yes"}
+    try:
+        from syndicate.features.shared.clv_join import compute_clv_for_date
+
+        report = compute_clv_for_date(date, sport)
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+    if not include_rows:
+        # Summary by default; the per-row detail is large and only wanted when
+        # someone is chasing a specific pairing.
+        report = {key: value for key, value in report.items() if key != "rows"}
+    return jsonify({"ok": True, **report})
 
 
 @ops_bp.get("/api/ops/odds-history/inspect")
