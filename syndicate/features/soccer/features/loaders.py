@@ -62,23 +62,80 @@ def team_rows_from_match_history(match_rows: list[dict[str, Any]]) -> list[dict[
 def compute_team_ratings(
     team_history_rows: list[dict[str, Any]],
     *,
+    as_of: str,
     window: int | None = None,
 ) -> dict[str, dict[str, float]]:
     """Per-team attack/defense ratings from per-match performance rows.
 
     Rows need ``team``, ``xg_for``, ``xg_against`` (Understat team-history
     rows match directly). ``window`` keeps only each team's most recent N
-    rows (rows are assumed chronologically ordered per team, as the
-    ingestion layer emits them).
+    rows.
+
+    ``as_of`` IS REQUIRED, AND THAT IS THE WHOLE POINT (audit §7 #6).
+
+    This function had no notion of time. It took ``rows[-window:]`` off
+    whatever history it was handed, and `backtest_soccer_live_lens.run_backtest`
+    computed it ONCE per league and then applied it to every match inside that
+    season -- so a March match was scored using ratings built partly from May
+    results. Every number in `data/soccer_source/*/validation/*_backtest_*.csv`
+    was produced that way and cannot be cited.
+
+    Required rather than defaulted, because the three call sites are NOT the
+    same case and a default would silently pick the wrong one for two of them:
+
+    - `backtest_soccer_live_lens` and `validate_soccer_vs_market` evaluate PAST
+      matches and must pass **each match's own date**.
+    - `build_soccer_artifacts` is PRODUCTION for FUTURE matches, where using all
+      available history is correct; it passes the target date and its behaviour
+      is unchanged, because a future date excludes nothing.
+
+    STRICTLY BEFORE, BY CALENDAR DAY. A match cannot inform its own prediction,
+    and same-day fixtures are excluded too: kickoff times within a day are not
+    reliably ordered across these sources, so "earlier that day" is not a
+    distinction this data can support. Conservative in the only safe direction.
+
+    A row with NO USABLE DATE IS DROPPED, not admitted. It cannot be shown to
+    predate `as_of`, and unknown must not take the permissive branch here of all
+    places -- admitting undated rows is exactly the leak this parameter exists
+    to close. Drops are counted and printed, because a ratings set that silently
+    collapses to empty is indistinguishable from a league with no history.
     """
+    cutoff = str(as_of or "").strip()[:10]
+    if not cutoff:
+        raise ValueError("compute_team_ratings requires an as_of date (YYYY-MM-DD)")
+
     by_team: dict[str, list[dict[str, Any]]] = {}
+    dropped_undated = 0
+    dropped_future = 0
     for row in team_history_rows:
         team = str(row.get("team") or "").strip()
         if not team:
             continue
         if _safe_float(row.get("xg_for")) is None or _safe_float(row.get("xg_against")) is None:
             continue
+        row_day = str(row.get("date") or "").strip()[:10]
+        if not row_day:
+            dropped_undated += 1
+            continue
+        if row_day >= cutoff:
+            dropped_future += 1
+            continue
         by_team.setdefault(team, []).append(row)
+
+    # Sort explicitly rather than trusting the caller. `window` takes the LAST N
+    # rows, so an unsorted input silently selects an arbitrary subset once
+    # filtering has removed rows from the middle -- and the old docstring's
+    # "rows are assumed chronologically ordered" was an assumption nothing
+    # checked.
+    for rows in by_team.values():
+        rows.sort(key=lambda row: str(row.get("date") or ""))
+
+    if dropped_undated:
+        print(
+            f"[soccer_ratings] AS_OF_DROPPED_UNDATED as_of={cutoff} "
+            f"rows={dropped_undated} teams_with_history={len(by_team)}",
+            flush=True,
+        )
 
     all_xg_for: list[float] = []
     for rows in by_team.values():
