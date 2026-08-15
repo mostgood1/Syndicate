@@ -4215,3 +4215,28 @@ Read-only lane. No files touched, no deploy.
   something it does not understand.
 - Verification: the comparison output itself, run against tomorrow's slate.
 - Blocked by: none.
+
+#### soccer autorun watcher — RESOLVED. Prediction confirmed; soccer recovered unaided. `[measured 2026-08-15 22:24Z]`
+
+    22:23:16  SOCCER_PREGAME_AUTORUN_LAUNCHED date=2026-08-15 pid=924
+    22:24:29  first new capture -- 73 SECONDS after launch
+              soccer age 516.6 min -> 0.1 min, status stale -> ok
+
+- **The LAUNCH branch occurred and captures resumed**, so the diagnosis is
+  CONFIRMED end to end: soccer was never broken, it was **starved by a 4-hourly
+  autorun colliding with a transient lock**. The third attempt found a free
+  window and recovered immediately.
+- **The branch I flagged as the genuinely informative one — a LAUNCH producing
+  no captures — did NOT occur.** That was the outcome that would have refuted
+  lock contention and sent this back to "the run is erroring". It didn't happen,
+  so nothing is left unexplained.
+- **Total outage: 14:22:29 -> 22:24:29, exactly 8h 02m.** Two refused attempts.
+- **THE FIX IS NOW QUANTIFIED, not just plausible.** First capture came **73
+  seconds** after a successful launch. A bounded retry (every 5 min for 30 min)
+  at the 14:22 refusal would almost certainly have found a free window inside
+  the ~2-minute gaps that occur every ~25 min — converting an **8-hour outage
+  into minutes**. That is the value of the change, measured rather than argued.
+- **Still unowned.** `live_refresh_loop.py` is claimed by OPEN
+  `live-game-line-projection`. Handing over with the number attached.
+- Watcher `bsym21jd1` may still be polling; its own recovery check will fire and
+  exit. Output `C:\tmp\t5\soccer_watch.jsonl` (outside git).
