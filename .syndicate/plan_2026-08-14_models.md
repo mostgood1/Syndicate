@@ -170,26 +170,50 @@ called by nothing. Either adopt it at prop call sites or record why not.
 
 ---
 
-## Lane C — sharp reference price (sourcing, not code)
+## Lane C — sharp reference price — **CLOSED 2026-08-15. WE ALREADY HAVE ONE.**
 
-**Goal:** know whether a real closing line is obtainable, before Lane B's output
-needs interpreting.
+**No sourcing work is needed. The audit's premise was stale, not wrong-at-the-time.**
 
-The audit records "no Pinnacle, Circa or exchange in the feed" as a caveat to
-attach to future CLV numbers. Promote it. Beating a closing consensus of eleven
-soft books is a materially lower bar than beating a sharp close, and it can read
-positive where no exploitable edge exists — meaning the headline metric could
-endorse a strategy that loses money.
+The audit recorded "no Pinnacle, Circa or exchange in the feed" and this plan
+promoted it to a lane on the reasoning that beating a consensus of eleven soft
+books is a materially lower bar than beating a sharp close — and could read
+positive where no exploitable edge exists. **That reasoning stands. The premise
+does not.** `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 
-**Task:** price out access to at least one sharp reference (Pinnacle or an
-exchange, directly or via a secondary aggregator). Vendor pages and emails, not
-engineering.
+| dates | distinct books | pinnacle rows | shard size |
+|---|---|---|---|
+| 07-28 .. 08-05 | **11** | **0** | ~13 MB/day |
+| 08-09 | **37** | **2,604** | **217 MB/day** |
 
-**Why now despite low effort:** lead time. You want the answer before a month of
-soft-book CLV has accumulated and needs a verdict attached to it.
+The feed widened between 08-05 and 08-09 — almost certainly the lost-books
+capture fix — and nobody re-read the caveat afterwards. Present now:
+`pinnacle`, `betfair_ex_eu`, `matchbook`, `novig`, `prophetx`, plus `kalshi` /
+`polymarket` as prediction markets.
 
-**Exit criteria:** a written answer — available at price X, or not available —
-in `.syndicate/`. "Not available" is a fine outcome; unknown is not.
+- **MLB GAME LINES: 102 of 102 markets carry a sharp quote = 100%.**
+- **PROPS: 0%.**
+
+**What this changes, and it is the most consequential correction in this plan:**
+
+- **Lane B can take game-line CLV against a genuine sharp close.** The standing
+  caveat — that a positive number might endorse a losing strategy — no longer
+  applies to game lines. This is the strongest evaluation position the platform
+  has ever had.
+- **Prop CLV remains a soft-consensus measurement and MUST be labelled as
+  such.** Do not let one `clv_pct` field mix the two; a sharp-referenced number
+  and a soft-referenced one are not the same statistic and averaging them
+  produces something with no interpretation at all.
+- **It reinforces the "do not thin odds capture" position.** The 13 MB → 217 MB
+  jump is what buying the sharp reference cost. Narrowing the book set to
+  reclaim bytes would delete it — and price shopping was independently measured
+  at **+2.79 ROI points**. The answer to the bytes is the storage-format work
+  (delta/columnar), which preserves every movement.
+
+**Caveats, stated rather than buried:** read from the git-tracked mirror, which
+is lossy, and only ONE post-widening date exists locally (08-09). **Confirm
+against production before publishing a sharp-referenced CLV number**, and
+re-read whether the 37-book set is still current — this lane exists because a
+book-set fact went stale once already.
 
 ---
 
