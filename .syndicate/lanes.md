@@ -24,6 +24,10 @@
 - **Current honest output on real data:** `same_book_n=0`, `avg_clv_pct=None`,
   `unresolved={close_precedes_open: 38, no_market_in_history: 14,
   no_pregame_observation: 23, line_mismatch: 1}`.
+- **THE MEASUREMENT IS NOW EXECUTABLE (shipped 2026-08-14 ~20:05 CDT).** It was
+  not before: the joiner had no call site and the openings were unreadable off
+  the worker. `GET /api/ops/clv/report?sport=<s>[&date=<d>][&rows=1]` is live on
+  web (`d9a39ce8`); the worker publishes the openings (`d70f70d8`).
 - **NEXT ACTION — the first clean measurement is 2026-08-15 (Central).**
   Production's 08-14 openings only began at 18:32 CDT, so tonight's file is
   late-loaded and its closes mostly predate its openings. Tomorrow, run
@@ -1392,7 +1396,15 @@ half was held overnight through an OOM incident.)
   projections must NOT flag.
 - Blocked by: none.
 
-### anon-allocation-site — OPEN — opened 2026-08-14 — session: memory-guard
+### anon-allocation-site — ORPHANED-REASSIGNED 2026-08-15 — file claims released to `memory-watchdog-435`; the lane's OWN FINDINGS ARE NOT CLOSED — opened 2026-08-14 — session: memory-guard
+> **STATUS IS NOT "DONE".** The owning `memory-guard` session no longer exists
+> (absent from the live session list 2026-08-15 01:0xZ; `state.md`'s 20:4xZ
+> census already recorded this lane as orphaned). Its file claims blocked `#435`
+> step two, and the owner authorised a cross-lane override. Only the CLAIMS are
+> released. Nothing below is verified by that override, and the tracemalloc
+> helpers and `malloc_trim`/arena machinery this lane built were deliberately
+> left untouched. If this lane resumes, re-take the files — the `#435` change is
+> additive and does not contradict its findings.
 - **NAMED 2026-08-14 04:1xZ — `json.loads` (`decoder.py:353`), 491.3MB across
   7,172,382 LIVE OBJECTS. AND THE WORKER IS OOM-KILLING.**
   - Production OOM kills confirmed in the Render EVENTS api (not the logs):
@@ -1589,7 +1601,12 @@ Run against the REAL program, not the guard functions. 105 tests pass.
   out-of-season run look like an outage).
 - Blocked by: none.
 
-### refresh-worker-anon-leak — OPEN — opened 2026-08-13 — session: memory-guard
+### refresh-worker-anon-leak — ORPHANED-REASSIGNED 2026-08-15 — file claims released to `memory-watchdog-435`; the leak itself IS STILL UNEXPLAINED — opened 2026-08-13 — session: memory-guard
+> **STATUS IS NOT "DONE", and this one matters more than most.** The anon growth
+> this lane opened on is still real and still unexplained — `#435` measured 16
+> OOM kills on 2026-08-14 alone. Owning session gone (see the note on
+> `anon-allocation-site`); owner authorised the override so `#435` step two could
+> proceed. CLAIMS released, findings untouched, conclusions unaffected.
 - Goal: name what allocates ~300MB/hour of ANONYMOUS memory on refresh-worker,
   with evidence, so the board stops needing a restart every ~4 hours.
   Testable outcome: `anon` growth over a full evening window attributed to a
@@ -4111,3 +4128,58 @@ Six kills sampled (not three — three would have produced a clean wrong answer)
 - Next step is therefore NOT a fix: it is sampling on a TIMER (or inside the
   loaders) rather than at stage boundaries. Recorded on `#435`.
 - Read-only lane. No files touched, no deploy.
+
+### memory-watchdog-435 — BLOCKED ON A LANE COLLISION — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: `#435` step two — sample memory on a TIMER while a build is in flight, so
+  the multi-GB excursion that kills the worker is caught IN PROGRESS. Two of six
+  kills show 22.7% and 71.9% seconds before death; the current instrumentation
+  samples at stage BOUNDARIES only, so the allocator is invisible.
+- Design (written, not implemented): extract the payload builder out of
+  `log_container_memory` so the watchdog cannot become a second copy of the
+  reclaimable expression (that exact drift is called out in its own docstring);
+  a daemon thread sampling every ~2s; emits only above a pct floor or on a
+  delta, so it is near-silent at rest and dense exactly during an excursion;
+  records the last stage seen plus seconds-since, which is what turns
+  "4GB at 00:40:59" into "the excursion began N seconds into stage X".
+  Default ON with an env KILL-SWITCH rather than opt-in, so a code deploy alone
+  can enable it and disabling needs no code — `learnings.md` "worker periodic
+  work is never free" (`#241` restart loop) is why the emit is gated at all.
+- **BLOCKED. `anon-allocation-site` (OPEN, session `memory-guard`) claims the
+  EXACT file set:** `syndicate/features/shared/memory_observability.py`,
+  `scripts/run_refresh_worker.py`, `tests/test_memory_observability.py`,
+  `tests/test_refresh_worker.py`. `refresh-worker-anon-leak` (OPEN, same session)
+  names both source files too.
+- **The owner session no longer exists** — `memory-guard` is absent from the
+  session list at 01:0xZ; only `UI plan`, `Audit models (fork)`, `Nfl autorun`,
+  `417 24h read` and `Deploy 419` remain. `state.md`'s 20:4xZ census already
+  recorded both lanes as orphaned.
+- **Not overriding unilaterally.** Closing or overriding another lane's claim is
+  the owner's call, these are the most memory-sensitive files in the repo, and
+  both lanes carry unfinished measurement obligations that a rewrite here could
+  invalidate. Surfaced for a decision instead.
+
+#### memory-watchdog-435 — UNBLOCKED 2026-08-15 01:1xZ — CROSS-LANE OVERRIDE, logged
+- **Override authorised by the owner (user) after the collision was surfaced.**
+  Evidence it rests on: the `memory-guard` session is ABSENT from the live
+  session list at 01:0xZ, and `state.md`'s 20:4xZ census already recorded
+  `anon-allocation-site` and `refresh-worker-anon-leak` as orphaned.
+- Files TAKEN from those two lanes: `memory_observability.py`,
+  `run_refresh_worker.py`, `tests/test_memory_observability.py`,
+  `tests/test_refresh_worker.py`.
+- **Deliberately NOT touched, so those lanes' findings survive:** the tracemalloc
+  helpers, the `malloc_trim`/arena machinery, and every existing emitter's
+  behaviour. This change is ADDITIVE — one extracted payload builder (so the
+  reclaimable expression is not copied a second time), one daemon sampler, one
+  start call.
+- Status: OPEN — implementing.
+
+- **ADJACENT FIX, taken on the user's instruction ("we are rooted to central
+  time not UTC") and shipped 2026-08-15 01:17:56Z as web `1ac485c0`:**
+  `ncaaf/betting_card.py:_kickoff_date_and_label` filed every kickoff under
+  its UTC day. **28 of 157 real 2026 kickoffs were on the wrong date**;
+  production's week-1 card lost its bogus "Sunday, August 30" group and those
+  games now sit under Saturday. Swept the tree for the same shape: the two
+  other NCAAF sites are administrative dates (transfer portal, coach hires)
+  where a day boundary carries no meaning and were left alone; five other
+  call sites already convert through Central explicitly. Four tests, one of
+  which asserts an afternoon kickoff does NOT move.

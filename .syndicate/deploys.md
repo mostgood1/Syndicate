@@ -2037,3 +2037,151 @@ canonical 20:03:11 kill the container was at **28.8%** twelve seconds prior with
 
 CONSEQUENCE FOR THE 3000MB FLOOR: leave it. It guards the wrong stage, but
 lowering it now would only let more work into a process that is dying elsewhere.
+
+### 2026-08-15 — web `932a1f71` — board contract: absent is absent — **MEASURED**
+
+Deploy `dep-d9vrccrl550s73bugj00`, live 00:50:23Z. Branch
+`deploy/board-contract-absent` = web's own live `aadcde77` + exactly one
+commit (`dda83c18`, on main as `7056c57f`). Not main's tip: main was 123
+commits and four lanes ahead. No `render.yaml` change.
+
+Same instrument before and after, on production:
+
+    route                cards  bars  50/50  draw  absent
+    /nfl/cards    before     16    16      1     0       0
+    /nfl/cards    after      16    16      1     0       0
+    /soccer/epl   before      1     1      0     0       0
+    /soccer/epl   after       1     1      0     1       0
+
+**The soccer draw segment is live: 0 -> 1.** A three-way market renders three
+segments, and the bar now reads the sim (77.3% on the audit's card) rather
+than the market's implied 81.1%.
+
+**The NFL 50/50 did NOT go away, and that is the correct outcome — checked,
+not assumed.** The contract no longer fabricates, so a surviving 50/50 must
+come from the producer. It does: NFL builds `probability_rows` straight from
+`projection.home_win_rate`, and the game is **Denver @ Kansas City, home mean
+22.5 vs away mean 22.1** — a 0.4-point projected margin. A ~50% win
+probability there is the model speaking, not a default. That is precisely the
+distinction this lane existed to make legible: before the change a 50/50 could
+be either, and now it can only be the model.
+
+All ten board/market routes 200 after the deploy.
+
+**Rollback, exact:** POST `/v1/services/srv-d88ahvrbc2fs73eodu30/deploys`
+`{"commitId": "aadcde77b064337a676e92e45f47563db215f3ca"}`.
+
+## 2026-08-15 01:1xZ — refresh-worker — `#435` memory watchdog — PENDING DEPLOY
+
+- Target: `c9378c91` on `deploy/memory-watchdog-435` = live `d70f70d8` + one
+  commit (`b3ee36d9` cherry-picked; another session shipped `d70f70d8` at
+  01:03:38Z while I was writing, so the branch was rebased onto it and re-tested
+  — 38 passed on the new base).
+- **This is an INSTRUMENT, not a fix. It changes no behaviour.** It exists
+  because 2 of 6 sampled kills show the process at 22.7% and 71.9% seconds
+  before death: multi-GB allocations INSIDE a stage, invisible to the
+  boundary-only sampling we have.
+- Watchdog: daemon thread, ~2s, one cgroup read per tick, emits only above 60%
+  or on a 200MB move. Carries `last_stage` + `seconds_since_stage`.
+  `SYNDICATE_MEMORY_WATCHDOG=0` disables without a code change.
+- EXPECTED, and this is the whole test: at the NEXT OOM kill there are
+  `MEMORY_WATCHDOG` lines in the final seconds naming a stage and a climb rate,
+  where today the last line is a stage boundary at 22.7%.
+- FAILURE MODES I AM WATCHING FOR: (a) log flood — should be silent at rest,
+  measured 1 line locally after the unknown-split fix, was 1-per-tick before;
+  (b) the thread dying silently — `MEMORY_WATCHDOG_STARTED` must appear at boot;
+  (c) the worker restart loop `#241` caused — if kill CADENCE worsens, disable
+  via env before anything else.
+- MEASUREMENT: <pending — needs one OOM kill to occur, which historically takes
+  15-20 min>
+- Rollback: `py -3 scripts/render_deploy.py --service refresh-worker --commit d70f70d8 --allow-rollback`
+
+### 2026-08-15 — web `1ac485c0` — NCAAF kickoffs file on their CENTRAL day — **MEASURED**
+
+Deploy `dep-d9vrpcm417fc7394q3r0`, live 01:17:56Z.
+
+**Measured before the fix, on the real 2026 schedule: 28 of 157 kickoffs were
+filed under the wrong date.** Every evening game is the next UTC day, so
+`.date()` on the parsed UTC value put the marquee Saturday slate on Sunday and
+labelled it "Sunday":
+
+    Memphis at UNLV           2026-08-30T02:00:00Z   filed 08-30, is 08-29 Sat
+    Colorado at Georgia Tech  2026-09-04T00:00:00Z   filed 09-04, is 09-03 Thu
+    UTEP at Oklahoma          2026-09-05T00:00:00Z   filed 09-05, is 09-04 Fri
+
+Production week-1 betting card, day labels before -> after:
+
+    before: Thu Sep 3 | Sun Sep 6 | SUN AUG 30 | Sat Sep 5 | Sat Aug 29 | Mon Sep 7 | Fri Sep 4
+    after:  Thu Sep 3 | Sun Sep 6 |            | Sat Sep 5 | Sat Aug 29 | Mon Sep 7 | Fri Sep 4
+
+**"Sunday, August 30" is gone** — those games are Saturday-evening kickoffs and
+now sit under Saturday. Sunday Sep 6 and Monday Sep 7 remain because those are
+real Labor Day weekend games; the fix moved what was wrong and left what was
+right, which is why the afternoon-kickoff case has its own test.
+
+Ten board routes 200. The other session's `/api/ops/clv/report` still answers
+(401 auth, not 404), i.e. their work survived this deploy.
+
+**Rollback:** POST `.../deploys` `{"commitId": "d9a39ce8..."}` — the commit
+this one was stacked on.
+
+**HOW THIS DEPLOY WAS SEQUENCED, because it nearly went wrong.** My first
+attempt refused to fire: a pre-flight check found `d9a39ce8` (another
+session's CLV route) already `build_in_progress` on web. Had I fired my
+branch — pinned to `932a1f71`, the then-live commit — it would have landed
+*after* theirs and **reverted their route**, because a pinned deploy carries
+its own tip and nothing else. I waited for theirs to reach live, re-pinned my
+commit on top of `d9a39ce8`, and deployed that. Both changes are live.
+
+## 2026-08-14 20:0x CDT — TWO services — CLV made readable (`d70f70d8` + `d9a39ce8`)
+
+- **Lane:** `clv-without-settlement`. **Why:** the recorded next action ("run
+  `compute_clv_for_date` tomorrow") **was not executable**. The joiner had no
+  call site and the openings live on refresh-worker's disk, which nothing can
+  read. Three pieces, any one alone inert.
+- **refresh-worker `d70f70d8`** (off `098877e1`, fast-forward) — allowlist
+  `reports/intelligence/clv_openings/*.jsonl` + `record_openings` now calls
+  `publish_hot_artifact`, and the joiner guards. **LIVE ~01:05Z.**
+- **web `d9a39ce8`** (off `932a1f71`, web's OWN live SHA) —
+  `GET /api/ops/clv/report`. **LIVE ~01:2xZ.**
+  - **A ROLLBACK WAS CAUGHT AGAIN.** `d70f70d8` does NOT contain web's last six
+    commits; deploying it to web would have dropped another session's board
+    contract, card-UI and Ask work. Two services, two branches, each verified
+    against its OWN live SHA. This is the third time tonight this check has
+    changed what shipped.
+- **VERIFIED:** the endpoint answers and is well-formed —
+  `date=2026-08-14` (Central default working; a UTC default would have asked
+  for a file that does not exist for five hours every evening),
+  `openings=0 resolved=0 same_book_n=0 avg_clv_pct=None unresolved={}`.
+- **NOT VERIFIED, and both matter:**
+  1. **The recorder has not been seen alive since the reboot.** No
+     `clv_opening_ledger` line in ~30 minutes across narrow windows. Board
+     builds were running ~21 min apart earlier, so this is overdue but not yet
+     diagnostic — `layer2-board-freshness` has a documented history of
+     `MEMORY_GUARD_ABORT` refusing board cycles, which would look exactly like
+     this. **Check this before trusting tomorrow's number.**
+  2. **`openings=0` on web is EXPECTED TODAY and is a DESIGN LIMIT worth
+     knowing.** Publishing fires only when `written > 0`, and 2026-08-14's
+     markets were all first-seen before this deploy — so today's file is
+     STRANDED on the worker unless a new market appears. It self-heals on the
+     next write (the push sends the whole file, not a delta), and tomorrow's
+     new date creates a new file whose first write publishes it. A one-shot
+     publish per worker boot would close the gap properly; not built.
+- **Rollback:** worker `098877e1`, web `932a1f71`, both by commitId.
+
+### `#435` WATCHDOG DEPLOYED 2026-08-15 01:16:54Z — boot checks PASS, measurement pending
+
+- `c9378c91` live 01:16:54Z (`dep-d9vrov9t0dsc7389aqb0`). **Zero jobs killed** —
+  the owner called to force it through, and the gate returned CLEAR on its own
+  as the call was made, so no force was needed. Four deploys tonight, four with
+  zero jobs killed.
+- (a) STARTED: `MEMORY_WATCHDOG_STARTED interval_s=2.0 floor_pct=60.0
+  delta_mb=200.0` at 01:17:29Z. The thread is running.
+- (b) NO FLOOD: zero `MEMORY_WATCHDOG` sample lines at rest. The gating works in
+  production, not just locally.
+- (c) PENDING: needs an OOM kill. Watcher armed against baseline 01:16:54Z.
+- **This deploy fixes NOTHING and must not be recorded as if it did.** It is an
+  instrument. Kills were arriving every ~16 min (last 00:57:02Z); the honest
+  outcomes are: a trace naming the stage and climb rate; a FLAT trace (excursion
+  faster than the 2s tick -> shorten the interval or sample in-loader); or no
+  lines at all (gating wrong or thread dead). All three are results.
