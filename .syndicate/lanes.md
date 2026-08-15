@@ -5704,3 +5704,54 @@ see the dispersion finding above.
   refusing to price / raise the sim count / never price). Recommendation: publish
   refusing to price, zero added compute.
 - No deploy. refresh-worker was `update_in_progress` (`eea7554a`) at lane-open.
+
+#### soccer-model-coverage — RECIPE CORRECTION 2026-08-15. MY OWN PREVIOUS NOTE WAS WRONG.
+
+**"Branch from `fix/soccer-backtest-leakage`" IS WRONG AND WOULD BE A MASSIVE
+ROLLBACK.** `git diff --stat origin/main fix/soccer-backtest-leakage` =
+**127 files, 3,618 insertions, 33,673 DELETIONS** — the branch predates a full
+day of many sessions' work (clv_join, layer2 uninformative-EV, the UI lanes,
+the whole `.syndicate` ledger). It is also 114 lines BEHIND `origin/main` on
+`scripts/run_live_odds_refresh_worker.py`, the very file I edited. This is the
+same shape as `state.md`'s "a branch cut for web is a ROLLBACK for
+refresh-worker" — I reproduced the mistake one note after quoting the rule.
+
+**THE ACTUAL SITUATION.** The `soccer-backtest-leakage` as-of change is
+UNCOMMITTED IN THE SHARED WORKTREE (its session is archived; `origin/main` has
+`as_of` count **0**). It spans `loaders.py`, `build_soccer_artifacts.py`,
+`validate_soccer_vs_market.py`, `backtest_soccer_live_lens.py` and
+`tests/test_soccer_team_ratings_as_of.py`. **My date fix sits on top of it and
+is meaningless without it** — `_as_iso_day` repairs a comparison that only
+exists in that change.
+
+**SO THE COMMIT NEEDS A DECISION, NOT A RECIPE — flagging rather than
+guessing.** Branch from `origin/main`, then either:
+ (a) two commits — land the orphaned as-of work first (it is CLOSED-VERIFIED
+     and was always meant to land), then mine on top, preserving attribution; or
+ (b) one commit that states plainly it carries both.
+Either way the `compute_team_ratings` signature change forces its callers to
+come along, so the 5 as-of files cannot be left behind.
+**Do NOT cherry-pick my `loaders.py` alone onto `origin/main`** — it would call
+`compute_team_ratings(as_of=...)` against a signature that has no such
+parameter.
+
+#### live-game-line-projection — H1 CONFIRMED 2026-08-15 04:0xZ, and the open discriminator is now MOOT
+- **Method:** imported the codebase's own `_lens_rows_have_projection_signal`
+  and evaluated `should_use_projection_lens`'s three disjuncts over the served
+  production payload, per live game. Not a code reading — the real function over
+  real data.
+- **Result: `False` on 5 of 5 live games.** `card_game_lens` non-empty (4 rows),
+  game is live, and the card's text-derived lens HAS signal — e.g. game 824159
+  `first1 projection={'homeMargin': 0.57, 'total': 1.31}`.
+- **This moots the discriminator the spec listed as build step §6.1.** The third
+  disjunct was the only one that could rescue the MC lens, and it is False
+  *because the card lens has signal*, independent of what the MC produced. So
+  **even if the MC payload arrives with a full lens, it is discarded.** Whether
+  it arrives no longer changes the outcome — only the fix's shape.
+- Residual caveat, stated: the card lens was read from web's served payload as a
+  proxy for the worker's. Same producer (`_live_lens_segments_from_card`) both
+  places, and the values are visibly pregame interpolations, but it is a proxy.
+- **USER DECISION on spec §8.1 (2026-08-15): PUBLISH, REFUSE TO PRICE.** Ship at
+  120 sims carrying `probStdErr` and a `priceable` gate; do not raise the sim
+  count now. Zero added compute; leaves the raise available once §6.2 measures
+  what a sim costs on live-odds-worker (84–89% of 2 GB).
