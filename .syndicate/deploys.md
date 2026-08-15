@@ -3027,3 +3027,203 @@ Kills are EVENTS: check `/v1/services/<id>/events`, never a log grep.
 (session `tier5-live-read`, unattended) claims `odds_book_quotes.py`. The
 evidence above is indirect: eviction churn stopping and peak anon halving on the
 same shard. Strong, but not the same as the branch announcing itself.
+
+### 2026-08-15 19:43:59Z — web `d7c2ca7d` (pinned `bebe87c9` + `1bb8cf9f`) — TABULAR DIGITS — 3 OF 4 SPORTS TO ZERO, MLB 89.7% AND THE REMAINDER EXPLAINED
+
+Deploy `dep-da0bvm3l550s73d3pq0g`. Pinned on web's OWN live commit, rebuilt
+atomically against it — **three other sessions deployed web while this one was
+held**, so the pin target moved `0bf866c3 -> 1e44e1da -> 0c65a832 -> bebe87c9`.
+The trigger script refused to fire twice when a deploy was in flight rather
+than racing it, and re-checked the live SHA between building the tree and
+POSTing. `7e334509` (Lane G) verified an ancestor of the deploy commit.
+
+`numericSweep` = leaf elements rendering a digit at `font-variant-numeric:
+normal`, production, `httpStatus` 200 on every row:
+
+    sport    before   after
+    nfl         468       0
+    ncaaf       432       0
+    soccer       60       0
+    mlb        1388     143    <- 89.7%, and 143/143 are ONE class
+
+**MLB's residual is `.cards-prop-filter-count`, and it is NOT a miss in the
+rule — it is a form-control inheritance boundary.** Measured on the live page:
+
+    .cards-game-card         tabular-nums   <- the rule applies
+    .cards-prop-filter-shell tabular-nums   <- and inherits down
+    button.cards-filter-pill normal         <- STOPS HERE
+    span.cards-prop-filter-count normal
+    button fontFamily:       Arial          <- the proof
+
+The span IS inside `.cards-game-card` (`closest()` confirms). The UA
+stylesheet's `font:` shorthand on `<button>` resets `font-variant-numeric`, and
+form controls do not inherit font properties. So `font-variant-numeric`
+inheriting "everywhere" is false at exactly one boundary, and MLB is the only
+sport with in-card filter pills carrying counts. One more rule closes it.
+
+**NOT CLAIMED, and it is not mine:** soccer's `.cards-data-pair` count went
+**9 -> 0** between the 19:0xZ and 19:5xZ reads. CSS cannot remove DOM nodes.
+The card is otherwise healthy — same fixture (Coventry @ Arsenal), 4 market
+tiles, 1 probability bar, **0** `.cards-empty-copy`, correct team names — so
+this is the soccer producer publishing fewer period rows, and G3's "a section
+renders only when its field is present" then correctly suppressing the lens
+card that holds the pairs. Flagged for `soccer-model-coverage`; UNEXPLAINED
+here, not diagnosed.
+
+**Also not attributable:** mlb mobile card-height spread 85 -> 109px. The MLB
+slate moves between reads and this lane changed no layout property. Stated so
+nobody later reads it as a regression from this deploy.
+
+**Unchanged, as required:** 0px overflow every sport both widths; ncaaf's
+`market-main` 0-element failure still correctly reported (that is the probe
+working, not a regression); Lane G's soccer numbers still hold.
+
+Rollback if needed: redeploy pinned to `bebe87c9`.
+
+## 2026-08-15 — refresh-worker — `dca39fad` — NFL live-edge suppression — PENDING MEASUREMENT
+- **What:** `nfl_game_projections.attach_nfl_game_projections` wired to
+  `live_edge_policy` at the single stamp point. Cherry-pick of `1d15686b`.
+- **WHY refresh-worker AND NOT web:** `/api/board/layer2-shortlist` is a plain
+  artifact read; the edges are baked in at build time by
+  `book_grid_artifact.py:221 → board_enrichment.attach_projections`. Deploying
+  this to web would have been an INERT fix.
+- **Base:** cut from refresh-worker's OWN live SHA `c67f7373`. Direct deploy of
+  `1d15686b` would have rolled the worker back **118 commits**.
+- **Diff vs live:** 2 files, +233, 0 deletions. Tests on the candidate: 26
+  passed / 14 subtests.
+- **Metric:** NFL rows on `/api/board/layer2-shortlist` with `is_live` AND
+  `model_edge_pct is not None`. **Baseline 5** (window 1, 2026-08-15T02:37Z).
+  Expected **0**, with `projection.edge_unavailable_reason` set.
+- **CANNOT BE MEASURED YET, STATED UP FRONT:** at deploy time the board carried
+  **zero live rows in any sport**. A reading of 0 tonight is NON-EVIDENCE — the
+  instrument cannot read unhealthy without a live NFL slate. Do not close this
+  on a 0 taken outside a live window.
+- **CONFOUND I AM CREATING FOR ANOTHER LANE — read this before using it.**
+  This restarts refresh-worker, which was at **91% of 4 GiB (3,729 MB, 366 MB
+  headroom)** with 7 confirmed `oomKilled` events 03:59–05:02Z and ~14.8 h
+  stable since. **The reboot resets the memory baseline to a fresh floor.**
+  OPEN lane `quote-shard-latest-index` (`#435`, session `memory-cutover-ship`)
+  verifies via "production PYMALLOC_STATS arenas after deploy" — that lane MUST
+  re-baseline and must NOT read a post-deploy memory improvement as evidence of
+  its own fix. This is the documented boot-confound: every deploy reboots, so
+  every fix looks good for five minutes.
+- **Rollback:** redeploy `c67f7373` by commitId.
+- **MEASUREMENT:** _(pending — needs a LIVE NFL slate, not just status=live)_
+
+## 2026-08-15 19:54:18Z — web `9b88d05b` — Drop 2, live-state lens survives the rebuild
+**Lane:** `live-game-line-projection`. **Deploy:** `dep-da0c4qm417fc73cha2u0`,
+fired 19:47:54Z, live 19:54:18Z. Cut from web's OWN live SHA `d7c2ca7d`
+(ancestry checked both ways; `render_deploy.py` re-checks at fire time).
+
+**Change:** `mlb/live_lens.py` +155. Web's fallback rebuild has the live Monte
+Carlo hard-refused in-request and REPLACED the worker's snapshot rather than
+merging, so the live win probability was dropped on a coin-flip per request
+(60 s max age against a 60 s worker tick). Now carried forward: bounded at 300 s
+(`MLB_LIVE_STATE_CARRY_FORWARD_MAX_AGE_SECONDS`, `0` = kill switch), refused on
+an unreadable age, refused on a settled game, stamped with a non-resettable
+`liveStateAsOf`.
+
+**MEASUREMENT: NONE, AND NONE IS EXPECTED YET. This row is deliberately open.**
+Drop 2 preserves a live-state lens that **nothing is currently producing** —
+live-odds-worker still runs `ccd10349` and lacks Drop 1, which is the half that
+makes the Monte Carlo lens survive the merge on the service where the MC
+actually runs. **Web alone is inert by construction, not by accident.** Do not
+read the absence of a live win probability on the board as a failed deploy, and
+do not close this row on that basis.
+
+**What will discharge it** (needs live-odds-worker on `191a001b` AND a live MLB
+slate): `mlb_source/data/live_lens/` carries `gameLens` rows with
+`source: live_mc` and a non-null `modelHomeWinProb` for live games, and
+`liveStateLensCarriedForward` appears when a web rebuild fires. Read the
+artifact, **never `/mlb/api/live-lens`**, which is structurally blind to the MC.
+**It will NOT move `rows_live_edged` off 0** — that needs Drop 3, the game-line
+join, which does not exist.
+
+**Superseded-but-preserved:** web deploy `f475c775` began building at 19:54Z from
+another session. Verified by content that it carries both drops and has
+`9b88d05b` as an ancestor, so it is not a revert.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service web --commit d7c2ca7d --allow-rollback`.
+
+### 2026-08-15 20:00:58Z — web `f475c775` (pinned `9b88d05b` + `454af741`) — **TABULAR DIGITS CLOSED, ALL FOUR SPORTS AT ZERO**
+
+Deploy `dep-da0c7t8u01pc738rgpd0`. Same atomic recipe: waited out an in-flight
+deploy (`9b88d05b`), rebuilt the pin on it, re-read the live SHA between
+building the tree and POSTing.
+
+    numericSweep (leaf elements rendering a digit at font-variant-numeric: normal)
+    sport    audit    after 1bb8cf9f    after 454af741
+    mlb       1388             143               0
+    nfl        468               0               0
+    ncaaf      432               0               0
+    soccer      60               0               0
+
+**MLB confirmed on desktop, 15 cards, `.cards-prop-filter-count` x146 all
+computing `tabular-nums`, `nonTabular: []`.** ~2,350 digit-rendering elements
+platform-wide moved from proportional to tabular across two deploys.
+
+**How the MLB reading was taken matters, and it is caveat 5 biting again.** The
+harness run immediately after this deploy reported `mlb desktop 0 cards` — a
+flake, not a result, because the probe waits on a TIMER and MLB is the one
+sport rendering through `cards_source.js`. The mobile row (15 cards, no sweep
+line) already showed zero. Re-measured with `wait_for_selector('.cards-game-card')`
+— waiting on CONTENT — it returns 15 cards and a clean zero. **The probe still
+uses a fixed delay and will keep flaking on MLB; that is now the top item for
+whoever next touches `ui_layout_probe.py`.**
+
+**The residual was a form-control inheritance boundary, not a selector gap.**
+`font-variant-numeric` inherits — except into `<button>`/`<input>`/`<select>`,
+where the UA `font:` shorthand resets it. Proven on the live page before the
+fix: `.cards-game-card` tabular-nums, `.cards-prop-filter-shell` tabular-nums,
+`button.cards-filter-pill` normal, its fontFamily `Arial`. MLB was the only
+sport above zero because it is the only one with in-card filter pills carrying
+counts.
+
+**Unchanged and re-verified:** 0px overflow, all four sports, both widths.
+Lane G's soccer numbers hold. NCAAF's `market-main` 0-element failure still
+reported — the probe working as designed, not a regression.
+
+**Still open, still not mine:** soccer `.cards-data-pair` 9 -> 0 (a producer
+change; the card is otherwise healthy), and mlb mobile card-height spread
+drifting 85 -> 109 -> 112px across reads as the slate moves.
+
+Rollback if needed: redeploy pinned to `9b88d05b`.
+
+### CORRECTION to the row above, 2026-08-15 ~20:0xZ — I named the WRONG INSTRUMENT and a VACUOUS CRITERION
+Caught by taking the pre-deploy baseline. Both errors were mine, in this file.
+
+**1. The instrument was wrong.** I wrote "read `mlb_source/data/live_lens/`,
+never `/mlb/api/live-lens`". Measured: that published artifact is the **SLIM**
+shape — a game row's keys are exactly `{gamePk, startTime, status}` and
+**`gameLens` is not a key at all**. It is written by
+`scripts/refresh_mlb_oddsapi.py` from an HTTP fetch with `slim=on`, not by
+`_persist_live_lens_report`. **It can never show the live lens, before or after
+Drop 1.** A verification run against it would have read 0 and been called a
+failed deploy.
+
+**2. "Never use `/mlb/api/live-lens`" was true and is now FALSE — because of my
+own Drop 2.** It was blind precisely because web's rebuild DESTROYED the lens.
+With Drop 2 live on web it preserves what the worker's snapshot carries, so it
+becomes the correct instrument. The rule inverted the moment the fix landed.
+
+**3. The criterion was vacuous, and it is the exact trap the code guards
+against.** I wrote success as "`source: live_mc` AND a non-null
+`modelHomeWinProb`". **Measured pre-deploy: 60 of 60 gameLens rows ALREADY carry
+a non-null `modelHomeWinProb`** — `_build_game_lens` stamps one on the
+`first1/3/5` lanes from `_live_margin_win_prob` over a segment interpolation.
+I chose `source` over `modelHomeWinProb` in the discriminator for exactly this
+reason, wrote a test pinning it, and then put the useless half into the success
+criterion anyway. **`source == "live_mc"` is the ONLY valid signal.**
+
+**BASELINE, pre-worker-deploy `[measured 2026-08-15 20:0xZ]`**
+Instrument `/mlb/api/live-lens`; slate 15 games, **4 live**, 1 final, 10 pregame;
+web `f475c775` (Drops 1+2), live-odds-worker `ccd10349` (**neither**).
+
+    gameLens rows            60
+    source == live_mc         0     <-- the real baseline
+    liveStateCarriedForward   0     <-- Drop 2 has nothing to preserve yet
+    modelHomeWinProb non-null 60    <-- VACUOUS, already satisfied
+    sources present: segment_projection x60 (Live 16, Preview 40, Final 4)
+
+**PASS after live-odds-worker gets `191a001b`:** live rows flip to
+`source: live_mc`. Nothing else changes meaning.
