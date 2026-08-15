@@ -93,6 +93,14 @@ OWNER_ID = "tea-d2bb5n95pdvs73cje4fg"
 DEFAULT_MAX_SAMPLE_AGE_SECONDS = 180
 
 EXIT_CLEAR, EXIT_HOLD, EXIT_UNKNOWN = 0, 1, 2
+# 3 = another session holds the deploy claim for this service. Separate from
+# HOLD because the remedy is different: HOLD means "wait for a lull", CLAIMED
+# means "this is not yours to deploy". Added 2026-08-15 after web took five
+# deploys in 21 minutes from four sessions -- one cancelled a peer's build
+# mid-flight, and a verified refresh-worker fix was silently reverted 8 minutes
+# after going live by a peer cutting from a stale live SHA. Anything already
+# treating non-zero as "do not deploy" keeps working unchanged.
+EXIT_CLAIMED = 3
 
 
 def _api_key() -> str:
@@ -289,6 +297,12 @@ def main() -> int:
     parser.add_argument("--target-commit", default="", help="commit you intend to deploy; warns if already live")
     parser.add_argument("--max-sample-age-seconds", type=int, default=DEFAULT_MAX_SAMPLE_AGE_SECONDS)
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--holder",
+        default=os.environ.get("SYNDICATE_DEPLOY_HOLDER", ""),
+        help="your lane/session name. If another holder owns this service's deploy claim, "
+             "preflight returns CLAIMED (exit 3) instead of CLEAR.",
+    )
     args = parser.parse_args()
 
     key = _api_key()
@@ -335,8 +349,33 @@ def main() -> int:
     report["defunct"] = [fmt(p) for p in defunct]
     report["unidentifiable"] = [fmt(p) for p in unidentifiable]
 
+    # The deploy claim is consulted BEFORE the process checks, because it answers
+    # a different question: not "is it safe to deploy now" but "is this yours to
+    # deploy at all". A CLEAR lull is worth nothing if a peer is mid-train on the
+    # same service -- that is precisely how one build cancelled another.
+    claim = None
+    try:
+        from deploy_claim import active_claim  # noqa: PLC0415 -- optional, must never break preflight
+
+        claim = active_claim(args.service)
+    except Exception:  # a missing or broken claim tool must not block a deploy
+        claim = None
+    foreign_claim = claim if (claim and claim.get("holder") != (args.holder or None)) else None
+    report["deploy_claim"] = (
+        {"holder": claim.get("holder"), "target_commit": claim.get("target_commit"),
+         "acquired_at_iso": claim.get("acquired_at_iso"), "yours": foreign_claim is None}
+        if claim else None
+    )
+
     stale = age is None or age > args.max_sample_age_seconds
-    if stale:
+    if foreign_claim:
+        verdict, code = "CLAIMED", EXIT_CLAIMED
+        reason = (
+            f"deploy claim on {args.service} is held by {foreign_claim.get('holder')}"
+            + (f" for {str(foreign_claim.get('target_commit'))[:8]}" if foreign_claim.get("target_commit") else "")
+            + ". Coordinate with them, or --force the claim if that session is gone."
+        )
+    elif stale:
         verdict, code = "UNKNOWN", EXIT_UNKNOWN
         reason = "no ALL_PROCESS_MEMORY sample" if age is None else f"sample is {age:.0f}s old (limit {args.max_sample_age_seconds}s)"
     elif jobs:
@@ -362,6 +401,15 @@ def main() -> int:
 
     print(f"service        {args.service}  ({service_id})")
     print(f"live commit    {live_commit[:8] or '?'}   finished {deploy.get('finishedAt') or '?'}")
+    if claim:
+        who = "YOU" if foreign_claim is None else claim.get("holder")
+        print(f"deploy claim   held by {who}"
+              + (f"   target {str(claim.get('target_commit'))[:8]}" if claim.get("target_commit") else "")
+              + (f"   since {claim.get('acquired_at_iso')}" if claim.get("acquired_at_iso") else ""))
+    else:
+        print("deploy claim   none -- acquire one before deploying "
+              "(scripts/deploy_claim.py acquire --service "
+              f"{args.service} --holder <you>)")
     if args.target_commit:
         state = {True: "ALREADY LIVE -- redundant", False: "not yet live", None: "git could not say"}[report.get("target_already_live")]
         print(f"target commit  {args.target_commit[:8]}   {state}")
