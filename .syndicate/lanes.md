@@ -3091,3 +3091,192 @@ a false one using a statistic I had not checked the provenance of.
   `tests/test_intelligence.py` at 218 (it is 218 as of `d348e040`, so any
   number below that is mine).
 - Blocked by: none. NO DEPLOY.
+
+#### soccer 13:47Z — HYPOTHESES, WRITTEN BEFORE TESTING `[session tier5-live-read, 2026-08-15 21:2xZ]`
+Diagnostic only, read-only, no file claims. Handed to the earlyExit lead holder.
+
+- **H1 — NOT AN OUTAGE AT ALL. The 08-15 fixtures kicked off, so pregame capture
+  for that DATE legitimately ended, and capture moved to future fixture dates.**
+  The soccer shard is keyed by FIXTURE date (measured: it spans 10 days), so
+  once a date's matches start there is nothing left to capture for it and its
+  newest-capture age grows forever. **If true, my alarm has a design flaw for
+  soccer specifically — it would report a permanent, worsening outage every day
+  after that day's kickoffs, forever.** This is the hypothesis I most expect and
+  least want.
+  - Decisive test: do soccer shards for FUTURE dates (08-16, 08-17, ...) carry
+    captures AFTER 13:47Z today? If yes, H1 holds and the feed is healthy.
+- **H2 — a deploy/restart of live-odds-worker at ~13:47Z.** Test: Render deploy
+  + event timestamps near 13:47Z. (Known exits were 14:34 and 20:03, neither is
+  13:47, so this starts weak.)
+- **H3 — the soccer refresh run began erroring at 13:47Z** (exception, league
+  list change, upstream 4xx/5xx). Test: live-odds-worker logs 13:40-14:00Z.
+- **H4 — OddsAPI quota/credit exhaustion for soccer.** Test:
+  `/api/ops/oddsapi/quota` and whether other sports kept capturing (they did —
+  mlb/nfl captured at ~21:00Z), which already argues against a global cap but
+  not against a per-sport or per-market one.
+- **H5 — a stuck run-lock from 13:47.** Weakened in advance: the other session
+  already established the lock IS released on `earlyExit` (`d4574644`).
+
+**Falsifier for the whole set:** if future-date soccer shards ARE being written
+after 13:47Z, then H2-H5 are all moot and the only defect is in my alarm.
+
+#### soccer-fallback-row-market — CLOSED-VERIFIED 2026-08-15 — deployed and measured
+
+`bb23c8f9` = web's live `e831263e` + `6e9e6107`, deploy
+`dep-da0dc9k9v7es7394gbg0`, live 21:18:38Z. The production re-measure this lane
+owed is DONE and every number came off the served card:
+
+    .cards-data-pair   0 -> 3     lens cards 0 -> 1     totals bar 0 -> 1
+    market      —  ->  ATS ARS -1.5 | Total 2.5
+    best_edge   —  ->  ATS +0.2 | Total +0.7
+
+Controls held: ncaaf and nfl identical on every probe axis, 0px overflow
+platform-wide, no empty state reappeared on soccer.
+
+**A gap in my own method, closed after the fact rather than before.** I stated
+"NFL unreachable, NCAAF inert" as the blast radius and never checked MLB —
+which turns out to reach the branch on 15/15 games. It is inert there too
+(0/15 rows changed, measured by loading both versions of the file from git and
+driving the live payload through each), so the claim survives. But the check
+was retrospective, and had it gone the other way the fix would already have
+been in production. **Enumerate every sport that reaches a changed branch
+BEFORE deploying, not the two that came to mind.**
+
+Full row, including the MLB card-height movement that is NOT attributable to
+this deploy, in `deploys.md`.
+
+- **FINAL:** shipped, measured, closed.
+
+#### soccer 13:47Z — ANSWERED. Nothing happened at 13:47. `[measured 2026-08-15 21:2xZ]`
+
+**RESULT AGAINST THE HYPOTHESES WRITTEN ABOVE — four refuted, one refined:**
+
+- **H1 (fixtures aged out / my alarm is the flaw) — REFUTED, decisively.** Every
+  soccer fixture-date shard stops at the same instant: 08-15 `13:47`, 08-16
+  `13:47:17`, 08-17 `13:47:14`. **Zero soccer rows captured at/after 13:48:00Z
+  across all shards.** A date aging out cannot stop FUTURE dates. The alarm is
+  reporting a real outage. (My design concern stands as a latent issue for a
+  quiet day; it is not what happened here.)
+- **H2 (restart at ~13:47) — REFUTED.** Nearest events are 14:34:36 `earlyExit`
+  and 20:03; nothing at 13:47.
+- **H3 (run began erroring) — REFUTED.** Zero `Traceback` on live-odds-worker
+  13:46-14:36Z. The only "error" hits are `PROCESS_ENUM_DEBUG`'s
+  `psutil_unavailable:ImportError`, which is constant background noise.
+- **H4 (OddsAPI quota) — REFUTED.** Zero `quota` lines in the window, and mlb/nfl
+  kept capturing normally (7.5 / 7.4 min old at 21:05Z).
+- **H5 (stuck lock) — REFINED AND CONFIRMED as the mechanism**, but not "stuck
+  from 13:47".
+
+**WHAT ACTUALLY HAPPENED.** Soccer's pregame capture is a **4-hourly autorun**:
+
+    02:14:40  LAUNCHED  date=2026-08-14  pid=2940
+    06:17:45  LAUNCHED  date=2026-08-15  pid=15866
+    10:21:54  LAUNCHED  date=2026-08-15  pid=1059     <-- wrote through 13:47:17
+    14:22:29  FAILED    A refresh run is already active (pid=7114)
+    18:22:34  FAILED    A refresh run is already active (pid=8200)
+
+**13:47:17 is the TAIL of the 10:21 run**, not an incident — that run walked
+leagues for ~3.5 h and finished. The outage begins at **14:22:29**, the first
+REFUSED autorun, and continues because 18:22 was refused too. Next attempt
+~22:22Z.
+
+**THE REAL MECHANISM, and it composes with what this session measured earlier:**
+soccer's autorun is a **4-hourly point sample fired against a lock that is held
+~92% of the time** (measured earlier today: back-to-back refresh runs, ~25 min
+held / ~2 min free, traced 11:39-17:00Z). Each attempt has roughly a **1-in-12
+chance** of landing in a free window. **Two consecutive misses is the expected
+outcome, not bad luck.** Soccer is not broken; it is starved by a scheduling
+interaction, and it will keep missing until either the lock frees up or the
+autorun retries instead of giving up for four hours.
+
+**CORRECTION TO THE STANDING LEAD:** the `earlyExit` cadence is **~6.5 h**
+(01:37/08:05/14:34/20:03) and the soccer autorun cadence is **~4 h**
+(02:14/06:17/10:21/14:22/18:22). **Two different clocks.** The 14:22 failure is
+12 min BEFORE the 14:34 exit, so the exit did not cause it. `earlyExit` remains
+a real problem for long in-flight runs; it is not the cause of this outage.
+
+**CHEAPEST FIX, for whoever owns it:** the autorun gives up for 4 h on a
+transient lock. A bounded retry (e.g. every 5 min for 30 min) would convert a
+1-in-12 shot into near-certainty without touching the lock or the worker.
+**Not mine to take** — `live_refresh_loop.py` is claimed by the OPEN
+`live-game-line-projection` lane.
+
+**WATCHABLE PREDICTION, ~22:22Z:** the next autorun either LAUNCHES (and soccer
+recovers on its own) or FAILS on a third lock. Either outcome is informative and
+costs one log query.
+
+#### soccer autorun watcher — RUNNING `[set 2026-08-15 21:3xZ, session tier5-live-read]`
+- Watches live-odds-worker for the next `SOCCER_PREGAME_AUTORUN` line (~22:22Z)
+  and, separately, whether `newest_captured_at` moves past **13:47:17**.
+  Polls every 120 s for ~90 min. Output `C:\tmp\t5\soccer_watch.jsonl`.
+- **PREDICTION, recorded before the outcome exists:** LAUNCHED ⇒ soccer recovers
+  on its own and "unlucky 4-hourly point sample against a ~92%-held lock" is
+  confirmed. FAILED ⇒ third consecutive miss.
+- **CALIBRATION, so the likely outcome is not over-read:** at ~92% lock
+  occupancy a single attempt succeeds ~1-in-12, so **three misses in a row is
+  ~77% likely**. A third FAILED is therefore NOT evidence of a new fault — it
+  confirms the 4-hourly give-up is the thing to fix. **The genuinely
+  informative outcome is a LAUNCH that still produces no captures**, which would
+  refute the lock-contention story entirely and send this back to H3.
+- Instrument caveat: the recovery check reads `/api/ops/quote-feed-age`, whose
+  live soccer threshold is the too-loose 7 h (corrected 4 h is committed at
+  `3760e59e`, undeployed). So `status` is not the signal — `newest_captured_at`
+  is.
+
+#### ui-plan-lane-gh session close 2026-08-15 - three lanes closed, one deployed
+
+`probe-mlb-content-wait` and `ncaaf-market-main-expectation` are dev-tooling
+only (`c61f859b`, `f5c16cc9`) - no deploy, nobody's request path.
+`soccer-fallback-row-market` shipped as web `bb23c8f9` and is measured on the
+served card.
+
+Carried forward, unowned:
+- **MLB card-height spread 56 -> 197px desktop, 112 -> 1887px mobile**, and
+  empty slots 8 -> 1, across 19:0x-21:2x. NOT the contract (0/15 rows changed).
+  Presumed slate movement, **never actually investigated.**
+- `home.py`'s generic `market_tiles` loop rendering publication metadata into a
+  market-recommendation list - handed to `market-key-blank-not-absent`, and
+  explicitly NOT measured in production.
+- soccer's remaining 4x repeated string is a boxscore label, pre-existing.
+
+#### mlb-live-pitcher-projection — COVERAGE GAP CLOSED IN CODE `3a476001` 2026-08-15 — NOT DEPLOYED, NOT VERIFIED
+- **The 8.9% was FOUR causes, and the alias table was not one of them.** The
+  lane header recorded the miss as snapshot-side and declined to name a cause;
+  that was right. Read from the emitter rather than the join:
+  1. `batter_hits_runs_rbis` in `_MLB_HITTER_PROP_DIST_CONFIG` but NOT in
+     `_LIVE_HITTER_MARKET_KEYS` — **0 of 79**, a clean zero beside
+     `batter_hits` 19 of 77.
+  2. `_select_bounded_live_side` is a BET SELECTOR (two-way price,
+     non-favourite `-200`, projection clear by 0.08/0.18, market edge over
+     0.05/0.03) and its rejections were dropped. `batter_home_runs` **0 of
+     116**: mean ~0.15 vs a 0.5 line puts the over on the wrong side and the
+     under past the favourite cap.
+  3. A pitcher market already past its line was skipped outright — Boyd on 7 ER
+     against 2.5 produced no row, so the board kept showing the pregame 3.242.
+  4. `_live_pitcher_prop_row_actionable` drops pulled-starter rows. **This made
+     `f4cd2bc8`'s settle-to-actual fix INERT in the snapshot path** — computed
+     correctly, then thrown away. Found only by tracing the emitter end to end.
+- **NAMED CANDIDATE FROM THE LANE HEADER WAS CORRECT** (`min_edge=0.03` /
+  the selector) — but it was one of four, and alone it would have left the two
+  zero-coverage markets and the pulled starter untouched. Recorded because
+  banking a partially-right hypothesis as the answer is the failure mode here.
+- Behind `include_projection_only`, default False, opted into by exactly one
+  caller (`live_prop_rows_for_game`). The game-detail pick rail is unchanged.
+  Pricing fields NULL not zeroed; ranking predictor skipped for those rows.
+- **CEILING, MEASURED: 48 of 492 live prop rows (9.8%) sit at an ALTERNATE line
+  for a (player, market) the board also carries elsewhere. If the snapshot holds
+  one line per market the reachable maximum is 444/492 = 90.2%, not 100%.**
+  Do not read a post-deploy number below 100% as a failure.
+- **TESTS: 15 new, six behaviours each mutation-verified red.** A seventh
+  mutation initially read GREEN and was NOT banked — it had hit the pitcher
+  occurrence of a string the hitter path shares (`replace(..., 1)` on the
+  earlier definition), and was redone with a disambiguating anchor. Blast radius
+  1858 passed / 4 failed, **all 4 pre-existing**;
+  `test_live_lens_loop_publish_watermark` was passing earlier in this session and
+  is still not mine — it fails 3/3 with `cards.py` reverted to HEAD, so another
+  session's commit landed it.
+- **PRODUCTION PREDICATE, UNMEASURED:** live rows carrying a projection
+  8.9% -> materially higher (≤90.2%); `batter_home_runs` and
+  `batter_hits_runs_rbis` both off zero; Boyd-shaped rows showing the actual.
+  **refresh-worker writes this artifact and its deployed commit has STILL not
+  been read** — a re-measure taken after a web-only deploy is non-evidence.
