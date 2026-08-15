@@ -3409,3 +3409,86 @@ another session. Verified by content that it carries both drops and has
 `9b88d05b` as an ancestor, so it is not a revert.
 
 **Rollback:** `py -3 scripts/render_deploy.py --service web --commit d7c2ca7d --allow-rollback`.
+
+### 2026-08-15 20:00:58Z — web `f475c775` (pinned `9b88d05b` + `454af741`) — **TABULAR DIGITS CLOSED, ALL FOUR SPORTS AT ZERO**
+
+Deploy `dep-da0c7t8u01pc738rgpd0`. Same atomic recipe: waited out an in-flight
+deploy (`9b88d05b`), rebuilt the pin on it, re-read the live SHA between
+building the tree and POSTing.
+
+    numericSweep (leaf elements rendering a digit at font-variant-numeric: normal)
+    sport    audit    after 1bb8cf9f    after 454af741
+    mlb       1388             143               0
+    nfl        468               0               0
+    ncaaf      432               0               0
+    soccer      60               0               0
+
+**MLB confirmed on desktop, 15 cards, `.cards-prop-filter-count` x146 all
+computing `tabular-nums`, `nonTabular: []`.** ~2,350 digit-rendering elements
+platform-wide moved from proportional to tabular across two deploys.
+
+**How the MLB reading was taken matters, and it is caveat 5 biting again.** The
+harness run immediately after this deploy reported `mlb desktop 0 cards` — a
+flake, not a result, because the probe waits on a TIMER and MLB is the one
+sport rendering through `cards_source.js`. The mobile row (15 cards, no sweep
+line) already showed zero. Re-measured with `wait_for_selector('.cards-game-card')`
+— waiting on CONTENT — it returns 15 cards and a clean zero. **The probe still
+uses a fixed delay and will keep flaking on MLB; that is now the top item for
+whoever next touches `ui_layout_probe.py`.**
+
+**The residual was a form-control inheritance boundary, not a selector gap.**
+`font-variant-numeric` inherits — except into `<button>`/`<input>`/`<select>`,
+where the UA `font:` shorthand resets it. Proven on the live page before the
+fix: `.cards-game-card` tabular-nums, `.cards-prop-filter-shell` tabular-nums,
+`button.cards-filter-pill` normal, its fontFamily `Arial`. MLB was the only
+sport above zero because it is the only one with in-card filter pills carrying
+counts.
+
+**Unchanged and re-verified:** 0px overflow, all four sports, both widths.
+Lane G's soccer numbers hold. NCAAF's `market-main` 0-element failure still
+reported — the probe working as designed, not a regression.
+
+**Still open, still not mine:** soccer `.cards-data-pair` 9 -> 0 (a producer
+change; the card is otherwise healthy), and mlb mobile card-height spread
+drifting 85 -> 109 -> 112px across reads as the slate moves.
+
+Rollback if needed: redeploy pinned to `9b88d05b`.
+
+### CORRECTION to the row above, 2026-08-15 ~20:0xZ — I named the WRONG INSTRUMENT and a VACUOUS CRITERION
+Caught by taking the pre-deploy baseline. Both errors were mine, in this file.
+
+**1. The instrument was wrong.** I wrote "read `mlb_source/data/live_lens/`,
+never `/mlb/api/live-lens`". Measured: that published artifact is the **SLIM**
+shape — a game row's keys are exactly `{gamePk, startTime, status}` and
+**`gameLens` is not a key at all**. It is written by
+`scripts/refresh_mlb_oddsapi.py` from an HTTP fetch with `slim=on`, not by
+`_persist_live_lens_report`. **It can never show the live lens, before or after
+Drop 1.** A verification run against it would have read 0 and been called a
+failed deploy.
+
+**2. "Never use `/mlb/api/live-lens`" was true and is now FALSE — because of my
+own Drop 2.** It was blind precisely because web's rebuild DESTROYED the lens.
+With Drop 2 live on web it preserves what the worker's snapshot carries, so it
+becomes the correct instrument. The rule inverted the moment the fix landed.
+
+**3. The criterion was vacuous, and it is the exact trap the code guards
+against.** I wrote success as "`source: live_mc` AND a non-null
+`modelHomeWinProb`". **Measured pre-deploy: 60 of 60 gameLens rows ALREADY carry
+a non-null `modelHomeWinProb`** — `_build_game_lens` stamps one on the
+`first1/3/5` lanes from `_live_margin_win_prob` over a segment interpolation.
+I chose `source` over `modelHomeWinProb` in the discriminator for exactly this
+reason, wrote a test pinning it, and then put the useless half into the success
+criterion anyway. **`source == "live_mc"` is the ONLY valid signal.**
+
+**BASELINE, pre-worker-deploy `[measured 2026-08-15 20:0xZ]`**
+Instrument `/mlb/api/live-lens`; slate 15 games, **4 live**, 1 final, 10 pregame;
+web `f475c775` (Drops 1+2), live-odds-worker `ccd10349` (**neither**).
+
+    gameLens rows            60
+    source == live_mc         0     <-- the real baseline
+    liveStateCarriedForward   0     <-- Drop 2 has nothing to preserve yet
+    modelHomeWinProb non-null 60    <-- VACUOUS, already satisfied
+    sources present: segment_projection x60 (Live 16, Preview 40, Final 4)
+
+**PASS after live-odds-worker gets `191a001b`:** live rows flip to
+`source: live_mc`. Nothing else changes meaning.
