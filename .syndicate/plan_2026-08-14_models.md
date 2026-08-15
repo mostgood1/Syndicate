@@ -193,6 +193,16 @@ capture fix — and nobody re-read the caveat afterwards. Present now:
 - **MLB GAME LINES: 102 of 102 markets carry a sharp quote = 100%.**
 - **PROPS: 0%.**
 
+**The prop gap has an EXISTING per-sport lever, and NHL already uses it.**
+`syndicate/local_nhl_odds.py:542` defaults
+`PROPS_ODDSAPI_BOOKMAKERS = "fanduel,draftkings,pinnacle"` — Pinnacle is
+explicitly requested for NHL props, and `vendor/nhl_betting_repo/.../odds_api.py`
+carries it in a book list. So extending sharp coverage to other sports' props is
+a **config change on a knob that already exists**, not a build. `[from-code 08-15]`
+**Cost it before flipping it:** every added book spends OddsAPI credits against
+a cap already at **92.8% projected burn**, and props are the highest-volume
+market family. Measure the per-call delta on one sport before doing it broadly.
+
 **What this changes, and it is the most consequential correction in this plan:**
 
 - **Lane B can take game-line CLV against a genuine sharp close.** The standing
