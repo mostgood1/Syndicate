@@ -3847,3 +3847,38 @@ Both **identity** fields (`market_key`, `player_name`) are fixed — the two a
 price join depends on. The remaining `_safe_text(..., None)` sites are display
 fields (`confidence`, `edge`, `matchup`, `detail`) where `""` and `None` are
 identical to every reader. Churn without a defect behind it.
+
+#### board-contract-normalize-cost — CLOSED 2026-08-15 21:5xZ — STAGE EXONERATED
+**H1 FALSIFIED, H2 CONFIRMED, H3 FALSIFIED.** 5,958 paired builds, 18:00-21:48Z:
+
+    sport   builds  games  anon@ENTRY  median delta  max delta
+    soccer   4,152      8     2,313.1       0.0        94.9
+    nfl      1,089     16     2,383.4       0.0       171.3
+    mlb        400     15     2,371.4       0.0        12.6
+    wnba       267      3     2,397.8       0.0        18.6
+
+- **H1 (doubling) FALSIFIED.** `_normalize_games` builds a new list of new dicts
+  while the caller still holds the old, so 2x looked obvious. It is 0.0 MB at the
+  median across every sport and every build.
+- **H2 (victim, not allocator) CONFIRMED.** anon is ALREADY ~2,350MB on ENTRY.
+- **H3 (MLB dominates) FALSIFIED.** MLB has the SMALLEST max delta of the four
+  active sports (12.6MB); NFL has the largest (171.3MB). Every prior memory
+  finding in this system pointed at MLB, so this was the expected answer and it
+  is wrong.
+
+**AND THE SAME IS TRUE ONE LEVEL UP.** The `cards_context_*` ladder, 2,628
+samples: EVERY transition is 0.0MB at the median. But the maxima are large and
+episodic — `sim_games_loaded -> actual_games_loaded` 589.2MB, `betting -> sim`
+151.8MB, `games_built -> result_assembled` 132.9MB.
+
+**SO THE TARGET IS THE FLOOR, NOT A STAGE.** ~2,350MB is resident BEFORE either
+ladder begins and persists between builds; the stages add nothing in the median
+and occasionally spike. `#423` called this floor "chronic, UNNAMED" and it still
+is. Chasing stages cannot find it — a stage that costs 0.0MB at the median is
+not where 2,350MB lives.
+
+Next: measure the floor AT REST rather than during an excursion. The censuses
+exist (`HEAP_CENSUS`, `UNTRACKED_BYTES_CENSUS`, `PYMALLOC_STATS`) but all three
+trigger on a CLIMB, so none has ever sampled the quiet state — the exact
+instrument-blindness this investigation has hit three times.
+Read-only lane; no files touched, no deploy.
