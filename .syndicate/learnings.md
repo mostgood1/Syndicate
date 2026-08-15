@@ -2697,3 +2697,74 @@ would have been green.
 - **State it in the module docstring too.** A reader comparing two live rows
   will see a 7-point edge published on one game and withheld on another and
   reasonably suspect a bug; the docstring is where that stops being a ticket.
+
+## 2026-08-15 — FORBIDDEN: never treat equality of a LABEL as identity of a BET
+
+`clv_join._price_for_side` refuses a close whose line does not match the
+opening's (`abs(point_line - opening_line) > 1e-6`). That guard is correct, was
+written against a real prior bug, and was still defeated — because the
+odds-history feed **transposed its `home_line`/`away_line` labels during the
+day**. Event `69928d29…`, FanDuel spreads, mlb 2026-08-15:
+
+    06:02:51Z   away_line -1.5 away_odds +168 | home_line  1.5 home_odds -205
+    21:26:47Z   away_line  1.5 away_odds -205 | home_line -1.5 home_odds +168
+
+Identical prices, opposite labels. Opening `home -1.5` matched the close's
+`home_line -1.5`, which by then was the OTHER SIDE OF THE SAME RUN LINE. Result:
+a `-29.90` "CLV" on a market that had not moved at all.
+
+**The rule:** a guard that compares a label to a label is only as sound as the
+label's convention is stable. When two sources each own their own labelling,
+matching on the label matches the wrong thing *silently and confidently* — it
+produces a number, not a refusal, which is the failure mode that survives review.
+
+**How to apply:**
+- When joining across two systems, establish WHICH SOURCE OWNS a convention
+  (sign, side, units) before trusting any field that encodes it. Check it per
+  sport and per market family, not once.
+- Prefer a check that is invariant to the label where one exists. Here: the two
+  run-line prices are the two sides of one bet, so `open` and `close` summing to
+  roughly the same book margin is a labelling-independent sanity check that
+  `-205 vs +168` fails instantly.
+- **A mirror pair is the fingerprint.** Both openings were recorded, so the
+  errors appeared as `+30.428` and `-29.900` and **nearly cancelled** — mean
+  `+0.515`, median exactly `0.000`. Aggregates looked healthy while every
+  individual row was wrong. **Check the tails before trusting a mean; a median
+  of exactly zero on a noisy quantity is itself suspicious.**
+
+**Standing until:** the sign convention for spread lines is pinned per source and
+per sport, with a test.
+
+### 2026-08-15 — ACQUIRING THE DEPLOY CLAIM BLINDS THE DEPLOY GATE. The safety mechanism disabled the safety check
+
+`scripts/deploy_preflight.py` prints one verdict line. Before acquiring a claim
+it is `HOLD: 3 job(s) in flight` or `CLEAR`. **After I acquired the claim it
+became:**
+
+    CLAIMED: deploy claim on refresh-worker is held by live-game-line-projection.
+
+The claim verdict **REPLACES** the job verdict rather than accompanying it, and
+it does not distinguish *held by me* from *held by someone else* — the JSON even
+reports `deploy_claim.yours: false` while `holder` is my own string.
+
+**So my poll-and-fire loop, which grepped `^(HOLD|CLEAR|UNKNOWN)`, matched
+nothing on every tick and silently fell through to its "not clear" branch.** It
+would have polled 300 times and never fired, and the output was blank lines
+rather than an error. I caught it only because I looked at the raw output after
+seeing empty timestamps.
+
+**The shape: a coordination mechanism that makes the thing it coordinates
+unobservable.** Acquiring the claim is the correct first step AND it destroys
+the text signal you need for the second step. Ordering makes it worse, not
+better: claim-then-poll blinds you; poll-then-claim races.
+
+**How to apply.**
+- **Gate on `--json`, never on the text verdict.** The structured payload keeps
+  `jobs_in_flight`, `deploy_claim.holder` and `sample_age_seconds` as separate
+  fields, so "my claim" and "jobs running" stay independent. The text line
+  collapses them into one string, by design, for humans.
+- **A loop whose match produces empty output is not "waiting", it is broken.**
+  Log the RAW value when a match fails, not just the parsed one. Blank lines at
+  a steady cadence look exactly like a healthy hold.
+- Treat a foreign claim as an ABORT, not a hold — someone else is mid-deploy and
+  polling past it is how two sessions cancel each other's deploys.
