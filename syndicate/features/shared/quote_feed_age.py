@@ -44,17 +44,66 @@ from typing import Any
 # Read at call time, not import time, so a deploy-free env change takes effect.
 _THRESHOLD_ENV = "SYNDICATE_QUOTE_FEED_STALE_SECONDS"
 
-# 3 hours. Chosen against MEASURED extremes, not picked round:
-#   - the worst healthy pregame gap ever measured is 123 min (2026-08-15) and
-#     the ledger's empty-slate figure is 121.6 min, so a threshold at or below
-#     2 h fires on normal pregame operation and would be muted within a week
-#   - the outage this exists to catch was 5.8 h
-# 3 h is the widest gap that is still unambiguously wrong. It is a DETECTION
-# floor, not a target: during a live slate the feed runs at ~60 s, so a 3 h
-# alarm is ~180x slower than it could be. The honest fix is per-regime
-# thresholds once a trustworthy regime signal exists; this is the version that
-# does not depend on one.
+# Fallback for a sport with no measured entry below. Deliberately the old global
+# value, so an unknown sport behaves exactly as it did before this change.
 _DEFAULT_STALE_SECONDS = 10800
+
+# PER-SPORT THRESHOLDS, SET FROM MEASURED CADENCE.
+#
+# The single global 3 h value this replaces was BOTH too slow and too tight,
+# because the feeds' normal cadences span a 173x range. Measured on production
+# shards 2026-08-15 (full day, distinct `captured_at` gaps, read from the
+# artifacts rather than the logs):
+#
+#     sport   captures   p50 gap    p90     max
+#     nfl        128      1.0 min    30     244
+#     mlb         16     31.0 min   349     448
+#     wnba        14    122.0 min   314     448
+#     soccer      91    173.0 min   248     558
+#
+# **p50 IS THE ONLY ROBUST BASE HERE, and that is not a stylistic preference.**
+# p90 and max are inflated by the overnight window for every sport, and for MLB
+# they are inflated by the 5.8 h starvation this alarm exists to catch. Setting
+# a threshold off MLB's p90 (349 min) would bake the outage into "normal" and
+# guarantee the alarm never fires on a repeat of it.
+#
+# **EACH DEFAULT IS SET ABOVE ITS SPORT'S MEASURED HEALTHY GAPS, NOT off p50.**
+# I first set these at ~3x p50 and the existing
+# `test_healthy_pregame_gap_does_not_false_alarm` went red: it pins the real
+# 123-min MLB pregame gap (09:06->11:07Z), and a 2 h MLB threshold fires on it.
+# p50 is the right base for COMPARING feeds and the wrong one for setting a
+# floor, because these distributions have long quiet tails and the alarm must
+# clear the tail, not the middle.
+#
+# TWO CONSEQUENCES WORTH STATING BEFORE SOMEONE REDISCOVERS THEM:
+#   1. NFL improves 3 h -> 2 h. Its p90 is 30 min, so 2 h is unambiguous while
+#      still clearing its quiet stretches.
+#   2. **Soccer gets LOOSER (3 h -> 7 h), and that is a correction, not a
+#      regression.** Soccer's p50 is 173 min, so the old 180 min global flagged
+#      it on roughly half of NORMAL operation. The `0c65a832` deploy note's
+#      "caught soccer STALE at 340.9 min" was therefore substantially a
+#      threshold artifact -- 340.9 min is above soccer's p90 (248) so the feed
+#      was elevated, but an alarm that fires on half of normal traffic is muted
+#      within a week, which is what makes alarms worthless.
+#
+# **KNOWN LIMIT, UNSOLVED HERE: an age-only alarm cannot tell "quiet" from
+# "broken".** Every sport's max gap (244-558 min) is an overnight or
+# between-slate window, not a fault. Clearing those tails is what keeps all
+# four thresholds in hours rather than minutes. The real fix is to gate on
+# whether the sport has games scheduled in the window -- then a 10-minute
+# silence during a live slate is actionable. That needs a schedule signal this
+# module deliberately does not reach for; per-sport is strictly better than one
+# global, and is not the end state.
+_DEFAULT_STALE_SECONDS_BY_SPORT: dict[str, int] = {
+    "nfl": 7200,      # p50 1 min,   p90  30 min -> 2 h clears the quiet stretches
+    "mlb": 10800,     # p50 31 min,  healthy pregame worst 123 min -> 3 h, PINNED BY TEST
+    "wnba": 21600,    # p50 122 min, p90 314 min -> 6 h
+    "soccer": 25200,  # p50 173 min, p90 248 min, max 558 -> 7 h
+}
+
+# Per-sport env override, checked before the global one:
+#   SYNDICATE_QUOTE_FEED_STALE_SECONDS_MLB=5400
+_SPORT_THRESHOLD_ENV_PREFIX = "SYNDICATE_QUOTE_FEED_STALE_SECONDS_"
 
 # Bounded tail. Comfortably larger than one JSON line (production rows run
 # ~300-600 bytes) while staying O(1) against a 217 MB shard.
@@ -65,13 +114,44 @@ STATUS_STALE = "stale"
 STATUS_UNKNOWN = "unknown"
 
 
-def stale_threshold_seconds() -> int:
-    raw = str(os.environ.get(_THRESHOLD_ENV) or "").strip()
+def _positive_int(raw: Any) -> int | None:
+    """An env value that is absent, unparseable or <= 0 yields None, never a guess."""
     try:
-        value = int(raw)
-    except ValueError:
-        return _DEFAULT_STALE_SECONDS
-    return value if value > 0 else _DEFAULT_STALE_SECONDS
+        value = int(str(raw or "").strip())
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def stale_threshold_seconds(sport: Any = None) -> int:
+    """The stale threshold for one sport, in seconds.
+
+    PRECEDENCE, most specific first:
+      1. `SYNDICATE_QUOTE_FEED_STALE_SECONDS_<SPORT>` -- one feed, one number
+      2. `SYNDICATE_QUOTE_FEED_STALE_SECONDS` -- the old global, still honoured
+         so an operator can flatten every sport in one move during an incident
+      3. this sport's measured default
+      4. `_DEFAULT_STALE_SECONDS` for a sport with no measured entry
+
+    The global sits ABOVE the per-sport defaults on purpose. Setting it is an
+    explicit operator act during an incident and must beat a constant compiled
+    in from last week's measurements; the per-sport ENV still wins over it,
+    because it is more specific still.
+
+    Called with no sport (the old signature) this returns the global-or-fallback
+    value, so existing callers keep working unchanged.
+    """
+    key = str(sport or "").strip().lower()
+    if key:
+        from_sport_env = _positive_int(
+            os.environ.get(_SPORT_THRESHOLD_ENV_PREFIX + key.upper())
+        )
+        if from_sport_env is not None:
+            return from_sport_env
+    from_global_env = _positive_int(os.environ.get(_THRESHOLD_ENV))
+    if from_global_env is not None:
+        return from_global_env
+    return _DEFAULT_STALE_SECONDS_BY_SPORT.get(key, _DEFAULT_STALE_SECONDS)
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -150,7 +230,12 @@ def feed_age(
     """
     from syndicate.features.shared.odds_book_quotes import book_quotes_path
 
-    threshold = int(threshold_seconds) if threshold_seconds else stale_threshold_seconds()
+    # An explicit argument (the `?threshold_seconds=` query param) still wins
+    # over everything -- it is a caller asking a specific question. Absent one,
+    # the threshold is resolved PER SPORT.
+    threshold = (
+        int(threshold_seconds) if threshold_seconds else stale_threshold_seconds(sport)
+    )
     moment = now or datetime.now(timezone.utc)
     result: dict[str, Any] = {
         "sport": str(sport or "").strip().lower(),
@@ -226,9 +311,15 @@ def feed_age_report(
         worst = STATUS_OK
     return {
         "date": str(date_str or ""),
-        "threshold_seconds": int(threshold_seconds)
-        if threshold_seconds
-        else stale_threshold_seconds(),
+        # A SCALAR HERE WOULD NOW BE A LIE. Thresholds are per-sport, so this
+        # carries the explicit override when a caller forced one and `None`
+        # otherwise, with the real values in `thresholds_by_sport` (and on each
+        # per-sport entry). Reporting one number while four are in use is the
+        # shape of defect this module exists to catch, one layer up.
+        "threshold_seconds": int(threshold_seconds) if threshold_seconds else None,
+        "thresholds_by_sport": {
+            sport: entry.get("threshold_seconds") for sport, entry in per_sport.items()
+        },
         "worst_status": worst,
         "stale_sports": sorted(
             s for s, e in per_sport.items() if e["status"] == STATUS_STALE
