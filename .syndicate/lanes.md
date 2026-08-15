@@ -5597,7 +5597,7 @@ coverage-reporting) was running at checkpoint time. Until it reports, soccer
 backtest accuracy remains **unmeasured** — and `SoccerSimulationOutput`
 still ships `calibration.win_probability.brier = None`.
 
-### live-game-line-projection — OPEN — SPEC PHASE, awaiting review before any engine work — opened 2026-08-15 — session: live-game-line-projection
+### live-game-line-projection — OPEN — SPEC DELIVERED (`9067b606`), AWAITING REVIEW — the premise is false: the projection already runs and is discarded — opened 2026-08-15 — session: live-game-line-projection
 - Goal: MLB game lines carry a projection computed from the CURRENT game state
   rather than the pregame sim. **Testable outcome:** on a live MLB slate, a
   published artifact carries a live win probability per live game whose value
@@ -5637,3 +5637,70 @@ still ships `calibration.win_probability.brier = None`.
   (`cardsFallback: True`, `simContextAvailable: False` on 14/14 games, measured).
 - Blocked by: none. **NO DEPLOY FROM THIS LANE.** refresh-worker is under
   `#435` and had a deploy in flight (`eea7554a`) at lane-open.
+
+#### soccer-model-coverage — COMMIT HYGIENE + FINAL TEST NUMBERS 2026-08-15
+
+**DO NOT COMMIT `loaders.py` AGAINST `origin/main`. The as-of work it builds on
+is UNMERGED, and a naive commit would sweep in another lane's branch work.**
+`[measured]` `git show origin/main:.../loaders.py | grep -c as_of` returns **0** —
+`compute_team_ratings` on `origin/main` has no `as_of` parameter at all. The
+whole `soccer-backtest-leakage` machinery lives only on branch
+`fix/soccer-backtest-leakage` (tip `2dcca4fe`) and in this shared worktree.
+`git merge-base --is-ancestor fix/soccer-backtest-leakage origin/main` -> **NO**.
+
+    vs origin/main                    loaders.py  153 insertions  (THEIRS + MINE, mixed)
+    vs fix/soccer-backtest-leakage    loaders.py   73 insertions / 3 deletions  (MINE only)
+
+`validate_soccer_vs_market.py`, `backtest_soccer_live_lens.py` and
+`build_soccer_artifacts.py` show **zero** diff against that branch — the
+worktree already matches it, which is why they read as "modified" against a
+local `main` that is 129 commits behind `origin/main`.
+`soccer_projections.py` (+120) and `run_live_odds_refresh_worker.py` (+30) ARE
+purely mine — those files are identical at `HEAD` and `origin/main`.
+
+**RECIPE: branch from `fix/soccer-backtest-leakage`, not from `main`.** Stack,
+do not merge — the same rule `learnings.md` records for pinned deploys. Commit
+through an isolated `GIT_INDEX_FILE` with an explicit pathspec, never
+`git add -A`, and read `git diff --cached --stat` before committing: the shared
+index has held another session's 4,993 staged deletions before.
+
+**Exactly 7 files, no strays** `[git status, scoped]`:
+
+    M  scripts/run_live_odds_refresh_worker.py
+    M  syndicate/features/shared/soccer_projections.py
+    M  syndicate/features/soccer/features/loaders.py
+    ?? scripts/backtest_soccer_h2h_calibration.py
+    ?? syndicate/features/soccer/seed_bootstrap.py
+    ?? tests/test_soccer_history_date_parsing.py
+    ?? tests/test_soccer_seed_bootstrap.py
+
+**FINAL TEST STATE:** full `-k soccer` after all four changes —
+**571 passed, 0 failed** (1273s), against a 553/0 baseline taken before the
+loaders change; the delta is the 18 new soccer-matching tests. Blast-radius set
+378/0. Every new test mutation-verified red.
+
+**NOTHING COMMITTED, NOTHING PUSHED, NOTHING DEPLOYED.** Fix 1 is inert until a
+live-odds-worker deploy. Fix 2 should NOT ship without the calibration number —
+see the dispersion finding above.
+
+#### live-game-line-projection — STATUS 2026-08-15 03:5xZ — SPEC PHASE COMPLETE, NO CODE WRITTEN
+- **Deliverable:** `.syndicate/spec_live_game_line_projection.md` (`9067b606`).
+- **H1 (the merge at :1094 rejects the MC lens) — EFFECT CONFIRMED, MECHANISM
+  NOT YET DISCRIMINATED.** The served snapshot carries 3 card-derived lanes,
+  `source: None`, 0 `modelHomeWinProb`, against `_build_game_lens`'s 6 sourced
+  lanes. Whether the merge rejected it or the payload never arrived is spec §6.1
+  and is the FIRST build step — recorded as unproven rather than banked.
+- **H2 (the published report is the slim shape with no `gameLens` field) —
+  CONFIRMED** from the deployed `ccd10349:scripts/refresh_mlb_oddsapi.py:764` and
+  the published artifact's own zeroed `perf` + `gameLens rows 0`.
+- **The MC runs:** 9 `LIVE_MC_BAIL` per tick × 11 ticks, all `status_not_live`,
+  against 9 Final / 5 Live. One uninstrumented exit named in the spec.
+- **Sequencing correction, re-derived here:** `0.1` is not a prerequisite for the
+  live product; the 1800s cooldown is bypassed whenever any game is live.
+- **`rows_live_edged` is a PROP counter and this lane does not move it** — the
+  lane's own success metric is a new `rows_live_gameline_*` family. The brief's
+  framing invites that conflation; recorded so it is not made.
+- **Awaiting a product answer on spec §8.1** (120 sims → ±4.56 pp SE; publish
+  refusing to price / raise the sim count / never price). Recommendation: publish
+  refusing to price, zero added compute.
+- No deploy. refresh-worker was `update_in_progress` (`eea7554a`) at lane-open.
