@@ -612,7 +612,15 @@ def project_game_market(
     except (TypeError, ValueError):
         return None
 
-    if market_key in {"totals", "total", "totals_3_way"}:
+    # `totals_alt` IS `totals` AT A DIFFERENT LINE, and the distribution prices
+    # any line. Measured on the served board 2026-08-15 22:41Z: of 107 live
+    # game-line rows, **53 carried no projection at all** -- not even a pregame
+    # one -- and every one of them was `spreads_alt` (29) or `totals_alt` (24),
+    # because neither key was in these sets and `project_game_market` returned
+    # None. Same defect class as `batter_hits_runs_rbis` sitting in the prop
+    # dist config while absent from the emitter's key table: the model could
+    # price it and no one asked.
+    if market_key in {"totals", "total", "totals_3_way", "totals_alt", "alternate_totals"}:
         dist = payload.get("total_runs_dist")
         if not isinstance(dist, Mapping):
             return None
@@ -630,7 +638,9 @@ def project_game_market(
             "basis": f"{basis}/total_runs_dist",
         }
 
-    if market_key in {"spreads", "spreads_3_way", "run_line", "ats"}:
+    # `spreads_alt` likewise -- same `run_margin_dist`, different line. The
+    # away/over frame note below applies to it unchanged.
+    if market_key in {"spreads", "spreads_3_way", "run_line", "ats", "spreads_alt", "alternate_spreads"}:
         dist = payload.get("run_margin_dist")
         if not isinstance(dist, Mapping):
             return None

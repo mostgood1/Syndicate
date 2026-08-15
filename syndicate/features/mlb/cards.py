@@ -2877,10 +2877,41 @@ def _extract_hitter_market_lines(doc: dict[str, Any] | None) -> dict[str, dict[s
             line_value = _safe_float(market.get("line"))
             if line_value is None:
                 continue
+            # EVERY CAPTURED LINE, not just the main one. The snapshot already
+            # carries `alternates` per (player, market) and this flattened them
+            # away, so the live index held ONE line per player-market and any
+            # board row at another line could never join -- 32 of 153 remaining
+            # live-prop misses on 2026-08-15 were exactly that shape.
+            # Production carries 113 alternates across 1,085 entries
+            # (`batter_total_bases` 81, `batter_hits_runs_rbis` 17,
+            # `batter_hits` 15). **No `batter_home_runs` alternates are
+            # captured**, so the 26 HR-at-1.5 misses are NOT addressed by this
+            # -- those lines exist only in the quote shard. Do not expect them
+            # to move.
+            #
+            # `line`/`over_odds`/`under_odds` stay exactly as they were: this is
+            # additive, and the other consumer of this map reads only those.
+            lanes: list[dict[str, Any]] = []
+            seen_lines: set[float] = set()
+            for lane in [market] + list(market.get("alternates") or []):
+                if not isinstance(lane, dict):
+                    continue
+                lane_line = _safe_float(lane.get("line"))
+                if lane_line is None or float(lane_line) in seen_lines:
+                    continue
+                seen_lines.add(float(lane_line))
+                lanes.append(
+                    {
+                        "line": float(lane_line),
+                        "over_odds": lane.get("over_odds"),
+                        "under_odds": lane.get("under_odds"),
+                    }
+                )
             player_lines[str(market_key)] = {
                 "line": float(line_value),
                 "over_odds": market.get("over_odds"),
                 "under_odds": market.get("under_odds"),
+                "lanes": lanes,
             }
         if player_lines:
             out[normalized] = player_lines
@@ -2908,6 +2939,22 @@ def _merge_hitter_market_lines(primary: dict[str, dict[str, Any]], fallback: dic
                         current[field] = market.get(field)
                     elif field == "line" and field not in current and market.get(field) is not None:
                         current[field] = market.get(field)
+                # UNION THE LANES, keyed by line. The archived snapshot and the
+                # current one can each carry a line the other lost, and taking
+                # only one source's list would silently narrow coverage back to
+                # what this merge exists to widen. Primary wins on price for a
+                # line both carry, which is the same precedence the fields above
+                # already use (primary is iterated second).
+                lanes_by_line: dict[float, dict[str, Any]] = {
+                    float(lane["line"]): lane
+                    for lane in (current.get("lanes") or [])
+                    if isinstance(lane, dict) and lane.get("line") is not None
+                }
+                for lane in market.get("lanes") or []:
+                    if isinstance(lane, dict) and lane.get("line") is not None:
+                        lanes_by_line[float(lane["line"])] = lane
+                if lanes_by_line:
+                    current["lanes"] = [lanes_by_line[k] for k in sorted(lanes_by_line)]
     return merged
 
 
@@ -3964,15 +4011,14 @@ def _synth_live_hitter_prop_rows(
             market = player_market_lines.get(market_key)
             if not isinstance(market, dict):
                 continue
-            line_value = _safe_float(market.get("line"))
-            if line_value is None:
-                continue
             hitter_dist_config = _MLB_HITTER_PROP_DIST_CONFIG.get(market_key) or {}
             dist_key = hitter_dist_config.get("dist_key")
             mean_key = hitter_dist_config.get("mean_key")
-            model_prob_over = _dist_prob_over_line(model_row.get(dist_key), float(line_value)) if dist_key else None
             model_mean = _safe_float(model_row.get(mean_key)) if mean_key else None
             actual_value = _actual_hitter_stat_value(actual_row, prop_key)
+            # PROJECTION IS PER PLAYER-MARKET, NOT PER LINE -- computed once and
+            # reused across every lane below. Only the probability, the price and
+            # the pick depend on the line.
             live_projection = _bounded_live_hitter_projection(
                 prop_key=prop_key,
                 player_name=hitter_name,
@@ -3984,71 +4030,83 @@ def _synth_live_hitter_prop_rows(
                 actual_payload=actual_payload,
                 batting_context=actual_rows,
             ) if team_side in {"away", "home"} else _bounded_live_projection(actual_value, model_mean, progress_fraction)
-            side_pick = _select_bounded_live_side(
-                model_prob_over=model_prob_over,
-                line_value=float(line_value),
-                over_odds=market.get("over_odds"),
-                under_odds=market.get("under_odds"),
-                live_projection=live_projection,
-            )
-            if side_pick is None and not include_projection_only:
-                continue
-            # A rejected row still has a projection; it just has no BET. Emitted
-            # with every pricing field null rather than zeroed, so a consumer
-            # cannot mistake "no pick here" for "a pick with no edge".
-            projection_only = side_pick is None
-            if projection_only and (model_prob_over is None and live_projection is None):
-                # Nothing to carry. This is the one honest drop.
-                continue
-            side_pick = side_pick or {}
-            item = {
-                "market": "hitter_props",
-                "prop": prop_key,
-                "market_label": market_label,
-                "game_pk": int(game_pk),
-                "player_name": hitter_name,
-                "team": team,
-                "team_side": team_side,
-                "projection_only": projection_only,
-                "projection_only_reason": (
-                    "the live model has a projection for this market but no bet passed "
-                    "the live-rail selector (two-way price, non-favourite, projection "
-                    "clear of the line, market edge over the floor)"
-                ) if projection_only else None,
-                "selection": side_pick.get("selection"),
-                "market_line": float(line_value),
-                "actual": actual_value,
-                "actual_so_far": actual_value,
-                "actual_value": actual_value,
-                "model_mean": model_mean,
-                "live_projection": live_projection,
-                "live_edge": side_pick.get("liveEdge"),
-                "edge": side_pick.get("marketEdge"),
-                "odds": side_pick.get("odds"),
-                "over_odds": market.get("over_odds"),
-                "under_odds": market.get("under_odds"),
-                "market_prob_over": side_pick.get("marketProbOver"),
-                "market_prob_under": side_pick.get("marketProbUnder"),
-                "market_prob_mode": side_pick.get("marketProbMode"),
-                "model_prob_over": model_prob_over,
-                "selected_side_market_prob": side_pick.get("selectedSideMarketProb"),
-                "projection_gap": side_pick.get("projectionGap"),
-                "lineup_order": _safe_int(model_row.get("lineup_order")),
-                "pa_mean": _safe_float(model_row.get("pa_mean")),
-                "ab_mean": _safe_float(model_row.get("ab_mean")),
-                "rank": None,
-                "firstSeenAt": refreshed_at,
-                "lastSeenAt": refreshed_at,
-                "recommendation_tier": "live",
-                "source": "current_market",
-            }
-            if not _live_hitter_prop_row_actionable(item):
-                continue
-            signature = _live_prop_signature(item)
-            if signature in existing_signatures:
-                continue
-            existing_signatures.add(signature)
-            out.append(item)
+            # ONE ROW PER CAPTURED LINE. `lanes` is main + `alternates`, deduped
+            # by line; falling back to the single `line` keeps this working
+            # against an archived snapshot written before `lanes` existed, which
+            # is the shape `_merge_hitter_market_lines` still has to accept.
+            lanes = [lane for lane in (market.get("lanes") or []) if isinstance(lane, dict) and lane.get("line") is not None]
+            if not lanes:
+                lanes = [market]
+            for lane in lanes:
+                line_value = _safe_float(lane.get("line"))
+                if line_value is None:
+                    continue
+                model_prob_over = _dist_prob_over_line(model_row.get(dist_key), float(line_value)) if dist_key else None
+                side_pick = _select_bounded_live_side(
+                    model_prob_over=model_prob_over,
+                    line_value=float(line_value),
+                    over_odds=lane.get("over_odds"),
+                    under_odds=lane.get("under_odds"),
+                    live_projection=live_projection,
+                )
+                if side_pick is None and not include_projection_only:
+                    continue
+                # A rejected row still has a projection; it just has no BET. Emitted
+                # with every pricing field null rather than zeroed, so a consumer
+                # cannot mistake "no pick here" for "a pick with no edge".
+                projection_only = side_pick is None
+                if projection_only and (model_prob_over is None and live_projection is None):
+                    # Nothing to carry. This is the one honest drop.
+                    continue
+                side_pick = side_pick or {}
+                item = {
+                    "market": "hitter_props",
+                    "prop": prop_key,
+                    "market_label": market_label,
+                    "game_pk": int(game_pk),
+                    "player_name": hitter_name,
+                    "team": team,
+                    "team_side": team_side,
+                    "projection_only": projection_only,
+                    "projection_only_reason": (
+                        "the live model has a projection for this market but no bet passed "
+                        "the live-rail selector (two-way price, non-favourite, projection "
+                        "clear of the line, market edge over the floor)"
+                    ) if projection_only else None,
+                    "selection": side_pick.get("selection"),
+                    "market_line": float(line_value),
+                    "actual": actual_value,
+                    "actual_so_far": actual_value,
+                    "actual_value": actual_value,
+                    "model_mean": model_mean,
+                    "live_projection": live_projection,
+                    "live_edge": side_pick.get("liveEdge"),
+                    "edge": side_pick.get("marketEdge"),
+                    "odds": side_pick.get("odds"),
+                    "over_odds": lane.get("over_odds"),
+                    "under_odds": lane.get("under_odds"),
+                    "market_prob_over": side_pick.get("marketProbOver"),
+                    "market_prob_under": side_pick.get("marketProbUnder"),
+                    "market_prob_mode": side_pick.get("marketProbMode"),
+                    "model_prob_over": model_prob_over,
+                    "selected_side_market_prob": side_pick.get("selectedSideMarketProb"),
+                    "projection_gap": side_pick.get("projectionGap"),
+                    "lineup_order": _safe_int(model_row.get("lineup_order")),
+                    "pa_mean": _safe_float(model_row.get("pa_mean")),
+                    "ab_mean": _safe_float(model_row.get("ab_mean")),
+                    "rank": None,
+                    "firstSeenAt": refreshed_at,
+                    "lastSeenAt": refreshed_at,
+                    "recommendation_tier": "live",
+                    "source": "current_market",
+                }
+                if not _live_hitter_prop_row_actionable(item):
+                    continue
+                signature = _live_prop_signature(item)
+                if signature in existing_signatures:
+                    continue
+                existing_signatures.add(signature)
+                out.append(item)
     out.sort(key=lambda row: (float(row.get("edge") or 0.0), float(row.get("model_prob_over") or 0.0)), reverse=True)
     for index, row in enumerate(out, start=1):
         row["rank"] = index
