@@ -34,6 +34,24 @@
   cannot be made to produce one on demand.
 - Blocked by: none. Read-only against production. **No deploy.**
 
+#### clamp-trigger-watcher — FOLLOW-ON 2026-08-15 21:4xZ — IT FIRED, THE DEPLOY LANDED, THE MEASUREMENT DID NOT
+- **The watcher did its job.** `PRE_FIX_MISPRICE` at 20:45:56Z (3 records):
+  nfl `h2h_3_way` away, JAX @ NO live, p=**0.007934** published **+4900** vs
+  correct **+12503**. That is the before-measurement the `/preflight` FAIL asked
+  for.
+- **Deployed web `e831263e`, live 21:11:54Z**, under the user's standing
+  authorisation and `runbook_clamp_deploy.md`. **Three cuts** — the first
+  REFUSED by `render_deploy.py` as a 189-line rollback, the second CANCELED by
+  Render 0.4s after a competing deploy. `--allow-rollback` never used.
+- **RESULT: INCONCLUSIVE, and recorded as such.** The row left the slate during
+  the build; post-deploy read `no_trigger`. Fix present in the deployed tree
+  (0/0 by content) and surviving two later deploys.
+- **`55bf1bf9` — the watcher now dedupes.** Its evidence listed one market 14
+  times. Occurrence counts and row counts are now separate named fields; the
+  audit and `deploys.md` were corrected. Self-test 5/5 -> 9/9.
+- **NEXT:** the watcher is running again and its role has INVERTED — the next
+  trigger is the verification, not the hunt.
+
 #### clamp-trigger-watcher — RESULT 2026-08-15 — both criteria MET, and it is RUNNING
 - **Shipped `4ead8eac`** — `scripts/watch_clamp_trigger.py` +
   `reports/clamp_watch/observations.jsonl`. No deploy (read-only against prod).
@@ -3436,3 +3454,89 @@ Carried forward, unowned:
   the user's explicit instruction; that notice is above.
 - **Drop 3 (the game-line join) remains untouched** — `rows_live_edged` stays 0
   for game lines regardless.
+
+### card-height-spread-by-state — CLOSED-VERIFIED 2026-08-15 — the spread is CONTENT VOLUME, and my first explanation was one sample — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: the card-height metric can detect a layout regression on MLB. Testable:
+  the probe reports spread WITHIN each game state, so the number stops swinging
+  with how many games happen to be live.
+- Files (exclusive to this lane): `scripts/ui_layout_probe.py`,
+  `tests/test_ui_layout_probe.py`. Collision check RUN: both free.
+- **Finding this closes, measured 2026-08-15 21:5xZ on production /mlb/cards,
+  390x844, 15 cards:**
+
+      Preview  n=10   2929-3009px   spread   80px
+      Final    n= 2   2833-2915px   spread   82px
+      Live     n= 3   3156-4549px   spread 1393px
+      overall                        spread 1716px
+
+  The overall spread is **entirely** live-game content. Within a state the
+  layout is tight to ~80px, which is well-behaved, not broken. Desktop at the
+  same instant: spread **95px** across all 15 (min 1052, max 1147) — the 197px
+  I flagged at checkpoint was the same phenomenon at a different moment.
+- Hypothesis: EXONERATED, `6e9e6107`. The contract rows were byte-identical
+  across that change (0/15 games), and the spread is explained by game state.
+- Falsification test: if per-state spread on MLB is large, the layout really
+  does vary within a state and the metric was right to alarm.
+- Verification: the probe's own output, per state, on production.
+- Blocked by: none.
+
+#### card-height-spread-by-state — CLOSED-VERIFIED 2026-08-15, WITH A CORRECTION TO THIS LANE'S OWN FINDING
+
+**EXONERATED first, and that part held:** the MLB card-height movement is not
+`6e9e6107` and not any layout change. The contract rows were byte-identical
+across that commit (0/15 games).
+
+**But this lane's opening finding was WRONG, and its own instrument falsified
+it 20 minutes later.** I measured Preview n=10 at 2929-3009px, spread **80px**,
+and concluded "the layout is tight within a state; the whole spread is live
+games". Second reading, same page, no code change:
+
+    Preview n=10   first read  2929-3009px  spread   80px
+                   second read 3020-3817px  spread  797px
+
+One sample of a moving quantity, presented as an explanation. **I have this
+rule already** (`learnings.md`: three wrong root causes in one session from
+exactly this shape) and applied it to production effects but not to my own
+measurement.
+
+**What actually drives it, measured across all 10 Preview cards at once:**
+height tracks `.cards-data-pair` count almost linearly, ~62px per pair.
+
+    33 pairs -> 3100px    41 -> 3591px    45 -> 3830-3846px
+    49 -> 4101-4121px     53 -> 4317-4345px
+
+Production now reports `content varies 20-57 pairs/card` on MLB. So the
+card-height spread on MLB answers **"how much data does this game have"**, not
+"is the layout stable" — and no per-state grouping fixes that, because content
+varies inside a state too.
+
+**What shipped:** `cardHeightByState` + `cardHeightSpreadWithinState` (the
+printed figure, least-confounded available) and `contentUnits`, printed as
+`content varies N-M pairs/card` whenever cards differ. The discriminating
+comparison now works — MLB carries the content line and 1583px; **ncaaf 45/53px
+and soccer 0px carry no content line at all**, because their cards are uniform.
+A reader can finally tell a busy slate from a broken layout.
+
+**Honest limit:** there is still no pure layout signal for MLB. Height per unit
+of content would be one; nobody has built it, and this lane does not claim to.
+
+- **FINAL:** shipped, verified, closed. 14 tests. No deploy — dev tooling.
+
+#### quote-shard-latest-index — CLOSED-VERIFIED 2026-08-15 21:32Z
+`#435` shipped and proven in production. Same window, same slate:
+**5 OOM kills -> 0**, peak anon **4,018.5 -> 3,572.4 MB**, longest clean run
+**53 -> 90 min**. Zero kills in 16.5 h across a full shard ramp. Fix confirmed
+present in all three SHAs that carried the window, by ancestry AND by content.
+Falsification test passed on the deployed tree: 15/15 real events, grids
+byte-identical, 478,782 -> 36,424 rows.
+
+NOT CLOSED BY THIS LANE, and the next reader should not think otherwise:
+- **The worker is not safe.** 3,572 MB is 87.2% of the ceiling. The fix bought
+  ~446 MB; a larger slate still crosses.
+- **`board_contract_games_normalized` remains the stage at the peak** — it was
+  running at the 18:25 excursion and at last night's kills. That is the next
+  lead, not the quote shard.
+- **No proof-of-branch log line.** `QUOTES_REDUCED` was blocked by
+  `quote-feed-age-alarm`'s claim on `odds_book_quotes.py`. Attribution rests on
+  kill count, peak anon, and eviction churn going 10 -> 0 — strong and
+  independent, but not the branch announcing itself.

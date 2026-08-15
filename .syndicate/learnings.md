@@ -2250,3 +2250,103 @@ Two failures followed, and neither pointed at the cause:
 - **A `--stat` line is not proof your content committed** on a shared worktree.
   Grep HEAD for a string only you wrote. That check is the entire reason this
   was caught rather than shipped as a checkpoint that silently lost its lesson.
+
+
+### 2026-08-15 - I APPLIED "ONE SAMPLE OF A MOVING QUANTITY" TO PRODUCTION AND NOT TO MY OWN MEASUREMENT
+
+- **What we believed:** MLB's card-height spread was fully explained by game
+  state. Measured once: Preview n=10 spread **80px**, Final n=2 spread 82px,
+  Live n=3 spread 1393px. Clean story - the layout is tight inside a state and
+  the whole number is live-game content. I wrote it into a lane as the finding.
+- **What was actually true:** the same page, 20 minutes later, no code change:
+  Preview spread **797px** (3020-3817px). The tightness was an artifact of the
+  moment. Measured properly across all 10 Preview cards at once, height tracks
+  `.cards-data-pair` count at ~62px per pair, 20-57 pairs per card - the spread
+  is CONTENT VOLUME, and grouping by state does not remove it because content
+  varies inside a state too.
+- **How we found out:** re-running the probe after changing it, and noticing
+  the number I had just explained had moved.
+- **The rule going forward:** I already hold this rule for production
+  quantities (`learnings.md`, three wrong root causes in one session from a
+  single sample). It applies with equal force to a measurement I take MYSELF to
+  explain something. Before writing "X explains Y", take the reading twice, or
+  measure the whole population once - here, ten cards against their content
+  counts settled in one pass what two timed samples could not.
+- **Second-order rule, and the useful one:** when a metric cannot separate the
+  thing you care about (layout) from a confound (content volume), report the
+  confound alongside it rather than refining the metric. `content varies 20-57
+  pairs/card` next to a 1583px spread is interpretable; the spread alone is
+  not, and no amount of grouping was going to make it so.
+- **Cost:** one wrong explanation written into a lane and reported to the user,
+  corrected within the hour. The EXONERATION it accompanied was and remains
+  correct.
+
+### 2026-08-15 — a mid-ramp reading is not a window reading; I called a 446MB difference "noise"
+
+- **What we believed:** at 19:51Z I told the owner the most likely outcome was
+  that kills would land and the quote shard was not the cause. The evidence was
+  peak anon 2,839 MB tonight against 2,897 MB last night in the same clock slot
+  — a 2% gap I called noise.
+- **What was actually true:** peak across the FULL window was 3,572 MB against
+  4,018 MB, a 446 MB gap, and the kill count went 5 -> 0. The fix worked.
+- **How we found out:** by re-measuring at window close instead of standing on
+  the earlier number. The 19:51 reading was taken before the shard ramp bit, so
+  it compared two processes that had not yet done the expensive thing.
+- **The rule going forward:** a peak is only comparable across windows that
+  contain the same WORK, not the same clock span. Before comparing peaks, check
+  that the expensive stage has actually run in both — otherwise the comparison
+  is of two warm-ups. State the window's work content, not just its start and
+  end times.
+- **Cost:** none to production — I held for the measurement instead of acting on
+  the prediction, which is the only reason this reads as a caught error rather
+  than a shipped one. But the wrong call was stated to the owner with a
+  confidence it had not earned.
+
+### 2026-08-15 — verify a deployed fix by CONTENT across every SHA that carried it
+
+The `#435` result rests on the fix being live for the whole window, and it was
+carried by THREE different deploys from two sessions: `c67f7373` (mine, 18:11),
+`dca39fad` (20:00), `0fa44322` (21:31). Attribution would have been worthless
+without confirming each one contained the change.
+
+Ancestry alone is not sufficient in this repo — `state.md` already records a live
+SHA that was not an ancestor of `main`. Both checks together are:
+
+    git merge-base --is-ancestor <fix-sha> <live-sha>
+    git grep -c "<distinctive token>" <live-sha> -- <path>
+
+Use `MSYS_NO_PATHCONV=1` on Windows or git mangles `rev:path` into a filename.
+
+
+### 2026-08-15 — AN OCCURRENCE COUNT IS NOT A ROW COUNT, and I published three numbers that could be read as either
+
+- **What we believed.** `served_at_clamp_price: 14` and "1346 `fair_price`
+  values served, 24 of them sitting exactly on ±4900" were counts of broken
+  markets. I said so in the ledger, and when I first noticed the duplication I
+  called it "cosmetic" and asserted "the count 14 is correct".
+- **What was actually true.** They are counts of OCCURRENCES in a served
+  payload that echoes one logical row into several sections. The 14 were **one**
+  mispriced market (`out_of_clamp_count: 1`); the 24 were **two** market sides.
+  The finding itself was never wrong — the join was always per-row — but the
+  magnitude was inflated ~14x for anyone who quoted the headline instead of
+  reading the table.
+- **How we found out.** Not from the instrument. From reading its own evidence
+  array and noticing the same row printed 14 times. The array was the honest
+  signal; the scalar counts beside it were the misleading ones.
+- **Why "cosmetic" was the wrong call.** A number in a ledger outlives the
+  session that wrote it and gets quoted without its table. "14 mispriced rows"
+  would have been a defensible read of what I wrote.
+- **The rule going forward.** When counting anything extracted by walking a
+  nested payload, **report the occurrence count and the distinct-entity count as
+  separate, explicitly-named fields.** Never publish one scalar that could be
+  read as either. If deduping, the key must include entity identity — deduping
+  on value alone collapses two genuinely different entities that share a value,
+  which UNDER-reports and is the more dangerous direction.
+- **Second-order, and worth keeping:** the fix required identity to flow down
+  the walk to the node holding the number. Identity is safe to inherit;
+  **the numbers are not** — inheriting a probability downward would pair it with
+  an unrelated nested price and manufacture a finding. That asymmetry is now
+  pinned by a test that fails if someone "simplifies" it.
+- **Cost:** none realised — caught before anyone quoted it, and corrected in
+  `audit_2026-08-15_probability_differential.md` and `deploys.md`. Related:
+  [[feedback_rate_not_count]], [[feedback_read_the_field_you_already_have]].

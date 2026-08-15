@@ -215,63 +215,44 @@ unsaved anywhere.
 
 ---
 
-## MEMORY — refresh-worker `#435` / `#423` — ROOT CAUSE FOUND `[measured 08-15 15:4xZ]`
+## MEMORY — refresh-worker `#435` — FIXED AND PROVEN `[measured 08-15 21:32Z]`
 
-**ROOT CAUSE: the book_quotes shard is APPEND-ONLY, and the whole day of it is
-read into memory.**
+**ROOT CAUSE: the `book_quotes/<date>.jsonl` shard is APPEND-ONLY and the whole
+day of it was read into memory.** It gains a row per quote OBSERVATION and grows
+all day (MLB 08-14: 89.9 -> 184.5 MB, then 2.2 MB after rollover). A read costs
+**6.3x file bytes** resident, so the end-of-day shard was ~1,162 MB for ONE cache
+entry against a 500 MB budget — and the evictor was `while len > 1`, so when it
+was the only entry nothing could drop it. **92.4% of the file is superseded**
+(478,782 rows -> 36,424 distinct keys on the 207 MB shard).
 
-- `data/<sport>_source/tracking/book_quotes/<date>.jsonl` gains a row per quote
-  OBSERVATION (17 fields). It grows all day and resets at the date rollover.
-  Production `CACHE_EVICT` records, MLB 2026-08-14: **89.9 → 108.8 → 133.2 →
-  165.2 → 184.5 MB**, then 2.2 MB the next morning.
-- A read costs **6.3x file bytes** resident (the module's own measured constant),
-  so the 184.5 MB shard is **~1,162 MB for ONE cache entry** against a 500 MB
-  budget. `_evict_book_quotes_over_budget` is `while len(cache) > 1`, so a single
-  oversized entry **can never be evicted**; when it is not alone it is evicted
-  and re-read, re-allocating ~1.1 GB each time.
-- **92.4% of that file is superseded.** Measured on the 207 MB 2026-08-09 shard:
-  478,782 rows collapse to **36,424** distinct quote keys — a **13.1x** shrink.
-- **THE FIX IS AN INDEX, NOT COMPACTION.** The lookup path needs latest-per-key
-  (~89 MB instead of ~1.16 GB). The superseded rows ARE the opening prices and
-  line movement that `clv-without-settlement` depends on — do not delete them.
-  Second, independent, cheap: let the evictor drop the last entry.
-- The guard's sizing comment is stale by 2.05x — it reasons from "~90 MB, so one
-  copy is ~570 MB".
+**THE FIX WORKS — same window, same slate `[08-15 20:00-21:32Z]`:**
 
-**IT IS A DAILY RAMP, NOT A LEAK.** Kills cluster in the evening with the shard
-at maximum and **stopped at 05:02:59Z** when the date rolled over. This is why
-every retention and allocator hypothesis failed.
+                          08-14 (no fix)        08-15 (fix live)
+    OOM kills                   5                     0
+    peak anon              4,018.5 MB (98.1%)   3,572.4 MB (87.2%)
+    longest clean run          53 min                90 min
 
-**What the memory IS, measured `[08-15 03:45Z]`:** pymalloc holds 1,688 arenas =
-1,688 MB, of which **1,638.5 MB is LIVE** (`bytes in allocated blocks`);
-fragmentation is 49.5 MB (3%) and 850 arenas had been reclaimed. Size classes:
-**13,719,058 x 64 B (838 MB)** and **614,024 x 400 B (234 MB)** — ~22.3M objects,
-which is exactly 478k rows x 17 fields.
+**Zero kills in 16.5 h** across a full shard ramp. Live since `c67f7373`
+18:11:41Z and carried by every deploy since — verified by ancestry AND by content
+(`read_book_quotes_latest` + the `layer2_shortlist` call site present in each).
 
-**RETRACTED, all measured wrong earlier in the same session:** (1) "85% of anon
-is not reachable Python data" — an artifact of a ONE-LEVEL census that summed
-only `str`/`bytes` DIRECTLY referenced by a tracked object, missing everything
-nested; (2) allocator retention — glibc coverage is 13.9% and its own binding
-reads `arena_not_representative`, and pymalloc retention is 3%; (3) cache
-retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
+**THE WORKER IS NOT SAFE.** 3,572 MB is 87.2% of a 4,096 MB ceiling. The fix
+bought ~446 MB; a larger slate still crosses.
+**Next lead is `board_contract_games_normalized`**, the stage running at both the
+18:25 excursion and last night's kills — NOT the quote shard.
 
-**Still true and still load-bearing:**
-- **Kills are EVENTS, not logs.** `/v1/services/<id>/events`. A killed process
-  cannot log its own death; a log grep for `oomKilled` produced a retracted
-  "0 kills" claim. `[08-15]`
-- **`#387` shipped in TWO halves** — `cfee9c6e` + `705eeefc`. It fixed BOARD
-  COVERAGE (`sports=8` against 5 consecutive `sports=1`), not the OOM.
-- **Leave the 3000 MB floor in front of MLB alone.** It guards the wrong stage.
-- **`tracemalloc` is OFF and is RULED OUT on this process at any frame count.**
-  With tracing on the sampler emitted ZERO samples and kill cadence went 16-22
-  min → 3-10 min. It never once returned an answer in production. `[08-15 02:1xZ]`
-- **Instrumentation that now exists and fires on CONDITION:** `MEMORY_WATCHDOG`
-  (2s sampler, gated), `HEAP_CENSUS`, `UNTRACKED_BYTES_CENSUS`, `PYMALLOC_STATS`.
-  All capped per process. `scripts/render_logs.py` pages the logs API BACKWARD
-  and prints the window it actually covered.
-- **`#253`'s worker cache bound was applied to MLB ONLY.** NBA/WNBA/soccer have
-  no worker variant. Magnitude NOT established. `[08-14 18:5xZ]`
-- **The MLB cards-context cache EARNS its retention — 22.9% hit rate.**
+**Still load-bearing:**
+- **Kills are EVENTS** (`/v1/services/<id>/events`). A log grep for `oomKilled`
+  returns 0 and means nothing; that produced a retracted all-clear.
+- **`tracemalloc` is RULED OUT on this process at any frame count** — it starved
+  the sampler and worsened kill cadence to 3-10 min. Never returned an answer.
+- **`#387` shipped in two halves** (`cfee9c6e` + `705eeefc`) and fixed BOARD
+  COVERAGE, not the OOM. Leave the 3000 MB MLB floor alone.
+- Instrumentation live and condition-triggered: `MEMORY_WATCHDOG`, `HEAP_CENSUS`,
+  `UNTRACKED_BYTES_CENSUS`, `PYMALLOC_STATS`; `scripts/render_logs.py` pages
+  BACKWARD and prints the window it actually covered.
+- **RETRACTED:** "85% of anon is not reachable Python data" — an artifact of a
+  one-level census. It is live application data.
 
 ---
 
@@ -505,7 +486,35 @@ retention of board payloads. `#423`'s "not glibc arena fragmentation" STANDS.
 ---
 
 
-### The ±4900 fair-price clamp — FIXED IN CODE, ONE THIRD LIVE, MEASUREMENT OWED
+### The ±4900 fair-price clamp — DEPLOYED 2026-08-15 21:11:54Z. **NOT VERIFIED.**
+
+- **ALL THREE sites are fixed AND LIVE.** web `e831263e`
+  (`dep-da0d8vnlk1mc73fn8ta0`). **Survived two later deploys** — checked by
+  CONTENT on each new live SHA (`bb23c8f9`, `8b010dac`): **0/0** occurrences of
+  `max(0.02`. `render_deploy.py`'s descendant rule is what protects it.
+- **THE FIX IS NOT VERIFIED IN PRODUCTION AND MUST NOT BE RECORDED AS SUCH.**
+  The triggering row left the slate during the ~7 min build; the post-deploy
+  read was `no_trigger`, which is the SAME reading a quiet slate gave before the
+  deploy. **`out_of_clamp=0` is not evidence the fix worked** — that count comes
+  from the WORKER's artifact and is independent of this web-side change.
+  The watcher is running; **its next trigger is the verification**, and a
+  `PRE_FIX_MISPRICE` against a fix-carrying SHA would be a real falsification.
+- **BEFORE, measured:** nfl `h2h_3_way` away, JAX @ NO live,
+  `fair_probability` **0.007934** published **+4900** vs correct **+12503**
+  (off by 7603 pts). **That was ONE row echoed 14x in the payload, not 14 rows.**
+- **`check_deploy_safety.py` IS REFRESH-WORKER SCOPED** `[measured 08-15]`. It
+  has **no `--service` flag**; its blockers (MLB sim, odds refresh, board build)
+  and its `--drain` are all refresh-worker work. **A `NOT CLEAR` from it does
+  not, by itself, block a WEB deploy** — web runs **no background loops**
+  (`MLB_ENABLE_LIVE_LENS_LOOP`, `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP`,
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` all `false` on the live
+  service). Read it, then decide per service.
+- **Web deploy contention is REAL: 6 deploys in ~50 minutes** from concurrent
+  sessions. Landing one took THREE cuts — `render_deploy.py` refused the first
+  as a 189-line rollback, Render canceled the second 0.4s after a competing
+  deploy started. Budget for re-cutting; never reach for `--allow-rollback`.
+
+### (superseded header, kept for the file/line map) — FIXED IN CODE, ONE THIRD LIVE
 
 - **All three `max(0.02, min(0.98, p))` sites are gone from `main`** (`de0c367f`
   WNBA, `7bb74c95` `layer2_board` + the INLINE copy in
@@ -1472,3 +1481,22 @@ than failing the run, and the declaration is checked in both directions.
 56 -> 197px desktop / 112 -> 1887px mobile across the 19:0x-21:2x window, and
 empty slots 8 -> 1. Not the contract (rows byte-identical, 0/15). Presumed the
 slate moving; **nobody has actually looked.** `[unverified]`
+
+
+## MLB card-height spread - it measures CONTENT, not layout `[measured 08-15 22:xxZ]`
+
+**Do not read MLB's card-height spread as a layout signal.** Height tracks
+`.cards-data-pair` count at ~62px per pair, and MLB serves **20-57 pairs per
+card**, so the figure reports how much data each game has. It moved 796 ->
+1716 -> 1583px across three readings with no code change. Grouping by game
+state does not fix it - Preview alone measured 80px and 797px twenty minutes
+apart. `[measured]`
+
+`scripts/ui_layout_probe.py` now prints `content varies N-M pairs/card`
+alongside the spread whenever cards differ, so the two can be told apart.
+**NCAAF (45/53px) and soccer (0px) carry no content line** - their cards are
+uniform and their spreads ARE layout signals. MLB's is not. `[measured]`
+
+**EXONERATED:** the MLB height movement flagged at the 21:2xZ checkpoint is not
+`6e9e6107` and not any layout change - the contract rows were byte-identical
+across it (0/15 games). `[measured]`
