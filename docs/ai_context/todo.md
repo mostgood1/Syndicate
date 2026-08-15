@@ -1,5 +1,53 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#439` — **The ±4900 fair-price clamp: 3 sites, DEPLOYED 2026-08-15, NOT YET VERIFIED IN PRODUCTION** — program Tier 3a, lanes `probability-differential-test` / `probability-clamp-removal` / `-2` / `clamp-trigger-watcher`
+
+**Filed at session close so shipped work reaches this list (the `#71` check).**
+Everything below is on `origin/main`; the deploy is live.
+
+**What was wrong.** `max(0.02, min(0.98, p))` in three places turned a
+probability the market really implied into a confident wrong price. Measured on
+production 2026-08-15: `/api/intelligence/query` published **+4900** for
+`fair_probability` **0.007934** (nfl `h2h_3_way` away, JAX @ NO live) where the
+correct fair price is **+12503** — off by **7603 points**. A clamp is not a
+guard: it answers an out-of-range input with a number instead of refusing.
+
+**Shipped.**
+- `d448a100` — `scripts/probability_differential.py`, the Tier 3a harness: 31
+  converters, 3 concepts, one price grid, plus a coverage sweep that fails if a
+  new converter is neither registered nor excused. `tests/test_probability_differential.py`.
+- `de0c367f` — WNBA site. `7bb74c95` — `layer2_board` + the INLINE copy in
+  `pipeline/intelligence_state` (no `def`, so the board audit's 42-site count
+  never saw it). `tests/test_fair_price_unclamped.py`.
+- `4ead8eac` / `55bf1bf9` — `scripts/watch_clamp_trigger.py`, the measurement
+  instrument, with evidence dedupe and occurrence-vs-row counts.
+- **Deployed:** web `e831263e` (21:11:54Z), branch `deploy/clamp-on-live`.
+
+**Owners established by evidence, not preference** (5-requirement scorecard):
+`opportunity_signals.implied_probability`, `opportunity_signals.american_price`
+(the UNIQUE survivor of its concept), `live_lens_local._american_to_decimal`.
+
+**STILL OPEN — the only open part:**
+1. **VERIFY IT IN PRODUCTION.** The fix is correct in code and present in the
+   deployed tree (0/0 by content), and has **never been observed pricing a live
+   out-of-clamp probability correctly** — the triggering row left the slate
+   during the build. Run `py -3 scripts/watch_clamp_trigger.py --interval 900`;
+   its next trigger IS the verdict. `POST_FIX_OK` closes this.
+   **`PRE_FIX_MISPRICE` against a fix-carrying SHA is a falsification.**
+2. **`market_lines:_prob_to_american` is deliberately NOT fixed** — fails all 5
+   requirements but has one caller fed medians strictly inside (0,1). Triage,
+   recorded in the test.
+3. **D1, a landmine with no live trigger found:** 5 converters return `0.0` for
+   price `0` (worst case — it manufactures the largest edge on the board);
+   `bankroll_manager` has a stake attached. No zero price seen in production.
+4. **D6:** `mlb/hr_targets` + `regrade_mlb_game_markets` truncate float prices
+   via `int()` — a −110.5 consensus silently reprices to −110.
+5. **Consolidate 31 converters onto the 3 owners** — after 3 and 4, so it stays
+   a mechanical move rather than a behaviour change wearing a refactor's clothes.
+
+Full table: `.syndicate/audit_2026-08-15_probability_differential.md`.
+Deploy procedure: `.syndicate/runbook_clamp_deploy.md`.
+
 ### `#437` — **Live MLB prop rows show a pregame projection as if it were current, and a probability that contradicts it.** USER-REPORTED 2026-08-15 — lane `mlb-live-pitcher-projection`, 3 fixes COMMITTED-PENDING, NOT DEPLOYED
 
 **Reported as "live projections rarely get appended, and the ones that do are
