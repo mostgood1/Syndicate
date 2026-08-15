@@ -3330,13 +3330,71 @@ def _live_pitcher_prop_row_actionable(row: dict[str, Any], actual_payload: dict[
     )
 
 
-def _bounded_live_pitcher_projection(actual_value: float | None, model_mean: float | None, progress_fraction: float) -> float | None:
+def _bounded_live_pitcher_projection(
+    actual_value: float | None,
+    model_mean: float | None,
+    progress_fraction: float,
+    *,
+    outs_mean: float | None = None,
+    outs_recorded: float | None = None,
+    pitcher_removed: bool = False,
+) -> float | None:
+    """Project a starter's final counting stat from the CURRENT game state.
+
+    Opportunity-based, matching `_bounded_live_hitter_projection` below: a
+    hitter's remaining chances are `ab_mean - actual_ab`, and a pitcher's are
+    `outs_mean - outs_recorded`. The pitcher path did not have that and used
+    `_live_progress_fraction` -- the fraction of the GAME played, total outs
+    over 54 -- which is the wrong clock by roughly a factor of three, since a
+    starter is expected to record ~15-18 of those 54.
+
+    Measured on the served board 2026-08-15 20:12:48Z, all three failure modes
+    live on one game (STL @ CHC, Top 7):
+
+      * Matthew Boyd was OUT of the game -- 5.1 IP, 2 K, 7 ER, two relievers
+        behind him -- and was still projected to finish with 4.057 K and 3.242
+        ER, because nothing here asked whether he was still pitching.
+      * Michael McGreevy had 18 outs recorded and was projected for 17.136 --
+        BELOW an already-banked actual, which is impossible for a monotone
+        counting stat and is the clearest proof the live number was not read.
+      * `max(mean - actual, 0.0)` floors the residual, so a pitcher ahead of his
+        pregame mean projected to add exactly nothing for the rest of his start.
+        Strikeouts only go up; this biased precisely the pitchers most likely to
+        go over.
+
+    `progress_fraction` is retained as the fallback for when the sim ships no
+    `outs_mean` (or the box score no outs), so a thin payload degrades to the
+    previous behaviour rather than to nothing.
+    """
     mean = _safe_float(model_mean)
     actual = _safe_float(actual_value)
     if mean is None:
         return actual
     if actual is None:
         return mean
+
+    # ONCE HE IS PULLED, THE COUNT IS FINAL. No clock and no rate can add to a
+    # line that has stopped moving. `_starter_removed_from_actual_payload` is
+    # the same predicate the starter-ladder path at `_live_pitcher_ladder_*`
+    # already uses to bail -- it existed, and this path simply never asked it.
+    if pitcher_removed:
+        return round(float(actual), 3)
+
+    starter_outs = _safe_float(outs_mean)
+    recorded = _safe_float(outs_recorded)
+    if starter_outs is not None and recorded is not None and float(starter_outs) > 0.0:
+        # The pitcher's OWN remaining workload, and his own per-out rate. For
+        # the `outs` market itself this is an identity (rate 1.0), which is why
+        # it also correctly floors at the actual once he is past his mean rather
+        # than projecting backwards through it.
+        remaining_outs = max(float(starter_outs) - float(recorded), 0.0)
+        rate_per_out = float(mean) / float(starter_outs)
+        return round(float(actual) + (remaining_outs * rate_per_out), 3)
+
+    # FALLBACK ONLY -- no `outs_mean` or no recorded outs. Deliberately left as
+    # it was, including the zero floor: without an opportunity denominator there
+    # is nothing better to say, and changing it here would move rows this lane
+    # cannot measure.
     remaining_fraction = max(0.0, min(1.0, 1.0 - float(progress_fraction)))
     return round(float(actual) + max(float(mean) - float(actual), 0.0) * remaining_fraction, 3)
 
@@ -3425,6 +3483,22 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
         actual_row = (actual_context or {}).get("stats") if isinstance(actual_context, dict) else None
         if not isinstance(model_row, dict) or not isinstance(market_entry, dict):
             continue
+        # THE OPPORTUNITY INPUTS, read once per pitcher rather than per market.
+        # The starter-ladder path already asked `_starter_removed_from_actual_payload`
+        # and bailed; this path -- the one that feeds the BOARD -- never did, so
+        # a pulled starter kept accruing projected strikeouts to the final out.
+        # Removal is NOT a reason to drop the row here (unlike the ladder, whose
+        # rungs are forward-looking bets): the board still wants to show what he
+        # finished with, so it is passed down and the projection settles to the
+        # actual.
+        pitcher_removed = _starter_removed_from_actual_payload(
+            actual_payload,
+            side=side,
+            starter_id=pitcher_id,
+            starter_name=pitcher_name,
+        )
+        outs_mean = _safe_float(model_row.get("outs_mean"))
+        outs_recorded = _actual_pitcher_stat_value(actual_row, "outs")
         side_rows: list[dict[str, Any]] = []
         for prop_key, cfg in config.items():
             market = market_entry.get(prop_key)
@@ -3438,7 +3512,14 @@ def _current_live_pitcher_prop_rows(selected_date: str, sim_payload: dict[str, A
                 continue
             model_mean = _safe_float(model_row.get(cfg["mean_key"]))
             model_prob_over = _dist_prob_over_line(model_row.get(cfg["dist_key"]), float(line_value))
-            live_projection = _bounded_live_pitcher_projection(actual_value, model_mean, progress_fraction)
+            live_projection = _bounded_live_pitcher_projection(
+                actual_value,
+                model_mean,
+                progress_fraction,
+                outs_mean=outs_mean,
+                outs_recorded=outs_recorded,
+                pitcher_removed=pitcher_removed,
+            )
             side_pick = _select_bounded_live_side(
                 model_prob_over=model_prob_over,
                 line_value=float(line_value),
@@ -4929,7 +5010,18 @@ def _live_starter_ladder_badges_for_side(
             continue
         actual_value = _actual_pitcher_stat_value(actual_row, prop_key)
         model_mean = _safe_float(model_row.get(cfg["mean_key"]))
-        live_projection = _bounded_live_pitcher_projection(actual_value, model_mean, progress_fraction)
+        # `pitcher_removed` is not passed: this function has already returned []
+        # above if the starter was pulled, so it is False by construction here.
+        # The outs clock still applies -- a starter who is IN the game but past
+        # his expected workload has little left to accrue, and the game-progress
+        # fallback consistently over-credits him.
+        live_projection = _bounded_live_pitcher_projection(
+            actual_value,
+            model_mean,
+            progress_fraction,
+            outs_mean=_safe_float(model_row.get("outs_mean")),
+            outs_recorded=_actual_pitcher_stat_value(actual_row, "outs"),
+        )
         supported_totals: list[int] = []
         last_supported_prob: float | None = None
         base_over_total = int(base_line) + 1

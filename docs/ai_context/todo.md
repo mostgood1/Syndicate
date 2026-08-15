@@ -1,5 +1,82 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#437` — **Live MLB prop rows show a pregame projection as if it were current, and a probability that contradicts it.** USER-REPORTED 2026-08-15 — lane `mlb-live-pitcher-projection`, 3 fixes COMMITTED-PENDING, NOT DEPLOYED
+
+**Reported as "live projections rarely get appended, and the ones that do are
+unrealistic, especially pitcher props."** Both halves are real and they are
+DIFFERENT DEFECTS. Measured on the served
+`/api/board/book-grid?sport=mlb&date=2026-08-15`, artifact generated
+20:12:48Z, web `f475c775`.
+
+**Ground truth** (StatsAPI `824644`, Top 7, STL 7-3) against what the board served:
+
+| pitcher | actual | board | line |
+|---|---|---|---|
+| McGreevy | **18 outs** recorded | proj **17.136** | 14.5 |
+| Boyd | 2 K, **pulled** (2 relievers behind him) | proj **4.057** K | 4.5 |
+| Boyd | **7 ER** | proj **3.242** ER, P(over) 0.531 | 2.5 |
+
+- **COVERAGE: 57 of 638 live rows (8.9%) carry the live overlay.** On the
+  reported game, **1 of 146**. The other 89% keep `source: pitcher_distribution`
+  / `hitter_threshold` / `game_simulation` — pregame numbers displayed against a
+  live market. `batter_home_runs` matched **0 of 116** and
+  `batter_hits_runs_rbis` **0 of 79**; the alias table already carries both
+  names, so the miss is snapshot-side.
+- **EDGE: 0 of 638 live rows carry one**, and that is mostly CORRECT — 356 are
+  the live-edge policy refusing to price a pregame projection against a live
+  market. 56 are `#414`'s sever (`liveModelProbOver` never emitted).
+- **THE PROBABILITY CONTRADICTED THE PROJECTION on the rows that DID get the
+  overlay.** `live_projection_join` stamped `projected` with the live re-sim's
+  number and `model_prob_over` with the lens' `modelProbOver` — the PREGAME
+  value (`live_lens.py:541` falls that chain through to `estimatedWinProb`;
+  :549 documents that the live value has its own key). **7 of 13 live pitcher
+  rows had the two on opposite sides of the line** (Brad Lord `outs` 16.77
+  projected vs an 11.5 line at P(over) 0.18; Logan Webb `earned_runs` 1.87 vs
+  2.5 at P(over) 0.90), against 10 of 81 on the pregame path — and those are
+  near-line ties, i.e. honest mean-vs-median skew. **The EDGE was never wrong:
+  it has always read `live_prob_over` only. This was the DISPLAY half of the
+  same rule, and it was missed because the edge is the thing that gets audited.**
+- **THE PITCHER FORMULA USED THE WRONG CLOCK.**
+  `_bounded_live_pitcher_projection` scaled the residual by
+  `_live_progress_fraction` — total outs over 54, the whole GAME — when a
+  starter is expected to record ~17 of those 54. It also never asked whether he
+  was still pitching (the starter-ladder path next door already called
+  `_starter_removed_from_actual_payload` and bailed; the path feeding the BOARD
+  never did), and floored the residual at `max(mean - actual, 0)`, so a pitcher
+  ahead of his mean projected to add exactly nothing.
+
+**FIXED (committed, NOT deployed — refresh-worker writes this artifact and is
+under `#435`):**
+1. `cards.py` — opportunity-based projection: `actual + remaining_outs × (mean /
+   outs_mean)`, settles to the actual once the pitcher is pulled, degrades to
+   the old game-clock formula when the sim ships no `outs_mean`.
+2. `live_projection_join.py` — `model_prob_over` now comes from `live_prob_over`
+   or goes ABSENT with a stated reason; the pregame value is preserved as
+   `sim_model_prob_over`. New counter `rows_live_prob_withheld`.
+3. `blueprints/intelligence.py` — the book-grid response now serves
+   `live_projections` / `live_game_state`. **The writer has always persisted
+   them and the route dropped them**, which is why the join's own counters
+   (`miss_no_market_alias`, `snapshot_live_prob_seen`, `unmatched_samples`) were
+   only readable off a raw artifact file on the worker's disk.
+
+**STILL OPEN, and deliberately not claimed:**
+- **The cause of the 435 unmatched live rows is NOT diagnosed.** Per
+  `learnings.md` 2026-08-15 ("never read a joiner zero as a data-quality verdict
+  until the reader has been shown to SEE the data"), the published lens snapshot
+  has not been read — it lives in keyvalue and web 404s on it. Fix 3 makes the
+  counters readable; that is all it does.
+- **NAMED CANDIDATE, UNVERIFIED:** `_current_live_pitcher_prop_rows` drops any
+  row where `_select_bounded_live_side(..., min_edge=0.03)` returns None, so the
+  live rail is an EDGE-FILTERED PICK LIST, not a projection set — it structurally
+  cannot cover every live board row. If that is the cause, the fix is a separate
+  projection-only emitter, not a wider alias table.
+- **McGreevy-shaped rows are NOT fixed by any of the three.** That row never
+  reaches `_bounded_live_pitcher_projection`; it is served by
+  `prop_projections.py:361` (pure pregame lookup) because the overlay never
+  matched it. It needs either the coverage fix above or a rule that a live row
+  may not display a pregame projection as current — the latter was offered to
+  the user and NOT selected.
+
 ### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** PARTLY CLOSED 2026-08-14 — timed on current code, estimator hardened, split out of `#387` 2026-08-14
 
 **MEASURED 2026-08-14 18:0xZ ON THE DEPLOYED CODE (`294f9ca9`), refresh-worker,

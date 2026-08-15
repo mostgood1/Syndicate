@@ -2298,6 +2298,25 @@ def board_book_grid_api():
                     "game_state": precomputed.get("game_state") if has_enrichment else None,
                     "projections": precomputed.get("projections") if has_enrichment else None,
                     "margin_model": precomputed.get("margin_model") if has_enrichment else None,
+                    # THE LIVE TIER'S OWN COVERAGE, which the writer has always
+                    # persisted (`book_grid_artifact.py` stores `live_projections`
+                    # and `live_game_state`) and this response silently dropped.
+                    # Everything needed to attribute a blank live column --
+                    # `rows_live_considered`, `rows_live_projected`,
+                    # `rows_live_edged`, `miss_no_market_alias`,
+                    # `snapshot_live_prob_seen`, `unmatched_samples` -- was being
+                    # computed, written to disk, and then not served, so the only
+                    # way to read it was off a raw artifact file on the worker's
+                    # disk. Measured 2026-08-15: 638 live rows, 57 overlaid, 0
+                    # edged, and none of those three numbers reachable from the API.
+                    #
+                    # `.get()` WITHOUT the `has_enrichment` gate, deliberately:
+                    # these keys post-date it, so gating them on it would report
+                    # `null` for an artifact that genuinely carries them. Absent
+                    # still serializes as null, which is the same "this artifact
+                    # predates the join" signal the gate exists to give.
+                    "live_projections": precomputed.get("live_projections"),
+                    "live_game_state": precomputed.get("live_game_state"),
                     # rows_total/rows_truncated come from the artifact so a bounded
                     # grid is attributable rather than reading as "that is all there is".
                     "total_rows": precomputed.get("rows_total"),
