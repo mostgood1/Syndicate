@@ -2508,3 +2508,91 @@ put to the owner were built on the wrong premise:
 01:38 excursion, using the samples the watchdog is now producing for free. The
 question is what is different about the excursion, not what is expensive in
 general. That needs no deploy and no tracing.
+
+---
+
+## 2026-08-15 03:15Z — web `7e334509` — soccer card Lane G+H — PENDING MEASUREMENT
+
+`dep-d9vtjklg1s2s73bs6ib0`, service `srv-d88ahvrbc2fs73eodu30`, triggered
+03:15:30Z. Lane `soccer-card-end-to-end`.
+
+**Pinned, and it had to be.** `7e334509` = web's own live `a86eb4ed` + the
+single commit `3912f8f2`. **`origin/main`'s tip was NOT deployable**: it is 131
+commits ahead of the live SHA and it contains `ad4b0a3a`, which another session
+deployed successfully at 02:46:23Z and then **deliberately reverted** by
+redeploying `a86eb4ed` at 03:00:19Z. Deploying the tip would have silently
+undone their rollback. Pinned deploys replace rather than merge, so the next
+web deploy has to stack on `7e334509` or it drops this commit.
+Same work is on `origin/main` as `9b6a48e7` for whoever rebases later.
+
+**Preflight, answered:**
+1. *Scope* — one substantive change: the soccer card renders its own data or
+   nothing. 7 files, 710 insertions. No backend, worker, env or `render.yaml`
+   change, so no `blueprint_sync` risk and no in-flight sim at stake (web only).
+2. *Expected effect* — on `/soccer/epl/cards` at 1440 and 390, within one
+   deploy cycle: **unstyled links 2 -> 0**, **empty slots 3 -> 0**,
+   **projected-score sentence 6 -> 2 in the card DOM (5 -> 1 on the default
+   tab)**, worst repeated string 6x -> 4x. On `ncaaf` — the control, same
+   contract and stylesheet — **no change**: 0px overflow, 45/53px card-height
+   spread, 5x repeat, 3 empty slots. On `nfl` — the control that shares the
+   generic TEMPLATE — 0px overflow and 16 cards, with its own 6x repeat
+   expected to persist (different cause, see the lane).
+3. *Measurement* — `py -3 scripts/ui_layout_probe.py --base-url
+   https://syndicate-an21.onrender.com --sports soccer,nfl,ncaaf`. Read by this
+   session, immediately after `finishedAt`. Before-numbers were taken with the
+   same instrument against the same production build, and it reproduced all
+   three defects before anything was touched.
+4. *Blast radius* — web only. Routes 502 for ~2 minutes during the restart
+   (observed on the 02:53-03:00 deploy, which is what a 502 sweep earlier in
+   this session was actually measuring). No persistent-disk service restarts.
+5. *Rollback* — redeploy the live-before SHA:
+   `POST /v1/services/srv-d88ahvrbc2fs73eodu30/deploys {"commitId":"a86eb4ed"}`.
+6. *Ledger* — no `learnings.md` FORBIDDEN or EXONERATED rule covers this. No
+   OPEN lane claims any of the 7 files (lane-guard's own `_claims()` re-run
+   twice; `board-contract-absent-not-neutral` released three of them when it
+   was orphaned).
+7. *Verdict* — **PASS on the change, FAIL on the naive form of it.** Deploying
+   `origin/main` would have been a rollback of another session's rollback. The
+   pinned stack is what was shipped, and the owning session was messaged before
+   the trigger.
+
+**MEASUREMENT: [pending — this session, immediately after finishedAt]**
+
+### `#435` ANSWERED IN PART 2026-08-15 03:20:15Z — THE ANON IS NOT IN PYTHON CONTAINERS
+
+`96f2cfb5` live 03:18:53Z. Census fired 82 seconds later on the CONDITION
+(anon >= 1500MB), where the existing call site had never fired in 5h:
+
+    HEAP_CENSUS reason=watchdog_anon_1709mb  container_mb=2506
+    gc_tracked_objects   415,596
+    top_by_count         dict 240,250 | list 77,637 | function 30,715 | tuple 15,756
+    top_by_shallow_mb    dict 98.5 | list 20.1 | set 4.6 | function 4.5 | type 3.6
+    individually_huge_mb []
+
+**~135MB shallow across 415k objects, against 1709MB anon.** The census's own
+docstring sets the bar -- "2GB of anything must appear as TENS OF MILLIONS of
+objects" -- and this is three orders of magnitude short. No single object over
+50MB either.
+
+**WHAT THIS ELIMINATES:** the per-sport payload caches, the board dictionaries,
+the candidate pool -- every dict/list-shaped hypothesis, including the RETENTION
+one I recommended twice tonight. They are all in that 240k dicts / 98.5MB.
+
+**WHAT IT DOES NOT SEE, AND THIS IS THE POINT.** `gc.get_objects()` returns only
+CYCLIC-GC-TRACKED objects. `str`, `bytes`, `int`, `float` hold no references and
+are NOT tracked; neither are numpy data buffers. In a JSON-heavy pipeline those
+are precisely the bytes in question. **The census did not find the memory; it
+ruled out the place everyone looks first.**
+
+Consistent with `#423`'s `json.loads` at 491.3MB / 7,172,382 allocations, and
+with `_BOOK_QUOTES_CACHE`'s 500MB budget of parsed JSON.
+
+**NEXT, and it needs no new deploy machinery:** measure the UNTRACKED classes --
+walk `gc.get_objects()` and sum `sys.getsizeof` over each object's `referents`
+that are `str`/`bytes`, or size the named caches directly. That distinguishes
+"one cache holding parsed JSON" from "millions of small strings spread across
+the process", which have different fixes.
+
+**METHOD NOTE:** this worked because it triggered on the CONDITION, not a call
+site -- the same change that made the watchdog see what stage-boundary sampling
+could not. The existing instrument was correct and simply never ran.
