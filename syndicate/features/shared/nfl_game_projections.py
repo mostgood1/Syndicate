@@ -51,6 +51,7 @@ from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared.team_aliases import teams_match
 from syndicate.features.shared.source_roots import preferred_source_roots
+from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
 from syndicate.features.shared.nfl_preseason_calibration import (
     calibrated_total,
     is_preseason_profile,
@@ -470,6 +471,47 @@ def attach_nfl_game_projections(
         if projection is None:
             continue
         row["projection"] = projection  # type: ignore[index]
+
+        # `#340`, and NFL is the sport the centralisation was supposed to catch.
+        #
+        # MEASURED on the served shortlist 2026-08-15T02:37Z: 5 rows with
+        # `market_state: live` carried a `model_edge_pct` -- all NFL, all
+        # `basis: smartsim2_total_normal`, on games at `Q4 4:53` and `Q4 2:52`,
+        # with edges +2.70/+2.47/-2.47/-4.53/-7.03 against full-game totals of
+        # 34.5-39.5. A pregame full-game total priced against a market that has
+        # already watched 55 minutes of football is not an edge, it is the
+        # score. MLB's 31 live rows on the same board were correctly blank.
+        #
+        # `live_edge_policy` exists BECAUSE this keeps happening: the rule was
+        # written in `prop_projections`, copied to `soccer_projections`, missed
+        # by WNBA (128 of 128 live rows edged, 2026-08-10), and then extracted
+        # into one module whose docstring says "every sport's projection attach
+        # can depend on it without depending on each other". This file never
+        # took the dependency, so the extraction fixed three sports and left the
+        # fourth exactly as it was.
+        #
+        # APPLIED AT THE STAMP POINT, NOT INSIDE THE TOTALS BRANCH. Totals is
+        # the only branch that currently produces an edge, so guarding it there
+        # would work today and would be missed by the next branch that learns
+        # to -- which is precisely the failure being fixed. One choke point,
+        # every branch, including ones not written yet.
+        #
+        # Evaluated AFTER the stamp above because the policy reads
+        # `row["projection"]["live_aware"]` to let a genuinely live-aware model
+        # through. NFL has no live re-sim join today, so that flag is never set
+        # here -- wired in this order anyway so that if one is ever added, this
+        # guard admits it instead of silently suppressing the one signal worth
+        # ranking. `projection` is the same object, so mutating it lands.
+        #
+        # `total_edge_by_game` is deliberately NOT filtered by this. It holds
+        # `mean - line`, a model-vs-line diagnostic feeding `_slate_bias_warning`
+        # -- a systematic lean is worth detecting whether or not the game has
+        # started, and it never reaches the board as an edge.
+        live_reason = live_edge_unavailable_reason(row)
+        if live_reason:
+            projection["edge_vs_market_pct"] = None
+            projection["edge_unavailable_reason"] = live_reason
+
         attached += 1
 
     coverage: dict[str, Any] = {
