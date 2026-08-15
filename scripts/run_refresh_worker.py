@@ -3248,6 +3248,24 @@ def main() -> int:
         configure_malloc_arenas(2)
     except Exception as exc:  # noqa: BLE001 - a memory hint must never stop boot
         print(f"[refresh_worker] MALLOC_ARENA_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # `#435`. Starts at BOOT, not around a suspect stage, because the stage is
+    # not known -- that is the bug. Six kills sampled 2026-08-14/15 put the last
+    # instrumented line at 100%, 99.6%, 99.1%, 100% and, twice, at 71.9% and
+    # 22.7% seconds before death. The two low ones are multi-GB allocations
+    # INSIDE a stage, invisible to boundary sampling, and they are the ones that
+    # would name the allocator. A clock is the only thing that sees them.
+    #
+    # Unlike the tracemalloc block below this defaults ON: it costs one cgroup
+    # read per tick and stays silent under the floor, whereas an opt-in
+    # instrument needs an env write AND a deploy on Render, so it would arrive
+    # one incident late. `SYNDICATE_MEMORY_WATCHDOG=0` turns it off with no code
+    # change.
+    try:
+        from syndicate.features.shared.memory_observability import start_memory_watchdog
+
+        start_memory_watchdog()
+    except Exception as exc:  # noqa: BLE001 - an instrument must never stop boot
+        print(f"[refresh_worker] MEMORY_WATCHDOG_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     # `#423` step 2. Must start HERE, not at a periodic stage call: tracemalloc
     # only records allocations made after it starts, so a late start would miss
     # everything already resident and report a confident tiny number -- the same
