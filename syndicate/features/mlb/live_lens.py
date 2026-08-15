@@ -755,6 +755,35 @@ def _lens_rows_have_projection_signal(values: Any) -> bool:
     return False
 
 
+_LIVE_STATE_LENS_SOURCE = "live_mc"
+
+
+def _lens_rows_have_live_state_signal(values: Any) -> bool:
+    """True only when a lens row was produced by the live Monte Carlo.
+
+    Distinct from `_lens_rows_have_projection_signal` above, which answers "is
+    there a number here" and is satisfied by a card lens whose numbers were
+    `_parse_number_text`-ed out of display strings. This answers the narrower
+    question the merge actually needs: was this lens computed from the CURRENT
+    game state, or interpolated from a pregame one?
+
+    `source` is the only field that separates them. `_build_game_lens` stamps
+    `live_mc` exclusively on the `live`/`full` lanes and exclusively when
+    `estimate_live` returned; every other lane, and every lane on a game where
+    the re-sim bailed, is `segment_projection`. A `modelHomeWinProb`-presence
+    test would NOT separate them -- the segment lanes carry one too, via
+    `_live_margin_win_prob`.
+    """
+    if not isinstance(values, list):
+        return False
+    for lens in values:
+        if not isinstance(lens, dict):
+            continue
+        if str(lens.get("source") or "").strip().lower() == _LIVE_STATE_LENS_SOURCE:
+            return True
+    return False
+
+
 _CARD_PROP_TITLE_RE = re.compile(r"^(?P<player>.+?)\s+(?P<selection>Over|Under)\s+(?P<line>[-+]?\d+(?:\.\d+)?)\s+(?P<market>.+)$", re.IGNORECASE)
 
 
@@ -1091,9 +1120,37 @@ def _enhance_card_row_with_live_projection(card_row: dict[str, Any], projection_
     card_game_lens = enhanced.get("gameLens") if isinstance(enhanced.get("gameLens"), list) else []
     card_game_lens_has_signal = _lens_rows_have_projection_signal(card_game_lens)
     projection_game_lens_has_signal = _lens_rows_have_projection_signal(projection_game_lens)
+    # A LIVE-STATE lens always beats a text-derived one, and before this clause
+    # it never did -- on precisely the games it was written for.
+    #
+    # `_lens_rows_have_projection_signal` returns True on any parseable
+    # total/homeMargin, and `_live_lens_segments_from_card` manufactures both by
+    # `_parse_number_text`-ing the card's own display strings. So for a live game
+    # the card lens always "has signal", `card_is_live_or_final` is always True,
+    # and `card_game_lens` is never empty -- all three disjuncts below are False,
+    # and the Monte-Carlo lens carrying the only real live win probability on the
+    # platform was discarded. Measured 2026-08-15 against the served production
+    # payload: False on 5 of 5 live games (`.syndicate/spec_live_game_line_projection.md`).
+    #
+    # The discriminator is `source == "live_mc"` and NOT `modelHomeWinProb`,
+    # which looks like the obvious test and is the wrong one: `_build_game_lens`
+    # stamps a `modelHomeWinProb` on its first1/first3/first5 lanes too, derived
+    # from `_live_margin_win_prob` over a segment interpolation, so a
+    # `modelHomeWinProb is not None` test is satisfied by a lens the live re-sim
+    # never touched. Only the `live`/`full` lanes carry `live_mc`, and only when
+    # `estimate_live` actually returned.
+    #
+    # Deliberately additive: this ADDS a case in which the projection lens wins
+    # and removes none. Pregame rows are unreachable by it (`not
+    # card_is_live_or_final` already short-circuits True), and when the MC bails
+    # -- `_live_mc_projection` has seven instrumented exits -- the lens carries
+    # `segment_projection` instead, this clause is False, and the card lens is
+    # left exactly where it was rather than being clobbered by an interpolation.
+    projection_lens_is_live_state = _lens_rows_have_live_state_signal(projection_game_lens)
     should_use_projection_lens = projection_game_lens and (
         not card_game_lens
         or not card_is_live_or_final
+        or projection_lens_is_live_state
         or (projection_game_lens_has_signal and not card_game_lens_has_signal)
     )
     if should_use_projection_lens:
