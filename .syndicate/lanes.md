@@ -208,8 +208,60 @@
 
 
 ### soccer-backtest-leakage — CLOSED-VERIFIED 2026-08-14 — **ARCHIVED to `lanes_closed.md`**. Audit §7 #6. HEAD `2dcca4fe`; `50fd7fe2` ALONE IS UNSAFE TO MERGE (it emptied MLS ratings in production). MLS cannot be backtested from its current source at all.
+> **CORRECTION FILED IN PLACE 2026-08-15 by lane `soccer-model-coverage`.
+> THE FIX IS INERT FOR NINE OF TEN LEAGUES, INCLUDING ALL FOUR IN SEASON.**
+> The owning session is archived, so this is written here rather than sent.
+> The change itself is correct; it simply never bit the sources that matter.
+> `compute_team_ratings` filters with `str(row["date"])[:10] >= cutoff` -- a raw
+> TEXT compare -- and the formats split cleanly across every committed file:
+> `history/*.csv` (football-data, ALL 9 non-MLS leagues) is **DD/MM/YYYY**,
+> `team_history/*.csv` (Understat, 5 leagues) is ISO. `'17/05/2026' >=
+> '2026-08-14'` is **False**, so no row was ever excluded. On eredivisie's 918
+> matches, as-of 2023-09-01 and as-of 2026-08-14 select an **identical 923
+> match-rows** -- a September 2023 rating built from May 2026 results.
+> eredivisie / primeira_liga / championship / belgian_pro_league are
+> `history`-only and had NO as-of protection at all.
+> `tests/test_soccer_team_ratings_as_of.py` passed throughout because its
+> fixtures are ISO: **a date test written in the format the code already
+> handles cannot detect that it only handles that format.**
+> Two further bugs, same cause, live in PRODUCTION ratings: matches on the
+> 30th/31st were dropped as "future" (`'30/05/2024' >= '2026-08-14'` is True),
+> and the text sort behind `rows[-window:]` made "most recent 45" mean "the 45
+> latest in the MONTH".
+> Fixed in `loaders._as_iso_day` (day-first proven from the data: 5,908 of
+> 9,683 rows have a first component > 12, zero have a second > 12).
+> **This lane's own conclusion still stands and is now doubly true: do NOT cite
+> a backtest number for the goals-based four -- they were never as-of clean.**
 
-### ask-headline-from-board — OPEN — BLOCKED ON A GUARD FALSE-POSITIVE — B01 FIXED AND MEASURED, THEN ROLLED BACK FOR A 1-CASE REGRESSION — opened 2026-08-15 — session: lane-cleanup
+### ask-headline-from-board — CLOSED-VERIFIED 2026-08-15 — web `c774fe1a` live 03:29:56Z; B01 delta 0.000 and refusal 4/8 matching its control, both measured in production — opened 2026-08-15 — session: lane-cleanup
+> **CLOSED on measurement, not on tests.** Full record in `deploys.md`.
+> Verification criteria, both met: B01 `top_edge_diverges_from_board` cleared
+> (chat 6.35 vs board 6.35, |delta| 0.000, was 23.81 vs 14.09, fingerprinted
+> 5/5 `source=layer2_shortlist`), and refusal is 4/8 — identical case-for-case
+> to `control_refusal_rolledback_2026_08_15.json`, the same-slate control taken
+> on unchanged code.
+> - **IT TOOK TWO ATTEMPTS AND ONE ROLLBACK, which is the part worth keeping.**
+>   `ad4b0a3a` fixed B01 and shipped two defects: `Best edge 635.0%` (fraction
+>   vs percent) and F07 answering a question it should decline (an empty
+>   `recommendations` IS the engine declining; the board must replace a pool,
+>   never create one). Rolled back 14 min later, fixed, redeployed.
+> - **A RETRACTION LIVES IN `deploys.md`:** the refusal cost was first reported
+>   as 3 cases. Measured against a real control it was **1**. The probe that
+>   produced "3" read `payload["recommendations"]`, a key the endpoint does not
+>   return.
+> - **`post_m1_fixed_2026_08_14.json` IS NOT A 52-CASE BASELINE** — it is a
+>   ranking-only run, `passed: 4`, `total: 10`. The "23/52" cited by several
+>   lanes exists only in prose. Full same-slate runs now exist:
+>   `post_headline_2026_08_15.json` (24/52, reverted code) and
+>   `post_headline_fixed_2026_08_15.json` (25/52, live).
+> - **Shipped:** web `c774fe1a` (branch `deploy/ask-headline-from-board`,
+>   parented on the LIVE commit, not on main), and `98900164` on main.
+> - **Handed on, NOT done by this lane:** chat's headline now equals the
+>   board's, but `structured_response` still SUPPLEMENTS rather than replaces
+>   for non-market_summary intents, and F01/F02/F03/F05 refusals fail
+>   independently of this change — those belong to `ask-sport-coverage`.
+> - `.syndicate/.current-lane` was never taken from `soccer-model-coverage`;
+>   this lane used the per-session marker slot instead.
 > **STATE 2026-08-15 03:0xZ.** Deployed web `ad4b0a3a` 02:46:23Z, **rolled back
 > to `a86eb4ed` 03:00:19Z**, rollback verified. Full measurement and a
 > retraction are in `deploys.md`.
@@ -5454,3 +5506,134 @@ sim. No `render.yaml` change -> no `blueprint_sync`, no env rewrite.
     and that is the honest answer.**
   - Audit #2 (grading), #8, #9, #10 — untouched.
   - The `power` devig adopt-or-record-why-not item under B3 — untouched.
+
+#### soccer-model-coverage — BUILT 2026-08-15 03:xxZ. FOUR fixes, none deployed.
+
+**A FIFTH DEFECT FOUND WHILE BUILDING, AND IT INVALIDATES A CLOSED LANE.**
+`soccer-backtest-leakage` is marked CLOSED-VERIFIED. **Its fix is INERT for
+nine of ten leagues, including all four currently in season.**
+`compute_team_ratings` compared `str(row["date"])[:10] >= cutoff` as raw TEXT,
+and the date formats split cleanly `[measured across every committed file]`:
+
+    history/*.csv       (football-data.co.uk, ALL 9 non-MLS leagues)  DD/MM/YYYY
+    team_history/*.csv  (Understat, 5 leagues)                        ISO
+
+`'17/05/2026' >= '2026-08-14'` is **False** ('1' sorts before '2'), so no row
+was ever excluded. Demonstrated on eredivisie's 918 matches: as-of 2023-09-01
+and as-of 2026-08-14 both selected an **identical 923 match-rows**. A rating
+"as of September 2023" was built from May 2026 results. The four leagues
+producing today (eredivisie, primeira_liga, championship, belgian_pro_league)
+are `history`-only, so they had **no** as-of protection at all.
+`tests/test_soccer_team_ratings_as_of.py` passed throughout because its
+fixtures are ISO — a date test written in the format the code already handles
+cannot detect that it only handles that format.
+
+**TWO MORE BUGS FROM THE SAME CAUSE, both live in PRODUCTION ratings:**
+- `'30/05/2024' >= '2026-08-14'` is True, so every match on the 30th/31st was
+  dropped as "future" against any cutoff.
+- `rows.sort` feeding `rows[-window:]` sorted the same text, so "the most
+  recent 45 matches" was really "the 45 latest in the MONTH" — a biased sample
+  of the season behind every rating these leagues produce.
+
+Fixed by `loaders._as_iso_day` at the choke point all callers share.
+**Day-first confirmed from the data, not assumed:** across 9,683 parsed rows,
+5,908 have a first component > 12 and **zero** have a second component > 12.
+After the fix, as-of is monotonic — 46 / 612 / 827 / 954 / 957 rows for
+2023-09-01 / 2024-06-01 / 2025-01-01 / 2026-05-01 / 2026-08-14.
+
+**THE FOUR FIXES (all local, nothing pushed, nothing deployed):**
+1. `syndicate/features/soccer/seed_bootstrap.py` (new) +
+   `scripts/run_live_odds_refresh_worker.py` — the player-props root cause.
+   Seeds all four families; idempotent by construction (only writes into a
+   subdir with no matching file). **Needs a live-odds-worker deploy to do
+   anything.**
+2. `soccer_projections._price_against_market` — removed the STALE blanket
+   3-way refusal. Its stated reason ("`_no_vig_over_probability` pairs home
+   against away and would drop the draw") was already false when written:
+   `95305cab` taught that function the draw leg at 13:13 CDT on 2026-08-07 and
+   `#263` wrote the refusal at 23:43 the SAME DAY. Scoped to a known
+   `_THREE_WAY_GAME_MARKETS` set, not to "anything with three sides".
+3. `soccer_projections.match_for` — the alias fallback was fed PRE-NORMALISED
+   names. `_norm_name` turns a non-ASCII char into a SPACE
+   (`'Vitória SC'` -> `'vit ria sc'`) while the alias map is keyed on
+   `normalize`/`fold_accents`, so `canonical_team` returned None for both sides.
+   `teams_match(raw,raw)` True vs `teams_match(normed,normed)` False for this
+   exact pair. **9 of 204 clubs across 5 leagues** had a dead alias fallback —
+   Atlético Madrid, Alavés, Málaga, Deportivo La Coruña, Borussia
+   Mönchengladbach, CF Montréal, Académico de Viseu, Vitória de Guimaraes,
+   RAAL La Louvière. la_liga opens 08-21/08-22, so four more were about to
+   enter the horizon.
+4. `loaders._as_iso_day` — the as-of/window/30th bug above.
+
+**VERIFIED ON PRODUCTION DATA, not fixtures:** replaying the real join and the
+real pricing path over the served board + the four production artifacts,
+primeira_liga goes NONE -> MATCHED and all four h2h rows carry an edge where
+none did (+11.17 / +0.03 / -27.73 / -49.9).
+
+**DO NOT SHIP #2 ON ITS OWN — READ THIS.** The model's AGGREGATE calibration is
+fine: over all 166 match probabilities in the 54 production recommendation
+files, mean P(home) **0.4525** / P(draw) **0.2382** / P(away) **0.3093** against
+real-world base rates of ~44-46 / ~25-27 / ~28-30. It is NOT biased toward the
+away side. **The defect is DISPERSION** — stdev of P(home) is **0.1364**, max
+0.80. The model shrinks everything toward the base rate, so against a market
+pricing a -500 favourite at 0.779 it produces a -49.9 "edge" that is
+under-confidence, not value. Publishing those numbers would tilt soccer
+systematically toward underdogs — the same longshot pathology already recorded
+for the model-free half of the board.
+Contributing and separately cheap to fix: `adapters._DEFAULT_SIMULATIONS = 300`,
+which is **±2.9pp of pure Monte Carlo noise** on every published probability
+(visible as 0.0025 quantisation in the artifacts).
+
+**TESTS.** `-k soccer` **553 passed / 0 failed** before the loaders change;
+blast-radius set (chosen by who calls the changed symbols, not by topic)
+**378 passed / 0 failed**; 17 new date tests; 6 new seed-bootstrap tests.
+Every new test MUTATION-VERIFIED red: reverting the overwrite guard turns 1
+red, reverting `_as_iso_day` turns 3 red, and the pre-change entrypoint lacks
+the bootstrap symbol.
+
+**OWED / NEXT:** the leak-free Brier number itself
+(`scripts/backtest_soccer_h2h_calibration.py`, new, market-benchmarked and
+coverage-reporting) was running at checkpoint time. Until it reports, soccer
+backtest accuracy remains **unmeasured** — and `SoccerSimulationOutput`
+still ships `calibration.win_probability.brier = None`.
+
+### live-game-line-projection — OPEN — SPEC PHASE, awaiting review before any engine work — opened 2026-08-15 — session: live-game-line-projection
+- Goal: MLB game lines carry a projection computed from the CURRENT game state
+  rather than the pregame sim. **Testable outcome:** on a live MLB slate, a
+  published artifact carries a live win probability per live game whose value
+  MOVES between two consecutive builds while the pregame `predictions.full`
+  for the same game does not — and `rows_live_edged` on the book-grid counters
+  is > 0 for game-line markets.
+- **THE PREMISE IS FALSE AND THAT IS THIS LANE'S CENTRAL FINDING.** "No live
+  game-line projection exists" is a statement about PUBLICATION, not about
+  computation. `estimate_live(LiveSituation(...))` runs in production today,
+  120 sims per live game, on every live-lens tick, and returns `homeWinProb`,
+  `awayWinProb`, projected `total` and `homeMargin` from the live inning /
+  outs / bases / score / batter / pitcher state. Evidence in
+  `.syndicate/spec_live_game_line_projection.md` §1.
+- Files (exclusive to this lane):
+  - `.syndicate/spec_live_game_line_projection.md` (new — the deliverable of
+    this phase)
+  - `syndicate/features/mlb/live_lens.py` — the merge site at 1090-1100 that
+    discards the live-MC game lens for exactly the live games.
+- Hypothesis (H1): the live MC's `gameLens` is dropped by
+  `_enhance_card_row_with_live_projection`'s `should_use_projection_lens`
+  because the card's own pregame-derived lens already satisfies
+  `_lens_rows_have_projection_signal`, so the branch is False on precisely the
+  live games it was written to serve.
+- Hypothesis (H2): a second, independent drop — the report that is PUBLISHED
+  is the slim HTTP-fetched shape from `scripts/refresh_mlb_oddsapi.py`, which
+  carries no `gameLens` at all. Fixing H1 alone therefore changes nothing that
+  crosses to web.
+- Falsification test: for H1 — a live game whose card row carries NO gameLens
+  still shows no `source: live_mc` row after the merge, which would mean the
+  MC payload never reached the merge. For H2 — a published report that already
+  carries `gameLens` rows, which would mean the slim path is not the binding
+  drop.
+- Verification: (1) the spec is reviewed and its scope agreed BEFORE any engine
+  work — this phase produces no source edit; (2) any later code change is
+  measured on the published artifact, never through web's `/mlb/api/live-lens`,
+  which recomputes a cards fallback locally and is structurally blind to the MC
+  (`cardsFallback: True`, `simContextAvailable: False` on 14/14 games, measured).
+- Blocked by: none. **NO DEPLOY FROM THIS LANE.** refresh-worker is under
+  `#435` and had a deploy in flight (`eea7554a`) at lane-open.
