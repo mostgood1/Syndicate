@@ -2365,3 +2365,18 @@ log query, not a deploy.
   It failed closed, which is the right direction, but a guard whose success
   path is an error exit will eventually be "fixed" by deleting it. Use
   `| wc -l`.
+
+#### red-intelligence-tests — POST-CLOSE: the deploys.md revert RE-ARMED, and the recurrence names the cause
+- Disarmed at 3029-vs-3411. Minutes later it was back at **3411-vs-3494** — the
+  index holds the copy that WAS HEAD when I disarmed it. So this is not random
+  drift: **some session is committing `deploys.md` through an isolated
+  `GIT_INDEX_FILE` and skipping the repair step**, and each such commit re-arms
+  a revert of exactly that commit (`learnings.md`: "COMMITTING THROUGH AN
+  ISOLATED INDEX LEAVES THE SHARED INDEX STAGING A DELETION OF THE FILE YOU
+  JUST COMMITTED"). `HEAD == worktree` both times, so nobody is editing it and
+  nothing is lost by the reset.
+- **The missing step is one line, after every isolated-index commit:**
+  `git restore --staged <the paths you just committed>`.
+- Disarmed twice; blobs at `C:/tmp/index-blob-backup-2026-08-15/`. **I am not
+  policing this further** — a session that commits `deploys.md` needs to add the
+  repair, or the next bare `git commit` in this tree un-ships a measurement.
