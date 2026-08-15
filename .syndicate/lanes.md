@@ -1683,7 +1683,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
-### tabular-figures-actually-applied — OPEN — BOTH HALVES BUILT AND PUSHED; CSS HALF UNDEPLOYED, SO ITS 4 NUMBERS ARE STILL TRUE OF PRODUCTION — opened 2026-08-15 — session: ui-plan-lane-gh
+### tabular-figures-actually-applied — CLOSED-VERIFIED 2026-08-15 — deployed twice, all four sports measured to ZERO — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the tabular-figures fix covers the classes users actually watch, and
   the probe can no longer report a pass for a class it never found. Testable:
   `ui_layout_probe.py` FAILS on any numeric class with 0 elements on a sport
@@ -2449,3 +2449,122 @@ log query, not a deploy.
   failure**. Re-run on the next live slate.
 - **STILL OPEN: Drop 3, the game-line join.** `rows_live_edged` stays 0 for
   game-line markets regardless of these two drops.
+
+#### tabular-figures-actually-applied - CLOSED-VERIFIED 2026-08-15 - deployed twice, measured to ZERO on all four sports
+
+Both halves done. Instrument: `33e7d7a8`. CSS: `1bb8cf9f` + `454af741`.
+Deploys `d7c2ca7d` (live 19:43:59Z, pinned `bebe87c9`) and `f475c775`
+(live 20:00:58Z, pinned `9b88d05b`), each pinned on web's OWN live commit.
+
+    numericSweep   audit   after 1bb8cf9f   after 454af741
+    mlb             1388             143                0
+    nfl              468               0                0
+    ncaaf            432               0                0
+    soccer            60               0                0
+
+The lane's Goal is met on both clauses: the probe now FAILS on a numeric class
+with 0 elements on a card-serving sport (ncaaf `market-main`, still reported),
+and production MLB computes `tabular-nums` - confirmed on desktop at 15 cards,
+146 filter pills, `nonTabular: []`.
+
+**MLB's residual was a form-control inheritance boundary, not a selector gap.**
+`font-variant-numeric` does not cross into `<button>`; the UA `font:` shorthand
+resets it. Measured live before the fix: card tabular-nums, button normal,
+button fontFamily Arial. MLB was the only sport affected because it is the only
+one with in-card filter pills carrying counts.
+
+**Carried forward, NOT fixed:**
+- `scripts/ui_layout_probe.py` still waits on a fixed delay and flaked on MLB
+  during this very verification (`0 cards`). Waiting on `.cards-game-card` is
+  the next change to that file.
+- soccer `.cards-data-pair` 9 -> 0 - a producer change, card otherwise healthy
+  (same fixture, 4 tiles, 1 prob bar, 0 empty-copy). For `soccer-model-coverage`.
+- ncaaf `.cards-market-main` 0 elements on 16 cards - the stale-class defect the
+  instrument now names. Real, unowned, one class.
+
+- **FINAL:** shipped, measured, closed. Nothing of this lane uncommitted.
+
+#### ADDENDUM to the soccer cross-lane notice — the blocking run is being KILLED, on a cadence `[measured 2026-08-15 20:3xZ]`
+From `/v1/services/srv-d91dpertqb8s73co8lt0/events` (**events, not logs** — a
+process that exits does not log its own death):
+
+    20:03:41  server_failed  reason={'earlyExit': True, 'evicted': False}
+    14:34:36  server_failed  reason={'earlyExit': True, 'evicted': False}
+    08:05:09  server_failed  reason={'earlyExit': True, 'evicted': False}
+    01:37:13  server_failed  reason={'earlyExit': True, 'evicted': False}
+
+**live-odds-worker exits early roughly every 6.5 hours.** `earlyExit: True,
+evicted: False` = the process ended on its own; **not** an OOM kill and **not**
+an eviction. Corroborated independently: the job PIDs collapsed from
+10328/10329 (19:33) to **65/66** (20:27) — a fresh process namespace — and a new
+`refresh_odds_sources.py` began walking soccer leagues immediately on boot.
+
+**Why this matters to `soccer-model-coverage`:** this service is the **single
+producer** of soccer game odds, and its pregame run is long (still walking
+leagues 45+ min in). A restart every ~6.5h kills whatever run is in flight.
+That is a **second, independent mechanism** by which the odds step can fail
+without ever logging an error — and it composes with the
+`AUTORUN_FAILED: a refresh run is already active` lock contention already filed:
+a run killed mid-flight may leave the lock held, which is exactly what the 14:22
+and 18:22 autoruns hit. **Still a LEAD, not a cause** — I have not checked
+whether the lock is released on `earlyExit`, and that is the question that would
+settle it.
+
+**Consequence for anyone trying to DEPLOY this service:** the gate is closed
+from boot, because a refresh run launches immediately on start. Two consecutive
+CLEARs may effectively never occur. Observed 19:33–20:30: exactly **one** CLEAR
+window (19:55:44), under a minute, minutes before the 20:03:41 exit. **A deploy's
+incremental cost over the baseline is smaller than it looks — the run is already
+being killed every ~6.5h — but that is the soccer lane's call, not the deployer's.**
+
+### mlb-live-pitcher-projection — OPEN — opened 2026-08-15 — session: mlb-live-pitcher-projection
+- Goal: on a live MLB slate, a live prop row never shows (a) a projection below
+  an already-recorded actual, (b) a `model_prob_over` on the opposite side of
+  the line from its own `projected`, or (c) a blank live column with no
+  attributable reason. **Testable outcome:** on the served `/api/board/book-grid`,
+  `proj-side != prob-side` on live pitcher rows goes 7/13 -> 0, and
+  `live_projections` (the join's own counters) becomes readable from the API.
+- Files (exclusive to this lane):
+  - `syndicate/features/mlb/cards.py` — `_bounded_live_pitcher_projection` + its 2 call sites
+  - `syndicate/features/shared/live_projection_join.py` — the overlay's probability stamp
+  - `syndicate/blueprints/intelligence.py` — book-grid artifact response passthrough
+  - `tests/test_mlb_live_pitcher_projection.py` (new)
+- **NOT taken, deliberately:** `syndicate/features/mlb/live_lens.py` is claimed
+  exclusively by OPEN lane `live-game-line-projection`. Its `modelProbOver`
+  fallback chain (:541) is the ORIGIN of the pregame-probability-labelled-live
+  defect; this lane fixes the CONSUMER instead, which honours the contract
+  `live_lens.py:549` already documents in its own comment.
+- Hypothesis (H1): `_bounded_live_pitcher_projection` uses GAME progress
+  (`_live_progress_fraction`, total outs/54) where it needs the PITCHER's own
+  remaining workload, has no still-in-game check, and floors the residual at 0 —
+  so a pulled starter keeps accruing and a pitcher ahead of his mean projects to
+  add exactly nothing.
+- Hypothesis (H2): `live_projection_join` stamps `hit["model_prob_over"]` (which
+  `build_live_prop_index` fills from the lens's `modelProbOver`, i.e. the PREGAME
+  number) onto a row it labels `mlb_live_lens_monte_carlo`, so `projected` moves
+  with live state and the probability beside it does not.
+- Falsification test: for H1 — a live pitcher row whose projection already tracks
+  remaining outs and drops to the actual once the pitcher is pulled, which would
+  mean some other writer owns the number. For H2 — a live-lens row whose
+  `model_prob_over` differs from the pregame `_dist_prob_over` value for the same
+  player/market/line, which would mean the probability IS being recomputed live.
+- **NOT hypothesised, and deliberately so:** the cause of the 435 unmatched live
+  prop rows (`batter_home_runs` 0/116, `batter_hits_runs_rbis` 0/79). The alias
+  table already carries both names, so the miss is snapshot-side — but per
+  learnings.md 2026-08-15 ("never read a joiner zero as a data-quality verdict
+  until the reader has been shown to SEE the data") the published lens snapshot
+  has NOT been read from this session (it lives in keyvalue; web 404s on it).
+  This lane makes the counters READABLE and stops there. No cause is claimed.
+- Verification: (1) new tests, each mutation-verified red before green;
+  (2) `pytest -k "mlb and live"` plus the blast-radius set green;
+  (3) production re-measure on the served book-grid against the baseline taken
+  2026-08-15 20:12:48Z (below). NOT closed on tests alone.
+- **BASELINE, served `/api/board/book-grid?sport=mlb&date=2026-08-15`, artifact
+  generated 20:12:48Z, web `f475c775`:** 638 live rows; 57 (8.9%) live-overlaid;
+  **0 edged**; 13 live pitcher rows of which **7 have projection and probability
+  on opposite sides of the line**; `live_projections` absent from the response.
+  Ground truth for the user-reported game (StatsAPI 824644, Top 7, STL 7-CHC 3):
+  McGreevy 18 outs recorded vs **proj 17.136**; Boyd out of the game with 2 K /
+  7 ER vs **proj 4.057 K / 3.242 ER**.
+- Blocked by: none. **NO DEPLOY FROM THIS LANE** — refresh-worker writes this
+  artifact and is under `#435`; its deployed commit has NOT been read.
