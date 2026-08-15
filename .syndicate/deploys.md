@@ -2878,3 +2878,149 @@ it differently.
 
 Secondary, cheap, independent: let the evictor drop the last entry, so one
 oversized shard cannot sit above budget indefinitely.
+
+## 2026-08-15 — ask-sport-coverage — web — PENDING MEASUREMENT
+
+- **Commit:** `0bf866c3` on `deploy/ask-sport-coverage`, cut from the
+  then-live `c774fe1a` + `b6f1a2e6` (K9/K2/K11/K3/K4/K5/K6) + the test fix.
+- **Service:** web `srv-d88ahvrbc2fs73eodu30` ONLY. ~2 min of 502s on every
+  route. Sims run on refresh-worker, so this does not kill an in-flight sim.
+  No `render.yaml` change -> no `blueprint_sync`, no env rewrite.
+- **PRE-DEPLOY BASELINE, re-measured on live `c774fe1a` (NOT the brief's
+  23/52, which was stale):** overall **25/52** — advice 4/5, entity 2/10,
+  explain 4/6, history 2/5, lookup 4/8, ranking 5/10, refusal 4/8.
+  `reports/ask_regression/prebaseline_c774fe1a_2026_08_15.json`.
+- **PREDICTION, falsifiable:** the 15 `no_sport_resolved_expected_*` failures
+  go to 0 (verified 15/15 in-process on the combined tree). 13 of those cases
+  have routing as their ONLY failure, so **overall 25 -> 38/52**; lookup
+  4/8 -> 8/8, entity 2/10 -> 9/10, ranking 5/10 -> 7/10. D06 and G09 also fail
+  `no_draw_handling` and must NOT be expected to flip.
+- **Floor / rollback trigger:** any class BELOW its baseline above, or overall
+  below 25/52. Rollback = redeploy `c774fe1a`.
+- **Honest caveat:** tonight's board is 150 rows — wnba 18, nfl 42, mlb 90,
+  **zero soccer, zero ncaab, zero nhl.** Routing is data-independent so it
+  clears regardless, but a newly-routed soccer/nhl/ncaab question can surface
+  NEW failures that did not exist while it was never routed at all. A result
+  below 38 is therefore informative, not automatically a regression.
+- **Measurement owed by:** this session, immediately on `live`.
+- **RESULT:** _(empty — to be filled by the post-deploy run)_
+
+### MEASURED 2026-08-15 16:52Z — ask-sport-coverage — **CONFIRMED, prediction exact**
+
+Live `0bf866c3` at 16:49:28Z. Verified the code actually RAN before trusting any
+number: `routed_sport: 'soccer'` on a soccer question (was `None` on 52/52) and
+`visuals.as_of: '2026-08-15'`.
+
+**Slate control — the comparison is NOT confounded despite ~13h of wall clock
+between the two runs.** The board is byte-comparable in shape at both instants:
+150 rows, wnba 18 / nfl 42 / mlb 90, and both runs carry the same
+`warn:board_count_150_not_stated`. Same slate, so the diff is attributable.
+
+| class | pre `c774fe1a` | post `0bf866c3` | predicted |
+|---|---|---|---|
+| advice | 4/5 | 4/5 | 4/5 |
+| entity | 2/10 | **9/10** (+7) | 9/10 |
+| explain | 4/6 | 4/6 | 4/6 |
+| history | 2/5 | 2/5 | 2/5 |
+| lookup | 4/8 | **8/8** (+4) | 8/8 |
+| ranking | 5/10 | **7/10** (+2) | 7/10 |
+| refusal | 4/8 | 4/8 | 4/8 |
+| **overall** | **25/52** | **38/52** | **38/52** |
+
+- `no_sport_resolved_expected_*`: **15 -> 0.**
+- **REGRESSIONS: none.** Newly passing = exactly the 13 predicted IDs.
+- **D06 and G09 did NOT flip, as predicted** — both also fail `no_draw_handling`.
+  That is the part that makes this a real prediction rather than a retrofit: the
+  model of the change named which cases would NOT move, and it was right.
+
+**K6 IS ONLY HALF DONE — stated plainly rather than banked.**
+`warn:no_as_of_stated` is **24 -> 24, unmoved.** The payload field is populated
+(verified above), but the harness warns on the ANSWER TEXT, which still does not
+state an as-of. The contract half shipped; the surfacing half did not. Do not
+record K6 as closed.
+
+**Not fixed by this lane, still open at 38/52:** `refusal` 4/8 (regressed 6->4 by
+`c774fe1a`, NOT by this change — it was already 4/8 in the pre-baseline),
+`history` 2/5, `explain` 4/6, and `no_draw_handling` on the two soccer draw
+questions.
+
+### CORRECTION 2026-08-15 17:1xZ — my K6 claim was wrong, and my VERIFICATION of it was invalid
+
+I reported K6 as "half done — the payload field is populated, the harness warns
+on the answer TEXT". **Both halves of that sentence are wrong.**
+
+**What the harness actually does** (`ask_syndicate_regression.py:473`):
+`if not as_of and not re.search(r"as of|updated|\bat \d", lowered)`. It checks
+the FIELD FIRST. A populated `as_of` suppresses the warning outright, so 24
+warnings means the FIELD is None on 24 cases — not that the text is missing a
+phrase.
+
+**Measured:** `as_of` populated **28/52 pre and 28/52 post — utterly unchanged.**
+K6's freshness fallback is **INERT ON PRODUCTION**, not partially working.
+
+**Why I got it wrong, and this is the important part.** I "verified K6 in
+production" by asking ONE question and seeing `as_of: '2026-08-15'`. That
+question was B03, a ranking question — its `as_of` came from the board fetcher's
+EVIDENCE (`_evidence.get("as_of")`), which is the FIRST term in
+`_evidence.get("as_of") or _snapshot_as_of or None`. **My fallback never ran, and
+I confirmed a value my change did not produce.** The same question under the old
+code would have returned the same string.
+
+**Isolated:** A04 (soccer, no evidence) returns `as_of: None` on production and
+`as_of: '2026-08-15T17:07:33Z'` LOCALLY on identical code. The local box takes a
+snapshot read path that carries top-level `freshness`; production's does not.
+**A production A04 response contains NO timestamp-bearing field anywhere** (walked
+the whole payload, depth 3).
+
+**Not yet explained, and NOT to be guessed at:** `/api/intelligence/status` on
+production DOES carry `freshness.computed_at = 2026-08-15T05:21:08Z`
+(`freshness_status: stale`) at top level, so the data exists on the box — the ask
+route's `read_latest_intelligence_state` simply is not resolving to it.
+`_hydrate_intelligence_snapshot_payload` (in `ask_the_syndicate.py`, so it IS in
+lane) hoists `top_opportunities`/`recommendations` out of a nested `response`
+block but never hoists `freshness` — a plausible cause, NOT a confirmed one.
+Locally that path returns freshness at top level with no nested block, so the
+local box cannot reproduce it.
+
+**Next step for whoever takes this:** instrument which of the two read paths
+`read_latest_intelligence_state` resolves to ON PRODUCTION before changing the
+hoist. Fixing it blind is how the last inert fix happened.
+
+**The 25 -> 38/52 result is UNAFFECTED** — it rests on routing failures 15 -> 0,
+which were measured directly and independently of as_of. K6 is the only item
+mis-reported.
+
+### `#435` FIX DEPLOYED 2026-08-15 18:11:53Z — `c67f7373` — FIRST MEASUREMENT
+
+Rebased onto the LIVE sha `984e48c8`, NOT main: live is not an ancestor of main
+(this morning's watchdog + censuses are on the deploy branch and were never
+merged), so deploying main's tip would have rolled back my own instrumentation.
+Fired on a confirmed CLEAR — zero jobs killed.
+
+**SAME-DAY, SAME-SHARD COMPARISON — the "before" side has NO boot confound:**
+
+    17:00-18:11Z  old code   CACHE_EVICT 10   peak anon 2,869.3 MB  (70.0%)
+    18:11-18:21Z  new code   CACHE_EVICT  0   peak anon 1,070.8 MB  (26.1%)
+
+The 10 evictions are the churn the fix targets: each drops a ~1.1GB entry and
+the next read rebuilds it. Zero since.
+
+**Board is healthy on the new reader:** `LAYER2_SHORTLIST rows=114
+considered=14,298 sports=['mlb','nfl','wnba']` at 18:21:09Z, container 57.3%,
+no tracebacks, all loops started.
+
+**WHAT THIS IS NOT YET.** The worker booted at 18:11:53, so the post-deploy
+figure is 9 minutes old and memory always looks good after a boot — the standing
+rule in `learnings.md`. What removes the confound is that the BEFORE side is the
+same day and the same shard, an hour earlier, at 2,869MB.
+
+**THE DECISIVE WINDOW IS TONIGHT 20:00-22:00Z.** Last night's kills started at
+20:03:11Z and ran every ~16 min with the shard at 130-184MB. Tonight the shard
+grows the same way; if the fix holds, no kill and anon stays off the ceiling.
+Kills are EVENTS: check `/v1/services/<id>/events`, never a log grep.
+
+**NO PROOF-OF-BRANCH MARKER, and that is a real gap.** I wrote a
+`QUOTES_REDUCED` line and the lane guard blocked it — `quote-feed-age-alarm`
+(session `tier5-live-read`, unattended) claims `odds_book_quotes.py`. The
+evidence above is indirect: eviction churn stopping and peak anon halving on the
+same shard. Strong, but not the same as the branch announcing itself.
