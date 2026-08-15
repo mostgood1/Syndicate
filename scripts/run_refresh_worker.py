@@ -3283,7 +3283,14 @@ def main() -> int:
     try:
         from syndicate.features.shared.memory_observability import start_allocation_tracing
 
-        start_allocation_tracing(3)
+        # nframe=2 for THIS window, not 3. Three frames was `#423`'s answer on a
+        # worker that was not simultaneously being measured; the 02:11-02:16
+        # window showed the overhead is not free here (sampler starved, kill
+        # cadence 3-10 min against 16-22). Two frames still names the CALLER --
+        # which is the entire reason 1 was useless -- at a lower per-allocation
+        # cost. The dump now also stops tracing the moment it has its answer, so
+        # this is a window measured in seconds rather than until someone notices.
+        start_allocation_tracing(2)
     except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop boot
         print(f"[refresh_worker] TRACEMALLOC_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     _diag_log_all_process_memory("boot")

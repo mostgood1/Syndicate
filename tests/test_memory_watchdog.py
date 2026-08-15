@@ -255,3 +255,24 @@ def test_the_dump_never_runs_on_the_sampler_thread():
         assert started.get("target") is mo._watchdog_dump_allocations_now
     finally:
         mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+
+
+def test_the_dump_closes_the_tracing_window_itself(capfd):
+    """The previous window stayed open until a human noticed, and cost ~25 min of
+    a 3-10 min kill cadence against 16-22. One dump per boot is all we take, so
+    every traced allocation after it is pure cost on a process that OOMs."""
+    mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+    try:
+        with patch.object(mo, "allocation_tracing_enabled", return_value=True), patch.object(
+            mo, "allocation_snapshot", return_value={"traced_mb": 1.0, "top": []}
+        ), patch.object(mo, "stop_allocation_tracing") as stop:
+            mo._watchdog_dump_allocations_now({"memory_anon_mb": 2500.27}, 133.2)
+        stop.assert_called_once()
+    finally:
+        mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+
+
+def test_stopping_tracing_never_raises_and_reports_what_it_did(capfd):
+    mo.stop_allocation_tracing("unit-test")
+    out = capfd.readouterr().out
+    assert "TRACEMALLOC_STOPPED" in out and "unit-test" in out

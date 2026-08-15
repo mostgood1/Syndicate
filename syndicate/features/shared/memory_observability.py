@@ -918,6 +918,35 @@ def _watchdog_maybe_dump_allocations(payload: dict[str, Any], climb_mb_per_s: fl
         )
 
 
+def stop_allocation_tracing(reason: str) -> bool:
+    """Stop tracing and free the per-allocation tracebacks. Never raises.
+
+    Tracing is a WINDOW, not a setting. Every allocation carries tracebacks while
+    it is on, so leaving it armed after the one dump has been taken is pure cost
+    on a process that is already OOM-killing.
+    """
+    try:
+        import tracemalloc
+
+        was_tracing = tracemalloc.is_tracing()
+        if was_tracing:
+            tracemalloc.stop()
+        _TRACEMALLOC_STATE["started"] = False
+        _TRACEMALLOC_STATE["reason"] = f"stopped:{reason}"
+        print(
+            "[memory_observability] TRACEMALLOC_STOPPED "
+            + json.dumps({"reason": reason, "was_tracing": bool(was_tracing)}, sort_keys=True),
+            flush=True,
+        )
+        return bool(was_tracing)
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] TRACEMALLOC_STOP_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
+
+
 def _watchdog_dump_allocations_now(payload: dict[str, Any], climb_mb_per_s: float | None) -> None:
     """The dump itself. Always called with the decision already made."""
     try:
@@ -943,6 +972,17 @@ def _watchdog_dump_allocations_now(payload: dict[str, Any], climb_mb_per_s: floa
             file=sys.stderr,
             flush=True,
         )
+        # THE WINDOW CLOSES ITSELF. We take exactly one dump per boot, so once it
+        # is printed every further traced allocation is pure cost on a process
+        # that OOMs -- and on 2026-08-15 02:11-02:16 that cost was measurable:
+        # kill cadence 3-10 min against 16-22, and the sampler starved outright.
+        #
+        # Ending it here rather than by hand is the point. The previous window
+        # stayed open until a human noticed, deployed twice and wrote an env
+        # var; this one ends microseconds after the data exists, whether or not
+        # anyone is watching. `#241` is the standing reminder that periodic work
+        # on this worker is never free.
+        stop_allocation_tracing("dump_complete")
     except Exception as exc:  # pragma: no cover - defensive, must never raise
         print(
             f"[memory_observability] WATCHDOG_ALLOCATION_DUMP_FAILED {type(exc).__name__}: {exc}",
