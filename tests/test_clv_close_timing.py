@@ -15,7 +15,7 @@ from __future__ import annotations
 from syndicate.features.shared.clv_join import compute_clv_for_date
 
 
-def _opening(key, price, *, book="fanduel", event="evt1", market="h2h", side="away",
+def _opening(key, price, *, book="fanduel", event="evt1", market="h2h", side="home",
              commence="2026-08-15T19:08:00Z"):
     # `commence_time` is read off the OPENING, not the history market
     # (`clv_join.py:197`). Getting that wrong makes every row read as
@@ -24,6 +24,7 @@ def _opening(key, price, *, book="fanduel", event="evt1", market="h2h", side="aw
         "key": key, "sport": "mlb", "market": market, "side": side, "line": None,
         "player_name": None, "bookmaker": book, "price": price, "event_id": event,
         "captured_at": "2026-08-15T05:07:53Z",
+        "home_team": "Toronto Blue Jays", "away_team": "New York Yankees",
         "book_prices": {book: price},
     }
     if commence is not None:
@@ -46,6 +47,7 @@ def _history(close_price, *, book="fanduel", event="evt1", market="h2h",
     return {
         "markets": {
             f"event_id={event}|home_team=H|away_team=A|market={market}|bookmaker={book}": {
+                "entity": "Toronto Blue Jays",
                 "closing_price": close_price,
                 "closing_captured_at": stamp,
             }

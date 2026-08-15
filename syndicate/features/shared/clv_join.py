@@ -178,6 +178,44 @@ def _price_for_side(point: Mapping[str, Any], opening: Mapping[str, Any]) -> tup
     return None, "no_price_on_point"
 
 
+def _stamped_close_side(
+    market_state: Mapping[str, Any], opening: Mapping[str, Any]
+) -> str | None:
+    """Which side the scalar `closing_price` belongs to, or None if unknowable.
+
+    **THE STAMP IS ENTITY-SCOPED AND CARRIES NO SIDE.**
+    `odds_refresh_tracking.py:1602` writes `closing_price = previous_odds`, and
+    `previous_odds` is the price of `entity` — one team, not both. Measured on
+    mlb 2026-08-15 across every market carrying a stamp: **`entity ==
+    home_team` on 18 of 18**, so in practice the stamp is the HOME price.
+
+    That is the whole defect this exists to close. Read as a side-blind scalar,
+    an away-side opening was differenced against the home close: event
+    `dbbb481a…` (Yankees @ Blue Jays) opened away `-186` and was paired with
+    `+168`, which is TORONTO's price — a `-27.72` that is not CLV at all.
+
+    Returned as a side rather than a bool so the caller can say WHY it refused.
+    None means the entity could not be identified, which is refused rather than
+    assumed: `learnings.md` is explicit that unknown must not take the
+    permissive branch, and this is the exact shape of that rule.
+    """
+    entity = str(market_state.get("entity") or "").strip()
+    if not entity:
+        for point in market_state.get("history") or ():
+            if isinstance(point, Mapping) and str(point.get("entity") or "").strip():
+                entity = str(point["entity"]).strip()
+                break
+    if not entity:
+        return None
+    home = str(opening.get("home_team") or "").strip()
+    away = str(opening.get("away_team") or "").strip()
+    if home and entity.casefold() == home.casefold():
+        return "home"
+    if away and entity.casefold() == away.casefold():
+        return "away"
+    return None
+
+
 def resolve_close(
     opening: Mapping[str, Any],
     market_state: Mapping[str, Any] | None,
@@ -201,6 +239,32 @@ def resolve_close(
     stamped = _as_float(market_state.get("closing_price"))
     if stamped is None:
         stamped = _as_float(market_state.get("closing_line"))
+    # THE STAMP IS ONLY USABLE FOR THE SIDE IT BELONGS TO.
+    #
+    # Unlike a history point, the stamp has no `line` block, so there is nothing
+    # to resolve the other side from — `_price_for_side` cannot help here. The
+    # only sound move is to use it when this opening IS the entity's side and
+    # otherwise fall through to `last_pregame_quote`, which reads the `line`
+    # block and is side-aware by construction. That fallback is not a
+    # degradation: it is the path that was already producing every correct row
+    # (measured 100%/100% — every contaminated row was `observed_transition`,
+    # every clean one `last_pregame_quote`).
+    #
+    # Falling through rather than refusing outright matters: a home-side opening
+    # keeps its real observed close, and an away-side one gets a correct
+    # side-aware close instead of a wrong number. Nothing is fabricated either way.
+    stamped_side = _stamped_close_side(market_state, opening) if stamped is not None else None
+    opening_side = str(opening.get("side") or "").strip().lower()
+    if stamped is not None and (stamped_side is None or stamped_side != opening_side):
+        # Counted by name on the row so the fallback is visible rather than
+        # silent. `totals` lands here by design: its sides are over/under while
+        # the entity is a team, so the stamp can never be attributed to a side.
+        out["stamped_close_skipped"] = (
+            "stamped_close_entity_unknown" if stamped_side is None
+            else f"stamped_close_is_{stamped_side}_side"
+        )
+        stamped = None
+
     if stamped is not None and not is_prop:
         # Only trusted for game markets: `closing_line` for a prop is the LINE
         # (e.g. 1.5), not a price, and treating it as one would fabricate a
@@ -456,6 +520,9 @@ def compute_clv_for_date(
                 "open_captured_at": opening.get("captured_at"),
                 "close_price": resolved.get("close_price"),
                 "close_source": resolved.get("close_source"),
+                # Present when the entity-scoped stamp was refused for this
+                # side and the side-aware fallback was used instead.
+                "stamped_close_skipped": resolved.get("stamped_close_skipped"),
                 "close_captured_at": resolved.get("close_captured_at"),
                 "close_age_seconds": resolved.get("close_age_seconds"),
                 "close_book_scope": resolved.get("close_book_scope"),
@@ -540,6 +607,12 @@ def compute_clv_for_date(
             "beat_close_rate": round(beat_n / len(subset), 4),
         }
 
+    _skipped_counts: dict[str, int] = {}
+    for row in rows:
+        reason = row.get("stamped_close_skipped")
+        if reason:
+            _skipped_counts[str(reason)] = _skipped_counts.get(str(reason), 0) + 1
+
     by_scope: dict[str, dict[str, Any]] = {}
     for scope in sorted({str(row.get("close_book_scope")) for row in rows}):
         by_scope[scope] = _stats([row for row in rows if row.get("close_book_scope") == scope])
@@ -578,6 +651,11 @@ def compute_clv_for_date(
             1 for row in same_book_all if row.get("close_timing") == "unknown"
         ),
         "by_close_timing": by_timing,
+        # How often the entity-scoped stamp was refused for this row's side.
+        # Expected to be LARGE and that is the fix working: before this, every
+        # away-side opening on a stamped market was silently differenced against
+        # the home team's closing price.
+        "stamped_close_skipped": _skipped_counts,
         "bias_note": (
             "avg_clv_pct counts same_book rows whose close was observed BEFORE "
             "first pitch. The opening is a best-of-N book price, so pairing it "
