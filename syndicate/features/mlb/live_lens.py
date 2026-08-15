@@ -784,6 +784,138 @@ def _lens_rows_have_live_state_signal(values: Any) -> bool:
     return False
 
 
+# Drop 2. A rebuild that CANNOT produce live-state signal must not destroy it.
+#
+# The live Monte Carlo is hard-refused inside a web request
+# (`_live_projection_enhancement_payload` -> `refuse_if_compute_in_request_path`),
+# so web's fallback rebuild is structurally incapable of carrying `live_mc` --
+# and it REPLACES rather than merges. With the snapshot max-age at 60s against a
+# 60s worker tick, that is a coin-flip per request. Same shape as `#124`'s
+# `prop_row_counts=[0]*9`.
+#
+# WHY CARRY-FORWARD AND NOT A BIGGER MAX-AGE. Raising the threshold only makes
+# the destruction rarer; it stays for the case that matters most -- a stalled
+# worker, which is measured and real (Layer 2 sat 60+ min with no alarm). `#124`
+# already tuned this threshold once, and `learnings.md` warns that a threshold
+# calibrated against a span is invalidated when the span changes. This is the
+# structural rule instead, mirroring the never-downgrade rule the prop branch of
+# `_enhance_card_row_with_live_projection` already applies.
+#
+# WHY IT IS AGE-BOUNDED AND STAMPED. Carrying a live win probability forward
+# without limit is exactly the harm `#414` exists to prevent -- a stale number on
+# a live label, which is worse than an absent one because nothing says so. So a
+# carried lens is refused past a bound, and stamped with the absolute instant the
+# re-sim actually ran, never a recomputed age.
+_LIVE_STATE_CARRY_FORWARD_MAX_AGE_DEFAULT_SECONDS = 300
+
+
+def _live_state_carry_forward_max_age_seconds() -> int:
+    try:
+        value = int(str(os.environ.get("MLB_LIVE_STATE_CARRY_FORWARD_MAX_AGE_SECONDS") or "").strip())
+    except Exception:
+        return _LIVE_STATE_CARRY_FORWARD_MAX_AGE_DEFAULT_SECONDS
+    # 0 disables carry-forward outright, which is the kill switch. A negative
+    # value is a typo, not an intent, and must not read as "disabled".
+    return value if value >= 0 else _LIVE_STATE_CARRY_FORWARD_MAX_AGE_DEFAULT_SECONDS
+
+
+def _live_state_lens_by_game_pk(snapshot: dict[str, Any] | None) -> dict[int, list[dict[str, Any]]]:
+    """gamePk -> lens rows, for games whose lens came from the live re-sim."""
+    if not isinstance(snapshot, dict):
+        return {}
+    out: dict[int, list[dict[str, Any]]] = {}
+    for game in _snapshot_games(snapshot):
+        try:
+            game_pk = int(game.get("gamePk") or 0)
+        except Exception:
+            continue
+        if not game_pk:
+            continue
+        lens = game.get("gameLens") if isinstance(game.get("gameLens"), list) else []
+        if _lens_rows_have_live_state_signal(lens):
+            out[game_pk] = lens
+    return out
+
+
+def _stamp_live_state_as_of(lens_rows: list[dict[str, Any]], as_of: str) -> list[dict[str, Any]]:
+    """Stamp the instant the re-sim ran, and NEVER overwrite an existing stamp.
+
+    This is what stops the age compounding. A carried lens can itself be carried
+    again on the next rebuild; if each hop re-stamped with its own `generatedAt`,
+    the lens would read as permanently fresh and the age bound would never fire.
+    """
+    stamped: list[dict[str, Any]] = []
+    for lens in lens_rows:
+        if not isinstance(lens, dict):
+            continue
+        row = dict(lens)
+        if not str(row.get("liveStateAsOf") or "").strip():
+            row["liveStateAsOf"] = as_of
+        row["liveStateCarriedForward"] = True
+        stamped.append(row)
+    return stamped
+
+
+def _carry_forward_live_state_lens(report: dict[str, Any], previous_snapshot: dict[str, Any] | None) -> dict[str, Any]:
+    """Restore the live-state lens a lens-less rebuild would otherwise drop.
+
+    Only touches a game that (a) is still LIVE in the fresh report, (b) has no
+    live-state lens of its own, and (c) had one in the previous snapshot inside
+    the age bound. A game that has gone final since is deliberately left alone --
+    resurrecting a live win probability onto a settled game is the `#414` harm.
+    """
+    if not isinstance(report, dict) or not isinstance(previous_snapshot, dict):
+        return report
+    max_age = _live_state_carry_forward_max_age_seconds()
+    if max_age <= 0:
+        return report
+
+    # An unknown age must NOT take the permissive branch: without a readable
+    # `generatedAt` there is no way to bound staleness, so refuse to carry.
+    age_seconds = _snapshot_generated_at_age_seconds(previous_snapshot)
+    if age_seconds is None or age_seconds > float(max_age):
+        return report
+
+    by_game_pk = _live_state_lens_by_game_pk(previous_snapshot)
+    if not by_game_pk:
+        return report
+
+    as_of = str(previous_snapshot.get("generatedAt") or "").strip()
+    rows = report.get("games") if isinstance(report.get("games"), list) else []
+    carried = 0
+    out_rows: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        row = dict(row)
+        try:
+            game_pk = int(row.get("gamePk") or 0)
+        except Exception:
+            game_pk = 0
+        own_lens = row.get("gameLens") if isinstance(row.get("gameLens"), list) else []
+        previous_lens = by_game_pk.get(game_pk)
+        if (
+            game_pk
+            and previous_lens
+            and not _lens_rows_have_live_state_signal(own_lens)
+            and _status_bucket_from_row(row) == "live"
+        ):
+            row["gameLens"] = _stamp_live_state_as_of(previous_lens, as_of)
+            carried += 1
+        out_rows.append(row)
+
+    if not carried:
+        return report
+    out = dict(report)
+    out["games"] = out_rows
+    counts = dict(out.get("counts") or {})
+    # Named so a served payload can be asked "did this come from a real re-sim
+    # on this tick, or from the last one?" without diffing two snapshots.
+    counts["liveStateLensCarriedForward"] = carried
+    out["counts"] = counts
+    return out
+
+
 _CARD_PROP_TITLE_RE = re.compile(r"^(?P<player>.+?)\s+(?P<selection>Over|Under)\s+(?P<line>[-+]?\d+(?:\.\d+)?)\s+(?P<market>.+)$", re.IGNORECASE)
 
 
@@ -1495,7 +1627,9 @@ def _live_lens_snapshot_needs_refresh(selected_date: str, snapshot: dict[str, An
 def read_latest_live_lens_page_context(selected_date: str, *, season: int | None = None) -> dict[str, Any]:
     snapshot = read_latest_live_lens_snapshot()
     if _live_lens_snapshot_needs_refresh(selected_date, snapshot):
-        fresh_snapshot = build_live_lens_snapshot_internal(selected_date, season=season, persist=False)
+        # Hand over the snapshot being replaced: the rebuild cannot produce
+        # live-state signal in-request, so this is the only thing that keeps it.
+        fresh_snapshot = build_live_lens_snapshot_internal(selected_date, season=season, persist=False, previous_snapshot=snapshot)
         if isinstance(fresh_snapshot, dict):
             snapshot = fresh_snapshot
     if snapshot is None:
@@ -1506,7 +1640,8 @@ def read_latest_live_lens_page_context(selected_date: str, *, season: int | None
 def read_latest_live_lens_api_payload(selected_date: str, *, season: int | None = None) -> dict[str, Any]:
     snapshot = read_latest_live_lens_snapshot()
     if _live_lens_snapshot_needs_refresh(selected_date, snapshot):
-        fresh_snapshot = build_live_lens_snapshot_internal(selected_date, season=season, persist=False)
+        # Same as the page context above -- this is the surface measured blind.
+        fresh_snapshot = build_live_lens_snapshot_internal(selected_date, season=season, persist=False, previous_snapshot=snapshot)
         if isinstance(fresh_snapshot, dict):
             snapshot = fresh_snapshot
     if snapshot is None:
@@ -1524,7 +1659,7 @@ def read_latest_live_lens_api_payload(selected_date: str, *, season: int | None 
     return payload
 
 
-def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None = None, persist: bool = False) -> dict[str, Any]:
+def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None = None, persist: bool = False, previous_snapshot: dict[str, Any] | None = None) -> dict[str, Any]:
     # Intended as a worker-only compute function (live-odds-worker's
     # live_lens_loop tick), but reachable in-request as a cache-miss
     # fallback from read_latest_live_lens_page_context/api_payload -- same
@@ -1555,6 +1690,20 @@ def build_live_lens_snapshot_internal(selected_date: str, *, season: int | None 
         fallback_report = _cards_backed_live_lens_report(selected_date)
         if fallback_report is not None:
             report = fallback_report
+    # Drop 2. Applied HERE, on the report, rather than on the finished snapshot,
+    # because `page_context` and `api_payload` are both derived from these rows
+    # further down -- one merge feeds both surfaces, instead of two that can
+    # drift apart. Costs no I/O in the common case: the caller hands over the
+    # snapshot it has already read, and the lazy read below only fires when the
+    # fresh report genuinely lacks live-state signal.
+    if isinstance(report, dict) and not any(
+        _lens_rows_have_live_state_signal(row.get("gameLens"))
+        for row in (report.get("games") or [])
+        if isinstance(row, dict)
+    ):
+        if previous_snapshot is None:
+            previous_snapshot = read_latest_live_lens_snapshot()
+        report = _carry_forward_live_state_lens(report, previous_snapshot)
     runtime_live_lens_dir = str(report_path.parent)
     runtime_data_root = str(report_path.parent.parent)
     generated_at = str((report or {}).get("generatedAt") or datetime.now().astimezone().isoformat(timespec="seconds")).strip() or selected_date

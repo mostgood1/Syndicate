@@ -428,7 +428,13 @@ class MlbRefreshRunnerTests(unittest.TestCase):
         self.assertEqual(payload["counts"]["games"], 1)
         self.assertEqual(payload["games"][0]["gamePk"], 123)
         mocked_snapshot.assert_called_once()
-        mocked_build.assert_called_once_with(today, season=None, persist=False)
+        # `previous_snapshot` hands the rebuild the snapshot being replaced, so
+        # a rebuild that cannot produce live-state signal in-request can keep it
+        # instead of destroying it (lane `live-game-line-projection`, Drop 2).
+        # Passing the ALREADY-READ snapshot rather than re-reading inside is
+        # what keeps this off the request path's I/O budget -- so the kwarg is
+        # load-bearing and pinned here rather than loosened to ANY.
+        mocked_build.assert_called_once_with(today, season=None, persist=False, previous_snapshot={})
 
     def test_build_live_lens_snapshot_internal_reads_report_without_feed_refresh(self) -> None:
         from syndicate.features.mlb import live_lens as live_lens_module
