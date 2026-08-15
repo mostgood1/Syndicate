@@ -3258,6 +3258,27 @@ def main() -> int:
         start_memory_watchdog()
     except Exception as exc:  # noqa: BLE001 - an instrument must never stop boot
         print(f"[refresh_worker] MEMORY_WATCHDOG_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # ####################################################################
+    # `#435` 2026-08-15: DO NOT TURN THIS ON WHILE THE WATCHDOG IS THE
+    # INSTRUMENT YOU ARE RELYING ON. MEASURED TWICE, AT TWO FRAME COUNTS:
+    #
+    #   tracing OFF   02:30-02:31   8 MEMORY_WATCHDOG samples per minute
+    #   nframe=3      02:11-02:16   ZERO samples, then OOM at 02:16:41
+    #   nframe=2      02:48-02:55   ZERO samples in 6.7 min, OOM at 02:47:54
+    #
+    # Both windows also carried a faster kill cadence (3-10 min against the
+    # 16-22 min baseline). Tracing every allocation on this heap costs enough
+    # that the sampling thread stops producing, so the cheap instrument that
+    # DOES work is silenced by the expensive one that has never yet returned an
+    # answer. Worse, the silence is indistinguishable from "no excursion
+    # happened" -- it was read that way twice.
+    #
+    # If it is re-armed: expect no watchdog samples for the duration, do not
+    # read that as calm, and close the window explicitly. The dump now closes it
+    # automatically once it fires (`stop_allocation_tracing`), but it has not
+    # fired yet in production.
+    # ####################################################################
+    #
     # `#423` step 2. Must start HERE, not at a periodic stage call: tracemalloc
     # only records allocations made after it starts, so a late start would miss
     # everything already resident and report a confident tiny number -- the same
