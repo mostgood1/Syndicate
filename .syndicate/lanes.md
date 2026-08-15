@@ -2708,7 +2708,7 @@ the STRICT reading. That fail-closed default is now pinned by a test.
 
 - **FINAL:** shipped, verified, closed. Nothing of this lane uncommitted.
 
-### quote-feed-threshold-per-sport — OPEN — CODE COMMITTED `9e100444` + MUTATION-PINNED (22 pass, 4-red/18-green); **NOT DEPLOYED, production still on the single 10,800 s value**; my 3x-p50 basis was REFUTED by my own earlier test and the soccer 'catch' is downgraded to a threshold artifact — opened 2026-08-15 — session: tier5-live-read
+### quote-feed-threshold-per-sport — CLOSED-VERIFIED 2026-08-15 — deployed web `b9ea0f0a`; **four distinct thresholds live** (nfl 120 / mlb 180 / wnba 360 / soccer 420 min); WNBA at 219.1 min now correctly `ok` where the old global called it stale; soccer STILL stale at 437.5 min (my predicted flip to `ok` did NOT happen — the feed aged past even the loosened threshold) — opened 2026-08-15 — session: tier5-live-read
 - Goal: the stale threshold is per-sport and grounded in each feed's MEASURED
   cadence, so the alarm stops being simultaneously too slow for NFL and a
   false-alarm generator for soccer. Testable outcome: with no env set, a feed at
@@ -2749,7 +2749,7 @@ the STRICT reading. That fail-closed default is now pinned by a test.
   previously read `stale`.
 - Blocked by: none.
 
-### ncaaf-market-main-expectation — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+### ncaaf-market-main-expectation — CLOSED-VERIFIED 2026-08-15 — ncaaf run OK; exemption checked in both directions — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the harness stops reporting a failure for a class NCAAF's design does
   not have, without reintroducing "absent reads as a pass". Testable: a clean
   ncaaf run passes; and if `.cards-market-main` ever DOES appear on ncaaf, the
@@ -2840,7 +2840,7 @@ recommendations are expected. Their file, their call; told them.
 
 - **FINAL:** shipped, verified, closed. 12 tests in `tests/test_ui_layout_probe.py`.
 
-### soccer-fallback-row-market — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+### soccer-fallback-row-market — CLOSED 2026-08-15 — fix VERIFIED against the live payload; PRODUCTION RE-MEASURE OWED (needs a web deploy) — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: the soccer card shows its market line and its edge, which it currently
   shows NOWHERE. Testable, on the served `/soccer/epl/api/cards`: the Full Game
   row carries a real `market` and `best_edge` (not `—`), and the rendered card
@@ -2921,3 +2921,83 @@ recommendations are expected. Their file, their call; told them.
   a complete revert of `f4cd2bc8` including a DELETION of the new test file
   while it sat on disk (`commit-guard.py` caught it). **Rule now applied: re-read
   HEAD immediately before committing and abort if it moved.**
+
+#### soccer-fallback-row-market — RESULT 2026-08-15 — verified on the production payload, NOT yet deployed
+
+**The `.cards-data-pair` 9 -> 0 drop was NOT a producer regression and NOT the
+G3 gate misfiring.** Both of my earlier readings were right and neither
+explained it. Served `/soccer/epl/api/cards`: `sim.periods` is `{}`, so the
+contract builds its stand-in row, and that row sourced market/edge from
+`_metric_lookup(metrics, "Spread"/"Total"/"Edge")`. Soccer's metric labels are
+`Home win`, `Draw`, `Away win`, `Total goals`, `BTTS`, `Over 2.5` — **nothing
+matched**, both fields became `—`, and `_build_lens_rows` then correctly
+dropped a row on which every value was a placeholder or a restatement.
+
+**So the card displayed its market line and its edge NOWHERE, on a game that
+had both.** `betting.home_spread` -1.5, `betting.total` 2.5, `sim.score`
+{away 0.78, home 2.46}. The single-period branch 90 lines above already builds
+`ATS ... | Total ...` from exactly those fields; the stand-in branch ignored
+them and asked the metrics list instead. **A label-matched lookup is not a
+substitute for the field.**
+
+Driven with the real production payload, before (production's own output) and
+after (same payload, new code):
+
+    shared_lens_rows     0  ->  1        .cards-data-pair   0  ->  3
+    shared_total_rows    0  ->  1 (1 bin)
+    market       —  ->  ATS ARS -1.5 | Total 2.5
+    best_edge    —  ->  ATS +0.2 | Total +0.7
+    subtitle    "EPL"  ->  "Projected total 3.2"
+
+`is_synthesized` still marks the row's provenance, and **`_build_lens_rows` was
+not touched** — the G3 gate is on CONTENT, so the panel comes back on its own
+the moment the row has something to say. That was the stated design and this is
+the first time it has been exercised in the "comes back" direction.
+
+**Blast radius measured, not reasoned.** The changed branch fires only when
+`sim.periods` is empty: NFL 0/16 games, NCAAF 16/16. Ran the live NCAAF payload
+through both versions — **0 of 16 rows changed**, because those games carry no
+`betting` spread/total and no `sim.score`, so every new path falls through to
+the old lookup. The change is inert for NCAAF and unreachable for NFL.
+
+**One existing test changed, and it was pinning the bug.**
+`test_a_total_row_with_no_projected_total_is_not_emitted` used the default
+fixture, which DOES carry `sim.score` — it passed only because the row ignored
+it. The rule it pins is right, so the fixture now genuinely has no score, and a
+new test pins that a derivable total DOES get its bar.
+
+**Tests:** 25 in `test_soccer_card_surface.py` (6 new), 34 across the contract /
+board-UI / probe suites, `tests.test_archives` 383 pass.
+
+**NOT DEPLOYED.** `.py` does not autodeploy. Production still shows 0 data
+pairs; the numbers above are the payload driven through the new code, not a
+served reading. **Owed: a web deploy pinned on the live SHA, then
+`.cards-data-pair` and the two strings read off the served card.**
+
+#### market-key-blank-not-absent — CLOSED-VERIFIED 2026-08-15 — both halves fixed, `test_intelligence.py` is 218/218
+- **Shipped `d348e040`** (fix + 2 mutation-pinned tests), `16743bc3` (`#438`),
+  plus the `learnings.md` rule. Local only. **NOT DEPLOYED.**
+- **Verification RAN.** `tests/test_intelligence.py` **218 passed** in 2375s —
+  the file went 217/1 -> 218/0, and the 1 was this. Also green: `test_home.py`
+  124, `test_intelligence_contracts.py` 15, and a 98-test market_key-adjacent
+  batch (`test_market_keys`, `test_intelligence_prop_dedup_and_movement`,
+  `test_opportunity_contract_metrics`, `test_prop_grading_gates`,
+  `test_market_segments`). `test_intelligence_state.py` NOT run — the ledger
+  records it as hanging at HEAD, and that predates this lane.
+- **Hypothesis CONFIRMED, and it was two bugs, not one.** `_safe_text` cannot
+  return `None` (last line `return ""`), so the producer's `None` fallback was
+  unreachable; and the consumer tested `is None` for absence, so `""` took the
+  permissive branch. Either fix alone turns the test green — which is exactly
+  why both shipped: one without the other leaves the defect reintroducible from
+  the other side.
+- **Each half measured for its OWN contribution** rather than as a pair on one
+  green run: guard alone 1 failure -> 0 (before the producer fix existed);
+  producer alone `""` -> `None` with `prop="player_threes"` unchanged. Mutation
+  test per half, each reddening only its own assertion.
+- **`#438a` OPEN and UNOWNED: 43 other `_safe_text(..., None)` call sites.**
+  Deliberately not swept — `player_name` is among them on the same dict, and
+  `player_name: null` cards are a defect that function was fixed for once
+  already. The count is the finding.
+- **Not an instrument failure for once:** the `missing_market_key` metric
+  `1f6c27b9` built counts with `bool(...)`, so it read `""` as missing and was
+  right all along. Nothing was reading it.
