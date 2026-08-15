@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#439` — **The ±4900 fair-price clamp: 3 sites, DEPLOYED 2026-08-15, NOT YET VERIFIED IN PRODUCTION** — program Tier 3a, lanes `probability-differential-test` / `probability-clamp-removal` / `-2` / `clamp-trigger-watcher`
+### `#439` — **The ±4900 fair-price clamp: FIXED ON WEB, STILL LIVE ON BOTH WORKERS. Falsified in production 2026-08-15 23:10Z** — program Tier 3a, lanes `probability-differential-test` / `probability-clamp-removal` / `-2` / `clamp-trigger-watcher`
 
 **Filed at session close so shipped work reaches this list (the `#71` check).**
 Everything below is on `origin/main`; the deploy is live.
@@ -27,27 +27,47 @@ guard: it answers an out-of-range input with a number instead of refusing.
 `opportunity_signals.implied_probability`, `opportunity_signals.american_price`
 (the UNIQUE survivor of its concept), `live_lens_local._american_to_decimal`.
 
-**STILL OPEN — the only open part:**
-1. **VERIFY IT IN PRODUCTION.** The fix is correct in code and present in the
-   deployed tree (0/0 by content), and has **never been observed pricing a live
-   out-of-clamp probability correctly** — the triggering row left the slate
-   during the build. Run `py -3 scripts/watch_clamp_trigger.py --interval 900`;
-   its next trigger IS the verdict. `POST_FIX_OK` closes this.
-   **`PRE_FIX_MISPRICE` against a fix-carrying SHA is a falsification.**
-   **A SCHEDULED TASK NOW DOES THIS — `clamp-fix-verification-watch`, every 2h**
-   (`~/.claude/scheduled-tasks/clamp-fix-verification-watch/SKILL.md`). It runs
-   `--once`, stays SILENT on `no_trigger`, and notifies only on a real verdict.
-   It only runs while the app is open. If it is gone, re-run the instrument by
-   hand — nothing is lost, there is no state to restore.
-2. **`market_lines:_prob_to_american` is deliberately NOT fixed** — fails all 5
+**STILL OPEN — item 1 is now BIGGER than "verify", and it is the priority:**
+1. **DEPLOY THE FIX TO THE WORKERS. It was only ever shipped to web, and web is
+   not the producer.** Measured 2026-08-15 **23:10:13Z and 23:15:46Z** — two
+   triggers, two unrelated slates, both `PRE_FIX_MISPRICE` against a
+   fix-carrying web SHA. nfl `h2h_3_way` p=0.014698 → +4900 (correct +6704);
+   mlb `spreads` p=0.009911/0.990089 → ±4900 (correct ±9990, off by 5090).
+   Evidence: `reports/clamp_watch/trigger_20260815T231013+0000.json`,
+   `..._231546+0000.json`. Write-up in `.syndicate/deploys.md` under the
+   `e831263e` entry.
+   - `git grep` over the **whole tree** at each service's live commit (the
+     original check looked only at the 2 files the fix touched): web
+     `c8810f45` = **0** sites; **refresh-worker `1f36d718` = 3**; **live-odds-worker
+     `f0452408` = 3** — `pipeline/intelligence_state.py:1817`,
+     `syndicate/features/shared/layer2_board.py:1285`, `wnba/cards.py:848`.
+     Both workers redeployed *today, after the fix*, and still carry it.
+   - **Why the web fix cannot help even though it is correct:** it is a
+     **backfill** — `if fair_probability is not None and card.get("fair_price")
+     is None:`. A clamped price already on the card is never rewritten. Web can
+     only act when the field arrives absent, and the worker fills it.
+   - Producer is the intelligence-state loop:
+     `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `true` only on
+     refresh-worker (`render.yaml:499`; web :145 and live-odds-worker :855 are
+     `false`). Blueprint, not live env — corroborating only.
+   - Not a stale snapshot: `snapshot_generated_at` 23:15:35Z and the mispriced
+     rows changed between the two reads.
+2. **THEN verify.** `py -3 scripts/watch_clamp_trigger.py --once`; `POST_FIX_OK`
+   closes it. The scheduled task `clamp-fix-verification-watch` (every 2h,
+   `~/.claude/scheduled-tasks/clamp-fix-verification-watch/SKILL.md`) runs this
+   automatically, silent on `no_trigger`. It only runs while the app is open;
+   if it is gone, re-run by hand — there is no state to restore.
+   Note its `PRE_FIX_MISPRICE` branch assumes web is the only service to check;
+   it now needs the worker SHAs read too.
+3. **`market_lines:_prob_to_american` is deliberately NOT fixed** — fails all 5
    requirements but has one caller fed medians strictly inside (0,1). Triage,
    recorded in the test.
-3. **D1, a landmine with no live trigger found:** 5 converters return `0.0` for
+4. **D1, a landmine with no live trigger found:** 5 converters return `0.0` for
    price `0` (worst case — it manufactures the largest edge on the board);
    `bankroll_manager` has a stake attached. No zero price seen in production.
-4. **D6:** `mlb/hr_targets` + `regrade_mlb_game_markets` truncate float prices
+5. **D6:** `mlb/hr_targets` + `regrade_mlb_game_markets` truncate float prices
    via `int()` — a −110.5 consensus silently reprices to −110.
-5. **Consolidate 31 converters onto the 3 owners** — after 3 and 4, so it stays
+6. **Consolidate 31 converters onto the 3 owners** — after 4 and 5, so it stays
    a mechanical move rather than a behaviour change wearing a refactor's clothes.
 
 Full table: `.syndicate/audit_2026-08-15_probability_differential.md`.

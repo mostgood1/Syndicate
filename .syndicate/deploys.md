@@ -3722,7 +3722,7 @@ allowlisted**, so making it observable is the cheapest instrument in reach.
 
 **No rollback taken.** Both drops are inert-but-harmless in this state.
 
-## 2026-08-15 21:11:54Z — web `e831263e` — the ±4900 clamp — **DEPLOYED. MEASUREMENT INCONCLUSIVE.**
+## 2026-08-15 21:11:54Z — web `e831263e` — the ±4900 clamp — **DEPLOYED TO WEB ONLY. MEASURED 23:10Z: STILL MISPRICING — the producer is the WORKER, which never got the fix. See the 23:10Z section below.**
 
 - **DEPLOYED AND VERIFIED PRESENT.** `dep-da0d8vnlk1mc73fn8ta0`, live
   21:11:54Z. Deployed tree checked **by CONTENT, not ancestry**:
@@ -3765,6 +3765,59 @@ allowlisted**, so making it observable is the cheapest instrument in reach.
   was killed. `deploy_preflight.py` = `UNKNOWN` (memory sample 26h stale);
   accepted deliberately, web being display-only.
 - **Rollback:** `py -3 scripts/render_deploy.py --service web --commit b9ea0f0a --allow-rollback`
+
+### MEASURED 2026-08-15 23:10Z — **FALSIFIED, AND THE FIX IS NOT WRONG, IT IS ON THE WRONG SERVICE**
+
+The watcher triggered twice, five minutes apart, on two unrelated slates, and
+both read `PRE_FIX_MISPRICE` **while a fix-carrying web SHA was live**:
+
+- **23:10:13Z** — nfl `h2h_3_way` home, `fair_probability` **0.014698**
+  published **+4900**, correct **+6704**, off by **1804**. 1 row, 12 of 1426
+  served `fair_price` occurrences at the clamp, 0 beyond.
+  `reports/clamp_watch/trigger_20260815T231013+0000.json`
+- **23:15:46Z** — mlb `spreads` home/away, **0.009911 / 0.990089** published
+  **±4900**, correct **±9990**, off by **5090**. 2 rows, 24 of 1352 occurrences
+  at the clamp, 0 beyond.
+  `reports/clamp_watch/trigger_20260815T231546+0000.json`
+
+**Web is clean. The workers were never fixed.** Checked by CONTENT at each
+service's live commit, and — this is the part the original check missed —
+`git grep` over the **whole tree**, not the two files the fix touched:
+
+| service | live commit | finished | `max(0.02, min(0.98` in Syndicate code |
+|---|---|---|---|
+| web | `c8810f45` (not `e831263e`) | 21:58:19Z | **0** (vendor/tests only) |
+| refresh-worker | `1f36d718` | 23:01:27Z | **3** — `pipeline/intelligence_state.py:1817`, `layer2_board.py:1285`, `wnba/cards.py:848` |
+| live-odds-worker | `f0452408` | 22:56:24Z | **3** — same three sites |
+
+Both workers redeployed **today, after the fix**, and still carry all three.
+
+**The mechanism, and why a correct web fix cannot help.** The fixed block is a
+**BACKFILL**: `if fair_probability is not None and card.get("fair_price") is
+None:`. A clamped `fair_price` already written onto the card upstream is never
+rewritten. The web fix can only act on a field that arrives **absent** — so
+when the producer clamps, the fix is structurally inert, not broken.
+
+**The producer is the intelligence-state loop, which web does not run.**
+`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` in `render.yaml`:
+web `false` (:145), **refresh-worker `true` (:499)**, live-odds-worker `false`
+(:855). Read from the blueprint, not from live env — corroborating only; the
+load-bearing fact is that the clamp exists **only** on worker commits while a
+clamped price is being served.
+
+**Not a stale snapshot.** `snapshot_generated_at` 23:15:35Z, seconds before the
+read, and the mispriced rows *changed* between the two runs (nfl → mlb). Whatever
+regenerates the state every few minutes is still clamping.
+
+**Status: `#439` item 1 (verify in production) stays OPEN**, and item 1 is no
+longer the whole job — the fix must land on `pipeline/intelligence_state.py`,
+`layer2_board.py` and `wnba/cards.py` **on refresh-worker** (and live-odds-worker,
+which carries the same three) before there is anything to verify.
+
+**Tooling note, so it is not repeated:** a hand-rolled walk of the
+`/api/intelligence/query` payload reported **0** occurrences at ±4900 because it
+truncated lists to 40 items — five minutes after the watcher counted 12. The
+watcher dedupes and does not truncate; it is the authoritative reader here.
 
 ### FOLLOW-UP to the negative result — two hypotheses killed, and the answer is COMPUTED IN PRODUCTION BUT UNREACHABLE `[2026-08-15 21:1xZ]`
 
@@ -4570,3 +4623,64 @@ fixable causes with counts**. Fixing (1) is a one-field copy in
 `_build_game_lens`; fixing (2) is a coverage question about why the re-sim
 reaches 3 of 9 games. **Neither is a Drop 3 change**, and neither was visible
 before this deploy.
+
+## 2026-08-15 23:1xZ — BOTH WORKERS — `129395cc` (refresh) + `b7ae47e6` (live-odds)
+
+**PREFLIGHT: PASS, proceeding deliberately on explicit user authorisation
+("just deploy now, the sim is already dead").**
+
+1. **The sim IS dead — verified, not assumed.** `check_deploy_safety` listed
+   `MLB sim RUNNING (pid=79)` at 22:53Z; at 23:1xZ it is **absent** from the
+   blocker list. The 22:54:53Z refresh-worker deploy by another session killed
+   it. My hold was protecting something already gone.
+2. **What is still in flight and WILL be killed:** a board build on
+   refresh-worker (started 23:07:03Z) and an odds refresh on live-odds-worker
+   (pid 1155, 23:07:47Z). Both are short, self-restarting jobs, unlike a sim.
+3. **Parents are each service's OWN live commit** — refresh-worker `1f36d718`,
+   live-odds-worker `f0452408`. Both services were `live` with no in-flight
+   deploy at build time, so no race.
+4. **RIDERS — other sessions' work carried along, named so a post-deploy anomaly
+   stays attributable.** The workers are behind main on `layer2_board.py`, so
+   shipping the current file necessarily carries:
+   - both workers: `7bb74c95` (Tier 3a — clamp sites stop pricing what the
+     market never implied) and `fb448d60` (lineage convergence).
+   - live-odds-worker also: `96e3a9b7` (record every book's opening price) and
+     `29ed6de1` (A3 — a row whose EV is the book's own hold restated must not
+     seat a slot).
+   All are already on `main`, i.e. their authors' committed intent — this brings
+   the workers up to it rather than introducing anything new. **But it means
+   this is NOT a one-change deploy.** If a worker misbehaves, the candidate set
+   is 3 commits (refresh) / 5 commits (live-odds), not 1.
+   The alternative — hand-splicing only my hunk onto the older file — would put
+   a version in production that exists in no commit, which is worse.
+5. **Rollback:** refresh-worker -> `1f36d718`, live-odds-worker -> `f0452408`,
+   `--allow-rollback`.
+6. **MEASUREMENT: pending.**
+
+### MEASUREMENT for the worker pair — **DEPLOYED CLEAN; OUTPUT NOT YET VERIFIED**
+
+- **Both live**: refresh-worker `129395cc` at 23:16:39Z, live-odds-worker
+  `b7ae47e6` at 23:17:42Z.
+- **No crash introduced.** Tracebacks on refresh-worker split about the deploy
+  boundary: **3 before (23:10:39, 23:12:10, 23:12:42), 0 after.** live-odds-worker:
+  0 throughout. The `Error` hits in the window are `PROCESS_ENUM_DEBUG
+  psutil_unavailable:ImportError` — pre-existing memory instrumentation from
+  `smaps-anon-breakdown`, not mine. Zero hits for `_side_line_from_cells` or the
+  closing-stamp path.
+- **WHAT IS NOT YET SHOWN, and it is the whole point of the deploy.** These are
+  artifact PRODUCERS: the code is live, but the last `LAYER2_SHORTLIST` ran at
+  **23:12:20Z — before the deploy** — so every artifact on disk is still
+  old-code output. **"Deployed and not crashing" is not "the fix works."**
+  Verification needs a build that starts after 23:16:39Z.
+- **Verification queued** (watcher armed; by hand if this session dies):
+  1. `/api/board/layer2-shortlist` — home spread rows' `line` equals the
+     book-grid cell's `home.line`; re-run the 525-cell invariant, expect **0**
+     opposite-sign (was 525/525).
+  2. A close stamped after 23:17Z has `closing_captured_at <= commence_time`
+     and a populated `closing_detected_at`.
+  3. `/api/ops/clv/report`: `in_play_excluded_n` falls toward zero for
+     `observed_transition`, `same_book_n` RISES, `avg_clv_pct` moves — predicted
+     in advance, so it is not read as a regression.
+- **Attribution note stands**: 3 commits rode along on refresh-worker, 5 on
+  live-odds-worker (see the preflight above). If something surfaces later, that
+  is the candidate set.

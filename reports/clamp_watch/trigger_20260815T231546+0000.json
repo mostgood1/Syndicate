@@ -1,0 +1,69 @@
+{
+  "checked_at": "2026-08-15T23:15:46+00:00",
+  "evidence": [
+    {
+      "correct_fair_price": 9990,
+      "error_points": 5090,
+      "fair_probability": 0.009911,
+      "market": "spreads",
+      "occurrences_in_payload": 12,
+      "published_fair_price": 4900.0,
+      "side": "home",
+      "sport": "mlb"
+    },
+    {
+      "correct_fair_price": -9990,
+      "error_points": 5090,
+      "fair_probability": 0.990089,
+      "market": "spreads",
+      "occurrences_in_payload": 12,
+      "published_fair_price": -4900.0,
+      "side": "away",
+      "sport": "mlb"
+    }
+  ],
+  "evidence_rows": 2,
+  "max_fair_probability": 0.990089,
+  "min_fair_probability": 0.009911,
+  "mispriced_rows": 2,
+  "out_of_clamp_count": 2,
+  "out_of_clamp_rows": [
+    {
+      "fair_probability": 0.009910792962445916,
+      "game": {
+        "away_score": "4",
+        "home_score": "4",
+        "matchup": "WSH @ NYM",
+        "start_time_utc": "2026-08-15T20:10:00+00:00",
+        "state": "live",
+        "status_token": "BOT 9"
+      },
+      "market": "spreads",
+      "side": "home",
+      "sport": "mlb"
+    },
+    {
+      "fair_probability": 0.990089207037554,
+      "game": {
+        "away_score": "4",
+        "home_score": "4",
+        "matchup": "WSH @ NYM",
+        "start_time_utc": "2026-08-15T20:10:00+00:00",
+        "state": "live",
+        "status_token": "BOT 9"
+      },
+      "market": "spreads",
+      "side": "away",
+      "sport": "mlb"
+    }
+  ],
+  "pairs_joined_occurrences": 1352,
+  "pairs_joined_rows": 104,
+  "served_at_clamp_price_occurrences": 24,
+  "served_beyond_clamp_price_occurrences": 0,
+  "served_fair_price_occurrences": 1352,
+  "shortlist_rows": 88,
+  "status": "ok",
+  "triggered": true,
+  "verdict": "PRE_FIX_MISPRICE"
+}

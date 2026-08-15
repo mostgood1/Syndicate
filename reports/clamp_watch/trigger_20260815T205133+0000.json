@@ -1,0 +1,116 @@
+{
+  "checked_at": "2026-08-15T20:51:33+00:00",
+  "evidence": [
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    },
+    {
+      "correct_fair_price": 12503,
+      "error_points": 7603,
+      "fair_probability": 0.007934,
+      "published_fair_price": 4900.0
+    }
+  ],
+  "max_fair_probability": 0.638554,
+  "min_fair_probability": 0.007934,
+  "out_of_clamp_count": 1,
+  "out_of_clamp_rows": [
+    {
+      "fair_probability": 0.007934408886537953,
+      "game": {
+        "away_score": "3",
+        "home_score": "7",
+        "matchup": "JAX @ NO",
+        "start_time_utc": "2026-08-15T20:00:00+00:00",
+        "state": "live",
+        "status_token": "Q1 1:55"
+      },
+      "market": "h2h_3_way",
+      "side": "away",
+      "sport": "nfl"
+    }
+  ],
+  "pairs_joined": 1686,
+  "served_at_clamp_price": 14,
+  "served_beyond_clamp_price": 0,
+  "served_fair_price_count": 1686,
+  "shortlist_rows": 117,
+  "status": "ok",
+  "triggered": true,
+  "verdict": "PRE_FIX_MISPRICE"
+}

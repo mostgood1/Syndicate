@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-08-15T23:10:13+00:00",
+  "evidence": [
+    {
+      "correct_fair_price": 6704,
+      "error_points": 1804,
+      "fair_probability": 0.014698,
+      "market": "h2h_3_way",
+      "occurrences_in_payload": 12,
+      "published_fair_price": 4900.0,
+      "side": "home",
+      "sport": "nfl"
+    }
+  ],
+  "evidence_rows": 1,
+  "max_fair_probability": 0.943125,
+  "min_fair_probability": 0.014698,
+  "mispriced_rows": 1,
+  "out_of_clamp_count": 1,
+  "out_of_clamp_rows": [
+    {
+      "fair_probability": 0.014698050910640111,
+      "game": {
+        "away_score": "20",
+        "home_score": "9",
+        "matchup": "LAR @ KC",
+        "start_time_utc": "2026-08-15T20:00:00+00:00",
+        "state": "live",
+        "status_token": "Q4 2:42"
+      },
+      "market": "h2h_3_way",
+      "side": "home",
+      "sport": "nfl"
+    }
+  ],
+  "pairs_joined_occurrences": 1426,
+  "pairs_joined_rows": 109,
+  "served_at_clamp_price_occurrences": 12,
+  "served_beyond_clamp_price_occurrences": 0,
+  "served_fair_price_occurrences": 1426,
+  "shortlist_rows": 97,
+  "status": "ok",
+  "triggered": true,
+  "verdict": "PRE_FIX_MISPRICE"
+}
