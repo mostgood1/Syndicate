@@ -115,3 +115,40 @@ def test_the_production_builder_passes_the_date_it_is_building_for():
 
     assert "as_of" in inspect.signature(mod._load_team_ratings).parameters
     assert "_load_team_ratings(league, source_root, iso_date)" in inspect.getsource(mod)
+
+
+def test_undated_rows_are_admitted_only_when_explicitly_allowed():
+    """`fetch_asa_mls_team_history` returns SEASON AGGREGATES with no date.
+
+    Dropping them silently emptied MLS ratings in production -- caught by a full
+    suite run, not by the targeted one. Forward-looking callers opt in; the
+    backtest must not, because a season average is contaminated by construction
+    and no `as_of` can repair it.
+    """
+    rows = [{"team": "LAFC", "xg_for": 1.8, "xg_against": 1.1}]  # no date
+    assert compute_team_ratings(rows, as_of="2026-06-01") == {}
+    allowed = compute_team_ratings(rows, as_of="2026-06-01", allow_undated=True)
+    assert allowed["LAFC"]["matches"] == 1.0
+
+
+def test_the_backtest_never_admits_undated_rows():
+    """MLS cannot be backtested from a season aggregate. The correct result is
+    an empty rating set that says so, not a number that quietly leaks."""
+    import inspect
+
+    import scripts.backtest_soccer_live_lens as mod
+
+    assert "allow_undated" not in inspect.getsource(mod), (
+        "the backtest opted into undated rows; MLS season aggregates would leak"
+    )
+
+
+def test_the_forward_looking_callers_do_opt_in_and_say_why():
+    import inspect
+
+    import scripts.build_soccer_artifacts as build
+    import scripts.validate_soccer_vs_market as validate
+
+    for mod in (build, validate):
+        source = inspect.getsource(mod._load_team_ratings)
+        assert "allow_undated=True" in source, f"{mod.__name__} would empty MLS ratings"

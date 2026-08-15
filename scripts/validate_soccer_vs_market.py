@@ -99,7 +99,9 @@ def _load_team_ratings(league: str, as_of: str) -> dict[str, dict[str, float]]:
     """
     if league == "mls":
         rows = fetch_asa_mls_team_history(2026)
-        return compute_team_ratings(rows, as_of=as_of)
+        # Forward-looking mode (upcoming fixtures), so undated MLS season
+        # aggregates cannot postdate `as_of`. A backtest must NOT do this.
+        return compute_team_ratings(rows, as_of=as_of, allow_undated=True)
     if league in _GOALS_BASED_RATING_LEAGUES:
         history_dir = REPO_ROOT / "data" / "soccer_source" / league / "history"
         frames = [pd.read_csv(path) for path in sorted(history_dir.glob("matches_*.csv"))]

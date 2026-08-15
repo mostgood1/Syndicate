@@ -64,6 +64,7 @@ def compute_team_ratings(
     *,
     as_of: str,
     window: int | None = None,
+    allow_undated: bool = False,
 ) -> dict[str, dict[str, float]]:
     """Per-team attack/defense ratings from per-match performance rows.
 
@@ -94,11 +95,29 @@ def compute_team_ratings(
     reliably ordered across these sources, so "earlier that day" is not a
     distinction this data can support. Conservative in the only safe direction.
 
-    A row with NO USABLE DATE IS DROPPED, not admitted. It cannot be shown to
-    predate `as_of`, and unknown must not take the permissive branch here of all
-    places -- admitting undated rows is exactly the leak this parameter exists
-    to close. Drops are counted and printed, because a ratings set that silently
-    collapses to empty is indistinguishable from a league with no history.
+    A row with NO USABLE DATE IS DROPPED unless ``allow_undated`` is set. It
+    cannot be shown to predate `as_of`, and unknown must not take the permissive
+    branch here of all places.
+
+    ``allow_undated`` EXISTS FOR A REAL SOURCE, NOT AS AN ESCAPE HATCH.
+    `fetch_asa_mls_team_history` returns **season aggregates** -- one row per
+    team, `xgoals_for / count_games`, with no date at all. Two consequences,
+    and they pull in opposite directions:
+
+    - For a FORWARD-LOOKING caller (production artifacts, upcoming-fixture
+      validation) those rows are fine. `as_of` is today or later, so no row can
+      postdate it, and dropping them would silently empty MLS ratings entirely.
+      Those callers pass ``allow_undated=True`` and say why.
+    - For a BACKTEST they are **irreparable**. A season average already contains
+      the whole season, so no `as_of` can make it point-in-time; filtering rows
+      cannot fix a row that is itself contaminated. The backtest therefore does
+      NOT set this flag, MLS ratings come back empty, and that is the correct
+      answer: **MLS cannot be backtested from this source at all.** An empty
+      result that says so beats a number that quietly leaks.
+
+    Drops are counted and printed either way, because a ratings set that
+    collapses to empty is otherwise indistinguishable from a league with no
+    history.
     """
     cutoff = str(as_of or "").strip()[:10]
     if not cutoff:
@@ -115,7 +134,10 @@ def compute_team_ratings(
             continue
         row_day = str(row.get("date") or "").strip()[:10]
         if not row_day:
-            dropped_undated += 1
+            if not allow_undated:
+                dropped_undated += 1
+                continue
+            by_team.setdefault(team, []).append(row)
             continue
         if row_day >= cutoff:
             dropped_future += 1
