@@ -146,7 +146,39 @@
   sits on ±4900 any more.
 
 
-### clv-without-settlement — OPEN — TAKEN 2026-08-15 by session `lane-cleanup` (was orphaned; `model-audit` is gone) — **ROOT CAUSE OF THE ZERO IS FOUND AND IT IS A VERSION SKEW, NOT A DEFECT** — opened 2026-08-14 — session: lane-cleanup
+### clv-without-settlement — OPEN — **PUBLISH FIXED AND MEASURED (web `bebe87c9`, live 19:36:45Z): `same_book_n` 0 → 144, FIRST UNBIASED CLV = -0.07% AT A 27.1% BEAT RATE (PRELIMINARY, TAKEN PRE-FIRST-PITCH). THE LANE'S BREADTH HYPOTHESIS IS REFUTED** — opened 2026-08-14 — session: lane-cleanup
+- **RESULT 2026-08-15 19:38Z — the publish fix landed and it changed the answer.**
+  `PUBLISH_FAILED`×8/16h (`HTTP 403 FORBIDDEN`, last 19:32:50Z) → `PUBLISH_OK`×2
+  at 19:37:00Z and 19:38:10Z, 15s after the deploy; zero failures since. Web now
+  holds the artifact. MLB: `openings 0→520`, `resolved 0→293`,
+  `same_book_n 0→144`. Also landed on main as `baec34a8` — it had existed ONLY
+  on deploy branches (web and main both carried blob `aff59302`).
+- **THE PRE-REGISTERED RULE IS REFUTED. Do not re-derive it.** "If `same_book_n`
+  is still 0, the blocker is odds-history breadth" — `same_book_n` moved 0→144
+  with **no change to odds history**; only the reader moved. Breadth is real but
+  it constrains `resolved`, not `same_book_n`:
+  `no_market_in_history: 172`, `close_precedes_open: 42`, `line_mismatch: 13`.
+- **FIRST UNBIASED NUMBER, and the selection effect is now measured:**
+
+      scope                    n     avg_clv   beat_close
+      same_book (UNBIASED)   144     -0.0711      27.1%
+      book_agnostic_close    143     +2.7261      82.5%
+      different_book_close     6     +1.3907      66.7%
+
+  The biased scopes say the board crushes the close; the honest one says it is
+  flat-to-negative and beats the close **27%** of the time. Supersedes the
+  retracted `-5.215`.
+- **`-0.0711` IS PRELIMINARY — timing, not arithmetic.** Taken 14:38 CDT, before
+  first pitch for most of the slate, so most "closes" are latest observations.
+  **Re-read after the last MLB game starts.** One date, one sport, 144 pairs.
+- **STILL OPEN, and this is what the lane is now for:** (1) re-read post-slate
+  and record the settled number; (2) NFL 246 openings / WNBA 80 both `resolved:
+  0` — odds history has no markets for them; (3) NBA/NHL/NCAAF/NCAAB/soccer
+  record **0 openings at all** — nobody has asked why; (4) `clv_pct` per
+  recommendation, the lane's original goal, is NOT built.
+- **Handed back:** lane left OPEN and unclaimed at the end of this session; the
+  per-session marker was released. `artifact_publisher.py` is free.
+
 - **THE PUBLISH FAILURE IS DIAGNOSED. Every link measured 2026-08-15 19:0xZ,
   no link inferred.**
   1. **Recorder healthy.** refresh-worker: `[clv_opening_ledger] OPENINGS
@@ -938,7 +970,7 @@ than have every session quietly decide it is.
 - Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
 - Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
 
-### ask-sport-coverage — OPEN — DEPLOYED + MEASURED 25->38/52, ZERO REGRESSIONS; K6 RETRACTED AS INERT ON PROD (my verification of it was invalid); SOCCER/NCAAB/NHL UNPROVEN ON DATA — opened 2026-08-15 — session: ask-sport-coverage
+### ask-sport-coverage — OPEN — ROUTING WIN LIVE + MEASURED 25->38/52 ZERO REGRESSIONS; K6 FIX IN origin/main BUT UNDEPLOYED (riding along, predicate UNMEASURED); SOCCER/NCAAB/NHL UNPROVEN ON DATA — opened 2026-08-15 — session: ask-sport-coverage
 - Goal: the deterministic path names and answers for all eight sports, not
   three. Single testable outcome: `scripts/ask_syndicate_regression.py` moves
   `lookup` (2/8) and `entity` (2/10) above baseline with **no** class
@@ -2232,3 +2264,67 @@ new (22 tests), `tests/test_mlb_refresh_runner.py` +8/-4 (one pinned kwarg).
 - **STILL OPEN: Drop 3, the join.** `live_projection_join` is entirely
   prop-shaped; nothing prices a live game line even once it is published, so
   `rows_live_edged` stays 0 for game-line markets until it exists.
+
+#### red-intelligence-tests — MARKER CORRECTED 2026-08-15
+- The `/lane` skill still says "write the slug to `.syndicate/.current-lane`",
+  which is the CONTENDED global slot. The guard has since gained
+  `.current-lane.<session_id>` (`lane-guard.py:166`) and prefers it. I took the
+  global slot from `quote-shard-latest-index` for ~40 min, then moved to
+  `.current-lane.6c60428a-...` and **restored the global to
+  `quote-shard-latest-index`**. Six per-session markers now exist in the tree;
+  the skill text is what is stale.
+
+#### ask-sport-coverage — WRAP 2026-08-15 19:4xZ
+
+**Durable:** 25/52 -> 38/52 live and measured, zero regressions, re-verified
+against four subsequent deploys by other sessions (`_routed_sport` present in
+every one — nothing reverted it). Commits `67ff20a0`, `854e6172`, `0050d1c4` are
+all ancestors of `origin/main`; worktree clean.
+
+**Open and explicitly NOT closed:**
+- **K6** — `0050d1c4` is in `origin/main` and in NO deployed commit. Lost the
+  deploy race 4x. User decision: ride along with the next deploy. Predicate is
+  UNMEASURED: `as_of` 28/52, `warn:no_as_of_stated` 24. **Re-baseline before
+  measuring it** — the baseline went stale 3x tonight.
+- **Soccer / ncaab / nhl remain UNPROVEN ON DATA.** They pass on ROUTING only;
+  the board carried zero rows for all three at every measurement instant. The
+  new fetcher branches have never returned a row in anger.
+- **`no_draw_handling`** (D06, G09) untouched, and `refusal` 4/8 was regressed by
+  `c774fe1a`, not by this lane.
+
+**Next action for whoever picks this up:** when soccer is actually on the board,
+re-measure — that is the only thing that distinguishes "routing fixed" from
+"coverage delivered".
+
+#### CROSS-LANE NOTICE to `soccer-model-coverage` — an OBSERVED soccer autorun error, 2026-08-15
+Found by `live-game-line-projection` while holding a deploy gate on
+live-odds-worker. **Not my lane, not investigated by me, handed over intact.**
+
+`state.md` records: *"WHY the soccer pregame odds step fails is STILL UNKNOWN.
+No error has been observed anywhere."* **An error is now observed, twice today**
+(live-odds-worker logs, `text=SOCCER_PREGAME`):
+
+    14:22:29  SOCCER_PREGAME_AUTORUN_FAILED ValueError: A refresh run is already
+              active (pid=7114). Cancel it before starting a new run.
+    18:22:34  SOCCER_PREGAME_AUTORUN_FAILED ValueError: A refresh run is already
+              active (pid=8200). Cancel it before starting a new run.
+
+**Why this looks load-bearing.** The autorun fires ~every 4h and used to
+COMPLETE in ~15 min — `06:17:45 LAUNCHED -> 06:32:57 NO_ARTIFACT`, `10:21:54 ->
+10:37:02`. The 14:22 and 18:22 firings did not run at all: a prior refresh run
+was still holding the lock. `state.md` also records that this autorun is the
+**single producer** of soccer game odds (`phase=live` builds 0 odds steps, so
+refresh-worker never fetches them). **A blocked autorun is therefore a plausible
+mechanism for "soccer game odds frozen since 08-10/08-11" — but the dates do not
+line up on their own, so this is a LEAD, not a cause.**
+
+**What is NOT established, stated so nobody over-reads it:**
+- Whether the blocking run is stuck or merely long. At 19:49Z its children were
+  rotating normally (`build_soccer_artifacts --league mls --week 2` ->
+  `--league championship`, different pids), so it is PROGRESSING, not hung.
+- Whether these two failures predate 08-10. I read only today's window.
+- Whether a lost autorun loses the odds step or merely defers it.
+
+**Cheap next check for whoever owns this:** pull `SOCCER_PREGAME` over 08-09..08-11
+and see whether `AUTORUN_FAILED` appears at the moment capture stopped. That is a
+log query, not a deploy.
