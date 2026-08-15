@@ -717,3 +717,43 @@ def attach_margin_model(grid: list) -> dict:
     except Exception:
         _LOGGER.exception("BOOK_GRID_MARGIN_MODEL_FAILURE")
         return {"rows_modelled": 0, "error": "margin model failed"}
+
+
+def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: str) -> dict:
+    """Overlay the live re-sim's GAME-LINE projection on live moneyline rows.
+
+    Sibling of `attach_live_projections_for_sport` above, deliberately separate:
+    that one is prop-shaped end to end and its counter is `rows_live_edged`.
+    Game-line rows were never in its scope, so a live moneyline carried a
+    PREGAME win probability and `live_edge_policy` suppressed it for exactly
+    that -- correctly, given what it was being handed.
+
+    MLB ONLY, for the same reason as the prop tier: the 120-sim re-sim is MLB's.
+    An unwired sport returns a stated reason so a blank column is attributable.
+
+    Reads the PUBLISHED snapshot. Never triggers the re-sim.
+    """
+    if sport != "mlb":
+        return {"supported": False, "reason": f"no live re-sim wired for {sport}",
+                "rows_live_gameline_edged": 0}
+    try:
+        from syndicate.features.shared.live_gameline_join import (
+            attach_live_gamelines,
+            build_live_gameline_index,
+        )
+        from syndicate.features.shared.refresh_state_store import data_root, read_json_file
+
+        snapshot = read_json_file(data_root() / "live" / f"{sport}_live_lens.json")
+        if not isinstance(snapshot, dict):
+            return {
+                "supported": True,
+                "reason": "no published live-lens snapshot",
+                "rows_live_gameline_edged": 0,
+            }
+        coverage = attach_live_gamelines(grid, build_live_gameline_index(snapshot))
+        coverage["supported"] = True
+        return coverage
+    except Exception:
+        _LOGGER.exception("BOOK_GRID_LIVE_GAMELINE_FAILURE sport=%s date=%s", sport, selected_date)
+        return {"supported": True, "error": "live gameline join failed",
+                "rows_live_gameline_edged": 0}

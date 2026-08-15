@@ -203,6 +203,7 @@ def build_book_grid_artifact(
     from syndicate.features.shared.board_enrichment import (
         attach_game_state,
         attach_live_game_state_from_lens,
+        attach_live_gamelines_for_sport,
         attach_live_projections_for_sport,
         attach_margin_model,
         attach_projections,
@@ -236,6 +237,19 @@ def build_book_grid_artifact(
     # `refuse_if_compute_in_request_path` territory and belongs on the live
     # worker's tick.
     live_projection_coverage = attach_live_projections_for_sport(grid, sport=sport, selected_date=date_str)
+    # GAME LINES, after the prop live tier and separate from it (Drop 3).
+    # `attach_live_projections_for_sport` above is prop-shaped end to end -- its
+    # input is `liveModelProbOver` on prop rows and its counter is
+    # `rows_live_edged`. Game-line rows (`kind: "game"`, `market: "h2h"`) were
+    # never in its scope, so every live moneyline carried a PREGAME win
+    # probability and was suppressed by `live_edge_policy` for exactly that.
+    #
+    # This joins the same live re-sim's `homeWinProb` -- already published on the
+    # snapshot's `gameLens` lanes as `source: "live_mc"` -- and prices it ONLY
+    # when the edge clears the estimator's own noise. At 120 sims that bar is
+    # ~9.1 points at p=0.5, so most rows are refused BY NAME rather than
+    # published as noise (recorded decision, spec 8.1: publish, refuse to price).
+    live_gameline_coverage = attach_live_gamelines_for_sport(grid, sport=sport, selected_date=date_str)
     margin_coverage = attach_margin_model(grid)
 
     # Market taxonomy, served rather than re-derived on the client -- the serve
@@ -278,6 +292,10 @@ def build_book_grid_artifact(
         "live_game_state": lens_state_coverage,
         "projections": projection_coverage,
         "live_projections": live_projection_coverage,
+        # Separate key from `live_projections` on purpose: they are different
+        # joins with different inputs and different failure modes, and folding
+        # them together would make one family's zero look like the other's.
+        "live_gamelines": live_gameline_coverage,
         "margin_model": margin_coverage,
         "market_kinds": market_kinds,
         "rows": bounded,
