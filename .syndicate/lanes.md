@@ -4140,30 +4140,3 @@ and labelled itself `arena_not_representative`, so that instrument cannot answer
 this either. This needs a different measurement, and it should be chosen BEFORE
 any more code is written.
 Read-only lane. No files touched, no deploy.
-
-#### mlb-live-pitcher-projection — CHECKPOINT 2026-08-15 ~22:1xZ — HALF VERIFIED IN PRODUCTION, HALF NEVER RUN
-- **DURABLE:** 8 commits, all confirmed in HEAD (`f4cd2bc8` `3a476001` code;
-  `6da01dd3` repair; `a7ad6aed` `265884c0` `9eb5b7bc` `dc85bfeb` `f96a00fd`
-  ledger). 36 new tests, six behaviours mutation-verified. Survived another lane
-  shipping Drop 3 (`758a89fa`) with no file overlap.
-- **VERIFIED IN PRODUCTION:** the proj/prob contradiction (refresh-worker
-  `846bb74e`, live 21:45:20Z; `sim_model_prob_over` on 21/21 = new-code marker;
-  straddles 7/13 -> 0).
-- **NEVER RUN ANYWHERE:** the coverage fix. Inert on refresh-worker
-  (`MLB_ENABLE_LIVE_LENS_LOOP=false` there, `true` on live-odds-worker),
-  undeployed on live-odds-worker. Its four causes are code-derived plus measured
-  zeros — the MECHANISM IS NOT PROVEN.
-- **NOT IN SCOPE, STILL BROKEN:** 89% of live rows show a pregame projection
-  against a live market with no staleness marker. The user was offered that fix
-  (option 1) and did not select it. The screenshotted McGreevy/Boyd rows are in
-  this bucket.
-- **NEXT ACTION, SINGLE:** deploy `cc4afae2`
-  (`deploy/mlb-live-prop-coverage-lo-20260815`, built on live-odds-worker's own
-  `191a001b`) to **live-odds-worker `srv-d91dpertqb8s73co8lt0`**, then re-read
-  `/api/board/book-grid?sport=mlb&date=2026-08-15` on a LIVE slate. Predicate:
-  coverage off 8.9% (ceiling **90.2%**, not 100%); `batter_home_runs` and
-  `batter_hits_runs_rbis` both off zero. **HELD** — blocked by a permission
-  classifier AND awaiting a deploy window from session "Syndicate plan
-  assessment and sessions" (`local_82a0a2fe-...`). Do not fire from elsewhere.
-- **ALSO OWED:** a WEB deploy for `blueprints/intelligence.py` — until then
-  `live_projections` stays absent from the API and its absence is NOT evidence.

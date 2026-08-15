@@ -632,14 +632,11 @@ bought ~446 MB; a larger slate still crosses.
   feed's measured healthy gaps. **NOT off p50:** an alarm floor lives in the
   tail, and 3x p50 put MLB at 93 min, under its measured 123-min healthy
   pregame gap — refuted by an existing test (`learnings.md`).
-- **THAT "THRESHOLD ARTIFACT" CORRECTION IS ITSELF WITHDRAWN.** The 173-min
-  soccer p50 was computed across a shard that spans **10 calendar days** —
-  soccer's is keyed by FIXTURE date, uniquely (mlb 2, nfl 1, wnba 2, soccer 10).
-  **Soccer's real intra-day p50 is 40 min**, so 340.9 min was ~8x normal and the
-  alarm's first catch WAS legitimate. Threshold corrected 7 h -> **4 h**,
-  deployed `8b010dac` 21:33:13Z and measured (`thresholds_by_sport.soccer`
-  14400). I corrected a true finding into a false one with an unchecked
-  statistic; the second correction restores the first.
+- **CORRECTION — "caught soccer STALE at 340.9 min" was substantially a
+  THRESHOLD ARTIFACT.** Soccer's own p50 is 173 min, so the 180 min global
+  flags that feed on roughly half of NORMAL operation. 340.9 min is above
+  soccer's p90 (248) so the feed was elevated, but this was not a clean catch,
+  and under the new 7 h default it reads `ok`.
 - **KNOWN LIMIT, UNSOLVED:** an age-only alarm cannot distinguish "quiet" from
   "broken". Every sport's max gap (244-558 min) is overnight or between-slate,
   and clearing those tails is what keeps all four thresholds in hours rather
@@ -1559,69 +1556,3 @@ uniform and their spreads ARE layout signals. MLB's is not. `[measured]`
 **EXONERATED:** the MLB height movement flagged at the 21:2xZ checkpoint is not
 `6e9e6107` and not any layout change - the contract rows were byte-identical
 across it (0/15 games). `[measured]`
-
-
-## UI probe - the height model and the settle rule `[measured 08-15 23:xxZ]`
-
-**`scripts/ui_layout_probe.py` now reports a LAYOUT signal for MLB**, not a
-content one: it fits `height = chrome + k * content_units` per game state and
-reports the residual. Baseline, settled: mlb mobile Live 6px / Preview 54px,
-mlb desktop Live 18px. Budget `LAYOUT_RESIDUAL_BUDGET_PX = 150` (~3x worst
-clean reading). Desktop Preview is declared UNRELIABLE — its grid wraps into
-columns, so height is linear in ROWS not pairs. `[measured]`
-
-**MLB RENDERS PROGRESSIVELY FOR ~4 SECONDS AND `wait_for_selector` DOES NOT
-COVER IT.** Total `.cards-data-pair` across 15 cards at 390px: 482 at +0ms,
-530 at +600ms, 590 at +1200, 683 at +2000, **719 at +3000 and stable**. Any
-probe of `/mlb/cards` must wait for the DOM to stop changing, not for the first
-card to attach. The probe does this now (`_settle`), records `settledMs`, and
-FAILS if the render never settles. MLB 3.6-4.0s; every other sport 0.8s.
-**Every MLB figure produced before this was taken at ~74% of final content.**
-`[measured]`
-
-
-## UI probe height model - MLB DESKTOP HAS NO LAYOUT SIGNAL, and grid-rows will not give it one `[measured 08-15]`
-
-**CLOSED AS WRONG:** the carried-forward idea that the desktop unit should be
-grid ROWS. Rows are proportional to pairs within a group, so the fit is an
-affine reparametrization — measured both ways on the same cards, residuals
-identical to the pixel (11/11, 139/139, 52/52 px). Do not pick this up again.
-`[measured]`
-
-**MLB desktop height is neither driven by the summary-pair unit nor
-independent of it** (105-197px explained at 16-26px/pair), so neither the
-residual branch nor the content-independent branch produces a signal there. Any
-future attempt needs a unit that captures panel COUNT and callout/table rows,
-or per-card height bounds instead of a model. `[measured]`
-
-**The model is only stable where a group is large enough.** n=3 groups gave fit
-ratios 0.59 and 1.29 while an n=9 group on the same page gave 0.09; the fit now
-requires **n >= 5**. Across one evening the same metric read reliable/54px,
-unreliable, unreliable, then unfittable as the slate churned — **one reading of
-it is not a baseline.** `[measured]`
-
-## SOCCER QUOTE FEED — OUTAGE DIAGNOSED, CAUSE IS LOCK CONTENTION `[measured 2026-08-15 21:2xZ]`
-
-- **Nothing happened at 13:47Z.** Soccer's pregame capture is a **4-hourly
-  autorun** on live-odds-worker:
-
-      02:14:40 LAUNCHED | 06:17:45 LAUNCHED | 10:21:54 LAUNCHED
-      14:22:29 FAILED (A refresh run is already active, pid=7114)
-      18:22:34 FAILED (pid=8200)
-
-  **13:47:17 is the TAIL of the 10:21 run**, which walked leagues ~3.5 h and
-  finished. The outage begins at **14:22:29**, the first REFUSED autorun.
-- **Mechanism:** a 4-hourly point sample fired at a refresh-run lock held
-  **~92%** of the time ⇒ ~1-in-12 success per attempt. Two consecutive misses is
-  expected, not anomalous. Soccer is starved by scheduling, not broken.
-- **TWO DIFFERENT CLOCKS — corrects the standing `earlyExit` lead.** `earlyExit`
-  is ~6.5 h (01:37/08:05/14:34/20:03); the autorun is ~4 h. The 14:22 failure
-  PRECEDES the 14:34 exit by 12 min, so the exit did not cause it. `earlyExit`
-  remains a real problem for long in-flight runs; it is not this outage.
-- **REFUTED on evidence, so nobody re-runs them:** fixtures aging out (08-16 and
-  08-17 shards stop at the SAME instant; zero soccer rows anywhere after
-  13:48:00Z), a restart at 13:47, the run erroring (zero tracebacks), and
-  OddsAPI quota (zero quota lines; mlb/nfl capturing normally).
-- **Cheapest fix, unowned:** the autorun gives up for 4 h on a TRANSIENT lock. A
-  bounded retry (every 5 min for 30 min) makes it near-certain without touching
-  the lock. `live_refresh_loop.py` is claimed by OPEN `live-game-line-projection`.
