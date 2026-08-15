@@ -2819,6 +2819,19 @@ def board_layer2_shortlist_api():
                 # rounds of shipping a working change with an unreadable counter.
                 "rows_excluded_market": shortlist.get("rows_excluded_market"),
                 "excluded_markets": shortlist.get("excluded_markets"),
+                # A3 (model audit 2026-08-14), added in the SAME commit as the
+                # rule that produces it -- the fourth time this key list has
+                # been the thing that made a working filter unreadable
+                # (`#373`, `#381`, `#397`, `#400` all above).
+                #
+                # Rows whose `ev_pct` was a restatement of the book's own hold:
+                # `book_margin_model` prices a one-sided market as
+                # `fair = implied x (1 - hold)`, so the price cancels and the EV
+                # is identically `-hold`, carrying nothing about the bet. This
+                # counter is the ONLY way to tell "soccer has no slate" apart
+                # from "soccer's whole slate was one-book longshots", and those
+                # need opposite responses.
+                "rows_uninformative_ev": shortlist.get("rows_uninformative_ev"),
                 "max_quote_age_seconds": shortlist.get("max_quote_age_seconds"),
                 "rows_beyond_quote_age": shortlist.get("rows_beyond_quote_age"),
                 "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),
