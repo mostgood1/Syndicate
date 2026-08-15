@@ -7,7 +7,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 118 rules `[generated]`
+## Index — 128 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -34,7 +34,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 104**
+**Rules and corrections — 114**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -140,6 +140,16 @@
 - [2026-08-15 — OVERTURNED: p50 is the wrong statistic to set an alarm floor from, and my own test caught it](#2026-08-15-overturned-p50-is-the-wrong-statistic-to-set-an-alarm-floor-from-and-my-own-test-caught-it)
 - [2026-08-15 — A FALLBACK ARGUMENT IS A REQUEST, NOT A GUARANTEE. `_safe_text(x, None)` RETURNS `""`, 43 TIMES OVER](#2026-08-15-a-fallback-argument-is-a-request-not-a-guarantee-_safe_textx-none-returns-43-times-over)
 - [2026-08-15 — THE SHARED-INDEX REPAIR MUST RUN IN A SHELL WITH NO `GIT_INDEX_FILE`, OR IT REPAIRS THE WRONG INDEX](#2026-08-15-the-shared-index-repair-must-run-in-a-shell-with-no-git_index_file-or-it-repairs-the-wrong-index)
+- [2026-08-15 - A LABEL-MATCHED LOOKUP IS NOT A SUBSTITUTE FOR THE FIELD, AND ITS FAILURE IS SILENT](#2026-08-15---a-label-matched-lookup-is-not-a-substitute-for-the-field-and-its-failure-is-silent)
+- [2026-08-15 - ENUMERATE EVERY SPORT THAT REACHES A CHANGED BRANCH *BEFORE* DEPLOYING](#2026-08-15---enumerate-every-sport-that-reaches-a-changed-branch-before-deploying)
+- [2026-08-15 — I PROPOSED ALLOWLISTING A READ PATH WITHOUT CHECKING THE WRITE PATH. It would have 404'd forever](#2026-08-15-i-proposed-allowlisting-a-read-path-without-checking-the-write-path-it-would-have-404d-forever)
+- [2026-08-15 — A HOOK THAT BLOCKS A `Bash` CALL DISCARDS EVERY SIDE EFFECT IN IT, INCLUDING THE HEREDOCS](#2026-08-15-a-hook-that-blocks-a-bash-call-discards-every-side-effect-in-it-including-the-heredocs)
+- [2026-08-15 - I APPLIED "ONE SAMPLE OF A MOVING QUANTITY" TO PRODUCTION AND NOT TO MY OWN MEASUREMENT](#2026-08-15---i-applied-one-sample-of-a-moving-quantity-to-production-and-not-to-my-own-measurement)
+- [2026-08-15 — a mid-ramp reading is not a window reading; I called a 446MB difference "noise"](#2026-08-15-a-mid-ramp-reading-is-not-a-window-reading-i-called-a-446mb-difference-noise)
+- [2026-08-15 — verify a deployed fix by CONTENT across every SHA that carried it](#2026-08-15-verify-a-deployed-fix-by-content-across-every-sha-that-carried-it)
+- [2026-08-15 — AN OCCURRENCE COUNT IS NOT A ROW COUNT, and I published three numbers that could be read as either](#2026-08-15-an-occurrence-count-is-not-a-row-count-and-i-published-three-numbers-that-could-be-read-as-either)
+- [2026-08-15 — A PINNED-DEPLOY SERVICE SILENTLY REVERTS PEERS. VERIFY YOUR COMMIT AFTER IT GOES LIVE.](#2026-08-15-a-pinned-deploy-service-silently-reverts-peers-verify-your-commit-after-it-goes-live)
+- [2026-08-15 — Render's git mirror is PER SERVICE and only refreshes at build time](#2026-08-15-renders-git-mirror-is-per-service-and-only-refreshes-at-build-time)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -2350,3 +2360,126 @@ Use `MSYS_NO_PATHCONV=1` on Windows or git mangles `rev:path` into a filename.
 - **Cost:** none realised — caught before anyone quoted it, and corrected in
   `audit_2026-08-15_probability_differential.md` and `deploys.md`. Related:
   [[feedback_rate_not_count]], [[feedback_read_the_field_you_already_have]].
+
+### 2026-08-15 — A PINNED-DEPLOY SERVICE SILENTLY REVERTS PEERS. VERIFY YOUR COMMIT AFTER IT GOES LIVE.
+
+- What we believed: a deploy reporting `live` with your commit means your change
+  is in production and stays there.
+- What was actually true: the prop `0.5` fix went live on refresh-worker at
+  21:36:59Z as `0fa44322`, verified additive and content-checked. **Eight
+  minutes later refresh-worker was `846bb74e`**, which does NOT have `0fa44322`
+  as an ancestor, and the deployed prop scripts were back to **7 and 8 reachable
+  `... or 0.5` sites**. A peer session had cut its branch from an earlier live
+  SHA, so its deploy silently undid mine. Nothing failed, nothing warned, and
+  the deploy history shows two successes.
+- How we found out: re-read the live SHA at checkpoint time and tested ancestry
+  plus FILE CONTENT, rather than trusting the deploy that had reported `live`.
+- The rule going forward: **on a service whose deploys are pinned cherry-picks,
+  "live" is a lease, not a fact.** Every session cutting from "the current live
+  SHA" is cutting from a moving target, so the last writer wins and the loser is
+  never told. Re-verify your change by content minutes AFTER it lands, not just
+  at the moment it lands — and when a peer is active on the same service,
+  expect to re-deploy. The durable fix is one deployer per service, or trains,
+  not per-lane deploys.
+- Cost: a verified production fix silently reverted within 8 minutes; production
+  fabricates a 0.5 on price-missing prop rows again.
+
+### 2026-08-15 — Render's git mirror is PER SERVICE and only refreshes at build time
+
+- What we believed: pushing a branch to origin makes its commits deployable on
+  any service in that repo.
+- What was actually true: `POST /v1/services/<id>/deploys` with a commit pushed
+  AFTER that service's last deploy returns **404 "service does not have a
+  commit"**, persistently — 3 attempts, ~20 minutes apart. Web was immune only
+  because it had deployed six times that day, keeping its mirror warm. The
+  workers, last deployed hours earlier, could not see the branch at all.
+- How we found out: read the 404 BODY instead of the status code; it names the
+  service and the sha explicitly.
+- The rule going forward: **"route one" — warm the mirror first.** Deploy the
+  service's own current live commit (a no-op in code), which forces a fetch,
+  then deploy the target. Measured: the same sha that 404'd three times fired
+  41 seconds after the warm deploy landed. Cost is two restarts, so take both
+  inside detected lulls. This has probably been silently blocking worker deploys
+  from fresh branches for some time.
+
+
+### 2026-08-15 - `wait_for_selector` PROVES ATTACHMENT, NOT COMPLETION, AND I HAD ALREADY "FIXED" THIS ONCE
+
+- **What we believed:** the MLB render race was closed. Earlier today I replaced
+  a fixed 400ms delay with `wait_for_selector('.cards-game-card')`, measured
+  15 cards on 10 consecutive readings, and wrote the rule down as "wait on
+  CONTENT, not a timer".
+- **What was actually true:** waiting on the first card only proves the first
+  card exists. MLB keeps populating for **seconds** afterwards. Total
+  `.cards-data-pair` across 15 cards at 390px:
+
+      +0ms 482   +600ms 530   +1200ms 590   +2000ms 683   +3000ms 719   +4500ms 719
+
+  The 600ms settle I added measured MLB at **74% of its final content**, so
+  every MLB height, spread, content-unit and model figure produced today came
+  off a partially-rendered page -- including the numbers I used to argue that
+  the spread was content rather than layout. That conclusion survived
+  re-measurement; it was not entitled to.
+- **How we found out:** the height model reported MLB mobile Preview as
+  unfittable while a hand check at 2500ms showed 10 cards with 5 distinct
+  content counts. The instrument disagreeing with a manual check is what
+  exposed it -- not any failure in the output, which looked entirely healthy.
+- **The rule going forward:** for a page that renders progressively, wait for
+  the DOM to STOP CHANGING -- poll a cheap fingerprint until it is stable
+  across two consecutive samples, cap it, and FAIL if it never stabilises. A
+  render still growing when you measure it makes every figure on that row
+  provisional, so it is a failure, not a footnote. And the meta-rule: "I fixed
+  the timing bug" is a claim about a threshold, and the next threshold is
+  usually also wrong. Verify by watching the quantity settle, not by getting a
+  plausible number once.
+- **Cost:** a day of MLB probe figures that were directionally right and
+  numerically wrong, and one conclusion that was lucky rather than earned.
+
+### 2026-08-15 — TWO READS INSIDE ONE WARM-UP WINDOW ARE ONE READ. I declared a working fix dead
+
+The worst call I made this session, and it survived into three ledger files
+before a later reading overturned it.
+
+live-odds-worker landed the fix at **20:56:07Z**. I measured `/mlb/api/live-lens`
+at ~20:59 and ~21:04, got `live_mc=0` both times, and wrote **"a clean negative
+result — the fix is correct and was not the binding constraint."** At 21:49,
+with no further change from me, the same endpoint read `live_mc=6`, matching the
+worker's own tally exactly. **The fix had always worked. It had not been given a
+tick to run.**
+
+**The reasoning error, precisely.** I treated two samples as independent evidence
+because the *system* changed between them — the slate moved, live 4→3, final
+1→2. That proves the reads were independent **of each other**. It says nothing
+about whether they were independent **of the transient I was sitting inside**.
+Both were drawn from the same restart warm-up, so they are one observation
+repeated, and repeating an observation inside a transient increases confidence
+without increasing information.
+
+**I had already written the guard and then ignored it.** My own words minutes
+earlier: *"the worker needs a tick or two after restart to rebuild the snapshot,
+which is why there are two passes — I'd treat a single zero as inconclusive."*
+Then a *double* zero read as conclusive, purely because there were two of them.
+**A stated caveat does not discharge itself by being stated. Two of an
+inconclusive reading is not a conclusive one.**
+
+**Why it was expensive.** A false negative on a working fix is worse than no
+measurement: it sends the next session hunting a defect that does not exist, and
+it discredits a change that should have been banked. I had already spent the
+deploy cost — including killing another lane's soccer run — and then threw the
+result away by reading it too early.
+
+**How to apply.**
+- **After any restart, deploy, or cache flush, establish WHEN the system is
+  warm before treating any reading as evidence.** For a loop, that is at least
+  one full tick observed to have completed — not a guessed sleep.
+- **Prefer a producer-side counter to a served-side one for the first read.**
+  The tally that settled this (`liveMcSources`) is stamped by the loop itself,
+  so it cannot be read before the work exists. A serving endpoint happily
+  returns a stale-but-valid payload and looks like an answer.
+- **State the warm-up window as a timestamp in the ledger row**, so a later
+  reader can see whether a null result fell inside it. My rows said "measured
+  20:56 and ~21:04" without saying the worker restarted at 20:56:07 — the two
+  facts were in different files.
+- **A negative result taken near a deploy is provisional until re-read cold.**
+  Re-read before writing it into `state.md`; that file is where wrong facts do
+  the most damage.
