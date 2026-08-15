@@ -3776,3 +3776,26 @@ read the comparison block, and if a STABLE metric moved with no deploy touching
 the card surface, that is a finding about the harness, not about the board.
 
 - **FINAL:** shipped, closed, nothing uncommitted.
+
+#### DEPLOY COORDINATION SENT 2026-08-15 ~22:0xZ — to `Syndicate plan assessment and sessions`
+- Recipient `local_82a0a2fe-b386-4615-b783-7a532cbd254f`, running, active seconds
+  before the send. **Messaged ONE session, deliberately** — `learnings.md`
+  FORBIDS waking many idle sessions at once, it stalls them.
+- **Held commits: `1322d0a8` (line), `d348e040` (market_key), `4ae71c4a`
+  (player_name).** All on local main, 218/218, nothing deployed.
+- Asked three things I cannot answer from here: who owns the refresh-worker
+  measurement window opened by `846bb74e` at 21:45:20Z; whether a worker deploy
+  train is forming these can ride; and if not, whether to just land it.
+- **I am NOT using the message as a gate.** `state.md` records that a
+  cross-session message cannot gate a deploy — it waits for the target's turn to
+  end while a deploy takes seconds, and every hold sent today arrived after the
+  deploy it was meant to stop. This works the other way round: the deploy is
+  held indefinitely and the message is what would RELEASE it, so latency cannot
+  hurt. Default if no reply: keep holding; any worker deploy cut above these
+  commits picks them up for free.
+- Also handed over, unrelated to my lane: the phantom-staged `docs/ai_context/
+  todo.md` index entry (blobs backed up, deliberately not disarmed), and the
+  identified CAUSE of the recurring `deploys.md` armed revert — a chained
+  `git restore --staged` inheriting a live `GIT_INDEX_FILE`.
+- **Web moved again while I was writing this**: `edfc0174` at 21:48:17Z,
+  superseding the `4316c907` I read at 21:41. Re-read per service, always.
