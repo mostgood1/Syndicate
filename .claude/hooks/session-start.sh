@@ -120,17 +120,27 @@ if [ -f .syndicate/deploys.md ]; then
   [ "$PENDING" -gt 0 ] && add "OPEN OBLIGATIONS: $PENDING deploy(s) with no measurement. Not evidence of a fix."
 fi
 
-# --- Ledger health: surface bloat instead of silently truncating it ---
+# --- Ledger health ---
+# A warning that always fires is ignored, so these thresholds are set where the
+# file actually stops being readable in one pass, not at "bigger than tiny".
+# 2026-08-15: state.md was 120KB/51 sections stacking contradictions (#387 in
+# six of them) and lanes.md was 79% closed lanes. Both are read at every session
+# start, so their size is a tax on every session, not just on the writer.
 BLOAT=""
-for f in state.md lanes.md; do
-  if [ -f ".syndicate/$f" ]; then
-    SZ=$(wc -c < ".syndicate/$f" 2>/dev/null | tr -d ' ')
-    [ "${SZ:-0}" -gt 6000 ] && BLOAT="${BLOAT}${f} ${SZ}B, "
+for f in state.md:60000 lanes.md:120000 learnings.md:120000; do
+  n=${f%%:*}; cap=${f##*:}
+  if [ -f ".syndicate/$n" ]; then
+    SZ=$(wc -c < ".syndicate/$n" 2>/dev/null | tr -d ' ')
+    [ "${SZ:-0}" -gt "$cap" ] && BLOAT="${BLOAT}${n} $((SZ/1024))KB>$((cap/1024))KB, "
   fi
 done
-if [ -n "$BLOAT" ]; then
-  add "LEDGER BLOAT: ${BLOAT%, }. Working state, not history — promote durable"
-  add "rules to learnings.md and cut back before these stop being read."
+[ -n "$BLOAT" ] && add "LEDGER OVER BUDGET: ${BLOAT%, } — these are read every session."
+
+# The actionable half: closed lanes retained in lanes.md. Archiving them is
+# mechanical and lossless (.syndicate/lanes_closed.md), unlike trimming prose.
+if [ -f .syndicate/lanes.md ]; then
+  CLOSED=$(grep -c '^### .*—[^—]*\(CLOSED\|ORPHANED\|VOID\)' .syndicate/lanes.md 2>/dev/null || echo 0)
+  [ "${CLOSED:-0}" -gt 12 ] && add "LANE ARCHIVE OWED: $CLOSED closed/orphaned lanes still in lanes.md. Move to lanes_closed.md, leave a one-line pointer each (keep the file/line maps and any ORPHANED 'to resume' notes reachable)."
 fi
 
 # --- Emit. Overflow is announced BEFORE the body, because the tail is the
