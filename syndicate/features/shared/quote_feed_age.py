@@ -98,7 +98,14 @@ _DEFAULT_STALE_SECONDS_BY_SPORT: dict[str, int] = {
     "nfl": 7200,      # p50 1 min,   p90  30 min -> 2 h clears the quiet stretches
     "mlb": 10800,     # p50 31 min,  healthy pregame worst 123 min -> 3 h, PINNED BY TEST
     "wnba": 21600,    # p50 122 min, p90 314 min -> 6 h
-    "soccer": 25200,  # p50 173 min, p90 248 min, max 558 -> 7 h
+    # 4 h. CORRECTED 2026-08-15 (same day, before this ever caught anything).
+    # The first value here was 7 h, derived from a p50 of 173 min computed over
+    # the WHOLE shard -- and the soccer shard is keyed by FIXTURE date, so
+    # `2026-08-15.jsonl` holds captures from 2026-08-06 onward, TEN calendar
+    # days. That p50 was measuring overnight boundaries, not cadence.
+    # Today-only: p50 40 min, max 198 min. mlb/nfl/wnba are unaffected -- their
+    # shards span 1-2 days and their today-only p50 equals the figure used.
+    "soccer": 14400,
 }
 
 # Per-sport env override, checked before the global one:

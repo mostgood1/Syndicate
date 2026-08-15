@@ -242,7 +242,7 @@ def test_thresholds_differ_by_sport():
     seen = {s: qfa.stale_threshold_seconds(s) for s in ("nfl", "mlb", "wnba", "soccer")}
     assert len(set(seen.values())) > 1, seen
     # ordered by each feed's measured p50
-    assert seen["nfl"] < seen["mlb"] < seen["wnba"] < seen["soccer"]
+    assert seen["nfl"] < seen["mlb"] < seen["soccer"] <= seen["wnba"]
 
 
 def test_nfl_detects_faster_than_the_old_global():
@@ -250,14 +250,20 @@ def test_nfl_detects_faster_than_the_old_global():
     assert qfa.stale_threshold_seconds("nfl") < 10800
 
 
-def test_soccer_is_looser_than_the_old_global():
-    """A CORRECTION, not a regression.
+def test_soccer_is_looser_than_the_old_global_but_not_by_much():
+    """Pinned against BOTH ways this constant has been wrong in one day.
 
-    Soccer's p50 is 173 min, so the old 180 min global flagged it on roughly
-    half of normal operation. An alarm that fires that often is muted within a
-    week, which is the real failure mode.
+    v1 was 7 h, from a p50 of 173 min computed over the whole shard. The soccer
+    shard is keyed by FIXTURE date, so `2026-08-15.jsonl` spans TEN calendar
+    days and that p50 was measuring overnight boundaries, not cadence.
+    Today-only: p50 40 min, max 198 min.
+
+    Upper bound is the real guard here. At 7 h this threshold would have called
+    a 437-min silence -- 11x soccer's own beat -- merely "ok".
     """
-    assert qfa.stale_threshold_seconds("soccer") > 10800
+    thr = qfa.stale_threshold_seconds("soccer")
+    assert thr > 10800, "must still clear soccer's genuine multi-hour quiet spells"
+    assert thr <= 14400, "7 h was derived from a fixture-date shard and hid a real outage"
 
 
 def test_unknown_sport_falls_back_to_the_old_global():

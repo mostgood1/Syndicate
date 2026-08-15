@@ -2419,7 +2419,7 @@ log query, not a deploy.
   policing this further** — a session that commits `deploys.md` needs to add the
   repair, or the next bare `git commit` in this tree un-ships a measurement.
 
-### market-key-blank-not-absent — OPEN — opened 2026-08-15 — session: red-intelligence-tests
+### market-key-blank-not-absent — CLOSED-VERIFIED 2026-08-15 — `test_intelligence.py` 218/218; shipped `d348e040`; `#438a` (43 sites) left open — opened 2026-08-15 — session: red-intelligence-tests
 - Goal: the THIRD pre-existing red,
   `test_intelligence.py::...resolves_typo_subject_and_three_point_market`, is
   green, and a candidate whose source carries no canonical market key stops
@@ -3001,3 +3001,93 @@ served reading. **Owed: a web deploy pinned on the live SHA, then
 - **Not an instrument failure for once:** the `missing_market_key` metric
   `1f6c27b9` built counts with `bool(...)`, so it read `""` as missing and was
   right all along. Nothing was reading it.
+
+#### CROSS-LANE HANDOVER — soccer feed outage. FOR THE SESSION HOLDING THE live-odds-worker earlyExit LEAD.
+`[measured 2026-08-15 21:0x-21:1xZ, read-only, by session tier5-live-read]`
+
+**I did not open a lane on this and I am not working it.** You have the lead
+(`a43ffda8`, `d4574644`, `8831463d`, all local-only). Two facts I have that your
+notes do not, both from the ARTIFACT rather than logs or events.
+
+**1. THE ~6.5 h earlyExit CADENCE DOES NOT EXPLAIN THIS OUTAGE. It is not
+sufficient, and the gap is 5.5 hours wide.**
+
+    soccer last successful capture   2026-08-15T13:47Z   (402 rows)
+    earlyExit events                 01:37  08:05  14:34  20:03Z
+
+The last capture PRECEDES the 14:34 exit by 47 min. Then **14:34 -> 20:03 is a
+full 5.5 h window, bounded by two restarts, containing ZERO captures.** Your own
+observation is that a fresh `refresh_odds_sources.py` begins walking soccer
+leagues *immediately on boot*, and soccer's beat earlier today was ~40-60 min.
+A run that is merely killed every 6.5 h should still have written repeatedly
+inside that window. **Something stopped soccer capturing at ~13:47 that is
+independent of the restarts.** The kill is real and is still worth fixing; it is
+not the cause of THIS silence.
+
+Caveat, stated: the ~20:51 kill in `8831463d` is yours and explains the most
+recent hour only — the silence starts 7 h earlier.
+
+**2. THE SOCCER SHARD IS KEYED BY FIXTURE DATE, NOT CAPTURE DATE, AND NOTHING
+ELSE IS.** `soccer_source/tracking/book_quotes/2026-08-15.jsonl` contains
+captures from **2026-08-06 through 2026-08-15 — 10 calendar days**, because
+pregame odds for a fixture accumulate for days before it. Measured spans:
+mlb 2 days, nfl 1, wnba 2, **soccer 10**.
+
+Consequences for anyone reasoning about this file:
+- **Any cadence computed over the whole shard is wrong for soccer.** Across all
+  10 days its gap p50 is 173 min; **today only, it is 40 min** (max 198).
+- **437 min of silence is therefore ~11x soccer's own normal beat and 2.2x its
+  worst gap today.** This is a large, unambiguous outage, not a slow feed.
+
+**COST TO ME, recorded because it changes a number I deployed:** my per-sport
+threshold for soccer (25,200 s / 7 h, live in web `b9ea0f0a`) was derived from
+the bad 173-min figure and is **too loose**. Correct basis is ~40 min p50 /
+198 min max, so ~4 h. mlb/nfl/wnba are UNAFFECTED — their shards span 1-2 days
+and their today-only p50 equals the figure I used. Fixing soccer separately.
+
+**AND THE CORRECTION THIS FORCES ON MY OWN CORRECTION:** I earlier downgraded
+the alarm's first-read catch ("soccer STALE at 340.9 min") to "substantially a
+threshold artifact", on the strength of the 173-min p50. **That downgrade was
+WRONG and is withdrawn.** Against soccer's real 40-min beat, 340.9 min was ~8x
+normal — the alarm's first catch was legitimate. I corrected a true finding into
+a false one using a statistic I had not checked the provenance of.
+
+### player-name-blank-not-absent — OPEN — opened 2026-08-15 — session: red-intelligence-tests
+- Goal: `#438a`'s named half. `_build_prop_dashboard_row` stops emitting
+  `player_name: ""` for a source that has no player, for the same reason and by
+  the same means as `market_key` in `d348e040`. Single testable outcome: a row
+  built from an item with no player identity has `player_name is None`, and a
+  row built from one that HAS a player is byte-identical to today.
+- Files (exclusive to this lane):
+  - `syndicate/blueprints/home.py` — `_build_prop_dashboard_row`, the ONE
+    `player_name` line (~L3060). Not `market_key` (already shipped), not the
+    enrich/profiler region at L2872/L2926.
+  - `tests/test_intelligence_contracts.py` — extend the existing `#438` test.
+- Collision check RUN, attributing every `home.py` mention to its enclosing
+  `###` heading and parsing that heading's status: the only OPEN hit was **my
+  own `market-key-blank-not-absent`**, whose `###` header I had left saying
+  OPEN after appending a `####` CLOSED note — an active lock by the
+  `learnings.md` rule, and `ncaaf-market-main-expectation` correctly backed off
+  `home.py` because of it. **Header flipped to CLOSED-VERIFIED in this same
+  edit.** No other OPEN lane claims the file; it is clean in `git status`.
+- **Why the held-back reason does NOT apply, checked rather than assumed.** I
+  held this back in `#438` because the comment records `player_name: null`
+  cards as a defect this function was fixed for once already. Read the commit:
+  `42902ee6` (`#221`, 2026-08-06) shows **only `+` lines for `player_name`** —
+  the key was ABSENT from the reconstructed dict, so rows that DID have a name
+  upstream serialized without one and 0 of 14 top_props could join to a price.
+  The fix was to ADD the field. `null` was the SYMPTOM OF OMISSION, never a
+  chosen value. Emitting `None` only when the source genuinely has no player
+  cannot reproduce it: those rows have no identity to join on either way.
+- Hypothesis: same mechanism as `market_key`. `_safe_text` ends `return ""`, so
+  the `None` fallback written at this call site is unreachable and absent
+  serializes as `""`.
+- Falsification test: if any reader distinguishes `""` from `None` for this
+  field, the change is not safe and the fix belongs at the reader. **Checked
+  BEFORE editing: zero `is None` / `== ""` readers in Python; every JS and
+  template consumer uses truthiness (`|| ''`, `|| 'Player'`, `? esc(...)`),
+  and none does a bare `String(player_name)` that would render "null".**
+- Verification: the extended contract test; `test_home.py`; the full
+  `tests/test_intelligence.py` at 218 (it is 218 as of `d348e040`, so any
+  number below that is mine).
+- Blocked by: none. NO DEPLOY.
