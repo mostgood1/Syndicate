@@ -348,6 +348,12 @@
   mislabel (the board does not read these rows), not zero either. It also
   corrupts every home-side spread row in the CLV join, which is where it was
   found.
+- Files (claimed 2026-08-15 23:0xZ — **claimed LATE, after the edit, which is a
+  protocol lapse of mine; recorded rather than quietly backfilled**):
+  `syndicate/features/shared/layer2_board.py`,
+  `tests/test_layer2_book_prices_line.py`. Collision check RUN via
+  `lane-guard.py`'s own `_claims()` at edit time AND again now: CLEAR both times,
+  so no other lane was blocked by the gap.
 - **FIX IMPLEMENTED, TESTED, ON MAIN AS `edbbee9d` — DEPLOY HELD.**
   `_side_line_from_cells` reads the handicap from the same cell as the price;
   no-op for away/h2h/props; returns None (caller keeps the row value) when books
@@ -4624,3 +4630,24 @@ whole-numbered is the one that should move, and `market_key`/`player_name` at
   the new live SHA — a deploy reporting `live` is not evidence a passenger rode —
   then re-read the four numbers in state.md's "Candidate field absence" section.
   `line` 84/101 with 7 whole-numbered is the ONLY one that should move.
+
+#### CLAIM HOLDER IDENTIFIED BY PROBE, MESSAGED 2026-08-15 ~23:1xZ
+- The claim holder string is **`coordination-session`**, which is a TOKEN NAME,
+  not a session title — no session is called that. **Probed instead of guessing**
+  (`search_session_transcripts`): `Syndicate plan assessment and sessions`
+  (`local_82a0a2fe`) acquired it, token `ee4a42f90b4256cf`, **23:07:54Z, ttl
+  2700s -> expires ~23:52:54Z**, `target_commit: pending`.
+- **At least THREE sessions are queued behind this one claim.** `Ship
+  refresh-worker branch` (`local_4226a973`) is polling it too — found in the
+  same transcript search, not reported to me. A `pending` target means the door
+  is being held rather than a specific commit deployed; if that is to batch a
+  train, mine should be in it.
+- **`4273839d`'s parent IS the current live SHA `1f36d718`**, so it is now a
+  clean one-commit fast-forward. This was NOT true an hour ago — when live was
+  `b0ab37a1`, deploying it would have shipped `live-game-line-projection`'s
+  then-undeployed Drop 3. **Re-check the parent against live before firing; the
+  commit is only correct while live is `1f36d718`.**
+- `live-game-line-projection` deployed TWICE (`b0ab37a1` 22:40:56Z, then
+  `1f36d718`) and I verified BY CONTENT that neither carried my fixes. They went
+  idle without answering the carry request.
+- **No claim was forced at any point**, by choice as well as by the harness.
