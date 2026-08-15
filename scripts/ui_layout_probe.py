@@ -113,6 +113,17 @@ TYPE_CLASSES = [
 ]
 
 # The classes that carry numbers which change on the 30s poll.
+#
+# THIS LIST IS A CROSS-CHECK, NOT THE MEASUREMENT, and the difference is the
+# whole point. Measured 2026-08-15 on production `c774fe1a`: all three of these
+# selectors match ZERO elements on /mlb/cards, because MLB renders through
+# `cards_source.js`, which emits `.cards-linescore-stat`, `.cards-chip`,
+# `.cards-starter-ladder-badge` and friends instead. The old probe did
+# `querySelector(sel); if (!el) return;` -- so the key simply vanished from the
+# report and `summarize()` had no branch for a missing key. MLB, the sport with
+# the most traffic and a 30s poll, read as a PASS on a check that never touched
+# it. A hand-maintained list of class names goes stale the moment a renderer
+# forks; `numericSweep` below finds elements by what they RENDER instead.
 NUMERIC_CLASSES = [".cards-data-pair strong", ".cards-market-main", ".cards-mini-metric strong"]
 
 WCAG_TARGET_PX = 44
@@ -216,12 +227,36 @@ MEASURE_JS = """
     });
   }
 
+  // Every element, not the first one, and a selector that matches nothing is
+  // reported as `count: 0` rather than dropped -- see the note on
+  // NUMERIC_CLASSES. An absent measurement must never look like a clean one.
   const tabularFigures = {};
   (spec.numericClasses || []).forEach((selector) => {
-    const el = document.querySelector(selector);
-    if (!el) return;
-    tabularFigures[selector] = getComputedStyle(el).fontVariantNumeric;
+    const els = [...document.querySelectorAll(selector)];
+    const values = {};
+    els.forEach((el) => {
+      const v = getComputedStyle(el).fontVariantNumeric;
+      values[v] = (values[v] || 0) + 1;
+    });
+    tabularFigures[selector] = {count: els.length, values};
   });
+
+  // The check that does not depend on knowing the class names. Any leaf element
+  // that actually renders a digit is a candidate for proportional-digit jitter
+  // on the 30s poll, whichever renderer emitted it. Grouped by class so the
+  // result names something a stylesheet can target.
+  const sweep = {};
+  document.querySelectorAll('.cards-game-card *, .cards-strip-card *').forEach((el) => {
+    if (el.children.length) return;
+    if (!/[0-9]/.test(el.textContent || '')) return;
+    if (getComputedStyle(el).fontVariantNumeric === 'tabular-nums') return;
+    const cls = (typeof el.className === 'string' ? el.className : '').split(/\\s+/).filter(Boolean);
+    (cls.length ? cls : ['(no class)']).forEach((c) => { sweep[c] = (sweep[c] || 0) + 1; });
+  });
+  const numericSweep = Object.entries(sweep)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([cls, count]) => ({cls, count}));
 
   const tabBoxes = [...document.querySelectorAll('.cards-tab')].map((t) => {
     const r = t.getBoundingClientRect();
@@ -252,6 +287,7 @@ MEASURE_JS = """
     panelsWithoutTab: [...new Set(panelsWithoutTab)],
     typeScale,
     tabularFigures,
+    numericSweep,
     tabBoxes,
     nameBoxes: nameBoxes.slice(0, 8),
     unstyledLinks,
@@ -382,6 +418,36 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             if measured.get("unstyledLinks"):
                 issues.append(f"{len(measured['unstyledLinks'])} unstyled link(s)")
                 ok = False
+            # Tabular figures, and the reason this branch exists at all: the
+            # old probe reported nothing when a selector matched nothing, so
+            # MLB passed a check that had never run on it. A numeric class with
+            # 0 elements on a sport that IS serving cards is now a failure --
+            # it means the class list has gone stale against that renderer, and
+            # the honest state of the measurement is "unknown", not "fine".
+            if cards:
+                figures = measured.get("tabularFigures") or {}
+                unmeasured = [s for s, v in figures.items() if not (v or {}).get("count")]
+                if unmeasured:
+                    issues.append(
+                        "numeric class not found (measurement did NOT run): "
+                        + ",".join(s.replace(".cards-", "") for s in unmeasured)
+                    )
+                    ok = False
+                proportional = [
+                    s for s, v in figures.items()
+                    if (v or {}).get("count") and any(k != "tabular-nums" for k in (v.get("values") or {}))
+                ]
+                if proportional:
+                    issues.append("proportional digits: " + ",".join(s.replace(".cards-", "") for s in proportional))
+                    ok = False
+                # The name-independent sweep. Reported, not failed: it finds the
+                # long tail a class list cannot, and hard-failing it would gate
+                # every run on a backlog rather than on a regression.
+                sweep = measured.get("numericSweep") or []
+                if sweep:
+                    total = sum(s["count"] for s in sweep)
+                    top = ",".join(f"{s['cls']}({s['count']})" for s in sweep[:3])
+                    issues.append(f"{total} numeric leaves not tabular, top: {top}")
             # These two are REPORTED, not failed. They are counts that should
             # trend down; hard-failing them on day one across seven sports
             # would make the harness something people skip rather than run.

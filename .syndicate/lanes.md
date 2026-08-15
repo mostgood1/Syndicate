@@ -6,6 +6,41 @@
 
 ## OPEN
 
+### probability-clamp-removal-2 — OPEN — opened 2026-08-15 — session: probability-differential
+- Goal: finish Tier 3a's fix. The **last two** `max(0.02, min(0.98, p))` clamp
+  sites delegate to `opportunity_signals.american_price`, so no board column
+  publishes a fair price for a probability the market never implied.
+  **Testable outcome:** `scripts/probability_differential.py --concept
+  probability_to_american` scores both at **5/5** (both are 2/5 today), and the
+  two live MLB totals rows stop reading ±4900 against a correct ±12488.
+- Context: `probability-clamp-removal` (CLOSED-VERIFIED, `de0c367f`) fixed the
+  WNBA site and recorded these two as **blocked by other lanes**. Both holders
+  have since closed **without fixing them** — verified by reading the functions,
+  not the lane headers: `layer2_board.py:1285` and
+  `pipeline/intelligence_state.py:1817` still carry the clamp.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/layer2_board.py` — `_american_from_probability`.
+  - `pipeline/intelligence_state.py` — the INLINE copy inside
+    `_backfill_layer2_board_columns`.
+  - `tests/test_probability_differential.py` — shrink `KNOWN_FAILING`.
+  - `tests/test_fair_price_unclamped.py` (new).
+  - Collision check RUN via `lane-guard.py`'s own `_claims()` over all 21 OPEN
+    claims: **both CLEAR.** The three prose mentions were read and are not
+    claims — `clv-without-settlement` says "Files: none claimed yet,
+    deliberately" and names a holder (`layer2-board-freshness`) that is CLOSED;
+    `soccer-model-coverage` lists them under "NOT this lane's files ...
+    read-only here"; `ask-sport-coverage` says "Read-only dependency".
+- Hypothesis: n/a — construction. The defect is measured and the owner
+  function is already established by the Tier 3a scorecard.
+- Falsification test: if a board column that rendered a price now renders blank
+  for a probability INSIDE [0.02, 0.98], the delegation changed behaviour on
+  valid input and must be reverted. Only out-of-range input should change.
+- Verification: (1) harness 5/5 on both; (2) the `KNOWN_FAILING` set shrinks and
+  the fixed entries are REMOVED so they cannot silently regress; (3) targeted
+  tests green over the changed symbols' real callers; (4) production re-read of
+  the two MLB rows AFTER a deploy — **and a deploy is NOT part of this lane**.
+- Blocked by: none. No deploy from this lane without `/preflight`.
+
 ### clv-without-settlement — OPEN — BOTH HALVES BUILT; THE FIRST CLV NUMBER WAS RETRACTED; NONE IS THE HONEST ANSWER — opened 2026-08-14 — session: model-audit
 - **STATUS 2026-08-14 19:50 CDT.** Recorder LIVE (`2b14fbeb`) + `book_prices`
   LIVE (`96e3a9b7`). Joiner is **library-only, no call site, NOT deployed**
@@ -1636,3 +1671,114 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
   `#124`'s `prop_row_counts=[0]*9`. **Not designed, not agreed, not started.**
 - **`0e0b0aa1` is NOT observable in production on its own.** It is a precondition
   for Drop 2, not a shippable user-visible change. No deploy fired.
+
+### tabular-figures-actually-applied — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: the tabular-figures fix covers the classes users actually watch, and
+  the probe can no longer report a pass for a class it never found. Testable:
+  `ui_layout_probe.py` FAILS on any numeric class with 0 elements on a sport
+  serving >0 cards; and on production MLB, the classes carrying digits compute
+  `tabular-nums`, not `normal`.
+- Files (exclusive to this lane):
+  - `scripts/ui_layout_probe.py` — absent-class must fail, not vanish.
+  - `docs/reports/ui_audit_2026_08_14/README.md` — the third method caveat.
+  - `syndicate/static/mlb/cards_exact.css` — MLB's real numeric classes.
+  - `syndicate/static/shared/dense_cards.css`
+  - `syndicate/static/nba/cards_source.css`
+  - `syndicate/static/wnba/cards-parity.css`
+  - Collision check RUN (lane-guard's own `_claims()` over `lanes.md`, not a
+    read): 25 claimed paths across 5 OPEN lanes; NONE is a stylesheet, the
+    probe, or the audit README. `soccer-model-coverage` claims
+    `syndicate/features/soccer` — a different tree from `syndicate/static`.
+- Hypothesis: Lane E's "do-now" tabular-figures item was verified with
+  `querySelector` over 3 class names that MLB's `cards_source.js` renderer
+  does not emit, so the check has NEVER measured MLB. Absent key -> no branch
+  in `summarize()` -> reads as a pass.
+- Falsification test: if MLB's numeric leaves already compute `tabular-nums`
+  under an all-elements probe, the fix landed and only the instrument is
+  blind.
+- **HYPOTHESIS PARTLY FALSIFIED, 2026-08-15, and by my own instrument.** The
+  claim was that the three `NUMERIC_CLASSES` match ZERO elements on MLB, so
+  the check had never run there. Re-measured through the probe itself against
+  production `c774fe1a`, /mlb/cards, http 200, 15 cards:
+
+      .cards-data-pair strong   count=495  {tabular-nums: 495}
+      .cards-market-main        count= 60  {tabular-nums: 60}
+      .cards-mini-metric strong count= 30  {tabular-nums: 30}
+
+  They are all there and all correct. **Lane E's tabular fix DID land on MLB.**
+  My `{}` reading came from a one-off that sampled 600ms after load — MLB
+  renders through `cards_source.js`, so the elements did not exist yet. A
+  single early read of an async render, which is a rule I already hold
+  (`watcher over spot check`). The stale-class defect is REAL but it is on
+  NCAAF, not MLB: `.cards-market-main` count=0 on a sport serving 16 cards.
+- **What survives, and it is the larger finding.** The three-class list covers
+  a small share of the digits on screen. Name-independent sweep, production,
+  leaves rendering a digit at `font-variant-numeric: normal`:
+
+      mlb    1388   top (no class) 349, cards-chip 233, cards-mini-copy 150
+      nfl     468   top cards-callout-copy 210, (no class) 48, cards-subcopy 48
+      ncaaf   432   top cards-callout-copy 224, cards-table-kicker 96
+      soccer   60   top cards-callout-copy 23, cards-table-row-value 8
+
+  So the plan's "four lines in four stylesheets" did what it said and the
+  jitter it was aimed at is still on screen everywhere.
+- Verification: the probe's own output, before and after, on production and
+  then locally; a class-coverage line per sport so "0 elements" is visible
+  rather than absent. Production numbers only after a web deploy, which is a
+  separate `/preflight`-gated decision and the user's call.
+- Blocked by: none.
+
+#### ask-sport-coverage — PREFLIGHT 2026-08-15 (2nd run): **PASS**, deployed
+
+Both blockers from the first run cleared:
+- **Blocker 2 (confound) RESOLVED BY THE OTHER LANE SHIPPING.**
+  `ask-headline-from-board` went live as `c774fe1a` at 03:29:56Z. There is no
+  longer a pending adapter change to be confounded by — it is now part of the
+  baseline.
+- **Blocker 1 (no deploy branch) FIXED PROPERLY.** `deploy/ask-sport-coverage`
+  = `0bf866c3`, cut from the LIVE commit `c774fe1a` and cherry-picked, NOT from
+  local `main` (which is 132 behind `origin/main` and would have reverted 132
+  commits of other sessions' work).
+
+**THE BASELINE IN MY BRIEF WAS STALE AND RE-MEASURING IT WAS THE WHOLE POINT.**
+The brief said judge everything against 23/52. Live `c774fe1a` actually measures
+**25/52** — and `refusal` had gone 6/8 -> **4/8**, a regression that the stale
+number would have hidden and that I would have inherited as "mine". Per-class
+baseline now recorded in `deploys.md` and in
+`reports/ask_regression/prebaseline_c774fe1a_2026_08_15.json`.
+
+**Verified before deploying, not asserted:**
+- Cherry-pick clean onto `c774fe1a`; adapter untouched (no collision).
+- **200 tests pass on the combined tree**, including the other lane's own
+  `test_ask_headline_from_board.py`.
+- **15/15 of the real failing questions now route correctly in-process**
+  (extracted from the baseline's `failures`, not invented).
+- 13 of those 15 have routing as their ONLY failure -> predicted **25 -> 38/52**.
+
+Deploy `dep-da09dv1t0dsc7397er6g`. Measurement owed and NOT yet taken.
+
+### quote-shard-latest-index — OPEN — opened 2026-08-15 — session: memory-cutover-ship
+- Goal: `#435`'s fix. The board path stops holding a whole day of quote
+  OBSERVATIONS and holds latest-per-key instead. Target: the ~1,162MB resident
+  cost of one 184.5MB MLB shard drops ~13x, and the OOM ramp with it.
+- Files: `syndicate/features/shared/odds_book_quotes.py`,
+  `pipeline/layer2_shortlist.py`, `tests/test_odds_book_quotes*.py`.
+  Collision check: no OPEN lane claims either. `clv-without-settlement` works on
+  openings but this change REMOVES NOTHING — `read_book_quotes` and
+  `iter_book_quotes` keep full history; the reduced reader is additive.
+- **Why this is safe, established BEFORE writing code:** `build_book_grid`
+  already reduces to latest-per-key internally (`book_grid.py:156` and `:225`,
+  `if current is None or _observed_at(row) >= _observed_at(current)`), and its
+  reduce key is `_INSTANCE_FIELDS + line + bookmaker + selection` = **exactly the
+  fields in `_KEY_FIELDS`**. So feeding it latest-per-key rows yields an
+  IDENTICAL grid. The reducer must use the grid's own `_observed_at` precedence
+  (`book_updated_at` first), not `closing_quotes`' — they differ.
+- Hypothesis: peak drops because the reduce is STREAMED, so the whole-file list
+  never materialises; and the floor drops because the cached object is 13x
+  smaller.
+- Falsification test: a byte-for-byte grid comparison over a real shard, full
+  rows vs reduced rows. If any grid row differs, the reduction is wrong and the
+  lane stops.
+- Verification: (1) grid equality on a real shard; (2) row-count and resident
+  measurement locally; (3) production `PYMALLOC_STATS` arenas after deploy.
+- Blocked by: none.
