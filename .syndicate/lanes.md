@@ -168,6 +168,33 @@
   The biased scopes say the board crushes the close; the honest one says it is
   flat-to-negative and beats the close **27%** of the time. Supersedes the
   retracted `-5.215`.
+- **SECOND READING 2026-08-15 20:4xZ (4 of 14 MLB games started) — THE NUMBER IS
+  MOVING, AND DOWNWARD.** Same endpoint, same date, ~1h later:
+
+      reading           games started   same_book_n   avg_clv   beat_close
+      19:38Z (first)         0 of 14         144      -0.0711      27.1%
+      20:4xZ (second)        4 of 14         167      -0.668       29.3%
+
+  - The biased scope barely moved (`book_agnostic_close` +2.7261 -> +2.8425,
+    n=143 -> 164, beat 82.5% -> 83.5%), so the gap between the honest and the
+    flattering number **widened** from ~2.80 to ~3.51 points.
+  - `different_book_close` FLIPPED SIGN, +1.3907 -> **-0.5665** (n=6 -> 9). At
+    n<10 that is noise; do not read it as a trend.
+  - `unresolved_reasons` grew as expected: `close_precedes_open` 42 -> 64,
+    `line_mismatch` 13 -> 19, plus a new `no_pregame_observation: 4`.
+    `no_market_in_history` held at 172.
+  - **STILL NOT THE SETTLED NUMBER.** Last first pitch is **2026-08-16T01:40Z
+    (20:40 CDT)** — 10 of 14 games had not started at this reading.
+  - **DIRECTION OF TRAVEL MATTERS FOR ANYONE WAITING ON THIS:** both readings
+    are negative and the second is 9x more negative. Nothing here supports "the
+    board beats the close"; the evidence so far points the other way.
+- **A re-read is ARMED** (background monitor, fires after 01:45Z) to capture the
+  settled figure. If this session is gone when it fires, run by hand:
+  `/api/ops/clv/report?date=2026-08-15&sport=mlb` and record `same_book_n`,
+  `avg_clv_pct`, `beat_close_rate` plus the `by_book_scope` table.
+- **Minor data oddity, logged not chased:** `by_book_scope` carries a bucket
+  keyed `None` with `n=0`. Harmless today; it means some row's scope label is
+  null rather than a scope name. Worth a look only if `n` ever becomes nonzero.
 - **`-0.0711` IS PRELIMINARY — timing, not arithmetic.** Taken 14:38 CDT, before
   first pitch for most of the slate, so most "closes" are latest observations.
   **Re-read after the last MLB game starts.** One date, one sport, 144 pairs.
@@ -2580,7 +2607,7 @@ being killed every ~6.5h — but that is the soccer lane's call, not the deploye
 - Blocked by: none. **NO DEPLOY FROM THIS LANE** — refresh-worker writes this
   artifact and is under `#435`; its deployed commit has NOT been read.
 
-### probe-mlb-content-wait — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+### probe-mlb-content-wait — CLOSED-VERIFIED 2026-08-15 — 10/10 MLB readings at 15 cards; timeout path proven to fail, not pass — opened 2026-08-15 — session: ui-plan-lane-gh
 - Goal: `ui_layout_probe.py` cannot report a spurious `0 cards` on a
   JS-rendered sport. Testable: run it against production /mlb/cards 5 times and
   get 15 cards every time (today it returned 0 on at least 1 of 3), and a
@@ -2647,3 +2674,134 @@ has a narrow window to ever finish. **Still a lead** — I have not timed a run
 end-to-end or confirmed one has ever completed since 08-10.
 
 **Do not spend time on a stale-lock bug. There isn't one.**
+
+#### probe-mlb-content-wait — CLOSED-VERIFIED 2026-08-15
+
+`page.wait_for_timeout(400)` -> `wait_for_selector('.cards-game-card,
+.cards-strip-card')` + a 600ms settle, gated on `httpStatus < 400`, with
+`CARD_WAIT_MS = 20000`.
+
+**Both halves of the stated Verification ran.**
+
+1. Five consecutive production runs, `--sports mlb`, desktop and mobile:
+   **15 cards on all 10 readings.** Before this change the same URL returned 0
+   on at least one of three runs, and a 600ms read found 0 elements for classes
+   a 2500ms read found 495 of.
+2. The timeout path REPORTS rather than passes, proven end-to-end against a
+   real 200-with-no-cards page (`/` at a 6s wait), not just in a unit test:
+
+       httpStatus 200  cards 0  cardWaitTimedOut True  ok False
+       "NO CARD ATTACHED in 6s -- render did not finish; this is NOT a 0-card slate"
+
+   It failed **even with mlb marked out-of-season**, which is the intended rule:
+   "nothing to show" resolves fast, so a long timeout is an anomaly regardless.
+
+**`tests/test_ui_layout_probe.py` is new — 9 tests, and the file had none.**
+Every case is a failure this harness actually produced against production: the
+502 that printed a clean table, the MLB false zero, the numeric class that
+vanished from the report. One of them **failed on first run and the code was
+right**: `out_of_season` travels on the REPORT (so `--expect-cards` can
+override it per run), not as a module constant, so a caller omitting it gets
+the STRICT reading. That fail-closed default is now pinned by a test.
+
+**No deploy.** The probe is a dev-time script; it runs in nobody's request path.
+
+- **FINAL:** shipped, verified, closed. Nothing of this lane uncommitted.
+
+### quote-feed-threshold-per-sport — OPEN — CODE COMMITTED `9e100444` + MUTATION-PINNED (22 pass, 4-red/18-green); **NOT DEPLOYED, production still on the single 10,800 s value**; my 3x-p50 basis was REFUTED by my own earlier test and the soccer 'catch' is downgraded to a threshold artifact — opened 2026-08-15 — session: tier5-live-read
+- Goal: the stale threshold is per-sport and grounded in each feed's MEASURED
+  cadence, so the alarm stops being simultaneously too slow for NFL and a
+  false-alarm generator for soccer. Testable outcome: with no env set, a feed at
+  its own sport's normal cadence reads `ok` and one at 3x that reads `stale`.
+- Files (exclusive): `syndicate/features/shared/quote_feed_age.py`,
+  `tests/test_quote_feed_age.py`.
+  **`blueprints/ops.py` is NOT touched** — it already passes
+  `threshold_seconds=None` unless `?threshold_seconds=` is given, so per-sport
+  defaults apply automatically. That file is claimed by the OPEN
+  `clv-without-settlement` lane and this change routes around it by design.
+- **Measured input (production shards, 2026-08-15, full day, via
+  `/api/ops/artifacts/stream`) — distinct `captured_at` gaps:**
+
+      sport   captures  p50 gap   p90     max
+      nfl        128     1.0 min   30     244
+      mlb         16    31.0 min  349     448
+      wnba        14   122.0 min  314     448
+      soccer      91   173.0 min  248     558
+
+  p90/max are inflated by the overnight window and, for MLB, by the 5.8 h
+  starvation itself — so **p50 is the only robust base** and the defaults are
+  set from it. Using p90 would bake the outage into "normal".
+- **CORRECTION THIS FORCES, recorded rather than buried:** the deploy note for
+  `0c65a832` says the alarm "caught soccer STALE at 340.9 min on its first
+  read". **Soccer's own p50 is 173 min**, so a 180 min global threshold flags
+  that feed roughly half the time. That detection was substantially a THRESHOLD
+  ARTIFACT, not a clean catch. 340.9 min is still above soccer's p90 (248), so
+  it was elevated — but it was not the unambiguous win the note implies.
+- Hypothesis: one global constant cannot serve feeds whose normal cadences span
+  1 min (nfl) to 173 min (soccer) — a 173x spread. Any single value is either
+  ~180x too slow for the fast feed or a false-alarm generator for the slow one.
+- Falsification test: if the per-sport defaults make every sport read `ok`
+  regardless of age, the thresholds are too loose and the alarm is inert.
+  Guarded by a test that each sport goes `stale` at 3x its own default.
+- Verification: (1) unit tests incl. env-precedence and a mutation pin;
+  (2) after deploy, `/api/ops/quote-feed-age` returns a DIFFERENT
+  `threshold_seconds` per sport, and soccer at ~340 min reads `ok` where it
+  previously read `stale`.
+- Blocked by: none.
+
+### ncaaf-market-main-expectation — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: the harness stops reporting a failure for a class NCAAF's design does
+  not have, without reintroducing "absent reads as a pass". Testable: a clean
+  ncaaf run passes; and if `.cards-market-main` ever DOES appear on ncaaf, the
+  run reports that the exemption is stale.
+- Files (exclusive to this lane):
+  - `scripts/ui_layout_probe.py`
+  - `tests/test_ui_layout_probe.py`
+  - Collision check RUN (lane-guard `_claims()` over `lanes.md`): 32 claimed
+    paths; both of mine free. **`syndicate/blueprints/home.py` IS claimed by
+    OPEN lane `market-key-blank-not-absent`** — not edited; finding handed over.
+- Hypothesis (traced, not assumed): `.cards-market-main` == 0 on ncaaf is
+  CORRECT, not a defect. `_game_card.html` dispatches `ncaaf_main` to
+  `_game_card_ncaaf.html`, which contains **zero** `cards-market` markup;
+  NCAAF presents the same numbers as `.cards-data-pair` inside panels.
+- **Traced further, and it overturned my first plan.** `ncaaf/cards.py` builds
+  `market_tiles` at 3 sites and the ncaaf template never renders them, so they
+  looked like dead code to delete. They are NOT dead: `home.py:6381` iterates
+  `market_tiles` GENERICALLY and renders `"{label}: {title}"`. NCAAF's tiles
+  are publication metadata (Coverage / Tier / Status / Priority), so deleting
+  them would change home-page output. **Not deleted.**
+- Falsification test: if `.cards-market-main` is found on ncaaf at any count,
+  the premise is wrong and the exemption must go.
+- Verification: probe run on production ncaaf passes; new tests cover both the
+  exempt-and-absent (pass) and exempt-but-present (report) directions.
+- Blocked by: none.
+
+#### NOTICE to `soccer-model-coverage` — I KILLED YOUR IN-FLIGHT REFRESH RUN, 2026-08-15 20:49:36Z
+**On the user's explicit instruction ("fire into the run"), after surfacing the
+cost and holding for 76 minutes.** Recording it rather than letting you find it.
+
+**What was killed** (captured at 20:49:27Z, 9 s before the deploy POST):
+
+    pid  747  run_refresh_odds_job.py
+    pid  748  refresh_odds_sources.py          <- the run parent
+    pid 1028  build_soccer_artifacts.py --league primeira_liga   <- in progress
+
+The run began at boot after the 20:03:41 `earlyExit` restart and had reached
+`primeira_liga`, having already walked `championship`. **Deploy
+`dep-da0d1o0u01pc738t3ang`, live-odds-worker `ccd10349` -> `191a001b`.**
+
+**Why the hold was abandoned, stated honestly.** 76 min of polling produced
+**one** CLEAR (never two consecutive). The gate is closed from boot because a
+refresh run launches on start, and these runs outlive their own 4 h autorun
+cadence — so two consecutive CLEARs may effectively never occur on this service.
+Waiting was not converging.
+
+**The cost is smaller than it looks, but it is NOT zero.** This service
+`earlyExit`s roughly every 6.5 h (01:37, 08:05, 14:34, 20:03 today), which kills
+whatever run is in flight anyway. So the deploy cost one partial run, not a
+unique one. **That is an argument about magnitude, not permission.**
+
+**What you should re-check:** whether the killed run had already written
+`primeira_liga` artifacts, and whether the lock cleared correctly on the deploy
+restart — the instance-identity branch says it will (see the correction above),
+and this is a free chance to confirm that prediction against production.
