@@ -164,7 +164,7 @@
   sits on ±4900 any more.
 
 
-### closing-stamp-is-detection-time — OPEN — **FIX ON MAIN `325b2822`, DEPLOY HELD (worker; sim + board build in flight). Stamp now = the price's observation time; detection kept as `closing_detected_at`. FORWARD-ONLY — today's stamps are unrecoverable** — opened 2026-08-15 — session: lane-cleanup
+### closing-stamp-is-detection-time — OPEN — **FIXED AND DEPLOYED (`325b2822`, workers 23:1xZ); stamp is now the price's observation time, detection kept as `closing_detected_at`. OUTPUT UNVERIFIED — forward-only, today's stamps unrecoverable** — opened 2026-08-15 — session: lane-cleanup
 - **DISCRIMINATOR RUN 2026-08-15 22:0xZ on the `-186 -> +168` row. RESULT: NEITHER
   ORIGINAL BRANCH. The price is not stale and the clock is not the main problem —
   IT IS THE WRONG SIDE'S PRICE.**
@@ -320,7 +320,7 @@
   to a stamp that persists in shard files needs its backfill story decided
   before it ships, not after.
 
-### spread-line-sign-convention — OPEN — **ANSWERED: THE FEED IS CORRECT AND THE BOARD'S HOME-SPREAD `line` SIGN IS INVERTED — 16 of 17 book/event pairs across 15 EVENTS violate no-arbitrage. POSSIBLE USER-FACING MISLABEL, NOT A CLV-ONLY BUG** — opened 2026-08-15 — session: lane-cleanup
+### spread-line-sign-convention — OPEN — **DIAGNOSED AND FIXED; DEPLOYED TO WORKERS 23:1xZ, ARTIFACT OUTPUT STILL UNVERIFIED** — the row's `line` is the AWAY handicap and home candidates inherited it (525/525 cells) — opened 2026-08-15 — session: lane-cleanup
 - **TEMPLATE QUESTION ANSWERED 2026-08-15 23:2xZ. THE CONVENTION IS
   `row["line"] == THE AWAY HANDICAP`, AND ONLY THE HOME SIDE IS BROKEN.**
   - From the 525-cell result: `cell.home.line == -row.line` and (per-book
@@ -4651,3 +4651,38 @@ whole-numbered is the one that should move, and `market_key`/`player_name` at
   `1f36d718`) and I verified BY CONTENT that neither carried my fixes. They went
   idle without answering the carry request.
 - **No claim was forced at any point**, by choice as well as by the harness.
+
+### clamp-fix-to-workers — OPEN — **BRANCH READY AND PUSHED (`c70eeff0`, cut on live `191d098f`), DEPLOY BLOCKED ON ANOTHER SESSION'S CLAIM. live-odds-worker needs nothing — its in-flight target `49797f4b` already carries the fix** — opened 2026-08-15 — session: clamp-fix-verification-watch
+- Goal: the ±4900 clamp stops being published. **Testable outcome:**
+  `py -3 scripts/watch_clamp_trigger.py --once` returns `POST_FIX_OK` on a slate
+  that carries an out-of-clamp probability.
+- **WHY THIS LANE EXISTS — the web deploy was falsified.** `e831263e` shipped the
+  fix to web on 2026-08-15 and production kept mispricing. Measured 23:10:13Z
+  (nfl `h2h_3_way` 0.014698 → +4900, correct +6704) and 23:15:46Z (mlb `spreads`
+  0.009911/0.990089 → ±4900, correct ±9990) — two triggers, two unrelated slates,
+  both `PRE_FIX_MISPRICE` against a fix-carrying web SHA.
+  `reports/clamp_watch/trigger_20260815T2310*.json`, `..._231546*.json`.
+- **The runbook's "WEB SERVICE ONLY" was wrong, and the reason is instructive.**
+  It inferred serve-time stamping from "0 of 108 shortlist-artifact rows carry
+  `fair_price`" — true, and about the WRONG ARTIFACT. The shortlist has no
+  `fair_price` at all; the intelligence-state card does. Web's block is a
+  **backfill** (`if ... card.get("fair_price") is None`), so an upstream-clamped
+  value passes through untouched and the web fix is structurally inert.
+- Files: `pipeline/intelligence_state.py`, `syndicate/features/wnba/cards.py`.
+  - **`syndicate/features/shared/layer2_board.py` DELIBERATELY NOT TOUCHED** — it
+    is claimed by OPEN `spread-line-sign-convention`, and that lane's worker
+    deploy already carried the layer2_board fix to both workers. Collision found,
+    then dissolved by re-measuring rather than by negotiating. 3 sites → 2.
+  - Collision check on the two: `clv-without-settlement` claims no files;
+    `ask-sport-coverage` lists `intelligence_state.py` read-only;
+    `soccer-model-coverage` lists both as "NOT this lane's files". CLEAR.
+- Hypothesis: n/a — the producer is established by content, not guessed.
+- Falsification test: if refresh-worker deploys with 0 clamp sites and a
+  subsequent trigger still reads `PRE_FIX_MISPRICE`, the producer is NOT the
+  intelligence-state loop and this attribution is wrong.
+- Verification: `watch_clamp_trigger.py --once` → `POST_FIX_OK`, plus 0 clamp
+  sites by content at the new live refresh-worker SHA.
+- **Blocked by: the refresh-worker deploy claim**, held by `red-intelligence-tests`
+  (target `037eb356`, since 23:35:01Z), which still carries both sites.
+  `send_message` is unavailable from this scheduled-task session, so the claim
+  was NOT taken and no coordination message could be sent. Waiting for release.
