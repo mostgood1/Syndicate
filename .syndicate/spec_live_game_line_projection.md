@@ -14,9 +14,19 @@ Deployed commits, re-read in the step that uses them:
 | refresh-worker `srv-d91dpertqb8s73co8ls0` | `eea7554a` | **`update_in_progress` at read time** |
 | live-odds-worker `srv-d91dpertqb8s73co8lt0` | `ccd10349` | live since 08-14 19:24Z; **not an ancestor of `origin/main`** |
 
-My checkout was **128 commits behind `origin/main`** when this work started, and
-the first counter I chased (`liveLensLiveGamesEnriched`) exists in neither local
-tree. Everything below that cites code cites the **deployed** tree by SHA.
+Everything below that cites code cites the **deployed** tree by SHA. My checkout
+was **128 commits behind `origin/main`**, which is reason enough to read by SHA.
+
+**CORRECTED after the fact — the anecdote I originally used to justify that was
+wrong.** I wrote that `liveLensLiveGamesEnriched` "exists in neither local tree."
+It exists in this checkout at `scripts/refresh_mlb_oddsapi.py:822`, the **same
+line** as the deployed tree. My searches covered `syndicate/` and
+`vendor/mlb_bettingv2/` and never covered `scripts/`, so the absence was a fact
+about my search scope, not about the tree. No finding below depends on it —
+reading the deployed tree by SHA is correct practice either way — but the
+inference "my checkout is too stale to hold this" was drawn from a search that
+could not have found it. **`learnings.md`: absence in a scoped search is a fact
+about the scope.**
 
 ---
 
