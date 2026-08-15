@@ -142,6 +142,48 @@ def test_market_summary_prefers_the_board_over_the_snapshot(monkeypatch):
     assert "SNAPSHOT ROW" not in [item.get("selection") for item in schema["top_opportunities"]]
 
 
+def test_an_empty_snapshot_is_a_refusal_and_the_board_must_not_fill_it(monkeypatch):
+    """The regression this file exists to prevent a second time.
+
+    Deployed and reverted 2026-08-15. An empty `recommendations` list is the
+    engine DECLINING, and the served answer becomes "No opportunities are on
+    the board right now" -- which is how a refusal reaches the user. Sourcing
+    from the board unconditionally answered "Ohtani's exact stats for
+    tomorrow's game" with five unrelated NFL totals (refusal 4/8 -> 3/8 against
+    a same-slate control). The board may REPLACE a pool, never create one.
+    """
+    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35)]})
+    schema = adapter._market_summary_schema(
+        {"recommendations": []}, question="Ohtani's exact stats for tomorrow?", context={}
+    )
+    assert schema["top_opportunities"] == []
+    assert "no opportunities" in schema["rationale_summary"]["summary"].lower()
+
+
+def test_summary_reports_a_board_edge_as_a_percent_not_635(monkeypatch):
+    """`Best edge 635.0%` was served live for 14 minutes.
+
+    Snapshot rows carry `edge` as a fraction, board rows as a percent, and the
+    sentence multiplied by 100 unconditionally.
+    """
+    _patch_shortlist(monkeypatch, {"rows": [_row(model_edge_pct=6.35)]})
+    schema = adapter._market_summary_schema(
+        {"recommendations": [{"selection": "x", "edge": 0.1}]}, question="biggest edges?", context={}
+    )
+    summary = schema["rationale_summary"]["summary"]
+    # 6.3, not 6.4: 6.35 is fractionally below the tie in binary float, so
+    # `.1f` rounds down. Asserting the real production value rather than a
+    # tidier one keeps this honest about what the user actually sees.
+    assert "Best edge 6.3%." in summary, summary
+    assert "635" not in summary
+
+
+def test_snapshot_rows_still_get_the_fraction_conversion():
+    """The other half: a fraction-scaled snapshot row must not become 0.1%."""
+    sentence = adapter._board_summary_sentence([{"sport": "mlb", "edge": 0.1359}])
+    assert "Best edge 13.6%." in sentence, sentence
+
+
 def test_market_summary_keeps_the_snapshot_when_the_board_has_nothing(monkeypatch):
     _patch_shortlist(monkeypatch, {"rows": []})
     snapshot = {"recommendations": [{"selection": "SNAPSHOT ROW", "edge": 13.59}]}

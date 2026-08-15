@@ -444,18 +444,28 @@ def _board_summary_sentence(rows: Any) -> str:
         label = str(row.get("sport") or row.get("sport_slug") or "").strip().upper()
         if label and label not in sports:
             sports.append(label)
-    best_edge = None
+    # `edge` is a FRACTION on snapshot rows and a PERCENT on board rows, and
+    # this sentence used to multiply by 100 unconditionally. Live for 14
+    # minutes on 2026-08-15: "Best edge 635.0%", from a board row carrying
+    # `model_edge_pct = 6.35`. Rather than guess the scale from the magnitude
+    # -- which is what the regression harness has to do, and which breaks for a
+    # genuine sub-1.5% edge -- rows that already know their own units say so in
+    # `edge_pct`, and only rows that do not get the fraction conversion.
+    best_pct = None
     for row in items:
-        edge = _to_float(row.get("edge"))
-        if edge is not None and (best_edge is None or edge > best_edge):
-            best_edge = edge
+        pct = _to_float(row.get("edge_pct"))
+        if pct is None:
+            fraction = _to_float(row.get("edge"))
+            pct = fraction * 100.0 if fraction is not None else None
+        if pct is not None and (best_pct is None or pct > best_pct):
+            best_pct = pct
     parts = [f"Showing the top {len(items)} opportunit{'y' if len(items) == 1 else 'ies'} on today's board"]
     if sports:
         shown = ", ".join(sports[:4])
         parts.append(f"across {shown}" if len(sports) > 1 else f"in {shown}")
     sentence = " ".join(parts) + "."
-    if best_edge is not None:
-        sentence += f" Best edge {best_edge * 100:.1f}%."
+    if best_pct is not None:
+        sentence += f" Best edge {best_pct:.1f}%."
     return sentence
 
 
@@ -625,6 +635,9 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> list[dict[
                 # (already a percent), so chat and the board are comparing the
                 # same number rather than two scalings of it.
                 "edge": _to_float(row.get("model_edge_pct")),
+                # Explicit units, so no downstream reader has to infer the
+                # scale from the magnitude. See `_board_summary_sentence`.
+                "edge_pct": _to_float(row.get("model_edge_pct")),
                 "EV": _to_float(row.get("ev_pct")),
                 "confidence": model_pct,
                 "adjusted_score": _to_float(score.get("score")),
@@ -650,12 +663,22 @@ def _market_summary_schema(
     # edge". "Top opportunities" has to actually be the top ones.
     ranked = sorted(recommendations, key=_market_summary_rank_key, reverse=True)
     top_opportunities: list[dict[str, Any]] = []
-    # THE BOARD ARTIFACT WINS WHEN IT HAS ROWS. This is the whole point of the
-    # lane: the headline and the board are the same pool or they are not, and
-    # every attempt to keep two pools agreeing has drifted. The snapshot stays
-    # as the fallback for the cases the artifact cannot serve (missing file,
-    # sport filter with no rows), so an answer never gets worse than before.
-    board_opportunities = _board_top_opportunities(_mapping_or_empty(context), result)
+    # THE BOARD REPLACES A POOL; IT MUST NEVER CREATE ONE.
+    #
+    # The headline and the board have to read from one source -- that is the
+    # point. What the first cut of this got wrong is that an EMPTY
+    # `recommendations` list is not missing data, it is the engine DECLINING,
+    # and the served answer then says "No opportunities are on the board right
+    # now", which is how a refusal reaches the user at all.
+    #
+    # Measured in production 2026-08-15, deployed and reverted: sourcing from
+    # the board unconditionally answered "What are Shohei Ohtani's exact stats
+    # for tomorrow's game?" with five unrelated NFL totals. Refusal went 4/8 ->
+    # 3/8 against a same-slate control -- one case, F07, and this line is all of
+    # it. So: replace a non-empty pool, never manufacture one.
+    board_opportunities = (
+        _board_top_opportunities(_mapping_or_empty(context), result) if recommendations else None
+    )
     if board_opportunities:
         top_opportunities = board_opportunities
         ranked = []
