@@ -3929,3 +3929,92 @@ Rollback if needed: redeploy pinned to `e831263e`.
    via `lane-guard.py`'s own `_claims()`. No `render.yaml` change, so
    `blueprint_sync` cannot fire.
 7. **MEASUREMENT: pending.**
+
+## 2026-08-15 21:39:09Z — refresh-worker `846bb74e` — live MLB prop projection / probability / coverage — PENDING MEASUREMENT
+
+| field | value |
+|---|---|
+| service | refresh-worker `srv-d91dpertqb8s73co8ls0` |
+| deploy | `dep-da0dovdg1s2s73cth36g` |
+| commit | `846bb74e` = content of `f4cd2bc8` + `3a476001` rebuilt on `dca39fad` |
+| branch | `deploy/mlb-live-prop-coverage-20260815` |
+| lane | `mlb-live-pitcher-projection` |
+| rollback | `POST /v1/services/srv-d91dpertqb8s73co8ls0/deploys {"commitId":"dca39fad7442..."}` |
+| measurement | **EMPTY — owed. Re-read by ~22:15Z on a LIVE MLB slate.** |
+
+**WHY NOT LOCAL `main`: it would have rolled the worker back 119 commits.**
+`dca39fad` (the running SHA) is NOT an ancestor of local `main` and is NOT on
+`origin/main`. Ancestry says nothing here; only content does. Both source files
+were checked for divergence first — `git rev-list --count HEAD..dca39fad --
+<file>` = 0 for `cards.py` and `live_projection_join.py`, so nothing another
+session shipped is reverted. `blueprints/intelligence.py` was DELIBERATELY LEFT
+OUT: it is a web route change, irrelevant to a background worker, and it carries
+2 commits on the live SHA a whole-file copy would have reverted. **The
+`live_projections` counters therefore stay unserved until a WEB deploy** — do
+not read their absence after this deploy as the fix failing.
+
+**BASELINE (served `/api/board/book-grid?sport=mlb&date=2026-08-15`, artifact
+generated 20:12:48Z, web `f475c775`):**
+
+| metric | baseline |
+|---|---|
+| live rows | 638 |
+| live rows carrying a live projection | **57 (8.9%)** |
+| `batter_home_runs` overlaid | **0 of 116** |
+| `batter_hits_runs_rbis` overlaid | **0 of 79** |
+| live pitcher rows with proj/prob on opposite sides of the line | **7 of 13** |
+| live rows with an edge | 0 (356 correctly policy-suppressed) |
+
+**PREDICATE:** coverage off 8.9% and materially higher; both zero markets off
+zero; straddle count 7 -> 0. **CEILING IS 90.2%, NOT 100%** — 48 of 492 live prop
+rows sit at an alternate line for a (player, market) the board also carries
+elsewhere, and the snapshot holds one line per market.
+
+**COST PAID, STATED:** an active refresh run (pid 741) was killed by this
+deploy; it re-runs on the next tick. The 21:27:37Z MLB sim was ALREADY
+`killed_by_restart` by another session's 21:23 deploy, so this deploy did not
+kill it. **A re-measure taken while the board carries no live rows is
+NON-EVIDENCE** — verify `state: live` rows exist before reading.
+
+**USER OVERRIDE, LOGGED:** lane `mlb-live-pitcher-projection` carried "NO DEPLOY
+FROM THIS LANE" (refresh-worker is under `#435`). The user explicitly directed
+this deploy and re-measure.
+
+### `#435` VERDICT 2026-08-15 21:32Z — THE FIX WORKS. 5 kills -> 0 in the same window.
+
+    window 20:00-21:32Z, same slate size (~15 MLB games), same clock slot
+
+                        2026-08-14 (no fix)      2026-08-15 (fix live)
+    OOM kills                 5                        0
+      at                20:03:11, 20:14:30,           --
+                        21:07:32, 21:16:50,
+                        21:25:48
+    peak anon            4,018.5 MB (98.1%)       3,572.4 MB (87.2%)
+    longest clean run       53 min                   90 min
+    samples                  8,248                    7,274
+
+**Zero OOM kills since 05:02:59Z — 16.5 hours**, spanning a full daily shard ramp.
+Source: `/v1/services/<id>/events`, never a log grep.
+
+**THE FIX WAS LIVE THROUGHOUT, VERIFIED BY CONTENT NOT ANCESTRY.** Three deploys
+carried it: `c67f7373` (18:11:41), `dca39fad` (20:00:19), `0fa44322` (building
+21:31). `c67f7373` is an ancestor of both later SHAs AND
+`def read_book_quotes_latest` plus the `layer2_shortlist` call site are present
+in each. Checking ancestry alone would not have been enough — this repo has had
+live SHAs that were not ancestors of `main`.
+
+**MY PREDICTION WAS WRONG, and it is worth recording which way.** At 19:51Z I
+weighted "kills land, the shard was not the cause" as the MOST likely outcome,
+on a peak-anon comparison of 2,839 vs 2,897 MB that I called noise. It was not
+noise — it was a reading taken BEFORE the ramp bit. The correct comparison was
+peak across the whole window, which is 446 MB lower.
+
+**WHAT THIS IS NOT.** 3,572 MB is 87.2% of a 4,096 MB ceiling. The fix bought
+~446 MB of headroom and that was enough for a 15-game slate; it is not enough to
+call the worker safe. A larger slate still crosses.
+
+**CONFOUND, STATED RATHER THAN BURIED.** Two deploys landed inside the window
+(20:00:19, 21:30:27) and each reboots the worker, resetting anon — the standing
+boot-confound rule. It does not explain the result: 20:00:19 -> 21:30:27 is a
+single unbroken 90-minute run, against a longest run of 53 minutes last night.
+Last night's reboots were the kills themselves.
