@@ -4216,3 +4216,43 @@ was BLOCKED by the permission classifier; the user has been asked to decide.**
 
 **Rollback for the refresh-worker half (if wanted):**
 `POST /v1/services/srv-d91dpertqb8s73co8ls0/deploys {"commitId":"dca39fad7442..."}`
+
+### MEASUREMENT for web `c8810f45` — live 21:58:19Z — **FIX CONFIRMED; ONE OUTLIER SURVIVES**
+
+**Fingerprint:** `stamped_close_skipped` present and populated —
+`{"stamped_close_is_home_side": 20}` — and **363/363 rows carry the key**. That
+field does not exist in any prior build.
+
+**The side error is gone, and the shape of the change is exactly what was
+predicted before deploying:**
+
+      metric                     before        after
+      close_source mix           obs_transition ~48    obs_transition 22
+                                                       last_pregame_quote 341
+      stamped closes refused     n/a            20 (all away-side openings)
+      in_play_excluded_n         48             19
+      same_book_n                131            151
+      avg_clv_pct                -0.3077        -0.2714
+
+`same_book_n` ROSE (131 -> 151) because away-side rows that previously carried a
+garbage home close now resolve correctly through the side-aware path, instead of
+being thrown out by the timing guard. **The `4316c907` timing exclusion was
+doing the side fix's job by accident; with the real fix in, it drops less than
+half as much data.**
+
+**Verified by independent recompute at the same instant:** hand-computed pregame
+same-book mean `-0.2714`, endpoint `-0.2714`, match.
+
+**HONEST REMAINDER — one extreme row survives and I have not explained it.**
+`clv_pct = -29.90`, `open_price -205`, `close_price 168.0`, **side `home`**,
+`close_source last_pregame_quote`. It is NOT the row this fix targeted (that one
+was away-side on the stamped path) and it is NOT a side mismatch — it came
+through the side-aware path. A 373-point move on a home moneyline is either a
+real event (a scratched starter will do it) or a third defect. **Unexplained,
+one row, flagged rather than smoothed over.** Anyone re-deriving this number
+should know a single row of this size on n=151 moves the mean by ~0.2 points —
+i.e. most of the remaining headline.
+
+**Also on main as `ae0bc968`.**
+
+**Obligation closed.**
