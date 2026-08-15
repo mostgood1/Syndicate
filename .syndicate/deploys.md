@@ -3762,3 +3762,48 @@ allowlisted**, so making it observable is the cheapest instrument in reach.
   was killed. `deploy_preflight.py` = `UNKNOWN` (memory sample 26h stale);
   accepted deliberately, web being display-only.
 - **Rollback:** `py -3 scripts/render_deploy.py --service web --commit b9ea0f0a --allow-rollback`
+
+### FOLLOW-UP to the negative result — two hypotheses killed, and the answer is COMPUTED IN PRODUCTION BUT UNREACHABLE `[2026-08-15 21:1xZ]`
+
+**H1 "Drop 1 is bypassed because `_persist_live_lens_report` never runs on a
+loop tick" — FALSIFIED.** `_live_projection_enhancement_payload` has **exactly
+one caller**, `mlb/live_lens.py:1384`, and that line is inside
+`_persist_live_lens_report`. It is also the only in-process import of the
+vendored `_live_lens_payload` in the MLB path. So the `LIVE_MC_BAIL` lines on
+live-odds-worker are **proof that `_persist_live_lens_report` executes on the
+tick.** The merge runs; Drop 1 is not routed around.
+
+**H2 "the MC bails on live games" — FALSIFIED, and my first evidence for it was
+bad.** I originally read "zero Live bails" off a sample of **40 hits against a
+limit of 40** — saturated, newest-N only, which proves nothing. Re-queried at
+limit 100: still saturated (`hasMore: true`) but **time-contiguous across
+21:05:27–21:11:04**, spanning multiple whole ticks, and **100% `status_not_live`
+(90 Preview, 10 Final)**. A live game cannot produce that reason, and **none of
+the other six instrumented reasons appears at all**. Live games are not bailing.
+
+**So the MC either SUCCEEDS or takes the ONE uninstrumented exit** —
+`if away_score is None or home_score is None: return None`, which emits nothing.
+That exit is the only remaining silent path, and it has now produced two wrong
+conclusions in this session.
+
+**THE INSTRUMENT THAT WOULD SETTLE IT ALREADY EXISTS AND IS UNREADABLE.**
+`_tally_mlb_live_mc_sources` (`live_lens_loop.py:473`) counts
+`live_mc / live_projection / segment_projection` per lane **on the snapshot the
+loop just built**, every tick, into `meta["liveMcSources"]`. It is exactly the
+missing measurement. But:
+- it is **never printed** (the tally goes into `meta`, not a `print`);
+- `live_lens_loop_status_payload()` (`:923`) has **ZERO callers** — no route
+  exposes it;
+- its file `reports/live_lens_loop/latest_live_lens_tick.json` is **not in the
+  hot-artifact allowlist** (403 from `/api/ops/artifacts/stream`).
+
+**The answer is computed once per tick, in production, and thrown away.** Its
+own docstring says it exists so the rate is "observable through the existing
+tick-status plumbing instead of requiring a live API probe" — and that plumbing
+terminates in nothing.
+
+**CHEAPEST NEXT STEP, in order:** (1) allowlist that one artifact path — a
+read-only change that needs no worker deploy and makes the tally visible; or
+(2) add `_live_mc_bail("no_score_in_snapshot")` to the silent exit, which is one
+line and closes the last blind spot in a function whose whole purpose is naming
+its failures. **Do not deploy another guess before one of these lands.**
