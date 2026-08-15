@@ -1731,3 +1731,45 @@ these four numbers; that is the measurement.**
 - `/api/board/layer2-shortlist` is the WRONG surface for this check — its rows
   carry no `market_key` at all (84/84 absent) and its `line` is the shortlist's
   own field, not the recommendation's display value.
+
+## MIA @ CIN's ZERO LIVE COVERAGE — DIAGNOSED, AND IT IS NOT A LIVE-LENS DEFECT `[measured 08-15 22:3x–22:4xZ]`
+
+**`game_chip_scoreboard._game_flags` reintroduces the abstract-only live check
+that `features/mlb/game_state.py` exists to prevent, and that module's own
+docstring forbids by name.** It builds `status_texts` from
+`status.abstract` (among others) and sets `is_live` on
+`status_texts.startswith("live") or " live" in status_texts`. MLB StatsAPI
+reports `abstractGameState: "Live"` during **warmup**, which is exactly the
+`#98`/`#100` trap — `game_state.py` says *"Do not reintroduce an abstract-only
+check at a new call site."* AST importers of the canonical module are
+`home.py`, `intelligence.py`, `mlb/cards.py`, `fetch_mlb_oddsapi_local.py`,
+`refresh_mlb_oddsapi.py`. **`game_chip_scoreboard.py` is not one of them.**
+Same shape as the NFL `live_edge_policy` miss: a rule centralised so every
+consumer could depend on it, with one consumer never wired to it.
+
+**The effect is a FALSE DENOMINATOR, not a missing projection.** The chip marks
+a warming-up game `live`, the board stamps `state: live` on its rows, the live
+join therefore counts them as live-and-unmatched — while `cards.py` correctly
+emits nothing, because `_actual_payload_is_live` delegates to the canonical
+predicate and a game that has not started has no live state to project from.
+**Zero was the right answer to the wrong question.**
+
+**PROVEN BY FIRST PITCH, same code, same game, same slate:**
+
+| board artifact | MIA @ CIN first pitch 22:40Z | overlaid |
+|---|---|---|
+| `22:38:36Z` | **not yet thrown** | **0 of 114 (0%)** |
+| `22:41:43Z` | thrown | **74 of 117 (63.2%)** |
+
+**THE BASELINE WAS NOT CONTAMINATED — checked, not assumed.** Rows marked live
+whose first pitch had not happened: **0** at the 20:12:48Z baseline, 114 at
+22:36:24Z, **0** at 22:41:43Z. So the honest coverage progression on live PROP
+rows is **11.6% -> 50.3%**, and the 25.5% mid-read was depressed by this bug
+(39.3% excluding the not-yet-started game).
+
+**Per-game, once warm: BAL @ TB 69.7%, MIA @ CIN 63.2%.** The remaining laggard
+is **WSH @ NYM at BOT 8 = 13.0%**, consistent with substituted players having no
+sim row — **UNVERIFIED, and not claimed.**
+
+**NOT FIXED. Blast radius is every sport's board chips**, not just MLB, and the
+predicate change would move what counts as `live` board-wide. Owner needed.
