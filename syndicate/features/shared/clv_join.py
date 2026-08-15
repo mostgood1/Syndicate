@@ -51,7 +51,105 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
 
-__all__ = ["compute_clv_for_date", "resolve_close", "clv_pct_from_prices"]
+__all__ = [
+    "compute_clv_for_date",
+    "resolve_close",
+    "clv_pct_from_prices",
+    "attach_clv_to_rows",
+]
+
+
+def attach_clv_to_rows(
+    rows: Any,
+    date: str,
+    sport: str,
+    *,
+    report: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Give each published recommendation its OWN `clv_pct`, joined by identity.
+
+    **WHY THIS IS A JOIN AND NOT A NEW COMPUTATION.** `compute_clv_for_date`
+    already emits one row per recorded opening, and an opening IS a published
+    recommendation -- same identity, `event_id|market|player|segment|side|line|
+    bookmaker`. So the per-recommendation number has existed all along; it was
+    only reachable on an ops diagnostic endpoint. This attaches it to the rows a
+    consumer actually reads, by key, so the two can never drift.
+
+    **WHY NOT THE PREDICTION LEDGER.** Measured 2026-08-15: that ledger holds
+    **3 records** (all sport `multi`, 0 settled) against **11,864 opportunities
+    considered** the same day. Populating `PredictionResult.clv_pct` would make
+    `/api/portfolio/summary.avg_clv` a real number over 3 rows -- a metric with
+    no denominator, which is worse than the honest `null` it returns today.
+
+    Mutates nothing: returns new row dicts plus a `coverage` block, because a
+    CLV that silently covers 12% of a board is a number people will quote as if
+    it covered all of it.
+
+    `report` is injectable so callers (and tests) can reuse a report they
+    already fetched rather than paying for the join twice.
+    """
+    from syndicate.features.shared.clv_opening_ledger import _opening_key
+
+    source_rows = [row for row in (rows or ()) if isinstance(row, Mapping)]
+    if report is None:
+        try:
+            report = compute_clv_for_date(date, sport)
+        except Exception as exc:  # pragma: no cover - environment dependent
+            # A board that renders must not fail because an enrichment could
+            # not be computed. Absent CLV is a degraded row, not a 500.
+            return {
+                "rows": [dict(row) for row in source_rows],
+                "coverage": {
+                    "rows": len(source_rows),
+                    "with_clv": 0,
+                    "error": f"{type(exc).__name__}: {exc}",
+                },
+            }
+
+    by_key: dict[str, Mapping[str, Any]] = {}
+    for clv_row in (report or {}).get("rows") or ():
+        if isinstance(clv_row, Mapping) and clv_row.get("key"):
+            by_key[str(clv_row["key"])] = clv_row
+
+    out: list[dict[str, Any]] = []
+    matched = 0
+    for row in source_rows:
+        new_row = dict(row)
+        key = _opening_key(row)
+        clv_row = by_key.get(str(key)) if key else None
+        if clv_row is not None:
+            matched += 1
+            # Carried alongside the number, not instead of it: a `clv_pct`
+            # whose close came from another book, or from an in-play tick, is
+            # not comparable to one that did not, and the row is the only place
+            # a reader can see which they are holding.
+            new_row["clv"] = {
+                "clv_pct": clv_row.get("clv_pct"),
+                "beat_close": clv_row.get("beat_close"),
+                "open_price": clv_row.get("open_price"),
+                "close_price": clv_row.get("close_price"),
+                "close_source": clv_row.get("close_source"),
+                "close_book_scope": clv_row.get("close_book_scope"),
+                "close_timing": clv_row.get("close_timing"),
+                "matched_bookmaker": clv_row.get("matched_bookmaker"),
+            }
+        out.append(new_row)
+
+    return {
+        "rows": out,
+        # STATED, ALWAYS. Most published rows have no recorded opening (the
+        # ledger is first-sighting-only and history is thin), so partial
+        # coverage is the normal case, not an error -- but an unstated 12%
+        # gets quoted as 100%.
+        "coverage": {
+            "rows": len(source_rows),
+            "with_clv": matched,
+            "unmatched": len(source_rows) - matched,
+            "openings_joined": len(by_key),
+            "date": str(date),
+            "sport": str(sport),
+        },
+    }
 
 
 def clv_pct_from_prices(original_price: Any, closing_price: Any) -> float | None:
