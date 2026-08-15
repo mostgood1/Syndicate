@@ -1558,3 +1558,76 @@ event here.
 - Leave a note at the restore site naming the commit that dropped it, so the next
   collapse re-reads instead of repeating.
 - **Never `cat >` a shared ledger file.** Append, or edit the specific lines.
+### 2026-08-15 — A CLASS NAME IS NOT A SURFACE, and `querySelector` turned that into two wrong plan items
+
+- **What we believed:** the UI audit's per-class type table described "soccer's
+  team names" — 13px against 16px elsewhere — and that a closed lane's 13px
+  ellipsis fix therefore CONFLICTED with the plan's instruction to raise them.
+  Two lanes, both confident, apparently contradicting each other.
+- **What was actually true:** `.cards-head-team-name` lives on TWO surfaces. The
+  13px rule is scoped to `.cards-strip-card--soccer` — the scoreboard strip,
+  where the names are `<div>`s in a ~52px box and truncation is correct. The
+  link-blue anchors are on the CARD head, which was already 16px. The audit's
+  table was built with `document.querySelector(selector)`, which returns the
+  FIRST match, so one surface's number was published as the class's number.
+  **There was never a conflict.** Both lanes were right about different
+  elements, and executing the plan literally would have undone a correct fix.
+- **How we found out:** grepping for every rule that sets the class, after the
+  brief flagged the "conflict" as something to resolve rather than obey.
+- **The rule going forward:** on a SHARED stylesheet, a per-class measurement
+  must enumerate every matching element and report a class rendering at two
+  sizes as *conflated*, never collapse it to its first hit. The whole point of a
+  shared stylesheet is that one class renders in more than one place. The probe
+  now does this and flags `type conflated:` per sport.
+- **Cost:** two plan items specified from a wrong number, one of which would
+  have caused a regression. Caught before any edit.
+
+### 2026-08-15 — THE INSTRUMENT THAT DROPPED A MISSING KEY, AND THE CORRECTION IT HANDED ME MID-FIX
+
+- **What we believed:** the tabular-figures check had never measured MLB — all
+  three numeric classes matched zero elements, so the platform's biggest sport
+  had passed a check that never ran on it.
+- **What was actually true:** MLB has 495 / 60 / 30 of those classes and every
+  one computes `tabular-nums`. The earlier fix landed exactly as claimed. My
+  `{}` came from a one-off that read the DOM **600ms after load** — and MLB is
+  the single sport that renders through `cards_source.js`, so the elements did
+  not exist yet. I had a rule for this already (*watcher over spot check*) and
+  applied it to async production effects but not to a page render.
+- **What was REAL underneath it:** the probe genuinely did drop a missing key —
+  `querySelector(sel); if (!el) return;` — and `summarize()` had no branch for
+  an absent key. NCAAF serves 16 cards and matches ZERO `.cards-market-main`.
+  That read as clean. So the defect existed; my attribution of it did not.
+- **How we found out:** the fixed probe, run against production, contradicted
+  the claim that motivated fixing it.
+- **The rule going forward:** two rules, and they are separable. (1) A value
+  meaning *"not measured"* — missing element, dropped key, error page,
+  first-of-many match, render not yet happened — must never share a code path
+  with *"fine"*. (2) **Never read MLB's DOM on a fixed delay.** Every other
+  sport is server-rendered and stable at load; MLB is not.
+- **Cost:** one wrong claim stated to the user and written into a lane, both
+  corrected within the session. The underlying instrument bug was real and is
+  fixed in `33e7d7a8`.
+
+### 2026-08-15 — ON A CONTENDED LEDGER, NEITHER COPY IS AUTHORITATIVE, AND A WHOLE-FILE COMMIT PICKS A WINNER SILENTLY
+
+- **What we believed:** the rule "check `git diff --cached` before committing"
+  plus "my worktree copy is additive (+146/-0)" was enough to commit
+  `.syndicate/lanes.md` safely.
+- **What was actually true:** that `+146/-0` expired. Minutes later the same
+  diff showed **3 deletions, two of which were other sessions' lines** — an
+  `ask-sport-coverage` status header and a soccer-model result line that had
+  landed on `origin/main` while I worked. Committing my copy would have reverted
+  both. Rebuilding my edits on `origin/main`'s copy fixed that and immediately
+  caused the MIRROR failure: `ask-sport-coverage`'s header was NEWER in the
+  worktree — an uncommitted edit by a live session — and basing on origin
+  destroyed it on disk.
+- **How we found out:** re-running `git diff origin/main -- <file>` and reading
+  the `-` lines individually instead of trusting the earlier numstat.
+- **The rule going forward:** for a file many sessions append to, **diff for
+  deletions immediately before the commit, and read each one.** A file where
+  both copies contain something the other lacks cannot be resolved by choosing a
+  base — splice your own block onto the freshest copy and leave every other line
+  untouched. If you do clobber someone, say so and tell them it is a
+  reconstruction, not their text.
+- **Cost:** none shipped. One session's ledger line destroyed and restored by
+  hand; that session was notified and has since corrected it themselves.

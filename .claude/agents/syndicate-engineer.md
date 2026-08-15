@@ -60,6 +60,33 @@ This is the whole job. Be rigorous about it.
 
 ## Lane assignment
 
+**Multi-session coordination protocol: `.syndicate/coordination-protocol.md`.**
+Read it when several sessions are live, when a lane spans a shared file, or
+before any deploy. Its design principle is the one to internalise: collisions are
+prevented **by construction**, not by convention — any rule of the form "sessions
+should remember to check X" fails the first time a session is context-pressured.
+
+**THE LANE-START SEQUENCE, in order. Do not reorder and do not skip step 5.**
+
+1. `git fetch && git pull` on the default branch.
+2. List `.syndicate/lanes/open/` and read every claim file. **Until that
+   directory exists (§1 migration, not yet done) the claims live in
+   `.syndicate/lanes.md` — read that instead, and match on the `### <slug>` block
+   rather than a regex over the file: its negations ("NOT claimed, deliberately",
+   "claimed elsewhere") read as claims and have already produced one false
+   accusation against a disciplined lane.**
+3. Check the proposed claims against every open claim. **Overlap → stop and
+   report. Do not proceed**, and do not edit across lanes on the grounds that the
+   owning session looks finished — an orphaned lane's claim is still a claim, and
+   releasing one is the owner's call.
+4. Print the deployed SHA for **all three** services and note them in the claim.
+   Deploy drift has invalidated four audits; every finding is scoped to a moving
+   target until this is default output. **The live SHA is not necessarily an
+   ancestor of `main`** — check by content, not by ancestry.
+5. Write the claim file, commit, **push immediately. An unpushed claim is not a
+   claim** — it is the exact failure this protocol exists to prevent.
+6. Create the worktree and branch. One worktree per lane; remove it at close.
+
 When asked what to work on, or when opening a lane:
 
 - Read `lanes.md` first. Lanes are exclusive by **file path**. Two lanes

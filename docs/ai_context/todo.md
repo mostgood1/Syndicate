@@ -1,5 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** OPEN, UNOWNED, split out of `#387` 2026-08-14
 ### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** PARTLY CLOSED 2026-08-14 — timed on current code, estimator hardened, split out of `#387` 2026-08-14
 
 **MEASURED 2026-08-14 18:0xZ ON THE DEPLOYED CODE (`294f9ca9`), refresh-worker,

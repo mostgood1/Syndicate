@@ -444,18 +444,28 @@ def _board_summary_sentence(rows: Any) -> str:
         label = str(row.get("sport") or row.get("sport_slug") or "").strip().upper()
         if label and label not in sports:
             sports.append(label)
-    best_edge = None
+    # `edge` is a FRACTION on snapshot rows and a PERCENT on board rows, and
+    # this sentence used to multiply by 100 unconditionally. Live for 14
+    # minutes on 2026-08-15: "Best edge 635.0%", from a board row carrying
+    # `model_edge_pct = 6.35`. Rather than guess the scale from the magnitude
+    # -- which is what the regression harness has to do, and which breaks for a
+    # genuine sub-1.5% edge -- rows that already know their own units say so in
+    # `edge_pct`, and only rows that do not get the fraction conversion.
+    best_pct = None
     for row in items:
-        edge = _to_float(row.get("edge"))
-        if edge is not None and (best_edge is None or edge > best_edge):
-            best_edge = edge
+        pct = _to_float(row.get("edge_pct"))
+        if pct is None:
+            fraction = _to_float(row.get("edge"))
+            pct = fraction * 100.0 if fraction is not None else None
+        if pct is not None and (best_pct is None or pct > best_pct):
+            best_pct = pct
     parts = [f"Showing the top {len(items)} opportunit{'y' if len(items) == 1 else 'ies'} on today's board"]
     if sports:
         shown = ", ".join(sports[:4])
         parts.append(f"across {shown}" if len(sports) > 1 else f"in {shown}")
     sentence = " ".join(parts) + "."
-    if best_edge is not None:
-        sentence += f" Best edge {best_edge * 100:.1f}%."
+    if best_pct is not None:
+        sentence += f" Best edge {best_pct:.1f}%."
     return sentence
 
 
@@ -483,7 +493,168 @@ def _market_summary_rank_key(item: dict[str, Any]) -> tuple[float, float]:
     return (score if score is not None else float("-inf"), edge if edge is not None else float("-inf"))
 
 
-def _market_summary_schema(result: Any, *, question: str = "", relevance_matched: bool | None = None) -> dict[str, Any]:
+def _board_row_selection(row: dict[str, Any]) -> str:
+    """Same label shape `_board_row_label` produces for the M1 evidence table.
+
+    Deliberately duplicated rather than imported: `ask_the_syndicate_data`
+    imports heavy per-sport fetchers, and the adapter is on the render path for
+    every answer. If the two ever need to agree on more than a string, promote
+    this to a shared module -- do not make the adapter import the data layer.
+    """
+    player = str(row.get("player_name") or "").strip()
+    side = str(row.get("side") or "").strip()
+    line = row.get("line")
+    if player:
+        parts = [player, side] if side else [player]
+        if line is not None:
+            parts.append(str(line))
+        return " ".join(p for p in parts if p)
+    away, home = str(row.get("away_team") or ""), str(row.get("home_team") or "")
+    matchup = f"{away} @ {home}".strip(" @")
+    label = f"{side} {line}".strip() if line is not None else side
+    return f"{label} ({matchup})".strip() if matchup else label
+
+
+def _board_row_probabilities(row: dict[str, Any]) -> tuple[float | None, float | None]:
+    """Model and market probability FOR THE ROW'S OWN SIDE, or (None, None).
+
+    **This is not a rename, and getting it wrong publishes a confident number
+    that is wrong by construction.** Measured against the live shortlist
+    2026-08-15: `projection.model_prob_over` is the probability of
+    `projection.side`, NOT of the row's side. 10 of 19 model-bearing rows had a
+    row side opposite their projection side ("under" rows carrying an "over"
+    projection, an "away" row carrying a "home" one), and for every one of them
+    `(model_prob_over - market_fair_prob_over)` came out at exactly the NEGATIVE
+    of the row's stated `model_edge_pct`. Taking the field at its name would
+    have shipped the wrong side's probability on more than half the rows.
+
+    So the opposite side is complemented, and the result is then RECONCILED
+    against the row's own `model_edge_pct`. If the two disagree, this returns
+    None rather than a number it cannot justify -- the house rule is that a
+    published probability is computed or absent, never invented.
+    """
+    projection = _mapping_or_empty(row.get("projection"))
+    model_p = _to_float(projection.get("model_prob_over"))
+    market_p = _to_float(projection.get("market_fair_prob_over"))
+    if model_p is None or market_p is None:
+        return (None, None)
+
+    row_side = str(row.get("side") or "").strip().lower()
+    projection_side = str(projection.get("side") or "").strip().lower()
+    if row_side and projection_side and row_side != projection_side:
+        model_p, market_p = 1.0 - model_p, 1.0 - market_p
+
+    stated_edge = _to_float(row.get("model_edge_pct"))
+    if stated_edge is not None and abs((model_p - market_p) * 100.0 - stated_edge) > 0.01:
+        # The complement rule did not reproduce the row's own edge. Something
+        # about this row's shape is not what was measured; say nothing.
+        return (None, None)
+    return (round(model_p * 100.0, 2), round(market_p * 100.0, 2))
+
+
+def _board_rank_key(row: dict[str, Any]) -> tuple[int, float]:
+    """The ranking M1 uses, kept identical on purpose.
+
+    Rows carrying a model comparison sort above rows that only have EV -- only
+    19 of 105 published rows carried `model_edge_pct` when this was written, so
+    ranking on edge alone would drop most of the board. Because model-bearing
+    rows sort first and by descending edge, the top row IS the board's maximum
+    `model_edge_pct`, which is precisely what the divergence check compares.
+    """
+    edge = row.get("model_edge_pct")
+    if isinstance(edge, (int, float)):
+        return (1, float(edge))
+    ev = row.get("ev_pct")
+    return (0, float(ev) if isinstance(ev, (int, float)) else float("-inf"))
+
+
+def _board_top_opportunities(context: dict[str, Any], result: Any) -> list[dict[str, Any]] | None:
+    """`top_opportunities` sourced from the SAME artifact the board serves.
+
+    **Why this exists.** `M1` gave aggregation questions a board-wide table but
+    left `structured_response.top_opportunities` reading the snapshot, so chat
+    and the board still answered from two different pools and still disagreed --
+    measured at one instant as 23.81% vs 14.09%. Adding a table did not fix
+    that; only sharing the source does, which is what this does.
+
+    Read-only: `read_layer2_shortlist` is a plain `read_json_file`, so this is
+    legal on the web request path under the rule that handlers read precomputed
+    artifacts and never recompute.
+
+    Returns None -- never an empty list -- when the artifact is missing or the
+    sport filter empties it, so the caller keeps the snapshot behaviour rather
+    than serving an empty headline.
+    """
+    try:
+        from pipeline.intelligence_state import read_layer2_shortlist
+        from syndicate.features.shared.timezone import central_today_iso
+    except Exception:
+        return None
+
+    selected_date = (
+        str(_result_value(result, "selected_date", "") or "").strip()
+        or str(context.get("selected_date") or "").strip()
+    )
+    try:
+        payload = read_layer2_shortlist(selected_date or central_today_iso())
+    except Exception:
+        # A headline is worth degrading, not worth 500ing an answer over.
+        return None
+    if not isinstance(payload, dict):
+        return None
+    rows = [row for row in (payload.get("rows") or []) if isinstance(row, dict)]
+    if not rows:
+        return None
+
+    sport = str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
+    if sport:
+        # EXACT match, not a substring test: `"nba" in "wnba"` is True and
+        # would answer an NBA question with WNBA rows.
+        scoped = [row for row in rows if str(row.get("sport") or "").strip().lower() == sport]
+        # Unlike M1 -- which REPORTS an empty sport filter, because "no NHL rows
+        # on the board" answers an aggregation question -- an empty headline
+        # answers nothing. Fall back to the snapshot instead of emptying the
+        # only rows a non-aggregation market summary has.
+        if not scoped:
+            return None
+        rows = scoped
+
+    rows.sort(key=_board_rank_key, reverse=True)
+    top: list[dict[str, Any]] = []
+    for row in rows[:5]:
+        model_pct, market_pct = _board_row_probabilities(row)
+        score = _mapping_or_empty(row.get("score"))
+        top.append(
+            {
+                "selection": _board_row_selection(row),
+                "market": row.get("market"),
+                "sport": row.get("sport"),
+                "model_probability": model_pct,
+                "market_probability": market_pct,
+                # The field the board's own max is taken over. Same units
+                # (already a percent), so chat and the board are comparing the
+                # same number rather than two scalings of it.
+                "edge": _to_float(row.get("model_edge_pct")),
+                # Explicit units, so no downstream reader has to infer the
+                # scale from the magnitude. See `_board_summary_sentence`.
+                "edge_pct": _to_float(row.get("model_edge_pct")),
+                "EV": _to_float(row.get("ev_pct")),
+                "confidence": model_pct,
+                "adjusted_score": _to_float(score.get("score")),
+                "source": "layer2_shortlist",
+                "recommendation": None,
+            }
+        )
+    return top or None
+
+
+def _market_summary_schema(
+    result: Any,
+    *,
+    question: str = "",
+    relevance_matched: bool | None = None,
+    context: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     recommendations = _items_to_dicts(_result_value(result, "recommendations", ()))
     # Was `recommendations[:5]` with no sort -- an arbitrary slice of
     # whatever order the payload happened to arrive in. Confirmed live
@@ -492,6 +663,25 @@ def _market_summary_schema(result: Any, *, question: str = "", relevance_matched
     # edge". "Top opportunities" has to actually be the top ones.
     ranked = sorted(recommendations, key=_market_summary_rank_key, reverse=True)
     top_opportunities: list[dict[str, Any]] = []
+    # THE BOARD REPLACES A POOL; IT MUST NEVER CREATE ONE.
+    #
+    # The headline and the board have to read from one source -- that is the
+    # point. What the first cut of this got wrong is that an EMPTY
+    # `recommendations` list is not missing data, it is the engine DECLINING,
+    # and the served answer then says "No opportunities are on the board right
+    # now", which is how a refusal reaches the user at all.
+    #
+    # Measured in production 2026-08-15, deployed and reverted: sourcing from
+    # the board unconditionally answered "What are Shohei Ohtani's exact stats
+    # for tomorrow's game?" with five unrelated NFL totals. Refusal went 4/8 ->
+    # 3/8 against a same-slate control -- one case, F07, and this line is all of
+    # it. So: replace a non-empty pool, never manufacture one.
+    board_opportunities = (
+        _board_top_opportunities(_mapping_or_empty(context), result) if recommendations else None
+    )
+    if board_opportunities:
+        top_opportunities = board_opportunities
+        ranked = []
     for item in ranked[:5]:
         top_opportunities.append(
             {
@@ -642,7 +832,9 @@ def build_syndicate_query_response(*, question: str, context: dict[str, Any], de
     if decision.intent in {"matchup_analysis", "comparison"}:
         schema = _matchup_analysis_schema(question, result, relevance_matched=relevance_matched)
     elif decision.intent == "market_summary":
-        schema = _market_summary_schema(result, question=question, relevance_matched=relevance_matched)
+        schema = _market_summary_schema(
+            result, question=question, relevance_matched=relevance_matched, context=context
+        )
     else:
         schema = _bet_analysis_schema(result, question=question, relevance_matched=relevance_matched)
 
