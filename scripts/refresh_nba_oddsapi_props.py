@@ -1067,7 +1067,14 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
             pred_total = _float_or_none(row.get("pred_total"))
             market_home_margin = _float_or_none(row.get("market_home_margin"))
             ev_pct = (ev * 100.0) if ev is not None else None
-            win_prob = _clamp_probability((implied_prob or 0.5) + (ev or 0.0))
+            # No implied probability means no price to imply it from, and
+            # "0.5 plus the edge" reads on the board as a confident
+            # 50-something percent that nothing computed. Absence propagates.
+            win_prob = (
+                _clamp_probability(implied_prob + (ev or 0.0))
+                if implied_prob is not None
+                else None
+            )
 
             if market == "ATS":
                 side_is_home = side.lower() == home_name.lower()
@@ -1153,7 +1160,12 @@ def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) ->
         if per_game_counts.get(game_key, 0) >= 3:
             continue
         ev_pct = _float_or_none(top_play.get("ev_pct"))
-        win_prob = _clamp_probability((_american_price_to_prob(top_play.get("price")) or 0.5) + (_float_or_none(top_play.get("ev")) or 0.0))
+        implied_prob = _american_price_to_prob(top_play.get("price"))
+        win_prob = (
+            _clamp_probability(implied_prob + (_float_or_none(top_play.get("ev")) or 0.0))
+            if implied_prob is not None
+            else None
+        )
         enriched_top_play = dict(top_play)
         enriched_top_play.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
         enriched_top_play["p_win"] = win_prob
@@ -1211,7 +1223,12 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
         if (home_tri, away_tri) not in grouped:
             continue
         ev_pct = _float_or_none(top_play.get("ev_pct"))
-        win_prob = _clamp_probability((_american_price_to_prob(top_play.get("price")) or 0.5) + (_float_or_none(top_play.get("ev")) or 0.0))
+        implied_prob = _american_price_to_prob(top_play.get("price"))
+        win_prob = (
+            _clamp_probability(implied_prob + (_float_or_none(top_play.get("ev")) or 0.0))
+            if implied_prob is not None
+            else None
+        )
         base_pick = dict(top_play)
         base_pick.update(_basketball_recent_form_fields(row, line_value=_float_or_none(top_play.get("line"))))
         base_pick["player"] = str(row.get("player") or "").strip()
@@ -1834,7 +1851,13 @@ def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str
                 # end-to-end assessment).
                 cover_edge = pred_margin + market_home_margin
                 pick_home = cover_edge >= 0
-                home_cover_prob = _margin_win_prob(cover_edge, scale=7.5) or 0.5
+                # Unreachable `or 0.5` -- cover_edge is arithmetic on two
+                # values the enclosing guard proved non-None, and the logistic
+                # cannot return 0.0 for a finite input. Kept as an explicit
+                # skip so it stays unreachable if that guard is ever relaxed.
+                home_cover_prob = _margin_win_prob(cover_edge, scale=7.5)
+                if home_cover_prob is None:
+                    continue
                 model_prob = home_cover_prob if pick_home else (1.0 - home_cover_prob)
                 price = _side_price(row, "home_spread_price" if pick_home else "away_spread_price")
                 edge_value = abs(cover_edge)
@@ -1848,7 +1871,12 @@ def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str
                         "date": date_str,
                         "ev": round(ev_value, 6),
                         "price": price,
-                        "implied_prob": round(_american_price_to_prob(price) or 0.5, 6),
+                        # A row with no price has no implied probability.
+                        "implied_prob": (
+                            round(_american_price_to_prob(price), 6)
+                            if _american_price_to_prob(price) is not None
+                            else None
+                        ),
                         "edge": round(edge_value, 6),
                         "line": round(abs(market_home_margin), 6),
                         "pred_margin": round(pred_margin if pick_home else (-pred_margin), 6),
@@ -1861,7 +1889,9 @@ def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str
             if total_line is not None:
                 total_edge = pred_total - total_line
                 pick_over = total_edge >= 0
-                total_over_prob = _margin_win_prob(total_edge, scale=10.5) or 0.5
+                total_over_prob = _margin_win_prob(total_edge, scale=10.5)
+                if total_over_prob is None:
+                    continue
                 model_prob = total_over_prob if pick_over else (1.0 - total_over_prob)
                 price = _side_price(row, "total_over_price" if pick_over else "total_under_price")
                 ev_value = _probability_ev(model_prob, price)
@@ -1874,7 +1904,12 @@ def _build_local_game_recommendations_artifact(*, processed_root: Path, date_str
                         "date": date_str,
                         "ev": round(ev_value, 6),
                         "price": price,
-                        "implied_prob": round(_american_price_to_prob(price) or 0.5, 6),
+                        # A row with no price has no implied probability.
+                        "implied_prob": (
+                            round(_american_price_to_prob(price), 6)
+                            if _american_price_to_prob(price) is not None
+                            else None
+                        ),
                         "edge": round(total_edge, 6),
                         "line": round(total_line, 6),
                         "pred_margin": "",
