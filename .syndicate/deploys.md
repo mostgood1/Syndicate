@@ -3373,7 +3373,58 @@ Rollback if needed: redeploy pinned to `bebe87c9`.
   its own fix. This is the documented boot-confound: every deploy reboots, so
   every fix looks good for five minutes.
 - **Rollback:** redeploy `c67f7373` by commitId.
-- **MEASUREMENT:** _(pending — needs a LIVE NFL slate, not just status=live)_
+- **DEPLOY LANDED 2026-08-15T20:00:19Z, `status=live`, commit `dca39fad`.**
+- **THE FIX'S EFFECT IS UNVERIFIED. BOTH HALVES. Do not read the deploy as the
+  fix.** `[checked 20:11Z, 11 min after live]`
+  - Worker IS running the new code: `OVERVIEW_SPORT_BEGIN` **24** since
+    20:00:20Z, `MEMORY_GUARD_ABORT` **0**, memory climbing at 49.9 MB/s through
+    `cards_context_sim_games_loaded`. Alive and building, liveness control passed.
+  - **But `LAYER2_FAST_REFRESH` = 0 and the served shortlist's `written_at` is
+    still `19:55:29Z` — PRE-deploy — after 11 minutes of polling at 30 s.**
+    No Layer 2 artifact has yet been produced by this code. The worker is doing
+    post-reboot cold-start work.
+  - So the guard has not yet run in production on a real grid. Asserting the
+    branch, not the outcome: the branch has not executed.
+- **Two separate things are still owed, and they need different conditions:**
+  1. **No-over-suppression (measurable ANY time):** once a post-20:00 build
+     exists, confirm PREGAME NFL rows still carry `model_edge_pct`. Baseline:
+     24 NFL rows, 0 live, at 19:4xZ. If pregame NFL edges vanish, the guard is
+     over-suppressing and this must be rolled back.
+  2. **Live suppression (needs a LIVE NFL slate):** NFL rows with `is_live` AND
+     `model_edge_pct is not None`. Baseline **5** (2026-08-15T02:37Z). Expect 0.
+     **A 0 read outside a live NFL window is NON-EVIDENCE** — the board carried
+     zero live rows in any sport all evening.
+- **MEASURED AND VERIFIED `[2026-08-15 20:15Z, first post-deploy build
+  written_at 20:14:50Z]` — BOTH HALVES, and the live half arrived unplanned
+  because NFL games went live between 19:55 and 20:14.**
+
+      NFL 24 rows = 12 live + 12 pregame
+      LIVE rows with model_edge_pct    : 0     (baseline 5, window 1 02:37Z)
+      PREGAME rows with model_edge_pct : 2     (not over-suppressed)
+      rows carrying the policy's exact reason string : 10
+
+  - **THE BRANCH EXECUTED — asserted, not inferred.** 10 NFL rows carry
+    `edge_unavailable_reason = "game is live: a pregame projection cannot be
+    priced against a live market"`. That exact string is written into an NFL
+    projection by nothing but this change, so its presence in the served
+    artifact is direct proof the new code ran, independent of the outcome.
+    Sample live row: `spreads`, `basis smartsim2_margin_mean`, `edge None`,
+    reason set.
+  - **NO OVER-SUPPRESSION.** Pregame `totals` rows retain real edges (`2.85`,
+    `-4.24`) with `edge_unavailable_reason: None`. The declared falsifier —
+    edged collapsing to 0 while rows are pregame — did NOT fire. No rollback.
+  - **The 7 → 2 pregame-edged drop is the slate, not the guard.** Baseline was
+    7 edged with 0 live; now 12 of 24 rows are live. The direction and
+    magnitude are consistent with ~5 of the originally-edged rows having gone
+    live. Stated as consistency, not proof: I did not match row identities
+    across the two builds. The two load-bearing counts (0 live edged, >0
+    pregame edged) do not depend on that attribution.
+  - Live `h2h` rows with `basis: None` carry no projection at all (index lookup
+    miss), so there was no edge to suppress — not a hole in the guard.
+- **CONFOUND CREATED, QUANTIFIED:** refresh-worker memory went
+  **3,729 MB / 91% (366 MB headroom) → 556 MB / 13.6% (3,539 MB headroom)** at
+  the reboot. OPEN lane `quote-shard-latest-index` (`#435`) must re-baseline;
+  a post-20:00Z memory improvement is MY reboot, not their fix.
 
 ## 2026-08-15 19:54:18Z — web `9b88d05b` — Drop 2, live-state lens survives the rebuild
 **Lane:** `live-game-line-projection`. **Deploy:** `dep-da0c4qm417fc73cha2u0`,
@@ -3492,3 +3543,51 @@ web `f475c775` (Drops 1+2), live-odds-worker `ccd10349` (**neither**).
 
 **PASS after live-odds-worker gets `191a001b`:** live rows flip to
 `source: live_mc`. Nothing else changes meaning.
+
+## 2026-08-15 — web — `7abd8e12` — NFL guard on web (closing the latent path) — PENDING
+- **What:** cherry-pick of `1d15686b` onto web's live `f475c775`. 2 files, +233,
+  0 deletions. Candidate tests: 40 passed / 14 subtests; carries BOTH this
+  session's fixes; app boots, 360 routes.
+- **WHY, stated honestly: this is INSURANCE, not a repair.** Layer 1 was
+  MEASURED clean beforehand — `/api/board/book-grid?sport=nfl`, 300 rows, 86
+  live/final, **0 with `edge_vs_market_pct`, 43 carrying the guard's reason**.
+  Web is clean *because it serves a worker-built artifact that was guarded*,
+  not because web's own code was. `intelligence.py:2383` (`board_book_grid_api`,
+  a web request handler) calls `attach_projections` every request, so a
+  degraded path that made web compute NFL projections itself would emit
+  unguarded live edges.
+- **Expected effect: NO user-visible change.** That is the point. If anything
+  on the NFL board changes, that is a SURPRISE and worth investigating.
+- **Falsifier:** live NFL rows on `/api/board/book-grid?sport=nfl` acquiring an
+  `edge_vs_market_pct`, or pregame NFL edges disappearing. Either ⇒ roll back.
+- **Web moved 3 deploys between my two:** `0c65a832` → `bebe87c9` → `d7c2ca7d`
+  → `9b88d05b` → `f475c775`. My alarm SURVIVED all of them (verified by content
+  AND runtime `HTTP 200`), so nobody cut from a stale base. Direct deploy of
+  `1d15686b` would have rolled web back **114 commits**.
+- **Blast radius:** web only. No worker restart — `#435` is NOT disturbed by
+  this one.
+- **Rollback:** redeploy `f475c775` by commitId.
+- **MEASURED `[2026-08-15 20:29Z, deploy live 20:29:00Z]` — NO CHANGE, WHICH
+  IS THE PASS CONDITION.** Running commit `7abd8e121f92` confirmed from
+  `/api/ops/version` (the service's own word).
+
+      /api/board/book-grid?sport=nfl  300 rows = 86 live/final + 214 pregame
+        LIVE rows edged     0   (pre-deploy 0)   unchanged
+        PREGAME rows edged 40   (must be > 0)    intact
+        LIVE rows w/ reason 43   (pre-deploy 43)  identical
+      /api/ops/quote-feed-age -> HTTP 200        alarm did not regress
+
+  The declared falsifier — live rows acquiring an edge, or pregame edges
+  vanishing — did NOT fire. No rollback.
+- **WHAT THIS DOES AND DOES NOT ESTABLISH, precisely.** It establishes NO
+  REGRESSION: web serves the same NFL board it did before, and the alarm
+  survived. It does **NOT** establish that web's own guard code executed on
+  this request — `generated_at` was `20:27:38Z`, i.e. the grid predates the
+  20:29:00Z deploy, so the response may rest on an artifact built by the
+  (already-guarded) worker. **That is acceptable and expected**: this deploy is
+  insurance against a degraded path where web computes NFL projections itself,
+  and that path is not currently being taken. Asserting the branch here would
+  require forcing the degraded path, which is not worth doing on production.
+- **Web's code now contains the guard** (verified pre-deploy by content: the
+  candidate carried both fixes), so the latent hole is closed regardless of
+  which path a future request takes.

@@ -1910,3 +1910,97 @@ key at all, so it reads 0 forever.
   as timeless.
 - **A "never use X" rule inherited from before your change is a hypothesis, not a
   constraint.** Check whether the thing that made X blind is the thing you fixed.
+
+
+### 2026-08-15 - A PINNED DEPLOY IS NOT ON main's LINEAGE, SO ANCESTRY ANSWERS THE WRONG QUESTION
+
+- **What we believed:** `git merge-base --is-ancestor <my commit> <live SHA>` is
+  the check for "did my work survive the next session's deploy". It had worked
+  three times today for Lane G.
+- **What was actually true:** it works only while the deploys share a lineage.
+  My two CSS commits live on `origin/main`; the deploys that shipped them were
+  PINNED commits parented on web's live SHA, so they are a different lineage
+  carrying identical trees. When the next session deployed `7abd8e12`, ancestry
+  reported **NO** for both my commits - and all four CSS blobs were
+  **byte-identical**. Read literally, ancestry said my work had been dropped
+  while it was in fact live.
+- **How we found out:** checking ancestry at checkpoint, getting NO, and not
+  believing it - because the same probe had measured zero non-tabular digits
+  minutes earlier.
+- **The rule going forward:** **test deployment by CONTENT.** Compare
+  `git rev-parse <deploy>:<path>` against your own commit's blob for every file
+  you shipped. Ancestry is a cheap positive signal (YES means yes) but its NO is
+  uninformative on a tree where deploys are pinned. This is the second form of
+  the trap already in state.md ("web runs a deploy branch, not main").
+- **Cost:** none - caught in the same breath. But a session that trusted the NO
+  would have re-deployed work that was already live, superseding whatever the
+  other session had just shipped.
+
+### 2026-08-15 - A FIXED `GIT_INDEX_FILE` NAME COLLIDES ACROSS SESSIONS, AND A FAILED read-tree LEAVES AN EMPTY INDEX THAT STAGES THE WHOLE REPO AS DELETIONS
+
+- **What we believed:** the existing rule - never put `$$` in `GIT_INDEX_FILE`,
+  because each Bash call is a new shell - was fully discharged by using a fixed
+  name like `/c/tmp/idx-final`.
+- **What was actually true:** a fixed name is shared mutable state on a tree
+  with nine sessions, exactly like the shared index it was invented to avoid.
+  A stale `/c/tmp/idx-final.lock` made `git read-tree origin/main` fail with
+  exit 128; `GIT_INDEX_FILE` then pointed at a file that did not exist, **which
+  git treats as an EMPTY index, not an error** - and the next
+  `git diff-index --cached --stat origin/main` listed **~37,000 files as
+  deletions**. `/c/tmp/idx-final2` was sitting there too, and is not mine.
+- **How we found out:** the deletion list scrolled past instead of the expected
+  one-file diff. Nothing was pushed only because the `&&` chain broke on the
+  failed `write-tree`, not because anything checked.
+- **The rule going forward:** scope the index file to the SESSION
+  (`/c/tmp/idx-<session-id>-<purpose>`), remove both it and its `.lock` first,
+  and **assert the index is non-empty after `read-tree`**
+  (`git ls-files --cached | wc -l` > 100) before staging anything. The empty
+  index is the dangerous state precisely because it looks like a successful
+  setup - same family as "a value meaning not-measured must not share a path
+  with fine".
+- **Cost:** none shipped, one aborted commit. The exposure was a push that would
+  have deleted the repository from `main`.
+
+### 2026-08-15 — OVERTURNED: two throttles with the same symptom, and I named the wrong one as the mechanism
+
+- **What I believed and wrote down:** the MLB quote-capture starvation was caused
+  by `JOB_CAP_THROTTLED active=1 max=1` (`scripts/run_refresh_worker.py:3496`,
+  `SYNDICATE_REFRESH_WORKER_MAX_ACTIVE_JOBS`, unset → default 1). I published
+  that in `tier5_quote_to_ui_WINDOW2` before tracing it.
+- **What is true:** the lock that refused all 17 ticks is a *different* one — the
+  per-lane refresh-run lock at `shared/ops_refresh.py:669`
+  (`_assert_no_active_refresh_run`), raised when the lane manifest is
+  non-terminal and its recorded pid is still alive. `JOB_CAP_THROTTLED` was
+  co-occurring noise. Both are downstream of one long-running job, which is
+  exactly why they were easy to conflate.
+- **Why it mattered, and this is the whole point:** the two point at OPPOSITE
+  remedies. "Raise `MAX_ACTIVE_JOBS`" follows from the wrong one — and that
+  would have doubled concurrent memory on a worker sitting at **91% of 4 GiB
+  with 7 confirmed `oomKilled` events the same morning.** A misattributed
+  mechanism is not a cosmetic error; it generates a dangerous fix.
+- **The rule:** when two throttles can produce the same symptom, find the code
+  that emits the EXACT string you observed before naming a mechanism. Symptom
+  co-occurrence is not identification. `grep` the literal message, not the
+  concept.
+- Related and already recorded: `absent signal is about the emitter` — the same
+  session, I counted `PREGAME_RELAUNCH_COOLDOWN_SKIPPED` on refresh-worker and
+  got 0, which was meaningless because live-odds-worker emits it. Both errors
+  are the same shape: **reasoning about a log line without locating its emitter.**
+
+### 2026-08-15 — RULE: deploy to where the artifact is BUILT, not where it is served
+
+- **The near-miss:** the NFL live-edge fix was about to go to `web`, because the
+  defect was observed on `/api/board/layer2-shortlist`, which web serves. That
+  would have been an **inert deploy**. The shortlist is a plain artifact read;
+  the edges are baked in at build time by
+  `book_grid_artifact.py:221 → board_enrichment.attach_projections`, which runs
+  on **refresh-worker**. Deployed to the worker, the fix measured 5 → 0 live NFL
+  edges on the first build.
+- **The rule:** for any artifact-backed surface, the service that SERVES the
+  symptom is usually not the service that must receive the fix. Trace
+  symptom → artifact → builder, and deploy to the builder. Then check whether
+  the serving service has its own compute path for the same data — here web's
+  `intelligence.py:2383` did, so it needed the commit too, as insurance.
+- **This is the deploy-time twin of `presence is not reachability`.** Presence in
+  the repo, presence on `main`, and presence on the service that shows the bug
+  are three different things, and only the third-from-last is usually checked.

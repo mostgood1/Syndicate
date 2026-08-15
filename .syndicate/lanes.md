@@ -2568,3 +2568,71 @@ being killed every ~6.5h — but that is the soccer lane's call, not the deploye
   7 ER vs **proj 4.057 K / 3.242 ER**.
 - Blocked by: none. **NO DEPLOY FROM THIS LANE** — refresh-worker writes this
   artifact and is under `#435`; its deployed commit has NOT been read.
+
+### probe-mlb-content-wait — OPEN — opened 2026-08-15 — session: ui-plan-lane-gh
+- Goal: `ui_layout_probe.py` cannot report a spurious `0 cards` on a
+  JS-rendered sport. Testable: run it against production /mlb/cards 5 times and
+  get 15 cards every time (today it returned 0 on at least 1 of 3), and a
+  render that genuinely never produces cards is reported as a TIMEOUT, distinct
+  from an out-of-season 0.
+- Files (exclusive to this lane):
+  - `scripts/ui_layout_probe.py` — the goto/wait block and its summary line.
+  - Collision check RUN (lane-guard's own `_claims()` over `lanes.md`): 31
+    claimed paths across the OPEN lanes; NONE is this file or anything in
+    `scripts/` that this touches.
+- Hypothesis: `page.wait_for_timeout(400)` after `wait_until="load"` is enough
+  for the seven server-rendered sports and NOT for MLB, which renders through
+  `cards_source.js` after load. Measured today: the same URL returned 0 cards
+  and 15 cards minutes apart, and a 600ms one-off returned 0 elements for
+  classes that a 2500ms read found 495 of.
+- Falsification test: if MLB still returns 0 cards with a content wait in
+  place, the render is not merely late and the fix is wrong.
+- Verification: 5 consecutive production runs of `--sports mlb`, card count
+  each time; plus one run against a deliberately bad route to confirm the
+  timeout path reports rather than passes.
+- Blocked by: none.
+
+#### CORRECTION to my own soccer lead — THE LOCK IS RELEASED ON `earlyExit`. My stale-lock mechanism is FALSIFIED `[from-code, deployed tree ccd10349, 2026-08-15]`
+I filed "a run killed mid-flight may leave the lock held, which is exactly what
+the 14:22 and 18:22 autoruns hit." **That is wrong. Reading the code that runs
+in production settles it against me.**
+
+`_refresh_run_still_active` (`shared/ops_refresh.py`) has an explicit
+previous-instance branch:
+
+```python
+if same_service:
+    launcher_instance_id = str(manifest.get("launcherInstanceId") or "").strip()
+    this_instance_id = _this_instance_identity()
+    if launcher_instance_id and this_instance_id and launcher_instance_id != this_instance_id:
+        return False
+```
+
+`RENDER_SERVICE_ID` survives a restart; **`RENDER_INSTANCE_ID` does not.** So a
+manifest written by the pre-`earlyExit` instance returns `False`, and the caller
+self-heals:
+
+```python
+if state == "running" and not _refresh_run_still_active(...):
+    _update_latest_state(state="failed", ...)   # lock released
+```
+
+The pid-reuse trap I was implicitly worried about **was already found and fixed**
+— the comment records that low pids get reoccupied fast in a fresh container and
+`_process_matches_expected_command` fails OPEN, so a coincidentally-alive pid
+"silently looked like the original run in production." That is why the identity
+check exists and why pid liveness is not reached in this case.
+
+**What this means for the two AUTORUN_FAILED events — the opposite of my lead.**
+They were **genuine, not stale**: the guard only raises when the run really is
+alive in the same instance. And the pids DIFFER (7114 at 14:22, 8200 at 18:22),
+with a restart at 14:34:36 between them — so these are **two different runs, each
+still alive ~4h after starting.**
+
+**The surviving hypothesis is therefore about DURATION, not locking: soccer
+refresh runs overrun their own 4-hour autorun cadence, so the next autorun is
+correctly skipped.** Combined with `earlyExit` every ~6.5h, a run that needs >4h
+has a narrow window to ever finish. **Still a lead** — I have not timed a run
+end-to-end or confirmed one has ever completed since 08-10.
+
+**Do not spend time on a stale-lock bug. There isn't one.**
