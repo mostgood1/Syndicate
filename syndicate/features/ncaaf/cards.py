@@ -35,6 +35,7 @@ from syndicate.features.ncaaf.smartsim2_projection import read_projection_artifa
 from syndicate.features.ncaaf.smartsim2_trial_monitoring import record_trial_page_view
 from syndicate.features.shared.discrete_nav import neighboring_values
 from syndicate.features.shared.discrete_nav import resolve_selected_value
+from syndicate.features.shared.game_board_contract import NULL_PLACEHOLDER
 from syndicate.features.shared.game_board_contract import apply_game_board_contract
 from syndicate.features.shared.market_inventory import join_odds_to_sim
 from syndicate.features.shared.team_branding import read_team_branding_snapshot
@@ -954,7 +955,12 @@ def _count_transfer_rows(rows: tuple[dict[str, Any], ...], *, team_id: str, seas
 def _format_decimal(value: Any, *, places: int = 3) -> str:
     amount = _safe_float(value)
     if amount is None:
-        return "-"
+        # The shared board placeholder, so one card does not mix "-" for its
+        # numbers with the contract's em dash for everything else. The two
+        # template gates that used to test `!= '-'` now test both forms, so
+        # neither this nor the contract can silently un-gate a panel by
+        # changing its own placeholder.
+        return NULL_PLACEHOLDER
     return f"{amount:.{places}f}".rstrip("0").rstrip(".")
 
 

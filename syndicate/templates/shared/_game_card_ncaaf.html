@@ -27,11 +27,12 @@
       raw value stays as the last-resort fallback so an unparseable row still
       renders something rather than a dash. -#}
   {% set kickoff = scoreboard.get('kickoff_label') or away_header.get('kickoff_label') or home_header.get('kickoff_label')
-     or scoreboard.get('kickoff') or away_header.get('kickoff') or home_header.get('kickoff') or '-' %}
-  {#- The '-' placeholders in this template (11 of them) are deliberately left
-      alone here: Lane F3 replaces them platform-wide at the contract, and
-      half-applying it would break that lane's measured baseline. -#}
-  {% set venue = scoreboard.get('venue') or away_header.get('venue') or home_header.get('venue') or '-' %}
+     or scoreboard.get('kickoff') or away_header.get('kickoff') or home_header.get('kickoff') or '—' %}
+  {#- One placeholder, and it is the contract's: game_board_contract's
+      NULL_PLACEHOLDER. The two `is-ready` gates below test BOTH forms on
+      purpose, so a card cannot silently un-suppress its projection panel the
+      next time somebody changes the placeholder. -#}
+  {% set venue = scoreboard.get('venue') or away_header.get('venue') or home_header.get('venue') or '—' %}
 
   {% if not ncaaf %}
     {% include 'shared/_game_card_generic.html' %}
@@ -112,10 +113,10 @@
           <div class="cards-summary-grid">
             <div class="cards-data-pair"><span>Away team</span><strong>{{ game.away.name }}</strong></div>
             <div class="cards-data-pair"><span>Home team</span><strong>{{ game.home.name }}</strong></div>
-            <div class="cards-data-pair"><span>Away rank</span><strong>{{ away_rank or '-' }}</strong></div>
-            <div class="cards-data-pair"><span>Home rank</span><strong>{{ home_rank or '-' }}</strong></div>
-            <div class="cards-data-pair"><span>Away conference</span><strong>{{ away_conf or '-' }}</strong></div>
-            <div class="cards-data-pair"><span>Home conference</span><strong>{{ home_conf or '-' }}</strong></div>
+            <div class="cards-data-pair"><span>Away rank</span><strong>{{ away_rank or '—' }}</strong></div>
+            <div class="cards-data-pair"><span>Home rank</span><strong>{{ home_rank or '—' }}</strong></div>
+            <div class="cards-data-pair"><span>Away conference</span><strong>{{ away_conf or '—' }}</strong></div>
+            <div class="cards-data-pair"><span>Home conference</span><strong>{{ home_conf or '—' }}</strong></div>
             <div class="cards-data-pair"><span>Kickoff</span><strong>{{ kickoff }}</strong></div>
             <div class="cards-data-pair"><span>Venue</span><strong>{{ venue }}</strong></div>
           </div>
@@ -137,9 +138,9 @@
               <div class="cards-table-kicker">Section 2</div>
               <div class="cards-table-title"><strong>Enhanced Totals Engine</strong></div>
             </div>
-            <span class="cards-overview-badge{% if scoreboard and scoreboard.home_points != '-' %} is-ready{% else %} is-suppressed{% endif %}">Projection</span>
+            <span class="cards-overview-badge{% if scoreboard and scoreboard.home_points not in ('-', '—') %} is-ready{% else %} is-suppressed{% endif %}">Projection</span>
           </div>
-          {% if scoreboard and scoreboard.home_points != '-' %}
+          {% if scoreboard and scoreboard.home_points not in ('-', '—') %}
             <div class="cards-summary-grid">
               <div class="cards-data-pair"><span>{{ game.home.name }}</span><strong>{{ scoreboard.home_points }}</strong></div>
               <div class="cards-data-pair"><span>{{ game.away.name }}</span><strong>{{ scoreboard.away_points }}</strong></div>
@@ -275,9 +276,9 @@
             <span class="cards-overview-badge{% if summary.publication_ready %} is-ready{% else %} is-suppressed{% endif %}">{{ summary.ready_label if summary else 'Unavailable' }}</span>
           </div>
           <div class="cards-summary-grid">
-            <div class="cards-data-pair"><span>Coverage score</span><strong>{{ '%.3f'|format(summary.coverage_score|float) if summary and summary.coverage_score is not none else '-' }}</strong></div>
-            <div class="cards-data-pair"><span>Coverage tier</span><strong>{{ summary.coverage_tier if summary else '-' }}</strong></div>
-            <div class="cards-data-pair"><span>Publication status</span><strong>{{ summary.publication_status if summary else '-' }}</strong></div>
+            <div class="cards-data-pair"><span>Coverage score</span><strong>{{ '%.3f'|format(summary.coverage_score|float) if summary and summary.coverage_score is not none else '—' }}</strong></div>
+            <div class="cards-data-pair"><span>Coverage tier</span><strong>{{ summary.coverage_tier if summary else '—' }}</strong></div>
+            <div class="cards-data-pair"><span>Publication status</span><strong>{{ summary.publication_status if summary else '—' }}</strong></div>
             <div class="cards-data-pair"><span>Publication ready</span><strong>{{ 'Yes' if summary and summary.publication_ready else 'No' }}</strong></div>
           </div>
           <div class="cards-callout-list">
