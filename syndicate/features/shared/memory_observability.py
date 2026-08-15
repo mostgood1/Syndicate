@@ -835,8 +835,84 @@ def _watchdog_should_emit(payload: dict[str, Any], last_emitted_mb: float | None
     return abs(float(metric) - last_emitted_mb) >= delta_mb
 
 
+def watchdog_excursion_climb_mb_per_s(previous_mb: float | None, current_mb: float | None,
+                                      elapsed_s: float | None) -> float | None:
+    """Climb rate between two watchdog samples, or None if it cannot be computed."""
+    if previous_mb is None or current_mb is None:
+        return None
+    if not isinstance(elapsed_s, (int, float)) or elapsed_s <= 0:
+        return None
+    return (float(current_mb) - float(previous_mb)) / float(elapsed_s)
+
+
+def watchdog_should_dump_allocations(*, climb_mb_per_s: float | None, anon_mb: float | None,
+                                     already_dumped: bool) -> bool:
+    """Fire the tracemalloc dump ONCE, while the excursion is actually happening.
+
+    `#435`. The dump already exists and has never once fired during an excursion:
+    it is on a 600s timer, and the excursion measured 2026-08-15 01:38 lasted 35
+    seconds end to end. A timer cannot catch that; a climb detector can.
+
+    ONCE PER BOOT, deliberately. tracemalloc keeps a traceback per live
+    allocation and this process is at its ceiling -- a dump per sample would
+    become the thing that kills it, and the first dump is the one taken while
+    anon is climbing, which is the one worth having.
+    """
+    if already_dumped:
+        return False
+    if climb_mb_per_s is None or anon_mb is None:
+        return False
+    floor_mb = _env_float("SYNDICATE_MEMORY_WATCHDOG_DUMP_FLOOR_MB", 2000.0)
+    rate_mb_s = _env_float("SYNDICATE_MEMORY_WATCHDOG_DUMP_RATE_MB_S", 25.0)
+    # BOTH conditions. Rate alone fires on ordinary warm-up; floor alone fires on
+    # a process sitting high but stable, which is the state this worker is in for
+    # most of its life and is NOT the moment worth a traceback dump.
+    return float(anon_mb) >= floor_mb and float(climb_mb_per_s) >= rate_mb_s
+
+
+def _watchdog_maybe_dump_allocations(payload: dict[str, Any], climb_mb_per_s: float | None) -> None:
+    """Emit the allocation-site census if we are inside an excursion."""
+    try:
+        anon_mb = payload.get("memory_unreclaimable_mb")
+        if anon_mb is None:
+            anon_mb = payload.get("memory_anon_mb")
+        if not watchdog_should_dump_allocations(
+            climb_mb_per_s=climb_mb_per_s,
+            anon_mb=anon_mb,
+            already_dumped=bool(_WATCHDOG_STATE.get("allocations_dumped")),
+        ):
+            return
+        _WATCHDOG_STATE["allocations_dumped"] = True
+        if not allocation_tracing_enabled():
+            # Say so ONCE, with the numbers that would have been captured. An
+            # instrument that is off must announce it at the moment it would
+            # have fired -- otherwise its silence reads as "nothing to report".
+            print(
+                f"[memory_observability] WATCHDOG_EXCURSION_NO_TRACING "
+                f"anon_mb={anon_mb} climb_mb_per_s={round(climb_mb_per_s, 1)} "
+                f"last_stage={payload.get('last_stage')} "
+                f"(set SYNDICATE_TRACEMALLOC_DIAG=1 to capture sites)",
+                flush=True,
+            )
+            return
+        snapshot = allocation_snapshot()
+        print(
+            f"WATCHDOG_EXCURSION_ALLOCATIONS "
+            f"{json.dumps({'climb_mb_per_s': round(climb_mb_per_s, 1), 'anon_mb': anon_mb, 'last_stage': payload.get('last_stage'), 'snapshot': snapshot}, default=str, sort_keys=True)}",
+            file=sys.stderr,
+            flush=True,
+        )
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] WATCHDOG_ALLOCATION_DUMP_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
 def _watchdog_loop(interval_seconds: float) -> None:  # pragma: no cover - thread body
     last_emitted_mb: float | None = None
+    previous_mb: float | None = None
+    previous_at: float | None = None
     while True:
         try:
             time.sleep(interval_seconds)
@@ -849,11 +925,27 @@ def _watchdog_loop(interval_seconds: float) -> None:  # pragma: no cover - threa
                 if isinstance(last_stage_at, (int, float))
                 else None
             )
+            # Climb rate is computed on EVERY sample, before the emit gate --
+            # the excursion must be detectable even in the ticks the gate
+            # suppresses, or the dump trigger inherits the gate's blind spots.
+            current_mb = payload.get("memory_unreclaimable_mb")
+            if current_mb is None:
+                current_mb = payload.get("memory_anon_mb")
+            now = time.monotonic()
+            climb = watchdog_excursion_climb_mb_per_s(
+                previous_mb,
+                current_mb,
+                (now - previous_at) if isinstance(previous_at, (int, float)) else None,
+            )
+            if climb is not None:
+                payload["climb_mb_per_s"] = round(climb, 1)
+            _watchdog_maybe_dump_allocations(payload, climb)
+            if current_mb is not None:
+                previous_mb = float(current_mb)
+                previous_at = now
             if not _watchdog_should_emit(payload, last_emitted_mb):
                 continue
-            metric = payload.get("memory_unreclaimable_mb")
-            if metric is None:
-                metric = payload.get("memory_anon_mb")
+            metric = current_mb
             if metric is not None:
                 last_emitted_mb = float(metric)
             print(
