@@ -1847,8 +1847,12 @@ and do not block a session on it — that is exactly how this one lost the run.
 ### quote-feed-age-alarm — OPEN — opened 2026-08-15 — session: tier5-live-read
 - Goal: the age of the newest quote sample is readable per sport, independent of
   whether any board built, and says `stale` when it is stale. Single testable
-  outcome: had this existed at 14:00Z today it would have reported MLB
-  `stale, age ~10,400s`; every existing signal reported healthy throughout.
+  outcome: had this existed today it would have fired on MLB at **14:07:48Z**
+  and stayed lit for **2.8 h of the 5.8 h outage**; every existing signal
+  reported healthy throughout. **CORRECTED from the opening claim** ("stale at
+  14:00Z"), which was wrong: age at 14:00Z is 10,332 s, under the 10,800 s
+  threshold, so it reports OK. Detection lag is **3.0 h** and that is the
+  honest cost of one threshold that must clear the 123-min healthy pregame gap.
 - **Why this and not a cadence metric.** Measured today (window 2): MLB capture
   starved 11:07→16:56Z while Layer 2 rebuilt every ~5 min and the tick loop ran
   every 60s. Every existing instrument was green. The outage was only visible in

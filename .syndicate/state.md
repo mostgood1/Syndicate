@@ -911,6 +911,19 @@ the place to read it, and it carries the guard on its two shortlists.
 - **`lane-guard` is blind to `.claude/**` by design**, so the enforcement layer
   cannot protect the directory it lives in — and every real collision has
   happened there.
+- **THE ARCHIVE PASS ITSELF CREATES ORPHANS, and that is a second mechanism, not
+  a repeat of the one below.** Moving a CLOSED lane to `lanes_closed.md` takes
+  the header and whatever body existed AT THAT MOMENT; any bullet the owning
+  session appends afterwards lands in `lanes.md` with no header above it and is
+  silently adopted by whichever lane precedes it. Measured 2026-08-15: two
+  blocks of `model-audit-devig-and-hygiene` ended up under
+  `nfl-live-edge-suppression` and `live-game-line-projection`, and **a later
+  collision check therefore reported a FALSE claim on
+  `scripts/backtest_mlb_props.py`** — the guard reading a real file claim that
+  belonged to nobody. Reconciled 2026-08-15; line arithmetic verified exact.
+  **When archiving, re-check the source lane for appends made after the move,
+  and when a collision check names a file, read the matched text before trusting
+  the slug it is attributed to.**
 - **A lane's guard state hangs on ONE header line in a hand-edited shared file,
   and its deletion is silent.** A header once vanished while its body stayed, and
   all 4 of that lane's claimed files went to exit 0. Nothing detected it; it was

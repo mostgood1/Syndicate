@@ -4471,3 +4471,204 @@ re-measure is `py -3 scripts/ui_layout_probe.py --base-url
 https://syndicate-an21.onrender.com --sports soccer,nfl,ncaaf` and the
 before-numbers to beat are at the top of this entry.
 
+- **RECONCILED 2026-08-15.** The two blocks below were left behind in
+  `lanes.md` when this lane's HEADER was archived here — orphaned under
+  `nfl-live-edge-suppression` and `live-game-line-projection`, which made a
+  later collision check report a FALSE claim on `scripts/backtest_mlb_props.py`.
+  Moved here verbatim, nothing dropped.
+
+- **SHIPPED (committed, NOT deployed) 2026-08-15: `2ac3c6bc`.** 10 files,
+  +1664/-26. `.py` pushes do not deploy (`autoDeploy: no`), so this is on the
+  lineage and live on nothing. **Not pushed yet** — `origin/main` moved to
+  `3a4de87b` while this ran.
+  - **#5 — DONE, as the falsification plus the real collapse.** Both vigged-mean
+    copies now call `opportunity_signals.consensus_vigged_price`.
+  - **D5 — DONE.** `/preflight` prints the deployed commit of all three
+    services; a per-service read failure degrades that row, never the gate.
+    3 new tests.
+  - **D4 — HALF DONE, and the half that is blocked is the number.** The
+    out-of-sample split is written into `scripts/backtest_mlb_props.py` (bias
+    fit on the earlier dates, scored on the later; always attempted, no opt-out
+    flag) and the served note now carries `debias_validation: in_sample`.
+    **BLOCKED ON DATA, measured not assumed:** the backtest window
+    2026-08-01..2026-08-14 is entirely absent from the checkout — 864
+    `daily_summary_*.json` files on disk, all 2026-05-28..07-xx, **zero in
+    August**. Per CLAUDE.md this needs production artifacts (`ADMIN_TOKEN` +
+    `/api/ops/...`), not the mirror. **Until it is run, every published MLB prop
+    skill number is still the in-sample one.**
+- **A3a WAS ALMOST SHIPPED BY ACCIDENT and was excluded deliberately.** It sits
+  uncommitted in the shared tree's `opportunity_signals.py`; staging that file
+  wholesale would have put a held-back change on main's lineage. Staged as
+  HEAD-blob + one function instead, asserted byte-exact. See `learnings.md`
+  2026-08-15 FORBIDDEN (`GIT_INDEX_FILE` / `$$`).
+- **Test state:** 173 green across the touched suites (devig 9, preflight 12,
+  calibration 21, book_grid/odds/opportunity 94, skill consumers 51). The **9
+  `test_layer2_board.py` failures are PRE-EXISTING** — reproduced identically on
+  a pristine HEAD worktree carrying none of this lane's changes, so they are the
+  stale-fixture problem `recommendation-lane-correctness` already recorded, not
+  a regression here.
+- **NOT DONE, and why:**
+  - **Lane B (CLV) — not advanced.** Its writer `pipeline/intelligence_state.py`
+    is claimed by FOUR OPEN lanes and the `#435` session has asked that the
+    board-build loop be left alone. This needs a cross-session decision, not
+    code. **The first real CLV number remains ~24h out; `avg_clv_pct` is None
+    and that is the honest answer.**
+  - Audit #2 (grading), #8, #9, #10 — untouched.
+  - The `power` devig adopt-or-record-why-not item under B3 — untouched.
+
+- **POST-CLOSE VERIFICATION 2026-08-15 — a gap I shipped through, now closed
+  with no break found.** Two background searches finished AFTER `2ac3c6bc` and
+  named consumers of `edge_vs_consensus_pct` / `consensus` that I had not
+  checked before committing. Re-verified:
+  - **`tests/test_quote_ref.py` exercises `edge_vs_consensus_pct` directly**
+    (asserts `< 0` and `> 0`) and **was not in my original test run.** It
+    passes. So does `test_nfl_preseason_cards.py`,
+    `test_book_grid_artifact_enrichment.py`, `test_prop_projections.py`,
+    `test_nfl_preseason_market_board_live_odds.py`,
+    `test_nfl_live_edge_policy.py` — **92 further green.**
+  - **The one real board_grid consumer is
+    `syndicate/features/nfl/preseason_cards.py`**, via
+    `read_book_grid_artifact("nfl", ...)` → `row.get("consensus")`. It tolerates
+    a `None` side by construction (`entry.setdefault("home_moneyline",
+    consensus.get("home"))`), and **`consensus[side] = None` was ALREADY
+    reachable before my change** (the empty-`all_prices` branch). My change adds
+    a second path to None, it does not introduce the state.
+  - `prop_projections.py:695` reads a `consensus` key from a MARKET-BOARD row,
+    not from `book_grid` — different producer, unaffected.
+  - **Noted, not fixed, belongs to the NFL surface:** `setdefault` means the
+    FIRST row for a matchup wins, so a refused consensus on that row sticks even
+    if a later row has a real price. Pre-existing; my change marginally raises
+    its likelihood. Requires an unusable price, of which Tier 3a found **zero**
+    in a 105-row production window.
+- **THE PROCESS LESSON, worth more than the result:** I ran a scoped consumer
+  search, got impatient when the unscoped one timed out, and shipped on the
+  scoped answer. The unscoped search later named a test that directly asserts
+  the field I changed. **The change was safe, but I did not know that when I
+  committed it.** Finish the consumer search before shipping a field's
+  semantics, or say plainly that you have not.
+
+### mlb-prop-oos-calibration — CLOSED-VERIFIED 2026-08-15 — D4 CLOSED: the split ran on production, `batter_hits` is the one verdict that did NOT survive — opened 2026-08-15 — session: model-audit-fork-2
+- Goal: finish plan **D4**. The MLB prop de-bias verdict is scored on dates it
+  was not fitted on, and the module publishes that number instead of the
+  in-sample one. **Testable outcome:** `skill_note()` returns
+  `debias_validation: "out_of_sample"` and no market's served verdict claims an
+  improvement that does not survive the split.
+- Successor to `model-audit-devig-and-hygiene` (CLOSED-VERIFIED, archived to
+  `lanes_closed.md`), which shipped D4's machinery and left only the number.
+- Files (exclusive): `syndicate/features/shared/mlb_prop_calibration.py`,
+  `tests/test_mlb_prop_calibration.py`.
+  `scripts/backtest_mlb_props.py` — READ/RUN ONLY, not edited by this lane.
+- **Collision note:** a parse of OPEN lanes reported `backtest_mlb_props.py` as
+  claimed by `nfl-live-edge-suppression`. **FALSE POSITIVE** — that text is my
+  own predecessor lane's ORPHANED BODY, left in `lanes.md` when the archive
+  session moved its HEADER to `lanes_closed.md`. See the hazard note below.
+- Hypothesis (recorded before running, per protocol): the published "de-biasing
+  flips 5 of 7 markets to beating the baseline" is optimistic, because both the
+  bias and the baseline were fitted on the games they were scored on.
+- Falsification test: if every market's `debiased_beats_baseline` survives the
+  split unchanged, the leakage was immaterial and only the LABEL needed fixing.
+- Verification: the backtest's own in-sample figures must reproduce the
+  published table exactly (proving the harness reaches the same data), and the
+  out-of-sample column is read beside them.
+- Blocked by: none. Production read-only (`/api/ops/artifacts/stream` +
+  StatsAPI); no deploy, no mutation.
+
+- **RESULT 2026-08-15 — D4 IS MEASURED. The hypothesis is CONFIRMED, but only
+  for ONE market, and it is the market the module quotes first.**
+  `py -3 scripts/backtest_mlb_props.py --end 2026-08-14 --limit 14`, production
+  artifacts, 2,487 player-games over 14 dates, 120 excluded for 0 PA, **0 dates
+  missing a projection and 0 missing a box score.**
+  - **HARNESS VALIDATED FIRST:** every in-sample figure reproduces the published
+    table exactly — `sb` corr 0.1605 / bias −0.0159 / inflation −22.2%, `hits`
+    corr 0.1607 / +28.6%, n=2487 throughout. So the split is being read against
+    the same data the module was built from, not a different slice.
+  - Split: fit **2026-08-01..08-06** (n=1,246), score **08-07..08-13**
+    (n=1,241). 13 usable dates, not 14 — the 14th carries no joinable rows.
+
+        market   IS beats   OOS beats    IS margin   OOS margin   IS corr  OOS corr
+        h          True      **False**    +0.0007      -0.0081     0.1607   0.1487
+        tb         True        True       +0.0256      +0.0313     0.1523   0.1262
+        rbi        True        True       +0.0210      +0.0285     0.1316   0.1156
+        r          True        True       +0.0243      +0.0289     0.1620   0.1520
+        2b         True        True       +0.0009      +0.0044     0.0278   0.0247
+        3b        False       False       -0.0014      -0.0010     0.0179   0.0265
+        sb         True        True       +0.0047      +0.0040     0.1605   0.1322
+
+  - **6 of 7 in-sample becomes 5 of 7 out-of-sample. Exactly one verdict flips:
+    `batter_hits`.** Its in-sample margin was **+0.0007** — smaller than the
+    4-dp rounding of the published table, i.e. it never was a result — and out
+    of sample it LOSES by 0.0081.
+  - **The result is NOT uniformly worse, which is the finding I did not expect.**
+    Four markets IMPROVE out of sample (`tb` +0.0256→+0.0313, `rbi`
+    +0.0210→+0.0285, `r` +0.0243→+0.0289, `2b` +0.0009→+0.0044). So the leakage
+    was not inflating the de-biasing across the board; it was manufacturing a
+    win in the ONE market whose margin was already indistinguishable from zero.
+  - **Correlations fall consistently but stay positive** (hits .1607→.1487, tb
+    .1523→.1262, rbi .1316→.1156, r .1620→.1520, sb .1605→.1322). **The
+    BIASED-NOT-BLIND headline survives**; the ranking signal is real and
+    somewhat weaker than published.
+  - `hrr` remains a degenerate constant 0.0 in this window, so its absence from
+    `_MARKET_SKILL` is still correct and `unmeasured` is still the truth.
+
+- **CLOSED-VERIFIED.** Verification ran and is stated above: the harness
+  reproduced every published in-sample figure exactly before the split was read,
+  which is what makes the out-of-sample column a reading rather than a belief.
+  Module and tests updated; **74 green** across
+  `test_mlb_prop_calibration.py` / `test_projection_skill.py` /
+  `test_projection_degeneracy.py` / `test_nfl_preseason_calibration.py`.
+- **Mutation-pinned:** `test_hits_does_not_claim_an_improvement_that_did_not_survive`
+  fails if `batter_hits` is restored to an "until de-biased" verdict, and
+  `test_the_row_declares_the_debias_is_in_sample` now fails if
+  `DEBIAS_VALIDATION` regresses to `in_sample`.
+- **NOT DEPLOYED.** `.py` pushes ship nothing (`autoDeploy: no`), so production
+  still serves the in-sample verdict — including `batter_hits`'s retired claim —
+  until a worker deploy carries this. **That is the one open risk from this
+  lane.**
+- **HAZARD FOUND, belongs to the archive session, not fixed here:** my
+  predecessor lane's HEADER was moved to `lanes_closed.md` while a large part of
+  its BODY was left behind in `lanes.md`, orphaned under
+  `nfl-live-edge-suppression` and `live-game-line-projection`. That is the
+  documented "a header vanishes while its body stays" failure, and it is not
+  cosmetic: **it made my own collision check report a false claim on
+  `scripts/backtest_mlb_props.py`.** `lanes_closed.md` has the header and the
+  early body but NOT the `#5 RESULT`, `SHIPPED`, or `POST-CLOSE VERIFICATION`
+  blocks. Whoever owns the archive pass should reconcile those, not delete them.
+
+#### live-game-line-projection — DROP 1 SHIPPED TO GIT 2026-08-15 as `0e0b0aa1` (NOT DEPLOYED)
+- **Change:** `syndicate/features/mlb/live_lens.py` +57/-0, three hunks, zero
+  deletions. New `_lens_rows_have_live_state_signal` (discriminates on
+  `source == "live_mc"`) plus ONE added disjunct in `should_use_projection_lens`.
+  `tests/test_mlb_live_game_line_lens.py` new, 14 tests.
+- **Why `source`, not `modelHomeWinProb`:** `_build_game_lens` stamps a
+  probability on its `first1/3/5` lanes too (`_live_margin_win_prob` over a
+  segment interpolation), so a probability-presence discriminator is satisfied by
+  a lens the re-sim never touched — and would ship a silent DOWNGRADE when the MC
+  bails, replacing the card lens with an interpolation. Pinned by
+  `test_live_game_keeps_the_card_lens_when_the_resim_bailed`.
+- **MUTATION-PINNED, not merely green.** Neutering the discriminator only where
+  the merge calls it fails **exactly 2** tests (live, final); the other 12 pass,
+  including pregame-unchanged, resim-bailed, and a fixture guard asserting the
+  card lens really does satisfy the old predicate (without which the suite would
+  pin nothing).
+- **Regression: 311 passed** across 10 live-lens-surface files.
+- **TWO PRE-EXISTING FAILURES, NOT MINE — dated, not assumed:**
+  - `test_mlb_refresh_runner::test_live_lens_payload_refreshes_card_before_game_lens`
+    — `TypeError: fake_build_game_lens() got an unexpected keyword argument
+    'live_mc_projection'`. Kwarg landed **2026-08-12** (`2caa8eac`); the test file
+    was last touched **2026-08-01**. Broken 3 days before this session, in the
+    vendored path this change does not touch.
+  - `test_slate_date_timezone_discipline` — flags `artifact_publisher.py`,
+    `artifact_retention.py`, `shadow_candidate_ledger.py` for `date.today()`.
+    **None touched here**; all three carry another session's uncommitted edits.
+    **Whoever owns them should see this.**
+- **DROP 2 RE-SCOPED — my original statement of it was aimed at the WRONG
+  ARTIFACT.** `/mlb/api/live-lens` serves a report **web writes itself**: it reads
+  the worker's keyvalue snapshot and, if it judges it stale, DISCARDS it and
+  rebuilds locally, where the MC is hard-refused by
+  `refuse_if_compute_in_request_path`. Max age **60 s** vs a **60 s** worker tick.
+  Drop 2 is therefore "the fallback recompute must not destroy live-state signal
+  it already holds", not "carry `gameLens` through the slim path". Same shape as
+  `#124`'s `prop_row_counts=[0]*9`. **Not designed, not agreed, not started.**
+- **`0e0b0aa1` is NOT observable in production on its own.** It is a precondition
+  for Drop 2, not a shippable user-visible change. No deploy fired.
+
