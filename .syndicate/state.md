@@ -365,8 +365,8 @@ refresh-worker memory, `pipeline/intelligence_state.py`, or the board-build loop
 
 ## PROBABILITY-STATISTIC OWNERSHIP `[measured 08-15, shipped `2ac3c6bc`]`
 
-- **THE AUDIT'S "TWO DE-VIG ORDERINGS" IS FALSIFIED. There is ONE, and
-  `book_grid` is not a second.** `book_grid` never de-vigs — its whole import
+- **THE AUDIT'S "TWO DE-VIG ORDERINGS" IS FALSIFIED. In the BOARD/ODDS path
+  there is ONE, and `book_grid` is not a second.** `book_grid` never de-vigs — its whole import
   surface from the odds layer is `_implied_probability`, `_line_value`,
   `market_sides_for_quote`. The canonical ordering (`devig` →
   `fair_probability_by_book` → `consensus_fair_probability` median) already had
@@ -384,6 +384,21 @@ refresh-worker memory, `pipeline/intelligence_state.py`, or the board-build loop
   `odds_book_quotes._implied_probability(0)` returns **0.0** rather than
   refusing. **The ±100 flip moves no derived number** — `implied(+100) ==
   implied(−100) == 0.5`, so `edge_vs_consensus_pct` is unchanged.
+- **SCOPE, because the line above is easy to over-read:** "one ordering" is
+  about the board/odds path only. Sport-local SIM market-anchoring has its own
+  de-vig implementations and they were deliberately NOT touched —
+  `soccer/features/market_anchoring.py::devig_decimal_odds`,
+  `nhl/sim_engine/hockeysim/market_anchoring.py::devig_two_way_home_prob`, plus
+  `scripts/backtest_soccer_h2h_calibration.py` and
+  `scripts/validate_soccer_vs_market.py`. **The soccer ones are claimed by
+  `soccer-model-coverage`.** These are the same engines `state.md` already flags
+  as market-anchored and therefore partly circular; unifying them is a modelling
+  decision, not a converter cleanup. `[verified 08-15 by repo-wide search with
+  `.claude/worktrees/` excluded — those hold full repo copies and triple-count]`
+- **Both production copies of the vigged mean are GONE, verified by search:** the
+  only `mean_implied` left outside worktree copies is in
+  `tests/test_devig_unification.py`, which reproduces the legacy arithmetic on
+  purpose to prove valid prices did not move.
 - **`/preflight` now prints the deployed commit of ALL THREE services** (D5),
   degrading a per-service read failure to that row rather than to the gate.
 - **MLB prop skill numbers are IN-SAMPLE and now say so** (`debias_validation`).
