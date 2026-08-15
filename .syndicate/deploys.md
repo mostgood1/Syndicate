@@ -4018,3 +4018,77 @@ call the worker safe. A larger slate still crosses.
 boot-confound rule. It does not explain the result: 20:00:19 -> 21:30:27 is a
 single unbroken 90-minute run, against a longest run of 53 minutes last night.
 Last night's reboots were the kills themselves.
+
+### MEASUREMENT for web `4316c907` — live 21:41:18Z — **VERIFIED BY INDEPENDENT RECOMPUTE**
+
+**Fingerprint first — my code is the code running.** `by_close_timing`,
+`same_book_all_n`, `in_play_excluded_n`, `unknown_timing_excluded_n` all present;
+**374/374 rows carry `close_timing`**. None of those keys exist in the prior build.
+
+**Verified by recomputing the headline from the rows at the same instant**, not
+against a remembered number (the slate moves, so any earlier figure is a stale
+target):
+
+      same_book rows in payload   179
+      pregame subset              131
+      my hand-computed mean       -0.3077
+      endpoint avg_clv_pct        -0.3077     <- MATCH
+
+`same_book_all_n=179`, `in_play_excluded_n=48`, `unknown_timing_excluded_n=0`.
+Headline is now **-0.3077 over n=131, beat 26.0%**.
+
+**THE RESULT IS STRONGER THAN THE ARGUMENT I MADE FOR IT, and in a way worth
+recording.** I justified this fix on "in-play rows drag the number DOWN" — at
+21:1xZ they averaged strongly negative and pulled the headline to -0.672. At
+21:4xZ **the same in-play bucket averages `+0.7937` (n=48, beat 54.2%)** and
+would have pulled the headline UP: the old code would now publish **-0.0124**.
+
+So the contamination is **not a consistent bias in one direction — it is noise
+that swings the headline either way depending on game state.** That is a better
+reason to exclude it than the one I gave, and it also means a
+"CLV improved today" reading off the old code could have been pure game-state
+drift.
+
+**The clean number is stable; the dirty one is not.** Across ~2.5 hours:
+
+      reading      dirty (old code)    clean (this fix)
+      21:1xZ            -0.672             -0.346
+      21:4xZ            -0.0124            -0.3077
+
+The clean series moves 0.04 points; the dirty series moves 0.66. That is the
+whole case for the change, measured.
+
+**Also landed on `main` as `a68e1ce0` — and `clv_join.py` was 600 insertions,
+i.e. the ENTIRE JOINER was missing from main**, exactly like the allowlist entry
+earlier today. Both are now on main rather than living only on deploy branches.
+
+**Obligation closed.**
+
+### RECONCILE COMPLETE 2026-08-15 ~22:0xZ — origin/main now holds everything
+
+`origin/main` was 158 ahead and the shared checkout 40 ahead — the exact
+blindness `coordination-protocol.md` describes. Merged in an ISOLATED worktree
+(`C:/tmp/reconcile`), never in the shared checkout, so a conflicted tree could
+not break the four other sessions working there.
+
+Pushed as `e27fad45` (`a68e1ce0..e27fad45`). Safety ref
+`backup/main-pre-reconcile-20260815`.
+
+Six ledger files conflicted, all append-vs-append; resolved by UNION so both
+sides' entries survive. Verified in both directions after resolving — my `#435`
+verdict, mid-ramp rule and closed lane; their CONFIRMED-A-VALUE rule and
+`clv-without-settlement`; the lanes archive still intact; no duplicated sections.
+Merged tree tested: app imports, 74 tests pass.
+
+**THE SHARED CHECKOUT IS STILL BEHIND, DELIBERATELY.** `git merge --ff-only`
+REFUSED, and it was right to: 125 uncommitted files live there, including four
+CSS files, `ui_layout_probe.py`, `artifact_publisher.py` and
+`game_board_contract.py` that another session is mid-edit on. Forcing it would
+have destroyed their work.
+
+    origin/main   e27fad45   COMPLETE — everything is here
+    local main    2f3dcae0   behind; fast-forwards for free once the
+                             uncommitted work in the shared tree is committed
+
+That is the owning sessions' call, not mine. Nothing is lost either way: the
+commits are on origin, and the working-tree edits are untouched.
