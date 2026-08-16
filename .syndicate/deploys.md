@@ -6448,3 +6448,46 @@ version was nearly written into the code comment as the cause.
 ### Not deployed, not claimed
 No production behaviour has changed. Full audit with per-sport × per-family
 rates: `.syndicate/audit_2026-08-16_layer1_board.md`.
+
+
+### PENDING DEPLOY — 2026-08-16 16:46:14Z — refresh-worker `ed54071a` (branch `deploy/restore-score-min`)
+
+**Change (exactly one):** `syndicate/features/shared/opportunity_signals.py`
+taken whole from `main` onto live `97491161`. 1 file, +71/-1. Restores
+`"score": round(min(value, discounted), 4)` and `reliability_applied`.
+
+**/preflight verdict: FAIL on the main-wide option, PASS on this one.**
+Deploying `main` would have carried **520 commits / 207 files / 85,232
+insertions** from seven parallel sessions, including work the ledger explicitly
+HOLDS (state.md decision 7). That is not one substantive change. The narrow unit
+is: imports byte-identical to the live tree, nothing in the live tree calls the
+one added function (`consensus_vigged_price`), so the only behavioural delta is
+the `min()`.
+
+**Expected effect, as a number and a window:** on the FIRST shortlist artifact
+written after this goes live, every row with `score.value_pct < 0` satisfies
+`score == value_pct` (not `value_pct * reliability`), and `reliability_applied`
+is present on 100% of rows. Board builds ran ~every 20 min today (last completed
+16:42:49Z), so the window is **one build after the deploy finishes**.
+
+**Measurement + who reads it:** this session (`layer2-board-quality`), against
+`/api/board/layer2-shortlist`. Baseline to beat: 4 of 4 negative-value rows
+inverted, `reliability_applied` 0 of 108.
+
+**Blast radius:** refresh-worker only — restart, stop-then-start. `check_deploy_safety`
+CLEAR (MLB sim `killed_by_restart`, odds refresh idle, board build idle) with a
+**live-games-in-progress warning**: the restart interrupts live-lens ticks and
+live prop hydration. Accepted; the user authorised the deploy. live-odds-worker
+and web NOT deployed — they carry the same stale `blended_score`, but the board
+is built on refresh-worker, and one change per deploy.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit 97491161 --allow-rollback`
+
+**Ledger check:** no `learnings.md` FORBIDDEN/EXONERATED rule covers this
+(the two deploy rules — never trust `check_deploy_safety` alone, never read a
+deploy claim's `target` as what is running — are both honoured: safety was
+corroborated against the live SHA read from the deploys API, and the target was
+verified a descendant of it). `opportunity_signals.py` is claimed only by
+`layer2-board-quality` (this lane).
+
+**MEASUREMENT: ____________ (pending — re-read after the next board build)**

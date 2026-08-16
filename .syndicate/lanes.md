@@ -6,6 +6,81 @@
 
 ## OPEN
 
+### export-force-refresh-escape — OPEN — opened 2026-08-16 — session: win-prob-null-readable
+- Goal: `--force-refresh` actually regenerates the three props SNAPSHOT exports
+  instead of re-serving a stale per-date file. Testable: with `force_refresh=True`
+  the builder is CALLED even when the snapshot exists; with `False` it is not.
+- **Why: found while explaining a `rows=0` win_prob reading.** All three exporters
+  short-circuit on a prior `<name>_<date>.json`, but only two take a
+  `force_refresh` escape. `_export_cards_props_snapshot` (WNBA `:5082`) has NONE —
+  and it is the builder that produced the `rows=32/null=3` reading, so its
+  staleness is the least visible. NBA is worse: the whole trio lacks the escape
+  AND `_materialize_artifact_bundle` has no `force_refresh` parameter to pass.
+  The WNBA sibling comment already names this shape "the same reuse-forever bug".
+- **DELIBERATELY NOT THE WHOLE CLASS.** ~30 `if existing:` short-circuits exist
+  across the two producers (live snapshots, recon artifacts, game cards, season
+  cards). `live_refresh_loop.py` passes `--force-refresh` on EVERY lineup/injury
+  trigger, so adding escapes everywhere would turn each trigger into a full
+  artifact rebuild on a 2GB worker — the same over-reach `#347`/the 2026-07-19
+  `smart_sim_overwrite` fix already had to undo once. Scope is the props snapshot
+  trio only; the rest is recorded, not touched.
+- Files (exclusive to this lane; `_claims()` CLEAR and every OPEN lane's `Files:`
+  block read — zero `oddsapi_props` mentions anywhere in `lanes.md`):
+  - `scripts/refresh_wnba_oddsapi_props.py`
+  - `scripts/refresh_nba_oddsapi_props.py`
+  - `tests/test_export_snapshot_force_refresh.py` (new)
+- Falsification test: if the builder still is not called under
+  `force_refresh=True`, the gate is not the one at `:5082` — re-read the caller
+  chain before changing anything else.
+- Verification: new tests assert called/not-called in both files, plus targeted
+  producer suites green. **NBA cannot be verified in production — out of season,
+  its producer writes no artifact.** Default `False` keeps every path inert until
+  someone actually forces a refresh.
+- Blocked by: none. No deploy from this lane tonight unless asked.
+
+### layer2-board-quality — OPEN — opened 2026-08-16 — session: layer2-board-quality
+- Goal: the curated board scores, labels and moves correctly, and never contradicts the sim. **Testable outcome:** on the served `/api/board/layer2-shortlist` payload, (a) `sim_component` is non-zero wherever `model_edge_pct` is non-zero, (b) every `quote.bookmaker` is in the shared book shortlist, (c) no row carries a negative `model_edge_pct` without an explicit label, (d) negative-value rows are not promoted by low reliability.
+- Files:
+  - `syndicate/features/shared/layer2_board.py`
+  - `syndicate/features/shared/opportunity_signals.py`
+  - `pipeline/layer2_shortlist.py`
+  - `syndicate/templates/intelligence.html`
+  - `syndicate/static/shared/bet_slip.js`
+  - `syndicate/static/shared/board_cards.css`
+  - `syndicate/blueprints/intelligence.py`
+- **CLAIM ON `layer2_board.py` TAKEN FROM `spread-line-sign-convention` 2026-08-16, RESOLVED BY CONTENT RATHER THAN BY NEGOTIATION** (the `clamp-fix-to-workers` precedent):
+  - That lane's outstanding item was "artifact output still unverified". **It is now verified: `_side_line_from_cells` is PRESENT in the deployed tree** — `git show 97491161:syndicate/features/shared/layer2_board.py` returns 3 occurrences, identical to `main`. The fix is live on refresh-worker.
+  - **Ancestry was the WRONG test and gave the WRONG answer.** `edbbee9d` is NOT an ancestor of live `97491161` (`git merge-base --is-ancestor` → NO), because refresh-worker runs branch `deploy/nfl-pbp-root`, not `main`. Testing by content reverses that conclusion.
+  - The holding session (`Orphaned lanes cleanup` = `lane-cleanup`) is ARCHIVED and not running — `list_sessions include_archived:true`, last activity 2026-08-16T01:14:03Z.
+- **THE CLAIM WAS NEVER ENFORCED ANYWAY, AND THE HOLDING LANE MIS-READ ITS OWN CHECK.** `lane-guard.py`'s `_claims()` cannot see `spread-line-sign-convention`'s Files block: `FILES_RE` matches its header line (on the colon inside `23:0xZ`), yielding no paths, and the two continuation lines carrying the actual paths start with a backtick, not `-`, so they are never parsed. Measured: a `_claims()` run over `lanes.md` returns **zero** claims on `layer2_board.py`. That lane recorded "Collision check RUN … CLEAR both times, so no other lane was blocked by the gap" — the guard read CLEAR because **its own claim was unparseable**, not because the file was free. My Files block above puts each path on its own `-` bullet so it actually parses.
+- Hypothesis: n/a for the audit half (measurement, not diagnosis). Per-goal hypotheses are recorded against G1–G8 below as they are tested.
+- Falsification test: per goal. The standing one for the whole lane — if the served payload already satisfies (a)–(d) above, the brief's premise is wrong and the lane closes without a code change.
+- Verification: the SERVED payload from `/api/board/layer2-shortlist`, written to `deploys.md`. Not a unit test — the user has twice reported a board defect that automated checks missed.
+- Blocked by: none. Read-only on `layer1_board.py`, `templates/shared/layer1_board.html`, `blueprints/layer1_page.py` (Layer 1 session), sim-engine internals, and `pipeline/intelligence_state.py`.
+
+### branch-overlap-baseline-instrumentation — CLOSED 2026-08-16 — the baseline was sampling hours where the failure does not happen — session: `branch-overlap-baseline-watch` (scheduled-task run)
+- Goal: take one Phase 1 (`#440`) before-baseline sample; it turned into fixing
+  the instrument, because the sample was honest and the schedule was not.
+- Files: `.syndicate/scheduled_task_branch_overlap.md`,
+  `.syndicate/scheduled_task_oom_band.md`, and three task files under
+  `~/.claude/scheduled-tasks/` (outside VCS — prompts now embedded in the
+  oom_band mirror so all three are recreatable).
+- **NO LANE WAS OPEN WHILE THE WORK HAPPENED.** Opened at checkpoint, closed
+  immediately. Config + mirrors only, no app code, nothing contended — but the
+  protocol says claim first and I did not.
+- Measured: 42 `oomKilled` in 8 days, **41 of 42 in 15:00–23:59 local**; cron
+  moved `15 */4 * * *` → `45 19,22,1 * * *` (three 5h windows tiling
+  14:45–01:45). Sampling drops 6/day → 3/day with the kill band fully covered.
+- Corrected: the oom-band tasks' SHA-equality pin → containment check. See
+  `learnings.md` 2026-08-16.
+- Added: `preband-refresh-worker-sha-check`, one-time 21:45Z, returns
+  BAND CLEAN / BAND COMPROMISED. **It notifies nobody** — created from a
+  scheduled-task run session, which cannot subscribe another task.
+- Pushed: `8150ff5b`, `b37b870c`, `80581700`, `38bb30b2`. Ledger writes from this
+  checkpoint are UNCOMMITTED (shared files carry other sessions' in-flight edits).
+- Blocked by: none. Nothing here is load-bearing for another lane; the
+  `refresh-worker-oom-recurrence` owner keeps the diagnosis.
+
 ### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
 - **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
   - **`closing_detected_at` is present on 21 markets. The new code path ran.**
