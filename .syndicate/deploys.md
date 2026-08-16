@@ -8585,3 +8585,77 @@ quoted**. Independent of the capture question, and it is this lane's own file.
   slot the hook names in its own error text
   (`.syndicate/.current-lane.<session-id>`), not closing or forcing the lane.
   Worth knowing: a resumed session does not inherit its own marker.
+
+---
+
+### ask-sim-supports-side — web `d8985df8` — MEASURED
+
+- Deployed 2026-08-16 16:59 CDT (21:59:38Z), **web only**, cut from web's own
+  live SHA `8172fdef`. Claim held, nothing in flight. Landed on `main` as
+  `339e510b`; main and live carry identical blobs.
+
+- **THE DEFECT WAS MINE, SHIPPED THIS MORNING.** Served 21:4xZ, verbatim from
+  the live panel:
+
+      "The simulation projects 1.396 batter hits against a line of 0.5,
+       which is why it lands on the under."
+
+  1.396 is ABOVE 0.5 — that projection argues for the over. `"which is why it
+  lands on the {side}"` is a **causal claim**, and `_reason_sentences` was making
+  it without ever comparing the two numbers in the same sentence.
+
+- **WHY IT SURVIVED REVIEW, AND THIS IS THE REUSABLE PART.** The sibling row on
+  the same board — Kyle Isbel, 0.256 against a 0.5 line, under — reads perfectly.
+  The template only breaks when the projection falls on the FAR side of the line
+  from the bet, so **half the output vindicates it**. Same shape as every other
+  defect in this lane today: a correct-LOOKING sentence assembled from real
+  numbers. A generator that is right half the time by construction will pass any
+  eyeball review of a handful of rows.
+
+- Guard is the arithmetic the sentence always implied: `over -> projected > line`,
+  `under -> projected < line`. When it holds the causal clause stands; when it
+  fails the numbers are still printed and the clause becomes "which does NOT
+  support the {side}".
+
+- **I WEAKENED MY OWN FIX AFTER MEASURING, AND THE MEASUREMENT IS THE POINT.**
+  The first draft read "which argues AGAINST the {side} — the sim and this side
+  disagree". That asserts the projection and the line are comparable quantities.
+  The board says otherwise:
+
+      live   basis           agree  DISAGREE
+      False  full                0         1
+      False  model_mean          0         2
+      False  rbi_1plus           1         2
+      True   first5              1         0
+      True   full               11         3
+      True   live_resim          5         4
+      True   rbi_1plus           1         0
+
+  **12 of 31 over/under rows on one read, 21 of 39 on another minutes earlier** —
+  across four `basis` values and on **pregame** rows as well as live. A
+  full-game projection sitting against a remaining-game line would explain the
+  live rows and **does not explain the pregame ones**. So the published sentence
+  now claims only what is checkable and stops.
+
+- **Verified on production after the deploy:** 5 rows, every sim-vs-line clause
+  cross-checked against its own numbers, **0 contradictions**. Including the
+  stark case the guard now labels correctly: `over 16.5 (Colorado Rockies @ San
+  Francisco Giants)` with `projected = 7.134` → "does NOT support the over".
+
+- Also fixed: "1 books quoting" → "1 book quoting".
+
+- 9 tests, including a 4-case parametrised table over both sides and both
+  directions, and a regression pin on the sibling row that was already correct
+  so the fix cannot over-apply. 78 in this file, 236 across all four ask suites.
+
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit 8172fdef
+  --allow-rollback`.
+
+- **HANDED OFF, NOT CLOSED — this is a BOARD defect, not an Ask one.** Whether
+  the projection or the published `side` is wrong belongs to
+  `layer2-board-quality`, whose stated goal is that the board never contradicts
+  the sim. Flagged to that session with the table above and the 7.134-vs-16.5
+  case. **Consequence they need to expect: the Ask panel will now visibly say
+  "does NOT support the over" on roughly a third to a half of over/under rows
+  until it is resolved.** That is honest output, not a new defect, but it makes
+  the contradiction user-visible.
