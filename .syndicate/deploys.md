@@ -3766,6 +3766,55 @@ allowlisted**, so making it observable is the cheapest instrument in reach.
   accepted deliberately, web being display-only.
 - **Rollback:** `py -3 scripts/render_deploy.py --service web --commit b9ea0f0a --allow-rollback`
 
+## 2026-08-16 00:23:04Z — refresh-worker `57a437d5` — the last 2 clamp sites — **DEPLOYED AND PRESENT BY CONTENT. NOT YET VERIFIED — the slate went quiet 80 seconds later.**
+
+- **DEPLOYED.** `dep-da0g34c9v7es7399p1mg`, triggered 00:17:21Z, live 00:23:04Z.
+  Cut on the LIVE SHA `2c14d9ae`, not on `main` — refresh-worker runs an
+  off-main deploy branch and `render_deploy.py` requires a descendant of live.
+  Two files: `pipeline/intelligence_state.py`, `syndicate/features/wnba/cards.py`.
+- **PRESENT BY CONTENT at the live SHA: 0 occurrences of `max(0.02, min(0.98`
+  across all three files.** `layer2_board.py` was already carried to the workers
+  by `spread-line-sign-convention`'s deploy, which is why this is 2 sites and
+  not 3.
+- **NOT VERIFIED. Do not record it as such.** Post-deploy read at 00:24:04Z:
+  `rows=12`, p=[0.338468, 0.603175], `out_of_clamp=0` → **`no_trigger`**. The
+  slate had collapsed from 97 rows to 12 as games finished. This is the SAME
+  reading a quiet slate gave before any fix existed, so it discriminates
+  nothing — the identical trap the `e831263e` entry above was written about.
+- **BEFORE (the falsification this deploy answers):** 23:10:13Z nfl `h2h_3_way`
+  0.014698 → **+4900** (correct +6704); 23:15:46Z mlb `spreads`
+  0.009911/0.990089 → **±4900** (correct ±9990). Two slates, two triggers, both
+  against a fix-carrying WEB SHA.
+  `reports/clamp_watch/trigger_20260815T231013+0000.json`, `..._231546+0000.json`.
+- **WHAT WOULD SETTLE IT:** the next `PRE_FIX_MISPRICE`-capable slate. The
+  scheduled task `clamp-fix-verification-watch` runs `--once` every 2h and is
+  silent on `no_trigger`. `POST_FIX_OK` closes `#439` item 1.
+- **A SAFETY GATE SAID CLEAR WHILE THREE JOBS WERE RUNNING — read this before
+  trusting it.** At 00:13Z `check_deploy_safety.py` returned **`CLEAR`, exit 0**
+  ("Odds refresh: idle") while `deploy_preflight`'s process list on the SAME
+  service showed `run_refresh_odds_job.py` (587) → `refresh_odds_sources.py`
+  (588) → `build_soccer_artifacts.py --league ligue_1` (621). It watches a
+  different odds lane than the one hosting that job. Deploying on that verdict
+  would have killed a soccer artifact build mid-flight — **the exact incident
+  its own docstring cites from 2026-08-03.** The deploy was gated on
+  `safety_rc == 0 AND zero [JOB] processes` instead, and re-verified in the same
+  shell command as the POST.
+- **An earlier waiter of mine reported `SAFETY CLEAR` and was wrong**: it
+  captured stdout only and tested for the ABSENCE of `NOT CLEAR`, so a
+  `[UNKNOWN] HTTP 502` on stderr passed as clear. Unknown must not default
+  permissive. Replaced with an exit-code gate requiring the affirmative
+  `CLEAR:` line.
+- **Claim discipline:** acquired, then released and re-acquired because the
+  first claim recorded the pre-recut target `c70eeff0`; released after the
+  deploy. `deploy_preflight` returns rc=3 for ANY held claim including your own
+  — that is not a blocker, it cannot tell it is you.
+- **STILL CARRYING THE CLAMP: live-odds-worker** on `c422f79a`. Its claim is
+  held by `live-game-line-projection` with target `49797f4b`, which IS clean.
+  **Do not assume that closes it** — `49797f4b` was pending at 23:45 too and
+  `c422f79a` landed instead, which is how a "needs nothing" call went wrong
+  once tonight already. Verify by content at whatever actually lands.
+- **Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit 2c14d9ae --allow-rollback`
+
 ### MEASURED 2026-08-15 23:10Z — **FALSIFIED, AND THE FIX IS NOT WRONG, IT IS ON THE WRONG SERVICE**
 
 The watcher triggered twice, five minutes apart, on two unrelated slates, and
@@ -4814,3 +4863,64 @@ measurement only; it will not deploy or roll back, and it names the rollback SHA
 
 **If you are another session and the slate is populated before 10:00 CT, take the
 reading yourself and say so here** — do not assume the task has covered it.
+
+### VERIFIED — `layer2_board` candidate-line fix WORKS in production (2026-08-16 00:2xZ)
+
+First post-deploy artifact: `written_at=2026-08-16T00:12:35Z` (deploy live
+23:16:39Z). Three joinable mlb spreads rows:
+
+      side   shortlist_line   grid cell's own line   verdict
+      away        1.0                 1.5            line MOVED since snapshot
+      home        1.5                 1.5            MATCH
+      home       -1.5                -1.5            MATCH
+
+**Both home rows carry their OWN cell's handicap.** Before the fix they carried
+the negation — the away handicap. That is the fix, confirmed on real data.
+
+**THE WATCHER SAID `FAIL`. IT WAS WRONG, AND WRONG THE SAME WAY FOR THE THIRD
+TIME.** Its away predicate compared a FROZEN artifact (`written_at` 00:12:35Z)
+against a LIVE grid fetched ~15 minutes later. A spread that moves between the
+two reads as a mismatch. **A verification that compares a snapshot to a moving
+reference cannot separate drift from breakage** — the same class of error as
+the first watcher (measured the input) and the second (never-passing predicate).
+Correct form: join the snapshot against a grid read at the SAME instant, or
+compare only fields that cannot move.
+
+**LIMIT, stated plainly: n=2 home rows.** Most published rows are h2h/props and
+do not join. The fix is confirmed on the rows that exist, not proven at volume,
+and generality beyond mlb remains unmeasured.
+
+`GAVE-UP` printed after the verdict is a script artifact (the break did not
+fire); the monitor has ended and the verdict above stands.
+
+### CLOSING-CLOCK FIX — NOT YET VERIFIABLE, and the reason is the slate, not the code
+
+Checked 2026-08-16 00:3xZ.
+
+- **The fix IS running.** live-odds-worker is live on `c422f79a` (finished
+  23:49:38Z) and that commit contains `_apply_closing_stamp` (2 hits). Verified
+  by content, not by ancestry.
+- **0 of 51 stamped markets carry `closing_detected_at`** — the field only the
+  new code writes.
+- **That is expected, not a failure.** Every stamp is idempotent (guarded on
+  `closing_line is None`), so a market stamped before the deploy is never
+  re-stamped. All 51 stamps have `closing_captured_at` between **17:25:32Z and
+  23:15:00Z — the latest predates the deploy.** No market has transitioned
+  pregame->live since the fix went live: mlb first pitches ran 23:11-23:16Z and
+  the next two are **01:38Z and 01:40Z**.
+- **So the absence of the fingerprint is the absence of an OPPORTUNITY, not the
+  absence of the fix.** Do not read `detected_at: 0` as a failed deploy — check
+  whether any market transitioned in the window first.
+
+**NEXT CHECK — after 01:40Z, when the last two games start:**
+1. `/api/ops/odds-history/inspect?sport=mlb&date=2026-08-15` -> find markets
+   carrying `closing_detected_at`. Any at all proves the new path ran.
+2. For those, assert `closing_captured_at <= commence_time` (the old code put it
+   AFTER, e.g. 20:34:26Z against a 19:08Z start).
+3. Beware a tz trap that already cost one run: `commence_time` from
+   `history_last.row` is offset-aware while some stamps parse naive — normalise
+   before comparing or the check dies with
+   `can't compare offset-naive and offset-aware datetimes`.
+
+The scheduled task `clv-settled-read-2026-08-15` fires 01:55Z, immediately after
+those transitions, and is the natural place to fold this in.
