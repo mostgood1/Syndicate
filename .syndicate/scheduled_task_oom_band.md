@@ -124,7 +124,8 @@ py -3 -c "from datetime import datetime,timezone; n=datetime.now(timezone.utc); 
 
 Classify the drift and say which case you are in, in your first line:
 
-- **drift < +10 min** — ON TIME. Proceed; the verdict means what it says.
+- **drift < −10 min** — **EARLY: THIS IS A MANUAL RUN, NOT THE SCHEDULED ONE.** A one-time task cannot fire ahead of its `fireAt`, so a negative drift means a human triggered this to test it. Label the whole report **TEST RUN** and do not issue a BAND verdict — the state you observe now is not the state at band open, and this output must never be mistaken for the 21:45Z reading. Reporting the live SHA, containment and event counts is still useful; presenting them as the pre-band answer is not. (Found 2026-08-16 by doing exactly this: a −264.6 min drift was classified ON TIME because the original branch bounded lateness only.)
+- **−10 min ≤ drift < +10 min** — ON TIME. Proceed; the verdict means what it says.
 - **+10 min to band open (22:00Z)** — LATE BUT STILL PRE-BAND. Proceed, and state the actual lead in minutes rather than implying 15.
 - **at or after 22:00Z, band not over** — **NOT A PRE-BAND READING.** Say that first and plainly. The band has already opened, so "was the worker untouched going in" can no longer be answered — a deploy may have landed before you looked. Report what you find as an IN-BAND spot check, and say explicitly that the pre-band question is now unanswerable.
 - **after 2026-08-17T05:00:00Z** — **THE BAND IS OVER; THIS TASK IS MOOT.** Do not report a verdict. Say the run was too late to serve its purpose, and point at `oom-band-full-report`, which measures the band retrospectively and reports the SHA it actually measured. Then stop.
@@ -145,7 +146,7 @@ STEP 2 — are the fixes still in what is running? Check CONTAINMENT, not SHA eq
 git fetch origin --quiet; git merge-base --is-ancestor d72d670c <live-sha> && echo "FIXES PRESENT" || echo "INVESTIGATE"
 ```
 
-`d72d670c` is the newest of the three fixes and they are linear (`164f6e80` -> `1409e96f` -> `d72d670c`), so that single check covers all three. If it fails, do NOT report a revert — re-check by content first (`git show <sha> | git patch-id --stable`, compared across `git log <live-sha>`), because the next rebase renames `d72d670c` too. Only genuinely absent patch-ids mean a revert.
+`d72d670c` is the newest of the three fixes and they are linear (`164f6e80` -> `1409e96f` -> `d72d670c`), so that single check covers all three. If it fails, do NOT report a revert — re-check by content first (`git show <sha> | git patch-id --stable`, compared across `git log <live-sha>`), because the next rebase renames `d72d670c` too. Only genuinely absent patch-ids mean a revert. If the live SHA is not present in this checkout at all, say so rather than guessing — `git fetch origin` first, and if it is still absent the service is running a branch this clone does not have.
 
 STEP 3 — deploys and kills since the last known state:
 
@@ -155,6 +156,8 @@ py -3 scripts/render_events.py --service refresh-worker --since 2026-08-16T15:45
 
 Kills come from the EVENTS API only. Never conclude "no kills" from a log search — a killed process emits no log line, and this repo carries a retracted "0 kills" claim that came from a log grep.
 
+**Daytime kills are no longer hypothetical.** Measured 2026-08-16: `oomKilled` at 16:34:32Z (11:34 local) and 17:19:42Z (12:19 local), both well outside the 15:00-23:59 local band that held 41 of the prior 42 kills, and both on an afternoon carrying 4+ deploy cycles. Report every kill you find with its local time; do not filter to the band, and do not treat a daytime kill as noise.
+
 STEP 4 — report in under 12 lines:
 - live SHA, its `finishedAt`, and whether it differs from `97491161`
 - FIXES PRESENT or INVESTIGATE (and if INVESTIGATE, the patch-id result — never a bare revert claim)
@@ -162,7 +165,7 @@ STEP 4 — report in under 12 lines:
 - any `server_failed` events, classified (`oomKilled` / `evicted` / `unhealthy` / `earlyExit` — these have different causes and must not be flattened)
 - **uptime at 22:00Z**, computed from the most recent deploy's `finishedAt`
 
-VERDICT, one line, exactly one of — **unless STEP 0 classified this run as MOOT or NOT A PRE-BAND READING, in which case do not issue one at all; a verdict from a late run is a claim the run cannot support:**
+VERDICT, one line, exactly one of — **unless STEP 0 classified this run as EARLY (manual test), NOT A PRE-BAND READING, or MOOT, in which case do not issue one at all; a verdict from a run that did not happen at band open is a claim the run cannot support:**
 - **BAND CLEAN** — no deploy since 15:45:50Z, fixes present, worker warm. Tonight's measurement rests on a single uninterrupted process.
 - **BAND COMPROMISED** — a deploy landed. Say when, by whom, and what uptime the band will actually open with. A short warm-up means the memory ratchet has not re-formed and the comparison against the recorded night baselines (amplitude 1,950-2,235 MB; min inactive_file 26.3/42.2 MB in windows that killed vs 164-240 MB in windows that survived) is weaker — say that plainly rather than letting the later tasks average through it.
 
