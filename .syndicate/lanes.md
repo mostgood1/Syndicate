@@ -1178,6 +1178,25 @@ Source: the `book_grid_2026-08-15.json` artifact streamed from web
    games, including the 2 live ones.** Consistent with "Drop 2's carry-forward has
    never fired" AND with "the stamp is only applied on the carry-forward path."
    **Not disambiguated — do not record either as established.**
+
+**CHECKPOINT 2026-08-16 03:4xZ.** Shipped to `origin/main`, DEPLOYED NOWHERE:
+`c87f6634` (ledger v2 + the book-grid pass-through + 2 test files),
+`bbc70d16` (the two deploy requests), `4e82d4b7` (the learnings rule).
+97 tests pass, and the pass-through was falsified first — commenting out the two
+served keys fails all 6 new tests.
+
+**THE ONE THING THAT DECIDES WHETHER TOMORROW IS A TEST:** the v2 recorder must
+be on refresh-worker before the scheduled `live-gameline-ledger-check` fires at
+**08-16 20:30 Central**. Against v1 it reads `written: 0` again and means nothing.
+That deploy is HELD by `refresh-worker-oom-recurrence`, deliberately — the hold is
+correct and the deadline is real, and only the user can trade them off.
+
+**NEXT ACTION for whoever picks this up:** not code. Get the refresh-worker
+deploy decided. Everything after it is measurement:
+`live_gameline_ledger.written > 0` on one build, then `skipped_unchanged > 0` on
+a later one — **the second is the real test**, because the append proving it
+writes is not the dedup proving it writes only on movement. Read it across two
+builds, never once.
 **Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
 
 **SHIPPED AND LIVE (content-verified per service, not by ancestry):**

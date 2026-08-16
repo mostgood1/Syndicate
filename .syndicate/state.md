@@ -1219,6 +1219,36 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
      **Expect `rows_live_gameline_edged: 0` at first and do not call it a
      defect:** at 120 sims the 2-sigma bar is ~9.1 pp at p=0.5, so a balanced
      slate refuses by design (recorded decision, spec §8.1).
+- **THE LIVE GAME-LINE POPULATION IS 8 ROWS PER BUILD, and the counters are now
+  reachable from an API.** `[measured 08-16 03:00Z, 2 games live / 13 Final;
+  artifact `generated_at 03:00:00.538Z` streamed off web]`
+
+      live_gamelines       considered 8  projected 2  priceable 0  edged 0
+                           withheld 8 = {segment_is_not_full_game: 6,
+                                         prob_interval_swamps_edge: 2}
+      live_gameline_ledger candidates 0  written 0  enabled true
+
+  - **`index_size` COUNTS SNAPSHOT GAMES CARRYING A `live_mc` LENS, NOT LIVE
+    GAMES — the "3 → 8 → 10 is unexplained" handoff line is RESOLVED and nothing
+    is broken.** Census at 03:0xZ: 10 of 15 = **8 Final + 2 Live**. A Final keeps
+    its last lens, so the number is monotone across a slate. The join filters on
+    `game.state == live` on the GRID side, so the Final entries are never used.
+  - **The ledger recorded nothing because its population was empty by
+    construction, not because of a defect.** v1 recorded `priceable` rows only.
+    **FIXED as v2 (`c87f6634`, on `origin/main`, DEPLOYED NOWHERE)** — records
+    every PROJECTED row, keeps `priceable`/`withheld_reason` as fields.
+    `LEDGER_VERSION` 1 → 2 because the POPULATION changed: **filter any reader on
+    `v` before aggregating**, or the rate spans two denominators.
+  - **`/api/board/book-grid` dropped `live_gamelines` and `live_gameline_ledger`**
+    though the artifact carries both — second instance of that bug in that
+    function. **FIXED in the same commit, web DEPLOYED NOWHERE.** Until it ships,
+    the only reader is a ~10 MB `/api/ops/artifacts/stream` of the raw artifact.
+  - **Neither half is deployed and the worker half is deliberately held** —
+    `refresh-worker-oom-recurrence` owns deploys to that service. Requests filed:
+    `.syndicate/deploy/requests/2026-08-16T0330Z-live-game-line-projection-{web,worker}.md`.
+    **The worker one is time-boxed:** the scheduled `live-gameline-ledger-check`
+    fires 08-16 20:30 Central, and against v1 it will read `written: 0` a second
+    night and mean nothing either way.
 - **WHERE THE HUNT STANDS AFTER BOTH DROPS `[measured 08-15 21:1xZ]`. Two
   hypotheses are DEAD — do not re-run them:**
   - **"Drop 1 is bypassed; `_persist_live_lens_report` never runs on a tick" —
