@@ -393,10 +393,46 @@ def main() -> None:
     # sync with the live fetch.
     snapshot_path = write_preseason_odds_snapshot(rows, season=args.season)
 
-    print(f"events_fetched={len(events)}")
-    print(f"rows_matched={len(rows)}")
-    print(f"odds_path={path}")
-    print(f"snapshot_path={snapshot_path}")
+    # `flush=True`, and it is not cosmetic. THIS RUN'S RESULT WAS INVISIBLE.
+    #
+    # Measured 2026-08-16: the process was observed on live-odds-worker at
+    # 00:24:36Z (caught in an ALL_PROCESS_MEMORY cmdline snapshot), and NOT ONE
+    # of these four lines reached Render's log collector -- a `text=` search for
+    # `events_fetched` across both workers over two days returned 0 matches.
+    # Unflushed stdout in a short-lived subprocess is buffered and lost, which
+    # is the failure mode `CLAUDE.md` already records as "logger.info never
+    # reaches Render's log collector (use print(..., flush=True))". The one
+    # print in this file that DOES carry it (the segment-fetch failure at :340)
+    # is the one that shows up.
+    #
+    # THE COST OF THAT SILENCE, concretely: the NFL board carried zero rows for
+    # 08-16..08-29 while 33 preseason games sat on the real schedule, and the
+    # question "did this fetch return no events, or return them and fail to
+    # append?" could not be answered from production at all. Both branches were
+    # still open after an hour of log and artifact archaeology. These four
+    # numbers would have closed it immediately.
+    #
+    # `events_fetched` is the one that matters most: it separates "the vendor
+    # has no lines for this week yet" (a real, correct empty board) from "we
+    # fetched them and lost them downstream" (a bug).
+    print(f"[nfl_preseason] events_fetched={len(events)}", flush=True)
+    print(f"[nfl_preseason] rows_matched={len(rows)}", flush=True)
+    print(f"[nfl_preseason] odds_path={path}", flush=True)
+    print(f"[nfl_preseason] snapshot_path={snapshot_path}", flush=True)
+    # The commence-time span of what came back, so an empty or short board is
+    # attributable to the FEED's horizon rather than guessed at. A run that
+    # returns only this week's game and a run that returns three weeks of them
+    # are different facts and previously serialised identically -- as nothing.
+    _spans = sorted(
+        str(event.get("commence_time") or "")[:10]
+        for event in events
+        if isinstance(event, dict) and event.get("commence_time")
+    )
+    print(
+        f"[nfl_preseason] commence_dates={_spans[0] if _spans else 'none'}"
+        f"..{_spans[-1] if _spans else 'none'} distinct={len(set(_spans))}",
+        flush=True,
+    )
 
 
 if __name__ == "__main__":

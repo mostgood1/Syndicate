@@ -8405,3 +8405,72 @@ was safe.
   `soccer-model-coverage` lane).
 - **Why 452 players are missing from rosters the sim DID run.** Genuine roster
   coverage, not a join bug — the join has now been eliminated as the cause.
+
+---
+
+## 2026-08-16 21:3xZ — #4 NFL preseason, DUG DEEPER — one candidate eliminated, the blocker was an unflushed print
+
+### Eliminated: "the step is not running"
+`fetch_nfl_preseason_odds.py --season 2026` was **observed running on
+live-odds-worker at 2026-08-16T00:24:36Z**, caught in an `ALL_PROCESS_MEMORY`
+cmdline snapshot via the Render logs API. It runs on **live-odds-worker**, not
+refresh-worker, and it ran **once today**.
+
+Also eliminated: **our fetch does not constrain the horizon.**
+`fetch_nfl_team_odds_local.fetch_odds` sends only `apiKey/regions/markets/
+oddsFormat` — no `commenceTimeTo` — so the request asks for the whole sport key.
+The `until > window` filter at `:319` gates only the per-event SEGMENT markets,
+never the base event list.
+
+### The schedule, corrected
+I had week 2 as 08-21. It is not:
+
+```
+week 2 = 2026-08-16, ONE game, DAL @ SEA, gametime 00:00
+week 3 = 08-21..08-24, 16 games
+week 4 = 08-27..08-29, 16 games
+```
+
+`preseason_target_week(2026) = 2` is therefore correct, and the fetch is not
+week-scoped anyway. Note the timing: the 00:24:36Z run fired **24 minutes after
+that game's listed 00:00 kickoff**, and OddsAPI's `/odds` endpoint excludes
+in-play events by default. That is a plausible reason today's single game is
+absent — and it says nothing about weeks 3 and 4.
+
+### WHY IT COULD NOT BE CLOSED: the result never reached the logs
+The script's four summary lines (`events_fetched`, `rows_matched`, `odds_path`,
+`snapshot_path`) had **no `flush=True`**. A `text=events_fetched` search across
+both workers over two days returns **0 matches**. Unflushed stdout in a
+short-lived subprocess is buffered and lost — exactly the failure `CLAUDE.md`
+records ("`logger.info` never reaches Render's log collector; use
+`print(..., flush=True)`"). The one print in that file that DOES carry the flag
+(`:340`, segment-fetch failure) is the only one that appears.
+
+`/api/ops/artifacts/export` refuses both `preseason_odds_2026.csv` and the dated
+snapshot ("path is not an allowed hot artifact"), so the written output is not
+readable from the web service either.
+
+**So the remaining question — did the vendor return week-3 events, or did we
+fetch them and lose them? — is unanswerable from production as instrumented.**
+
+### Shipped: the missing instrument
+Added `flush=True` to all four summary lines and one new line:
+
+```
+[nfl_preseason] commence_dates=<min>..<max> distinct=<n>
+```
+
+`events_fetched` alone separates "the vendor has no lines for this week yet" (a
+correct empty board) from "we fetched them and lost them downstream" (a bug).
+`commence_dates` says how far the feed's horizon actually reaches, so a short
+board is attributable to the FEED rather than guessed at. Both were previously
+indistinguishable — as nothing. 12 tests pass.
+
+**Next run of the step answers #4 outright.** Cadence is ~daily and the last run
+was 00:24Z, so the read is available after the next one. Grep
+`[nfl_preseason] events_fetched` on live-odds-worker.
+
+### Actionable regardless of the answer
+`_SLATE_WINDOW_DAYS["nfl"] = 5` with a forward-only window means a board anchored
+on 08-16 spans 08-16..08-20 and **cannot show week 3 (08-21) even once it is
+quoted**. Independent of the capture question, and it is this lane's own file.
