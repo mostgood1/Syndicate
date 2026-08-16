@@ -105,3 +105,47 @@ def test_a_missing_mean_yields_a_blank_not_a_zero():
     rows = [_row("totals", line=161.5), _row("h2h")]
     attach_wnba_game_projections(rows, _index(margin=None, total=None))
     assert all(r.get("projection") is None for r in rows), "a missing mean rendered as a real projection"
+
+
+def test_moneyline_states_why_it_has_no_edge():
+    """The h2h branch was the ONE that served a blank Edge with no reason.
+
+    Found by the 2026-08-16 production falsification sweep, not by review: the
+    matching fix in `prop_projections` took MLB from 284 unattributed rows to 0
+    and these 3 WNBA rows did not move, because this function writes
+    `row["projection"]` directly and never passes through `attach_projections`.
+    A fourth producer.
+
+    `spreads` and `totals` were already attributed AND already get an
+    `edge_vs_line`; h2h is excluded from that block by `market != "h2h"`,
+    because a moneyline has no line to subtract. So it alone had neither.
+    """
+    row = _row("h2h")
+    attach_wnba_game_projections([row], _index(margin=7.5))
+    projection = row["projection"]
+
+    assert projection["model_prob_over"] > 0.5, "guard: this row HAS a model probability"
+    assert projection.get("edge_vs_market_pct") is None
+    assert projection.get("edge_vs_line") is None, "a moneyline has no line to subtract"
+    reason = projection.get("edge_unavailable_reason")
+    assert reason, "an h2h projection with no edge must say why"
+    assert "producer does not compute" in reason
+
+
+def test_moneyline_reason_does_not_claim_a_missing_term():
+    """The reason must be honest about WHICH kind of gap this is.
+
+    These rows are two-sided and carry a model probability, so unlike the
+    means-only spreads/totals branches nothing is arithmetically missing --
+    an edge is computable and is deliberately withheld. A reason borrowed from
+    the mean branches would send the next reader to the sim to add a
+    distribution that already effectively exists here.
+    """
+    row = _row("h2h")
+    attach_wnba_game_projections([row], _index(margin=7.5))
+    reason = row["projection"]["edge_unavailable_reason"]
+    assert "mean" not in reason.lower()
+    assert "one-sided" not in reason.lower()
+    # And it must not reuse the mean branches' DIFFERENT key, which the board
+    # does not read for the Edge column.
+    assert "probability_unavailable_reason" not in row["projection"]
