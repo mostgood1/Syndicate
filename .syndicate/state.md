@@ -395,8 +395,11 @@ unsaved anywhere.
 
 ## KILLS ARE EVENTS — there is now a tool, and a census `[measured 08-16 17:5xZ]`
 
-`scripts/render_events.py` (`#442`, shipped `f4627832`/`d72a3f66`, local tooling,
-nothing deployed). Reads `/v1/services/<id>/events`. The 2026-08-15 FORBIDDEN
+`scripts/render_events.py` (`#442`, `f4627832` on `origin/main`, local tooling,
+nothing deployed). **`d72a3f66` — the `_deploy_trigger` fix — was ORPHANED by a
+stale-copy commit and re-committed 18:3xZ; verify with
+`git show HEAD:scripts/render_events.py | grep -c build_started` (0 = the
+reverted version is back).** Reads `/v1/services/<id>/events`. The 2026-08-15 FORBIDDEN
 rule said a negative result about process death must come from the events API and
 named `render_logs.py` as unable to give one; this is that tool.
 
@@ -2415,6 +2418,11 @@ Read from every engine package and from live production, not from registry prose
   margin. **That older figure is STALE — do not judge Phase 1 against it.** Whether 4096.0
   indicates a leak is NOT established: `memory.current` includes page cache and anon vs
   inactive_file was never split.
+  **Provenance, verified 08-16 19:52Z:** records now carry `run_mode`. Of the 4
+  records on `main`, exactly **ONE** (`2026-08-16T19:52:23+00:00`, `samples=1967`)
+  is `run_mode="scheduled"`; the other three carry NO field and are UNKNOWN, not
+  scheduled. **Count only `scheduled` records toward the Phase 1 distribution** —
+  the 10:09Z and 10:37Z pair also double-counts ~4.5 of its 5 hours.
 
 ## LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT, NOT a production measurement]`
 

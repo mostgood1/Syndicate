@@ -2341,6 +2341,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
 ### clamp-fix-to-workers — OPEN — **CHECKPOINTED 2026-08-16 01:4xZ. refresh-worker SHIPPED `57a437d5` (live 00:23:04Z, 0 clamp sites by content). live-odds-worker DEFERRED by user decision — `079cc42b` ready, re-cut before shipping. THE ONLY OPEN WORK IS VERIFICATION: 2 post-deploy reads (00:24Z, 01:30Z) both `no_trigger`, which proves nothing** — opened 2026-08-15 — session: clamp-fix-verification-watch
+- Files: `pipeline/intelligence_state.py`, `syndicate/features/wnba/cards.py`.
 - Goal: the ±4900 clamp stops being published. **Testable outcome:**
   `py -3 scripts/watch_clamp_trigger.py --once` returns `POST_FIX_OK` on a slate
   that carries an out-of-clamp probability.
@@ -2356,7 +2357,18 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
   `fair_price` at all; the intelligence-state card does. Web's block is a
   **backfill** (`if ... card.get("fair_price") is None`), so an upstream-clamped
   value passes through untouched and the web fix is structurally inert.
-- Files: `pipeline/intelligence_state.py`, `syndicate/features/wnba/cards.py`.
+- Files: `pipeline/intelligence_state.py`.
+  - **`syndicate/features/wnba/cards.py` is NOT CLAIMED by this lane as of
+    2026-08-16 23:2xZ — released to `wnba-live-tier`.** This lane's own status says the code work is done
+    (`57a437d5` shipped, 0 clamp sites by content) and that the only open
+    work is VERIFICATION, which runs `scripts/watch_clamp_trigger.py` and
+    does not read that file. The taking lane changes
+    `_public_scoreboard_live_state_payload` (the ESPN scoreboard fetch) --
+    a different function from the clamp sites, zero overlap. Coordination
+    was ATTEMPTED and refused by the transport: this lane's session
+    (`local_70bfde12…`) is UNATTENDED, a scheduled-task run, so
+    `send_message` cannot reach it. Released rather than silently
+    overridden; if the clamp lane needs it back, this line is the record.
   - **`syndicate/features/shared/layer2_board.py` DELIBERATELY NOT TOUCHED** — it
     is claimed by OPEN `spread-line-sign-convention`, and that lane's worker
     deploy already carried the layer2_board fix to both workers. Collision found,
@@ -3119,6 +3131,94 @@ and then failed the thing it was checking, which is the point of running it.
   - Delivery note: no live session holds this lane — both
     `refresh-worker OOM: two kills in 25 min` sessions are archived and stopped
     (last activity 15:33:05Z). This ledger entry IS the handoff.
+- **RE-TAKEN 2026-08-16 ~23:4xZ by session `refresh-worker-oom-trace`.** Entered
+  from a user report of an unrelated log line; that report is RESOLVED and is NOT
+  this lane's business — `[artifact_publisher] PULL_FAILED ... Name or service
+  not known` is web deploy downtime, not a publisher or hostname fault. Web
+  `dep-da14csnlk1mc7396ann0` ran `23:23:31Z -> 23:30:17Z` (events API); DNS
+  errors are present inside that window, publish/pull successes are present
+  outside it, and `PUBLISH_OK` resumes `23:31:05Z`, after `deploy_ended`. This
+  re-confirms `state.md:1630` (`syndicate-an21` RESOLVES FINE) — the name blanks
+  only while the target service has no instance. **No ratio is claimed**:
+  `learnings.md:2917` forbids counts from the logs API, and every window I
+  requested came back capped and tail-truncated (a 6-min request covered 41s).
+  Presence and ordering only.
+- **THREE NEW `oomKilled` tonight, INSIDE the 22:00Z-05:00Z live-slate band this
+  lane was waiting on** (`/v1/services/srv-d91dpertqb8s73co8ls0/events`,
+  `memoryLimit=4Gi`): `23:03:50Z`, `23:16:51Z`, `23:32:18Z`. First two are
+  ~13 min apart and clean; **the third is suspect as a timestamp** — Render
+  logged `server_available 23:31:20Z` then `server_failed 23:32:18Z` while the
+  container read 730 MB / 17.8% at `23:32:00Z`, so that event's stamp probably
+  lags the kill it reports rather than describing a 58-second OOM. Treat
+  `23:03:50Z` and `23:16:51Z` as the usable pair.
+- **Peak snapshot captured, consistent with this lane's existing transient
+  model — NOT new evidence of a leak.** `ALL_PROCESS_MEMORY` `23:31:08Z`:
+  container **4092 MB = 99.9%**, headroom **4.3 MB**, `accounted_rss` 3883 MB,
+  12 procs. **pid 39 (`run_refresh_worker.py`) alone = 3206.1 MB**; every child
+  is small (MLB `daily_update.py` 183 MB, soccer/odds builders 87-95 MB, the two
+  `multiprocessing-fork` children 54 MB each). Confirms "PARENT process,
+  children <54MB" independently, on a different night, at a different hour.
+- **The stage label at the peak is NOT an attribution.** The sample carries
+  `stage=live_lens_publish_after`, but this lane already records that the climb
+  runs ~51s with NO stage marker, so the field names the last marker EMITTED
+  before the sample, not the code that allocated. Filed explicitly so the next
+  reader does not mistake it for a pointer at the publish path — that is the
+  error this session was about to make.
+- Open item unchanged and now current: **the allocator inside the ~2 GB pass is
+  still UNNAMED.** In progress this session.
+- **THE CLIMB IS NOW CAPTURED SAMPLE-BY-SAMPLE, and the reason it has stayed
+  unnamed is INSTRUMENT COVERAGE, not sampling rate.** Covered slice
+  `23:15:48.560Z .. 23:16:33.194Z` (contiguous, ordering only — no rate or count
+  claimed, `learnings.md:2917`), ending in the clean `23:16:51Z` kill:
+  - `23:15:57.2-.5` — the multi-sport loop runs `board_contract_begin` +
+    `board_contract_games_normalized` for eleven sports/slates back to back
+    (`game_count` 16, 31, 1, 8, 1, 11, 1, 8, 8, 11, 9), **anon FLAT at
+    1745.52 MB across every one of them.** The board-contract builder is cheap.
+  - `23:16:00 .. 23:16:10` — flat, anon 1746.
+  - `23:16:12.890` onward — **climb with NO new stage marker**: anon 1746 ->
+    1901 -> 2170 -> 2417 -> 2482 -> 2870 -> 2939 -> 3260 -> 3605 -> 3935 MB,
+    `last_stage` pinned at `board_contract_games_normalized` the entire way,
+    container at 4096.0 from 23:16:20. Then SIGKILL.
+  - So the excursion is **+2.2 GB anon in ~41 s, beginning ~13 s AFTER the last
+    board-contract marker** — i.e. after that builder returned, not inside it.
+- **RULED OUT — the board-contract builder itself.** The marker is
+  `game_board_contract.py:849`, inside `apply_game_board_contract`
+  (`game_board_contract.py:833`). Everything after :849 is `out.setdefault(...)`
+  scalar assignment, and the one historically expensive branch,
+  `build_simulation_contract_from_context`, is **default OFF** (:892, `#75/#43`)
+  and confirmed not taken. Nothing on that path can allocate 2.2 GB. The stage
+  label names the VICTIM; `memory_observability.py:763` says exactly this.
+- **THE FINDING: the hydration instrumentation is MLB-ONLY.**
+  `_log_cards_context_memory` is defined at `syndicate/features/mlb/cards.py:182`
+  and **exists nowhere else in `syndicate/`** — the eleven `cards_context_*`
+  stages (`begin` :5550, `summary_loaded` :5577, `betting_games_loaded` :5579,
+  `sim_games_loaded` :5583, `games_built` :5605, `result_assembled` :5771,
+  `board_contract_applied` :5776, `end` :5811) are MLB's alone. Every other
+  sport hydrates with **zero stage markers**. Tonight the marker that should
+  have closed the span, `cards_context_board_contract_applied`, never arrived.
+- **Why this matters more than one more measurement.** `intelligence.py:2604-2611`
+  concludes "MLB is in a class of its own" and sizes TWO production floors on it
+  (`_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` 3000 MB expensive vs
+  `_OVERVIEW_MIN_SAFE_HEADROOM_STREAMED_BYTES` 1500 MB for the seven "cheap"
+  sports, `:2621-2624`). MLB is also **the only sport whose hydration can be
+  seen**. A sport with no instrument reads as cheap for the same reason an
+  unplugged meter reads zero — so "the seven are cheap" and "MLB is expensive"
+  may be one statement about instrument coverage wearing the clothes of two
+  statements about cost. `_overview_headroom_floor_bytes` (:2627) already treats
+  UNKNOWN sports as expensive on exactly this reasoning; the seven are not
+  unknown, they are unmeasured, which is not the same thing and currently gets
+  the relaxed floor.
+- **NOT CLAIMED:** I have not shown a non-MLB sport allocating the 2.2 GB. The
+  span is dark, which is the point — it is equally consistent with an
+  uninstrumented sport's hydration and with something else entirely between the
+  loop iterations. What IS established is that the board-contract builder is
+  exonerated and that no instrument exists that could name the occupant of that
+  span. **Next step: add the MLB stage markers to the shared hydration path (or
+  the overview loop's per-sport span) so the next excursion names itself** —
+  before any further floor tuning, which is currently being decided by numbers
+  only MLB can produce.
+- Governed by `learnings.md` "instrument blindness" and `feedback_rate_not_count`
+  — the denominator here is the set of sports that CAN be observed, and it is 1.
 ### render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this is local tooling). Falsification test PASSED: 29/29 known `oomKilled` reproduced for 2026-08-14 CT, and the unpaged control returns 20/29 — i.e. a single-page reader undercounts by 31% while looking like an answer.** — opened 2026-08-16 — session: branch-overlap-baseline-watch
 - Goal: `scripts/render_events.py` exists and answers "was this service killed,
   and why" from `/v1/services/<id>/events`, so the 2026-08-15 FORBIDDEN rule
@@ -3876,3 +3976,235 @@ and then failed the thing it was checking, which is the point of running it.
   `scripts/census_kickoff_hours.py`, `scripts/watch_branch_overlap.py`, plus tests.
 - **Plan artifact:** `.syndicate/plan_2026-08-16_sim_scheduling.md` (`#440`) —
   phases 0/1 landed, phases 2-9 untouched.
+
+### game-shape-capture — UPDATE 2026-08-16 ~23:0xZ (checkpoint) — **PRIMITIVE COMMITTED `af3017e6`; EMIT STILL BLOCKED; HANDOFF SENT**
+
+- **Committed:** `af3017e6` — `game_shape.py` (356 ln) + `test_game_shape.py`
+  (332 ln), 2 files / 688 insertions / **0 deletions**, through an isolated
+  `GIT_INDEX_FILE` with the file-count and deletion guards asserted in the same
+  shell. Reachability asserted after the fact (`merge-base --is-ancestor`) —
+  see below for why that step is not optional.
+- **THE FIRST COMMIT (`87ffffd2`) WAS ORPHANED WITHIN MINUTES.** Another session
+  moved local `main` to a commit not descending from it. Blobs were verified
+  byte-identical (`rev-parse <sha>:<path>` vs `hash-object`) and re-committed as
+  `af3017e6`. **`05f7d8fb`, another lane's wnba commit, was orphaned by the same
+  move and is NOT recovered here** — it belongs to that lane and `origin/main`
+  carries a different wnba commit (`e9fdcf98`). Rule filed in `learnings.md`.
+- **`commit-guard` blocked twice**, both times on stale shared-index reverts that
+  were not mine (5 ledger files, then 5 more incl. 182 dropped lines of
+  `live_refresh_loop.py`). Disarmed path-scoped, index-only. **Its fix list was
+  incomplete BOTH times** (`scheduled_task_ncaaf_445.md`, then `deploys.md`);
+  every remaining staged path was audited by hand for on-disk/in-HEAD status.
+  Other sessions' legitimate staged work was left untouched throughout.
+- **HANDOFF SENT** to session `Layer 1 board coverage audit (fork 2)`
+  (`local_c83b3d44-…`), which holds both `mlb-live-gameline-distributions` and
+  `wnba-live-tier`: the two-line change (bind `situation` INSIDE the existing
+  `try` so the bare-except semantics are unchanged; one `"gameShape"` key on the
+  return) plus the guarded helper. **No reply yet.** They may decline; the
+  primitive stands either way.
+- **STILL BLOCKED, and the lane's verification has NOT run.** No production data
+  has passed through this code. Every bucket count is **n=0**. Do not read
+  "committed and tested" as "working in production".
+- **Local `main` is ahead 1 / behind 2 of `origin/main` — `af3017e6` is NOT
+  PUSHED.** That is the single largest risk to this work surviving.
+- Blocked by: `mlb-live-gameline-distributions` (emit half only).
+
+#### game-shape-capture — ORPHANED A SECOND TIME, THEN ANCHORED `[2026-08-16 ~23:1xZ]`
+
+`af3017e6` was orphaned **again** while this checkpoint was being written —
+local `main` was hard-reset to `origin/main` (`git status -sb` went from
+`ahead 1, behind 2` to level). Twice in one session, two different sessions'
+commits, so **re-committing onto `main` is not a fix; the next reset takes it
+too.**
+
+**The work is now anchored on a real ref: branch `lane/game-shape-capture` ->
+`af3017e6`.** A ref makes the commit reachable, immune to any `main` move, and
+safe from gc — and it costs nothing and touches no other session. Blobs
+re-verified against disk (`95035c9a…`, `907b4d4e…`). **`game_shape.py` is NOT
+in `main`/`HEAD` and NOT on `origin/main`.**
+
+**NEXT ACTION for whoever picks this up:** get `lane/game-shape-capture` onto
+`origin/main` (cherry-pick or merge, then push) — until then this work exists
+only in this worktree.
+- **CHECKPOINT 2 — 2026-08-16 ~22:3xZ. DEPLOY AUTHORISED, ARMED, NOT FIRED.**
+  - Fix is on `origin/main` (blob `426bbd70`, `_freeze_market_dirs` = 2) and **not live** on either worker (both `f471b0d2`, = 0). Verified by blob, not ancestry.
+  - User authorised this unattended session to fire it ("fire it"), logged as an OVERRIDE in `learnings.md` with scope bounded to this one deploy. **The override does not suspend the job gate.**
+  - Not fired because both workers read HOLD at every check — refresh-worker 5 jobs incl. `run_mlb_daily_sim_job.py`, live-odds-worker 3 jobs.
+  - **User constraint: do not fire if it slips past 08-17 first pitch.** Watch `bs8qocgqt` has two exits, `DEPLOYABLE` and `DEADLINE`; a resolver error counts as expired so an instrument failure cannot authorise a deploy. Deadline is measured from the production 08-17 snapshot, on a conservative 16:00:00Z floor until that feed populates (it currently holds 0 games).
+  - `grading-freeze-payload-check` re-aimed to **date 08-17, firing 08-18 07:00 CT**, and gained Gate A: prove by content that the fix was RUNNING for the whole slate, else VOID rather than FAIL.
+  - **NEXT ACTION:** if the window opens before first pitch, deploy both workers per the handoff doc (ROUTE ONE warm-up, one service at a time, verify by blob). If it does not, do not fire — let Tuesday's check return VOID and deploy for a later date.
+
+#### game-shape-capture — **PUSHED AND VERIFIED ON `origin/main` `597f4a80`** `[2026-08-16 ~23:2xZ]`
+
+Supersedes the two orphaning entries above: the work is now durable off this
+worktree.
+
+- **`dff358bb..597f4a80` on `origin/main`.** Built with plumbing directly on
+  `origin/main`'s tip (`read-tree` into an isolated index -> `write-tree` ->
+  `commit-tree -p origin/main` -> `push <sha>:main`), so it touched **no**
+  working-tree file, **not** local `main`, and **not** the shared index — the
+  three things that had already destroyed this commit twice.
+- **Guards asserted before the push, in the same shell:** diff vs `origin/main`
+  is exactly 2 files / **688 insertions / 0 deletions**, and the new commit's
+  parent IS `origin/main` (checked by `rev-parse`, not assumed).
+- **Verified AFTER the push, by re-fetch:** both paths present on `origin/main`;
+  blobs byte-identical to disk (`95035c9a…`, `907b4d4e…`); **0 carriage returns**
+  in the pushed blob — relevant because `origin/main`'s previous tip
+  (`dff358bb`) was itself a warning that the commit recipe is the CRLF vector.
+  That vector is `git hash-object --stdin` WITHOUT `--path`, which this recipe
+  does not use.
+- **`lane/game-shape-capture` re-anchored to `597f4a80`.**
+- **A useful side effect:** the resets that orphaned this work twice were to
+  `origin/main`. Now that the commit IS on `origin/main`, the next such reset
+  DELIVERS these files instead of destroying them.
+- **UNCHANGED BY THE PUSH — do not read this as progress:** nothing emits
+  `gameShape`, the lane's verification has not run, and **every bucket count is
+  still n=0**. The handoff to `Layer 1 board coverage audit (fork 2)` is
+  unanswered.
+
+### wnba-live-tier — CLAIM OVERRIDE LOGGED 2026-08-16 23:2xZ — `syndicate/features/wnba/cards.py`
+- `clamp-fix-to-workers` (OPEN) claims that file. I am taking ONE function in it.
+  Reasoning, so this can be judged rather than trusted:
+  1. **That lane's code work is DONE by its own status:** "refresh-worker SHIPPED
+     `57a437d5` (0 clamp sites by content)... THE ONLY OPEN WORK IS VERIFICATION."
+  2. **Zero functional overlap.** Their fix was the ±4900 clamp sites; mine is
+     `_public_scoreboard_live_state_payload` (`cards.py:3679`), the ESPN
+     scoreboard fetch. Different function, untouched by the clamp work. Their
+     verification (`watch_clamp_trigger.py --once`) does not read it.
+  3. **Their session is UNATTENDED** (`local_70bfde12…`, a scheduled-task run) —
+     `send_message` was attempted and REFUSED by the transport, so there is no
+     owner to coordinate with. It is a verification watcher, not active editing.
+  4. Explicit user instruction to fix the WNBA live_state dropout.
+  One function plus a module-level dict; trivially revertable.
+
+#### game-shape-capture — WNBA EXTRACTOR ADDED `[2026-08-16 ~23:4xZ]` — **primitive done, emit blocked by the SAME session as MLB's**
+
+**WNBA is a DIFFERENT job from MLB and the plan understated it.** MLB was
+serialisation — `LiveSituation` existed in full and was discarded. WNBA has no
+state vector at all, so this derives one.
+
+**MEASURED, from a real in-progress game** (`data/live/wnba_cards_context_2026-06-05.json`,
+DAL @ LAS, period 4, clock `"7:43"`, 84-83):
+- `live_state` carries `period`, `clock`, `home_pts`, `away_pts`, `in_progress`,
+  `final`, **and a per-quarter `periods` array** — richer than expected, and the
+  per-quarter array is real run-detection material.
+- **The team objects carry ONLY branding** (`abbr`, `logo`, `name`, colours).
+  **No FGA / TOV / OREB / FTA anywhere**, and `basketball_props_features`'
+  column map is box-score totals with no pace column either.
+- **CONSEQUENCE: possession pace is NOT derivable and this module refuses to
+  fake it.** The field is `points_per_minute` (scoring pace) and every record
+  carries `possession_pace_available: False`. Naming it `pace` would let a
+  reader join it to a possession-pace prior and be silently wrong. A test
+  asserts the key `pace` does not exist.
+
+**A SECOND FIND THAT CHANGED THE DESIGN: the derivation ALREADY EXISTS.**
+`wnba/cards.py:891 _wnba_elapsed_minutes` is correct and complete (10-minute
+quarters, 5-minute OT, regulation 40 — *not* NBA's 48), **and its own comment
+says it was relocated once specifically so two copies would not drift apart.**
+That file is claimed (by `clamp-fix-to-workers`, with a logged override from
+`wnba-live-tier`), so I could not consolidate into it.
+- Resolution: implemented in `shared/game_shape.py` **parameterised** by quarter
+  length so it serves NBA (12) as well as WNBA (10), and **pinned to the
+  existing function by a drift test** that asserts agreement across a 143-cell
+  grid of periods x clocks, including the REJECTION cases. Being more permissive
+  would itself be the drift. Mutation M5 (accept a bare `"7"` as `7:00`) fires it.
+- **Owed follow-up, needs the claimed file:** have `cards.py:891` delegate here,
+  so there is one copy again.
+
+**NON-VACUITY VERIFIED BY MUTATION, 7 of 7 caught:** NBA given WNBA's 10-minute
+quarters (1 fail), dropping the `status` period/clock fallback (1), unsupported
+sport silently defaulting to WNBA (1), reusing baseball margin bands (2),
+permissive clock parsing (1), pace dividing without the `>0` guard (1), run
+detection including the in-progress period (1). **34 tests green** (19 MLB + 15).
+
+**Margin bands are deliberately NOT MLB's** — basketball uses <=5 / <=10 / <=19
+/ 20+. A 3-point basketball game is `close`; the baseball scale would call it a
+blowout, which would put nearly every live game in one cell and measure nothing.
+
+**EMIT BLOCKED, same session as MLB's.** The `live_state` producer is
+`_public_scoreboard_live_state_payload` (`wnba/cards.py:3679`) — the exact
+function `wnba-live-tier` took under a logged claim override 23:2xZ, in the same
+session (`Layer 1 board coverage audit (fork 2)`) that holds
+`mlb-live-gameline-distributions`. **One session gates both sports' emits.**
+- **UNVERIFIED, and it is the whole point:** no production data has passed
+  through this code. Every bucket count is **n=0** for WNBA too.
+
+#### `render-events-reader` — RE-COMMITTED 2026-08-16 18:3xZ after a stale-copy revert took the CODE
+Restoring this block for the THIRD time, and this instance is worse than the two
+before it: the revert hit a **source file**, not just the ledger.
+
+**What happened, verified by ancestry not by memory.** `d72a3f66` and `73668b69`
+are **orphaned** — `git merge-base --is-ancestor <sha> HEAD` says NO for both,
+while `f4627832` says YES. Current HEAD `fedd17ee` therefore carries
+`scripts/render_events.py`, `#442` AND `#444` — but **not** the
+`_deploy_trigger` fix that `#444` was found by (`grep -c build_started` on
+`HEAD:scripts/render_events.py` = **0**; disk = present). Test count in HEAD is
+**12** functions; on disk **14** (17 cases, all passing).
+
+**Why that combination is the dangerous one.** A session committed
+`docs/ai_context/todo.md` from a copy that included my `#444`, alongside a copy
+of `render_events.py` that predated my fix. So the ledger DESCRIBES a fix that
+the tree no longer contains, and every cheap check passes: the file exists, the
+todo entry exists, the tool runs. Only a content grep on the deployed-tree file
+distinguishes it. Same family as `presence-is-not-reachability` and
+`test-the-fixs-predicate-not-its-deploy-state`.
+
+**Re-committed from the working tree, which never lost it.** The fix and its two
+regression tests are the only code this lane owns; nothing deployed.
+
+#### game-shape-capture — NFL/NCAAF ADDED, **AND THE NFL EMIT ACTUALLY LANDED** `[2026-08-17 ~00:0xZ]`
+
+First sport whose producer was NOT held by another lane. Claim re-checked
+immediately before the edit (the rule this lane learned the hard way at 23:0xZ),
+`live_game_state` unclaimed in `lanes.md`.
+
+**A THIRD DISTINCT SITUATION — the plan's field list was wrong again (3 for 3).**
+It promised down/distance/field position/timeouts/`pace_secs_play` from a grep.
+Measured:
+- NFL's `_state_from_event` captures `period`, `clock`, `away_pts`, `home_pts`
+  **and nothing else** — no down, distance, field position or possession.
+- **BUT `_fetch_scoreboard` returns the WHOLE ESPN event JSON**, whose
+  competitions carry a `situation` block that **nothing in `nfl/`, `ncaaf/` or
+  `football/` reads** — the only `down` references in the tree are the sim
+  engine's internal `play_state` and the historical loaders, neither on the live
+  path. **Discarded, not absent** — the MLB pattern, and free to fix.
+- **`pace_features.py` IS NOT LIVE.** It reads `game["pace_features"]`, a
+  season-level secs/play feature for the pregame drive priors. Joining it to a
+  live record as in-game tempo is a silent category error.
+- **NCAAF HAS NO LIVE-STATE PRODUCER AT ALL** (no `live_game_state` analog).
+
+**TWO SPORT RULES THAT WOULD HAVE BEEN SILENTLY WRONG:**
+1. **NCAAF overtime is UNTIMED** — alternating possessions from the 25, no
+   clock. Reusing NFL's timed-OT branch would invent a 15-minute period that
+   does not exist and report a confident elapsed time. NCAAF OT returns
+   `elapsed_minutes: None` and the record stays valid. Mutation F2 fires on it.
+2. **NFL regular-season OT is 10 minutes, not 15.** Mutation F3 fires.
+
+**MARGIN BANDS ARE IN SCORES, NOT POINTS** (<=8 / <=16 / <=24 / 25+). An
+8-point football game is ONE possession; the basketball scale calls it
+`moderate` and baseball's calls it a blowout. Three sports, three units — a
+test asserts the same 8-point gap buckets differently in football vs basketball.
+
+**THE EMIT (`nfl/live_game_state.py`):**
+- `_state_from_event` now keeps `situation`, **on live games only** — a
+  `situation` on a finished game is a feed artefact and would render "3rd and 7"
+  hours after the whistle, the same class of defect as the 0-0 placeholder score
+  that file already guards against. Mutation E1 fires on it.
+- `attach_nfl_live_game_state` attaches `live_state["game_shape"]` behind a
+  function-local import and a bare except, so a failure costs the shape block
+  and nothing else. The cards board is the product.
+- Tests call the REAL `attach_nfl_live_game_state`, not a stub — that file's own
+  docstring warns that asserting a field is SET only proves presence.
+
+**66 tests green** (46 shape + 20 NFL, up from 15). **10 of 10 mutations caught**
+— 7 on the primitive (football quarters inheriting basketball's 10, NCAAF OT
+treated as timed, NFL OT at 15, point bands reused, absent situation reading as
+"not in the red zone", out-of-range situation values stored, `margin_in_scores`
+flooring instead of ceiling) and **3 on the emit** (stale situation on a finished
+game, shape built without the situation so the capture does nothing, shape never
+attached).
+
+**UNVERIFIED, and this is the part not to misread.** NFL is the first sport with
+a live emit PATH; no production slate has run through it. **n is still 0.**
+NCAAF has the contract and **no producer**, season opens 08-29, so nothing there
+is verifiable today — a ready rules entry is not coverage. No deploy requested.

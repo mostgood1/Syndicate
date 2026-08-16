@@ -3219,6 +3219,188 @@ read as a CLEAR deploy gate, and a binary content check that shouted
 "blank board" at a deploy carrying none of my files. All three were written
 quickly, at the end of a long task, to check something I expected to be fine.
 
+## 2026-08-16 — FORBIDDEN: reading `$?` after a pipeline. TWICE IN ONE HOUR, two different tools, both times the wrong answer was the REASSURING one
+
+`$?` after `cmd | filter` is the FILTER's status. Both instances reported success.
+
+1. **pytest.** `py -3 -m pytest ... | tail` reported exit 0 on a run that was
+   **6 failed / 245 passed**. I nearly wrote "tests pass" into a checkpoint.
+2. **deploy_preflight, within the hour, after banking rule 1.** A watcher built as
+   `OUT=$(preflight ... | tr -d '\r'); CODE=$?` read `tr`'s 0 and printed
+   **`CLEAR`** on its first tick — while the log line beside it said
+   `jobs=3 claim=grading-blocker-settled-zero`. The real exit was **3 (CLAIMED)**.
+   Acting on it would have killed a running `build_soccer_artifacts.py` job, i.e.
+   the exact work the change being deployed exists to protect.
+
+**Why this one is dangerous rather than merely wrong:** the failure is silent and
+always optimistic. A broken guard that reports HOLD gets noticed in minutes; one
+that reports CLEAR gets acted on.
+
+**THE RULE.** Capture the status on the command itself, never through a filter:
+
+    OUT=$(cmd 2>&1); CODE=$?          # correct
+    OUT=$(printf '%s' "$OUT" | tr ...)  # filter AFTER
+    cmd > file 2>&1; CODE=$?; grep ... file   # also correct
+
+**And the tell:** instance 2 printed `CLEAR` on a line that also carried
+`jobs=3 claim=<someone>`. **A verdict that contradicts the fields printed beside
+it is the instrument lying, not the system behaving oddly.** Read the fields, not
+the verdict -- the same lesson as `feedback_read_the_field_you_already_have`.
+
+### 2026-08-16 — AN ISOLATED-INDEX COMMIT IS PROTECTED FROM THE SHARED INDEX AND NOT FROM A HEAD MOVE. Mine was orphaned within minutes, and so was another lane's
+
+**The documented recipe protects your commit's CONTENT from other sessions'
+staged junk. It does nothing to protect its REACHABILITY.** I committed
+`87ffffd2` through `GIT_INDEX_FILE` with every guard this file prescribes —
+2 files, 0 deletions, asserted in the same shell, shared index repaired
+afterwards. Minutes later `git merge-base --is-ancestor 87ffffd2 HEAD` returned
+FALSE: another session had moved local `main` to `1508c463`, which does not
+descend from it (reflog `HEAD@{0}`, empty message — a reset or checkout, not a
+commit). No ref reached it, `git branch -a --contains` was empty, and it was not
+on `origin/main`. **`05f7d8fb`, another lane's wnba commit, was orphaned by the
+same move** — so this is a worktree-wide event, not one session's mistake.
+
+- **The rule going forward:**
+  1. **A commit is not durable until it is REACHABLE. Assert it:**
+     `git merge-base --is-ancestor <sha> HEAD`. Presence in `git log` right
+     after committing proves nothing five minutes later, and presence in the
+     REFLOG is not reachability at all — a dangling commit still reflogs.
+  2. **Re-assert at checkpoint**, not only at commit time. This session's commit
+     was made and orphaned inside one turn boundary.
+  3. **Recovery is cheap IF the blobs are checked first.** `git rev-parse
+     <sha>:<path>` vs `git hash-object <worktree path>` — confirm byte-identity,
+     then re-commit onto the new HEAD. Re-committing without that check would
+     silently ship whatever another session had left in the worktree.
+  4. **Do not rescue another lane's orphan.** Record it and notify; their
+     content may have been deliberately superseded (`origin/main` here carried a
+     DIFFERENT wnba commit, `e9fdcf98`).
+  5. **`git status` says nothing about this.** It reported a clean tree for
+     files that had just fallen out of history.
+
+### 2026-08-16 — A COLLISION CHECK IS A READING WITH A TIMESTAMP, NOT A FACT. A lane was re-opened between my check and my edit
+
+At `/lane open` the header for `mlb-live-gameline-distributions` read
+`CLOSED-VERIFIED 2026-08-16 22:2xZ`, so I recorded its claim on
+`vendor/.../flask_frontend.py` as released and wrote that into my lane block.
+Between that read and the edit, the holding session **re-opened it** (`12bba949`
+— *"the line-gate PASS was a pass on an empty population; a verifier that cannot
+fail cannot pass"*). `lane-guard` blocked the edit and **the guard was right**.
+
+- **The rule going forward:** re-run the collision check **immediately before
+  the edit**, not only at lane open. A CLOSED lane can re-open — closure is
+  itself a claim that can be withdrawn, and withdrawal is exactly what a failed
+  verification produces. Corollary: when a guard contradicts your own recorded
+  check, **the guard is reading now and you read earlier** — believe it and
+  re-read before arguing.
+- Same session, same mechanism: my first `lanes.md` lane block was **overwritten
+  wholesale** by a parallel session's write and had to be re-appended.
+
+### 2026-08-16 — `commit-guard`'s suggested fix list was INCOMPLETE on all THREE occurrences in one session
+
+Already recorded as a hazard; this is the evidence that it is the norm, not the
+exception. Omitted: `.syndicate/scheduled_task_ncaaf_445.md` (0/-58) on the
+first block, and `.syndicate/deploys.md` (0/-66) on the second.
+
+- **The rule going forward:** after running the guard's `git restore --staged`
+  line, **re-print the WHOLE index and audit every remaining path yourself** —
+  for each, is it on disk, and is it in HEAD? `absent on disk + in HEAD` is a
+  legitimate deletion (leave it — `scheduled_task_ncaaf_445.md` was one);
+  `present on disk + in HEAD + staged as deleting lines` is a stale-index revert
+  (disarm it). Do not treat the guard's list as the fix.
+
+- **ADDENDUM 2026-08-16, same session:** it happened a SECOND time — the
+  re-commit `af3017e6` was orphaned by a hard reset of local `main` to
+  `origin/main` minutes later. **Re-committing onto `main` is therefore not the
+  fix.** The fix is a REF: `git branch lane/<slug> <sha>` makes the commit
+  reachable, immune to any `main` move, and safe from gc, at zero cost to any
+  other session. **In this worktree, do that immediately after every commit,
+  before doing anything else** — and treat a commit as durable only once it is
+  on `origin/main`.
+
+## 2026-08-16 — OVERRIDE, LOGGED: an unattended session was authorised by the user to fire this deploy
+
+The FORBIDDEN entry above ("never let an UNATTENDED session fire a deploy") was
+raised to the user twice with its reasoning — the same-day `wnba-win-prob-counter-read`
+incident, the absent structural control, and the tell that `send_message` is
+unavailable in unattended runs so the session that most needs to coordinate cannot.
+The user chose it deliberately, in these words: **"fire it"**, after being offered
+the alternative of running `.syndicate/handoff_deploy_freeze_reader_tree.md` from
+their own attended window.
+
+**Scope of the override:** deploy `_freeze_market_dirs` (blob `426bbd70`, on
+`origin/main`) to refresh-worker and live-odds-worker. Nothing else.
+
+**What the override does NOT suspend**, and these were kept:
+- the in-flight job gate — both workers read HOLD (5 and 3 jobs, including
+  `run_mlb_daily_sim_job.py`) at 22:15Z and the deploy waited rather than killing them;
+- ROUTE ONE (warm-up deploy before target), one service at a time, `finishedAt`
+  observed between calls;
+- verification by CONTENT, by blob, never by ancestry;
+- rollback SHAs captured before firing.
+
+**The rule is unchanged and still stands for the next run.** This entry records a
+human decision on one deploy, not a precedent. The structural fix the earlier entry
+asks for — no `RENDER_API_KEY` in an unattended run environment, or a
+`deploy_claim.py` that refuses an unattended holder — is still not built, and until
+it is, "the session judged it was fine" is the only thing standing between an
+unattended run and three restarted services.
+
+## 2026-08-16 — CORRECTION: the shared index CHURNS, it does not accumulate — and staged content is not the alarm
+
+I recorded the shared index earlier the same day as a landmine "growing" on a
+timer: 725 staged ledger deletions, then 1127 half an hour later, with the
+inference that its blast radius increases the longer it sits.
+
+Measured a third time minutes after that: **207 deletions across four DIFFERENT
+files.** `deploys.md` and `lanes.md` had left the staged set entirely, and local
+`HEAD` had moved twice in between. The staged set is simply whatever the
+currently-active sessions are holding at that instant. The 725 -> 1127 reading
+was two samples of a churning quantity, and I turned it into a trend.
+
+**How to apply.**
+- **Two samples of a quantity other writers control is not a trend.** Same error
+  as [[feedback-rate-not-count]] wearing different clothes: I had no denominator
+  and no idea of the sampling process, and still described a direction.
+- **A `git reset HEAD -- <paths>` on a shared index is point-in-time, not a
+  fix.** The state can return within minutes. The durable fix is other sessions
+  committing through isolated indexes — see
+  [[project-shared-tree-commit-recipes]] — not repeated disarms.
+- **Staged content in a shared index is normal; staged DELETIONS are the
+  signal.** Immediately after the disarm the index held another session's
+  `game_shape.py` (+356) and `test_game_shape.py` (+332), purely additive — a
+  shared index in correct use. An alarm that fires on "something is staged"
+  would fire constantly and be ignored. Gate on `git diff --cached --numstat |
+  awk '$2>0'`, which is empty in the healthy case.
+
+### 2026-08-16 — a stale-copy commit can keep the DOC and drop the CODE, and every cheap check still passes
+- **Extends the same-day rule about slug-level ledger checks.** That one framed
+  whole-file rewrites from stale in-memory copies as a `.syndicate/**` hazard.
+  Measured three hours later: the same mechanism reverted a **source file**.
+- **What it looked like.** HEAD `fedd17ee` carried `scripts/render_events.py`,
+  `#442` and `#444` in `todo.md` — but not the `_deploy_trigger` fix that `#444`
+  was *found by*, and not its two regression tests (12 test functions in HEAD, 14
+  on disk). A session had committed `todo.md` from a copy containing my entry
+  and `render_events.py` from a copy predating my edit to it.
+- **Why nothing caught it.** The file existed. The tool ran. The todo entry
+  describing the fix existed and read as evidence the fix was in. `git status`
+  showed the difference as a normal working-tree modification — indistinguishable
+  from work in progress. Two of my own commits were **orphaned**, which
+  `git log <sha>` still resolves happily because the objects remain reachable
+  from the reflog.
+- **The rule going forward:** after committing on a tree with concurrent
+  sessions, verify by **ancestry and content**, not by the commit succeeding:
+
+    git merge-base --is-ancestor <sha> HEAD   # orphaned if this fails
+    git show HEAD:<path> | grep -c <a token unique to the change>
+
+  A commit that returned a SHA is not a commit that is still in the history, and
+  a doc entry describing a fix is not the fix. Same family as
+  `presence-is-not-reachability` and
+  `test-the-fixs-predicate-not-its-deploy-state`.
+
+
+<!-- RESTORED 2026-08-16 18:3xZ by session branch-overlap-baseline-watch: present in HEAD, absent from this working copy. Same stale-copy mechanism documented in this file today. Content is byte-identical to HEAD. -->
+
 ## 2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 4: fixing a fix, and two bad inferences
 
 ### REFUTED: "the guard I added to stop a false claim is therefore correct"
@@ -3268,31 +3450,3 @@ the `edge_vs_market_pct` pairing defect — the harness warning
 and nobody would ever have looked.** When adding a reconciliation check, make its
 failure VISIBLE (a null, a counter, a warning) rather than falling back to
 whichever input looks reasonable.
-
-## 2026-08-16 — OVERRIDE, LOGGED: an unattended session was authorised by the user to fire this deploy
-
-The FORBIDDEN entry above ("never let an UNATTENDED session fire a deploy") was
-raised to the user twice with its reasoning — the same-day `wnba-win-prob-counter-read`
-incident, the absent structural control, and the tell that `send_message` is
-unavailable in unattended runs so the session that most needs to coordinate cannot.
-The user chose it deliberately, in these words: **"fire it"**, after being offered
-the alternative of running `.syndicate/handoff_deploy_freeze_reader_tree.md` from
-their own attended window.
-
-**Scope of the override:** deploy `_freeze_market_dirs` (blob `426bbd70`, on
-`origin/main`) to refresh-worker and live-odds-worker. Nothing else.
-
-**What the override does NOT suspend**, and these were kept:
-- the in-flight job gate — both workers read HOLD (5 and 3 jobs, including
-  `run_mlb_daily_sim_job.py`) at 22:15Z and the deploy waited rather than killing them;
-- ROUTE ONE (warm-up deploy before target), one service at a time, `finishedAt`
-  observed between calls;
-- verification by CONTENT, by blob, never by ancestry;
-- rollback SHAs captured before firing.
-
-**The rule is unchanged and still stands for the next run.** This entry records a
-human decision on one deploy, not a precedent. The structural fix the earlier entry
-asks for — no `RENDER_API_KEY` in an unattended run environment, or a
-`deploy_claim.py` that refuses an unattended holder — is still not built, and until
-it is, "the session judged it was fine" is the only thing standing between an
-unattended run and three restarted services.

@@ -144,6 +144,23 @@ def test_deploy_with_no_user_and_no_flag_is_named_as_the_blueprint_sync_shape():
     assert "blueprint_sync" in render_events._deploy_trigger(event)
 
 
+def test_a_failure_is_never_labelled_with_a_deploy_trigger():
+    """The defect this catches shipped and was caught in its own output.
+
+    `server_failed` carries no `trigger`. Reading that absence as "no user" put
+    `NO USER (blueprint_sync shape?)` against all 20 live-odds-worker
+    `earlyExit` events, which would have read as a config-push finding.
+    """
+    event = _event("2026-08-16T16:38:05Z", reason={"earlyExit": True, "evicted": False})
+    assert render_events._deploy_trigger(event) == ""
+
+
+def test_an_unknown_reason_shows_its_raw_shape():
+    event = _event("2026-08-16T16:38:05Z", reason={"someFutureReason": True})
+    detail = render_events._reason_detail(event)
+    assert "someFutureReason" in detail
+
+
 def test_deploy_by_a_user_reports_the_user():
     event = _event(
         "2026-08-14T20:03:11Z",

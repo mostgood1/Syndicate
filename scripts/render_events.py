@@ -182,11 +182,26 @@ def _reason_detail(event: dict) -> str:
         return f"memoryLimit={oom['memoryLimit']}"
     if reason.get("unhealthy"):
         return str(reason["unhealthy"])
+    if classify(event) == "failed:unknown" and reason:
+        # The whole point of a failed:unknown bucket is that someone can SEE the
+        # shape that did not match. Printing nothing would hide the new mode as
+        # effectively as mis-bucketing it.
+        return "raw reason: " + json.dumps(reason, sort_keys=True)
     return ""
 
 
 def _deploy_trigger(event: dict) -> str:
-    """Who or what started a deploy. `blueprint_sync` is the one that bites."""
+    """Who or what started a DEPLOY. `blueprint_sync` is the one that bites.
+
+    Only meaningful for deploy/build events. A `server_failed` carries no
+    `trigger` at all, and reading that absence as "no user" printed
+    `NO USER (blueprint_sync shape?)` against all 20 of live-odds-worker's
+    `earlyExit` failures -- dressing a restart-loop finding up as a config-push
+    finding. Absence of a field is a fact about THIS event's shape, not evidence
+    about how it was triggered.
+    """
+    if str(event.get("type") or "") not in ("deploy_started", "build_started"):
+        return ""
     trigger = (event.get("details") or {}).get("trigger") or {}
     if not isinstance(trigger, dict):
         return ""
