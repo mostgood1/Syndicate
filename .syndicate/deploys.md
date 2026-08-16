@@ -8208,3 +8208,73 @@ a working gate.
 even once 08-21 IS quoted, a board anchored on 08-16 spans 08-16..08-20 and will
 still not show it. That is independent of the capture question and is this
 lane's own file (`layer1_board.py`).
+
+---
+
+## 2026-08-16 21:1xZ — **CORRECTION: the soccer game-state fix DID work.** And #5, the cross-sport live A/B, finally ran
+
+### CORRECTION to the 19:5xZ entry above ("FIX DEPLOYED, PRODUCTION UNCHANGED")
+
+That entry is **WRONG and is superseded**. I measured a post-deploy artifact
+(19:51:08 > deploy 19:48:33), saw `unknown: 17`, and concluded the fix had not
+taken. Measured again at 21:11:39:
+
+```
+soccer by_state   before: {live 0,  final 0,  pregame 49, unknown 17}
+                  now:    {live 0,  final 15, pregame 46, unknown  5}
+```
+
+**17 → 5.** And the 5 that remain are exactly the ones I predicted would:
+la_liga 3, mls 1, serie_a 1 — the same leagues I named as "separate
+schedule/alias gaps, NOT claimed as fixed".
+
+**Why I got it wrong:** one artifact is not the population. The 19:51 build was
+post-deploy by 2½ minutes, but the chip cache
+(`game_chip_scoreboard._CACHE_TTL_SECONDS`) and the per-league card builds mean
+the first rebuild after a restart does not necessarily reflect the new
+resolution. I applied the "wait for a post-deploy artifact" rule correctly and
+still read a single sample as a verdict. **The rule needs a second clause: for a
+change behind a cache, sample until the value MOVES or a stated number of builds
+pass — one fresh artifact is necessary, not sufficient.**
+
+The hypothesis I recorded as "remaining, unverified" — that the worker's disk
+lacks week-2 soccer schedules — is **not needed**. Do not go looking for it.
+
+### #5 — the cross-sport live A/B, MLB as reference. RAN AT LAST
+
+First moment this session with two sports live at once: MLB 8 live, WNBA 2 live.
+
+```
+                    rows  projected  live_aware  live_projected  actual_so_far  edge
+MLB  props          1467       1219         647             647            647     -
+     game lines      537        529          75              67              -     44
+WNBA props           258        204           0               0              0     0
+     game lines       339         16           0               -              -     0
+```
+
+**WNBA has no live tier at all — absent, not degraded.** Zero live-aware rows on
+live games, zero actual-so-far, zero live edges, on a slate where MLB served 647
+live-aware props with the actual stat alongside and 44 live game-line edges.
+
+**Cause is explicit and by construction**, three separate gates in
+`board_enrichment.py`:
+
+```
+:228  attach_live_game_state_from_lens   if sport != "mlb": "no live status source wired"
+:719  _attach_projections_by_sport       if sport != "mlb": "no projection source wired"
+:754  attach_live_projections_for_sport  if sport != "mlb": "no live re-sim wired"
+```
+
+Each returns a STATED reason rather than failing silently, which is the contract
+working. But note what it means: **the live tier is MLB-only by construction,
+and adding a sport is not a config change.**
+
+**`syndicate/features/wnba/live_lens.py` EXISTS** — 32.5 KB, and it carries
+`modelHomeWinProb`. So WNBA already produces live-lens output that nothing on
+the board consumes. That is the same shape as the two discards found earlier
+today (MLB's `total_runs_dist`, WNBA's `margin_q`): the number is computed and
+never reaches the surface. Worth checking before anyone builds a WNBA live tier
+from scratch.
+
+G3 is now answered for both halves: MLB's live lens works for props and (since
+today) for game lines; WNBA's is unwired.
