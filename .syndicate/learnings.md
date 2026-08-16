@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 203 rules `[generated]`
+## Index — 213 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1805,3 +1805,33 @@ invisible to any check that looks at paths rather than content.
 BOTH `HEAD` and the worktree. And a green guard is evidence only once you know
 what makes it read red: this one had never fired, which read as "no problem" and
 actually meant "blind to this problem".
+
+### 2026-08-16 — FORBIDDEN: attributing a dirty file to a person before diffing it against the REMOTE
+
+Local `main` was 244 commits behind. `git diff` in that tree reported 52 modified
+files, including 13 production files with large edits — `recommendation_engine.py`
++196/-28, `layer2_board.py` +144, `soccer_projections.py` +108/-12. I read that as
+other sessions' uncommitted work, published it to the user as a blocker, and
+messaged two sessions asking them to commit "their" work.
+
+**All 28 blocking files were byte-identical to `origin/main`.** They were not
+anyone's work. They were the upstream state in a tree whose HEAD had not caught
+up, and `git diff` was measuring MY staleness against a 244-commit-old baseline.
+
+The tell was available before I published: the same session had already
+established that local main was a strict content SUBSET of origin. If local is a
+subset, a local "modification" cannot be new work — it can only be the newer
+content already upstream. I had the discriminating fact and did not apply it.
+
+**The rule going forward:** a dirty file in a stale tree is a statement about the
+BASELINE, not about a person. Before attributing it, diff the worktree against
+the REMOTE (`git ls-tree origin/main` + `cat-file blob`), not against HEAD. Three
+outcomes, and only the third is anyone's work: equal to origin (a no-op), a
+subset of origin (stale), or carrying content origin lacks.
+
+Corollary that cost three failed merge attempts: **untracked collisions are
+revealed in batches** — each `git merge` names only the next ~7. Compute the set
+directly with `ls-files --others --exclude-standard` INTERSECT
+`ls-tree -r --name-only origin/main`. And **`git stash create` does not capture
+untracked files**, so a snapshot taken that way is not the safety net you think
+it is for exactly the files that block a merge.

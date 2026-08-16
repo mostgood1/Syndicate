@@ -1,6 +1,6 @@
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 193 rules `[generated]`
+## Index — 213 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -8,7 +8,7 @@
 > again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
 > `[evidence]` have their body in `learnings_evidence.md`.
 
-**FORBIDDEN — 26**
+**FORBIDDEN — 29**
 
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, an…](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring)
@@ -22,6 +22,9 @@
 - [2026-08-15 — FORBIDDEN: never read a joiner zero as a fact about the world until the re…](#2026-08-15-forbidden-never-read-a-joiner-zero-as-a-fact-about-the-world-until-the-reader-is-shown-to-see-the-data)
 - [2026-08-15 — FORBIDDEN: shipping a verification you have not falsified. THREE failed ch…](#2026-08-15-forbidden-shipping-a-verification-you-have-not-falsified-three-failed-checks-in-one-night-zero-failed-fixes)
 - [2026-08-15 — FORBIDDEN: `git <cmd> <rev>:<dotpath>` in Git Bash on Windows. It silently…](#2026-08-15-forbidden-git-cmd-revdotpath-in-git-bash-on-windows-it-silently-reads-the-wrong-thing-and-only-for-dot-prefixed-trees)
+- [2026-08-16 — FORBIDDEN: never read a deploy claim's `target` as a statement about what…](#2026-08-16-forbidden-never-read-a-deploy-claims-target-as-a-statement-about-what-is-running)
+- [2026-08-16 — FORBIDDEN: never rely on a PROMPT to stop an unattended session from acting](#2026-08-16-forbidden-never-rely-on-a-prompt-to-stop-an-unattended-session-from-acting)
+- [2026-08-16 — FORBIDDEN: never rely on a PROMPT to stop an unattended session from acting](#2026-08-16-forbidden-never-rely-on-a-prompt-to-stop-an-unattended-session-from-acting)
 - [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never judge a pinned deploy by ANCESTRY alone. Patch-id is the…](learnings_evidence.md#2026-08-15-forbidden-never-judge-a-pinned-deploy-by-ancestry-alone-patch-id-is-the-test) `[evidence]`
 - [2026-08-15 — FORBIDDEN: never wake many idle sessions at once. It stalls them.](learnings_evidence.md#2026-08-15-forbidden-never-wake-many-idle-sessions-at-once-it-stalls-them) `[evidence]`
@@ -43,7 +46,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 164**
+**Rules and corrections — 181**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -147,6 +150,23 @@
 - [2026-08-16 — THE HANDOFF THAT WORKED WAS A SCHEDULED TASK, NOT A MESSAGE](#2026-08-16-the-handoff-that-worked-was-a-scheduled-task-not-a-message)
 - [2026-08-16 — A TEST THAT PROVES A DEFECT DOES NOT PROVE PRODUCTION RUNS THROUGH IT. I D…](#2026-08-16-a-test-that-proves-a-defect-does-not-prove-production-runs-through-it-i-deployed-a-correct-fix-to-an-unused-path)
 - [2026-08-16 — COLLAPSING A LEDGER FILE WITHOUT FIXING THE WRITING HABIT JUST REGROWS IT](#2026-08-16-collapsing-a-ledger-file-without-fixing-the-writing-habit-just-regrows-it)
+- [2026-08-16 — verify a watcher's FIRST line, or it will report failure as patience](#2026-08-16-verify-a-watchers-first-line-or-it-will-report-failure-as-patience)
+- [2026-08-16 — do not rebase onto a deploy target that has not shipped](#2026-08-16-do-not-rebase-onto-a-deploy-target-that-has-not-shipped)
+- [2026-08-16 — A DEPLOY HAS TWO LAGS IN SERIES. I GUARDED ONE AND MISREAD THE SYSTEM THRE…](#2026-08-16-a-deploy-has-two-lags-in-series-i-guarded-one-and-misread-the-system-three-times)
+- [2026-08-16 — I HELD A CLAIM ONCE AND THEN DEPLOYED OVER SOMEONE ELSE'S, TWICE](#2026-08-16-i-held-a-claim-once-and-then-deployed-over-someone-elses-twice)
+- [2026-08-16 — a one-game-wide range cannot answer "how does it scale", and the fit will…](#2026-08-16-a-one-game-wide-range-cannot-answer-how-does-it-scale-and-the-fit-will-look-plausible-anyway)
+- [2026-08-16 — a headroom figure that counts one process is not headroom on a container](#2026-08-16-a-headroom-figure-that-counts-one-process-is-not-headroom-on-a-container)
+- [2026-08-16 — three processes with the same NAME are not three concurrent jobs; read the…](#2026-08-16-three-processes-with-the-same-name-are-not-three-concurrent-jobs-read-the-ppid)
+- [2026-08-16 — MERGE PARALLEL IMPLEMENTATIONS BEFORE PICKING BETWEEN THEM](#2026-08-16-merge-parallel-implementations-before-picking-between-them)
+- [2026-08-15 — RULE: merge in the object database when the shared tree is dirty](#2026-08-15-rule-merge-in-the-object-database-when-the-shared-tree-is-dirty)
+- [2026-08-15 — RULE: resolve a ledger conflict by REPLACING the stale entry, never by app…](#2026-08-15-rule-resolve-a-ledger-conflict-by-replacing-the-stale-entry-never-by-appending)
+- [2026-08-16 — A RECORDER GATED ON THE PUBLISH DECISION CANNOT EVALUATE THE PUBLISHER](#2026-08-16-a-recorder-gated-on-the-publish-decision-cannot-evaluate-the-publisher)
+- [2026-08-16 — MERGE PARALLEL IMPLEMENTATIONS BEFORE PICKING BETWEEN THEM](#2026-08-16-merge-parallel-implementations-before-picking-between-them)
+- [2026-08-15 — RULE: merge in the object database when the shared tree is dirty](#2026-08-15-rule-merge-in-the-object-database-when-the-shared-tree-is-dirty)
+- [2026-08-15 — RULE: resolve a ledger conflict by REPLACING the stale entry, never by app…](#2026-08-15-rule-resolve-a-ledger-conflict-by-replacing-the-stale-entry-never-by-appending)
+- [2026-08-16 — a "regression" that was a SCOPE ERROR: the two numbers were never the same…](#2026-08-16-a-regression-that-was-a-scope-error-the-two-numbers-were-never-the-same-quantity)
+- [2026-08-16 — the decisive TEST for the stale shared index, and why "deletions vs HEAD"…](#2026-08-16-the-decisive-test-for-the-stale-shared-index-and-why-deletions-vs-head-is-not-the-test)
+- [2026-08-16 — `commit-guard.py` gates on `D` status and every real occurrence was `M`](#2026-08-16-commit-guardpy-gates-on-d-status-and-every-real-occurrence-was-m)
 - [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
 - [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
 - [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
