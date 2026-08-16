@@ -1636,7 +1636,45 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
-### clamp-fix-to-workers — OPEN — **CHECKPOINTED 2026-08-16 01:4xZ. refresh-worker SHIPPED `57a437d5` (live 00:23:04Z, 0 clamp sites by content). live-odds-worker DEFERRED by user decision — `079cc42b` ready, re-cut before shipping. THE ONLY OPEN WORK IS VERIFICATION: 2 post-deploy reads (00:24Z, 01:30Z) both `no_trigger`, which proves nothing** — opened 2026-08-15 — session: clamp-fix-verification-watch
+### clamp-fix-to-workers — OPEN — **CLOSE REFUSED 2026-08-16 23:5xZ. The headline "THE ONLY OPEN WORK IS VERIFICATION" IS FALSE: a REACHABLE clamp site is still live on live-odds-worker.** — opened 2026-08-15 — session: clamp-fix-verification-watch
+- **CLOSE ATTEMPTED AND REFUSED 2026-08-16 23:5xZ.** Both halves of this
+  lane's own Verification line were checked. Neither passes.
+  - **Behavioural half: still never fired.** `watch_clamp_trigger.py --once`
+    at 23:49:14Z read `served_rows=6 p=[0.145882, 0.874966] out_of_clamp=0`
+    -> `no_trigger (proves nothing)`. That is the THIRD inconclusive read
+    (00:24Z, 01:30Z, 23:49Z). A quiet slate reads identically with the bug
+    fully present, which is why this lane already refused to bank it.
+  - **Structural half: FAILS, and this is the new finding.** Clamp sites by
+    content at each service's LIVE SHA, counting `max(0.02, min(0.98`:
+    ```
+    web              9f617f34   0
+    refresh-worker   fdc72dd0   0
+    live-odds-worker 16a898ef   2   <- intelligence_state.py 1, wnba/cards.py 1
+    ```
+- **One of the two is dormant; the other is REACHABLE AND PUBLISHING.**
+  - `pipeline/intelligence_state.py` — dormant on this service:
+    `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` in its live
+    env, so the loop never starts. **Dormant is not fixed** — loop ownership
+    is an env flag that moves with no diff, so this is a latent re-arm.
+  - `syndicate/features/wnba/cards.py:848` — **REACHABLE.**
+    `_american_from_prob` still clamps, and it is called at :1614/:1616 to
+    produce `home_ml`/`away_ml` on the WNBA cards THIS SERVICE BUILDS AND
+    PUBLISHES (it runs `start_live_lens_loop`). The served lens carries
+    those exact fields in each game's `betting` block.
+- **Not observed firing today, and that is not evidence of absence.** The
+  served WNBA cards at 23:5xZ read `away_ml` -749.55 / 186.21 / 146.13 —
+  no value at ±4900, because no game today is lopsided enough to push a win
+  probability past 0.98. Same quiet-slate confound as the watcher.
+- **What would let this lane close:** ship the deferred fix to
+  live-odds-worker (`079cc42b`, re-cut on live `16a898ef`), taking all three
+  services to 0 sites. At that point the clamp CANNOT be published because
+  it does not exist, and the never-firing behavioural trigger stops being
+  load-bearing. **That deploy was DEFERRED BY USER DECISION and is NOT being
+  taken unilaterally.**
+- Note: tonight's live-odds-worker deploy (`16a898ef`, the WNBA live_state
+  carry-forward) was deliberately cut on live `440f5f29`, which already
+  carried these 2 sites — so it PRESERVED the deferral rather than
+  silently resolving or worsening it.
 - Goal: the ±4900 clamp stops being published. **Testable outcome:**
   `py -3 scripts/watch_clamp_trigger.py --once` returns `POST_FIX_OK` on a slate
   that carries an out-of-clamp probability.
