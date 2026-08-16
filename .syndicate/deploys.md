@@ -7770,3 +7770,94 @@ causes. The next step is to check the worker's soccer schedule artifacts for
 weeks beyond the current one — artifact territory, i.e. the orphaned
 `soccer-model-coverage` lane's domain, and `build_soccer_artifacts.py` is one of
 its claimed files.
+
+---
+
+### ask-quote-age + NaN + draw-leg — web `8676da1f` — MEASURED
+
+Three deploys in one chain, each defect found by VERIFYING the one before it.
+Web only (`srv-d88ahvrbc2fs73eodu30`), cut from web's own live SHA `1468780b`.
+Deploy claim held throughout; a peer's `1468780b` was mid-build at acquire time
+and **I waited for it rather than cancelling it** — the failure mode from the
+previous chain, not repeated.
+
+| # | commit | live | what |
+|---|---|---|---|
+| 1 | `06f3b3fa` | 19:47:16Z | quote age read the wrong clock |
+| 2 | `a01b30eb` | 19:57:54Z | `float("nan")` reached production as text |
+| 3 | `8676da1f` | 20:13:49Z | the draw leg returned `None`, and that was drift |
+
+**1 — A QUIET MARKET IS NOT A STALE QUOTE.** `_bet_facts` read
+`book_age_seconds` ("has the PRICE moved" — a change log, so a motionless market
+ages without limit) where the board deliberately gates on
+`quote_seen_age_seconds` ("when did WE last look").
+`layer2_board._row_quote_age_seconds` already documents the distinction.
+Measured on the served board, 101 rows:
+
+    warnings off book_age (shipped)   31
+    warnings off seen_age (correct)   18
+    FALSE                             13    <- 42% of all firings
+
+Worst case `book_age 217.4m` vs `seen_age 3.0m`: the answer told a reader a
+three-minute-old MLB price was three and a half hours stale. **Every false alarm
+landed on MLB, the freshest sport on the board** (seen median 3.0m), because MLB
+is exactly where prices sit still between moves — the warning was loudest where
+the data was best. After the fix, replayed over the same 101 rows: 18 warnings,
+all 18 genuinely old, **zero** false alarms, none resting on the fallback clock.
+Wording changed with it: "The quote behind this is 84 minutes old" (a claim
+about the MARKET) → "Last checked 119 minutes ago, so confirm the price before
+betting" (a claim about OUR DATA).
+
+**THE TEST SUITE COULD NOT HAVE CAUGHT THIS, AND THAT IS THE REUSABLE PART.**
+`test_reason_flags_a_stale_quote` asserted "84 minutes old" and passed — against
+a fixture I had TRIMMED when capturing it, dropping `quote_seen_age_seconds` and
+`suspect_stale` as "not needed". With one clock in the fixture, no test could
+notice the code read the wrong one. **A trimmed fixture cannot fail the test its
+own omission causes.** Fixture is now verbatim with a do-not-trim comment.
+
+**2 — NaN.** Probing WNBA as a POSITIVE CONTROL for fix 1, production served
+`"draw nan (Indiana Fever @ Atlanta Dream)"`. The layer2 row is clean
+(`line: null`, zero literal NaN tokens in the served JSON); the NaN enters
+downstream, and `float("nan")` survives every `is None` check and renders as
+"nan". Fixed at `_to_float` — **the choke point every caller shares** — not at
+the label: the same value reaches edges ("nan%"), prices ("+nan") and
+probabilities, where it silently PASSES the `> 0` guards meant to suppress an
+absent number. Replayed over 83 live rows across two sports: 0 labels containing
+nan/inf.
+
+**3 — THE DRAW LEG, AND A PIN THAT DIDN'T.** The NaN guard turned that string
+into a `selection` of literally `None` — less wrong, still not a bet. It was
+also **drift**: `layer2_board._pick_label` renders that row "Draw" via
+`side.title()`, so the two labellers disagreed on a real published row. That is
+precisely what `test_bet_label_matches_layer2_pick_label_on_team_naming` exists
+to prevent, **and it passed, because it only ever exercised home/away rows.**
+A pin covering three of four shapes is not a pin; it now covers the draw leg.
+`_SELF_CONTAINED_SIDES = {"draw","tie"}` is a whitelist, not an inference,
+because the failure directions are asymmetric: "Over (A @ B)" names no bet,
+while dropping the draw leg loses a real one.
+
+**Measured on production 20:1xZ, MLB and WNBA:** 0 null selections, 0 "nan"
+anywhere, 0 rows on the old wording. The warning now DISCRIMINATES rather than
+firing blanket — 1 of 5 MLB rows, 5 of 5 WNBA — and the draw leg serves as
+`Draw (Indiana Fever @ Atlanta Dream)`.
+
+**METHOD NOTE, worth more than any of the three fixes.** The suite was green at
+every step and found none of them. Each was found by checking production:
+fix 1's replay, then fix 1's **positive control** — the probe came back
+0-warnings-of-5 and "PASSED", which looked like success and proved nothing,
+because that day's top 5 were all fresh MLB. Running a sport that *should* warn
+is what both confirmed the fix and exposed the NaN; reading that output exposed
+the draw leg. **An all-clear is evidence only once you know what makes the
+instrument read unhealthy.**
+
+- Landed on `main` as `d1592617`; main and live carry identical blobs. 210 green
+  across all four ask suites. `render.yaml` untouched.
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit 1468780b
+  --allow-rollback` (drops all three; they are one chain).
+- **NOT FIXED HERE, and neither is Ask's to decide:** the board's
+  `max_quote_age_seconds` ceiling is 50400s (**14 hours**), which is not a
+  meaningful gate for a live-odds product — publishing is decided upstream.
+  And with the correct clock, all 18 genuinely-stale rows were WNBA at
+  **exactly 119.8 minutes, identical to the decimal** — one fetch timestamp, not
+  18 independent ages, against MLB's 3.0m across 83 rows. Stalled lane or
+  deliberate off-peak cadence is the odds worker's call. Flagged, not diagnosed.
