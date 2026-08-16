@@ -191,7 +191,17 @@ def test_a_scan_failure_cannot_break_the_join(monkeypatch):
     )
     monkeypatch.setattr(mod, "detect_degenerate_projections", _boom)
     coverage = mod.attach_projections([], sport="mlb", selected_date="2026-08-13")
-    assert coverage == {"supported": True, "rows_with_projection": 3}
+    # The sport's own coverage survives the exploding scan, untouched.
+    assert coverage["supported"] is True
+    assert coverage["rows_with_projection"] == 3
+    # And the scan that exploded contributed NOTHING -- this is the half that
+    # actually tests the try/except, and an exact-equality assertion used to
+    # carry it. That broke the moment `attach_projections` gained another
+    # unconditional coverage field (`live_edge_enforced_rows`, 2026-08-16),
+    # which is a real addition and not a regression. Naming the absent keys
+    # keeps the guarantee while letting the payload grow.
+    assert "degenerate_projection_groups" not in coverage
+    assert "degenerate_projections" not in coverage
 
 
 @pytest.mark.parametrize("sport", ["mlb", "nfl", "wnba", "soccer", "nhl", "nba", "ncaaf", "ncaab"])

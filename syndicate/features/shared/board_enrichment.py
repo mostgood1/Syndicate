@@ -450,6 +450,78 @@ def detect_degenerate_projections(grid: list, *, sport: str) -> dict:
     }
 
 
+def _enforce_live_edge_policy(grid: list) -> dict:
+    """No row keeps an edge the live-edge policy refuses — whatever produced it.
+
+    WHY THIS IS AT THE WRAPPER AND NOT IN A PRODUCER. Every projection producer
+    is *supposed* to call `live_edge_unavailable_reason` itself, and each one
+    believes it does. Measured on production 2026-08-16 18:38Z, soccer:
+    **27 rows carried an edge on a game whose own `game.state` read `final`**,
+    plus 9 on live games from a pregame projection. GRO @ ADO, `final`, 4-1,
+    served `edge_vs_line: -0.175` on `spreads -0.0` — a settled market with a
+    number next to it.
+
+    The producer's refusal was real and unreachable. `soccer_projections`
+    `_price_against_market` opens with `if model_prob is None: return`, and
+    `_mean_projection` sets `model_prob_over: None` with `edge_vs_line: <x>` —
+    so every mean-based row, which is every soccer game spread and total,
+    returned before the refusal. The comment attached to that refusal claimed
+    it ran "for every row, mean-based and probability-based alike. Checked
+    rather than assumed." It did not, and the early return three lines above it
+    was why.
+
+    This is the exact argument `attach_projections`'s own docstring makes for
+    the degeneracy check: thirteen return sites across seven sports, and
+    patching each is how three of four paths get fixed and the fourth stays
+    broken. So the policy is enforced once, here, over the finished grid, where
+    no producer's control flow can route around it.
+
+    BOTH EDGE CONTRACTS, because a mean-based row's edge lives in the other one.
+    Clearing only `edge_vs_market_pct` is precisely how these rows stayed
+    bettable while looking suppressed — the same defect WNBA shipped in 2026-08
+    and soccer inherited.
+
+    IDEMPOTENT AND CONSERVATIVE. A producer that already refused correctly hits
+    no rows here. `live_edge_unavailable_reason` allows a live-aware projection
+    (MLB's live re-sim is the signal worth ranking, not the failure) and allows
+    unknown state, so this cannot blank the board when the game-state join
+    degrades. Verified against production before shipping: MLB's 3 live-aware
+    edges survive.
+    """
+    from syndicate.features.shared.live_edge_policy import live_edge_unavailable_reason
+
+    cleared = 0
+    reasons: dict[str, int] = {}
+    for row in grid:
+        # `dict`, not `Mapping`: this module does not import `Mapping`, and the
+        # rows are the grid's own mutable dicts -- every other join in this file
+        # writes back into them directly.
+        if not isinstance(row, dict):
+            continue
+        projection = row.get("projection")
+        if not isinstance(projection, dict):
+            continue
+        if projection.get("edge_vs_market_pct") is None and projection.get("edge_vs_line") is None:
+            continue
+        reason = live_edge_unavailable_reason(row)
+        if not reason:
+            continue
+        projection["edge_vs_market_pct"] = None
+        projection["edge_vs_line"] = None
+        # Do not overwrite a producer's own, more specific reason if it managed
+        # to set one and still left an edge behind -- that would erase the more
+        # informative message. In practice a row reaching here has none.
+        projection.setdefault("edge_unavailable_reason", reason)
+        cleared += 1
+        reasons[reason] = reasons.get(reason, 0) + 1
+    # Reported even when zero: a counter that only appears on failure cannot
+    # confirm the sweep ran, which is the rule this repo keeps relearning.
+    return {
+        "live_edge_enforced_rows": cleared,
+        "live_edge_enforced_reasons": reasons,
+    }
+
+
 def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
     """Per-sport projection join, plus a cross-sport degeneracy check (`#425`).
 
@@ -465,6 +537,17 @@ def attach_projections(grid: list, *, sport: str, selected_date: str) -> dict:
     coverage = _attach_projections_by_sport(grid, sport=sport, selected_date=selected_date)
     if not isinstance(coverage, dict):
         return coverage
+    try:
+        enforced = _enforce_live_edge_policy(grid)
+    except Exception:
+        # Same rule as the checks below: an enforcement sweep must never be
+        # able to break the join it polices. But note the asymmetry -- if this
+        # raises, edges the policy would have refused stay on the board, so the
+        # failure is LOUD in the coverage payload rather than only in the log.
+        _LOGGER.exception("LIVE_EDGE_ENFORCEMENT_FAILURE sport=%s", sport)
+        coverage["live_edge_enforcement"] = "failed"
+    else:
+        coverage.update(enforced)
     try:
         degeneracy = detect_degenerate_projections(grid, sport=sport)
     except Exception:
