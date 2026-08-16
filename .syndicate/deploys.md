@@ -4753,3 +4753,48 @@ fix is INERT on this path and the mechanism was mis-traced.
 2. The first hand attempt lost the window by spending ~60s building the target
    INSIDE the lull. The lull is 60-90s; the target must be built before it, or
    built by the same process that fires.
+
+## 2026-08-15 23:47/23:49Z — refresh-worker `32186e28` + live-odds-worker `c422f79a` — ALT-LINE PROJECTIONS — **DEPLOYED, MEASUREMENT OWED, WINDOW CLOSED**
+
+| field | value |
+|---|---|
+| refresh-worker | `dep-da0fie61egvs738k7v0g`, live **23:47:53Z**, commit `32186e28` on `191d098f` |
+| live-odds-worker | `dep-da0fiq67bikc73f1j77g`, live **23:49:57Z**, commit `c422f79a` on `b7ae47e6` |
+| content | `302ea0f4` applied as a PATCH, not copied |
+| rollback | refresh-worker -> `191d098f4a8d`, live-odds-worker -> `b7ae47e6d1a0` |
+
+**PATCHED, NOT COPIED, AND THAT MATTERED THIS TIME.** Three commits had landed on
+my two files since the branch point (`098877e1` mlb props measured, `214f5151`
+HRR mean from components, plus my own earlier `846bb74e`). A whole-file copy —
+the technique used for the two earlier deploys, where divergence was 0 — would
+have reverted two other sessions' work. `git apply --3way` applied both files
+cleanly on each service's own SHA. **Check divergence per deploy; it is not a
+property of the change, it is a property of the moment.**
+
+**BASELINE, captured 23:39:13Z BEFORE the deploy** (`/api/board/layer2-shortlist`):
+88 rows, 52 with a model projection, **14 alt rows (8 `totals_alt`, 6
+`spreads_alt`) carrying `sim_component: None` on every one** — scored purely on
+book-price EV × book_confidence × price_reliability. Saved to
+`C:/tmp/shortlist_baseline_2026-08-15.json`.
+Book grid at 22:41Z: **238 `spreads_alt`/`totals_alt` rows, 0 with a projection**,
+against `spreads`/`totals` at **115 of 115**.
+
+**THE WINDOW CLOSED BEFORE THE PREDICATE COULD BE READ, and the post-deploy
+numbers are NON-EVIDENCE.** At 23:59:12Z the 08-15 board reported
+`games_in_summary: 0` — the daily summary emptied at UTC midnight — so
+`project_game_market` returns None for EVERY game market. Main `spreads`/`totals`
+went **115 -> 0** alongside the alt rows. **A reading of "0 alt projections" here
+says nothing about this fix; it says the sim payloads are gone.** The 08-16 board
+has `games_in_summary: 15` and **0 rows** (quote shard not yet populated).
+
+**OWED, on the next populated slate:**
+1. Book grid: `spreads_alt`/`totals_alt` rows with a projection **0 -> ~all**,
+   and main `spreads`/`totals` still ~100% (the control — if main is 0 the
+   summary is empty again and the read is void).
+2. Shortlist: alt rows carrying a non-null `sim_component` **0 -> >0**, and
+   **shortlist COMPOSITION compared against the saved baseline** — this is the
+   watch the user asked for. 116 pregame alt rows gain a model view; they were
+   ALREADY in the shortlist (14 of 88), ranked on book EV alone, so the risk is
+   re-ranking, not new admissions.
+3. Live props: alternate-line rows joining. **Expect a small move only** — no
+   `batter_home_runs` alternates are captured.
