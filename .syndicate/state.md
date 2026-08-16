@@ -1699,7 +1699,17 @@ production soccer**, and production soccer is no longer evidence for it. It
 remains correct and tested and fires for any sport publishing no periods.
 `[measured]`
 
-## Candidate field absence — the served payload TODAY `[measured 08-15 ~21:5xZ, lane market-key-blank-not-absent]`
+## Candidate field absence — **THE BASELINE BELOW WAS MEASURED ON THE WRONG PATH** `[corrected 08-16 00:1xZ]`
+
+**CORRECTION, READ THIS FIRST.** These numbers are real but they do NOT measure
+the `UniversalCandidate` fixes. The served rows come from the **Layer 2 board**
+(`source: layer2_shortlist`), whose `line` is stamped at
+`syndicate/features/shared/layer2_board.py:1104` as a bare `row.get("line")`
+float. `UniversalCandidate.to_dict` is not on that path. Verified after a
+confirmed rebuild on `2c14d9ae` (`computed_at 2026-08-16T00:12:39Z`): `line as a
+string` is still **0**, so the deployed fix is **INERT on the served path**.
+Fixing whole-numbered lines means changing `layer2_board.py:1104`, where `line`
+is also an `_IDENTITY_FIELD` feeding the dedupe key at `:450` — not cosmetic.
 
 Baseline taken from live `/api/intelligence/query`, 101 recommendations, BEFORE
 any of this session's three fixes are deployed. **Whoever deploys them re-reads
@@ -1773,3 +1783,27 @@ sim row — **UNVERIFIED, and not claimed.**
 
 **NOT FIXED. Blast radius is every sport's board chips**, not just MLB, and the
 predicate change would move what counts as `live` board-wide. Owner needed.
+
+## Board build cadence vs deploy cadence `[measured 2026-08-15/16, lane board-publish-stall]`
+
+- A real board build takes **178-358 s** (3.0-6.0 min), end-to-end
+  `BOARD_OVERVIEW_READY -> BOARD_PUBLICATION_RESPONSE_READY` about **10.6 min**
+  on the 00:02 build (567 candidates). **`BUILD_SPAN_EXIT elapsed_s=0.0` is the
+  empty-pool short-circuit, not a build** — counting those inflates the rate.
+- **Closely-spaced worker deploys starve the board.** 13 refresh-worker deploys
+  on 08-15 after 21:30Z. Builds completed only inside gaps of **15-33 min**
+  (21:53 / 22:32 / 22:52 / 23:10). Six deploys in 46 min at **6-9 min** spacing
+  produced **zero** completed builds, and the board went **77 min stale** on a
+  worker that was busy the whole time. **Before deploying refresh-worker, ask
+  whether the last deploy was under ~15 min ago; if so you are likely killing a
+  build nobody will see fail.**
+- **The served intelligence recommendations are LAYER 2 rows**, not the
+  candidate pool: `source: layer2_shortlist`, `surface_key: layer2`,
+  `candidate_type: None`. Anything reasoning about "what the board serves" must
+  start at `pipeline/layer2_shortlist.py` /
+  `syndicate/features/shared/layer2_board.py`, NOT at `collect_candidates` or
+  `UniversalCandidate`. `[this cost one pointless worker restart on 08-15]`
+- `/api/intelligence/query` returns a **different-sized set on each call**
+  (101, 98, 271, 216, 30 observed within one hour on the same body). **Counts
+  across calls are not comparable** — compare type distributions or ratios, and
+  never quote a bare N/M as a before/after.

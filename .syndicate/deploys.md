@@ -4924,3 +4924,64 @@ Checked 2026-08-16 00:3xZ.
 
 The scheduled task `clv-settled-read-2026-08-15` fires 01:55Z, immediately after
 those transitions, and is the natural place to fold this in.
+
+### CORRECTION 2026-08-16 00:1xZ — `2c14d9ae` IS INERT ON THE SERVED PATH. The mechanism was mis-traced.
+
+The measurement owed by the entry above has been taken, and it FAILED its own
+stated falsifier. Recording it as a negative result, not quietly dropping it.
+
+**The board DID rebuild on my code** — published `computed_at 2026-08-16T00:12:39Z`,
+567 candidates, ~10.6 min end to end (`BOARD_OVERVIEW_READY` 00:02:00 ->
+`BOARD_PUBLICATION_RESPONSE_READY` 00:12:39). So the deploy is not waiting on
+anything.
+
+    AFTER a confirmed rebuild on 2c14d9ae:
+      line as a STRING   0     <- predicted to rise. DID NOT.
+      line as a number 207     of which 24 whole-numbered
+
+**The falsifier I wrote before deploying fired: the fix is INERT on this path.**
+
+**WHY, traced rather than guessed.** Every numeric-line row served carries
+`source: layer2_shortlist`, `surface_key: layer2`, `candidate_type: None`. Their
+`line` is stamped at **`syndicate/features/shared/layer2_board.py:1104`** as a
+bare `"line": row.get("line")` — a raw float copied off the market row.
+`UniversalCandidate.to_dict` is **never on this path**. A web deploy would not
+have helped either; the field is stamped in the worker, in a different module,
+before anything I changed runs.
+
+**The root error is mine and it is upstream of the deploy.** The failing test
+exercised `run_intelligence_query` with `force_refresh=True`. Production serves
+the **Layer 2 board**. I found a real flattening in the test path, then
+predicted a production number without checking that production routes through
+it. The baseline "84 of 101 numeric, 7 whole-numbered" was never a valid
+before-measurement for this change.
+
+**What remains true:** the three defects are real and fixed where they live
+(`test_intelligence.py` 216/2 -> 218/0, mutation-pinned); anything routing
+through `UniversalCandidate` now gets correct display text. **What is false:**
+any claim that `2c14d9ae` changed production. It did not.
+
+**Cost:** one refresh-worker restart that bought nothing observable. Zero jobs
+killed, so the cost is the restart and the measurement window, not lost work.
+
+**Handover, NOT actioned here:** the real fix for whole-numbered lines is at
+`layer2_board.py:1104`, a file claimed by an OPEN lane. It is not a cosmetic
+edit — `line` is one of `_IDENTITY_FIELDS` and feeds the dedupe key at
+`layer2_board.py:450`, so changing its type changes dedupe behaviour.
+
+### SEPARATE AND STILL STANDING — refresh-worker restart starvation `[measured 2026-08-15/16]`
+
+Independent of the above and unaffected by any of its errors.
+
+- Real board builds take **178 / 197 / 241 / 325 / 358 s** (3.0-6.0 min).
+  `BUILD_SPAN_EXIT elapsed_s=0.0` lines are the documented empty-pool
+  short-circuit, NOT builds — do not count them.
+- **13 refresh-worker deploys since 21:30Z.** Builds completed at 21:53 / 22:32 /
+  22:52 / 23:10 — every one inside a gap of **15-33 min**.
+- Then **six deploys in 46 minutes** (23:16, 23:25, 23:31, 23:38, 23:47, 23:56),
+  gaps of **6-9 min**: **zero builds completed.** A 3-6 min build cannot fit a
+  6-9 min gap once boot is paid.
+- The churn stopped and a build completed within ~12 min.
+- **Consequence: a burst of closely-spaced worker deploys starves the artifact
+  the whole queue is waiting on.** The board went 77 min stale on a busy worker
+  with nothing wrong with it.

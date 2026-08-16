@@ -4748,3 +4748,93 @@ a rebase, so it is filed as a request rather than raced for —
 `.syndicate/deploy/requests/2026-08-15T2350Z-smaps-reconciliation.md`.
 Until it lands the reader reports `reconciles: false` on every read. Cosmetic;
 the breakdown itself is correct.
+
+### board-publish-stall — CLOSED-FALSIFIED 2026-08-16 — no stall, no publish failure; the REAL result is that my deployed fix is INERT and restart starvation is separately real — opened 2026-08-16 — session: red-intelligence-tests
+- Goal: name the stage where a COMPLETED board build stops without publishing,
+  with a measurement, so the 77-minute-stale board has a cause rather than a
+  suspicion. Not a fix — this lane ends at a named stage and a handover.
+- **NOT A FILE-EDITING LANE (yet). `pipeline/intelligence_state.py` is claimed by
+  TWO OPEN lanes** — `clv-without-settlement` ("writer, currently held by") and
+  `clamp-fix-to-workers` (Files: it). **I will not edit it.** If the diagnosis
+  points there, it gets handed to whoever holds it. Read-only for me.
+- Files (read/diagnose only): `pipeline/intelligence_state.py`, worker logs.
+- **HYPOTHESIS, written before testing it.** The build is STALLING, not crashing,
+  in the unlogged span between `DECIDED_LIVE_PROPS_REMOVED` (last marker,
+  00:08:31Z) and `EXPOSURE_BUDGETS_*` / `LAYER2_SHORTLIST` (never reached). That
+  span runs three things over the whole merged pool:
+  `attach_board_correlation_flags`, `_attach_board_stakes`, and
+  `_attach_adjusted_scores`. The third is the suspect: its own comment says
+  `rank_recommendations` "walks odds-history/market-feature state per candidate"
+  and "was previously never called on the board path at all". 579 candidates x
+  an odds-history walk is exactly the shape `#414` measured at 21.5x.
+- **Falsification test:** if a `BOARD_OVERVIEW_READY` for a NEW build appears
+  after 00:08:31Z, the build was ABANDONED by the loop rather than stalled, and
+  the stall hypothesis is wrong. Equally, if candidate counts for this build are
+  no larger than the 22:5x build that published fine in ~3 min, then volume is
+  not the cause and the stage is failing for a different reason.
+- **Already established, and NOT to be re-derived:**
+  - Last publish `computed_at 2026-08-15T22:55:10Z`; still stale at 00:12:29Z.
+  - This build: `BOARD_OVERVIEW_READY` 00:02:00, collect 00:02:01->00:07:58
+    (357.73s), `BOARD_RAW_CANDIDATES` 684/684, `CANDIDATE_SLATE_FILTER` kept
+    579, `DECIDED_LIVE_PROPS_REMOVED` 00:08:31. **Then silence.**
+  - The only `Traceback` in the window is `generate_smartsim2_nfl_projections.py`
+    `assert_ratings_data_available` — a DIFFERENT job, **not this path**. Do not
+    attribute the stall to it.
+  - Real builds tonight took **178 / 197 / 241 / 325 / 358 s**. Everything else
+    logging `BUILD_SPAN_EXIT elapsed_s=0.0` is the documented empty-pool
+    short-circuit, not a build.
+- **RESTART-STARVATION IS SEPARATELY TRUE AND IS NOT THIS.** 13 refresh-worker
+  deploys since 21:30Z. Builds completed at 21:53 / 22:32 / 22:52 / 23:10, all
+  inside gaps of 15-33 min. Then SIX deploys in 46 min (gaps 6-9 min) and **zero
+  builds completed**. A 3-6 min build cannot fit a 6-9 min gap minus boot. The
+  churn was starving the artifact the whole queue was waiting on. **But the
+  current stall is on a quiet worker with no restart since 23:56:06Z**, so
+  starvation does not explain it.
+- Blocked by: none. NO DEPLOY, NO EDIT to the claimed writer.
+
+#### board-publish-stall — CLOSED-FALSIFIED 2026-08-16. The hypothesis was wrong and the by-product is the finding
+- **HYPOTHESIS FALSIFIED.** There was no stall and no publish failure. The build
+  completed normally: `ADJUSTED_SCORES_ATTACHED` 00:12:00 (the span I suspected
+  took 3.5 min, not forever) -> `EXPOSURE_BUDGETS_APPLIED` ->
+  `LAYER2_SHORTLIST` -> `CANDIDATE_POOL_READY 567` ->
+  `BOARD_PUBLICATION_RESPONSE_READY` **00:12:39Z**.
+- **MY "IT DID NOT PUBLISH" CLAIM WAS AN ARTEFACT OF READING TEN SECONDS EARLY.**
+  I read `computed_at` at 00:12:29 and a log window that was still being
+  written. `absence in a window is not absence` — a rule I already held.
+- **THE REAL RESULT, and it is a negative one: `2c14d9ae` IS INERT.** After the
+  confirmed rebuild, `line as a string` is still **0**. The falsifier I wrote
+  before deploying fired exactly as designed.
+- **TRACED, not guessed:** every served row carries `source: layer2_shortlist`,
+  `surface_key: layer2`, `candidate_type: None`. Its `line` is stamped at
+  **`syndicate/features/shared/layer2_board.py:1104`** (`"line": row.get("line")`).
+  `UniversalCandidate.to_dict` is **never on that path**, and a web deploy would
+  not have helped — the field is stamped in the worker, in another module.
+- **Root error is upstream of the deploy:** the failing test exercised
+  `run_intelligence_query(force_refresh=True)`; production serves Layer 2. I had
+  a real defect, a mutation pin, a production baseline and a written falsifier —
+  and never checked that the baseline and the fix describe the SAME PATH.
+- **STILL STANDING, independent of all of the above: restart starvation.**
+  Builds take 178-358 s; they completed in every 15-33 min gap and in NONE of
+  six deploys spaced 6-9 min. The board went 77 min stale on a busy worker.
+- **HANDOVER, deliberately not actioned.** The real fix for whole-numbered lines
+  is `layer2_board.py:1104`, in a file claimed by an OPEN lane. **Not cosmetic:**
+  `line` is one of `_IDENTITY_FIELDS` and feeds the dedupe key at `:450`, so
+  changing its type changes dedupe behaviour. Whoever takes it should measure
+  dedupe counts before and after.
+- **I edited nothing in `pipeline/intelligence_state.py`**, as the lane promised.
+
+#### LEDGER DATA LOSS FOUND AND REPAIRED 2026-08-16 — `learnings.md` worktree was 905 lines short of HEAD
+- Caught because the index builder reported **103 rules** where it had reported
+  **118** an hour earlier. **A count that goes DOWN on an append-only file is
+  the alarm.**
+- The worktree copy was missing **46 rule headings that are in HEAD**, including
+  several FORBIDDEN entries and three rules I had already committed. It had 3
+  genuinely new ones (two from another session, one mine) appended onto the
+  stale base. **Committing the worktree would have deleted 46 rules.**
+- Repaired by rebuilding `HEAD + the 3 new rule bodies` and regenerating the
+  index: 2259 -> 2368 lines, 146 rules, deletions vs HEAD limited to the index
+  block. Stale copy preserved at `C:/tmp/learnings_worktree_backup.md`.
+- **Possible near-duplicate to dedupe, flagged not resolved:** the worktree
+  carried a reworded joiner-zero FORBIDDEN rule while HEAD has the original
+  `same_book_n=0` wording. I kept BOTH — a duplicate is recoverable, a lost rule
+  is not. Whoever owns that rule should merge them.

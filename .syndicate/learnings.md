@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 145 rules `[generated]`
+## Index — 147 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -53,7 +53,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 129**
+**Rules and corrections — 131**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -184,6 +184,8 @@
 - [2026-08-15 — NEVER PIPE A COMMAND WHOSE EXIT CODE YOU DEPEND ON](#2026-08-15-never-pipe-a-command-whose-exit-code-you-depend-on)
 - [2026-08-15 — THE DEPLOY CLAIM IS ADVISORY, AND IT LOST A RACE IT LOOKED LIKE IT WOULD WIN](#2026-08-15-the-deploy-claim-is-advisory-and-it-lost-a-race-it-looked-like-it-would-win)
 - [2026-08-16 — THE HANDOFF THAT WORKED WAS A SCHEDULED TASK, NOT A MESSAGE](#2026-08-16-the-handoff-that-worked-was-a-scheduled-task-not-a-message)
+- [2026-08-16 — A TEST THAT PROVES A DEFECT DOES NOT PROVE PRODUCTION RUNS THROUGH IT. I DEPLOYED A CORRECT FIX TO AN UNUSED PATH](#2026-08-16-a-test-that-proves-a-defect-does-not-prove-production-runs-through-it-i-deployed-a-correct-fix-to-an-unused-path)
+- [2026-08-16 — COLLAPSING A LEDGER FILE WITHOUT FIXING THE WRITING HABIT JUST REGROWS IT](#2026-08-16-collapsing-a-ledger-file-without-fixing-the-writing-habit-just-regrows-it)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -2257,3 +2259,137 @@ distinguish "healthy" from "could not read", it is not a poll. This is
 [[feedback_unknown_must_not_default_permissive]] recurring in a wait loop
 rather than in application code, and [[feedback_instrument_blindness]]: a
 healthy reading is evidence only once you know what makes it read unhealthy.
+
+## 2026-08-15 — FORBIDDEN: never read a joiner zero as a fact about the world until the reader is shown to SEE the data
+
+Supersedes and merges two entries from the same night (full evidence in
+`learnings_evidence.md`): the pre-registered rule *"if `same_book_n` is still 0,
+the blocker is odds-history breadth"*, and its refutation.
+
+**What happened.** The rule was written in advance, in good faith, and was
+wrong. `same_book_n=0` came back for all 8 sports. The truth: `/api/ops/clv/report`
+runs on **web**, `load_openings` is a `path.exists()` on a local file, and web
+held **0 bytes** of the ledger while refresh-worker had **490 openings recorded
+for that same date**. The endpoint returned `ok: true` throughout. Shipping one
+allowlist line moved `same_book_n` **0 → 144** with **no change to odds history
+at all**. Breadth constrains `resolved` (`no_market_in_history: 172`), never
+`same_book_n`.
+
+**The generalisable trap: a zero with two sufficient causes.** "No same-book
+pairs" is produced BOTH by a thin market AND by an empty input. The rule named
+one and never checked the other, so the unanticipated cause was silently routed
+into the anticipated explanation. **A decision rule that maps every zero onto a
+substantive cause is a rule with no null branch.**
+
+**How to apply:**
+- Demand a NON-ZERO reading from the same instrument before believing a zero.
+  Here one call did it: the same endpoint for the previous date, known to have
+  150 openings, also returned 0. Two known-non-empty inputs, both 0 → the
+  instrument.
+- Read the SIBLING fields first. `unresolved_reasons: {}` and `by_book_scope: {}`
+  were empty in the very first payload; under the breadth hypothesis they are
+  necessarily non-empty. The refutation was already on screen.
+- **Name the service that runs the code and the service that owns the file,
+  every time.** Deployed and reachable ≠ able to read. An allowlisted pattern
+  PERMITS a transfer; it does not make one happen.
+- A report whose "no data" and "cannot see data" look identical is a defect in
+  the report. 0 openings and 490 openings must not share a response shape.
+
+### 2026-08-16 — A TEST THAT PROVES A DEFECT DOES NOT PROVE PRODUCTION RUNS THROUGH IT. I DEPLOYED A CORRECT FIX TO AN UNUSED PATH
+
+Three red tests in `test_intelligence.py` led to three real defects, all fixed,
+218/0, every fix mutation-pinned. Then I predicted a production number from
+them, deployed refresh-worker to get it, and the number **did not move** —
+because the code I fixed is not on the path production serves.
+
+**The gap.** The failing test exercised `run_intelligence_query` with
+`force_refresh=True`, where a candidate flows through `UniversalCandidate.to_dict`.
+**Production serves the Layer 2 board**: every served row carries
+`source: layer2_shortlist`, `surface_key: layer2`, `candidate_type: None`, and
+its `line` is stamped at `layer2_board.py:1104` as a bare `row.get("line")`
+float. `to_dict` never runs on it. A web deploy would not have helped either —
+the field is stamped in the worker, in a different module, upstream of my change.
+
+**What made it feel verified when it was not.** I had a genuine defect, a
+reproducing test, a mutation pin, a measured production baseline (84 of 101
+numeric, 7 whole-numbered), and a falsifier written down before deploying. Every
+one of those is good practice and none of them checks the one thing that was
+wrong: **that the baseline and the fix describe the same code path.** The
+baseline measured the served payload; the fix changed a producer that payload
+does not use. Two rigorous halves, never joined.
+
+**How to apply.**
+- Before predicting a production number from a test, **trace one served row back
+  to its producer** and confirm your changed function is in that trace. A field
+  on the payload does not tell you who wrote it — `source`/`surface_key` on the
+  row often does, and it took one request to read.
+- "Which service runs this" is necessary but NOT sufficient. I got the service
+  question right (worker, not web) and still shipped to an unused module. The
+  question is which **producer**, not which host.
+- **A falsifier is only worth writing if you will act on it.** This one fired
+  exactly as designed and it is the reason the error is one restart rather than
+  a false entry in `deploys.md` — but it fired AFTER the deploy. The same check
+  run BEFORE, as "does my function appear in this row's provenance", costs one
+  request and no restart.
+- Related, same session, same shape: I called a build "stalled, did not publish"
+  from a log window I had read **ten seconds** before the publish line was
+  written. `absence in a window is not absence` — and I already held that rule.
+
+## 2026-08-15 — FORBIDDEN: shipping a verification you have not falsified. THREE failed checks in one night, zero failed fixes
+
+Every one of these produced the reading a BROKEN FIX produces, so the natural
+next move was to debug working code or roll back a correct change.
+
+1. **Measured the input the fix never touches.** A watcher compared
+   `row["line"]` to `cell.home.line` on the book-grid and would PASS only when
+   they stopped being opposite — but that opposition is the INPUT SHAPE and the
+   fix changed the SHORTLIST candidate. It reported `opposite=573 / FAIL` on
+   perfectly healthy data, forever.
+2. **Confused "not rebuilt yet" with "rebuilt and wrong."** The same watcher had
+   no `written_at` gate, so a stale artifact and a broken fix were the same
+   output.
+3. **Compared a snapshot against a moving reference.** The replacement joined a
+   frozen shortlist (`written_at` 00:12:35Z) to a LIVE grid fetched 15 minutes
+   later. A spread that moved in between read as a mismatch: `away_wrong=1`,
+   reported FAIL, while the fix was in fact working (`home_correct=2/2`).
+
+**The rule.** Before arming any check, ask the falsification question about the
+CHECK, not the fix: *what reading would this produce if the fix worked
+perfectly?* If that equals the failure reading, the check is broken. Then:
+- **Name the artifact the change WRITES and measure that one.** A related
+  endpoint showing the same concept is not it.
+- **Gate on the artifact's own `written_at`** against the deploy time, so
+  "not rebuilt yet" can never be read as "wrong".
+- **Join snapshot to snapshot.** Read both sides at the same instant, or compare
+  only fields that cannot move between reads.
+- **For a PRODUCER, the deploy is the START of the wait.** Code being live is not
+  the artifact being fixed, and "no errors in the logs" is evidence that nothing
+  crashed — a different claim from the fix working.
+
+Full evidence for 1 and 2 is in `learnings_evidence.md`; 3 is in `deploys.md`
+under the candidate-line verification.
+
+### 2026-08-16 — COLLAPSING A LEDGER FILE WITHOUT FIXING THE WRITING HABIT JUST REGROWS IT
+
+- What we believed: `state.md` was too big, so collapsing it to current truth
+  would fix it.
+- What was actually true: it went **40 KB -> 113 KB in about five hours**. The
+  section list showed the mechanism plainly -- **eight separate UI/card sections
+  and four soccer ones**, each a dated measurement rather than a subject, several
+  superseding each other. Two carried claims the file itself refuted further
+  down: the prop `0.5` fix "on no worker" (live on both), and soccer's "250x
+  disagreement / 8,456 rows / 29.6%" (one join, two different grids). **A reader
+  going top-down hits the wrong answer first**, which is the real cost -- the
+  byte count is only the symptom.
+- How we found out: printed the section list with sizes instead of reading the
+  file, which made the one-section-per-measurement pattern obvious in seconds.
+- The rule going forward: **when a ledger file regrows, fix the WRITING RULE and
+  put it where the writing happens, not just the contents.** Each collapsed
+  section now opens with "OVERWRITE this; do not append another section", and
+  `learnings.md`'s preamble now states that the five-bullet template is what
+  makes compaction mechanical and that a prose entry costs every future session
+  ~2 KB forever. Also: **a compaction script must leave an entry INTACT when it
+  cannot find the rule** -- guessing keeps the evidence and drops the rule,
+  which is the one outcome worse than the file being large.
+- Cost: a second full collapse of the same file within one session, and four
+  wrong claims live in the ledger for hours between the two.
