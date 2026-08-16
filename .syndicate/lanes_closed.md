@@ -7203,3 +7203,892 @@ whole-numbered is the one that should move, and `market_key`/`player_name` at
   `1f36d718`) and I verified BY CONTENT that neither carried my fixes. They went
   idle without answering the carry request.
 - **No claim was forced at any point**, by choice as well as by the harness.
+
+### spread-line-sign-convention — **CLOSED-VERIFIED 2026-08-16 — home candidates now carry their own handicap, confirmed on a post-deploy artifact (`written_at=00:12:35Z`, 2/2 home rows). n=2; generality beyond mlb unmeasured** — opened 2026-08-15 — session: lane-cleanup
+- **TEMPLATE QUESTION ANSWERED 2026-08-15 23:2xZ. THE CONVENTION IS
+  `row["line"] == THE AWAY HANDICAP`, AND ONLY THE HOME SIDE IS BROKEN.**
+  - From the 525-cell result: `cell.home.line == -row.line` and (per-book
+    internal consistency) `cell.home.line == -cell.away.line`. Therefore
+    **`cell.away.line == row.line`, exactly.**
+  - So: **away-side rows are CORRECT** — their price and `row["line"]` describe
+    the same bet. **Home-side rows are INVERTED** — `layer2_board.py:852` pairs
+    `cell["home"]["price"]` with `row["line"]`, which is the away handicap.
+  - That is why the no-arb violation showed up only when comparing a home `-1.5`
+    opening against a home `+1.5` one: both were home rows.
+- **NO TEMPLATE CONSUMES THE SHORTLIST — but chat does, because I wired it there
+  tonight.** `grep` over `templates/` and `static/` for `layer2-shortlist`:
+  **zero hits**; the board still renders `ranked_all`. The one consumer on a
+  user-facing path is `ask_the_syndicate_adapter.py:599`
+  (`_board_top_opportunities`), shipped this session as web `c774fe1a`, whose
+  `_board_row_selection` renders `f"{side} {line}"`.
+  - **Verified live**: the chat headline served
+    `'away -1.5 (San Diego Padres @ Cleveland Guardians)'` — an AWAY row, which
+    is the correct case. **A HOME spreads row in that list would display the
+    away handicap beside the home price.**
+  - **So the user-facing blast radius is: home-side spread selections appearing
+    in the Ask headline.** Narrow, real, and created by my own change tonight —
+    before `c774fe1a` the shortlist had no user-facing consumer at all.
+- **SEVERITY, stated so it is not over- or under-called:** not a board-wide
+  mislabel (the board does not read these rows), not zero either. It also
+  corrupts every home-side spread row in the CLV join, which is where it was
+  found.
+- Files (claimed 2026-08-15 23:0xZ — **claimed LATE, after the edit, which is a
+  protocol lapse of mine; recorded rather than quietly backfilled**):
+  `syndicate/features/shared/layer2_board.py`,
+  `tests/test_layer2_book_prices_line.py`. Collision check RUN via
+  `lane-guard.py`'s own `_claims()` at edit time AND again now: CLEAR both times,
+  so no other lane was blocked by the gap.
+- **FIX IMPLEMENTED, TESTED, ON MAIN AS `edbbee9d` — DEPLOY HELD.**
+  `_side_line_from_cells` reads the handicap from the same cell as the price;
+  no-op for away/h2h/props; returns None (caller keeps the row value) when books
+  disagree on the sign. 8 new tests, 71 green across board + CLV suites.
+  **Not deployed: it needs REFRESH-WORKER, and an MLB sim (pid 79) plus a board
+  build were in flight.** Forward-only — today's openings keep the bad lines.
+  Ship when the slate is quiet, then re-run the 525-cell invariant.
+- **FIX unchanged and now fully justified:** at `layer2_board.py:852` take the
+  line from the same cell as the price. Away is already right, so the change
+  must not touch it — negate only for the home side, or carry
+  `cell[side]["line"]` per book.
+- **SAME-BOOK TEST RUN 2026-08-15 23:1xZ on `/api/board/book-grid` (mlb, 33
+  spreads rows, 525 book-cells). THIS IS THE DECISIVE MEASUREMENT and it is
+  UNIFORM, not statistical:**
+
+      1. each book's OWN home/away lines sum to zero    525/525  consistent
+      2. cell's home line vs the ROW's `line`             0/525  agree
+                                                        525/525  OPPOSITE SIGN
+      3. no-arb per book (implied home + implied away)  median 1.0483, none < 1.0
+
+- **`book_prices` IS NOT MIXING BOOKS. Every book agrees with every other book
+  and with itself.** The 2026-08-07 `_complementary` condition (*"books inside a
+  single grid row disagree on the SIGN"*) is real but is **NOT** what is
+  happening on this data. My previous entry blamed book-vs-book mixing; that is
+  now refuted — 100% agreement between books.
+- **THE ACTUAL DEFECT, and it is deterministic:** the ROW's `line` is the
+  NEGATION of the cell's `home.line`, in every single case. So
+  `layer2_board.py:852` building `book_prices = {book: cell["home"]["price"]}`
+  and publishing it beside `row["line"]` pairs **the home team's price with the
+  opposite handicap**. Every home-side spread opening is therefore recorded as
+  `side=home, line=L, price=<home price at -L>`.
+- **THIS PARTIALLY REINSTATES THE FINDING I WITHDREW, with a corrected
+  mechanism.** The 16-of-17 no-arbitrage violations were REAL; my second reading
+  ("confounded by book mixing") was wrong. It is not mixing — it is a uniform
+  row-vs-cell convention mismatch. **Third revision of this attribution; this
+  one is measured on 525 cells with 100% agreement rather than inferred from a
+  neighbouring module's comment.** The sequence, so nobody re-treads it:
+  feed transposes labels (WRONG) -> books disagree so `book_prices` mixes
+  (WRONG) -> row.line is uniformly the negation of the cell's home line (this,
+  measured).
+- **STILL NOT ESTABLISHED — the user-facing question, now sharper.** `row["line"]`
+  being the away handicap may be the board's INTENDED convention, in which case
+  the cards are fine and only the home-side flattening at `:852` is wrong. The
+  test is narrow: **does any template render `row.line` beside a HOME selection?**
+  Read the card template before assigning any user-facing severity.
+- **FIX, now well-specified:** at `layer2_board.py:852`, take the line from the
+  same cell as the price (`cell[side]["line"]`) rather than inheriting
+  `row["line"]` — either by carrying it per book or by negating for the home
+  side. Do NOT "fix" the sign at the CLV end; the pairing is wrong where it is
+  built, and every other consumer of `book_prices` inherits it.
+- **TRACED 2026-08-15 23:0xZ. THE LINE IS SET AT `layer2_board.py:852-858`, AND
+  THE DEFECT IS A DROPPED FIELD, NOT AN INVERTED SIGN.**
+
+      "book_prices": {
+          str(book): cell[side]["price"]        # <- price kept
+          for book, cell in (row.get("cells") or {}).items()
+          ...                                    # <- cell[side]["line"] DROPPED
+      }
+
+  Full chain: fetcher (`fetch_mlb_oddsapi_local.py`, EXONERATED — derives
+  `home_line = -away_line` per lane) -> book grid (`book_grid.py:304`, passes
+  `row.get("line")` through) -> `layer2_board` flattens each cell to a bare
+  price -> `record_openings` stores that flat map -> `clv_join`'s same-book
+  override reads `book_prices[book]` and pairs it with the ROW's line.
+- **THIS REPO ALREADY KNEW, IN A NEIGHBOURING MODULE, AND SAID SO.**
+  `board_cross_book.py` tags each quote with *"the CELL's own line, which is not
+  always the row's line … this is the pairing guard"*, and `_complementary`
+  documents the measured reason (production 2026-08-07, `spreads_alt`, first5):
+
+      betmgm     away -1.5 (+210)   home +1.5 (-295)
+      betrivers  away +1.5 (-240)   home -1.5 (+180)
+
+  **Books inside ONE grid row disagree on the SIGN of the line.** That module
+  refuses such pairings ("*spreads are signed per side*", postmortem §2.6, after
+  a false +250.88% arbitrage). `layer2_board`'s `book_prices` drops the very
+  field that guard depends on — and the comment above it says so deliberately:
+  *"Flat {book: price}, not the whole cell."* The choice was made for artifact
+  size; its cost is that sign information is unrecoverable downstream.
+- **SO MY PREVIOUS CONCLUSION IS WRONG AND I AM WITHDRAWING IT.** I reported "the
+  BOARD's home-spread `line` sign is inverted, 16 of 17 — possible user-facing
+  mislabel". **That test was confounded by exactly this mixing:** it compared
+  `book_prices` across books for one row-level line, and those books were not
+  all quoting the same side. The 16/17 measures **sign disagreement BETWEEN
+  BOOKS**, which is a known and expected market fact — not a board defect.
+  **There is no evidence of a user-facing mislabel. Do not act on that claim.**
+- **What IS established:** `book_prices` silently mixes books quoting opposite
+  sides of a spread, so ANY consumer reading it for a spread selection can get
+  the opposite bet's price. `clv_join`'s same-book override is one such consumer;
+  that is the `-29.90`/`+30.428` mirror pair.
+- **What is NOT established, and needs a same-book test to settle:** whether the
+  ROW's own `line`+`price` (anchor book) are correct. My attempt was confounded —
+  the two openings had DIFFERENT anchor books (onexbet, betopenly), and since
+  books disagree on sign, an anchor-vs-anchor comparison proves nothing. The
+  clean test is one book quoting both lines of one event.
+- **REVISED FIX (do not ship before the same-book test):** carry the cell's line
+  alongside its price — `{book: {"price": …, "line": …}}` — or refuse a same-book
+  join whose book line is unknown. The size objection in that comment is real and
+  should be answered with a line-only companion field, not by dropping the guard.
+- **DISCRIMINATOR RUN 2026-08-15 22:4xZ. It trusts NEITHER label**, which is what
+  makes it decisive: for one team, `-1.5` (win by 2+) is strictly harder than
+  `+1.5`, so `implied(-1.5) < implied(+1.5)` is a no-arbitrage fact regardless of
+  whose naming is right.
+
+      source                          respects invariant   violates
+      BOARD (published openings)            1 of 17          16
+      FEED  (odds-history lanes)            2 of 2            0
+
+  Board pairs span **15 distinct events** and many books; junk quotes
+  (`novig -100000`) excluded. The single exception is `nordicbet -1.5=117 /
+  +1.5=111` — implied 0.461 vs 0.474, a 1.3-point gap on a near-pick'em, i.e.
+  inside the vig and not evidence of correctness.
+- **The feed, on the same event, is internally right both times:** home `+1.5`
+  at `-205` (implied 0.672, the easier bet, minus money) and home `-1.5` at
+  `+168` (implied 0.373, the harder bet, plus money).
+- **SO: `fetch_mlb_oddsapi_local.py` IS EXONERATED. The bug is downstream, where
+  a published home-spread selection gets its `line`.** The hypothesis in this
+  lane's header is CONFIRMED and the falsification branch (lane-collapse only)
+  is REFUTED — lane collapse is real but cannot explain a systematic sign
+  violation across 15 events.
+- **MY EARLIER ATTRIBUTION IS NOW DOUBLY CORRECTED, and this is the final
+  version.** First I wrote that the FEED "transposed its labels" (in
+  `learnings.md`). Then I corrected that to "each point is internally
+  consistent; the market state holds one lane at a time". **Measured, it is
+  neither: the feed is correct and the BOARD is inverted.** The learnings entry
+  from earlier tonight describes the right FAILURE MODE (a label whose
+  convention is not stable across sources) but names the wrong culprit.
+- **THIS IS BIGGER THAN CLV AND MUST NOT SHIP AS A CLV FIX.** These openings are
+  recorded FROM published board rows, so if the board serves `side=home,
+  line=-1.5` while the price is the `+1.5` price, **users are being shown the
+  wrong side of the run line.** That is a correctness problem on the product
+  surface; CLV merely made it visible.
+- **UNVERIFIED, and it decides the severity — DO THIS BEFORE ANY FIX:** I have
+  NOT checked what the rendered card/API actually displays. Two possibilities and
+  they need different fixes: (a) the board's `line` field is genuinely inverted at
+  the point of publication -> user-facing defect; (b) the board's `line` means
+  something other than the home team's handicap (e.g. it carries the away line,
+  or the market line) and only the CLV join misreads it -> internal-only. **The
+  price data cannot tell these apart; only reading the publisher and the template
+  can.**
+- Next step, concrete: find where a spreads selection's `line` is set on the
+  published row (start from `pipeline/layer2_shortlist.py` and the per-sport
+  `cards.py`), and read what the card template renders beside it. Then decide (a)
+  vs (b). **Still no deploy** — and generality beyond MLB is still unmeasured.
+
+- Goal: for a spread, ONE source owns the sign of `line` and every consumer
+  agrees with it. Testable outcome: for every same-book spreads row in
+  `/api/ops/clv/report`, the opening's `(side, line, price)` and the close's
+  `(side, line, price)` describe the SAME bet — checked by an assertion that does
+  not itself rely on the label (see below) — and a test pins the convention per
+  source.
+- **WHY: a `-29.90` CLV on a market that never moved.** Event `69928d29…`
+  (Seattle @ Houston), FanDuel spreads. The opening recorded `home -1.5 @ -205`;
+  the close resolved `home -1.5 @ +168`. `-205` and `+168` are the two sides of
+  ONE run line, so the "30-point move" is a bet differenced against its opposite.
+- **REFINEMENT FROM READING THE FETCHER — my first framing was too strong and is
+  corrected here before anyone acts on it.** I wrote in `learnings.md` that the
+  feed "transposed its labels". **Each history point is internally consistent:**
+  `fetch_mlb_oddsapi_local.py:505-525` derives `home_line = -away_line` and keys
+  each lane by the home line, so `{away -1.5 / home +1.5}` and
+  `{away +1.5 / home -1.5}` are both correct — they are **two different lanes of
+  the same spreads market**.
+  - **The real mechanism is that the odds-history market key carries NO line**
+    (`event_id|home_team|away_team|market|bookmaker`), which `clv_join.py`'s own
+    docstring already states. So every spread lane collapses into ONE market
+    state and the last writer wins. At 06:02Z that state held the home `+1.5`
+    lane; at 21:26Z it held home `-1.5`.
+  - **What is still genuinely unresolved, and is this lane's question:** the
+    opening says `home -1.5` costs `-205`; the 06:02 history says `home +1.5`
+    costs `-205`. Same price, opposite line. **One of the two is using the
+    opposite sign convention for a home spread, and I do not yet know which.**
+- Hypothesis: the board's published `line` for `side=home` carries the OPPOSITE
+  sign to the feed's `home_line`. If so every home spread opening is joined to
+  the wrong lane, and away rows are joined correctly by accident.
+- Falsification test: if the board and feed signs agree, then the mismatch is
+  purely lane-collapse (the state simply held a different lane than the opening),
+  the sign is exonerated, and the fix is to key history by line rather than to
+  change any sign.
+  - **Discriminator that does NOT trust either label:** for one event, take the
+    published `book_prices` for the home `-1.5` selection and the feed's two
+    lanes at the same instant. The lane whose `home_odds` EQUALS the published
+    price identifies which line the board meant. Prices are the invariant here;
+    labels are the thing under test.
+- **SCOPE ALREADY MEASURED, so nobody re-derives it:** mlb 2026-08-15 same-book —
+  spreads n=42, mean `+0.515`, median **exactly 0.000**, only 2 rows |clv|>10 and
+  those two are a **mirror pair from this one event** (`+30.428` / `-29.900`),
+  because both openings were recorded and each got the other's close. h2h/totals
+  n=128, **zero** |clv|>10. **Severe per row, near-cancelling in aggregate** —
+  so this corrupts per-recommendation CLV, variance, CIs and any "worst bets"
+  list, while leaving the headline roughly intact. **It is NOT a headline
+  emergency and must not be deployed like one.**
+- Files (exclusive to this lane):
+  - `scripts/fetch_mlb_oddsapi_local.py` — where `home_line`/`away_line` and the
+    lane key are derived. Collision check RUN via `lane-guard.py`'s own
+    `_claims()`: CLEAR.
+  - `tests/test_spread_line_sign_convention.py` (new). CLEAR.
+  - **NOT claimed, held by other OPEN lanes — coordinate, do not edit across:**
+    `syndicate/features/shared/odds_refresh_tracking.py`
+    (`closing-stamp-is-detection-time`) and
+    `syndicate/features/shared/clv_join.py` (`clv-without-settlement`). Both are
+    this session's lanes, so the marker can simply be moved if the fix lands
+    there — but the claim must be updated first, not bypassed.
+- Verification: (1) the discriminator run on >= 5 events across >= 2 books, with
+  the winning convention named per source; (2) a test pinning it; (3) the
+  spreads |clv|>10 count re-derived and the mirror pair gone.
+- **Generality is UNMEASURED and must be established before any fix ships:** all
+  of the above is ONE event, ONE date, MLB, FanDuel. NFL/NCAAF spreads and other
+  books are untested, and MLB run lines are the asymmetric case that makes the
+  error visible — symmetric `-110/-110` spreads would hide it entirely.
+- Blocked by: none. **No deploy without `/preflight`**, and not before generality
+  is measured — a sign flip applied to a source that was already correct would
+  invert every spread join instead of fixing it.
+
+### (superseded lane detail — the original body this lane was opened with)
+- Goal: name why MLB odds went **2h01m without a single new quote observation**
+  on 2026-08-14 while the refresh loop ticked ~8 times through it. Testable
+  outcome: the gap is attributed to a named gate/failure with a log line or a
+  counter proving it, and either fixed or filed with the fix specified.
+- **MEASURED BEFORE HYPOTHESISING, all times CDT:**
+  - Freshest MLB quote observation was **08:09:14** and was still 08:09:14 when
+    re-read **78 minutes later** — the identical instant, so this is a stall,
+    not a slow cadence. Read twice off `/api/board/layer1` (10:00 and 10:18).
+  - The board artifact rebuilt normally through the whole gap (10:09 build
+    against 08:09 odds). **Board freshness and odds freshness are independent**
+    — the grid keeps re-pivoting a frozen shard, which is exactly why nothing
+    downstream noticed.
+  - **The loop was NOT dead.** `loop_tick_begin` on live-odds-worker at 08:08,
+    08:24, 08:39, 08:54, 09:09 ... and `loop_sleep` carrying
+    `interval_seconds: 900`, i.e. the adaptive pregame cadence, working as
+    designed. Ticks ran; quotes did not appear.
+  - **Not memory.** 795MB of 2048, 1252MB headroom, zero `MEMORY_GUARD` hits in
+    the window. The two `server_failed earlyExit=true evicted=false` events
+    (06:16Z, 12:22Z, ~6h apart) are the worker's OWN `max_uptime_seconds`
+    recycle, not crashes — `run_live_odds_refresh_worker.py:411` prints
+    `RECYCLING ... to reset accumulated page cache`. Do not chase these.
+  - **It recovered on its own** between 10:18 and 10:36 (freshest observation
+    moved to 10:10). So the target is an intermittent gate, not a dead service.
+  - Cross-sport at 10:37: mlb 23.5m, wnba 54.0m, nfl 53.1m, soccer 12.9m. Tens
+    of minutes is NORMAL here. The 2h hole is the tail of an existing
+    distribution, not a unique event — so "is 2h just a long sample of the
+    ordinary cadence" is a live alternative to the gate story and must be
+    tested, not assumed away.
+- Hypothesis: the tick runs but the per-sport fetch is skipped by a gate that
+  is time- or state-dependent (a T-window/cost gate, an "already captured"
+  short-circuit, or an OddsAPI error swallowed into a no-op), so the tick
+  reports success while writing nothing to the `book_quotes` shard.
+- Falsification test: if a tick inside a stall is shown to CALL the OddsAPI and
+  receive quotes, then the fetch is not being skipped and the loss is
+  downstream in the shard write or the last-seen tracking — a different fix in
+  a different file, and this hypothesis is dead.
+- Secondary falsifier: if the per-tick quote-write count is nonzero throughout
+  the 08:09-10:10 window, then nothing stalled and `seen_age` is simply not
+  measuring what the board is now reporting — which would make the freshness
+  field I just shipped WRONG and is the first thing to rule out.
+- Files: none claimed yet — this is read-only diagnosis until the gate is
+  named. Any fix will land in `syndicate/features/shared/live_refresh_loop.py`
+  or `scripts/run_live_odds_refresh_worker.py`, **both of which are claimed by
+  OPEN lane `mlb-props-regen`** (`live_refresh_loop.py`) and
+  `refresh-worker-anon-leak` / `anon-allocation-site`
+  (`run_live_odds_refresh_worker.py`). Diagnosis can proceed; a fix cannot be
+  written here without reassigning that file. Flagged now rather than at the
+  point of edit.
+- Blocked by: none for diagnosis. Blocked on lane reassignment for any fix.
+
+### quote-join-enrich-cost — FOLLOW-UP 2026-08-14 04:37Z — the fix HOLDS, the workload OUTGREW it
+
+- **UNION-NARROWING ANALYSIS 2026-08-14 05:0xZ — TRACED, NOT SHIPPED. Read the
+  equivalence warning before writing any of it.**
+  - **Where the ~12k rows/call come from.** The union is
+    `by_event | by_player | team_groups`
+    (`odds_book_quotes.py` ~1292-1307). For a GAME row, `wanted_teams` pulls in
+    **every quote row for that game** — every market x every book x every
+    selection. That branch dominates; `by_event` and `by_player` are narrow.
+  - **OPTION A — market prefilter.** The caller already passes `market`. A
+    `by_market` index intersected with the union would cut it by roughly the
+    markets-per-game factor (potentially 10x+).
+    **NOT equivalence-preserving.** Today the order is identity FIRST, then
+    market narrowing with `candidates = narrowed or candidates`. That trailing
+    `or` means a market-vocabulary mismatch **falls back to every row of the
+    game**. Prefiltering by market removes that fallback: rows that today
+    return a same-game quote would return `None`.
+    Arguably MORE correct — but it is a silent-failure join, and the decision
+    to drop the fallback must be made deliberately, not as a side effect of an
+    optimisation.
+  - **OPTION B — skip `team_groups` when `by_event` or `by_player` already hit.**
+    Team matching is the FALLBACK identity signal; when `event_id` matched, its
+    rows are the same game anyway. Same objection: it changes which rows reach
+    `identified`, so it is not equivalence-preserving either.
+  - **WHY NEITHER WAS SHIPPED TONIGHT.** The original `#414` index was safe
+    because it was PROVABLY equivalent — 30+ query shapes asserted identical
+    against a full-scan reference, exercising `by_event`, `by_player`,
+    `by_teams_fallthrough` AND `no_identity`. Both options above deliberately
+    change the identified set, so a differential test cannot pass; they need a
+    test that PINS the new semantics, plus an explicit answer to "is losing the
+    market fallback intended?".
+  - This function's own docstring is the reason for the caution: *"a missing
+    quote is visibly missing, a wrong one silently misprices the card and, once
+    `#213` records it at bet time, poisons CLV."*
+  - **RECOMMENDED ORDER for whoever takes it:** (1) decide the fallback
+    question — it is a product call, not a performance one; (2) write the test
+    that pins the chosen semantics; (3) then implement. Doing 3 first is how a
+    silent mispricing ships.
+
+- **The `#414` index is still doing its job.** 833,619 rows walked against a
+  13,215,068-row shard = **6.3% scanned**, ~16x reduction, consistent with the
+  21.5x measured at 00:18Z. It has not degraded.
+- **But per-game cost is climbing again: 7-8s -> 14.70s.** Fresh MLB readings:
+  ```
+  04:37:09  total 14.70s  walked  833,619  shard 13,215,068  calls 69
+  04:29:34  total  9.12s  walked  760,417  shard 12,832,072  calls 44
+  04:15:55  total  4.76s  walked   16,642  shard     49,172  calls  2
+  ```
+- **TWO separable drivers, and neither is the index failing:**
+  1. **Call count 20 -> 69 per game.** More candidates enriched — good for board
+     richness, linear in cost.
+  2. **Cost per call 0.2755 -> 0.7346s (2.7x).** The shard grew again:
+     **~191k rows/call now**, against ~216k earlier and ~83k yesterday
+     afternoon. 6.3% of a bigger shard is still more rows.
+- `join` is **14.69 of 14.70s**; `post`, `score` and `unattributed_s` are all
+  0.00. The segment split is clean and the join is the entire cost — same shape
+  as before the fix, at a lower level.
+- The two small games at 04:15 (3.95s / 4.76s on a 49,172-row shard) confirm
+  cost tracks shard size closely, which is what a join-dominated profile
+  predicts.
+- **NEXT LEVER, unchanged from what this lane already named: the residual ~12k
+  rows walked PER CALL.** Indexing removed the full-shard scan; what remains is
+  a linear pass over the candidate union, and at 69 calls a game that is ~833k
+  row visits per game. Narrowing the union, or making the per-row test cheaper,
+  is the remaining work.
+- **Do not read this as a regression of the fix.** Without the index those same
+  games would walk 13.2M rows instead of 833k. The lane's verification stands;
+  this records that the win is real and eroding under growth.
+
+### quote-join-enrich-cost — PRODUCTION RESULT IN 2026-08-14 00:18Z — the index works, 21.5x measured
+
+- **Both profilers fired at 00:11:15 and 00:18:46Z**, after
+  `SYNDICATE_SLOW_ROW_TOTAL_SECONDS=1` / `SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS=1`
+  were set on refresh-worker (both were absent, defaulting to 5s — at which the
+  instruments could never fire if the fix worked).
+  ```
+  SLOW_SEGMENT_PROFILE  total_s=7.17 tail_s=7.17 enrich_block=7.17
+                        rows_walked=502,157  shard_rows=10,806,750  calls=50
+  SLOW_ENRICH_PROFILE   total_s=7.17 join_s=7.16 post_s=0.00 score_s=0.00
+                        accounted_s=7.17 unattributed_s=0.00
+                        candidates=26 join_calls=26 join_s_per_call=0.2755
+  ```
+- **READ THESE COUNTERS AS CUMULATIVE, NOT PER-CALL.** `_bump` accumulates
+  across the window, so `shard_rows` is 50 calls x ~216k, not a 10.8M-row
+  shard. Per call: **216,135 rows before -> 10,043 walked now = 21.5x
+  reduction, measured in production.**
+- **Board-build cost 21-54s -> 7-8s.** The `#414` cause is fixed.
+- **Not the 130x measured locally, and the same line says why: the shard GREW.**
+  ~83k rows/call this afternoon -> ~216k now (2.6x). The index is working
+  against a target that got bigger. Quote the 21.5x, not the 130x.
+- `unattributed_s=0.00` — the segment accounting is complete, so the split is
+  trustworthy.
+- **`join_s` is still 7.16 of 7.17s.** The join remains essentially the entire
+  cost; it is just 3-7x less of it. **The next lever is the residual ~10k
+  rows/call, not the scan that is already gone.** Do not re-optimise the scan.
+- Verification for this lane is now MET in production. What remains open is
+  only whether 7-8s is acceptable, which is a different question.
+
+### quote-join-enrich-cost (detail below, kept for the file/line map) — session: memory-guard
+- Goal: the MLB board-build's ~33s per slow game is attributed to a named
+  cause inside `enrich_block` and then cut. Testable outcome: on a comparable
+  evening slate, `SLOW_SEGMENT_PROFILE tail_s` for MLB drops below 10s with
+  `rows_walked` down by at least an order of magnitude.
+- **THE MEASUREMENT LANDED. This lane starts from data, not a hypothesis.**
+  `sim-execution-observability` handed this on CLOSED-PENDING-MEASUREMENT,
+  waiting for one evening build. It fired 2026-08-13 18:10Z on refresh-worker
+  (`03073270`), twice:
+  ```
+  18:10:24 [home] SLOW_SEGMENT_PROFILE sport=mlb total_s=33.32 rows=2
+     rows_s=0.00 tail_s=33.32 enrich_block=33.32 mlb_props_block=0.00
+     row[0]=0.00 join:by_player=15,by_teams_fallthrough=5,calls=20,
+     rows_walked=1718960
+  18:10:58 [home] SLOW_SEGMENT_PROFILE sport=mlb total_s=34.28 rows=2
+     rows_s=0.00 tail_s=34.28 enrich_block=34.27 record_rows_block=0.00
+     join:by_player=17,by_teams_fallthrough=2,calls=19,rows_walked=1
+  ```
+  Reading it against that lane's own decision rule:
+  - `tail_s` (33.32) **>>** `rows_s` (0.00) -> the cost is **post-loop**, and
+    `enrich_block=33.32` names it. The row loop is **EXONERATED** — 0.00s in
+    both samples.
+  - This confirms the retraction already in `learnings.md`: `SLOW_ROW_PROFILE`'s
+    "one pathological iteration takes 100-400s" was a span artifact. There is
+    no pathological row.
+  - `rows_walked=1718960` over `calls=20` — ~86k rows walked per call. The
+    second sample walked **1** row for a near-identical total time, which is
+    the single most interesting number here (see falsification test).
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/odds_book_quotes.py` — the join and its
+    counters. `_bump("rows_walked", len(rows))` at L1254; `_QUOTE_JOIN_STATS`
+    is per-call, not per-row (documented L1250).
+  - `syndicate/features/shared/quote_enrichment.py` — `enrich_candidate_rows`
+    at L366, the entry point the enrich block calls.
+  - `syndicate/blueprints/home.py` — `enrich_block` mark at L2872, profiler
+    emit at L2926. Segment/profiler code only.
+- NOT claimed, deliberately: `syndicate/features/intelligence.py`. It is the
+  caller (L6362) and holds the `blueprints.home` imports, but this lane does
+  not need to edit it, and `memory-guard-reclaimable` has a (never-exercised)
+  L2563-constant-only claim on it. If a fix needs that file, resolve the claim
+  first rather than editing across lanes.
+- Collision check: CLEAR. Neither OPEN lane (`memory-guard-reclaimable`,
+  `mlb-props-regen`) claims any of the three files above. The CLOSED
+  `sim-execution-observability` lane claimed two of them; this lane is the
+  continuation it handed on.
+- Hypothesis: the ~33s is a linear scan in the quote join, taken on the
+  `by_teams_fallthrough` path when the cheap `event_id` key misses.
+- **Falsification test, and it must be run FIRST.** The two samples disagree
+  with the hypothesis as stated: sample 1 walked **1,718,960** rows in 33.32s;
+  sample 2 walked **1** row in 34.28s. **Near-identical time, six orders of
+  magnitude apart in rows walked.** If `rows_walked` does not drive the time,
+  the join scan is NOT the cause and the cost is elsewhere in
+  `enrich_candidate_rows` — an I/O wait, a per-call artifact load, or a
+  network call. Do not optimise the scan until this is resolved.
+- **HAZARD — the two instruments agree EXACTLY and that is not corroboration.**
+  `SLOW_SEGMENT_PROFILE total_s=33.32` and `SLOW_GAME_CANDIDATE elapsed_s=33.32`
+  match to the hundredth in both samples. `learnings.md` ("An instrument's SPAN
+  is not its NAME") records that this exact agreement was previously read as two
+  independent measurements confirming each other when they were **the same
+  quantity measured twice**. Prove they are not reading the same clock interval
+  before citing either as independent evidence.
+- **HAZARD — `QUOTE_JOIN_STATS` returns 0 hits as a standalone token.** The
+  join counters are emitted *inside* the `SLOW_SEGMENT_PROFILE` line
+  (`join:...`), so a search for the bare token is not evidence of anything.
+  Do not read that zero as a missing instrument.
+- Architectural finding, recorded not actioned: `syndicate/features/
+  intelligence.py` imports **four** symbols from `syndicate/blueprints/home.py`
+  (`_build_sport_overview` L47, `_build_prop_dashboard_row` L48,
+  `_game_bet_candidates_from_game` L49, `_mlb_actual_payload_for_game` L6641).
+  The worker's board build therefore executes a Flask **presentation
+  blueprint**, which inverts the layering CLAUDE.md specifies. Concrete
+  consequence already observed: the `[home]` prefix makes worker cost look like
+  a web-route problem. Out of scope here; worth its own ticket.
+- Verification: a comparable evening slate shows MLB `tail_s` < 10s, with the
+  cause named in the lane before any change ships, and a before/after pair
+  taken from the SAME instrument on comparable slates.
+- Deploy exposure: refresh-worker `.py` only when it comes. No `render.yaml`.
+  NOTE: refresh-worker currently carries an OPEN `#417` measurement due
+  2026-08-14 13:00 — **do not deploy this lane's changes before that read
+  lands**, or the two changes become unattributable.
+- Blocked by: none for diagnosis. Deploy blocked until the `#417` read.
+- **STATUS 2026-08-13 17:0x CDT — FIX WRITTEN, PUSHED (`9d730aec`), NOT
+  DEPLOYED. `/preflight` FAILED; held until after the `#417` read.**
+  - The join now indexes `event_id` / `player_name` / `(home,away)` to a
+    candidate union instead of scanning the shard. **Measured at production
+    shard size (82,500 rows): 85.43 -> 0.66 ms/call, 130x, identical result.**
+    Per game: 1.71s -> 0.01s at 20 calls, 5.30s -> 0.04s at 62.
+  - **Teams could be indexed safely and that was the load-bearing question.**
+    `_row_teams_match` delegates to the alias maps, so a token index would
+    silently drop matches ("chc" vs "chicago cubs" is the gap that left 0 of
+    108 candidates priced on 2026-08-06). It reads ONLY `home_team`/
+    `away_team`, so rows sharing a pair cannot disagree — grouping by pair
+    runs the fuzzy matcher once per PAIR (~15) instead of once per ROW (~83k).
+  - Equivalence PROVEN, not assumed, because this join's wrong answers are
+    silent: 30+ query shapes asserted identical to the full scan, where the
+    reference is the real old path (union forced to every row). The grid is
+    also asserted to exercise `by_event`, `by_player`,
+    `by_teams_fallthrough` AND `no_identity` — a differential test proves
+    equality, not coverage — plus index-narrows and no-stale-index tests.
+    105 passed / 30 subtests across every quote suite.
+  - **The fix will silence its own instrument.** `SLOW_SEGMENT_PROFILE` is
+    gated at 5s, so success means it stops emitting — and that zero is
+    indistinguishable from a broken instrument or an empty slate. Read it only
+    against a positive control (`LAYER2_SHORTLIST` still recurring) and the
+    pre-fix baseline of 8 lines in ~4 minutes. Same emitter trap as `basis`,
+    caught before the deploy this time rather than after.
+  - Local absolute numbers run ~19x faster per call than production's ~1.6s;
+    the RATIO is the transferable claim and is likely conservative, since the
+    indexed path does not scale with shard size while the scan does.
+  - Still unexplained and worth watching: the 18:07:20 sample at **10.53 s/M**
+    against ~18-21 for the other seven, at the largest volume. That suggests
+    an amortised per-call cost the index will not touch.
+
+- **STATUS 2026-08-13 16:4x CDT — HYPOTHESIS CONFIRMED, NOT FALSIFIED. THE
+  FALSIFICATION TEST ABOVE RESTED ON MY OWN TRUNCATION ARTIFACT. Read this
+  before acting on anything earlier in this lane.**
+  - **RETRACTED: "sample 2 walked 1 row in 34.28s".** That was never in the
+    data. The log line is **216 characters** and the printout that produced it
+    cut at **210**, turning `rows_walked=1633012` into `rows_walked=1`. The
+    "six orders of magnitude apart for identical time" paradox — the entire
+    stated reason to distrust the join-scan hypothesis — was an artifact of my
+    own display code, not a property of the system.
+  - **Eight samples, pulled untruncated 2026-08-13 16:4x from the already-
+    deployed profiler.** No new deploy was needed to get them.
+    ```
+    time      total_s   rows_walked  calls  rows/call  s/call  s per 1M rows
+    18:07:20    54.17     5,143,272     62     82,956   0.874         10.53
+    18:07:59    38.39     2,073,900     25     82,956   1.536         18.51
+    18:08:20    21.22     1,161,384     14     82,956   1.516         18.27
+    18:08:44    24.11     1,327,296     16     82,956   1.507         18.16
+    18:09:19    34.59     1,704,000     20     85,200   1.730         20.30
+    18:09:50    31.72     1,718,960     20     85,948   1.586         18.45
+    18:10:24    33.32     1,718,960     20     85,948   1.666         19.38
+    18:10:58    34.28     1,633,012     19     85,948   1.804         20.99
+    ```
+  - **`rows_walked` per call is essentially CONSTANT: 82,956 – 85,948.** Every
+    call walks the same ~83k rows. Linear fit of `total_s` on `rows_walked`,
+    excluding the 5.1M sample: **19.86 s per million rows, intercept −1.07s,
+    R² = 0.918.** Near-zero intercept and near-perfect proportionality — the
+    time IS the scan. Hypothesis CONFIRMED.
+  - **And it is sharper than the lane predicted.** The lane expected the cost
+    on the `by_teams_fallthrough` path when the cheap `event_id` key misses.
+    It is not: `by_player` resolves 15–17 of ~20 calls and those calls STILL
+    walk ~83k rows. **The scan is unconditional** — a successful join costs the
+    same as a failed one. Fixing the fallthrough would have changed nothing.
+  - Cost model: ~83k rows/call × ~20s per million ≈ **1.6s per call**, and a
+    game makes 14–62 calls, which reproduces the observed 21–54s.
+  - One sample resists the model: 18:07:20 is **10.53** s/M against ~18–21 for
+    the other seven, and it is the largest (5.1M rows, 62 calls). Cheaper per
+    row at higher volume suggests an amortised per-call cost (shard load, cache
+    warm). Recorded rather than explained away — it is the one point that would
+    move the fix's expected payoff.
+  - **Fix direction:** index the quote log by join key instead of scanning it
+    per candidate. Not a micro-optimisation of the scan.
+  - The `SLOW_ENRICH_PROFILE` deploy is still worth doing — it separates
+    `join_s` from `post_s`/`score_s` definitively and gives `join_s_per_call`
+    directly — but it is now CONFIRMATION of a known answer, not the discovery
+    step. Do not let its absence block the fix.
+- **STATUS 2026-08-13 16:2x CDT — INSTRUMENT WRITTEN, PUSHED, NOT DEPLOYED.**
+  - `7ce27100` on `origin/main`: `SLOW_ENRICH_PROFILE` splits
+    `enrich_candidate_rows` into `setup_s`/`join_s`/`post_s`/`score_s` plus
+    `accounted_s`/`unattributed_s`. **Observability only, no behaviour change.**
+    Gated at 5s (`SYNDICATE_SLOW_ENRICH_TOTAL_SECONDS`), one line per slow game.
+  - Verified rather than assumed, four ways: **liveness** (forced slow join →
+    emits, `join_s=0.51` of `total_s=0.54`); **accounting**
+    (`accounted_s == total_s`, `unattributed_s=0.00` — no blind spot);
+    **silence** below threshold; **degraded path** (a raising join still returns
+    every row). Plus a **mutation check** — deleting the `join_s` accumulation
+    turns exactly the two attribution tests red and leaves the other 19 green,
+    so they are not toothless (`#288`'s failure mode).
+  - Two deliberate safety properties: timing locals live OUTSIDE the `try`
+    (its `except Exception` swallows and returns unenriched candidates, so
+    anything raising in there degrades the board silently), and the emit is in
+    a `finally` (three exits; a profiler covering only the happy one would
+    under-report exactly the slow calls worth seeing).
+  - **DEPLOY FOLDED INTO THE 2026-08-14 13:00 WINDOW** as Part 3 of the
+    `417-24h-read` scheduled task, gated on the `#417` read returning a
+    CONCLUSIVE verdict. If that read is INCONCLUSIVE the deploy is skipped —
+    another reboot would reset the re-warm clock and the read would never land.
+  - **Scope of that deploy depends on what happens overnight.** If
+    `deploy-419-refresh-worker` fires (00:00–05:00) the worker lands on
+    `d6188ca7` and `7ce27100` then adds **exactly one production file**
+    (`quote_enrichment.py`). If it does NOT fire, `7ce27100` also carries
+    `live_refresh_loop.py` (+107, `#419`) which belongs to `mlb-props-regen` —
+    two substantive changes, and not this lane's to bundle. The task is told
+    to check and ask rather than decide.
+  - **First useful reading is the following EVENING, not at deploy time.** The
+    line only fires on a slow game and MLB's slow builds cluster 20:49–00:45Z.
+    Silence before then is expected and is not evidence — the same mistake the
+    predecessor lane made when it read "neither instrument has emitted" as a
+    finding.
+
+### memory-guard-reclaimable (detail below, kept for the file/line map) — session: memory-guard
+- Goal: `memory_headroom_snapshot` decides on unreclaimable memory
+  (`anon + shmem + slab_unreclaimable`), so that total memory in use FALLING
+  can never tighten the guard. Unblocks `#417` and `#387` in one change.
+- Files (exclusive to this lane):
+  - `syndicate/features/shared/memory_observability.py` — the fix. Two sites
+    share the same wrong formula:
+    - `memory_headroom_snapshot()` L238–242 — `reclaimable_bytes =
+      inactive_file + slab_reclaimable`. This is the guard.
+    - `log_container_memory()` L599–609 — recomputes the SAME expression to
+      derive `memory_unreclaimable_mb`. Diagnostic only, but it is the line
+      humans read, so it must move with the guard or the log will contradict
+      the decision.
+  - `tests/test_memory_observability.py` — see hazard below.
+  - `pipeline/intelligence_state.py` — L3189 constant only
+    (`_MIN_SAFE_MEMORY_HEADROOM_BYTES = 1900MB`). No call-site change.
+  - `syndicate/features/intelligence.py` — L2563 constant only
+    (`_OVERVIEW_MIN_SAFE_HEADROOM_BYTES = 3000MB` vs a stage measured at
+    ~1479MB). No call-site change.
+- Not touched, deliberately: the five calling modules
+  (`live_refresh_loop.py` ×2 wrappers, `live_lens_loop.py` ×2 wrappers, and
+  both `intelligence_state.py` call sites) all funnel through the one shared
+  function. Per the `#334` lesson, the fix goes INSIDE it and touches zero
+  call sites — that is what makes it unmissable.
+  `scripts/check_worker_memory_gate.py` L338 records that it never inherited
+  this formula and works on an RSS basis; adjacent, not the same defect,
+  and out of scope.
+- Hypothesis: the guard's verdict moves on kernel LRU bookkeeping, not on
+  memory pressure. `#417`'s 300 consecutive aborts were caused by ~243MB
+  being promoted `inactive_file` → `active_file`, which the formula counts
+  as unavailable, while `anon` drifted +18.9MB across all 300 samples.
+- Falsification test: replay the `#417` sample series — effective headroom
+  fell 1877 → 1643MB while total memory in use fell 3120 → 2705MB. Under the
+  new metric the guard must NOT tighten across that series. If it still
+  tightens, the LRU-promotion hypothesis is wrong and something else moved it.
+- Verification (all three required):
+  1. Unit: the replayed `#417` series does not tighten.
+  2. Liveness — the guard must still be able to REFUSE. Construct a case with
+     genuinely high unreclaimable memory and assert `sufficient` is False.
+     Without this, "zero aborts in production" is indistinguishable from a
+     permanently-inert guard, and inert is how `#75` (the 4GiB OOM) happened.
+  3. Production, after deploy: `MEMORY_GUARD_ABORT
+     stage=pre_source_state_fingerprint` over a full day drops to ~0 with
+     `anon` flat, and `#387`'s overview build stops aborting at
+     `sports_done=0 sports_total=8`.
+- HAZARD — an existing test asserts the bug is intentional.
+  `test_active_file_and_shmem_are_not_treated_as_reclaimable`
+  (`tests/test_memory_observability.py:173`) and the code comment at
+  `memory_observability.py:234–237` both call the current formula
+  "deliberately the conservative reading". That premise was overturned by
+  `#417`: excluding `active_file` is not conservative, it is unstable — it
+  makes the verdict swing on a quantity the kernel moves for free. This test
+  must be rewritten with a comment recording WHY the premise changed, never
+  deleted or quietly made green.
+- HAZARD — the direction of failure. Relaxing this guard is what the
+  `memory_observability.py:166–168` comment warns walks back into `#75`, the
+  4GiB OOM. Note `shmem` was 0.0 in the `#79` measurement, so it has never
+  actually been exercised as a pinned-cache term; do not assume it is zero on
+  refresh-worker today.
+- Deploy: refresh-worker `.py` only. No `render.yaml`, so no `blueprint_sync`
+  exposure. Standing sim-check gate applies before any deploy is triggered.
+- Blocked by: none.
+- **STATUS 2026-08-13 — falsification test written and RUN. Hypothesis
+  SURVIVED; the lane is cleared to proceed to the fix.**
+  `tests/test_memory_observability.py`, 11 passed / 2 failed, the two failures
+  being the new falsification tests, failing for exactly the predicted reason:
+  - `test_417_page_cache_promotion_must_not_move_the_guard` — moving 243MB
+    between LRU buckets, with `current`, `anon` and total file cache all held
+    constant, swings the guard **1895.3 -> 1652.3 (243.0MB)**. The observable
+    moves the full size of the reclassification with nothing real changing.
+  - `test_417_series_never_tightens_while_memory_in_use_falls` — the recorded
+    4-sample series is refused at sample 1 (`09:29:27 refused a build that
+    fits`), i.e. all 300 aborted cycles had room under the unreclaimable
+    reading.
+  - Fixture provenance: `slab_reclaimable` is absent from the recorded table
+    and was back-solved per row (34.2 / 35.3 / 34.8 / 39.3MB). All four rows
+    then reproduce the recorded `headroom` to **±0.00MB**, so the fixture is
+    derived from the real formula rather than fitted to the conclusion. If a
+    future edit breaks that reproduction, the fixture is wrong, not the code.
+  - `test_unreadable_anon_must_not_produce_a_rosy_headroom` **passes today and
+    is still required.** It is inert against the current formula, which never
+    reads `anon`; it becomes load-bearing the moment the fix does. Do not read
+    its green as evidence of anything about the fix — it is a regression guard
+    placed ahead of the change, and its own predicate is not yet exercised.
+  - Not committed. The file is RED on a shared tree by design.
+- **STATUS 2026-08-13 — FIX WRITTEN. Both falsification tests now pass;
+  `tests/test_memory_observability.py` 13/13 green. Not committed, not
+  deployed, production effect UNVERIFIED.**
+  - The guard now decides on `max_bytes - unreclaimable`, where unreclaimable
+    is `max(anon + shmem + slab_unreclaimable, current - reclaimable_file)`
+    and `reclaimable_file` now includes `active_file`.
+  - **The max() is the part worth reviewing.** The formula `learnings.md`
+    prescribed (`anon + shmem + slab_unreclaimable`) is a LOWER bound on
+    unreclaimable memory — it credits everything `memory.stat` fails to
+    attribute as available, which is the permissive-on-unknown shape. Taking
+    the larger of it and the residual basis (`current - reclaimable_file`,
+    which is what `#318`'s log line already used) makes unaccounted memory
+    count against the guard. On the `#417` samples the two bases differ by
+    ~5.1-5.6MB, so this does not change the verdict there — it changes what
+    happens if `#327`'s unattributed allocator ever shows up in this reading.
+  - Both helpers are shared by the guard and by `log_container_memory`, which
+    had an independent second copy of the reclaimable expression. Fixing only
+    the guard would have left the abort line contradicting the decision it is
+    read to explain. Grepped after the change: no third copy exists.
+  - Degrade path unchanged in the safe direction: `anon` absent -> return None
+    -> fall back to the previous arithmetic, never to a rosier number.
+  - `#417`'s second defect fixed in the same pass:
+    `headroom_including_file_cache_mb` -> `headroom_excluding_file_cache_mb`.
+    The name stated the opposite of its value and produced a 792MB apparent
+    deficit against a real one of 278MB during the incident. Renamed rather
+    than aliased; nothing outside this module's tests reads it.
+  - Two pre-existing tests changed deliberately, neither made green by
+    weakening it:
+    - `test_reclaimable_page_cache_does_not_count_against_headroom` (`#79`)
+      moved +34.3MB, exactly its fixture's `active_file`. Conclusion it
+      protects is intact (868 vs 3428, was 868 vs 3393).
+    - `test_active_file_and_shmem_are_not_treated_as_reclaimable` split into
+      `test_shmem_is_not_treated_as_reclaimable` (still true, different
+      reason) plus the new `#417` invariance test that owns the overturned
+      active_file half.
+  - Consumer blast radius, partially checked: 7/7
+    `test_intelligence_overview_memory_guard.py`, and 25 memory/headroom/guard
+    tests across `test_intelligence_state.py`, `test_deploy_preflight.py`,
+    `test_live_lens_loop.py`. **Full 6-file consumer sweep still running at
+    time of writing — not yet a result.**
+  - REMAINING before this can close: the production half of Verification
+    (items 2 and 3 above) is untouched. Nothing here proves the deployed
+    behaviour changes; per `learnings.md` a deployed fix can be inert.
+- **STATUS 2026-08-13 12:2x CDT — PUSHED to `origin/main` as `03073270`,
+  decoupled from config. NOT DEPLOYED. Production effect still UNVERIFIED.**
+  - `/preflight` returned **FAIL** on the original candidate (`03073270` on
+    local `main`) for a reason that had nothing to do with the fix: local
+    `main` carried **four unpushed `render.yaml` commits** underneath it
+    (web env block 64 -> 52 keys). Render deploys from GitHub, so shipping
+    the fix required a push, and that push would have fired `blueprint_sync`
+    — rewriting the whole env block on all three live services. A code fix
+    would have carried an undecided production config change as a passenger.
+  - Resolved by cherry-picking onto `origin/main` in a throwaway worktree
+    (the shared tree has other sessions' uncommitted work). Verified before
+    pushing: 3 files, **zero `render.yaml` delta**, web-block key count
+    64 == 64, and `render.yaml` absent from the commit entirely. 20/20 tests
+    green on that base (13 memory_observability + 7 overview guard).
+  - **The `render.yaml` web-block audit is now unshipped and unowned.** It
+    still sits on local `main` only. It needs its own `/preflight` and its
+    own `deploys.md` row — it is a production config change, not a passenger.
+    One item for whoever takes it: `MLB_ENABLE_LIVE_LENS_LOOP: "false"` is
+    among the 12 keys being removed from web. If the code default is True,
+    removing it turns the loop ON for web rather than off — the `absent != off`
+    hazard. NOT verified by this lane.
+  - **`main` has diverged and this commit now exists twice.** `03073270`
+    (local) and `03073270` (origin) are the same change. Local `main` is 6
+    ahead / 1 behind origin. Do not `git pull` and assume a clean merge —
+    reconcile deliberately, and drop the local duplicate rather than
+    re-landing it.
+  - Deploy still gated: `scripts/check_deploy_safety.py` returned NOT CLEAR
+    twice, 12:14 and 12:2x CDT — MLB sims running back-to-back (pid 4514
+    `tip_off_window`, then pid 4718 `fingerprint_change`) plus a live odds
+    refresh, with live games in progress. Deploying kills them.
+  - **Falsifiable discriminator for the post-deploy read, stated before the
+    deploy:** the new `basis` field. `basis=unreclaimable` proves the new
+    path executed; `basis=reclaimable_cache` means it degraded to the old
+    arithmetic and any "zero aborts" reading is inert-guard-shaped and means
+    nothing. Read that BEFORE reading the abort count.
+- **STATUS 2026-08-13 ~12:5x CDT — local `main` reconciled with `origin/main`
+  (`a3f9ed97`). Push HELD by decision. Still not deployed.**
+  - Merge, not rebase. `git cherry` showed two local commits patch-equivalent
+    to origin (`03073270`≡`03073270`, `b48aa0d3`≡`b48aa0d3`); a rebase would
+    have dropped them cleanly but rewritten **seven commits belonging to other
+    sessions** working this shared checkout, and the ledger cites SHAs by
+    hand. Verified after: 0 behind / 11 ahead, `origin/main` is an ancestor,
+    all six other-session SHAs unchanged, and the merge commit is **empty
+    against its first parent** — content was already identical, only ancestry
+    changed.
+  - One conflict (`.syndicate/lanes.md`), both regions ours-only with an
+    **empty theirs side**. Resolved keep-ours; verified content-complete
+    (468 lines both sides, differing only CRLF vs LF).
+  - NEAR-MISS worth recording: the first merge attempt was aborted because
+    another session had **8 files staged in the shared index** (the
+    `.syndicate` enforcement hooks). A merge commit takes the WHOLE index, so
+    completing it would have swallowed their in-flight work. Proved the merge
+    safe in a throwaway worktree instead, and ran it only once their index
+    cleared. `learnings.md` already has the never-chain-add-and-commit rule;
+    this is the same hazard arriving through `git merge` instead.
+- **RETRACTION — the `render.yaml` hazard I raised is NOT a hazard.** This
+  lane earlier flagged `MLB_ENABLE_LIVE_LENS_LOOP: "false"` as a possible
+  `absent != off` trap in the web-block audit. Checked against the code:
+  **no Python reads that key anywhere** — it exists only in `render.yaml`, so
+  removing it from web is inert. Also cleared:
+  `WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN` defaults **False** when absent
+  (`scripts/run_refresh_worker.py:338`), `REFRESH_PREDICT_PROPS_SMART_SIM_PBP`
+  defaults **True** matching its removed value, and
+  `SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS` is read only by a worker script as
+  EXTRAS (absent = no extras, `scripts/fetch_mlb_oddsapi_local.py:1593`).
+  The audit's "already declared on both workers, unchanged there" claim holds.
+  Recording the retraction loudly because a false caveat about someone else's
+  work silently devalues their correct readings too.
+- **What still blocks the push is the MECHANISM, not the diff.** A
+  `blueprint_sync` writes the WHOLE env block on all three services — not the
+  diff — including live drift nobody has read, and last time it 502'd every
+  route for ~2 minutes. That restart kills an in-flight MLB sim exactly as a
+  deploy does. Decision taken: **hold the push until
+  `check_deploy_safety.py` reports CLEAR, then push and deploy in the same
+  quiet window** so the config sync and the code deploy cost one interruption
+  instead of two. Watcher `b07yqo98b` is armed, polling every 90s.
+- Discrepancy noted, does not affect the verdict: the `#417` narrative in
+  `.syndicate/log/2026-08-13.md` and `todo.md` says `current_mb` fell
+  "3120 -> 2705", but the 4-row table it sits beside records 2988.6 -> 2705.3.
+  The 3120 figure is not in the table; it is presumably an intermediate peak.
+  Both readings agree in DIRECTION (usage fell, guard tightened), so the
+  falsification test holds either way — but the table is the authoritative
+  per-sample record and is what the fixture uses.
+
+### render-yaml-web-block-hygiene — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
+- Recorded after the fact. The originating task carried an explicit "do not open
+  or close any lane" instruction and the work grew past it; five commits landed
+  outside lane discipline. Flagged rather than tidied away.
+- No collision occurred: the only OPEN lane (`memory-guard-reclaimable`) scopes
+  itself to "refresh-worker `.py` only. No `render.yaml`." That was a read, not
+  a claim — a second session editing `render.yaml` would not have been detected.
+- Files touched: `render.yaml` (web `envVars` only), plus the ops-kit install
+  (`.claude/**`, `.syndicate/**`, `CLAUDE.md`).
+- Done: web block 62 → 52 entries; nine worker-only keys removed; three
+  duplicate declarations (one per service) deduped. Every removed key remains
+  declared on both workers.
+- Verified: `audit_blueprint_drift.py` exit 0 / zero reverts after each commit;
+  `tests/test_render_yaml_envs.py` + `tests/test_refresh_worker.py` pass;
+  no duplicate keys on any service.
+- **Unverified: nothing was deployed.** Reachability is static analysis only —
+  no process has been observed booting without these keys.
+- **Open obligation:** three commits unpushed (`d16950b9`, `1e09fa9b`,
+  `7c60d0f8`), `origin/main` at `bf06710c`. Two `render.yaml` commits are
+  already on origin with no `blueprint_sync` seen in a ~23-minute window —
+  that is a window, not an all-clear.
+
+### (superseded lane detail, kept for the file/line map)
+
+### hooks-enforcement-wiring — DONE 2026-08-13 — **NO LANE WAS EVER OPENED**
+
+Recorded retroactively for traceability, matching the `render-yaml-web-block-hygiene`
+precedent. Harness-only work (`.claude/**`, `.gitignore`, `.gitattributes`);
+collisions were checked against the OPEN lanes and were nil, but that was a
+read, not a claim. Third session today to work `.claude/**` without a lane —
+if that keeps happening, the protocol should say harness work is exempt rather
+than have every session quietly decide it is.
+
+- Outcome: three hooks wired and measured end-to-end. `session-start` v3
+  delivers 1,243 B inside the ~2KB cap (v1 delivered ~5%); `lane-guard.py`
+  rewritten to parse the real lanes.md shape and confirmed blocking through
+  the harness; `checkpoint-guard.py` replaces the `.sh` and can now pass.
+- Commits: `f6fec4f1`, `0634e7bb`, `5cdf45b6`. Pushed: `f6fec4f1` only.
+- Full detail: `.syndicate/log/2026-08-13.md`, session entry at the tail.
+
+### mlb-live-pitcher-projection — CLOSED-VERIFIED 2026-08-16 00:3xZ — all three invariants measured at scale, 423 rows, zero violations
+Opened 2026-08-15 from a user report: "live projections rarely get appended, and
+the ones that do are unrealistic, especially pitcher props." Both halves were
+real and were different defects. Todo `#437`.
+
+- **Goal, and it was met.** On a live MLB slate a live prop row must never show
+  (a) a projection below an already-recorded actual, (b) a `model_prob_over` on
+  the opposite side of the line from its own `projected`, or (c) a blank live
+  column with no attributable reason.
+- **VERIFIED IN PRODUCTION, served board, 423 live-lens overlaid rows:**
+  **(a) 0 violations. (b) 0 violations** (baseline was 7 of 13). **(c)
+  `live_projections` served** — `rows_live_considered 1377 /
+  rows_live_projected 599 / rows_live_edged 0 / rows_live_prob_withheld 599 /
+  miss_no_market_alias 778 / live_games_in_snapshot 8`. Live prop coverage went
+  **11.6% -> 50.3%** on a clean same-slate read.
+- **`rows_live_prob_withheld == rows_live_projected` (599 = 599) is the
+  designed reading, not a fault:** the re-sim priced nothing that tick, and the
+  counter exists to say so out loud instead of letting a pregame probability
+  stand in.
+- **Four fixes shipped:** `f4cd2bc8` (probability follows the projection or goes
+  absent; pregame preserved as `sim_model_prob_over`), `3a476001` (the snapshot
+  is a projection set, not a pick list — four causes), `302ea0f4` (alt lines),
+  plus the route change that made the counters readable at all.
+- **Deployed and CONFIRMED BY CONTENT after other sessions redeployed over the
+  top:** refresh-worker `57a437d5` and live-odds-worker `c4116ab6` both still
+  carry all five markers (`totals_alt`, `spreads_alt`, `lanes`,
+  `include_projection_only`, `sim_model_prob_over`); web `484221bd` carries the
+  route change. **Ancestry was never used as the test** — every service runs its
+  own SHA and none are on `origin/main`.
+- **Two findings handed on, NOT closed here:**
+  1. **`game_chip_scoreboard._game_flags` reintroduces the abstract-only live
+     check** that `features/mlb/game_state.py` exists to prevent and forbids by
+     name. It marks a warming-up game `live`, which is what made MIA @ CIN read
+     0-of-114 before first pitch and 74-of-117 (63.2%) after. **Blast radius is
+     every sport's board chips. Needs an owner.** Detail in `state.md`.
+  2. **The alt-line predicate is UNMEASURED** — deployed 23:47/23:49Z, window
+     closed at UTC midnight. One-shot watch `alt-line-shortlist-watch` fires
+     2026-08-16 10:00 CT, gated on both the book grid AND the shortlist, and
+     re-arms itself up to 4 times rather than reporting a false negative.
+- **Self-inflicted, recorded rather than buried:** two commits (`f4cd2bc8`,
+  `36439f4e`) reverted other sessions' ledger lines via a stale scratch index —
+  the second one *after* I had written that exact race into `learnings.md`.
+  Both repaired (`6da01dd3`, `6ccc4779`), nothing lost, and the rule is now a
+  FORBIDDEN entry with the ref-lock backstop named.
+- Commits: `f4cd2bc8` `6da01dd3` `a7ad6aed` `3a476001` `265884c0` `9eb5b7bc`
+  `dc85bfeb` `f96a00fd` `36439f4e` `6ccc4779` `b11e19ba` `302ea0f4` `e6405fcc`
+  `803dd65d`. All confirmed present in HEAD at close.
+- Full detail: `.syndicate/log/2026-08-15.md`, and `deploys.md` for every
+  measurement with its working.
