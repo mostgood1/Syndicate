@@ -282,44 +282,51 @@ unsaved anywhere.
 
 ---
 
-## MEMORY — refresh-worker `#435` — FIXED AND PROVEN `[measured 08-15 21:32Z]`
+## MEMORY — refresh-worker `#435` — FIXED, PROVEN, INSTRUMENTED `[measured 08-16 01:07Z]`
 
-**ROOT CAUSE: the `book_quotes/<date>.jsonl` shard is APPEND-ONLY and the whole
-day of it was read into memory.** It gains a row per quote OBSERVATION and grows
-all day (MLB 08-14: 89.9 -> 184.5 MB, then 2.2 MB after rollover). A read costs
-**6.3x file bytes** resident, so the end-of-day shard was ~1,162 MB for ONE cache
-entry against a 500 MB budget — and the evictor was `while len > 1`, so when it
-was the only entry nothing could drop it. **92.4% of the file is superseded**
-(478,782 rows -> 36,424 distinct keys on the 207 MB shard).
+**`#435` IS FIXED AND PROVEN.** Root cause: `book_quotes/<date>.jsonl` is
+APPEND-ONLY and was read whole. It grows all day (MLB 89.9 -> 184.5MB, resets at
+rollover), costs **6.3x file bytes** resident, and **92.4% of it is superseded**
+(478,782 rows -> 36,424 keys). `read_book_quotes_latest` reduces AS IT STREAMS.
 
-**THE FIX WORKS — same window, same slate `[08-15 20:00-21:32Z]`:**
+    same window, same slate      08-14 (no fix)      08-15 (fix live)
+    OOM kills                          5                   0
+    peak anon                    4,018.5 MB          3,572.4 MB
+    longest clean run               53 min              90 min
 
-                          08-14 (no fix)        08-15 (fix live)
-    OOM kills                   5                     0
-    peak anon              4,018.5 MB (98.1%)   3,572.4 MB (87.2%)
-    longest clean run          53 min                90 min
+Grid equality on the DEPLOYED tree: 15/15 events byte-identical.
 
-**Zero kills in 16.5 h** across a full shard ramp. Live since `c67f7373`
-18:11:41Z and carried by every deploy since — verified by ancestry AND by content
-(`read_book_quotes_latest` + the `layer2_shortlist` call site present in each).
+**THE WORKER IS NOT SAFE.** 3,572MB is 87.2% of the 4,096MB ceiling. The fix
+bought ~446MB; a larger slate still crosses.
 
-**THE WORKER IS NOT SAFE.** 3,572 MB is 87.2% of a 4,096 MB ceiling. The fix
-bought ~446 MB; a larger slate still crosses.
-**Next lead is `board_contract_games_normalized`**, the stage running at both the
-18:25 excursion and last night's kills — NOT the quote shard.
+**ANON COMPOSITION, per-process, clean reading `[01:07:38Z]`:**
+`anon_mmap` **1,540.3MB (92%)** vs `heap` 128.3MB. smaps and `RssAnon` agree to
+**0.0%**. pymalloc at rest `[21:58Z]`: 934 arenas / 583.7MB live / **350.3MB
+retention** — not reclaimable by a trim, and the expected aftermath of freeing
+millions of small objects.
 
-**Still load-bearing:**
-- **Kills are EVENTS** (`/v1/services/<id>/events`). A log grep for `oomKilled`
-  returns 0 and means nothing; that produced a retracted all-clear.
-- **`tracemalloc` is RULED OUT on this process at any frame count** — it starved
-  the sampler and worsened kill cadence to 3-10 min. Never returned an answer.
-- **`#387` shipped in two halves** (`cfee9c6e` + `705eeefc`) and fixed BOARD
-  COVERAGE, not the OOM. Leave the 3000 MB MLB floor alone.
-- Instrumentation live and condition-triggered: `MEMORY_WATCHDOG`, `HEAP_CENSUS`,
-  `UNTRACKED_BYTES_CENSUS`, `PYMALLOC_STATS`; `scripts/render_logs.py` pages
-  BACKWARD and prints the window it actually covered.
-- **RETRACTED:** "85% of anon is not reachable Python data" — an artifact of a
-  one-level census. It is live application data.
+**EVERY MEMORY NUMBER CARRIES A SCOPE.** `memory.current`/`anon` and `oomKilled`
+are CONTAINER. `smaps`, `PYMALLOC_STATS`, `HEAP_CENSUS`, `RssAnon` are PROCESS.
+The worker spawns 8-10 children whose anon swings from 0.4MB to ~504MB, so the
+two differ by an amount that is not constant. Subtracting across scopes produced
+a retracted "673MB outside pymalloc".
+
+**Instruments live and condition-triggered** (all capped per process, all off the
+sampler thread): `MEMORY_WATCHDOG`, `HEAP_CENSUS`, `UNTRACKED_BYTES_CENSUS`,
+`PYMALLOC_STATS`, `SMAPS_ANON`. `scripts/render_logs.py` pages BACKWARD and
+prints the window it actually covered.
+
+**RULED OUT:** `tracemalloc` at any frame count — it starved the sampler and drove
+kill cadence to 3-10 min, and never returned an answer in production.
+**EXONERATED:** `board_contract_games_normalized` (0.0MB median, 5,958 builds);
+glibc arena fragmentation (`#423`); the per-sport board caches.
+
+**RETRACTED:** "oomKilled 0" (log grep — kills are EVENTS); "85% of anon is not
+Python data" (one-level census); "673MB outside pymalloc" (scope error).
+
+**NEXT LEVERS, both smaller than the fix already shipped:** the children
+(~504MB when running) and pymalloc's 350MB arena retention. NOT another
+instrument.
 
 ---
 
