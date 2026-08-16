@@ -1943,3 +1943,58 @@ whether the model is right.** No settlement, no backtest, no CLV.
 **I deliberately did NOT build a parallel CLV path.** `clv_join.py` is yours and
 the recorder decision is yours. Producing my own number would have duplicated
 the machinery and inherited the side defect.
+
+#### HANDOFF to `memory-watchdog-435` — a 2,092 MB in-process excursion, attribution already done
+From `live-game-line-projection`, 2026-08-16 ~02:3xZ. **First refresh-worker OOM
+of the day** (user's report: none until this one).
+
+**THE KILL.** `server_failed reason={'evicted': False, 'oomKilled':
+{'memoryLimit': '4Gi'}}` at **02:11:34Z** — events API, not logs.
+
+**THE ALLOCATOR IS pid 39, THE MAIN WORKER. Every child is a bystander.**
+`ALL_PROCESS_MEMORY`, two samples 34 s apart:
+
+    02:10:49  container 2458.8 MB (60%)   pid 39 rss 1191.1 MB
+    02:11:23  container 4094.6 MB (100%)  pid 39 rss 3283.4 MB
+    02:11:34  oomKilled
+
+    pid 39 (run_refresh_worker.py)   1191 -> 3283 MB   = +2,092 MB in 34 s
+    pid 353 (daily_update.py)        207.7 -> 207.7    FLAT
+    pid 394                           95.1 -> 143.7    +48
+    pid 383                           79.1 ->  79.4    FLAT
+    multiprocessing pool workers     ~54 MB each       FLAT
+
+**THIS KILLS THE OBVIOUS HYPOTHESIS.** The running job was
+`daily_update.py --sims 1000 --workers 2`, so "the sim's worker pool multiplies
+memory" is the natural guess. **It is wrong** — every pool worker sits at ~54 MB
+and the parent is flat to the decimal. It is ONE in-process allocation on the
+main thread.
+
+**`post_mlb_sim_tick` IS A BYSTANDER, as `state.md` already says.** Both
+`CONTAINER_MEMORY` samples carry that stage and the whole excursion happens
+between them. The label names the victim, not the allocator.
+
+**WHY THIS ONE IS WORTH THE WATCHDOG.** `#327`'s open problem is "something
+allocates 493-878 MB in-process and nothing knows what". **This is 2,092 MB,
+roughly 3x the largest previously recorded** — which is why it crossed 4 GiB
+instead of being absorbed. If the ~2 s timer sampler is deployed it should have
+caught the interior of this window; if it is not, this is the strongest case yet
+for shipping it.
+
+**CONFOUND, STATED.** refresh-worker took **five deploys in the preceding hour**
+(01:13, 01:24, 01:31, 01:56 mine, and 02:19 mine AFTER the kill), and `state.md`
+records that every deploy resets the memory baseline. **"No OOM all day" partly
+describes a worker that had not been restarted repeatedly until tonight — do not
+treat it as a controlled baseline.**
+
+**MY OWN CHANGES, assessed rather than assumed:**
+- **The CLV ledger (`f8ca54e1`) is EXONERATED for this kill — it deployed
+  02:19:10, EIGHT MINUTES AFTER it.** It was not running.
+- The segment/boundary fix (`d1e3f908`, live 01:56:44) WAS running. It makes
+  `attach_live_gamelines` do strictly LESS work (an early `continue`) and adds
+  scalar arithmetic; the join has been live since 23:01 without OOMs. **On the
+  stack, but not memory-shaped. Not cleared — just not indicated.**
+- **FORWARD RISK THAT IS MINE:** the ledger's `read_last_by_key` parses the whole
+  JSONL into a dict **on every board build**. Empty today, grows with the slate,
+  and it now runs on this worker. **If a second OOM appears, suspect it first —
+  `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` disables it with no deploy.**
