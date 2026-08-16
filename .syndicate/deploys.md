@@ -8160,3 +8160,51 @@ on this path that is three. **Fix: publish `openings_loaded` and
   exist, or to surface the disagreement in the reason sentence. **Needs a
   decision, not a patch** — requiring both would have dropped this row entirely,
   and whether a model-strong/price-poor row is an opportunity is a product call.
+
+---
+
+## 2026-08-16 21:1xZ — outstanding #4, NFL preseason unquoted — **NARROWED TO TWO CANDIDATES, NOT RESOLVED**
+
+**No code change.** Four things are established and one question is left; the
+question needs production logs or an OddsAPI probe, neither of which I could do
+from here.
+
+### Established
+1. **The board gap is real.** NFL grid holds 1,425 rows: **179 dated 08-15**,
+   then nothing until **09-13**. `schedule_preseason_2026.csv` has 1 game on
+   08-16, **16 across 08-21..08-24**, and 16 more across 08-27..08-29.
+2. **Preseason capture works in principle** — the 179 rows on 08-15 ARE
+   preseason week 1. So the pipeline has captured this sport key before.
+3. **The week resolution is correct.** `preseason_target_week(2026)` returns
+   **2** (verified by running it). The old "self-pins to 1" defect is fixed and
+   is NOT the cause.
+4. **The gate should fire.** `refresh_odds_sources.py:935` requires
+   `requested_month in (7,8,9)` AND `preseason_target_week(season) is not None`
+   — both true today. And the fetch is **not week-scoped**: `main()` calls
+   `fetch_odds(sport_key="americanfootball_nfl_preseason")` for the whole key.
+   The `until > window` filter at `:319` gates only the extra per-event SEGMENT
+   markets, not the base event fetch, so 08-21 events should arrive.
+
+### The two remaining candidates, and how to tell them apart
+- **(a) The step is not actually running on the worker.** The gate is evaluated
+  in `refresh_odds_sources.py`, but whether the worker invokes that path for NFL
+  on its current cadence is unverified. `/api/ops/odds-refresh/status` returns
+  the manifest artifacts but no per-step list I could read, so this is open.
+  **Test:** grep the refresh-worker log for `nfl_preseason_oddsapi_refresh`.
+- **(b) The vendor offers no week-2 lines yet.** Books do sometimes hold
+  preseason lines until closer to kickoff. **Test:**
+  `GET /v4/sports/americanfootball_nfl_preseason/events` — **0 credits**, so it
+  is quota-safe even against the 5M cap. Needs `ODDS_API_KEY`, which is on
+  Render and not in the local `.env`; I chose not to pull a live secret to a
+  local shell mid-session.
+
+Whichever it is, the fix differs completely — (a) is a scheduling/cadence bug on
+our side, (b) is "wait, and the board is correct to be empty". **Do not fix
+either until the discriminator has been run**; guessing here would mean changing
+a working gate.
+
+### One thing that IS actionable regardless
+`_SLATE_WINDOW_DAYS["nfl"] = 5` and `resolve_window_dates` is forward-only, so
+even once 08-21 IS quoted, a board anchored on 08-16 spans 08-16..08-20 and will
+still not show it. That is independent of the capture question and is this
+lane's own file (`layer1_board.py`).
