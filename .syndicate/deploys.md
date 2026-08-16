@@ -6163,3 +6163,288 @@ for play-by-play**. It was present as recently as **2026-08-13** —
 `verify_nfl_autorun_obligations.py:25` records the 21:02:06Z run writing a real
 rating on 16/16 games — which matches the 2.79-day staleness exactly. So: present,
 then gone, with no code path able to restore it.
+
+---
+
+## 2026-08-16 ~16:20-16:35Z — LAYER 2 BOARD AUDIT (lane `layer2-board-quality`). NO DEPLOY. Eight goals measured against the SERVED payload.
+
+**Substrate.** `/api/board/layer2-shortlist?sport=all&limit=2000`, `written_at`
+**2026-08-16T16:20:21Z**, 108 rows, `source=layer2_shortlist_artifact`; the
+server-rendered `/intelligence` page (1.73 MB, board contract parsed out of it);
+and `/api/board/book-grid?sport=mlb` for the cell-level cross-check.
+Live SHAs read at measurement time: refresh-worker `97491161` (15:45:50Z),
+live-odds-worker `dd53d47c` (05:20:39Z), web `ebd5f677` (03:38:07Z).
+
+### 0. THE SHORTLIST **IS** THE BOARD NOW. The ledger's standing claim is STALE.
+
+`spread-line-sign-convention` recorded *"NO TEMPLATE CONSUMES THE SHORTLIST —
+the board still renders `ranked_all`"*, from a `grep` over `templates/` and
+`static/` returning zero hits. **That grep still returns zero, and the conclusion
+is now wrong.** The wiring is server-side, not in the template:
+
+    boardContract.cards          108
+    source == layer2_shortlist   108 of 108
+    layer2_is_primary            True
+    legacy_candidate_count       0
+
+Every card a user sees today comes from the shortlist. So every defect below is
+**user-facing**, not latent. A `grep` over the template can no longer answer
+"does anyone consume this" — read the served payload.
+
+### 1. SPREAD-SIGN FIX: **VERIFIED IN THE ARTIFACT.** 12 of 12. Lane's open item closes.
+
+`_side_line_from_cells` present in the deployed tree (`git show
+97491161:...layer2_board.py` -> 3 occurrences, identical to `main`). Output
+verified against the book grid, joined on the book set AND the price vector:
+
+    away rows agree      9/9      (already correct pre-fix)
+    home rows agree      3/3      (the case that was broken)
+    total               12/12
+
+**TWO WAYS I NEARLY GOT THIS WRONG, both worth keeping:**
+
+- **Ancestry gave the OPPOSITE answer.** `git merge-base --is-ancestor edbbee9d
+  97491161` -> **NO**, because refresh-worker runs branch `deploy/nfl-pbp-root`,
+  not `main`. By ancestry the fix looks un-deployed; by content it is deployed.
+  `project_web_runs_a_deploy_branch_not_main` generalises to the WORKERS too.
+- **My first join said 3 of 3 home rows were still WRONG.** The grid carries
+  MIRRORED rows for the same (event, market, segment) — `row.line=+1.5` with
+  `home_cells=-1.5` alongside `row.line=-1.5` with `home_cells=+1.5`. Matching on
+  `line` picks the wrong twin and manufactures a uniform-looking defect. The
+  discriminating field is the **price vector**: the disputed row's
+  `{leovegas_se:123, prophetx:140, unibet_nl:125, unibet_se:125}` matches
+  `row.line=1.0` (home cells -1.0) exactly, so `-1.0` is CORRECT.
+  **A 3-of-3 "uniform defect" that dissolves on a better join is the same shape
+  as the 525-cell result that opened that lane — and that one is still sound,
+  because it compared cells WITHIN a row rather than across mirrored rows.**
+
+### 2. **REGRESSION: the `min()` score fix is NOT running in production.**
+
+Measured two independent ways, agreeing:
+
+    (a) served payload: rows with negative value_pct        4
+        of those, score == value * reliability              4/4   (discount applied)
+        of those, score == min(value, discounted)           0/4
+        `reliability_applied` key present                   0/108
+
+    (b) deployed source, git show 97491161:...opportunity_signals.py
+        "score": round(value * confidence * freshness * price_reliability, 4)
+        vs main: "score": round(min(value, discounted), 4)
+
+**Cause: a branch cut before the fix landed.** `deploy/nfl-pbp-root` branched at
+`b0ab37a1` (2026-08-15 17:26 CDT); `5a94b134`, which carries the `min()`, landed
+**19:04 CDT — 1h38m later**. Both workers and web are on trees without it
+(`reliability_applied` count: refresh-worker 0, live-odds-worker 0, web 0).
+
+So the inversion that fix was built to kill is live again: on these 4 rows the
+LESS a bad row is trusted, the BETTER it ranks. Small on today's board (4 of
+108); the measurement that justified the fix had **156 negative of 256**, so the
+exposure is slate-dependent, not inherently small.
+
+**This is the general failure, not a one-off: cutting a deploy branch from an
+older commit silently un-ships every fix landed since the branch point, and
+nothing in the deploy path reports it.**
+
+### 3. THE SIM CARRIES **ZERO** WEIGHT. The brief's premise (`0.5`) is wrong.
+
+`_SCORE_SIM_WEIGHT = 0.0` in `opportunity_signals.py:390` — and identically in the
+deployed tree. Confirmed in the served payload rather than inferred:
+
+    rows carrying model_edge_pct        65 of 108
+    rows with non-zero sim_component     0 of 65
+    rows where value_pct != ev_pct       0 of 108
+
+`layer2_board.py:30`'s module docstring still says `_SCORE_SIM_WEIGHT = 0.5`, and
+so does the session brief. **The constant was deliberately zeroed** with its
+reasoning in place (`opportunity_signals.py:352-390`): the sim term dominated,
+`settled: 0`, so it was selecting rows where an unvalidated model most disagrees
+with the market. Raising it is gated on S6, not on taste.
+
+**THE OBLIGATION THAT COMMENT CREATES IS UNMET.** It states: *"THE SURFACE MUST
+SAY WHAT IT IS: with this at 0, L2-A is a low-hold / line-shopping board and must
+NOT be presented as 'our model found these'."* The board presents these as
+recommendations with a PROJECTED column and no such disclosure. That is the
+single largest honesty gap on the surface.
+
+**Its stated consequence is only PARTLY true, and the reason matters.** The
+comment predicts EV is identical for every side under proportional de-vig, so
+"L2-A cannot pick a side at all". Measured: of the 6 market-instances with both
+sides on the board, only **2** carry identical `ev_pct`. Best-book-per-side
+breaks the symmetry — the board discriminates by LINE SHOPPING, not by a model.
+That is consistent with the comment's conclusion and refutes its arithmetic.
+
+### 4. BEST-BOOK IS UNRESTRICTED. 27 of 108 (25.0%) are unbettable-by-default.
+
+Layer 2 has no allowlist of any kind; 36 distinct books appear in `book_prices`.
+Against Layer 1's `DEFAULT_BOOKS` (11, `layer1_board.html:267`):
+
+    best book outside the L1 list    27 of 108   25.0%
+      betopenly      16
+      betfair_ex_eu   9
+      betsson         2
+
+**9 of those 27 are `h2h_lay` rows quoted ONLY by `betfair_ex_eu` + `matchbook`**
+— exchange LAY markets. They do not degrade to a worse price under the L1 list;
+they disappear, because no L1 book quotes them at all. The other 18 cost a few
+cents (`betopenly +191 -> novig +182`), which is the honest price of restricting
+to books the user can actually bet.
+
+### 5. **`h2h_lay` ROWS ARE LABELLED AS BACK BETS. This is the worst defect found.**
+
+`_pick_label` (`layer2_board.py:1029`) maps `side=home` -> the home team's name,
+with no market-family awareness. A LAY bet is a bet **against** that team, so a
+card reading *"Los Angeles Dodgers"* is a bet ON the Dodgers LOSING, rendered
+identically to a back bet. 9 such rows served. No sport, market or price check
+distinguishes them.
+
+### 6. PROP CARDS ATTRIBUTE THE PLAYER TO THE **AWAY** TEAM, UNCONDITIONALLY.
+
+`layer2_board.py:1123`: `"team": home if side == "home" else away`. A prop's side
+is `over`/`under`, never `home`, so **every prop card falls to `away`** —
+56 of 108 cards. Right ~half the time by coincidence. Served example: **Andy
+Pages** (Los Angeles Dodgers, the HOME team) carried `"team": "Milwaukee
+Brewers"`. Read by the UI at `intelligence.html:525`.
+
+### 7. MOVEMENT / STEAM: DARK, CONFIRMED IN THE PAYLOAD.
+
+`_layer2_movement_columns` is `return {}` with an unreachable body
+(`layer2_board.py:1152`). Union of all keys across 108 served rows contains **no**
+movement, steam or opening field. The score has no movement term. The `#372`
+stall reason still holds — the join loaded a ~20 MB shard inside the builder —
+so re-enabling it naively re-stalls the build.
+
+### 8. THE GAME RAIL IS DERIVED FROM OPPORTUNITIES, SO IT CANNOT SHOW A GAME THAT HAS NONE.
+
+`deriveGameCards(items)` (`intelligence.html:1258`) groups **board rows**. A game
+with no surviving opportunity contributes no row and therefore no rail card.
+Today this is invisible — MLB 15 scheduled / 15 on the rail, WNBA 3 / 3, because
+`SHORTLIST_ROWS_PER_GAME = 6` seated every game — so **the defect is structural,
+not currently observable**. `/api/board/game-chips` already returns the full
+slate; the rail must be seeded from chips and left-joined to rows.
+
+**Finals sort to the FRONT, not the end.** The rail sort
+(`intelligence.html:1443`) is `hasLive` -> start time -> count. `allFinal` is
+computed (`:1307`, `:1409`) and used only for the LABEL at `:1496`; it appears
+nowhere in the comparator. A finished game keeps its early start time and sorts
+ahead of everything not live.
+
+### 9. WHOLE SPORTS ARE ABSENT, AND IT IS THE HORIZON, NOT AN OUTAGE.
+
+    active_sports        ['mlb', 'wnba']
+    nfl    2,861 candidates / 2,492 opportunities -> rows_beyond_horizon 2,492  (ALL of them)
+    soccer 8,933 candidates / 3,199 opportunities -> 0 selected
+    ncaaf  no_slate
+
+`rows_beyond_horizon = 2492` equals NFL's opportunity count exactly, so
+`SHORTLIST_HORIZON_DAYS = 1` drops NFL entirely. Soccer's 3,199 die elsewhere
+(`rows_uninformative_ev` 1,884 + `rows_excluded_market` 1,854 + value floor 601
+across all sports). **Consistent with the `#380` comment at `:1012-1026` and NOT
+a bug** — but it means "audit every in-season sport" resolves to MLB and WNBA
+only, and the horizon is exactly what G1 must widen for the RAIL without
+widening the SHORTLIST.
+
+### 10. LIVE-LENS PROJECTION DOES NOT REACH LAYER 2.
+
+6 live rows served, all carrying a projection — but **every projection source on
+the board is a PREGAME artifact**: `hitter_threshold` 41, `game_simulation` 30,
+`pitcher_distribution` 4, `wnba_props_recommendations` 3, none 30. Zero live
+sources. The book-grid payload carries `live_projections` (19) and
+`live_gamelines` (8) that the shortlist build never joins.
+
+**Today's slate hides the consequence:** all 6 live games are at `TOP 1`, where a
+full-game pregame projection is still nearly right. Later in a game, a pregame
+`total_runs_dist` projection of 10.516 shown beside a LIVE total of 7.0 is a
+full-game number against a remaining-game line. Matches lane
+`live-game-line-projection`'s "plumbing done twice, evaluation not started".
+
+### 11. THE BET SLIP ALREADY SITS BESIDE THE BOARD; IT COLLAPSES THE WRONG WAY.
+
+`#bet-slip-panel` is section 3 of 5 inside `<aside class="board-rail">`
+(`intelligence.html:83`). Collapsing hides only `.bet-slip__body`
+(`board_cards.css:1091`), leaving a header stranded mid-rail. Layer 1 collapses
+the WHOLE rail horizontally — `.l1-layout[data-rail="collapsed"] .l1-rail {
+flex-basis: 34px }` (`layer1_board.html:143`) with a count badge at `:152`.
+`board_rail_toggle.js` + `.board-rail-handle` already exist but are gated to
+**mobile only** (`board_cards.css:726`: *"Desktop/tablet (>1080px): .board-rail
+stays a normal static grid"*). So the desktop work is to lift an existing mobile
+mechanism, not to write a new one.
+
+### 12. THE `layer2_board.py` CLAIM WAS NEVER ENFORCEABLE.
+
+`lane-guard.py`'s `_claims()` returns **zero** claims on that file.
+`FILES_RE` matches the holding lane's header line on the colon inside `23:0xZ`,
+yielding no paths; the two continuation lines carrying the real paths start with
+a backtick, so `in_files` never harvests them. That lane recorded *"Collision
+check RUN … CLEAR both times, so no other lane was blocked by the gap"* — **it
+read CLEAR because its own claim was invisible, not because the file was free.**
+A guard that cannot parse a claim reports the same string for "unclaimed" and
+"claimed in a format I cannot read".
+
+---
+
+## 2026-08-16 16:19–16:40Z — lane `layer1-board-coverage` — MEASUREMENT ONLY, NOTHING DEPLOYED
+
+**Nothing was deployed and nothing is claimed fixed in production.** `e543e8dd`
+is committed to the local `main` only. Render `autoDeploy = no` for code, so the
+served payloads below are all PRE-change and remain what production serves.
+
+### Instrument
+`GET /api/board/layer1?sport=<s>&view=all&window=slate` on
+`https://syndicate-an21.onrender.com`, one same-instant sweep 16:19:52–16:20:07Z,
+plus a 4-build availability watch 16:26–16:37Z. Board's own counters
+(`counts.rows`, `counts.rows_with_projection`) plus a per-row walk.
+
+### Baseline re-established (the prior one had expired)
+`docs/ai_context/betting_contract_lifecycle.md` §3a recorded MLB **19.7%
+projected / 0 edges / game state 1,220 of 3,604**. Today: **68.3% projected
+(1,941/2,843) / 1,462 edges / game state 2,843 of 2,843**. Judging today's board
+against that table would have booked another lane's fix as this lane's
+regression. That table is superseded, not wrong-at-the-time.
+
+### Availability — the briefed premise did not reproduce
+4 distinct consecutive MLB builds (16:26:31 / 16:30:45 / 16:33:49 / 16:35:06),
+**all non-zero**, WNBA and soccer non-zero on all 4. The "`count=0` on 3 of 5
+builds" reading is not the current behaviour. **Coverage does move between
+builds** — projected 2,107 → 1,935 with `rows` flat at 3,006 across one rebuild —
+so any future availability claim must carry the `generated_at` it was read from.
+
+### The finding `e543e8dd` addresses
+Rows with a projection, an empty `Edge`, and **no `edge_unavailable_reason` key
+at all** (absent, not null — checked: `key_absent` 284/284):
+
+```
+mlb    284   223 batter_home_runs, 34 batter_total_bases, 26 batter_hits, 1 outs
+wnba     3   game|h2h|full, source "wnba_game_cards"
+soccer   0   attributes 1,176 of 1,176
+```
+
+### Verification method, and why it is not a fixture
+The changed function was replayed over **the real served payloads**, re-deriving
+the `fair` term with the same `_no_vig_over_probability` the producer calls
+rather than trusting the payload's own field:
+**287 of 287 previously-silent rows emit a reason, 0 unattributed.**
+284 `one-sided market: no two-sided fair to price against`, 3
+`this projection's producer does not compute a probability-space edge`.
+`tests/test_prop_projections_edge_attribution.py` 11 passed;
+`test_prop_projections.py` + `test_live_edge_policy.py` + `test_market_board_ui.py`
+41 passed, 32 subtests, no regression.
+
+### What would falsify the fix after a deploy
+Re-run the same sweep and count rows with a projection, no edge of either
+contract, and no reason. **Expected 0.** Any non-zero names a branch the helper
+does not cover. Do NOT verify by "the reason string appears" — it appears on 287
+rows already in the replay; the discriminating count is the residual.
+
+### A hypothesis I raised and then falsified in the same pass
+The 3 WNBA `h2h` rows looked like a side-frame mismatch: `projection.side` is a
+team NAME ("Phoenix Mercury") while `consensus` is keyed `home`/`away`, the
+hazard `layer1_board.html:770` warns about. **Checked: all three name the HOME
+team**, so the terms describe the same team and the subtraction is legitimate
+(model 0.9673 vs fair 0.6502 = +31.7pp). Which makes it a MODEL reading on a
+projection whose own `model_skill` says `sample_games: 0, "model never
+backtested"` — so it stays refused, and now says so. Recorded because the wrong
+version was nearly written into the code comment as the cause.
+
+### Not deployed, not claimed
+No production behaviour has changed. Full audit with per-sport × per-family
+rates: `.syndicate/audit_2026-08-16_layer1_board.md`.

@@ -531,8 +531,15 @@ rule would break it. The gate must be TIME-TO-KICKOFF.
   - **Still unmeasured: a pregame-window end-to-end, and a deploy-free Layer 2
     window.** Both numbers above are live-slate, one sport.
     Full read: `.syndicate/tier5_quote_to_ui_2026-08-14.md`.
-- **Layer 1 is dark on ~3 of 5 builds** (`count=0`). On the stated hierarchy that
-  is an outage on the research surface, not a deletion argument. Program Tier 4.
+- **Layer 1 is NOT dark. `[re-measured 2026-08-16 16:26–16:37Z, lane
+  `layer1-board-coverage`]`** The earlier "`count=0` on ~3 of 5 builds" reading
+  did NOT reproduce: **4 distinct consecutive MLB builds, all non-zero**, and
+  WNBA and soccer non-zero on every one. Same-instant sweep at 16:19:52Z —
+  mlb 2,843 rows / 1,941 projected (68.3%), soccer 6,453 / 1,704 (26.4%),
+  wnba 872 / 305 (35.0%); nba/nhl/ncaab correctly `no_precomputed_grid_artifact`.
+  **Projection coverage does move build to build** (mlb 2,107 → 1,935 projected
+  across 16:33:49 → 16:35:06 with `rows` flat at 3,006), so an availability
+  claim needs the build stamp, not one read. Program Tier 4.
 - **The candidate-pool path serves NEITHER board** and is the real deletion
   candidate. Layer 1 and Layer 2 are **siblings off the shared grid**, not
   sequential — which is the mechanism by which L1 can fail without L2 noticing.
@@ -1711,7 +1718,17 @@ appears, and the framing that layer1 and layer2 run different joins.**
   `load_soccer_projections(roots, selected_date)` loads ONE date by design.
   Future-date recommendation files DO exist on prod (08-15: 6 leagues,
   08-16: 6, 08-17: 4).
-- **THE SOCCER SIM PUBLISHES ZERO PLAYER PROJECTIONS.** All four production
+- **~~THE SOCCER SIM PUBLISHES ZERO PLAYER PROJECTIONS.~~ NO LONGER TRUE —
+  superseded 2026-08-16 16:20Z by lane `layer1-board-coverage`.** Production
+  `/api/board/layer1?sport=soccer&window=slate` serves **1,525 projected player
+  props**: `player_goal_scorer_anytime` 519/1,539, `player_first_goal_scorer`
+  506/1,516, `player_shots_on_target` 394/1,278, `player_last_goal_scorer`
+  106/588. Whoever closed this should record which fix did it. **Still zero:**
+  `player_shots` 0/960, `player_assists` 0/171, `player_to_receive_card` /
+  `_red_card` 0/162 — and `player_shots` is the notable one, since the sim
+  demonstrably models shots-on-target. The 2026-08-15 reading below is kept for
+  its root-cause trail only; do not cite its counts as current.
+  All four production
   artifacts read `matches=1, player_props=0`. **107 of the 123 soccer board
   rows are player props and every one is unprojected**; all 12 projections are
   game rows. Root cause: **live-odds-worker builds the soccer artifacts** (its
@@ -2135,3 +2152,29 @@ Read from every engine package and from live production, not from registry prose
   margin. **That older figure is STALE — do not judge Phase 1 against it.** Whether 4096.0
   indicates a leak is NOT established: `memory.current` includes page cache and anon vs
   inactive_file was never split.
+
+## LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT, NOT a production measurement]`
+
+Full briefs: `.syndicate/brief_2026-08-16_layer1_board.md`,
+`.syndicate/brief_2026-08-16_layer2_board.md` (commit `01c53f56`). Lane names
+`layer1-board-coverage` / `layer2-board-quality` are RESERVED BY BRIEF and
+deliberately NOT opened in `lanes.md` — no session holds them yet.
+
+- **L2 movement/steam is DISABLED IN CODE, not decayed by data.**
+  `layer2_board.py:1152` is `return {}` with an unreachable body. `#372` turned
+  it off because the in-builder ~20MB odds-history load **stalled the shortlist
+  build for 70 minutes with no exception**. Naive re-enable re-stalls the board.
+  Only `h2h`/`totals`/`spreads` have history at all (`:1244`); served overlap was
+  event+market 11 of 73.
+- **The L2 scoring model EXISTS** — `blended_score()`,
+  `opportunity_signals.py:497-575`, `min(value, value*reliability)`. Auditing it
+  is the work; rebuilding it is not. The `min()` is load-bearing (it corrects a
+  sign inversion on negative-value rows, `corr -0.8312` vs `+0.8560` control).
+- **Layer 1 already publishes its own projection-coverage instrument** — the
+  header's `N markets / M with a projection`, via `_classify_enrichment`
+  (`layer1_board.py:328`) / `_row_is_enriched` (`:176`). Do not build a second.
+
+**NOT established, and stated here so it is not cited as if it were:** "Layer 2
+has no book allowlist" is a **negative from a grep over one file**. Layer 1's
+list IS confirmed (`DEFAULT_BOOKS`, `templates/shared/layer1_board.html:267`,
+client-side JS). Trace the served `book` field to its writer before acting.
