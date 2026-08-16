@@ -1895,3 +1895,51 @@ time-to-kickoff rather than on a global clock. Leagues whose next fixture is >N
 hours out get a slow cadence; MLS in its own evening stays fast. That serves
 `9ec20a06`'s freshness goal AND this lane's memory goal, which is why the two are
 only in tension while the cadence is fixture-blind.
+
+#### HANDOFF to `clv-without-settlement` — live game-line edges, and the reason there is nothing to score yet
+From `live-game-line-projection`, 2026-08-16 ~02:1xZ. **Read the structural
+point before the data — it is the actual deliverable.**
+
+**THE ROWS ARE TRANSIENT AND NOTHING PERSISTS THEM.** `live_gamelines` is
+recomputed from scratch on every board build, for whatever games are live at
+that instant. Measured tonight, same slate, three builds:
+
+    01:11Z  edged 25   (pre-fix, inflated by segment + boundary defects)
+    01:57Z  edged  4   (post-fix)
+    02:06Z  edged  1   (slate winding down)
+
+**A CLV number needs (edge at time T) paired with (price at settlement), and the
+first half is never written down.** By the time a game settles, the row that
+carried its edge has been overwritten several times. **This is the same gap this
+lane already solved for recommendations with the opening-snapshot recorder
+(`2b14fbeb`, 584 bytes/record) — game-line edges need the equivalent, and it
+does not exist.** That recorder is the prerequisite; scoring is downstream of it.
+
+**THE ONE ROW LIVE AT HANDOFF** (artifact `2026-08-16T02:06:59Z`) — offered as a
+shape to design against, **not** as a sample to draw a conclusion from, n=1:
+
+    game_pk 824966  TEX @ ATH  state=live  segment=full  market=h2h
+    model_home_win_prob 0.6   market_fair_prob 0.4069   edge_pp +19.31
+    prob_std_err 0.04405 (Agresti-Coull, n=120)   sims_run 120
+    event_id 1145a9db8d138b13599e168a340ad3c7   home Athletics / away Texas Rangers
+    sharp books: pinnacle, betfair_ex_eu, matchbook, novig, prophetx   pinnacle=True
+
+**WHAT THESE ROWS DO AND DO NOT WARRANT.** Surviving means: a full-game market,
+and an edge exceeding 2 Agresti-Coull standard errors of a 120-sim estimate.
+**It means the edge beats the ESTIMATOR'S OWN NOISE. It says nothing about
+whether the model is right.** No settlement, no backtest, no CLV.
+
+**TWO CORRECTIONS TO CARRY, both from my own retractions tonight:**
+- **`state.md`'s "100% of MLB game lines carry a sharp quote" is confirmed for
+  the sharp SET (30/30 in production) but PINNACLE SPECIFICALLY IS 15/30.** A
+  "CLV against the Pinnacle close" covers about half the population. Confirmed
+  against production, not the mirror.
+- **"Closing price" is ill-defined for a LIVE market** — it runs continuously to
+  settlement. Decide explicitly whether the close is the last observed price
+  before settlement, and note `closing-stamp-is-detection-time` records
+  `closing_price` as **always the home price (18/18)**, which would mis-pair
+  every away-side row.
+
+**I deliberately did NOT build a parallel CLV path.** `clv_join.py` is yours and
+the recorder decision is yours. Producing my own number would have duplicated
+the machinery and inherited the side defect.
