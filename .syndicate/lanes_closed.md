@@ -4722,3 +4722,85 @@ real and were different defects. Todo `#437`.
   `803dd65d`. All confirmed present in HEAD at close.
 - Full detail: `.syndicate/log/2026-08-15.md`, and `deploys.md` for every
   measurement with its working.
+
+### sim-engine-phase0-census — **CLOSED 2026-08-15 — H1/H2/H3 all settled by measurement; the 4th (memory baseline) is delegated to scheduled task `branch-overlap-baseline-watch`, first sample taken** — opened 2026-08-15 — session: sim-engine-track
+- Goal: produce the four Phase 0 measurements in `.syndicate/plan_2026-08-16_sim_scheduling.md`
+  so Phase 1 has a baseline it did not inherit. Read-only; no production code, no deploy.
+- Files (exclusive to this lane): `scripts/census_kickoff_hours.py` (new),
+  `scripts/watch_branch_overlap.py` (new, added for the baseline watcher),
+  `.syndicate/scheduled_task_branch_overlap.md` (new, canonical task mirror),
+  `.syndicate/plan_2026-08-16_sim_scheduling.md`. Collision check RUN against all
+  7 OPEN lanes (38 claimed paths): CLEAR on both.
+- Hypotheses, written BEFORE testing (this lane is diagnostic):
+  - H1 — every sport's pregame work lands uniformly across 24h, because cadence is
+    elapsed-time not fixture-relative. Soccer's European leagues kick off 07:00-16:00 CT
+    and MLS 19:00-22:00 CT.
+  - H2 — the live-lens loop ticks on BOTH workers, duplicating mlb/wnba/soccer every 60s.
+    Read from config only; unproven.
+  - H3 — production basketball sims run the real vendor engine, not
+    `_simulate_smart_game_local` (the no-sampling stub reached by a bare `except`).
+- Falsification tests:
+  - H1 fails if kickoff hours are already uniform across the day, or if European
+    kickoffs sit in the US evening — then the peak overlap is not a cadence artifact.
+  - H2 fails if only one worker emits `[live_lens_loop] TICK_COMPLETE`.
+  - H3 fails if a live `smart_sim_*.json` carries no `score` key — the stub ran, and
+    every basketball probability in production is a means-sum with no MC behind it.
+- Verification: each hypothesis recorded in the plan with the measurement that settled
+  it, INCLUDING exoneration. A hypothesis that survives is recorded as unfalsified,
+  not as confirmed.
+- Blocked by: none. Feeds `odds-cadence-off-the-mlb-peak` (SCOPED, unstarted) — that
+  lane owns Phase 1; this one does not touch its files.
+- Governing rules read before starting: `FORBIDDEN: never run a heavyweight census ON
+  the thread that is doing the measuring` (the census is an offline script, not worker
+  work); `EXONERATED: the soccer window is not the egress cause` (pull any metric back
+  far enough to see whether the symptom predates the change).
+
+
+#### RESULTS 2026-08-15 evening CDT — two of four measurements done
+- **H3 UNFALSIFIED — the real engine runs in production.** 3/3 WNBA artifacts
+  (`smart_sim_2026-08-15_{LVA_MIN,WSH_LAS,CON_NYL}.json`, pulled via
+  `/api/ops/artifacts/stream`) carry `score`/`intervals`/`periods`/`rotation_minutes`
+  and NOT the stub's `home_team_total_pts_mean`. The §2.2 OWED item closes with the
+  reassuring answer: the bare-`except` fallback is not firing.
+  - Path gotcha for repeats: files are at `wnba_source/data/processed/`, NOT
+    `.../source_artifacts/data/processed/` (404s). Both are listed as candidate roots.
+- **H3b — n_sims=100 confirmed ON THE ARTIFACT, and the cost is visible in the
+  output.** All 9 served probabilities across the 3 games are exact multiples of
+  0.01 (0.25/0.29/0.59, 0.66/0.55/0.73, 0.14/0.25/0.46) because each is a count out
+  of 100 draws. Binomial SE at p=0.25 is ±4.3 pts — the size of the edges priced.
+- **H2 CONFIRMED BY LOG, no longer config-inferred.** `TICK_COMPLETE`
+  02:21Z-03:13Z: refresh-worker 31 ticks {mlb,wnba,soccer,nfl}, live-odds-worker
+  38 ticks {mlb,wnba,soccer}. **mlb/wnba/soccer built on BOTH** — 69 MLB builds/hr
+  where one owner needs ~35. Cycles run ~100s/~81s against a 60s interval, so the
+  tick itself costs ~20-40s. Makes Phase 4.1 a prerequisite, not a nicety.
+- **STILL OWED: H1 (kickoff-hour census) and the baseline re-take.** H1 is the one
+  that sizes Phase 1; nothing about cadence should be changed before it runs.
+- No code changed, no deploy, no production write. `scripts/census_kickoff_hours.py`
+  claimed but not yet created.
+
+#### H1 SETTLED 2026-08-15 — 0 of 200 European kickoffs are in the US evening
+- `scripts/census_kickoff_hours.py` (new, this lane) ->
+  `reports/kickoff_census/latest.json`. Window 2026-07-16..2026-08-29, CT.
+- **Falsification test did not fire.** 9 European leagues, n=200, hours 5..14 CT,
+  **0.0%** in the 18:00-01:00 band and ZERO fixtures at any hour after 14:00.
+  MLS n=111 at 94.6% (the named exception, now confirmed from fixtures rather
+  than from process cmdlines). mlb n=605 53.6%, wnba n=117 84.6%,
+  nfl_preseason n=49 71.4%.
+- **CORRECTED THIS PLAN'S OWN BAND TABLE.** It guessed European soccer at
+  01:00-09:00 CT; measured is 05:00-14:00, and US fixtures start at 11:00, so a
+  real 11:00-14:00 contested band exists that the guess denied. A hardcoded
+  "soccer in the morning" rule would have been built on the wrong hours --
+  which is the argument for fixture-relative rather than band-relative gating.
+- **TWO ERRORS OF MINE, caught and recorded rather than quietly fixed:**
+  1. I read nflverse `gametime` as US/Eastern. It is UTC. The tell was an
+     implausible 22:00 CT median; verified against the Hall of Fame Game
+     (2026-08-07 `00:00` UTC = 20:00 ET Thu) and DET@CIN (`23:00` = 18:00 CT)
+     before correcting. I had written a comment warning about this exact shift
+     and made it anyway.
+  2. The script's attributable-zero branch conflated "schema miss" with "no
+     fixtures in window", so regular-season NFL (season starts after the window)
+     reported as a parser failure. Now three distinct outcomes.
+- Still owed: the hour-by-hour both-branches-live MEMORY baseline. Needs a
+  multi-hour observation window; not doable in one pass, should run as a
+  scheduled watcher. **Phase 1 must not be judged against the lane's existing
+  2026-08-16 table without re-taking it.**
