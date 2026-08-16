@@ -4798,3 +4798,19 @@ has `games_in_summary: 15` and **0 rows** (quote shard not yet populated).
    re-ranking, not new admissions.
 3. Live props: alternate-line rows joining. **Expect a small move only** — no
    `batter_home_runs` alternates are captured.
+
+### MEASUREMENT SCHEDULED — `alt-line-shortlist-watch`, fires 2026-08-16 10:00 CT
+The predicate above for `32186e28` / `c422f79a` is **not abandoned, it is queued**.
+A one-shot scheduled task (`C:\Users\tempadmin\.claude\scheduled-tasks\alt-line-shortlist-watch\SKILL.md`)
+carries the full baseline inline (shortlist 88 rows / 52 projected / **14 alt rows
+at `sim_component: None`**; book grid 238 alt rows at 0 projected against
+`spreads`+`totals` **115 of 115**) and writes its result back here.
+
+**It leads with the CONTROL and aborts on it:** if main `spreads`/`totals` read 0
+projected, or `games_in_summary` is 0, the run reports VOID rather than FAIL —
+that is the exact false negative the 2026-08-15 date rollover produced. It is a
+measurement only; it will not deploy or roll back, and it names the rollback SHAs
+(`191d098f4a8d`, `b7ae47e6d1a0`) for the user to decide on.
+
+**If you are another session and the slate is populated before 10:00 CT, take the
+reading yourself and say so here** — do not assume the task has covered it.
