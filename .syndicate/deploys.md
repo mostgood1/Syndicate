@@ -8278,3 +8278,57 @@ from scratch.
 
 G3 is now answered for both halves: MLB's live lens works for props and (since
 today) for game lines; WNBA's is unwired.
+
+---
+
+## PENDING RIDEALONG — `a21b63db`, the cross-file compat guard. Producer-side. Web needs nothing.
+
+**Whoever next deploys refresh-worker: cherry-pick these three blobs onto that
+service's LIVE SHA and it comes along.** They are unchanged on `origin/main` as
+of 2026-08-16 21:1xZ — verified blob-for-blob, not assumed:
+
+    pipeline/layer2_shortlist.py                   c64da25044
+    syndicate/features/shared/layer2_board.py      ef4e40dccf
+    tests/test_layer2_cross_file_compat.py         09fd9afd2c
+
+**Live refresh-worker `a9e5d3d6` has NONE of it** — `_blended_score_accepts` 0,
+the `openings` signature probe 0, the live-join optional-import reason string 0.
+
+### Why it matters more than a normal ridealong
+
+This is the guard for the **blank-board incident at 20:34Z**, and the incident
+is repeatable until it ships. `c324447d` shipped
+`pipeline/layer2_shortlist.py` without `layer2_board.py`; the caller passed
+`openings=` to a signature that lacked it; the `TypeError` was swallowed into
+`cards = []`; and with `layer2_is_primary=True` that is a blank board announced
+only by a string nobody reads. It was caught by a watcher before a build landed
+and closed by roll-forward `77dbbd06`.
+
+**Right now those three files are still coupled in production.** Ship any one of
+them alone onto `a9e5d3d6` and the same thing happens again. Once `a21b63db` is
+live the coupling is gone and they can be cut in any combination.
+
+### It is ALSO self-protecting, which is the point
+
+`a21b63db` is safe to ship alone, by construction: the guards it adds are the
+thing that makes a partial deploy survivable. If only
+`pipeline/layer2_shortlist.py` from it reaches the worker, the signature probe
+sees an older `layer2_board.py`, builds the board WITHOUT movement, and stamps
+`cards_compat_note` saying so. A degraded board with a stated reason, not a
+blank one.
+
+So this ridealong has no ordering constraint and no companion requirement —
+unlike the payload it protects.
+
+### Falsification once it lands
+
+    git show <live-sha>:syndicate/features/shared/layer2_board.py | grep -c _blended_score_accepts   -> 3
+    /api/board/layer2-shortlist  ->  cards_present > 0, and cards_compat_note ABSENT
+      (present would mean layer2_board.py did NOT travel with it -- degraded, not broken)
+
+### Not urgent, and stated so it is not over-called
+
+No current defect depends on it. It removes a FUTURE failure mode. If the next
+worker deploy is days away that is acceptable; it should simply not be dropped,
+because the cost of forgetting it is another blank board and the cost of
+carrying it is three blobs.
