@@ -5260,6 +5260,103 @@ correctly withheld.
 
 **OPEN:** `index_size` 3 -> 8 -> 10 across the night is still unexplained; Drop
 2's carry-forward has never been observed firing; the tally is MLB-only.
+**OWED, and it will not arrive by itself:** a reading with `rows>0`. The WNBA
+producer was last observed running on **live-odds-worker — the one service that
+did not get this deploy** — so the likeliest source of the first reading is
+still dark. Next deployer of live-odds-worker should carry
+`deploy/win-prob-null-live-odds-worker` (re-cut on its then-live SHA; the pushed
+`3573a0c3` is already stale). The hourly `wnba-win-prob-counter-read` scheduled
+task now reads this endpoint and will report "writer not deployed" until then —
+that is a true statement, not a null result.
+
+---
+
+## 2026-08-16 03:31:11Z — web `ebd5f677` — serve the live game-line coverage — MEASUREMENT PENDING
+
+Lane `live-game-line-projection`. Deploy `dep-da0itvpt0dsc739pj3n0`, fired
+03:31:11Z. **Measurement column deliberately empty; reminder 03:45Z.**
+
+**THE PREFLIGHT FAILED ITS FIRST CANDIDATE, AND THAT IS THE ENTRY WORTH READING.**
+The candidate was `639ecce0` (= `origin/main`). **`main` is not an ancestor of
+what web runs.** The live SHA was `fa1871cf`, and **33 commits are live on this
+service and absent from `origin/main`** — among them `484221bd` (the opt-in
+per-recommendation `clv_pct` block) and `4316c907` ("a close stamped after first
+pitch is an in-play price, not a close"). Deploying main would have reverted all
+33, including work another session shipped tonight. Re-parented on the live SHA
+as `ebd5f677` and verified by CONTENT, not ancestry: `_clv_block` count 2 in the
+deployed tree, my pass-through count 1.
+
+**Scope:** `+20` lines in one function of `syndicate/blueprints/intelligence.py`,
+plus a new test file that production never executes. Nothing else.
+`live_gameline_ledger.py` and `live_gameline_join.py` are **absent from web's
+tree and deliberately not carried** — `build_book_grid_artifact` has exactly one
+call site, `scripts/run_refresh_worker.py:3140`, so the ledger cannot run here.
+`render.yaml` untouched → no `blueprint_sync`.
+
+**Expected effect, as a number and a window:** on the FIRST request after the
+deploy reports `live`, `GET /api/board/book-grid?sport=mlb&date=2026-08-15&limit=1`
+returns `live_gamelines` as an object carrying `rows_live_gameline_considered`
+and `live_gameline_ledger` as an object carrying `written`. **Both read `null`
+right now** — that is the pre-state, taken 03:0xZ. No board build is required:
+the route reads an artifact that already carries both keys. Every other field
+must be unchanged for the same `generated_at`.
+
+**Falsification, run before the deploy:** with the two served keys commented out,
+all 6 tests fail; restored, they pass — on the LIVE tree (`fa1871cf` + the
+change), not on main.
+
+**What a null result would mean, stated before reading it:** if both keys are
+still `null`, check `generated_at` FIRST. A `null` from an artifact written
+before Drop 3 is the honest "this artifact predates the join" signal and is NOT
+a failed deploy. Only `null` against an artifact that demonstrably carries the
+keys implicates this change.
+
+**Blast radius:** web only (`srv-d88ahvrbc2fs73eodu30`, 2 GB, persistent disk →
+stop-then-start, no instance overlap). Recent deploys on this service ran ~7–8
+min end to end with 502s during the swap. Fired at 22:31 Central **with 2 MLB
+games live**, so the board was unavailable to a user for a few minutes — recorded
+as a cost, not netted out. **No worker restarts**: `refresh-worker` and
+`live-odds-worker` untouched, so `refresh-worker-oom-recurrence`'s deploy hold is
+not crossed and no in-flight sim was killed.
+
+**Rollback:** `POST /v1/services/srv-d88ahvrbc2fs73eodu30/deploys` with
+`{"commitId": "fa1871cf..."}` — the exact SHA that was live at 03:31Z.
+
+### MEASURED 2026-08-16 03:38–03:40Z — web `ebd5f677` — **PASS**
+
+Deploy `dep-da0itvpt0dsc739pj3n0` reported `live` at **03:38:07.648Z** (6m56s
+from 03:31:11Z). Gated on the affirmative token `live`, not on the absence of a
+failure string.
+
+    read (server_time)   artifact generated_at   live_gamelines   live_gameline_ledger
+    03:38:28.543Z        03:37:13.853Z           object           object
+    03:38:57.335Z        03:37:13.853Z           object           object
+    03:39:43.233Z        03:39:36.922Z           object           object
+
+    live_gamelines       considered 8  projected 2  priceable 0  edged 0
+                         withheld 8 = {segment_is_not_full_game: 6,
+                                       prob_interval_swamps_edge: 2}
+                         index_size 10
+    live_gameline_ledger candidates 0  written 0  enabled true
+
+**Pre-state was `null` for BOTH keys** (03:0xZ, recorded in the pending row
+above before the deploy). **Two different artifacts** — 03:37:13 and 03:39:36 —
+both served them, so this is two builds, not two reads of one.
+
+**Why one read would in fact have been enough here, stated so the rule is not
+cargo-culted:** the artifact already carried both keys, proven at 03:00Z by
+streaming the raw file. The only producer between the code and the number was
+the route. The "two lags in series" rule binds when a snapshot sits upstream of
+the artifact; it does not here, and saying which applies is the point.
+
+**`written: 0` is expected and is NOT this deploy's business.** refresh-worker
+still runs the v1 recorder, whose `candidates` is 0 because 0 of 8 rows are
+priceable. **The measurement this unblocks has not been taken** — it needs the
+worker half, which `refresh-worker-oom-recurrence` still holds.
+
+**Cost:** fired 22:31 Central with 2 MLB games live; the board 502'd during a
+~7-minute stop-then-start swap. No worker restarted; no sim killed; the OOM
+lane's hold was not crossed. `render.yaml` untouched, so no `blueprint_sync`.
 
 ---
 

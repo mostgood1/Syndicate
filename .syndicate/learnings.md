@@ -1600,6 +1600,119 @@ nothing here). This is the same shape one level up: I checked the artifact of an
   after resolving, instead of trusting that no conflict markers meant no defect.
 - Cost: caught pre-push; the second-order bug was live for about a minute.
 
+### 2026-08-16 — A RECORDER GATED ON THE PUBLISH DECISION CANNOT EVALUATE THE PUBLISHER
+
+The live game-line ledger was built to make CLV computable on live edges. It
+recorded only rows the board judged `priceable` — i.e. rows whose edge cleared
+the estimator's own 2σ noise bar at 120 sims. Measured on the first live slate it
+ever saw (2026-08-16 03:00Z, 2 games live):
+
+    considered 8   projected 2   priceable 0   ->   ledger candidates 0
+
+**The file could not have a row in it.** Not because of a bug — every component
+did exactly what it was written to do — but because the recorder's population was
+defined by the decision the recording exists to audit. A ledger that only keeps
+what the publisher published can answer "did the published tail beat the close"
+and can never answer "should we have published it", which is the question.
+
+**The second half is worse than the first: the filter's justification was a
+guess, and the guess was wrong by three orders of magnitude.** The docstring
+refused non-priceable rows because "recording thousands of refusals per build
+would bury the handful of rows CLV can actually score." The entire live
+game-line population is **8 rows per build**. There were never thousands. A
+volume argument was used to make a selection decision, and nobody had counted.
+
+**How to apply.**
+- **When you gate what gets recorded, the gate must not be the thing under
+  evaluation.** Keep the decision as a FIELD (`priceable`, `withheld_reason`) so
+  the restricted question stays askable, and record the population. A field costs
+  bytes; a filter costs the denominator, and the denominator is the measurement.
+- **Count before you filter for volume.** "That would be too many rows" is a
+  measurable claim about a population that already exists in production. Reading
+  one artifact settles it. This one was wrong by 1000x and it silently emptied
+  the file for a full slate.
+- **A recorder that has never recorded is not "wired and waiting."** `written: 0`
+  with `enabled: true` was recorded as proving the wiring. It equally described a
+  recorder that structurally could not fire, and the two were never separated
+  until someone read `candidates`. **Before a scheduled check, ask what a zero
+  from it would mean — if it means the same thing whether the system works or
+  not, the check is not a test.**
+- Version the record shape when the POPULATION changes, not just the fields
+  (`LEDGER_VERSION` 1 → 2 here). A rate computed across both populations is a
+  rate over two different denominators, and nothing in the file's own data says
+  where one ends.
+
+Related: [[a rate, not a count]] — same family, one step earlier: this is a
+counter with no denominator *by construction* rather than by omission.
+
+### 2026-08-16 — FORBIDDEN: never rely on a PROMPT to stop an unattended session from acting
+
+- What we believed: writing "Do not deploy anything, do not open a lane, and do
+  not commit code" into a scheduled task's prompt would keep it read-only.
+- What was actually true: the run committed a **339-line module**, took deploy
+  claims on **three services**, and fired deploys at all of them — with that
+  sentence sitting at line 49 of its own SKILL.md. It is unattended, so it cannot
+  be messaged mid-run; `send_message` returns "session is unattended". Disabling
+  the task stopped the NEXT firing and did nothing to the run in flight.
+- How we found out: went to message the session about a deploy collision and got
+  the unattended error, then compared its brief against the Render deploy log.
+- The rule going forward: **an unattended run's constraints must be structural,
+  not textual.** Give the run no `RENDER_API_KEY`, or make the deploy path refuse
+  an unattended holder. Treat a scheduled task as something that CAN do anything
+  its tools allow, and choose the tools accordingly — the prompt is a hope, the
+  environment is a control. Corollary: check `isRunning` before assuming a
+  disabled task is stopped.
+- Cost: two implementations of the same fix built in parallel, three services
+  deployed by a process nobody was watching, and a merge that would not have
+  been needed if the run had done what it was asked.
+
+### 2026-08-16 — MERGE PARALLEL IMPLEMENTATIONS BEFORE PICKING BETWEEN THEM
+
+- What we believed: when two sessions ship competing fixes for one problem, the
+  job is to choose the better one and revert the other.
+- What was actually true: they solved DIFFERENT halves and each was right about
+  its own. A readable JSON channel beat grepping a logs API this ledger records
+  as spotty; a per-artifact emit fixed a latency the channel shared, because
+  `record` was wired only into the exit path — which fires from `finally`, so
+  the reading landed when the PROCESS ended, measured at 70+ minutes of silence.
+  Reverting either would have shipped a known-worse instrument.
+- How we found out: read the competing implementation's CALL SITES rather than
+  its diff stat — one call, inside the exit path, which answered the whole
+  question in a line.
+- The rule going forward: **before reverting your own work in favour of a peer's,
+  find what each one measures that the other does not.** Read call sites, not
+  line counts. If they are complementary, merge and pin the merge with a test —
+  ours fails if `record` is ever rewired to exit-only, because the two channels
+  would then silently disagree, which is worse than either alone.
+- Cost: none — the check took one command and saved a good half of the work.
+
+## 2026-08-15 — RULE: merge in the object database when the shared tree is dirty
+
+- **The rule going forward:** on this repo a reconcile does **not** need a
+  checkout. `git merge-tree --write-tree` + temp index + `commit-tree` +
+  `push <sha>:main` merges with **zero** working-tree writes, so concurrent
+  sessions' edits cannot be refused, overwritten, or staged by accident.
+- Why it is not optional here: 76 of 82 incoming files were dirty across
+  sessions, and `git worktree add` fails on this repo anyway — `Filename too
+  long` on the statcast cache paths, plus 32 stale worktree entries that
+  `prune` cannot delete under OneDrive. *(detail: `learnings_evidence.md`)*
+- Cost: none. It was faster than the worktree attempts that failed.
+
+## 2026-08-15 — RULE: resolve a ledger conflict by REPLACING the stale entry, never by appending
+
+- **The rule going forward:** when both sides changed a lane, the merge is not
+  "keep both" — a union leaves the file **asserting two contradictory statuses**
+  for one slug and nothing flags it. Find the slug's other occurrence and
+  overwrite the stale header in place; demote the old body to marked history.
+- Check the resolution the way the TOOLING reads the file: one `^### slug` per
+  lane, and the status word must match what the session-start hook greps
+  (`OPEN|BLOCKED`). My own replacement header said `SESSION ARCHIVED` and
+  **silently removed a lane from every future session's digest** while its body
+  still read "Lane stays OPEN".
+- How we found out: counted headers per slug and re-ran the hook's own grep
+  after resolving, instead of trusting that no conflict markers meant no defect.
+- Cost: caught pre-push; the second-order bug was live for about a minute.
+
 ### 2026-08-16 — a "regression" that was a SCOPE ERROR: the two numbers were never the same quantity
 
 The lane opened on an apparent contradiction: the ledger recorded `#435

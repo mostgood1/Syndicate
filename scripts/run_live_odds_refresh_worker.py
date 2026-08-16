@@ -421,6 +421,36 @@ def main() -> int:
     log_all_process_memory("startup", worker="run_live_odds_refresh_worker", pid=os.getpid(), argv=list(sys.argv))
     log_runtime_memory("startup", worker="run_live_odds_refresh_worker", pid=os.getpid(), argv=list(sys.argv))
     assert_refresh_state_backend_ready(process_name="live-odds-worker")
+
+    # THIS SERVICE BUILDS THE SOCCER ARTIFACTS, SO IT NEEDS SOCCER'S SEED FILES.
+    #
+    # `#145`/`#170`/`#361` fixed exactly this three times in
+    # `scripts/run_refresh_worker.py`, and it came back a fourth time here
+    # because the soccer sim moved to a service whose entrypoint never ran any
+    # bootstrap. Measured 2026-08-15: `_launch_autorun_soccer_pregame_refresh`
+    # below spawns `scripts/build_soccer_artifacts.py` on THIS worker (its PID
+    # is in our own ALL_PROCESS_MEMORY payload at 02:25:48Z, matching the
+    # `generated_at` on all four published recommendations files), and
+    # `_load_player_rows` reads `players_*.csv` off THIS disk -- which is not
+    # refresh-worker's, and which nothing seeded. Every published file carried
+    # `player_props: 0`, so all 107 player-prop rows on the soccer board had no
+    # projection while the committed CSVs sat correct and unread in git.
+    #
+    # Must run AFTER assert_refresh_state_backend_ready: it resolves the
+    # destination through `refresh_state_store.data_root()`.
+    #
+    # Never fatal. Missing seeds degrade the sim; a seeder that can stop this
+    # worker booting is strictly worse than the bug it fixes.
+    try:
+        from syndicate.features.soccer.seed_bootstrap import bootstrap_soccer_seed_files
+
+        bootstrap_soccer_seed_files(log_prefix="live_odds_worker")
+    except Exception as exc:
+        print(
+            f"[live_odds_worker] SOCCER_SEED_BOOTSTRAP_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
     # #57: the intelligence board build can now be hosted here instead of on
     # refresh-worker, where it no longer fits alongside the MLB sim in 2GB.
     # This service runs neither the sim nor the intelligence pipeline today,

@@ -204,6 +204,252 @@
   to a stamp that persists in shard files needs its backfill story decided
   before it ships, not after.
 
+### spread-line-sign-convention — OPEN — **DIAGNOSED AND FIXED; DEPLOYED TO WORKERS 23:1xZ, ARTIFACT OUTPUT STILL UNVERIFIED** — the row's `line` is the AWAY handicap and home candidates inherited it (525/525 cells) — opened 2026-08-15 — session: lane-cleanup
+- **TEMPLATE QUESTION ANSWERED 2026-08-15 23:2xZ. THE CONVENTION IS
+  `row["line"] == THE AWAY HANDICAP`, AND ONLY THE HOME SIDE IS BROKEN.**
+  - From the 525-cell result: `cell.home.line == -row.line` and (per-book
+    internal consistency) `cell.home.line == -cell.away.line`. Therefore
+    **`cell.away.line == row.line`, exactly.**
+  - So: **away-side rows are CORRECT** — their price and `row["line"]` describe
+    the same bet. **Home-side rows are INVERTED** — `layer2_board.py:852` pairs
+    `cell["home"]["price"]` with `row["line"]`, which is the away handicap.
+  - That is why the no-arb violation showed up only when comparing a home `-1.5`
+    opening against a home `+1.5` one: both were home rows.
+- **NO TEMPLATE CONSUMES THE SHORTLIST — but chat does, because I wired it there
+  tonight.** `grep` over `templates/` and `static/` for `layer2-shortlist`:
+  **zero hits**; the board still renders `ranked_all`. The one consumer on a
+  user-facing path is `ask_the_syndicate_adapter.py:599`
+  (`_board_top_opportunities`), shipped this session as web `c774fe1a`, whose
+  `_board_row_selection` renders `f"{side} {line}"`.
+  - **Verified live**: the chat headline served
+    `'away -1.5 (San Diego Padres @ Cleveland Guardians)'` — an AWAY row, which
+    is the correct case. **A HOME spreads row in that list would display the
+    away handicap beside the home price.**
+  - **So the user-facing blast radius is: home-side spread selections appearing
+    in the Ask headline.** Narrow, real, and created by my own change tonight —
+    before `c774fe1a` the shortlist had no user-facing consumer at all.
+- **SEVERITY, stated so it is not over- or under-called:** not a board-wide
+  mislabel (the board does not read these rows), not zero either. It also
+  corrupts every home-side spread row in the CLV join, which is where it was
+  found.
+- Files (claimed 2026-08-15 23:0xZ — **claimed LATE, after the edit, which is a
+  protocol lapse of mine; recorded rather than quietly backfilled**):
+  `syndicate/features/shared/layer2_board.py`,
+  `tests/test_layer2_book_prices_line.py`. Collision check RUN via
+  `lane-guard.py`'s own `_claims()` at edit time AND again now: CLEAR both times,
+  so no other lane was blocked by the gap.
+- **FIX IMPLEMENTED, TESTED, ON MAIN AS `edbbee9d` — DEPLOY HELD.**
+  `_side_line_from_cells` reads the handicap from the same cell as the price;
+  no-op for away/h2h/props; returns None (caller keeps the row value) when books
+  disagree on the sign. 8 new tests, 71 green across board + CLV suites.
+  **Not deployed: it needs REFRESH-WORKER, and an MLB sim (pid 79) plus a board
+  build were in flight.** Forward-only — today's openings keep the bad lines.
+  Ship when the slate is quiet, then re-run the 525-cell invariant.
+- **FIX unchanged and now fully justified:** at `layer2_board.py:852` take the
+  line from the same cell as the price. Away is already right, so the change
+  must not touch it — negate only for the home side, or carry
+  `cell[side]["line"]` per book.
+- **SAME-BOOK TEST RUN 2026-08-15 23:1xZ on `/api/board/book-grid` (mlb, 33
+  spreads rows, 525 book-cells). THIS IS THE DECISIVE MEASUREMENT and it is
+  UNIFORM, not statistical:**
+
+      1. each book's OWN home/away lines sum to zero    525/525  consistent
+      2. cell's home line vs the ROW's `line`             0/525  agree
+                                                        525/525  OPPOSITE SIGN
+      3. no-arb per book (implied home + implied away)  median 1.0483, none < 1.0
+
+- **`book_prices` IS NOT MIXING BOOKS. Every book agrees with every other book
+  and with itself.** The 2026-08-07 `_complementary` condition (*"books inside a
+  single grid row disagree on the SIGN"*) is real but is **NOT** what is
+  happening on this data. My previous entry blamed book-vs-book mixing; that is
+  now refuted — 100% agreement between books.
+- **THE ACTUAL DEFECT, and it is deterministic:** the ROW's `line` is the
+  NEGATION of the cell's `home.line`, in every single case. So
+  `layer2_board.py:852` building `book_prices = {book: cell["home"]["price"]}`
+  and publishing it beside `row["line"]` pairs **the home team's price with the
+  opposite handicap**. Every home-side spread opening is therefore recorded as
+  `side=home, line=L, price=<home price at -L>`.
+- **THIS PARTIALLY REINSTATES THE FINDING I WITHDREW, with a corrected
+  mechanism.** The 16-of-17 no-arbitrage violations were REAL; my second reading
+  ("confounded by book mixing") was wrong. It is not mixing — it is a uniform
+  row-vs-cell convention mismatch. **Third revision of this attribution; this
+  one is measured on 525 cells with 100% agreement rather than inferred from a
+  neighbouring module's comment.** The sequence, so nobody re-treads it:
+  feed transposes labels (WRONG) -> books disagree so `book_prices` mixes
+  (WRONG) -> row.line is uniformly the negation of the cell's home line (this,
+  measured).
+- **STILL NOT ESTABLISHED — the user-facing question, now sharper.** `row["line"]`
+  being the away handicap may be the board's INTENDED convention, in which case
+  the cards are fine and only the home-side flattening at `:852` is wrong. The
+  test is narrow: **does any template render `row.line` beside a HOME selection?**
+  Read the card template before assigning any user-facing severity.
+- **FIX, now well-specified:** at `layer2_board.py:852`, take the line from the
+  same cell as the price (`cell[side]["line"]`) rather than inheriting
+  `row["line"]` — either by carrying it per book or by negating for the home
+  side. Do NOT "fix" the sign at the CLV end; the pairing is wrong where it is
+  built, and every other consumer of `book_prices` inherits it.
+- **TRACED 2026-08-15 23:0xZ. THE LINE IS SET AT `layer2_board.py:852-858`, AND
+  THE DEFECT IS A DROPPED FIELD, NOT AN INVERTED SIGN.**
+
+      "book_prices": {
+          str(book): cell[side]["price"]        # <- price kept
+          for book, cell in (row.get("cells") or {}).items()
+          ...                                    # <- cell[side]["line"] DROPPED
+      }
+
+  Full chain: fetcher (`fetch_mlb_oddsapi_local.py`, EXONERATED — derives
+  `home_line = -away_line` per lane) -> book grid (`book_grid.py:304`, passes
+  `row.get("line")` through) -> `layer2_board` flattens each cell to a bare
+  price -> `record_openings` stores that flat map -> `clv_join`'s same-book
+  override reads `book_prices[book]` and pairs it with the ROW's line.
+- **THIS REPO ALREADY KNEW, IN A NEIGHBOURING MODULE, AND SAID SO.**
+  `board_cross_book.py` tags each quote with *"the CELL's own line, which is not
+  always the row's line … this is the pairing guard"*, and `_complementary`
+  documents the measured reason (production 2026-08-07, `spreads_alt`, first5):
+
+      betmgm     away -1.5 (+210)   home +1.5 (-295)
+      betrivers  away +1.5 (-240)   home -1.5 (+180)
+
+  **Books inside ONE grid row disagree on the SIGN of the line.** That module
+  refuses such pairings ("*spreads are signed per side*", postmortem §2.6, after
+  a false +250.88% arbitrage). `layer2_board`'s `book_prices` drops the very
+  field that guard depends on — and the comment above it says so deliberately:
+  *"Flat {book: price}, not the whole cell."* The choice was made for artifact
+  size; its cost is that sign information is unrecoverable downstream.
+- **SO MY PREVIOUS CONCLUSION IS WRONG AND I AM WITHDRAWING IT.** I reported "the
+  BOARD's home-spread `line` sign is inverted, 16 of 17 — possible user-facing
+  mislabel". **That test was confounded by exactly this mixing:** it compared
+  `book_prices` across books for one row-level line, and those books were not
+  all quoting the same side. The 16/17 measures **sign disagreement BETWEEN
+  BOOKS**, which is a known and expected market fact — not a board defect.
+  **There is no evidence of a user-facing mislabel. Do not act on that claim.**
+- **What IS established:** `book_prices` silently mixes books quoting opposite
+  sides of a spread, so ANY consumer reading it for a spread selection can get
+  the opposite bet's price. `clv_join`'s same-book override is one such consumer;
+  that is the `-29.90`/`+30.428` mirror pair.
+- **What is NOT established, and needs a same-book test to settle:** whether the
+  ROW's own `line`+`price` (anchor book) are correct. My attempt was confounded —
+  the two openings had DIFFERENT anchor books (onexbet, betopenly), and since
+  books disagree on sign, an anchor-vs-anchor comparison proves nothing. The
+  clean test is one book quoting both lines of one event.
+- **REVISED FIX (do not ship before the same-book test):** carry the cell's line
+  alongside its price — `{book: {"price": …, "line": …}}` — or refuse a same-book
+  join whose book line is unknown. The size objection in that comment is real and
+  should be answered with a line-only companion field, not by dropping the guard.
+- **DISCRIMINATOR RUN 2026-08-15 22:4xZ. It trusts NEITHER label**, which is what
+  makes it decisive: for one team, `-1.5` (win by 2+) is strictly harder than
+  `+1.5`, so `implied(-1.5) < implied(+1.5)` is a no-arbitrage fact regardless of
+  whose naming is right.
+
+      source                          respects invariant   violates
+      BOARD (published openings)            1 of 17          16
+      FEED  (odds-history lanes)            2 of 2            0
+
+  Board pairs span **15 distinct events** and many books; junk quotes
+  (`novig -100000`) excluded. The single exception is `nordicbet -1.5=117 /
+  +1.5=111` — implied 0.461 vs 0.474, a 1.3-point gap on a near-pick'em, i.e.
+  inside the vig and not evidence of correctness.
+- **The feed, on the same event, is internally right both times:** home `+1.5`
+  at `-205` (implied 0.672, the easier bet, minus money) and home `-1.5` at
+  `+168` (implied 0.373, the harder bet, plus money).
+- **SO: `fetch_mlb_oddsapi_local.py` IS EXONERATED. The bug is downstream, where
+  a published home-spread selection gets its `line`.** The hypothesis in this
+  lane's header is CONFIRMED and the falsification branch (lane-collapse only)
+  is REFUTED — lane collapse is real but cannot explain a systematic sign
+  violation across 15 events.
+- **MY EARLIER ATTRIBUTION IS NOW DOUBLY CORRECTED, and this is the final
+  version.** First I wrote that the FEED "transposed its labels" (in
+  `learnings.md`). Then I corrected that to "each point is internally
+  consistent; the market state holds one lane at a time". **Measured, it is
+  neither: the feed is correct and the BOARD is inverted.** The learnings entry
+  from earlier tonight describes the right FAILURE MODE (a label whose
+  convention is not stable across sources) but names the wrong culprit.
+- **THIS IS BIGGER THAN CLV AND MUST NOT SHIP AS A CLV FIX.** These openings are
+  recorded FROM published board rows, so if the board serves `side=home,
+  line=-1.5` while the price is the `+1.5` price, **users are being shown the
+  wrong side of the run line.** That is a correctness problem on the product
+  surface; CLV merely made it visible.
+- **UNVERIFIED, and it decides the severity — DO THIS BEFORE ANY FIX:** I have
+  NOT checked what the rendered card/API actually displays. Two possibilities and
+  they need different fixes: (a) the board's `line` field is genuinely inverted at
+  the point of publication -> user-facing defect; (b) the board's `line` means
+  something other than the home team's handicap (e.g. it carries the away line,
+  or the market line) and only the CLV join misreads it -> internal-only. **The
+  price data cannot tell these apart; only reading the publisher and the template
+  can.**
+- Next step, concrete: find where a spreads selection's `line` is set on the
+  published row (start from `pipeline/layer2_shortlist.py` and the per-sport
+  `cards.py`), and read what the card template renders beside it. Then decide (a)
+  vs (b). **Still no deploy** — and generality beyond MLB is still unmeasured.
+
+- Goal: for a spread, ONE source owns the sign of `line` and every consumer
+  agrees with it. Testable outcome: for every same-book spreads row in
+  `/api/ops/clv/report`, the opening's `(side, line, price)` and the close's
+  `(side, line, price)` describe the SAME bet — checked by an assertion that does
+  not itself rely on the label (see below) — and a test pins the convention per
+  source.
+- **WHY: a `-29.90` CLV on a market that never moved.** Event `69928d29…`
+  (Seattle @ Houston), FanDuel spreads. The opening recorded `home -1.5 @ -205`;
+  the close resolved `home -1.5 @ +168`. `-205` and `+168` are the two sides of
+  ONE run line, so the "30-point move" is a bet differenced against its opposite.
+- **REFINEMENT FROM READING THE FETCHER — my first framing was too strong and is
+  corrected here before anyone acts on it.** I wrote in `learnings.md` that the
+  feed "transposed its labels". **Each history point is internally consistent:**
+  `fetch_mlb_oddsapi_local.py:505-525` derives `home_line = -away_line` and keys
+  each lane by the home line, so `{away -1.5 / home +1.5}` and
+  `{away +1.5 / home -1.5}` are both correct — they are **two different lanes of
+  the same spreads market**.
+  - **The real mechanism is that the odds-history market key carries NO line**
+    (`event_id|home_team|away_team|market|bookmaker`), which `clv_join.py`'s own
+    docstring already states. So every spread lane collapses into ONE market
+    state and the last writer wins. At 06:02Z that state held the home `+1.5`
+    lane; at 21:26Z it held home `-1.5`.
+  - **What is still genuinely unresolved, and is this lane's question:** the
+    opening says `home -1.5` costs `-205`; the 06:02 history says `home +1.5`
+    costs `-205`. Same price, opposite line. **One of the two is using the
+    opposite sign convention for a home spread, and I do not yet know which.**
+- Hypothesis: the board's published `line` for `side=home` carries the OPPOSITE
+  sign to the feed's `home_line`. If so every home spread opening is joined to
+  the wrong lane, and away rows are joined correctly by accident.
+- Falsification test: if the board and feed signs agree, then the mismatch is
+  purely lane-collapse (the state simply held a different lane than the opening),
+  the sign is exonerated, and the fix is to key history by line rather than to
+  change any sign.
+  - **Discriminator that does NOT trust either label:** for one event, take the
+    published `book_prices` for the home `-1.5` selection and the feed's two
+    lanes at the same instant. The lane whose `home_odds` EQUALS the published
+    price identifies which line the board meant. Prices are the invariant here;
+    labels are the thing under test.
+- **SCOPE ALREADY MEASURED, so nobody re-derives it:** mlb 2026-08-15 same-book —
+  spreads n=42, mean `+0.515`, median **exactly 0.000**, only 2 rows |clv|>10 and
+  those two are a **mirror pair from this one event** (`+30.428` / `-29.900`),
+  because both openings were recorded and each got the other's close. h2h/totals
+  n=128, **zero** |clv|>10. **Severe per row, near-cancelling in aggregate** —
+  so this corrupts per-recommendation CLV, variance, CIs and any "worst bets"
+  list, while leaving the headline roughly intact. **It is NOT a headline
+  emergency and must not be deployed like one.**
+- Files (exclusive to this lane):
+  - `scripts/fetch_mlb_oddsapi_local.py` — where `home_line`/`away_line` and the
+    lane key are derived. Collision check RUN via `lane-guard.py`'s own
+    `_claims()`: CLEAR.
+  - `tests/test_spread_line_sign_convention.py` (new). CLEAR.
+  - **NOT claimed, held by other OPEN lanes — coordinate, do not edit across:**
+    `syndicate/features/shared/odds_refresh_tracking.py`
+    (`closing-stamp-is-detection-time`) and
+    `syndicate/features/shared/clv_join.py` (`clv-without-settlement`). Both are
+    this session's lanes, so the marker can simply be moved if the fix lands
+    there — but the claim must be updated first, not bypassed.
+- Verification: (1) the discriminator run on >= 5 events across >= 2 books, with
+  the winning convention named per source; (2) a test pinning it; (3) the
+  spreads |clv|>10 count re-derived and the mirror pair gone.
+- **Generality is UNMEASURED and must be established before any fix ships:** all
+  of the above is ONE event, ONE date, MLB, FanDuel. NFL/NCAAF spreads and other
+  books are untested, and MLB run lines are the asymmetric case that makes the
+  error visible — symmetric `-110/-110` spreads would hide it entirely.
+- Blocked by: none. **No deploy without `/preflight`**, and not before generality
+  is measured — a sign flip applied to a source that was already correct would
+  invert every spread join instead of fixing it.
+
 ### clv-without-settlement — OPEN — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
 - **SETTLED CLV READING 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read,
   taken after the last two first pitches at 01:38Z and 01:40Z).**
@@ -1015,6 +1261,25 @@ Source: the `book_grid_2026-08-15.json` artifact streamed from web
    games, including the 2 live ones.** Consistent with "Drop 2's carry-forward has
    never fired" AND with "the stamp is only applied on the carry-forward path."
    **Not disambiguated — do not record either as established.**
+
+**CHECKPOINT 2026-08-16 03:4xZ.** Shipped to `origin/main`, DEPLOYED NOWHERE:
+`c87f6634` (ledger v2 + the book-grid pass-through + 2 test files),
+`bbc70d16` (the two deploy requests), `4e82d4b7` (the learnings rule).
+97 tests pass, and the pass-through was falsified first — commenting out the two
+served keys fails all 6 new tests.
+
+**THE ONE THING THAT DECIDES WHETHER TOMORROW IS A TEST:** the v2 recorder must
+be on refresh-worker before the scheduled `live-gameline-ledger-check` fires at
+**08-16 20:30 Central**. Against v1 it reads `written: 0` again and means nothing.
+That deploy is HELD by `refresh-worker-oom-recurrence`, deliberately — the hold is
+correct and the deadline is real, and only the user can trade them off.
+
+**NEXT ACTION for whoever picks this up:** not code. Get the refresh-worker
+deploy decided. Everything after it is measurement:
+`live_gameline_ledger.written > 0` on one build, then `skipped_unchanged > 0` on
+a later one — **the second is the real test**, because the append proving it
+writes is not the dedup proving it writes only on movement. Read it across two
+builds, never once.
 **Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
 
 **SHIPPED AND LIVE (content-verified per service, not by ancestry):**
@@ -1890,6 +2155,98 @@ treat it as a controlled baseline.**
 - `win-prob-null-readable` — CLOSED-VERIFIED 2026-08-16 *(full entry in `lanes_closed.md`)*
 - `slate-size-headroom` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
 - `worker-child-processes` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
+
+#### `clv-without-settlement` — SETTLED READING 2026-08-15 MLB, recorded by `live-game-line-projection`
+Read from `/api/ops/clv/report?sport=mlb&date=2026-08-15` at ~2026-08-16 02:5xZ,
+after the scheduled task `clv-settled-read-2026-08-15` fired 01:55:33Z. **Not my
+lane — recorded because I had the reading and the context; interpret it yourself.**
+
+**THE NUMBER (same-book, close observed BEFORE first pitch):**
+
+    avg_clv_pct      -0.4049 %
+    beat_close_rate   21.64 %   (29 of 134)
+    same_book_n      134   |  same_book_all_n 159  |  book_biased_n 107
+    openings         987   ->  resolved 266
+
+**IT GOT WORSE ON SETTLEMENT.** This lane's own preliminary figure was
+**-0.07 % at a 27.1 % beat rate**, taken pre-first-pitch. Settled it is
+**-0.4049 % at 21.64 %**. The direction of that move is the finding.
+
+**DO NOT QUOTE `book_agnostic_close`.** It reads **+2.6793 % at an 83.16 % beat
+rate on n=95** and is an ARTIFACT, not a result — the report's own `bias_note`
+says pairing a best-of-N opening against another book's close is **biased
+upward**. That is precisely what the same-book restriction exists to remove, and
+it is the most quotable wrong number in the payload.
+
+**`by_close_timing` — and this is the part that touches Tier 5:**
+
+    pregame   n=134   avg -0.4049 %   beat 21.64 %
+    in_play   n= 25   avg -0.3498 %   beat 36.00 %
+
+**IN-PLAY IS A SEPARATE, EXCLUDED BUCKET (`in_play_excluded_n: 25`) — AND
+IN-PLAY IS EXACTLY WHAT `live-game-line-projection` PRODUCES.** The live
+game-line edges cannot be scored through this path as it stands; they would land
+in the bucket this report sets aside. **This empirically confirms the caveat in
+my handoff above** ("close is ill-defined for a live market"): it is not a
+theoretical objection, the pipeline already treats those rows as un-scoreable.
+Deciding what "close" means for a market that runs continuously to settlement is
+a prerequisite for scoring the live game-line ledger, and it is this lane's call.
+
+**LIMITS, stated so nobody over-reads a single evening:** one slate; `resolved`
+is **266 of 987** openings, so roughly a quarter of published rows got a close at
+all — the 134 that carry the headline are ~14 % of what was published. Whether
+the unresolved 721 differ systematically from the resolved 266 is **unknown and
+not tested**, and if they do the -0.4049 % is not representative.
+
+> *(The blockquote and body below are this lane's HISTORY, kept for the
+> reasoning trail. The status above supersedes them — 2026-08-16 reconcile.)*
+> **STATUS LINE CORRECTED 2026-08-15 ~18:0xZ by the coordinating session.** It
+> read "NOT DEPLOYED" and that is no longer true: `0e0b0aa1` rode the web train
+> and is in the deployed tree (`dep-da0a5rlg1s2s73cm43kg`, live 17:40:30Z).
+> **This does NOT discharge the lane's measurement obligation.** By this lane's
+> own commit message the change publishes nothing on its own — the visible
+> effect needs Drop 2 — so "deployed" here means *present*, not *proven*. No
+> production predicate was declared for it and none was measured. Do not read
+> the deploy as evidence the lens now serves a live win probability.
+- Goal: MLB game lines carry a projection computed from the CURRENT game state
+  rather than the pregame sim. **Testable outcome:** on a live MLB slate, a
+  published artifact carries a live win probability per live game whose value
+  MOVES between two consecutive builds while the pregame `predictions.full`
+  for the same game does not — and `rows_live_edged` on the book-grid counters
+  is > 0 for game-line markets.
+- **THE PREMISE IS FALSE AND THAT IS THIS LANE'S CENTRAL FINDING.** "No live
+  game-line projection exists" is a statement about PUBLICATION, not about
+  computation. `estimate_live(LiveSituation(...))` runs in production today,
+  120 sims per live game, on every live-lens tick, and returns `homeWinProb`,
+  `awayWinProb`, projected `total` and `homeMargin` from the live inning /
+  outs / bases / score / batter / pitcher state. Evidence in
+  `.syndicate/spec_live_game_line_projection.md` §1.
+- Files (exclusive to this lane):
+  - `.syndicate/spec_live_game_line_projection.md` (new — the deliverable of
+    this phase)
+  - `syndicate/features/mlb/live_lens.py` — the merge site at 1090-1100 that
+    discards the live-MC game lens for exactly the live games.
+- Hypothesis (H1): the live MC's `gameLens` is dropped by
+  `_enhance_card_row_with_live_projection`'s `should_use_projection_lens`
+  because the card's own pregame-derived lens already satisfies
+  `_lens_rows_have_projection_signal`, so the branch is False on precisely the
+  live games it was written to serve.
+- Hypothesis (H2): a second, independent drop — the report that is PUBLISHED
+  is the slim HTTP-fetched shape from `scripts/refresh_mlb_oddsapi.py`, which
+  carries no `gameLens` at all. Fixing H1 alone therefore changes nothing that
+  crosses to web.
+- Falsification test: for H1 — a live game whose card row carries NO gameLens
+  still shows no `source: live_mc` row after the merge, which would mean the
+  MC payload never reached the merge. For H2 — a published report that already
+  carries `gameLens` rows, which would mean the slim path is not the binding
+  drop.
+- Verification: (1) the spec is reviewed and its scope agreed BEFORE any engine
+  work — this phase produces no source edit; (2) any later code change is
+  measured on the published artifact, never through web's `/mlb/api/live-lens`,
+  which recomputes a cards fallback locally and is structurally blind to the MC
+  (`cardsFallback: True`, `simContextAvailable: False` on 14/14 games, measured).
+- Blocked by: none. **NO DEPLOY FROM THIS LANE.** refresh-worker is under
+  `#435` and had a deploy in flight (`eea7554a`) at lane-open.
 
 #### live-game-line-projection — ARCHIVE ADDENDUM 2026-08-16 ~03:0xZ (supersedes the "next session" line in the archive above)
 Recorded after the archive block, and it **changes the next step**.

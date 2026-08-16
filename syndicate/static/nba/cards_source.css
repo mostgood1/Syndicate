@@ -4011,3 +4011,21 @@ body[data-viewport='phone'] .cards-scoreboard {
 .cards-strip-card {
   font-variant-numeric: tabular-nums;
 }
+
+/* Form controls do not inherit font properties: the UA stylesheet sets a
+   `font:` shorthand on <button>/<input>/<select>, which resets
+   `font-variant-numeric` to normal. Measured on production 2026-08-15 after
+   the rule above went live: `.cards-game-card` and `.cards-prop-filter-shell`
+   both computed `tabular-nums`, and `button.cards-filter-pill` inside them
+   computed `normal` with fontFamily `Arial` -- the UA shorthand winning. That
+   accounted for all 143 remaining non-tabular digits on MLB
+   (`.cards-prop-filter-count`, the count inside each filter pill), and MLB is
+   the only sport with in-card filter pills that carry counts. */
+.cards-game-card button,
+.cards-game-card input,
+.cards-game-card select,
+.cards-strip-card button,
+.cards-strip-card input,
+.cards-strip-card select {
+  font-variant-numeric: inherit;
+}
