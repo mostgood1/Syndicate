@@ -81,6 +81,14 @@ REASON_NOT_PRICEABLE = "prob_interval_swamps_edge"
 REASON_TOTALS_MEAN = "totals_mean_not_distribution"
 REASON_NO_MARKET_PRICE = "no_two_sided_market_price"
 REASON_UNUSABLE_SIMS = "sim_count_unusable"
+# The live re-sim publishes a FULL-GAME win probability. The grid carries the
+# same h2h market once per segment (full / first5 / first3 / first1), so
+# joining without this filter prices a full-game projection against a
+# FIRST-INNING market. Measured 2026-08-16, SD @ CLE: model 0.9667 against
+# mkt 0.8750 (full) = +9.17 pp, and against mkt 0.5424 (first1) = **+42.43 pp**
+# -- an edge that is entirely an artifact of the mismatched segment.
+REASON_SEGMENT_NOT_FULL_GAME = "segment_is_not_full_game"
+_FULL_GAME_SEGMENTS = frozenset({"full", "full_game", "game"})
 
 
 def _min_sims() -> int:
@@ -108,7 +116,20 @@ def prob_std_err(probability: Any, sims: Any) -> float | None:
         return None
     if not (0.0 <= p <= 1.0) or n <= 0:
         return None
-    return math.sqrt(max(0.0, p * (1.0 - p)) / float(n))
+    # AGRESTI-COULL, not Wald. The Wald form `sqrt(p(1-p)/n)` is **0.0 at p=0 and
+    # p=1**, which is not "perfectly precise" -- it is undefined, and it is a
+    # LIVE case: the re-sim quantises to k/n, so 0/120 and 120/120 occur on real
+    # slates. Measured 2026-08-16: `PHI @ MIN model=0.0 se=0.0` was published
+    # PRICEABLE with a 2-sigma bar of ZERO, so every edge cleared it. This
+    # module's own docstring warned that a 0.0 here "would make every edge
+    # priceable" and then returned one for degenerate-but-valid input.
+    #
+    # Add-two smoothing shifts the estimate off the boundary and widens by the
+    # same token, so the tails are conservative rather than infinitely confident.
+    successes = p * float(n)
+    n_adj = float(n) + 4.0
+    p_adj = (successes + 2.0) / n_adj
+    return math.sqrt(max(0.0, p_adj * (1.0 - p_adj)) / n_adj)
 
 
 def live_gameline_from_lens(lens_rows: Any) -> dict[str, Any] | None:
@@ -332,6 +353,15 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
         if str(row.get("kind") or "") != "game":
             continue
         if str(row.get("market") or "").strip().lower() != "h2h":
+            continue
+        # Counted, then refused BY NAME -- a segment row is a real live h2h row
+        # the join saw and declined, not one it never considered. An ABSENT
+        # segment refuses too: unknown must not take the permissive branch.
+        segment = str(row.get("segment") or "").strip().lower()
+        if segment not in _FULL_GAME_SEGMENTS:
+            record(coverage, {"priceable": False,
+                              "withheld_reason": REASON_SEGMENT_NOT_FULL_GAME},
+                   projected=False)
             continue
 
         key = (_norm_team(row.get("away_team")), _norm_team(row.get("home_team")))
