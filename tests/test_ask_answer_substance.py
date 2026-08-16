@@ -118,8 +118,17 @@ BET_CANDIDATE = {
     "side": "over",
     "sim_projection": 3.951,
     "sport": "mlb",
-    "quote": {"book_age_seconds": 5074.9, "bookmaker": "draftkings", "books_quoting": 2,
-              "fair_probability": 0.5094786729857821, "price": -101},
+    # VERBATIM, and the two fields at the end are why this comment exists. The
+    # first cut of this fixture dropped `quote_seen_age_seconds` and
+    # `suspect_stale` as "not needed", which is exactly how the stale-quote bug
+    # survived a green suite: with only the book clock present there was no way
+    # for a test to notice the code was reading the wrong one. A trimmed fixture
+    # cannot fail the test its omission causes. Do not trim rows here.
+    "quote": {"assumed_hold_pct": None, "book_age_seconds": 5074.9,
+              "book_prices": {"betmgm": -120, "bovada": -125, "draftkings": -101},
+              "bookmaker": "draftkings", "books_quoting": 2, "fair_method": "consensus",
+              "fair_probability": 0.5094786729857821, "price": -101,
+              "quote_seen_age_seconds": 585.4, "suspect_stale": False},
 }
 
 
@@ -391,12 +400,44 @@ def test_reason_degrades_to_absent_rather_than_inventing():
     ) is None
 
 
-def test_reason_flags_a_stale_quote():
+def test_a_quiet_market_is_not_a_stale_quote():
+    """THE FALSE ALARM THIS TEST USED TO PIN.
+
+    `BET_CANDIDATE` is the real served shape and carries BOTH clocks:
+    `book_age_seconds` 5074.9 (84 min, the price has not MOVED) and
+    `quote.quote_seen_age_seconds` 585.4 (9.8 min, when we last LOOKED). This
+    asserted "84 minutes old" and was passing on the wrong one -- measured on
+    the served board 2026-08-16, that read fired on 31 of 101 rows and **13 were
+    false**, all on the freshest sport. A motionless market is not stale data.
+    """
+    facts = adapter._bet_facts(BET_CANDIDATE)
+    assert facts["quote_age_seconds"] == pytest.approx(585.4)
     reason = adapter._reason_sentences(
-        BET_CANDIDATE, adapter._bet_facts(BET_CANDIDATE), adapter._sim_terms(BET_CANDIDATE),
+        BET_CANDIDATE, facts, adapter._sim_terms(BET_CANDIDATE),
         model_pct=63.0, market_pct=50.95, edge_pct=14.01,
     )
-    assert "84 minutes old" in reason
+    assert "minutes ago" not in reason
+    assert "84" not in reason
+
+
+def test_reason_flags_a_genuinely_stale_OBSERVATION():
+    """Only the seen-clock can raise it, and it says what the number means."""
+    stale = dict(BET_CANDIDATE, quote=dict(BET_CANDIDATE["quote"],
+                                           quote_seen_age_seconds=7188.0))
+    reason = adapter._reason_sentences(
+        stale, adapter._bet_facts(stale), adapter._sim_terms(stale),
+        model_pct=63.0, market_pct=50.95, edge_pct=14.01,
+    )
+    assert "Last checked 119 minutes ago" in reason
+    assert "confirm the price before betting" in reason
+
+
+def test_book_age_is_the_fallback_only_when_there_is_no_seen_clock():
+    """Absence of the seen clock is not evidence of freshness -- gate as before."""
+    no_seen = dict(BET_CANDIDATE)
+    no_seen["quote"] = {k: v for k, v in BET_CANDIDATE["quote"].items()
+                        if k != "quote_seen_age_seconds"}
+    assert adapter._bet_facts(no_seen)["quote_age_seconds"] == pytest.approx(5074.9)
 
 
 def test_live_game_situation_is_stated():

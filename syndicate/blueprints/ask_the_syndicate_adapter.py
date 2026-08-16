@@ -694,7 +694,30 @@ def _bet_facts(row: dict[str, Any]) -> dict[str, Any]:
     if price is None:
         price = _to_float(row.get("odds"))
     books = quote.get("books_quoting")
-    age = _to_float(quote.get("book_age_seconds"))
+    # **TWO CLOCKS, AND THIS ONE WANTS THE SECOND.** `layer2_board`'s
+    # `_row_quote_age_seconds` spells out the distinction and this originally
+    # took the wrong half:
+    #
+    #   book_age_seconds       -- has the PRICE MOVED. `book_quotes` is a change
+    #                             log, so an unchanged price writes no row and a
+    #                             motionless market ages without limit.
+    #   quote_seen_age_seconds -- how stale OUR OBSERVATION is, i.e. when we
+    #                             last looked. This is the one that answers
+    #                             "is this price still there".
+    #
+    # Measured on the served board 2026-08-16, 101 rows: warning off `book_age`
+    # fired on 31 rows, off `seen_age` on 18, and **13 of the 31 were FALSE** --
+    # worst case `book_age 217.4m` against `seen_age 3.0m`, which would have
+    # told a reader a three-minute-old MLB price was three and a half hours
+    # stale. A quiet market is not a stale one, and the false alarms all landed
+    # on the freshest sport on the board.
+    #
+    # Gated the same way the board gates: seen first, book only as the fallback
+    # for a source that never produced a seen-age (absence of a clock is not
+    # evidence of staleness).
+    age = _to_float(quote.get("quote_seen_age_seconds"))
+    if age is None:
+        age = _to_float(quote.get("book_age_seconds"))
     if age is None:
         age = _to_float(row.get("book_age_seconds"))
     market = row.get("market") or row.get("market_key")
@@ -843,7 +866,14 @@ def _reason_sentences(
             parts.append("This game is already live.")
     age = facts.get("quote_age_seconds")
     if age is not None and age >= 900:
-        parts.append(f"The quote behind this is {int(age // 60)} minutes old.")
+        # Says WHEN WE LOOKED, not "the price is old" -- see `_bet_facts` for
+        # why those are different claims. The old wording ("The quote behind
+        # this is N minutes old") was true of neither clock once the field was
+        # corrected: it reads as a claim about the market when the number is a
+        # claim about our own data.
+        parts.append(
+            f"Last checked {int(age // 60)} minutes ago, so confirm the price before betting."
+        )
 
     return " ".join(parts) or None
 
