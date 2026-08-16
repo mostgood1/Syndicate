@@ -841,104 +841,189 @@ bought ~446 MB; a larger slate still crosses.
 
 ---
 
-## SOCCER
+## SOCCER — one section, current truth only
 
-**Owner: `soccer-model-coverage` (new) for the model; UI Lane G for the card.**
+> Collapsed 2026-08-16 from three sections, two of which contradicted each other.
+> **OVERWRITE lines here; do not append a fourth section.**
 
-- **Soccer serves ZERO shortlist rows and that is the INTENDED interim state,
-  not an outage.** Its whole presence was one-book longshot props whose `ev_pct`
-  was arithmetically `-assumed_hold_pct`. **Read `rows_uninformative_ev` before
-  diagnosing soccer as broken** — soccer is ABSENT from `per_sport` rather than
-  present at 0.
-- **The A3 filter SELF-HEALS.** It keys on `fair_method`, so if soccer ever gets
-  two-sided quotes the fair becomes `consensus` and the rows return with a real
-  EV — no code change. `[from-code 08-14]`
-- **Two endpoints disagree about projection coverage by 250×, same sport, same
-  date, 45 seconds apart `[measured 08-14 19:1xZ]`:**
-  `/api/board/layer1?sport=soccer` → 8,456 rows, 2,504 projected = **29.6%**;
-  `/api/board/layer2-shortlist` → 8,512 rows, 12 projected = **0.1%**, with
-  `rows_with_model_edge: 0`, `matches_in_source: 4`, `unmatched_match_rows:
-  8,393`. **These are two different joins and at most one describes the board a
-  user sees.** Settle this before raising coverage.
-- **SOCCER GAME ODDS HAVE NOT BEEN CAPTURED FOR ANY LEAGUE SINCE 08-10/08-11.**
-  Eredivisie looked healthy solely because `prop` rows from a different producer
-  masked it. **The vendor is NOT the cause** — all ten soccer keys
-  `listed=True, active=True`. `[measured 08-14 18:4xZ]`
-- **THERE IS EXACTLY ONE PRODUCER and it is not refresh-worker.** `phase=pregame`
-  builds 50 steps including 10 odds steps; `phase=live` builds 20 steps and **0
-  odds steps** — and refresh-worker's soccer autorun runs `phase="live"`, so it
-  never fetches soccer odds at all, by design since `#148`. Everything depends on
-  `_launch_autorun_soccer_pregame_refresh` on live-odds-worker, 4h cadence.
-  **Single point of failure.** `[measured 08-14 18:5xZ]`
-- **WHY the step fails is STILL UNKNOWN.** No error has been observed anywhere.
-  **Two hypotheses are DEAD — do not re-run them:** step truncation at #27 of 50
-  (falsified by a ~6-step scoped run that captured nothing), and
-  three-specific-leagues (all ten are affected). The `#433` step reorder is
-  retained on its own merits but **must not be credited with fixing capture**.
-- **The run's own logs are UNREADABLE FROM WEB** — `launch_refresh_run` spawns
-  the child `stdout=DEVNULL, stderr=DEVNULL` onto the WORKER's disk, and Render's
-  collector captures only a service's own stdout. That is the disk split, not an
-  absence of logs, and it is how four days of failure produced no visible error.
-- **The sim reports its own input is missing:** `SOCCER_PLAYER_ROWS_MISSING` on
-  eredivisie, primeira_liga, championship. Observed once while looking at
-  something else — **a lead, not a finding.** `[observed 08-14 19:25Z]`
-- **Some markets can never carry an edge however good the model gets.**
-  `player_shots` / `player_shots_on_target` map to a MEAN and `soccer_projections`
-  refuses by design to derive a probability from a mean; the rows are one-sided
-  so `_no_vig_over_probability` returns None. `player_to_receive_red_card` and
+**THE MODEL LOSES TO THE MARKET — the load-bearing fact.**
+`[measured 08-15, first leak-free number this repo has had]`
+`scripts/backtest_soccer_h2h_calibration.py`, **1,112 matches / 9 leagues**,
+ratings recomputed per match day:
+
+    MODEL  multiclass Brier  0.5875
+    MARKET multiclass Brier  0.5737   (de-vigged closing odds, same matches)
+    gap                     +0.0139   lower is better -> the MODEL LOSES
+
+Worse in **8 of 9 leagues** (sign test p = 0.039); the lone exception,
+belgian_pro_league at -0.0011, is noise at n=120. Under-dispersed on an
+independent route: model stdev(P home) **0.1575** vs market **0.1811**, narrower
+in 8 of 9. Coverage is not the excuse — eredivisie has 918 history rows with
+result and complete closing odds, **intersection 918**.
+**CONSEQUENCE: soccer must NOT publish `model_edge_pct` yet.** Its errors sit on
+the FAVOURITES, so published edges would systematically point at underdogs. The
+3-way de-vig removes a stale block; it does not make the number publishable.
+Named cheap levers, neither done: sharpen the distribution, and raise
+`adapters._DEFAULT_SIMULATIONS` from 300 (**±2.9pp of Monte Carlo noise**).
+
+**USER DECISION 2026-08-15: ship the three correctness fixes, HOLD the de-vig.**
+Seed bootstrap, accent join and as-of parsing ship; #2 is held because it makes
+an untrustworthy number visible. The as-of pair is LIVE on live-odds-worker.
+
+**CORRECTED — there is ONE soccer projection join** (`board_enrichment.py:595`).
+**The "250x disagreement / 8,456 rows / 2,504 projected / 29.6%" figure is
+REFUTED and must not be quoted again**; it compared two different GRIDS.
+`layer1?sport=soccer` = 123 rows / 4 games / 12 projected (date-scoped);
+`layer2-shortlist` = 8,515 rows over SIX dates / 434 games / 109 projected.
+`matches_in_source: 4` is CORRECT — there were 4 fixtures that day and the sim
+produced all four; `load_soccer_projections` loads ONE date by design.
+
+**THE SIM PUBLISHES ZERO PLAYER PROJECTIONS.** All four production artifacts read
+`matches=1, player_props=0`; **107 of 123 soccer board rows are player props and
+every one is unprojected.** Cause: live-odds-worker builds the artifacts but its
+entrypoint ran **no seed bootstrap**, so its disk never received the committed
+`players_*.csv`. refresh-worker HAS them and is not doing the work. `#145`
+recurring on a fourth service.
+
+**`compute_team_ratings`'s as-of filter was INERT for 9 of 10 leagues** — it
+compared dates as raw TEXT and `history/*.csv` is **DD/MM/YYYY**, so
+`'17/05/2026' >= '2026-08-14'` is False and eredivisie returned an identical 923
+rows at every as-of from 2023 to 2026. This CONTRADICTED `soccer-backtest-leakage`
+being closed as fixing the leak. Two further live bugs from the same cause:
+matches on the 30th/31st dropped as "future", and a text sort making "most recent
+45" mean "the 45 latest in the MONTH". Fixed in `loaders._as_iso_day`;
+**verify deployment by content before relying on it.**
+
+**PUBLISHED EV IS BOUND BY THE ODDS, NOT THE MODEL.** soccer `margin_model`:
+`one_sided_rows` **8,189**, `pct_modelled` **100.0** — one book quoting, so every
+row is `book_margin_model` and the uninformative-EV filter drops all of them.
+**A perfect model publishes zero rows until two-sided quotes return.** Soccer is
+ABSENT from `per_sport` rather than present at 0 — read `rows_uninformative_ev`
+before calling it broken. The A3 filter SELF-HEALS on `fair_method`.
+
+**QUOTE FEED — the 8h outage was LOCK CONTENTION, not a break.**
+`[measured 08-15 21:2xZ]` Pregame capture is a **4-hourly autorun** on
+live-odds-worker; 14:22:29 and 18:22:34 both FAILED with "a refresh run is
+already active". A 4-hourly point sample against a lock held **~92%** of the time
+is ~1-in-12 per attempt, so two consecutive misses is expected.
+**RESOLVED 22:24:29Z unaided** — the 22:23:16 autorun launched and the first
+capture landed **73 seconds later**; soccer went 516.6 min -> 0.1 min.
+**Total 8h 02m.** Cheapest fix, unowned and quantified: a bounded retry (every
+5 min for 30 min) at the refusal would have found one of the ~2-min free windows
+that occur every ~25 min — **an 8-hour outage becomes minutes.**
+`live_refresh_loop.py` is claimed by OPEN `live-game-line-projection`.
+**TWO DIFFERENT CLOCKS:** `earlyExit` is ~6.5h, the autorun ~4h; the 14:22
+failure PRECEDES the 14:34 exit, so the exit did not cause it.
+**REFUTED, do not re-run:** fixtures aging out, a 13:47 restart, the run
+erroring (zero tracebacks), OddsAPI quota.
+
+**STRUCTURAL FACTS THAT STILL HOLD**
+- **One producer, and it is not refresh-worker.** `phase=pregame` builds 10 odds
+  steps; `phase=live` builds **0**, and refresh-worker's soccer autorun runs
+  `phase="live"`. Everything depends on
+  `_launch_autorun_soccer_pregame_refresh` on live-odds-worker. Single point of
+  failure. The `#433` step reorder must NOT be credited with fixing capture.
+- **The run's logs are unreadable from web** — the child is spawned
+  `stdout=DEVNULL` onto the WORKER's disk. That is the disk split, not absence.
+- **Some markets can never carry an edge**: `player_shots` /
+  `player_shots_on_target` map to a MEAN and the projection layer refuses to
+  derive a probability from a mean; rows are one-sided so
+  `_no_vig_over_probability` returns None. `player_to_receive_red_card` and
   `player_assists` are not in the market map at all.
-- **MLS cannot be backtested from its current source at all.**
-  `fetch_asa_mls_team_history` returns undated **season aggregates**, so a season
-  average already contains the whole season and no `as_of` filter can repair it.
-  The backtest returns `{}` for MLS with `AS_OF_DROPPED_UNDATED`. `[measured 08-14]`
-- **`data/soccer_source/*/validation/*_backtest_*.csv` is NOT CITABLE** (leakage).
-  Report soccer backtest accuracy as **unmeasured**. Production is unaffected —
-  `build_soccer_artifacts` predicts forward.
-- Soccer sims are ENABLED and running; one sim job = one league-date (`#282`).
-
----
+- **MLS cannot be backtested from its current source** — undated season
+  aggregates; the backtest returns `{}` with `AS_OF_DROPPED_UNDATED`.
+- `data/soccer_source/*/validation/*_backtest_*.csv` remain **NOT CITABLE**.
+- **The 3-way h2h edge refusal is STALE, not a safety property** —
+  `_no_vig_over_probability` has handled the draw leg since `95305cab`.
+- The producer now publishes half-by-half periods (`sim.periods` h1/h2).
 
 ## NFL — CLOSED, archived
 
 Moved to `state_archive.md` 2026-08-15. Closed work; the rules it records
 generalise but are not current state. `#377`, `#425`, `#429`.
 
-## UI / BOARD CARDS
+## UI / BOARD CARDS — one section, current truth only
 
-- **Lane E is CLOSED-VERIFIED in production** (web `aadcde77`, live 21:42:56Z):
-  horizontal overflow 28px desktop / 20–40px mobile → **0 at both widths** on
-  nfl, ncaaf, soccer, ncaab; NCAAF default tab 0 panels/187px → 1 panel/556px;
-  orphan tabs and unreachable panels → 0; mobile tab targets under 44px 64/48/4
-  → 0; numeric classes `normal` → `tabular-nums`. `[measured 08-14 21:4xZ]`
-- **Lane F is CLOSED-VERIFIED and live** (web `932a1f71`, then `a86eb4ed`):
-  seven fabrication sites in `game_board_contract.py` are gone — an absent
-  probability renders as an explicit empty state, a genuine 0.0 survives instead
-  of becoming 50/50, and a projected scoreline is never recast as a win split.
-  Soccer three-way markets carry a draw segment. One null placeholder (`—`)
-  platform-wide: NCAAF hyphen cells 48 → 0, em dashes 0 → 144. `[measured 08-15 01:41Z]`
-- **A 50/50 on the board now MEANS 50/50.** The one still served (NFL, DEN@KC)
-  sits on a 0.4-point projected margin — the producer's own `home_win_rate`.
-- **NCAAF kickoffs file on their CENTRAL day** — 28 of 157 real 2026 kickoffs
-  were previously filed under their UTC day. **The platform's display timezone is
-  Central everywhere**; `central_today_iso()` is the slate clock. An MLB slate
-  spans two UTC dates; it does not span two Central ones.
-- **`scripts/ui_layout_probe.py` is the durable instrument.** It reproduced the
-  audit's before-numbers against the unchanged service, which is what makes its
-  after-numbers a reading rather than a belief. **Synthetic `el.click()` is not
-  used anywhere in it — the audit had to retract a finding produced that way.**
-- **NBA / NHL / NCAAB serve 0 cards** in production and locally. Their rows in
-  the divergence matrix are code-only. **Re-measure in October.**
-- **Carried, not fixed:** the desktop strip still breaks long names mid-word in a
-  ~52px box — a design decision that CONTRADICTS Lane G1's "raise soccer's 13px
-  names to 16px", since 13px + ellipsis is the documented fix for that problem.
-- **The prop-producer 0.5 fix is COMMITTED AND NOT ON ANY WORKER**
-  (`bd40056c` / origin `536dfcd0`). Local sizing: 6 of 4,240 probability rows
-  were price-missing and every one carried a fabricated 0.5; **67 further exact-
-  0.5 rows have real ±100 prices and are legitimate** — a blanket "no 0.5
-  anywhere" rule would have destroyed real data. Production rate UNMEASURED.
-  **Until a worker deploy carries it, production still fabricates.**
+> Collapsed 2026-08-16 from **eight** dated sections that superseded each other.
+> If you measure this surface again, OVERWRITE the line below; do not append a
+> ninth section. Superseded text is in `state_archive_2026-08-15.md`.
 
----
+**SHIPPED AND VERIFIED IN PRODUCTION**
+- **Lane E** (`aadcde77`): horizontal overflow 28px desktop / 20-40px mobile -> **0
+  at both widths** on nfl/ncaaf/soccer/ncaab; NCAAF default tab 0 panels/187px ->
+  1 panel/556px; orphan tabs -> 0; mobile targets under 44px 64/48/4 -> 0.
+- **Lane F** (`932a1f71` then `a86eb4ed`): seven fabrication sites gone from
+  `game_board_contract.py` — absent probability renders as an empty state, a
+  genuine 0.0 survives, a projected scoreline is never recast as a win split.
+  Soccer three-way markets carry a draw segment. One placeholder (`—`)
+  platform-wide: NCAAF hyphen cells 48 -> 0, em dashes 0 -> 144.
+  **A 50/50 on the board now MEANS 50/50** — the one still served (NFL DEN@KC)
+  sits on a 0.4-point projected margin, the producer's own `home_win_rate`.
+- **Lane G** (`7e334509`, carried as an ancestor through later deploys): soccer
+  unstyled links 2 -> 0, empty slots 3 -> 0, projected-score sentence 5 -> 1.
+- **Tabular figures CLOSED** (`f475c775`): `numericSweep` leaf elements at
+  `font-variant-numeric: normal` — mlb **1388 -> 0**, nfl **468 -> 0**, ncaaf
+  **432 -> 0**, soccer **60 -> 0**. `font-variant-numeric` inherits everywhere
+  EXCEPT into form controls: the UA `font:` shorthand on `<button>`/`<input>`
+  resets it, which is why MLB (the only sport with in-card filter pills) was the
+  last holdout.
+- **NCAAF kickoffs file on their CENTRAL day** — 28 of 157 were on their UTC day.
+  **Display timezone is Central everywhere**; `central_today_iso()` is the slate
+  clock. An MLB slate spans two UTC dates, never two Central ones.
+- **The prop-producer `0.5` fix IS NOW LIVE ON BOTH WORKERS** (refresh-worker,
+  live-odds-worker; 0 reachable `... or 0.5`). **This corrects the line that stood
+  here saying it was on no worker and that production still fabricates.** Its
+  ARTIFACT effect is still unmeasured — see the win_prob counter.
+
+**THE PROBE IS THE INSTRUMENT — `scripts/ui_layout_probe.py`**
+- **It fails closed.** A selector matching nothing used to be dropped from the
+  report: NCAAF serves 16 cards and matches ZERO `.cards-market-main`, and that
+  read as a pass. It now reports `count: 0` and FAILS.
+- **MLB RENDERS PROGRESSIVELY FOR ~4 SECONDS.** Total `.cards-data-pair` across
+  15 cards: 482 at +0ms, 590 at +1200, **719 at +3000 and stable**. The probe
+  waits for the DOM to STOP CHANGING (`_settle`, records `settledMs`, fails if it
+  never settles). MLB 3.6-4.0s, every other sport 0.8s. **Every MLB figure taken
+  before this was measured at ~74% of final content.**
+- **MLB card-height spread measures CONTENT, not layout** — height tracks
+  `.cards-data-pair` count at ~62px/pair and MLB serves 20-57 pairs per card. It
+  moved 796 -> 1716 -> 1583px with no code change. NCAAF (45/53px) and soccer
+  (0px) are uniform, so THEIR spreads are layout signals.
+- **CLOSED AS WRONG, do not pick up again:** using grid ROWS as the desktop unit.
+  Rows are proportional to pairs within a group, so it is an affine
+  reparametrization — residuals identical to the pixel (11/11, 139/139, 52/52).
+  **MLB desktop has no layout signal** from this model at all.
+- The fit needs **n >= 5** per group; n=3 gave ratios 0.59 and 1.29 where n=9
+  gave 0.09. Across one evening the same metric read reliable / unreliable /
+  unfittable as the slate churned — **one reading is not a baseline.**
+
+**SOCCER SURFACE**
+- **The producer now publishes half-by-half periods** — `sim.periods` = `h1`,
+  `h2`; the card renders 1st Half / 2nd Half / Full Game. The `-` on the two half
+  rows is deliberate: only a full-game row is compared to the full-game line.
+  **So the stand-in-row fix (`6e9e6107`) is NOT exercised on production soccer
+  any more** — it remains correct and fires for any sport publishing no periods,
+  but production soccer is no longer evidence for it.
+- **Soccer team names are TWO surfaces sharing one class.** The scoreboard strip
+  is 13px with ellipsis (`.cards-strip-card--soccer`) — a deliberate fix, not a
+  defect — and the card head is 16px and always was. Any "class X is N px on
+  sport Y" claim from before 2026-08-15 was taken with a first-match
+  `querySelector` and needs re-reading per surface.
+
+**DEPLOY FACTS THIS SURFACE TAUGHT**
+- **`fair_price` is stamped at SERVE time, not in the artifact** (0 of 108
+  artifact rows vs 1800 served), so board-column fixes are a **web-only** deploy —
+  no worker restart, no sim at risk.
+- **`SYNDICATE_BOARD_L2A_ENABLED = "true"` on live web**, though it defaults
+  **False** in code and is **absent from `render.yaml`**. Absent =/= off, and here
+  the code default is the misleading one.
+- **A 502 sweep across every route is a deploy restart window, not an outage** —
+  web 502s for ~2 minutes on every deploy. Read `/v1/services/<id>/deploys` for an
+  overlapping start before opening an incident.
+- **NBA / NHL / NCAAB serve 0 cards.** Their divergence-matrix rows are code-only.
+  **Re-measure in October.**
+- **Carried, not fixed:** the desktop strip breaks long names mid-word in a ~52px
+  box — a design decision that contradicts Lane G1's "raise 13px to 16px", since
+  13px + ellipsis is the documented fix for that same problem.
 
 ## ASK THE SYNDICATE
 
@@ -1388,347 +1473,6 @@ the place to read it, and it carries the guard on its two shortlists.
   contended by every live session and will block edits to your own lane's
   files. Verified: global-only still blocks, per-session allows own lane,
   per-session naming a different lane still blocks.
-
-## Web card surfaces — soccer, 2026-08-15 03:1xZ `[measured]`
-
-- **Live web SHA is `1e44e1da`** `[measured 08-15 18:1xZ via the deploys API]`
-  (`dep-da0a5rlg1s2s73cm43kg`, finished 17:40:30Z). **Supersedes `7e334509`,
-  which was 14h stale and is what a session reading this line would have stacked
-  on.** Live refresh-worker is `c67f7373` (18:11:41Z); live-odds-worker
-  `ccd10349`. Deploys are still PINNED, so **stack on the target service's own
-  live SHA** and re-read it — it moved 3 times today.
-- **`SYNDICATE_BOARD_L2A_ENABLED` = `"true"` on the live web service**
-  `[measured 08-15 18:1xZ]`, although it defaults **False** in code and is
-  **absent from `render.yaml`**. The serve-time L2-A fallback path
-  (`_layer2_fallback_recommendations` -> `_backfill_layer2_board_columns`) is
-  therefore LIVE. Absent =/= off, and here the code default is the misleading one.
-- **`fair_price` is stamped at SERVE time, not in the artifact**
-  `[measured 08-15 18:1xZ]`: the shortlist artifact carries it on **0 of 108**
-  rows while `/api/intelligence/query` serves 1800. So board-column fixes of
-  this kind are a **web-only** deploy — no refresh-worker restart, no sim at
-  risk.
-- **`origin/main` is NOT deployable to web as-is.** It was 131 commits ahead of
-  live and contains `ad4b0a3a`, which was deployed successfully at 02:46:23Z
-  and then **deliberately reverted** by redeploying `a86eb4ed` at 03:00:19Z
-  (another session, `ask-headline-from-board`). Deploying the tip undoes that
-  rollback. Check the deploys API for `trigger` and the live `commit.id` before
-  any web deploy, and stack rather than replace.
-- **A 502 sweep across every route at ~02:5xZ was that deploy's restart
-  window, not an outage.** Web routes 502 for ~2 minutes on every deploy. Do
-  not open an incident on a 502 without first reading
-  `/v1/services/<id>/deploys` for an overlapping `deploy_started`.
-- **Soccer publishes no `sim.periods` and no `prop_recommendations`.**
-  `[measured 2026-08-15 on /soccer/epl/cards]` The board contract therefore
-  synthesizes a single stand-in "Full Game" period row, and its props rows are
-  scraped off display panels. Both are now tagged `is_synthesized` and gated:
-  `shared_lens_rows` and `shared_prop_status_rows` are the subsets that have
-  something of their own to show. The gates are on CONTENT, not on sport — the
-  panels return by themselves when the model starts publishing per-half output.
-  **`shared_period_rows` is unchanged**, which is what keeps Lane F's three-way
-  draw bar alive.
-- **Soccer's team names are TWO surfaces sharing one class.** The scoreboard
-  strip renders 13px with ellipsis (`.cards-strip-card--soccer`) and that is a
-  deliberate fix, not a defect. The card head renders 16px and always did. Any
-  claim of the form "class X is N px on sport Y" from before 2026-08-15 was
-  measured with a first-match `querySelector` and needs re-reading per surface.
-
-## Soccer model — VERIFIED 2026-08-15 02:4x-03:0xZ (lane `soccer-model-coverage`)
-
-**SUPERSEDES the "8,456 rows / 2,504 projected = 29.6%" figure wherever it
-appears, and the framing that layer1 and layer2 run different joins.**
-
-- **There is ONE soccer projection join**, `board_enrichment.py:595`. The 250x
-  disagreement was two different GRIDS. `[measured]`
-  `layer1?sport=soccer` = **123 rows / 4 games / 12 projected**, date-scoped;
-  `layer2-shortlist` `per_sport_ingest.soccer` = **8,515 rows over SIX dates
-  (08-14..08-20) / 434 scheduled games / 109 projected**. The layer1 figure of
-  8,456 rows is **not reproducible** and should not be quoted again.
-- **`matches_in_source: 4` is CORRECT, not an empty source.** There were 4
-  soccer fixtures on 2026-08-14, one per league, and the sim produced all four.
-  `unmatched_match_rows: 8,396` is dominated by later-date fixtures, because
-  `load_soccer_projections(roots, selected_date)` loads ONE date by design.
-  Future-date recommendation files DO exist on prod (08-15: 6 leagues,
-  08-16: 6, 08-17: 4).
-- **THE SOCCER SIM PUBLISHES ZERO PLAYER PROJECTIONS.** All four production
-  artifacts read `matches=1, player_props=0`. **107 of the 123 soccer board
-  rows are player props and every one is unprojected**; all 12 projections are
-  game rows. Root cause: **live-odds-worker builds the soccer artifacts** (its
-  own `ALL_PROCESS_MEMORY` carries `scripts/build_soccer_artifacts.py` at
-  02:25:48Z, matching the four `generated_at` stamps) and its entrypoint
-  `run_live_odds_refresh_worker.py` ran **no seed bootstrap**, so its disk never
-  received the committed `players_*.csv`. refresh-worker HAS them
-  (`SOCCER_SEED_CENSUS ... already_present=[all 10 leagues]`, 02:11:05Z) and is
-  not doing the work. `#145` recurring on a fourth service.
-- **`compute_team_ratings`'s as-of filter is INERT for 9 of 10 leagues**, and
-  this contradicts `soccer-backtest-leakage` being closed as fixing the leak.
-  It compares dates as raw TEXT; `history/*.csv` is **DD/MM/YYYY** for all 9
-  non-MLS leagues (only Understat `team_history/*.csv` is ISO), and
-  `'17/05/2026' >= '2026-08-14'` is **False**. eredivisie returns an identical
-  **923 match-rows** at every as-of from 2023 to 2026. The four leagues in
-  season (eredivisie, primeira_liga, championship, belgian_pro_league) are
-  `history`-only and had NO protection. Two further bugs, same cause, live in
-  PRODUCTION ratings: matches on the 30th/31st dropped as "future", and the
-  text sort behind `rows[-window:]` making "most recent 45" mean "the 45 latest
-  in the MONTH". Fixed locally in `loaders._as_iso_day`; **not deployed.**
-- **The 3-way h2h edge refusal is STALE, not a safety property.**
-  `_no_vig_over_probability` has handled the draw leg since `95305cab`
-  (08-07 13:13 CDT); `#263` wrote the refusal at 23:43 the SAME DAY. Verified
-  by running the real function on the live board's 4 h2h rows (Telstar
-  133/255/183 -> fair 0.4033 on a 6.4% hold).
-- **Soccer's model is well calibrated in AGGREGATE and under-dispersed.**
-  Across all 166 probabilities in the 54 production recommendation files: mean
-  P(home) **0.4525** / draw **0.2382** / away **0.3093**, against real base
-  rates of ~44-46 / ~25-27 / ~28-30. **stdev of P(home) is only 0.1364**
-  (max 0.80). It is NOT biased toward the away side — it shrinks toward the base
-  rate, so it disagrees with the market by 28-50 points on heavy favourites.
-  Contributing: `adapters._DEFAULT_SIMULATIONS = 300` = **±2.9pp of Monte Carlo
-  noise** on every published probability (0.0025 quantisation is visible in the
-  artifacts).
-- **Soccer's binding constraint on PUBLISHED EV is still the odds, not the
-  model.** `[measured]` soccer `margin_model`: `one_sided_rows` **8,189**,
-  `pct_modelled` **100.0** — one book quoting, so every row is
-  `book_margin_model` and the uninformative-EV filter drops all of them.
-  A perfect model publishes zero rows until two-sided quotes return.
-- **SOCCER BACKTEST ACCURACY IS NOW MEASURED, AND THE MODEL LOSES TO THE
-  CLOSING LINE.** `[measured 2026-08-15, first leak-free number this repo has
-  ever had]` `scripts/backtest_soccer_h2h_calibration.py`, **1,112 matches
-  across 9 leagues**, ratings recomputed per match day with `as_of` set to that
-  day (only meaningful at all because `_as_iso_day` fixed the inert filter):
-
-        MODEL  multiclass Brier  0.5875
-        MARKET multiclass Brier  0.5737   (proportionally de-vigged closing odds, same matches)
-        gap                     +0.0139   lower is better, so the MODEL LOSES
-
-  **Worse than the closing line in 8 of 9 leagues** (two-sided sign test
-  p = 0.039). The only exception is belgian_pro_league at -0.0011, which is
-  noise at n=120. Per league (n / model / market / gap): eredivisie
-  126/.5211/.5064/+.0147, primeira_liga 125/.5722/.5405/+.0317, championship
-  126/.6158/.6061/+.0097, belgian_pro_league 120/.6045/.6056/-.0011, epl
-  120/.5794/.5572/+.0222, la_liga 123/.5947/.5846/+.0101, bundesliga
-  126/.5840/.5653/+.0187, serie_a 120/.5970/.5869/+.0101, ligue_1
-  126/.6201/.6117/+.0084.
-- **The under-dispersion diagnosis is independently confirmed by the backtest.**
-  Mean model stdev(P home) **0.1575** vs market **0.1811**, and the model is
-  narrower in **8 of 9** leagues. eredivisie's reliability curve shows the
-  model is too TIMID at both extremes: predicted 0.144 -> actual 0.000, and
-  predicted 0.823 -> actual 1.000.
-- **CONSEQUENCE, and it is the load-bearing one for the board: soccer's model
-  must NOT be used to publish `model_edge_pct` yet.** A model that loses to the
-  closing line on 1,112 matches produces edges that are noise against a
-  better-informed price. The 3-way de-vig fix removes a stale BLOCK; it does
-  not make the resulting number publishable. Sharpening the distribution and
-  raising `adapters._DEFAULT_SIMULATIONS` from 300 (±2.9pp of Monte Carlo
-  noise) are the two named, cheap levers — neither is done.
-- Coverage, per the `data/**` rule: eredivisie 918 history rows spanning
-  2023-08-11..2026-05-17, with result 918, with complete closing odds 918,
-  **intersection 918** — this result does not rest on a narrow join. Matches
-  are skipped where either side has fewer than 20 prior as-of matches, so
-  early-season rows are not scored as if the model had an opinion.
-- The retired `data/soccer_source/*/validation/*_backtest_*.csv` remain **not
-  citable**. `SoccerSimulationOutput` still ships
-  `calibration.win_probability.brier = None` — the harness exists but is not
-  wired into the sim's own evaluation slot.
-
-
-## UI / card surface — verified 2026-08-15 (session `ui-plan-lane-gh`)
-
-**Lane G (soccer card) is LIVE and has survived three web deploys.** Shipped as
-`7e334509` (live 03:21:35Z); superseded by `c774fe1a` then `1e44e1da`, both of
-which carry it as an ancestor. Verified by ancestry AND by re-measuring the live
-service, not by either alone. Production, `httpStatus` 200: soccer unstyled
-links 2 -> 0, empty slots 3 -> 0, projected-score sentence 5 -> 1 on the default
-tab, 0px overflow. NCAAF control unmoved. `[measured]`
-
-**`scripts/ui_layout_probe.py` is the harness for this surface and it now fails
-closed.** A selector matching nothing used to be dropped from the report
-entirely — NCAAF serves 16 cards and matches ZERO `.cards-market-main`, and that
-read as a pass. It now reports `count: 0` and FAILS. It also carries
-`numericSweep`, which finds digit-rendering elements by what they render rather
-than by class name. `[measured]` `33e7d7a8`
-
-**Tabular figures: the 2026-08-14 fix is correct and incomplete.** The three
-named classes are right on MLB in production (495 / 60 / 30, all
-`tabular-nums`). The digits it does NOT reach: **mlb 1388, nfl 468, ncaaf 432,
-soccer 60** leaf elements at `font-variant-numeric: normal`. `[measured]`
-The container-rule fix is built and pushed (`1bb8cf9f`) but **NOT DEPLOYED**, so
-those four numbers are still true of production.
-
-**MLB renders through `cards_source.js` and is the only sport whose DOM is not
-stable at load.** A fixed short delay returns a confident zero. Any probe of
-`/mlb/cards` must wait on content, not on a timer. `[measured — this rule cost
-me a false claim that a shipped fix had never run]`
-
-**A `deactivated` pinned deploy means SUPERSEDED, not reverted.** Whether your
-work survived is a separate question answered only by ancestry or a measurement.
-Held twice on 2026-08-15; enforced by nothing but the person deploying.
-
-
-## Card surface - tabular figures CLOSED `[measured 08-15 20:0xZ]`
-
-**All four generic-board sports render tabular digits. Verified in production
-after two pinned deploys.** `numericSweep` (leaf elements rendering a digit at
-`font-variant-numeric: normal`): mlb **1388 -> 0**, nfl **468 -> 0**, ncaaf
-**432 -> 0**, soccer **60 -> 0**. MLB confirmed on desktop at 15 cards with 146
-filter pills all `tabular-nums`. Live: `f475c775` (20:00:58Z), preserved by
-content in the next deploy `7abd8e12`.
-
-**`font-variant-numeric` inherits everywhere EXCEPT into form controls.** The UA
-stylesheet's `font:` shorthand on `<button>`/`<input>`/`<select>` resets it -
-measured live: card `tabular-nums`, `button.cards-filter-pill` `normal`,
-`fontFamily` `Arial`. Both rules are now in all four stylesheets. MLB was the
-only sport affected because it is the only one with in-card filter pills
-carrying counts. `[measured]`
-
-**A pinned deploy is NOT on main's lineage, so ancestry is the WRONG test for
-"did my work survive".** `454af741` and `1bb8cf9f` both read as non-ancestors of
-the very deploy that carries them; the four CSS blobs are byte-identical. Test
-deployment by CONTENT. `[measured 08-15 - this exact check]`
-
-**`scripts/ui_layout_probe.py` still waits on a fixed delay and WILL report
-`mlb: 0 cards` spuriously.** It did so mid-verification today. Any MLB reading
-must wait on `.cards-game-card`, not a timer. Fixing that wait is the next
-change to the probe. `[measured]`
-
-
-## Card surface - soccer shows its market line and edge `[measured 08-15 21:2xZ]`
-
-**Live `bb23c8f9` (21:18:38Z).** Soccer's card carries `.cards-data-pair` 3
-(was 0), `market` `ATS ARS -1.5 | Total 2.5` and `best_edge`
-`ATS +0.2 | Total +0.7`, read off the served card. `[measured]`
-
-**A sport with no `sim.periods` gets a stand-in Full Game row, and that row now
-reads `betting` + `sim.score` before falling back to a metric-label lookup.**
-The lookup asks for "Spread"/"Total"/"Edge"; soccer publishes "Total goals" and
-friends, so it matched nothing and the card showed its market line NOWHERE
-while `betting.home_spread` and `betting.total` sat on the game. **A
-label-matched lookup is not a substitute for the field.** `[measured]`
-
-**Which sports reach that branch** (`sim.periods` empty), measured 08-15:
-soccer 1/1, **mlb 15/15**, **ncaaf 16/16**, nfl 0/16. MLB and NCAAF are inert
-through it today only because their games carry no `betting` spread/total in
-that shape - that is a data fact, not a structural guarantee, and it can change
-without anyone touching this code. `[measured]`
-
-**`scripts/ui_layout_probe.py` waits on CONTENT, not a timer.** Five
-consecutive production runs returned 15 MLB cards on all 10 readings; the old
-fixed 400ms delay returned 0 on at least one of three. A render that never
-attaches a card is reported as `cardWaitTimedOut`, which is NOT a 0-card slate
-and fails even out of season. `[measured]`
-
-**NCAAF has no market tile row and that is by design** - `_game_card_ncaaf.html`
-contains zero `cards-market` markup. Declared in `NUMERIC_CLASS_EXEMPT` rather
-than failing the run, and the declaration is checked in both directions.
-`[measured]`
-
-**UNEXPLAINED, do not inherit as a regression:** MLB card-height spread
-56 -> 197px desktop / 112 -> 1887px mobile across the 19:0x-21:2x window, and
-empty slots 8 -> 1. Not the contract (rows byte-identical, 0/15). Presumed the
-slate moving; **nobody has actually looked.** `[unverified]`
-
-
-## MLB card-height spread - it measures CONTENT, not layout `[measured 08-15 22:xxZ]`
-
-**Do not read MLB's card-height spread as a layout signal.** Height tracks
-`.cards-data-pair` count at ~62px per pair, and MLB serves **20-57 pairs per
-card**, so the figure reports how much data each game has. It moved 796 ->
-1716 -> 1583px across three readings with no code change. Grouping by game
-state does not fix it - Preview alone measured 80px and 797px twenty minutes
-apart. `[measured]`
-
-`scripts/ui_layout_probe.py` now prints `content varies N-M pairs/card`
-alongside the spread whenever cards differ, so the two can be told apart.
-**NCAAF (45/53px) and soccer (0px) carry no content line** - their cards are
-uniform and their spreads ARE layout signals. MLB's is not. `[measured]`
-
-**EXONERATED:** the MLB height movement flagged at the 21:2xZ checkpoint is not
-`6e9e6107` and not any layout change - the contract rows were byte-identical
-across it (0/15 games). `[measured]`
-
-
-## UI probe - the height model and the settle rule `[measured 08-15 23:xxZ]`
-
-**`scripts/ui_layout_probe.py` now reports a LAYOUT signal for MLB**, not a
-content one: it fits `height = chrome + k * content_units` per game state and
-reports the residual. Baseline, settled: mlb mobile Live 6px / Preview 54px,
-mlb desktop Live 18px. Budget `LAYOUT_RESIDUAL_BUDGET_PX = 150` (~3x worst
-clean reading). Desktop Preview is declared UNRELIABLE — its grid wraps into
-columns, so height is linear in ROWS not pairs. `[measured]`
-
-**MLB RENDERS PROGRESSIVELY FOR ~4 SECONDS AND `wait_for_selector` DOES NOT
-COVER IT.** Total `.cards-data-pair` across 15 cards at 390px: 482 at +0ms,
-530 at +600ms, 590 at +1200, 683 at +2000, **719 at +3000 and stable**. Any
-probe of `/mlb/cards` must wait for the DOM to stop changing, not for the first
-card to attach. The probe does this now (`_settle`), records `settledMs`, and
-FAILS if the render never settles. MLB 3.6-4.0s; every other sport 0.8s.
-**Every MLB figure produced before this was taken at ~74% of final content.**
-`[measured]`
-
-
-## UI probe height model - MLB DESKTOP HAS NO LAYOUT SIGNAL, and grid-rows will not give it one `[measured 08-15]`
-
-**CLOSED AS WRONG:** the carried-forward idea that the desktop unit should be
-grid ROWS. Rows are proportional to pairs within a group, so the fit is an
-affine reparametrization — measured both ways on the same cards, residuals
-identical to the pixel (11/11, 139/139, 52/52 px). Do not pick this up again.
-`[measured]`
-
-**MLB desktop height is neither driven by the summary-pair unit nor
-independent of it** (105-197px explained at 16-26px/pair), so neither the
-residual branch nor the content-independent branch produces a signal there. Any
-future attempt needs a unit that captures panel COUNT and callout/table rows,
-or per-card height bounds instead of a model. `[measured]`
-
-**The model is only stable where a group is large enough.** n=3 groups gave fit
-ratios 0.59 and 1.29 while an n=9 group on the same page gave 0.09; the fit now
-requires **n >= 5**. Across one evening the same metric read reliable/54px,
-unreliable, unreliable, then unfittable as the slate churned — **one reading of
-it is not a baseline.** `[measured]`
-
-## SOCCER QUOTE FEED — OUTAGE DIAGNOSED, CAUSE IS LOCK CONTENTION `[measured 2026-08-15 21:2xZ]`
-
-- **Nothing happened at 13:47Z.** Soccer's pregame capture is a **4-hourly
-  autorun** on live-odds-worker:
-
-      02:14:40 LAUNCHED | 06:17:45 LAUNCHED | 10:21:54 LAUNCHED
-      14:22:29 FAILED (A refresh run is already active, pid=7114)
-      18:22:34 FAILED (pid=8200)
-
-  **13:47:17 is the TAIL of the 10:21 run**, which walked leagues ~3.5 h and
-  finished. The outage begins at **14:22:29**, the first REFUSED autorun.
-- **Mechanism:** a 4-hourly point sample fired at a refresh-run lock held
-  **~92%** of the time ⇒ ~1-in-12 success per attempt. Two consecutive misses is
-  expected, not anomalous. Soccer is starved by scheduling, not broken.
-- **TWO DIFFERENT CLOCKS — corrects the standing `earlyExit` lead.** `earlyExit`
-  is ~6.5 h (01:37/08:05/14:34/20:03); the autorun is ~4 h. The 14:22 failure
-  PRECEDES the 14:34 exit by 12 min, so the exit did not cause it. `earlyExit`
-  remains a real problem for long in-flight runs; it is not this outage.
-- **REFUTED on evidence, so nobody re-runs them:** fixtures aging out (08-16 and
-  08-17 shards stop at the SAME instant; zero soccer rows anywhere after
-  13:48:00Z), a restart at 13:47, the run erroring (zero tracebacks), and
-  OddsAPI quota (zero quota lines; mlb/nfl capturing normally).
-- **RESOLVED 22:24:29Z, UNAIDED, AND THE DIAGNOSIS IS CONFIRMED.** The 22:23:16
-  autorun LAUNCHED (pid=924) and the first new capture landed **73 seconds
-  later**; soccer went 516.6 min -> 0.1 min, `stale` -> `ok`.
-  **Total outage 14:22:29 -> 22:24:29 = 8h 02m**, two refused attempts.
-- **Cheapest fix, unowned, and now QUANTIFIED:** the autorun gives up for 4 h on
-  a TRANSIENT lock. Given first-capture-in-73s, a bounded retry (every 5 min for
-  30 min) at the 14:22 refusal would have found one of the ~2-min free windows
-  that occur every ~25 min — **turning an 8-hour outage into minutes.**
-  `live_refresh_loop.py` is claimed by OPEN `live-game-line-projection`.
-
-
-## Soccer card - the producer now publishes half-by-half periods `[measured 08-15 22:0xZ]`
-
-Served `/soccer/epl/api/cards` carries `sim.periods` = `h1`, `h2`. The card
-renders `1st Half` / `2nd Half` / `Full Game` (3 lens rows, 3 total rows), with
-the Full Game row carrying `ATS ARS -1.5 | Total 2.5` and
-`ATS +0.0 | Total +0.8`. The `-` on the two half rows is deliberate contract
-design - only a full-game row is compared against the full-game line.
-
-**Therefore the stand-in-row fix (`6e9e6107`) is NOT currently exercised on
-production soccer**, and production soccer is no longer evidence for it. It
-remains correct and tested and fires for any sport publishing no periods.
-`[measured]`
 
 ## Candidate field absence — the served payload TODAY `[measured 08-15 ~21:5xZ, lane market-key-blank-not-absent]`
 
