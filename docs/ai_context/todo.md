@@ -34,6 +34,14 @@ guard: it answers an out-of-range input with a number instead of refusing.
    **nothing is verified yet**. `POST_FIX_OK` from
    `py -3 scripts/watch_clamp_trigger.py --once` closes this; the 2-hourly
    `clamp-fix-verification-watch` task runs it automatically.
+   - **The task prompt is mirrored at `.syndicate/scheduled_task_clamp_watch.md`,
+     which is CANONICAL.** The live task
+     (`~/.claude/scheduled-tasks/clamp-fix-verification-watch/SKILL.md`) is
+     outside the repo and unversioned; if that directory is lost, recreate it
+     from the mirror. **It is a copy — change both in the same pass.**
+   - Rewritten 2026-08-15 to check **refresh-worker**, not web: its
+     `PRE_FIX_MISPRICE` branch previously read the web SHA, which was correct
+     only while web was the suspected producer.
 2. **live-odds-worker: DEFERRED to a quiet window (user decision 2026-08-16).**
    It carries the clamp but does not run the intelligence-state loop, so it is
    not the producer. `079cc42b` is cut, tested (40 green) and pushed on
