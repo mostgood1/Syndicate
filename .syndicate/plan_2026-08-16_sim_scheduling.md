@@ -531,8 +531,50 @@ fetch is days away.
 overlap *up*, and should still ship: independent clocks plus fixture-awareness
 serves both goals. They are only in tension while cadence is fixture-blind.
 
-**Cost check:** cadence changes change OddsAPI volume against a 5M cap. The tier
-table should reduce calls; measure, don't assume.
+**Cost check — DONE 2026-08-15, and it changed the design.**
+
+Live quota (`/api/ops/oddsapi/quota`): `projected_30d_credits` **3,134,318**
+against the 5M cap = **62.7%**, at 4,353 credits/hour. Spend by sport, cumulative
+since 2026-07-28:
+
+    mlb     1,627,718 credits   93.0%
+    soccer     71,912            4.1%
+    nfl        37,639            2.2%
+    wnba       13,475            0.8%
+
+**So soccer cadence is not a cost lever at all — it is 4% of spend.** Phase 1
+cannot blow the cap in either direction, and its case rests on memory and
+concurrency, not credits. (Note the cap: the API headers report ~13.3M remaining;
+CLAUDE.md records that as untrue and the real budget as 5M. 5M is used here.)
+
+**THE CHECK FOUND A DEFECT IN 1a/1b, WHICH IS WHY IT EXISTED.** Modelling the
+tiers against the real 2026 fixture lists over 336 hours:
+
+    sport            sweeps/day now   projected   change
+    mlb                      12.00        5.45     -55%
+    wnba                     12.00        5.83     -51%
+    nfl_preseason            12.00        3.56     -70%
+    soccer                    3.00        5.08     +69%   <-- WRONG DIRECTION
+
+**Soccer's sport-level fixture clock is the MINIMUM gap across ten leagues, so it
+is almost never far from a kickoff: the 24h tier is reached in 0.0% of hours.**
+Applying the gate at sport granularity would have made soccer sweep MORE often,
+increasing the very MLB-peak overlap this lane exists to remove. Per-league, the
+24h tier is reached in 49.3% of league-hours and per-league volume is flat
+(3.03/day) but redistributed away from the peak — which is the actual benefit.
+
+**Consequence: soccer is now EXCLUDED from the gate** (`_FIXTURE_CADENCE_EXCLUDED_SPORTS`),
+with the measurement in the code and three tests pinning it. **Step 1c is
+therefore a PREREQUISITE for any soccer benefit, not an optimisation** — and it
+stays blocked on `soccer-model-coverage`.
+
+The gate remains worth shipping for the single-league sports on the numbers above.
+
+**What this model is NOT.** `sweeps/day` is a ceiling on the PREGAME cadence, not
+measured call volume: launches are additionally gated by the 1800s relaunch
+cooldown and the off-hours gates, and the 60s live tick is not governed by this
+cadence at all. Treat the credit delta as unmeasured until the flag is enabled on
+one service and the quota is re-read.
 
 **Verification:** re-run the hour table. `BOTH` must fall in MLB's peak hours and
 worst-combined must drop from 3,972 MB — a **worst-combined across all
