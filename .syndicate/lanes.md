@@ -6,7 +6,7 @@
 
 ## OPEN
 
-### win-prob-null-readable — OPEN — **DEPLOYED TO 2 OF 3 (refresh-worker `b2af0fac`, web `fa1871cf`, both live 01:1xZ); live-odds-worker HELD BY ANOTHER LANE. Route answers 200; `readings: 0` — THE READING ITSELF IS STILL OWED** — opened 2026-08-15 — session: win-prob-null-readable
+### win-prob-null-readable — OPEN — **DEPLOYED TO ALL THREE (refresh-worker `b2af0fac`, web `fa1871cf`, live-odds-worker `3573a0c3` @ 01:59:59Z). Route answers 200 — but `readings: 0`, so THE READING ITSELF IS STILL OWED and this lane does not close on it** — opened 2026-08-15 — session: win-prob-null-readable
 - Goal: the `WIN_PROB_NULL_NO_PRICE` counter is READABLE from the web service
   (one HTTP read, no log archaeology), for both prop producers, on every run.
 - **THE DEFECT, measured not suspected.** The counter deployed 2026-08-15
@@ -1826,3 +1826,37 @@ it is the one I should have named.
   look like 578MB when it was 124MB.
 - **Cost note:** OddsAPI spend. Changing cadence changes call volume against a 5M
   cap; `9ec20a06` was held partly for that call.
+
+#### odds-cadence-off-the-mlb-peak — CHECKED 2026-08-16 02:0xZ: `9ec20a06` does NOT do it
+Answering the scope's own question so nobody re-reads that branch.
+
+**It pushes the OPPOSITE way for memory.** Its purpose is FRESHNESS:
+`_pregame_relaunch_blocked` read one marker keyed by date, so any sport's launch
+started the 1800s cooldown for all eight; MLB rode every 2nd-4th launch and its
+quote capture ran every **121.6 min**, which is why the board served prices up to
+two hours old and carried candidates that were no longer bettable.
+
+The fix decouples that — each sport cools against its OWN last launch. Checked
+the diff explicitly: **no concurrency limit, no memory gate, no serialisation.**
+Its direct effect is MORE independent launches, i.e. soccer MORE likely to run
+during MLB's peak, not less. The author mitigated exactly one tick of that risk
+(a sport with no entry inherits the legacy epoch "so the first tick after this
+deploys does not stampede every sport at once") — after that first tick all eight
+are free.
+
+**SO THE TWO GOALS ARE IN GENUINE TENSION, and that is the finding:**
+- FRESHNESS wants independent clocks -> more overlap.
+- MEMORY wants fewer concurrent branches at MLB's peak -> less overlap.
+
+**Do NOT shelve `9ec20a06` for this lane.** Two-hour-stale MLB prices are a
+product defect that directly produces unbettable candidates; that outranks 202MB
+on a worker that is no longer crashing.
+
+**THE RESOLUTION IS THE OWNER'S DOMAIN POINT:** independent clocks PLUS
+fixture-awareness serves both. Soccer keeps its own cadence, but that cadence
+follows soccer's kickoffs — which are opposite the US evening. MLB gets its 30-min
+freshness; soccer stops polling leagues with no imminent kickoff during MLB's peak.
+
+**NEXT MEASUREMENT IS THE FALSIFICATION TEST ALREADY IN THIS LANE:** read
+`commence_time` on what the 18-22Z soccer runs write. Imminent kickoffs -> the
+overlap is required and the lever is memory, not scheduling.
