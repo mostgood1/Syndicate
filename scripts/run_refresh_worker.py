@@ -2379,6 +2379,148 @@ def _season_projection_launch_state_path(sport: str) -> Path:
     return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / f"season_projection_launch_{sport}.json"
 
 
+# ---------------------------------------------------------------------------
+# NFL play-by-play ingestion (`#441`).
+#
+# WHY THIS AUTORUN EXISTS. `generate_smartsim2_nfl_projections.py` derives every
+# team rating from the nflverse pbp, and NOTHING in this repo wrote that file --
+# ten scripts referenced it, all reads. Measured in production 2026-08-16 (the
+# `a775e372` diagnostic): absent from all four candidate roots, mounted disk
+# included, so the degenerate-run guard refused for 2.79 days while the
+# staleness gate relaunched the generator ~107x/day against a once-daily
+# interval. The load was the symptom; the missing input was the defect.
+#
+# DEFAULT OFF, like every sibling autorun. `NFL_PBP_FETCH_ENABLE_REFRESH_WORKER_
+# AUTORUN=true` arms it.
+#
+# I SHIPPED THIS DEFAULT-ON FIRST AND THREE EXISTING TESTS CAUGHT IT. Reasoning
+# was: `#441` is a live outage, and an off-by-default fix repeats the same-day
+# mistake of deploying something inert because nothing set its flag. But
+# `test_main_run_once_*` in `tests/test_refresh_worker.py` runs `main()` with
+# `patch.dict(os.environ, ..., clear=True)` and asserts that a worker with
+# nothing pending reports `state=idle / ranJob=False`. A default-on autorun in
+# the dispatch chain fires in that cleared environment, writes
+# `state=launched / ranJob=True`, and breaks a contract three tests encode.
+# Verified against a clean-HEAD worktree: 3 passed there, 3 failed with the
+# default-on version, so the regression was unambiguously mine.
+#
+# The house default is not arbitrary -- `--run-once` means "do one unit of work
+# and exit", and callers rely on "nothing pending => idle". An autorun that
+# arms itself changes that for every caller. The inert-ship risk is real and is
+# handled the right way instead: set the env var as part of the deploy and
+# VERIFY the launch line appears, rather than making absence mean armed.
+#
+# NO PERSISTED PID GUARD, deliberately -- see `#443`. The sibling guard blocks
+# on a stale pid after a restart and `continue`s with NO log line, which stalled
+# a sport's projections for up to 45 minutes per deploy and twice consumed this
+# very investigation's verification window. A pile-up guard is still needed, so
+# this uses a last-ATTEMPT marker recorded BEFORE the launch (the same rule as
+# the pregame sweep markers): a crash costs one interval, never a storm, and
+# there is no pid whose liveness can be misread. The fetch is idempotent and
+# installs atomically, so two overlapping runs cannot corrupt the file.
+# ---------------------------------------------------------------------------
+
+def _nfl_pbp_fetch_enabled() -> bool:
+    # Absent means OFF -- see the block comment above for why the first version
+    # of this returned True and which three tests caught it.
+    raw = str(os.environ.get("NFL_PBP_FETCH_ENABLE_REFRESH_WORKER_AUTORUN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
+
+
+def _nfl_pbp_fetch_interval_seconds() -> int:
+    raw = str(os.environ.get("NFL_PBP_FETCH_INTERVAL_SECONDS") or "").strip()
+    try:
+        value = int(raw or 86400)
+    except Exception:
+        value = 86400
+    return max(3600, value)
+
+
+def _nfl_pbp_fetch_state_path() -> Path:
+    return _refresh_state_store()["reports_root"]() / "refresh_status" / "latest" / "nfl_pbp_fetch.json"
+
+
+def _nfl_pbp_fetch_script_args(season: int) -> list[str]:
+    script_path = Path(__file__).resolve().parent / "fetch_nfl_pbp.py"
+    return [sys.executable, str(script_path), "--season", str(season), "--json"]
+
+
+def _launch_autorun_nfl_pbp_fetch(
+    *,
+    latest_manifest_path: Path,
+    worker_status_path: Path,
+    refresh_cycle: dict[str, int],
+) -> bool:
+    """Fetch the nflverse pbp when it is missing or stale. `#441`.
+
+    Runs BEFORE `_launch_autorun_season_projections` in the dispatch chain so the
+    input exists before its only consumer asks for it.
+    """
+    if not _nfl_pbp_fetch_enabled():
+        return False
+    selected_date = central_today_iso()
+    active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
+    if "nfl" not in active:
+        return False
+
+    interval = _nfl_pbp_fetch_interval_seconds()
+    state = _refresh_state_store()["read_json_file"](_nfl_pbp_fetch_state_path())
+    last_attempt = 0.0
+    if isinstance(state, dict):
+        try:
+            last_attempt = float(state.get("attempted_at_epoch") or 0.0)
+        except (TypeError, ValueError):
+            last_attempt = 0.0
+    age = time.time() - last_attempt
+    if last_attempt > 0.0 and age < interval:
+        return False
+
+    season = date.today().year
+    # Marker BEFORE the launch: a run that dies costs one interval rather than
+    # relaunching every tick, which is the failure `#441` documents downstream.
+    try:
+        _refresh_state_store()["write_json_file"](
+            _nfl_pbp_fetch_state_path(),
+            {
+                "attempted_at_epoch": time.time(),
+                "attempted_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+                "season": season,
+                "interval_seconds": interval,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        # A marker we cannot write means we cannot rate-limit; refuse rather than
+        # risk a fetch storm against a public host.
+        print(f"[refresh_worker] NFL_PBP_FETCH_MARKER_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    print(
+        f"[refresh_worker] NFL_PBP_FETCH_LAUNCHING season={season} "
+        f"prior_season={season - 1} last_attempt_age_s={int(age) if last_attempt else 'never'} "
+        f"interval_s={interval}",
+        flush=True,
+    )
+    try:
+        process = subprocess.Popen(_nfl_pbp_fetch_script_args(season))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[refresh_worker] NFL_PBP_FETCH_LAUNCH_FAILED error={type(exc).__name__}: {exc}", flush=True)
+        return False
+
+    refresh_cycle["claimed_count"] = int(refresh_cycle.get("claimed_count") or 0) + 1
+    _write_worker_status(
+        worker_status_path=worker_status_path,
+        latest_manifest_path=latest_manifest_path,
+        state="launched",
+        detail=f"Auto-launched NFL play-by-play fetch (season={season} and {season - 1}) because the marker was missing or older than {interval}s.",
+        ran_job=True,
+        run_exit_code=None,
+        latest_manifest_state=str((_latest_manifest_payload(latest_manifest_path).get("state") or "")).strip().lower() or None,
+        launch_pid=int(getattr(process, "pid", 0) or 0) or None,
+        refresh_cycle=refresh_cycle,
+    )
+    return True
+
+
 def _season_projection_process_still_running(sport: str) -> bool:
     # Confirmed live 2026-08-02: this autorun had no "already running" guard
     # at all -- unlike every sibling autorun here (MLB's daily sim, the
@@ -3594,6 +3736,17 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_evaluation_settlement(
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
+        elif _launch_autorun_nfl_pbp_fetch(
+            # BEFORE season projections on purpose (`#441`): this fetches the
+            # ONLY input those projections rate teams from, and without it the
+            # generator's guard correctly refuses and the staleness gate
+            # relaunches it ~107x/day. Producer before consumer.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
