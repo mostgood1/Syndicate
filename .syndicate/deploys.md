@@ -7394,3 +7394,102 @@ verification disagrees with an expectation, check the verifier before the fix.
   gone from the worktree, from `HEAD` and from `origin/main`, with no conflict
   and no error. A `cat >>` append is not safe on a contended ledger file. This
   copy is committed in the same action that writes it.
+## 2026-08-16 18:37Z + 18:54Z — lane `soccer-live-game-state` — TWO DEPLOYS, refresh-worker — **FALSIFICATION PASS.** Soccer stopped serving edges on finished matches
+
+Follow-on from the user's report ("SOCCER has live games") while the board said
+`live: 0`. Both deploys cut on the LIVE worker SHA, never on `main`.
+
+| deploy | commit | parent | live at | what |
+|---|---|---|---|---|
+| `dep-da103u95efls73ak3bcg` | `38ba954c` | `7b544eb4` (another session's live deploy) | 18:37:38Z | soccer publishes a structured `live_state` |
+| `dep-da10c3u1egvs739mu440` | `a72b4bf4` | `38ba954c` | 18:54:37Z | live-edge refusal enforced at the wrapper |
+
+### Deploy 1 — the state. Diagnosis confirmed BEFORE coding, as the ledger required
+
+Dumped the real provider rather than trusting the grep-based hypothesis: soccer's
+game dict gave the liveness readers nothing structured. `status` was a display
+**string**, and `live_state` / `gameState` / `status_badge` were absent, so
+`_game_flags` returned `(False, False)` for **all 90** soccer chips while MLB
+returned **9 live of 15**. Falling back to prose, `_infer_live_state`'s
+`final_tokens` contains **"scheduled"** — soccer's own placeholder wording
+actively forced a not-live verdict.
+
+`status_state` (`pre`/`in`/`post`) was already computed and already used to
+decide whether to fetch live stats. It was never put on the game dict.
+
+**Sport-local by choice.** No shared eight-sport predicate was touched (verified:
+`game_chip_scoreboard.py` and `game_board_contract.py` unchanged). Widening
+`_game_flags` to infer liveness from kickoff+score was the alternative and is
+strictly more dangerous — a wrong `live` costs as much as a wrong `pregame`.
+
+**Result, first post-deploy artifact:**
+`{live 0, final 0, pregame 49, unknown 17}` → **`{live 4, final 11, pregame 34,
+unknown 17}`**. Games past kickoff still marked pregame: **10 → 0.**
+
+### Deploy 1 was NOT sufficient, and the sweep is what said so
+
+With states finally correct, **27 rows still carried an edge on a game whose own
+`game.state` read `final`**, plus 9 on live games from a pregame projection.
+GRO @ ADO, `final`, 4-1, served `edge_vs_line: -0.175`.
+
+**The producer's refusal existed and was unreachable.**
+`soccer_projections._price_against_market` opens `if model_prob is None: return`,
+and `_mean_projection` sets `model_prob_over: None` **alongside** `edge_vs_line`
+— so every mean-based row (every soccer game spread and total) returned before
+the refusal ran. The comment on that refusal reads *"this runs for every row,
+mean-based and probability-based alike. Checked rather than assumed."* It did
+not, and the early return three lines above it was why.
+
+### Deploy 2 — enforcement at the choke point, not the producer
+
+Added `_enforce_live_edge_policy` to `board_enrichment.attach_projections`, for
+the reason that function's own docstring already gives about the degeneracy
+check: thirteen return sites across seven sports, and patching each is how three
+of four paths get fixed and the fourth stays broken. One sweep over the finished
+grid, after every producer. It also covers `soccer_projections.py` **without
+editing it** — that file is claimed by the orphaned `soccer-model-coverage` lane.
+
+Clears BOTH edge contracts, because a mean-based row's edge lives in
+`edge_vs_line`; clearing only `edge_vs_market_pct` is exactly how these rows
+stayed bettable while looking suppressed.
+
+**Caught before shipping:** the first draft used `isinstance(row, Mapping)` in a
+module that does not import `Mapping` — a `NameError` on the first row that
+would have taken the entire projection join down.
+
+### FALSIFICATION TEST — PASS, on artifacts stamped after 18:54:37Z
+
+```
+soccer  by_state {live 4, final 11, pregame 34, unknown 17}   no edges on live/final
+mlb     by_state {live 9, pregame 6}                          2 live-aware edges (INTENDED)
+wnba    by_state {pregame 3}                                  none
+--------------------------------------------------------------------------
+HARMFUL edges (finished, or live off a pregame projection):  0   (expected 0)
+INTENDED live-aware edges preserved:                         2
+```
+
+**And the branch is confirmed to have RUN, not merely to have produced a zero** —
+served `projections` coverage on `/api/board/book-grid`:
+
+```
+soccer  live_edge_enforced_rows: 36
+        {"game is final: the market is settled...": 27,
+         "game is live: a pregame projection...":    9}
+mlb     live_edge_enforced_rows: 0    {}
+```
+
+**27 + 9 = 36 matches the pre-fix measurement exactly.** MLB reads 0 because its
+producers already refuse correctly — the sweep is a backstop there, and its
+live-aware edges survived, which was the main regression risk.
+
+### Rollback
+Redeploy `7b544eb4` on `srv-d91dpertqb8s73co8ls0` (reverts both). Branch
+`deploy/soccer-live-game-state` holds both commits.
+
+### Claim override, logged
+`syndicate/features/soccer/` and `syndicate/features/shared/soccer_projections.py`
+are claimed "exclusive" by `soccer-model-coverage` (OPEN). That lane is
+**ORPHANED** — its owning session is absent from a 40-entry `list_sessions`
+census with `include_archived: true`. I took `soccer/cards.py` with the override
+written into my lane, and deliberately did NOT take `soccer_projections.py`,
+routing around it via the wrapper instead. `soccer_projections.py` is unmodified.
