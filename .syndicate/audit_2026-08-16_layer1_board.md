@@ -11,7 +11,7 @@
 
 | brief premise | status | evidence |
 |---|---|---|
-| "Layer 1 built `count=0` on 3 of 5 builds" (state.md:529) | **NOT REPRODUCED** in this window | MLB/WNBA/soccer served non-zero rows on every build sampled. See §5. |
+| "Layer 1 built `count=0` on 3 of 5 builds" (state.md:549) | **NOT REPRODUCED** | **5 distinct consecutive builds 16:26–16:40Z, all non-zero**, MLB/WNBA/soccer. §5a |
 | "every alt-line and period row has an empty `Proj` while its base market is populated" | **FALSE for MLB, TRUE for WNBA** | MLB `game\|totals_alt` **86/86**, `game\|spreads_alt` **76/77** projected. WNBA `game\|totals_alt` **0/243**, `game\|spreads_alt` **0/176**. §2 |
 | "the `Edge` column is a dot on every row … establish which term is missing" | **PARTLY FALSE.** The board serves 1,462 MLB edges. The missing term is already named on the row by `edge_unavailable_reason` — except in one producer. | §4 |
 | "875 markets unprojected of 2802" | superseded; today's read is **902 of 2,843** MLB | §1 |
@@ -256,6 +256,28 @@ n ≈ 2,500.
 
 ---
 
+## 5a. AVAILABILITY ACROSS BUILDS — the briefed premise, settled
+
+Five distinct MLB artifact builds, polled at 3-minute intervals:
+
+| poll | MLB `generated_at` | rows | projected | WNBA | soccer |
+|---|---|---|---|---|---|
+| 16:27:49 | 16:26:31 | 3,006 | 2,107 | 872/305 | 6,453/1,704 |
+| 16:30:53 | 16:30:45 | 3,006 | 2,107 | 872/305 | 6,453/1,704 |
+| 16:33:58 | 16:33:49 | 3,006 | 2,107 | 872/305 | 6,453/1,704 |
+| 16:37:01 | 16:35:06 | 3,006 | **1,935** | 872/305 | 6,453/1,704 |
+| 16:40:07 | 16:38:53 | 3,245 | 2,169 | 872/305 | 6,453/1,704 |
+
+**5 of 5 non-zero.** The "dark on ~3 of 5 builds" behaviour is not what the
+surface does now. Rebuild cadence ~3–4 min.
+
+**But coverage moves between builds and nothing on the board says so:** projected
+fell 2,107 → 1,935 (−172) across one rebuild with `rows` flat at 3,006. Any
+future availability or coverage claim must carry the `generated_at` it was read
+from — a single read of this surface is not a property of the surface.
+
+---
+
 ## 5. G3 — LIVE LENS
 
 One live game in the window (MLB BAL @ TB). WNBA and soccer had none, so
@@ -283,6 +305,23 @@ counterpart and no actual-so-far, while the moneyline has one that is withheld
 for precision. `REASON_TOTALS_MEAN = "totals_mean_not_distribution"` exists in
 `live_gameline_join.py:81`, so the live path knows it has no total distribution.
 
+### The prop lens genuinely updates — measured, not inferred
+
+Two snapshots of the same live game, 16:26:31 → 16:30:45 (`BOT 1` → `TOP 2`),
+201 projected rows common to both:
+
+```
+live_projected CHANGED   27
+live_projected unchanged 174
+actual_so_far  CHANGED    3
+```
+
+Direction is sensible — e.g. Junior Caminero `batter_total_bases` 1.5 fell
+**2.024 → 1.485** as the first inning resolved. So MLB's live lens is a working
+reference implementation for props: the projection re-sims and the actual stat
+advances alongside it. G3's requirement is met for props and **not met for game
+lines**, on the same live game, in the same payload.
+
 ---
 
 ## 6. RECOMMENDATIONS — ordered, with owner
@@ -308,10 +347,38 @@ for precision. `REASON_TOTALS_MEAN = "totals_mean_not_distribution"` exists in
 
 ---
 
-## 7. WHAT IS NOT YET MEASURED
+## 7. WHAT WAS SHIPPED, AND WHAT IS STILL OPEN
 
-- Availability across consecutive builds (the `count=0` premise) — watcher
-  running, §5 of the lane.
-- Live-lens tick-over-tick movement — one snapshot taken, second pending.
-- Cross-sport live A/B — needs a slate with two sports live at once.
-- Whether soccer's 3,128 bucket-A rows are stale lineups or unrun fixtures.
+**Shipped to local `main`, NOT deployed** (`autoDeploy = no` for code, so
+production still serves the pre-change payload):
+
+- `e543e8dd` — `prop_projections.py` + `tests/test_prop_projections_edge_attribution.py`.
+  Recommendation 1 only. Attribution, no behaviour change. Verified by replaying
+  the real served payloads through the changed code: **287 of 287 previously
+  silent rows emit a reason, 0 unattributed.** 11 new tests pass; 41 existing
+  tests over the same file pass.
+- `ac307bca` — `state.md` (two stale lines edited, not contradicted) and
+  `deploys.md` (the measurement, plus the falsification test to run after a
+  deploy: re-sweep and count rows with a projection, no edge, and no reason —
+  expected 0).
+
+**Open, and deliberately not taken here:**
+
+- Recommendations 2, 3, 5 are the sim-engine lane's — sent via `send_message`.
+- Recommendation 4 (`book_margin_model` as an edge denominator, 1,416 rows) is a
+  user decision and is sent to the Layer 2 session, since those rows would
+  become rankable the moment they exist.
+- The WNBA `wnba_game_cards` finding could not be delivered — the
+  "Wnba win prob counter read" session is unattended and rejects messages. It is
+  written up in §4b and in the `e543e8dd` commit message instead.
+
+**Still not measured:**
+
+- Cross-sport live A/B — needs a slate with two sports live at once. MLB was the
+  only live sport in this window, so the "audit each other in-season sport
+  against MLB" half of G3 is **deferred, not concluded**.
+- Whether soccer's 3,128 bucket-A rows are stale lineups or fixtures the sim
+  never ran. 17 of 66 soccer games carry `state: unknown`, which points at the
+  second, but that is a guess until measured.
+- Whether NFL's 08-16..08-29 hole is a capture failure or an upstream feed that
+  does not quote preseason week 3+. Only the absence is established.
