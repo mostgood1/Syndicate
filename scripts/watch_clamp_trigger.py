@@ -33,10 +33,24 @@ it read unhealthy).
 The verdict is derived from PUBLISHED CONTENT, not from a deployed SHA, so it
 needs no API key and cannot be fooled by a deploy that did not carry the fix.
 
-COST. The cheap probe is one unauthenticated GET of the shortlist artifact. The
-expensive confirming POST to `/api/intelligence/query` runs ONLY on a trigger,
-so a quiet slate costs one small request per interval. The board rebuilds on
-roughly a 25-minute cycle, so the 600s default already oversamples it.
+WHAT THE TRIGGER READS, AND WHY IT CHANGED (2026-08-16). The trigger comes from
+the SERVED payload -- the same surface the verdict judges. It used to come from
+`/api/board/layer2-shortlist`, which gated whether the confirming read ran at
+all, and that was wrong in a way that mattered: the shortlist is a filtered
+view. It drops `stale_kickoff_seconds` (7200 -- any game started more than two
+hours ago) and `max_quote_age_seconds`, which is precisely the in-play late-game
+population every trigger this instrument has caught came from. Measured at
+03:14:08Z on 2026-08-16, same instant: shortlist 0 rows, served payload 18
+priced rows, 8345 opportunities considered and all 8345 filtered out. A gate
+reading 0 against a judged surface of 18 reports `no_trigger` while it is simply
+blind. The shortlist is still recorded as context and can no longer suppress a
+check.
+
+COST. One unauthenticated GET (shortlist context) plus one POST to
+`/api/intelligence/query` per check -- the POST now runs every time rather than
+only on a trigger, which is the price of not being blind. The board rebuilds on
+roughly a 25-minute cycle, so the 600s default already oversamples it; a quiet
+slate re-reads the same artifact and cannot produce new information.
 
 Usage:
     python scripts/watch_clamp_trigger.py --once          # single check
@@ -130,18 +144,30 @@ def _walk_fair_prices(node: Any, found: list[float]) -> None:
             _walk_fair_prices(item, found)
 
 
-def _joined_pairs(payload: Any) -> list[dict[str, Any]]:
-    """(fair_probability, fair_price) pairs from the served payload, with identity.
+def _served_rows(payload: Any) -> list[dict[str, Any]]:
+    """Every `fair_probability` in the served payload, with identity and its price.
 
-    Joined on the row rather than compared as two populations -- the whole
-    finding rests on knowing WHICH probability produced WHICH price.
+    `fair_price` is populated ONLY when it is CO-LOCATED on the same node as the
+    probability, and is `None` otherwise. That distinction carries a verdict:
+    a probability with no price is the post-fix shape (the fixed code omits the
+    column rather than faking one), so it must be visible, not silently dropped.
+
+    Identity is inherited downward; the NUMBERS never are. Inheriting a
+    probability the way identity is inherited would happily pair it with an
+    unrelated nested price and invent a misprice.
 
     Returns OCCURRENCES, not rows. The served payload echoes the same logical row
     into several sections, so one mispriced market can appear a dozen times.
     `_dedupe` collapses them; both counts are reported, because they answer
     different questions and only one of them is a count of broken markets.
     """
-    pairs: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
+    # A `quote` node is read from its PARENT (where the co-located price lives)
+    # and then walked into again by the recursion. Without this, every quoted row
+    # emits twice -- once priced at the parent, once unpriced at the quote node --
+    # and each correctly-priced row grows a phantom unpriced twin. Invisible
+    # while only pairs were emitted; a double-count the moment they are not.
+    consumed: set[int] = set()
 
     def walk(node: Any, identity: dict[str, Any]) -> None:
         if isinstance(node, dict):
@@ -158,13 +184,15 @@ def _joined_pairs(payload: Any) -> list[dict[str, Any]]:
             price = node.get("fair_price")
             quote = node.get("quote") if isinstance(node.get("quote"), dict) else {}
             probability = node.get("fair_probability")
-            if probability is None:
+            if probability is None and "fair_probability" in quote:
                 probability = quote.get("fair_probability")
-            if isinstance(price, (int, float)) and not isinstance(price, bool) \
-                    and isinstance(probability, (int, float)) and not isinstance(probability, bool):
-                pairs.append({**here,
-                              "fair_probability": float(probability),
-                              "fair_price": float(price)})
+                consumed.add(id(quote))
+            if isinstance(probability, (int, float)) and not isinstance(probability, bool) \
+                    and id(node) not in consumed:
+                priced = isinstance(price, (int, float)) and not isinstance(price, bool)
+                rows.append({**here,
+                             "fair_probability": float(probability),
+                             "fair_price": float(price) if priced else None})
             for value in node.values():
                 walk(value, here)
         elif isinstance(node, list):
@@ -172,7 +200,16 @@ def _joined_pairs(payload: Any) -> list[dict[str, Any]]:
                 walk(item, identity)
 
     walk(payload, {})
-    return pairs
+    return rows
+
+
+def _joined_pairs(payload: Any) -> list[dict[str, Any]]:
+    """The subset of `_served_rows` that actually carries a price.
+
+    Joined on the row rather than compared as two populations -- the whole
+    finding rests on knowing WHICH probability produced WHICH price.
+    """
+    return [row for row in _served_rows(payload) if row["fair_price"] is not None]
 
 
 def _row_key(entry: dict[str, Any]) -> tuple:
@@ -263,22 +300,60 @@ def classify(out_of_clamp: list[dict[str, Any]], pairs: list[dict[str, Any]]) ->
     }
 
 
-def check_once(*, confirm: bool = True) -> dict[str, Any]:
-    """One cheap probe; the expensive read only if it can prove something."""
+def check_once() -> dict[str, Any]:
+    """Read the surface that actually publishes prices, and judge THAT.
+
+    WHY THIS IS NOT GATED ON THE SHORTLIST ANY MORE. It used to be: the cheap
+    shortlist GET decided whether the expensive read ran at all. That made the
+    instrument blind in exactly the window it exists to watch. The shortlist is
+    a heavily FILTERED view -- it drops `stale_kickoff_seconds` (7200: any game
+    started more than two hours ago) and `max_quote_age_seconds` -- and the
+    triggers this instrument has actually caught came from IN-PLAY markets late
+    in games, which is precisely the population those filters remove.
+
+    Measured 2026-08-16T03:14:08Z, same instant: the shortlist offered 0 rows
+    while the served payload published 18 priced rows. A gate reading 0 against
+    a judged surface of 18 reports `no_trigger` while it simply cannot see. It
+    is the shape `learnings.md` warns about -- a healthy reading is evidence
+    only once you know what makes it read unhealthy.
+
+    So the trigger is now derived from the served payload itself: the same
+    population the verdict is about. The shortlist is still read, but ONLY as
+    recorded context, and it can no longer suppress a check.
+    """
     record: dict[str, Any] = {"checked_at": _now()}
+
+    # Context, not a gate. A failure here must not stop the real read, so the
+    # divergence stays visible without ever being load-bearing.
     try:
         shortlist = _get(SHORTLIST_PATH)
+        shortlist_rows = _fair_probabilities(shortlist)
+        record["shortlist_rows"] = len(shortlist_rows)
+        record["shortlist_out_of_clamp_count"] = sum(
+            1 for r in shortlist_rows
+            if r["fair_probability"] < CLAMP_LOW or r["fair_probability"] > CLAMP_HIGH)
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
-        record.update({"status": "unreachable", "error": f"{type(exc).__name__}: {exc}"})
+        record["shortlist_rows"] = None
+        record["shortlist_error"] = f"{type(exc).__name__}: {exc}"
+
+    try:
+        served = _post(QUERY_PATH, {"question": "show me the board"})
+    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
+        # A failed read is not a result. Say so rather than reporting a verdict.
+        record.update({"status": "unreachable",
+                       "verdict": "TRIGGER_UNCONFIRMED",
+                       "error": f"served read failed: {type(exc).__name__}: {exc}"})
         return record
 
-    rows = _fair_probabilities(shortlist)
-    out_of_clamp = [r for r in rows
-                    if r["fair_probability"] < CLAMP_LOW or r["fair_probability"] > CLAMP_HIGH]
+    rows = _served_rows(served)
+    out_of_clamp = _dedupe([r for r in rows
+                            if r["fair_probability"] < CLAMP_LOW
+                            or r["fair_probability"] > CLAMP_HIGH])
     probabilities = [r["fair_probability"] for r in rows]
     record.update({
         "status": "ok",
-        "shortlist_rows": len(rows),
+        "served_probability_occurrences": len(rows),
+        "served_probability_rows": len(_dedupe(rows)),
         "min_fair_probability": round(min(probabilities), 6) if probabilities else None,
         "max_fair_probability": round(max(probabilities), 6) if probabilities else None,
         "out_of_clamp_count": len(out_of_clamp),
@@ -287,23 +362,11 @@ def check_once(*, confirm: bool = True) -> dict[str, Any]:
     if not out_of_clamp:
         # Stated, not implied: this run proves nothing about the fix.
         record["verdict"] = "no_trigger"
-        record["note"] = "no out-of-clamp probability on this slate; NOT evidence of correctness"
+        record["note"] = ("no out-of-clamp probability published on this slate; "
+                          "NOT evidence of correctness")
         return record
 
     record["triggered"] = True
-    if not confirm:
-        record["verdict"] = "TRIGGER_UNCONFIRMED"
-        record["note"] = "trigger seen; confirming read skipped (--no-confirm)"
-        return record
-
-    try:
-        served = _post(QUERY_PATH, {"question": "show me the board"})
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, OSError) as exc:
-        # A failed read is not a result. Say so rather than reporting a verdict.
-        record["verdict"] = "TRIGGER_UNCONFIRMED"
-        record["error"] = f"confirming read failed: {type(exc).__name__}: {exc}"
-        return record
-
     prices: list[float] = []
     _walk_fair_prices(served, prices)
     # OCCURRENCE counts -- the payload echoes one row into several sections, so
@@ -330,7 +393,11 @@ def _write(record: dict[str, Any]) -> None:
 def _summarize(record: dict[str, Any]) -> str:
     if record.get("status") == "unreachable":
         return f"[{record['checked_at']}] UNREACHABLE -- {record.get('error')}"
-    head = (f"[{record['checked_at']}] rows={record.get('shortlist_rows')} "
+    # Both populations are printed because their divergence is the defect this
+    # instrument was rebuilt around. `served` is what the verdict is about;
+    # `shortlist` is context and never gates anything.
+    head = (f"[{record['checked_at']}] served_rows={record.get('served_probability_rows')} "
+            f"(shortlist={record.get('shortlist_rows')}) "
             f"p=[{record.get('min_fair_probability')}, {record.get('max_fair_probability')}] "
             f"out_of_clamp={record.get('out_of_clamp_count')}")
     verdict = record.get("verdict", "?")
@@ -436,6 +503,33 @@ def _self_test() -> int:
     print(f"  [{'PASS' if ok else 'FAIL'}] a split price/probability yields NO invented pair: "
           f"{len(split)} pair(s)")
 
+    # --- the trigger population, which is what changed on 2026-08-16 ---------
+    # An UNPRICED out-of-clamp probability must still reach the trigger. It is
+    # the post-fix shape (the fixed code omits the column rather than faking a
+    # price), so dropping it would make POST_FIX_OK_COLUMN_ABSENT unreachable
+    # and the instrument would go blind to the fix working.
+    unpriced = _served_rows({"structured_response": {"top_opportunities": [
+        {"sport": "nfl", "market": "h2h_3_way", "side": "away",
+         "game": {"matchup": "JAX @ NO"},
+         "quote": {"fair_probability": 0.007934}}]}})
+    ok = (len(unpriced) == 1 and unpriced[0]["fair_price"] is None
+          and unpriced[0]["fair_probability"] < CLAMP_LOW
+          and unpriced[0].get("matchup") == "JAX @ NO")
+    failures += 0 if ok else 1
+    print(f"  [{'PASS' if ok else 'FAIL'}] an UNPRICED out-of-clamp probability still triggers: "
+          f"rows={len(unpriced)} price={unpriced[0]['fair_price'] if unpriced else '?'}")
+
+    # And the trigger must not fire on a slate confined to the band, or every
+    # quiet night becomes a spurious verdict.
+    inside = _served_rows({"rows": [{"quote": {"fair_probability": 0.4}, "fair_price": 150.0},
+                                    {"quote": {"fair_probability": 0.63}, "fair_price": -170.0}]})
+    triggered = [r for r in inside
+                 if r["fair_probability"] < CLAMP_LOW or r["fair_probability"] > CLAMP_HIGH]
+    ok = len(inside) == 2 and not triggered
+    failures += 0 if ok else 1
+    print(f"  [{'PASS' if ok else 'FAIL'}] a slate inside the band does NOT trigger: "
+          f"rows={len(inside)} triggering={len(triggered)}")
+
     for name, expected, got in checks:
         ok = got["verdict"] == expected
         failures += 0 if ok else 1
@@ -457,8 +551,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--interval", type=int, default=600,
                         help="seconds between checks (default 600; the board rebuilds ~every 25 min)")
     parser.add_argument("--max-checks", type=int, default=0, help="stop after N checks (0 = unlimited)")
-    parser.add_argument("--no-confirm", action="store_true",
-                        help="skip the expensive confirming read on a trigger")
     parser.add_argument("--self-test", action="store_true", help="exercise the classifier and exit")
     args = parser.parse_args(argv)
 
@@ -467,7 +559,7 @@ def main(argv: list[str] | None = None) -> int:
 
     checks = 0
     while True:
-        record = check_once(confirm=not args.no_confirm)
+        record = check_once()
         _write(record)
         print(_summarize(record), flush=True)
         checks += 1

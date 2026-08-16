@@ -51,10 +51,22 @@ def _api_root(league: str, out_root: Path) -> Path:
     return out_root / league / "api"
 
 
-def _load_team_ratings(league: str, source_root: Path) -> dict[str, dict[str, float]]:
+def _load_team_ratings(league: str, source_root: Path, as_of: str) -> dict[str, dict[str, float]]:
+    """PRODUCTION path. `as_of` is the date being built for (audit §7 #6).
+
+    Behaviour is UNCHANGED here and that is deliberate: this builds artifacts
+    for matches that have not been played, so every history row already
+    predates `as_of` and nothing is filtered out. It passes a date only because
+    `compute_team_ratings` now requires one -- the requirement exists so the two
+    EVALUATION callers cannot silently keep using future results, and making it
+    optional would have left exactly that hole open.
+    """
     if league == "mls":
         rows = fetch_asa_mls_team_history(date_cls.today().year)
-        return compute_team_ratings(rows)
+        # MLS rows are SEASON AGGREGATES with no date. Safe here and only
+        # here: this builds for a future date, so no row can postdate `as_of`.
+        # Dropping them would silently empty MLS ratings in production.
+        return compute_team_ratings(rows, as_of=as_of, allow_undated=True)
     if league in _GOALS_BASED_RATING_LEAGUES:
         history_dir = source_root / league / "history"
         frames = [pd.read_csv(path) for path in sorted(history_dir.glob("matches_*.csv"))]
@@ -62,13 +74,13 @@ def _load_team_ratings(league: str, source_root: Path) -> dict[str, dict[str, fl
             raise SystemExit(f"no match history under {history_dir}; run fetch_soccer_history_local.py --kind matches first")
         match_rows = pd.concat(frames, ignore_index=True).to_dict("records")
         rows = team_rows_from_match_history(match_rows)
-        return compute_team_ratings(rows, window=90)
+        return compute_team_ratings(rows, as_of=as_of, window=90)
     history_dir = source_root / league / "team_history"
     frames = [pd.read_csv(path) for path in sorted(history_dir.glob("teams_*.csv"))]
     if not frames:
         raise SystemExit(f"no team history under {history_dir}; run fetch_soccer_history_local.py --kind teams first")
     rows = pd.concat(frames, ignore_index=True).to_dict("records")
-    return compute_team_ratings(rows, window=45)
+    return compute_team_ratings(rows, as_of=as_of, window=45)
 
 
 def _load_player_rows(league: str, source_root: Path) -> list[dict[str, Any]]:
@@ -223,7 +235,7 @@ def build_artifacts(league: str, iso_date: str, *, source_root: Path, out_root: 
         print(f"no ESPN fixtures found for {league} on {iso_date}; wrote empty artifact")
         return payload
 
-    ratings = _load_team_ratings(league, source_root)
+    ratings = _load_team_ratings(league, source_root, iso_date)
     team_names = [fixture["home_team"] for fixture in fixtures_raw] + [fixture["away_team"] for fixture in fixtures_raw]
     promoted = _fill_promoted(ratings, team_names)
     player_rows = _load_player_rows(league, source_root)
