@@ -3955,7 +3955,128 @@ _PREGAME_SWEEP_INTERVAL_DEFAULTS = {"soccer": 8 * 3600}
 _PREGAME_SWEEP_INTERVAL_FALLBACK = 2 * 3600
 
 
+# `#440` Phase 1a/1b: FIXTURE-AWARE pregame cadence.
+#
+# The constants above are elapsed-time. Measured 2026-08-15 (`#440` Phase 0/H1,
+# `reports/kickoff_census/latest.json`): across 9 European soccer leagues, n=200,
+# **0.0%** of kickoffs fall in the 18:00-01:00 CT band and NONE at any hour after
+# 14:00 CT -- yet those leagues sweep in every hour, including MLB's evening peak,
+# because an 8h elapsed timer knows nothing about kickoffs. 61% of the soccer
+# refreshes during 18-22Z were serving fixtures 2+ days away.
+#
+# THE GATE IS TIME-TO-NEXT-FIXTURE, NEVER THE CLOCK. H1 also corrected the band
+# table this plan first guessed (European soccer is 05:00-14:00 CT, not
+# 01:00-09:00, and US fixtures start at 11:00, so an 11:00-14:00 contested band
+# exists). A clock rule would also break MLS, whose kickoffs ARE in the US
+# evening -- 94.6% of 111.
+_FIXTURE_TIER_SECONDS: tuple[tuple[float, int, str], ...] = (
+	(3 * 3600.0, 0, "imminent_handoff_to_t_window"),   # < 3h: the T-75/T-10 ramp owns it
+	(12 * 3600.0, 2 * 3600, "near"),                   # 3-12h
+	(48 * 3600.0, 8 * 3600, "mid"),                    # 12-48h
+	(float("inf"), 24 * 3600, "far"),                  # > 48h: heartbeat only
+)
+
+# Deliberately OFF by default -- the dark-launch posture every other behaviour
+# change in this file uses (`_mlb_daily_sim_enabled`, `_look_ahead_enabled`).
+# Flip on per service once the `branch-overlap-baseline-watch` distribution has
+# a BEFORE to compare against.
+def _fixture_aware_cadence_enabled() -> bool:
+	return _env_bool("SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE", default=False)
+
+
+# Bounded at 4 days deliberately: the widest tier boundary is 48h, so anything
+# past ~2 days is already "far" and scanning further buys no decision. An
+# unbounded look-ahead is the shape that produced the 2026-07-25 OOM elsewhere in
+# this file.
+_NEXT_FIXTURE_LOOKAHEAD_DAYS = 4
+_NEXT_FIXTURE_CACHE: dict[str, tuple[float, float | None]] = {}
+_NEXT_FIXTURE_CACHE_TTL_SECONDS = 900.0
+
+
+def _next_fixture_epoch(sport: str, *, now_epoch: float) -> float | None:
+	"""Epoch of this sport's next fixture, or None if none inside the window.
+
+	Goes through `fetch_schedule_for_date`, which already covers 7 of the 8
+	sports and is TTL-cached -- rather than re-reading each sport's schedule
+	artifact by hand, which is how the two would drift apart.
+
+	SHORT-CIRCUITS ON THE FIRST DATE THAT YIELDS A FUTURE FIXTURE. A sport with a
+	game today costs one lookup; only a genuinely idle sport pays the full scan,
+	and an idle sport is exactly the one whose answer ("far") is stable enough to
+	cache. Own cache on top of the adapter's, because the miss path here is N
+	adapter calls, not one.
+	"""
+	sport = str(sport or "").strip().lower()
+	cached = _NEXT_FIXTURE_CACHE.get(sport)
+	if cached is not None and (now_epoch - cached[0]) < _NEXT_FIXTURE_CACHE_TTL_SECONDS:
+		return cached[1]
+
+	found: float | None = None
+	base = central_datetime_from_epoch(now_epoch).date()
+	for offset in range(0, _NEXT_FIXTURE_LOOKAHEAD_DAYS + 1):
+		date_str = (base + timedelta(days=offset)).isoformat()
+		try:
+			events = fetch_schedule_for_date(sport, date_str)
+		except Exception:
+			# One unreadable date must not decide the whole answer; keep scanning.
+			continue
+		for event in events or []:
+			try:
+				epoch = event.start_time_epoch()
+			except Exception:
+				epoch = None
+			if epoch is None or epoch <= now_epoch:
+				continue
+			if found is None or epoch < found:
+				found = epoch
+		if found is not None:
+			break
+
+	if len(_NEXT_FIXTURE_CACHE) > 16:
+		_NEXT_FIXTURE_CACHE.clear()
+	_NEXT_FIXTURE_CACHE[sport] = (now_epoch, found)
+	return found
+
+
+def _fixture_aware_interval_seconds(sport: str, *, now_epoch: float) -> tuple[int | None, str]:
+	"""(interval, reason) from time-to-next-fixture, or (None, reason) to defer.
+
+	UNKNOWN MUST NOT DEFAULT PERMISSIVE, and it must not default silent either.
+	When the next fixture cannot be resolved this returns the MIDDLE tier with a
+	named reason rather than the fastest (which would keep the very sweeps this
+	exists to remove) or the slowest (which would starve a sport whose schedule
+	artifact merely went missing). Both failure directions are real; the middle
+	is the only one that is wrong by a bounded amount either way.
+	"""
+	try:
+		next_epoch = _next_fixture_epoch(sport, now_epoch=now_epoch)
+	except Exception as exc:
+		return _PREGAME_SWEEP_INTERVAL_FALLBACK, f"unresolved_exception:{type(exc).__name__}"
+	if next_epoch is None:
+		return _PREGAME_SWEEP_INTERVAL_FALLBACK, "unresolved_no_fixture_found"
+	seconds_out = float(next_epoch) - float(now_epoch)
+	if seconds_out <= 0:
+		# A fixture already under way is the LIVE path's business, not pregame's.
+		return None, "fixture_in_progress"
+	for ceiling, interval, label in _FIXTURE_TIER_SECONDS:
+		if seconds_out < ceiling:
+			if interval <= 0:
+				return None, f"{label}:{int(seconds_out)}s"
+			return interval, f"{label}:{int(seconds_out / 3600)}h_out"
+	return _PREGAME_SWEEP_INTERVAL_FALLBACK, "unreachable_tier"
+
+
 def _pregame_sweep_interval_seconds(sport: str) -> int:
+	"""The BASELINE elapsed-time interval. Deliberately unchanged by `#440`.
+
+	DO NOT layer the fixture gate in here. This function has a second caller --
+	`recommendation_engine._staleness_ceiling_seconds` multiplies it by 3 to get a
+	RECOMMENDATION STALENESS CEILING, which is a different concept that happens to
+	share a number. Raising soccer to a 24h heartbeat here would silently raise
+	that ceiling to 72h, so a three-day-old recommendation would read as fresh.
+	The fixture gate therefore lives in `_pregame_sweep_interval_for_tick` below,
+	which only the sweep cadence calls.
+	"""
 	sport = str(sport or "").strip().lower()
 	raw = str(os.environ.get(f"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_{sport.upper()}") or "").strip()
 	if not raw:
@@ -3965,6 +4086,35 @@ def _pregame_sweep_interval_seconds(sport: str) -> int:
 	except Exception:
 		value = int(_PREGAME_SWEEP_INTERVAL_DEFAULTS.get(sport, _PREGAME_SWEEP_INTERVAL_FALLBACK))
 	return max(0, value)
+
+
+def _pregame_sweep_interval_for_tick(sport: str, *, now_epoch: float | None = None) -> int:
+	"""What the SWEEP CADENCE should use for this sport right now (`#440` Phase 1b).
+
+	The one place the fixture gate applies. Scoped to this caller on purpose --
+	see `_pregame_sweep_interval_seconds` for the staleness-ceiling coupling that
+	makes a shared implementation wrong.
+	"""
+	sport = str(sport or "").strip().lower()
+	explicit = str(os.environ.get(f"SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_{sport.upper()}") or "").strip()
+	if not explicit:
+		explicit = str(os.environ.get("SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS") or "").strip()
+	if explicit:
+		# AN EXPLICIT ENV VALUE STILL WINS, deliberately: the per-sport override is
+		# the documented escape hatch for the incident where this gate misbehaves,
+		# so the gate must not be able to override the thing that turns it off.
+		return _pregame_sweep_interval_seconds(sport)
+	if _fixture_aware_cadence_enabled():
+		resolved, reason = _fixture_aware_interval_seconds(
+			sport, now_epoch=float(now_epoch if now_epoch is not None else time.time())
+		)
+		# Printed, not silent: a cadence gate that changes an interval without
+		# saying why is indistinguishable from a sport that simply stopped
+		# sweeping -- the failure this file keeps re-shipping.
+		print(f"[live_refresh_loop] FIXTURE_CADENCE sport={sport} interval={resolved} reason={reason}", flush=True)
+		if resolved is not None:
+			return max(0, int(resolved))
+	return _pregame_sweep_interval_seconds(sport)
 
 
 def _pregame_sport_sweep_epochs_path() -> Path:
@@ -4132,7 +4282,7 @@ def _apply_pregame_sport_cadence(
 		if normalized in force_sports:
 			kept.append(normalized)
 			continue
-		interval = _pregame_sweep_interval_seconds(normalized)
+		interval = _pregame_sweep_interval_for_tick(normalized, now_epoch=now_epoch)
 		if interval <= 0:
 			kept.append(normalized)
 			continue
