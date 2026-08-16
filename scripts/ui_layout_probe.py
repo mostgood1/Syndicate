@@ -1232,6 +1232,26 @@ SLATE_METRICS = ("cards", "cardHeightSpread", "cardHeightSpreadWithinState", "co
 # baselined.
 WATCH_METRICS = ("identicalContentSpread",)
 
+# Sports whose `identicalContentSpread` has EARNED a baseline and now fails on
+# drift. Opt-in BY NAME with a reason, the same shape as OUT_OF_SEASON and
+# NUMERIC_CLASS_EXEMPT -- a blanket promotion would take mlb with it, and mlb
+# moved on every reading.
+#
+# Evidence (2026-08-16, 7+ production runs, both widths, across both the
+# largest-group and worst-group statistics): nfl 14/50 and ncaaf 45/53 were
+# bit-identical every single time. mlb was not. The difference is not the sport,
+# it is that these slates are STATIC -- units 3-3 and 16-16, a single "Week 1"
+# state, no games in progress -- while mlb enriches continuously during a live
+# slate.
+#
+# THE LIMIT THIS CARRIES: when these games kick off, the slates stop being
+# static and this check will fire on a slate change rather than a layout
+# regression. That is designed for rather than ignored -- the tie spread is
+# per-STATE, so the comparison below only fires when the state matches on both
+# sides, and a state change is reported as not-comparable instead. The failure
+# text names the slate as the first thing to check.
+TIE_SPREAD_BASELINED = frozenset({"nfl", "ncaaf"})
+
 
 def _cmp_value(v):
     if isinstance(v, list):
@@ -1303,15 +1323,57 @@ def compare(baseline: dict[str, Any], current: dict[str, Any]) -> tuple[list[str
                 lines.append(f"{sport:8} {width:8} stable metrics unchanged")
             if moved:
                 lines.append(f"{'':17} slate moved: " + "; ".join(moved))
-            # Collected, not judged. Printed even when unchanged, because the
-            # point of this line is to build a series -- a metric only shown
-            # when it moves can never be shown to be stable.
-            for key in WATCH_METRICS:
-                b, c = _cmp_value(base.get(key)), _cmp_value(cur.get(key))
-                if b is None and c is None:
-                    continue
-                verdict = "unchanged" if b == c else f"{b} -> {c}"
-                lines.append(f"{'':17} watch (stability unknown): {key} {verdict}")
+            if sport in TIE_SPREAD_BASELINED:
+                b_tie = base.get("identicalContentSpread") or {}
+                c_tie = cur.get("identicalContentSpread") or {}
+                b_val, c_val = _cmp_value(b_tie), _cmp_value(c_tie)
+                if b_val is None and c_val is None:
+                    pass
+                elif b_val is None:
+                    # A baseline predating the field cannot be drifted from.
+                    # Reported, not failed -- this is absence on the BASELINE
+                    # side, and failing here would just punish an old file.
+                    lines.append(
+                        f"{'':17} identicalContentSpread {c_val}px NOT COMPARED "
+                        "-- the baseline predates this metric; re-baseline to arm it"
+                    )
+                elif c_val is None:
+                    # Absence on the CURRENT side is different in kind: the
+                    # measurement stopped happening, and absence is never a pass.
+                    lines.append(
+                        f"{'':17} identicalContentSpread VANISHED (baseline {b_val}px, "
+                        "now unmeasured) -- no two cards tie, so the check did NOT run"
+                    )
+                    ok = False
+                elif b_tie.get("state") != c_tie.get("state"):
+                    # Per-state metric: two states are two quantities.
+                    lines.append(
+                        f"{'':17} identicalContentSpread NOT COMPARABLE -- state moved "
+                        f"{b_tie.get('state')!r} -> {c_tie.get('state')!r} "
+                        f"({b_val}px -> {c_val}px)"
+                    )
+                elif b_val != c_val:
+                    lines.append(
+                        f"{'':17} identicalContentSpread DRIFT {b_val}px -> {c_val}px "
+                        f"in {c_tie.get('state')!r} -- cards with the SAME data changed "
+                        "height. Check whether the slate went live before reading this "
+                        "as a layout regression"
+                    )
+                    ok = False
+                else:
+                    lines.append(
+                        f"{'':17} identicalContentSpread {c_val}px unchanged (baselined)"
+                    )
+            else:
+                # Collected, not judged. Printed even when unchanged, because the
+                # point of this line is to build a series -- a metric only shown
+                # when it moves can never be shown to be stable.
+                for key in WATCH_METRICS:
+                    b, c = _cmp_value(base.get(key)), _cmp_value(cur.get(key))
+                    if b is None and c is None:
+                        continue
+                    verdict = "unchanged" if b == c else f"{b} -> {c}"
+                    lines.append(f"{'':17} watch (stability unknown): {key} {verdict}")
     return lines, ok
 
 

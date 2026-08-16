@@ -875,3 +875,74 @@ def test_the_controlled_figure_is_taken_from_the_models_own_state():
     ))
     assert not ok, "a Live tie floor must not exempt a Preview spread"
     assert "NO tied cards" in text
+
+
+# --- nfl/ncaaf baselined; mlb and soccer still only watched ----------------
+
+
+def _tie(px, state="Week 1"):
+    return {"state": state, "spreadPx": px, "worstGroupPx": px, "atU": 3, "n": 16}
+
+
+def _pair(sport, base_tie, cur_tie):
+    return (_report(sport=sport, identicalContentSpread=base_tie),
+            _report(sport=sport, identicalContentSpread=cur_tie))
+
+
+def test_only_the_static_slates_are_baselined():
+    """mlb moved on every reading; nfl/ncaaf were bit-identical on 7+ runs."""
+    assert probe.TIE_SPREAD_BASELINED == frozenset({"nfl", "ncaaf"})
+    assert "mlb" not in probe.TIE_SPREAD_BASELINED
+
+
+def test_a_baselined_sport_fails_on_drift():
+    text, ok = _compare(*_pair("nfl", _tie(14), _tie(38)))
+    assert not ok
+    assert "identicalContentSpread DRIFT 14px -> 38px" in text
+    assert "cards with the SAME data changed height" in text
+    # Whoever reads this must check the slate before calling it a regression.
+    assert "Check whether the slate went live" in text
+
+
+def test_a_baselined_sport_passes_when_unchanged():
+    text, ok = _compare(*_pair("ncaaf", _tie(45), _tie(45)))
+    assert ok, text
+    assert "identicalContentSpread 45px unchanged (baselined)" in text
+
+
+def test_mlb_drift_is_still_only_watched():
+    """The same movement that fails nfl must not fail mlb -- mlb's slate is live
+    and its tie spread is not baselineable in any statistic."""
+    text, ok = _compare(*_pair("mlb", _tie(109, "Preview"), _tie(53, "Preview")))
+    assert ok, text
+    assert "watch (stability unknown): identicalContentSpread 109 -> 53" in text
+    assert "DRIFT" not in text
+
+
+def test_a_state_change_is_not_comparable_rather_than_drift():
+    """The tie spread is per-state, so two states are two quantities. This is
+    what stops kickoff from being reported as a layout regression."""
+    text, ok = _compare(*_pair("nfl", _tie(14, "Week 1"), _tie(220, "Live")))
+    assert ok, text
+    assert "NOT COMPARABLE -- state moved 'Week 1' -> 'Live'" in text
+    assert "DRIFT" not in text
+
+
+def test_a_baseline_predating_the_metric_does_not_fail():
+    base = _report(sport="nfl")           # no identicalContentSpread at all
+    cur = _report(sport="nfl", identicalContentSpread=_tie(14))
+    text, ok = _compare(base, cur)
+    assert ok, text
+    assert "NOT COMPARED" in text
+    assert "re-baseline to arm it" in text
+
+
+def test_a_vanished_measurement_fails_even_though_it_is_an_absence():
+    """Absence on the CURRENT side is not the same as absence on the baseline:
+    the check stopped running, and absence is never a pass."""
+    base = _report(sport="nfl", identicalContentSpread=_tie(14))
+    cur = _report(sport="nfl")            # no tied cards this run
+    text, ok = _compare(base, cur)
+    assert not ok
+    assert "identicalContentSpread VANISHED (baseline 14px, now unmeasured)" in text
+    assert "the check did NOT run" in text

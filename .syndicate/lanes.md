@@ -2863,3 +2863,27 @@ and then failed the thing it was checking, which is the point of running it.
 - Verification: met for G1/G2/G4 and for G3-props. **Unmet:** cross-sport live
   A/B (no second live sport in the window). Lane stays OPEN for that.
 - Blocked by: none.
+
+### ui-probe-baseline-nfl-ncaaf — CLOSED 2026-08-16 — armed for nfl/ncaaf only; mlb stays watch-only — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `identicalContentSpread` fails on drift for nfl/ncaaf, stays watch-only
+  for mlb/soccer, with a new baseline carrying the field.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`,
+  `reports/ui_layout/baseline_2026-08-16.json` (NEW)
+- Falsification test: if nfl/ncaaf tie spreads differed between two runs now with
+  no deploy, they are not baselineable. **They did not** — 14/50/45/53 held
+  across every run today, and the armed comparison reports all four as
+  `unchanged (baselined)`.
+- Four outcomes kept distinct: drift FAILS; a baseline predating the field is
+  NOT COMPARED and does not fail; a VANISHED current value FAILS (absence is
+  never a pass); a state change is NOT COMPARABLE rather than drift — which is
+  what stops kickoff reading as a layout regression.
+- Verification: 72 tests pass (65 + 7 new); live run splits exactly as intended,
+  nfl/ncaaf baselined-unchanged while mlb moved 68 -> 69 on the watch line
+  without failing.
+- **First baseline run was DISCARDED, not shipped**: it failed on `ncaaf desktop
+  tab click identity`. Second run clean; the baseline carries `ok: true`. The
+  tab-click intermittent is real and unexplained — recorded, not chased.
+- **Open and unrelated:** mlb mobile Live state now fails legitimately — residual
+  151px against a 40px floor, `atNoiseFloor` False, worst card +79px at 45 pairs,
+  1px over budget. The exemption correctly declines. Needs its own look.
+- Blocked by: none
