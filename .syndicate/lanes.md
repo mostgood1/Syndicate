@@ -2887,3 +2887,29 @@ and then failed the thing it was checking, which is the point of running it.
   151px against a 40px floor, `atNoiseFloor` False, worst card +79px at 45 pairs,
   1px over budget. The exemption correctly declines. Needs its own look.
 - Blocked by: none
+
+### mlb-mobile-live-residual — CLOSED 2026-08-16 — HYPOTHESIS FALSIFIED; it is a false alarm, the Live fit is convex and `fitRatio` cannot see curvature — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: name what makes one Live card +79px off the model, or show the residual
+  is noise.
+- Hypothesis: the outlier carries a BLOCK its same-pair-count peers lack.
+- **FALSIFIED. There is no outlier.** Residuals are U-shaped across pair count
+  (+76 at u=45; -2/-10/-42 at u=49; -41/-75 at u=53; +73 at u=57) — a line
+  fitted to a curve, not an anomalous card.
+- **Mechanism found:** per-pair cost is LINEAR in Preview (62.4, 62.1 px/pair)
+  and CONVEX in Live (41.3, 61.8, 76.6). The curvature is entirely in
+  `section.cards-panel.is-active > div.cards-overview-grid` (3187 -> 3906px
+  across the Live series; every sibling block flat or <=28px). Live puts cells of
+  differing heights into a wrapping row-max grid, so each added pair costs more
+  than the last; Preview's cells are uniform.
+- **The harness is at fault, not the board:** `fitRatio = residual/explained`
+  cannot see curvature, so a misspecified model with a wide explained range
+  (771px) passed as `reliable: True` at ratio 0.2 and then tripped the budget
+  with a STRUCTURED residual. The named worst card (u=45) is the ONLY card at
+  that u — no peers — so "+79px off the model" is deviation from a LINE. Cards
+  that do have peers agree to 40px.
+- Recommended, NOT implemented (needs a decision): fail on deviation from
+  same-content PEERS (`floorPx`, model-free) rather than from the line; and
+  optionally flag monotone per-step slope drift as MISSPECIFIED so `fitRatio`
+  stops certifying curved fits.
+- Live consequence: the probe fails every run while MLB has a live slate.
+- Blocked by: none
