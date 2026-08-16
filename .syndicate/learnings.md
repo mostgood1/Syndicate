@@ -1986,3 +1986,45 @@ for not looking.
 
 Related: [[instrument blindness]], [[gate on the output, not the input]],
 [[unknown must not default permissive]].
+
+## 2026-08-16 — FORBIDDEN: reading a git error as noise from the NEXT command when it names the file the PREVIOUS one staged
+
+I pushed `475b8c6c` with `<<<<<<< Updated upstream` / `=======` /
+`>>>>>>> Stashed changes` inside `tests/test_ui_layout_probe.py`. That is a
+Python syntax error: the file could not be collected at all, and `main` carried
+a broken test file until `b5185678` repaired it.
+
+**Git told me, in the same output as the push.** The command chained
+`commit-tree`, `push`, then `git reset`, and printed:
+
+    error: short read while indexing tests/test_ui_layout_probe.py
+
+I read that as a complaint from the trailing `git reset` — the command nearest
+the error — and moved on because the push line above it said success. It was a
+report about **the blob I had just staged**: a concurrent session ran a stash
+operation against the shared worktree while `git update-index --add -- <path>`
+was reading that path, so `update-index` captured the file mid-write, conflict
+markers and all.
+
+What caught it was the blob-hash check afterwards
+(`git hash-object <local>` vs `git rev-parse origin/main:<path>`), which is
+already a standing rule here. The exit code did not catch it: the push
+succeeded, because a blob with conflict markers is a perfectly valid blob.
+
+**How to apply.**
+- An error naming a path is about **that path**, whichever command in the chain
+  emitted it. Do not attribute it to the nearest command; attribute it to the
+  command that touches that file.
+- On a shared worktree, never stage a path you are about to push straight from
+  the worktree if anything else may write it. **Copy it to a private snapshot
+  first, `git hash-object -w` the snapshot, and stage the resulting blob via
+  `--cacheinfo`.** A concurrent writer then cannot change it under the stage.
+- Verify by content, not by exit code: hash-compare the pushed blob, and for a
+  source file `ast.parse` it. "The push succeeded" says nothing about what was
+  in the blob.
+- Corollary to the existing rule against bundling `git reset` into the commit
+  command: the bundling is also what let a real error hide behind a success
+  line. Keep them in separate calls so each output has one owner.
+- This is [[feedback_instrument_blindness]] in a new place — a green push is
+  evidence only once you know what a bad push would have printed. It printed
+  exactly that, one line above.
