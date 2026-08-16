@@ -2017,8 +2017,17 @@ succeeded, because a blob with conflict markers is a perfectly valid blob.
   command that touches that file.
 - On a shared worktree, never stage a path you are about to push straight from
   the worktree if anything else may write it. **Copy it to a private snapshot
-  first, `git hash-object -w` the snapshot, and stage the resulting blob via
-  `--cacheinfo`.** A concurrent writer then cannot change it under the stage.
+  first, `git hash-object -w --path=<path>` the snapshot, and stage the
+  resulting blob via `--cacheinfo`.** A concurrent writer then cannot change it
+  under the stage. **`--path` is load-bearing, not cosmetic:** without it
+  `hash-object` skips the clean filter, so a CRLF worktree file reaches the blob
+  verbatim where `git add` would have normalised it (`core.autocrlf=true` here).
+  Every Windows writer emits CRLF, so the writers are not the variable: measured
+  2026-08-16, 0 of 34,820 tracked artifacts under `reports/ .syndicate/ data/
+  docs/` have mixed endings. This recipe is the only path by which CRLF can land
+  in a blob, and hand-normalising the bytes per-file is a discipline that works
+  only until someone forgets. `docs/ai_context/todo.md`'s recipe already uses
+  `--path=`; this generalises it.
 - Verify by content, not by exit code: hash-compare the pushed blob, and for a
   source file `ast.parse` it. "The push succeeded" says nothing about what was
   in the blob.
