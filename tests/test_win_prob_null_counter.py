@@ -19,6 +19,7 @@ So the assertions here are about OBSERVABILITY, not arithmetic:
 from __future__ import annotations
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 
@@ -125,3 +126,24 @@ def test_every_artifact_writer_emits(sport):
     src = PRODUCERS[sport].read_text(encoding="utf-8")
     for build in ("recommendations_slate", "top_by_game", "cards_props_snapshot"):
         assert f'_emit_win_prob_build("{build}")' in src, f"{build} writes an artifact but emits nothing"
+
+@pytest.mark.parametrize("sport", sorted(PRODUCERS))
+def test_the_readable_channel_is_written_PER_ARTIFACT_not_only_at_exit(sport):
+    """Both halves of the merged instrument must have the same granularity.
+
+    Two sessions built this in parallel: a readable JSON channel (better than
+    grepping a logs API this ledger records as spotty and saturating at 100
+    lines) and a per-artifact log emit (which fixed the latency -- the exit path
+    fires from `finally`, and the producer ran 70+ minutes writing nothing).
+    Merged, the channel inherits the latency fix. If `record` is ever called
+    ONLY from the exit path again, the artifact reading goes back to being hours
+    late while the log line stays current, and the two would disagree.
+    """
+    src = PRODUCERS[sport].read_text(encoding="utf-8")
+    assert src.count("_record_win_prob_null(") >= 2, (
+        "record() must fire from the per-artifact emit as well as at exit"
+    )
+    tail = src.split("def _emit_win_prob_build(")[1]
+    build_fn = re.split(r"^def ", tail, maxsplit=1, flags=re.M)[0]
+    assert "_record_win_prob_null(" in build_fn, "the per-build emit does not reach the readable channel"
+    assert 'tag=f"{tag}:{build}"' in build_fn, "per-artifact readings must be distinguishable by tag"

@@ -1595,6 +1595,24 @@ def _emit_win_prob_build(build: str, tag: str = "refresh_wnba_oddsapi_props") ->
         f"[{tag}] WIN_PROB_NULL_NO_PRICE build={build} null={nulls} rows={rows} pct={pct:.1f}",
         flush=True,
     )
+    # Also publish to the readable channel, per ARTIFACT. `record` was wired
+    # only into the exit path, which inherits the latency this per-build emit
+    # exists to remove: measured 2026-08-16, the producer ran 70+ minutes
+    # having written nothing. The log line and the artifact now carry the same
+    # deltas, so whichever a reader reaches first agrees with the other.
+    # Never raises, by `record`'s contract.
+    try:
+        from syndicate.features.shared.win_prob_null_diag import record as _record_win_prob_null
+
+        _record_win_prob_null(
+            sport="wnba",
+            tag=f"{tag}:{build}",
+            rows=rows,
+            nulls=nulls,
+            date=_WIN_PROB_RUN_DATE.get("date"),
+        )
+    except Exception:
+        pass
 
 
 def _emit_win_prob_stats(tag: str = "refresh_wnba_oddsapi_props") -> None:
