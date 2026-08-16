@@ -3091,3 +3091,23 @@ and then failed the thing it was checking, which is the point of running it.
   stops certifying curved fits.
 - Live consequence: the probe fails every run while MLB has a live slate.
 - Blocked by: none
+
+### branch-overlap-manual-run-marker — OPEN — opened 2026-08-16 — session: `branch-overlap-baseline-watch`
+- Goal: a record in `reports/branch_overlap/baseline.jsonl` states whether it came
+  from the scheduled run or from a human, so a manual probe can never be counted
+  as evidence in the Phase 1 (`#440`) before-distribution.
+- Files: `scripts/watch_branch_overlap.py`,
+  `reports/branch_overlap/baseline.jsonl`,
+  `.syndicate/scheduled_task_branch_overlap.md`, and the live task file.
+- Why: testing the new 14:45 slot appended a record indistinguishable in shape
+  from a scheduled sample — same failure the pre-band drift check was added to
+  prevent, in the instrument this session was fixing. Baseline also already
+  double-counts 10:09–15:09Z (two runs overlapping ~4.5 of 5 hours).
+- Design: `--scheduled` flag; **absent means manual**. Fails safe — forgetting the
+  flag excludes a run from the distribution rather than silently counting a probe.
+  No time-vs-cron math, which would re-couple the script to a schedule that has
+  already changed twice today.
+- Consumer note: records written before this change carry NO field. Absent must
+  read as UNKNOWN, never as scheduled.
+- Blocked by: none. `refresh-worker-oom-recurrence` owns the diagnosis; this is
+  instrument provenance only.

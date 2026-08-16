@@ -101,6 +101,17 @@ def main() -> int:
     parser.add_argument("--tail", type=int, default=4000)
     parser.add_argument("--tz", default="America/Chicago")
     parser.add_argument("--out", type=Path, default=REPO_ROOT / "reports" / "branch_overlap" / "baseline.jsonl")
+    parser.add_argument(
+        "--scheduled",
+        action="store_true",
+        help="this run came from the scheduled task, so its record counts toward the "
+             "baseline distribution. ABSENT MEANS MANUAL. Deliberately fail-safe: "
+             "forgetting the flag excludes a run rather than silently counting a "
+             "hand-run probe as evidence. Testing the 14:45 slot on 2026-08-16 "
+             "appended a record indistinguishable from a scheduled sample, which is "
+             "how this got here. Not inferred from the clock -- the cron changed "
+             "twice in one day and time-vs-cron math would just re-create the drift.",
+    )
     args = parser.parse_args()
 
     tz = ZoneInfo(args.tz)
@@ -184,8 +195,18 @@ def main() -> int:
         print("NOTE: zero overlap in this window. That is a real reading, NOT an instrument "
               "failure -- samples parsed above. It may simply be an off-peak window.")
 
+    run_mode = "scheduled" if args.scheduled else "manual"
+    if run_mode == "manual":
+        print("\nRUN MODE: MANUAL (no --scheduled). This record is marked "
+              "run_mode=manual and MUST NOT be counted in the Phase 1 baseline "
+              "distribution. Records written before 2026-08-16 carry no run_mode "
+              "at all -- treat a missing field as UNKNOWN, never as scheduled.")
+    else:
+        print("\nRUN MODE: SCHEDULED. Counts toward the baseline distribution.")
+
     record = {
         "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "run_mode": run_mode,
         "service": args.service,
         "tz": args.tz,
         "requested_hours": args.hours,

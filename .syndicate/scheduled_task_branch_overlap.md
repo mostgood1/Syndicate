@@ -71,8 +71,10 @@ This task exists to build the BEFORE baseline that Phase 1 will be judged agains
 STEP 1 — run the instrument (read-only; reads Render's logs API, touches no worker):
 
 ```bash
-py -3 scripts/watch_branch_overlap.py --hours 5
+py -3 scripts/watch_branch_overlap.py --hours 5 --scheduled
 ```
+
+**`--scheduled` is required and not optional decoration.** Without it the record is written as `run_mode=manual` and is excluded from the Phase 1 distribution. That default is deliberate: a forgotten flag loses one sample, whereas the reverse default would silently count hand-run probes as evidence. If you are running this by hand to test something, OMIT the flag.
 
 It appends one JSON record per run to `reports/branch_overlap/baseline.jsonl` and prints an hour table. The 5-hour window against the **14:45/19:45/22:45/01:45** local cadence overlaps heavily on purpose — a gap in the baseline is worse than a duplicated hour, and those four windows tile **09:45–01:45 local continuously**.
 
