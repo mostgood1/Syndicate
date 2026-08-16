@@ -1120,7 +1120,55 @@ does not hold.** `[measured 08-14]`
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
-### live-game-line-projection — OPEN — DROP 1 DEPLOYED **TO THE WRONG SERVICE** (web, where it is INERT); DROP 2 BUILT (`4bd7dbb3`) AND ON NO SERVICE; DROP 3 UNBUILT — opened 2026-08-15 — session: live-game-line-projection
+### live-game-line-projection — SESSION ARCHIVED 2026-08-16 ~02:4xZ. TIER 5'S PREMISE IS TRUE IN PRODUCTION.
+**Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
+
+**SHIPPED AND LIVE (content-verified per service, not by ancestry):**
+- live-odds-worker `c4116ab6` — the live MC stamps `simsRun`.
+- refresh-worker `f8ca54e1` — the game-line join, the segment filter, the
+  Agresti-Coull boundary, and the CLV recorder.
+- web carries D1+D2; it needs neither the vendor stamp nor the join.
+
+**THE ARC, in measured numbers:**
+
+    baseline   index 3   projected 12  edged 0   (sim_count_unusable 12)
+    +simsRun   index 8   projected 32  edged 25  <- FIRST EVER, and WRONG
+    +segment   index 10  projected  5  edged 4   <- first credible ones
+    tail       index 10  projected  2  edged 0   (slate over; ledger written 0)
+
+**THE 25 WERE FAKE AND I RETRACTED THEM MYSELF**, caught while packaging them
+for handoff: Wald `sqrt(p(1-p)/n)` is **0.0 at p in {0,1}**, so the 2-sigma bar
+was ZERO and everything cleared it; and the full-game projection was priced
+against every SEGMENT (SD @ CLE `first1` gave **+42.43 pp**). Both fixed.
+
+**WHAT IS NOT ESTABLISHED — do not let the arc imply otherwise:**
+- **No CLV, no settlement, no backtest.** Surviving means an edge exceeds the
+  ESTIMATOR'S OWN NOISE at 120 sims. It says nothing about the model.
+- **The recorder has never recorded a row** — it went live on a finished slate.
+  `written: 0` with `enabled: true` proves wiring, not behaviour.
+- **`index_size` 3 -> 8 -> 10 across the night is unexplained.**
+- **Drop 2's carry-forward has never been observed firing.**
+- The tally is MLB-only; soccer/wnba report `liveMcSources: null`.
+
+**HANDOFFS, all verified present in HEAD:**
+- `clv-without-settlement` — the rows are TRANSIENT (edged 25→4→1 on one slate);
+  the recorder is the prerequisite, and `clv_join.py` was deliberately untouched.
+  Carries two corrections: **Pinnacle is 15/30 in production** (the sharp SET is
+  30/30), and "close" is ill-defined for a live market.
+- `memory-watchdog-435` — a **2,092 MB** in-process excursion, pid 39, 34 s,
+  children proven flat. ~3x `#327`'s largest.
+- `soccer-model-coverage` — `SOCCER_PREGAME_AUTORUN_FAILED` lock contention.
+
+**COSTS I IMPOSED, recorded rather than netted out:** three soccer runs killed,
+one wrong rollback of a working fix, and two deploys fired over another
+session's claim. **No claims held; refresh-worker and live-odds-worker are free.**
+
+**NEXT SESSION STARTS HERE:** tomorrow's live slate is the first real test —
+does the ledger grow only on movement, and do the surviving edges beat a sharp
+close. **That is evaluation, not plumbing.** The plumbing is done.
+
+> *(The blockquote and body below are this lane's HISTORY, kept for the
+> reasoning trail. The status above supersedes them — 2026-08-16 reconcile.)*
 > **STATUS LINE CORRECTED 2026-08-15 ~18:0xZ by the coordinating session.** It
 > read "NOT DEPLOYED" and that is no longer true: `0e0b0aa1` rode the web train
 > and is in the deployed tree (`dep-da0a5rlg1s2s73cm43kg`, live 17:40:30Z).
