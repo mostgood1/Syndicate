@@ -117,8 +117,19 @@ live-odds-worker):
 export GIT_INDEX_FILE=C:/tmp/idx.deployfreeze && git read-tree "$RW_LIVE" && git update-index --cacheinfo 100644,426bbd7056499843dfe5d42990962ca6235c01ff,scripts/refresh_mlb_oddsapi.py && git update-index --cacheinfo 100644,b624f372666cdefca39d3703e106a3df044c734a,tests/test_oddsapi_pregame_freeze.py && git diff --cached --stat
 ```
 
-That diff must show **exactly 2 files**. If it shows more, the live SHA predates
-other work and you are about to revert it — stop.
+**THAT COMMAND IS WRONG — VERIFY AGAINST THE LIVE SHA, NOT AGAINST HEAD.**
+`--cached` compares the index to **HEAD**. Because refresh-worker's branch is far
+from `main`, on 2026-08-16 it reported **103,410 deletions across ~140 files**
+(`.claude/hooks/commit-guard.py`, `scripts/deploy_claim.py`, the whole `.syndicate/`
+ledger) — which reads exactly like catastrophic data loss and is **not** what is
+being deployed. The deploy is `$RW_LIVE` plus two blobs, so compare it to `$RW_LIVE`:
+
+```bash
+export GIT_INDEX_FILE=C:/tmp/idx.deployfreeze && TREE=$(git write-tree) && git diff-tree -r --stat "$RW_LIVE" "$TREE" && git diff-tree -r --diff-filter=D --name-only "$RW_LIVE" "$TREE"
+```
+
+Must be **exactly 2 files**, `+180/-11`, and **zero deletions**. Anything else means
+the blobs do not graft cleanly onto that SHA — stop.
 
 ```bash
 export GIT_INDEX_FILE=C:/tmp/idx.deployfreeze && TREE=$(git write-tree) && NEW=$(git commit-tree "$TREE" -p "$RW_LIVE" -m "deploy: pregame freeze writes to the grading reader's tree (bf643d72 grafted onto $RW_LIVE)") && echo "NEW=$NEW" && git push origin "$NEW:refs/heads/deploy/freeze-reader-tree-rw"
@@ -128,11 +139,29 @@ export GIT_INDEX_FILE=C:/tmp/idx.deployfreeze && TREE=$(git write-tree) && NEW=$
 
 ## STEP 3 — ROUTE ONE: warm the mirror, then deploy
 
-`POST /deploys` 404s with *"service does not have a commit"* for anything pushed
+**BEFORE EVERY `POST /deploys`, CHECK THE SERVICE'S LATEST DEPLOY STATUS. If it is
+`build_in_progress` / `update_in_progress` / `queued`, SOMEBODY ELSE IS DEPLOYING AND
+YOUR FIRE WILL CANCEL THEIR BUILD.** Measured 2026-08-16: this lane held the
+refresh-worker claim, fired at 22:42:43Z, and cancelled a peer's `fdc72dd0` build
+that had started 11 s earlier; their retry at 22:43:32Z then cancelled this lane's
+deploy. **`deploy_claim.py` is ADVISORY — the peer fired straight through a claim
+this lane held.** The in-progress check, not the claim, is the real guard:
+
+```bash
+curl -s -H "Authorization: Bearer $RENDER_API_KEY" "https://api.render.com/v1/services/srv-d91dpertqb8s73co8ls0/deploys?limit=1" | python -c "import sys,json;d=json.load(sys.stdin)[0]['deploy'];print(d['commit']['id'][:8],d['status'])"
+```
+
+Only proceed on `live`. Re-run it immediately before the POST, not just once at the
+start of the sequence — the race that bit this lane was eleven seconds wide.
+
+`POST /deploys` MAY 404 with *"service does not have a commit"* for anything pushed
 after that service's last build: **Render's git mirror is per-service and refreshes
-only at build time.** Proven twice. So deploy the service's own live commit first
-(a no-op in code) to force a fetch, wait for it to finish, then deploy the target.
-**Two restarts per service. Fire the two steps BY HAND**, not from a watcher.
+only at build time.** So the fallback is to deploy the service's own live commit
+first (a no-op in code) to force a fetch, wait for it to finish, then deploy the
+target — two restarts per service. **But try the target FIRST**: on 2026-08-16 the
+direct POST returned **HTTP 201, no 404**, after the deploy branch was pushed, so the
+warm-up was unnecessary and would have cost a needless restart. **Fire BY HAND**,
+not from a watcher.
 
 Warm-up:
 

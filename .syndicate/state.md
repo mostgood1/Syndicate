@@ -2552,3 +2552,24 @@ described in `learnings.md` for this date.
 on 2026-08-16 (season opens ~08-29); `layer1?sport=ncaaf` returns `games=0
 empty_reason=no_precomputed_grid_artifact`. Do not close on the absence of the
 old crash line. See `todo.md` `#445` UPDATE for the two unseparated readings.
+
+**THE FREEZE FIX IS ON `main` AND NOT LIVE ON EITHER WORKER `[measured 08-16 22:2xZ, by blob]`.**
+`origin/main` carries `scripts/refresh_mlb_oddsapi.py` blob **`426bbd70`**
+(`_freeze_market_dirs` = 2). Live SHAs `bdb3dc58` (refresh-worker) and `440f5f29`
+(live-odds-worker) both carry **`f471b0d2`** (= 0). Deploy runbook:
+`.syndicate/handoff_deploy_freeze_reader_tree.md`. **`autoDeploy` is off, so it ships
+nothing until someone deploys.**
+
+**IT REACHED `main` WITHOUT BEING MERGED, AND ANCESTRY SAYS OTHERWISE `[08-16]`.**
+`git merge-base --is-ancestor origin/wip/grading-blocker-freeze-fix origin/main` = **NO**,
+yet the content is there — commits made on the shared local `main` were pushed by another
+session. Judged by ancestry this reads "go merge it"; judged by content it is done.
+**Compare by BLOB** (`git ls-tree` + `git cat-file`): `git show <rev>:<path>` returns a
+false negative under Git Bash on dot-prefixed paths, and an empty-input `0` that looks
+like a real zero.
+
+**`send_message` IS UNAVAILABLE IN UNATTENDED SESSIONS, IN BOTH DIRECTIONS `[08-16]`.**
+A scheduled-task run cannot reach its peers and cannot be reached. So the session that
+most needs to coordinate before a deploy is structurally the one that cannot — which is
+the practical argument for the control `learnings.md` already asks for (a
+`deploy_claim.py` that refuses an unattended holder).

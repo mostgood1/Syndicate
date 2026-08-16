@@ -3268,3 +3268,31 @@ the `edge_vs_market_pct` pairing defect — the harness warning
 and nobody would ever have looked.** When adding a reconciliation check, make its
 failure VISIBLE (a null, a counter, a warning) rather than falling back to
 whichever input looks reasonable.
+
+## 2026-08-16 — OVERRIDE, LOGGED: an unattended session was authorised by the user to fire this deploy
+
+The FORBIDDEN entry above ("never let an UNATTENDED session fire a deploy") was
+raised to the user twice with its reasoning — the same-day `wnba-win-prob-counter-read`
+incident, the absent structural control, and the tell that `send_message` is
+unavailable in unattended runs so the session that most needs to coordinate cannot.
+The user chose it deliberately, in these words: **"fire it"**, after being offered
+the alternative of running `.syndicate/handoff_deploy_freeze_reader_tree.md` from
+their own attended window.
+
+**Scope of the override:** deploy `_freeze_market_dirs` (blob `426bbd70`, on
+`origin/main`) to refresh-worker and live-odds-worker. Nothing else.
+
+**What the override does NOT suspend**, and these were kept:
+- the in-flight job gate — both workers read HOLD (5 and 3 jobs, including
+  `run_mlb_daily_sim_job.py`) at 22:15Z and the deploy waited rather than killing them;
+- ROUTE ONE (warm-up deploy before target), one service at a time, `finishedAt`
+  observed between calls;
+- verification by CONTENT, by blob, never by ancestry;
+- rollback SHAs captured before firing.
+
+**The rule is unchanged and still stands for the next run.** This entry records a
+human decision on one deploy, not a precedent. The structural fix the earlier entry
+asks for — no `RENDER_API_KEY` in an unattended run environment, or a
+`deploy_claim.py` that refuses an unattended holder — is still not built, and until
+it is, "the session judged it was fine" is the only thing standing between an
+unattended run and three restarted services.
