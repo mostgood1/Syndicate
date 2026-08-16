@@ -709,14 +709,40 @@ def test_result_as_of_reads_state_meta_not_only_freshness():
 # `_market_summary_schema` half-learned.
 # --------------------------------------------------------------------------
 
-def test_positive_edge_uses_the_term_the_row_is_ranked_on():
-    """Model edge when present, EV otherwise -- same term as `_board_rank_key`,
-    so ordering and eligibility cannot disagree."""
-    assert adapter._has_positive_edge({"model_edge_pct": 4.91, "ev_pct": -2.0}) is True
+def test_every_edge_term_the_row_carries_must_be_positive():
+    """A veto should hear every term that can object, not just the ranking one.
+
+    The first cut mirrored `_board_rank_key` (one term: model edge if present,
+    else EV) and published `Pittsburgh Pirates` at model edge +9.18% with EV
+    -2.18% -- the model liked the side while the price was worse than consensus
+    fair. Both-or-nothing now.
+    """
+    # both present -> both must pass
+    assert adapter._has_positive_edge({"model_edge_pct": 4.91, "ev_pct": 3.45}) is True
+    assert adapter._has_positive_edge({"model_edge_pct": 9.18, "ev_pct": -2.18}) is False  # Pittsburgh
     assert adapter._has_positive_edge({"model_edge_pct": -8.20, "ev_pct": 4.16}) is False
+    assert adapter._has_positive_edge({"model_edge_pct": -1.0, "ev_pct": -1.0}) is False
+    # only one present -> that one decides
     assert adapter._has_positive_edge({"ev_pct": 1.35}) is True
     assert adapter._has_positive_edge({"ev_pct": -2.16}) is False
+    assert adapter._has_positive_edge({"model_edge_pct": 2.5}) is True
+    assert adapter._has_positive_edge({"model_edge_pct": -2.5}) is False
+    # neither -> not an opportunity
     assert adapter._has_positive_edge({}) is False
+    assert adapter._has_positive_edge({"model_edge_pct": None, "ev_pct": None}) is False
+
+
+def test_ranking_is_unchanged_by_the_stricter_eligibility():
+    """This filters the pool; it must not reorder what survives."""
+    rows = [
+        {"model_edge_pct": 2.0, "ev_pct": 1.0},
+        {"model_edge_pct": 9.0, "ev_pct": 1.0},
+        {"ev_pct": 5.0},
+    ]
+    kept = [r for r in rows if adapter._has_positive_edge(r)]
+    kept.sort(key=adapter._board_rank_key, reverse=True)
+    # model-bearing rows still sort above EV-only, and by descending edge
+    assert [r.get("model_edge_pct") for r in kept] == [9.0, 2.0, None]
 
 
 def test_zero_edge_is_not_positive():
@@ -734,8 +760,7 @@ def test_summary_says_why_the_list_is_short():
     rows = [{"selection": "Jose Altuve over 0.5", "sport": "mlb", "edge_pct": 4.91}]
     text = adapter._board_summary_sentence(rows, excluded_negative=4)
     assert "top 1 opportunity" in text
-    assert "4 rows priced against the model" in text
-    assert "were left out" in text
+    assert "4 rows with a non-positive edge were left out." in text
 
 
 def test_an_empty_result_explains_itself():
@@ -743,11 +768,11 @@ def test_an_empty_result_explains_itself():
     the model dislikes. Two very different facts for a bettor."""
     text = adapter._board_summary_sentence([], excluded_negative=6)
     assert "No positive-edge opportunities" in text
-    assert "6 rows priced against the model" in text
+    assert "6 rows with a non-positive edge were left out." in text
     # and the un-explained form survives for a genuinely empty board
     assert adapter._board_summary_sentence([], 0) == "No opportunities are on the board right now."
 
 
 def test_singular_plural_on_one_excluded_row():
     text = adapter._board_summary_sentence([], excluded_negative=1)
-    assert "1 row priced against the model and was left out" in text
+    assert "1 row with a non-positive edge was left out." in text

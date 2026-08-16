@@ -517,6 +517,21 @@ _GENERAL_BOARD_QUESTION_PATTERNS = (
 )
 
 
+def _excluded_clause(count: int) -> str:
+    """Why rows were dropped, worded so it stays true for every drop reason.
+
+    This said "priced against the model", which was already loose (it covered
+    rows dropped for a non-positive `ev_pct`, where the model has no opinion at
+    all) and became plainly wrong once eligibility started vetoing on EV as well
+    as model edge: a row can now be dropped with the model FOR it and only the
+    price against it. `_has_positive_edge` does not report which term objected,
+    so the sentence must not claim to know.
+    """
+    plural = "s" if count != 1 else ""
+    verb = "were" if count != 1 else "was"
+    return f"{count} row{plural} with a non-positive edge {verb} left out."
+
+
 def _board_summary_sentence(rows: Any, excluded_negative: int = 0) -> str:
     """A factual one-liner describing the opportunities actually returned.
 
@@ -532,8 +547,7 @@ def _board_summary_sentence(rows: Any, excluded_negative: int = 0) -> str:
         if excluded_negative > 0:
             return (
                 f"No positive-edge opportunities on today's board right now — "
-                f"{excluded_negative} row{'s' if excluded_negative != 1 else ''} "
-                f"priced against the model and {'were' if excluded_negative != 1 else 'was'} left out."
+                f"{_excluded_clause(excluded_negative)}"
             )
         return "No opportunities are on the board right now."
     sports = []
@@ -566,10 +580,7 @@ def _board_summary_sentence(rows: Any, excluded_negative: int = 0) -> str:
     # Say why the list is short. Without this, "top 2" on a 70-row board reads
     # as thin data rather than as a deliberate exclusion.
     if excluded_negative > 0:
-        sentence += (
-            f" {excluded_negative} row{'s' if excluded_negative != 1 else ''} "
-            f"priced against the model and {'were' if excluded_negative != 1 else 'was'} left out."
-        )
+        sentence += f" {_excluded_clause(excluded_negative)}"
     return sentence
 
 
@@ -1086,16 +1097,33 @@ def _has_positive_edge(row: dict[str, Any]) -> bool:
     fix then was to SORT. Sorting was necessary and never sufficient: it orders a
     pool, it does not decline to publish one.
 
-    The test mirrors `_board_rank_key` deliberately -- a row is judged on the
-    same term it is ranked on, so ordering and eligibility cannot disagree.
-    `ev_pct` is checked too because it is NOT floored at zero: the served board's
-    `min_value_pct` is **-2.0**, and 6 of 70 rows had `ev_pct <= 0`.
+    **ELIGIBILITY IS DELIBERATELY STRICTER THAN RANKING, and that is a change
+    from the first cut.** `_board_rank_key` picks ONE term -- `model_edge_pct`
+    when present, `ev_pct` otherwise -- and the first version of this function
+    mirrored it, judging a row on the same single term it is ordered by. That
+    published `Pittsburgh Pirates` at **model edge +9.18% with EV -2.18%**
+    (production, 21:0xZ, found in the post-deploy read): the model liked the side
+    while the offered price was worse than consensus fair. Ranking wants one
+    number to sort on; eligibility is a veto, and a veto should hear every term
+    that can object.
+
+    So: every edge term the row actually carries must be positive. A row with
+    both must satisfy both; a row with one must satisfy that one; a row with
+    neither is not an opportunity. Ordering is untouched -- this only decides
+    what is allowed into the pool being ordered.
+
+    `ev_pct` is checked at all because it is NOT floored at zero: the served
+    board's `min_value_pct` is **-2.0**, and 6 of 70 rows had `ev_pct <= 0`.
+
+    `isinstance(True, int)` is True in Python, so bools are excluded explicitly
+    -- a stray flag must not be read as an edge of 1.0.
     """
-    edge = row.get("model_edge_pct")
-    if isinstance(edge, (int, float)) and not isinstance(edge, bool):
-        return float(edge) > 0.0
-    ev = row.get("ev_pct")
-    return isinstance(ev, (int, float)) and not isinstance(ev, bool) and float(ev) > 0.0
+    terms = [
+        float(value)
+        for value in (row.get("model_edge_pct"), row.get("ev_pct"))
+        if isinstance(value, (int, float)) and not isinstance(value, bool)
+    ]
+    return bool(terms) and all(term > 0.0 for term in terms)
 
 
 def _board_rank_key(row: dict[str, Any]) -> tuple[int, float]:
