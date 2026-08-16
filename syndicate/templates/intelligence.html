@@ -563,8 +563,22 @@
     return matchup ? `${sportSlug}|${matchup}` : null;
   }
 
+  // A whole-numbered line must keep its decimal. The payload carries `line` as
+  // a JSON number (measured 2026-08-16: 40 of the served tokens end in `.0`,
+  // none are quoted), so `JSON.parse` gives 7 for `7.0` and a bare String()
+  // renders "7". On the live board that put "9 · totals" and "7 · totals" next
+  // to "11.5 · totals" and "5.5 · totals" -- and a whole-numbered TOTAL is
+  // exactly the case where a push is possible, so it is the one a reader most
+  // needs to see stated as a line rather than as a count.
+  //
+  // Only integers are padded. Non-integers are passed through as-is rather
+  // than through toFixed(1), which would turn a 10.25 alternate line into
+  // "10.3" -- inventing a line no book is offering.
   function displayLine(item) {
     const line = item.line ?? item.market_data?.current_line;
+    if (typeof line === "number" && Number.isFinite(line)) {
+      return Number.isInteger(line) ? line.toFixed(1) : String(line);
+    }
     const text = String(line ?? "").trim();
     return text && text !== "-" ? text : null;
   }
