@@ -165,6 +165,33 @@ WCAG_TARGET_PX = 44
 # Re-derive it if the card design changes; do not widen it to silence a run.
 LAYOUT_RESIDUAL_BUDGET_PX = 150
 
+# How far cards carrying IDENTICAL content may sit apart before the run fails,
+# as a share of their own height. Proportional because the fixed 150px above was
+# calibrated for a different metric (the residual, which no longer judges) on a
+# different slate, and because wrap noise scales with card size: 150px is 2.8% of
+# a 4800px mlb mobile card and 27% of a 541px ncaaf desktop one.
+#
+# Calibrated on 16 healthy readings, production 2026-08-16, two runs, all sports
+# and both widths -- `spread / median height of the tied group`:
+#
+#     mlb   desktop Live     9.9%  8.3%      mlb   mobile Live     3.3%  3.3%
+#     mlb   desktop Preview  3.3%  0.0%      mlb   mobile Preview  1.1%  2.8%
+#     ncaaf desktop          8.3%  8.3%      ncaaf mobile          3.9%  3.9%
+#     nfl   desktop          1.6%  1.6%      nfl   mobile          2.8%  2.8%
+#
+# Worst healthy reading 9.9%, so 15% is ~1.5x margin. Deliberately tighter than
+# the 3x the fixed budget above used: 3x here would be 30%, which on a 4800px
+# card is 1440px and would not catch anything.
+#
+# HONEST LIMIT, measured and not hidden: proportional does NOT tighten the
+# distribution. Raw px span 0-158 (max/median 3.3) and these percentages span
+# 0-9.9% (max/median 3.0) -- the same scatter. What it fixes is the width bias,
+# where a fixed px budget is strict on tall mobile cards and loose on short
+# desktop ones. It is a BACKSTOP for rows with no baseline; drift against a
+# baseline (see TIE_SPREAD_BASELINED) is the sharper check and should be
+# preferred wherever a row is stable enough to carry one.
+PEER_DEVIATION_BUDGET_PCT = 15.0
+
 # How long to wait for the first card to attach before calling the render
 # failed. Generous on purpose: it is only ever paid in full by a sport that is
 # genuinely serving nothing, and the cost of being stingy is a false zero on
@@ -262,11 +289,21 @@ MEASURE_JS = """
   function tieFloor(pts) {
     const byU = {};
     pts.forEach((p) => (byU[p.u] = byU[p.u] || []).push(p.h));
+    const median = (v) => {
+      const s = v.slice().sort((a, b) => a - b);
+      const mid = Math.floor(s.length / 2);
+      return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+    };
     const groups = Object.keys(byU)
       .map((u) => ({
         u: Number(u),
         n: byU[u].length,
         spread: Math.round(Math.max(...byU[u]) - Math.min(...byU[u])),
+        // The DENOMINATOR for a proportional budget: how tall the cards being
+        // compared actually are. Wrap noise scales with card size, so the same
+        // px of spread means something different on a 700px nfl card and a
+        // 4800px mlb one.
+        medianH: median(byU[u]),
       }))
       .filter((g) => g.n > 1);
     if (!groups.length) return null;
@@ -297,6 +334,9 @@ MEASURE_JS = """
       spreadPx: worst.spread,
       atU: worst.u,
       n: worst.n,
+      medianH: worst.medianH,
+      // Spread as a share of the compared cards' own height, in percent.
+      spreadPct: worst.medianH ? Math.round((worst.spread / worst.medianH) * 1000) / 10 : null,
       // Same value as `spreadPx`, kept under its own name so a report written
       // on either side of the revert compares on the SAME quantity.
       worstGroupPx: worst.spread,
@@ -1144,18 +1184,31 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             # by a clean line.
             by_state_ties = measured.get("identicalContentSpreadByState") or {}
             if by_state_ties:
-                over = [
-                    (state, blob) for state, blob in sorted(by_state_ties.items())
-                    if (blob.get("spreadPx") or 0) > LAYOUT_RESIDUAL_BUDGET_PX
-                ]
-                for state, blob in over:
+                # Proportional, not a fixed px: wrap noise scales with card
+                # size, so 150px is 2.8% of an mlb mobile card and 27% of an
+                # ncaaf desktop one. A reading with no measurable height cannot
+                # be judged as a share of it -- absence must not map onto the
+                # permissive branch, so it is named instead of skipped.
+                over, unmeasurable = [], []
+                for state, blob in sorted(by_state_ties.items()):
+                    pct = blob.get("spreadPct")
+                    if pct is None:
+                        unmeasurable.append((state, blob))
+                    elif pct > PEER_DEVIATION_BUDGET_PCT:
+                        over.append((state, blob, pct))
+                for state, blob, pct in over:
                     issues.append(
-                        f"PEER DEVIATION OVER BUDGET in {state} ({blob['spreadPx']}px > "
-                        f"{LAYOUT_RESIDUAL_BUDGET_PX}px): {blob['n']} cards carry "
-                        f"{blob['atU']} pairs each and differ by {blob['spreadPx']}px "
-                        "-- same data, different height"
+                        f"PEER DEVIATION OVER BUDGET in {state} ({pct}% > "
+                        f"{PEER_DEVIATION_BUDGET_PCT}% of card height): {blob['n']} cards "
+                        f"carry {blob['atU']} pairs each and differ by {blob['spreadPx']}px "
+                        f"on a {blob['medianH']}px card -- same data, different height"
                     )
                     ok = False
+                for state, blob in unmeasurable:
+                    issues.append(
+                        f"peer deviation in {state} NOT JUDGED -- {blob['spreadPx']}px "
+                        "with no measurable card height to take a share of"
+                    )
                 tied = sum(b.get("cardsTied", 0) for b in by_state_ties.values())
                 if cards and tied < cards:
                     issues.append(

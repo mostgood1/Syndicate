@@ -3188,3 +3188,27 @@ and then failed the thing it was checking, which is the point of running it.
   spread (gaps 11/23/16/49/28/66), i.e. wrap, not a defect. Must not be resolved
   by raising 150 until the board passes.
 - Blocked by: none
+
+### ui-probe-proportional-budget — CLOSED 2026-08-16 — shipped; falsification test FIRED (proportional does not tighten the spread) but it fixes the width bias — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: peer budget as a share of the tie group's card height, percentage chosen
+  from measurement.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Method held: denominator added FIRST, 16 readings collected, threshold picked
+  only afterwards — so the number could not be reverse-engineered from the answer.
+- Calibration: worst healthy reading 9.9% (mlb desktop Live); 15% is ~1.5x.
+  Deliberately tighter than the old 3x principle, which here would be 30% = 1440px
+  on a 4800px card.
+- **FALSIFICATION TEST FIRED.** The lane predicted healthy readings would cluster
+  as a share of height. They do not: raw px max/median 3.3, percentages 3.0 —
+  the same scatter. The premise was wrong and is recorded, not dropped.
+- Kept anyway because it fixes a DIFFERENT real defect: the width bias. 150px is
+  2.8% of a 4800px mlb mobile card and 27% of a 541px ncaaf desktop one.
+  Percentages separate by width; px separate the opposite way.
+- Verification: 80 tests pass incl. the same 400px passing at 4800px (8.3%) and
+  failing at 541px (73.9%); no-height groups named NOT JUDGED rather than
+  skipped; live run exit 0/OK with all four baselined rows unchanged.
+- **Standing recommendation:** this is a BACKSTOP. Drift-against-baseline caught
+  nothing false all day while the absolute budget produced three false alarms.
+  Extending `TIE_SPREAD_BASELINED` beyond nfl/ncaaf is worth more than tuning
+  this percentage.
+- Blocked by: none

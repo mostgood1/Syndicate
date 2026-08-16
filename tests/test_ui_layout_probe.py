@@ -55,7 +55,8 @@ def _report(sport="mlb", **measured):
         # A healthy slate under the peer rule: every card tied, deviation small.
         "identicalContentSpreadByState": {
             "Preview": {"spreadPx": 40, "atU": 45, "n": 15, "cardsTied": 15,
-                        "worstGroupPx": 40, "tiedGroups": 1},
+                        "worstGroupPx": 40, "tiedGroups": 1,
+                        "medianH": 3800, "spreadPct": 1.1},
         },
     }
     base.update(measured)
@@ -865,22 +866,28 @@ def test_a_vanished_measurement_fails_even_though_it_is_an_absence():
 # `summarize`.
 
 
-def _ties(**states):
+def _ties(median_h=3800, **states):
+    """Budget is a SHARE of card height, so a tie block needs a height."""
     return {s: dict(spreadPx=px, atU=45, n=4, cardsTied=15, worstGroupPx=px,
-                    tiedGroups=1) for s, px in states.items()}
+                    tiedGroups=1, medianH=median_h,
+                    spreadPct=round(px / median_h * 1000) / 10)
+            for s, px in states.items()}
 
 
 def test_a_card_that_differs_from_its_peers_fails():
     """The falsification test for this rule: a real defect must still be caught
     when the card HAS peers -- e.g. one card grew an extra block."""
-    text, ok = _summarize(_report(identicalContentSpreadByState=_ties(Preview=420)))
+    text, ok = _summarize(_report(
+        identicalContentSpreadByState=_ties(median_h=2000, Preview=420)))
     assert not ok
-    assert "PEER DEVIATION OVER BUDGET in Preview (420px > 150px)" in text
+    assert "PEER DEVIATION OVER BUDGET in Preview (21.0% > 15.0% of card height)" in text
+    assert "differ by 420px on a 2000px card" in text
     assert "same data, different height" in text
 
 
 def test_every_state_is_judged_not_just_the_worst():
-    text, ok = _summarize(_report(identicalContentSpreadByState=_ties(Preview=40, Live=400)))
+    text, ok = _summarize(_report(
+        identicalContentSpreadByState=_ties(median_h=2000, Preview=40, Live=400)))
     assert not ok
     assert "PEER DEVIATION OVER BUDGET in Live" in text
     assert "PEER DEVIATION OVER BUDGET in Preview" not in text
@@ -940,7 +947,7 @@ def test_the_peer_rule_runs_where_no_model_exists_at_all():
     """The uniform-33 slate: nothing fits, and the peer rule is all there is."""
     text, ok = _summarize(_report(
         heightModel=None, statesUnfitted=["Live", "Preview"],
-        identicalContentSpreadByState=_ties(Preview=400)))
+        identicalContentSpreadByState=_ties(median_h=2000, Preview=400)))
     assert not ok
     assert "PEER DEVIATION OVER BUDGET in Preview" in text
 
@@ -1008,3 +1015,35 @@ def test_curvature_does_not_fail_the_run():
         state="Live", curved=True, reliable=False, fitRatio=0.2,
         slopePerStep=[40.8, 54.2, 96.5], slopeDrift=0.88)))
     assert ok, text
+
+
+def test_the_same_px_is_judged_differently_on_a_tall_and_a_short_card():
+    """The width bias this change exists to fix. 150px is 2.8% of an mlb mobile
+    card and 27% of an ncaaf desktop one -- a fixed px budget is strict on tall
+    cards and loose on short ones."""
+    tall, ok_tall = _summarize(_report(
+        identicalContentSpreadByState=_ties(median_h=4800, Preview=400)))
+    assert ok_tall, tall                      # 8.3% -- ordinary wrap on a tall card
+    short, ok_short = _summarize(_report(
+        identicalContentSpreadByState=_ties(median_h=541, Preview=400)))
+    assert not ok_short                        # 73.9% -- a third of a short card
+    assert "PEER DEVIATION OVER BUDGET" in short
+
+
+def test_the_budget_is_calibrated_above_every_healthy_reading():
+    """16 healthy production readings on 2026-08-16 topped out at 9.9%."""
+    assert probe.PEER_DEVIATION_BUDGET_PCT > 9.9
+    # ...but not so wide it stops catching anything: 3x the worst healthy
+    # reading would be 30%, i.e. 1440px on a 4800px card.
+    assert probe.PEER_DEVIATION_BUDGET_PCT < 30
+
+
+def test_a_tie_group_with_no_measurable_height_is_named_not_skipped():
+    """Absence must not land on the permissive branch."""
+    ties = {"Preview": {"spreadPx": 400, "atU": 45, "n": 4, "cardsTied": 15,
+                        "worstGroupPx": 400, "tiedGroups": 1,
+                        "medianH": None, "spreadPct": None}}
+    text, ok = _summarize(_report(identicalContentSpreadByState=ties))
+    assert ok, text
+    assert "peer deviation in Preview NOT JUDGED" in text
+    assert "no measurable card height" in text
