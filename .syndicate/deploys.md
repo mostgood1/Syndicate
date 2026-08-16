@@ -4895,6 +4895,78 @@ measurement only; it will not deploy or roll back, and it names the rollback SHA
 **If you are another session and the slate is populated before 10:00 CT, take the
 reading yourself and say so here** — do not assume the task has covered it.
 
+### ATTEMPT 1 of 4 — 2026-08-16 15:12/15:20Z (10:12/10:20 CT) — **VOID. THE GATE PASSED AND THE READ IS STILL VOID.**
+
+`alt-line-shortlist-watch` fired at 10:12 CT. Re-armed for **12:00 CT
+(2026-08-16T17:00:00-05:00)**. Two reads, 8 minutes apart, identical.
+
+**All four gate conditions PASSED — and the measurement is still worthless.**
+
+| gate condition | reading | verdict |
+|---|---|---|
+| book-grid `rows` non-empty | **1972** | pass |
+| `projections.games_in_summary` > 0 | **15** | pass |
+| main `spreads`/`totals` with `projection.source` > 90% | **100.0% (66 of 66)** | pass |
+| shortlist >= 30 rows | **108** | pass |
+
+**The gate checked that the SLATE was populated. It never checked that the
+POPULATION UNDER TEST was present.** It is not:
+
+- **Book grid: 0 `spreads_alt`/`totals_alt` rows** (baseline 238). Not
+  present-and-unprojected — *absent*. The artifact's own `markets` list at
+  15:07:19Z and 15:17:44Z carries no `_alt` key at all: `batter_*`, `earned_runs`,
+  `h2h`, `h2h_lay`, `hits_allowed`, `outs`, `spreads`, `strikeouts`, `totals`,
+  `walks_allowed`. Zero denominators, so "0 projected" is not a number.
+- **Shortlist: 14 alt rows, and every one is WNBA.** MLB alt rows: **0**. The
+  baseline's 14 split **mlb 9 / wnba 5**, and all 9 MLB ones were
+  `game_state: live`. At 15:12Z first pitch (16:15Z) had not happened.
+- **The 14 WNBA alt rows read `sim_component: None`, and that is
+  NON-DISCRIMINATING.** WNBA carries no game-market sim projection *at all* —
+  not for `spreads_alt`/`totals_alt`, and not for main markets either
+  (the baseline's WNBA `h2h_3_way` is also `source: None`). Every WNBA
+  projection in either snapshot comes from `wnba_props_recommendations`, a props
+  path. `project_game_market` returns None at its first branch —
+  `if not payloads: return None` — because there are no WNBA game payloads in
+  the index. **Reading 0/14 here as "the fix failed" would have repeated the
+  2026-08-15 error in a new costume.**
+- **Live props: 0 rows with `mlb_live_lens_monte_carlo`.** No MLB game had
+  started. Expected at this hour; not a finding.
+
+**THE FIX IS LIVE BY CONTENT — and both workers were REDEPLOYED since the
+measurement was queued.** Neither runs the SHA the task file names:
+
+| service | live now | finishedAt | the deployed SHA |
+|---|---|---|---|
+| refresh-worker | **`d72d670c`** | 2026-08-16T06:01:34Z | `32186e28` |
+| live-odds-worker | **`dd53d47c`** | 2026-08-16T05:20:39Z | `c422f79a` |
+
+Verified by blob, not by ancestry (`git rev-parse <sha>:<path>`):
+
+- `shared/prop_projections.py` @ `d72d670c` = `3ec9f652` = the blob at
+  `32186e28`. Byte-identical. `@ dd53d47c` = `f7572d5d` = the blob at
+  `c422f79a`. Byte-identical.
+- `mlb/cards.py` @ `d72d670c` = `ec176d9e`, which **does** differ from
+  `32186e28`'s `267bf61f` — but the diff is an unrelated build-scoped
+  `odds_history` cache, and the alternates de-flatten (`lanes = [market] +
+  list(market.get("alternates") or [])`, dedup by `seen_lines`) is intact.
+
+So a later VOID cannot be blamed on the fix having been reverted, and the
+rollback targets `191d098f4a8d` / `b7ae47e6d1a0` are still the right ones.
+
+**WHAT THE NEXT ATTEMPT MUST ADD TO THE GATE.** A fifth condition, because the
+four above are jointly satisfiable on a slate that cannot test this fix:
+
+> **book-grid `spreads_alt` + `totals_alt` row count > 0, AND shortlist MLB alt
+> rows > 0.**
+
+Evidence for when that becomes true: the baseline's 9 MLB alt rows were **all
+`live`**, and the 238-row book-grid baseline was taken at 22:41Z, mid-slate. The
+alt population appears once games go live, not at pregame. 12:00 CT (17:00Z) is
+~45 min after first pitch, which should clear it.
+
+**Attempts remaining: 3 (12:00, 14:00, 16:00 CT).** No deploy, no rollback, no
+source file touched.
+
 ### VERIFIED — `layer2_board` candidate-line fix WORKS in production (2026-08-16 00:2xZ)
 
 First post-deploy artifact: `written_at=2026-08-16T00:12:35Z` (deploy live
