@@ -5525,3 +5525,68 @@ in-pass measurement, which needs a deploy, which needs the clean window first.
   36 of 57 markets keep the pre-fix clock and 96 of 126 headline rows are pre-fix.
   **−0.3165 is a mixed-cohort number. First clean date is 2026-08-16.**
 - Generality beyond MLB **unmeasured** — no other sport resolved a row today.
+
+---
+
+## 2026-08-16 ~04:5xZ — `refresh-worker-oom-recurrence` — deepcopy EXONERATED, and a named candidate in the unmarked gap
+
+**No deploy made by this lane.** `5c419007` (ledger v2) was shipped by another
+lane at 04:24:33Z; this is a measurement of it.
+
+### THE KILL ON THE NEW SHA
+
+    04:24:33Z  5c419007 live (ledger v2)
+    04:46:44Z  oomKilled, memoryLimit 4Gi   <- 22.2 min after boot
+
+Watcher exited on the event, from `/v1/services/.../events`. Prior SHA `f8ca54e1`
+died at 15 and 12 min after boot. **22.2 vs 12-15 is n=1 and not a result.**
+Signature at 11 min, before the kill: amplitude mean **2,220 MB** (baseline
+1,950), peak anon 3,425.9, and `inactive_file` driven to **12.3 MB** — *below*
+both windows that ended in a kill (26.3 / 42.2). **Ledger v2 did not stop it and
+did not visibly shrink the transient.**
+
+### `copy.deepcopy` IS NOT THE 2GB — EXONERATED BY MEASUREMENT
+
+The hypothesis was good and the evidence for it was circumstantial: the climb
+begins 0-16s after `cards_context_page_cache_hit` and `cards_context_end`, and
+BOTH markers are immediately followed by a full-context `deepcopy`
+(`mlb/cards.py:5544` on a hit, `:5802` on the return). In production those two
+sites run ~250x in 78 min (98 hits + 152 ends), matching the excursion cadence.
+
+**Measured on the worker path (`SYNDICATE_WEB_DYNO=0`), 15 games, local
+artifacts:**
+
+    whole page context      0.81 MB      games subtree 0.78 MB (96.7%)
+    deepcopy PEAK           0.54 MB      retained 0.40 MB
+    copying only `games`    saves 2.4%
+
+**Three orders of magnitude short of 2GB.** No plausible production/local ratio
+closes that gap. **Stop chasing the deepcopy, and do not "optimise" it** — the
+copy is also load-bearing: `home.py:5381` mutates the returned game dicts, and
+the worker path stores `result` in the cache BY REFERENCE (`:5800`), so removing
+the copy would corrupt the cached context.
+
+### THE CANDIDATE THAT REPLACES IT — unmarked, worker-only, uncached
+
+`home.py:5367` takes `payload["games"]` and then, with **no stage marker of its
+own**, runs `_enrich_games_with_tracked_market_lines` (`:5376`). Inside it,
+`mlb/cards.py:2294`:
+
+    load_odds_history_payload_for_sport("mlb", resolve_current_shard_key("mlb", selected_date))
+      if selected_date == today_iso and not render_web_dyno else None
+
+- **No `cache=` argument** -> `cache=None` -> the shard is re-read and re-parsed
+  in full on EVERY board build. The parameter exists; the call site does not use it.
+- **`not render_web_dyno`** -> **worker only**. Exactly the asymmetry the OOM has:
+  web serves the same board and does not die.
+- Size, from this function's own docstring: the MLB shard was **19,798,176 bytes
+  / 3,436 markets**. At `#435`'s measured **6.3x file-bytes-resident** for this
+  JSON family that is **~125 MB per read**.
+- It sits in the gap between `cards_context_end` and the next marker — which is
+  precisely where `seconds_since_stage` 14-34s puts the climb.
+
+**HONESTY ON THE GAP: ~125 MB is not 2 GB.** This is a named, worker-only,
+per-build, uncached multi-hundred-MB read in the right place, and it is the best
+candidate on the table — it is NOT a proven attribution. Do not record it as the
+cause. What would settle it: one bounded in-pass measurement around `:2294`
+(bytes read, parse peak, call count per build), which needs a deploy.
