@@ -5033,3 +5033,44 @@ would be the same error as crediting a fix for a number it did not move.
 **NOT ROLLED BACK.** The prior state was itself producing zero edges, so the
 rollback buys diagnosis, not function — and it spends a third soccer run tonight.
 Left for an explicit decision.
+
+## 2026-08-16 00:5xZ — RETRACTION: THE ROLLBACK VERDICT WAS WRONG. THE FIX WORKS, AND IT PUBLISHED THE FIRST LIVE GAME-LINE EDGES.
+
+**`live_gamelines`, measured under `c4116ab6` (the simsRun fix):**
+
+    index_size 8   considered 32   projected 32   priceable 25   EDGED 25
+    withheld_by_reason {prob_interval_swamps_edge: 7}
+
+**25 live game-line edges. The platform had never published one.** And the
+precision gate is finally the thing doing the refusing — 7 rows under
+`prob_interval_swamps_edge`, which is the recorded "publish, refuse to price"
+decision being EXERCISED for the first time rather than bypassed by missing
+plumbing.
+
+Against the pre-fix state (23:02): `index_size 3, projected 12,
+sim_count_unusable 12, edged 0`.
+
+### HOW I GOT IT WRONG, TWICE, IN OPPOSITE DIRECTIONS
+1. **I read post-restart warm-up as a regression.** At 00:34:42 and 00:37:44 —
+   5 and 8 minutes after the fix landed — `index_size` was 0, and I recorded a
+   persistent regression and asked for a rollback. The worker had simply not
+   rebuilt its snapshot yet. **I had already been burned by exactly this earlier
+   tonight** (the "clean negative" retraction) and wrote the guard for it, then
+   ignored the guard because two consecutive zeros felt like convergence.
+   **Two reads inside one warm-up window are still one read.**
+2. **My rollback watcher attributed a PRE-rollback artifact to the rollback.**
+   It waited for `ROLLBACK_LANDED` (00:54:07) then read the artifact — which was
+   stamped **00:52:14**, built while the fix was still live. It printed
+   "RECOVERED -> the fix IS implicated". **The artifact lags the deploy, so the
+   first read after any deploy still describes the previous code.** Caught only
+   by comparing `generated_at` against the landing time, which is the check that
+   should be automatic and was not.
+
+**A watcher that concludes for you is only as good as its freshness test.** Both
+errors are the same defect in different clothes: comparing a number to an event
+without checking the number was produced after the event.
+
+### ACTION
+Rollback to `c422f79a` (landed 00:54:07) is being UNDONE — `c4116ab6` re-fired
+00:58:33Z, confirmed building by re-reading the deploys list. Net cost of the
+round trip: **three soccer runs** and two extra restarts.
