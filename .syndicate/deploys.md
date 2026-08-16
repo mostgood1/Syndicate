@@ -7627,3 +7627,25 @@ on a missing, hard-coded 2025 input. Filed as `#445`; NCAAF opens 2026-08-29.
   HTTP 200 immediately before the deploy.
 - Rollback: `py -3 scripts/render_deploy.py --service web --commit ad77e46a
   --allow-rollback`.
+
+## 2026-08-16 18:44Z — the `force_refresh` watch closed EMPTY, and the reason is not the fix
+
+Follow-up to the 17:53Z both-workers deploy (`b9f2b5f1` / `e28594a7`). 50 minutes
+of polling `/api/ops/win-prob-null`: **zero post-deploy records of ANY kind on
+either worker**, and no `--force-refresh` run in the census.
+
+**WNBA IS NOT IN THE ODDS CYCLE RIGHT NOW.** The running `refresh_odds_sources`
+carries **`--sports mlb,soccer`**; the same job at 01:31Z carried
+`mlb,wnba,nfl`. **The sports list is dynamic**, so for long stretches no WNBA
+producer runs at all and no record can appear no matter what the code does.
+**Anyone verifying a WNBA-dependent change must check this FIRST** — it outranks
+"did a forced refresh happen", and without it a quiet cycle reads as a failed fix.
+
+- **The worker is healthy** — `refresh_odds_sources` + rolling soccer builds, and
+  153 `oddsapi` publish lines in 45 min. The deploy killed 3 jobs by design and
+  they came back. Not a regression from the deploy.
+- **Nothing is measured yet.** The escape stays UNVERIFIED IN EFFECT; this entry
+  records why the window was empty, not a verdict on the fix.
+- The hourly `wnba-win-prob-counter-read` task now walks three causes IN ORDER —
+  WNBA absent from the cycle → no forced run → genuine negative — and pings only
+  on a real landing.
