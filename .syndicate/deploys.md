@@ -5226,3 +5226,37 @@ arithmetic on ONE row at 21:0xZ and generalised from it.
 **Fix order:** (1) refuse or widen `p in {0,1}` in `prob_std_err`; (2) establish
 per-row which side `market_fair_prob_over` describes and join side-explicitly;
 (3) only then re-count edges and consider CLV.
+
+## 2026-08-16 01:56:44Z — refresh-worker `d1e3f908` — SEGMENT FILTER + BOUNDARY FIX: EDGES 23 -> 4, AND THE 4 ARE THE FIRST CREDIBLE ONES
+
+**Gate opened NATURALLY at 01:50:45 after ~15 min of HOLD (5->9 jobs). ZERO jobs
+killed** — I had told the user a window probably would not come and was wrong;
+waiting cost nothing and saved 9 in-flight jobs incl. MLB sims.
+
+**Measured with BOTH lags guarded** — artifact `generated_at 01:57:56` > deploy
+`finishedAt 01:56:44`, **AND** `segment_is_not_full_game` present, so the new
+code's own fingerprint is the pass condition rather than a timestamp:
+
+    considered 20  projected 5  priceable 4  EDGED 4  withheld 16
+    withheld_by_reason {segment_is_not_full_game: 15, prob_interval_swamps_edge: 1}
+    index_size 10
+
+**Against the pre-fix build: edged 23 -> 4, with 15 of 20 rows (75%) now refused
+as the wrong segment.** The `+42.43 pp` SD @ CLE first-inning row is gone. **The
+count FALLING is the fix working** — three-quarters of the old "edges" were a
+full-game projection priced against F1/F3/F5 markets.
+
+**Caveat on the population:** `considered` fell 36 -> 20 because the slate wound
+down (13 final / 2 live at measurement). So the 23->4 comparison mixes the fix
+with a shrinking slate. **The RATE is the honest read: 75% of considered rows
+refused for segment, which no slate change explains.**
+
+### WHAT THE 4 ARE AND ARE NOT
+They survive both gates: a full-game market, and an edge exceeding 2 Agresti-
+Coull standard errors. **That is still only "beats the estimator's own noise at
+120 sims".** No CLV, no settlement, no backtest. They are the first rows worth
+handing to `clv-without-settlement` — the earlier 23 were not, and were
+correctly withheld.
+
+**OPEN:** `index_size` 3 -> 8 -> 10 across the night is still unexplained; Drop
+2's carry-forward has never been observed firing; the tally is MLB-only.
