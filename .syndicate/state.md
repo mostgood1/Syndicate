@@ -2064,7 +2064,11 @@ does.** A card is anomalous when it differs from cards carrying the SAME
 `.cards-data-pair` count — model-free, per state, and it runs on slates where no
 line can be fitted. Budget is **`PEER_DEVIATION_BUDGET_PCT = 15.0`**, a share of
 the tied group's own median card height, calibrated on 16 healthy readings whose
-worst was 9.9%. `LAYOUT_RESIDUAL_BUDGET_PX = 150` survives only for the
+worst was 9.9%, **and a verdict needs `PEER_MIN_GROUP_N = 3` cards** — an n=2
+group read 30.9% (2 cards at 41 pairs, 312px apart) while the n=6 group on the
+same board sat at 82px, and minutes later only one card remained at that pair
+count. Thin groups are printed as NOT JUDGED, never dropped. `tieFloor` returns
+the FULL per-group list so a thin group cannot mask a fat one. `LAYOUT_RESIDUAL_BUDGET_PX = 150` survives only for the
 content-independent branch's legacy path; the residual is now CONTEXT. `[measured]`
 
 **Three false alarms on 2026-08-16 shared one root cause: the fitted line was
@@ -2092,7 +2096,9 @@ pre-enrichment plateau — it shipped a bad row (`rerun_2026-08-16.json`, mlb
 desktop, 15 cards at a uniform 33 pairs, `renderSettled: true`, while mobile read
 33-49 on the same slate). `_settle` now returns `sawChange`; MLB settles
 4.4-10.0s, the seven server-side sports at the 2400ms floor with
-`sawChange: false`, named in a footer. The 08-15 growth curve still stands and
+`sawChange: false`, named in a footer. The tab click-through check now
+reports WHY it failed (error type, or `active=[…] h=…px`) and waits on the
+outcome — the board replaces `cardsGrid.innerHTML` on a 30s timer underneath it. The 08-15 growth curve still stands and
 is why a short window is not enough — total `.cards-data-pair` across 15 cards at
 390px: **482 at +0ms, 530 at +600, 590 at +1200, 683 at +2000, 719 at +3000 and
 stable**; every MLB figure produced before `_settle` existed was taken at ~74% of
