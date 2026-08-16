@@ -6,86 +6,6 @@
 
 ## OPEN
 
-### sim-engine-phase0-census — OPEN — **H1/H2/H3 ALL SETTLED. Only the multi-hour memory baseline still owed** — opened 2026-08-15 — session: sim-engine-track
-- Goal: produce the four Phase 0 measurements in `.syndicate/plan_2026-08-16_sim_scheduling.md`
-  so Phase 1 has a baseline it did not inherit. Read-only; no production code, no deploy.
-- Files (exclusive to this lane): `scripts/census_kickoff_hours.py` (new),
-  `.syndicate/plan_2026-08-16_sim_scheduling.md`. Collision check RUN against all
-  7 OPEN lanes (38 claimed paths): CLEAR on both.
-- Hypotheses, written BEFORE testing (this lane is diagnostic):
-  - H1 — every sport's pregame work lands uniformly across 24h, because cadence is
-    elapsed-time not fixture-relative. Soccer's European leagues kick off 07:00-16:00 CT
-    and MLS 19:00-22:00 CT.
-  - H2 — the live-lens loop ticks on BOTH workers, duplicating mlb/wnba/soccer every 60s.
-    Read from config only; unproven.
-  - H3 — production basketball sims run the real vendor engine, not
-    `_simulate_smart_game_local` (the no-sampling stub reached by a bare `except`).
-- Falsification tests:
-  - H1 fails if kickoff hours are already uniform across the day, or if European
-    kickoffs sit in the US evening — then the peak overlap is not a cadence artifact.
-  - H2 fails if only one worker emits `[live_lens_loop] TICK_COMPLETE`.
-  - H3 fails if a live `smart_sim_*.json` carries no `score` key — the stub ran, and
-    every basketball probability in production is a means-sum with no MC behind it.
-- Verification: each hypothesis recorded in the plan with the measurement that settled
-  it, INCLUDING exoneration. A hypothesis that survives is recorded as unfalsified,
-  not as confirmed.
-- Blocked by: none. Feeds `odds-cadence-off-the-mlb-peak` (SCOPED, unstarted) — that
-  lane owns Phase 1; this one does not touch its files.
-- Governing rules read before starting: `FORBIDDEN: never run a heavyweight census ON
-  the thread that is doing the measuring` (the census is an offline script, not worker
-  work); `EXONERATED: the soccer window is not the egress cause` (pull any metric back
-  far enough to see whether the symptom predates the change).
-
-
-#### RESULTS 2026-08-15 evening CDT — two of four measurements done
-- **H3 UNFALSIFIED — the real engine runs in production.** 3/3 WNBA artifacts
-  (`smart_sim_2026-08-15_{LVA_MIN,WSH_LAS,CON_NYL}.json`, pulled via
-  `/api/ops/artifacts/stream`) carry `score`/`intervals`/`periods`/`rotation_minutes`
-  and NOT the stub's `home_team_total_pts_mean`. The §2.2 OWED item closes with the
-  reassuring answer: the bare-`except` fallback is not firing.
-  - Path gotcha for repeats: files are at `wnba_source/data/processed/`, NOT
-    `.../source_artifacts/data/processed/` (404s). Both are listed as candidate roots.
-- **H3b — n_sims=100 confirmed ON THE ARTIFACT, and the cost is visible in the
-  output.** All 9 served probabilities across the 3 games are exact multiples of
-  0.01 (0.25/0.29/0.59, 0.66/0.55/0.73, 0.14/0.25/0.46) because each is a count out
-  of 100 draws. Binomial SE at p=0.25 is ±4.3 pts — the size of the edges priced.
-- **H2 CONFIRMED BY LOG, no longer config-inferred.** `TICK_COMPLETE`
-  02:21Z-03:13Z: refresh-worker 31 ticks {mlb,wnba,soccer,nfl}, live-odds-worker
-  38 ticks {mlb,wnba,soccer}. **mlb/wnba/soccer built on BOTH** — 69 MLB builds/hr
-  where one owner needs ~35. Cycles run ~100s/~81s against a 60s interval, so the
-  tick itself costs ~20-40s. Makes Phase 4.1 a prerequisite, not a nicety.
-- **STILL OWED: H1 (kickoff-hour census) and the baseline re-take.** H1 is the one
-  that sizes Phase 1; nothing about cadence should be changed before it runs.
-- No code changed, no deploy, no production write. `scripts/census_kickoff_hours.py`
-  claimed but not yet created.
-
-#### H1 SETTLED 2026-08-15 — 0 of 200 European kickoffs are in the US evening
-- `scripts/census_kickoff_hours.py` (new, this lane) ->
-  `reports/kickoff_census/latest.json`. Window 2026-07-16..2026-08-29, CT.
-- **Falsification test did not fire.** 9 European leagues, n=200, hours 5..14 CT,
-  **0.0%** in the 18:00-01:00 band and ZERO fixtures at any hour after 14:00.
-  MLS n=111 at 94.6% (the named exception, now confirmed from fixtures rather
-  than from process cmdlines). mlb n=605 53.6%, wnba n=117 84.6%,
-  nfl_preseason n=49 71.4%.
-- **CORRECTED THIS PLAN'S OWN BAND TABLE.** It guessed European soccer at
-  01:00-09:00 CT; measured is 05:00-14:00, and US fixtures start at 11:00, so a
-  real 11:00-14:00 contested band exists that the guess denied. A hardcoded
-  "soccer in the morning" rule would have been built on the wrong hours --
-  which is the argument for fixture-relative rather than band-relative gating.
-- **TWO ERRORS OF MINE, caught and recorded rather than quietly fixed:**
-  1. I read nflverse `gametime` as US/Eastern. It is UTC. The tell was an
-     implausible 22:00 CT median; verified against the Hall of Fame Game
-     (2026-08-07 `00:00` UTC = 20:00 ET Thu) and DET@CIN (`23:00` = 18:00 CT)
-     before correcting. I had written a comment warning about this exact shift
-     and made it anyway.
-  2. The script's attributable-zero branch conflated "schema miss" with "no
-     fixtures in window", so regular-season NFL (season starts after the window)
-     reported as a parser failure. Now three distinct outcomes.
-- Still owed: the hour-by-hour both-branches-live MEMORY baseline. Needs a
-  multi-hour observation window; not doable in one pass, should run as a
-  scheduled watcher. **Phase 1 must not be judged against the lane's existing
-  2026-08-16 table without re-taking it.**
-
 ### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
 - **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
   - **`closing_detected_at` is present on 21 markets. The new code path ran.**
@@ -1971,7 +1891,7 @@ sessions deploying, a two-file change should ride along, not chase.
     that is this lane's stated falsification test, and it is still live.
   - Session log: `.syndicate/log/2026-08-15.md`, final section.
 
-### odds-cadence-off-the-mlb-peak — SCOPED, NOT STARTED — opened 2026-08-16 — session: memory-cutover-ship
+### odds-cadence-off-the-mlb-peak — OPEN — **STARTED 2026-08-15 as Phase 1 of `#440`. Premise now MEASURED: 0 of 200 European kickoffs fall in the US evening** — opened 2026-08-16 — session: sim-engine-track
 **Scoped only. No code, no deploy. Handing this over rather than starting it at
 02:00 local on a fixed crash.**
 
@@ -2021,6 +1941,43 @@ sessions deploying, a two-file change should ride along, not chase.
   look like 578MB when it was 124MB.
 - **Cost note:** OddsAPI spend. Changing cadence changes call volume against a 5M
   cap; `9ec20a06` was held partly for that call.
+
+#### PHASE 1 OPENED 2026-08-15 — scope, files, and what is deliberately NOT in it
+- **Goal (single testable outcome):** a sport's pregame sweep interval becomes a
+  function of time-to-next-fixture instead of a constant, so leagues with no
+  imminent kickoff stop sweeping during MLB's evening peak.
+- **Files (exclusive to this lane):** `syndicate/features/shared/live_refresh_loop.py`,
+  `tests/test_pregame_cadence_fixture_aware.py` (new). Collision check RUN
+  2026-08-15 against all OPEN lanes: both CLEAR.
+- **DELIBERATELY OUT OF SCOPE — a collision I am not going to work around.**
+  Plan step 1c (per-league soccer scoping) needs `scripts/build_soccer_artifacts.py`
+  and `scripts/run_live_odds_refresh_worker.py`, and **both are claimed by OPEN lane
+  `soccer-model-coverage`.** Phase 1 ships 1a (commence-time providers) and 1b
+  (tiered interval) only. 1c requires coordinating with that lane first.
+- **Hypothesis:** most soccer refreshes during 18-22Z serve fixtures days away, so
+  a time-to-kickoff gate removes the overlap at no freshness cost.
+- **ALREADY FALSIFICATION-TESTED, TWICE, AND IT SURVIVED BOTH:**
+  1. This lane's own cmdline test: 43 of 71 invocations (61%) during 18-22Z were
+     for kickoffs 2+ days out; 19Z was 100% future-dated.
+  2. `#440` Phase 0/H1, independent source (fixtures, not processes):
+     **9 European leagues, n=200, 0.0% of kickoffs in the 18:00-01:00 CT band, and
+     zero at ANY hour after 14:00 CT.** MLS is the exception at 94.6%, n=111.
+- **The rule that falls out, and it is fixture-relative ON PURPOSE:** H1 also
+  CORRECTED the believed band table (European soccer is 05:00-14:00 CT, not
+  01:00-09:00, and US fixtures start at 11:00, so an 11:00-14:00 contested band
+  exists). A clock-based "no soccer in the evening" rule would have been built on
+  wrong hours and would break MLS. Gate on time-to-next-kickoff, never on the clock.
+- **Verification, and the baseline is NOT the one in this lane's scope block:**
+  re-run the hour table from `reports/branch_overlap/baseline.jsonl`, which the
+  scheduled task `branch-overlap-baseline-watch` is now accruing. **The 2026-08-16
+  figure in this lane (3,972 MB / 97.0% / 124 MB margin) IS ALREADY STALE — the
+  first watcher sample read 4096.0 MB = 100.0% of cap in three separate hours.**
+  Judge Phase 1 against the accrued distribution, not against that number.
+- **Cost gate before shipping:** cadence changes OddsAPI call volume against a 5M
+  cap. The tiering should REDUCE calls; measure, do not assume.
+- **Do not shelve `9ec20a06`** (per-sport pregame cooldown). It is a freshness fix
+  and pushes overlap up; independent clocks PLUS fixture-awareness serves both.
+- Blocked by: none. 1c blocked on `soccer-model-coverage`.
 
 #### odds-cadence-off-the-mlb-peak — CHECKED 2026-08-16 02:0xZ: `9ec20a06` does NOT do it
 Answering the scope's own question so nobody re-reads that branch.
