@@ -42,6 +42,49 @@ def default_nfl_source_root() -> Path:
     return _first_existing_root(_source_roots())
 
 
+def nfl_pbp_path(season: int) -> Path:
+    """Where the nflverse play-by-play for *season* actually IS. `#441`.
+
+    THE READ-PATH TWIN OF `nfl_artifact_output_root()` BELOW, and it exists for
+    the identical reason. `#389` found that `_first_existing_root` decides a root
+    by probing for `upcoming_recs_*.csv` -- an unrelated artifact family -- and
+    fixed the WRITE path. The READ path was left on the same selector and fails
+    the same way, which is what `#441` measured in production 2026-08-16:
+
+        DATA_ROOT  : /opt/render/project/src/data/nfl_source        <- CHECKOUT
+        looked for : .../src/data/nfl_source/tracking/nflverse/pbp/pbp_2026.csv
+
+    `data/nfl_source/tracking/` is gitignored (`.gitignore:96`), so the pbp lives
+    ONLY on the mounted disk while the checkout ships the 5 tracked
+    `upcoming_recs_*.csv` files the selector probes for. An unrelated artifact's
+    presence therefore decided where the pbp was read from, it loaded ZERO plays,
+    and `assert_ratings_data_available` correctly refused to write a degenerate
+    projection -- ~107 relaunches/day against a once-daily interval, with the
+    artifact 2.36 days stale.
+
+    RESOLVES PER REQUESTED FILE across the candidate list, which is what
+    `preferred_artifact_roots`' own comment instructs ("Callers that need a real
+    file resolve per requested file across the list") and what
+    `wnba/sources.py::_strict_artifact_path` already does. It does NOT ask
+    whether a directory is non-empty, and it does NOT ask about a different
+    file -- both are the mistakes that comment records.
+
+    Returns the first candidate that HAS the file. When no candidate has it,
+    returns the path under `default_nfl_source_root()` so the caller's error
+    message still names a concrete location -- the guard prints this path, and a
+    `None` here would degrade a precise diagnostic into "not found".
+    """
+    relative = Path("tracking") / "nflverse" / "pbp" / f"pbp_{season}.csv"
+    for root in _source_roots():
+        candidate = root / relative
+        try:
+            if candidate.is_file():
+                return candidate
+        except OSError:
+            continue
+    return default_nfl_source_root() / relative
+
+
 def nfl_artifact_output_root() -> Path:
     """Where generated NFL artifacts must be WRITTEN. `#389` follow-up.
 
