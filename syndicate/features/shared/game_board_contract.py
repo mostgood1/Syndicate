@@ -338,17 +338,65 @@ def _build_period_rows(game: dict[str, Any]) -> list[dict[str, Any]]:
         home_win_text = _format_pct(p_home_win) if p_home_win is not None else (
             _metric_lookup(game.get("metrics", []), "Home win") or _metric_lookup(game.get("metrics", []), "Win prob") or NULL_PLACEHOLDER
         )
+        # The market line and the edge come from `betting` FIRST, exactly as the
+        # single-period branch above builds them, and only then from the metrics
+        # list. Measured on production /soccer/epl/api/cards 2026-08-15: this
+        # row read `Market —` / `Best edge —` while the same game carried
+        # `betting.home_spread` -1.5, `betting.total` 2.5 and `sim.score`
+        # {away 0.78, home 2.46}. The metrics lookup asks for "Spread" / "Total"
+        # / "Edge"; soccer publishes "Home win", "Draw", "Away win",
+        # "Total goals", "BTTS", "Over 2.5" -- so it matched nothing and the
+        # card showed its market line and its edge NOWHERE, on a sport that had
+        # both. A label-matched lookup is not a substitute for the field.
+        score = game.get("sim") if isinstance(game.get("sim"), dict) else {}
+        score = score.get("score") if isinstance(score.get("score"), dict) else {}
+        fallback_away_mean = _safe_float(score.get("away_mean"))
+        fallback_home_mean = _safe_float(score.get("home_mean"))
+        fallback_total_mean = _safe_float(score.get("total_mean"))
+        if fallback_total_mean is None and fallback_away_mean is not None and fallback_home_mean is not None:
+            fallback_total_mean = fallback_away_mean + fallback_home_mean
+        fallback_margin_mean = _safe_float(score.get("margin_mean"))
+        if fallback_margin_mean is None and fallback_away_mean is not None and fallback_home_mean is not None:
+            fallback_margin_mean = fallback_home_mean - fallback_away_mean
+        market_bits = []
+        edge_bits = []
+        if betting_home_spread is not None:
+            market_bits.append(f"ATS {home_abbr} {_format_signed_num(betting_home_spread)}")
+            if fallback_margin_mean is not None:
+                edge_bits.append(f"ATS {_format_signed_num(fallback_margin_mean + betting_home_spread)}")
+        if betting_total is not None:
+            market_bits.append(f"Total {_format_num(betting_total)}")
+            if fallback_total_mean is not None:
+                edge_bits.append(f"Total {_format_signed_num(fallback_total_mean - betting_total)}")
+        fallback_market = " | ".join(market_bits) if market_bits else (
+            _metric_lookup(game.get("metrics", []), "Spread")
+            or _metric_lookup(game.get("metrics", []), "Total")
+            or NULL_PLACEHOLDER
+        )
+        fallback_edge = " | ".join(edge_bits) if edge_bits else (
+            _metric_lookup(game.get("metrics", []), "Edge") or NULL_PLACEHOLDER
+        )
+        # `detail` is the competition ("EPL"), which the card already shows as
+        # Slate context -- the UI audit counted it as one of the panel's four
+        # duplicated values. When a projected total exists, say that instead:
+        # it is the one number this row can state that nothing else on the card
+        # does, and it is what `_build_total_rows` parses to size its bar.
+        fallback_subtitle = (
+            f"Projected total {_format_num(fallback_total_mean)}"
+            if fallback_total_mean is not None
+            else (game.get("detail") or game.get("status") or NULL_PLACEHOLDER)
+        )
         rows.append(
             {
                 "label": "Full Game",
                 "main": away_score or game.get("summary") or "Game outlook unavailable",
-                "subtitle": game.get("detail") or game.get("status") or NULL_PLACEHOLDER,
+                "subtitle": fallback_subtitle,
                 "away_pct": (p_away_win * 100.0) if p_away_win is not None else None,
                 "home_pct": (p_home_win * 100.0) if p_home_win is not None else None,
                 "draw_pct": (p_draw * 100.0) if p_draw is not None else None,
                 "home_win": home_win_text,
-                "market": _metric_lookup(game.get("metrics", []), "Spread") or _metric_lookup(game.get("metrics", []), "Total") or NULL_PLACEHOLDER,
-                "best_edge": _metric_lookup(game.get("metrics", []), "Edge") or NULL_PLACEHOLDER,
+                "market": fallback_market,
+                "best_edge": fallback_edge,
                 # This row is a STAND-IN: the sport published no `sim.periods`,
                 # so there is no per-period lens to show and every field above
                 # is either the game-level number or a restatement of the card

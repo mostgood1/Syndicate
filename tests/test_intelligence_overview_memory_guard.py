@@ -93,6 +93,109 @@ def test_headroom_exhausted_is_true_when_below_floor(capfd):
     assert "OVERVIEW_STOPPED_FOR_MEMORY" in capfd.readouterr().out
 
 
+def _floor_aware_snapshot(headroom_mb: float):
+    """A snapshot that answers `sufficient` FROM THE FLOOR IT WAS HANDED.
+
+    The point of these tests is WHICH floor the guard passes in, and a stub that
+    ignores its argument cannot see that -- it would pass identically whether the
+    guard asked for 1500MB or 3000MB, which is the exact bug being pinned.
+    """
+
+    def _snapshot_for(min_required_bytes: int) -> dict:
+        min_required_mb = min_required_bytes / BYTES_PER_MB
+        return _snapshot(headroom_mb=headroom_mb, min_required_mb=min_required_mb)
+
+    return _snapshot_for
+
+
+def test_streamed_floor_applies_to_the_cheap_sports_and_expensive_to_mlb():
+    # `#387` 2026-08-14. Sizing evidence in the constant's comment: five sports
+    # hydrated in 171ms for +1.7MB, against MLB's +1543MB in the same pass.
+    for slug in ("nba", "wnba", "nfl", "ncaaf", "ncaab", "nhl", "soccer"):
+        floor, label = intelligence_module._overview_headroom_floor_bytes(slug)
+        assert label == "streamed"
+        assert floor == intelligence_module._OVERVIEW_MIN_SAFE_HEADROOM_STREAMED_BYTES
+    floor, label = intelligence_module._overview_headroom_floor_bytes("mlb")
+    assert label == "expensive"
+    assert floor == intelligence_module._OVERVIEW_MIN_SAFE_HEADROOM_BYTES
+
+
+def test_an_unknown_sport_takes_the_expensive_floor():
+    # An unknown cost is not a cheap cost. A new module, a renamed slug or a
+    # typo must not fall through onto the relaxed branch.
+    for slug in ("", "   ", "cricket", "MLB_PROPS", None):
+        floor, label = intelligence_module._overview_headroom_floor_bytes(slug)  # type: ignore[arg-type]
+        assert label == "expensive", slug
+        assert floor == intelligence_module._OVERVIEW_MIN_SAFE_HEADROOM_BYTES
+
+
+def test_slug_matching_is_case_and_whitespace_insensitive():
+    assert intelligence_module._overview_headroom_floor_bytes(" Soccer ")[1] == "streamed"
+
+
+def test_the_production_truncation_no_longer_happens(capfd):
+    # THE REGRESSION THIS EXISTS FOR, at the measured numbers. Twice on
+    # 2026-08-14 the stream stopped after MLB with headroom 2587.3MB against a
+    # 3000MB floor, producing BOARD_OVERVIEW_READY sports=1 where every build in
+    # the preceding three hours read sports=8.
+    with patch(
+        "syndicate.features.shared.memory_observability.memory_headroom_snapshot",
+        side_effect=_floor_aware_snapshot(2587.3),
+    ):
+        assert (
+            intelligence_module._overview_headroom_exhausted(
+                next_sport="nba", sports_done=1, sports_total=8
+            )
+            is False
+        )
+    assert "OVERVIEW_STOPPED_FOR_MEMORY" not in capfd.readouterr().out
+
+
+def test_the_gate_in_front_of_mlb_is_not_relaxed(capfd):
+    # Same headroom, first sport. MLB took the process from anon 522MB to a
+    # 4096MB SIGKILL in 25 seconds on 2026-08-14; that variance is unexplained,
+    # so this branch keeps the full margin.
+    with patch(
+        "syndicate.features.shared.memory_observability.memory_headroom_snapshot",
+        side_effect=_floor_aware_snapshot(2587.3),
+    ):
+        assert (
+            intelligence_module._overview_headroom_exhausted(
+                next_sport="mlb", sports_done=0, sports_total=8
+            )
+            is True
+        )
+    out = capfd.readouterr().out
+    assert "OVERVIEW_STOPPED_FOR_MEMORY" in out
+    # Two floors now produce this one message; without the label a relaxed
+    # refusal reads identically to a strict one.
+    assert "floor=expensive" in out and "floor_mb=3000" in out
+
+
+def test_a_cheap_sport_still_stops_when_it_is_genuinely_tight(capfd):
+    # Relaxed is not absent. Below 1500MB the cheap branch must still refuse.
+    with patch(
+        "syndicate.features.shared.memory_observability.memory_headroom_snapshot",
+        side_effect=_floor_aware_snapshot(900.0),
+    ):
+        assert (
+            intelligence_module._overview_headroom_exhausted(
+                next_sport="soccer", sports_done=7, sports_total=8
+            )
+            is True
+        )
+    assert "floor=streamed" in capfd.readouterr().out
+
+
+def test_the_streamed_floor_stays_under_the_expensive_one_and_over_the_measured_cost():
+    streamed_mb = intelligence_module._OVERVIEW_MIN_SAFE_HEADROOM_STREAMED_BYTES / BYTES_PER_MB
+    expensive_mb = intelligence_module._OVERVIEW_MIN_SAFE_HEADROOM_BYTES / BYTES_PER_MB
+    assert streamed_mb < expensive_mb
+    # Whole EIGHT-sport hydrated pass on the pre-cutover code moved anon
+    # 444.6 -> 804.2MB. The streamed floor must cover that with room to spare.
+    assert streamed_mb >= 2 * 359.6
+
+
 def _run_overview(*, skip_game_hydration: bool, headroom_mb: float):
     sports = [{"slug": slug} for slug in ("mlb", "nba", "wnba", "nhl", "soccer")]
     with patch.object(intelligence_module, "_configured_syndicate_sports", return_value=sports), patch.object(

@@ -166,6 +166,22 @@ HOT_ARTIFACT_PATTERNS: tuple[str, ...] = (
     # matches the stated architecture: workers write artifacts, web reads them.
     "reports/intelligence/intelligence_state.json",
     "reports/intelligence/intelligence_state_*.json",
+    # The CLV opening ledger. refresh-worker records the price we PUBLISHED for
+    # each market (audit §7 #1) and web is the only place it can be inspected --
+    # the same worker-writes/web-reads split the settlement inputs above sit in.
+    #
+    # Small by construction, which is why it is allowlisted at all: it is
+    # first-sighting-only, so it is bounded by DISTINCT MARKETS PER DAY rather
+    # than by ticks. Measured on the real payload: **584 bytes/record, ~90KB a
+    # day**, against the evaluation chunk ledger's 40,555 bytes/record. This is
+    # deliberately the opposite of the `odds_events/<date>.jsonl` case the next
+    # comment refuses -- that one reached 1.2GB in a day.
+    #
+    # `#208`'s lesson applies here as it does everywhere in this tuple:
+    # allowlisting PERMITS the transfer, it does not make one happen.
+    # `record_openings` calls `publish_hot_artifact` itself, and only when it
+    # actually wrote something.
+    "reports/intelligence/clv_openings/*.jsonl",
     # #83's bounded per-date steam record. capture_phase and steam detection
     # are otherwise only observable through the raw per-observation lifecycle
     # log (odds_events/<date>.jsonl), which reached 1.2GB in a single day

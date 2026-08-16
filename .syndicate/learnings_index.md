@@ -1,0 +1,213 @@
+<!-- LEARNINGS-INDEX:START -->
+
+## Index — 193 rules `[generated]`
+
+> Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
+> This block is the ONLY part of this file that is rewritten; rule bodies
+> are append-only and are never touched. **FORBIDDEN** = never do this
+> again. **EXONERATED** = ruled out, stop re-investigating. Entries marked
+> `[evidence]` have their body in `learnings_evidence.md`.
+
+**FORBIDDEN — 26**
+
+- [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, an…](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
+- [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the…](#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring)
+- [2026-08-15 — FORBIDDEN: never put `$$` (or any per-shell value) in `GIT_INDEX_FILE`. Ea…](#2026-08-15-forbidden-never-put-or-any-per-shell-value-in-git_index_file-each-bash-call-is-a-new-shell-and-an-absent-index-file-is-an-empty-one-not-an-error)
+- [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname)
+- [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers th…](#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content)
+- [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session)
+- [2026-08-15 — FORBIDDEN: never treat equality of a LABEL as identity of a BET](#2026-08-15-forbidden-never-treat-equality-of-a-label-as-identity-of-a-bet)
+- [2026-08-16 — FORBIDDEN: never deploy on `check_deploy_safety.py` alone. It said CLEAR w…](#2026-08-16-forbidden-never-deploy-on-check_deploy_safetypy-alone-it-said-clear-while-three-jobs-were-running-on-the-service)
+- [2026-08-16 — FORBIDDEN: a wait loop must gate on an AFFIRMATIVE success token, never on…](#2026-08-16-forbidden-a-wait-loop-must-gate-on-an-affirmative-success-token-never-on-the-absence-of-a-failure-string)
+- [2026-08-15 — FORBIDDEN: never read a joiner zero as a fact about the world until the re…](#2026-08-15-forbidden-never-read-a-joiner-zero-as-a-fact-about-the-world-until-the-reader-is-shown-to-see-the-data)
+- [2026-08-15 — FORBIDDEN: shipping a verification you have not falsified. THREE failed ch…](#2026-08-15-forbidden-shipping-a-verification-you-have-not-falsified-three-failed-checks-in-one-night-zero-failed-fixes)
+- [2026-08-15 — FORBIDDEN: `git <cmd> <rev>:<dotpath>` in Git Bash on Windows. It silently…](#2026-08-15-forbidden-git-cmd-revdotpath-in-git-bash-on-windows-it-silently-reads-the-wrong-thing-and-only-for-dot-prefixed-trees)
+- [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never judge a pinned deploy by ANCESTRY alone. Patch-id is the…](learnings_evidence.md#2026-08-15-forbidden-never-judge-a-pinned-deploy-by-ancestry-alone-patch-id-is-the-test) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never wake many idle sessions at once. It stalls them.](learnings_evidence.md#2026-08-15-forbidden-never-wake-many-idle-sessions-at-once-it-stalls-them) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never gate a DEPLOY with a cross-session message. It always arr…](learnings_evidence.md#2026-08-15-forbidden-never-gate-a-deploy-with-a-cross-session-message-it-always-arrives-late) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never treat "the code is deployed" as "the artifact is fixed",…](learnings_evidence.md#2026-08-15-forbidden-never-treat-the-code-is-deployed-as-the-artifact-is-fixed-for-any-producer) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never verify a fix by measuring the INPUT it was never meant to…](learnings_evidence.md#2026-08-15-forbidden-never-verify-a-fix-by-measuring-the-input-it-was-never-meant-to-change) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never read `same_book_n=0` (or any joiner zero) as a data-quali…](learnings_evidence.md#2026-08-15-forbidden-never-read-same_book_n0-or-any-joiner-zero-as-a-data-quality-verdict-until-the-reader-has-been-shown-to-see-the-data) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. I…](learnings_evidence.md#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never read a background-task wrapper's `exit code 0` as "the te…](learnings_evidence.md#2026-08-15-forbidden-never-read-a-background-task-wrappers-exit-code-0-as-the-tests-passed) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never judge a pinned deploy by ANCESTRY alone. Patch-id is the…](learnings_evidence.md#2026-08-15-forbidden-never-judge-a-pinned-deploy-by-ancestry-alone-patch-id-is-the-test) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never wake many idle sessions at once. It stalls them.](learnings_evidence.md#2026-08-15-forbidden-never-wake-many-idle-sessions-at-once-it-stalls-them) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never gate a DEPLOY with a cross-session message. It always arr…](learnings_evidence.md#2026-08-15-forbidden-never-gate-a-deploy-with-a-cross-session-message-it-always-arrives-late) `[evidence]`
+- [2026-08-15 — FORBIDDEN: never deploy a fix without first reading WHICH SERVICE runs the…](learnings_evidence.md#2026-08-15-forbidden-never-deploy-a-fix-without-first-reading-which-service-runs-the-code-it-changes-the-env-decides-not-the-repo) `[evidence]`
+- [2026-08-15 — FORBIDDEN: a scratch index seeded with `git read-tree HEAD` snapshots the…](learnings_evidence.md#2026-08-15-forbidden-a-scratch-index-seeded-with-git-read-tree-head-snapshots-the-whole-tree-and-git-diff---cached---numstat-cannot-see-it-go-stale) `[evidence]`
+
+**EXONERATED — 3**
+
+- [2026-08-12 — EXONERATED: the soccer window is not the egress cause](#2026-08-12-exonerated-the-soccer-window-is-not-the-egress-cause)
+- [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
+- [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
+
+**Rules and corrections — 164**
+
+- [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
+- [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
+- [2026-08-12 — Parallel sessions on one problem need lane discipline](#2026-08-12-parallel-sessions-on-one-problem-need-lane-discipline)
+- [2026-08-13 — A grep excerpt is not the file](#2026-08-13-a-grep-excerpt-is-not-the-file)
+- [2026-08-10 — a briefed premise is a hypothesis, not a starting condition](#2026-08-10-a-briefed-premise-is-a-hypothesis-not-a-starting-condition)
+- [2026-08-15 — a threshold is calibrated against a SPAN; changing what the span contains…](#2026-08-15-a-threshold-is-calibrated-against-a-span-changing-what-the-span-contains-invalidates-it-without-touching-the-constant)
+- [2026-08-15 — the kill is MLB game hydration in pid 39, not the overview pass](#2026-08-15-the-kill-is-mlb-game-hydration-in-pid-39-not-the-overview-pass)
+- [2026-08-14 — OVERTURNED: a number that corrects a known bias is the easiest one to beli…](#2026-08-14-overturned-a-number-that-corrects-a-known-bias-is-the-easiest-one-to-believe)
+- [2026-08-14 — a control with no baseline is a guess wearing a control's clothes](#2026-08-14-a-control-with-no-baseline-is-a-guess-wearing-a-controls-clothes)
+- [2026-08-14 — read the system's clock, not the wall clock](#2026-08-14-read-the-systems-clock-not-the-wall-clock)
+- [2026-08-15 — Pinned deploys do not merge; they REPLACE, so they have to be stacked](#2026-08-15-pinned-deploys-do-not-merge-they-replace-so-they-have-to-be-stacked)
+- [2026-08-15 — The lane marker is repo-global, so only one session can hold it](#2026-08-15-the-lane-marker-is-repo-global-so-only-one-session-can-hold-it)
+- [2026-08-15 — a fix on `main` is not a fix in production: check the DEPLOYED tree](#2026-08-15-a-fix-on-main-is-not-a-fix-in-production-check-the-deployed-tree)
+- [2026-08-15 — RULE: WEB DOES NOT RUN `main`. Parent a deploy on the LIVE SHA.](#2026-08-15-rule-web-does-not-run-main-parent-a-deploy-on-the-live-sha)
+- [2026-08-15 — A COUNT OF DEFINITIONS IS NOT A COUNT OF PRODUCERS, and the one it missed…](#2026-08-15-a-count-of-definitions-is-not-a-count-of-producers-and-the-one-it-missed-was-the-live-bug)
+- [2026-08-15 — A field nobody reads is the same as the `None` it replaced](#2026-08-15-a-field-nobody-reads-is-the-same-as-the-none-it-replaced)
+- [2026-08-15 — A single-slot lock in a five-session worktree blocks the RIGHT work](#2026-08-15-a-single-slot-lock-in-a-five-session-worktree-blocks-the-right-work)
+- [2026-08-15 — A CADENCE IS A DISTRIBUTION ACROSS REGIMES, NOT A CONSTANT](#2026-08-15-a-cadence-is-a-distribution-across-regimes-not-a-constant)
+- [2026-08-15 — ANCESTRY OF `origin/main` IS NOT DEPLOYMENT; READ THE DEPLOYED TREE](#2026-08-15-ancestry-of-originmain-is-not-deployment-read-the-deployed-tree)
+- [2026-08-15 — RULE: a "baseline" is a FILE you diffed, not a number you quoted](#2026-08-15-rule-a-baseline-is-a-file-you-diffed-not-a-number-you-quoted)
+- [2026-08-15 — A PER-CLASS MEASUREMENT OVER A SHARED STYLESHEET IS A PER-SURFACE MEASUREM…](#2026-08-15-a-per-class-measurement-over-a-shared-stylesheet-is-a-per-surface-measurement-or-it-is-wrong)
+- [2026-08-15 — A PROBE THAT PASSES ON AN ERROR PAGE. Attach the liveness check to the SAM…](#2026-08-15-a-probe-that-passes-on-an-error-page-attach-the-liveness-check-to-the-same-fetch)
+- [2026-08-15 — DE-DUPLICATING A FIELD IS NOT DE-DUPLICATING THE OUTPUT. Look at what the…](#2026-08-15-de-duplicating-a-field-is-not-de-duplicating-the-output-look-at-what-the-fallback-renders)
+- [2026-08-15 — `GIT_INDEX_FILE` PROTECTS YOUR COMMIT AND LEAVES THE SHARED INDEX HOLDING…](#2026-08-15-git_index_file-protects-your-commit-and-leaves-the-shared-index-holding-a-revert-of-it)
+- [2026-08-15 — a scoped search answers a scoped question. I shipped a field's semantics o…](#2026-08-15-a-scoped-search-answers-a-scoped-question-i-shipped-a-fields-semantics-on-one-and-the-unscoped-search-later-named-the-test-that-guards-it)
+- [2026-08-15 — COMMITTING THROUGH AN ISOLATED INDEX LEAVES THE SHARED INDEX STAGING A DEL…](#2026-08-15-committing-through-an-isolated-index-leaves-the-shared-index-staging-a-deletion-of-the-file-you-just-committed)
+- [2026-08-15 — A DATE TEST WRITTEN IN THE FORMAT THE CODE ALREADY HANDLES CANNOT DETECT T…](#2026-08-15-a-date-test-written-in-the-format-the-code-already-handles-cannot-detect-that-it-only-handles-that-format)
+- [2026-08-15 — A GUARD'S STATED REASON IS A CLAIM ABOUT ANOTHER FUNCTION, AND IT ROTS WIT…](#2026-08-15-a-guards-stated-reason-is-a-claim-about-another-function-and-it-rots-without-touching-either-file)
+- [2026-08-15 — I QUOTED THE "A BRANCH CUT FOR ONE SERVICE IS A ROLLBACK FOR ANOTHER" RULE…](#2026-08-15-i-quoted-the-a-branch-cut-for-one-service-is-a-rollback-for-another-rule-then-broke-it-one-note-later)
+- [2026-08-13 — A guard can measure a number that moves without the system moving](#2026-08-13-a-guard-can-measure-a-number-that-moves-without-the-system-moving)
+- [2026-08-13 — A criterion has a DIRECTION, and checking it is free](#2026-08-13-a-criterion-has-a-direction-and-checking-it-is-free)
+- [2026-08-13 — Confirm an instrument can emit non-zero before believing its zero](#2026-08-13-confirm-an-instrument-can-emit-non-zero-before-believing-its-zero)
+- [2026-08-13 — A pooled denominator can make a measurement unreadable](#2026-08-13-a-pooled-denominator-can-make-a-measurement-unreadable)
+- [2026-08-13 — `git log --format=%an` is zero evidence in this repo](#2026-08-13-git-log---formatan-is-zero-evidence-in-this-repo)
+- [2026-08-10 — an instrument's blind spot will be mistaken for a finding](#2026-08-10-an-instruments-blind-spot-will-be-mistaken-for-a-finding)
+- [2026-08-10 — segment on process boundaries before any neighbour-based test](#2026-08-10-segment-on-process-boundaries-before-any-neighbour-based-test)
+- [2026-08-10 — counts are the wrong denominator when the cost is bytes](#2026-08-10-counts-are-the-wrong-denominator-when-the-cost-is-bytes)
+- [2026-08-13 — Presence is not reachability: verify the PATH, not the symbol](#2026-08-13-presence-is-not-reachability-verify-the-path-not-the-symbol)
+- [2026-08-13 — A safety gate answers ITS question, not the one you were asked](#2026-08-13-a-safety-gate-answers-its-question-not-the-one-you-were-asked)
+- [2026-08-13 — "Identical to origin" does not mean "absent from the commit"](#2026-08-13-identical-to-origin-does-not-mean-absent-from-the-commit)
+- [2026-08-13 — "Who reads this env var" is a grep question; "does this service read it" i…](#2026-08-13-who-reads-this-env-var-is-a-grep-question-does-this-service-read-it-is-not)
+- [2026-08-13 — A guard that has never once PASSED is not a guard](#2026-08-13-a-guard-that-has-never-once-passed-is-not-a-guard)
+- [2026-08-13 — A discriminator that is only emitted on FAILURE cannot confirm a fix](#2026-08-13-a-discriminator-that-is-only-emitted-on-failure-cannot-confirm-a-fix)
+- [2026-08-13 — A watcher's headline can contradict its own body](#2026-08-13-a-watchers-headline-can-contradict-its-own-body)
+- [2026-08-13 — A guard's "is this mine" input must not default to the locked state](#2026-08-13-a-guards-is-this-mine-input-must-not-default-to-the-locked-state)
+- [2026-08-13 — A path one toolchain resolves and another cannot makes a guard pass silent…](#2026-08-13-a-path-one-toolchain-resolves-and-another-cannot-makes-a-guard-pass-silently)
+- [2026-08-13 — A free-text status field cannot be a predicate; test guards against the le…](#2026-08-13-a-free-text-status-field-cannot-be-a-predicate-test-guards-against-the-ledger-not-against-synthetics)
+- [2026-08-13 — A discriminator that only emits on FAILURE cannot confirm success](#2026-08-13-a-discriminator-that-only-emits-on-failure-cannot-confirm-success)
+- [2026-08-13 — A watcher's LABEL must be entailed by its exit CONDITION](#2026-08-13-a-watchers-label-must-be-entailed-by-its-exit-condition)
+- [2026-08-13 — "Pushed to origin" is not "applied to production"](#2026-08-13-pushed-to-origin-is-not-applied-to-production)
+- [2026-08-13 — The enforcement layer cannot protect itself, and a lane is one deletable l…](#2026-08-13-the-enforcement-layer-cannot-protect-itself-and-a-lane-is-one-deletable-line)
+- [2026-08-13 — A FAILED READ RENDERS AS A RESULT. Five instances, one session, five diffe…](#2026-08-13-a-failed-read-renders-as-a-result-five-instances-one-session-five-different-tools)
+- [2026-08-13 — The stale-read rule failed on its second application, in a form it did not…](#2026-08-13-the-stale-read-rule-failed-on-its-second-application-in-a-form-it-did-not-cover)
+- [2026-08-13 — A guard has TWO failure directions, and fixing the loud one is where the s…](#2026-08-13-a-guard-has-two-failure-directions-and-fixing-the-loud-one-is-where-the-silent-one-survives)
+- [2026-08-13 — Cite the SHA that will exist on origin, not the one your clone minted](#2026-08-13-cite-the-sha-that-will-exist-on-origin-not-the-one-your-clone-minted)
+- [2026-08-13 — MY OWN DISPLAY TRUNCATION BECAME A FINDING, AND THEN A LANE'S PREMISE](#2026-08-13-my-own-display-truncation-became-a-finding-and-then-a-lanes-premise)
+- [2026-08-13 — A BROKEN GUARD CAN MASK THE REAL PROBLEM. Fixing it is how you find out](#2026-08-13-a-broken-guard-can-mask-the-real-problem-fixing-it-is-how-you-find-out)
+- [2026-08-13 — Symptom relief resets the clock that would have proved the cause](#2026-08-13-symptom-relief-resets-the-clock-that-would-have-proved-the-cause)
+- [2026-08-13 — Check whether the obvious fix was already tried, BEFORE building an instru…](#2026-08-13-check-whether-the-obvious-fix-was-already-tried-before-building-an-instrument)
+- [2026-08-13 — I RETRACTED POINT-SAMPLING, THEN BUILT A HEADLINE ON IT ANYWAY](#2026-08-13-i-retracted-point-sampling-then-built-a-headline-on-it-anyway)
+- [2026-08-13 — A habit that fails silently needs a tool, not more care](#2026-08-13-a-habit-that-fails-silently-needs-a-tool-not-more-care)
+- [2026-08-14 — A TROUGH THAT CLEARS AN EARLIER PEAK IS A RATCHET. That is the test](#2026-08-14-a-trough-that-clears-an-earlier-peak-is-a-ratchet-that-is-the-test)
+- [2026-08-14 — I RE-READ THE DEPLOYED SHA BEFORE EVERY *READ* AND SKIPPED IT BEFORE A *WR…](#2026-08-14-i-re-read-the-deployed-sha-before-every-read-and-skipped-it-before-a-write)
+- [2026-08-13 — A "PURE READ" endpoint is a reader you will not find by grepping the attach](#2026-08-13-a-pure-read-endpoint-is-a-reader-you-will-not-find-by-grepping-the-attach)
+- [2026-08-13 — A CONSTANT that reproduces exactly is a data outage, not a weak model](#2026-08-13-a-constant-that-reproduces-exactly-is-a-data-outage-not-a-weak-model)
+- [2026-08-13 — A FIXTURE THAT OMITS A MARKER FILE TESTS A DIFFERENT DIRECTORY, AND SCORES…](#2026-08-13-a-fixture-that-omits-a-marker-file-tests-a-different-directory-and-scores-it-as-a-defect)
+- [2026-08-13 — CLOSING A TICKET IS A SCOPE DECISION, AND WHOLESALE CLOSURE SILENTLY RETIR…](#2026-08-13-closing-a-ticket-is-a-scope-decision-and-wholesale-closure-silently-retires-the-part-nobody-worked)
+- [2026-08-14 — A PLATEAU IS A STRONGER SIGNAL THAN A PERCENTAGE](#2026-08-14-a-plateau-is-a-stronger-signal-than-a-percentage)
+- [2026-08-14 — I MEASURED A STAGE WITHOUT THE THING THAT DOMINATES IT, AND ALMOST SHIPPED…](#2026-08-14-i-measured-a-stage-without-the-thing-that-dominates-it-and-almost-shipped-the-fix)
+- [2026-08-14 — A guard's floor is a claim about ONE stage; refusing everything downstream…](#2026-08-14-a-guards-floor-is-a-claim-about-one-stage-refusing-everything-downstream-of-it-is-a-separate-bug)
+- [2026-08-14 — A CADENCE IS NOT AN OUTAGE, AND I ESCALATED ONE AS THE OTHER](#2026-08-14-a-cadence-is-not-an-outage-and-i-escalated-one-as-the-other)
+- [2026-08-14 — A CONSTANT THAT REPRODUCES EXACTLY FROM AN EMPTY INPUT IS A DATA OUTAGE, N…](#2026-08-14-a-constant-that-reproduces-exactly-from-an-empty-input-is-a-data-outage-not-a-weak-model)
+- [2026-08-14 — A LANE LEFT OPEN AFTER ITS WORK SHIPS IS AN ACTIVE LOCK, NOT A STALE NOTE](#2026-08-14-a-lane-left-open-after-its-work-ships-is-an-active-lock-not-a-stale-note)
+- [2026-08-14 — `git add <paths>` SCOPES THE INDEX; ONLY A PATHSPEC ON `commit` SCOPES THE…](#2026-08-14-git-add-paths-scopes-the-index-only-a-pathspec-on-commit-scopes-the-commit)
+- [2026-08-14 — DECOMPOSE BIAS BEFORE PUBLISHING A SKILL VERDICT](#2026-08-14-decompose-bias-before-publishing-a-skill-verdict)
+- [2026-08-14 — A GUARD MUST COUNT THE ROWS THE STATISTIC USES, NOT THE ROWS THE JOIN PROD…](#2026-08-14-a-guard-must-count-the-rows-the-statistic-uses-not-the-rows-the-join-produced)
+- [2026-08-14 — THREE wrong root causes in one session, one shape: a single sample of a mo…](#2026-08-14-three-wrong-root-causes-in-one-session-one-shape-a-single-sample-of-a-moving-quantity)
+- [2026-08-14 — I CALLED A CORRELATION A PROOF, TWICE IN ONE SESSION](#2026-08-14-i-called-a-correlation-a-proof-twice-in-one-session)
+- [2026-08-14 — A HEALTHY-LOOKING SIBLING MASKED A PLATFORM-WIDE OUTAGE](#2026-08-14-a-healthy-looking-sibling-masked-a-platform-wide-outage)
+- [2026-08-14 — A fallback CHAIN has a rung that fires; find it before costing the fix](#2026-08-14-a-fallback-chain-has-a-rung-that-fires-find-it-before-costing-the-fix)
+- [2026-08-14 — A MANGLED SHELL ARGUMENT NEARLY BECAME "THE LEDGER LOST MY WORK"](#2026-08-14-a-mangled-shell-argument-nearly-became-the-ledger-lost-my-work)
+- [2026-08-14 — A watcher that compares TIMESTAMPS to identify a thing will misidentify it…](#2026-08-14-a-watcher-that-compares-timestamps-to-identify-a-thing-will-misidentify-it-by-microseconds)
+- [2026-08-14 — I PREDICTED FILE OWNERSHIP INSTEAD OF PROBING IT, TWICE](#2026-08-14-i-predicted-file-ownership-instead-of-probing-it-twice)
+- [2026-08-14 — PINNED DEPLOYS PUT CODE IN PRODUCTION THAT WAS NEVER ON MAIN](#2026-08-14-pinned-deploys-put-code-in-production-that-was-never-on-main)
+- [2026-08-14 — Separating `add` from `commit` is not enough if you chain them with `&&`](#2026-08-14-separating-add-from-commit-is-not-enough-if-you-chain-them-with)
+- [2026-08-14 — A saturated log window proves nothing, and the untouched sibling is the co…](#2026-08-14-a-saturated-log-window-proves-nothing-and-the-untouched-sibling-is-the-control)
+- [2026-08-14 — A regex over a hand-written ledger inverts "NOT claimed" into "claimed"](#2026-08-14-a-regex-over-a-hand-written-ledger-inverts-not-claimed-into-claimed)
+- [2026-08-14 — An audit's CAUSAL claim is a hypothesis; its MEASUREMENT is evidence](#2026-08-14-an-audits-causal-claim-is-a-hypothesis-its-measurement-is-evidence)
+- [2026-08-14 — A COUNT can rise because the population grew, not because the property got…](#2026-08-14-a-count-can-rise-because-the-population-grew-not-because-the-property-got-worse)
+- [2026-08-14 — An audit brief's "known already" inputs are claims, not axioms](#2026-08-14-an-audit-briefs-known-already-inputs-are-claims-not-axioms)
+- [2026-08-14 — the Render logs API returns the NEWEST N in a window; paging forward silen…](#2026-08-14-the-render-logs-api-returns-the-newest-n-in-a-window-paging-forward-silently-reports-a-peak-over-a-sliver)
+- [2026-08-14 — a before/after is void if the change moved work INSIDE the measured span](#2026-08-14-a-beforeafter-is-void-if-the-change-moved-work-inside-the-measured-span)
+- [2026-08-14 — "it cannot fit" from one sample, when the same shape runs fine twice](#2026-08-14-it-cannot-fit-from-one-sample-when-the-same-shape-runs-fine-twice)
+- [2026-08-15 — ACQUIRING THE DEPLOY CLAIM BLINDS THE DEPLOY GATE. The safety mechanism di…](#2026-08-15-acquiring-the-deploy-claim-blinds-the-deploy-gate-the-safety-mechanism-disabled-the-safety-check)
+- [2026-08-15 — ANCESTRY CANNOT TELL YOU YOUR WORK IS PUBLISHED, AND A BROKEN GREP LOOKS E…](#2026-08-15-ancestry-cannot-tell-you-your-work-is-published-and-a-broken-grep-looks-exactly-like-a-deletion)
+- [2026-08-15 — a cgroup number minus a per-process number is not a difference, it is a ca…](#2026-08-15-a-cgroup-number-minus-a-per-process-number-is-not-a-difference-it-is-a-category-error)
+- [2026-08-15 — A DEPLOY CLAIM IS ADVISORY. It binds participants, not the fleet.](#2026-08-15-a-deploy-claim-is-advisory-it-binds-participants-not-the-fleet)
+- [2026-08-15 — NEVER PIPE A COMMAND WHOSE EXIT CODE YOU DEPEND ON](#2026-08-15-never-pipe-a-command-whose-exit-code-you-depend-on)
+- [2026-08-15 — THE DEPLOY CLAIM IS ADVISORY, AND IT LOST A RACE IT LOOKED LIKE IT WOULD W…](#2026-08-15-the-deploy-claim-is-advisory-and-it-lost-a-race-it-looked-like-it-would-win)
+- [2026-08-16 — THE HANDOFF THAT WORKED WAS A SCHEDULED TASK, NOT A MESSAGE](#2026-08-16-the-handoff-that-worked-was-a-scheduled-task-not-a-message)
+- [2026-08-16 — A TEST THAT PROVES A DEFECT DOES NOT PROVE PRODUCTION RUNS THROUGH IT. I D…](#2026-08-16-a-test-that-proves-a-defect-does-not-prove-production-runs-through-it-i-deployed-a-correct-fix-to-an-unused-path)
+- [2026-08-16 — COLLAPSING A LEDGER FILE WITHOUT FIXING THE WRITING HABIT JUST REGROWS IT](#2026-08-16-collapsing-a-ledger-file-without-fixing-the-writing-habit-just-regrows-it)
+- [2026-08-14 — OVERTURNED: a stale snapshot is not a dead loop](learnings_evidence.md#2026-08-14-overturned-a-stale-snapshot-is-not-a-dead-loop) `[evidence]`
+- [2026-08-14 — a control is only as good as the premise under it](learnings_evidence.md#2026-08-14-a-control-is-only-as-good-as-the-premise-under-it) `[evidence]`
+- [2026-08-14 — re-read the post-deploy measurement before blaming the deploy](learnings_evidence.md#2026-08-14-re-read-the-post-deploy-measurement-before-blaming-the-deploy) `[evidence]`
+- [2026-08-14 — a "targeted regression" that omits the changed function's own test file is…](learnings_evidence.md#2026-08-14-a-targeted-regression-that-omits-the-changed-functions-own-test-file-is-not-a-regression-run) `[evidence]`
+- [2026-08-15 — RULE: a session census MUST pass `include_archived: true`](learnings_evidence.md#2026-08-15-rule-a-session-census-must-pass-include_archived-true) `[evidence]`
+- [2026-08-15 — RULE: `git status` is not `git diff --cached`](learnings_evidence.md#2026-08-15-rule-git-status-is-not-git-diff---cached) `[evidence]`
+- [2026-08-15 — A JOB THAT ONLY FLUSHES ON COMPLETION CANNOT SURVIVE A SESSION BOUNDARY, A…](learnings_evidence.md#2026-08-15-a-job-that-only-flushes-on-completion-cannot-survive-a-session-boundary-and-i-launched-two) `[evidence]`
+- [2026-08-15 — A BASELINE QUOTED IN PROSE MAY CORRESPOND TO NO RUN ON DISK](learnings_evidence.md#2026-08-15-a-baseline-quoted-in-prose-may-correspond-to-no-run-on-disk) `[evidence]`
+- [2026-08-15 — A CLASS NAME IS NOT A SURFACE, and `querySelector` turned that into two wr…](learnings_evidence.md#2026-08-15-a-class-name-is-not-a-surface-and-queryselector-turned-that-into-two-wrong-plan-items) `[evidence]`
+- [2026-08-15 — THE INSTRUMENT THAT DROPPED A MISSING KEY, AND THE CORRECTION IT HANDED ME…](learnings_evidence.md#2026-08-15-the-instrument-that-dropped-a-missing-key-and-the-correction-it-handed-me-mid-fix) `[evidence]`
+- [2026-08-15 — ON A CONTENDED LEDGER, NEITHER COPY IS AUTHORITATIVE, AND A WHOLE-FILE COM…](learnings_evidence.md#2026-08-15-on-a-contended-ledger-neither-copy-is-authoritative-and-a-whole-file-commit-picks-a-winner-silently) `[evidence]`
+- [2026-08-15 - A PINNED DEPLOY IS NOT ON main's LINEAGE, SO ANCESTRY ANSWERS THE WRONG QU…](learnings_evidence.md#2026-08-15---a-pinned-deploy-is-not-on-mains-lineage-so-ancestry-answers-the-wrong-question) `[evidence]`
+- [2026-08-15 - A FIXED `GIT_INDEX_FILE` NAME COLLIDES ACROSS SESSIONS, AND A FAILED read-…](learnings_evidence.md#2026-08-15---a-fixed-git_index_file-name-collides-across-sessions-and-a-failed-read-tree-leaves-an-empty-index-that-stages-the-whole-repo-as-deletions) `[evidence]`
+- [2026-08-15 - A LABEL-MATCHED LOOKUP IS NOT A SUBSTITUTE FOR THE FIELD, AND ITS FAILURE…](learnings_evidence.md#2026-08-15---a-label-matched-lookup-is-not-a-substitute-for-the-field-and-its-failure-is-silent) `[evidence]`
+- [2026-08-15 - ENUMERATE EVERY SPORT THAT REACHES A CHANGED BRANCH *BEFORE* DEPLOYING](learnings_evidence.md#2026-08-15---enumerate-every-sport-that-reaches-a-changed-branch-before-deploying) `[evidence]`
+- [2026-08-15 - I APPLIED "ONE SAMPLE OF A MOVING QUANTITY" TO PRODUCTION AND NOT TO MY OW…](learnings_evidence.md#2026-08-15---i-applied-one-sample-of-a-moving-quantity-to-production-and-not-to-my-own-measurement) `[evidence]`
+- [2026-08-15 — a mid-ramp reading is not a window reading; I called a 446MB difference "n…](learnings_evidence.md#2026-08-15-a-mid-ramp-reading-is-not-a-window-reading-i-called-a-446mb-difference-noise) `[evidence]`
+- [2026-08-15 — AN OCCURRENCE COUNT IS NOT A ROW COUNT, and I published three numbers that…](learnings_evidence.md#2026-08-15-an-occurrence-count-is-not-a-row-count-and-i-published-three-numbers-that-could-be-read-as-either) `[evidence]`
+- [2026-08-15 — A PINNED-DEPLOY SERVICE SILENTLY REVERTS PEERS. VERIFY YOUR COMMIT AFTER I…](learnings_evidence.md#2026-08-15-a-pinned-deploy-service-silently-reverts-peers-verify-your-commit-after-it-goes-live) `[evidence]`
+- [2026-08-15 — Render's git mirror is PER SERVICE and only refreshes at build time](learnings_evidence.md#2026-08-15-renders-git-mirror-is-per-service-and-only-refreshes-at-build-time) `[evidence]`
+- [2026-08-15 - `wait_for_selector` PROVES ATTACHMENT, NOT COMPLETION, AND I HAD ALREADY "…](learnings_evidence.md#2026-08-15---wait_for_selector-proves-attachment-not-completion-and-i-had-already-fixed-this-once) `[evidence]`
+- [2026-08-15 - A UNIT CHANGE CANNOT FIX A FIT WHEN THE UNITS ARE PROPORTIONAL, AND I ALMO…](learnings_evidence.md#2026-08-15---a-unit-change-cannot-fix-a-fit-when-the-units-are-proportional-and-i-almost-built-it-anyway) `[evidence]`
+- [2026-08-15 — check whether the instrument is already firing BEFORE building a way to ma…](learnings_evidence.md#2026-08-15-check-whether-the-instrument-is-already-firing-before-building-a-way-to-make-it-fire) `[evidence]`
+- [2026-08-15 — MY OWN WATCHERS FAILED THREE TIMES IN ONE EVENING. Hand-run the gate befor…](learnings_evidence.md#2026-08-15-my-own-watchers-failed-three-times-in-one-evening-hand-run-the-gate-before-trusting-a-poller) `[evidence]`
+- [2026-08-15 — CORRECTION: a chain of three wrong attributions on one number, and what ac…](learnings_evidence.md#2026-08-15-correction-a-chain-of-three-wrong-attributions-on-one-number-and-what-actually-ended-it) `[evidence]`
+- [2026-08-15 — A BASELINE IS A MEASUREMENT, NOT A CONSTANT. Re-measure it before you judg…](learnings_evidence.md#2026-08-15-a-baseline-is-a-measurement-not-a-constant-re-measure-it-before-you-judge-anything-against-it) `[evidence]`
+- [2026-08-15 — A JOB THAT ONLY FLUSHES ON COMPLETION CANNOT SURVIVE A SESSION BOUNDARY, A…](learnings_evidence.md#2026-08-15-a-job-that-only-flushes-on-completion-cannot-survive-a-session-boundary-and-i-launched-two) `[evidence]`
+- [2026-08-15 — A COMMITTED LEDGER FACT IS NOT A DURABLE ONE. Re-read it at archive time,…](learnings_evidence.md#2026-08-15-a-committed-ledger-fact-is-not-a-durable-one-re-read-it-at-archive-time-or-the-file-will-quietly-go-back-to-the-claim-you-refuted) `[evidence]`
+- [2026-08-15 — I CONFIRMED A VALUE MY CHANGE DID NOT PRODUCE. A field with two sources ve…](learnings_evidence.md#2026-08-15-i-confirmed-a-value-my-change-did-not-produce-a-field-with-two-sources-verifies-nothing-until-you-know-which-one-filled-it) `[evidence]`
+- [2026-08-15 — OVERTURNED: two locks with one symptom. `JOB_CAP_THROTTLED` is not the ref…](learnings_evidence.md#2026-08-15-overturned-two-locks-with-one-symptom-job_cap_throttled-is-not-the-refresh-run-lock-and-the-difference-picks-the-remedy) `[evidence]`
+- [2026-08-15 — A BASELINE QUOTED IN PROSE MAY CORRESPOND TO NO RUN ON DISK](learnings_evidence.md#2026-08-15-a-baseline-quoted-in-prose-may-correspond-to-no-run-on-disk) `[evidence]`
+- [2026-08-15 — A CLASS NAME IS NOT A SURFACE, and `querySelector` turned that into two wr…](learnings_evidence.md#2026-08-15-a-class-name-is-not-a-surface-and-queryselector-turned-that-into-two-wrong-plan-items) `[evidence]`
+- [2026-08-15 — THE INSTRUMENT THAT DROPPED A MISSING KEY, AND THE CORRECTION IT HANDED ME…](learnings_evidence.md#2026-08-15-the-instrument-that-dropped-a-missing-key-and-the-correction-it-handed-me-mid-fix) `[evidence]`
+- [2026-08-15 — ON A CONTENDED LEDGER, NEITHER COPY IS AUTHORITATIVE, AND A WHOLE-FILE COM…](learnings_evidence.md#2026-08-15-on-a-contended-ledger-neither-copy-is-authoritative-and-a-whole-file-commit-picks-a-winner-silently) `[evidence]`
+- [2026-08-15 — A FIELD MOVED INTO AN UNCONDITIONAL LOOP LOSES THE CONDITION ITS NEIGHBOUR…](learnings_evidence.md#2026-08-15-a-field-moved-into-an-unconditional-loop-loses-the-condition-its-neighbours-were-given) `[evidence]`
+- [2026-08-15 — REFUTED: "if `same_book_n` is 0, the blocker is odds-history breadth". It…](learnings_evidence.md#2026-08-15-refuted-if-same_book_n-is-0-the-blocker-is-odds-history-breadth-it-was-the-reader-and-the-same-zero-had-two-candidate-causes-nobody-separated) `[evidence]`
+- [2026-08-15 — MY SUCCESS CRITERION CONTAINED A TERM THE BASELINE ALREADY SATISFIED, AND…](learnings_evidence.md#2026-08-15-my-success-criterion-contained-a-term-the-baseline-already-satisfied-and-my-instrument-rule-inverted-because-of-my-own-fix) `[evidence]`
+- [2026-08-15 - A PINNED DEPLOY IS NOT ON main's LINEAGE, SO ANCESTRY ANSWERS THE WRONG QU…](learnings_evidence.md#2026-08-15---a-pinned-deploy-is-not-on-mains-lineage-so-ancestry-answers-the-wrong-question) `[evidence]`
+- [2026-08-15 - A FIXED `GIT_INDEX_FILE` NAME COLLIDES ACROSS SESSIONS, AND A FAILED read-…](learnings_evidence.md#2026-08-15---a-fixed-git_index_file-name-collides-across-sessions-and-a-failed-read-tree-leaves-an-empty-index-that-stages-the-whole-repo-as-deletions) `[evidence]`
+- [2026-08-15 — OVERTURNED: two throttles with the same symptom, and I named the wrong one…](learnings_evidence.md#2026-08-15-overturned-two-throttles-with-the-same-symptom-and-i-named-the-wrong-one-as-the-mechanism) `[evidence]`
+- [2026-08-15 — RULE: deploy to where the artifact is BUILT, not where it is served](learnings_evidence.md#2026-08-15-rule-deploy-to-where-the-artifact-is-built-not-where-it-is-served) `[evidence]`
+- [2026-08-15 — OVERTURNED: p50 is the wrong statistic to set an alarm floor from, and my…](learnings_evidence.md#2026-08-15-overturned-p50-is-the-wrong-statistic-to-set-an-alarm-floor-from-and-my-own-test-caught-it) `[evidence]`
+- [2026-08-15 — A FALLBACK ARGUMENT IS A REQUEST, NOT A GUARANTEE. `_safe_text(x, None)` R…](learnings_evidence.md#2026-08-15-a-fallback-argument-is-a-request-not-a-guarantee-_safe_textx-none-returns-43-times-over) `[evidence]`
+- [2026-08-15 — THE SHARED-INDEX REPAIR MUST RUN IN A SHELL WITH NO `GIT_INDEX_FILE`, OR I…](learnings_evidence.md#2026-08-15-the-shared-index-repair-must-run-in-a-shell-with-no-git_index_file-or-it-repairs-the-wrong-index) `[evidence]`
+- [2026-08-15 - A LABEL-MATCHED LOOKUP IS NOT A SUBSTITUTE FOR THE FIELD, AND ITS FAILURE…](learnings_evidence.md#2026-08-15---a-label-matched-lookup-is-not-a-substitute-for-the-field-and-its-failure-is-silent) `[evidence]`
+- [2026-08-15 - ENUMERATE EVERY SPORT THAT REACHES A CHANGED BRANCH *BEFORE* DEPLOYING](learnings_evidence.md#2026-08-15---enumerate-every-sport-that-reaches-a-changed-branch-before-deploying) `[evidence]`
+- [2026-08-15 — I PROPOSED ALLOWLISTING A READ PATH WITHOUT CHECKING THE WRITE PATH. It wo…](learnings_evidence.md#2026-08-15-i-proposed-allowlisting-a-read-path-without-checking-the-write-path-it-would-have-404d-forever) `[evidence]`
+- [2026-08-15 — A HOOK THAT BLOCKS A `Bash` CALL DISCARDS EVERY SIDE EFFECT IN IT, INCLUDI…](learnings_evidence.md#2026-08-15-a-hook-that-blocks-a-bash-call-discards-every-side-effect-in-it-including-the-heredocs) `[evidence]`
+- [2026-08-15 - I APPLIED "ONE SAMPLE OF A MOVING QUANTITY" TO PRODUCTION AND NOT TO MY OW…](learnings_evidence.md#2026-08-15---i-applied-one-sample-of-a-moving-quantity-to-production-and-not-to-my-own-measurement) `[evidence]`
+- [2026-08-15 — a mid-ramp reading is not a window reading; I called a 446MB difference "n…](learnings_evidence.md#2026-08-15-a-mid-ramp-reading-is-not-a-window-reading-i-called-a-446mb-difference-noise) `[evidence]`
+- [2026-08-15 — verify a deployed fix by CONTENT across every SHA that carried it](learnings_evidence.md#2026-08-15-verify-a-deployed-fix-by-content-across-every-sha-that-carried-it) `[evidence]`
+- [2026-08-15 — AN OCCURRENCE COUNT IS NOT A ROW COUNT, and I published three numbers that…](learnings_evidence.md#2026-08-15-an-occurrence-count-is-not-a-row-count-and-i-published-three-numbers-that-could-be-read-as-either) `[evidence]`
+- [2026-08-15 — A PINNED-DEPLOY SERVICE SILENTLY REVERTS PEERS. VERIFY YOUR COMMIT AFTER I…](learnings_evidence.md#2026-08-15-a-pinned-deploy-service-silently-reverts-peers-verify-your-commit-after-it-goes-live) `[evidence]`
+- [2026-08-15 — Render's git mirror is PER SERVICE and only refreshes at build time](learnings_evidence.md#2026-08-15-renders-git-mirror-is-per-service-and-only-refreshes-at-build-time) `[evidence]`
+- [2026-08-15 - `wait_for_selector` PROVES ATTACHMENT, NOT COMPLETION, AND I HAD ALREADY "…](learnings_evidence.md#2026-08-15---wait_for_selector-proves-attachment-not-completion-and-i-had-already-fixed-this-once) `[evidence]`
+- [2026-08-15 — TWO READS INSIDE ONE WARM-UP WINDOW ARE ONE READ. I declared a working fix…](learnings_evidence.md#2026-08-15-two-reads-inside-one-warm-up-window-are-one-read-i-declared-a-working-fix-dead) `[evidence]`
+- [2026-08-15 - A UNIT CHANGE CANNOT FIX A FIT WHEN THE UNITS ARE PROPORTIONAL, AND I ALMO…](learnings_evidence.md#2026-08-15---a-unit-change-cannot-fix-a-fit-when-the-units-are-proportional-and-i-almost-built-it-anyway) `[evidence]`
+- [2026-08-15 — A TIMESTAMP WHERE A SIGNAL STOPS IS NOT WHERE THE FAULT IS](learnings_evidence.md#2026-08-15-a-timestamp-where-a-signal-stops-is-not-where-the-fault-is) `[evidence]`
+- [2026-08-15 — A HARDCODED ABSOLUTE `startTime` IS A FUTURE TIMESTAMP FOR PART OF A WATCH…](learnings_evidence.md#2026-08-15-a-hardcoded-absolute-starttime-is-a-future-timestamp-for-part-of-a-watchers-life) `[evidence]`
+- [2026-08-15 — check whether the instrument is already firing BEFORE building a way to ma…](learnings_evidence.md#2026-08-15-check-whether-the-instrument-is-already-firing-before-building-a-way-to-make-it-fire) `[evidence]`
+- [2026-08-15 — MY OWN WATCHERS FAILED THREE TIMES IN ONE EVENING. Hand-run the gate befor…](learnings_evidence.md#2026-08-15-my-own-watchers-failed-three-times-in-one-evening-hand-run-the-gate-before-trusting-a-poller) `[evidence]`
+- [2026-08-15 — THE CONFIDENCE INTERVAL BELONGS TO THE ESTIMATE, NOT TO THE THRESHOLD. My…](learnings_evidence.md#2026-08-15-the-confidence-interval-belongs-to-the-estimate-not-to-the-threshold-my-own-test-asserted-otherwise-and-failed) `[evidence]`
+
+<!-- LEARNINGS-INDEX:END -->

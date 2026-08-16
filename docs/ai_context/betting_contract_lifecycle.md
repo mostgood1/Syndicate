@@ -260,15 +260,8 @@ holds.
 
 ### Why only MLB has the wide grid — and what it does to fair value
 
-**Two different axes here, and only one of them is explained.** `#325` (another
-lane, same night) root-causes the **game-line-vs-prop** axis: `_game_line_regions`
-is **deliberate**, shipped as S0b in `1fa0a6d3`, and scoped that way precisely
-because props bill per event — *"the ~1M/month mistake"* the plan works out
-explicitly. **That axis is settled policy, not a gap.**
-
-**The axis below is the MLB-vs-every-other-sport one, and `#325` does not
-address it.** The env block is set on **all three services**, yet only MLB
-returns `eu`/`us_ex` books:
+`[code]`. The env block above is set on **all three services**, yet only MLB
+returns `eu`/`us_ex` books. The reason is not policy:
 
 ```
 12 OddsAPI fetchers in scripts/
@@ -325,28 +318,10 @@ was measured.** `[code]`, not `[live]`.
 
 > **HEADLINE, so it is not quoted without its caveat: `projected_30d_credits =
 > 7,737,455 = 155% of cap` is a true reading of a 27.6-hour window that
-> CONTAINS A KNOWN INCIDENT. Do not carry "the cap is exhausted in 19.4 days";
-> it is not supported.**
->
-> **CORRECTED by `#325`, and the correction goes the other way — read it before
-> using any number here.** This section originally offered the 12-day aggregate
-> (74,870/day = **45% of cap**) as the defensible standing rate. **That figure
-> is wrong as a description of the current baseline**: the 12-day window
-> **spans S0b's activation on 2026-08-07**, so it averages a pre-S0b regime with
-> a post-S0b one and understates today's. `#325`'s post-S0b readings are
-> **3.96M/79.3%** (08-08T17:32Z) and **5.03M/100.7%** (latest). The coherent
-> picture across both lanes:
->
-> ```
-> pre-S0b    ~37%      S0's measurement, 2026-08-07
-> post-S0b   79-100%   #325 -- DELIBERATE, and the plan projected 79-82.6%
-> my window  155%      post-S0b baseline PLUS the spawn-incident excursion
-> ```
->
-> **My "45%" and my "0.29x the hourly norm" both compare against a baseline that
-> straddles a step change, and neither is a clean ratio.** The 19.4-day
-> withdrawal still stands — it came off the contaminated 155% — but *"the
-> standing rate is 45% and falling"* does not. **Use `#325`'s post-S0b readings.**
+> CONTAINS A KNOWN INCIDENT. The standing rate is the 12-day aggregate —
+> 74,870/day = 2.25M/month = 45% of cap — and even that includes the incident,
+> so the real baseline is BELOW 45%. Do not carry "the cap is exhausted in 19.4
+> days"; it is not supported.**
 
 `[live]` `[web]` `GET /api/ops/oddsapi/quota`, 03:54:31Z. The 30-day projection
 is the endpoint's own field.
@@ -403,22 +378,10 @@ Two caveats that keep this honest:
   against the same clock hours on a prior day**, and the quota endpoint has **no
   per-day breakdown**, so it cannot be run from this surface. Listed in §11.
 
-**Bottom line for a spend decision — SUPERSEDED IN PART, see the headline
-box.** The 155% is a real reading of a contaminated window and **the 19.4-day
-exhaustion figure is withdrawn**. But the 12-day aggregate is **not** the
-standing rate: it straddles S0b's activation. Post-S0b is **79–100% of cap**
-per `#325`, deliberate and roughly on-plan. **The direction of my original error
-was wrong in both places at once** — I over-read a spike *and* under-read the
-baseline, and the two happened to look like one story.
-
-**One joint conclusion neither lane has alone.** `#325` notes only half the
-documented two-var activation happened: `SYNDICATE_LIVE_ODDS_REFRESH_REGIONS` is
-still `us`, not `us,us2`. This section measured that **7 of `us2`'s 8 books
-already arrive on `us`** (prop rows, base regions only). **So the un-done half of
-the activation would buy very little** — which matters now that the burn is at
-~100% of cap rather than 45%. The original withdrawn text follows.
-
-**The 19.4-day exhaustion figure that follows from 257,916/day is withdrawn** — it was a true measurement carrying an
+**Bottom line for a spend decision:** the 155% is a real reading of a
+contaminated window. The defensible standing rate is the 12-day aggregate at
+**45% of cap**, itself an upper bound. **The 19.4-day exhaustion figure that
+follows from 257,916/day is withdrawn** — it was a true measurement carrying an
 unearned inference, which is the same shape as the retractions this file has
 been collecting all night.
 
@@ -1005,7 +968,7 @@ Allocated by the coordinating session.
 | **`#300`** | L2-A: absent game-state chip → `pregame` → 24 h ceiling → 100/100 rows, one in-progress game, 21 h prices. **Blocks the board swap.** | `[live]` |
 | **`#301`** | `/api/board/game-chips` ignores `sport` — identical 65-chip list for all eight | `[live]` |
 | **`#302`** | Web OOM; `book-grid?limit=2000` 502s reproducibly; L1-A pivot has no payload ceiling | `[live]` |
-| **`#303`** | OddsAPI: a 155%-of-cap reading over a **contaminated** window; **the 19.4-day figure is withdrawn**. **My "45% standing rate" is ALSO withdrawn** — see `#325`: post-S0b is **79–100%**, deliberate, and my 12-day baseline straddled the step change. §4d's `us2` pricing rests on a **stale region→book map** — 7 of its 8 books already arrive free on `us`, so the un-done half of S0b's activation buys little | `[live]`; spike inference refuted, baseline corrected by `#325`, peak-hour test still open |
+| **`#303`** | OddsAPI: a 155%-of-cap reading over a **contaminated** window. Standing rate is **45% of cap** and falling. **The 19.4-day exhaustion figure is withdrawn.** §4d's `us2` pricing rests on a **stale region→book map** — 7 of its 8 books already arrive free on `us` | `[live]`; the structural inference is refuted, the peak-hour test remains open |
 | **`#304`** | Two ledgers on two disks; bets log on web, settle on refresh-worker | `[structural]` |
 | **`#305`** | soccer `prop_source_in` 162/162 missing `market_key` | `[live]` |
 
@@ -1023,14 +986,10 @@ So absence here is never read as evidence.
   structural or incident-inflated. The quota endpoint has no per-day breakdown.
 - **A fresh region→book query.** §1 shows §4d's map is stale from the *data*
   side; confirming it costs 1 credit per region against `/v4/sports/.../odds`.
-- **Whether the sharp-anchor asymmetry (§1) is deliberate — HALF ANSWERED.**
-  `#325` settles the **game-line-vs-prop** axis: deliberate, S0b, `1fa0a6d3`.
-  It does **not** address the **MLB-vs-all-sports** axis, which is the one §1
-  raises — the extras are read by 1 of 12 fetchers. Still open, and still
-  the difference between a line to record and eleven fetchers to change.
-  Note S0b was authored *in* `fetch_mlb_oddsapi_local.py`, and MLB is 95% of
-  spend, so "MLB first" is the more likely reading than "MLB only" — but that
-  is inference, not what anyone has said.
+- **Whether the sharp-anchor asymmetry (§1) is deliberate.** Established that
+  only MLB's fetcher reads the game-line extras; **not** established whether
+  that was a choice or an unfinished rollout. That determines whether it is a
+  scoping decision to record or eleven fetchers to change.
 - **`#292`** — best-price vs retained book. Requires refresh-worker's disk.
 - **L2-B and L2-C row counts.** The endpoints exist and share the row.
 - **Whether a web-logged bet reaches refresh-worker's ledger** — needs a

@@ -6,7 +6,11 @@
 
 ## OPEN
 
+<<<<<<< HEAD
 ### win-prob-null-readable — OPEN — **DEPLOYED TO 2 OF 3 (refresh-worker `b2af0fac`, web `fa1871cf`, both live 01:1xZ); live-odds-worker HELD BY ANOTHER LANE. Route answers 200; `readings: 0` — THE READING ITSELF IS STILL OWED** — opened 2026-08-15 — session: win-prob-null-readable
+=======
+### win-prob-null-readable — OPEN — **BUILT, TESTED AND COMMITTED (`b281bc7f`); ON NO SERVICE — the reading itself is still owed** — opened 2026-08-15 — session: win-prob-null-readable
+>>>>>>> origin/main
 - Goal: the `WIN_PROB_NULL_NO_PRICE` counter is READABLE from the web service
   (one HTTP read, no log archaeology), for both prop producers, on every run.
 - **THE DEFECT, measured not suspected.** The counter deployed 2026-08-15
@@ -1521,6 +1525,7 @@ the breakdown itself is correct.
 - [mlb-live-pitcher-projection](lanes_closed.md) — mlb-live-pitcher-projection — CLOSED-VERIFIED 2026-08-16 — (a)/(b)/(c) all measured on 423 rows, 0 violations; live coverage 11.6% -> 50.3%;
 - [board-publish-stall](lanes_closed.md) — board-publish-stall — CLOSED-FALSIFIED 2026-08-16 — no stall, no publish failure; the REAL result is that my deployed fix is INERT and resta
 - [line-decimal-renderer](lanes_closed.md) — line-decimal-renderer — CLOSED-VERIFIED 2026-08-16 — shipped `f3b9b293`; 5 live rows change, 77 untouched; WEB DEPLOY OWED — opened 2026-08-
+<<<<<<< HEAD
 
 #### smaps-anon-breakdown — DEPLOY LANDED 2026-08-16 00:57:32Z (`ada731f5`)
 The reconciliation fix is live and the guard is meaningful again. First reading
@@ -1547,3 +1552,5 @@ subtract, it moves with whatever the worker has spawned.
 COST: five rebases across five live SHAs (`6f512ffa` -> `129395cc` -> `32186e28`
 -> `2c14d9ae` -> `57a437d5`) and four claim holders. On a worker with five
 sessions deploying, a two-file change should ride along, not chase.
+=======
+>>>>>>> origin/main

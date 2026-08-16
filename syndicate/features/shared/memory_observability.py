@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -16,6 +17,9 @@ except Exception:  # pragma: no cover - psutil is optional in some local environ
 _BYTES_PER_MB = 1024 * 1024
 _BYTES_PER_KB = 1024
 _PROCFS_ROOT = Path("/proc")
+# A smaps mapping header: "7f3c-7f4d rw-p 00000000 00:00 0    [heap]".
+# Anchored so a field line ("Anonymous:  12 kB") can never match it.
+_SMAPS_HEADER_RE = re.compile(r"^[0-9a-fA-F]+-[0-9a-fA-F]+\s+\S{4}\s+\S+\s+\S+\s+\d+")
 
 
 def _bytes_to_mb(value: int | float | None) -> float | None:
@@ -883,6 +887,76 @@ def _watchdog_maybe_dump_allocations(payload: dict[str, Any], climb_mb_per_s: fl
         ):
             return
         _WATCHDOG_STATE["allocations_dumped"] = True
+        # THE DUMP MUST NOT RUN ON THE SAMPLER THREAD. Measured the hard way
+        # 2026-08-15 02:11-02:16: with tracing at nframe=3 the worker emitted
+        # its MEMORY_WATCHDOG_STARTED line and then **not one sample** before
+        # dying 5.5 minutes later, where the previous build emitted 567. The
+        # kill cadence went from ~16-22 min to 3-10 min across the same change.
+        # `tracemalloc.take_snapshot()` walks every live traced allocation in C
+        # holding the GIL; on this heap that is millions of objects, so the
+        # sampler was starved by the one call it makes -- and because the print
+        # happens AFTER the snapshot returns, it looked like the trigger had
+        # simply never fired. An instrument that blocks its own measurement is
+        # worse than no instrument, because its silence reads as "nothing
+        # happened".
+        #
+        # Off-thread and daemon: if it never finishes, it dies with the process
+        # and the sampler keeps sampling either way.
+        try:
+            import threading
+
+            threading.Thread(
+                target=_watchdog_dump_allocations_now,
+                args=(dict(payload), climb_mb_per_s),
+                name="memory-watchdog-dump",
+                daemon=True,
+            ).start()
+            return
+        except Exception:
+            pass  # fall through and do it inline rather than lose the dump
+        _watchdog_dump_allocations_now(payload, climb_mb_per_s)
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] WATCHDOG_ALLOCATION_DUMP_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+def stop_allocation_tracing(reason: str) -> bool:
+    """Stop tracing and free the per-allocation tracebacks. Never raises.
+
+    Tracing is a WINDOW, not a setting. Every allocation carries tracebacks while
+    it is on, so leaving it armed after the one dump has been taken is pure cost
+    on a process that is already OOM-killing.
+    """
+    try:
+        import tracemalloc
+
+        was_tracing = tracemalloc.is_tracing()
+        if was_tracing:
+            tracemalloc.stop()
+        _TRACEMALLOC_STATE["started"] = False
+        _TRACEMALLOC_STATE["reason"] = f"stopped:{reason}"
+        print(
+            "[memory_observability] TRACEMALLOC_STOPPED "
+            + json.dumps({"reason": reason, "was_tracing": bool(was_tracing)}, sort_keys=True),
+            flush=True,
+        )
+        return bool(was_tracing)
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] TRACEMALLOC_STOP_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        return False
+
+
+def _watchdog_dump_allocations_now(payload: dict[str, Any], climb_mb_per_s: float | None) -> None:
+    """The dump itself. Always called with the decision already made."""
+    try:
+        anon_mb = payload.get("memory_unreclaimable_mb")
+        if anon_mb is None:
+            anon_mb = payload.get("memory_anon_mb")
         if not allocation_tracing_enabled():
             # Say so ONCE, with the numbers that would have been captured. An
             # instrument that is off must announce it at the moment it would
@@ -902,9 +976,444 @@ def _watchdog_maybe_dump_allocations(payload: dict[str, Any], climb_mb_per_s: fl
             file=sys.stderr,
             flush=True,
         )
+        # THE WINDOW CLOSES ITSELF. We take exactly one dump per boot, so once it
+        # is printed every further traced allocation is pure cost on a process
+        # that OOMs -- and on 2026-08-15 02:11-02:16 that cost was measurable:
+        # kill cadence 3-10 min against 16-22, and the sampler starved outright.
+        #
+        # Ending it here rather than by hand is the point. The previous window
+        # stayed open until a human noticed, deployed twice and wrote an env
+        # var; this one ends microseconds after the data exists, whether or not
+        # anyone is watching. `#241` is the standing reminder that periodic work
+        # on this worker is never free.
+        stop_allocation_tracing("dump_complete")
     except Exception as exc:  # pragma: no cover - defensive, must never raise
         print(
             f"[memory_observability] WATCHDOG_ALLOCATION_DUMP_FAILED {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+
+
+_UNTRACKED_CENSUS_MAX_PER_PROCESS = 3
+_UNTRACKED_CENSUS_STATE: dict[str, int] = {"count": 0}
+
+
+def log_untracked_bytes_census(reason: str) -> dict[str, Any] | None:
+    """Size the `str`/`bytes` the heap census CANNOT see, attributed to holders.
+
+    `#435`. `log_heap_census` measured 415,596 GC-tracked objects totalling
+    ~135MB shallow while `anon` was 1709MB. That is not a near miss, it is three
+    orders of magnitude, and the reason is structural: `gc.get_objects()` returns
+    only CYCLIC-GC-TRACKED objects, and `str`/`bytes`/`int`/`float` hold no
+    references so they are never tracked. In a JSON pipeline those ARE the bytes.
+
+    So this walks the tracked objects and sizes their `str`/`bytes` REFERENTS --
+    the strings hanging off dicts and lists -- which is where parsed JSON lives.
+
+    DEDUPLICATED BY id(). Interned and shared strings are referenced from many
+    places; counting each reference would inflate the total to something
+    comfortably larger than the container, which would look like an answer and
+    be arithmetic.
+
+    Attribution is by HOLDER TYPE, not by string content, because the actionable
+    question is which structure is holding them. The biggest individual strings
+    are named separately -- one 400MB blob and four million 100-byte quote keys
+    are different bugs with different fixes.
+    """
+    if _UNTRACKED_CENSUS_STATE["count"] >= _UNTRACKED_CENSUS_MAX_PER_PROCESS:
+        return None
+    try:
+        import gc
+
+        _UNTRACKED_CENSUS_STATE["count"] += 1
+        gc.collect()
+        seen: set[int] = set()
+        by_holder: dict[str, list[int]] = {}
+        biggest: list[tuple[int, str, str]] = []
+        total_bytes = 0
+        scanned = 0
+
+        for obj in gc.get_objects():
+            try:
+                holder = type(obj).__name__
+                for ref in gc.get_referents(obj):
+                    if not isinstance(ref, (str, bytes, bytearray)):
+                        continue
+                    ident = id(ref)
+                    if ident in seen:
+                        continue
+                    seen.add(ident)
+                    size = sys.getsizeof(ref)
+                    total_bytes += size
+                    scanned += 1
+                    bucket = by_holder.setdefault(holder, [0, 0])
+                    bucket[0] += size
+                    bucket[1] += 1
+                    # 1MB, not 50MB: at this scale the interesting object is a
+                    # cached payload, not a monolith. Ten of these is a lead.
+                    if size > 1 * _BYTES_PER_MB:
+                        biggest.append((size, holder, repr(ref)[:160]))
+            except Exception:
+                continue
+
+        anon_mb = None
+        stat = _read_container_memory_stat()
+        if stat and "anon" in stat:
+            anon_mb = _bytes_to_mb(stat.get("anon"))
+        total_mb = round(total_bytes / _BYTES_PER_MB, 1)
+        payload = {
+            "reason": str(reason or "")[:80],
+            "census_index": _UNTRACKED_CENSUS_STATE["count"],
+            "anon_mb": anon_mb,
+            "str_bytes_total_mb": total_mb,
+            # THE HEADLINE NUMBER. If this is small, the memory is not in Python
+            # objects at all and the next look is C-level (numpy/pandas buffers,
+            # allocator retention) rather than anywhere in this file.
+            "explained_pct_of_anon": (
+                round(100.0 * total_mb / anon_mb, 1) if anon_mb else None
+            ),
+            "distinct_str_bytes": scanned,
+            "top_holders_mb": sorted(
+                ((name, round(v[0] / _BYTES_PER_MB, 1), v[1]) for name, v in by_holder.items()),
+                key=lambda row: row[1],
+                reverse=True,
+            )[:15],
+            "biggest_individual": [
+                (round(size / _BYTES_PER_MB, 1), holder, text)
+                for size, holder, text in sorted(biggest, reverse=True)[:10]
+            ],
+        }
+        print(f"UNTRACKED_BYTES_CENSUS {json.dumps(payload, default=str)}", flush=True)
+        return payload
+    except Exception as exc:
+        print(f"UNTRACKED_BYTES_CENSUS_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
+def watchdog_should_heap_census(*, anon_mb: float | None, already_censused: bool) -> bool:
+    """Fire ONE heap census once the process is holding the memory in question.
+
+    `#435`. `log_heap_census` is the RIGHT instrument for "what is in the anon"
+    and it has never fired in production: its only call site is inside
+    `_build_candidate_pool` behind `min_container_mb=1200`, and five hours of
+    logs contain zero `HEAP_CENSUS` lines. Waiting on a call site is what kept it
+    silent, so this triggers on the CONDITION instead -- the same change that
+    made the watchdog itself work.
+
+    Unlike tracemalloc (ruled out 2026-08-15: it silenced this sampler at both
+    nframe=3 and nframe=2) a census is a ONE-SHOT walk, not per-allocation
+    bookkeeping. It holds the GIL once for the walk rather than taxing every
+    allocation, and `_HEAP_CENSUS_MAX_PER_PROCESS` already caps it.
+    """
+    if already_censused or anon_mb is None:
+        return False
+    return float(anon_mb) >= _env_float("SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB", 1500.0)
+
+
+_SMAPS_MAX_PER_PROCESS = 3
+_SMAPS_STATE: dict[str, int] = {"count": 0}
+
+# Anonymous mmap regions, bucketed by SIZE. pymalloc takes 1MB arenas by mmap and
+# glibc routes anything over MMAP_THRESHOLD (128KB default) the same way, so the
+# size distribution is what separates them -- there is no name to key on.
+#
+# Deliberately NOT "regions of exactly 1MB are pymalloc arenas": the kernel
+# COALESCES adjacent anonymous mappings with identical flags into one VMA, so 934
+# arenas can appear as far fewer, much larger regions. Buckets describe what is
+# there; they do not assert who allocated it.
+_SMAPS_BUCKETS_BYTES = (
+    (64 * 1024, "<64KB"),
+    (1024 * 1024, "64KB-1MB"),
+    (8 * 1024 * 1024, "1-8MB"),
+    (64 * 1024 * 1024, "8-64MB"),
+    (float("inf"), ">64MB"),
+)
+
+
+def parse_smaps(text: str) -> dict[str, Any]:
+    """Group `/proc/self/smaps` anonymous bytes by mapping kind.
+
+    `#435` step: 673MB of a 1,607MB rest-state floor is anon that pymalloc never
+    allocated (arenas 934MB against anon 1,607MB). `malloc_info` cannot see it --
+    it reported `arena_coverage_pct` 13.9% and labelled itself
+    `arena_not_representative`, because it reports arena bookkeeping and not
+    mmap'd chunks. The Python censuses cannot see non-Python allocations at all.
+
+    This asks the kernel instead, using the same accounting that decides the OOM
+    kill. `Anonymous:` per mapping is the field that matters; `Rss` includes
+    file-backed pages that the cgroup counts under `file`, not `anon`, and
+    conflating them is how a page-cache plateau once got called a leak.
+
+    Split out from the reader so it can be tested on a fixture rather than only
+    against a live process -- every other instrument in this investigation was
+    calibrated before it was trusted, and the two that were not produced wrong
+    answers.
+    """
+    totals: dict[str, int] = {}
+    buckets: dict[str, int] = {}
+    regions: list[tuple[int, str]] = []
+    current_path = ""
+    current_size = 0
+    current_anon = 0
+    seen_header = False
+
+    def _flush() -> None:
+        nonlocal current_anon, current_size, current_path
+        if not seen_header or current_anon <= 0:
+            return
+        path = current_path
+        if path in {"[heap]", "[stack]"}:
+            kind = path.strip("[]")
+        elif path.startswith("["):
+            kind = "special"
+        elif path:
+            kind = "file_backed"
+        else:
+            kind = "anon_mmap"
+            for limit, label in _SMAPS_BUCKETS_BYTES:
+                if current_size < limit:
+                    buckets[label] = buckets.get(label, 0) + current_anon
+                    break
+        totals[kind] = totals.get(kind, 0) + current_anon
+        regions.append((current_anon, path or f"anon:{round(current_size / _BYTES_PER_MB, 1)}MB"))
+
+    for line in text.splitlines():
+        if _SMAPS_HEADER_RE.match(line):
+            _flush()
+            seen_header = True
+            parts = line.split(None, 5)
+            current_path = parts[5].strip() if len(parts) > 5 else ""
+            span = parts[0].split("-")
+            try:
+                current_size = int(span[1], 16) - int(span[0], 16)
+            except Exception:
+                current_size = 0
+            current_anon = 0
+        elif line.startswith("Anonymous:"):
+            try:
+                current_anon = int(line.split()[1]) * _BYTES_PER_KB
+            except Exception:
+                current_anon = 0
+    _flush()
+
+    return {
+        "by_kind_mb": {k: round(v / _BYTES_PER_MB, 1) for k, v in sorted(totals.items(), key=lambda kv: -kv[1])},
+        "anon_mmap_by_size_mb": {k: round(v / _BYTES_PER_MB, 1) for k, v in sorted(buckets.items(), key=lambda kv: -kv[1])},
+        "total_anon_mb": round(sum(totals.values()) / _BYTES_PER_MB, 1),
+        "region_count": len(regions),
+        "largest_regions_mb": [
+            (round(anon / _BYTES_PER_MB, 1), path[:70]) for anon, path in sorted(regions, reverse=True)[:8]
+        ],
+    }
+
+
+def log_smaps_anon_breakdown(reason: str) -> dict[str, Any] | None:
+    """Read `/proc/self/smaps` and report where the anon actually lives.
+
+    Cost: the kernel walks page tables to answer this, so it is not free -- but
+    it is a single read with no per-allocation bookkeeping, which is the property
+    `tracemalloc` lacked when it silenced the sampler at both nframe=3 and 2.
+    Capped per process like the other censuses, and run off the sampler thread.
+    """
+    if _SMAPS_STATE["count"] >= _SMAPS_MAX_PER_PROCESS:
+        return None
+    try:
+        path = _PROCFS_ROOT / "self" / "smaps"
+        if not path.exists():
+            print("[memory_observability] SMAPS_UNAVAILABLE (not a Linux procfs)", flush=True)
+            return None
+        _SMAPS_STATE["count"] += 1
+        payload = parse_smaps(path.read_text(encoding="utf-8", errors="ignore"))
+        payload["reason"] = str(reason or "")[:80]
+        payload["smaps_index"] = _SMAPS_STATE["count"]
+
+        # RECONCILIATION, and it is the point rather than a nicety. smaps and the
+        # cgroup are INDEPENDENT kernel accountings of the same bytes. If they
+        # disagree materially the parse is wrong, and a breakdown that does not
+        # add up must not be read as attribution -- this investigation has twice
+        # acted on a number that was internally consistent and wrong.
+        stat = _read_container_memory_stat()
+        cgroup_anon_mb = _bytes_to_mb(stat.get("anon")) if stat and "anon" in stat else None
+        payload["cgroup_anon_mb"] = cgroup_anon_mb
+        if cgroup_anon_mb:
+            delta = payload["total_anon_mb"] - cgroup_anon_mb
+            payload["reconciles_within_pct"] = round(100.0 * abs(delta) / cgroup_anon_mb, 1)
+            payload["reconciles"] = abs(delta) <= max(64.0, 0.10 * cgroup_anon_mb)
+        print(f"SMAPS_ANON {json.dumps(payload, default=str, sort_keys=True)}", flush=True)
+        return payload
+    except Exception as exc:
+        print(f"SMAPS_ANON_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
+_PYMALLOC_STATS_MAX_PER_PROCESS = 3
+_PYMALLOC_STATS_STATE: dict[str, int] = {"count": 0}
+
+
+def log_pymalloc_arena_stats(reason: str) -> dict[str, Any] | None:
+    """PYMALLOC's arena accounting -- the last place the missing anon can be.
+
+    `#435`, and this is the measurement the other three point at. Established:
+
+      anon                              1858.3 MB
+      GC-tracked containers              ~135 MB  (415,596 objects)
+      str/bytes hanging off them         ~136 MB  (1,704,754 strings, avg 84B)
+      glibc `malloc_info` system_current  237.5 MB, coverage 13.9%, and the
+                                          binding itself reads
+                                          "arena_not_representative"
+
+    So ~85% of anon is neither reachable Python data nor glibc arena memory.
+    pymalloc is what is left: it serves every allocation under 512 bytes -- which
+    is ALL 2.1M of the small objects above -- from 1MB arenas it takes by mmap,
+    invisible to `malloc_info`. An arena is only returned to the OS when it is
+    COMPLETELY empty, so a burst of millions of short-lived JSON strings that
+    leaves one survivor per arena pins the lot.
+
+    `sys._debugmallocstats()` prints the arena counts to stderr. It is the only
+    supported way to see this; there is no structured API. Parsed loosely here
+    and the raw table left in the log, because the derived number
+    (`arenas * 1MB` against live bytes) is the whole answer and a parse that
+    silently misses a line must not turn into a confident zero.
+    """
+    if _PYMALLOC_STATS_STATE["count"] >= _PYMALLOC_STATS_MAX_PER_PROCESS:
+        return None
+    try:
+        import os
+        import re
+        import tempfile
+
+        _PYMALLOC_STATS_STATE["count"] += 1
+        # FD-LEVEL CAPTURE, and the first version of this got it wrong.
+        # `_debugmallocstats` writes from C to fd 2, so `redirect_stderr` (which
+        # only rebinds `sys.stderr`) captured NOTHING -- measured
+        # `captured_chars: 0` locally before this shipped. Only dup2 sees it.
+        #
+        # This briefly points the process's fd 2 at a temp file, so a concurrent
+        # thread logging in that window lands there instead of the collector.
+        # The window is milliseconds and the alternative is no measurement at
+        # all; worth knowing if a sample looks missing around a PYMALLOC_STATS.
+        text = ""
+        sys.stderr.flush()
+        saved_fd = os.dup(2)
+        try:
+            with tempfile.TemporaryFile(mode="w+b") as tmp:
+                os.dup2(tmp.fileno(), 2)
+                try:
+                    sys._debugmallocstats()
+                finally:
+                    sys.stderr.flush()
+                    os.dup2(saved_fd, 2)
+                tmp.seek(0)
+                text = tmp.read().decode("utf-8", errors="replace")
+        finally:
+            os.close(saved_fd)
+
+        def _num(value: str) -> int | None:
+            try:
+                return int(value.replace(",", "").strip())
+            except Exception:
+                return None
+
+        arenas = None
+        arena_bytes = None
+        bytes_in_use = None
+        unused_pool_bytes = None
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("# arenas allocated current"):
+                arenas = _num(stripped.split("=")[-1])
+            elif "bytes/arena" in stripped and "=" in stripped:
+                # `2 arenas * 1048576 bytes/arena  =  2,097,152` -- the total
+                # comes straight off the line, so the arena SIZE never has to be
+                # assumed (it changed between CPython versions).
+                arena_bytes = _num(stripped.split("=")[-1])
+            elif stripped.startswith("# bytes in allocated blocks"):
+                bytes_in_use = _num(stripped.split("=")[-1])
+            elif re.match(r"^\d+ unused pools \*", stripped) and "=" in stripped:
+                unused_pool_bytes = _num(stripped.split("=")[-1])
+        arena_mb = _bytes_to_mb(arena_bytes) if isinstance(arena_bytes, int) else None
+        live_mb = _bytes_to_mb(bytes_in_use) if isinstance(bytes_in_use, int) else None
+        payload = {
+            "reason": str(reason or "")[:80],
+            "stats_index": _PYMALLOC_STATS_STATE["count"],
+            "arenas_currently_allocated": arenas,
+            "arena_mb": arena_mb,
+            "bytes_in_allocated_blocks_mb": live_mb,
+            "unused_pools_mb": (
+                _bytes_to_mb(unused_pool_bytes) if isinstance(unused_pool_bytes, int) else None
+            ),
+            # THE NUMBER. Arenas held minus bytes live = memory pymalloc is
+            # sitting on that no Python object is using.
+            "retained_by_pymalloc_mb": (
+                round(arena_mb - live_mb, 1)
+                if isinstance(arena_mb, float) and isinstance(live_mb, float)
+                else None
+            ),
+            "captured_chars": len(text),
+        }
+        print(f"PYMALLOC_STATS {json.dumps(payload, default=str)}", flush=True)
+        if text:
+            # The raw table, once. A loose parse that misses a renamed line must
+            # not be the only record -- the counts above are derived, this is not.
+            print("PYMALLOC_STATS_RAW\n" + text[:4000], flush=True)
+        return payload
+    except Exception as exc:
+        print(f"PYMALLOC_STATS_FAILED {type(exc).__name__}: {exc}", flush=True)
+        return None
+
+
+def _run_censuses(reason: str) -> None:
+    """Both censuses, in order, on one thread. Neither may stop the other.
+
+    The tracked census answers "is it Python containers" (measured: no, 135MB of
+    415k objects against 1709MB anon) and the untracked one answers "is it the
+    strings hanging off them". Run together they either account for the anon or
+    prove it is below Python entirely -- and that is the fork the next fix
+    depends on, so a failure in the first must not skip the second.
+    """
+    try:
+        log_heap_census(reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[memory_observability] HEAP_CENSUS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+    try:
+        log_untracked_bytes_census(reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[memory_observability] UNTRACKED_CENSUS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+    try:
+        log_pymalloc_arena_stats(reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[memory_observability] PYMALLOC_STATS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+    try:
+        log_smaps_anon_breakdown(reason)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[memory_observability] SMAPS_THREAD_FAILED {type(exc).__name__}: {exc}", flush=True)
+
+
+def _watchdog_maybe_heap_census(payload: dict[str, Any]) -> None:
+    """Census the heap once we are holding the memory we are trying to explain."""
+    try:
+        anon_mb = payload.get("memory_unreclaimable_mb")
+        if anon_mb is None:
+            anon_mb = payload.get("memory_anon_mb")
+        if not watchdog_should_heap_census(
+            anon_mb=anon_mb, already_censused=bool(_WATCHDOG_STATE.get("heap_censused"))
+        ):
+            return
+        _WATCHDOG_STATE["heap_censused"] = True
+        # OFF-THREAD, for the reason the dump is: a walk of millions of objects
+        # holds the GIL, and a blocked sampler is indistinguishable from a calm
+        # system. Measured 2026-08-15 02:11-02:55.
+        import threading
+
+        threading.Thread(
+            target=_run_censuses,
+            args=(f"watchdog_anon_{int(float(anon_mb))}mb",),
+            name="memory-watchdog-census",
+            daemon=True,
+        ).start()
+    except Exception as exc:  # pragma: no cover - defensive, must never raise
+        print(
+            f"[memory_observability] WATCHDOG_HEAP_CENSUS_FAILED {type(exc).__name__}: {exc}",
             flush=True,
         )
 
@@ -940,6 +1449,7 @@ def _watchdog_loop(interval_seconds: float) -> None:  # pragma: no cover - threa
             if climb is not None:
                 payload["climb_mb_per_s"] = round(climb, 1)
             _watchdog_maybe_dump_allocations(payload, climb)
+            _watchdog_maybe_heap_census(payload)
             if current_mb is not None:
                 previous_mb = float(current_mb)
                 previous_at = now

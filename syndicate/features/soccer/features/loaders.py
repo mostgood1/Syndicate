@@ -41,6 +41,68 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
+def _as_iso_day(value: Any) -> str | None:
+    """A row's calendar day as ISO `YYYY-MM-DD`, or None if unparseable.
+
+    THE AS-OF FILTER WAS INERT FOR NINE OF TEN LEAGUES UNTIL THIS EXISTED, and
+    it looked like it worked.
+
+    `compute_team_ratings` compared `str(row["date"])[:10] >= cutoff` as raw
+    TEXT. That is only a date comparison when both sides are ISO. Measured
+    2026-08-15 across every committed history file:
+
+        history/*.csv       (football-data.co.uk, ALL 9 non-MLS leagues)  DD/MM/YYYY
+        team_history/*.csv  (Understat, 5 leagues)                        ISO
+
+    So for every `history`-backed league the comparison ran on strings like
+    `'17/05/2026'`, and `'17/05/2026' >= '2026-08-14'` is **False** because '1'
+    sorts before '2'. Every row was kept, whatever the cutoff. Demonstrated on
+    eredivisie's 918 matches: ratings as-of 2023-09-01 and as-of 2026-08-14
+    selected an **identical 923 match-rows**. A rating "as of September 2023"
+    was built from May 2026 results.
+
+    That is the exact leakage `soccer-backtest-leakage` was closed as fixing.
+    The fix was real but only ever bit the ISO sources, and the four leagues in
+    season right now -- eredivisie, primeira_liga, championship,
+    belgian_pro_league -- are `history`-only, so they had no protection at all.
+
+    THREE BUGS, ONE CAUSE, and the other two are live in production ratings:
+
+    - dates on the 30th/31st were dropped as "future" against any cutoff
+      (`'30/05/2024' >= '2026-08-14'` is True);
+    - the `rows.sort` that feeds `rows[-window:]` sorted the same text, so "the
+      most recent 45 matches" was really "the 45 latest in the MONTH" -- a
+      biased sample, not a recency window.
+
+    DAY-FIRST IS CONFIRMED FROM THE DATA, NOT ASSUMED: across 9,683 parsed
+    rows, 5,908 have a first component > 12 and **zero** have a second
+    component > 12. The order is unambiguous.
+
+    Anything not recognised returns None and is treated as UNDATED -- dropped
+    unless the caller explicitly allows undated rows. An unparseable date must
+    not take the permissive branch here of all places.
+    """
+    text = str(value or "").strip()
+    if not text:
+        return None
+    # ISO first, so an already-correct source is never reinterpreted.
+    if len(text) >= 10 and text[4] == "-" and text[7] == "-":
+        head = text[:10]
+        if head[:4].isdigit() and head[5:7].isdigit() and head[8:10].isdigit():
+            return head
+    parts = text.split("/")
+    if len(parts) == 3:
+        day, month, year = (part.strip() for part in parts)
+        if day.isdigit() and month.isdigit() and year.isdigit():
+            if len(year) == 2:
+                # football-data's older seasons use a 2-digit year. These files
+                # start in 2023, so the 1900s window cannot apply.
+                year = f"20{year}"
+            if len(year) == 4 and 1 <= int(month) <= 12 and 1 <= int(day) <= 31:
+                return f"{year}-{int(month):02d}-{int(day):02d}"
+    return None
+
+
 def team_rows_from_match_history(match_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Convert football-data match rows into per-team performance rows.
 
@@ -62,23 +124,110 @@ def team_rows_from_match_history(match_rows: list[dict[str, Any]]) -> list[dict[
 def compute_team_ratings(
     team_history_rows: list[dict[str, Any]],
     *,
+    as_of: str,
     window: int | None = None,
+    allow_undated: bool = False,
 ) -> dict[str, dict[str, float]]:
     """Per-team attack/defense ratings from per-match performance rows.
 
     Rows need ``team``, ``xg_for``, ``xg_against`` (Understat team-history
     rows match directly). ``window`` keeps only each team's most recent N
-    rows (rows are assumed chronologically ordered per team, as the
-    ingestion layer emits them).
+    rows.
+
+    ``as_of`` IS REQUIRED, AND THAT IS THE WHOLE POINT (audit §7 #6).
+
+    This function had no notion of time. It took ``rows[-window:]`` off
+    whatever history it was handed, and `backtest_soccer_live_lens.run_backtest`
+    computed it ONCE per league and then applied it to every match inside that
+    season -- so a March match was scored using ratings built partly from May
+    results. Every number in `data/soccer_source/*/validation/*_backtest_*.csv`
+    was produced that way and cannot be cited.
+
+    Required rather than defaulted, because the three call sites are NOT the
+    same case and a default would silently pick the wrong one for two of them:
+
+    - `backtest_soccer_live_lens` and `validate_soccer_vs_market` evaluate PAST
+      matches and must pass **each match's own date**.
+    - `build_soccer_artifacts` is PRODUCTION for FUTURE matches, where using all
+      available history is correct; it passes the target date and its behaviour
+      is unchanged, because a future date excludes nothing.
+
+    STRICTLY BEFORE, BY CALENDAR DAY. A match cannot inform its own prediction,
+    and same-day fixtures are excluded too: kickoff times within a day are not
+    reliably ordered across these sources, so "earlier that day" is not a
+    distinction this data can support. Conservative in the only safe direction.
+
+    A row with NO USABLE DATE IS DROPPED unless ``allow_undated`` is set. It
+    cannot be shown to predate `as_of`, and unknown must not take the permissive
+    branch here of all places.
+
+    ``allow_undated`` EXISTS FOR A REAL SOURCE, NOT AS AN ESCAPE HATCH.
+    `fetch_asa_mls_team_history` returns **season aggregates** -- one row per
+    team, `xgoals_for / count_games`, with no date at all. Two consequences,
+    and they pull in opposite directions:
+
+    - For a FORWARD-LOOKING caller (production artifacts, upcoming-fixture
+      validation) those rows are fine. `as_of` is today or later, so no row can
+      postdate it, and dropping them would silently empty MLS ratings entirely.
+      Those callers pass ``allow_undated=True`` and say why.
+    - For a BACKTEST they are **irreparable**. A season average already contains
+      the whole season, so no `as_of` can make it point-in-time; filtering rows
+      cannot fix a row that is itself contaminated. The backtest therefore does
+      NOT set this flag, MLS ratings come back empty, and that is the correct
+      answer: **MLS cannot be backtested from this source at all.** An empty
+      result that says so beats a number that quietly leaks.
+
+    Drops are counted and printed either way, because a ratings set that
+    collapses to empty is otherwise indistinguishable from a league with no
+    history.
     """
+    cutoff = _as_iso_day(as_of)
+    if not cutoff:
+        raise ValueError("compute_team_ratings requires an as_of date (YYYY-MM-DD)")
+
     by_team: dict[str, list[dict[str, Any]]] = {}
+    dropped_undated = 0
+    dropped_future = 0
     for row in team_history_rows:
         team = str(row.get("team") or "").strip()
         if not team:
             continue
         if _safe_float(row.get("xg_for")) is None or _safe_float(row.get("xg_against")) is None:
             continue
+        # PARSED, NOT SLICED. `str(date)[:10]` compared 'DD/MM/YYYY' against an
+        # ISO cutoff as raw text -- see `_as_iso_day` for what that cost.
+        row_day = _as_iso_day(row.get("date"))
+        if not row_day:
+            if not allow_undated:
+                dropped_undated += 1
+                continue
+            by_team.setdefault(team, []).append(row)
+            continue
+        if row_day >= cutoff:
+            dropped_future += 1
+            continue
         by_team.setdefault(team, []).append(row)
+
+    # Sort explicitly rather than trusting the caller. `window` takes the LAST N
+    # rows, so an unsorted input silently selects an arbitrary subset once
+    # filtering has removed rows from the middle -- and the old docstring's
+    # "rows are assumed chronologically ordered" was an assumption nothing
+    # checked.
+    #
+    # Sorted on the PARSED day for the same reason the filter is: sorting
+    # 'DD/MM/YYYY' as text orders by day-of-month, so "the most recent 45
+    # matches" was really "the 45 matches latest in the month" -- a biased
+    # sample of the season, feeding every rating these leagues produce.
+    # Undated rows sort first so they never displace a dated row from `window`.
+    for rows in by_team.values():
+        rows.sort(key=lambda row: _as_iso_day(row.get("date")) or "")
+
+    if dropped_undated:
+        print(
+            f"[soccer_ratings] AS_OF_DROPPED_UNDATED as_of={cutoff} "
+            f"rows={dropped_undated} teams_with_history={len(by_team)}",
+            flush=True,
+        )
 
     all_xg_for: list[float] = []
     for rows in by_team.values():
