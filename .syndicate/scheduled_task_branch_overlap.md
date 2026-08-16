@@ -11,7 +11,18 @@ reconcile deliberately, do not assume this one is current.
 
 Created 2026-08-15 (local) as Phase 0 measurement 4 of
 `.syndicate/plan_2026-08-16_sim_scheduling.md` (`#440`), lane
-`sim-engine-phase0-census`. Cron `15 */4 * * *` (local), notify on completion.
+`sim-engine-phase0-census`. Cron `45 19,22,1 * * *` (local), notify on completion.
+
+**Cron changed 2026-08-16 (local): `15 */4 * * *` → `45 19,22,1 * * *`.** The old
+grid fired at 00:15/04:15/08:15/12:15/16:15/20:15 and so spent three of six daily
+samples on hours where the failure does not happen. An OOM census over
+2026-08-09..08-16 (`scripts/render_events.py --failures-only`) found **42
+`oomKilled` events on refresh-worker, 41 of them between 15:00 and 23:59 local**
+(29 on 08-14 alone; one outlier at 00:0x). The three retained runs cover
+14:45–19:45, 17:45–22:45 and 20:45–01:45 — continuous 14:45–01:45 local, with the
+kill band double-covered and ~15 min of margin at the leading edge for dispatch
+jitter. Sampling frequency drops 6/day → 3/day while coverage of the band that
+matters goes up.
 
 **Why it is scheduled rather than run once.** Phase 1 changes soccer's refresh
 cadence and its success claim is "the overlap fell". That is only checkable
@@ -43,7 +54,7 @@ STEP 1 — run the instrument (read-only; reads Render's logs API, touches no wo
 py -3 scripts/watch_branch_overlap.py --hours 5
 ```
 
-It appends one JSON record per run to `reports/branch_overlap/baseline.jsonl` and prints an hour table. A 5-hour window against a 4-hour cadence overlaps slightly on purpose — a gap in the baseline is worse than a duplicated hour.
+It appends one JSON record per run to `reports/branch_overlap/baseline.jsonl` and prints an hour table. The 5-hour window against the 19:45/22:45/01:45 local cadence overlaps heavily on purpose — a gap in the baseline is worse than a duplicated hour, and those three windows are chosen to tile 14:45–01:45 local continuously. That band is where the failure lives: 41 of 42 refresh-worker OOM kills over 2026-08-09..08-16 landed between 15:00 and 23:59 local. Do not "helpfully" widen or shift the window; the hours are the point.
 
 STEP 2 — read the output honestly. Three outcomes are DIFFERENT and must not be reported the same way:
 - Exit code 2 with "NO LOG LINES RETURNED" → the reader failed. NOT a measurement. Say so.
@@ -56,11 +67,12 @@ STEP 3 — report briefly:
 - `WORST container (any sample)` and `WORST container while BOTH live`
 - whether worst container reached `container_memory_max_mb` (4096.0 MB on refresh-worker)
 
-STEP 4 — ESCALATE only on this condition: if `WORST container (any sample)` is at or above 4000 MB, say so prominently at the top of your report. On 2026-08-15 this read **4096.0 MB = 100.0% of cap** in three separate hours, against a previously recorded baseline of 3,972 MB / 97.0%.
+STEP 4 — ESCALATE only on this condition: if `WORST container (any sample)` is at or above 4000 MB, say so prominently at the top of your report. On 2026-08-15 this read **4096.0 MB = 100.0% of cap** in three separate hours, against a previously recorded baseline of 3,972 MB / 97.0%. Since then 4096.0 has been the reading in every record — treat it as the current normal, not as news, and report the hour table and the both-live share as the informative parts.
 
 IMPORTANT INTERPRETATION LIMITS — do not overstate:
 - `container_memory_mb` is cgroup `memory.current`, which INCLUDES page cache. A high value is NOT by itself a leak or an imminent OOM. Split anon vs inactive_file before calling it either. This mistake has been made in this repo before.
-- Never conclude "no OOM occurred" from a log search. Kills are EVENTS and appear in Render's events API, not in logs.
+- **At-cap is not a kill.** Measured 2026-08-16: a 5-hour window with `WORST container = 4096.0 MB` contained **zero** OOM events. Reclaim succeeding at the cap is exactly what page cache looks like. Never report an at-cap reading as if a kill happened.
+- Never conclude "no OOM occurred" from a log search. Kills are EVENTS and appear in Render's events API, not in logs. The read-only tool for that is `py -3 scripts/render_events.py --service refresh-worker --failures-only --since <ISO>`; running it to state whether a kill did or did not occur in your covered window is in scope and does not make this a diagnosis.
 - There is a separate open work lane `refresh-worker-oom-recurrence` owned by another session that owns diagnosing refresh-worker memory. This task MEASURES; it does not diagnose and must not change any code or config.
 
 DO NOT: deploy anything, edit any file other than the appended `reports/branch_overlap/baseline.jsonl`, or open/close any work lane.
