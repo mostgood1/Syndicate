@@ -5073,13 +5073,26 @@ def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, 
     return str(out_path) if out_path is not None else None
 
 
-def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_root: Path, force_refresh: bool = False) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
         processed_root=processed_root,
         file_name=f"cards_props_snapshot_{date_str}.json",
     )
-    if existing:
+    # THE ODD ONE OUT OF THIS TRIO UNTIL 2026-08-16: both siblings above take the
+    # force_refresh bypass and this one did not, so `--force-refresh` regenerated
+    # recommendations_slate and top_by_game while cards_props_snapshot kept
+    # re-serving the first file written for that date. Same "reuse-forever" shape
+    # the sibling comments already name.
+    #
+    # Found while explaining a `rows=0` win_prob counter reading: this gate is why
+    # the 2026-08-16 04:24 run fetched (`decision=will_fetch`) and still computed
+    # no win_prob -- pid 2466 emitted only the exit record, no per-builder record,
+    # because no builder was CALLED. This exporter is also the one whose builder
+    # produced the `rows=32/null=3` reading, so its staleness is the least visible
+    # of the three: the artifact that most needs rebuilding was the one that could
+    # not be forced.
+    if existing and not force_refresh:
         return existing
     _, out_path = _build_local_cards_props_snapshot_artifact(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
@@ -5536,7 +5549,7 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
         recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
         if recommendations_slate_path:
             copied["recommendations_slate_path"] = recommendations_slate_path
-        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root)
+        cards_props_snapshot_path = _export_cards_props_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
         if cards_props_snapshot_path:
             copied["cards_props_snapshot_path"] = cards_props_snapshot_path
         cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=effective_source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
