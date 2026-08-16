@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import unicodedata
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -68,11 +69,33 @@ _HRR_COMPONENT_MEANS: tuple[str, ...] = ("h_mean", "r_mean", "rbi_mean")
 def _norm_name(value: Any) -> str:
     """Normalised player name for joining sim output to quote rows.
 
-    Accents and punctuation differ between feeds -- the same fold `#218`'s team
-    matching needed. Kept deliberately simple: lowercase, strip non-letters, and
-    collapse whitespace.
+    ACCENTS ARE FOLDED TO ASCII, NOT DELETED, and that one word is the whole
+    fix. The docstring here already claimed accents were handled -- "the same
+    fold `#218`'s team matching needed" -- and the code did the opposite: with
+    no decomposition step, `re.sub(r"[^a-z ]", " ", text)` REPLACED every
+    accented letter WITH A SPACE, splitting the name in half.
+
+        "Eugenio Suarez"  -> "eugenio suarez"
+        "Eugenio Suárez"  -> "eugenio su rez"     <- never joins
+
+    So any player one feed spells with an accent and the other spells plain was
+    invisible to the projection join. Measured on production 2026-08-16: 63 MLB
+    players carried NO projection on ANY stat, holding 337 rows, and the list is
+    led by Eugenio Suárez, Francisco Álvarez and Andrés Giménez. I first
+    recorded that population as a stale lineup/injury fingerprint; for the
+    accented names it was never a fingerprint problem at all.
+
+    NOT ALL 63 ARE ACCENTED -- Christian Yelich is on the same list -- so this
+    fixes one cause of that population and not the whole of it. The remainder
+    is a genuine lineup question and stays open.
+
+    `unicodedata.normalize("NFD", ...)` splits a precomposed character into its
+    base letter plus a combining mark; dropping category `Mn` (nonspacing mark)
+    leaves the base letter. `ñ` -> `n` and `ü` -> `u` follow the same path,
+    which is what the quote feeds actually do when they strip accents.
     """
-    text = str(value or "").strip().lower()
+    text = unicodedata.normalize("NFD", str(value or "").strip().lower())
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
     text = text.replace(".", " ").replace("'", "").replace("-", " ")
     text = re.sub(r"[^a-z ]", " ", text)
     return " ".join(text.split())
@@ -363,15 +386,42 @@ class PropProjectionIndex:
             }
 
         if market_key == _HR_MARKET:
+            # THE LINE PICKS THE RUNG, like every other counting stat.
+            #
+            # This used to read `if not row or abs(line_value - 0.5) > 0.01:
+            # return None` -- an outright refusal of every line but 0.5, which
+            # matched a sim that counted only `hr_1plus`. Measured on production
+            # 2026-08-16: `batter_home_runs` 240/290 projected at 0.5, **1/260
+            # at 1.5 and 0/244 at 2.5** -- 504 rows, the largest single coverage
+            # gap on the board, and three layers each enforcing a limit none of
+            # them needed.
+            #
+            # The sim now walks the same ladder for HR that it always walked for
+            # hits/runs/RBIs/total bases, so the bucket is derived here the same
+            # way too rather than hard-coded.
+            #
+            # ONE INDEX KEY, MANY RUNGS: HR rows come from the separate
+            # `hitter_hr_likelihood_all` payload as ONE row per player carrying
+            # every `p_hr_Nplus`, so the row is still found under `hr_1plus`
+            # while the FIELD varies. Indexing per rung would have implied a row
+            # per rung, which the payload does not have.
             row = self._hitters.get((name, "hr_1plus"))
-            if not row or abs(line_value - 0.5) > 0.01:
+            if not row:
                 return None
-            prob = row.get("p_hr_1plus_cal", row.get("p_hr_1plus"))
+            bucket = _bucket_for_line("hr", line_value)
+            if bucket is None:
+                return None
+            prob = row.get(f"p_{bucket}_cal", row.get(f"p_{bucket}"))
+            if prob is None:
+                # An artifact written before the sim counted this rung. Absent,
+                # not zero -- a 0.0 here would be indistinguishable from "the
+                # model says it will not happen" and would price against it.
+                return None
             return {
                 "projected": row.get("hr_mean"),
-                "model_prob_over": round(float(prob), 4) if prob is not None else None,
+                "model_prob_over": round(float(prob), 4),
                 "source": "hitter_threshold",
-                "basis": "hr_1plus",
+                "basis": bucket,
             }
 
         if market_key in _HITTER_BUCKETS:

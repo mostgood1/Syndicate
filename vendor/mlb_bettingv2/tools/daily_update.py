@@ -763,8 +763,25 @@ def _simw_chunk(start_i: int, n: int) -> Dict[str, Any]:
                     _inc_ge("doubles_1plus", pid)
                 if d3 >= 1:
                     _inc_ge("triples_1plus", pid)
-                if hr >= 1:
-                    _inc_ge("hr_1plus", pid)
+                # HR GOES THROUGH THE LADDER LIKE EVERY OTHER COUNTING STAT.
+                #
+                # This read `if hr >= 1: _inc_ge("hr_1plus", pid)` -- the only
+                # multi-valued hitter stat here NOT using the helper on the line
+                # above it. The market quotes 0.5, 1.5 and 2.5; the board
+                # therefore had 504 rows it could never answer, measured on
+                # production 2026-08-16: `batter_home_runs` 240/290 projected at
+                # line 0.5, **1/260 at 1.5 and 0/244 at 2.5**.
+                #
+                # Nothing about the model needed to change. Each sim already
+                # produces a whole-game HR count per batter; only the >=2 and
+                # >=3 tallies were being dropped, in the same loop that keeps
+                # them for hits, runs, RBIs and total bases.
+                #
+                # Depth 3 matches `hits`: 3+ HR in a game is a real market and a
+                # rare event, and a rung with a tiny count is still an honest
+                # probability -- the consumer's precision handling is a separate
+                # question from whether the number exists.
+                _inc_ge_thresholds("hr", pid, hr, 3)
                 _inc_ge_thresholds("hits_runs_rbis", pid, hrr, 5)
                 _inc_ge_thresholds("runs", pid, rr, 3)
                 _inc_ge_thresholds("rbi", pid, rbi, 4)
@@ -4453,8 +4470,12 @@ def _sim_many(
                         _inc_ge("doubles_1plus", pid)
                     if d3 >= 1:
                         _inc_ge("triples_1plus", pid)
-                    if hr >= 1:
-                        _inc_ge("hr_1plus", pid)
+                    # THE SECOND OF TWO SITES, and both must move together.
+                    # See the long note at the first one. The comment a few
+                    # lines above this block records `#334`, where exactly this
+                    # duplication was changed in one place and not the other and
+                    # zeroed `hrr_mean`; this is the same pair.
+                    _inc_ge_thresholds("hr", pid, hr, 3)
                     _inc_ge_thresholds("hits_runs_rbis", pid, hrr, 5)
                     _inc_ge_thresholds("runs", pid, rr, 3)
                     _inc_ge_thresholds("rbi", pid, rbi, 4)
@@ -4610,6 +4631,21 @@ def _sim_many(
                         prop_key="hr_1plus",
                     )
                 ),
+                # THE HIGHER RUNGS, now that the loop counts them.
+                #
+                # RAW ONLY, NO `_cal`, AND THAT IS DELIBERATE.
+                # `hitter_hr_prob_calibration` was fitted against `hr_1plus`
+                # outcomes; applying it to P(HR>=2) would push an unvalidated
+                # correction through a distribution it was never measured on and
+                # produce a confident number nobody has checked. The consumer
+                # prefers `_cal` when present and falls back to raw, so omitting
+                # it is the honest signal that this rung is uncalibrated.
+                #
+                # A rung with zero sims reads 0.0, which is a real probability
+                # estimate at this sim count and not a missing value -- the
+                # market's own price is what says whether 0.0 is credible.
+                "p_hr_2plus": float(_p("hr_2plus", int(pid))),
+                "p_hr_3plus": float(_p("hr_3plus", int(pid))),
                 "hr_mean": float(_stat(pid, "HR")) / denom_sims,
                 "pa_mean": float(_stat(pid, "PA")) / denom_sims,
                 "ab_mean": float(_stat(pid, "AB")) / denom_sims,
