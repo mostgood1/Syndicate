@@ -141,12 +141,22 @@
       rail cards (live chips + rows)   108        -> 18       PASS
       no_bettable_book / repriced       absent    -> absent    FAIL
 
-- **OWED, and it is the only functional debt from this lane:**
-  `no_bettable_book` and `repriced_to_bettable` are returned by
-  `build_layer2_rows` and never published — `pipeline/layer2_shortlist.py`
-  assembles `per_sport_stats` from an explicit key list that omits them.
-  The filter works and is invisible. `#397`'s trap. **One-line fix, in a file
-  this lane already claims.**
+- **OWED -> FIXED IN CODE, NOT DEPLOYED (`7576b1d5`).**
+  `no_bettable_book` / `repriced_to_bettable` now reach `per_sport_ingest`.
+  The gap was that `#397`'s "add the counter in the same commit as the rule" is
+  NOT SUFFICIENT — the counter has to be added everywhere the payload is
+  ASSEMBLED, which on this path is three places. Producer-side, so it **rides
+  along with the next worker deploy**; web needs nothing. Falsification once it
+  ships: `per_sport_ingest.mlb.no_bettable_book` is present and an integer.
+- **Found and PARTLY fixed on the way, handed on:** `test_layer2_shortlist_wiring`
+  patched `read_book_quotes` while the code calls `read_book_quotes_latest`, so
+  its fixtures were INERT and the tests read the real disk (same defect as
+  `test_layer2_sweep_state`'s, fixed earlier today). Renamed; **1 of 7 goes
+  green.** The other **6 are red for a deeper reason, traced not guessed**: the
+  fixtures' quote-row shape no longer satisfies `build_book_grid` —
+  reproduced directly as `quote_rows: 1` in, `grid_rows: 0` out. Not this
+  lane's, not a one-line fix, and it makes those tests environment-dependent
+  until someone owns it.
 - **STILL NOT DONE — G4 (movement/steam) and G7 (live-lens projection).**
   G4 is blocked on the odds sampling interval (`odds-cadence-off-the-mlb-peak`,
   effect unmeasured) and on `#372`'s stall cause. G7 overlaps

@@ -7103,7 +7103,31 @@ which is what the shortlist already publishes) — a one-line change to the
 field it reads (`sim_view`) is stamped by the worker, which has not deployed.
 Verified the degrade is silent: 0 badges render, no console error.
 
-**MEASUREMENT (worker): ____________**
+**MEASUREMENT (worker): SUPERSEDED — that branch (`b8939778`) was never deployed.**
+It went two deploys stale behind the gate and was re-cut as `7b544eb4`; the real
+measurement is under the 18:13:53Z entry below. Left in place rather than
+deleted, because a blank placeholder that is silently removed reads as a
+measurement nobody took.
+
+**RE-VERIFIED 2026-08-16 ~19:0xZ, after TWO further worker deploys by other
+sessions.** The worker is now on `a72b4bf4` (live 18:54:37Z), two past mine.
+Content on the CURRENT live SHA: `no_bettable_book` 4, `_is_lay_market` 2,
+`_row_team` 2, `sim_view` 3, `repriced_to_bettable` 4, `book_shortlist.py`
+PRESENT. Outcomes on the served payload (artifact 18:52:57Z, 92 rows / 88 cards):
+
+    best book outside DEFAULT_BOOKS   0        h2h_lay rows            0
+    prop cards team == away_team      0        cards on unbettable bk  0
+    cards carrying sim_view           88/88    lay cards               0
+
+**Stated precisely: that artifact (18:52:57Z) PREDATES the current live SHA
+(18:54:37Z), so it verifies my fixes, not `a72b4bf4`.** The content check above
+is what covers `a72b4bf4`. Conflating the two would be claiming a build proved
+code it never ran.
+
+**THE COUNTER GAP IS FIXED IN CODE AND NOT DEPLOYED** (`7576b1d5`,
+`pipeline/layer2_shortlist.py`): `no_bettable_book` / `repriced_to_bettable` now
+reach `per_sport_ingest`. Producer-side only — **rides along with the next
+worker deploy; web needs nothing.**
 
 ---
 
