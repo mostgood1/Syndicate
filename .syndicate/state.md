@@ -560,9 +560,35 @@ instrument.
 ---
 
 
-### The ±4900 fair-price clamp — DEPLOYED 2026-08-15 21:11:54Z. **NOT VERIFIED.**
+### The ±4900 fair-price clamp — web + refresh-worker FIXED. live-odds-worker STILL CARRIES IT. **STILL NOT VERIFIED.**
 
-- **ALL THREE sites are fixed AND LIVE.** web `e831263e`
+- **THE WEB-ONLY DEPLOY WAS FALSIFIED IN PRODUCTION** `[measured 08-15 23:10:13Z
+  and 23:15:46Z]`. Two triggers, two unrelated slates, both `PRE_FIX_MISPRICE`
+  while a fix-carrying web SHA was live: nfl `h2h_3_way` 0.014698 → **+4900**
+  (correct +6704); mlb `spreads` 0.009911/0.990089 → **±4900** (correct ±9990).
+  `reports/clamp_watch/trigger_20260815T231013+0000.json`, `..._231546+0000.json`.
+- **WEB IS NOT THE PRODUCER AND ITS FIX IS STRUCTURALLY INERT.** The block is a
+  **backfill** — `if fair_probability is not None and card.get("fair_price") is
+  None:` — so a value clamped upstream passes through untouched. Web can only
+  act when the field arrives ABSENT. The producer is the intelligence-state
+  loop: `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` is `true` **only
+  on refresh-worker** (`render.yaml:499`).
+- **refresh-worker FIXED: `57a437d5`, live 2026-08-16 00:23:04Z** — 0
+  occurrences of `max(0.02, min(0.98` across all three files at the live SHA.
+  Cut on live `2c14d9ae` (off-main deploy branch).
+- **live-odds-worker STILL CARRIES THE CLAMP** on `c4116ab6`. Deferred by user
+  decision — it does not run the intelligence-state loop, so it is not the
+  producer. `079cc42b` is cut/tested/pushed on `deploy/clamp-workers-on-live`;
+  **re-cut on the live SHA first**, that service moved 4× in 100 minutes.
+- **STILL NOT VERIFIED** `[reads 08-16 00:24:04Z and 01:30:50Z]`: both
+  `no_trigger` (12 then 68 rows, extremes 0.0687/0.8904). Same reading a quiet
+  slate gives with the bug fully present. `out_of_clamp=0` is never evidence.
+  Both of the real triggers came from **in-play** markets late in games.
+- **A CLAIM'S TARGET IS AN INTENTION, NOT A DEPLOYMENT** `[measured 08-15/16]`.
+  live-odds-worker's claim advertised clean target `49797f4b` for 45 min; it
+  never landed. `c422f79a` then `c4116ab6` landed instead, both clamping.
+  Verify by CONTENT at the live SHA.
+- Superseded detail: web `e831263e`
   (`dep-da0d8vnlk1mc73fn8ta0`). **Survived two later deploys** — checked by
   CONTENT on each new live SHA (`bb23c8f9`, `8b010dac`): **0/0** occurrences of
   `max(0.02`. `render_deploy.py`'s descendant rule is what protects it.
@@ -583,6 +609,13 @@ instrument.
   (`MLB_ENABLE_LIVE_LENS_LOOP`, `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP`,
   `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP` all `false` on the live
   service). Read it, then decide per service.
+- **`check_deploy_safety.py` ALSO REPORTS `CLEAR` WHILE JOBS RUN ON THE SERVICE**
+  `[measured 08-16 00:13Z refresh-worker, reproduced 00:29Z live-odds-worker]`.
+  It returned `CLEAR`, exit 0, "Odds refresh: idle" while that same service ran
+  `run_refresh_odds_job.py` → `refresh_odds_sources.py` →
+  `build_soccer_artifacts.py --league <X>`. **Gate a worker deploy on
+  `safety_rc == 0` AND zero `[JOB]` lines in `deploy_preflight --service <svc>`**,
+  re-verified in the same shell command as the POST.
 - **Web deploy contention is REAL: 6 deploys in ~50 minutes** from concurrent
   sessions. Landing one took THREE cuts — `render_deploy.py` refused the first
   as a 189-line rollback, Render canceled the second 0.4s after a competing

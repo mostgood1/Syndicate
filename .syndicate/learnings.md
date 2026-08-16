@@ -1435,3 +1435,34 @@ for free on the same call that gates the jobs, so there is no excuse of cost.
 
 Corollary: **you cannot release a claim you no longer hold**, and `--force`
 against a live claim breaks another session's lock. Mine was gone; I left it.
+
+## 2026-08-16 — FORBIDDEN: never read a deploy claim's `target` as a statement about what is running
+
+**Measured 2026-08-15/16 on live-odds-worker.** Its claim advertised
+`target=49797f4b`, and `49797f4b` genuinely carried the clamp fix — verified by
+reading the code, not just counting a grep. I concluded twice, in writing, that
+the service "needs nothing".
+
+It never landed. Over 100 minutes the service went
+`f0452408` → `b7ae47e6` → `c422f79a` → `c4116ab6`, and **every one of those
+still carried the clamp.** The clean target sat pending under the claim the
+whole time and was superseded by other work from the same session.
+
+**A claim is a lock plus a stated intention. It is not a deployment, not a
+queue, and not a promise.** The holder can deploy something else, deploy
+nothing, or let the claim expire — all of which happened here.
+
+**How to apply.** The only answer to "does the running code have X" is content
+at the CURRENT live SHA:
+
+```bash
+py -3 scripts/deploy_preflight.py --service <svc>   # read live commit
+git grep -c "<pattern>" <live commit> -- <files>    # by content, not ancestry
+```
+
+Re-read it after any wait — these SHAs moved 4× in 100 minutes on one service
+and 3× on another the same night. Sibling rules:
+[[feedback_test_the_fixs_predicate_not_its_deploy_state]] (a deployed fix can be
+inert) and [[project_web_runs_a_deploy_branch_not_main]] (ancestry proves
+nothing here). This is the same shape one level up: I checked the artifact of an
+*intention* instead of the artifact of an *action*.
