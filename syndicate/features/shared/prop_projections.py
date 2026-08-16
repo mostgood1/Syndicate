@@ -735,6 +735,81 @@ def _no_vig_over_probability(row: Mapping[str, Any]) -> float | None:
     return round(over_implied / total, 4)
 
 
+def _edge_unavailable_reason(
+    row: Mapping[str, Any], *, model_prob: Any, fair: Any
+) -> str:
+    """WHICH term is missing, in the words of the branch that dropped it.
+
+    Derived from the row rather than guessed, and deliberately mirroring
+    `_no_vig_over_probability`'s refusal branches in the same order -- a reason
+    that names the wrong subsystem sends the next reader somewhere else, which
+    is worse than a blank one. `soccer_projections` records the same rule for
+    the same reason.
+
+    THE MODEL TERM IS CHECKED FIRST because it is a different subsystem: a
+    missing `model_prob_over` is the projection being mean-only (`#263`'s
+    ladder: MLB distribution -> soccer probability at some lines -> WNBA means
+    -> NFL nothing), while a missing `fair` is the MARKET not quoting a second
+    side. Reporting a means-only WNBA row as "one-sided market" would blame the
+    book for a modelling gap.
+    """
+    if model_prob is None:
+        return (
+            "projection is a mean with no distribution, so no probability-space "
+            "edge exists for this market"
+        )
+    if fair is not None:
+        # BOTH TERMS PRESENT AND STILL NO EDGE -- a real population, not a
+        # defensive branch that never fires. Measured on production 2026-08-16:
+        # 3 WNBA `h2h` rows, projections stamped `source: "wnba_game_cards"` /
+        # `basis: "margin_win_prob"`, carrying a `model_prob_over` against a
+        # perfectly computable no-vig fair and no `market_fair_prob_over` key at
+        # all -- i.e. attached by a producer that never runs the edge step.
+        #
+        # I FIRST WROTE THIS DOWN AS A SIDE-FRAME MISMATCH AND IT WAS NOT.
+        # `projection.side` on those rows is a team NAME ("Phoenix Mercury")
+        # while `consensus` is keyed `home`/`away`, so the subtraction looked
+        # like it spanned opposite teams. Checked: all three named the HOME
+        # team, so the terms do agree. The reason string says only what was
+        # established.
+        #
+        # NOT computed here on purpose. One of the three reads model 0.9673
+        # against a market fair of 0.6502 -- a +31.7 pp moneyline edge, on a
+        # projection whose own `model_skill` says "model never backtested". A
+        # confident number off an unvalidated input is the clamp failure mode,
+        # so the row stays refused and says why.
+        return (
+            "this projection's producer does not compute a probability-space "
+            "edge, so none was priced"
+        )
+
+    sides = [str(side).strip().lower() for side in (row.get("sides") or [])]
+    consensus = row.get("consensus") if isinstance(row.get("consensus"), Mapping) else {}
+    over_side = next((s for s in sides if s in {"over", "yes", "home", "1"}), None)
+    under_side = next((s for s in sides if s in {"under", "no", "away", "2"}), None)
+    draw_side = next((s for s in sides if s in {"draw", "tie", "x"}), None)
+
+    if not over_side or not under_side:
+        return "one-sided market: no two-sided fair to price against"
+    if draw_side is not None and _implied((consensus or {}).get(draw_side)) is None:
+        return "3-way market: incomplete price set, no fair to price against"
+    missing = [
+        side
+        for side in (over_side, under_side)
+        if _implied((consensus or {}).get(side)) is None
+    ]
+    if missing:
+        # Two sides are QUOTED but at least one has no consensus price. That is a
+        # different fact from a one-sided market and points at the quote join,
+        # not at the book.
+        return (
+            "no consensus price on "
+            + " and ".join(missing)
+            + ", so no two-sided fair could be computed"
+        )
+    return "no two-sided fair could be computed from the quoted prices"
+
+
 def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionIndex) -> dict[str, Any]:
     """Stamp `projection` onto each grid row that the sim can answer for.
 
@@ -813,12 +888,32 @@ def attach_projections(grid_rows: list[dict[str, Any]], index: PropProjectionInd
         if live_reason:
             projection["edge_vs_market_pct"] = None
             projection["edge_unavailable_reason"] = live_reason
+        elif model_prob is not None and fair is not None:
+            projection["edge_vs_market_pct"] = round((float(model_prob) - float(fair)) * 100.0, 2)
         else:
-            projection["edge_vs_market_pct"] = (
-                round((float(model_prob) - float(fair)) * 100.0, 2)
-                if model_prob is not None and fair is not None
-                else None
-            )
+            # SAY WHY. This branch used to set `edge_vs_market_pct = None` and
+            # nothing else, so the row served a blank Edge with no reason field
+            # at all -- not null, ABSENT. Measured on production 2026-08-16:
+            # 284 of MLB's 2,843 served rows landed here, 223 of them
+            # `batter_home_runs`, every one carrying a `model_prob_over` and a
+            # null `market_fair_prob_over`. A reader could not tell them from a
+            # broken join.
+            #
+            # The refusal itself is correct and stays -- `_no_vig_over_probability`
+            # returns None rather than de-vigging one leg (`#238`). What was
+            # missing is the standard `live_gameline_join` already states two
+            # files away: "Every zero must be diagnosable by reason."
+            # `soccer_projections` has attributed this same refusal since it was
+            # written; this is the sibling copy catching up, not a new policy.
+            projection["edge_vs_market_pct"] = None
+            # An edge may still exist under the OTHER contract. `_mean_projection`
+            # sets `edge_vs_line` in stat units for mean-based sports (WNBA), and
+            # stamping "unavailable" over a row that is carrying one would be a
+            # reason that contradicts its own payload.
+            if projection.get("edge_vs_line") is None:
+                projection["edge_unavailable_reason"] = _edge_unavailable_reason(
+                    row, model_prob=model_prob, fair=fair
+                )
         row["projection"] = projection
         attached += 1
         if projection["edge_vs_market_pct"] is not None:
