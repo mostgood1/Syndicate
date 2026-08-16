@@ -14,10 +14,22 @@ Polling for 7 hours would burn API calls to learn the same thing later.
 
 ## The question they answer, and only that one
 
-**DID THE TRANSIENT MOVE?** Three fixes are live in `d72d670c` (live
-2026-08-16T06:01:34Z) — `51ae7218` odds-shard duplicate, `21f8a165` ledger
-streaming, `aa190d58` three-loads-to-one. All are exercised in production and
-**none has been shown to change the ~2GB excursion.**
+**DID THE TRANSIENT MOVE?** Three fixes are live — odds-shard duplicate, ledger
+streaming, three-loads-to-one. All are exercised in production and **none has
+been shown to change the ~2GB excursion.**
+
+Their SHAs were **rebased** on 2026-08-16, which renamed all three while
+changing nothing:
+
+| change | original SHA | live SHA |
+|---|---|---|
+| odds-shard duplicate parse | `51ae7218` | `164f6e80` |
+| ledger streaming | `21f8a165` | `1409e96f` |
+| three-loads-to-one | `aa190d58` | `d72d670c` |
+
+Verified by `git patch-id --stable`, not by subject line. They are linear
+(`164f6e80` → `1409e96f` → `d72d670c`), so one ancestry check on `d72d670c`
+covers all three.
 
 Judge against the night baselines: amplitude mean **1,950-2,235 MB**;
 `min inactive_file` **26.3 / 42.2 MB** in the two windows that ended in a kill
@@ -46,6 +58,23 @@ kills, the deploy split, and `min inactive_file` 26.3 / 42.2.
 
 ## Note for whoever reads the result
 
-If the live SHA is no longer `d72d670c`, the comparison is invalid — other
-sessions redeploy this service frequently and one of them may have reverted the
-fixes. Check the SHA before reading the numbers.
+**Check containment, not SHA equality.** The earlier version of this note said
+the comparison was invalid if live was no longer `d72d670c`. That test is wrong
+and fired falsely within a day: refresh-worker moved to `97491161` (finished
+2026-08-16T15:45:50Z) purely because the branch was rebased plus one unrelated
+NFL play-by-play fix (`#441`). All three fixes were still running. A SHA
+equality test cannot tell a revert from a rename.
+
+The right check:
+
+```bash
+git merge-base --is-ancestor d72d670c <live-sha>
+```
+
+Present → the fixes are in what is running, regardless of the tip SHA. Absent →
+still not proof of a revert; re-check by content with `git patch-id --stable`
+across `git log <live-sha>` before saying anything, because the next rebase will
+rename `d72d670c` too.
+
+Live at last check: **`97491161`**, 2026-08-16T15:45:50Z. That value goes stale
+in minutes — read it, don't quote it.
