@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+from collections.abc import Iterable, Mapping
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -4005,6 +4006,17 @@ def _fixture_aware_cadence_enabled() -> bool:
 	return _env_bool("SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE", default=False)
 
 
+def _league_scoped_cadence_enabled() -> bool:
+	"""`#440` Phase 1c. A SEPARATE flag from 1b, deliberately.
+
+	1b (sport-level tiers) is already enabled on refresh-worker and verified. If
+	1c shared that flag, turning 1c off after an incident would also turn off a
+	working 1b, and the rollback would be blamed on the wrong change. Separate
+	flags are what make one-change-per-deploy actually possible here.
+	"""
+	return _env_bool("SYNDICATE_PREGAME_LEAGUE_SCOPED_CADENCE", default=False)
+
+
 # Bounded at 4 days deliberately: the widest tier boundary is 48h, so anything
 # past ~2 days is already "far" and scanning further buys no decision. An
 # unbounded look-ahead is the shape that produced the 2026-07-25 OOM elsewhere in
@@ -4091,6 +4103,198 @@ def _fixture_aware_interval_seconds(sport: str, *, now_epoch: float) -> tuple[in
 				return None, f"{label}:{int(seconds_out)}s"
 			return interval, f"{label}:{int(seconds_out / 3600)}h_out"
 	return _PREGAME_SWEEP_INTERVAL_FALLBACK, "unreachable_tier"
+
+
+# ---------------------------------------------------------------------------
+# `#440` Phase 1c -- PER-LEAGUE soccer cadence.
+#
+# WHY THIS EXISTS AT ALL: `_next_fixture_epoch` resolves ONE clock per sport, but
+# soccer's "sport" is ten leagues on ten calendars, so the gap it returns is the
+# MINIMUM across all of them and is therefore almost always small. Modelled over
+# 336 hours against the real 2026 fixture lists, the 24h tier was reached in
+# 0.0% of sport-hours versus 49.3% of LEAGUE-hours. That difference is the whole
+# feature; at sport granularity the gate made soccer WORSE (+69% sweeps/day).
+#
+# THE ENABLING DETAIL, measured 2026-08-16: soccer events returned by
+# `fetch_schedule_for_date` carry NO league attribute -- but `event_id` is
+# league-prefixed (`'la_liga:401882923'`). So the per-league clock is derivable
+# here, without touching any soccer-owned module. That matters beyond tidiness:
+# `build_soccer_artifacts.py` and `run_live_odds_refresh_worker.py` are claimed
+# by OPEN lane `refresh-worker-oom-recurrence`, and needing neither is what keeps
+# this change collision-free.
+_LEAGUE_SCOPED_SPORTS: frozenset[str] = frozenset({"soccer"})
+_NEXT_FIXTURE_BY_LEAGUE_CACHE: dict[str, tuple[float, dict[str, float]]] = {}
+
+
+def _league_from_event_id(event_id: object) -> str | None:
+	"""`'la_liga:401882923'` -> `'la_liga'`. None when unprefixed.
+
+	Returning None rather than guessing is deliberate: an unprefixed id means the
+	adapter changed shape, and inventing a league would silently bucket every
+	fixture under one name -- which reads exactly like "one league has a kickoff
+	in 20 minutes" and would pin the whole sport to the fastest tier.
+	"""
+	text = str(event_id or "").strip()
+	if ":" not in text:
+		return None
+	league = text.split(":", 1)[0].strip().lower()
+	return league or None
+
+
+def _next_fixture_epoch_by_league(sport: str, *, now_epoch: float) -> dict[str, float]:
+	"""{league: epoch of its next fixture} inside the lookahead window.
+
+	Unlike `_next_fixture_epoch` this must NOT short-circuit on the first date
+	that yields a fixture: MLS having a game tonight says nothing about when
+	la_liga next plays, and stopping early would leave every other league absent
+	-- which the caller cannot distinguish from "no fixture", the permissive
+	answer. Scans the full bounded window and keeps the earliest per league.
+	"""
+	sport = str(sport or "").strip().lower()
+	cached = _NEXT_FIXTURE_BY_LEAGUE_CACHE.get(sport)
+	if cached is not None and (now_epoch - cached[0]) < _NEXT_FIXTURE_CACHE_TTL_SECONDS:
+		return dict(cached[1])
+
+	found: dict[str, float] = {}
+	base = central_datetime_from_epoch(now_epoch).date()
+	for offset in range(0, _NEXT_FIXTURE_LOOKAHEAD_DAYS + 1):
+		date_str = (base + timedelta(days=offset)).isoformat()
+		try:
+			events = fetch_schedule_for_date(sport, date_str)
+		except Exception:
+			# One unreadable date must not decide the whole answer; keep scanning.
+			continue
+		for event in events or []:
+			league = _league_from_event_id(getattr(event, "event_id", None))
+			if league is None:
+				continue
+			try:
+				epoch = event.start_time_epoch()
+			except Exception:
+				epoch = None
+			if epoch is None or epoch <= now_epoch:
+				continue
+			current = found.get(league)
+			if current is None or epoch < current:
+				found[league] = float(epoch)
+
+	if len(_NEXT_FIXTURE_BY_LEAGUE_CACHE) > 8:
+		_NEXT_FIXTURE_BY_LEAGUE_CACHE.clear()
+	_NEXT_FIXTURE_BY_LEAGUE_CACHE[sport] = (now_epoch, dict(found))
+	return dict(found)
+
+
+def _league_interval_from_epoch(next_epoch: float | None, *, now_epoch: float) -> tuple[int | None, str]:
+	"""Tier lookup for ONE league. Same ladder as the sport-level path.
+
+	Shares `_FIXTURE_TIER_SECONDS` on purpose: two ladders that drift apart would
+	make `sport=soccer` and `league=mls` disagree about what "near" means.
+	"""
+	if next_epoch is None:
+		# UNKNOWN IS THE MIDDLE TIER, NAMED -- not the fastest (which keeps the
+		# sweeps this exists to remove) and not the slowest (which would starve a
+		# league whose schedule artifact merely went missing).
+		return _PREGAME_SWEEP_INTERVAL_FALLBACK, "unresolved_no_fixture_found"
+	seconds_out = float(next_epoch) - float(now_epoch)
+	if seconds_out <= 0:
+		return None, "fixture_in_progress"
+	for ceiling, interval, label in _FIXTURE_TIER_SECONDS:
+		if seconds_out < ceiling:
+			if interval <= 0:
+				return None, f"{label}:{int(seconds_out)}s"
+			return interval, f"{label}:{int(seconds_out / 3600)}h_out"
+	return _PREGAME_SWEEP_INTERVAL_FALLBACK, "unreachable_tier"
+
+
+def _due_league_scope_text(sport: str, *, now_epoch: float | None = None) -> str | None:
+	"""Comma-joined due leagues for `--soccer-leagues`, or None for "all".
+
+	None on EVERY uncertain path -- flag off, not a league-scoped sport, nothing
+	resolved, or any exception. None means the launch keeps today's behaviour of
+	refreshing every active league. The opposite default would let a transient
+	schedule-read failure silently narrow a refresh to a subset, which looks
+	identical to a league that has no fixtures and would go unnoticed for days.
+	"""
+	sport = str(sport or "").strip().lower()
+	if sport not in _LEAGUE_SCOPED_SPORTS or not _league_scoped_cadence_enabled():
+		return None
+	try:
+		due, _ = _due_leagues_for_sport(
+			sport,
+			now_epoch=float(now_epoch if now_epoch is not None else time.time()),
+			markers=_read_pregame_sport_sweep_epochs(),
+		)
+	except Exception as exc:
+		print(
+			f"[live_refresh_loop] LEAGUE_SCOPE_UNRESOLVED sport={sport} "
+			f"error={type(exc).__name__}: {exc} -- launching all leagues",
+			flush=True,
+		)
+		return None
+	return ",".join(due) if due else None
+
+
+def _league_marker_key(sport: str, league: str) -> str:
+	"""Marker key for one league. Namespaced so it cannot collide with a sport.
+
+	`soccer:mls` rather than `mls`: the epoch map is shared with the per-sport
+	markers, and a bare league name would be indistinguishable from a sport slug
+	if a league were ever named like one.
+	"""
+	return f"{str(sport).strip().lower()}:{str(league).strip().lower()}"
+
+
+def _due_leagues_for_sport(
+	sport: str,
+	*,
+	now_epoch: float,
+	markers: Mapping[str, float] | None = None,
+	leagues: Iterable[str] | None = None,
+) -> tuple[list[str], dict[str, str]]:
+	"""(leagues due to sweep now, {league: reason}) for a league-scoped sport.
+
+	FAIL-OPEN PER LEAGUE, matching `_filter_sports_for_pregame_sweep`'s rules: a
+	league with no marker sweeps, and a league whose interval resolves to None
+	(imminent, or already kicked off) sweeps. Only "resolved to an interval AND
+	swept inside it" is dropped.
+
+	Returns EVERY league's reason, not just the due ones, so the caller can print
+	why a league was skipped. A cadence gate that drops a league silently is
+	indistinguishable from a league that stopped having fixtures -- the failure
+	this file keeps re-shipping.
+	"""
+	sport = str(sport or "").strip().lower()
+	marker_map = dict(markers or {})
+	by_league = _next_fixture_epoch_by_league(sport, now_epoch=now_epoch)
+	if leagues is None:
+		candidates = sorted(by_league)
+	else:
+		candidates = sorted({str(x).strip().lower() for x in leagues if str(x).strip()})
+
+	due: list[str] = []
+	reasons: dict[str, str] = {}
+	for league in candidates:
+		interval, reason = _league_interval_from_epoch(by_league.get(league), now_epoch=now_epoch)
+		if interval is None or interval <= 0:
+			due.append(league)
+			reasons[league] = f"due:{reason}"
+			continue
+		last = marker_map.get(_league_marker_key(sport, league))
+		try:
+			last_epoch = float(last) if last is not None else None
+		except Exception:
+			last_epoch = None
+		if last_epoch is None:
+			due.append(league)
+			reasons[league] = f"due:no_marker:{reason}"
+			continue
+		age = float(now_epoch) - last_epoch
+		if age >= float(interval):
+			due.append(league)
+			reasons[league] = f"due:{reason}:age={int(age)}s>={interval}s"
+		else:
+			reasons[league] = f"skip:{reason}:age={int(age)}s<{interval}s"
+	return due, reasons
 
 
 def _pregame_sweep_interval_seconds(sport: str) -> int:
@@ -4190,7 +4394,28 @@ def _record_pregame_sport_sweep_epochs(epoch: float, sports: list[str]) -> None:
 	try:
 		existing = _read_pregame_sport_sweep_epochs()
 		for sport in sports:
-			existing[str(sport).strip().lower()] = float(epoch)
+			normalized = str(sport).strip().lower()
+			existing[normalized] = float(epoch)
+			# `#440` PHASE 1C: stamp the LEAGUES too, or a league-scoped sport can
+			# never go quiet. Its own marker would be the only one ever written,
+			# every league would read `no_marker`, and `_due_leagues_for_sport`'s
+			# fail-open would make every league due on every tick -- the gate would
+			# look enabled and do nothing. Computed from the SAME due-set the
+			# filter used (both hit `_NEXT_FIXTURE_BY_LEAGUE_CACHE`), so the
+			# leagues stamped are the leagues that actually swept.
+			if normalized in _LEAGUE_SCOPED_SPORTS and _league_scoped_cadence_enabled():
+				try:
+					due, _ = _due_leagues_for_sport(
+						normalized, now_epoch=float(epoch), markers=existing
+					)
+					for league in due:
+						existing[_league_marker_key(normalized, league)] = float(epoch)
+				except Exception as exc:
+					print(
+						f"[live_refresh_loop] PREGAME_LEAGUE_MARKER_SKIPPED sport={normalized} "
+						f"error={type(exc).__name__}: {exc}",
+						flush=True,
+					)
 		write_json_file(_pregame_sport_sweep_epochs_path(), existing)
 	except Exception as exc:
 		# A missing marker only ever fails open to an extra sweep.
@@ -4334,6 +4559,48 @@ def _apply_pregame_sport_cadence(
 			continue
 		if normalized in force_sports:
 			kept.append(normalized)
+			continue
+		if normalized in _LEAGUE_SCOPED_SPORTS and _league_scoped_cadence_enabled():
+			# `#440` PHASE 1C. Decided per LEAGUE, then collapsed back to a
+			# sport-level keep/skip because that is what this function returns.
+			#
+			# The sport-level liveness checker still wins first and still
+			# fails open: it reads the per-league live_state artifacts, which is
+			# a stronger signal than a schedule clock, and a live match must
+			# sweep regardless of any league's tier.
+			checker = _LIVE_STATUS_CHECKERS.get(normalized)
+			if checker is not None:
+				try:
+					if bool(checker(date_str)):
+						kept.append(normalized)
+						print(
+							f"[live_refresh_loop] FIXTURE_CADENCE sport={normalized} scope=league decision=keep reason=sport_live",
+							flush=True,
+						)
+						continue
+				except Exception:
+					kept.append(normalized)
+					continue
+			due, league_reasons = _due_leagues_for_sport(
+				normalized, now_epoch=now_epoch, markers=markers
+			)
+			# EVERY league's reason, due or not. A league dropped silently is
+			# indistinguishable from a league that stopped having fixtures --
+			# and that ambiguity is what made `#341` take weeks to find.
+			for league in sorted(league_reasons):
+				print(
+					f"[live_refresh_loop] FIXTURE_CADENCE sport={normalized} league={league} {league_reasons[league]}",
+					flush=True,
+				)
+			if due:
+				kept.append(normalized)
+			else:
+				skipped.append(normalized)
+			print(
+				f"[live_refresh_loop] FIXTURE_CADENCE sport={normalized} scope=league "
+				f"due={','.join(due) if due else 'none'} of={len(league_reasons)}",
+				flush=True,
+			)
 			continue
 		interval = _pregame_sweep_interval_for_tick(normalized, now_epoch=now_epoch)
 		if interval <= 0:
@@ -5027,6 +5294,20 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 			print(f"[live_refresh_loop] WNBA_LAUNCH_MARKER_SKIPPED error={type(exc).__name__}: {exc}", flush=True)
 		try:
 			wnba_only_matchups_arg = _wnba_only_matchups_arg_from_changed(_last_wnba_lineup_injury_changed_matchups())
+			# `#440` Phase 1c: scope the soccer half of this launch to the leagues
+			# whose own fixture clock says they are due.
+			#
+			# PASSED AS **kwargs AND OMITTED ENTIRELY WHEN None, rather than passed
+			# as `soccer_leagues=None`. With 1c off `_due_league_scope_text` always
+			# returns None, and omitting it makes this call BYTE-IDENTICAL to its
+			# pre-1c form -- which is what a dark-launched change is supposed to
+			# be. Passing the key unconditionally broke six `test_run_tick_*`
+			# assertions that pin the exact launch kwargs; those tests were right
+			# and the call was wrong. None is also the uncertain path (flag off,
+			# nothing resolved, any exception), so this can never narrow a refresh
+			# by accident.
+			league_scope = _due_league_scope_text("soccer")
+			league_scope_kwargs = {"soccer_leagues": league_scope} if league_scope else {}
 			result = launch_refresh_run(
 				date=meta["date"],
 				sports=launch_sports,
@@ -5041,6 +5322,7 @@ def _run_live_refresh_tick() -> dict[str, Any]:
 				force_refresh=force_sim_rerun,
 				force_refresh_sports=force_refresh_sports,
 				wnba_only_matchups=wnba_only_matchups_arg,
+				**league_scope_kwargs,
 			)
 			meta["ok"] = True
 			if wnba_only_matchups_arg:
