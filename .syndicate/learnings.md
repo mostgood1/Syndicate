@@ -2312,3 +2312,54 @@ wrong place" — the exact ambiguity that made the log version unreadable.
 
 Related: the emitter rule already in this file covers *reading* an absence; this
 one covers *building* the emitter. Both were needed. `[measured 2026-08-15/16]`
+---
+
+## 2026-08-16 — NARROWING AN INSTRUMENT TO A MEASURED DISTRIBUTION BUILDS IN A BLIND SPOT
+
+**What I did, and it looked like good work.** A census said **41 of 42**
+refresh-worker `oomKilled` events fell in **15:00–23:59 local**. So I retuned
+`branch-overlap-baseline-watch` from `15 */4 * * *` (six samples/day, half of
+them in hours with zero recorded kills) to `45 19,22,1 * * *` — three samples,
+tiling the kill band. Fewer samples, full coverage of where the failure lives.
+I reported it as a strict improvement.
+
+**Hours later, on the same day**, refresh-worker was `oomKilled` at
+**16:34:32Z (11:34 local)** and **17:19:42Z (12:19 local)**. The new schedule
+observes neither. The old one would have caught both.
+
+**The error is not the schedule. It is what the schedule silently converted.**
+Before narrowing, "no kill in the morning sample" was a *finding*. After
+narrowing, morning kills cannot appear at all — so the same silence now means
+nothing, while still *reading* like a clean result to anyone looking at the
+baseline file. **Narrowing an instrument turns "we did not observe X" into "we
+cannot observe X", and the two are indistinguishable downstream.**
+
+**Why the distribution did not transfer.** The 8-day census was dominated by
+ordinary days. The two daytime kills landed on an afternoon carrying **four
+deploy cycles**, and every deploy reboots the worker into cold hydration — a
+known route to the same ~2GB transient. Deploy-provoked and slate-provoked kills
+are plausibly **different populations**, and only the second is confined to the
+band. A distribution measured under one regime does not license an instrument
+that can only see that regime.
+
+**The rules.**
+
+1. When you narrow an instrument, **write the blind spot down where the output
+   is read**, not only in the commit that narrowed it. `state.md` now says
+   plainly that anything sampling 15:00–23:59 cannot be cited as evidence that
+   daytime kills did not occur.
+2. **State the denominator's regime, not just its size.** "41 of 42 over 8 days"
+   invites the reading "kills are evening"; "41 of 42 over 8 mostly churn-free
+   days" does not.
+3. For absence claims about a rebooting service, **the deploy count in the
+   window is part of the claim.** Absence of a daytime kill is evidence only if
+   the window was also deploy-free.
+4. Prefer keeping one cheap wide sample when narrowing. The cost of the three
+   dropped morning samples was small; the cost of not being able to see a new
+   failure population is not.
+
+**Related, and the same shape as the day's other two entries:** the SHA pin
+could not tell a revert from a rename, the ref name could not tell a base from a
+moving target, and here a cron could not tell a quiet window from an unobserved
+one. Each is a measurement whose *scope* silently stopped matching the question
+it was still being used to answer.
