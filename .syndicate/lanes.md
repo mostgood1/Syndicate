@@ -59,7 +59,7 @@
   visuals render are client-side and no server test can see them.
 - Blocked by: none.
 
-### nfl-pbp-fetcher — OPEN — opened 2026-08-16 — session: sim-engine-track
+### nfl-pbp-fetcher — **CLOSED-VERIFIED 2026-08-16 18:31:15Z — pbp_2025.csv written on the mounted disk (97,951,481 bytes, 46,452 REG plays) and the guard stopped refusing. `#441` FIXED.** — opened 2026-08-16 — session: sim-engine-track
 - Goal: `#441`. A pbp ingestion path exists, so the NFL SmartSim2 projection has
   real ratings again instead of refusing for 2.8 days.
 - Files (exclusive to this lane): `scripts/fetch_nfl_pbp.py` (new),
@@ -95,6 +95,33 @@
 - Blocked by: none. `#443` (stale PID stalls the autorun ~45 min per restart)
   will DELAY observation and is not a blocker.
 
+
+#### CLOSED-VERIFIED 2026-08-16 18:31:15Z
+- **Verification ran and passed, on the real success condition rather than a proxy.**
+  `season 2025: status=written, bytes=97,951,481, reg_plays=46,452` to
+  `/opt/render/project/data/nfl_source/tracking/nflverse/pbp/pbp_2025.csv`, and
+  `NO PLAY-BY-PLAY` has not recurred since. The generator ran again at 18:31:43
+  and did not refuse.
+- **The lane's own falsification test did NOT fire:** "if the artifact still
+  refuses, the fetcher is not sufficient." It stopped refusing.
+- **2026 returned 404 and that is CORRECT** — the season has not started. The
+  lane predicted this ("the file that actually matters is pbp_2025.csv"), which
+  is why `--season` fetches the prior year by default. A current-season-only
+  fetcher would have shipped, 404'd, and changed nothing.
+- **Two bugs caught pre-ship:** a ~300MB memory transient on a service at 95% of
+  cap (rewritten to stream), and `gzip.decompressobj` which does not exist (it is
+  `zlib`) — that one would have crashed every real fetch.
+- **One regression I caused and reversed:** default-ON broke three
+  `test_main_run_once_*` contracts; confirmed mine against a clean-HEAD worktree,
+  now default-off like every sibling.
+- **One overstatement corrected:** "starved" was wrong; a 23-minute delay at
+  position 6 is not `#341`'s weeks of muteness. Position-2 move stands as an
+  improvement, not a fix.
+- **Files released:** `scripts/fetch_nfl_pbp.py`, `tests/test_fetch_nfl_pbp.py`,
+  `tests/test_nfl_pbp_fetch_autorun.py`, `scripts/run_refresh_worker.py`.
+- **Handover:** `b909d008` (position-2 + skip logging) is on `origin/main`,
+  NOT deployed, rides the next worker deploy. `#443` (stale-PID silent stall)
+  and `#445` (NCAAF hard-coded 2025 input) remain open and unowned.
 
 ### export-force-refresh-escape — OPEN — **DEPLOYED TO BOTH WORKERS 17:53Z (refresh-worker `b9f2b5f1`, live-odds-worker `e28594a7`), verified BY CONTENT; EFFECT UNMEASURED — needs a `:cards_props_snapshot` staged record from a forced run over an existing snapshot** — opened 2026-08-16 — session: win-prob-null-readable
 - Goal: `--force-refresh` actually regenerates the three props SNAPSHOT exports

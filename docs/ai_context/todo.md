@@ -1,6 +1,104 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#441` — **ROOT CAUSE CORRECTED 2026-08-16 (v3): the nflverse play-by-play is ABSENT FROM EVERY ROOT and nothing in this repo writes it. Two earlier diagnoses were wrong, the second was shipped and falsified in production** — NOT FIXED, no owner
+### `#444` — **`live-odds-worker` has exited early 20 times in 7.6 days and nobody owns it. Zero of them are OOM** — FOUND 2026-08-16, NOT STARTED, no owner
+
+**Why this has stayed invisible:** every memory investigation this month has been
+about `refresh-worker`, where the failures are `oomKilled`. `live-odds-worker`
+fails at a comparable *count* and **not one is a kill** — all 20 are
+`earlyExit`, i.e. **the process returned on its own**. A "19 failures / 20
+failures" summary buries that completely; the two services are failing for
+unrelated reasons and only one of them is being worked on.
+
+    py -3 scripts/render_events.py --service live-odds-worker \
+        --failures-only --since 2026-08-09T00:00:00Z
+
+**The reading** (covered 2026-08-08 21:37 .. 2026-08-16 12:53 CT, 300 events,
+4 pages): **20 `earlyExit`, 0 `oomKilled`, 0 `evicted`, 0 `unhealthy`.**
+Roughly **2.6/day**, steady across all 8 days — no cluster, no trend, no tie to
+the MLB evening band that dominates `refresh-worker`. Most recent: 2026-08-16
+11:38:05 CT. Longest observed gap ~19h, shortest ~5h.
+
+**What is NOT established, stated because the temptation is to assume it:**
+- **The cause is unknown.** `earlyExit` says the process returned; it does not
+  say why, and no exit code is exposed in the event. That needs a log read
+  around each timestamp — which was not done here.
+- **The impact is unmeasured.** `live-odds-worker` is the odds source of truth.
+  Whether a restart drops an odds tick, a book, or nothing at all is unknown.
+  Do not assume "it restarts, so it's fine" — that is exactly the shape of
+  `#388`, where deploys silently killed half of all MLB sims and every run
+  still recorded `exit_code: 0`.
+- **Whether it is a restart *loop* or a clean exit-and-respawn** is unknown.
+
+**First step for whoever takes it:** pull the log window around 2–3 of the
+timestamps above and find the last thing the process said. That decides whether
+this is benign lifecycle or a silent data gap, and it is cheap.
+
+**Related:** `#442` (the tool), lane `refresh-worker-oom-recurrence` (the OTHER
+service — do not merge these two investigations, they share only a symptom word).
+
+### `#441` — **FIXED AND VERIFIED IN PRODUCTION 2026-08-16 18:31:15Z. The nflverse pbp had no ingestion path; there is one now** — CLOSED
+
+> **RESOLVED. Measured, not inferred.** `scripts/fetch_nfl_pbp.py` ran on
+> refresh-worker and wrote the file the guard had been refusing without for
+> 2.79 days:
+>
+>     season 2026: status=unavailable, HTTP 404          <- correct, season not started
+>     season 2025: status=written, bytes=97,951,481, reg_plays=46,452
+>     path: /opt/render/project/data/nfl_source/tracking/nflverse/pbp/pbp_2025.csv
+>
+> Byte count and play count match what the same code produced locally, and the
+> path is the MOUNTED DISK via `nfl_artifact_output_root()` (`#389`), not the
+> ephemeral checkout. **`NO PLAY-BY-PLAY` has not appeared since 18:31:12Z** —
+> the generator ran again at 18:31:43 and did not refuse. The guard is satisfied
+> because the input arrived, not bypassed.
+>
+> **THE SEASON THAT MATTERED WAS 2025, NOT 2026** — exactly as designed for.
+> 2026 legitimately 404s because that season has not started; week-1 ratings come
+> from `prior_season_fallback`. A fetcher that pulled only the requested season
+> would have shipped, 404'd, and changed nothing.
+>
+> **FOUR DIAGNOSES, AND ONLY THE FOURTH WAS RIGHT.** v1 "the generator is broken"
+> (wrong, the guard was correct). v2 "root selection picks the checkout" (wrong —
+> BUILT, TESTED AND DEPLOYED before being falsified in production). v3 "the file
+> is absent everywhere" (right, but unverified at the time). v4 "the env is not
+> reaching the subprocess" (wrong, falsified by the diagnostic). What settled it
+> was `nfl_pbp_diagnostic`, which printed the env and every candidate path with
+> `exists=` and answered on the first reading.
+>
+> **The lesson is filed in `learnings.md`:** a NOTE in the code that names a
+> cause is a HYPOTHESIS, not a measurement. The generator's own message asserted
+> "the pbp lives on the mounted disk"; that unverified clause was the false one,
+> and I built and shipped a fix for the clause that was true.
+>
+> Remaining, and NOT part of this item: the autorun's position-2 move and skip
+> logging are on `origin/main` (`b909d008`) but NOT deployed — they are
+> diagnostic improvements, not fixes, and ride the next natural deploy.
+
+
+> **SETTLED 2026-08-16 17:10:45Z — measured, not inferred.** The diagnostic
+> deployed as `a775e372` printed, on the first post-restart refusal:
+>
+>     strict_hosted_storage_resolves_to = True
+>     env SYNDICATE_NFL_SOURCE_ROOT = '/opt/render/project/data/nfl_source'
+>     candidate[0] /opt/render/project/data/nfl_source/source_artifacts/.../pbp_2026.csv  exists=False
+>     candidate[1] /opt/render/project/data/nfl_source/.../pbp_2026.csv                    exists=False
+>     candidate[2] /opt/render/project/src/data/.../pbp_2026.csv                           exists=False
+>     candidate[3] /opt/render/project/src/data/.../pbp_2026.csv                           exists=False
+>
+> **v3 CONFIRMED: the mounted disk WAS searched and the file is not there.**
+> **v4 FALSIFIED: the env vars DO reach the subprocess.** So the defect is not
+> resolution, not the guard, and not the environment — the file simply does not
+> exist, and nothing in this repo can create it.
+>
+> **THE FIX IS A FETCHER.** The pattern exists four times over —
+> `fetch_nfl_schedule.py` pulls `nflverse/nfldata/master/data/games.csv`, and
+> there are equivalents for rosters and depth charts. What is needed is the same
+> shape for play-by-play, writing under `nfl_artifact_output_root()/tracking/
+> nflverse/pbp/`, plus an autorun entry so it refreshes.
+>
+> Everything below this line records the earlier v1/v2/v3 reasoning and is kept
+> for the trail; the header above is current.
+
 
 > **AMENDED 2026-08-16 after a deployed fix failed. Read this block before the
 > original text below, which records diagnosis v2 and is now WRONG about the cause.**
@@ -32701,6 +32799,55 @@ across five stages" into a list of allocation sites, which is the last unknown.
 
 Cost note: tracemalloc keeps a traceback per live allocation and the process is
 already at its ceiling — arm it to fire ONCE per boot, on the excursion only.
+### `#445` — **NCAAF SmartSim2 projections crash on a MISSING, HARD-CODED 2025 INPUT — the `#441` shape, 13 days before the season opens** — FOUND 2026-08-16, NOT STARTED, no owner
+
+Found while verifying `#441` on refresh-worker. Same family, different sport,
+and it is currently in a relaunch loop.
+
+**THE CRASH, from production 2026-08-16 18:33:00Z:**
+
+    [refresh_worker] SEASON_PROJECTION_LAUNCHING sport=ncaaf season=2026 week=1
+        reason=artifact_missing_no_prior_launch
+    Traceback (most recent call last):
+      File ".../scripts/generate_smartsim2_ncaaf_projections.py", line 225, in main
+        schedule_rows = load_engine_schedule(args.season, args.week)
+      File ".../scripts/generate_smartsim2_ncaaf_projections.py", line 76, in load_engine_schedule
+        with ENHANCED_CSV.open("r", encoding="utf-8-sig", newline="") as handle:
+    FileNotFoundError: [Errno 2] No such file or directory:
+      '/opt/render/project/data/ncaaf_source/data/college_football_schedule_2025_predicted_totals_enhanced.csv'
+
+**TWO DEFECTS, AND THE SECOND IS THE INTERESTING ONE:**
+
+1. The file is absent from the mounted disk — the `#441` shape.
+2. **`ENHANCED_CSV` IS HARD-CODED TO A 2025 FILENAME** and is season-blind:
+
+       scripts/generate_smartsim2_ncaaf_projections.py:44
+       ENHANCED_CSV = DATA_ROOT / "college_football_schedule_2025_predicted_totals_enhanced.csv"
+
+   It is being asked for `season=2026 week=1`. So even if someone drops the 2025
+   file onto the disk, the generator would rate the 2026 season from 2025
+   predicted totals and never notice. **Fixing only (1) produces a silently
+   wrong artifact rather than a crash**, which is worse — the crash is currently
+   the only thing making this visible.
+
+**Deadline:** NCAAF opens **2026-08-29**, 13 days out. Unlike `#441` there is no
+degenerate-run guard on this path that I have verified, so it is worth checking
+whether a missing/wrong input here would produce league-average projections
+silently the way NFL's did on 2026-08-13.
+
+**Do NOT copy the `#441` fix blindly.** NFL's answer was a fetcher, because
+nflverse publishes pbp per season. NCAAF's input is a *predicted-totals* CSV that
+looks like pipeline OUTPUT, not a public dataset — find out what produces it
+before assuming it can be fetched.
+
+**Next steps, reads before changes:**
+1. What writes `college_football_schedule_2025_predicted_totals_enhanced.csv`?
+   `git log` the path; grep for writers as `#441` did (ten readers, zero writers
+   was the finding there).
+2. Is the 2025 filename deliberate (a fixed historical baseline) or drift? The
+   NCAAF profile is `ncaaf_v2` and calibrated; the input naming may predate it.
+3. Only then decide fetch vs generate vs parameterise-by-season.
+
 ### `#443` — **A stale PID silently blocks a sport's season projections for up to 45 min after EVERY restart** — FOUND 2026-08-16, NOT STARTED, no owner
 
 **Found while verifying `#441`, and it is why that verification stalled.** Separate

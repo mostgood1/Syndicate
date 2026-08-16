@@ -7517,3 +7517,39 @@ are claimed "exclusive" by `soccer-model-coverage` (OPEN). That lane is
 census with `include_archived: true`. I took `soccer/cards.py` with the override
 written into my lane, and deliberately did NOT take `soccer_projections.py`,
 routing around it via the wrapper instead. `soccer_projections.py` is unmodified.
+
+## 2026-08-16 18:31:15Z — refresh-worker `cf467794` — **MEASURED: `#441` FIXED.** The pbp fetcher wrote the file
+
+Deployed 18:07:36Z. First fetch fired 18:31:12Z and completed in ~3s:
+
+    season 2026: status=unavailable, HTTP 404          <- correct, season not started
+    season 2025: status=written, bytes=97,951,481, reg_plays=46,452
+    path: /opt/render/project/data/nfl_source/tracking/nflverse/pbp/pbp_2025.csv
+
+Byte count and REG-play count match what the same code produced locally, and the
+path is the MOUNTED DISK via `nfl_artifact_output_root()` (`#389`), not the
+checkout. **`NO PLAY-BY-PLAY` has not appeared since 18:31:12Z**; the generator
+ran again at 18:31:43 and did not refuse. The guard is SATISFIED, not bypassed —
+it stopped refusing because the input arrived.
+
+**A 23-MINUTE DELAY, AND I CALLED IT STARVATION. That was overstated.** At
+position 6 of 8 in the autorun elif chain it emitted nothing for 23 minutes, and
+I mapped `#341`'s weeks-of-muteness onto that wait. It was DELAYED, not starved —
+for a daily-gated job, harmless. The move to position 2 (`b909d008`) is a fair
+improvement but rests on a weaker claim than I made, and I had already talked
+myself into and out of that same hypothesis twice in the same hour.
+
+**WHAT WAS RIGHT TO CHECK ANYWAY, and what it cost to check it:** the flag, the
+deploy/env ordering, the live commit's content, `_active_sports_for_date`, and
+whether the chain was reached — all ruled out with evidence before I touched the
+ordering. The thing that made the diagnosis slow was my own three SILENT decline
+branches (`#443` reproduced in my own code), which is now fixed on `origin/main`
+but NOT deployed.
+
+**NOT DEPLOYED, deliberately:** `b909d008` (position-2 + skip logging) is on
+`origin/main` and rides the next natural deploy. It is diagnostic, not
+functional — `#441` is already fixed in production — and a fourth worker restart
+during a live MLB slate was not worth it.
+
+**A SIBLING DEFECT SURFACED IN THE SAME LOG WINDOW:** NCAAF's generator crashes
+on a missing, hard-coded 2025 input. Filed as `#445`; NCAAF opens 2026-08-29.
