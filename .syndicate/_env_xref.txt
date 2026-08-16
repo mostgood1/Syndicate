@@ -1,0 +1,158 @@
+CONFIGURED_NOT_READ
+EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN
+GUNICORN_GRACEFUL_TIMEOUT
+GUNICORN_KEEPALIVE
+GUNICORN_THREADS
+GUNICORN_TIMEOUT
+MLB_BETTING_DATA_ROOT
+MLB_BETTING_DAY_BACKFILL_DATE
+MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS
+MLB_ENABLE_LIVE_LENS_LOOP
+MLB_ENABLE_REFRESH_WORKER_AUTORUN
+MLB_LIVE_LENS_DIR
+MLB_LIVE_LENS_LOOP_INTERVAL_SECONDS
+MLB_LIVE_LENS_REPORT_REFRESH_INTERVAL_SECONDS
+MLB_LIVE_ODDSAPI_REFRESH_INTERVAL_SECONDS
+NBA_LIVE_LENS_DIR
+NHL_LIVE_LENS_DIR
+PYTHON_VERSION
+RECONCILIATION_ENABLE_MLB_ACTUALS_WRITER
+RECONCILIATION_ENABLE_REFRESH_WORKER_AUTORUN
+RECONCILIATION_MLB_ACTUALS_WRITER_INTERVAL_SECONDS
+RECONCILIATION_REFRESH_INTERVAL_SECONDS
+REFRESH_PREDICT_PROPS_SMART_SIM_N_SIMS
+REFRESH_PREDICT_PROPS_SMART_SIM_PBP
+SEASON_PROJECTION_ENABLE_REFRESH_WORKER_AUTORUN
+SEASON_PROJECTION_ENABLE_REFRESH_WORKER_PRESEASON_AUTORUN
+SYNDICATE_ARTIFACT_REFRESH_INTERVAL_SECONDS
+SYNDICATE_BOARD_BUILD_FORCE_DESPITE_SIM
+SYNDICATE_BOARD_L2A_ENABLED
+SYNDICATE_BOOK_QUOTES_COMPACTION_ENABLED
+SYNDICATE_BOOTSTRAP_ON_START
+SYNDICATE_BOOTSTRAP_WNBA_TODAY
+SYNDICATE_DISK_MAINTENANCE_ENABLED
+SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP
+SYNDICATE_ENABLE_LIVE_LENS_LOOP
+SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP
+SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER
+SYNDICATE_ENABLE_MLB_STATCAST_REFRESH_TRIGGER
+SYNDICATE_ENABLE_SOCCER_PREGAME_REFRESH_AUTORUN
+SYNDICATE_ENABLE_SOCCER_WEEKLY_REFRESH_AUTORUN
+SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE
+SYNDICATE_INTELLIGENCE_CANONICAL_BOARD_STATE_SHADOW_COMPARE
+SYNDICATE_INTELLIGENCE_LEDGER_RECORDING_ENABLED
+SYNDICATE_INTELLIGENCE_REFRESH_INTERVAL_SECONDS
+SYNDICATE_LIVE_ODDS_GAME_LINE_REGIONS
+SYNDICATE_LIVE_ODDS_REFRESH_MEMORY_TRACE
+SYNDICATE_LIVE_ODDS_REFRESH_SKIP_MIRROR
+SYNDICATE_LIVE_ODDS_WORKER_MAX_UPTIME_SECONDS
+SYNDICATE_LOOK_AHEAD_ENABLED
+SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED
+SYNDICATE_MLB_SIM_TIMEOUT_SECONDS
+SYNDICATE_NBA_SOURCE_APP_FALLBACK
+SYNDICATE_NBA_SOURCE_ROOT
+SYNDICATE_NCAAB_SOURCE_ROOT
+SYNDICATE_NCAAF_SOURCE_ROOT
+SYNDICATE_NHL_SOURCE_CLI_GENERATION
+SYNDICATE_NHL_SOURCE_ROOT
+SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS
+SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS_MLB
+SYNDICATE_PUBLISH_HOURLY_BYTE_BUDGET
+SYNDICATE_SERIAL_SPORT_REFRESH
+SYNDICATE_SOCCER_LEAGUE_LAUNCH_SPACING_SECONDS
+SYNDICATE_SOCCER_PREGAME_REFRESH_INTERVAL_SECONDS
+SYNDICATE_SOCCER_SIM_HORIZON_DAYS
+SYNDICATE_SOCCER_WEEKLY_REFRESH_INTERVAL_SECONDS
+SYNDICATE_WEB_PUBLISH_URL
+SYNDICATE_WNBA_SOURCE_APP_FALLBACK
+SYNDICATE_WNBA_SOURCE_ROOT
+TZ
+WEEKLY_SPORTS_ENABLE_REFRESH_WORKER_AUTORUN
+WEEKLY_SPORTS_REFRESH_INTERVAL_SECONDS
+WNBA_LIVE_LENS_DIR
+
+READ_NOT_CONFIGURED
+ANTHROPIC_API_KEY	default=<none>	syndicate/blueprints/ask_the_syndicate_engine.py:150
+GIT_BRANCH	default=<none>	syndicate/blueprints/home.py:173
+GIT_COMMIT	default=<none>	syndicate/blueprints/home.py:167
+MALLOC_ARENA_MAX	default=<none>	syndicate/features/shared/memory_observability.py:1149
+ODDS_API_BASE	default=<none>	syndicate/blueprints/ops.py:1472
+QNN_BACKEND_PATH	default=<none>	syndicate/features/shared/basketball_props_onnx.py:454
+QNN_SDK	default=<none>	syndicate/features/shared/basketball_props_onnx.py:441
+QNN_SDK_ROOT	default=<none>	syndicate/features/shared/basketball_props_onnx.py:442
+REDIS_URL	default=<none>	syndicate/features/shared/refresh_state_store.py:41
+RENDER	default=<none>	syndicate/app.py:139
+RENDER_EXTERNAL_URL	default=<none>	syndicate/app.py:140
+RENDER_GIT_BRANCH	default=<none>	syndicate/blueprints/home.py:172
+RENDER_GIT_COMMIT	default=<none>	syndicate/blueprints/home.py:166
+RENDER_INSTANCE_ID	default=<none>	syndicate/blueprints/home.py:240
+RENDER_SERVICE_ID	default=<none>	syndicate/app.py:141
+RENDER_SERVICE_NAME	default=<none>	syndicate/blueprints/home.py:239
+SMARTSIM_WORKERS	default=<none>	syndicate/features/shared/basketball_props_smart_sim.py:4860
+SMART_SIM_WORKERS	default=<none>	syndicate/features/shared/basketball_props_smart_sim.py:4860
+SOURCE_VERSION	default=<none>	syndicate/blueprints/home.py:168
+SYNDICATE_ADMIN_TOKEN	default=<none>	syndicate/blueprints/ops.py:217
+SYNDICATE_ARTIFACT_EXPORT_MAX_BYTES	default=<none>	syndicate/blueprints/ops.py:1407
+SYNDICATE_ARTIFACT_RETENTION_ENABLED	default=<none>	syndicate/features/shared/artifact_retention.py:162
+SYNDICATE_ASK_CACHE_TTL_SECONDS	default="600"	syndicate/blueprints/ask_the_syndicate.py:335
+SYNDICATE_ASK_LLM_ENABLED	default="true"	syndicate/blueprints/ask_the_syndicate_engine.py:148
+SYNDICATE_BOARD_BUILD_MIN_HEADROOM_MB	default=<none>	pipeline/intelligence_state.py:539
+SYNDICATE_BOARD_TZ	default="America/Chicago"	syndicate/features/shared/layer1_board.py:73
+SYNDICATE_DISK_MAINTENANCE_INTERVAL_SECONDS	default=<none>	syndicate/features/shared/disk_maintenance.py:61
+SYNDICATE_EMPTY_BOARD_PROTECTION_SECONDS	default=<none>	pipeline/intelligence_state.py:659
+SYNDICATE_EVALUATION_LEDGER_MAX_CHUNK_BYTES	default=<none>	syndicate/features/shared/intelligence_evaluation.py:608
+SYNDICATE_GAME_CANDIDATE_SLOW_LOG_SECONDS	default=<none>	syndicate/features/intelligence.py:6421
+SYNDICATE_GATE_DEMOTE_UNKNOWN_GAME_STATE	default=<none>	syndicate/features/shared/opportunity_gate.py:131
+SYNDICATE_INTELLIGENCE_NEWS_TRIGGERED_WINDOW_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:933
+SYNDICATE_KELLY_FRACTION_MULTIPLIER	default=<none>	syndicate/features/bankroll_manager.py:162
+SYNDICATE_LINEUP_CHECK_INTERVAL_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:561
+SYNDICATE_LIVE_ODDS_REFRESH_MIN_HEADROOM_MB	default=<none>	syndicate/features/shared/live_refresh_loop.py:3516
+SYNDICATE_LIVE_ODDS_REFRESH_SPORTS	default=<none>	syndicate/features/shared/live_refresh_loop.py:3287
+SYNDICATE_LIVE_ODDS_REFRESH_STARVATION_CEILING_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:3398
+SYNDICATE_MAX_GAME_EXPOSURE_FRACTION	default=<none>	syndicate/features/bankroll_manager.py:229
+SYNDICATE_MLB_PROPS_REGEN_COOLDOWN_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:1529
+SYNDICATE_MLB_SIM_LOG_DIR	default=<none>	syndicate/features/shared/live_refresh_loop.py:2503
+SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFERS	default=<none>	syndicate/features/shared/live_refresh_loop.py:1749
+SYNDICATE_MLB_SIM_MAX_PIPELINE_DEFER_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:1777
+SYNDICATE_MLB_SIM_MAX_PROGRESS_STALL_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:2608
+SYNDICATE_MLB_SIM_MIN_MEMORY_HEADROOM_MB	default=<none>	syndicate/features/shared/live_refresh_loop.py:1179
+SYNDICATE_MLB_STATCAST_REFRESH_CHECK_INTERVAL_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:2876
+SYNDICATE_MLB_STATCAST_REFRESH_MAX_AGE_DAYS	default=<none>	syndicate/features/shared/live_refresh_loop.py:2885
+SYNDICATE_MLB_WEATHER_INTERVAL_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:3743
+SYNDICATE_ODDS_EVENTS_COMPACT_BYTES	default=<none>	syndicate/features/shared/odds_lifecycle.py:464
+SYNDICATE_ODDS_EVENTS_ROOT	default=<none>	syndicate/features/shared/odds_lifecycle.py:212
+SYNDICATE_ODDS_EVENT_ROOT	default=<none>	syndicate/features/shared/odds_lifecycle.py:212
+SYNDICATE_ODDS_HISTORY_LIMIT	default=<none>	syndicate/features/shared/odds_refresh_tracking.py:38
+SYNDICATE_ODDS_HISTORY_MARKET_STALENESS_CEILING_SECONDS	default=<none>	syndicate/features/shared/odds_refresh_tracking.py:78
+SYNDICATE_ODDS_HISTORY_SHARD_LOOKBACK	default=<none>	syndicate/features/shared/odds_lifecycle.py:79
+SYNDICATE_ODDS_OFF_HOURS_GAME_DAY_MAX_STALENESS_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:3703
+SYNDICATE_ODDS_OFF_HOURS_MAX_STALENESS_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:3681
+SYNDICATE_PREGAME_SWEEP_INTERVAL_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:3983
+SYNDICATE_REFRESH_MODE	default=<none>	syndicate/features/shared/live_refresh_loop.py:3268
+SYNDICATE_REFRESH_RUN_MAX_RUNTIME_SECONDS	default=<none>	syndicate/features/shared/ops_refresh.py:533
+SYNDICATE_SERVICE_ROLE	default=<none>	syndicate/features/shared/opportunity_contract_metrics.py:142
+SYNDICATE_SHADOW_CANDIDATE_LEDGER_ENABLED	default=<none>	syndicate/features/shared/shadow_candidate_ledger.py:85
+SYNDICATE_SHADOW_CANDIDATE_LEDGER_MAX_PER_CYCLE	default=<none>	syndicate/features/shared/shadow_candidate_ledger.py:99
+SYNDICATE_SHADOW_CANDIDATE_LEDGER_RETENTION_DAYS	default=<none>	syndicate/features/shared/shadow_candidate_ledger.py:108
+SYNDICATE_SHADOW_CANDIDATE_LEDGER_SAMPLE_RATE	default=<none>	syndicate/features/shared/shadow_candidate_ledger.py:90
+SYNDICATE_SHORTLIST_EXCLUDED_MARKETS	default=<none>	syndicate/features/shared/layer2_board.py:1454
+SYNDICATE_SHORTLIST_MIN_IMPLIED_BOOK_TOTAL_PCT	default=<none>	syndicate/features/shared/layer2_board.py:1241
+SYNDICATE_SOCCER_LIVE_LENS_MIN_HEADROOM_MB	default=<none>	syndicate/features/shared/live_lens_loop.py:370
+SYNDICATE_SOCCER_LIVE_LENS_TICK_SIMULATIONS	default=<none>	syndicate/features/shared/live_lens_loop.py:130
+SYNDICATE_SOCCER_RESIM_CHECK_INTERVAL_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:3546
+SYNDICATE_SOCCER_RESIM_TICK_OWNER	default=<none>	syndicate/features/shared/live_refresh_loop.py:3539
+SYNDICATE_STATE_ROOT	default=<none>	syndicate/features/shared/refresh_state_store.py:342
+SYNDICATE_WNBA_CARDS_CONTEXT_HARD_MAX_AGE_SECONDS	default=<none>	syndicate/features/wnba/cards.py:3131
+SYNDICATE_WNBA_CARDS_CONTEXT_MAX_AGE_SECONDS	default=<none>	syndicate/features/wnba/cards.py:3075
+SYNDICATE_WNBA_CARDS_CONTEXT_PUBLISH_ENABLED	default=<none>	syndicate/features/wnba/cards.py:3091
+SYNDICATE_WNBA_LIVE_LENS_MIN_HEADROOM_BYTES	default=<none>	syndicate/features/shared/live_lens_loop.py:438
+SYNDICATE_WNBA_ODDS_REFRESH_STARVATION_CEILING_SECONDS	default=<none>	syndicate/features/shared/live_refresh_loop.py:3485
+WEEKLY_SPORTS_GAME_HORIZON_DAYS	default=<none>	syndicate/features/shared/live_refresh_loop.py:4356
+WERKZEUG_RUN_MAIN	default=<none>	syndicate/features/shared/live_refresh_loop.py:4945
+
+WEB_ONLY
+SYNDICATE_ASK_LLM_MAX_CALLS
+SYNDICATE_ASK_LLM_WINDOW_SECONDS
+SYNDICATE_ASK_MODEL
+SYNDICATE_INTELLIGENCE_COMBINED_BOARD_DEFAULT
+SYNDICATE_REFRESH_STATE_NAMESPACE

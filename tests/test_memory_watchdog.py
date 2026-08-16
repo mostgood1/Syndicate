@@ -183,7 +183,7 @@ def test_tracing_off_announces_itself_at_the_moment_it_would_have_fired(capfd):
     mo._WATCHDOG_STATE.pop("allocations_dumped", None)
     try:
         with patch.object(mo, "allocation_tracing_enabled", return_value=False):
-            mo._watchdog_maybe_dump_allocations(
+            mo._watchdog_dump_allocations_now(
                 {"memory_anon_mb": 2500.27, "last_stage": "board_contract_games_normalized"},
                 133.2,
             )
@@ -200,7 +200,7 @@ def test_tracing_on_emits_the_allocation_census(capfd):
         with patch.object(mo, "allocation_tracing_enabled", return_value=True), patch.object(
             mo, "allocation_snapshot", return_value={"traced_mb": 1234.5, "top": ["site-a"]}
         ):
-            mo._watchdog_maybe_dump_allocations(
+            mo._watchdog_dump_allocations_now(
                 {"memory_anon_mb": 2500.27, "last_stage": "cards_context_sim_games_loaded"},
                 133.2,
             )
@@ -217,7 +217,232 @@ def test_a_failing_snapshot_never_escapes(capfd):
         with patch.object(mo, "allocation_tracing_enabled", return_value=True), patch.object(
             mo, "allocation_snapshot", side_effect=RuntimeError("boom")
         ):
-            mo._watchdog_maybe_dump_allocations({"memory_anon_mb": 2500.27}, 133.2)
+            mo._watchdog_dump_allocations_now({"memory_anon_mb": 2500.27}, 133.2)
         assert "WATCHDOG_ALLOCATION_DUMP_FAILED" in capfd.readouterr().out
     finally:
         mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+
+
+def test_the_dump_never_runs_on_the_sampler_thread():
+    """MEASURED 2026-08-15 02:11-02:16: with tracing at nframe=3 the worker
+    emitted its START line and then ZERO samples before dying 5.5 minutes later,
+    where the previous build emitted 567. `take_snapshot()` walks every live
+    traced allocation in C holding the GIL, so the one call the trigger makes
+    starved the sampler -- and since the print happens after the snapshot
+    returns, it looked like the trigger had never fired.
+
+    So: the scheduler must hand off and return, never call the dump inline.
+    """
+    mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+    started = {}
+
+    class _FakeThread:
+        def __init__(self, target=None, args=(), name=None, daemon=None):
+            started["target"] = target
+            started["daemon"] = daemon
+            started["name"] = name
+
+        def start(self):
+            started["started"] = True
+
+    try:
+        with patch.object(mo, "allocation_tracing_enabled", return_value=True), patch.object(
+            mo, "allocation_snapshot", side_effect=AssertionError("must not run inline")
+        ), patch("threading.Thread", _FakeThread):
+            mo._watchdog_maybe_dump_allocations({"memory_anon_mb": 2500.27}, 133.2)
+        assert started.get("started") is True
+        assert started.get("daemon") is True
+        assert started.get("target") is mo._watchdog_dump_allocations_now
+    finally:
+        mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+
+
+def test_the_dump_closes_the_tracing_window_itself(capfd):
+    """The previous window stayed open until a human noticed, and cost ~25 min of
+    a 3-10 min kill cadence against 16-22. One dump per boot is all we take, so
+    every traced allocation after it is pure cost on a process that OOMs."""
+    mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+    try:
+        with patch.object(mo, "allocation_tracing_enabled", return_value=True), patch.object(
+            mo, "allocation_snapshot", return_value={"traced_mb": 1.0, "top": []}
+        ), patch.object(mo, "stop_allocation_tracing") as stop:
+            mo._watchdog_dump_allocations_now({"memory_anon_mb": 2500.27}, 133.2)
+        stop.assert_called_once()
+    finally:
+        mo._WATCHDOG_STATE.pop("allocations_dumped", None)
+
+
+def test_stopping_tracing_never_raises_and_reports_what_it_did(capfd):
+    mo.stop_allocation_tracing("unit-test")
+    out = capfd.readouterr().out
+    assert "TRACEMALLOC_STOPPED" in out and "unit-test" in out
+
+
+# --- #435 step four: the heap census ------------------------------------------
+#
+# `log_heap_census` is the RIGHT instrument for "what is in the anon" -- it walks
+# gc.get_objects() rather than instrumenting allocations, so it does not have
+# tracemalloc's cost. It had never fired in production: its only call site sits
+# inside `_build_candidate_pool` behind min_container_mb=1200, and five hours of
+# logs contained zero HEAP_CENSUS lines. These pin the condition-trigger.
+
+
+def test_census_fires_once_the_process_holds_the_memory_in_question():
+    # The worker sits at ~2200MB anon between excursions -- that is the state the
+    # owner asked about ("what is in the 1GB that sits around and grows").
+    assert mo.watchdog_should_heap_census(anon_mb=2242.8, already_censused=False) is True
+
+
+def test_census_does_not_fire_on_a_light_process():
+    assert mo.watchdog_should_heap_census(anon_mb=400.0, already_censused=False) is False
+
+
+def test_census_is_once_per_boot_at_this_layer():
+    assert mo.watchdog_should_heap_census(anon_mb=2242.8, already_censused=True) is False
+
+
+def test_census_threshold_is_env_tunable():
+    with patch.dict("os.environ", {"SYNDICATE_MEMORY_WATCHDOG_CENSUS_MB": "300"}):
+        assert mo.watchdog_should_heap_census(anon_mb=400.0, already_censused=False) is True
+
+
+def test_census_never_runs_on_the_sampler_thread():
+    # Same rule as the allocation dump, for the same measured reason: a walk of
+    # millions of objects holds the GIL, and a blocked sampler reads as calm.
+    mo._WATCHDOG_STATE.pop("heap_censused", None)
+    started = {}
+
+    class _FakeThread:
+        def __init__(self, target=None, args=(), name=None, daemon=None):
+            started.update(target=target, daemon=daemon)
+
+        def start(self):
+            started["started"] = True
+
+    try:
+        with patch("threading.Thread", _FakeThread):
+            mo._watchdog_maybe_heap_census({"memory_anon_mb": 2242.8})
+        assert started.get("started") is True
+        assert started.get("daemon") is True
+        # Both censuses, via the one runner -- see `_run_censuses`.
+        assert started.get("target") is mo._run_censuses
+    finally:
+        mo._WATCHDOG_STATE.pop("heap_censused", None)
+
+
+# --- #435 step five: the UNTRACKED (str/bytes) census -------------------------
+#
+# The tracked census measured 415,596 objects / ~135MB shallow while anon was
+# 1709MB. gc.get_objects() cannot see str/bytes at all -- they hold no
+# references -- so in a JSON pipeline it is blind to the actual bytes.
+
+
+def test_untracked_census_finds_strings_held_off_a_container():
+    holder = {"payloads": ["x" * 1_000_000 for _ in range(40)]}  # ~40MB
+    try:
+        out = mo.log_untracked_bytes_census("unit-test")
+        assert out is not None
+        assert out["str_bytes_total_mb"] >= 35, out["str_bytes_total_mb"]
+        holders = dict((name, mb) for name, mb, _count in out["top_holders_mb"])
+        assert holders.get("list", 0) >= 35, out["top_holders_mb"]
+    finally:
+        del holder
+
+
+def test_untracked_census_deduplicates_shared_strings():
+    # Interned and shared strings are referenced from many places. Counting each
+    # reference would inflate the total past the container size -- which would
+    # look like an answer and be arithmetic.
+    shared = "y" * 2_000_000
+    holder = [shared, shared, shared, shared, shared]  # one object, five refs
+    try:
+        out = mo.log_untracked_bytes_census("unit-test-dedupe")
+        assert out is not None
+        # 5 references to a single ~2MB string must contribute ~2MB, not ~10MB.
+        listed = dict((name, mb) for name, mb, _c in out["top_holders_mb"]).get("list", 0)
+        assert listed < 6, listed
+    finally:
+        del holder, shared
+
+
+def test_untracked_census_reports_what_fraction_of_anon_it_explains():
+    out = mo.log_untracked_bytes_census("unit-test-pct")
+    assert out is not None
+    # Off-cgroup there is no anon to compare against; the key must still exist
+    # rather than being silently dropped, because its ABSENCE is the signal that
+    # the memory is below Python entirely.
+    assert "explained_pct_of_anon" in out
+    assert "anon_mb" in out
+
+
+def test_untracked_census_is_capped_per_process():
+    saved = mo._UNTRACKED_CENSUS_STATE["count"]
+    try:
+        mo._UNTRACKED_CENSUS_STATE["count"] = mo._UNTRACKED_CENSUS_MAX_PER_PROCESS
+        assert mo.log_untracked_bytes_census("unit-test-capped") is None
+    finally:
+        mo._UNTRACKED_CENSUS_STATE["count"] = saved
+
+
+def test_a_failing_tracked_census_does_not_skip_the_untracked_one():
+    # The two answer different halves of one question and the FORK between them
+    # is what the next fix depends on, so the first must not be able to eat the
+    # second.
+    with patch.object(mo, "log_heap_census", side_effect=RuntimeError("boom")), patch.object(
+        mo, "log_untracked_bytes_census"
+    ) as untracked:
+        mo._run_censuses("unit-test")
+    untracked.assert_called_once()
+
+
+# --- #435 step six: pymalloc arenas -------------------------------------------
+
+
+def test_pymalloc_stats_parse_real_cpython_labels():
+    """Parsed off ACTUAL `sys._debugmallocstats()` output, commas and all.
+
+    The first version of this used `contextlib.redirect_stderr` and captured
+    NOTHING (`captured_chars: 0`) because `_debugmallocstats` writes from C to
+    fd 2. It now dup2s the fd. This test pins the label format so a CPython
+    rename shows up as a failure rather than as a confident null.
+    """
+    out = mo.log_pymalloc_arena_stats("unit-test")
+    assert out is not None
+    assert isinstance(out["arenas_currently_allocated"], int), out
+    assert isinstance(out["arena_mb"], float), out
+    assert isinstance(out["bytes_in_allocated_blocks_mb"], float), out
+    # arenas held can never be less than the bytes live inside them
+    assert out["arena_mb"] >= out["bytes_in_allocated_blocks_mb"] - 0.5, out
+    assert out["captured_chars"] > 0, "fd-level capture returned nothing"
+
+
+def test_pymalloc_stats_measure_real_retention():
+    """CALIBRATION, because an uncalibrated instrument is how tonight produced
+    three wrong answers. 2M distinct ~130B strings held then freed:
+
+        HELD   251 arenas / 251.0 MB, 248.2 MB live
+        FREED    7 arenas /   7.0 MB,   4.1 MB live
+
+    So pymalloc DOES return arenas when they empty -- which is what makes a high
+    arena count against low live bytes in production meaningful rather than
+    normal.
+    """
+    import gc
+
+    mo._PYMALLOC_STATS_STATE["count"] = 0
+    junk = [str(i) + "x" * 70 for i in range(400_000)]
+    held = mo.log_pymalloc_arena_stats("unit-held")
+    del junk
+    gc.collect()
+    mo._PYMALLOC_STATS_STATE["count"] = 0
+    freed = mo.log_pymalloc_arena_stats("unit-freed")
+    assert held["arena_mb"] > freed["arena_mb"], (held, freed)
+
+
+def test_pymalloc_stats_capped_per_process():
+    saved = mo._PYMALLOC_STATS_STATE["count"]
+    try:
+        mo._PYMALLOC_STATS_STATE["count"] = mo._PYMALLOC_STATS_MAX_PER_PROCESS
+        assert mo.log_pymalloc_arena_stats("unit-capped") is None
+    finally:
+        mo._PYMALLOC_STATS_STATE["count"] = saved

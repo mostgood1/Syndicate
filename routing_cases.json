@@ -1,0 +1,92 @@
+[
+ {
+  "id": "A04",
+  "q": "What is the projected scoreline for Arsenal in the EPL this week?",
+  "expect": "soccer",
+  "cls": "lookup"
+ },
+ {
+  "id": "A05",
+  "q": "Who is favored in the WNBA game tonight?",
+  "expect": "wnba",
+  "cls": "lookup"
+ },
+ {
+  "id": "A07",
+  "q": "What is the NHL puck line tonight?",
+  "expect": "nhl",
+  "cls": "lookup"
+ },
+ {
+  "id": "A08",
+  "q": "Any NCAAB games on the board today?",
+  "expect": "ncaab",
+  "cls": "lookup"
+ },
+ {
+  "id": "B03",
+  "q": "What are the best soccer bets today?",
+  "expect": "soccer",
+  "cls": "ranking"
+ },
+ {
+  "id": "B08",
+  "q": "Best WNBA player props tonight?",
+  "expect": "wnba",
+  "cls": "ranking"
+ },
+ {
+  "id": "D06",
+  "q": "How does the model handle a draw in a soccer match?",
+  "expect": "soccer",
+  "cls": "explain"
+ },
+ {
+  "id": "G01",
+  "q": "What is United's price this weekend?",
+  "expect": "soccer",
+  "cls": "entity"
+ },
+ {
+  "id": "G02",
+  "q": "How does the model see City?",
+  "expect": "soccer",
+  "cls": "entity"
+ },
+ {
+  "id": "G04",
+  "q": "Who leads in assists tonight in the NHL?",
+  "expect": "nhl",
+  "cls": "entity"
+ },
+ {
+  "id": "G05",
+  "q": "How many goals will Arsenal score?",
+  "expect": "soccer",
+  "cls": "entity"
+ },
+ {
+  "id": "G06",
+  "q": "What are the best WNBA points props?",
+  "expect": "wnba",
+  "cls": "entity"
+ },
+ {
+  "id": "G07",
+  "q": "Which Premier League match has the best value?",
+  "expect": "soccer",
+  "cls": "entity"
+ },
+ {
+  "id": "G09",
+  "q": "Is the draw good value in the Coventry match?",
+  "expect": "soccer",
+  "cls": "entity"
+ },
+ {
+  "id": "G10",
+  "q": "Any college basketball value today?",
+  "expect": "ncaab",
+  "cls": "entity"
+ }
+]

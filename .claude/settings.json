@@ -25,6 +25,18 @@
             "statusMessage": "Checking lane ownership..."
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/commit-guard.py",
+            "timeout": 25,
+            "statusMessage": "Checking the shared git index..."
+          }
+        ]
       }
     ],
     "Stop": [

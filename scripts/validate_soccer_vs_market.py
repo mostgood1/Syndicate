@@ -88,10 +88,20 @@ def _american_to_prob(price: Any) -> float | None:
     return -value / (-value + 100.0)
 
 
-def _load_team_ratings(league: str) -> dict[str, dict[str, float]]:
+def _load_team_ratings(league: str, as_of: str) -> dict[str, dict[str, float]]:
+    """`as_of` is the fixture date (audit §7 #6).
+
+    This mode simulates UPCOMING fixtures against current market odds, so it
+    does not leak the way the backtest did -- the history is all in the past
+    either way. It still passes a date because `compute_team_ratings` now
+    REQUIRES one, and that requirement is what stops the forward-looking and
+    backward-looking callers being confused for each other again.
+    """
     if league == "mls":
         rows = fetch_asa_mls_team_history(2026)
-        return compute_team_ratings(rows)
+        # Forward-looking mode (upcoming fixtures), so undated MLS season
+        # aggregates cannot postdate `as_of`. A backtest must NOT do this.
+        return compute_team_ratings(rows, as_of=as_of, allow_undated=True)
     if league in _GOALS_BASED_RATING_LEAGUES:
         history_dir = REPO_ROOT / "data" / "soccer_source" / league / "history"
         frames = [pd.read_csv(path) for path in sorted(history_dir.glob("matches_*.csv"))]
@@ -99,14 +109,14 @@ def _load_team_ratings(league: str) -> dict[str, dict[str, float]]:
             raise SystemExit(f"no match history under {history_dir}; run fetch_soccer_history_local.py --kind matches first")
         match_rows = pd.concat(frames, ignore_index=True).to_dict("records")
         rows = team_rows_from_match_history(match_rows)
-        return compute_team_ratings(rows, window=90)  # goals-based rows: two rows/match, so double the window
+        return compute_team_ratings(rows, as_of=as_of, window=90)  # goals-based rows: two rows/match, so double the window
     history_dir = REPO_ROOT / "data" / "soccer_source" / league / "team_history"
     frames = [pd.read_csv(path) for path in sorted(history_dir.glob("teams_*.csv"))]
     if not frames:
         raise SystemExit(f"no team history under {history_dir}; run fetch_soccer_history_local.py --kind teams first")
     rows = pd.concat(frames, ignore_index=True).to_dict("records")
     # Most recent ~1.2 seasons of form per team.
-    return compute_team_ratings(rows, window=45)
+    return compute_team_ratings(rows, as_of=as_of, window=45)
 
 
 def _fill_promoted(ratings: dict[str, dict[str, float]], fixtures: list[dict[str, Any]]) -> list[str]:
@@ -175,7 +185,8 @@ def run_h2h(league: str, *, simulations: int, out_path: Path | None) -> int:
         print("no fixtures with complete three-way odds")
         return 1
 
-    ratings = _load_team_ratings(league)
+    fixture_date = str(fixtures[0].get("commence_time") or "")[:10]
+    ratings = _load_team_ratings(league, fixture_date)
     promoted = _fill_promoted(ratings, fixtures)
     simulation_input = build_soccer_simulation_input(
         league=league,

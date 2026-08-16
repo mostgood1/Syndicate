@@ -5074,6 +5074,7 @@ without checking the number was produced after the event.
 Rollback to `c422f79a` (landed 00:54:07) is being UNDONE — `c4116ab6` re-fired
 00:58:33Z, confirmed building by re-reading the deploys list. Net cost of the
 round trip: **three soccer runs** and two extra restarts.
+<<<<<<< HEAD
 
 ---
 
@@ -5116,3 +5117,5 @@ still dark. Next deployer of live-odds-worker should carry
 `3573a0c3` is already stale). The hourly `wnba-win-prob-counter-read` scheduled
 task now reads this endpoint and will report "writer not deployed" until then —
 that is a true statement, not a null result.
+=======
+>>>>>>> origin/main
