@@ -71,6 +71,45 @@ def american_price(probability: Any) -> int | None:
     return round(-100.0 * p / (1.0 - p)) if p > 0.5 else round(100.0 * (1.0 - p) / p)
 
 
+def consensus_vigged_price(prices: Iterable[Any]) -> int | None:
+    """The market's AVERAGE quoted price for ONE side. **Not a fair value.**
+
+    The mean implied probability across the books quoting this side, converted
+    back to a price. The averaging happens in probability space because
+    averaging American odds directly is meaningless -- the scale is
+    discontinuous at +/-100.
+
+    **This is margin-inclusive, and it is not `consensus_fair_probability`.**
+    The two answer different questions and only one of them is value. This one
+    says "what is the typical book charging for this side"; the fair says "what
+    should it cost". A number from here still carries that side's share of the
+    hold, so it is a PRICE-SHOPPING reference -- how far the best book sits from
+    the pack -- and never an edge against true odds. It is also bounded below by
+    zero when compared against the best price, since the best price is by
+    construction the longest of the set being averaged.
+
+    Refuses (None) rather than raising when a price is unusable or the mean
+    lands on 0 or 1. Both hand-rolled copies this replaces raised
+    ZeroDivisionError there, and that is reachable: `odds_book_quotes`'
+    converter maps a price of `0` to probability **0.0** instead of refusing it,
+    so an all-zero side crashed the board build rather than returning a number.
+    Refusing the whole side on one bad price follows `overround` for the same
+    reason it gives -- a partial average is not the market, it is a smaller
+    sample wearing the market's name.
+    """
+    total = 0.0
+    seen = 0
+    for price in prices:
+        implied = implied_probability(price)
+        if implied is None:
+            return None
+        total += implied
+        seen += 1
+    if seen == 0:
+        return None
+    return american_price(total / seen)
+
+
 def overround(prices: Iterable[Any]) -> float | None:
     """Sum of implied probabilities across every side of one market.
 
@@ -495,14 +534,45 @@ def blended_score(
     # freshness, for the same reason they are multiplicative: it is not
     # additional value, it is confidence in the value already computed.
     price_reliability = _price_reliability(price, fair_prob)
+    reliability = confidence * freshness * price_reliability
+    # A DISCOUNT MUST LOWER A SCORE. NEVER RAISE ONE.
+    #
+    # `value * reliability` is right for positive value and INVERTED for
+    # negative value: multiplying -7.08 by 0.0088 gives -0.062, so the less we
+    # trust a bad row the better it ranks. Measured on the served shortlist
+    # 2026-08-14T18:59:34Z, 256 rows: **156 carried negative value**, and across
+    # them `corr(reliability, score) = -0.8312` -- against a **+0.8560 control**
+    # on the 98 positive-value rows. Same formula, opposite sign.
+    #
+    # Concretely, the two rows that sat at opposite ends of that ranking:
+    #     soccer player_to_receive_red_card  value -7.08  1 book, stale  -> -0.062
+    #     nfl    h2h                         value -3.37  3 books, fresh -> -1.433
+    # The worse bet, quoted by one book, outranked the better one by 23x. Every
+    # reliability term this module added to demote junk was PROMOTING it over
+    # exactly the half of the board those terms were built to sort.
+    #
+    # `min` rather than a re-derived formula, because it is provably
+    # behaviour-preserving where the old rule was already correct: for
+    # value >= 0 the discounted number is the smaller one and is still chosen,
+    # so every positive row keeps its exact score and the board's ranking above
+    # zero does not move. For value < 0 the discount can only make the row look
+    # better, so it is not applied at all -- a bad row ranks on its badness.
+    #
+    # Generalises `learnings.md` 2026-08-13: "if usage going DOWN can make a
+    # guard stricter, the guard is reading the wrong quantity." Here, if TRUST
+    # goes down the RANK goes up. That inversion is a complete proof on its own.
+    discounted = value * reliability
     return {
-        "score": round(value * confidence * freshness * price_reliability, 4),
+        "score": round(min(value, discounted), 4),
         "value_pct": round(value, 4),
         "ev_component": None if value_ev is None else round(value_ev, 4),
         "sim_component": None if value_sim is None else round(_SCORE_SIM_WEIGHT * value_sim, 4),
         "book_confidence": confidence,
         "freshness_factor": freshness,
         "price_reliability": price_reliability,
+        # Whether the reliability discount was applied. False means the row's
+        # value was negative and the discount would have promoted it.
+        "reliability_applied": discounted <= value,
     }
 
 
