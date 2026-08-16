@@ -5747,3 +5747,87 @@ number exists.**
 (`path`, `bytes`, running `len(rows)`), then read one pass. The guard currently
 announces only what it refused, never what it accepted — the same blind spot
 that made this take all night.
+
+## 2026-08-16 05:0x-05:3xZ — MEASUREMENTS for the three deploys of this run (`#440` Phases 1 and 4.1)
+
+Fills the empty measurement column on `755ec40a`, and records the two deploys
+that followed it. **One is VERIFIED, one is INERT BY DESIGN, one is still PENDING.**
+
+### 1. refresh-worker `755ec40a` (04:58:57Z) — **MEASURED: INERT. I enabled the flag on the wrong service.**
+
+`FIXTURE_CADENCE` never appeared, and the reason is structural rather than timing:
+
+    _pregame_sweep_interval_for_tick   called ONLY at live_refresh_loop.py:4338
+      inside _apply_pregame_sport_cadence (def 4306)
+        called ONLY at :4948
+          inside _run_live_refresh_tick (def 4682)
+
+and the imports settle ownership:
+
+    refresh-worker    imports _run_mlb_sim_tick, _weekly_sport_claimed_by_fast_tick, _process_exists
+    live-odds-worker  imports _run_live_refresh_tick   <- the ONLY caller
+
+refresh-worker also carries `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`. So the
+gate was unreachable there and the deploy changed nothing.
+
+**A FALSE LEAD I NEARLY ACCEPTED, recorded because it was convincing:**
+refresh-worker DOES emit `[live_refresh_loop] ODDS_SWEEP_OUTCOME` — 13 lines,
+including after the deploy — which flatly contradicts "the gate is unreachable
+there". Those come from `_run_mlb_sim_tick` (def 4578, emitter at :4621), a
+DIFFERENT function in the same module that refresh-worker genuinely does import.
+Shared module, shared log prefix, different code path. I also re-verified the log
+tool's service mapping (`ls0`=refresh-worker, `lt0`=live-odds-worker) against the
+API before trusting any of it, because a swap there would have invalidated the
+Phase 0/H2 finding too. It was correct.
+
+**Remediation:** flag DELETED from refresh-worker, SET on live-odds-worker; both
+read back across all three services.
+
+### 2. live-odds-worker `dd53d47c` (live 05:20:39Z) — **MEASUREMENT STILL PENDING**
+
+Deployed from live-odds-worker's OWN live SHA `44bc02f3` (2 files, 18 tests green,
+no `render.yaml`). Process is alive (first output 05:21:36Z; my earlier "silence"
+was log-ingestion lag, not a boot failure). The tick runs. **The gate has not been
+reached yet**, and the cause is measured:
+
+    05:08:40  the killed odds refresh stamped a launch -> cooldown until 05:38:40
+    05:21:32  tick -> PREGAME_RELAUNCH_COOLDOWN_SKIPPED cooldown_s=1800
+    05:36:37  tick -> PREGAME_RELAUNCH_COOLDOWN_SKIPPED  (2 min early)
+    ~05:51:37 next tick -> the first that can reach the gate
+
+`_pregame_relaunch_blocked` sits UPSTREAM of `_apply_pregame_sport_cadence`, and
+with no live games the loop is on `SYNDICATE_LIVE_ODDS_REFRESH_IDLE_INTERVAL_SECONDS=900`
+against an 1800s cooldown — so only every OTHER tick can pass.
+
+**CORRECTION TO MY OWN EARLIER CLAIM, made the same night:** I said the cooldown
+"materially caps the modelled -51%/-70%" and that the numbers needed re-deriving.
+**That was wrong.** The cooldown and the cadence interval are both MINIMUM
+SPACINGS, so the larger binds — and every tier (2h/8h/24h) exceeds the 30-minute
+cooldown. The model stands; the cooldown delays OBSERVATION, not effect.
+
+### 3. refresh-worker `1409e96f` (live 05:35:34Z) — **VERIFIED. Phase 4.1 works.**
+
+`SYNDICATE_ACTIVE_SPORTS` on refresh-worker `mlb,wnba,soccer,nfl` -> `nfl`.
+
+    refresh-worker    05:36:13Z  results={'nfl': True}
+                                 skipped=['mlb','nba','wnba','soccer']
+    live-odds-worker  05:31:52..05:36:24Z, 5 consecutive ticks, unbroken
+                                 results={'mlb': True,'wnba': True,'soccer': True}
+                                 skipped=['nba','nfl']
+
+**Union complete, intersection empty.** Every registered sport has exactly one
+owner; nba is skipped by both (out of season, correct). No sport lost coverage —
+that was the failure mode worth checking and it did not happen. MLB/WNBA/soccer
+go from built-twice to built-once: **~69 MLB live-lens builds/hr -> ~35**, each
+carrying a 120-sim resim, and refresh-worker also sheds WNBA's builder (worst
+measured +153MB) and soccer's 4-pass Monte Carlo.
+
+**ATTRIBUTION LIMIT, stated rather than glossed:** this deploy was triggered by the
+dashboard env save (`trigger=service_updated`), which deploys the tracked BRANCH
+HEAD rather than the live commit — so it carried two commits from another session
+(`164f6e80` mlb odds-shard double-read fix, `1409e96f` ledger streaming), both
+**memory reductions on the same service**. Neither touches `live_lens_loop.py` or
+`ACTIVE_SPORTS`, so the partition mechanism is unaffected — but **if refresh-worker
+memory drops, it cannot be attributed to Phase 4.1 alone.** The
+`branch-overlap-baseline-watch` before/after boundary must be re-stamped from
+05:35:34Z.
