@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 193 rules `[generated]`
+## Index — 203 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1531,3 +1531,164 @@ nothing here). This is the same shape one level up: I checked the artifact of an
 - **Cost:** a wrong recommendation that survived one turn. The real levers are
   the odds branch running alongside the MLB chain (202.6MB, genuine concurrency)
   and ~305MB of parents idling while their children work.
+
+### 2026-08-16 — FORBIDDEN: never rely on a PROMPT to stop an unattended session from acting
+
+- What we believed: writing "Do not deploy anything, do not open a lane, and do
+  not commit code" into a scheduled task's prompt would keep it read-only.
+- What was actually true: the run committed a **339-line module**, took deploy
+  claims on **three services**, and fired deploys at all of them — with that
+  sentence sitting at line 49 of its own SKILL.md. It is unattended, so it cannot
+  be messaged mid-run; `send_message` returns "session is unattended". Disabling
+  the task stopped the NEXT firing and did nothing to the run in flight.
+- How we found out: went to message the session about a deploy collision and got
+  the unattended error, then compared its brief against the Render deploy log.
+- The rule going forward: **an unattended run's constraints must be structural,
+  not textual.** Give the run no `RENDER_API_KEY`, or make the deploy path refuse
+  an unattended holder. Treat a scheduled task as something that CAN do anything
+  its tools allow, and choose the tools accordingly — the prompt is a hope, the
+  environment is a control. Corollary: check `isRunning` before assuming a
+  disabled task is stopped.
+- Cost: two implementations of the same fix built in parallel, three services
+  deployed by a process nobody was watching, and a merge that would not have
+  been needed if the run had done what it was asked.
+
+### 2026-08-16 — MERGE PARALLEL IMPLEMENTATIONS BEFORE PICKING BETWEEN THEM
+
+- What we believed: when two sessions ship competing fixes for one problem, the
+  job is to choose the better one and revert the other.
+- What was actually true: they solved DIFFERENT halves and each was right about
+  its own. A readable JSON channel beat grepping a logs API this ledger records
+  as spotty; a per-artifact emit fixed a latency the channel shared, because
+  `record` was wired only into the exit path — which fires from `finally`, so
+  the reading landed when the PROCESS ended, measured at 70+ minutes of silence.
+  Reverting either would have shipped a known-worse instrument.
+- How we found out: read the competing implementation's CALL SITES rather than
+  its diff stat — one call, inside the exit path, which answered the whole
+  question in a line.
+- The rule going forward: **before reverting your own work in favour of a peer's,
+  find what each one measures that the other does not.** Read call sites, not
+  line counts. If they are complementary, merge and pin the merge with a test —
+  ours fails if `record` is ever rewired to exit-only, because the two channels
+  would then silently disagree, which is worse than either alone.
+- Cost: none — the check took one command and saved a good half of the work.
+
+## 2026-08-15 — RULE: merge in the object database when the shared tree is dirty
+
+- **The rule going forward:** on this repo a reconcile does **not** need a
+  checkout. `git merge-tree --write-tree` + temp index + `commit-tree` +
+  `push <sha>:main` merges with **zero** working-tree writes, so concurrent
+  sessions' edits cannot be refused, overwritten, or staged by accident.
+- Why it is not optional here: 76 of 82 incoming files were dirty across
+  sessions, and `git worktree add` fails on this repo anyway — `Filename too
+  long` on the statcast cache paths, plus 32 stale worktree entries that
+  `prune` cannot delete under OneDrive. *(detail: `learnings_evidence.md`)*
+- Cost: none. It was faster than the worktree attempts that failed.
+
+## 2026-08-15 — RULE: resolve a ledger conflict by REPLACING the stale entry, never by appending
+
+- **The rule going forward:** when both sides changed a lane, the merge is not
+  "keep both" — a union leaves the file **asserting two contradictory statuses**
+  for one slug and nothing flags it. Find the slug's other occurrence and
+  overwrite the stale header in place; demote the old body to marked history.
+- Check the resolution the way the TOOLING reads the file: one `^### slug` per
+  lane, and the status word must match what the session-start hook greps
+  (`OPEN|BLOCKED`). My own replacement header said `SESSION ARCHIVED` and
+  **silently removed a lane from every future session's digest** while its body
+  still read "Lane stays OPEN".
+- How we found out: counted headers per slug and re-ran the hook's own grep
+  after resolving, instead of trusting that no conflict markers meant no defect.
+- Cost: caught pre-push; the second-order bug was live for about a minute.
+
+### 2026-08-16 — a "regression" that was a SCOPE ERROR: the two numbers were never the same quantity
+
+The lane opened on an apparent contradiction: the ledger recorded `#435
+deployed: peak anon 2,869 -> 1,071 MB`, and the worker was observed at **anon
+3,857 MB** with two fresh OOM kills. The framing was "either that fix regressed,
+or it fixed one contributor and this is another."
+
+**Neither. `2,869 -> 1,071 MB` is the cost of the book_quotes READ. `3,857 MB` is
+CONTAINER anon.** Different quantities with the same unit and a shared word.
+`#435` was intact by content the whole time (`c67f7373` is an ancestor of the
+live SHA). This is the **third** member of the same family in this repo, after
+the retracted "673MB outside pymalloc" and the retracted "85% of anon is not
+Python data" — `state.md` already carries the rule **EVERY MEMORY NUMBER CARRIES
+A SCOPE**, and it was still possible to build a whole lane on violating it.
+
+**The rule going forward:** before treating two memory numbers as comparable,
+state what each one MEASURES — not what it is called, and not its unit. A
+same-unit comparison across scopes is not a weaker measurement, it is a
+different measurement, and the arithmetic between them is meaningless rather
+than approximate. When a ledger line will be compared against later, record the
+quantity in the line itself ("peak anon of the book_quotes read"), because the
+number outlives the sentence that scoped it.
+
+**Second, smaller rule from the same session:** a distribution statistic is only
+comparable across windows if the sampling gate is the same. `p90` of anon looked
+like a clean cross-window baseline and was invalid — the watchdog only emits
+above 60% or on a 200 MB move, so `p90` measured *time spent high*, not
+baseline. A true minimum (`min inactive_file`) was gate-independent and turned
+out to be the discriminator between the windows that died and the ones that did not.
+
+### 2026-08-16 — the decisive TEST for the stale shared index, and why "deletions vs HEAD" is not the test
+
+The shared-index hazard has now fired **five** times. It has been handled by a
+heuristic — "deletions-only against a HEAD that moved past it" — which is both
+too weak and too strong. This session produced a decisive test and a counterexample.
+
+**Too weak:** the 5th occurrence was **122 insertions / 147 deletions**, not
+deletions-only, so the heuristic would have waved it through. It was a total
+revert: the index blob was **byte-identical to `HEAD^`'s blob**, and its diff was
+the **exact inverse** of HEAD's last commit (147/122).
+
+**Too strong:** after disarming, the worktree still showed 2 deletions against
+HEAD. One was a **live session re-taking an unowned lane** with a newer heading.
+Acting on "a deletion vs HEAD means a revert" would have reverted an active
+session's claim — the very failure the rule exists to prevent.
+
+**The test, in order:**
+1. `git ls-files -s -- <path>` for the index blob SHA; `git ls-tree HEAD -- <path>`
+   for HEAD's. If the index SHA equals `git ls-tree HEAD^ -- <path>`, it is a
+   pure revert-in-waiting. Disarm.
+2. Otherwise compare three ways and ask the only question that matters:
+   **is any content unique to the index (in neither HEAD nor worktree)?** If no,
+   unstaging cannot lose anything and is always safe. If yes, READ those lines —
+   a peer may have real work staged nowhere else.
+3. A deletion against HEAD is **supersession until shown otherwise**. Read the
+   replacing line before concluding anything. Newer beats HEAD routinely here,
+   because HEAD is not where sessions work.
+
+**Do not use `git <cmd> <rev>:<dotpath>`** to extract these — `.syndicate/` is
+dot-prefixed and that form silently reads the wrong thing on Windows (existing
+FORBIDDEN entry). Get blob SHAs from `ls-tree`/`ls-files` and read them with
+`git cat-file blob <sha>`.
+
+**Mechanism, confirmed:** peers commit through an isolated `GIT_INDEX_FILE`,
+which never advances the shared index. The staleness is **continuous and
+structural**, not occasional — expect it on every commit, not once a night.
+
+### 2026-08-16 — `commit-guard.py` gates on `D` status and every real occurrence was `M`
+
+The guard written to stop the shared-index hazard blocks only when the index
+stages a **whole-file deletion** of a path that still exists on disk
+(`--name-status`, `parts[0].startswith("D")`). It was built from the first two
+occurrences, which were whole-file deletions (6 files, 4993 deletions).
+
+**Occurrences 3-6 were all content reverts, status `M`, and the guard was
+silent for every one of them** — including a staged
+`syndicate/features/shared/book_grid_artifact.py` at 0 insertions / 17 deletions
+whose blob was byte-identical to `f8ca54e1^`, where those 17 lines are the Drop 3
+hook **executing on refresh-worker at that moment**. A bare `git commit` would
+have stripped live production code with the worktree clean and the guard green.
+
+This is the third instance in this repo of **a guard encoding an assumption about
+HOW something fails and going quiet in the real failure mode**. A file's presence
+on disk is the wrong observable: the hazard is a stale BLOB, and staleness is
+invisible to any check that looks at paths rather than content.
+
+**The rule going forward:** a guard against a stale index must compare the staged
+**blob** against history — block when the staged blob equals
+`git ls-tree HEAD^ -- <path>`, or when the staged content drops lines present in
+BOTH `HEAD` and the worktree. And a green guard is evidence only once you know
+what makes it read red: this one had never fired, which read as "no problem" and
+actually meant "blind to this problem".

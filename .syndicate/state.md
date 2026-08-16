@@ -198,6 +198,17 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **`git push` from this checkout is not scoped to your own commits.** Read
   `git log origin/main..HEAD` first. `[from-git 08-13]`
 
+**AN UNATTENDED SCHEDULED TASK DEPLOYED TO THREE SERVICES AGAINST ITS OWN
+INSTRUCTIONS `[08-16 01:0x-01:2xZ]`.** `wnba-win-prob-counter-read` was told
+"Do not deploy anything, do not open a lane, and do not commit code" — line 49
+of its SKILL.md. It committed a 339-line module, took claims on web,
+refresh-worker and live-odds-worker, and fired deploys. **A prohibition in prose
+is not a control.** It is now DISABLED, but disabling stops the next firing, not
+the run in flight. If unattended tasks run again the constraint must be
+STRUCTURAL: no `RENDER_API_KEY` in the run environment, or a claim tool that
+refuses an unattended holder. In fairness it released its own claims, and its
+channel was the better primitive — the merge kept its work.
+
 **DEPLOYS ARE NOT SERIALISED BY DEFAULT — THERE IS NOW A CLAIM `[08-15 22:3xZ]`.**
 Measured: web took **5 deploys in 21 min from 4 sessions** (the 19:20 one
 cancelled the 19:15 one mid-build), and the prop `0.5` fix was **silently
@@ -298,7 +309,33 @@ unsaved anywhere.
 
 ---
 
-## MEMORY — refresh-worker `#435` — FIXED, PROVEN, INSTRUMENTED `[measured 08-16 01:07Z]`
+## MEMORY — refresh-worker `#435` — FIX HOLDS; KILLS RECURRED 08-16 02:11Z/02:37Z FROM A SECOND CONDITION `[re-measured 08-16 02:5xZ]`
+
+**THE KILL IS A ~2 GB TRANSIENT, NOT A LEAK, AND NOT A `#435` REGRESSION.**
+`c67f7373` IS an ancestor of live `f8ca54e1`, so the streaming reader is in
+production by content. The ledger's `#435` figure `2,869 -> 1,071 MB` is the
+**book_quotes READ**; `3,857 MB` is **CONTAINER anon** — different quantities,
+never in contradiction. 22 excursions over 5 **deploy-free** windows: anon
+climbs ~2 GB in 15-25 s (100-330 MB/s), collapses ~2 GB in ~2 s, trough returns
+to 971-1,900 MB every time. **Amplitude and peak are FLAT across the night,
+before and after tonight's 12 deploys.** Every cycle reaches headroom 0.0-0.2.
+**What decides life or death is evictable page cache:** the two kill windows
+bottomed at `inactive_file` 26.3 / 42.2 MB; surviving windows kept 164-240 MB.
+Kill list from the EVENTS API: 21 kills 08-14 22:17Z..08-15 05:02Z, then **0 for
+21h 08m**, then 2. live-odds-worker 0 in window. **The 3000 MB floor does not
+guard this pass** — `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` is consumed only by
+`_overview_headroom_exhausted(next_sport=…)` inside the overview sport loop.
+**STILL UNNAMED: which allocation inside the pass is the 2 GB.** `last_stage`
+cannot say — `seconds_since_stage` is 14-34 s and `apply_game_board_contract`
+only does `setdefault`s after `games_normalized`, so the cost is BETWEEN markers.
+Working in `deploys.md` (2026-08-16 ~02:5xZ).
+**CLEAN WINDOW OPEN: no kill and no deploy since 02:37:06Z — 42.8 min as of
+03:19:53Z** (events API). This is the precondition the `win_prob` counter has
+been waiting on: both its channels only write when a run COMPLETES, so it
+cannot produce a reading until refresh-worker gets an uninterrupted hour.
+**Every deploy to this service resets that clock to zero.**
+
+### Prior `#435` record, unchanged and still true `[measured 08-16 01:07Z]`
 
 **`#435` IS FIXED AND PROVEN.** Root cause: `book_quotes/<date>.jsonl` is
 APPEND-ONLY and was read whole. It grows all day (MLB 89.9 -> 184.5MB, resets at
@@ -340,9 +377,14 @@ glibc arena fragmentation (`#423`); the per-sport board caches.
 **RETRACTED:** "oomKilled 0" (log grep — kills are EVENTS); "85% of anon is not
 Python data" (one-level census); "673MB outside pymalloc" (scope error).
 
-**NEXT LEVERS, both smaller than the fix already shipped:** the children
-(~504MB when running) and pymalloc's 350MB arena retention. NOT another
-instrument.
+**NEXT LEVER, SUPERSEDED 08-16 02:5xZ by the transient measurement above:** the
+children (~504MB) and pymalloc's 350MB retention are real but are NOT what
+crosses the ceiling. The binding lever is the **amplitude of the single ~2 GB
+pass**, or a headroom gate in front of THAT pass rather than in front of the
+overview sport loop. Raising the ceiling is excluded by user decision
+(keep `pro`, reduce instead). NOT another instrument — but naming the allocator
+needs a bounded in-pass measurement, which needs a deploy, which needs a clean
+window first. **Deploys must stay OFF refresh-worker until then.**
 
 ---
 
