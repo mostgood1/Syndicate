@@ -270,11 +270,30 @@ MEASURE_JS = """
       }))
       .filter((g) => g.n > 1);
     if (!groups.length) return null;
+    // TWO statistics, because two questions are being asked and they do not
+    // have the same answer.
+    //
+    // `worstGroupPx` is the MAX spread over all tie groups. That is the floor a
+    // FIT has to beat -- a model must explain every card, so the worst tie
+    // bounds its residual from below. Using anything smaller here would let
+    // something read as fittable when it is not.
+    //
+    // `spreadPx` is the spread within the LARGEST tie group, and it is the
+    // number tracked across runs (user decision, 2026-08-16, after mlb mobile
+    // read 109/109/53 on the max statistic). Biggest group = most evidence, and
+    // it does not hand the metric to a two-card group that happens to straddle
+    // the extremes. Ties on group size break toward the LARGER spread, so the
+    // choice can never hide a difference.
     const worst = groups.reduce((a, b) => (b.spread > a.spread ? b : a));
+    const largest = groups.reduce((a, b) =>
+      b.n > a.n || (b.n === a.n && b.spread > a.spread) ? b : a);
     return {
-      floorPx: worst.spread,
-      atU: worst.u,
-      n: worst.n,
+      spreadPx: largest.spread,
+      atU: largest.u,
+      n: largest.n,
+      worstGroupPx: worst.spread,
+      worstAtU: worst.u,
+      worstN: worst.n,
       tiedGroups: groups.length,
       cardsTied: groups.reduce((a, g) => a + g.n, 0),
     };
@@ -349,8 +368,9 @@ MEASURE_JS = """
     // text wraps, not a layout deviation. Mobile passes because its slope is
     // ~62px/pair against desktop's ~16px, which buys 743px of explained range
     // to hide the same noise behind.
+    // The WORST tie, not the largest one: a fit has to beat every tie group.
     const tie = tieFloor(pts);
-    const floorPx = tie ? tie.floorPx : null;
+    const floorPx = tie ? tie.worstGroupPx : null;
     // The best ratio ANY model in `u` could reach on this slate. Above the
     // reliability bar means no fit is possible here, however the line is drawn.
     const floorRatio = floorPx !== null && explained > 0 ? floorPx / explained : null;
@@ -413,8 +433,10 @@ MEASURE_JS = """
     if (t) tieByState[k] = t;
   });
   const tieStates = Object.keys(tieByState);
+  // Ranked by the statistic that is actually REPORTED, so the row shown is the
+  // row the number came from.
   const worstTieState = tieStates.length
-    ? tieStates.reduce((a, b) => (tieByState[a].floorPx >= tieByState[b].floorPx ? a : b))
+    ? tieStates.reduce((a, b) => (tieByState[a].spreadPx >= tieByState[b].spreadPx ? a : b))
     : null;
   const identicalContentSpread = worstTieState
     ? Object.assign({state: worstTieState}, tieByState[worstTieState])
@@ -1016,11 +1038,20 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
             # gating it on the model would hide it exactly when it is the only
             # thing left. Reported, never failed -- see WATCH_METRICS.
             tie = measured.get("identicalContentSpread") or {}
-            if tie.get("floorPx") is not None:
+            if tie.get("spreadPx") is not None:
+                # Both statistics, always. The tracked one is the largest group;
+                # printing the worst next to it is what stops the choice of
+                # statistic from quietly hiding a bigger difference elsewhere on
+                # the page.
+                worst = ""
+                if tie.get("worstGroupPx") != tie.get("spreadPx"):
+                    worst = (f"; worst group {tie['worstGroupPx']}px "
+                             f"at {tie['worstAtU']} pairs, n={tie['worstN']}")
                 issues.append(
-                    f"identical-content spread {tie['floorPx']}px in {tie['state']} "
-                    f"({tie['n']} cards at {tie['atU']} pairs; "
-                    f"{tie['cardsTied']} tied across {tie['tiedGroups']} group(s))"
+                    f"identical-content spread {tie['spreadPx']}px in {tie['state']} "
+                    f"(largest group: {tie['n']} cards at {tie['atU']} pairs; "
+                    f"{tie['cardsTied']} tied across {tie['tiedGroups']} group(s)"
+                    f"{worst})"
                 )
             conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
             if conflated:
@@ -1152,10 +1183,12 @@ def _cmp_value(v):
     if isinstance(v, list):
         return len(v)
     if isinstance(v, dict):
-        # `floorPx` first: `identicalContentSpread` carries no `spread`/`max`,
+        # `spreadPx` first: `identicalContentSpread` carries no `spread`/`max`,
         # and without this it compares None to None and reads "unchanged" on
-        # every run -- a watch metric that can never move is not a watch.
-        return v.get("floorPx", v.get("spread", v.get("max")))
+        # every run -- a watch metric that can never move is not a watch. It is
+        # the LARGEST-group statistic that is tracked, so that is what the
+        # comparison must read; `worstGroupPx` is reported but not diffed.
+        return v.get("spreadPx", v.get("floorPx", v.get("spread", v.get("max"))))
     return v
 
 

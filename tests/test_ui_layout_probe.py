@@ -495,6 +495,27 @@ def _fit(pts):
     return (model.get("heightModelByState") or {}).get("Preview")
 
 
+def _fit_tie(pts):
+    """The `identicalContentSpread` block for one Preview group, via real JS."""
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page()
+        page.set_content("".join(
+            f"<div class='cards-game-card' style='height:{h}px'>"
+            f"<span class='cards-status-badge'>Preview</span>"
+            + "<div class='cards-data-pair'>x</div>" * u
+            + "</div>"
+            for u, h in pts))
+        measured = page.evaluate(
+            probe.MEASURE_JS,
+            {"typeClasses": probe.TYPE_CLASSES, "numericClasses": probe.NUMERIC_CLASSES})
+        browser.close()
+    return measured["identicalContentSpread"]
+
+
 DESKTOP_PTS = [(49, 1157), (49, 1197), (45, 1134), (49, 1120), (45, 1111),
                (53, 1129), (45, 1092), (49, 1106), (45, 1157), (45, 1208),
                (41, 914), (45, 1180), (45, 1180), (41, 914), (49, 1203)]
@@ -603,7 +624,8 @@ def test_the_floor_is_emitted_when_no_model_is():
     assert measured["heightModel"] is None
     assert measured["statesUnfitted"] == ["Preview"]
     tie = measured["identicalContentSpread"]
-    assert tie["floorPx"] == 116  # 1216 - 1100
+    assert tie["spreadPx"] == 116  # 1216 - 1100
+    assert tie["worstGroupPx"] == 116  # one group, so both statistics agree
     assert tie["n"] == 5 and tie["atU"] == 33
     assert tie["state"] == "Preview"
 
@@ -611,12 +633,15 @@ def test_the_floor_is_emitted_when_no_model_is():
 def test_the_floor_is_printed_even_with_no_model():
     text, ok = _summarize(_report(
         heightModel=None,
-        identicalContentSpread={"state": "Live", "floorPx": 116, "atU": 33,
-                                "n": 15, "tiedGroups": 1, "cardsTied": 15},
+        identicalContentSpread={"state": "Live", "spreadPx": 116, "atU": 33,
+                                "n": 15, "worstGroupPx": 116, "worstAtU": 33,
+                                "worstN": 15, "tiedGroups": 1, "cardsTied": 15},
     ))
     assert ok, text
     assert "identical-content spread 116px in Live" in text
-    assert "15 cards at 33 pairs" in text
+    assert "largest group: 15 cards at 33 pairs" in text
+    # One group, so the two statistics agree and the worst-group clause is noise.
+    assert "worst group" not in text
 
 
 def test_the_floor_never_fails_a_run_while_its_stability_is_unknown():
@@ -678,3 +703,67 @@ def test_an_errored_baseline_row_is_named_as_the_errored_side():
     text, ok = _compare(base, _report())
     assert not ok
     assert "SKIPPED -- the baseline row ERRORED" in text
+
+
+# --- largest tie group as the tracked statistic (user decision 2026-08-16) ---
+#
+# Chosen AFTER seeing that the max-across-groups statistic read 109/109/53 on
+# mlb mobile. Recorded here because a statistic picked to look stable must not
+# later be cited as having been predicted to be stable.
+
+
+def test_the_tracked_statistic_is_the_largest_group_not_the_worst():
+    """A 2-card group straddling the extremes must not own the metric."""
+    pts = [(41, 1000), (41, 1400)]                      # n=2, spread 400
+    pts += [(45, 1100), (45, 1130), (45, 1120), (45, 1150)]  # n=4, spread 50
+    m = _fit_tie(pts)
+    assert m["n"] == 4 and m["atU"] == 45
+    assert m["spreadPx"] == 50
+    assert m["worstGroupPx"] == 400 and m["worstAtU"] == 41
+
+
+def test_the_worst_group_still_drives_fit_impossibility():
+    """A fit has to beat EVERY tie group, so the impossibility floor keeps
+    using the max. Tracking the largest group must not make something read as
+    fittable when it is not."""
+    pts = [(41, 1000), (41, 1400)]
+    pts += [(45, 1100), (45, 1130), (45, 1120), (45, 1150)]
+    pts += [(49, 1200), (49, 1210), (49, 1205)]
+    model = _fit(pts)
+    assert model is not None
+    assert model["floorPx"] == 400, "floorPx must be the worst tie, not the largest"
+
+
+def test_equal_sized_groups_break_toward_the_larger_spread():
+    """The tie-break can never be the thing that hides a difference."""
+    pts = [(41, 1000), (41, 1040), (41, 1010)]   # n=3, spread 40
+    pts += [(45, 1100), (45, 1220), (45, 1150)]  # n=3, spread 120
+    m = _fit_tie(pts)
+    assert m["n"] == 3
+    assert m["spreadPx"] == 120 and m["atU"] == 45
+
+
+def test_both_statistics_are_printed_when_they_disagree():
+    text, ok = _summarize(_report(identicalContentSpread={
+        "state": "Preview", "spreadPx": 50, "atU": 45, "n": 4,
+        "worstGroupPx": 400, "worstAtU": 41, "worstN": 2,
+        "tiedGroups": 2, "cardsTied": 6}))
+    assert ok, text
+    assert "identical-content spread 50px in Preview" in text
+    assert "worst group 400px at 41 pairs, n=2" in text
+
+
+def test_the_comparison_diffs_the_tracked_statistic_not_the_worst():
+    base = _report(identicalContentSpread={
+        "state": "Preview", "spreadPx": 50, "worstGroupPx": 400, "atU": 45, "n": 4})
+    cur = _report(identicalContentSpread={
+        "state": "Preview", "spreadPx": 50, "worstGroupPx": 900, "atU": 45, "n": 4})
+    text, ok = _compare(base, cur)
+    assert ok
+    assert "identicalContentSpread unchanged" in text
+
+
+def test_an_older_report_using_floorPx_still_compares():
+    """Reports written before the statistic changed carry `floorPx` only."""
+    assert probe._cmp_value({"state": "Preview", "floorPx": 116}) == 116
+    assert probe._cmp_value({"state": "Preview", "spreadPx": 50, "floorPx": 400}) == 50

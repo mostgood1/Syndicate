@@ -2634,3 +2634,35 @@ and then failed the thing it was checking, which is the point of running it.
   `page.goto` timeout was reported as `CODE-DRIVEN DRIFT` on four metrics at
   once. Errored rows are now SKIPPED and named; they still fail the run.
 - Blocked by: none
+
+### ui-probe-tie-statistic — CLOSED 2026-08-16 — implemented as decided; the statistic did NOT help and the instability is the SLATE — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: track the spread within the LARGEST tie group (user decision), applied at
+  every row; the fit-impossibility floor keeps using the MAX across groups.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis (written BEFORE the runs): switching statistic will NOT rescue mlb
+  mobile.
+- **CONFIRMED — and it is worse, not merely no better.** 3 production runs:
+  mlb mobile tracked 67/132/164 = **2.45x** (fires) against worst-group
+  99/132/164 = 1.66x; mlb desktop tracked 64/80/64 = 1.25x against worst-group
+  83/80/83 = 1.04x. **On both MLB rows the new statistic is LESS stable than the
+  one it replaced.** My stated expectation ("would probably pull mlb mobile under
+  the bar") was wrong. Mechanism differed from the guess too: the largest group's
+  SIZE churns, n = 7/14/7 between runs.
+- **The real finding: the axis was wrong.** nfl and ncaaf read 1.00x across three
+  runs, both widths, under BOTH statistics — their slates are static (units 3-3,
+  16-16). MLB carries a live game and enriches continuously (units 41-57 / 33-57
+  / 41-57, Live 1 + Preview 14 every run). The identical-content spread is
+  exactly reproducible on a static slate and not reproducible on a churning one;
+  no choice of statistic survives content moving underneath it.
+- Verification: 57 tests pass (51 prior + 6 new) incl. largest-group tracked
+  while `floorPx` takes the worst, and equal-n groups breaking toward the larger
+  spread so the tie-break cannot hide a difference. 3 production runs recorded.
+- Both statistics are emitted and printed when they differ, so nothing is lost
+  whichever is diffed; only `_cmp_value` selects. Reverting is one line.
+- **Recommendation NOT taken unilaterally:** revert the tracked statistic to
+  `worstGroupPx` (more stable on both MLB rows, and identical to the quantity the
+  impossibility floor already uses), then baseline nfl/ncaaf and treat
+  MLB-during-a-live-slate as not baselineable in any statistic.
+- Provenance caveat: this statistic was chosen AFTER seeing which looked stable,
+  so its behaviour is not independent evidence. It did not come true.
+- Blocked by: none
