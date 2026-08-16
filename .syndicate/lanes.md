@@ -3171,7 +3171,7 @@ window (19:55:44), under a minute, minutes before the 20:03:41 exit. **A deploy'
 incremental cost over the baseline is smaller than it looks — the run is already
 being killed every ~6.5h — but that is the soccer lane's call, not the deployer's.**
 
-### mlb-live-pitcher-projection — OPEN — opened 2026-08-15 — session: mlb-live-pitcher-projection
+### mlb-live-pitcher-projection — CLOSED-VERIFIED 2026-08-16 — (a)/(b)/(c) all measured on 423 rows, 0 violations; live coverage 11.6% -> 50.3%; archived to lanes_closed.md — opened 2026-08-15 — session: mlb-live-pitcher-projection
 - Goal: on a live MLB slate, a live prop row never shows (a) a projection below
   an already-recorded actual, (b) a `model_prob_over` on the opposite side of
   the line from its own `projected`, or (c) a blank live column with no

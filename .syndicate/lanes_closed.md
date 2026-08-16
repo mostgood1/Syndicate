@@ -4672,3 +4672,53 @@ before-numbers to beat are at the top of this entry.
 - **`0e0b0aa1` is NOT observable in production on its own.** It is a precondition
   for Drop 2, not a shippable user-visible change. No deploy fired.
 
+
+### mlb-live-pitcher-projection — CLOSED-VERIFIED 2026-08-16 00:3xZ — all three invariants measured at scale, 423 rows, zero violations
+Opened 2026-08-15 from a user report: "live projections rarely get appended, and
+the ones that do are unrealistic, especially pitcher props." Both halves were
+real and were different defects. Todo `#437`.
+
+- **Goal, and it was met.** On a live MLB slate a live prop row must never show
+  (a) a projection below an already-recorded actual, (b) a `model_prob_over` on
+  the opposite side of the line from its own `projected`, or (c) a blank live
+  column with no attributable reason.
+- **VERIFIED IN PRODUCTION, served board, 423 live-lens overlaid rows:**
+  **(a) 0 violations. (b) 0 violations** (baseline was 7 of 13). **(c)
+  `live_projections` served** — `rows_live_considered 1377 /
+  rows_live_projected 599 / rows_live_edged 0 / rows_live_prob_withheld 599 /
+  miss_no_market_alias 778 / live_games_in_snapshot 8`. Live prop coverage went
+  **11.6% -> 50.3%** on a clean same-slate read.
+- **`rows_live_prob_withheld == rows_live_projected` (599 = 599) is the
+  designed reading, not a fault:** the re-sim priced nothing that tick, and the
+  counter exists to say so out loud instead of letting a pregame probability
+  stand in.
+- **Four fixes shipped:** `f4cd2bc8` (probability follows the projection or goes
+  absent; pregame preserved as `sim_model_prob_over`), `3a476001` (the snapshot
+  is a projection set, not a pick list — four causes), `302ea0f4` (alt lines),
+  plus the route change that made the counters readable at all.
+- **Deployed and CONFIRMED BY CONTENT after other sessions redeployed over the
+  top:** refresh-worker `57a437d5` and live-odds-worker `c4116ab6` both still
+  carry all five markers (`totals_alt`, `spreads_alt`, `lanes`,
+  `include_projection_only`, `sim_model_prob_over`); web `484221bd` carries the
+  route change. **Ancestry was never used as the test** — every service runs its
+  own SHA and none are on `origin/main`.
+- **Two findings handed on, NOT closed here:**
+  1. **`game_chip_scoreboard._game_flags` reintroduces the abstract-only live
+     check** that `features/mlb/game_state.py` exists to prevent and forbids by
+     name. It marks a warming-up game `live`, which is what made MIA @ CIN read
+     0-of-114 before first pitch and 74-of-117 (63.2%) after. **Blast radius is
+     every sport's board chips. Needs an owner.** Detail in `state.md`.
+  2. **The alt-line predicate is UNMEASURED** — deployed 23:47/23:49Z, window
+     closed at UTC midnight. One-shot watch `alt-line-shortlist-watch` fires
+     2026-08-16 10:00 CT, gated on both the book grid AND the shortlist, and
+     re-arms itself up to 4 times rather than reporting a false negative.
+- **Self-inflicted, recorded rather than buried:** two commits (`f4cd2bc8`,
+  `36439f4e`) reverted other sessions' ledger lines via a stale scratch index —
+  the second one *after* I had written that exact race into `learnings.md`.
+  Both repaired (`6da01dd3`, `6ccc4779`), nothing lost, and the rule is now a
+  FORBIDDEN entry with the ref-lock backstop named.
+- Commits: `f4cd2bc8` `6da01dd3` `a7ad6aed` `3a476001` `265884c0` `9eb5b7bc`
+  `dc85bfeb` `f96a00fd` `36439f4e` `6ccc4779` `b11e19ba` `302ea0f4` `e6405fcc`
+  `803dd65d`. All confirmed present in HEAD at close.
+- Full detail: `.syndicate/log/2026-08-15.md`, and `deploys.md` for every
+  measurement with its working.
