@@ -5831,3 +5831,62 @@ HEAD rather than the live commit — so it carried two commits from another sess
 memory drops, it cannot be attributed to Phase 4.1 alone.** The
 `branch-overlap-baseline-watch` before/after boundary must be re-stamped from
 05:35:34Z.
+
+---
+
+## 2026-08-16 05:35:34Z — DEPLOY `1409e96f` refresh-worker — MEASURED, AND THE TRANSIENT DID NOT MOVE
+
+Deployed from live `755ec40a` (re-cut; the live SHA moved 3x in 40 min). Window
+taken at a job boundary by explicit user decision: 3 jobs in flight, all odds /
+soccer refresh, **0 MLB sim jobs**, re-verified immediately before the POST.
+Claim acquired and released. Diff vs live: exactly 2 files.
+
+### BOTH FIXES ARE LIVE AND EXERCISED (not assumed — seen)
+
+    05:40:08  [mlb_cards] ODDS_HISTORY_BUILD_CACHE entries=1 date=2026-08-16
+    05:43:49  [intelligence_evaluation] LEDGER_CHUNKS_ACCEPTED count=8
+              bytes=833550415 ceiling=256000000 records=22188 streamed=1
+
+**THE NUMBER THAT WAS MISSING ALL NIGHT: 833,550,415 bytes accepted across 8
+chunks**, every one under the 256MB per-file ceiling. The mechanism is now
+proven with a measurement: the ceiling bounded each FILE while the SUM went
+unbounded, and all 833MB used to land in one list.
+
+### THE RESULT — HONEST NULL
+
+    metric                 f8ca54e1 baseline   5c419007      1409e96f (this)
+    amplitude mean            1,950 MB          2,220 MB        2,235 MB
+    peak anon                 3,907 MB          3,426 MB        3,646 MB
+    min inactive_file      26.3 / 42.2 MB        12.3 MB           0.6 MB
+    kills                   2 in 26 min        1 @22.2 min    0 in 9 min (early)
+
+**The excursion is UNCHANGED.** 833MB is no longer materialised on the paths I
+changed, and the transient did not shrink by a measurable amount. So the ledger
+accumulation, as reached through `intelligence_evaluation`, is **not** the ~2GB.
+
+### WHY — A CONSUMER I LEFT MATERIALISING, AND IT DOUBLE-COPIES
+
+`recommendation_engine.py:1239` and `:1528`:
+
+    history_rows = [dict(record) for record in
+                    (evaluation_records or _load_records_from_ledger(ledger_path))
+                    if isinstance(record, Mapping)]
+
+`_load_records_from_ledger` (`:456`) calls the MATERIALISING
+`_iter_record_payloads` — the full 833MB-of-chunks list — and the comprehension
+then builds a **second full copy**, one `dict(record)` per record. Two complete
+copies of the whole ledger, in the recommendation path that runs during board
+builds. I fixed the six `intelligence_evaluation` call sites and left this one,
+because it wants a list; that is exactly why the number did not move.
+
+**This is the same defect one call frame further out, and the fix pattern is
+already proven here.** Next: stream `_load_records_from_ledger`, and drop the
+`dict(record)` re-copy unless a downstream mutation actually needs it — check
+before removing, `history_rows` may be iterated more than once.
+
+**Standing correction:** the excursions remain tagged `board_contract_games_normalized`
+with `seconds_since_stage` 14-51s, so the cost is still in the unmarked region
+after that marker. The named candidates so far — deepcopy (EXONERATED, 0.54MB),
+odds-shard duplicate (~125MB, FIXED), ledger accumulation (833MB, FIXED on 6 of
+8 paths) — do not yet add to 2GB. The remaining double-copy is the best
+outstanding candidate and is UNMEASURED.
