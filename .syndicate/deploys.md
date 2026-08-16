@@ -5157,13 +5157,26 @@ verification; "live" is a lease.
 channel is wired. **It confirms nothing about the `or 0.5` fix.** A route that
 answers is not a producer that reported.
 
-**STILL OWED: a reading with `rows>0`.** All three services now carry it, and at
-02:0xZ the endpoint still returns `readings: 0` — live-odds-worker rebooted at
-01:59:59Z and its next producer run has not completed. **Nothing about the
-`or 0.5` fix is confirmed yet.** The hourly `wnba-win-prob-counter-read`
-scheduled task reads this endpoint and will report the first reading; a
-`rows>0, null=0` there is the first genuine confirmation, `null>0` is the branch
-firing correctly. Neither has happened.
+**FIRST CROSS-SERVICE READING, 2026-08-16T02:02:33Z — THE CHANNEL IS PROVEN.**
+
+    wnba / live-odds-worker   rows=0  null_no_price=0  date=2026-08-15
+    generated_at 2026-08-15T21:01:19-05:00 (02:01:19Z)  commit 3573a0c3  runs_recorded=1
+
+The worker wrote it and **web read it back**, which is the thing that was
+impossible three hours ago: `generated_at` post-dates the 01:59:59Z deploy by 80
+seconds and `commit` is the deployed SHA, so this reading was produced by the new
+code and is not a stale artifact. The instrument is no longer blind.
+
+**IT SAYS NOTHING ABOUT THE `or 0.5` FIX, AND MUST NOT BE READ AS PASSING.**
+`rows=0` means that run computed **no `win_prob` at all** — the denominator is
+zero, so "null=0" is arithmetic, not evidence. Today's live artifact carried 15
+`win_prob` rows, so a full run does compute them; why THIS run computed none
+(reuse-gate skip per `#344`, a partial/fast step, or a finished slate at 21:01
+CT) is an open question and is NOT asserted here.
+
+**STILL OWED: a reading with `rows>0`.** That is the first genuine confirmation
+(`null=0`) or the branch firing correctly (`null>0`). The hourly
+`wnba-win-prob-counter-read` task now reads this endpoint and will report it.
 
 ## 2026-08-16 01:2xZ — RETRACTION: THE "25 LIVE GAME-LINE EDGES" ARE NOT CREDIBLE. TWO DEFECTS IN MY OWN GATE.
 

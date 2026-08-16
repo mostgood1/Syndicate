@@ -254,9 +254,12 @@ recorded on 2026-08-01, for this same script.
   since carried forward by another session's `3e1994a2` — verified BY CONTENT),
   web `fa1871cf` (01:15:37Z), live-odds-worker `3573a0c3` (01:59:59Z).
   `/api/ops/win-prob-null` answers **200** and reports
-  `reports_root=/opt/render/project/data/reports`, so the channel is wired end to
-  end. **`readings: 0` as of 02:0xZ — NOTHING ABOUT THE `or 0.5` FIX IS CONFIRMED
-  YET.** A live-odds-worker WNBA producer run was observed at 01:31:36Z, before
+  `reports_root=/opt/render/project/data/reports`. **CHANNEL PROVEN 02:02:33Z by a
+  real cross-service reading:** `wnba/live-odds-worker rows=0 null=0`,
+  `generated_at` 02:01:19Z (80s after the deploy), `commit 3573a0c3` — worker
+  wrote, web read. **NOTHING ABOUT THE `or 0.5` FIX IS CONFIRMED: `rows=0` means
+  that run computed no `win_prob` at all, so `null=0` is arithmetic on an empty
+  denominator, not evidence.** A `rows>0` reading is still owed.** A live-odds-worker WNBA producer run was observed at 01:31:36Z, before
   that service had the writer; the next one after its 01:59:59Z reboot is what
   produces the first reading. live-odds-worker has NO idle window during live
   hours (10 of 10 samples across 25 min had jobs running), so this deploy killed
