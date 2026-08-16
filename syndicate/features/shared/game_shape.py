@@ -54,6 +54,14 @@ caller's problem, deliberately: the natural store
 fired yet, and changing a record shape underneath a running measurement is how
 a result gets silently confounded.
 
+SPORTS COVERED, and they are NOT the same job. **MLB is serialisation** — its
+state vector (`LiveSituation`) already exists in full at tick time and is merely
+discarded. **Basketball is derivation** — no state vector exists, so period,
+clock, score and the per-quarter array are assembled into one, and the pace
+statistic available is scoring pace rather than possessions (see the basketball
+section header, which explains why that distinction is load-bearing rather than
+pedantic).
+
 NEVER RAISES. An unparseable situation returns `valid: False` with a `reason`,
 mirroring `model_scoring`'s philosophy that a bad record should cost one
 observation rather than the whole batch. **An invalid shape buckets to
@@ -333,6 +341,297 @@ def mlb_shape_bucket(shape: Any) -> str:
     if phase == _UNKNOWN_BUCKET:
         return _UNKNOWN_BUCKET
     band = mlb_margin_band(shape)
+    if band == _UNKNOWN_BUCKET:
+        return _UNKNOWN_BUCKET
+    return f"{phase}|{band}"
+
+
+# ---------------------------------------------------------------------------
+# BASKETBALL (WNBA / NBA)
+# ---------------------------------------------------------------------------
+#
+# WHAT IS AVAILABLE, MEASURED -- and it is a different situation from MLB's.
+# MLB's state vector existed in full and was merely discarded. Basketball's
+# does not exist: `live_state` on the WNBA card context carries
+# `period`, `clock`, `home_pts`, `away_pts`, `in_progress`, `final` and a
+# per-quarter `periods` array, and the team objects carry ONLY branding
+# (`abbr`, `logo`, `name`, colours).
+# `[measured 2026-08-16, data/live/wnba_cards_context_2026-06-05.json,
+#   a real in-progress game: period 4, clock "7:43", 84-83]`
+#
+# **THERE IS NO POSSESSION PACE HERE, AND THIS MODULE WILL NOT INVENT ONE.**
+# Possessions need FGA, TOV, OREB and FTA. None of the four appears anywhere in
+# any live basketball artifact measured, and `basketball_props_features`'
+# column map is box-score totals with no pace column either. So the pace field
+# below is `points_per_minute` -- SCORING pace, which is a real and useful game
+# shape signal and is NOT the same statistic as possessions per 40. Naming it
+# `pace` would let a reader join it to a possession-pace prior and get a
+# silently wrong answer. If box stats are ever captured live, add possessions
+# as a NEW field; do not redefine this one.
+#
+# **PERIOD/CLOCK PRECEDENCE IS NOT ARBITRARY.** `live_state` first, then
+# `status` -- the same order as `wnba/cards.py:1048-1049`, which records the
+# reason: an in-progress game measured 2026-07-30 had a `live_state` carrying
+# only `{away_pts, final, home_pts, in_progress, status}` with no period or
+# clock at all. Reading either source alone loses real live games.
+
+_BASKETBALL_RULES: dict[str, dict[str, float]] = {
+    # WNBA quarters are 10 minutes (regulation 40), NOT NBA's 12 (regulation
+    # 48). A shared basketball function that hardcoded either one would be
+    # silently wrong for the other sport, which is why this is a table.
+    "wnba": {"quarter_minutes": 10.0, "ot_minutes": 5.0, "regulation_periods": 4.0},
+    "nba": {"quarter_minutes": 12.0, "ot_minutes": 5.0, "regulation_periods": 4.0},
+}
+
+
+def basketball_elapsed_minutes(
+    period: Any,
+    clock: Any,
+    *,
+    quarter_minutes: float = 10.0,
+    ot_minutes: float = 5.0,
+    regulation_periods: int = 4,
+) -> float | None:
+    """Minutes elapsed since tip-off. Can exceed regulation in OT.
+
+    **This is deliberately byte-for-byte equivalent to
+    `wnba/cards.py:_wnba_elapsed_minutes` for WNBA parameters**, including its
+    strict clock parsing (exactly `M:SS`, integer parts, seconds 0-58). That
+    function's own comment says it was relocated once precisely so two copies
+    would not drift apart, so this one is pinned to it by
+    `test_basketball_elapsed_minutes_agrees_with_the_wnba_implementation`.
+
+    Being *more* permissive here would BE the drift -- one caller would accept
+    a clock the other rejects, and the disagreement would surface as a
+    population difference in a scoring cell rather than as an error. The
+    consolidation (having `cards.py` delegate here) needs that file, which is
+    held by another lane; until then the test is the guard.
+    """
+    try:
+        period_int = int(period)
+    except (TypeError, ValueError):
+        return None
+    if period_int < 1:
+        return None
+    parts = str(clock or "").strip().split(":")
+    if len(parts) != 2:
+        return None
+    try:
+        minutes_left = int(parts[0])
+        seconds_left = int(parts[1])
+    except ValueError:
+        return None
+    if minutes_left < 0 or not (0 <= seconds_left < 60):
+        return None
+    reg = int(regulation_periods)
+    period_length = float(quarter_minutes) if period_int <= reg else float(ot_minutes)
+    remaining_in_period = max(0.0, min(period_length, minutes_left + seconds_left / 60.0))
+    elapsed_in_period = period_length - remaining_in_period
+    if period_int <= reg:
+        prior_minutes = (period_int - 1) * float(quarter_minutes)
+    else:
+        prior_minutes = reg * float(quarter_minutes) + (period_int - reg - 1) * float(ot_minutes)
+    return prior_minutes + elapsed_in_period
+
+
+def _period_rows(live_state: Any) -> list[dict[str, Any]]:
+    rows = _get(live_state, "periods")
+    out: list[dict[str, Any]] = []
+    if not isinstance(rows, (list, tuple)):
+        return out
+    for row in rows:
+        if not isinstance(row, Mapping):
+            continue
+        num = _as_int(row.get("period"))
+        home = _as_float(row.get("home"))
+        away = _as_float(row.get("away"))
+        if num is None or home is None or away is None:
+            continue
+        out.append({"period": num, "home": home, "away": away})
+    out.sort(key=lambda r: r["period"])
+    return out
+
+
+def _as_float(value: Any) -> float | None:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def basketball_game_shape(live_state: Any, *, sport: str = "wnba", status: Any = None) -> dict[str, Any]:
+    """Flat, JSON-safe game shape for one live basketball game. Never raises.
+
+    `live_state` is the card context's `live_state` block; `status` is the
+    sibling `status` block, consulted only for period/clock (see the precedence
+    note above).
+    """
+    slug = str(sport or "").strip().lower()
+    rules = _BASKETBALL_RULES.get(slug)
+    if rules is None:
+        return {
+            "shape_version": SHAPE_VERSION,
+            "sport": slug or "unknown",
+            "valid": False,
+            "reason": "sport_not_supported",
+            "bucket": _UNKNOWN_BUCKET,
+        }
+
+    def invalid(reason: str) -> dict[str, Any]:
+        return {
+            "shape_version": SHAPE_VERSION,
+            "sport": slug,
+            "valid": False,
+            "reason": reason,
+            "bucket": _UNKNOWN_BUCKET,
+        }
+
+    if live_state is None and status is None:
+        return invalid("live_state_absent")
+
+    period = _get(live_state, "period")
+    if period is None:
+        period = _get(status, "period")
+    clock = _get(live_state, "clock")
+    if clock is None:
+        clock = _get(status, "clock")
+
+    home_pts = _as_float(_get(live_state, "home_pts"))
+    away_pts = _as_float(_get(live_state, "away_pts"))
+
+    period_int = _as_int(period)
+    if period_int is None or period_int < 1:
+        return invalid("period_absent_or_invalid")
+    if home_pts is None or away_pts is None:
+        return invalid("score_absent")
+
+    reg_periods = int(rules["regulation_periods"])
+    quarter_minutes = rules["quarter_minutes"]
+    regulation_minutes = quarter_minutes * reg_periods
+
+    elapsed = basketball_elapsed_minutes(
+        period_int,
+        clock,
+        quarter_minutes=quarter_minutes,
+        ot_minutes=rules["ot_minutes"],
+        regulation_periods=reg_periods,
+    )
+    # A clock can legitimately be missing on a live game (measured 2026-07-30).
+    # That costs the pace fields and nothing else -- the score, margin and
+    # period are still real, so the record stays VALID with a stated gap rather
+    # than being thrown away.
+    clock_parsed = elapsed is not None
+
+    total_points = home_pts + away_pts
+    home_margin = home_pts - away_pts
+
+    points_per_minute = None
+    if elapsed is not None and elapsed > 0:
+        points_per_minute = round(total_points / elapsed, 3)
+
+    rows = _period_rows(live_state)
+    completed = [r for r in rows if r["period"] < period_int]
+    current_row = next((r for r in rows if r["period"] == period_int), None)
+    largest_swing = None
+    if completed:
+        largest_swing = max(abs(r["home"] - r["away"]) for r in completed)
+
+    shape: dict[str, Any] = {
+        "shape_version": SHAPE_VERSION,
+        "sport": slug,
+        "valid": True,
+        # --- clock state ---
+        "period": period_int,
+        "clock": str(clock or "").strip() or None,
+        "clock_parsed": clock_parsed,
+        "overtime": period_int > reg_periods,
+        # --- progress ---
+        "elapsed_minutes": round(elapsed, 4) if elapsed is not None else None,
+        "minutes_remaining_regulation": (
+            round(max(0.0, regulation_minutes - elapsed), 4) if elapsed is not None else None
+        ),
+        "game_pct_complete": (
+            round(min(1.0, elapsed / regulation_minutes), 4) if elapsed is not None else None
+        ),
+        # --- score, oriented to match a home win probability ---
+        "home_pts": home_pts,
+        "away_pts": away_pts,
+        "home_margin": home_margin,
+        "total_points": total_points,
+        # --- pace: SCORING pace. NOT possessions. See the header note. ---
+        "points_per_minute": points_per_minute,
+        "possession_pace_available": False,
+        # --- game shape across periods: run detection ---
+        "periods_completed": len(completed),
+        "period_scores": rows,
+        "largest_completed_period_swing": largest_swing,
+        "current_period_points": (
+            (current_row["home"] + current_row["away"]) if current_row else None
+        ),
+        # --- lifecycle ---
+        "in_progress": bool(_get(live_state, "in_progress") or _get(status, "in_progress")),
+        "final": bool(_get(live_state, "final") or _get(status, "final")),
+    }
+    shape["bucket"] = basketball_shape_bucket(shape)
+    return shape
+
+
+def wnba_game_shape(live_state: Any, *, status: Any = None) -> dict[str, Any]:
+    """WNBA convenience wrapper -- 10-minute quarters, 40-minute regulation."""
+    return basketball_game_shape(live_state, sport="wnba", status=status)
+
+
+def basketball_phase(shape: Any) -> str:
+    if not isinstance(shape, Mapping) or not shape.get("valid"):
+        return _UNKNOWN_BUCKET
+    period = _as_int(shape.get("period"))
+    if period is None or period < 1:
+        return _UNKNOWN_BUCKET
+    if shape.get("overtime"):
+        return "overtime"
+    if period <= 2:
+        return "first_half"
+    if period == 3:
+        return "third_quarter"
+    return "fourth_quarter"
+
+
+def basketball_margin_band(shape: Any) -> str:
+    """Coarse score-gap band, sign-free.
+
+    **The thresholds are NOT MLB's, deliberately.** A two-run baseball game and
+    a two-point basketball game are not comparable states: basketball margins
+    are an order of magnitude larger and a 5-point gap late is the canonical
+    "clutch" boundary. Reusing the baseball bands here would put ~every live
+    basketball game in one cell and measure nothing.
+    """
+    if not isinstance(shape, Mapping) or not shape.get("valid"):
+        return _UNKNOWN_BUCKET
+    margin = shape.get("home_margin")
+    value = _as_float(margin)
+    if value is None:
+        return _UNKNOWN_BUCKET
+    gap = abs(value)
+    if gap <= 5:
+        return "close"
+    if gap <= 10:
+        return "moderate"
+    if gap <= 19:
+        return "comfortable"
+    return "blowout"
+
+
+def basketball_shape_bucket(shape: Any) -> str:
+    """At most 17 labels (4 phases x 4 margin bands, plus `unknown`).
+
+    Same coarseness bound and same reason as MLB: production basketball
+    `n_sims` is 100, so a finer partition produces cells indistinguishable from
+    noise. The fine fields stay on the record for a later re-cut.
+    """
+    phase = basketball_phase(shape)
+    if phase == _UNKNOWN_BUCKET:
+        return _UNKNOWN_BUCKET
+    band = basketball_margin_band(shape)
     if band == _UNKNOWN_BUCKET:
         return _UNKNOWN_BUCKET
     return f"{phase}|{band}"

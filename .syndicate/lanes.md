@@ -3961,3 +3961,55 @@ worktree.
   `gameShape`, the lane's verification has not run, and **every bucket count is
   still n=0**. The handoff to `Layer 1 board coverage audit (fork 2)` is
   unanswered.
+
+#### game-shape-capture — WNBA EXTRACTOR ADDED `[2026-08-16 ~23:4xZ]` — **primitive done, emit blocked by the SAME session as MLB's**
+
+**WNBA is a DIFFERENT job from MLB and the plan understated it.** MLB was
+serialisation — `LiveSituation` existed in full and was discarded. WNBA has no
+state vector at all, so this derives one.
+
+**MEASURED, from a real in-progress game** (`data/live/wnba_cards_context_2026-06-05.json`,
+DAL @ LAS, period 4, clock `"7:43"`, 84-83):
+- `live_state` carries `period`, `clock`, `home_pts`, `away_pts`, `in_progress`,
+  `final`, **and a per-quarter `periods` array** — richer than expected, and the
+  per-quarter array is real run-detection material.
+- **The team objects carry ONLY branding** (`abbr`, `logo`, `name`, colours).
+  **No FGA / TOV / OREB / FTA anywhere**, and `basketball_props_features`'
+  column map is box-score totals with no pace column either.
+- **CONSEQUENCE: possession pace is NOT derivable and this module refuses to
+  fake it.** The field is `points_per_minute` (scoring pace) and every record
+  carries `possession_pace_available: False`. Naming it `pace` would let a
+  reader join it to a possession-pace prior and be silently wrong. A test
+  asserts the key `pace` does not exist.
+
+**A SECOND FIND THAT CHANGED THE DESIGN: the derivation ALREADY EXISTS.**
+`wnba/cards.py:891 _wnba_elapsed_minutes` is correct and complete (10-minute
+quarters, 5-minute OT, regulation 40 — *not* NBA's 48), **and its own comment
+says it was relocated once specifically so two copies would not drift apart.**
+That file is claimed (by `clamp-fix-to-workers`, with a logged override from
+`wnba-live-tier`), so I could not consolidate into it.
+- Resolution: implemented in `shared/game_shape.py` **parameterised** by quarter
+  length so it serves NBA (12) as well as WNBA (10), and **pinned to the
+  existing function by a drift test** that asserts agreement across a 143-cell
+  grid of periods x clocks, including the REJECTION cases. Being more permissive
+  would itself be the drift. Mutation M5 (accept a bare `"7"` as `7:00`) fires it.
+- **Owed follow-up, needs the claimed file:** have `cards.py:891` delegate here,
+  so there is one copy again.
+
+**NON-VACUITY VERIFIED BY MUTATION, 7 of 7 caught:** NBA given WNBA's 10-minute
+quarters (1 fail), dropping the `status` period/clock fallback (1), unsupported
+sport silently defaulting to WNBA (1), reusing baseball margin bands (2),
+permissive clock parsing (1), pace dividing without the `>0` guard (1), run
+detection including the in-progress period (1). **34 tests green** (19 MLB + 15).
+
+**Margin bands are deliberately NOT MLB's** — basketball uses <=5 / <=10 / <=19
+/ 20+. A 3-point basketball game is `close`; the baseball scale would call it a
+blowout, which would put nearly every live game in one cell and measure nothing.
+
+**EMIT BLOCKED, same session as MLB's.** The `live_state` producer is
+`_public_scoreboard_live_state_payload` (`wnba/cards.py:3679`) — the exact
+function `wnba-live-tier` took under a logged claim override 23:2xZ, in the same
+session (`Layer 1 board coverage audit (fork 2)`) that holds
+`mlb-live-gameline-distributions`. **One session gates both sports' emits.**
+- **UNVERIFIED, and it is the whole point:** no production data has passed
+  through this code. Every bucket count is **n=0** for WNBA too.
