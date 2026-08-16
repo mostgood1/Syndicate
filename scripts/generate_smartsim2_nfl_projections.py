@@ -47,6 +47,7 @@ from syndicate.features.nfl.injury_adjustment import adjust_team_rating_for_inju
 from syndicate.features.nfl.smartsim2_projection import SmartSimNflProjection
 from syndicate.features.nfl.smartsim2_projection import write_projection_artifact
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_pbp_diagnostic
 from syndicate.features.nfl.sources import nfl_pbp_path
 from syndicate.features.nfl.sources import nfl_artifact_output_root
 # Reused rather than reimplemented: the reader already decides what counts as
@@ -142,9 +143,22 @@ def assert_ratings_data_available(
         f"  DATA_ROOT  : {DATA_ROOT}\n"
         "  Both loaded ZERO plays, so every team would rate neutral_no_data "
         "and every game would receive the same league-average projection.\n"
-        "  NOTE: data/nfl_source/tracking/ is gitignored -- the pbp lives on "
-        "the mounted disk and is absent from the repo checkout. If DATA_ROOT "
-        "points at the checkout, that is the bug, not a missing download."
+        # `#441`, third diagnosis. THE PATHS ABOVE CANNOT DISTINGUISH "absent"
+        # FROM "never looked for": both `looked for` lines print the resolver's
+        # FALLBACK when no candidate has the file, so a process that cannot see
+        # the mounted disk prints exactly what a genuinely missing file prints.
+        # Two diagnoses were already wrong on this, the second one shipped.
+        # The candidate list and the env AS THIS PROCESS SEES THEM settle it.
+        "  RESOLUTION (this process):\n"
+        f"{nfl_pbp_diagnostic(season)}\n"
+        "  READ IT LIKE THIS: candidates under /opt/render/project/data/ mean the "
+        "env is fine and the file is genuinely absent (an ingestion gap). "
+        "Candidates only under /src/data/ mean the env is NOT reaching this "
+        "subprocess, the mounted disk was never consulted, and THAT is the bug.\n"
+        "  NOTE: data/nfl_source/tracking/ is gitignored, so the pbp cannot ship "
+        "in the repo checkout -- it exists only on the mounted disk. This NOTE "
+        "previously asserted the file WAS on that disk; that was a hypothesis, "
+        "never a measurement, and it sent one fix in the wrong direction."
     )
 
 

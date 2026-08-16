@@ -9,6 +9,7 @@ from typing import Any
 
 from syndicate.features.shared.formatters import format_pct
 from syndicate.features.shared.formatters import format_signed_price
+from syndicate.features.shared.source_roots import _strict_hosted_storage_enabled
 from syndicate.features.shared.source_roots import preferred_artifact_roots
 from syndicate.features.shared.source_roots import repo_root_from
 
@@ -83,6 +84,59 @@ def nfl_pbp_path(season: int) -> Path:
         except OSError:
             continue
     return default_nfl_source_root() / relative
+
+
+def nfl_pbp_diagnostic(season: int) -> str:
+    """Why `nfl_pbp_path` returned what it did. `#441` diagnostic, third pass.
+
+    THE QUESTION THIS EXISTS TO ANSWER, and it is the one two previous diagnoses
+    got wrong by assuming. "The pbp is absent" and "the pbp was never looked for"
+    produce the SAME failure, and the guard's message could not tell them apart:
+    it printed one resolved path, which is the fallback when nothing is found.
+
+    Measured 2026-08-16: `SYNDICATE_REQUIRE_HOSTED_STORAGE=true` and
+    `SYNDICATE_NFL_SOURCE_ROOT=/opt/render/project/data/nfl_source` are BOTH set
+    on refresh-worker, and with strict storage on `preferred_artifact_roots`
+    cannot append the repo checkout at all. Yet the generator resolved
+    `DATA_ROOT` to `/opt/render/project/src/data/nfl_source` -- the checkout.
+    That is only possible if this process does not see those variables, in which
+    case the mounted disk was never searched and the file's presence there is
+    UNKNOWN rather than disproven.
+
+    So this prints the three env vars AS THIS PROCESS SEES THEM, plus every
+    candidate path and whether it exists. Both hypotheses become readable off one
+    line:
+
+      * candidates under `/opt/render/project/data/...` -> env is fine, the file
+        is genuinely absent, and the defect is ingestion.
+      * candidates only under `/src/data/...` -> the env is not reaching this
+        subprocess, the mounted disk was never consulted, and THAT is the defect.
+
+    Returns a string rather than logging, so the caller decides where it goes and
+    the guard's message stays one self-contained block.
+    """
+    relative = Path("tracking") / "nflverse" / "pbp" / f"pbp_{season}.csv"
+    lines: list[str] = []
+    for name in ("SYNDICATE_REQUIRE_HOSTED_STORAGE", "SYNDICATE_NFL_SOURCE_ROOT", "SYNDICATE_DATA_ROOT"):
+        raw = os.environ.get(name)
+        lines.append(f"    env {name} = {raw!r}" if raw is not None else f"    env {name} = <UNSET>")
+    lines.append(f"    strict_hosted_storage_resolves_to = {_strict_hosted_storage_enabled()}")
+    try:
+        roots = _source_roots()
+    except Exception as exc:  # a raising resolver is itself the answer
+        lines.append(f"    _source_roots() RAISED {type(exc).__name__}: {exc}")
+        return "\n".join(lines)
+    if not roots:
+        lines.append("    _source_roots() returned NO CANDIDATES")
+    for index, root in enumerate(roots):
+        candidate = root / relative
+        try:
+            exists = candidate.is_file()
+        except OSError as exc:
+            lines.append(f"    candidate[{index}] {candidate}  UNREADABLE ({type(exc).__name__})")
+            continue
+        lines.append(f"    candidate[{index}] {candidate}  exists={exists}")
+    return "\n".join(lines)
 
 
 def nfl_artifact_output_root() -> Path:
