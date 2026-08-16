@@ -3212,3 +3212,68 @@ and then failed the thing it was checking, which is the point of running it.
   Extending `TIE_SPREAD_BASELINED` beyond nfl/ncaaf is worth more than tuning
   this percentage.
 - Blocked by: none
+### grading-blocker-settled-zero — OPEN — opened 2026-08-16 — session: alt-line-shortlist-watch
+- Goal: `settled > 0` on `/api/ops/evaluation-settlement/status`. **NOTE the reading this lane opened on was STALE — see the correction in the checkpoint below.**
+- Why it matters: this is the S6 gate that holds `_SCORE_SIM_WEIGHT` at 0.0, which is why `sim_component` is 0.0 on every scored row. Raising the weight without it is forbidden by `opportunity_signals.py:340` (measured 286/300 negative-EV rows at 0.5).
+- Files:
+  - `syndicate/features/shared/graded_outcomes.py`
+  - `syndicate/features/shared/evaluation_settlement.py`
+  - `scripts/refresh_mlb_oddsapi.py` (read-only so far)
+- Hypothesis: the blocker is on the GRADED side, not the matching side.
+- Verification: per-date graded row counts off `/mlb/api/market-accuracy`, then a re-read of production `settled`.
+- Blocked by: none. `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN=false`, OFF BY USER DECISION (`todo.md:13464`).
+- **LEDGER HAZARD, recorded because it bit this lane:** the lane header written at open time was **silently lost** — another session rewrote `lanes.md` between this session's two appends, dropping the header while keeping the later checkpoint, which then sat orphaned under `ui-probe-curvature-detection` (a CLOSED lane). Re-appended here whole. An append to this file is not safe against a concurrent full rewrite.
+
+- **CHECKPOINT 2026-08-16 ~18:1xZ — DIAGNOSED, NOTHING CHANGED. One correction, one falsified hypothesis, one named mechanism.**
+- **CORRECTION, and it invalidates the framing this lane opened with.** `settled 0 / graded_rows_available 1` is **NOT a current reading**. `/api/ops/evaluation-settlement/status` is read-only over a STORED status file, and its `epoch` decodes to **2026-08-06T11:03:17Z** — ten days stale, frozen since the autorun was disabled. It describes the world BEFORE the 2026-08-08 pregame-freeze repair. Nobody has measured `settled` since. I reported it as the live gate reading; it is not.
+- **Grading is no longer ~zero.** Measured live today off `/mlb/api/market-accuracy`, `rows.all` per date:
+
+      08-04  1     08-08  79    08-12  13
+      08-05  1     08-09  79    08-13   7
+      08-06  0     08-10  18    08-14   9
+      08-07 37     08-11   7    08-15   7
+
+  The 08-04..08-06 floor is the pre-repair era; 08-07 onward is non-zero. Against the historical baseline in `graded_outcomes.py` (06-04 all=971, 07-04 782, 07-08 626) it is still 10-100x down.
+- **THE SHARP SYMPTOM: `ml` graded rows = EXACTLY 1 on every date measured (8 of 8)**, with 4-14 `Missing game-line match` warnings each. `season_betting_day_2026_08_15.json` carries `games` with **one** key (`824966`) against a ~15-game slate. Game-line grading is not thin, it is pinned at one.
+- **HYPOTHESIS FALSIFIED — it is not a freeze/reader PATH mismatch.** I suspected the writer wrote to `daily/snapshots/<date>/` while `_odds_paths` reads `market/oddsapi/`. Wrong: `_freeze_oddsapi_pregame_markets` writes BOTH destinations (`refresh_mlb_oddsapi.py:677`, `:699`), and the reader's freeze preference is present (`build_season_betting_cards_manifest._odds_paths:765`). Both halves of the 08-08 repair are in the tree with tests (`tests/test_oddsapi_pregame_freeze.py`, `tests/test_season_betting_cards_odds_paths.py`).
+- **AND THE INSTRUMENT THAT SUGGESTED IT IS BLIND.** `/api/ops/artifacts/export` returned `count: 0` for `**/market/oddsapi/*` — including the LIVE files that must exist. It also returns `count: 0` for `evaluation_ledger_chunks/*.jsonl` while `chunk_diagnostics` in the same payload proves a 367MB chunk is on disk. **That endpoint's root does not cover these trees; a 0 from it is not absence.** I nearly banked a wrong root cause on it.
+- **MECHANISM (code-supported, not yet proven in production): the freeze is thin because the MLB odds refresh does not run PREGAME on most days.** Freeze contents measured: 08-11 **13 games**, 08-16 **14 games**, but 08-12 / 08-15 / 08-09 only **1-3 games**. `_merge_pregame_game_lines` (`refresh_mlb_oddsapi.py:610-631`) is merge-only and never shrinks — but it only ADDS an event that is still pregame (`already under way -> continue`). So a refresh pass that first runs after first pitch contributes nothing, forever. The seal is only as good as the earliest pass that touched it.
+- **This overlaps `odds-cadence-off-the-mlb-peak`** (1a/1b verified, effect unmeasured). If that lane moved sampling off the MLB pregame window, it is the same fact seen from the other end. Coordinate before changing cadence.
+- **NEXT TEST, cheap and decisive:** today's 08-16 freeze already holds 14 games. If tomorrow's `season_betting_day_2026_08_16.json` grades ~15 `ml` rows instead of 1, the mechanism is confirmed and the fix is scheduling, not logic. If it still grades 1 with a 14-game freeze present, the reader is not reaching the freeze in production and the next suspect is `_odds_data_roots()` ordering on the mounted disk.
+- **NOT DONE / NOT CHANGED:** no source file touched, no deploy, no env change. `_SCORE_SIM_WEIGHT` untouched. The settlement autorun remains off by user decision.
+
+### layer1-board-coverage — **CLOSE REFUSED 2026-08-16 18:0xZ.** Verification is not met, and a NEW production defect was found in this lane's own scope while attempting to close
+- The `/lane close` gate says: confirm the verification ran and state the result;
+  if it did not, refuse and say what is missing. Two things are missing.
+- **(1) The lane's own stated verification is unmet.** Cross-sport LIVE A/B
+  requires two sports live at once. At 18:00Z: mlb 8 live, wnba 3 pregame (first
+  kickoff 21:00Z, ~3h out), soccer *reported* 0 live. **Satisfiable from ~21:00Z
+  today**, when WNBA's 21:00Z games overlap the MLB slate.
+- **(2) SOCCER SERVES BETTABLE EDGES ON FINISHED MATCHES — found by the USER, not
+  by my sweep.** They said "SOCCER has live games" while the board said `live: 0`.
+  Measured 18:03Z: **14 soccer games past kickoff, 12 carrying a real score, 0
+  marked live; 45 rows serving an edge on a game in play or over.** GRO @ ADO
+  kicked off 7.8h ago, finished 4-1, and the board offers an edge on `totals 2.5`
+  — settled OVER before lunch. mlb/wnba: 0 such games.
+  - Cost mechanism: `live_edge_policy` keys on `game.state`, and `pregame` is its
+    PERMISSIVE branch, so a game stuck there never has its edge withheld. `#413`
+    reappearing on a sport whose state never becomes live at all.
+  - Decision site: `game_chip_scoreboard._game_flags:113` infers live/final from
+    status TEXT only and **never consults kickoff time or score**; absent status
+    falls through to `pregame`. `attach_game_state` copies `chip["state"]`
+    through and is NOT the cause.
+  - Unconfirmed hypothesis (two greps, not a measurement): soccer emits `status`
+    as a STRING (`soccer/cards.py:197,512`) while `_game_flags` reads it as a
+    DICT, so soccer's status is invisible by TYPE. **Falsify by dumping one
+    soccer chip as the worker sees it before touching `_game_flags`.**
+  - NOT fixed here on purpose: `_game_flags` is shared by all 8 sports and a
+    wrong `live` costs as much as a wrong `pregame`. Needs its own lane, its own
+    falsification test, and a decision. `game_chip_scoreboard.py` is unclaimed.
+- **This also invalidates my own G3 conclusion.** I wrote "no second sport was
+  live, so the cross-sport A/B is deferred". Soccer WAS live; the board could not
+  see it. The blocker was the finding.
+- Lesson, already a standing rule and violated anyway: *the user watches the
+  board, and their concrete board report beats my automated check.* My instrument
+  had produced the evidence (10 stale-pregame, 17 unknown) and I read it as a
+  scoping curiosity instead of an outage. Third occurrence.
+- Lane REMAINS OPEN.

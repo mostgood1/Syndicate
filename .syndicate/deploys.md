@@ -6956,3 +6956,232 @@ No edge was added. The 1,416 rows carrying BOTH a `model_prob_over` and a
 `modelled_fair.*.fair_probability` still serve no edge — that remains a user
 decision, not a defect. The 3 WNBA rows now say why rather than being blank; one
 of them would read +31.7 pp against a model with `sample_games: 0`.
+
+## 2026-08-16 17:53Z — both workers — the props-snapshot `force_refresh` escape — DEPLOYED, MEASUREMENT OWED
+
+| service | commit | live | cut on |
+|---|---|---|---|
+| refresh-worker | `b9f2b5f1` | 2026-08-16T17:53:08Z | `f88796a9` |
+| live-odds-worker | `e28594a7` | 2026-08-16T17:53:28Z | `dd53d47c` |
+
+Web deliberately NOT deployed: these exporters are producer-side only.
+
+**Verified by CONTENT on both live SHAs, not by deploy status:** `wnba_guards=3`,
+`nba_guards=3`, `nba_materialize_param=1`. 20 tests green on each branch before
+push, and the branches were cut on each service's OWN live SHA — `main` is not a
+superset of the workers.
+
+**THE LIVE SHA MOVED WHILE I PREPARED, AND THE FIRST BRANCH WAS ALREADY STALE.**
+refresh-worker went `01a4b83e` → `f88796a9` (17:40:50Z) between cutting and
+deploying. `8c52b0dd` was cut on `01a4b83e`; deploying it would have REVERTED
+whatever `f88796a9` carried. Re-cut on `f88796a9` as `b9f2b5f1` — the ancestry
+check (`01a4b83e` IS an ancestor of `f88796a9`) is what made the re-cut a rebase
+rather than a merge. **"Live" is a lease; re-read it immediately before firing.**
+
+- refresh-worker deployed into a genuine lull (2 processes, both infra).
+- live-odds-worker deployed on top of 3 jobs (`refresh_odds_sources` +
+  `build_soccer_artifacts --league primeira_liga`), as established earlier
+  tonight: 10 of 10 samples over 25 minutes had jobs. That service has no idle
+  window during live hours. The jobs re-run next cycle.
+
+**MEASUREMENT OWED — this is NOT verified in effect.** Falsifiable check, on
+`/api/ops/win-prob-null`: a run that passes `--force-refresh` for a date whose
+`cards_props_snapshot_<date>.json` ALREADY EXISTS must now emit a
+`refresh_wnba_oddsapi_props:cards_props_snapshot` staged record. Before this
+deploy that record could only appear on a first build. Absence of it proves
+nothing on its own — `--force-refresh` only fires on a lineup/injury trigger, so
+check that a forced run happened at all before reading a null as a failure.
+
+---
+
+## 2026-08-16 17:5x-18:0xZ — LAYER 2 BOARD FIXES, TWO SERVICES (lane `layer2-board-quality`)
+
+Both branches cut from each service's **LIVE SHA**, never from `main`. `/preflight`
+had already failed `main` on scope (520 commits / 207 files / 85,232 insertions).
+
+### WEB — `4ab9d12a` on `deploy/layer2-board-ui`, parent live `ebd5f677`
+
+5 files: `intelligence.html`, `board_cards.css`, `bet_slip.js`,
+`board_rail_toggle.js`, `tests/js/game_rail_derive.test.mjs`. +307/-10.
+
+Carries the rail-from-chips seeding, finals-sort-last, the ranking disclosure,
+the 36px betslip strip, and the `sim disagrees` badge (inert until the worker
+half lands — the field does not exist yet, so the badge simply does not render).
+
+**ALSO CARRIES `f3b9b293`** (another lane): whole-numbered lines keep their
+decimal. Unavoidable — same file — web-only, 28 tests, already on `main`.
+
+### REFRESH-WORKER — `b8939778` on `deploy/layer2-bettable-books`, parent live `f88796a9`
+
+8 files, +741/-32. The book allowlist (`book_shortlist.py`, new), the lay-bet
+label, the prop-team fix, `sim_view`, plus the approved ridealong `734c163e`.
+
+**THE RIDEALONG IS A CHERRY-PICK, AND TAKING THE FILES FROM `main` WOULD HAVE
+REVERTED LIVE WORK.** `c410be4d`'s per-artifact `win_prob` emit is on
+`f88796a9` and **absent from `main`** — copying `main`'s two prop scripts scores
+**49 deletions instead of 13** and silently un-ships another lane's
+instrumentation. Three-way merged onto the live versions instead (`git merge-file`,
+clean, no markers): `_record_win_prob_null` survives at 4 sites, `force_refresh`
+arrives at 23. Same class as `fb448d60`, "production code was not on the default
+branch" — and the second time in two days that `main` was the wrong source for a
+worker file.
+
+**Tested against the EXACT deploy commit**, not against `main`: a detached
+worktree at `b8939778`, 39 passed — including the ridealong's own suite run
+against the MERGED scripts, which is different code from what its lane tested.
+
+### Expected effect, as numbers on the next artifact after the worker deploy
+
+    quote.bookmaker outside DEFAULT_BOOKS      27 of 108  ->  0
+    rows dropped for no bettable book                     ->  no_bettable_book > 0
+    rows repriced to a bettable book                      ->  repriced_to_bettable > 0
+    cards with team set on a prop (side=over/under)  56   ->  0
+    h2h_lay selections rendered as a bare team name   9   ->  0
+    rows carrying sim_view                            0   ->  108
+
+### Blast radius / gate
+
+Web: restart, brief 502s — observed, and it blinded `check_deploy_safety.py`
+itself (see below). Worker: restart, kills any in-flight sim or board build.
+**HELD at 17:57Z** on `MLB sim RUNNING (pid=148, fingerprint_change)` + a board
+build; deployed only after an explicit `CLEAR:`.
+
+**`check_deploy_safety.py` RETURNED `[UNKNOWN] HTTP 502` WHILE WEB RESTARTED,
+AND THAT IS NOT A CLEAR RESULT.** It reads live-refresh state off the web
+service. The string contains neither `NOT CLEAR` nor `CLEAR:`, so a watcher
+testing `'NOT CLEAR' not in out` — which is what I first wrote — reports the gate
+CLEAR precisely while it cannot see. Killed and replaced with one that requires
+an explicit `CLEAR:` line AND the absence of `[UNKNOWN]`. This is the same shape
+as the standing rule "never deploy on `check_deploy_safety.py` alone": here it
+was not wrong, it was **blind**, and blind read as permissive.
+
+### Rollback
+
+    py -3 scripts/render_deploy.py --service web --commit ebd5f677 --allow-rollback
+    py -3 scripts/render_deploy.py --service refresh-worker --commit f88796a9 --allow-rollback
+
+### Ledger check
+
+No `learnings.md` FORBIDDEN/EXONERATED rule covers these. Files claimed only by
+`layer2-board-quality`; the two prop scripts belong to `export-force-refresh-escape`,
+whose lane text explicitly authorises this ridealong.
+
+**MEASUREMENT (web) — 2026-08-16 18:0xZ. LIVE at 18:03:15Z, all five changes SERVED.**
+
+Read off the production page and its static assets, not off the repo:
+
+    /intelligence          board-disclosure block        2
+                           claimedChips (rail seeding)   3
+                           const isFinal (finals last)   1
+                           board-badge--sim-disagrees    1
+                           game-mini-card--empty         2
+    board_cards.css        minmax(0, 1fr) 36px           1
+                           .game-mini-card--empty        2
+                           .board-disclosure             3
+    bet_slip.js            syncRailSlipCount             2
+
+**THE RAIL GOES FROM 18 CARDS TO 108, AND 90 OF THE NEW ONES ARE SOCCER.**
+Measured against the live endpoints:
+
+    /api/board/game-chips        108 games today   (mlb 15, soccer 90, wnba 3)
+                                 9 live, 99 pregame
+    games WITH an opportunity     18   (mlb 15 + wnba 3)
+    NEW count-0 cards             90   (all soccer)
+
+This is literally what "list all of today's games with or without an
+opportunity" asks for, and it is a **6x expansion of the rail** driven entirely
+by a sport that is at ~0 published EV rows **by decision** (state.md decision 7:
+the soccer model loses to the market, so its rows die on the EV floors). Under a
+sport filter the rail is 15 or 3; only the "all" view shows 108.
+
+Flagged rather than quietly shipped. If the compact rail should stay compact,
+the cheapest scoping is to seed only from sports in `active_sports` (18 cards,
+which is what the shortlist already publishes) — a one-line change to the
+`state.sport` guard in the seeding loop.
+
+**The `sim disagrees` badge is CORRECTLY INERT.** The renderer is live; the
+field it reads (`sim_view`) is stamped by the worker, which has not deployed.
+Verified the degrade is silent: 0 badges render, no console error.
+
+**MEASUREMENT (worker): ____________**
+
+---
+
+## 2026-08-16 18:0xZ — lane `layer1-board-coverage` — **SOCCER SERVES BETTABLE EDGES ON FINISHED MATCHES.** Found by the user, not by my sweep
+
+**Not a deploy. A production defect found while trying to CLOSE the lane, and the
+reason it stays open.**
+
+**The user said "SOCCER has live games" while the board said `live: 0`.** They
+were right. My own instrument had already produced the smell — 10 soccer games
+marked `pregame` with kickoffs 3+ hours past, 17 more in `unknown` — and I had
+read that as a scoping curiosity rather than the thing it was.
+
+### Measured, production, 18:03Z (`/api/board/layer1?sport=soccer&window=slate`)
+
+```
+soccer games past kickoff                                        14
+  of those, carrying a real live SCORE on the chip                12   <- the SCORE join works
+  board `counts.by_state.live`                                     0   <- the STATE join does not
+  >3h past kickoff (certainly over)                               10
+rows on those games                                            1,236
+*** rows serving a BETTABLE EDGE on a game in play or finished    45 ***
+```
+
+Worked example: **GRO @ ADO, kicked off 7.8 h ago, final score 4-1, and the board
+serves an edge on `totals 2.5`** — a market that settled OVER before lunch. Also
+`totals 3.0`, `totals 2.75`, `spreads -0.0`. `status_token` on these rows is
+`"5:15A CT"` — the scheduled kickoff rendered as a clock, i.e. the PREGAME token.
+
+MLB and WNBA: 0 stale-pregame games, 0 unknown. **Soccer only.**
+
+### Why it costs edges rather than just looking wrong
+
+`live_edge_policy` keys on `game.state`. `pregame` is its PERMISSIVE branch, so a
+game stuck in `pregame` never has its edge withheld. This is `#413` exactly — the
+defect whose fix ordering (`attach_live_game_state_from_lens` BEFORE
+`attach_projections`) is documented in `book_grid_artifact.py` — reappearing on a
+sport whose state never becomes live in the first place.
+
+### The decision site, named
+
+`attach_game_state` (`board_enrichment.py:124-139`) copies `chip["state"]`
+straight through, so it is not the cause. The state is decided in
+`game_chip_scoreboard._game_flags` (`:113`):
+
+- It infers live/final **from status TEXT ONLY** — `status.is_live`,
+  `status.in_progress`, `live_state.in_progress`, `gameState in {LIVE, CRIT}`, or
+  substrings `"in progress"` / `"live"` / `"final"`.
+- **It never consults the kickoff time or the score.** A match 7.8 h past
+  kickoff at 4-1 is not evidence of anything to this function.
+- `if not is_live and not is_final: state = "pregame"` — **absent status maps
+  onto the permissive branch.** The standing rule
+  *"unknown must not default permissive"* is violated here, in the one place
+  where the permissive branch is what releases money.
+- Note the line directly above it already distrusts a placeholder score
+  (`0-0 on a non-live non-final game is suppressed`) — so the function DOES
+  reason about scores, just never in the direction that would catch this.
+
+**HYPOTHESIS, not yet confirmed at runtime:** soccer emits `status` as a **string**
+(`features/soccer/cards.py:197` and `:512`, via `_status_label`), while
+`_game_flags` reads it as a **dict** (`game.get("status") if isinstance(..., dict)
+else {}`). If so, every soccer status is invisible to the predicate by TYPE and
+the fall-through is guaranteed. `features/soccer/cards.py` never sets
+`in_progress` or `shared_is_live` (grepped: zero hits), which is consistent.
+**Falsify by dumping one soccer chip's `game` dict as the worker sees it** before
+changing `_game_flags` — I have not done that, and the type mismatch is inference
+from two greps, not a measurement.
+
+### Deliberately NOT fixed here
+
+`_game_flags` is shared by all eight sports. Teaching it to infer state from
+kickoff+score would change MLB, WNBA, NFL and NCAAF behaviour too, and a wrong
+`live` is as costly as a wrong `pregame`. That is a scoped change with a real
+blast radius, needs its own lane and its own falsification test, and
+`game_chip_scoreboard.py` is unclaimed by any OPEN lane as of this writing.
+
+### What this invalidates in my own audit
+My G3 conclusion "no second sport was live, so the cross-sport live A/B is
+deferred" was **WRONG**. Soccer WAS live. The A/B was blocked by the board's
+inability to see it — which is itself the finding the A/B was supposed to
+produce.
