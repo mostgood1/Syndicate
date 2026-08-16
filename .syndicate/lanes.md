@@ -3310,3 +3310,41 @@ and then failed the thing it was checking, which is the point of running it.
   had produced the evidence (10 stale-pregame, 17 unknown) and I read it as a
   scoping curiosity instead of an outage. Third occurrence.
 - Lane REMAINS OPEN.
+
+### soccer-live-game-state — CLOSED-VERIFIED 2026-08-16 18:56Z — a kicked-off match is no longer `pregame`, and no finished match carries an edge
+- **Verification RAN and PASSED**, on production artifacts stamped after the
+  18:54:37Z deploy:
+  - soccer `by_state` `{live 0, final 0, pregame 49, unknown 17}` →
+    **`{live 4, final 11, pregame 34, unknown 17}`**; games past kickoff still
+    marked pregame **10 → 0**.
+  - **Harmful edges (on a finished game, or on a live game from a pregame
+    projection) across all in-season sports: 0.** Was 27 + 9 on soccer.
+  - MLB's **2 live-aware edges preserved** — the main regression risk, since
+    suppressing those would delete the only genuinely live number on the board.
+  - **The branch is confirmed to have RUN, not just to have produced a zero:**
+    served coverage reads `live_edge_enforced_rows: 36` for soccer
+    (`final` 27 + `live` 9 — matching the pre-fix count exactly) and `0` for MLB.
+- Two deploys, both cut on the LIVE worker SHA: `38ba954c` (state) 18:37:38Z,
+  `a72b4bf4` (enforcement) 18:54:37Z. Measurement in `deploys.md`.
+- **Deploy 1 alone was NOT enough and the sweep is what said so.** With states
+  finally correct, 36 rows still carried edges, because
+  `soccer_projections._price_against_market` opens `if model_prob is None:
+  return` while `_mean_projection` sets `model_prob_over: None` alongside
+  `edge_vs_line` — so every mean-based row returned before the refusal whose own
+  comment claimed it ran "for every row, mean-based and probability-based alike.
+  Checked rather than assumed."
+- Fixed at `board_enrichment.attach_projections`, not in the producer: thirteen
+  return sites across seven sports, and that wrapper already exists for exactly
+  this argument. It also covers `soccer_projections.py` **without editing it**,
+  so the orphaned lane's claim on that file was never crossed — the file is
+  unmodified.
+- Claim override taken on `syndicate/features/soccer/cards.py` only, logged at
+  lane open: `soccer-model-coverage` is ORPHANED (owning session absent from a
+  40-entry census incl. archived).
+- Near-miss worth keeping: the first draft used `isinstance(row, Mapping)` in a
+  module that does not import `Mapping` — a `NameError` on the FIRST row that
+  would have taken the whole projection join down. Caught by running it.
+- Files: `syndicate/features/soccer/cards.py`,
+  `syndicate/features/shared/board_enrichment.py`,
+  `tests/test_soccer_cards_live_state.py`, `tests/test_live_edge_enforcement.py`,
+  `tests/test_projection_degeneracy.py` (one exact-dict assertion widened).
