@@ -1835,3 +1835,26 @@ directly with `ls-files --others --exclude-standard` INTERSECT
 `ls-tree -r --name-only origin/main`. And **`git stash create` does not capture
 untracked files**, so a snapshot taken that way is not the safety net you think
 it is for exactly the files that block a merge.
+
+### 2026-08-15 — OVERTURNED: "a fixture-relative cadence helps soccer". It is the ONE sport it hurts, because the sport is not the unit
+- **What we believed:** soccer motivated the whole fixture-aware cadence lane, so soccer would
+  be its main beneficiary. I shipped 1a/1b saying so in the commit message.
+- **What was actually true:** the gate resolves ONE fixture clock per SPORT, and soccer's
+  "sport" is ten leagues on ten calendars. The gap it returns is the MINIMUM across all of
+  them, so it is almost never large. Modelled over 336 hours against the real 2026 fixture
+  lists: the 24h tier is reached in **0.0%** of hours, and the gate yields **5.08 sweeps/day
+  against 3.00 today (+69%)** — more overlap with MLB's peak, not less. Per-league the same
+  tiers reach 24h in 49.3% of league-hours.
+- **How we found out:** the call-volume check the lane required before enabling. It was run to
+  answer a COST question and answered a CORRECTNESS one.
+- **The rule going forward: before shipping a per-X gate, verify that X is the unit the data
+  varies over.** An aggregate whose members have independent clocks collapses to its extreme —
+  here a min() — and the gate then reads the aggregate as always-busy. The tell is cheap: model
+  the tier occupancy before shipping, and if one tier is reached 0% of the time the unit is
+  wrong, not the thresholds.
+- **Second-order:** the single-league sports were fine all along (mlb 12.00 -> 5.45, wnba ->
+  5.83, nfl_preseason -> 3.56), so the feature was ~85% right and the 15% was aimed exactly at
+  the lane's stated goal. A partly-correct change whose incorrect part is the motivating case
+  is the dangerous shape.
+- *(evidence: `#440` plan Phase 1 cost-check section; lane `odds-cadence-off-the-mlb-peak`;
+  fix `8640f872`)*
