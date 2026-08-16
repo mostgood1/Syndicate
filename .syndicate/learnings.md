@@ -2393,3 +2393,37 @@ under the candidate-line verification.
   which is the one outcome worse than the file being large.
 - Cost: a second full collapse of the same file within one session, and four
   wrong claims live in the ledger for hours between the two.
+
+## 2026-08-15 — FORBIDDEN: `git <cmd> <rev>:<dotpath>` in Git Bash on Windows. It silently reads the WRONG thing, and only for dot-prefixed trees
+
+`git rev-parse "origin/main:.syndicate/state.md"` fails with
+`ambiguous argument 'origin\main;.syndicate\state.md'`. MSYS sees `a:.b`, decides
+it is a POSIX path LIST, and rewrites `:`→`;` and `/`→`\` before git ever sees it.
+
+**The part that makes it dangerous: it is selective.** Measured:
+
+    git rev-parse "origin/main:syndicate/features/shared/clv_join.py"   -> WORKS
+    git rev-parse "origin/main:.syndicate/state.md"                     -> MANGLED
+    git rev-parse "origin/main:.claude/hooks/lane-guard.py"             -> MANGLED
+    MSYS_NO_PATHCONV=1 git rev-parse "origin/main:.syndicate/state.md"  -> WORKS
+
+So it breaks on exactly the two trees that hold the LEDGER and the HOOKS, and
+never on source. A reconcile loop over mixed paths therefore reports source as
+clean and `.claude/hooks/lane-guard.py` as UNRECONCILED — which is what happened,
+twice, and produced a third false negative when verifying a pushed ledger commit
+("content missing on origin/main" when it was all there).
+
+**Fix — any of:**
+- `MSYS_NO_PATHCONV=1 git show "<rev>:<path>"` (verified)
+- `MSYS2_ARG_CONV_EXCL='*' git show "<rev>:<path>"` (verified)
+- Avoid the syntax: `git grep <pat> <rev> -- <path>`, `git diff <rev> -- <path>`,
+  `git log <rev> -- <path>`. These take the path as a separate argument and are
+  immune.
+
+**And the deeper rule this is the third instance of tonight: a failing CHECK and
+a failing SUBJECT look identical.** `git diff` said lane-guard.py was clean while
+`hash-object` vs `rev-parse` said it diverged — the diff was right and the blob
+comparison was reading a mangled path. **When two methods disagree about the same
+fact, suspect the instrument before the subject.** For reconcile specifically:
+`git diff` is authoritative; `hash-object` against `<rev>:<path>` is not, both
+because of this mangling and because git normalizes CRLF on the way in.
