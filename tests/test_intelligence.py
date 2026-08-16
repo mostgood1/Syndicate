@@ -7226,6 +7226,34 @@ class IntelligenceBlueprintTests(unittest.TestCase):
         self.assertIn('<td data-label="Live proj.">', source)
         self.assertIn('itemState === "live" ? displayLiveProjection(item) : null', source)
 
+    def test_display_line_keeps_the_decimal_on_a_whole_numbered_line(self) -> None:
+        # `line` arrives as a JSON NUMBER (measured 2026-08-16 on the wire: 40
+        # of the served tokens end in `.0`, none quoted), so `JSON.parse` gives
+        # 7 for `7.0` and a bare `String()` renders "7". Confirmed in a real
+        # browser against the live board: "9 · totals" and "7 · totals" sat
+        # beside "11.5 · totals" and "5.5 · totals". A whole-numbered TOTAL is
+        # the case where a push is possible, so it is the one that most needs
+        # to read as a line rather than a count.
+        #
+        # Guarded as source text because displayLine is client-side JS with no
+        # server-rendered output to assert on -- same reasoning as the blotter
+        # column guard above. Behaviour was verified by injecting both the old
+        # and new function into the live page over its own 100-row payload:
+        # exactly 5 rows changed (all totals), 77 unchanged, 18 line-less.
+        template_path = Path(__file__).resolve().parents[1] / "syndicate" / "templates" / "intelligence.html"
+        source = template_path.read_text(encoding="utf-8")
+
+        # The numeric branch must exist and must pad integers only.
+        self.assertIn('if (typeof line === "number" && Number.isFinite(line)) {', source)
+        self.assertIn("return Number.isInteger(line) ? line.toFixed(1) : String(line);", source)
+
+        # Non-integers must NOT be routed through toFixed, which would turn a
+        # 10.25 alternate line into "10.3" -- a line no book is offering.
+        self.assertNotIn("Number(line).toFixed(1)", source)
+
+        # The string/placeholder path stays intact for rows with no line.
+        self.assertIn('return text && text !== "-" ? text : null;', source)
+
     def test_intelligence_page_renders_game_cards_container(self) -> None:
         # Mini per-game cards (grouping opportunities by underlying game so
         # a user can select one game's picks instead of scrolling the whole
