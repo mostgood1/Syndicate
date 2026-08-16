@@ -4684,3 +4684,72 @@ before this deploy.
 - **Attribution note stands**: 3 commits rode along on refresh-worker, 5 on
   live-odds-worker (see the preflight above). If something surfaces later, that
   is the candidate set.
+
+### VERIFICATION CORRECTION — the first post-deploy watcher was measuring the wrong artifact
+
+`bbeqtk5jv` fired `written_at=2026-08-15T23:12:20Z grid_home_line_agrees=0
+opposite=573 STILL OLD ARTIFACT or fix not applied`. **Both halves of that were
+misleading and the watcher has been stopped.**
+
+1. `written_at=23:12:20Z` is the PRE-deploy shortlist (deploy live 23:16:39Z), so
+   nothing had been rebuilt — correct to keep waiting.
+2. **But the predicate could never pass.** It compared `row["line"]` to
+   `cell.home.line` on the BOOK-GRID. That opposition is the input shape — the
+   grid row's line is the away handicap — and the fix does not touch the grid at
+   all. It changes the SHORTLIST CANDIDATE's `line`. `opposite=573` is the
+   correct, expected reading of healthy data.
+
+**Replaced by `bb12r5c1x`**, which measures the artifact the fix actually
+writes: for mlb spreads rows in `/api/board/layer2-shortlist`, joined to the grid
+row for the same event —
+- `side=home` must now have `line == -grid_row.line` (was `== grid_row.line`),
+- `side=away` must still have `line == grid_row.line` (unchanged),
+- and it refuses to judge at all until `written_at` is later than the deploy,
+  so "not rebuilt yet" and "rebuilt and wrong" stay distinguishable.
+
+**Still no verified output for either worker fix.**
+
+## 2026-08-15 23:56:06Z — refresh-worker `2c14d9ae` — red-intelligence-tests field-absence fixes — **MEASUREMENT NOT YET OBTAINABLE**
+
+| field | value |
+|---|---|
+| service | refresh-worker (`srv-d91dpertqb8s73co8ls0`) |
+| commit | `2c14d9ae`, parent = live-at-fire-time `32186e28` |
+| finished | 2026-08-15T23:56:06.006Z |
+| jobs killed | **0** — fired on two consecutive `jobs_in_flight == 0` polls |
+| claim | acquired (NOT forced), released after, token `cdbe6d9dc1a8d891` |
+| rollback | pinned redeploy of `32186e28` |
+
+**PRESENCE VERIFIED, INDEPENDENTLY OF THE DEPLOY SCRIPT.** All four fixes read
+back PRESENT by content in the live tree — `line` fix, alias guard, `market_key`
+producer, `player_name` producer. Three earlier deploys tonight reported `live`
+without carrying them, which is why presence is checked and never inferred.
+
+**EFFECT: NOT OBSERVED. DO NOT RECORD THIS AS A WORKING FIX.**
+
+    POST-DEPLOY, live 2c14d9ae, /api/intelligence/query, 98 recommendations
+      market_key blank   0    (baseline 0/101 -- unchanged, as predicted)
+      player_name blank  0    (baseline 0/101 -- unchanged, as predicted)
+      line as a number  74    of which 7 whole-numbered   (baseline 84 / 7)
+      line as a STRING   0    (baseline 0 -- THIS IS WHAT SHOULD RISE, AND HAS NOT)
+
+**Why, and it is expected rather than a failure:** the served rows come from
+**cached worker state**, and `UniversalCandidate.to_dict` runs inside
+`collect_candidates` during a BOARD BUILD. The worker restarted at 23:56:06Z
+carrying the new code, but no board has been rebuilt since. The deployed code
+cannot change a payload it has not yet produced.
+
+**MEASUREMENT OWED — the deploy is NOT closed.** Re-read the same four numbers
+after the next board build. Success = `line as a string` rises toward 74 and the
+7 whole-numbered rows serialize as `"N.0"`; `market_key`/`player_name` must stay
+at 0, since those two fixes have zero current incidence and no effect is claimed
+for them. If `line as a string` is still 0 after a confirmed board build, the
+fix is INERT on this path and the mechanism was mis-traced.
+
+**Two costs of getting here, recorded because both were self-inflicted:**
+1. An earlier auto-fire aborted at a valid window — the patch was piped through
+   stdin with `text=True`, so Python newline-translated it and every hunk
+   failed. The same procedure by hand, which used a FILE, worked three times.
+2. The first hand attempt lost the window by spending ~60s building the target
+   INSIDE the lull. The lull is 60-90s; the target must be built before it, or
+   built by the same process that fires.
