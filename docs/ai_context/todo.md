@@ -30586,6 +30586,21 @@ corrected value (`bf06710c`) so this doesn't drift silently again.
 > rollover. Needs one more longer-window reading before calling this
 > conclusively confirmed rather than an optimistic early signal.
 
+✅ **CONFIRMED, 2026-08-16T16:12Z — the longer-window reading requested
+above, same baseline, now 40.1h total:**
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 144,510s (40.1h, 243,180 obs) | 125,693 | **3,131.2** | **2.25M** | **45.1%** |
+>
+> Lower than the first post-fix reading (54.9% → 45.1%), not higher — this
+> is real stabilization, not noise reverting. **Marginal rate over just the
+> newest ~20.8h: (125,693 − 73,833) / 20.8h ≈ 2,496cr/hour → ~1.80M/mo
+> (36.0%)** — continuing to trend down, not up. **The fix is confirmed
+> working.** #325 is closed as far as the event-scoping-window
+> misconfiguration goes; if burn climbs again in a future reading it is a
+> new question, not a reopening of this one.
+
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as
 #215, collided with a concurrent session's unrelated #215/#216 board/ranking
