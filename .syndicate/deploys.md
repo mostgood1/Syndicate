@@ -8087,3 +8087,76 @@ same file, and I reintroduced it while writing the movement code. `#397`'s rule
 sufficient: the counter has to reach every place the payload is ASSEMBLED, and
 on this path that is three. **Fix: publish `openings_loaded` and
 `movement_rows_matched` beside the existing counters.**
+
+---
+
+### ask-positive-edge — web `b30f0972` — MEASURED
+
+- Deployed 2026-08-16 16:05 CDT (21:05:02Z), **web only**, cut from web's own
+  live SHA `d6ae3e8c`. Claim held, nothing in flight, nothing cancelled. Landed
+  on `main` as `4b92d79c`; main and live carry identical blobs.
+
+- **THE DEFECT.** Served 20:5xZ under "Showing the top 5 opportunities on
+  today's board in MLB. Best edge 4.9%":
+
+      Jose Altuve over 0.5      +4.9%      Seattle Mariners +1    -4.9%
+      over 8.0 (SEA @ HOU)      +3.2%      under 7.5 (SEA @ HOU)  -8.2%
+      Brendan Donovan over 0.5  -1.8%
+
+  Three of five "opportunities" were bets the model calls bad. **The ranker was
+  not wrong** — the board had thinned to 70 rows (46 live) with only 6 carrying
+  a model edge and 2 of those positive, so "the best 5" genuinely contained four
+  bad bets.
+
+- **SECOND OCCURRENCE, AND THE FIRST FIX IS WHY IT RETURNED.**
+  `_market_summary_schema` already carried a note about 2026-08-03 — "the
+  summary returned 4 negative-edge rows with the only positive one (+16.9%)
+  ranked LAST" — and the fix then was to **sort**. Sorting orders a pool; it
+  does not decline to publish one. Necessary, never sufficient. **A fix that
+  addresses the ORDER of bad output does not stop the output.**
+
+- `_has_positive_edge` tests the term the row is RANKED ON (`model_edge_pct`
+  when present, `ev_pct` otherwise), mirroring `_board_rank_key` so ordering and
+  eligibility cannot disagree. `ev_pct` is included because it is **not floored
+  at zero**: the served `min_value_pct` is `-2.0` and 6 of 70 rows had
+  `ev_pct <= 0`. Filtering runs BEFORE the slice, so a thin board returns fewer
+  rows instead of padding five out with negatives.
+
+- **Two traps handled, both of which would have silently undone the fix:**
+  1. An empty board list is an ANSWER, not missing data. The caller now tests
+     `is not None`, not truthiness — under the old check an empty list fell
+     through to the snapshot pool and would have **republished exactly the rows
+     the filter had just removed**.
+  2. The absence is EXPLAINED. "No opportunities" reads as "the board is empty"
+     when the truth may be "the board is full and the model likes none of it".
+     The summary now states how many rows were priced against the model and left
+     out, in both the short-list and the empty case.
+  The excluded count travels beside the rows as a tuple, not stashed on them —
+  a private key on a row serialises straight into the API payload.
+
+- Same defect one surface over: the M1 evidence CHART is titled "Top edges" and
+  was plotting a `-9.17%` bar. Positive only now. The TABLE deliberately keeps
+  every row — it is an inventory with an explicit "N of M rows" count and a
+  signed `Model edge` column, so a negative there is information, not a
+  recommendation.
+
+- **Measured on production 21:0xZ:** 5 rows published, **0 non-positive**, 0
+  non-positive chart bars, and the summary reads "…Best edge 12.4%. 2 rows
+  priced against the model and were left out." Pre-deploy replay over the live
+  70-row board: 60 qualify, 10 excluded, top 5 becomes 2 positive-model rows
+  plus 3 positive-EV rows.
+
+- 6 tests (69 in this file, 227 across all four ask suites).
+
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit d6ae3e8c
+  --allow-rollback`.
+
+- **OPEN, FOUND IN THE POST-DEPLOY READ, NOT FIXED:** `Pittsburgh Pirates`
+  published with `model_edge +9.18%` **and `EV -2.18%`**. The rule admits it by
+  design — a row with a model edge is judged on the model edge — but the two
+  terms disagree: the model likes the side while the offered price is worse than
+  consensus fair. That is a real caution a bettor would want, and the current
+  rule is silent about it. Options are to require BOTH terms positive when both
+  exist, or to surface the disagreement in the reason sentence. **Needs a
+  decision, not a patch** — requiring both would have dropped this row entirely,
+  and whether a model-strong/price-poor row is an opportunity is a product call.
