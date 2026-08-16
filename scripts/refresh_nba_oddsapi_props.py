@@ -912,6 +912,9 @@ def _american_price_to_prob(value: object) -> float | None:
 # does, so the denominator is exactly "win_prob values computed". A new site
 # added later is counted automatically.
 _WIN_PROB_STATS: dict[str, int] = {"rows": 0, "null_no_price": 0}
+# Set once from argv so the emitter in `__main__`'s `finally` can name the slate
+# it counted. A reading with no date cannot be aged against the run that made it.
+_WIN_PROB_RUN_DATE: dict[str, str | None] = {"date": None}
 
 
 def _clamp_probability(value: float | None) -> float | None:
@@ -923,11 +926,22 @@ def _clamp_probability(value: float | None) -> float | None:
 
 
 def _emit_win_prob_stats(tag: str = "refresh_nba_oddsapi_props") -> None:
-    """Report the null rate, not a bare count.
+    """Report the null rate, not a bare count -- through a channel that is read.
 
     A count with no denominator cannot be read: `null=0` means "the fix held" if
     rows is large and "nothing ran" if rows is 0, and those need opposite
-    responses. Printed on EVERY run including the all-zero one.
+    responses. Emitted on EVERY run including the all-zero one.
+
+    **THE PRINT BELOW IS NOT THE CHANNEL**, for the reason recorded in the WNBA
+    twin: `refresh_odds_sources._run_command` runs this script under
+    `subprocess.run(capture_output=True)` and discards a successful step's
+    stdout, so no print here reaches Render's logs on a normal run (proven for
+    the WNBA producer 2026-08-15/16 -- it ran, and the line was nowhere).
+    Production reads the keyvalue record instead.
+
+    NBA reporting `rows=0` is EXPECTED while the sport is out of season, and it
+    is a real reading, not a failure: it says the producer reported and computed
+    no win_prob, which is different from never having reported at all.
     """
     rows = _WIN_PROB_STATS["rows"]
     nulls = _WIN_PROB_STATS["null_no_price"]
@@ -936,6 +950,20 @@ def _emit_win_prob_stats(tag: str = "refresh_nba_oddsapi_props") -> None:
         f"[{tag}] WIN_PROB_NULL_NO_PRICE null={nulls} rows={rows} pct={pct:.1f}",
         flush=True,
     )
+    # Never raises (see `record`'s contract): this runs in a `finally` guarding
+    # the process exit code.
+    try:
+        from syndicate.features.shared.win_prob_null_diag import record as _record_win_prob_null
+
+        _record_win_prob_null(
+            sport="nba",
+            tag=tag,
+            rows=rows,
+            nulls=nulls,
+            date=_WIN_PROB_RUN_DATE.get("date"),
+        )
+    except Exception:
+        pass
 
 
 def _format_signed_line(value: float | None) -> str:
@@ -4483,6 +4511,7 @@ def main() -> int:
     parser.add_argument("--started-at")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
+    _WIN_PROB_RUN_DATE["date"] = str(getattr(args, "date", "") or "").strip() or None
 
     source_root_arg = str(args.source_root or "").strip()
     source_root = Path(source_root_arg).resolve() if source_root_arg else None
