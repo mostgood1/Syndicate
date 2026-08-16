@@ -33059,3 +33059,59 @@ Instrument note for whoever checks: read these lines with
 `--width 200000`. I truncated one at 125 chars and read `interval_s=8640`
 instead of `86400` — a 10x error that would have predicted the relaunch 18 hours
 early.
+
+### `#448` — **AN UNATTENDED SCHEDULED TASK CAN TAKE THE DEPLOY CLAIM ON EVERY SERVICE AND THEN END** — FOUND 2026-08-16, NOT STARTED, no owner
+
+Not a hypothetical. Measured tonight, and it blocked a ready, tested deploy.
+
+**WHAT HAPPENED, 2026-08-16:**
+
+- 22:39:29Z — lane `grading-blocker-settled-zero` acquired the deploy claim on
+  **BOTH** `refresh-worker` and `live-odds-worker` ("freeze fix `426bbd70`").
+- 22:46:40Z — its owning session, **`Alt line shortlist watch`**, went quiet.
+  That session is an **unattended scheduled-task run**.
+- Result: the claim sat held on two services by a session that had ended.
+
+**Why this is worse than a person holding a claim too long:**
+
+1. **You cannot ask for it back.** `send_message` refuses: *"Session is
+   unattended (a scheduled-task run or dispatched session); messages can't be
+   delivered there."* There is no negotiation path at all.
+2. **Finding the owner is not obvious.** The claim names a LANE
+   (`grading-blocker-settled-zero`), not a session. Resolving it took a
+   transcript search — and the first session the search returned was **archived**,
+   which looks identical to "dead" and sent me down a wrong path. See
+   `feedback_session_roster_hides_archived`.
+3. **It claims services it may not need.** This run held BOTH workers; I needed
+   exactly one.
+4. **`--force` is not universally available.** The permission classifier here
+   blocks `deploy_claim.py acquire --force` outright (twice, this session), so
+   "just force it" is not the escape hatch the tool's own message suggests.
+
+**WHAT IS NOT BROKEN — do not over-fix this.** The claim is NOT a permanent
+wedge. `deploy_claim.py` carries a **45-minute default TTL**, preflight reports an
+aged claim as `EXPIRED (does not block)` rather than honouring it, and `acquire`
+takes over an expired claim **without** `--force` (`if not expired and not
+args.force`). So this self-heals at `acquired_at + 45min` — here ~23:24Z. The
+defect is the **45-minute blind window**, not a deadlock.
+
+**Why the window still matters:** it is 45 minutes in which no other lane can
+deploy, including an incident response, held by nobody, releasable by nobody, and
+with the usual escape hatch unavailable. It is also silent — nothing announces
+that the holder has exited.
+
+**Candidate fixes, in rough order of cost:**
+- A shorter TTL when the acquirer is an unattended run (it knows: the same
+  runtime that refuses message delivery could stamp `unattended: true`).
+- Release-on-exit for scheduled tasks — the strongest fix, and the one that
+  removes the class rather than shrinking it.
+- Claim only the service being deployed. Two claims for a one-service deploy is
+  the multiplier here.
+- Record the SESSION id alongside the lane in the claim, so the owner is
+  resolvable without a transcript search.
+- Have `deploy_claim.py status` show time-to-expiry, so a blocked lane can see
+  "clears in 26 min" instead of inferring the TTL by reading the source.
+
+**Prior art:** `live-odds-worker EXPIRED (does not block) by snapshot-freshness
+69.4 min` was observed earlier the same evening — the same shape, already
+self-healed, and nobody wrote it down.
