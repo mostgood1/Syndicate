@@ -9088,3 +9088,81 @@ moves >=15 points within 3 hours of its opening. Scheduled re-run 2026-08-17
   lossy-mirror trap. The table is arithmetic on the engine's own Poisson
   assumption, **not an observation of served rows.** Re-check when soccer
   returns to the board; that is the single open item on this clause.
+
+---
+
+## 2026-08-16 23:38Z — WNBA live_state dropout — live-odds-worker `16a898ef` — **DEPLOYED AND UNIT-VERIFIED; THE PRODUCTION TRIGGER HAS NOT YET FIRED**
+
+### Root cause, named at the line
+`wnba/cards.py::_public_scoreboard_live_state_payload` was
+`except Exception: return None`, **silently**. Every caller then saw zero public
+games, no live merge ran, and the published lens carried `in_progress: False,
+clock: None, pts: None-None` for games genuinely in progress — at which point
+that module's own source rule (`live_projection` only when `is_live` AND
+`live_margin` AND `elapsed_min`) downgraded every game to `pregame`, and the
+Layer 1 board lost its whole live tier.
+
+**A 6-second timeout to an external host, published as "no games in progress".**
+
+### The dropout, observed end to end
+```
+22:50:31Z  board served 149 live-aware WNBA game rows
+22:57:22Z  same board served 309 game rows and ZERO, while CHI @ SEA and
+           IND @ ATL were still live at 78-74 and 78-77
+22:57:43Z  lens: sources=['pregame'] in_progress=False clock=None pts=None-None
+23:19:10Z  recovered on its own, unchanged code
+```
+
+### The fix, and its limits
+Age-bounded, MARKED carry-forward of the last good scoreboard, following MLB's
+`_carry_forward_live_state_lens` rules because it solved this first:
+- **180s bound**, tighter than MLB's 300s — a basketball clock moves faster than
+  a half-inning. Past it, return None (an honest absence) **and drop the entry**
+  so a later failure cannot resurrect an older board.
+- **Unknown age never takes the permissive branch** (monotonic time, so the age
+  is always knowable).
+- **Marked, never silent:** `carried_forward: True` with age, source and reason;
+  the failure now prints. A carried board that looked fresh would be worse than
+  the nulls it replaces.
+- **Kill switch** `WNBA_LIVE_STATE_CARRY_FORWARD_MAX_AGE_SECONDS=0`; a negative
+  value is a typo, not a disable.
+- **A 200 with no events is NOT carried.** Out of season legitimately has none,
+  and carrying over that would INVENT a slate. Only a FAILED fetch is smoothed.
+
+### What is verified, and what is NOT
+**Verified:** 8 tests including the real call path (`urlopen` patched to raise,
+driving `_public_scoreboard_live_state_payload` itself, not just the helper);
+118 green across carry-forward, live-tier, MLB carry-forward and WNBA cards
+suites; deployed SHA carries the code by content.
+
+**NOT verified: the trigger has not fired in production.** A log search for
+`SCOREBOARD_CARRIED_FORWARD` / `SCOREBOARD_FETCH_FAILED` /
+`SCOREBOARD_CARRY_EXPIRED` since 23:38Z returns **0 matches** — the ESPN fetch
+simply has not failed since the deploy. **This fix is unproven against the real
+failure and must not be recorded as proven.** The next dropout is its first
+test; the instrument will say so by name, which it could not do before.
+
+### Collateral confirmation: the live tier itself works on a healthy lens
+23:31:16Z board, IND @ ATL 94-91 (OT) and POR @ PHX 18-22:
+**218 of 321 game rows live_aware with a live_gameline** (up from 149 earlier),
+withheld reasons `live_resim_published_no_distribution_for_this_market` 216 and
+`sim_count_unusable` 2. So `wnba-live-tier`'s wiring is confirmed against a
+second, independent live slate.
+
+### Deploy target reasoning
+**live-odds-worker, not refresh-worker:** `start_live_lens_loop()` is called only
+from `run_live_odds_refresh_worker.py:412`. Cut on live `440f5f29`, which does
+NOT carry the clamp change that lane deferred by user decision — so that
+deferral is preserved.
+
+### Claim override
+`wnba/cards.py` was claimed by `clamp-fix-to-workers`. Its code work has shipped
+(`57a437d5`) and its only open work is verification that does not read this
+function; its session is UNATTENDED (a scheduled-task run) and `send_message`
+was attempted and **refused by the transport**. The file was released in
+`lanes.md` with the reasoning, not silently taken.
+
+### Process fix carried from the previous deploy
+The push and the deploy were **gated on the test exit code in the same shell**
+this time (`RC=$?; if [ "$RC" -ne 0 ]; then ... exit 1; fi`), after chaining them
+ungated an hour earlier and having to cancel a deploy mid-build.
