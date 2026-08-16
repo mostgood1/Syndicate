@@ -1738,3 +1738,40 @@ are second-tier.
 Together these are ~400-500MB against a 124MB margin — i.e. the children are a
 BIGGER lever than pymalloc's 350MB retention, and cheaper to pull.
 Read-only lane. No files touched, no deploy.
+
+#### worker-child-processes — CORRECTION 2026-08-16 01:5xZ — THEY ARE NESTED, NOT CONCURRENT
+I recommended "serialise the three `daily_update` variants — the single biggest
+win". **That was wrong. They are already sequential.** The ppid chain at the
+22:00:31Z worst moment:
+
+    pid  39  run_refresh_worker.py                  3,302.4
+    └ pid 340  run_mlb_daily_sim_job.py                39.2
+      └ pid 341  daily_update.py (ui-daily)           180.6
+        └ pid 369  daily_update_multi_profile.py       47.9
+          └ pid 370  daily_update.py                   76.8
+            ├ pid 490/493 multiprocessing spawn       107.4
+            └ pid 371  python                          11.9
+    └ pid 381  run_refresh_odds_job.py                 20.4
+      └ pid 382  refresh_odds_sources.py               95.5
+        └ pid 415  build_soccer_artifacts.py           86.7
+
+Three processes with the same NAME are not three concurrent jobs. `daily_update`
+spawns `multi_profile`, which spawns another `daily_update`. Each parent then
+sits holding its memory while its child works.
+
+**SO THE LEVER IS NESTING COST, NOT SCHEDULING.** ~305MB of that chain is parents
+IDLING with memory retained (180.6 + 47.9 + 76.8) while the actual work happens
+in the leaf spawns. Serialising cannot help something already serial; the
+question is why a process that is only `wait()`ing holds 180MB.
+
+**WHAT IS GENUINELY CONCURRENT is the ODDS BRANCH**: `run_refresh_odds_job` ->
+`refresh_odds_sources` -> `build_soccer_artifacts` = **202.6MB running alongside
+the MLB chain**, off a different child of pid 39. That IS a scheduling lever and
+it is the one I should have named.
+
+**REVISED, in order of size and cheapness:**
+1. **Odds/soccer branch off the MLB peak — 202.6MB.** Pure scheduling, no code.
+2. **The idle-parent chain — ~305MB.** Needs the parents to release before
+   spawning, or to hand off rather than nest. Real work, not a flag.
+3. **`--workers 2` -> 1 — ~54MB** (2 spawns at 53.7MB; only one is saved since
+   one worker remains).

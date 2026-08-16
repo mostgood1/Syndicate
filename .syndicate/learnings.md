@@ -1510,3 +1510,24 @@ nothing here). This is the same shape one level up: I checked the artifact of an
 - **Cost:** none yet, but it understated risk by 454MB in a decision about whether
   to spend money on memory. The decision may still be right; it was made on a
   number that was wrong.
+
+### 2026-08-16 — three processes with the same NAME are not three concurrent jobs; read the ppid
+
+- **What we believed:** the refresh-worker ran THREE `daily_update` variants
+  concurrently (`ui-daily`, `core`, `multi_profile`), and serialising them was
+  "the single biggest win" for memory. Recommended to the owner in those words.
+- **What was actually true:** they are a NESTED CHAIN. `daily_update.py` (341)
+  spawns `daily_update_multi_profile.py` (369), which spawns another
+  `daily_update.py` (370), which spawns the multiprocessing workers. Already
+  sequential. Serialising something already serial saves nothing.
+- **How we found out:** by printing `ppid` alongside `pid`, which the process
+  sample carried all along. The first read grouped by command line and saw three
+  similar names at one instant, which looks exactly like parallelism.
+- **The rule going forward:** when a process census shows several instances of
+  one program, resolve the PARENT before calling them concurrent. Same-name
+  siblings and a nested chain are indistinguishable from the name and rss alone,
+  and they have opposite fixes — scheduling for one, memory-release-before-spawn
+  for the other.
+- **Cost:** a wrong recommendation that survived one turn. The real levers are
+  the odds branch running alongside the MLB chain (202.6MB, genuine concurrency)
+  and ~305MB of parents idling while their children work.
