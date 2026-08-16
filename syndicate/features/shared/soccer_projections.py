@@ -56,6 +56,15 @@ _DERIVED_SCORER_MARKETS = {"player_first_goal_scorer", "player_last_goal_scorer"
 
 _TOTALS_EXACT_PROB_LINE = 2.5
 
+# Game markets whose third leg is a KNOWN, enumerable outcome (the draw), so a
+# three-leg de-vig spans the whole outcome space. `_no_vig_over_probability`
+# handles exactly these: it finds `draw`/`tie`/`x`, includes it in the
+# denominator, and returns None if the leg is quoted-but-priceless rather than
+# de-vigging across two of three. Anything NOT on this list keeps the old
+# refusal -- see `_price_against_market` for why "three sides" alone is not a
+# licence to de-vig.
+_THREE_WAY_GAME_MARKETS = {"h2h", "h2h_3_way", "totals_3_way", "spreads_3_way"}
+
 
 from syndicate.features.shared.team_aliases import teams_match  # noqa: E402
 
@@ -105,6 +114,42 @@ class SoccerProjectionIndex:
         fixtures both alias-match this row, the join cannot know which, and a
         wrong projection is far worse than a blank one -- it puts a real number
         next to the wrong bet.
+
+        THE ALIAS FALLBACK MUST SEE RAW NAMES, NOT NORMALISED ONES. `_norm_team`
+        is `prop_projections._norm_name`, which replaces a non-ASCII character
+        with a SPACE rather than folding it:
+
+            'Vitória SC'           -> 'vit ria sc'
+            'Vitória de Guimaraes' -> 'vit ria de guimaraes'
+
+        `teams_match` then normalises again internally, but its alias map is
+        keyed on `normalize` ('vitória sc') and `fold_accents` ('vitoria sc') --
+        neither of which is 'vit ria sc'. So `canonical_team` returned None for
+        BOTH sides, the authoritative map could not answer, and the heuristics
+        could not rescue it. Feeding it pre-normalised text destroyed the only
+        thing it needed.
+
+        Measured 2026-08-15 by reproducing the real join against the served
+        board and the four production recommendation files:
+        `teams_match(raw, raw)` is **True** and `teams_match(normed, normed)` is
+        **False** for exactly this pair -- primeira_liga was the one league of
+        four serving 0 projections, on a fixture whose sim payload was complete
+        (`win_probability {home 0.28, draw 0.2625, away 0.4575}`).
+
+        NOT A ONE-FIXTURE FIX. 9 of 204 configured clubs across 5 leagues carry
+        a non-ASCII name and had a dead alias fallback: Atlético Madrid, Alavés,
+        Málaga, Deportivo La Coruña (la_liga), Borussia Mönchengladbach,
+        CF Montréal, Académico de Viseu, Vitória de Guimaraes, RAAL La Louvière.
+        They still joined whenever both feeds happened to spell the club
+        IDENTICALLY -- both sides get mangled the same way, so the exact tuple
+        lookup above survives -- which is why this stayed invisible: the safety
+        net for a name DISAGREEMENT was the only part broken, and only for
+        accented clubs. la_liga opens 08-21/08-22, so four more of these were
+        about to enter the sim horizon.
+
+        The index side is read back from the match's own `matchup`, because
+        `by_teams` is keyed on the same mangled form and comparing mangled to
+        raw would fail in the other direction.
         """
         event_id = str(row.get("event_id") or "").strip()
         if event_id and event_id in self.by_event:
@@ -116,11 +161,17 @@ class SoccerProjectionIndex:
         exact = self.by_teams.get((home, away))
         if exact is not None:
             return exact
-        hits = [
-            match
-            for (index_home, index_away), match in self.by_teams.items()
-            if teams_match("soccer", home, index_home) and teams_match("soccer", away, index_away)
-        ]
+        raw_home = row.get("home_team")
+        raw_away = row.get("away_team")
+        hits = []
+        for (index_home, index_away), match in self.by_teams.items():
+            matchup = match.get("matchup") or {}
+            source_home = matchup.get("home_team") or index_home
+            source_away = matchup.get("away_team") or index_away
+            if teams_match("soccer", raw_home, source_home) and teams_match(
+                "soccer", raw_away, source_away
+            ):
+                hits.append(match)
         return hits[0] if len(hits) == 1 else None
 
 
@@ -282,22 +333,58 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
     THREE REFUSALS, each deliberate:
 
     - a mean is not a probability, so mean-based rows never get an edge here;
-    - a 3-WAY market cannot be de-vigged on two legs. `_no_vig_over_probability`
-      pairs home against away and would silently drop the draw, inflating the
-      fair in the bettor's favour -- the most dangerous direction, and the exact
-      trap `market_sides_for_quote`'s docstring already warns about;
+    - a market with more than two sides that is NOT a known three-way game
+      market is not de-vigged, because nothing here knows what its legs span;
     - a pregame projection cannot be priced against a LIVE market. Same rule
       prop_projections applies, for the same measured reason (a +23-point "edge"
       on a coin-flip game once the score, not the model, moved the line).
+
+    THE BLANKET THREE-WAY REFUSAL THAT USED TO STAND HERE WAS STALE ON THE DAY
+    IT WAS WRITTEN, and it was suppressing every h2h edge soccer has.
+
+    It read "`_no_vig_over_probability` pairs home against away and would
+    silently drop the draw". That was true of an older version of that function.
+    `95305cab` (2026-08-07 13:13 CDT) taught it the draw leg explicitly -- it
+    now finds `draw`/`tie`/`x`, adds it to the denominator, and returns None if
+    a three-way market is missing its draw price rather than de-vigging across
+    two of three legs. `#263`'s refusal was written at 23:43 the SAME DAY,
+    describing behaviour the function had already stopped having ten hours
+    earlier. `git merge-base --is-ancestor` confirms the ordering.
+
+    Verified against production rather than read off the source, 2026-08-15, by
+    calling the real `_no_vig_over_probability` on the live board's four h2h
+    rows. Telstar vs Sparta Rotterdam, consensus home 133 / draw 255 / away 183:
+    implied 0.4292 / 0.2817 / 0.3534 summing to 1.0643 (a 6.4% hold, matching
+    soccer's ~6.5% modelled hold), fair home = 0.4292/1.0643 = **0.4033**. A
+    correct three-leg de-vig. Three of the four rows produced a real edge
+    (+11.17, +0.03, -27.98 points); the fourth had no model probability for an
+    unrelated reason (a primeira_liga name-join miss).
+
+    BOTH SIDES OF THE COMPARISON LIVE IN THE SAME SPACE, which is what makes it
+    valid: the h2h branch above emits `win_probability.home`, an UNCONDITIONAL
+    P(home) over the three-way outcome space, and the fair above is
+    home/(home+draw+away) over that same space. Neither is renormalised into a
+    decided-only space, so they are directly comparable. If a future branch ever
+    emits a conditional P(home | decided) it must NOT reach this comparison
+    without renormalising -- that is the mistake `prop_projections` documents at
+    its `win_prob_decided` basis.
+
+    Scoped to a known list rather than "anything with three sides": a market
+    with many legs (a scorer market quoting a price per player, say) is still
+    refused, because de-vigging it would need to span every leg and nothing here
+    can confirm the quoted set is complete.
     """
     model_prob = projection.get("model_prob_over")
     if model_prob is None:
         return
 
+    market = str(row.get("market") or "").strip().lower()
     sides = [str(side).strip().lower() for side in (row.get("sides") or [])]
-    if "draw" in sides or len(sides) > 2:
+    if len(sides) > 2 and market not in _THREE_WAY_GAME_MARKETS:
         projection["edge_vs_market_pct"] = None
-        projection["edge_unavailable_reason"] = "3-way market: two-leg de-vig would drop the draw"
+        projection["edge_unavailable_reason"] = (
+            f"{len(sides)}-side market '{market}': no de-vig spans an unknown leg set"
+        )
         return
 
     # `#340`: shared with MLB and WNBA via `live_edge_policy` rather than kept
@@ -323,7 +410,16 @@ def _price_against_market(row: Mapping[str, Any], projection: dict[str, Any]) ->
     projection["market_fair_prob_over"] = fair
     if fair is None:
         projection["edge_vs_market_pct"] = None
-        projection["edge_unavailable_reason"] = "one-sided market: no two-sided fair to price against"
+        # Say WHICH leg is missing. Now that three-way markets reach this
+        # point, "one-sided market" would be an actively wrong description of
+        # an h2h row whose draw price simply failed to arrive -- and a wrong
+        # reason is worse than a blank one, because it sends the next reader to
+        # the wrong subsystem.
+        projection["edge_unavailable_reason"] = (
+            "3-way market: incomplete price set, no fair to price against"
+            if market in _THREE_WAY_GAME_MARKETS
+            else "one-sided market: no two-sided fair to price against"
+        )
         return
     projection["edge_vs_market_pct"] = round((float(model_prob) - float(fair)) * 100.0, 2)
 

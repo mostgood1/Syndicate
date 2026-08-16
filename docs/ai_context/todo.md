@@ -98,6 +98,7 @@ guard: it answers an out-of-range input with a number instead of refusing.
 Full table: `.syndicate/audit_2026-08-15_probability_differential.md`.
 Deploy procedure: `.syndicate/runbook_clamp_deploy.md`.
 
+### `#427` — **The board build has never been timed, and the three figures in the repo disagree by 7x.** OPEN, UNOWNED, split out of `#387` 2026-08-14
 ### `#437` — **Live MLB prop rows show a pregame projection as if it were current, and a probability that contradicts it.** USER-REPORTED 2026-08-15 — lane `mlb-live-pitcher-projection`, 3 fixes COMMITTED-PENDING, NOT DEPLOYED
 
 **Reported as "live projections rarely get appended, and the ones that do are
@@ -30447,14 +30448,29 @@ per-cycle effect that scales with however many games sit in that
 on fuller slates and during peak evening hours — exactly matching a
 *continuing*, non-plateauing drift rather than S0b's one-time shift.
 
-**Not fixed here — flagged with the fix identified but not applied.** The
-fix is almost certainly setting `SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS`
-back to `4500` (or removing the override so the 75-min default applies) on
-live-odds-worker, then measuring the next few burn readings to confirm the
-segment/alternate share stops climbing. Left as a decision for the user
-rather than applied unilaterally, matching this session's pattern for
-anything that changes live production behavior rather than just measuring
-it.
+✅ **FIXED AND DEPLOYED, 2026-08-13T16:36Z, user-directed.**
+`SYNDICATE_ODDS_EVENT_SCOPING_WINDOW_SECONDS` set to `4500` on
+live-odds-worker (confirmed via the Render API, both before triggering the
+deploy and again after), live-odds-worker deployed and independently
+re-verified `live` (`dep-d9uv34bncjis73akhf30`, commit `95effcfa`,
+`finishedAt: 2026-08-13T16:36:19Z`). `render.yaml` updated to document the
+corrected value (`bf06710c`) so this doesn't drift silently again.
+
+> **First clean post-fix reading, 2026-08-15T19:25Z** — baseline rolled
+> forward to 2026-08-15T00:03:53Z (7-day `_MAX_WINDOW_SECONDS` cap), so
+> this ENTIRE window postdates the fix, no pre-fix contamination:
+>
+> | Window | Burned | /hour | Projected 30d | vs 5M target |
+> |---|---|---|---|---|
+> | 69,704s (19.4h, obs since baseline) | 73,833 | **3,813.2** | **2.75M** | **54.9%** |
+>
+> Down from the pre-fix trend (6,770.6–8,164/hr) to **3,813.2/hr** — below
+> even the S0b plan's own projected baseline (~5,733cr/hr equivalent of its
+> 4.13M/mo estimate). Consistent with the fix working, not just slate
+> variation, but **this is a 19.4h window — short by this doc's own
+> "full-day windows only" standard**, right after a fresh baseline
+> rollover. Needs one more longer-window reading before calling this
+> conclusively confirmed rather than an optimistic early signal.
 
 **#234** — **Failed soccer pregame refresh (2026-08-06), dug into: isolated but
 not root-caused; the diagnosability gap that blocked it is fixed.** (Filed as

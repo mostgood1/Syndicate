@@ -3266,29 +3266,60 @@ def main() -> int:
         start_memory_watchdog()
     except Exception as exc:  # noqa: BLE001 - an instrument must never stop boot
         print(f"[refresh_worker] MEMORY_WATCHDOG_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
+    # ####################################################################
+    # `#435` 2026-08-15: DO NOT TURN THIS ON WHILE THE WATCHDOG IS THE
+    # INSTRUMENT YOU ARE RELYING ON. MEASURED TWICE, AT TWO FRAME COUNTS:
+    #
+    #   tracing OFF   02:30-02:31   8 MEMORY_WATCHDOG samples per minute
+    #   nframe=3      02:11-02:16   ZERO samples, then OOM at 02:16:41
+    #   nframe=2      02:48-02:55   ZERO samples in 6.7 min, OOM at 02:47:54
+    #
+    # Both windows also carried a faster kill cadence (3-10 min against the
+    # 16-22 min baseline). Tracing every allocation on this heap costs enough
+    # that the sampling thread stops producing, so the cheap instrument that
+    # DOES work is silenced by the expensive one that has never yet returned an
+    # answer. Worse, the silence is indistinguishable from "no excursion
+    # happened" -- it was read that way twice.
+    #
+    # If it is re-armed: expect no watchdog samples for the duration, do not
+    # read that as calm, and close the window explicitly. The dump now closes it
+    # automatically once it fires (`stop_allocation_tracing`), but it has not
+    # fired yet in production.
+    # ####################################################################
+    #
     # `#423` step 2. Must start HERE, not at a periodic stage call: tracemalloc
     # only records allocations made after it starts, so a late start would miss
     # everything already resident and report a confident tiny number -- the same
     # failure mode as the gc census, reached a different way. Default OFF
     # (`SYNDICATE_TRACEMALLOC_DIAG`); it keeps a traceback per live allocation on
     # a process that hits its ceiling hourly.
+    #
+    # `#423`/`#435`: nframe=3, NOT 1, AND THIS LINE HAS BEEN WRONG IN PRODUCTION
+    # THE WHOLE TIME. At one frame the top site comes back as `decoder.py:353` --
+    # Python's own json module, measured at 491.3MB across 7,172,382 live
+    # objects -- which names the ALLOCATOR and not the CALLER, i.e. "JSON
+    # parsing" instead of "this read, from this caller". `#423` fixed that by
+    # passing 3, and the fix landed on a lineage that never reached this
+    # service: production ran `start_allocation_tracing(1)` and confirmed it in
+    # its own boot log (`TRACEMALLOC_INIT {"nframe": 1}`, 2026-08-15 01:59:08Z).
+    # Found by reading the deployed tree rather than `main` -- the same
+    # main-vs-deployed divergence that has bitten this repo before.
+    #
+    # Three frames costs more memory per live allocation on a process already at
+    # its ceiling. Accepted deliberately and temporarily: it is gated behind
+    # `SYNDICATE_TRACEMALLOC_DIAG`, which is ON only while `#435` names the
+    # allocator, and the dump now fires once per boot from the watchdog.
     try:
         from syndicate.features.shared.memory_observability import start_allocation_tracing
 
-        # `#423`. nframe=3, not 1. At one frame the top site came back as
-        # `decoder.py:353` -- Python's own json module, 491.3MB across 7,172,382
-        # live objects -- which names the ALLOCATOR and not the CALLER. That
-        # 491MB is `_BOOK_QUOTES_CACHE` at its 500MB budget (68 bytes/object,
-        # ~2 shards of ~216k rows), i.e. a bounded by-design cost rather than
-        # the leak. The growth is in the ~76% of `anon` tracemalloc could not
-        # see at one frame, and three frames is what turns "JSON parsing" into
-        # "this read, from this caller".
-        #
-        # The cost is real and bounded: three frames per live allocation rather
-        # than one. Accepted deliberately while the worker is OOM-killing --
-        # a cheaper instrument that cannot name the caller is not cheaper, it
-        # is just another cycle of guessing.
-        start_allocation_tracing(3)
+        # nframe=2 for THIS window, not 3. Three frames was `#423`'s answer on a
+        # worker that was not simultaneously being measured; the 02:11-02:16
+        # window showed the overhead is not free here (sampler starved, kill
+        # cadence 3-10 min against 16-22). Two frames still names the CALLER --
+        # which is the entire reason 1 was useless -- at a lower per-allocation
+        # cost. The dump now also stops tracing the moment it has its answer, so
+        # this is a window measured in seconds rather than until someone notices.
+        start_allocation_tracing(2)
     except Exception as exc:  # noqa: BLE001 - a diagnostic must never stop boot
         print(f"[refresh_worker] TRACEMALLOC_SETUP_FAILED {type(exc).__name__}: {exc}", flush=True)
     _diag_log_all_process_memory("boot")

@@ -5157,6 +5157,7 @@ verification; "live" is a lease.
 channel is wired. **It confirms nothing about the `or 0.5` fix.** A route that
 answers is not a producer that reported.
 
+<<<<<<< HEAD
 **FIRST CROSS-SERVICE READING, 2026-08-16T02:02:33Z — THE CHANNEL IS PROVEN.**
 
     wnba / live-odds-worker   rows=0  null_no_price=0  date=2026-08-15
@@ -5260,3 +5261,13 @@ correctly withheld.
 
 **OPEN:** `index_size` 3 -> 8 -> 10 across the night is still unexplained; Drop
 2's carry-forward has never been observed firing; the tally is MLB-only.
+**OWED, and it will not arrive by itself:** a reading with `rows>0`. The WNBA
+producer was last observed running on **live-odds-worker — the one service that
+did not get this deploy** — so the likeliest source of the first reading is
+still dark. Next deployer of live-odds-worker should carry
+`deploy/win-prob-null-live-odds-worker` (re-cut on its then-live SHA; the pushed
+`3573a0c3` is already stale). The hourly `wnba-win-prob-counter-read` scheduled
+task now reads this endpoint and will report "writer not deployed" until then —
+that is a true statement, not a null result.
+=======
+>>>>>>> origin/main
