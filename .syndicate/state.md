@@ -404,12 +404,25 @@ They are linear (`164f6e80`→`1409e96f`→`d72d670c`), so
 live `97491161` = `d72d670c` + one unrelated NFL pbp fix (`#441`), finished
 08-16 15:45:50Z; no deploy 15:45:50Z–16:29Z.
 
-**Kills are EVENING, and at-cap is not a kill `[events API, 08-09..08-16]`:**
-**42 `oomKilled`**, every failure event in 8 days — **41 of 42 between 15:00 and
-23:59 local** (08-14 alone: 29; last 08-15 23:46:44 local). And a 5h window
-(08-16 05:37–10:37 CDT, 2714 samples) read `container_memory_mb` **4096.0 MB =
-100.0% of cap** with **ZERO kills in it** — reclaim succeeding at the cap is what
-page cache looks like. Do not report an at-cap reading as a kill.
+**Kills are MOSTLY evening, and at-cap is not a kill `[events API, re-censused
+08-16 17:26Z, covering 08-09 00:04Z..08-16 17:26Z]`:** **44 `oomKilled`**, every
+failure event in the window — **41 of 44 between 15:00 and 23:59 local**
+(08-14 alone: 29). The **3 outside** the band are `08-15 00:02:59`,
+`08-16 11:34:32` and `08-16 12:19:42` local. And a 5h window (08-16 05:37–10:37
+CDT, 2714 samples) read `container_memory_mb` **4096.0 MB = 100.0% of cap** with
+**ZERO kills in it** — reclaim succeeding at the cap is what page cache looks
+like. Do not report an at-cap reading as a kill.
+
+**The two 08-16 daytime kills are the reason "evening" is now "mostly evening."**
+Both landed on an afternoon carrying four deploy cycles (16:43, 16:46, 16:53 and
+17:20Z, all user-triggered). Every deploy reboots the worker and re-runs
+hydration cold, which is its own route to the transient — so deploy-provoked and
+slate-provoked kills are plausibly **different populations, and only the second
+is confined to the band.** Not yet a claim that the slate-driven distribution
+moved: that needs re-measuring over churn-free days. **Consequence for
+instruments:** anything sampling only 15:00–23:59 local — including
+`branch-overlap-baseline-watch` since 08-16 — is structurally blind to
+deploy-provoked kills and cannot be cited as evidence they did not happen.
 
 **What IS established:** the failure is a ~2GB TRANSIENT, not a leak (22
 excursions, 5 deploy-free windows, trough returns every cycle); it is IN-PROCESS
@@ -424,10 +437,21 @@ never bounded the sum.
 context (context 0.81MB, copy peak 0.54MB, three orders short, and load-bearing
 because `home.py:5381` mutates the returned games).
 
-**THE DAYTIME LULL IS WORTHLESS AS EVIDENCE.** Same clock window one day apart:
-peak anon 2,816.7 MB pre-fix vs 2,898.5 MB post-fix, **zero excursions on both**.
-The pre-fix code once ran **17h51m clean** in daylight. Judge only on the
-live-slate band ~22:00Z-05:00Z; `scripts/oom_band_report.py` measures it.
+**A QUIET DAYTIME IS WORTHLESS AS EVIDENCE — but daytime is not always quiet.**
+Same clock window one day apart: peak anon 2,816.7 MB pre-fix vs 2,898.5 MB
+post-fix, **zero excursions on both**. The pre-fix code once ran **17h51m clean**
+in daylight. Judge a FIX only on the live-slate band ~22:00Z-05:00Z;
+`scripts/oom_band_report.py` measures it.
+
+**Amended 08-16 17:2xZ (session `branch-overlap-baseline-watch`; the paragraph
+above is the `refresh-worker-oom-recurrence` lane's and its measurements stand
+unchanged).** The heading previously read "THE DAYTIME LULL IS WORTHLESS AS
+EVIDENCE", which is true of a warm deploy-free daytime and false as a blanket
+statement: refresh-worker was **`oomKilled` twice in daylight on 08-16**,
+16:34:32Z (11:34 local) and 17:19:42Z (12:19 local), amid four deploy cycles.
+So "nothing happens in daylight" must not be assumed — **absence of a daytime
+kill is only evidence when the window was also deploy-free, and the window's
+deploy count must be stated for the claim to mean anything.**
 
 ## MEMORY — refresh-worker `#435` — FIX HOLDS; KILLS RECURRED 08-16 02:11Z/02:37Z FROM A SECOND CONDITION `[re-measured 08-16 02:5xZ]`
 
