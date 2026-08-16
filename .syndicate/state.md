@@ -2329,3 +2329,20 @@ deliberately NOT opened in `lanes.md` — no session holds them yet.
 has no book allowlist" is a **negative from a grep over one file**. Layer 1's
 list IS confirmed (`DEFAULT_BOOKS`, `templates/shared/layer1_board.html:267`,
 client-side JS). Trace the served `book` field to its writer before acting.
+
+## NFL PLAY-BY-PLAY — verified 2026-08-16 (`#441`, CLOSED)
+
+- **The nflverse pbp had NO ingestion path in this repo.** Ten scripts read it, zero
+  wrote it. It was absent from all four candidate roots including the mounted disk;
+  env vars were present and strict storage on, so neither configuration nor root
+  selection was the cause.
+- **`scripts/fetch_nfl_pbp.py` now provides it**, wired as a refresh-worker autorun at
+  dispatch position 2, gated by `NFL_PBP_FETCH_ENABLE_REFRESH_WORKER_AUTORUN` (set
+  `true` on refresh-worker only, default OFF).
+- **VERIFIED IN PRODUCTION 18:31:15Z:** `pbp_2025.csv` written to the mounted disk,
+  97,951,481 bytes, 46,452 REG plays. `NO PLAY-BY-PLAY` stopped; the generator ran
+  again 31s later and did not refuse.
+- **The season that matters is the PRIOR one.** 2026 legitimately 404s until the season
+  starts; week-1 ratings come from `prior_season_fallback`.
+- **`#443` and `#445` remain OPEN and unowned** — the stale-PID silent stall, and
+  NCAAF's generator crashing on a hard-coded 2025 input 13 days before its season opens.

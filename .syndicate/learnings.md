@@ -2598,3 +2598,26 @@ Two distinct failures of the gate in one evening:
 `[UNKNOWN]` - never on the absence of a negative. Cross-check any "build in
 flight" claim against the artifact's `written_at`, which is the output rather
 than the marker.
+
+### 2026-08-16 — FORBIDDEN: trusting a commit you verified only BEFORE `git commit`. Guards cannot see corruption that happens DURING it
+- **What happened:** an isolated-index commit of 3 ledger files produced a commit of
+  **14 files** that rendered every path it had not re-read as a DELETION — including
+  this session's own `scripts/fetch_nfl_pbp.py` (0/276), `run_refresh_worker.py`
+  (0/193) and another session's `syndicate/features/soccer/cards.py` (0/64).
+- **Mechanism:** `git commit` refreshed the index and hit
+  `reports/live_refresh_loop/latest_live_refresh_tick.json` **while the worker was
+  writing it**. Git printed `short read while indexing` and committed anyway,
+  against a partially-read index.
+- **Why every guard missed it:** all of them — file count, deletion count, content
+  assertions — ran on `git diff --cached` BEFORE `git commit`. They were correct.
+  The object that resulted was not the object they described.
+- **The rule going forward: verify a commit AFTER it exists.** `git show --numstat
+  --format="" HEAD` immediately after committing, and compare it to what you staged.
+  On this repo that is not optional: the worktree contains live artifacts a worker
+  is writing continuously, so a torn read during commit is a standing hazard, not a
+  freak event.
+- **Recovery, for next time:** it never reached origin and the worktree was intact.
+  The branch move that orphaned the bad commit ALSO reverted two ledger files, but
+  the orphaned object still held them — `git show <orphan>:<path>` recovered both.
+  An orphaned bad commit is a backup of the work it appeared to destroy.
+- *(evidence: `c1ff7b21` orphaned; recovery in `af7e864d`)*
