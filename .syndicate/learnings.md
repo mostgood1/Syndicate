@@ -1572,3 +1572,30 @@ nothing here). This is the same shape one level up: I checked the artifact of an
   ours fails if `record` is ever rewired to exit-only, because the two channels
   would then silently disagree, which is worse than either alone.
 - Cost: none — the check took one command and saved a good half of the work.
+
+## 2026-08-15 — RULE: merge in the object database when the shared tree is dirty
+
+- **The rule going forward:** on this repo a reconcile does **not** need a
+  checkout. `git merge-tree --write-tree` + temp index + `commit-tree` +
+  `push <sha>:main` merges with **zero** working-tree writes, so concurrent
+  sessions' edits cannot be refused, overwritten, or staged by accident.
+- Why it is not optional here: 76 of 82 incoming files were dirty across
+  sessions, and `git worktree add` fails on this repo anyway — `Filename too
+  long` on the statcast cache paths, plus 32 stale worktree entries that
+  `prune` cannot delete under OneDrive. *(detail: `learnings_evidence.md`)*
+- Cost: none. It was faster than the worktree attempts that failed.
+
+## 2026-08-15 — RULE: resolve a ledger conflict by REPLACING the stale entry, never by appending
+
+- **The rule going forward:** when both sides changed a lane, the merge is not
+  "keep both" — a union leaves the file **asserting two contradictory statuses**
+  for one slug and nothing flags it. Find the slug's other occurrence and
+  overwrite the stale header in place; demote the old body to marked history.
+- Check the resolution the way the TOOLING reads the file: one `^### slug` per
+  lane, and the status word must match what the session-start hook greps
+  (`OPEN|BLOCKED`). My own replacement header said `SESSION ARCHIVED` and
+  **silently removed a lane from every future session's digest** while its body
+  still read "Lane stays OPEN".
+- How we found out: counted headers per slug and re-ran the hook's own grep
+  after resolving, instead of trusting that no conflict markers meant no defect.
+- Cost: caught pre-push; the second-order bug was live for about a minute.

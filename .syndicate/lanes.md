@@ -1120,7 +1120,7 @@ does not hold.** `[measured 08-14]`
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
-### live-game-line-projection — SESSION ARCHIVED 2026-08-16 ~02:4xZ. TIER 5'S PREMISE IS TRUE IN PRODUCTION.
+### live-game-line-projection — OPEN, UNOWNED (session archived 2026-08-16 ~02:4xZ) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
 **Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
 
 **SHIPPED AND LIVE (content-verified per service, not by ancestry):**
