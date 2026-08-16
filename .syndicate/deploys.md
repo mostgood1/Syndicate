@@ -5637,3 +5637,113 @@ considered is still a self-selected sample with no denominator — but the stron
 claim that the recorder *structurally could not write* was wrong. **It was wrong
 because I generalised a single build to a whole night**, which is the same shape
 as this repo's standing rule about reading a null as a fact about the world.
+
+## 2026-08-16 04:58:57Z — refresh-worker `755ec40a` — fixture-aware pregame cadence ENABLED (`#440` Phase 1)
+
+**MEASUREMENT: PENDING.** Nothing here is a claim yet. Reminder to read: within
+2h of the deploy going live, and again from the 4-hourly
+`branch-overlap-baseline-watch`.
+
+**What shipped.** Deploy branch `deploy/fixture-cadence-on-live` @ `755ec40a`,
+cut from the **LIVE SHA `5c419007`**, not from `main`. Diff vs live is exactly
+two files:
+
+    syndicate/features/shared/live_refresh_loop.py   +183 / -1
+    tests/test_pregame_cadence_fixture_aware.py      +201 / -0
+
+Preflight FAILED on the first shape and this is the fix: the service runs a
+deploy branch diverged from `main` by 14 live-only / 472 origin-only commits, so
+deploying `origin/main` would have changed **196 files, 92 of them `.py`**, while
+diagnosing. `render.yaml` untouched — no `blueprint_sync`.
+
+**Config, set by the user in the dashboard and READ BACK before deploying:**
+`SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=true` on refresh-worker (105 keys, up
+from 104); **absent on live-odds-worker and web** — verified, not assumed.
+
+**Deploy safety CLEAR at 04:53Z and re-checked immediately before triggering:**
+no MLB sim in flight, odds refresh idle, no live games, board build idle.
+
+**Expected effect, as a number and a window.** Within 2h: `FIXTURE_CADENCE` lines
+on refresh-worker carrying `interval` in {7200, 28800, 86400} for mlb/wnba/nfl,
+and `reason=excluded_pending_per_league_scoping` for soccer. Pregame sweep
+ceiling mlb 12.00 -> 5.45/day, wnba -> 5.83, nfl_preseason -> 3.56. **Soccer
+unchanged at 3.00 BY DESIGN** — it is excluded, because at sport granularity the
+gate measured +69% (see `learnings.md` 2026-08-15).
+
+**What would falsify it:** no `FIXTURE_CADENCE` line at all (the branch did not
+run, or the flag is not being read); or a soccer line with a numeric interval
+instead of the exclusion reason.
+
+**Baseline caveat, stated because it limits what can be concluded:** the before
+side is **ONE** `branch-overlap-baseline-watch` sample (worst container 4096.0 MB
+= 100.0% of cap in 3 hours), not a distribution. The older 3,972 MB / 97.0% /
+124 MB figure is STALE and must not be used as the comparison.
+
+**Rollback:** delete the env key (default is False, so absence restores baseline)
+and `py -3 scripts/render_deploy.py --service refresh-worker --commit 5c419007`.
+
+---
+
+## 2026-08-16 ~05:2xZ — THE REMAINING ~1,900 MB IS NAMED: cumulative ledger accumulation
+
+**No deploy.** Measurement only, from production telemetry + code.
+
+### THE CHAIN, each step measured
+
+1. **The 2GB is IN THE PARENT PROCESS.** `ALL_PROCESS_MEMORY` across the
+   04:46:44Z kill: **pid 39 (`run_refresh_worker.py`) 3,138 -> 3,545.8 MB**,
+   every child under **54 MB** (12 processes). Not a sim job, not a subprocess.
+   (pid 39 at 85.9 MB from 04:46:33 is the post-kill reboot.)
+2. **The fatal climb runs 51s with NO stage marker.** `last_stage` sat at
+   `board_contract_games_normalized` with `seconds_since_stage` 0.7 -> **51.5**
+   while anon went **1,666 -> 3,990 MB**. Sport-carrying board emissions stop at
+   **soccer 04:45:16**; everything after is unmarked.
+3. **What IS logging in that gap:** `[intelligence_evaluation]
+   SKIP_OVERSIZED_LEDGER_CHUNK` at 04:45:29, 04:45:33 (x3) and 04:46:01.
+   **Read those correctly — they are the guard WORKING**, skipping 305/367/480MB
+   chunks. They are not the allocation. What they prove is that **the chunked
+   prediction-ledger pass is executing inside the fatal window.**
+
+### THE DEFECT — `intelligence_evaluation.py:615-677`
+
+    def _load_chunked_ledger_records(path) -> list[dict]:
+        max_chunk_bytes = _ledger_max_chunk_bytes()   # 256,000,000
+        rows: list[dict[str, Any]] = []               # <-- 636, OUTSIDE the loop
+        for chunk_path in chunk_paths:                # <-- 637
+            if chunk_path.stat().st_size > max_chunk_bytes:  # per-FILE ceiling
+                ...continue
+            with chunk_path.open(...) as handle:      # #254 streams, correctly
+                for line in handle:
+                    rows.append(json.loads(line))     # <-- 674, ACCUMULATES
+        return rows
+
+**`#254` fixed the wrong half.** It removed the 256MB string and the
+`splitlines()` list — real defects — but left `rows`, which **materialises every
+record of every ACCEPTED chunk into one list that outlives the loop.** The
+ceiling is **per chunk**; nothing bounds the SUM. Three accepted chunks near the
+ceiling is ~750MB of file bytes, and this repo measured this JSON family at
+**~6.3x file bytes resident** (`#435`) — i.e. **multiple GB in `rows`**.
+
+This is `#435`'s defect one level up. `read_book_quotes_latest` was fixed by
+**reducing AS IT STREAMS** (478,782 rows -> 36,424 keys, 92.4% superseded).
+Here the streaming was fixed and the reduction was never added.
+
+The file's own comment already contains the principle and stops one step short:
+*"the ceiling above bounds which files are SKIPPED, never what reading an
+accepted one costs"* — true of the string it was written about, and equally true
+of the list it did not consider.
+
+### WHAT IS AND IS NOT PROVEN
+
+**Proven:** location (parent process), timing (inside the unmarked 51s),
+mechanism (unbounded cumulative accumulation past a per-file ceiling), and that
+the pass runs there.
+**NOT proven:** that this totals ~1,900 MB. The accepted-chunk count and their
+sizes have not been measured — only the SKIPPED ones are logged, which is
+exactly the wrong half to log. **Do not record this as the cause until that
+number exists.**
+
+**Cheapest next step, no deploy needed:** log accepted chunks too
+(`path`, `bytes`, running `len(rows)`), then read one pass. The guard currently
+announces only what it refused, never what it accepted — the same blind spot
+that made this take all night.
