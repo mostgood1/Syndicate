@@ -1236,7 +1236,24 @@ def filter_candidates(
     # with `_shadow_rejection_reason`, so the sink has enough fields to
     # identify and later grade what was turned away.
     candidate_rows = [_copy_mapping(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
-    history_rows = [dict(record) for record in (evaluation_records or _load_records_from_ledger(ledger_path)) if isinstance(record, Mapping)]
+    # LOAD ONCE, and do not re-copy what we already own.
+    #
+    # This was `[dict(record) for record in (evaluation_records or
+    # _load_records_from_ledger(ledger_path))]` -- a full ledger load followed
+    # by a SECOND full copy. Measured in production 2026-08-16:
+    # `LEDGER_CHUNKS_ACCEPTED count=8 bytes=833550415` per load, so the copy
+    # alone is the same order as the load.
+    #
+    # `dict(record)` is a DEFENSIVE copy and it is only meaningful when the
+    # caller handed us their records. Records we load ourselves come straight
+    # out of `json.loads` on this call's own read -- nothing else references
+    # them and there is no cache behind them -- so copying them protects
+    # nobody. Truthiness is preserved exactly: an EMPTY `evaluation_records`
+    # still falls through to the ledger, as before.
+    if evaluation_records:
+        history_rows = [dict(record) for record in evaluation_records if isinstance(record, Mapping)]
+    else:
+        history_rows = [record for record in _load_records_from_ledger(ledger_path) if isinstance(record, Mapping)]
     sport_profile = build_reliability_profile(records=history_rows, sport=sport)
     policy_spec = _policy_spec(policy or select_policy(history_rows, sport=sport))
     filtered: list[dict[str, Any]] = []
@@ -1512,9 +1529,26 @@ def rank_recommendations(
     rejected_sink: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
     candidate_rows = [_copy_mapping(candidate) for candidate in candidates if isinstance(candidate, Mapping)]
+    # THREE FULL LEDGER LOADS IN ONE CALL, measured 2026-08-16. With
+    # `evaluation_records` absent -- which is the worker's case -- this
+    # function loaded the whole chunked ledger three separate times:
+    # `select_policy` below, `filter_candidates` internally, and `history_rows`
+    # further down; then copied it a fourth time. Production says each load is
+    # `LEDGER_CHUNKS_ACCEPTED count=8 bytes=833550415` of accepted chunks.
+    #
+    # Load once here and thread the SAME list through all three, including
+    # into `filter_candidates` via its `evaluation_records=` parameter, which
+    # already existed for exactly this purpose and was being passed the empty
+    # value. `_owned_records` records that we loaded them ourselves, so the
+    # defensive `dict()` copy below can be skipped for records nothing else
+    # references. Truthiness preserved: empty still means "load".
+    _owned_records = False
+    if not evaluation_records:
+        evaluation_records = _load_records_from_ledger(ledger_path)
+        _owned_records = True
     if experiment_key is None:
         experiment_key = _candidate_policy_key(candidate_rows, sport=sport)
-    selected_policy = _normalize_policy_name(policy or select_policy(evaluation_records or _load_records_from_ledger(ledger_path), sport=sport, experiment_key=experiment_key))
+    selected_policy = _normalize_policy_name(policy or select_policy(evaluation_records, sport=sport, experiment_key=experiment_key))
     policy_spec = _policy_spec(selected_policy)
     performance_summary = _load_performance_summary(ledger_path=ledger_path)
     filtered_candidates = filter_candidates(
@@ -1525,7 +1559,12 @@ def rank_recommendations(
         policy=selected_policy,
         rejected_sink=rejected_sink,
     )
-    history_rows = [dict(record) for record in (evaluation_records or _load_records_from_ledger(ledger_path)) if isinstance(record, Mapping)]
+    # Reuses the single load above. `_owned_records` means we read them on this
+    # call, so nothing else holds a reference and the defensive copy is waste.
+    if _owned_records:
+        history_rows = [record for record in evaluation_records if isinstance(record, Mapping)]
+    else:
+        history_rows = [dict(record) for record in evaluation_records if isinstance(record, Mapping)]
     sport_profile = build_reliability_profile(records=history_rows, sport=sport)
     scored: list[dict[str, Any]] = []
     # Same per-market memoization as filter_candidates above -- avoids
