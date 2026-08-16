@@ -943,3 +943,68 @@ def test_the_peer_rule_runs_where_no_model_exists_at_all():
         identicalContentSpreadByState=_ties(Preview=400)))
     assert not ok
     assert "PEER DEVIATION OVER BUDGET in Preview" in text
+
+
+# --- curvature: fitRatio must stop certifying a fit of the wrong shape ------
+#
+# Both series below are the real 2026-08-16 mlb mobile measurements. Live is
+# convex (41.3 -> 61.8 -> 76.6 px/pair) and scored fitRatio 0.20 / reliable
+# under the old rule. Preview is straight (65.6, 65.1) and must NOT be caught --
+# that is this detector's falsification test.
+
+LIVE_PTS = [(45, 3989), (49, 4168), (49, 4160), (49, 4128),
+            (53, 4386), (53, 4352), (57, 4757)]
+PREVIEW_PTS = [(41, 3561), (41, 3596), (45, 3872), (45, 3842),
+               (45, 3803), (45, 3846), (49, 4101)]
+
+
+def test_the_curved_live_fit_is_no_longer_reliable():
+    m = _fit(LIVE_PTS)
+    assert m["curved"] is True
+    assert m["reliable"] is False
+    # The ratio still looks fine -- that is the whole point.
+    assert m["fitRatio"] <= 0.25
+    assert m["slopePerStep"] == [40.8, 54.2, 96.5] or m["slopePerStep"][0] < m["slopePerStep"][-1]
+    assert m["slopeDrift"] > 0.5
+
+
+def test_the_straight_preview_fit_is_not_flagged():
+    """Falsification test: a known-linear series must survive the detector."""
+    m = _fit(PREVIEW_PTS)
+    assert m["curved"] is False
+    assert m["reliable"] is True
+
+
+def test_two_steps_are_never_enough_to_call_a_drift():
+    """Two steps can only say 'one went up', which is noise, not drift."""
+    m = _fit([(41, 1000), (41, 1010), (45, 1200), (45, 1210), (49, 1600), (49, 1610)])
+    assert len(m["slopePerStep"]) == 2
+    assert m["curved"] is False
+    assert m["slopeDrift"] is None
+
+
+def test_non_monotone_slope_wobble_is_noise_not_curvature():
+    """Slopes that go up then down are a noisy line, not a bend."""
+    m = _fit([(41, 1000), (45, 1300), (49, 1450), (53, 1780), (57, 1930)])
+    assert m["curved"] is False
+
+
+def test_a_curved_fit_is_reported_as_misspecified_not_as_no_signal():
+    text, ok = _summarize(_report(heightModel=_model(
+        state="Live", curved=True, reliable=False, fitRatio=0.2,
+        slopePerStep=[40.8, 54.2, 96.5], slopeDrift=0.88)))
+    assert ok, text
+    assert "layout model MISSPECIFIED in Live" in text
+    assert "40.8/54.2/96.5 px/pair" in text
+    assert "the fit is CURVED" in text
+    assert "certifies nothing" in text
+    # It must NOT be described as an absence of signal.
+    assert "no layout signal here" not in text
+
+
+def test_curvature_does_not_fail_the_run():
+    """The peer rule judges; this is a label on the fit, which is context."""
+    text, ok = _summarize(_report(heightModel=_model(
+        state="Live", curved=True, reliable=False, fitRatio=0.2,
+        slopePerStep=[40.8, 54.2, 96.5], slopeDrift=0.88)))
+    assert ok, text

@@ -3164,3 +3164,27 @@ and then failed the thing it was checking, which is the point of running it.
   so this work survives it.
 - **Lane STAYS OPEN** for the one unmeasured goal: the cross-sport LIVE A/B needs
   two sports live at once. Everything else in the audit is delivered.
+
+### ui-probe-curvature-detection — CLOSED 2026-08-16 — `curved` forces `reliable:false`; Preview (the falsification case) is not flagged — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `reliable` stops certifying a CURVED fit.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Method: slopes between consecutive pair-count group MEANS, then monotone-drift
+  test. >=3 steps required; two steps can only say "one went up".
+- Threshold measured: Live drift 0.88 vs Preview 0.008 — two orders of magnitude
+  apart, so the 0.5 cutoff is not load-bearing.
+- **Falsification test PASSED:** the known-linear Preview series is NOT flagged,
+  while Live is flagged with `fitRatio` still 0.20. Two-step and non-monotone
+  series also not flagged.
+- Verification: 77 tests pass, both series driven through the real shipped JS.
+  Live run shows no false positives; today's slate has too few distinct pair
+  counts per state to exercise the detector either way.
+- Reported as MISSPECIFIED, deliberately distinct from UNRELIABLE: the line is
+  the wrong shape, not noisy, and "no layout signal here" would understate it.
+- Low risk: `reliable` gates no failure now, so this changes a label not a
+  verdict — which is why it was safe to do after the peer rule, not before.
+- **HANDS OFF, needs a decision (see log):** the peer budget is a FIXED 150px
+  against a quantity that scales with content. mlb mobile's identical-content
+  spread read 81/109/123/164/193px today; the 193px case is 7 cards evenly
+  spread (gaps 11/23/16/49/28/66), i.e. wrap, not a defect. Must not be resolved
+  by raising 150 until the board passes.
+- Blocked by: none

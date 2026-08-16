@@ -378,8 +378,50 @@ MEASURE_JS = """
     // ~62px/pair against desktop's ~16px, which buys 743px of explained range
     // to hide the same noise behind.
     // The WORST tie, not the largest one: a fit has to beat every tie group.
+    // The WORST tie, not the largest one: a fit has to beat every tie group.
     const tie = tieFloor(pts);
     const floorPx = tie ? tie.worstGroupPx : null;
+
+    // IS THE LINE THE WRONG SHAPE? `fitRatio` cannot answer that. It is
+    // residual / explained, so a misspecified model with a wide explained range
+    // passes: mlb mobile Live, 2026-08-16, scored ratio 0.20 and `reliable`
+    // while its per-pair cost ran 41.3 -> 61.8 -> 76.6 px/pair. Its residual was
+    // not noise, it was a bend -- +76 at u=45, negative through the middle, +73
+    // at u=57, the U-shape of a line fitted to a curve.
+    //
+    // Test the SHAPE directly: slopes between consecutive pair-count group
+    // MEANS (means, so within-group wrap noise averages out instead of driving
+    // the sign), then ask whether those slopes drift monotonically.
+    //
+    // Threshold measured rather than guessed, same slate and instant:
+    //     Live    (97.0 - 40.8) / 64.0 = 0.88   <- curved
+    //     Preview (65.6 - 65.1) / 65.4 = 0.008  <- straight
+    // Two orders of magnitude apart, so 0.5 sits between them with enormous
+    // margin and is not a load-bearing number.
+    //
+    // >=3 steps required: two steps can only ever be "one went up", which is
+    // noise, not drift.
+    const meanByU = {};
+    pts.forEach((p) => (meanByU[p.u] = meanByU[p.u] || []).push(p.h));
+    const orderedU = Object.keys(meanByU).map(Number).sort((a, b) => a - b);
+    const slopes = [];
+    for (let i = 1; i < orderedU.length; i++) {
+      const lo = meanByU[orderedU[i - 1]], hi = meanByU[orderedU[i]];
+      const mLo = lo.reduce((a, b) => a + b, 0) / lo.length;
+      const mHi = hi.reduce((a, b) => a + b, 0) / hi.length;
+      slopes.push((mHi - mLo) / (orderedU[i] - orderedU[i - 1]));
+    }
+    let curved = false;
+    let slopeDrift = null;
+    if (slopes.length >= 3) {
+      const diffs = [];
+      for (let i = 1; i < slopes.length; i++) diffs.push(slopes[i] - slopes[i - 1]);
+      const monotone = diffs.every((d) => d > 0) || diffs.every((d) => d < 0);
+      const meanSlope = slopes.reduce((a, b) => a + b, 0) / slopes.length;
+      const range = Math.max(...slopes) - Math.min(...slopes);
+      slopeDrift = meanSlope ? Math.round((range / Math.abs(meanSlope)) * 100) / 100 : null;
+      curved = monotone && slopeDrift !== null && slopeDrift > 0.5;
+    }
     // The best ratio ANY model in `u` could reach on this slate. Above the
     // reliability bar means no fit is possible here, however the line is drawn.
     const floorRatio = floorPx !== null && explained > 0 ? floorPx / explained : null;
@@ -393,7 +435,12 @@ MEASURE_JS = """
       groupHeightSpread,
       fitRatio: fitRatio === null ? null : Math.round(fitRatio * 100) / 100,
       contentIndependent,
-      reliable: fitRatio !== null && fitRatio <= 0.25,
+      // A curved fit is NOT reliable however small its ratio -- the ratio is
+      // measuring the wrong thing when the shape is wrong.
+      reliable: fitRatio !== null && fitRatio <= 0.25 && !curved,
+      curved,
+      slopeDrift,
+      slopePerStep: slopes.map((s) => Math.round(s * 10) / 10),
       // Model-free, no free parameters, and the same number at both widths:
       // two cards with the same amount of data should be the same height.
       floorPx,
@@ -1013,6 +1060,17 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                         f"identical-content cards differ by {model['floorPx']}px while "
                         f"content explains only {model['explainedPx']}px -- no model in "
                         "pair count fits here at ANY threshold (text wrap drives height)"
+                    )
+                elif model.get("curved"):
+                    # Distinct from UNRELIABLE: the line is not noisy, it is the
+                    # WRONG SHAPE, and its ratio looked fine. Saying "no layout
+                    # signal here" would understate it -- there is a signal and
+                    # the model is mis-reading it.
+                    issues.append(
+                        f"layout model MISSPECIFIED in {model['state']}: per-pair cost "
+                        f"drifts {'/'.join(str(s) for s in model.get('slopePerStep') or [])}"
+                        f" px/pair (drift {model.get('slopeDrift')}) -- the fit is CURVED, "
+                        f"so its {model['fitRatio']} ratio certifies nothing"
                     )
                 elif not model.get("reliable"):
                     issues.append(
