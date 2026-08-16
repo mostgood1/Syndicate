@@ -912,6 +912,9 @@ def _american_price_to_prob(value: object) -> float | None:
 # does, so the denominator is exactly "win_prob values computed". A new site
 # added later is counted automatically.
 _WIN_PROB_STATS: dict[str, int] = {"rows": 0, "null_no_price": 0}
+# Set once from argv so the emitter in `__main__`'s `finally` can name the slate
+# it counted. A reading with no date cannot be aged against the run that made it.
+_WIN_PROB_RUN_DATE: dict[str, str | None] = {"date": None}
 
 
 def _clamp_probability(value: float | None) -> float | None:
@@ -922,20 +925,70 @@ def _clamp_probability(value: float | None) -> float | None:
     return max(0.0, min(1.0, float(value)))
 
 
+_WIN_PROB_LAST: dict[str, int] = {"rows": 0, "null_no_price": 0}
+
+
+def _emit_win_prob_build(build: str, tag: str = "refresh_nba_oddsapi_props") -> None:
+    """Per-ARTIFACT delta, because the exit emit can be hours late.
+
+    `_emit_win_prob_stats` fires from `finally`, so it only prints when the
+    process ends -- correct for a total, useless for a first reading: measured
+    2026-08-16, the producer was still mid-run 70+ minutes after deploy and had
+    emitted nothing. This fires as each artifact lands, so the branch is
+    observable at the moment it is exercised.
+
+    Deltas, not running totals: consecutive builds otherwise print a growing
+    number that cannot be attributed to the artifact that caused it.
+    """
+    rows = _WIN_PROB_STATS["rows"] - _WIN_PROB_LAST["rows"]
+    nulls = _WIN_PROB_STATS["null_no_price"] - _WIN_PROB_LAST["null_no_price"]
+    _WIN_PROB_LAST.update(_WIN_PROB_STATS)
+    pct = (100.0 * nulls / rows) if rows else 0.0
+    print(
+        f"[{tag}] WIN_PROB_NULL_NO_PRICE build={build} null={nulls} rows={rows} pct={pct:.1f}",
+        flush=True,
+    )
+
+
 def _emit_win_prob_stats(tag: str = "refresh_nba_oddsapi_props") -> None:
-    """Report the null rate, not a bare count.
+    """Report the null rate, not a bare count -- through a channel that is read.
 
     A count with no denominator cannot be read: `null=0` means "the fix held" if
     rows is large and "nothing ran" if rows is 0, and those need opposite
-    responses. Printed on EVERY run including the all-zero one.
+    responses. Emitted on EVERY run including the all-zero one.
+
+    **THE PRINT BELOW IS NOT THE CHANNEL**, for the reason recorded in the WNBA
+    twin: `refresh_odds_sources._run_command` runs this script under
+    `subprocess.run(capture_output=True)` and discards a successful step's
+    stdout, so no print here reaches Render's logs on a normal run (proven for
+    the WNBA producer 2026-08-15/16 -- it ran, and the line was nowhere).
+    Production reads the keyvalue record instead.
+
+    NBA reporting `rows=0` is EXPECTED while the sport is out of season, and it
+    is a real reading, not a failure: it says the producer reported and computed
+    no win_prob, which is different from never having reported at all.
     """
     rows = _WIN_PROB_STATS["rows"]
     nulls = _WIN_PROB_STATS["null_no_price"]
     pct = (100.0 * nulls / rows) if rows else 0.0
     print(
-        f"[{tag}] WIN_PROB_NULL_NO_PRICE null={nulls} rows={rows} pct={pct:.1f}",
+        f"[{tag}] WIN_PROB_NULL_NO_PRICE build=TOTAL null={nulls} rows={rows} pct={pct:.1f}",
         flush=True,
     )
+    # Never raises (see `record`'s contract): this runs in a `finally` guarding
+    # the process exit code.
+    try:
+        from syndicate.features.shared.win_prob_null_diag import record as _record_win_prob_null
+
+        _record_win_prob_null(
+            sport="nba",
+            tag=tag,
+            rows=rows,
+            nulls=nulls,
+            date=_WIN_PROB_RUN_DATE.get("date"),
+        )
+    except Exception:
+        pass
 
 
 def _format_signed_line(value: float | None) -> str:
@@ -1164,6 +1217,7 @@ def _build_local_recommendations_slate_artifact(*, processed_root: Path, date_st
     out_path = processed_root / f"recommendations_slate_{date_str}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    _emit_win_prob_build("recommendations_slate")
     return len(per_game), out_path
 
 
@@ -1229,6 +1283,7 @@ def _build_local_top_by_game_snapshot(*, processed_root: Path, date_str: str) ->
     out_path = processed_root / f"props_recommendations_top_by_game_{date_str}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps({"date": date_str, "data": rows_out}, indent=2), encoding="utf-8")
+    _emit_win_prob_build("top_by_game")
     return len(rows_out), out_path
 
 
@@ -1294,6 +1349,7 @@ def _build_local_cards_props_snapshot_artifact(*, processed_root: Path, date_str
     out_path = processed_root / f"cards_props_snapshot_{date_str}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps({"date": date_str, "games": games_out}, indent=2), encoding="utf-8")
+    _emit_win_prob_build("cards_props_snapshot")
     return len(games_out), out_path
 
 
@@ -4483,6 +4539,7 @@ def main() -> int:
     parser.add_argument("--started-at")
     parser.add_argument("--mode", choices=("fast", "full"), default="full")
     args = parser.parse_args()
+    _WIN_PROB_RUN_DATE["date"] = str(getattr(args, "date", "") or "").strip() or None
 
     source_root_arg = str(args.source_root or "").strip()
     source_root = Path(source_root_arg).resolve() if source_root_arg else None

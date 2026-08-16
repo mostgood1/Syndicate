@@ -89,3 +89,39 @@ def test_no_win_prob_branch_bypasses_the_chokepoint(sport):
 
     bypass = re.findall(r"if implied_prob is not None\s*\n(?:\s*#[^\n]*\n)*\s*else None", src)
     assert not bypass, f"{len(bypass)} win_prob branch(es) skip _clamp_probability and would not be counted"
+
+@pytest.mark.parametrize("sport", sorted(PRODUCERS))
+def test_per_build_emit_reports_a_DELTA_not_a_running_total(sport, capsys):
+    """Consecutive builds must not print a growing cumulative number.
+
+    The exit emit fires from `finally`, so it only lands when the process ends —
+    measured 2026-08-16, the producer was still mid-run 70+ minutes after deploy
+    with nothing logged. The per-build emit exists to make the branch observable
+    when the artifact lands, and it is only readable if each line is attributable
+    to the build that caused it.
+    """
+    m = _load(sport)
+
+    m._clamp_probability(None)          # build 1: 1 null of 2
+    m._clamp_probability(0.7)
+    m._emit_win_prob_build("first")
+    first = capsys.readouterr().out
+    assert "build=first" in first and "null=1 rows=2" in first
+
+    m._clamp_probability(0.6)           # build 2: 0 nulls of 1
+    m._emit_win_prob_build("second")
+    second = capsys.readouterr().out
+    assert "build=second" in second
+    assert "null=0 rows=1" in second, "second build must report ITS OWN counts, not 1/3"
+
+    m._emit_win_prob_stats()            # exit emit: the cumulative total
+    total = capsys.readouterr().out
+    assert "build=TOTAL" in total and "null=1 rows=3" in total
+
+
+@pytest.mark.parametrize("sport", sorted(PRODUCERS))
+def test_every_artifact_writer_emits(sport):
+    """A writer added later without an emit is silent exactly where it matters."""
+    src = PRODUCERS[sport].read_text(encoding="utf-8")
+    for build in ("recommendations_slate", "top_by_game", "cards_props_snapshot"):
+        assert f'_emit_win_prob_build("{build}")' in src, f"{build} writes an artifact but emits nothing"
