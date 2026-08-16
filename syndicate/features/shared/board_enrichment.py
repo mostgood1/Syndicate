@@ -802,6 +802,12 @@ def attach_margin_model(grid: list) -> dict:
         return {"rows_modelled": 0, "error": "margin model failed"}
 
 
+# Sports whose published live lens carries a game-line projection this join can
+# read. A NAMED SET, not a truthy check: an unlisted sport must fail closed and
+# say so, which is what makes a blank live column attributable.
+_LIVE_GAMELINE_SPORTS = frozenset({"mlb", "wnba"})
+
+
 def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: str) -> dict:
     """Overlay the live re-sim's GAME-LINE projection on live moneyline rows.
 
@@ -811,18 +817,37 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
     PREGAME win probability and `live_edge_policy` suppressed it for exactly
     that -- correctly, given what it was being handed.
 
-    MLB ONLY, for the same reason as the prop tier: the 120-sim re-sim is MLB's.
-    An unwired sport returns a stated reason so a blank column is attributable.
+    MLB AND WNBA. It was MLB-only, on the stated grounds that "the 120-sim
+    re-sim is MLB's" and that WNBA "has no live tier at all" -- and that second
+    half went stale without anyone noticing.
+
+    MEASURED 2026-08-16 22:2xZ on a real live WNBA slate (CHI @ SEA 58-53,
+    IND @ ATL 51-58): the live-lens loop already runs for wnba
+    (`/api/ops/live-lens/status` -> `activeSports: ["mlb","wnba","soccer"]`,
+    wnba `ok: true`, 60s tick), writing the very path this function reads.
+    3 of 3 `gameLens` entries carried `modelHomeWinProb`, and the two live games
+    carried `projection {total, homeMargin, homeScore, awayScore}` re-projected
+    off the live score -- total 151.17 against a pregame 173.96 at 60-53. The
+    board showed **0 of 521 rows** live-aware because of the gate below, not
+    because the data was absent.
+
+    WNBA PUBLISHES NO `simsRun`, AND THAT IS NOT PAPERED OVER. `prob_std_err`
+    needs n; with none, `price_moneyline` withholds by `REASON_UNUSABLE_SIMS`.
+    So wnba gets a live PROJECTION and an explicitly unpriced edge -- the same
+    "publish, refuse to price" posture MLB began with. Inventing an n to open
+    the gate would be the single worst substitution available here, and the
+    module says so where `prob_std_err` returns None rather than 0.0.
 
     Reads the PUBLISHED snapshot. Never triggers the re-sim.
     """
-    if sport != "mlb":
+    if sport not in _LIVE_GAMELINE_SPORTS:
         return {"supported": False, "reason": f"no live re-sim wired for {sport}",
                 "rows_live_gameline_edged": 0}
     try:
         from syndicate.features.shared.live_gameline_join import (
             attach_live_gamelines,
             build_live_gameline_index,
+            lens_sources_for_sport,
         )
         from syndicate.features.shared.refresh_state_store import data_root, read_json_file
 
@@ -833,7 +858,9 @@ def attach_live_gamelines_for_sport(grid: list, *, sport: str, selected_date: st
                 "reason": "no published live-lens snapshot",
                 "rows_live_gameline_edged": 0,
             }
-        coverage = attach_live_gamelines(grid, build_live_gameline_index(snapshot))
+        coverage = attach_live_gamelines(
+            grid, build_live_gameline_index(snapshot, sources=lens_sources_for_sport(sport))
+        )
         coverage["supported"] = True
         return coverage
     except Exception:

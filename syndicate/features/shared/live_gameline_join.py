@@ -73,6 +73,35 @@ _DEFAULT_MIN_SIMS = 20
 
 LIVE_STATE_LENS_SOURCE = "live_mc"
 
+# WHICH `source` STAMP COUNTS AS A LIVE LENS, PER SPORT.
+#
+# Keying on `source` rather than on the probability's presence is deliberate and
+# is explained at `live_gameline_from_lens` -- the `first1/3/5` lanes carry a
+# `modelHomeWinProb` too, so presence would accept a lens the re-sim never
+# touched. That guarantee must NOT be weakened to admit a second sport, which is
+# why this is an explicit per-sport table and not a relaxed check.
+#
+# Measured on production 2026-08-16 22:2xZ against a real live WNBA slate
+# (CHI @ SEA 58-53, IND @ ATL 51-58): wnba stamps `source: "live_projection"` on
+# exactly the live games (2 of 3 lenses) and `"pregame"` on the one that had not
+# tipped. So the stamp is as discriminating for wnba as `live_mc` is for mlb --
+# it is simply spelled differently.
+LIVE_LENS_SOURCES_BY_SPORT: dict[str, tuple[str, ...]] = {
+    "mlb": (LIVE_STATE_LENS_SOURCE,),
+    "wnba": ("live_projection",),
+}
+_DEFAULT_LENS_SOURCES: tuple[str, ...] = (LIVE_STATE_LENS_SOURCE,)
+
+
+def lens_sources_for_sport(sport: Any) -> tuple[str, ...]:
+    """Accepted `source` stamps for this sport, defaulting to MLB's.
+
+    An unknown sport gets MLB's stamp rather than "anything": a sport whose
+    lens shape nobody has looked at must fail to join and be counted, not be
+    admitted on a guess.
+    """
+    return LIVE_LENS_SOURCES_BY_SPORT.get(str(sport or "").strip().lower(), _DEFAULT_LENS_SOURCES)
+
 # Withheld reasons. Every zero must be diagnosable by reason -- the shape
 # `live_edge_policy` established, and the reason a counter of 0 was mysterious
 # for so long on the prop side.
@@ -150,7 +179,9 @@ def prob_std_err(probability: Any, sims: Any) -> float | None:
     return math.sqrt(max(0.0, p_adj * (1.0 - p_adj)) / n_adj)
 
 
-def live_gameline_from_lens(lens_rows: Any) -> dict[str, Any] | None:
+def live_gameline_from_lens(
+    lens_rows: Any, *, sources: tuple[str, ...] | None = None
+) -> dict[str, Any] | None:
     """The live-state moneyline projection from a snapshot's `gameLens`.
 
     Only the `live`/`full` lanes are ever stamped `live_mc`, and only when
@@ -161,10 +192,11 @@ def live_gameline_from_lens(lens_rows: Any) -> dict[str, Any] | None:
     """
     if not isinstance(lens_rows, list):
         return None
+    accepted = tuple(sources) if sources else _DEFAULT_LENS_SOURCES
     for lens in lens_rows:
         if not isinstance(lens, Mapping):
             continue
-        if str(lens.get("source") or "").strip().lower() != LIVE_STATE_LENS_SOURCE:
+        if str(lens.get("source") or "").strip().lower() not in accepted:
             continue
         prob = lens.get("modelHomeWinProb")
         if prob is None:
@@ -425,7 +457,9 @@ def _norm_team(value: Any) -> str:
     return " ".join(str(value or "").strip().lower().split())
 
 
-def build_live_gameline_index(snapshot: Any) -> dict[tuple[str, str], dict[str, Any]]:
+def build_live_gameline_index(
+    snapshot: Any, *, sources: tuple[str, ...] | None = None
+) -> dict[tuple[str, str], dict[str, Any]]:
     """(away_team, home_team) -> the live moneyline projection.
 
     JOINED ON FULL TEAM NAMES, WHICH MATCH EXACTLY. Verified against production
@@ -446,13 +480,32 @@ def build_live_gameline_index(snapshot: Any) -> dict[tuple[str, str], dict[str, 
     for game in games:
         if not isinstance(game, Mapping):
             continue
+        # TWO SNAPSHOT SHAPES, AND NEITHER IS WRONG. MLB nests the teams under
+        # `matchup`; WNBA's lens carries `away`/`home` at the top level (and
+        # `away_name`/`home_name` beside them). Measured on production
+        # 2026-08-16: wnba games have no `matchup` key at all, so a
+        # matchup-only read indexed zero of them and the join reported a clean
+        # empty rather than a mismatch.
+        #
+        # Fall through in order rather than merging: the first shape that yields
+        # BOTH names wins, so a snapshot carrying a partial `matchup` cannot
+        # half-match and produce a key built from two different games.
         matchup = game.get("matchup") if isinstance(game.get("matchup"), Mapping) else {}
-        away = matchup.get("away") if isinstance(matchup.get("away"), Mapping) else {}
-        home = matchup.get("home") if isinstance(matchup.get("home"), Mapping) else {}
-        key = (_norm_team(away.get("name")), _norm_team(home.get("name")))
-        if not key[0] or not key[1]:
+        key: tuple[str, str] | None = None
+        for away_raw, home_raw in (
+            (matchup.get("away"), matchup.get("home")),
+            (game.get("away"), game.get("home")),
+            (game.get("away_name"), game.get("home_name")),
+        ):
+            away_name = away_raw.get("name") if isinstance(away_raw, Mapping) else away_raw
+            home_name = home_raw.get("name") if isinstance(home_raw, Mapping) else home_raw
+            candidate = (_norm_team(away_name), _norm_team(home_name))
+            if candidate[0] and candidate[1]:
+                key = candidate
+                break
+        if key is None:
             continue
-        projection = live_gameline_from_lens(game.get("gameLens"))
+        projection = live_gameline_from_lens(game.get("gameLens"), sources=sources)
         if projection is None:
             continue
         projection = dict(projection)
