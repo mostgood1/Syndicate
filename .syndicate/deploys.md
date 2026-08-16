@@ -7949,3 +7949,73 @@ workers now carry the freshness gate** (live-odds-worker `46b5ec66`, 19:47:16Z).
   the decimal" is batch stamping, **not** evidence of a stall — WNBA does
   refresh (119.8 → ~18 → 47.1 across the evening), it is simply on a much longer
   interval than MLB.
+
+---
+
+## 2026-08-16 20:50Z — outstanding items #1 and #2 — refresh-worker `a9e5d3d6`
+
+### #2 — the name normaliser: **VERIFIED IN PRODUCTION, +19 players**
+
+`_norm_name`'s docstring claimed it folded accents; the code deleted them.
+With no decomposition step `re.sub(r"[^a-z ]", " ", text)` replaced each
+accented letter WITH A SPACE:
+
+```
+sim feed    "Eugenio Suárez"  ->  "eugenio su rez"
+quote feed  "Eugenio Suarez"  ->  "eugenio suarez"     never joins
+```
+
+Measured on BOTH sides, which is what makes it a join bug: sim side **412
+distinct hitters, 33 accented (8.0%)**; quote side plain ASCII throughout.
+One-directional asymmetry, silent failure.
+
+**Production, one artifact apart, same denominator:**
+
+```
+pre  (gen 20:47:57)   dark players 92   projected 2431/3499  (69.5%)
+post (gen 20:51:49)   dark players 73   projected 2535/3499  (72.4%)
+                      19 players recovered, +104 rows
+```
+
+Predicted 18 from the artifact cross-check before deploying; measured 19.
+
+**The other 73 are NOT this bug** and remain a genuine lineup question. I
+originally filed the whole population as a stale lineup/injury fingerprint;
+for these 19 it never was one.
+
+The correct pattern already existed two files away in
+`basketball_props_edges._norm_name` (NFKD since it was written).
+`prop_projections` was the outlier.
+
+### #1 — the HR threshold ladder: **SHIPPED, NOT YET VERIFIABLE**
+
+`daily_update` counted HR with a bare `if hr >= 1: _inc_ge("hr_1plus")` — the
+only multi-valued hitter stat on that screen not using `_inc_ge_thresholds`,
+which the line ABOVE it uses for hits and the lines below for
+hits_runs_rbis / runs / rbi / total_bases. `_hr_row` published only
+`p_hr_1plus`, and the consumer refused outright with
+`abs(line_value - 0.5) > 0.01`. Three layers, one limit, none of them needing it.
+
+Board before: `batter_home_runs` **240/290 at line 0.5, 1/260 at 1.5, 0/244 at
+2.5** — 504 dark rows, the largest single coverage gap.
+
+Both counter sites changed together (the comment above the second records
+`#334`, where this same duplication was changed in one place and zeroed
+`hrr_mean`). `p_hr_2plus`/`3plus` publish RAW with no `_cal`: the calibration
+was fitted against `hr_1plus` outcomes and pushing it through P(HR>=2) would be
+an unvalidated correction wearing a calibrated label.
+
+**VERIFICATION REQUIRES A SIM RUN, NOT A DEPLOY.** The counters only change what
+a NEW sim writes; today's artifact cannot gain the field. Consumer-side the
+rung reads absent and returns None rather than 0.0, so the board is unchanged
+until the next MLB sim cycle. **A green deploy here must not be read as a
+working fix** — re-measure `batter_home_runs` at lines 1.5/2.5 after the next
+sim.
+
+### Deploy contention, recorded because it cost three attempts
+Two of my deploys were CANCELED by other sessions' deploys (20:26:58, 20:36:31),
+the second of which was a hotfix for a break their own `c324447d` had shipped. I
+stopped racing and waited for their hotfix to go live before deploying once on
+top of it. Their deploy branches were also cut from a base that lacked the HR
+ladder already on `origin/main` — a reminder that "on main" and "on the live
+worker" are independent facts here.
