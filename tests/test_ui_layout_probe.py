@@ -52,6 +52,11 @@ def _report(sport="mlb", **measured):
         "typeScale": {},
         "unstyledLinks": [],
         "touchTargetFailures": [],
+        # A healthy slate under the peer rule: every card tied, deviation small.
+        "identicalContentSpreadByState": {
+            "Preview": {"spreadPx": 40, "atU": 45, "n": 15, "cardsTied": 15,
+                        "worstGroupPx": 40, "tiedGroups": 1},
+        },
     }
     base.update(measured)
     return {
@@ -213,15 +218,6 @@ def test_a_healthy_slate_passes_the_layout_model():
     assert "layout residual 54px in Preview" in text
 
 
-def test_a_card_off_the_height_model_fails():
-    """The falsification case: tall at constant content is a layout defect."""
-    text, ok = _summarize(_report(heightModel=_model(
-        residualSpread=420, maxAbsResidual=390,
-        worstCard={"u": 45, "h": 4266, "residual": 390})))
-    assert not ok
-    assert "LAYOUT RESIDUAL OVER BUDGET" in text
-    assert "+390px at 45 pairs" in text
-
 
 def test_content_independent_reports_the_raw_spread_as_the_signal():
     """At 1440 the summary grid wraps, so a pair adds width not height.
@@ -238,17 +234,6 @@ def test_content_independent_reports_the_raw_spread_as_the_signal():
     assert "content-independent" in text
     assert "UNRELIABLE" not in text
 
-
-def test_content_independent_over_budget_fails():
-    text, ok = _summarize(_report(heightModel=_model(
-        state="Final", pxPerUnit=0.4, explainedPx=10, groupHeightSpread=420,
-        residualSpread=11, fitRatio=2.0, reliable=False, contentIndependent=True)))
-    assert not ok
-    assert "LAYOUT SPREAD OVER BUDGET" in text
-    # Wording changed 2026-08-16: the budget is applied to the content-
-    # CONTROLLED figure where tied cards exist. This report has none, so the
-    # raw spread is still the signal and still fails.
-    assert "NO tied cards, so this raw spread is the best available signal" in text
 
 
 def test_an_unreliable_fit_is_neither_an_alarm_nor_a_pass():
@@ -795,86 +780,11 @@ def test_an_older_report_using_floorPx_still_compares():
     assert probe._cmp_value({"state": "Preview", "spreadPx": 50, "floorPx": 400}) == 50
 
 
-def test_a_residual_at_its_noise_floor_is_not_failed_for_being_over_budget():
-    """Seen live 2026-08-16, mlb mobile: residual 164px == floor 164px against a
-    150px budget. The row said "text wrap, not layout deviation" and failed the
-    run on that same number. No model beats its own floor, so this would make
-    the harness permanently red on a healthy board."""
-    text, ok = _summarize(_report(heightModel=_model(
-        residualSpread=164, floorPx=164, atNoiseFloor=True)))
-    assert ok, text
-    assert "EQUALS its noise floor" in text
-    assert "cannot be met by any model" in text
-    assert "LAYOUT RESIDUAL OVER BUDGET" not in text
 
 
-def test_a_residual_clear_of_its_floor_still_fails_over_budget():
-    """The budget must still bite where a model COULD have done better."""
-    text, ok = _summarize(_report(heightModel=_model(
-        residualSpread=164, floorPx=20, atNoiseFloor=False)))
-    assert not ok
-    assert "LAYOUT RESIDUAL OVER BUDGET" in text
 
 
-def test_the_over_budget_suppression_needs_the_floor_to_be_known():
-    """No tied cards means no floor. An unmeasured floor must not buy an
-    exemption -- absent must not read as `atNoiseFloor`."""
-    text, ok = _summarize(_report(heightModel=_model(
-        residualSpread=164, floorPx=None, atNoiseFloor=False)))
-    assert not ok
-    assert "LAYOUT RESIDUAL OVER BUDGET" in text
 
-
-def test_content_independent_applies_the_budget_to_the_controlled_figure():
-    """Seen live 2026-08-16, mlb desktop: raw group spread 313px against an
-    identical-content spread of 70px, failed as "a layout difference". 243px of
-    that was the 33-57 pair range. A flat linear slope on desktop means the LINE
-    cannot see wrap, not that content is absent."""
-    text, ok = _summarize(_report(
-        heightModel=_model(contentIndependent=True, reliable=False,
-                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
-        identicalContentSpreadByState={"Preview": {"spreadPx": 70}},
-    ))
-    assert ok, text
-    assert "identical-content spread 70px in Preview" in text
-    assert "raw spread 313px is mostly content" in text
-    assert "LAYOUT SPREAD OVER BUDGET" not in text
-
-
-def test_content_independent_still_fails_when_the_controlled_figure_is_over():
-    """Controlling for content must not disarm the check -- only aim it."""
-    text, ok = _summarize(_report(
-        heightModel=_model(contentIndependent=True, reliable=False,
-                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
-        identicalContentSpreadByState={"Preview": {"spreadPx": 260}},
-    ))
-    assert not ok
-    assert "LAYOUT SPREAD OVER BUDGET (260px > 150px)" in text
-    assert "content controlled for" in text
-
-
-def test_content_independent_falls_back_to_raw_spread_when_nothing_ties():
-    """No tied cards means no controlled figure; the raw spread is then the
-    best available signal and must still be able to fail."""
-    text, ok = _summarize(_report(
-        heightModel=_model(contentIndependent=True, reliable=False,
-                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
-        identicalContentSpreadByState={},
-    ))
-    assert not ok
-    assert "NO tied cards, so this raw spread is the best available signal" in text
-    assert "LAYOUT SPREAD OVER BUDGET" in text
-
-
-def test_the_controlled_figure_is_taken_from_the_models_own_state():
-    """A tie floor from a DIFFERENT state is not a control for this one."""
-    text, ok = _summarize(_report(
-        heightModel=_model(state="Preview", contentIndependent=True, reliable=False,
-                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
-        identicalContentSpreadByState={"Live": {"spreadPx": 70}},
-    ))
-    assert not ok, "a Live tie floor must not exempt a Preview spread"
-    assert "NO tied cards" in text
 
 
 # --- nfl/ncaaf baselined; mlb and soccer still only watched ----------------
@@ -946,3 +856,90 @@ def test_a_vanished_measurement_fails_even_though_it_is_an_absence():
     assert not ok
     assert "identicalContentSpread VANISHED (baseline 14px, now unmeasured)" in text
     assert "the check did NOT run" in text
+
+
+# --- the one height failure rule: deviation from same-content PEERS ---------
+#
+# Replaces residual-from-the-line and raw-group-spread, which each produced a
+# false alarm on a healthy board on 2026-08-16. See the block comment in
+# `summarize`.
+
+
+def _ties(**states):
+    return {s: dict(spreadPx=px, atU=45, n=4, cardsTied=15, worstGroupPx=px,
+                    tiedGroups=1) for s, px in states.items()}
+
+
+def test_a_card_that_differs_from_its_peers_fails():
+    """The falsification test for this rule: a real defect must still be caught
+    when the card HAS peers -- e.g. one card grew an extra block."""
+    text, ok = _summarize(_report(identicalContentSpreadByState=_ties(Preview=420)))
+    assert not ok
+    assert "PEER DEVIATION OVER BUDGET in Preview (420px > 150px)" in text
+    assert "same data, different height" in text
+
+
+def test_every_state_is_judged_not_just_the_worst():
+    text, ok = _summarize(_report(identicalContentSpreadByState=_ties(Preview=40, Live=400)))
+    assert not ok
+    assert "PEER DEVIATION OVER BUDGET in Live" in text
+    assert "PEER DEVIATION OVER BUDGET in Preview" not in text
+
+
+def test_a_curved_fit_no_longer_fails_on_its_residual():
+    """mlb mobile Live, 2026-08-16: residual 151px on a CURVED fit that passed
+    as `reliable` at ratio 0.2, while every card agreed with its own peers to
+    40px. The residual is reported; it no longer judges."""
+    text, ok = _summarize(_report(
+        heightModel=_model(state="Live", residualSpread=151, maxAbsResidual=79,
+                           fitRatio=0.2, explainedPx=771, floorPx=40,
+                           atNoiseFloor=False,
+                           worstCard={"u": 45, "h": 3989, "residual": 79}),
+        identicalContentSpreadByState=_ties(Live=40)))
+    assert ok, text
+    assert "layout residual 151px in Live" in text          # context
+    assert "OVER BUDGET" not in text                         # but not a verdict
+
+
+def test_a_large_raw_spread_no_longer_fails_on_its_own():
+    """mlb desktop, 2026-08-16: raw spread 313px, peers differed by 70px."""
+    text, ok = _summarize(_report(
+        heightModel=_model(contentIndependent=True, reliable=False,
+                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
+        identicalContentSpreadByState=_ties(Preview=70)))
+    assert ok, text
+    assert "layout spread 313px in Preview" in text
+    assert "the peer check below is what judges" in text
+    assert "OVER BUDGET" not in text
+
+
+def test_the_coverage_gap_is_printed_rather_than_implied():
+    """A card with no same-`u` peer cannot be judged. That blind spot has to be
+    visible on the row, not inferred from a clean line."""
+    ties = _ties(Preview=40)
+    ties["Preview"]["cardsTied"] = 9
+    text, ok = _summarize(_report(cards=15, identicalContentSpreadByState=ties))
+    assert ok, text
+    assert "peer check covered 9/15 cards" in text
+    assert "cannot be judged" in text
+
+
+def test_full_coverage_prints_no_gap_note():
+    text, ok = _summarize(_report(cards=15, identicalContentSpreadByState=_ties(Preview=40)))
+    assert ok, text
+    assert "peer check covered" not in text
+
+
+def test_no_ties_at_all_is_a_stated_gap_not_a_pass_and_not_a_failure():
+    text, ok = _summarize(_report(cards=15, identicalContentSpreadByState={}))
+    assert ok, text
+    assert "PEER CHECK DID NOT RUN -- no two of 15 cards share a pair count" in text
+
+
+def test_the_peer_rule_runs_where_no_model_exists_at_all():
+    """The uniform-33 slate: nothing fits, and the peer rule is all there is."""
+    text, ok = _summarize(_report(
+        heightModel=None, statesUnfitted=["Live", "Preview"],
+        identicalContentSpreadByState=_ties(Preview=400)))
+    assert not ok
+    assert "PEER DEVIATION OVER BUDGET in Preview" in text

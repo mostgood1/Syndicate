@@ -997,34 +997,12 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                     # when one exists: cards carrying the same data, how far
                     # apart are they. The raw spread is only the signal when
                     # nothing ties and there is nothing better.
-                    tie_state = (measured.get("identicalContentSpreadByState") or {}).get(
-                        model.get("state")
-                    ) or {}
-                    controlled = tie_state.get("spreadPx")
-                    if controlled is not None:
-                        signal = controlled
-                        basis = (
-                            f"identical-content spread {signal}px in {model['state']} "
-                            f"(raw spread {model['groupHeightSpread']}px is mostly content: "
-                            f"a flat {model['pxPerUnit']}px/pair slope means the LINE cannot "
-                            "see wrap, not that content is absent)"
-                        )
-                    else:
-                        signal = model["groupHeightSpread"]
-                        basis = (
-                            f"layout spread {signal}px in {model['state']} "
-                            f"(content-independent: {model['explainedPx']}px explained "
-                            f"at {model['pxPerUnit']}px/pair; NO tied cards, so this raw "
-                            "spread is the best available signal)"
-                        )
-                    issues.append(basis)
-                    if signal > LAYOUT_RESIDUAL_BUDGET_PX:
-                        issues.append(
-                            f"LAYOUT SPREAD OVER BUDGET ({signal}px > "
-                            f"{LAYOUT_RESIDUAL_BUDGET_PX}px) with content controlled for "
-                            "-- this is a layout difference"
-                        )
-                        ok = False
+                    issues.append(
+                        f"layout spread {model['groupHeightSpread']}px in {model['state']} "
+                        f"(content-independent: {model['explainedPx']}px explained "
+                        f"at {model['pxPerUnit']}px/pair) -- context; the peer check below "
+                        "is what judges"
+                    )
                 elif model.get("unfittable"):
                     # Not "mis-tuned" and not "no signal" -- IMPOSSIBLE. State
                     # the floor and the range so the number can be checked
@@ -1058,31 +1036,6 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                         f"({model['chromePx']}px chrome + {model['pxPerUnit']}px/pair)"
                         + floor_note
                     )
-                    if model["residualSpread"] > LAYOUT_RESIDUAL_BUDGET_PX:
-                        if model.get("atNoiseFloor"):
-                            # The row would otherwise say "this is text wrap,
-                            # not layout deviation" and fail the run on that
-                            # same number in the next breath. Seen live
-                            # 2026-08-16: mlb mobile, residual 164px == floor
-                            # 164px, over a 150px budget. No model can do
-                            # better than its floor by construction, so failing
-                            # here makes the harness permanently red on a
-                            # healthy board -- the exact outcome fitGroup's own
-                            # comments argue against.
-                            issues.append(
-                                f"residual {model['residualSpread']}px is over the "
-                                f"{LAYOUT_RESIDUAL_BUDGET_PX}px budget but EQUALS its "
-                                "noise floor, so the budget cannot be met by any model "
-                                "-- not failed; the floor is the thing to watch"
-                            )
-                        else:
-                            issues.append(
-                                f"LAYOUT RESIDUAL OVER BUDGET ({model['residualSpread']}px > "
-                                f"{LAYOUT_RESIDUAL_BUDGET_PX}px): a card is off the height "
-                                f"model -- worst {model['worstCard']['residual']:+}px at "
-                                f"{model['worstCard']['u']} pairs"
-                            )
-                            ok = False
                 # Absence of a fit is absence of a signal, never a pass.
                 unfitted = measured.get("statesUnfitted") or []
                 if unfitted:
@@ -1106,6 +1059,58 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                     f"(worst group: {tie['n']} cards at {tie['atU']} pairs; "
                     f"{tie['cardsTied']} tied across {tie['tiedGroups']} group(s)"
                     f"{other})"
+                )
+            # THE ONE HEIGHT FAILURE RULE. A card is anomalous when it differs
+            # from cards carrying the SAME pair count -- not when it differs from
+            # a fitted line. Model-free: no slope, no intercept, no reliability
+            # bar, and it runs on slates where nothing can be fitted at all.
+            #
+            # It replaces two rules that each produced a false alarm on a healthy
+            # board on 2026-08-16:
+            #   * residual-from-the-line: mlb mobile Live read residual 151px and
+            #     failed, while every card agreed with its OWN peers to 40px. The
+            #     fit was CURVED (41.3 -> 61.8 -> 76.6 px/pair) and `fitRatio`
+            #     cannot see curvature, so a misspecified model passed as
+            #     `reliable` and its structured residual tripped the budget. The
+            #     card it accused was the only card at its pair count, so the
+            #     accusation had no peer to rest on.
+            #   * raw group spread: mlb desktop read 313px and failed, while
+            #     identical-content cards differed by 70px -- the other 243px was
+            #     the 33-57 pair range.
+            #
+            # THE COVERAGE THIS COSTS, stated rather than hidden: a card with no
+            # same-pair-count peer cannot be judged at all, so a defect isolated
+            # to a unique-content card is missed where the residual might have
+            # caught it. Both the tie coverage and the did-not-run case are
+            # printed so the blind spot is visible on the row rather than implied
+            # by a clean line.
+            by_state_ties = measured.get("identicalContentSpreadByState") or {}
+            if by_state_ties:
+                over = [
+                    (state, blob) for state, blob in sorted(by_state_ties.items())
+                    if (blob.get("spreadPx") or 0) > LAYOUT_RESIDUAL_BUDGET_PX
+                ]
+                for state, blob in over:
+                    issues.append(
+                        f"PEER DEVIATION OVER BUDGET in {state} ({blob['spreadPx']}px > "
+                        f"{LAYOUT_RESIDUAL_BUDGET_PX}px): {blob['n']} cards carry "
+                        f"{blob['atU']} pairs each and differ by {blob['spreadPx']}px "
+                        "-- same data, different height"
+                    )
+                    ok = False
+                tied = sum(b.get("cardsTied", 0) for b in by_state_ties.values())
+                if cards and tied < cards:
+                    issues.append(
+                        f"peer check covered {tied}/{cards} cards -- the rest share a "
+                        "pair count with nothing and cannot be judged"
+                    )
+            elif cards:
+                # Absence of a comparison is not a pass, and it is not a failure
+                # either -- it is a stated gap, the same treatment `statesUnfitted`
+                # gets.
+                issues.append(
+                    f"PEER CHECK DID NOT RUN -- no two of {cards} cards share a pair "
+                    "count, so nothing is comparable at equal content"
                 )
             conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
             if conflated:

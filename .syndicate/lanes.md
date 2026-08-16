@@ -3111,3 +3111,28 @@ and then failed the thing it was checking, which is the point of running it.
   read as UNKNOWN, never as scheduled.
 - Blocked by: none. `refresh-worker-oom-recurrence` owns the diagnosis; this is
   instrument provenance only.
+
+### ui-probe-peer-deviation-gate — CLOSED 2026-08-16 — one model-free height rule; production green, coverage gap printed — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: ONE height failure rule — deviation from same-pair-count peers — with
+  residual-from-the-line and raw-spread removed.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Falsification test had two halves and BOTH passed: a fabricated 420px peer
+  deviation still fails (so a real defect with peers is caught), and the live
+  board went GREEN (exit 0/OK) where it had been failing — matching the
+  diagnosis that no card deviates from its peers.
+- Live peer deviations: mlb desktop 96px, mlb mobile 123px, nfl 14/50, ncaaf
+  45/53, all under the 150px budget.
+- **Coverage loss stated, not hidden:** a card with no same-`u` peer cannot be
+  judged. The row now prints `peer check covered 11/15 cards` and, where nothing
+  ties at all, `PEER CHECK DID NOT RUN` — a stated gap, the treatment
+  `statesUnfitted` already gets.
+- The fit is still reported (residual, chrome, px/pair, UNFITTABLE, UNRELIABLE,
+  noise floor) as CONTEXT. It decides nothing.
+- Verification: 71 tests pass. Nine tests encoding the removed rules were
+  DELETED rather than adjusted; the default fixture is now a healthy slate under
+  the peer rule; 8 new tests cover fail/pass/per-state/coverage/did-not-run/
+  no-model.
+- Closes the root cause behind all three of today's false alarms: the fitted
+  line was treated as ground truth when the tie structure is the only model-free
+  evidence available.
+- Blocked by: none
