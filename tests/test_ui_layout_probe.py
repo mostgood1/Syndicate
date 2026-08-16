@@ -1095,3 +1095,78 @@ def test_the_activation_wait_is_bounded_and_short():
     innerHTML swap, not for a slow handler. It must not become a sleep."""
     assert probe.TAB_ACTIVATE_WAIT_MS <= 3000
     assert probe.TAB_POLL_MS <= 250
+
+
+# --- a verdict needs n>=3 cards ---------------------------------------------
+#
+# 2026-08-16: one run failed at 30.9% on an n=2 Live group (2 cards at 41 pairs,
+# 312px apart) while the n=6 group on the same board sat at 82px. Minutes later
+# only ONE card remained at 41 pairs -- the pairing was transient, produced by
+# MLB live enrichment giving a card a passing pair count that coincided with an
+# unrelated card's.
+
+
+def _grouped(state="Live", **kw):
+    """A tie blob carrying the full per-group list."""
+    groups = kw.pop("groups")
+    return {state: {"state": state, "spreadPx": groups[0]["spread"],
+                    "atU": groups[0]["u"], "n": groups[0]["n"],
+                    "worstGroupPx": groups[0]["spread"], "cardsTied": sum(g["n"] for g in groups),
+                    "tiedGroups": len(groups), "medianH": groups[0]["medianH"],
+                    "spreadPct": groups[0]["pct"], "groups": groups}}
+
+
+def test_a_two_card_group_over_budget_is_reported_but_does_not_fail():
+    ties = _grouped(groups=[{"u": 41, "n": 2, "spread": 312, "medianH": 1009, "pct": 30.9}])
+    text, ok = _summarize(_report(identicalContentSpreadByState=ties))
+    assert ok, text
+    assert "peer deviation in Live NOT JUDGED -- 30.9% over 2 card(s) at 41 pairs" in text
+    assert "below the n>=3 a verdict needs" in text
+    assert "PEER DEVIATION OVER BUDGET" not in text
+
+
+def test_three_cards_is_enough_to_fail():
+    ties = _grouped(groups=[{"u": 41, "n": 3, "spread": 312, "medianH": 1009, "pct": 30.9}])
+    text, ok = _summarize(_report(identicalContentSpreadByState=ties))
+    assert not ok
+    assert "PEER DEVIATION OVER BUDGET in Live (30.9%" in text
+    assert "3 cards carry 41 pairs each" in text
+
+
+def test_a_thin_group_must_not_mask_a_fat_one():
+    """The reason the per-group list exists. If the gate only saw the WORST
+    group it would skip the n=6 one behind the n=2 one and pass."""
+    ties = _grouped(groups=[
+        {"u": 41, "n": 2, "spread": 312, "medianH": 1009, "pct": 30.9},   # thin, worst
+        {"u": 45, "n": 6, "spread": 220, "medianH": 1009, "pct": 21.8},   # judged
+    ])
+    text, ok = _summarize(_report(identicalContentSpreadByState=ties))
+    assert not ok, "the n=6 group is over budget and must still fail"
+    assert "PEER DEVIATION OVER BUDGET in Live (21.8%" in text
+    assert "6 cards carry 45 pairs each" in text
+    assert "NOT JUDGED -- 30.9% over 2 card(s)" in text
+
+
+def test_a_healthy_board_with_a_thin_group_stays_green():
+    """The 2026-08-16 board after the churn passed: n=6 at 82px, n=2 at 51px."""
+    ties = _grouped(groups=[
+        {"u": 45, "n": 6, "spread": 82, "medianH": 1100, "pct": 7.5},
+        {"u": 57, "n": 2, "spread": 51, "medianH": 1250, "pct": 4.1},
+    ])
+    text, ok = _summarize(_report(identicalContentSpreadByState=ties))
+    assert ok, text
+    assert "NOT JUDGED" not in text
+
+
+def test_the_minimum_is_the_smallest_n_where_one_card_is_not_the_spread():
+    assert probe.PEER_MIN_GROUP_N == 3
+
+
+def test_a_report_predating_the_group_list_is_still_judged():
+    """Older artifacts carry only the summary entry. They must not silently
+    stop being checked -- absence of the list is not absence of a problem."""
+    ties = {"Live": {"state": "Live", "spreadPx": 312, "atU": 41, "n": 4,
+                     "medianH": 1009, "spreadPct": 30.9, "worstGroupPx": 312}}
+    text, ok = _summarize(_report(identicalContentSpreadByState=ties))
+    assert not ok
+    assert "PEER DEVIATION OVER BUDGET in Live" in text

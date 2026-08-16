@@ -3513,3 +3513,24 @@ and then failed the thing it was checking, which is the point of running it.
   never committed, so its detail is unrecoverable. Keep a failing artifact under
   a separate name before re-running.
 - Blocked by: none
+
+### ui-probe-peer-min-group — CLOSED 2026-08-16 — verdicts need n>=3; thin groups reported, never dropped — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: a PEER DEVIATION failure requires n>=3; thinner groups still reported.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Evidence: a run failed at 30.9% on an n=2 Live group (2 cards at 41 pairs,
+  312px apart) while the n=6 group on the same board sat at 82px. Minutes later
+  only ONE card remained at 41 pairs — transient pairing from MLB live
+  enrichment, which gives a card a passing pair count that can coincide with an
+  unrelated card's. Three runs after: green.
+- **Falsification test held:** had the n=6 groups also been over budget, group
+  size would not be the discriminator. They were not — 82px vs 312px.
+- `tieFloor` now returns the FULL per-group list. Required, not cosmetic: with
+  only worst+largest the gate would skip a genuine n=6 group hiding behind a
+  thin n=2 one with a larger spread. Pinned by a test.
+- Verification: 91 tests pass (85 + 6). Three consecutive live runs OK, zero
+  over-budget failures, all four baselined rows unchanged.
+- **Deliberate trade, recorded:** a defect isolated to a card with fewer than 3
+  same-content peers no longer carries a verdict, though it is still printed.
+- Does NOT make MLB baselineable — that number still read 81..312px across the
+  day. Tomorrow's scheduled pre-game run tests that separately.
+- Blocked by: none

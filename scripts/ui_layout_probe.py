@@ -192,6 +192,24 @@ LAYOUT_RESIDUAL_BUDGET_PX = 150
 # preferred wherever a row is stable enough to carry one.
 PEER_DEVIATION_BUDGET_PCT = 15.0
 
+# How many cards must share a pair count before their spread may FAIL a run.
+# Thinner groups are still reported — never silently dropped — they just do not
+# carry a verdict.
+#
+# Measured 2026-08-16: one run failed at 30.9% on an **n=2** Live group (2 cards
+# at 41 pairs, 312px apart) while the n=6 group on the same board sat at 82px,
+# comfortably under budget. Minutes later only ONE card remained at 41 pairs —
+# the pairing was transient, and three consecutive runs since were green.
+#
+# The mechanism is MLB live enrichment: the peer rule assumes equal pair count
+# implies comparable cards, and a card still receiving data holds a TRANSIENT
+# pair count that can coincide with an unrelated card at a different stage. Two
+# cards is the thinnest evidence the rule can be built on, and it is the second
+# time an n=2 group produced a misleading number.
+#
+# 3 is the smallest n where one odd card does not BE the spread.
+PEER_MIN_GROUP_N = 3
+
 # How long to wait for the first card to attach before calling the render
 # failed. Generous on purpose: it is only ever paid in full by a sport that is
 # genuinely serving nothing, and the cost of being stingy is a false zero on
@@ -337,6 +355,19 @@ MEASURE_JS = """
       medianH: worst.medianH,
       // Spread as a share of the compared cards' own height, in percent.
       spreadPct: worst.medianH ? Math.round((worst.spread / worst.medianH) * 1000) / 10 : null,
+      // EVERY tie group, not just the worst and largest. The failure gate needs
+      // to pick the worst group ABOVE a minimum size, and it cannot do that from
+      // two summary entries: excluding a thin group would otherwise skip a
+      // genuine larger group whose spread happens to be smaller.
+      groups: groups
+        .map((g) => ({
+          u: g.u,
+          n: g.n,
+          spread: g.spread,
+          medianH: g.medianH,
+          pct: g.medianH ? Math.round((g.spread / g.medianH) * 1000) / 10 : null,
+        }))
+        .sort((a, b) => (b.pct || 0) - (a.pct || 0)),
       // Same value as `spreadPx`, kept under its own name so a report written
       // on either side of the revert compares on the SAME quantity.
       worstGroupPx: worst.spread,
@@ -1236,24 +1267,48 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 # ncaaf desktop one. A reading with no measurable height cannot
                 # be judged as a share of it -- absence must not map onto the
                 # permissive branch, so it is named instead of skipped.
-                over, unmeasurable = [], []
+                over, thin, unmeasurable = [], [], []
                 for state, blob in sorted(by_state_ties.items()):
-                    pct = blob.get("spreadPct")
-                    if pct is None:
-                        unmeasurable.append((state, blob))
-                    elif pct > PEER_DEVIATION_BUDGET_PCT:
-                        over.append((state, blob, pct))
-                for state, blob, pct in over:
+                    groups = blob.get("groups")
+                    if groups is None:
+                        # A report predating the per-group list. Fall back to the
+                        # summary entry so an older artifact still gets judged,
+                        # but it carries no group sizes, so it cannot be filtered.
+                        groups = [{
+                            "u": blob.get("atU"), "n": blob.get("n"),
+                            "spread": blob.get("spreadPx"), "medianH": blob.get("medianH"),
+                            "pct": blob.get("spreadPct"),
+                        }]
+                    for g in groups:
+                        if g.get("pct") is None:
+                            unmeasurable.append((state, g))
+                        elif g["pct"] <= PEER_DEVIATION_BUDGET_PCT:
+                            continue
+                        elif (g.get("n") or 0) >= PEER_MIN_GROUP_N:
+                            over.append((state, g))
+                        else:
+                            thin.append((state, g))
+                for state, g in over:
                     issues.append(
-                        f"PEER DEVIATION OVER BUDGET in {state} ({pct}% > "
-                        f"{PEER_DEVIATION_BUDGET_PCT}% of card height): {blob['n']} cards "
-                        f"carry {blob['atU']} pairs each and differ by {blob['spreadPx']}px "
-                        f"on a {blob['medianH']}px card -- same data, different height"
+                        f"PEER DEVIATION OVER BUDGET in {state} ({g['pct']}% > "
+                        f"{PEER_DEVIATION_BUDGET_PCT}% of card height): {g['n']} cards "
+                        f"carry {g['u']} pairs each and differ by {g['spread']}px "
+                        f"on a {g['medianH']}px card -- same data, different height"
                     )
                     ok = False
-                for state, blob in unmeasurable:
+                for state, g in thin:
+                    # Reported, not failed, and NOT silent: a thin group over
+                    # budget is the shape of a transient pairing during live
+                    # enrichment, but it is also how a real defect would first
+                    # appear, so it has to stay visible.
                     issues.append(
-                        f"peer deviation in {state} NOT JUDGED -- {blob['spreadPx']}px "
+                        f"peer deviation in {state} NOT JUDGED -- {g['pct']}% over "
+                        f"{g['n']} card(s) at {g['u']} pairs, below the n>={PEER_MIN_GROUP_N} "
+                        "a verdict needs"
+                    )
+                for state, g in unmeasurable:
+                    issues.append(
+                        f"peer deviation in {state} NOT JUDGED -- {g.get('spread')}px "
                         "with no measurable card height to take a share of"
                     )
                 tied = sum(b.get("cardsTied", 0) for b in by_state_ties.values())
