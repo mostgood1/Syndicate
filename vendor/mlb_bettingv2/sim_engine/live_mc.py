@@ -67,6 +67,27 @@ class LiveMcResult:
     # what makes an already-decided prop resolve to exactly 1.0 instead of 0.66.
     batter_stat_dist: Dict[int, Dict[str, Dict[int, int]]] = field(default_factory=dict)
     pitcher_stat_dist: Dict[int, Dict[str, Dict[int, int]]] = field(default_factory=dict)
+    # HOME MARGIN HISTOGRAM: {home_final - away_final: sim_count}.
+    #
+    # The same argument as `total_runs_dist` above, for the market that had no
+    # distribution at all. A live SPREAD needs P(home covers X), and the only
+    # live number reaching the board was `avg_home_runs - avg_away_runs` -- a
+    # mean, which cannot price a line. Measured on the served board 2026-08-16
+    # 19:13Z across 8 live MLB games: `spreads|full` 36 rows and
+    # `spreads_alt|first5` 79 rows, every one of them 0 live_aware and 0 edge,
+    # rendering a PREGAME projection against a live market.
+    #
+    # Free, in the sense that matters: the loop below already computes both
+    # finals to decide the winner, so this counts something it has in hand. It
+    # is one small int-keyed dict per game -- next to `batter_stat_dist`'s
+    # measured ~72 KB/game it does not register.
+    #
+    # SIGNED HOME-POSITIVE, matching `avg_home_runs - avg_away_runs` so the two
+    # never disagree about direction. The board's `line` arrives in the
+    # away/over frame (`book_grid._canonical_line`), and reconciling that is the
+    # CONSUMER's job -- doing it here would bake a presentation convention into
+    # the sim.
+    margin_dist: Dict[int, int] = field(default_factory=dict)
     # The denominator. Every histogram above sums to exactly this, including the
     # zeros -- see `_record_player_stats`.
     sims_run: int = 0
@@ -332,6 +353,7 @@ def estimate_live(
     away_sum = 0.0
     home_sum = 0.0
     dist: Dict[int, int] = {}
+    margin: Dict[int, int] = {}
     batter_dist: Dict[int, Dict[str, Dict[int, int]]] = {}
     pitcher_dist: Dict[int, Dict[str, Dict[int, int]]] = {}
     effective_cfg_kwargs = dict(cfg_kwargs or {})
@@ -363,6 +385,8 @@ def estimate_live(
         away_sum += float(away_final)
         home_sum += float(home_final)
         dist[total] = dist.get(total, 0) + 1
+        # Home-positive, same frame as `avg_home_runs - avg_away_runs`.
+        margin[home_final - away_final] = margin.get(home_final - away_final, 0) + 1
 
         if home_final > away_final:
             home_wins += 1
@@ -387,6 +411,7 @@ def estimate_live(
         avg_away_runs=away_sum / denom,
         avg_home_runs=home_sum / denom,
         total_runs_dist=dist,
+        margin_dist=margin,
         batter_stat_dist=batter_dist,
         pitcher_stat_dist=pitcher_dist,
         sims_run=sims_run,

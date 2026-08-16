@@ -90,6 +90,24 @@ REASON_UNUSABLE_SIMS = "sim_count_unusable"
 REASON_SEGMENT_NOT_FULL_GAME = "segment_is_not_full_game"
 _FULL_GAME_SEGMENTS = frozenset({"full", "full_game", "game"})
 
+# `REASON_TOTALS_MEAN` above is now a LEGACY path, not the normal one. It fires
+# only against a lens written before the producer carried `totalRunsDist` --
+# i.e. an old snapshot -- and is deliberately kept so that case stays
+# distinguishable from a genuinely absent projection.
+REASON_NO_LIVE_DISTRIBUTION = "live_resim_published_no_distribution_for_this_market"
+REASON_NO_LINE = "row_carries_no_line_to_price_against"
+REASON_UNKNOWN_SIDE = "unrecognised_side_token"
+REASON_UNSUPPORTED_MARKET = "market_not_priced_from_a_live_distribution"
+
+# The alt families are the SAME market at another line, and the distribution
+# prices any line -- which is the whole reason a histogram beats a mean. Leaving
+# them out would have repeated the pregame defect `prop_projections:615` records:
+# 53 of 107 live game-line rows carrying no projection at all, every one of them
+# `spreads_alt` or `totals_alt`, because neither key was in the set.
+_TOTALS_MARKETS = frozenset({"totals", "total", "totals_alt", "alternate_totals"})
+_SPREAD_MARKETS = frozenset({"spreads", "run_line", "ats", "spreads_alt", "alternate_spreads"})
+_DIST_MARKETS = _TOTALS_MARKETS | _SPREAD_MARKETS
+
 
 def _min_sims() -> int:
     """Below this the interval is so wide the number is not worth publishing."""
@@ -163,11 +181,128 @@ def live_gameline_from_lens(lens_rows: Any) -> dict[str, Any] | None:
             "sims_run": lens.get("simsRun"),
             "total_mean": projection.get("total"),
             "home_margin": projection.get("homeMargin"),
+            # THE SHAPES, not just the means. Without these a totals row can
+            # only be refused (`REASON_TOTALS_MEAN`) and a spreads row cannot be
+            # answered at all -- which is why every live totals/spreads row on
+            # the board carried a PREGAME projection while the moneyline, the
+            # one market a bare probability can price, worked.
+            #
+            # Absent on any lens written before the producer carried them, and
+            # `{}` reads as "no distribution" everywhere downstream, so an old
+            # snapshot degrades to exactly the previous behaviour rather than
+            # to a wrong number.
+            "total_runs_dist": projection.get("totalRunsDist") or {},
+            "margin_dist": projection.get("marginDist") or {},
             "as_of": lens.get("liveStateAsOf"),
             "carried_forward": bool(lens.get("liveStateCarriedForward")),
             "lane": lens.get("key"),
         }
     return None
+
+
+def price_distribution_market(
+    *,
+    dist: Any,
+    line: Any,
+    side: str,
+    market: str,
+    market_prob: Any,
+    sims: Any,
+    sigma: float = PRICEABLE_SIGMA,
+) -> dict[str, Any]:
+    """Price a live TOTALS or SPREADS row off the re-sim's own histogram.
+
+    Same contract as `price_moneyline`: always a dict, never a bare None, and
+    the refusal is named. The precision gate is identical -- a distribution does
+    not make 120 sims more precise, it only makes a LINE answerable at all.
+
+    THE LINE FRAME IS THE AWAY/OVER ONE and is not re-derived here. `#262` made
+    the grid row's `line` canonical, and `prop_projections.project_game_market`
+    already encodes what that means for spreads: with `L` the away-frame line,
+    home covers when `margin > L`, so the home branch must NOT negate. Getting
+    this backwards produced measured home probabilities of 0.67-0.74 on
+    underdogs and 19-28 point phantom edges on 2026-08-08. The same helpers are
+    imported rather than reimplemented so the two paths cannot drift -- a second
+    copy of this rule is how the first one rotted.
+
+    `margin_dist` is home-positive (`home_final - away_final`), matching
+    `run_margin_dist`'s frame, so the pregame rule transfers unchanged.
+    """
+    from syndicate.features.shared.prop_projections import _dist_prob_below, _dist_prob_over
+
+    out: dict[str, Any] = {
+        "model_prob": None,
+        "market_prob": None,
+        "edge_pp": None,
+        "prob_std_err": None,
+        "priceable": False,
+        "withheld_reason": None,
+        "sigma": float(sigma),
+    }
+    if not isinstance(dist, Mapping) or not dist:
+        out["withheld_reason"] = REASON_NO_LIVE_DISTRIBUTION
+        return out
+    try:
+        line_value = float(line)
+    except (TypeError, ValueError):
+        out["withheld_reason"] = REASON_NO_LINE
+        return out
+
+    key = str(market or "").strip().lower()
+    token = str(side or "").strip().lower()
+    if key in _TOTALS_MARKETS:
+        if token in {"over", "o"}:
+            model_prob = _dist_prob_over(dist, line_value)
+        elif token in {"under", "u"}:
+            model_prob = _dist_prob_below(dist, line_value)
+        else:
+            out["withheld_reason"] = REASON_UNKNOWN_SIDE
+            return out
+    elif key in _SPREAD_MARKETS:
+        # See the frame note above: no negation on the home branch.
+        if token in {"home", "1"}:
+            model_prob = _dist_prob_over(dist, line_value)
+        elif token in {"away", "2"}:
+            model_prob = _dist_prob_below(dist, line_value)
+        else:
+            out["withheld_reason"] = REASON_UNKNOWN_SIDE
+            return out
+    else:
+        out["withheld_reason"] = REASON_UNSUPPORTED_MARKET
+        return out
+
+    if model_prob is None:
+        out["withheld_reason"] = REASON_NO_LIVE_DISTRIBUTION
+        return out
+    out["model_prob"] = float(model_prob)
+
+    try:
+        market_p = float(market_prob)
+    except (TypeError, ValueError):
+        out["withheld_reason"] = REASON_NO_MARKET_PRICE
+        return out
+    if not (0.0 < market_p < 1.0):
+        out["withheld_reason"] = REASON_NO_MARKET_PRICE
+        return out
+    out["market_prob"] = market_p
+
+    std_err = prob_std_err(model_prob, sims)
+    if std_err is None:
+        out["withheld_reason"] = REASON_UNUSABLE_SIMS
+        return out
+    out["prob_std_err"] = std_err
+    edge = _edge_pp(float(model_prob), market_p)
+    out["edge_pp"] = round(edge, 2)
+    # THE SAME BAR AS THE MONEYLINE, deliberately. A histogram answers "what is
+    # P(over 8.5)"; it does not narrow the interval around that answer, which is
+    # still set by the sim count. Releasing distribution-based edges at a looser
+    # threshold would publish exactly the noise the moneyline gate exists to
+    # withhold, and it would look more rigorous for having come from a shape.
+    if abs(edge) < float(sigma) * std_err * 100.0:
+        out["withheld_reason"] = REASON_NOT_PRICEABLE
+        return out
+    out["priceable"] = True
+    return out
 
 
 def _edge_pp(model_prob: float, market_prob: float) -> float:
@@ -352,7 +487,12 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
             continue
         if str(row.get("kind") or "") != "game":
             continue
-        if str(row.get("market") or "").strip().lower() != "h2h":
+        market_key = str(row.get("market") or "").strip().lower()
+        # h2h prices off the win probability; totals/spreads price off the
+        # histograms. Anything else is not a market this join answers, and it is
+        # skipped rather than counted -- counting it would inflate the
+        # denominator with rows nobody expected a live number for.
+        if market_key != "h2h" and market_key not in _DIST_MARKETS:
             continue
         # Counted, then refused BY NAME -- a segment row is a real live h2h row
         # the join saw and declined, not one it never considered. An ABSENT
@@ -371,6 +511,27 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
             continue
 
         projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+        if market_key in _DIST_MARKETS:
+            # THE SIDE THE PROJECTION DESCRIBES, taken from the row's own side
+            # tokens rather than assumed. `market_fair_prob_over` is the de-vig
+            # of the FIRST side in the grid's ordering -- `over` for totals,
+            # `home` for spreads -- so the model probability must describe that
+            # same side or the subtraction spans opposite outcomes. This is the
+            # identical trap `layer1_board.html:770` records for `projection.side`.
+            side_token = "over" if market_key in _TOTALS_MARKETS else "home"
+            verdict = price_distribution_market(
+                dist=(hit.get("total_runs_dist") if market_key in _TOTALS_MARKETS
+                      else hit.get("margin_dist")),
+                line=row.get("line"),
+                side=side_token,
+                market=market_key,
+                market_prob=projection.get("market_fair_prob_over"),
+                sims=hit.get("sims_run"),
+            )
+            _apply_verdict(row, projection, verdict, hit, coverage,
+                           live_projected=verdict.get("model_prob"))
+            continue
+
         verdict = price_moneyline(
             model_prob=hit.get("home_win_prob"),
             # `market_fair_prob_over` is the de-vigged HOME probability on an
@@ -382,25 +543,55 @@ def attach_live_gamelines(grid: Any, index: Mapping[tuple[str, str], Mapping[str
             sims=hit.get("sims_run"),
         )
 
-        if isinstance(row, dict):
-            block = dict(verdict)
-            block["game_pk"] = hit.get("game_pk")
-            block["home_win_prob"] = hit.get("home_win_prob")
-            block["sims_run"] = hit.get("sims_run")
-            block["total_mean"] = hit.get("total_mean")
-            block["as_of"] = hit.get("as_of")
-            block["carried_forward"] = hit.get("carried_forward")
-            row["live_gameline"] = block
-            updated = dict(projection)
-            updated["live_aware"] = True
-            if verdict.get("priceable"):
-                updated["edge_vs_market_pct"] = verdict.get("edge_pp")
-                updated["edge_unavailable_reason"] = None
-            else:
-                updated["edge_vs_market_pct"] = None
-                updated["edge_unavailable_reason"] = verdict.get("withheld_reason")
-            row["projection"] = updated
-
-        record(coverage, verdict, projected=True)
+        _apply_verdict(row, projection, verdict, hit, coverage)
 
     return coverage
+
+
+def _apply_verdict(
+    row: Any,
+    projection: Mapping[str, Any],
+    verdict: Mapping[str, Any],
+    hit: Mapping[str, Any],
+    coverage: dict[str, Any],
+    *,
+    live_projected: Any = None,
+) -> None:
+    """Write one verdict onto the row, for BOTH the moneyline and distribution
+    paths.
+
+    Extracted rather than copied. The moneyline version of this block already
+    existed and the distribution path needed the same six fields plus the
+    projection rewrite; a second copy is how the two would drift, and this
+    module has already paid for that once -- `#340` records the live-edge rule
+    living in two per-sport copies while WNBA, which had neither, shipped 128
+    live edges.
+    """
+    if isinstance(row, dict):
+        block = dict(verdict)
+        block["game_pk"] = hit.get("game_pk")
+        block["home_win_prob"] = hit.get("home_win_prob")
+        block["sims_run"] = hit.get("sims_run")
+        block["total_mean"] = hit.get("total_mean")
+        block["as_of"] = hit.get("as_of")
+        block["carried_forward"] = hit.get("carried_forward")
+        row["live_gameline"] = block
+        updated = dict(projection)
+        updated["live_aware"] = True
+        if live_projected is not None:
+            # The LIVE model probability, kept next to the pregame one rather
+            # than overwriting it. `projected` on a game row is the pregame
+            # sim's number and stays readable; a reader comparing the two is a
+            # legitimate thing to want, and silently replacing it is how a live
+            # board loses its own provenance.
+            updated["live_model_prob_over"] = live_projected
+            updated["live_projected"] = live_projected
+        if verdict.get("priceable"):
+            updated["edge_vs_market_pct"] = verdict.get("edge_pp")
+            updated["edge_unavailable_reason"] = None
+        else:
+            updated["edge_vs_market_pct"] = None
+            updated["edge_unavailable_reason"] = verdict.get("withheld_reason")
+        row["projection"] = updated
+
+    record(coverage, verdict, projected=True)

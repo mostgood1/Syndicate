@@ -16694,6 +16694,30 @@ def _live_mc_projection(snapshot: Optional[Dict[str, Any]], sim_context: Optiona
         # distribution for their P(over).
         "batterStatDist": getattr(result, "batter_stat_dist", None) or {},
         "pitcherStatDist": getattr(result, "pitcher_stat_dist", None) or {},
+        # AND THE GAME LINES, for exactly the same reason -- which is the part
+        # that was missed when the two lines above were added.
+        #
+        # `total_runs_dist` has existed on `LiveMcResult` all along and was
+        # dropped here, so the props got a real live probability off these sims
+        # while the game total from the SAME sims kept only `avg_total_runs`.
+        # `live_gameline_join` then had a mean and nothing else, which is
+        # precisely what its `REASON_TOTALS_MEAN =
+        # "totals_mean_not_distribution"` refusal reports -- an honest refusal
+        # standing in for data that was computed and discarded three functions
+        # upstream.
+        #
+        # Measured on the served board 2026-08-16 19:13Z, 8 live MLB games:
+        # `h2h|full` 7 of 8 joined and 2 priceable, while `totals|full` (41
+        # rows), `spreads|full` (36), `totals_alt|first5` (98) and
+        # `spreads_alt|first5` (79) were 0 live_aware and 0 edge -- 470+ rows
+        # rendering a pregame projection against a live market.
+        #
+        # Int-keyed and small: ~20 buckets for the total, ~25 for the margin.
+        # Against `batterStatDist`'s measured ~72 KB/game this is noise, which
+        # matters because this payload crosses a worker boundary into a service
+        # with a standing memory lane.
+        "totalRunsDist": getattr(result, "total_runs_dist", None) or {},
+        "marginDist": getattr(result, "margin_dist", None) or {},
         "simsRun": int(getattr(result, "sims_run", 0) or 0),
         # NAME -> MLBAM ID, so the per-prop lookup does not depend on the prop
         # row happening to carry an id field. The histograms are keyed by the
@@ -16853,6 +16877,22 @@ def _build_game_lens(card: Dict[str, Any], snapshot: Optional[Dict[str, Any]], s
                 "home": _safe_float(live_mc_projection.get("home")),
                 "total": _safe_float(live_mc_projection.get("total")),
                 "homeMargin": _safe_float(live_mc_projection.get("homeMargin")),
+                # THE DISTRIBUTIONS, not just their means. A mean cannot price a
+                # LINE: `total 7.83` says nothing about P(over 8.5) without a
+                # shape, which is why every live totals and spreads row on the
+                # board carried a pregame projection and no edge while the
+                # moneyline -- the one market a bare probability CAN price --
+                # worked fine.
+                #
+                # Only on the `live`/`full` lanes, which is the same condition
+                # guarding the means above: these histograms describe the FULL
+                # remaining game, so putting them on a `first3`/`first5` lane
+                # would price a full-game distribution against a segment market.
+                # That exact mismatch is why `live_gameline_join` carries
+                # `REASON_SEGMENT_NOT_FULL_GAME` (measured +42.43 pp of pure
+                # artifact on a first-inning line).
+                "totalRunsDist": live_mc_projection.get("totalRunsDist") or {},
+                "marginDist": live_mc_projection.get("marginDist") or {},
                 "closed": False,
             }
         baseline_probs = predictions.get(lane["key"]) if isinstance(predictions.get(lane["key"]), dict) else {}

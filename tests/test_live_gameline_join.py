@@ -270,10 +270,19 @@ class TestIndexAndAttach:
         assert row["projection"]["edge_unavailable_reason"] == REASON_NOT_PRICEABLE
 
     @pytest.mark.parametrize("kw", [{"state": "pregame"}, {"state": "final"},
-                                    {"kind": "prop"}, {"market": "totals"}])
+                                    {"kind": "prop"}, {"market": "player_points"}])
     def test_rows_outside_scope_are_untouched(self, kw):
-        """A pregame, final, prop or totals row must not be considered at all --
-        final in particular is live_edge_policy's call, not this module's."""
+        """A pregame, final, prop or non-game-line row must not be considered at
+        all -- final in particular is live_edge_policy's call, not this module's.
+
+        `{"market": "totals"}` USED TO BE IN THIS LIST and was removed on
+        2026-08-16, deliberately: totals are now priced off the re-sim's own
+        `totalRunsDist`, so a live totals row IS in scope. It was excluded
+        before because the lens carried only `avg_total_runs` and a mean cannot
+        price a line -- see `REASON_TOTALS_MEAN`, now a legacy path for old
+        snapshots. Replaced with a genuinely out-of-scope market rather than
+        dropped, so the "not every market is ours" guarantee still has a case.
+        """
         grid = [self._row(**kw)]
         before = dict(grid[0]["projection"])
         cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
@@ -453,3 +462,126 @@ class TestSegmentFilter:
         assert cov["rows_live_gameline_edged"] == 1
         assert cov["withheld_by_reason"] == {"segment_is_not_full_game": 3}
         assert grid[3].get("live_gameline") is None   # the +42pp row is gone
+
+
+class TestLiveDistributionPricing:
+    """Live TOTALS and SPREADS priced off the re-sim's own histograms.
+
+    THE DEFECT, measured on the served board 2026-08-16 19:13Z across 8 live
+    MLB games: `h2h|full` had 7 of 8 joined and 2 priceable, while
+    `totals|full` (41 rows), `spreads|full` (36), `totals_alt|first5` (98) and
+    `spreads_alt|first5` (79) were **0 live_aware and 0 edge** -- 470+ rows
+    rendering a PREGAME projection against a live market.
+
+    It was a discard, not a gap. `LiveMcResult.total_runs_dist` has always
+    existed; `flask_frontend`'s live-MC return kept `batterStatDist` and
+    `pitcherStatDist` for the props and dropped the game histograms on the
+    floor, so `live_gameline_join` had a mean and nothing else.
+    """
+
+    # 100 sims: totals 5..10, margin -3..+3. Deliberately hand-countable so a
+    # failure names the arithmetic rather than the fixture.
+    TOTAL_DIST = {5: 10, 6: 20, 7: 30, 8: 20, 9: 15, 10: 5}
+    MARGIN_DIST = {-3: 10, -2: 15, -1: 20, 0: 10, 1: 20, 2: 15, 3: 10}
+
+    def _price(self, **kw):
+        from syndicate.features.shared.live_gameline_join import price_distribution_market
+        base = dict(dist=self.TOTAL_DIST, line=7.5, side="over", market="totals",
+                    market_prob=0.40, sims=100)
+        base.update(kw)
+        return price_distribution_market(**base)
+
+    def test_over_probability_comes_off_the_histogram(self):
+        """P(total > 7.5) = (15+5)/100 = 0.40 exactly, not a normal fit."""
+        out = self._price(line=7.5, side="over", market_prob=0.20)
+        assert out["model_prob"] == 0.40
+
+    def test_under_is_the_complement_side_not_one_minus_over(self):
+        """P(total < 7.5) = (10+20+30)/100 = 0.60. Push mass is excluded from
+        BOTH sides, so at a whole-number line these do not sum to 1."""
+        assert self._price(line=7.5, side="under", market_prob=0.20)["model_prob"] == 0.60
+        out = self._price(line=7.0, side="over", market_prob=0.20)
+        under = self._price(line=7.0, side="under", market_prob=0.20)
+        assert out["model_prob"] + under["model_prob"] < 1.0, "the push on 7 must not be split"
+
+    def test_the_spread_home_branch_does_not_negate(self):
+        """The sign convention that cost 19-28 point phantom edges in 2026-08.
+
+        With `L` the away-frame line, home covers when `margin > L`. Negating
+        computes P(margin > -L) -- the home +L probability reported against the
+        home -L market. At L=1.5 on this histogram:
+            correct  P(margin >  1.5) = (15+10)/100         = 0.25
+            negated  P(margin > -1.5) = (20+10+20+15+10)/100 = 0.75
+        Three times the true value, in the bettor's favour -- the direction
+        that gets money on the table.
+        """
+        out = self._price(dist=self.MARGIN_DIST, line=1.5, side="home",
+                          market="spreads", market_prob=0.50)
+        assert out["model_prob"] == 0.25, "home branch negated the line"
+
+    def test_the_spread_away_branch_reads_the_frame_it_is_given(self):
+        """away wants P(margin < L). At L=1.5: (10+15+20+10+20)/100 = 0.75."""
+        out = self._price(dist=self.MARGIN_DIST, line=1.5, side="away",
+                          market="spreads", market_prob=0.50)
+        assert out["model_prob"] == 0.75
+
+    def test_alt_lines_are_priced_by_the_same_distribution(self):
+        """The whole point of a histogram over a mean: any line is answerable.
+
+        Leaving the alt families out would repeat `prop_projections:615` --
+        53 of 107 live game-line rows unprojected, every one `spreads_alt` or
+        `totals_alt`, because neither key was in the set.
+        """
+        for market in ("totals_alt", "alternate_totals"):
+            assert self._price(market=market, line=9.5, market_prob=0.10)["model_prob"] == 0.05
+        for market in ("spreads_alt", "alternate_spreads"):
+            out = self._price(dist=self.MARGIN_DIST, line=2.5, side="home",
+                              market=market, market_prob=0.50)
+            assert out["model_prob"] == 0.10
+
+    def test_the_precision_gate_is_the_same_bar_as_the_moneyline(self):
+        """A histogram answers WHICH probability, not how precise it is.
+
+        std_err at p=0.40, n=100 is 0.049, so 2 sigma is ~9.8 points. A 5-point
+        edge must be withheld and a 20-point one released -- otherwise a shape
+        would launder noise that the moneyline gate refuses.
+        """
+        from syndicate.features.shared.live_gameline_join import REASON_NOT_PRICEABLE
+        tight = self._price(line=7.5, side="over", market_prob=0.45)
+        assert tight["priceable"] is False
+        assert tight["withheld_reason"] == REASON_NOT_PRICEABLE
+        wide = self._price(line=7.5, side="over", market_prob=0.15)
+        assert wide["priceable"] is True
+        assert wide["edge_pp"] == 25.0
+
+    def test_an_absent_distribution_refuses_by_name(self):
+        """An old snapshot degrades to a NAMED refusal, never to a guess."""
+        from syndicate.features.shared.live_gameline_join import REASON_NO_LIVE_DISTRIBUTION
+        out = self._price(dist={})
+        assert out["priceable"] is False
+        assert out["withheld_reason"] == REASON_NO_LIVE_DISTRIBUTION
+        assert out["model_prob"] is None
+
+    def test_a_missing_line_and_an_unknown_side_each_refuse_by_name(self):
+        from syndicate.features.shared.live_gameline_join import (
+            REASON_NO_LINE, REASON_UNKNOWN_SIDE,
+        )
+        assert self._price(line=None)["withheld_reason"] == REASON_NO_LINE
+        assert self._price(side="draw")["withheld_reason"] == REASON_UNKNOWN_SIDE
+
+    def test_no_market_price_refuses_rather_than_assuming_one(self):
+        from syndicate.features.shared.live_gameline_join import REASON_NO_MARKET_PRICE
+        assert self._price(market_prob=None)["withheld_reason"] == REASON_NO_MARKET_PRICE
+        assert self._price(market_prob=0.0)["withheld_reason"] == REASON_NO_MARKET_PRICE
+        assert self._price(market_prob=1.0)["withheld_reason"] == REASON_NO_MARKET_PRICE
+
+    def test_the_verdict_is_always_a_dict_carrying_its_own_refusal(self):
+        """Never a bare None -- an absent verdict is how "withheld" silently
+        becomes "not considered"."""
+        for kw in ({"dist": {}}, {"line": None}, {"side": "x"},
+                   {"market": "h2h_3_way"}, {"market_prob": None}):
+            out = self._price(**kw)
+            assert isinstance(out, dict)
+            assert out["priceable"] is False
+            assert out["withheld_reason"]
+            assert out["sigma"] == 2.0
