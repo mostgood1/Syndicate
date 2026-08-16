@@ -264,11 +264,16 @@ complete.
   discriminator; **it was false when written** — those runs were in the same
   payload, on the `prior[1..3]` lines, while only the single `latest` line read
   `dd53d47c rows=0`. Retracted, not stacked.
-- **Still unestablished, and scoped to ONE service:** refresh-worker's
-  `d72d670c` has 5 consecutive `rows=0` runs (06:06Z–10:08Z) where its
-  predecessor `755ec40a` computed 32 rows for the same `date=2026-08-17`. It
-  builds next-day boards only, so "already built, nothing new to do" is the
-  likely reading — **likely, not measured.**
+- **MOOT AS OF 15:45:50Z, and never establishable now:** the `rows=0` streak
+  question was about refresh-worker's `d72d670c` (5 runs, 06:06Z–10:08Z, where
+  predecessor `755ec40a` computed 32 rows for the same `date=2026-08-17`).
+  **That commit is no longer deployed** — refresh-worker redeployed to
+  `97491161` (`#441`) at 15:39:59Z→15:45:50Z. The streak is **frozen at 5, not
+  growing**: checked 16:26Z, `runs_recorded` still 9, latest still 10:08:33Z,
+  no producer in logs since 10:00Z. Not a crash — events 10:00Z–15:39Z are
+  genuinely quiet (verified with the endpoint's own positive control), so the
+  producer simply was not invoked for 6h. Whether `97491161` computes rows is a
+  **new** question its first run will answer.
 - **Read it with `scripts/read_win_prob_null.py`**, which prints `recent`
   alongside `latest` — see below for why the route's headline cannot be trusted.
 - **DO NOT READ THE ROUTE'S HEADLINE — READ `readings[*].recent`.** The same
