@@ -268,10 +268,32 @@ complete.
   and the reuse gate returns the cached bundle BEFORE any of them run. No builder
   → no `win_prob` computed → `rows=0`. **Structurally correct output of a
   reuse-skipped run, not a fault.**
-  - **NOT GENERALISED: a second `rows=0` at `04:24:45-05:00` is unexplained.**
-    That date's decision was `will_fetch` (recorded `04:24:18`, 27s earlier), so
-    reuse does not cover it. The memory census had NO sample in that window, so
-    that process's flags are unknown — do not assume it was also reuse.
+  - **THE `04:24:45-05:00` RUN IS NOW EXPLAINED TOO, AND IT IS A SECOND,
+    INDEPENDENT GATE — not the bundle reuse one.** That run's decision really was
+    `will_fetch`, so it DID fetch; what it skipped was the artifact BUILD, via the
+    per-file "already exists" short-circuit in the three exporters:
+    `_export_top_by_game_snapshot:5049` and
+    `_export_recommendations_slate_snapshot:5070` (`if existing and not
+    force_refresh: return existing`) and `_export_cards_props_snapshot:5082`
+    (`if existing: return existing`). By 00:53 all three
+    `*_2026-08-16.json` snapshots existed, so at 04:24 every exporter returned the
+    stale copy and no builder was called.
+  - **The discriminator, and it is exact:** pid `2466` emitted ONLY the exit
+    record, while pids `4732` (00:11) and `230` (00:53) each also emitted their
+    per-builder records. The builders have NO early return before their
+    `_emit_win_prob_build` call (read, not assumed), so a missing per-builder
+    record means the builder was never CALLED — which isolates the gate to the
+    exporter, above it.
+  - **CONSEQUENCE FOR READING THIS INSTRUMENT: the denominator only accumulates
+    on BUILDS, not on runs.** `rows=0` is the normal steady state for a date whose
+    snapshots already exist; exposure to the `or 0.5` branch is concentrated in
+    first-build runs. Do not treat "11 of 18 runs exercised" as a health metric
+    that should stay high — it will fall as a date settles, with nothing wrong.
+  - **ASYMMETRY WORTH FIXING (not fixed): `_export_cards_props_snapshot` has NO
+    `force_refresh` escape** while both siblings do, and the sibling comment names
+    that exact shape "the same reuse-forever bug". So `--force-refresh` cannot
+    regenerate `cards_props_snapshot_<date>.json` — and that is the builder that
+    produced the `rows=32/null=3` reading.
 - **CLOSED BENIGN 16:14:55Z — the fix is exercised on CURRENT code.**
   `dd53d47c` (verified descendant of `44bc02f3`) has **3 exercised runs,
   `rows=24/9/15`, 48 rows, 05:53:3xZ, live-odds-worker.** An earlier line here
