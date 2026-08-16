@@ -1450,7 +1450,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
-### clamp-fix-to-workers — OPEN — **BRANCH READY AND PUSHED (`c70eeff0`, cut on live `191d098f`), DEPLOY BLOCKED ON ANOTHER SESSION'S CLAIM. live-odds-worker needs nothing — its in-flight target `49797f4b` already carries the fix** — opened 2026-08-15 — session: clamp-fix-verification-watch
+### clamp-fix-to-workers — OPEN — **refresh-worker SHIPPED `57a437d5` (live 00:23:04Z, 0 clamp sites by content). live-odds-worker DEFERRED to a quiet window by user decision — `079cc42b` ready. VERIFICATION STILL OPEN: post-deploy read was `no_trigger` on a 12-row slate** — opened 2026-08-15 — session: clamp-fix-verification-watch
 - Goal: the ±4900 clamp stops being published. **Testable outcome:**
   `py -3 scripts/watch_clamp_trigger.py --once` returns `POST_FIX_OK` on a slate
   that carries an out-of-clamp probability.
@@ -1484,6 +1484,29 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
   (target `037eb356`, since 23:35:01Z), which still carries both sites.
   `send_message` is unavailable from this scheduled-task session, so the claim
   was NOT taken and no coordination message could be sent. Waiting for release.
+
+- **RESULT 2026-08-16 00:23:04Z — refresh-worker shipped `57a437d5`.** 0
+  occurrences of `max(0.02, min(0.98` across all three files at the live SHA.
+  Cut on live `2c14d9ae`, not main. Gated on `safety_rc == 0 AND zero [JOB]
+  processes`, re-verified in the same shell command as the POST.
+- **VERIFICATION DID NOT HAPPEN AND IS NOT CLAIMED.** 00:24:04Z read: `rows=12`,
+  p=[0.338468, 0.603175], `out_of_clamp=0` → `no_trigger`. The slate collapsed
+  from 97 rows as games finished. Same reading a quiet slate gives with the bug
+  fully present. The 2-hourly `clamp-fix-verification-watch` task carries this.
+- **`live-odds-worker` DEFERRED, not forgotten.** It carries the clamp but does
+  not run the intelligence-state loop, so it is not the producer of the measured
+  misprice. It is also effectively never idle — 57 samples over 35 min, zero
+  job-free moments, running a per-league soccer artifact sweep. `079cc42b` is
+  cut, tested and pushed; re-cut on the live SHA before shipping.
+- **CORRECTION LOGGED: I twice called live-odds-worker "already fixed" off a
+  PENDING claim target.** `49797f4b` was clean and never landed as-is; `c422f79a`
+  then `c4116ab6` landed instead, both still clamping. **A claim's target is an
+  intention, not a deployment.** Verify by content at the live SHA, every time.
+- **TWO SAFETY-TOOL DEFECTS, both in `learnings.md` 2026-08-16:**
+  `check_deploy_safety.py` reports CLEAR while jobs run on the service (measured
+  on BOTH workers), and has no `--service` flag so it also blocks on the wrong
+  service's work. And a wait loop of mine read a stderr HTTP 502 as CLEAR by
+  testing for the absence of a failure string.
 
 #### smaps-anon-breakdown — CLOSED 2026-08-15 23:5xZ
 **HYPOTHESIS CONFIRMED.** pid 39 anon is **91% mmap** (1,007.2 of 1,106.9MB)

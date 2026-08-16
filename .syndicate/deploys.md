@@ -3766,6 +3766,37 @@ allowlisted**, so making it observable is the cheapest instrument in reach.
   accepted deliberately, web being display-only.
 - **Rollback:** `py -3 scripts/render_deploy.py --service web --commit b9ea0f0a --allow-rollback`
 
+## 2026-08-16 01:2xZ — live-odds-worker — the last 2 clamp sites — **NOT DEPLOYED. DEFERRED TO A QUIET WINDOW BY USER DECISION. Branch `079cc42b` is cut, tested and pushed; nothing to redo but a re-cut on the live SHA.**
+
+- **DECISION (user, 2026-08-16):** leave it. live-odds-worker does **not** run the
+  intelligence-state loop (`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP`
+  is `true` only on refresh-worker), so it **carries** the clamp but there is no
+  evidence it **publishes** one. refresh-worker was the service that mattered and
+  it shipped at 00:23:04Z. Deferring costs nothing measured.
+- **READY TO SHIP:** `079cc42b` on `deploy/clamp-workers-on-live`, cut on live
+  `c4116ab6`, two files, 0 clamp sites across all three, 40 tests green.
+  **Re-cut before deploying** — this service moved 4× in 100 minutes
+  (`f0452408` → `b7ae47e6` → `c422f79a` → `c4116ab6`).
+- **WHY IT COULD NOT BE SHIPPED TONIGHT: the service is effectively never idle.**
+  57 samples over 35 minutes (40s and 8s intervals) found **zero** job-free
+  moments. It runs a per-league soccer artifact sweep inside the odds refresh
+  job — `run_refresh_odds_job.py` → `refresh_odds_sources.py` →
+  `build_soccer_artifacts.py --league <X>` — cycling `eredivisie` →
+  `primeira_liga` → `championship` with fresh PIDs each time. Deploying means
+  killing a league build mid-flight; recoverable (next cycle rewrites), but it
+  re-spends the OddsAPI calls of the interrupted cycle.
+- **`check_deploy_safety.py` IS NOT A GATE FOR THIS SERVICE, and reading it as
+  one wastes hours.** It has **no `--service` flag**: its blockers (MLB sim,
+  board build) are refresh-worker work. At 01:18Z it reported `NOT CLEAR — Board
+  build IN FLIGHT on refresh-worker` while the question on the table was a
+  live-odds-worker deploy. Conversely at 00:29Z it reported **`CLEAR`, exit 0**
+  while live-odds-worker itself ran 3 jobs. **For a non-refresh-worker deploy the
+  gate is that service's own `[JOB]` process list in `deploy_preflight.py`.**
+  Same tool, wrong-service blindness in both directions, measured within an hour.
+- **Claim hygiene:** held ~45 min, hit the 2700s TTL, released and re-acquired
+  once with the corrected target, then **released on the defer decision** rather
+  than left to expire while blocking other sessions.
+
 ## 2026-08-16 00:23:04Z — refresh-worker `57a437d5` — the last 2 clamp sites — **DEPLOYED AND PRESENT BY CONTENT. NOT YET VERIFIED — the slate went quiet 80 seconds later.**
 
 - **DEPLOYED.** `dep-da0g34c9v7es7399p1mg`, triggered 00:17:21Z, live 00:23:04Z.
@@ -5116,3 +5147,52 @@ still dark. Next deployer of live-odds-worker should carry
 `3573a0c3` is already stale). The hourly `wnba-win-prob-counter-read` scheduled
 task now reads this endpoint and will report "writer not deployed" until then —
 that is a true statement, not a null result.
+
+## 2026-08-16 01:2xZ — RETRACTION: THE "25 LIVE GAME-LINE EDGES" ARE NOT CREDIBLE. TWO DEFECTS IN MY OWN GATE.
+
+I was about to hand these rows to `clv-without-settlement` as a population to
+score. Reading the rows themselves stopped it. **Do not score them.**
+
+### DEFECT 1 — A DEGENERATE PROBABILITY MAKES EVERYTHING PRICEABLE
+    PHI @ MIN  model=0.0  mkt=0.0979  edge_pp=-9.79  se=0.0  sims=120  PRICEABLE
+
+`prob_std_err = sqrt(p(1-p)/n)`. At **p = 0.0 exactly** that is **0.0**, so the
+bar is `2 x 0.0 = 0` and **every edge clears it**. `0/120` is a legitimate Monte
+Carlo outcome (the model quantises to 1/120 — 0.0083, 0.0417, 0.9667 are all
+k/120), so this fires on real data, not on bad input.
+
+**I wrote the exact warning and then missed the case.** `prob_std_err`'s
+docstring says a 0.0 "would read as perfectly precise and would make every edge
+priceable — the single worst substitution available in this module." I guarded
+it for **unparseable** input and returned `0.0` for **degenerate** input, which
+is the same hole with a valid type. **A Wald interval is undefined at the
+boundary; it needs a rule (Wilson/Jeffreys, or refuse p in {0,1}).**
+
+### DEFECT 2 — THE EDGES LOOK SIDE-BLIND
+One game appears many times with wildly divergent market probabilities against a
+CONSTANT model probability:
+
+    MIA @ CIN  model=0.0417  mkt = 0.5028 / 0.4682 / 0.3905 / 0.531   edge -35 to -49 pp
+    SD  @ CLE  model=0.9667  mkt = 0.875 / 0.8856 / 0.8993 / 0.5424   edge +6.7 to +42.4 pp
+
+A **+42 pp** edge on a moneyline is not a finding, it is a units or side error.
+`model_prob` is the HOME win probability; I read `market_fair_prob_over` and
+assumed it is the home side on every h2h row. **The 0.5424 and 0.5028 values
+look like the OTHER side of the same market**, which is precisely the
+side-blindness `closing-stamp-is-detection-time` already documents for
+`closing_price` (always the home price, 18/18). I verified the de-vig
+arithmetic on ONE row at 21:0xZ and generalised from it.
+
+### STATUS
+- **Drop 3's plumbing is still real**: the join runs, counters attribute every
+  row, `simsRun` now reaches the gate. That part stands.
+- **`rows_live_gameline_edged` is NOT a product signal yet.** It is currently
+  counting rows that pass a gate with a zero-width interval and a probably
+  mismatched side.
+- **NOT handed to `clv-without-settlement`.** Scoring these would have produced
+  a CLV number off mis-sided rows — the same class of error that lane just
+  retracted its own first number for.
+
+**Fix order:** (1) refuse or widen `p in {0,1}` in `prob_std_err`; (2) establish
+per-row which side `market_fair_prob_over` describes and join side-explicitly;
+(3) only then re-count edges and consider CLV.

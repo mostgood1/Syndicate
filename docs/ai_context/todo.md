@@ -1,6 +1,6 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#439` — **The ±4900 fair-price clamp: FIXED ON WEB, STILL LIVE ON BOTH WORKERS. Falsified in production 2026-08-15 23:10Z** — program Tier 3a, lanes `probability-differential-test` / `probability-clamp-removal` / `-2` / `clamp-trigger-watcher`
+### `#439` — **The ±4900 fair-price clamp: web + refresh-worker FIXED (`57a437d5`, live 2026-08-16 00:23:04Z). live-odds-worker deferred. STILL UNVERIFIED IN PRODUCTION** — program Tier 3a, lanes `probability-differential-test` / `probability-clamp-removal` / `-2` / `clamp-trigger-watcher`
 
 **Filed at session close so shipped work reaches this list (the `#71` check).**
 Everything below is on `origin/main`; the deploy is live.
@@ -28,8 +28,25 @@ guard: it answers an out-of-range input with a number instead of refusing.
 (the UNIQUE survivor of its concept), `live_lens_local._american_to_decimal`.
 
 **STILL OPEN — item 1 is now BIGGER than "verify", and it is the priority:**
-1. **DEPLOY THE FIX TO THE WORKERS. It was only ever shipped to web, and web is
-   not the producer.** Measured 2026-08-15 **23:10:13Z and 23:15:46Z** — two
+1. **VERIFY IT IN PRODUCTION — the only thing left that matters.** The producer
+   (refresh-worker) shipped `57a437d5` at 2026-08-16 00:23:04Z with 0 clamp
+   sites by content. The read 80s later was `no_trigger` on a 12-row slate, so
+   **nothing is verified yet**. `POST_FIX_OK` from
+   `py -3 scripts/watch_clamp_trigger.py --once` closes this; the 2-hourly
+   `clamp-fix-verification-watch` task runs it automatically.
+2. **live-odds-worker: DEFERRED to a quiet window (user decision 2026-08-16).**
+   It carries the clamp but does not run the intelligence-state loop, so it is
+   not the producer. `079cc42b` is cut, tested (40 green) and pushed on
+   `deploy/clamp-workers-on-live`; **re-cut on the live SHA first** — that
+   service moved 4× in 100 minutes. It is effectively never idle (57 samples,
+   zero job-free), so shipping it means either an off-peak window or
+   deliberately killing a soccer league build.
+   - **A claim's target is an intention, not a deployment.** `49797f4b` was
+     clean and pending for 45 min and never landed; `c422f79a` and `c4116ab6`
+     landed instead, both clamping. I called this service "already fixed" twice
+     off that pending target. Verify by content at the live SHA.
+3. **Superseded — kept for the mechanism.** The web-only deploy was falsified
+   because web is not the producer: Measured 2026-08-15 **23:10:13Z and 23:15:46Z** — two
    triggers, two unrelated slates, both `PRE_FIX_MISPRICE` against a
    fix-carrying web SHA. nfl `h2h_3_way` p=0.014698 → +4900 (correct +6704);
    mlb `spreads` p=0.009911/0.990089 → ±4900 (correct ±9990, off by 5090).
