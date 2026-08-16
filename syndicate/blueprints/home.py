@@ -5997,6 +5997,10 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
             season=resolved_season,
             week=resolved_week,
             league=league,
+            # Carried so `games()` below can resolve the OTHER leagues against
+            # the date that was asked for. Without it the fan-out fell back to
+            # the wall clock and every date returned this week's fixtures.
+            requested_date=today,
         )
 
     def is_active(self, *, today_value: str, context_label: str) -> bool:
@@ -6007,7 +6011,25 @@ class _SoccerDataProvider(_HomeSportDataProviderBase):
     def games(self, context: SportContext, *, is_active_today: bool) -> list[dict[str, Any]]:
         from syndicate.features.soccer.cards import build_cards_page_context
 
-        today = central_today_iso()
+        # THE DATE THE CALLER ASKED FOR, not the wall clock.
+        #
+        # This line read `today = central_today_iso()` and it silently made the
+        # whole fan-out date-blind: `_league_season_week` resolves every
+        # non-primary league with `default_week(..., reference_date=today)`, so
+        # a request for a future date returned THIS week's fixtures for all ten
+        # leagues. `resolve_context` had already done the right thing for the
+        # primary league and its answer was being thrown away here.
+        #
+        # Measured 2026-08-16: `build_game_chips` returned the identical 90
+        # soccer chips for 08-16, 08-17, 08-20 and 08-22, while `default_week`
+        # maps 08-16 -> week 1 and 08-22 -> week 2 for epl/la_liga/ligue_1. The
+        # consequence on the board was 17 games in `state: "unknown"` holding
+        # 1,628 rows -- 15 of them with no matching chip at ANY date, and for
+        # epl and ligue_1 the clubs were absent from the chip set entirely.
+        #
+        # Falls back to the wall clock when the context carries no date, so a
+        # caller that builds a SportContext by hand behaves exactly as before.
+        today = str(getattr(context, "requested_date", None) or central_today_iso())
         games: list[dict[str, Any]] = []
         for league in self._active_leagues(today):
             # One broken league (missing schedule artifact, bad season roll)
