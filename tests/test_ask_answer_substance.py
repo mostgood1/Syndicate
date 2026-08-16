@@ -695,3 +695,59 @@ def test_result_as_of_reads_state_meta_not_only_freshness():
     assert adapter._result_as_of({"state_meta": {"computed_at": "2026-08-16T20:15:41Z"}}) == "2026-08-16T20:15:41Z"
     assert adapter._result_as_of({"freshness": {"as_of": "2026-08-16T20:15:41Z"}}) == "2026-08-16T20:15:41Z"
     assert adapter._result_as_of({}) is None
+
+
+# --------------------------------------------------------------------------
+# 8. A negative edge is not an opportunity.
+#
+# Served 2026-08-16 20:5xZ under "Showing the top 5 opportunities on today's
+# board in MLB. Best edge 4.9%": three of the five carried `model_edge_pct` of
+# -1.83, -4.87 and -8.20. The ranker was correct -- the board had thinned to 70
+# rows with 6 carrying a model edge and only 2 positive -- so "the best 5"
+# genuinely included four bad bets. Sorting a pool is not the same as declining
+# to publish one, which is the lesson the 2026-08-03 note in
+# `_market_summary_schema` half-learned.
+# --------------------------------------------------------------------------
+
+def test_positive_edge_uses_the_term_the_row_is_ranked_on():
+    """Model edge when present, EV otherwise -- same term as `_board_rank_key`,
+    so ordering and eligibility cannot disagree."""
+    assert adapter._has_positive_edge({"model_edge_pct": 4.91, "ev_pct": -2.0}) is True
+    assert adapter._has_positive_edge({"model_edge_pct": -8.20, "ev_pct": 4.16}) is False
+    assert adapter._has_positive_edge({"ev_pct": 1.35}) is True
+    assert adapter._has_positive_edge({"ev_pct": -2.16}) is False
+    assert adapter._has_positive_edge({}) is False
+
+
+def test_zero_edge_is_not_positive():
+    assert adapter._has_positive_edge({"model_edge_pct": 0.0}) is False
+    assert adapter._has_positive_edge({"ev_pct": 0.0}) is False
+
+
+def test_booleans_are_not_edges():
+    """`isinstance(True, int)` is True -- a bool must not pass as a number."""
+    assert adapter._has_positive_edge({"model_edge_pct": True}) is False
+
+
+def test_summary_says_why_the_list_is_short():
+    """"top 2" on a 70-row board must not read as thin data."""
+    rows = [{"selection": "Jose Altuve over 0.5", "sport": "mlb", "edge_pct": 4.91}]
+    text = adapter._board_summary_sentence(rows, excluded_negative=4)
+    assert "top 1 opportunity" in text
+    assert "4 rows priced against the model" in text
+    assert "were left out" in text
+
+
+def test_an_empty_result_explains_itself():
+    """"No opportunities" reads as an empty board; the truth may be a full board
+    the model dislikes. Two very different facts for a bettor."""
+    text = adapter._board_summary_sentence([], excluded_negative=6)
+    assert "No positive-edge opportunities" in text
+    assert "6 rows priced against the model" in text
+    # and the un-explained form survives for a genuinely empty board
+    assert adapter._board_summary_sentence([], 0) == "No opportunities are on the board right now."
+
+
+def test_singular_plural_on_one_excluded_row():
+    text = adapter._board_summary_sentence([], excluded_negative=1)
+    assert "1 row priced against the model and was left out" in text

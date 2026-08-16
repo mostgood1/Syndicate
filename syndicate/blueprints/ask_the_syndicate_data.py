@@ -3566,9 +3566,15 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
         "columns": ["Sport", "Market", "Selection", "Price", "EV", "Model edge"],
         "rows": table_rows,
     }]
+    # POSITIVE ONLY. The chart is titled "Top edges"; a -9.17% bar under that
+    # heading is not a top edge, it is the model saying "do not bet this".
+    # The TABLE above keeps every row on purpose -- it is an inventory with an
+    # explicit "N of M rows" count and a signed `Model edge` column, so a
+    # negative there is information rather than a recommendation.
     points = [
         {"x": _board_row_chart_label(row), "y": round(float(row["model_edge_pct"]), 2)}
-        for row in top if isinstance(row.get("model_edge_pct"), (int, float))
+        for row in top
+        if isinstance(row.get("model_edge_pct"), (int, float)) and float(row["model_edge_pct"]) > 0
     ]
     # No row in the result carries a model number, so a "top edges" chart would
     # be an empty frame implying we had nothing to say. Drop it and let the

@@ -517,7 +517,7 @@ _GENERAL_BOARD_QUESTION_PATTERNS = (
 )
 
 
-def _board_summary_sentence(rows: Any) -> str:
+def _board_summary_sentence(rows: Any, excluded_negative: int = 0) -> str:
     """A factual one-liner describing the opportunities actually returned.
 
     Everything here is read off the rows -- count, sports covered, and the
@@ -526,6 +526,15 @@ def _board_summary_sentence(rows: Any) -> str:
     """
     items = [row for row in (rows or []) if isinstance(row, dict)]
     if not items:
+        # AN EXPLAINED ABSENCE, NOT A BARE ONE. "No opportunities" reads as
+        # "the board is empty" when the truth may be "the board is full and the
+        # model likes none of it" -- two very different facts for a bettor.
+        if excluded_negative > 0:
+            return (
+                f"No positive-edge opportunities on today's board right now — "
+                f"{excluded_negative} row{'s' if excluded_negative != 1 else ''} "
+                f"priced against the model and {'were' if excluded_negative != 1 else 'was'} left out."
+            )
         return "No opportunities are on the board right now."
     sports = []
     for row in items:
@@ -554,6 +563,13 @@ def _board_summary_sentence(rows: Any) -> str:
     sentence = " ".join(parts) + "."
     if best_pct is not None:
         sentence += f" Best edge {best_pct:.1f}%."
+    # Say why the list is short. Without this, "top 2" on a 70-row board reads
+    # as thin data rather than as a deliberate exclusion.
+    if excluded_negative > 0:
+        sentence += (
+            f" {excluded_negative} row{'s' if excluded_negative != 1 else ''} "
+            f"priced against the model and {'were' if excluded_negative != 1 else 'was'} left out."
+        )
     return sentence
 
 
@@ -1053,6 +1069,35 @@ def _board_row_probabilities(row: dict[str, Any]) -> tuple[float | None, float |
     return (round(model_p * 100.0, 2), round(market_p * 100.0, 2))
 
 
+def _has_positive_edge(row: dict[str, Any]) -> bool:
+    """Is the number this row is RANKED ON actually positive?
+
+    **A negative edge is the model saying "do not bet this".** Served
+    2026-08-16 20:5xZ under the headline "Showing the top 5 opportunities on
+    today's board in MLB. Best edge 4.9%": three of the five carried
+    `model_edge_pct` of -1.83, -4.87 and -8.20. The ranker was not wrong -- the
+    board had thinned to 70 rows with only 6 carrying a model edge and only 2 of
+    those positive, so "the best 5" genuinely included four bad bets. Sorting
+    correctly is not the same as having something to show.
+
+    This is the second time this exact shape has shipped. `_market_summary_schema`
+    already carries a note about 2026-08-03, when the summary "returned 4
+    negative-edge rows with the only positive one (+16.9%) ranked LAST", and the
+    fix then was to SORT. Sorting was necessary and never sufficient: it orders a
+    pool, it does not decline to publish one.
+
+    The test mirrors `_board_rank_key` deliberately -- a row is judged on the
+    same term it is ranked on, so ordering and eligibility cannot disagree.
+    `ev_pct` is checked too because it is NOT floored at zero: the served board's
+    `min_value_pct` is **-2.0**, and 6 of 70 rows had `ev_pct <= 0`.
+    """
+    edge = row.get("model_edge_pct")
+    if isinstance(edge, (int, float)) and not isinstance(edge, bool):
+        return float(edge) > 0.0
+    ev = row.get("ev_pct")
+    return isinstance(ev, (int, float)) and not isinstance(ev, bool) and float(ev) > 0.0
+
+
 def _board_rank_key(row: dict[str, Any]) -> tuple[int, float]:
     """The ranking M1 uses, kept identical on purpose.
 
@@ -1069,7 +1114,7 @@ def _board_rank_key(row: dict[str, Any]) -> tuple[int, float]:
     return (0, float(ev) if isinstance(ev, (int, float)) else float("-inf"))
 
 
-def _board_top_opportunities(context: dict[str, Any], result: Any) -> list[dict[str, Any]] | None:
+def _board_top_opportunities(context: dict[str, Any], result: Any) -> tuple[list[dict[str, Any]] | None, int]:
     """`top_opportunities` sourced from the SAME artifact the board serves.
 
     **Why this exists.** `M1` gave aggregation questions a board-wide table but
@@ -1100,12 +1145,12 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> list[dict[
         payload = read_layer2_shortlist(selected_date or central_today_iso())
     except Exception:
         # A headline is worth degrading, not worth 500ing an answer over.
-        return None
+        return None, 0
     if not isinstance(payload, dict):
-        return None
+        return None, 0
     rows = [row for row in (payload.get("rows") or []) if isinstance(row, dict)]
     if not rows:
-        return None
+        return None, 0
 
     sport = str(context.get("sport_slug") or context.get("sport") or "").strip().lower()
     if sport:
@@ -1117,8 +1162,17 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> list[dict[
         # answers nothing. Fall back to the snapshot instead of emptying the
         # only rows a non-aggregation market summary has.
         if not scoped:
-            return None
+            return None, 0
         rows = scoped
+
+    # DECLINE TO PUBLISH A BAD BET. Filtering before the slice, not after, so a
+    # thin board returns fewer rows rather than padding the five out with
+    # negatives. An EMPTY list here is a real answer ("nothing qualifies right
+    # now") and is deliberately distinguished from the `None` returned above for
+    # a missing artifact -- see the caller, which tests `is not None`.
+    considered = len(rows)
+    rows = [row for row in rows if _has_positive_edge(row)]
+    excluded = considered - len(rows)
 
     rows.sort(key=_board_rank_key, reverse=True)
     top: list[dict[str, Any]] = []
@@ -1160,7 +1214,12 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> list[dict[
                 ),
             }
         )
-    return top or None
+    # `top` may legitimately be EMPTY when every row was filtered out. That is a
+    # published fact, not a missing one, so it is returned as-is; only the
+    # missing-artifact paths above return None. The excluded count travels
+    # BESIDE the rows rather than on them -- a private key stashed on a row would
+    # be serialised straight into the API payload.
+    return top, excluded
 
 
 def _market_summary_schema(
@@ -1191,10 +1250,14 @@ def _market_summary_schema(
     # for tomorrow's game?" with five unrelated NFL totals. Refusal went 4/8 ->
     # 3/8 against a same-slate control -- one case, F07, and this line is all of
     # it. So: replace a non-empty pool, never manufacture one.
-    board_opportunities = (
-        _board_top_opportunities(_mapping_or_empty(context), result) if recommendations else None
+    board_opportunities, board_excluded = (
+        _board_top_opportunities(_mapping_or_empty(context), result) if recommendations else (None, 0)
     )
-    if board_opportunities:
+    # `is not None`, NOT truthiness. An EMPTY board list means "the board had
+    # rows and none of them qualify", which is an answer; falling through to the
+    # snapshot there would republish exactly the negative-edge rows the filter
+    # just removed.
+    if board_opportunities is not None:
         top_opportunities = board_opportunities
         ranked = []
     for item in ranked[:5]:
@@ -1255,7 +1318,7 @@ def _market_summary_schema(
         # summary empty. Describe what is actually being shown instead,
         # entirely from the rows themselves -- no narration, no LLM, and
         # nothing asserted that the data does not support.
-        summary_text = _board_summary_sentence(top_opportunities)
+        summary_text = _board_summary_sentence(top_opportunities, board_excluded)
     return {
         "schema_type": "market_summary",
         "top_opportunities": top_opportunities,
