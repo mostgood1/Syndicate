@@ -42,6 +42,21 @@ class SportContext:
     season: int | None = None
     week: int | None = None
     league: str | None = None
+    # THE DATE THE CALLER ASKED FOR, carried so a provider that fans out across
+    # sub-leagues can resolve each one against it.
+    #
+    # WHY THIS EXISTS. `resolve_context(requested_date=...)` resolves the
+    # PRIMARY league's season/week correctly, and then soccer's `games()` opened
+    # with `today = central_today_iso()` and re-resolved every other league
+    # against the wall clock. Measured 2026-08-16:
+    # `build_game_chips("2026-08-22", ["soccer"])` returned the SAME 90 chips as
+    # `"2026-08-16"`, though `default_week` maps those dates to week 1 and week
+    # 2 respectively -- so 14 fixtures on 08-22 had no chip, landed in
+    # `state: "unknown"`, and carried 1,628 rows with no game state at all.
+    #
+    # Optional and defaulted, so the seven providers that never read it are
+    # untouched and a caller that omits it gets exactly the old behaviour.
+    requested_date: str | None = None
 
 
 class SportDataProvider(Protocol):
