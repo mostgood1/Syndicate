@@ -8019,3 +8019,73 @@ stopped racing and waited for their hotfix to go live before deploying once on
 top of it. Their deploy branches were also cut from a base that lacked the HR
 ladder already on `origin/main` — a reminder that "on main" and "on the live
 worker" are independent facts here.
+## 2026-08-16 21:0xZ — outstanding #3, WNBA distribution — **DIAGNOSED, NOT BUILT.** The raw material exists; what is published cannot price a line
+
+**No code change. This is the diagnosis, and it contains a trap worth more than
+the fix.**
+
+### The board symptom
+`game|totals_alt|full` **0/243** and `game|spreads_alt|full` **0/176** projected
+— 419 rows, 48% of the WNBA board — plus `player_double_double` 0/30 and
+`player_triple_double` 0/8. The BASE spread and total of the same games are
+projected (9/9, 8/8) off means, via `edge_vs_line` in stat units.
+
+### It is NOT a modelling gap. The sim runs 2,000 sims and keeps the arrays
+`smart_sim.SmartSimConfig.n_sims = 2000`, and `_summarize_period` computes, per
+game, from `home_scores`/`away_scores` arrays of that length:
+
+```
+margin      = h - a          (full 2000-element array)
+margin_mean, total_mean
+margin_q, total_q            <- _period_quantiles(...)
+p_home_win  = mean(margin > 0)
+p_raw       = mean((margin + spread_line) > 0)     <- a real COVER probability
+```
+
+It even computes a cover probability against a spread line already.
+
+### THE TRAP: MLB's key names on a shape MLB cannot read
+`vendor/wnba_betting_repo/app.py:7477-7478` builds an MLB-shaped prediction row:
+
+```python
+"total_runs_dist": score.get("total_q"),
+"run_margin_dist": score.get("margin_q"),
+```
+
+Those are **exactly** the keys `prop_projections.project_game_market` consumes
+for MLB totals and spreads. But `_quantiles` (`smart_sim.py:3449`) returns
+
+```python
+{"p10": -8.0, "p50": 1.5, "p90": 11.0}
+```
+
+— a THREE-POINT SUMMARY, while MLB's `_dist_prob_over` iterates the dict
+treating each KEY as an outcome value and each VALUE as a count:
+`float("p10")` raises, the entry is skipped, `total` stays 0, and the function
+returns `None`.
+
+**So wiring these together on the strength of the matching name yields silence,
+not an error.** A future reader who greps `run_margin_dist`, sees WNBA already
+emits it, and points the consumer at it will get a board that stays exactly as
+blank as it is now, with nothing saying why. Recorded here so that hour is not
+spent twice.
+
+### What the fix actually needs (not done)
+Publish something a line can be priced against, from arrays that already exist:
+- **Empirical histogram** `{margin_value: sim_count}` — matches MLB's contract
+  exactly and needs no distributional assumption. ~40 int keys per game.
+- **Or mean + sigma**, which is cheaper but imposes normality on a
+  basketball margin — defensible, and it must be labelled as an assumption
+  rather than presented as the sim's own distribution.
+
+Then the WNBA consumer (`wnba_game_projections.py`, currently reading
+`pred_margin`/`pred_total` means out of `game_cards_<date>.csv`) prices
+`spreads`/`totals` and their `_alt` families the same way
+`live_gameline_join.price_distribution_market` now does for MLB — including the
+away-frame sign convention, which is already written down in two places.
+
+**Verification will require a WNBA sim re-run**, like the HR ladder: the
+counters/arrays only change what a NEW sim writes.
+
+`player_double_double` / `player_triple_double` fall out of the same gap — both
+are joint conditions on the per-player stat arrays the sim also already has.
