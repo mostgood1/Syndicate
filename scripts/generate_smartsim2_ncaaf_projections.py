@@ -73,6 +73,42 @@ def norm(name: str) -> str:
 
 
 def load_engine_schedule(season: int, week: int) -> list[dict[str, str]]:
+    """Rows for this season/week from the legacy engine's predicted-totals CSV.
+
+    RETURNS EMPTY WHEN THE FILE IS ABSENT, DELIBERATELY. `#445`.
+
+    `games_from_cfbd_when_engine_schedule_empty` below is the intended handling
+    for a season this file does not cover, and its own docstring says so: "a
+    single, non-season-partitioned file that is only ever refreshed for the
+    engine's own season". `main` already calls it on an empty result. But this
+    function OPENED the path unguarded, so an absent file raised
+    FileNotFoundError and killed the run before that fallback could engage --
+    the fallback has been unreachable for exactly the case it was written for.
+
+    Measured 2026-08-16 on refresh-worker: every launch for season=2026 week=1
+    died here on
+    `.../ncaaf_source/data/college_football_schedule_2025_predicted_totals_enhanced.csv`,
+    and the staleness gate relaunched it indefinitely
+    (`SEASON_PROJECTION_ARTIFACT_MISSING sport=ncaaf ... since_launch_seconds=2866`).
+    All 278 of these files in the checkout are season 2025; there is no 2026 one
+    and nothing writes one.
+
+    NOTE THE FILENAME IS PINNED TO 2025 WHILE THE FILTER BELOW IS SEASON-AWARE.
+    That is left alone on purpose: pointing it at a 2026 file would be worse, not
+    better, because no such file exists and inventing one would rate the 2026
+    season from 2025 predicted totals. CFBD is the correct source for a season
+    the legacy engine never covered.
+    """
+    if not ENHANCED_CSV.is_file():
+        # Attributable, not silent: "no rows for this week" and "the file is not
+        # there at all" are different facts, and the caller's fallback log line
+        # cannot tell them apart on its own.
+        print(
+            f"ENGINE_SCHEDULE_ABSENT path={ENHANCED_CSV} season={season} week={week} "
+            "-- falling back to CFBD games",
+            flush=True,
+        )
+        return []
     with ENHANCED_CSV.open("r", encoding="utf-8-sig", newline="") as handle:
         rows = [row for row in csv.DictReader(handle) if row.get("week") == str(week) and row.get("season") == str(season)]
     return rows
