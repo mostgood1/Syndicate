@@ -391,10 +391,23 @@ unsaved anywhere.
 
 ## MEMORY — refresh-worker: THE 2GB IS A TRANSIENT, AND ITS ALLOCATOR IS STILL UNNAMED `[measured 08-16 15:1xZ]`
 
-**Three fixes are live in `d72d670c` and exercised; NONE has been shown to move
-the transient.** `51ae7218` (odds-shard duplicate parse), `21f8a165` (ledger
-streaming + `LEDGER_CHUNKS_ACCEPTED`), `aa190d58` (rank_recommendations: 3 full
-ledger loads per call -> 1). Verified by counting the branch, not the outcome.
+**Three fixes are live and exercised; NONE has been shown to move the
+transient.** Verified by counting the branch, not the outcome. **Their SHAs were
+REBASED 08-16 — the originals are NOT ancestors of live and a SHA-equality check
+reads them as reverted** (patch-id verified 08-16 16:3xZ): odds-shard duplicate
+parse `51ae7218`→`164f6e80`; ledger streaming + `LEDGER_CHUNKS_ACCEPTED`
+`21f8a165`→`1409e96f`; rank_recommendations 3 loads→1 `aa190d58`→`d72d670c`.
+They are linear (`164f6e80`→`1409e96f`→`d72d670c`), so
+`git merge-base --is-ancestor d72d670c <live>` covers all three. refresh-worker
+live `97491161` = `d72d670c` + one unrelated NFL pbp fix (`#441`), finished
+08-16 15:45:50Z; no deploy 15:45:50Z–16:29Z.
+
+**Kills are EVENING, and at-cap is not a kill `[events API, 08-09..08-16]`:**
+**42 `oomKilled`**, every failure event in 8 days — **41 of 42 between 15:00 and
+23:59 local** (08-14 alone: 29; last 08-15 23:46:44 local). And a 5h window
+(08-16 05:37–10:37 CDT, 2714 samples) read `container_memory_mb` **4096.0 MB =
+100.0% of cap** with **ZERO kills in it** — reclaim succeeding at the cap is what
+page cache looks like. Do not report an at-cap reading as a kill.
 
 **What IS established:** the failure is a ~2GB TRANSIENT, not a leak (22
 excursions, 5 deploy-free windows, trough returns every cycle); it is IN-PROCESS

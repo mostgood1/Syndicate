@@ -2175,3 +2175,56 @@ index state, and it is real. This is a different mechanism:
    — their lane is committed and correct — but the ledger now has one commit
    whose message and content disagree, which is exactly the shape that makes
    `git log -S` archaeology lie later.
+---
+
+## 2026-08-16 — OVERTURNED: a pinned SHA identifies deployed CODE
+
+**The belief.** Two scheduled measurement tasks pinned their comparison with
+"if the live SHA is no longer `d72d670c`, the comparison is invalid — a
+different SHA may have reverted the fixes." That reads as rigour. It is a
+string equality test standing in for a question about content.
+
+**What happened.** Within a day refresh-worker moved to `97491161`. Ancestry
+said all three fixes under test were ABSENT from live. Both facts were true and
+the conclusion they invite — "reverted, comparison invalid" — was false. The
+branch had been rebased: `51ae7218`→`164f6e80`, `21f8a165`→`1409e96f`,
+`aa190d58`→`d72d670c`, identical patch-ids, all three running the whole time.
+The one commit actually added on top was an unrelated NFL pbp fix.
+
+**Why the wrong version survived review.** A rebase changes every SHA while
+changing no code, so the *stricter-looking* test (equality) is the one that
+fires falsely, and it fires in the direction that looks responsible — declaring
+your own measurement invalid. A guard that errs toward "invalid" does not feel
+like a bug. It quietly throws away good evidence.
+
+**The rule.** Ask whether the code is IN what runs, never whether the tip
+matches:
+
+```bash
+git merge-base --is-ancestor <fix-sha> <live-sha>
+```
+
+Linear fixes collapse to one check on the newest. A FAILED containment check is
+still not a revert finding — re-check by `git patch-id --stable` across
+`git log <live-sha>` first, because the next rebase renames the pin too. This
+is the same shape as the existing rule that a deployed fix can be inert: both
+say **test the property you care about, not a proxy that correlates with it.**
+
+## 2026-08-16 — CORRECTED IN-SESSION: at-cap is not a kill
+
+`container_memory_mb` hit **4096.0 MB = 100.0% of a 4096 MB cap** across a 5h
+window, 2714 samples. I led a report with it as an escalation. The events API
+then showed **zero OOM kills in that same window** — while the 8-day census
+found 42, **41 of them between 15:00 and 23:59 local**, i.e. none in the hours
+I had sampled.
+
+`memory.current` includes page cache. Reaching the cap with reclaim succeeding
+is what a healthy page-cache-heavy process looks like. The repo already carried
+"`memory.current` includes page cache — split anon vs `inactive_file`"; I even
+wrote that caveat into my own report and then still led with the number as
+alarming. **A caveat stated is not a caveat applied.**
+
+Second-order, and the more useful half: the sampling schedule was aimed at the
+wrong hours. Two of three baseline records covered morning. A baseline that
+never covers the failure window measures the wrong distribution no matter how
+many samples it has. Cron moved `15 */4 * * *` → `45 19,22,1 * * *`.
