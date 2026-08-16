@@ -96,7 +96,7 @@
   will DELAY observation and is not a blocker.
 
 
-### export-force-refresh-escape — OPEN — **BUILT, TESTED (20, verified non-vacuous) AND ON `origin/main` (`734c163e`); ON NO SERVICE — rides along with the next worker deploy, see `deploys.md` PENDING** — opened 2026-08-16 — session: win-prob-null-readable
+### export-force-refresh-escape — OPEN — **DEPLOYED TO BOTH WORKERS 17:53Z (refresh-worker `b9f2b5f1`, live-odds-worker `e28594a7`), verified BY CONTENT; EFFECT UNMEASURED — needs a `:cards_props_snapshot` staged record from a forced run over an existing snapshot** — opened 2026-08-16 — session: win-prob-null-readable
 - Goal: `--force-refresh` actually regenerates the three props SNAPSHOT exports
   instead of re-serving a stale per-date file. Testable: with `force_refresh=True`
   the builder is CALLED even when the snapshot exists; with `False` it is not.

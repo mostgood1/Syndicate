@@ -6835,3 +6835,38 @@ live-odds-worker `b7ae47e6d1a0`.
 
 Measurement only — no deploy, no rollback, no source file touched. The watch task
 is discharged; attempts 3 and 4 are not needed and the task was not re-armed.
+
+## 2026-08-16 17:53Z — both workers — the props-snapshot `force_refresh` escape — DEPLOYED, MEASUREMENT OWED
+
+| service | commit | live | cut on |
+|---|---|---|---|
+| refresh-worker | `b9f2b5f1` | 2026-08-16T17:53:08Z | `f88796a9` |
+| live-odds-worker | `e28594a7` | 2026-08-16T17:53:28Z | `dd53d47c` |
+
+Web deliberately NOT deployed: these exporters are producer-side only.
+
+**Verified by CONTENT on both live SHAs, not by deploy status:** `wnba_guards=3`,
+`nba_guards=3`, `nba_materialize_param=1`. 20 tests green on each branch before
+push, and the branches were cut on each service's OWN live SHA — `main` is not a
+superset of the workers.
+
+**THE LIVE SHA MOVED WHILE I PREPARED, AND THE FIRST BRANCH WAS ALREADY STALE.**
+refresh-worker went `01a4b83e` → `f88796a9` (17:40:50Z) between cutting and
+deploying. `8c52b0dd` was cut on `01a4b83e`; deploying it would have REVERTED
+whatever `f88796a9` carried. Re-cut on `f88796a9` as `b9f2b5f1` — the ancestry
+check (`01a4b83e` IS an ancestor of `f88796a9`) is what made the re-cut a rebase
+rather than a merge. **"Live" is a lease; re-read it immediately before firing.**
+
+- refresh-worker deployed into a genuine lull (2 processes, both infra).
+- live-odds-worker deployed on top of 3 jobs (`refresh_odds_sources` +
+  `build_soccer_artifacts --league primeira_liga`), as established earlier
+  tonight: 10 of 10 samples over 25 minutes had jobs. That service has no idle
+  window during live hours. The jobs re-run next cycle.
+
+**MEASUREMENT OWED — this is NOT verified in effect.** Falsifiable check, on
+`/api/ops/win-prob-null`: a run that passes `--force-refresh` for a date whose
+`cards_props_snapshot_<date>.json` ALREADY EXISTS must now emit a
+`refresh_wnba_oddsapi_props:cards_props_snapshot` staged record. Before this
+deploy that record could only appear on a first build. Absence of it proves
+nothing on its own — `--force-refresh` only fires on a lineup/injury trigger, so
+check that a forced run happened at all before reading a null as a failure.

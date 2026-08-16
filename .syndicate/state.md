@@ -289,13 +289,15 @@ complete.
     snapshots already exist; exposure to the `or 0.5` branch is concentrated in
     first-build runs. Do not treat "11 of 18 runs exercised" as a health metric
     that should stay high — it will fall as a date settles, with nothing wrong.
-  - **ASYMMETRY NOW FIXED — `704bdc1a`, on `origin/main` as `734c163e`, ON NO
-    SERVICE.** `_export_cards_props_snapshot` takes the `force_refresh` escape its
-    two siblings had; NBA's whole trio got it plus the `_materialize_artifact_bundle`
-    parameter it lacked. 20 tests, verified non-vacuous against HEAD. Rides along
-    with the next worker deploy (`deploys.md` PENDING). **Not inert on WNBA:**
-    `live_refresh_loop` passes `--force-refresh` on every lineup/injury trigger, so
-    that snapshot starts rebuilding on those triggers — expected, not a regression.
+  - **ASYMMETRY FIXED AND DEPLOYED TO BOTH WORKERS `[verified by content 17:53Z]`:**
+    refresh-worker `b9f2b5f1`, live-odds-worker `e28594a7` — `wnba_guards=3`,
+    `nba_guards=3`, `nba_materialize_param=1` on each live SHA. Web needs nothing
+    (producer-side only). **UNVERIFIED IN EFFECT:** the proof is a
+    `:cards_props_snapshot` staged record on `/api/ops/win-prob-null` from a
+    `--force-refresh` run over an EXISTING snapshot; that has not been seen yet.
+    **Not inert on WNBA:** `live_refresh_loop` passes `--force-refresh` on every
+    lineup/injury trigger, so that snapshot now rebuilds on those triggers —
+    expected, not a regression. NBA's half stays untestable while out of season.
 - **CLOSED BENIGN 16:14:55Z — the fix is exercised on CURRENT code.**
   `dd53d47c` (verified descendant of `44bc02f3`) has **3 exercised runs,
   `rows=24/9/15`, 48 rows, 05:53:3xZ, live-odds-worker.** An earlier line here
