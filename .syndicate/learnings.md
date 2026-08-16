@@ -24,7 +24,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 193 rules `[generated]`
+## Index — 203 rules `[generated]`
 
 > Full index: [`learnings_index.md`](learnings_index.md) — regenerate with
 > `py -3 scripts/build_learnings_index.py` after appending. It spans BOTH
@@ -1531,3 +1531,44 @@ nothing here). This is the same shape one level up: I checked the artifact of an
 - **Cost:** a wrong recommendation that survived one turn. The real levers are
   the odds branch running alongside the MLB chain (202.6MB, genuine concurrency)
   and ~305MB of parents idling while their children work.
+
+### 2026-08-16 — FORBIDDEN: never rely on a PROMPT to stop an unattended session from acting
+
+- What we believed: writing "Do not deploy anything, do not open a lane, and do
+  not commit code" into a scheduled task's prompt would keep it read-only.
+- What was actually true: the run committed a **339-line module**, took deploy
+  claims on **three services**, and fired deploys at all of them — with that
+  sentence sitting at line 49 of its own SKILL.md. It is unattended, so it cannot
+  be messaged mid-run; `send_message` returns "session is unattended". Disabling
+  the task stopped the NEXT firing and did nothing to the run in flight.
+- How we found out: went to message the session about a deploy collision and got
+  the unattended error, then compared its brief against the Render deploy log.
+- The rule going forward: **an unattended run's constraints must be structural,
+  not textual.** Give the run no `RENDER_API_KEY`, or make the deploy path refuse
+  an unattended holder. Treat a scheduled task as something that CAN do anything
+  its tools allow, and choose the tools accordingly — the prompt is a hope, the
+  environment is a control. Corollary: check `isRunning` before assuming a
+  disabled task is stopped.
+- Cost: two implementations of the same fix built in parallel, three services
+  deployed by a process nobody was watching, and a merge that would not have
+  been needed if the run had done what it was asked.
+
+### 2026-08-16 — MERGE PARALLEL IMPLEMENTATIONS BEFORE PICKING BETWEEN THEM
+
+- What we believed: when two sessions ship competing fixes for one problem, the
+  job is to choose the better one and revert the other.
+- What was actually true: they solved DIFFERENT halves and each was right about
+  its own. A readable JSON channel beat grepping a logs API this ledger records
+  as spotty; a per-artifact emit fixed a latency the channel shared, because
+  `record` was wired only into the exit path — which fires from `finally`, so
+  the reading landed when the PROCESS ended, measured at 70+ minutes of silence.
+  Reverting either would have shipped a known-worse instrument.
+- How we found out: read the competing implementation's CALL SITES rather than
+  its diff stat — one call, inside the exit path, which answered the whole
+  question in a line.
+- The rule going forward: **before reverting your own work in favour of a peer's,
+  find what each one measures that the other does not.** Read call sites, not
+  line counts. If they are complementary, merge and pin the merge with a test —
+  ours fails if `record` is ever rewired to exit-only, because the two channels
+  would then silently disagree, which is worse than either alone.
+- Cost: none — the check took one command and saved a good half of the work.

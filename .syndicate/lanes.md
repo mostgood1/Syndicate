@@ -6,60 +6,6 @@
 
 ## OPEN
 
-### win-prob-null-readable — CLOSED-VERIFIED 2026-08-16 — **the counter is readable in production: `wnba/live-odds-worker rows=0 null=0`, generated_at 02:01:19Z (80s after the deploy), commit `3573a0c3` — worker wrote, web read. THE `or 0.5` MEASUREMENT IS NOT THIS LANE'S AND REMAINS OWED (`rows=0` = empty denominator)** — opened 2026-08-15 — session: win-prob-null-readable — opened 2026-08-15 — session: win-prob-null-readable
-- Goal: the `WIN_PROB_NULL_NO_PRICE` counter is READABLE from the web service
-  (one HTTP read, no log archaeology), for both prop producers, on every run.
-- **THE DEFECT, measured not suspected.** The counter deployed 2026-08-15
-  (refresh-worker `903d09c5`, live-odds-worker `b7ae47e6`) `print()`s to stdout
-  from `__main__`'s `finally`, and `refresh_odds_sources._run_command` runs every
-  producer under `subprocess.run(capture_output=True)` and **discards a
-  successful step's stdout** (bounded stderr tail only, only on FAILURE). Trap
-  already documented at `ops.py:2263` on 2026-08-01 for this same script.
-  - **The producer RAN and the line was still nowhere.** live-odds-worker's own
-    `ALL_PROCESS_MEMORY` census 23:36:05Z lists PID 1900
-    `refresh_wnba_oddsapi_props.py --date 2026-08-15 --do-edges --do-export`
-    (started 23:36:04Z, ppid 1880 = `refresh_odds_sources.py`), while
-    `render_logs.py` returned **zero matches on both workers** across the whole
-    window since the deploy. "Not yet run" was the WRONG reading; the silence
-    belonged to the emitter.
-- **SHIPPED IN CODE `b281bc7f`:** both producers also publish through
-  `write_json_file`; new `syndicate/features/shared/win_prob_null_diag.py` owns
-  the key so writer and reader cannot disagree; `/api/ops/win-prob-null` reads it
-  back and reports what it PROBED next to what it found. Per-service keys (the
-  `disk_maintenance._status_path` lesson: one shared key made a per-service fact
-  a race). 11 new tests + 55 targeted green; route exercised end-to-end
-  (worker-slug write → web-slug read → 200, 401 unauthenticated).
-  - **Env verified before relying on it, all three services:**
-    `SYNDICATE_REPORTS_ROOT=/opt/render/project/data/reports`,
-    `SYNDICATE_REFRESH_STATE_BACKEND=keyvalue`, so the key string matches
-    cross-service. `SYNDICATE_REFRESH_LANE` = `web` / `refresh-worker` /
-    `live-odds-worker`.
-  - The commit also carries the EARLIER session's counter (`_WIN_PROB_STATS`, the
-    `_clamp_probability` counting, the `finally` block) — live on both workers,
-    never committed to main. Not this lane's work; committed rather than left one
-    checkout away from loss.
-- Files (exclusive to this lane; `lane-guard.py` `_claims()` CLEAR **and** every
-  OPEN lane's `Files:` block read, per the under-report rule):
-  - `syndicate/features/shared/win_prob_null_diag.py` (new)
-  - `scripts/refresh_wnba_oddsapi_props.py`
-  - `scripts/refresh_nba_oddsapi_props.py`
-  - `syndicate/blueprints/ops.py` — the only two `lanes.md` mentions are explicit
-    NON-claims ("consumer only", "NOT claimed"); former holder
-    `quote-feed-age-alarm` is CLOSED-VERIFIED.
-  - `tests/test_win_prob_null_diag.py` (new)
-- Falsification test: if a producer run completes after the deploy and the key is
-  still absent, the keyvalue write is NOT the readable channel either — EXECUTE
-  `_keyvalue_backed()` against the real path (as `disk_maintenance._status_path`
-  did) and compare `reports_root()` on web vs worker. **Do not add a third
-  channel first.**
-- Verification (NOT DONE — this lane does not close on the code): after both
-  workers and web carry `b281bc7f`, `/api/ops/win-prob-null` returns a WNBA
-  reading whose `generated_at` post-dates the deploy. Until then the `or 0.5` fix
-  stays **UNVERIFIED IN EFFECT**; this lane made the measurement possible, not
-  made.
-- Blocked by: none. Needs a deploy to **both workers and web**; no deploy without
-  `/preflight`.
-
 ### closing-stamp-is-detection-time — OPEN — **FIXED AND DEPLOYED (`325b2822`, workers 23:1xZ); stamp is now the price's observation time, detection kept as `closing_detected_at`. OUTPUT UNVERIFIED — forward-only, today's stamps unrecoverable** — opened 2026-08-15 — session: lane-cleanup
 - **DISCRIMINATOR RUN 2026-08-15 22:0xZ on the `-186 -> +168` row. RESULT: NEITHER
   ORIGINAL BRANCH. The price is not stale and the clock is not the main problem —
@@ -1606,176 +1552,6 @@ sessions deploying, a two-file change should ride along, not chase.
     that is this lane's stated falsification test, and it is still live.
   - Session log: `.syndicate/log/2026-08-15.md`, final section.
 
-### slate-size-headroom — CLOSED 2026-08-16 — UNKNOWN FROM HISTORY (slate range is 1 game wide; naive fit gives an absurd +703MB/game). Solid: max peak 3,518MB = 85.9%, 578MB headroom — opened 2026-08-16 — session: memory-cutover-ship
-- Goal: answer "at what slate size does the worker cross 4GiB", with a number and
-  an honest error bar. Post-`#435` peak is **3,527.8MB (86.1%)** on a 15-game MLB
-  slate — 568MB of headroom. Whether that survives a 16-18 game night is
-  currently a guess, and the wrong way to find out is on a Sunday.
-- Files: none claimed — READ-ONLY. Measurement from production history first.
-- **METHOD, and the order matters:** model from EXISTING data before running any
-  experiment. Every board build already emits `game_count` alongside
-  `CONTAINER_MEMORY`, so the relationship between slate size and peak anon is
-  already recorded across days. An experiment that forces a large slate on the
-  live worker risks repeated OOM kills to learn something the logs may already
-  contain.
-- **Hypothesis:** peak anon scales roughly linearly with MLB game count, and the
-  crossing point is within reach of a real slate (16-18 games).
-- **Falsification test:** if peak anon shows no usable relationship to game count
-  — because the quote-shard ramp and time-of-day dominate it — then the model is
-  unavailable from history and the honest answer is "unknown, and a stress test
-  is the only way", stated as such rather than fitted anyway.
-- **KNOWN CONFOUND, declared up front:** slate size and shard size are
-  correlated (more games -> more quotes -> bigger shard) AND the shard grows
-  through the day independently. A naive fit will attribute shard growth to game
-  count. Any number produced must say which of the two it actually measured.
-- Verification: a table of (game_count, peak anon) with the sample count per
-  bucket, and an explicit statement of what the confound leaves unresolved.
-- Blocked by: none.
-
-#### slate-size-headroom — CLOSED 2026-08-16 01:3xZ — FALSIFICATION FIRED, NO NUMBER PRODUCED
-249 complete board builds, 20,000 samples, 20:42Z-01:31Z:
-
-    games  builds  median peak   max peak  % of 4096   hours seen
-       14      14        835.4     1672.2      40.8%   00,01,21,22,23
-       15     235       1538.1     3518.0      85.9%   00,01,20,21,22,23
-
-**THE OBSERVED SLATE RANGE IS ONE GAME WIDE.** Every MLB slate in the post-fix
-window was 14 or 15 games, so there is no variation to model against.
-
-**AND THE NAIVE FIT IS SELF-EVIDENTLY WRONG: +702.7 MB PER GAME.** No single
-baseball game costs 700MB. Two buckets one game apart differing by 703MB means
-they are different KINDS of build, not different sizes — the 14-game bucket has
-18 builds against 235 and sits at a different point in the quote-shard ramp. Its
-extrapolation ("~19 games to 4096MB") is an artifact and **must not be quoted.**
-
-**SO THE ANSWER IS: UNKNOWN FROM HISTORY**, exactly as this lane's falsification
-test specified. Fitting it anyway would have produced a confident number with no
-support, which is the failure mode this whole investigation kept hitting.
-
-WHAT IS SOLID FROM THE SAME DATA:
-- max peak **3,518.0MB = 85.9%** of the 4,096MB ceiling, over 249 builds.
-- **578MB of headroom** at that peak.
-- Zero OOM kills in 7h15m post-fix, across a full evening ramp.
-
-**WHY I AM NOT RUNNING THE EXPERIMENT WITHOUT A DECISION.** Answering this
-empirically means forcing an oversized slate on the live worker to find the
-crossing point — i.e. deliberately OOM-killing production, repeatedly, to learn
-a number. A local run cannot substitute: `learnings.md` records local
-underestimating production by ~40x on this exact code path.
-
-**THE CHEAPER DECISION IS CAPACITY, NOT DIAGNOSIS.** 578MB of headroom on a
-worker that legitimately holds ~1.6GB and spawns 8-10 children is thin. Raising
-the plan removes the question; measuring it costs production outages to answer
-something the answer to which is "add memory" either way. That is an owner call,
-and `render.yaml` is a `blueprint_sync` change — it applies to production on push.
-
-### worker-child-processes — CLOSED 2026-08-16 — CONFIRMED: worst combined 3,972MB = 97.0% of ceiling; 3 concurrent daily_update variants + `--workers 2` spawns are the lever — opened 2026-08-16 — session: memory-cutover-ship
-- Goal: characterise the refresh-worker's CHILD processes over a window — how
-  many, which, how big, how long-lived, and whether their peak coincides with
-  pid 39's. Measured twice and got 0.4MB and ~504MB, which is not a
-  characterisation, it is two anecdotes.
-- Files: none claimed — READ-ONLY, from `ALL_PROCESS_MEMORY` already in
-  production. No deploy.
-- **Hypothesis:** the children are dominated by MLB `daily_update.py` and its
-  `multiprocessing` spawns (`--workers 2` is on its command line), so the count
-  is CONFIGURABLE and the reduction is a flag rather than a rewrite.
-- **Falsification test:** if the largest child is NOT `daily_update`/its spawns —
-  e.g. the soccer or odds refresh jobs — the flag does nothing and the lever is
-  elsewhere.
-- **The measurement that matters is CONCURRENCY WITH THE PARENT'S PEAK**, not the
-  children's own size. 504MB of children while pid 39 sits at 1.1GB is
-  affordable; the same 504MB during pid 39's 3.5GB peak is what kills. A
-  characterisation that reports only the children's totals answers the wrong
-  question.
-- Verification: per-cmdline table (count, median/max rss, lifetime) plus the
-  joint distribution against parent rss at the same instant.
-- Blocked by: none.
-
-#### worker-child-processes — CLOSED 2026-08-16 01:4xZ — HYPOTHESIS CONFIRMED, LEVER NAMED
-6,199 `ALL_PROCESS_MEMORY` samples, 18:11Z-01:4xZ.
-
-**THE CHILDREN ARE CONCURRENT WITH THE PARENT'S PEAK, which is the finding —
-their own size was never the question:**
-
-    parent rss      samples   median kids   max kids   worst sum
-    0-1000 MB           742           3.3      677.0      1650.3
-    1000-2000 MB      1,391         300.2      771.8      2668.9
-    2000-3000 MB      2,013         450.2      778.1      3665.1
-    3000+ MB             53         206.4      672.1    **3972.0**
-
-**WORST COMBINED 3,972.0MB = 97.0% OF THE 4,096MB CEILING** — parent 3,302.4 +
-children 669.6 across 11 kids, at 22:00:31Z. **124MB from the ceiling.** The
-`#435` fix did not leave 578MB of headroom; it left 124MB at the worst observed
-moment, because the earlier figure counted the parent alone.
-
-**THE WORST MOMENT, named:**
-
-    3302.4  pid 39   run_refresh_worker.py
-     180.6  pid 341  daily_update.py --workers 2
-      95.5  pid 382  refresh_odds_sources.py
-      86.7  pid 415  build_soccer_artifacts.py
-      76.8  pid 370  daily_update.py --workers 2      <- a SECOND one
-      53.7  pid 493  multiprocessing spawn
-      53.7  pid 490  multiprocessing spawn
-      47.9  pid 369  daily_update_multi_profile.py --workers 2
-      39.2  pid 340  run_mlb_daily_sim_job.py --workers 2
-
-**HYPOTHESIS CONFIRMED:** the largest children are `daily_update.py` and its
-`multiprocessing` spawns, and **`--workers 2` is on every one of their command
-lines** — so the count is CONFIGURABLE. Falsification would have been the biggest
-child being a soccer/odds job; the soccer jobs are there (95.5 + 86.7) but they
-are second-tier.
-
-**THE LEVER, in order of size:**
-1. **THREE `daily_update` variants ran CONCURRENTLY** (`ui-daily`, `core`,
-   `multi_profile`) = 305.3MB before their spawns. Serialising them is the
-   single biggest win and costs no memory work at all.
-2. **`--workers 2` on four jobs** produced 2 live spawns at 53.7MB each. Dropping
-   to 1 saves ~107MB at the worst moment.
-3. Soccer (`refresh_odds_sources` + `build_soccer_artifacts`) = 182.2MB
-   concurrent with the MLB peak. Scheduling, not code.
-
-Together these are ~400-500MB against a 124MB margin — i.e. the children are a
-BIGGER lever than pymalloc's 350MB retention, and cheaper to pull.
-Read-only lane. No files touched, no deploy.
-
-#### worker-child-processes — CORRECTION 2026-08-16 01:5xZ — THEY ARE NESTED, NOT CONCURRENT
-I recommended "serialise the three `daily_update` variants — the single biggest
-win". **That was wrong. They are already sequential.** The ppid chain at the
-22:00:31Z worst moment:
-
-    pid  39  run_refresh_worker.py                  3,302.4
-    └ pid 340  run_mlb_daily_sim_job.py                39.2
-      └ pid 341  daily_update.py (ui-daily)           180.6
-        └ pid 369  daily_update_multi_profile.py       47.9
-          └ pid 370  daily_update.py                   76.8
-            ├ pid 490/493 multiprocessing spawn       107.4
-            └ pid 371  python                          11.9
-    └ pid 381  run_refresh_odds_job.py                 20.4
-      └ pid 382  refresh_odds_sources.py               95.5
-        └ pid 415  build_soccer_artifacts.py           86.7
-
-Three processes with the same NAME are not three concurrent jobs. `daily_update`
-spawns `multi_profile`, which spawns another `daily_update`. Each parent then
-sits holding its memory while its child works.
-
-**SO THE LEVER IS NESTING COST, NOT SCHEDULING.** ~305MB of that chain is parents
-IDLING with memory retained (180.6 + 47.9 + 76.8) while the actual work happens
-in the leaf spawns. Serialising cannot help something already serial; the
-question is why a process that is only `wait()`ing holds 180MB.
-
-**WHAT IS GENUINELY CONCURRENT is the ODDS BRANCH**: `run_refresh_odds_job` ->
-`refresh_odds_sources` -> `build_soccer_artifacts` = **202.6MB running alongside
-the MLB chain**, off a different child of pid 39. That IS a scheduling lever and
-it is the one I should have named.
-
-**REVISED, in order of size and cheapness:**
-1. **Odds/soccer branch off the MLB peak — 202.6MB.** Pure scheduling, no code.
-2. **The idle-parent chain — ~305MB.** Needs the parents to release before
-   spawning, or to hand off rather than nest. Real work, not a flag.
-3. **`--workers 2` -> 1 — ~54MB** (2 spawns at 53.7MB; only one is saved since
-   one worker remains).
-
 ### odds-cadence-off-the-mlb-peak — SCOPED, NOT STARTED — opened 2026-08-16 — session: memory-cutover-ship
 **Scoped only. No code, no deploy. Handing this over rather than starting it at
 02:00 local on a fixed crash.**
@@ -1895,3 +1671,111 @@ time-to-kickoff rather than on a global clock. Leagues whose next fixture is >N
 hours out get a slow cadence; MLS in its own evening stays fast. That serves
 `9ec20a06`'s freshness goal AND this lane's memory goal, which is why the two are
 only in tension while the cadence is fixture-blind.
+
+#### HANDOFF to `clv-without-settlement` — live game-line edges, and the reason there is nothing to score yet
+From `live-game-line-projection`, 2026-08-16 ~02:1xZ. **Read the structural
+point before the data — it is the actual deliverable.**
+
+**THE ROWS ARE TRANSIENT AND NOTHING PERSISTS THEM.** `live_gamelines` is
+recomputed from scratch on every board build, for whatever games are live at
+that instant. Measured tonight, same slate, three builds:
+
+    01:11Z  edged 25   (pre-fix, inflated by segment + boundary defects)
+    01:57Z  edged  4   (post-fix)
+    02:06Z  edged  1   (slate winding down)
+
+**A CLV number needs (edge at time T) paired with (price at settlement), and the
+first half is never written down.** By the time a game settles, the row that
+carried its edge has been overwritten several times. **This is the same gap this
+lane already solved for recommendations with the opening-snapshot recorder
+(`2b14fbeb`, 584 bytes/record) — game-line edges need the equivalent, and it
+does not exist.** That recorder is the prerequisite; scoring is downstream of it.
+
+**THE ONE ROW LIVE AT HANDOFF** (artifact `2026-08-16T02:06:59Z`) — offered as a
+shape to design against, **not** as a sample to draw a conclusion from, n=1:
+
+    game_pk 824966  TEX @ ATH  state=live  segment=full  market=h2h
+    model_home_win_prob 0.6   market_fair_prob 0.4069   edge_pp +19.31
+    prob_std_err 0.04405 (Agresti-Coull, n=120)   sims_run 120
+    event_id 1145a9db8d138b13599e168a340ad3c7   home Athletics / away Texas Rangers
+    sharp books: pinnacle, betfair_ex_eu, matchbook, novig, prophetx   pinnacle=True
+
+**WHAT THESE ROWS DO AND DO NOT WARRANT.** Surviving means: a full-game market,
+and an edge exceeding 2 Agresti-Coull standard errors of a 120-sim estimate.
+**It means the edge beats the ESTIMATOR'S OWN NOISE. It says nothing about
+whether the model is right.** No settlement, no backtest, no CLV.
+
+**TWO CORRECTIONS TO CARRY, both from my own retractions tonight:**
+- **`state.md`'s "100% of MLB game lines carry a sharp quote" is confirmed for
+  the sharp SET (30/30 in production) but PINNACLE SPECIFICALLY IS 15/30.** A
+  "CLV against the Pinnacle close" covers about half the population. Confirmed
+  against production, not the mirror.
+- **"Closing price" is ill-defined for a LIVE market** — it runs continuously to
+  settlement. Decide explicitly whether the close is the last observed price
+  before settlement, and note `closing-stamp-is-detection-time` records
+  `closing_price` as **always the home price (18/18)**, which would mis-pair
+  every away-side row.
+
+**I deliberately did NOT build a parallel CLV path.** `clv_join.py` is yours and
+the recorder decision is yours. Producing my own number would have duplicated
+the machinery and inherited the side defect.
+
+#### HANDOFF to `memory-watchdog-435` — a 2,092 MB in-process excursion, attribution already done
+From `live-game-line-projection`, 2026-08-16 ~02:3xZ. **First refresh-worker OOM
+of the day** (user's report: none until this one).
+
+**THE KILL.** `server_failed reason={'evicted': False, 'oomKilled':
+{'memoryLimit': '4Gi'}}` at **02:11:34Z** — events API, not logs.
+
+**THE ALLOCATOR IS pid 39, THE MAIN WORKER. Every child is a bystander.**
+`ALL_PROCESS_MEMORY`, two samples 34 s apart:
+
+    02:10:49  container 2458.8 MB (60%)   pid 39 rss 1191.1 MB
+    02:11:23  container 4094.6 MB (100%)  pid 39 rss 3283.4 MB
+    02:11:34  oomKilled
+
+    pid 39 (run_refresh_worker.py)   1191 -> 3283 MB   = +2,092 MB in 34 s
+    pid 353 (daily_update.py)        207.7 -> 207.7    FLAT
+    pid 394                           95.1 -> 143.7    +48
+    pid 383                           79.1 ->  79.4    FLAT
+    multiprocessing pool workers     ~54 MB each       FLAT
+
+**THIS KILLS THE OBVIOUS HYPOTHESIS.** The running job was
+`daily_update.py --sims 1000 --workers 2`, so "the sim's worker pool multiplies
+memory" is the natural guess. **It is wrong** — every pool worker sits at ~54 MB
+and the parent is flat to the decimal. It is ONE in-process allocation on the
+main thread.
+
+**`post_mlb_sim_tick` IS A BYSTANDER, as `state.md` already says.** Both
+`CONTAINER_MEMORY` samples carry that stage and the whole excursion happens
+between them. The label names the victim, not the allocator.
+
+**WHY THIS ONE IS WORTH THE WATCHDOG.** `#327`'s open problem is "something
+allocates 493-878 MB in-process and nothing knows what". **This is 2,092 MB,
+roughly 3x the largest previously recorded** — which is why it crossed 4 GiB
+instead of being absorbed. If the ~2 s timer sampler is deployed it should have
+caught the interior of this window; if it is not, this is the strongest case yet
+for shipping it.
+
+**CONFOUND, STATED.** refresh-worker took **five deploys in the preceding hour**
+(01:13, 01:24, 01:31, 01:56 mine, and 02:19 mine AFTER the kill), and `state.md`
+records that every deploy resets the memory baseline. **"No OOM all day" partly
+describes a worker that had not been restarted repeatedly until tonight — do not
+treat it as a controlled baseline.**
+
+**MY OWN CHANGES, assessed rather than assumed:**
+- **The CLV ledger (`f8ca54e1`) is EXONERATED for this kill — it deployed
+  02:19:10, EIGHT MINUTES AFTER it.** It was not running.
+- The segment/boundary fix (`d1e3f908`, live 01:56:44) WAS running. It makes
+  `attach_live_gamelines` do strictly LESS work (an early `continue`) and adds
+  scalar arithmetic; the join has been live since 23:01 without OOMs. **On the
+  stack, but not memory-shaped. Not cleared — just not indicated.**
+- **FORWARD RISK THAT IS MINE:** the ledger's `read_last_by_key` parses the whole
+  JSONL into a dict **on every board build**. Empty today, grows with the slate,
+  and it now runs on this worker. **If a second OOM appears, suspect it first —
+  `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` disables it with no deploy.**
+
+
+- `win-prob-null-readable` — CLOSED-VERIFIED 2026-08-16 *(full entry in `lanes_closed.md`)*
+- `slate-size-headroom` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
+- `worker-child-processes` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*

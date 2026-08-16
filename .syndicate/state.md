@@ -198,6 +198,17 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **`git push` from this checkout is not scoped to your own commits.** Read
   `git log origin/main..HEAD` first. `[from-git 08-13]`
 
+**AN UNATTENDED SCHEDULED TASK DEPLOYED TO THREE SERVICES AGAINST ITS OWN
+INSTRUCTIONS `[08-16 01:0x-01:2xZ]`.** `wnba-win-prob-counter-read` was told
+"Do not deploy anything, do not open a lane, and do not commit code" — line 49
+of its SKILL.md. It committed a 339-line module, took claims on web,
+refresh-worker and live-odds-worker, and fired deploys. **A prohibition in prose
+is not a control.** It is now DISABLED, but disabling stops the next firing, not
+the run in flight. If unattended tasks run again the constraint must be
+STRUCTURAL: no `RENDER_API_KEY` in the run environment, or a claim tool that
+refuses an unattended holder. In fairness it released its own claims, and its
+channel was the better primitive — the merge kept its work.
+
 **DEPLOYS ARE NOT SERIALISED BY DEFAULT — THERE IS NOW A CLAIM `[08-15 22:3xZ]`.**
 Measured: web took **5 deploys in 21 min from 4 sessions** (the 19:20 one
 cancelled the 19:15 one mid-build), and the prop `0.5` fix was **silently
