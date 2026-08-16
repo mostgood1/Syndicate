@@ -7185,3 +7185,78 @@ My G3 conclusion "no second sport was live, so the cross-sport live A/B is
 deferred" was **WRONG**. Soccer WAS live. The A/B was blocked by the board's
 inability to see it — which is itself the finding the A/B was supposed to
 produce.
+
+---
+
+## 2026-08-16 18:13:53Z — refresh-worker `7b544eb4` — **GATE OVERRIDDEN ON EXPLICIT USER INSTRUCTION**
+
+`deploy/layer2-bettable-books-v2`, cut on live `cf467794`. 5 files, +565/-19:
+`book_shortlist.py` (new), `layer2_board.py`, 3 test files. The board fixes only —
+the props ridealong is NOT in this branch (see below).
+
+### The gate was RED and was overridden deliberately
+
+    * MLB sim RUNNING (pid=111, reason=fingerprint_change, started 18:08:53Z)
+    * Board build IN FLIGHT (started 17:57:07Z)   <- PHANTOM, see below
+
+User instruction, verbatim: **"deploy it now, don't wait for the sim"**, given
+after being told the sim was running and that a restart kills it. Logged here
+because an overridden gate that is not written down is indistinguishable from a
+gate nobody ran. **The sim was killed by this deploy. That was the accepted cost,
+not an accident.**
+
+### The board-build half of the gate was a PHANTOM, and that is worth keeping
+
+The marker claimed a build in flight since 17:57:07Z — across another session's
+`cf467794` deploy at 18:07:36Z, which restarts the worker and therefore kills any
+running build. Falsified by the output rather than by the marker: the shortlist
+artifact `written_at` was still **17:35:43Z, 35.8 minutes stale**, so the 17:57
+build never produced anything. Same shape as `#443` (a stale PID silently stalls
+work after every restart).
+
+**So `check_deploy_safety.py` reported two blockers of which one did not exist.**
+A gate that cannot distinguish a running build from a killed one is a gate that
+will eventually be ignored for the wrong reason. Cross-check it against the
+ARTIFACT's `written_at`, which is the output, not the marker.
+
+### THE BRANCH WAS RE-CUT TWICE, AND THE SECOND RE-CUT PREVENTED A REVERT
+
+The first branch `b8939778` was cut on `f88796a9`. While it sat behind the gate,
+two deploys landed from another session:
+
+    b9f2b5f1  17:53:08Z   the props ridealong, both workers
+    cf467794  18:07:36Z   #441 NFL pbp ingestion path
+
+**Deploying `b8939778` would have reverted both.** It was two deploys stale after
+14 minutes of waiting.
+
+Re-cut as `7b544eb4` on `cf467794`, and the props ridealong was DROPPED from it:
+`cf467794` already carries it (`force_refresh` x23) and still preserves
+`c410be4d`'s per-artifact emit (`_record_win_prob_null` x4), so that lane's
+three-way merge and mine agree. `git diff --name-only cf467794 -- scripts/` is
+EMPTY on this branch — their work is not touched.
+
+**The rule this proves, and it is the other session's own words from the 17:53
+entry above: "Live is a lease; re-read it immediately before firing."** It moved
+TWICE in the 14 minutes my branch was gated. Waiting on a gate is itself a source
+of staleness — the longer a branch is held, the more likely it has become a
+revert.
+
+### Expected effect on the first artifact built after this goes live
+
+    quote.bookmaker outside DEFAULT_BOOKS      27 of 108  ->  0
+    no_bettable_book                            absent    ->  > 0
+    repriced_to_bettable                        absent    ->  > 0
+    cards with team set on a prop               56 of 108 ->  0
+    h2h_lay rendered as a bare team name         9        ->  0
+    rows carrying sim_view                       0        ->  108
+
+**A build takes time and deploy churn keeps killing them** — no artifact has been
+written since 17:35:43Z. Do not read a stale artifact as a failed fix; gate the
+measurement on `written_at > 18:1xZ`.
+
+### Rollback
+
+    py -3 scripts/render_deploy.py --service refresh-worker --commit cf467794 --allow-rollback
+
+**MEASUREMENT: ____________ (pending — needs an artifact with `written_at` after the deploy)**

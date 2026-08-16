@@ -1454,14 +1454,54 @@
     // regardless: any game filtered out by the value floor, the quote-age
     // ceiling or the per-game cap disappears from the schedule strip too.
     //
-    // /api/board/game-chips already carries the full slate, so the rail is
-    // seeded from CHIPS and left-joined to rows. A chip with no rows becomes
-    // a count-0 card: the game is on the board, it just has no bet.
+    // /api/board/game-chips carries the slate, so the rail is seeded from
+    // CHIPS and left-joined to rows. A chip with no rows becomes a count-0
+    // card: the game is on the board, it just has no bet.
     //
     // Deliberately NOT widening the shortlist. `layer2_board.py:1012-1026`
     // exists because the board once served 1,244 NFL rows starting 34-156
     // days out -- "quoted today" is not "playing today". This widens what the
     // RAIL SHOWS and touches no selection rule.
+    //
+    // TWO FILTERS, AND BOTH ARE LOAD-BEARING. Seeding from chips unfiltered
+    // put **108 cards** on the rail against 18 before, and it was wrong twice:
+    //
+    //   1. `/api/board/game-chips` IS NOT A "TODAY" FEED. It is deliberately
+    //      multi-day -- `game_chip_scoreboard.py:227` says so ("a chip strip
+    //      can span several days at once, soccer's week-keyed schedule is the
+    //      clearest case") and disambiguates by prefixing the DATE onto the
+    //      status token rather than by filtering. Measured on production
+    //      2026-08-16: a single-date request returned **90 soccer chips across
+    //      10 distinct Central dates, 08-15 through 08-28, of which only 21
+    //      were actually today.** MLB (15/15) and WNBA (3/3) were clean, so the
+    //      multi-day case is invisible until a week-keyed sport is on the rail.
+    //      The wrong assumption was "chips == today", and it was mine.
+    //
+    //   2. A sport with NO board coverage should not seat rail cards. Soccer
+    //      publishes ~0 EV rows by decision (state.md decision 7 -- the model
+    //      loses to the market), so every soccer card was a game with nothing
+    //      to bet and no prospect of one.
+    //
+    // Sports come from the ROWS rather than from a payload field: it cannot
+    // drift from what is actually rendered, and it needs no new contract.
+    const boardSports = new Set(
+      items.map((item) => String(item.sport_slug || item.sport || "").trim().toLowerCase()).filter(Boolean)
+    );
+    // Central, because the board's day is Central (`central_today_iso`) and a
+    // 7:30P CT game reads as TOMORROW in UTC -- the 08-16T00:30Z chip above is
+    // Aug 15 locally, and bucketing it by UTC date would file it under today.
+    const chipCentralDate = (chip) => {
+      const raw = chip && chip.start_time_utc;
+      if (!raw) return null;
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) return null;
+      try {
+        return parsed.toLocaleDateString("en-CA", { timeZone: "America/Chicago" });
+      } catch (e) {
+        return null;
+      }
+    };
+    const railDate = String(state.date || "").slice(0, 10) || null;
     const claimedChips = new Set();
     for (const group of groups.values()) {
       const chip = chipForGame(group);
@@ -1471,6 +1511,13 @@
       if (claimedChips.has(chip)) continue;
       const sport = String(chip.sport || "").toLowerCase();
       if (state.sport !== "all" && sport !== state.sport) continue;
+      if (!boardSports.has(sport)) continue;
+      // An UNDATED chip is kept. Absent evidence is not evidence of a
+      // different day, and dropping it would silently hide a game whose
+      // provider gave no ISO timestamp -- the case the day-prefix fallback in
+      // game_chip_scoreboard.py exists for.
+      const chipDate = chipCentralDate(chip);
+      if (railDate && chipDate && chipDate !== railDate) continue;
       const away = String((chip.away || {}).abbr || (chip.away || {}).name || "").trim();
       const home = String((chip.home || {}).abbr || (chip.home || {}).name || "").trim();
       if (!away || !home) continue;

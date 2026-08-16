@@ -39,7 +39,7 @@ if (start < 0 || end < 0 || end <= start) {
 const src = html.slice(start, end);
 
 // Minimal stand-ins for the page globals deriveGameCards reads.
-let state = { sport: 'all' };
+let state = { sport: 'all', date: '2026-08-16' };
 let gameChipsById = new Map();
 let gameChipsByMatchup = new Map();
 let gameKeyMergeMap = new Map();
@@ -91,3 +91,34 @@ console.log('ASSERT the no-opportunity game appears  :', names.includes('GGG @ H
 console.log('ASSERT it carries count 0               :', (out.find(g=>g.matchup==='GGG @ HHH')||{}).count === 0 ? 'PASS' : 'FAIL');
 console.log('ASSERT live game is FIRST               :', names[0] === 'CCC @ DDD' ? 'PASS' : 'FAIL');
 console.log('ASSERT final game is LAST               :', names[names.length-1] === 'AAA @ BBB' ? 'PASS' : 'FAIL');
+
+// --------------------------------------------------------------------------
+// The two seeding filters, from the production defect on 2026-08-16: an
+// unfiltered seed put 108 cards on the rail against 18, because
+// /api/board/game-chips is deliberately MULTI-DAY (90 soccer chips across 10
+// Central dates, only 21 of them today) and because soccer has no board
+// coverage at all.
+// --------------------------------------------------------------------------
+gameChipsById.clear(); gameChipsByMatchup.clear(); gameKeyMergeMap.clear();
+const mixed = [
+  mkChip('mlb','g-today','III','JJJ','pregame','2026-08-16T23:00:00Z'),     // today CT, board sport
+  mkChip('mlb','g-nextwk','KKK','LLL','pregame','2026-08-22T23:00:00Z'),    // NOT today
+  mkChip('soccer','g-soc','MMM','NNN','pregame','2026-08-16T23:00:00Z'),    // today, but no board rows
+  // 00:30Z on the 16th is 7:30P CT on the FIFTEENTH -- the exact shape that
+  // makes UTC-date bucketing file yesterday's game under today.
+  mkChip('mlb','g-utctrap','OOO','PPP','pregame','2026-08-16T00:30:00Z'),
+];
+for (const c of mixed) {
+  gameChipsById.set(`${c.sport}|${c.game_key}`, c);
+  gameChipsByMatchup.set(`${c.sport}|${c.matchup.toLowerCase()}`, c);
+}
+const out2 = deriveGameCards([
+  {sport:'mlb',sport_slug:'mlb',event_id:'g-seed',matchup:'QQQ @ RRR',market_state:'pregame'},
+]);
+const n2 = out2.map(g=>g.matchup);
+console.log();
+console.log('rail with mixed chips:', n2.join(' | ') || '(none)');
+console.log('ASSERT a NON-today chip is excluded     :', !n2.includes('KKK @ LLL') ? 'PASS' : 'FAIL');
+console.log('ASSERT a no-coverage SPORT is excluded  :', !n2.includes('MMM @ NNN') ? 'PASS' : 'FAIL');
+console.log('ASSERT a today chip in-sport is kept    :', n2.includes('III @ JJJ') ? 'PASS' : 'FAIL');
+console.log('ASSERT 00:30Z is yesterday CT, excluded :', !n2.includes('OOO @ PPP') ? 'PASS' : 'FAIL');
