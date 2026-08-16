@@ -1891,7 +1891,7 @@ sessions deploying, a two-file change should ride along, not chase.
     that is this lane's stated falsification test, and it is still live.
   - Session log: `.syndicate/log/2026-08-15.md`, final section.
 
-### odds-cadence-off-the-mlb-peak — OPEN — **STARTED 2026-08-15 as Phase 1 of `#440`. Premise now MEASURED: 0 of 200 European kickoffs fall in the US evening** — opened 2026-08-16 — session: sim-engine-track
+### odds-cadence-off-the-mlb-peak — OPEN — **1a/1b SHIPPED BUT DARK (`c5daa41a`) and SOCCER EXCLUDED BY MEASUREMENT (`8640f872`). Nothing enabled on any service; NOTHING VERIFIED IN PRODUCTION. The lane's own goal is DEFERRED to 1c, which is blocked.** — opened 2026-08-16 — session: sim-engine-track
 **Scoped only. No code, no deploy. Handing this over rather than starting it at
 02:00 local on a fixed crash.**
 

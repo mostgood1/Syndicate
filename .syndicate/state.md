@@ -2000,3 +2000,38 @@ predicate change would move what counts as `live` board-wide. Owner needed.
   (101, 98, 271, 216, 30 observed within one hour on the same body). **Counts
   across calls are not comparable** — compare type distributions or ratios, and
   never quote a bare N/M as a before/after.
+
+## SIM ENGINES — verified 2026-08-15 (`#440`, lane `sim-engine-phase0-census`)
+
+Read from every engine package and from live production, not from registry prose.
+
+- **7 of 8 sports have a real Monte Carlo pregame engine. NCAAB has NONE** — no `sim_engine`,
+  no projection module, no generator; its only pipeline step is an odds snapshot.
+- **Only 2 of 8 have a live sim** (MLB `estimate_live`, soccer `poll_league`). NBA/WNBA/NFL
+  carry non-sim stand-ins; NHL/NCAAF/NCAAB have nothing live.
+- **NBA/WNBA run a full possession-level MC game sim** (`simulate_smart_game` -> score
+  distributions, `p_home_win`/`p_home_cover`/`p_total_over`), persisted per game. Verified on
+  3/3 production artifacts. The no-sampling stub is NOT firing.
+- **Production basketball `n_sims` = 100** (engine default 2000). All 9 served probabilities
+  across 3 games are exact multiples of 0.01 — quantized because each is a count of 100 draws.
+  Binomial SE at p=0.25 is ±4.3 pts.
+- **The live-lens loop runs on BOTH workers**, so mlb/wnba/soccer are built TWICE per cycle —
+  69 MLB builds/hr across two containers where one owner needs ~35. Measured by log
+  (`TICK_COMPLETE`, 02:21-03:13Z), not inferred from config.
+- **Kickoffs, America/Chicago** (`reports/kickoff_census/latest.json`): 9 European soccer
+  leagues n=200 span hours **5..14 with 0.0% in the 18:00-01:00 band and none after 14:00**;
+  MLS n=111 94.6%; mlb n=605 53.6%; wnba n=117 84.6%; nfl_preseason n=49 71.4%.
+- **OddsAPI is at 62.7% of the 5M cap** (`projected_30d_credits` 3,134,318; 4,353 credits/hr).
+  Spend is **mlb 93.0%, soccer 4.1%** — soccer cadence is not a cost lever.
+- **`calibration_profile_store` load/save have NO non-test caller**, and most of
+  `model_scoring` (CRPS, pinball, reliability, bias/dispersion) likewise. `sim_run_ledger` IS
+  wired at three choke points. The convergence foundation is built and ~1/3 reachable.
+- **Fixture-aware pregame cadence is SHIPPED BUT DARK** —
+  `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE` defaults false and **no service sets it**. Soccer
+  is excluded from it by measurement (see learnings 2026-08-15).
+- **Baseline watcher `branch-overlap-baseline-watch`** (cron `15 */4 * * *`) is accruing
+  `reports/branch_overlap/baseline.jsonl`. First sample: **worst container 4096.0 MB = 100.0%
+  of cap in 3 separate hours**, against the previously recorded 3,972 MB / 97.0% / 124 MB
+  margin. **That older figure is STALE — do not judge Phase 1 against it.** Whether 4096.0
+  indicates a leak is NOT established: `memory.current` includes page cache and anon vs
+  inactive_file was never split.
