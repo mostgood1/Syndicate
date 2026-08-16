@@ -427,3 +427,78 @@ def test_live_game_situation_is_stated():
 )
 def test_market_label(key, expected):
     assert adapter._market_label(key) == expected
+
+
+# --------------------------------------------------------------------------
+# 5. The M1 EVIDENCE TABLE names the same bet the headline names.
+#
+# Reported 2026-08-16, after the headline fix shipped: the table under the
+# answer still read `home -1.5 (Philadelphia Phillies @ Minnesota Twins)` one
+# line below a headline reading `Minnesota Twins -1.5` -- the SAME row, in the
+# SAME response, naming two different things. `_board_row_label` was the third
+# copy of this logic and the last one still wrong.
+#
+# `ask_the_syndicate_data` imports heavy per-sport fetchers, so these tests are
+# the reason this file imports it at all; keep the import local to this block.
+# --------------------------------------------------------------------------
+
+from syndicate.blueprints import ask_the_syndicate_data as data  # noqa: E402
+
+
+def test_evidence_table_label_is_the_headline_label():
+    """The one property that matters: the two surfaces cannot disagree."""
+    for row in (PROP_ROW, GAME_ROW):
+        assert data._board_row_label(row) == adapter._bet_label(row)
+
+
+def test_evidence_table_never_names_a_convention():
+    """`home`/`away` is a column in an artifact, not a bet a person can place."""
+    label = data._board_row_label(GAME_ROW).lower()
+    assert not label.startswith(("home ", "away "))
+    assert label.startswith("kansas city royals")
+
+
+def test_evidence_table_prop_names_prop_and_side():
+    assert data._board_row_label(PROP_ROW) == "JJ Wetherholt over 0.5"
+
+
+def test_evidence_table_moneyline_is_the_bare_team():
+    row = dict(GAME_ROW, market="h2h", line=None, side="home")
+    assert data._board_row_label(row) == "Los Angeles Angels"
+
+
+def test_evidence_table_lay_market_says_it_is_against():
+    """A bare team name on a lay row is not vague, it is inverted."""
+    row = dict(GAME_ROW, market="h2h_lay", line=None, side="home")
+    label = data._board_row_label(row)
+    assert label.startswith("LAY Los Angeles Angels")
+    assert "does not" in label
+
+
+def test_evidence_table_game_total_keeps_the_matchup():
+    """A total has no team side, so side+line+matchup IS the bet. Not a miss."""
+    row = dict(GAME_ROW, market="totals", line=7.5, side="over",
+               player_name=None)
+    assert data._board_row_label(row) == "over 7.5 (Kansas City Royals @ Los Angeles Angels)"
+
+
+def test_evidence_table_falls_back_to_the_game_never_to_the_old_shape():
+    """No side and no line -> name the game, never `home -1.5 (...)`."""
+    row = {"away_team": "Kansas City Royals", "home_team": "Los Angeles Angels",
+           "market": "h2h", "side": "", "line": None}
+    assert data._board_row_label(row) == "Kansas City Royals @ Los Angeles Angels"
+
+
+def test_chart_label_keeps_LAY_and_drops_the_clause():
+    """Truncation must not cut a lay label mid-phrase, and must keep `LAY`."""
+    row = dict(GAME_ROW, market="h2h_lay", line=None, side="away")
+    chart = data._board_row_chart_label(row)
+    assert chart.startswith("LAY Kansas City Royals")
+    assert "wins if" not in chart
+    assert len(chart) <= 28
+
+
+def test_chart_label_respects_its_budget():
+    row = dict(GAME_ROW, player_name="A Player With A Very Long Name Indeed",
+               side="over", line=1.5)
+    assert len(data._board_row_chart_label(row)) <= 28

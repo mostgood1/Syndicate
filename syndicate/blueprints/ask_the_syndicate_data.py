@@ -3375,20 +3375,54 @@ def _board_market_filter(question: str) -> str | None:
 
 
 def _board_row_label(row: dict[str, Any]) -> str:
-    player = str(row.get("player_name") or "").strip()
-    side = str(row.get("side") or "").strip()
-    line = row.get("line")
-    if player:
-        parts = [player]
-        if side:
-            parts.append(side)
-        if line is not None:
-            parts.append(str(line))
-        return " ".join(parts)
-    away, home = str(row.get("away_team") or ""), str(row.get("home_team") or "")
+    """The bet, named the same way the headline names it.
+
+    **This was the THIRD copy of this logic and the last one still wrong.** It
+    emitted `"home -1.5 (Philadelphia Phillies @ Minnesota Twins)"` — a string a
+    reader cannot act on without already knowing that home is the second name —
+    and on 2026-08-16 that shipped one line under a headline reading
+    `"Minnesota Twins -1.5"`, for the same row, in the same answer. Two surfaces
+    of one response disagreeing about which team you are backing is the same
+    defect class as the edge units, and quieter.
+
+    So it DELEGATES to `_bet_label` rather than reimplementing it. That function
+    also carries the lay-market rule (`h2h_lay` names the team you are betting
+    AGAINST), which this copy never had — a bare team name there is not vague,
+    it is inverted.
+
+    **The import direction was checked, not assumed.**
+    `ask_the_syndicate_adapter` imports only `re`, `typing`,
+    `IntelligenceResult`, `RouteDecision` (pure stdlib) and
+    `build_intelligence_board_contract`, and imports nothing from this module,
+    so there is no cycle. The adapter's own note about not importing THIS module
+    still stands and is not contradicted — the ban is on the adapter depending
+    on these heavy per-sport fetchers, not on the dependency running the other
+    way. Imported inside the function to keep module import order irrelevant.
+    """
+    from syndicate.blueprints.ask_the_syndicate_adapter import _bet_label
+
+    label = _bet_label(row)
+    if label:
+        return label
+    # `_bet_label` returns None when there is no bet to describe (no player, and
+    # no side+line pair). In a TABLE an empty cell is worse than a partial
+    # answer, so fall back to naming the game — but never to the old
+    # `"home -1.5 (…)"` shape, which is the thing this function exists to stop.
+    away, home = str(row.get("away_team") or "").strip(), str(row.get("home_team") or "").strip()
     matchup = f"{away} @ {home}".strip(" @")
-    label = f"{side} {line}".strip()
-    return f"{label} ({matchup})" if matchup else label
+    return matchup or str(row.get("side") or "").strip() or "—"
+
+
+def _board_row_chart_label(row: dict[str, Any], limit: int = 28) -> str:
+    """Chart-axis form of `_board_row_label`.
+
+    A lay label carries a trailing "(wins if X does not)" clause that a blunt
+    `[:28]` would cut mid-phrase. Drop the clause first and keep the `LAY`
+    prefix, which is the part that changes what the bar means.
+    """
+    label = _board_row_label(row)
+    head = label.split(" (wins if", 1)[0].strip()
+    return head if len(head) <= limit else head[: limit - 1].rstrip() + "…"
 
 
 def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[str, Any] | None:
@@ -3500,14 +3534,28 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
     rows.sort(key=_rank_key, reverse=True)
     top = rows[:15]
 
+    from syndicate.blueprints.ask_the_syndicate_adapter import _market_label
+
     table_rows = []
     for row in top:
         edge = row.get("model_edge_pct")
         ev = row.get("ev_pct")
+        # Same quote the headline quotes. A "Selection" naming a bet with no
+        # price beside it is still not a bet you can place, and the headline
+        # already carries one -- leaving the table without it recreates the
+        # two-surfaces-disagreeing problem one column over.
+        quote = row.get("quote") if isinstance(row.get("quote"), dict) else {}
+        price, book = quote.get("price"), str(quote.get("bookmaker") or "").strip()
+        price_cell = "—"
+        if isinstance(price, (int, float)):
+            price_cell = f"{price:+g}" + (f" @ {book}" if book else "")
         table_rows.append([
             str(row.get("sport") or "").upper(),
-            str(row.get("market") or ""),
+            # Was the raw artifact key ("spreads_alt", "h2h"). Same humanising
+            # the headline uses, so one answer does not name a market two ways.
+            _market_label(row.get("market")) or str(row.get("market") or ""),
             _board_row_label(row),
+            price_cell,
             f"{float(ev):+.2f}%" if isinstance(ev, (int, float)) else "-",
             f"{float(edge):+.2f}%" if isinstance(edge, (int, float)) else "no model",
         ])
@@ -3515,11 +3563,11 @@ def _board_candidates_evidence(question: str, context: dict[str, Any]) -> dict[s
     scope = ", ".join(filters) if filters else "whole board"
     tables = [{
         "title": f"Published board — {scope} ({matched} of {total_published} rows)",
-        "columns": ["Sport", "Market", "Selection", "EV", "Model edge"],
+        "columns": ["Sport", "Market", "Selection", "Price", "EV", "Model edge"],
         "rows": table_rows,
     }]
     points = [
-        {"x": _board_row_label(row)[:28], "y": round(float(row["model_edge_pct"]), 2)}
+        {"x": _board_row_chart_label(row), "y": round(float(row["model_edge_pct"]), 2)}
         for row in top if isinstance(row.get("model_edge_pct"), (int, float))
     ]
     # No row in the result carries a model number, so a "top edges" chart would
