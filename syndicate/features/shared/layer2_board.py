@@ -821,8 +821,17 @@ def _model_edge_for(row: Mapping[str, Any], side: str) -> float | None:
     return edge
 
 
-def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
-    """Fan a market grid out into ranked, gated one-side candidates."""
+def build_layer2_rows(
+    grid: Iterable[Mapping[str, Any]],
+    openings: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Fan a market grid out into ranked, gated one-side candidates.
+
+    `openings` is the CLV opening-ledger index, loaded ONCE per build by the
+    caller. It is needed HERE and not only in the card builder because movement
+    is folded into the SCORE, and the score is computed before selection --
+    computing movement later would rank on one number and display another.
+    """
     candidates: list[dict[str, Any]] = []
     lanes: dict[str, int] = {}
     rows_in = 0
@@ -1029,6 +1038,17 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
             if projection is not None:
                 candidate["projection"] = projection
 
+            # THE LIVE RE-SIM'S BLOCK, carried for the same reason `#270`
+            # carried `projection`: the enrichment stamps it on the GRID row and
+            # this fan-out copies a fixed field list, so anything not named here
+            # dies at the candidate boundary. `live_gameline_join` writes
+            # `row["live_gameline"]` and folds `live_projected` into
+            # `row["projection"]`; the first was being dropped, so a live game
+            # line reached the board with no live number at all.
+            live_gameline = row.get("live_gameline")
+            if live_gameline is not None:
+                candidate["live_gameline"] = live_gameline
+
             # Eligibility BEFORE scoring: a dead market should never be ranked,
             # and the gate is the one place that decision lives (#245).
             opportunity_gate.annotate(candidate, quote)
@@ -1037,9 +1057,17 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
 
             ev = expected_value_pct(price, fair) if fair is not None else None
             model_edge = _model_edge_for(row, side)
+            # Computed ONCE, here, and stamped onto the candidate so the card
+            # builder reuses it rather than recomputing against the same index.
+            # Ranking on a movement number the card does not show (or showing
+            # one the ranking did not use) is the `#364` unit-mismatch shape:
+            # two numbers that have to be the same number.
+            movement = _movement_from_opening(candidate, openings)
+            candidate["movement"] = movement
             score = blended_score(
                 ev_pct=ev,
                 model_edge=model_edge,
+                movement_price_delta=movement.get("movement_price_delta"),
                 books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
                 book_age_seconds=side_best.get("age_seconds"),
                 quote_seen_age_seconds=side_best.get("seen_age_seconds"),
@@ -1173,7 +1201,97 @@ def _row_team(row: Mapping[str, Any], home: str, away: str) -> str | None:
     return None
 
 
-def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+def _live_projection_columns(row: Mapping[str, Any]) -> dict[str, Any]:
+    """The LIVE re-sim's number, under the name the board's Live column reads.
+
+    `intelligence.html:640` resolves the column as
+    `item.live_projection ?? item.live_total` for game lines and
+    `item.live_projection` for props, and nothing on an L2-A card ever set
+    either -- so "Live proj." rendered an em dash on every live row while the
+    live re-sim's answer existed one level down.
+
+    THE PREGAME NUMBER IS NOT A SUBSTITUTE AND MUST NOT BE COPIED HERE.
+    Measured on the served board 2026-08-16 19:16Z, 54 live rows: every one
+    carried `projection.source = "game_simulation"`, a FULL-GAME PREGAME
+    distribution. Showing 10.5 projected runs beside a live total of 11.5 in
+    the BOTTOM OF THE 5TH is a full-game number against a remaining-game line --
+    two different quantities, and the comparison is meaningless in the
+    direction that matters. So this reads ONLY the keys the live joins write
+    (`live_projected`, `live_model_prob_over`, `live_gameline`) and emits
+    nothing when the live join did not run.
+
+    Absent stays absent. A live row with no live re-sim renders a dash, which
+    is honest; a fabricated live number on a live board is the worst cell on
+    the page.
+    """
+    projection = row.get("projection") if isinstance(row.get("projection"), Mapping) else {}
+    gameline = row.get("live_gameline") if isinstance(row.get("live_gameline"), Mapping) else {}
+    out: dict[str, Any] = {}
+
+    live_value = _as_float(projection.get("live_projected"))
+    if live_value is None:
+        live_value = _as_float(gameline.get("live_projected") or gameline.get("projected"))
+    if live_value is not None:
+        out["live_projection"] = live_value
+        out["live_total"] = live_value
+
+    live_prob = _as_float(
+        projection.get("live_model_prob_over")
+        if projection.get("live_model_prob_over") is not None
+        else projection.get("live_prob_over")
+    )
+    if live_prob is not None:
+        out["live_model_probability"] = live_prob
+
+    if projection.get("live_aware") or gameline:
+        out["live_aware"] = True
+    return out
+
+
+def _segment_label(segment: Any, sport: Any = None) -> str | None:
+    """Which slice of the game this line is for, in words.
+
+    Alt and interval lines were rendering as a bare number beside the market --
+    `8.5 · totals_alt` sat next to `11.5 · totals` with nothing saying the first
+    was FIRST FIVE INNINGS. Measured on the served board 2026-08-16, 30 of 102
+    rows carried a non-`full` segment: `first5` (14), `first1` (3), `first3`
+    (2), `h1` (1), `q4` (1) and alt variants. A total of 8.5 for five innings
+    and a total of 8.5 for nine are different bets that read identically.
+
+    Returns None for the full game, because labelling the common case adds
+    noise to every row to disambiguate a minority.
+    """
+    token = str(segment or "").strip().lower()
+    if not token or token in {"full", "full_game", "game"}:
+        return None
+    known = {
+        "first1": "1st inning",
+        "first3": "1st 3 innings",
+        "first5": "1st 5 innings",
+        "first7": "1st 7 innings",
+        "h1": "1st half",
+        "h2": "2nd half",
+        "q1": "1st quarter",
+        "q2": "2nd quarter",
+        "q3": "3rd quarter",
+        "q4": "4th quarter",
+        "p1": "1st period",
+        "p2": "2nd period",
+        "p3": "3rd period",
+    }
+    if token in known:
+        return known[token]
+    # UNKNOWN SEGMENTS ARE SHOWN, NOT SWALLOWED. A segment this map has not
+    # seen is exactly the case where the reader most needs telling that the
+    # line is not for the full game -- returning None there would reproduce the
+    # defect for every new interval market the feed adds.
+    return token.replace("_", " ")
+
+
+def layer2_rows_to_board_cards(
+    rows: Iterable[Mapping[str, Any]],
+    openings: Mapping[str, Mapping[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     """Translate L2-A rows into the shape the board card normaliser expects.
 
     THE BOARD IS NOT REWRITTEN TO FIT L2-A; L2-A IS TRANSLATED TO FIT THE BOARD.
@@ -1282,15 +1400,179 @@ def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[s
                 "model_edge_pct": row.get("model_edge_pct"),
                 "surface_key": "layer2",
                 "source": "layer2_shortlist",
+                # WHICH SLICE OF THE GAME. Both keys: `segment_label` is the
+                # words, `segment` is the raw token a filter can group on.
+                "segment_label": _segment_label(row.get("segment"), sport),
                 **_layer2_board_columns(row, quote, score),
-                **_layer2_movement_columns(row, history_cache),
+                **(row.get("movement") if isinstance(row.get("movement"), Mapping) else _movement_from_opening(row, openings)),
+                **_live_projection_columns(row),
             }
         )
     return cards
 
 
+_STEAM_PRICE_POINTS = 15.0    # American-odds move that counts as sharp
+_STEAM_WINDOW_SECONDS = 3 * 3600
+
+
+def _movement_from_opening(
+    row: Mapping[str, Any], openings: Mapping[str, Mapping[str, Any]] | None
+) -> dict[str, Any]:
+    """Movement against the price WE published, not against a 20MB shard.
+
+    `#372` DISABLED the previous implementation and the reason is the design
+    constraint here, not a footnote: it called
+    `load_odds_history_payload_for_sport` INSIDE the per-row card builder, and
+    `#370` made it try two shard keys, so a miss loaded a second multi-megabyte
+    payload. It stalled the shortlist build outright -- last good build
+    00:22:21Z, then 70 minutes of reaching `EXPOSURE_BUDGETS_APPLIED` and never
+    printing `LAYER2_SHORTLIST` again, with no exception and therefore no
+    failure log. Every producer-side fix queued behind that build stopped
+    shipping.
+
+    That module's own docstring said where this belongs: *where the odds
+    tracker already holds the data, not in a per-build read of a multi-megabyte
+    artifact.* The CLV opening ledger is that place. It already records, for
+    every row this board publishes, the line, the price, the bookmaker, every
+    book's price and the capture time -- keyed by `_opening_key`, the same
+    identity used here. `load_openings` reads ONE small JSONL of our own
+    published rows (~100/sport), ONCE per build, OUTSIDE this function.
+
+    **This function does no IO at all.** That is the property that makes it
+    safe to re-enable, and it is why the index is a parameter rather than
+    something fetched here.
+
+    WHAT IT MEASURES, stated because it is NOT the same quantity the old one
+    attempted: movement since WE FIRST PUBLISHED THE ROW, not since the market
+    opened. That is the more actionable number -- it answers "has this moved
+    since we flagged it" -- and it is the only one recoverable without the
+    shard. Labelled `since: "our_open"` so nobody reads it as a true market
+    open.
+
+    Absence is REPORTED, never blank: `movement_state` distinguishes
+    "no opening recorded" (this row is new, or the ledger was off) from
+    "flat" (recorded and unchanged). `#368` exists because those two rendered
+    identically as a bare dash and the whole column read as broken.
+    """
+    if not _movement_is_tracked(row.get("market")):
+        return {"movement_not_tracked": True, "movement_state": "not_tracked"}
+    if not openings:
+        return {"movement_state": "no_openings"}
+    try:
+        from syndicate.features.shared.clv_opening_ledger import _opening_key
+        key = _opening_key(row)
+    except Exception:
+        key = None
+    if not key:
+        return {"movement_state": "unkeyable"}
+    opened = openings.get(key)
+    if not isinstance(opened, Mapping):
+        return {"movement_state": "no_opening_for_row"}
+
+    quote = row.get("quote") if isinstance(row.get("quote"), Mapping) else {}
+    now_price = _as_float(quote.get("price"))
+    open_price = _as_float(opened.get("price"))
+    now_line = _as_float(row.get("line"))
+    open_line = _as_float(opened.get("line"))
+
+    out: dict[str, Any] = {
+        "movement_state": "tracked",
+        "movement_since": "our_open",
+        "movement_opened_at": opened.get("captured_at"),
+        "movement_open_price": open_price,
+        "movement_open_line": open_line,
+        "movement_open_bookmaker": opened.get("bookmaker"),
+    }
+
+    # PRICE DELTA IS ONLY MEANINGFUL SAME-BOOK. The board publishes the best of
+    # N books, and the best book can change between builds -- differencing
+    # across a book switch measures the switch, not the market. `book_prices`
+    # on the opening record exists precisely so this can be same-book; fall
+    # back to the headline pair only when labelled as such.
+    open_books = opened.get("book_prices") if isinstance(opened.get("book_prices"), Mapping) else {}
+    now_books = quote.get("book_prices") if isinstance(quote.get("book_prices"), Mapping) else {}
+    book = str(quote.get("bookmaker") or "").strip().lower()
+    same_book_open = _as_float((open_books or {}).get(book))
+    same_book_now = _as_float((now_books or {}).get(book)) if now_books else now_price
+    if same_book_open is not None and same_book_now is not None:
+        out["movement_price_delta"] = round(same_book_now - same_book_open, 2)
+        out["movement_basis"] = "same_book"
+        out["movement_book"] = book
+    elif open_price is not None and now_price is not None:
+        out["movement_price_delta"] = round(now_price - open_price, 2)
+        out["movement_basis"] = "best_of_n"
+
+    if open_line is not None and now_line is not None:
+        out["movement_line_delta"] = round(now_line - open_line, 2)
+
+    delta = out.get("movement_price_delta")
+    line_delta = out.get("movement_line_delta")
+    if delta is None and line_delta is None:
+        out["movement_state"] = "no_comparable_price"
+        return out
+
+    # DIRECTION IS ABOUT THE BETTOR, AND THE TWO INPUTS DISAGREE ABOUT HOW.
+    #
+    # PRICE is unambiguous: a larger American number always pays more, in both
+    # signs. -125 -> -105 is +20 and is better; that needs no knowledge of the
+    # side.
+    #
+    # LINE IS SIDE-DEPENDENT AND GETTING IT WRONG IS THE DEFECT THIS REPO HAS
+    # PAID FOR MOST. A total moving 9.0 -> 8.5 is FAVOURABLE to an over and
+    # hostile to an under; the first version of this function called it
+    # "against" for both, because it compared the raw delta and never read
+    # `side`. Same family as the spread-sign lane, whose whole finding was a
+    # sign attached to the wrong perspective.
+    #
+    # So the two are reported SEPARATELY rather than reduced to one verdict,
+    # and the line verdict is only emitted for sides whose preference is known.
+    side = str(row.get("side") or "").strip().lower()
+    if delta:
+        out["movement_direction"] = "toward" if delta > 0 else "against"
+    if line_delta:
+        prefers_lower = side in {"over", "home", "away"}
+        prefers_higher = side == "under"
+        if prefers_lower or prefers_higher:
+            favourable = (line_delta < 0) if prefers_lower else (line_delta > 0)
+            out["movement_line_direction"] = "toward" if favourable else "against"
+        else:
+            # h2h and anything else has no line to have a direction about.
+            out["movement_line_direction"] = "unknown_side"
+    if not delta and not line_delta:
+        out["movement_state"] = "flat"
+        out["movement_direction"] = "flat"
+    moved = bool(delta or line_delta)
+
+    # STEAM: a sharp move in a short window. Both halves are required -- a 30
+    # point drift over eight hours is not steam, and this is the distinction
+    # the old implementation never made because it had no clock.
+    age = None
+    opened_at = str(opened.get("captured_at") or "")
+    if opened_at:
+        try:
+            opened_dt = datetime.fromisoformat(opened_at.replace("Z", "+00:00"))
+            if opened_dt.tzinfo is None:
+                opened_dt = opened_dt.replace(tzinfo=timezone.utc)
+            age = (datetime.now(timezone.utc) - opened_dt).total_seconds()
+            out["movement_age_seconds"] = round(age, 1)
+        except Exception:
+            age = None
+    if (
+        delta is not None
+        and abs(delta) >= _STEAM_PRICE_POINTS
+        and age is not None
+        and age <= _STEAM_WINDOW_SECONDS
+    ):
+        out["steam"] = True
+        out["steam_reason"] = (
+            f"{'+' if delta > 0 else ''}{delta:.0f} at {book or 'best book'} "
+            f"in {age / 60:.0f} min since we published it"
+        )
+    return out
+
+
 def _layer2_movement_columns(row: Mapping[str, Any], cache: dict[tuple[str, str], Any]) -> dict[str, Any]:
-    """DISABLED (`#372`). Was the `#368`/`#370` odds-history join.
+    """SUPERSEDED by `_movement_from_opening` (see it for the `#372` history).
 
     **IT STALLED THE SHORTLIST BUILD.** The join loaded
     `load_odds_history_payload_for_sport` INSIDE the builder -- a ~20MB MLB shard

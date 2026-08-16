@@ -103,7 +103,7 @@ gameChipsById.clear(); gameChipsByMatchup.clear(); gameKeyMergeMap.clear();
 const mixed = [
   mkChip('mlb','g-today','III','JJJ','pregame','2026-08-16T23:00:00Z'),     // today CT, board sport
   mkChip('mlb','g-nextwk','KKK','LLL','pregame','2026-08-22T23:00:00Z'),    // NOT today
-  mkChip('soccer','g-soc','MMM','NNN','pregame','2026-08-16T23:00:00Z'),    // today, but no board rows
+  mkChip('soccer','g-soc','MMM','NNN','pregame','2026-08-16T23:00:00Z'),    // today, no board rows -> count-0 card
   // 00:30Z on the 16th is 7:30P CT on the FIFTEENTH -- the exact shape that
   // makes UTC-date bucketing file yesterday's game under today.
   mkChip('mlb','g-utctrap','OOO','PPP','pregame','2026-08-16T00:30:00Z'),
@@ -119,6 +119,12 @@ const n2 = out2.map(g=>g.matchup);
 console.log();
 console.log('rail with mixed chips:', n2.join(' | ') || '(none)');
 console.log('ASSERT a NON-today chip is excluded     :', !n2.includes('KKK @ LLL') ? 'PASS' : 'FAIL');
-console.log('ASSERT a no-coverage SPORT is excluded  :', !n2.includes('MMM @ NNN') ? 'PASS' : 'FAIL');
+// REVERSED 2026-08-16, and the reversal is the point. An earlier version also
+// required the chip's sport to appear in the board rows. That took the rail
+// from 108 cards to 18 and DELETED SOCCER, which had 21 real games that day --
+// reported live. The rail is a SCHEDULE: a sport with no priced opportunity is
+// precisely the count-0 case, not a reason to hide its games.
+console.log('ASSERT a today game with NO rows appears:', n2.includes('MMM @ NNN') ? 'PASS' : 'FAIL');
+console.log('ASSERT ...and it is a count-0 card       :', (out2.find(g=>g.matchup==='MMM @ NNN')||{}).count === 0 ? 'PASS' : 'FAIL');
 console.log('ASSERT a today chip in-sport is kept    :', n2.includes('III @ JJJ') ? 'PASS' : 'FAIL');
 console.log('ASSERT 00:30Z is yesterday CT, excluded :', !n2.includes('OOO @ PPP') ? 'PASS' : 'FAIL');

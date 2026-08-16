@@ -49,6 +49,28 @@ def build_layer2_shortlist(
     """
     from syndicate.features.shared.layer2_board import build_layer2_rows, select_shortlist
 
+    # LOADED ONCE, BEFORE ANY SPORT IS PROCESSED. See `_movement_from_opening`
+    # for why this is not read per row: `#372` stalled the whole build by doing
+    # exactly that with a ~20MB shard. This reads one small JSONL of the rows
+    # THIS board published today.
+    #
+    # Read BEFORE `record_openings` appends today's rows, deliberately: movement
+    # must compare against the FIRST time we published a row, not against the
+    # copy being written this instant.
+    openings_index: dict[str, Any] = {}
+    openings_error: str | None = None
+    try:
+        from syndicate.features.shared.clv_opening_ledger import load_openings
+
+        for record in load_openings(selected_date) or []:
+            key = record.get("key") if isinstance(record, Mapping) else None
+            # FIRST WRITE WINS -- the ledger is append-only, so a key can recur
+            # and the earliest occurrence is the opening by definition.
+            if key and key not in openings_index:
+                openings_index[str(key)] = record
+    except Exception as exc:
+        openings_error = f"{type(exc).__name__}: {exc}"
+
     opportunities: list[dict[str, Any]] = []
     per_sport_stats: dict[str, Any] = {}
 
@@ -59,6 +81,8 @@ def build_layer2_shortlist(
         try:
             from syndicate.features.shared.board_enrichment import (
                 attach_game_state,
+                attach_live_gamelines_for_sport,
+                attach_live_projections_for_sport,
                 attach_margin_model,
                 attach_projections,
             )
@@ -178,18 +202,43 @@ def build_layer2_shortlist(
             #
             # Same functions the serve-time endpoint calls, so the board a user
             # reads and the board that is persisted cannot drift.
+            #   live        -> the LIVE re-sim's number. Absent, every live row
+            #                  on the board shows its PREGAME full-game
+            #                  projection beside a live line, which is two
+            #                  different quantities. Measured 2026-08-16 19:16Z:
+            #                  54 live rows, all carrying
+            #                  `projection.source = "game_simulation"` (pregame)
+            #                  and none carrying a live one, because THESE TWO
+            #                  JOINS WERE NEVER CALLED HERE -- they ran only for
+            #                  the serve-time `/api/board/book-grid` endpoint.
+            #                  That is the drift this loop's own comment below
+            #                  says must not happen.
             enrichment: dict[str, object] = {}
             for step, fn in (
                 ("game_state", lambda: attach_game_state(grid, sport=sport, selected_date=selected_date)),
                 ("projections", lambda: attach_projections(grid, sport=sport, selected_date=selected_date)),
                 ("margin_model", lambda: attach_margin_model(grid)),
+                # Same functions the serve-time endpoint calls
+                # (`_attach_book_grid_*` in `blueprints/intelligence.py`), for
+                # the reason stated above the loop. Both read a PUBLISHED
+                # snapshot and neither triggers a re-sim -- that path is
+                # `refuse_if_compute_in_request_path` and belongs to
+                # live-odds-worker's tick, so this stays a read.
+                (
+                    "live_projections",
+                    lambda: attach_live_projections_for_sport(grid, sport=sport, selected_date=selected_date),
+                ),
+                (
+                    "live_gamelines",
+                    lambda: attach_live_gamelines_for_sport(grid, sport=sport, selected_date=selected_date),
+                ),
             ):
                 try:
                     enrichment[step] = fn()
                 except Exception as exc:  # never let enrichment break the build
                     enrichment[step] = {"error": f"{type(exc).__name__}"}
 
-            result = build_layer2_rows(grid)
+            result = build_layer2_rows(grid, openings=openings_index)
             sport_opportunities = list(result.get("opportunities") or [])
             # `sport` is carried on the grid row already, but stamp defensively:
             # select_shortlist buckets per sport and a missing slug would
@@ -317,13 +366,40 @@ def build_layer2_shortlist(
     # narrowing of persisted data, which is what
     # slice_intelligence_board_state_for_request already does; a field mapping
     # is not.
+    # MOVEMENT IS JOINED FROM THE OPENING LEDGER, AND THE LOAD HAPPENS HERE --
+    # ONCE PER BUILD, OUTSIDE THE PER-ROW LOOP.
+    #
+    # That placement IS the fix for `#372`. The previous movement
+    # implementation called `load_odds_history_payload_for_sport` inside the
+    # per-row card builder; the MLB shard is ~20MB and `#370` made a miss load a
+    # second one, which stalled the whole shortlist build -- 70 minutes of no
+    # `LAYER2_SHORTLIST` line, no exception, no failure log. The disabled
+    # function's own docstring named the remedy: use the place that already
+    # holds the data.
+    #
+    # `load_openings` reads one small JSONL of the rows THIS BOARD published
+    # today (~100/sport), which `record_openings` writes a few lines below. So
+    # the read is of our own output, not of the full quote history, and
+    # `_movement_from_opening` does no IO at all.
+    #
+    # Read BEFORE `record_openings` runs, deliberately: that call appends
+    # today's rows, and movement must compare against the FIRST time we
+    # published a row, not against the copy we are writing this instant.
     try:
         from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards
 
-        shortlist["cards"] = layer2_rows_to_board_cards(shortlist.get("rows") or [])
+        shortlist["cards"] = layer2_rows_to_board_cards(
+            shortlist.get("rows") or [], openings=openings_index
+        )
     except Exception as exc:
         shortlist["cards"] = []
         shortlist["cards_error"] = f"{type(exc).__name__}: {exc}"
+
+    # Both numbers, so "no movement on the board" is attributable: 0 openings
+    # loaded is a different fact from openings loaded and nothing having moved.
+    shortlist["openings_loaded"] = len(openings_index)
+    if openings_error:
+        shortlist["openings_error"] = openings_error
 
     # RECORD THE OPENING PRICE OF EVERY ROW WE ARE ABOUT TO PUBLISH (audit §7 #1).
     #

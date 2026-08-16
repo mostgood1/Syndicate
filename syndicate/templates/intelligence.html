@@ -1482,11 +1482,21 @@
     //      loses to the market), so every soccer card was a game with nothing
     //      to bet and no prospect of one.
     //
-    // Sports come from the ROWS rather than from a payload field: it cannot
-    // drift from what is actually rendered, and it needs no new contract.
-    const boardSports = new Set(
-      items.map((item) => String(item.sport_slug || item.sport || "").trim().toLowerCase()).filter(Boolean)
-    );
+    // ONLY THE DATE FILTER SURVIVES. An earlier version ALSO required the
+    // chip's sport to appear in the board rows, which was an over-correction:
+    // it took the rail from 108 cards to 18 by dropping every sport with no
+    // priced opportunity -- and soccer, which had **21 real games today**,
+    // vanished from the schedule strip entirely. Reported live.
+    //
+    // That is the opposite of the goal. The rail is a SCHEDULE, not a results
+    // list: a game with nothing to bet is exactly the case the count-0 card was
+    // built for. Soccer publishes ~0 EV rows by decision (the model loses to
+    // the market), and that is a reason to show its games with no opportunity,
+    // not a reason to hide the games.
+    //
+    // The multi-day defect was never about sports -- it was the date. Filtering
+    // on Central date alone keeps soccer's 21 today and drops its 69 spread
+    // across 08-15..08-28.
     // Central, because the board's day is Central (`central_today_iso`) and a
     // 7:30P CT game reads as TOMORROW in UTC -- the 08-16T00:30Z chip above is
     // Aug 15 locally, and bucketing it by UTC date would file it under today.
@@ -1511,7 +1521,6 @@
       if (claimedChips.has(chip)) continue;
       const sport = String(chip.sport || "").toLowerCase();
       if (state.sport !== "all" && sport !== state.sport) continue;
-      if (!boardSports.has(sport)) continue;
       // An UNDATED chip is kept. Absent evidence is not evidence of a
       // different day, and dropping it would silently hide a game whose
       // provider gave no ISO timestamp -- the case the day-prefix fallback in
@@ -2036,7 +2045,7 @@
                     <div class="board-blotter__primary">${headshot}${escapeHtml(title)}</div>
                     <div class="board-blotter__meta">${escapeHtml(sport)}${matchup ? " &middot; " + escapeHtml(matchup) : ""}${updatedDisplay ? ` &middot; <span title="${escapeHtml(updatedIso)}">${escapeHtml(updatedDisplay)}</span>` : ""}</div>
                   </td>
-                  <td data-label="Line">${escapeHtml(propText || "-")}</td>
+                  <td data-label="Line">${escapeHtml(propText || "-")}${item.segment_label ? `<span class="board-segment-chip" title="This line is for ${escapeHtml(item.segment_label)}, not the full game">${escapeHtml(item.segment_label)}</span>` : ""}</td>
                   <td data-label="Odds">${oddsDisplay ? escapeHtml(oddsDisplay) : (hasMarket ? "&mdash;" : pendingMarketHtml)}</td>
                   <td data-label="Book">${renderBlotterBook(item)}</td>
                   <td data-label="Fair">${renderBlotterFair(item)}</td>

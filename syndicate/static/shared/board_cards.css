@@ -531,6 +531,28 @@ body.syndicate-body .cards-shell {
    carries no weight in the score and has never been graded. */
 .board-badge--sim-disagrees { background: rgba(231, 76, 60, 0.2); color: #ffd9d3; border-color: rgba(231, 76, 60, 0.45); }
 
+/* WHICH SLICE OF THE GAME a line is for. `8.5 · totals_alt` sat beside
+   `11.5 · totals` with nothing saying the first was FIRST FIVE INNINGS --
+   30 of 102 served rows on 2026-08-16 carried a non-full segment
+   (first5, first1, first3, h1, q4). A 8.5 total over five innings and
+   over nine are different bets that read identically. Rendered next to
+   the line rather than the market, because the line is the number that
+   changes meaning. */
+.board-segment-chip {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(120, 170, 255, 0.42);
+  background: rgba(120, 170, 255, 0.16);
+  color: #d6e6ff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 /* Which side (Over/Under, home/away) the sim's own probability actually
    favors for a two-sided market (row.model_side === row.side) -- distinct
    from the join_status badges above, which only say whether a model read

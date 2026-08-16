@@ -388,6 +388,34 @@ def is_low_hold(prices: Iterable[Any], *, threshold_pct: float = 2.0) -> bool:
 # If the page cannot say that, keep it off the main board rather than raising
 # this number to make it look like a model board.
 _SCORE_SIM_WEIGHT = 0.0          # was 0.5; see above -- gated on S6, not taste
+
+# MOVEMENT SINCE WE PUBLISHED THE ROW, folded into value at a CAPPED weight.
+#
+# WHY THIS IS ALLOWED IN WHERE THE SIM TERM IS NOT, because that is the obvious
+# objection and it deserves an answer rather than a coefficient:
+#
+#   - `model_edge` is a MODEL'S OPINION, unvalidated, `settled: 0`. Weighting it
+#     selected rows where an unchecked model most disagreed with the market.
+#   - `movement` is an OBSERVATION of the market itself, against a price we
+#     recorded. A line moving toward us after we flagged it is CLV in miniature
+#     -- the one quantity this repo has repeatedly said it wants and cannot
+#     compute yet. It cannot be "miscalibrated"; it either moved or it did not.
+#
+# That is a real distinction, and it still does NOT license a large weight.
+# `_SCORE_MOVEMENT_CAP_PCT` bounds the contribution to +/- 1 EV point no matter
+# how far a price ran, so movement can BREAK TIES and SURFACE STEAM without ever
+# outranking a materially better price. The failure mode that killed the sim
+# term was domination (ev ~ -5 against model_edge ~ +12), and a cap is the
+# structural fix for it rather than a smaller number that fails the same way
+# later.
+#
+# TO CHANGE THESE you need the same thing `_SCORE_SIM_WEIGHT` needs: settled
+# rows, with CLV decomposed by component, so "did the moved rows actually win"
+# is a measurement rather than a preference. Until then the cap is doing the
+# work, not the weight.
+_SCORE_MOVEMENT_WEIGHT = 0.05     # per American-odds point of same-book move
+_SCORE_MOVEMENT_CAP_PCT = 1.0     # hard bound on the contribution, in EV points
+
 _SCORE_BOOK_CONFIDENCE = ((1, 0.5), (2, 0.7), (4, 0.85))   # books quoting -> factor
 _SCORE_FRESHNESS = ((300, 1.0), (1800, 0.9), (3600, 0.75), (10800, 0.5))  # seconds -> factor
 
@@ -504,6 +532,7 @@ def blended_score(
     quote_seen_age_seconds: Any = None,
     price: Any = None,
     fair_prob: Any = None,
+    movement_price_delta: Any = None,
 ) -> dict[str, Any] | None:
     """Rank a board row by value discounted for how much we trust it (#243).
 
@@ -527,7 +556,16 @@ def blended_score(
     value_sim = _as_float(model_edge)
     if value_ev is None and value_sim is None:
         return None
-    value = (value_ev or 0.0) + _SCORE_SIM_WEIGHT * (value_sim or 0.0)
+    # Movement is CAPPED, not merely weighted -- see `_SCORE_MOVEMENT_CAP_PCT`.
+    # A row whose price ran 60 points contributes the same +1.0 as one that ran
+    # 20, which is the point: it orders rows that are otherwise close and never
+    # displaces a materially better price.
+    move = _as_float(movement_price_delta)
+    value_move = 0.0
+    if move:
+        raw = _SCORE_MOVEMENT_WEIGHT * move
+        value_move = max(-_SCORE_MOVEMENT_CAP_PCT, min(_SCORE_MOVEMENT_CAP_PCT, raw))
+    value = (value_ev or 0.0) + _SCORE_SIM_WEIGHT * (value_sim or 0.0) + value_move
     confidence = _book_confidence(books_quoting)
     freshness = _freshness_factor(book_age_seconds, quote_seen_age_seconds)
     # Third multiplicative reliability term, alongside book breadth and
@@ -567,6 +605,12 @@ def blended_score(
         "value_pct": round(value, 4),
         "ev_component": None if value_ev is None else round(value_ev, 4),
         "sim_component": None if value_sim is None else round(_SCORE_SIM_WEIGHT * value_sim, 4),
+        # Emitted whenever a move was supplied, INCLUDING zero -- "we compared
+        # against our opening and it had not moved" is a different fact from
+        # "we had no opening to compare against", and a single absent key
+        # cannot say which.
+        "movement_component": None if move is None else round(value_move, 4),
+        "movement_capped": bool(move) and abs(_SCORE_MOVEMENT_WEIGHT * move) > _SCORE_MOVEMENT_CAP_PCT,
         "book_confidence": confidence,
         "freshness_factor": freshness,
         "price_reliability": price_reliability,
