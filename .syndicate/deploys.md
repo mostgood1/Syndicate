@@ -8893,3 +8893,96 @@ arithmetic closes to the decimal: stated `-39.93` = `(live_model_prob_over
 `full/*` only — segment bases are not live-joined and agree 3/3. Recommended fix
 (theirs, not mine): rename to `live_edge_vs_market_pct` so the pairing cannot be
 got wrong at the call site.
+
+---
+
+## 2026-08-16 22:49Z — `#5` WNBA live tier — refresh-worker `fdc72dd0` — **GAME LINES WIRED AND PROVEN; AND THE WNBA LENS ITSELF IS INTERMITTENT**
+
+### The gate was shut on data that was already being published
+`attach_live_gamelines_for_sport` was `if sport != "mlb"`, justified as "the
+120-sim re-sim is MLB's" and WNBA "has no live tier at all". First half true;
+**second half stale.** `/api/ops/live-lens/status` reports
+`activeSports: ["mlb","wnba","soccer"]`, wnba `ok: true` on a 60s tick, writing
+`live/wnba_live_lens.json` — the exact path the join reads, and already in
+`HOT_ARTIFACT_PATTERNS`. The board showed **0 of 521 rows** live-aware across two
+live games because of the gate, not the data.
+
+### Three shape differences, handled rather than papered over
+1. wnba stamps `source: "live_projection"`, not `live_mc`. Fixed with a
+   **per-sport** `LIVE_LENS_SOURCES_BY_SPORT`, not a relaxed check — MLB keys on
+   `source` so a lens the re-sim never touched cannot be admitted, and widening
+   it globally would hand MLB every `pregame` lane in its own snapshot. Unknown
+   sports get MLB's stamp and fail closed. **Verified: the wnba snapshot indexes
+   2 games under wnba sources and 0 under MLB's.**
+2. wnba carries `away`/`home` at the TOP level with no `matchup` wrapper. Shapes
+   are tried in order; the first yielding BOTH names wins, so a partial
+   `matchup` cannot build a key from two different games.
+3. **wnba publishes no `simsRun`**, so `prob_std_err` is uncomputable and
+   `REASON_UNUSABLE_SIMS` withholds. An `n` was NOT invented — `prob_std_err`
+   returns None rather than 0.0 precisely because 0.0 reads as perfectly
+   precise. WNBA gets a live PROJECTION with an explicitly unpriced edge.
+
+### Verified in production, 22:50:31Z artifact (post-deploy)
+```
+totals_alt|full    78 rows   78 live_aware   78 live_gameline   0 priceable
+spreads_alt|full   71 rows   71 live_aware   71 live_gameline   0 priceable
+period segments (q1/h1/h2)  0 live_aware   <- correct, full-game lens
+withheld: live_resim_published_no_distribution_for_this_market 160
+          sim_count_unusable                                     2
+```
+**149 rows went 0 -> live-aware**, each carrying a live projection and a NAMED
+reason for the unpriced edge. Exactly the "publish, refuse to price" outcome
+designed for and stated in advance.
+
+### THE FINDING THE WIRING EXPOSED: the WNBA lens loses its own live state
+Seven minutes later, the 22:57:22 artifact served **309 game rows, 0 live_aware,
+0 live_gameline** — while the board still had both games LIVE at 78-74 and
+78-77. Cause read straight off the lens at 22:57:43Z:
+
+```
+Chicago Sky @ Seattle Storm : sources=['pregame'] in_progress=False clock=None period=None pts=None-None
+Indiana Fever @ Atlanta Dream: sources=['pregame'] in_progress=False clock=None period=None pts=None-None
+```
+
+At 22:50 the same games carried `away_pts 60, clock "0:06", period 3,
+in_progress true`. **The lens's `live_state` went entirely null and the lens
+self-downgraded to `pregame`** (`wnba/cards.py:1057` sets `live_projection` only
+when `is_live` AND `live_margin` AND `elapsed_min` are all present). The join
+then correctly refused it.
+
+**This is a pre-existing WNBA producer intermittency that the board was
+previously blind to, and is now visible.** It is NOT the join, and NOT this
+deploy: the join is proven by the 22:50 reading. The WNBA live tier will flicker
+until the live-state feed stops dropping out.
+
+### Tick-over-tick movement: NOT captured, and the reason
+The verification asked for a diff proving the numbers MOVE. The 22:57 tick had
+no live rows to compare against (above), so the movement test never got two
+populated ticks. **Unproven, not passed** — needs another live WNBA slate.
+
+### PROPS: NOT WIRED, deliberately, because it would be inert
+Across the ENTIRE wnba snapshot, `actual` / `live_projection` / `live_total` /
+`live_total_line` appear **24 times each and are NULL in all 24** (16 of those
+rows on live games). The field names are right; nothing fills them. Wiring
+`attach_live_projections_for_sport` for wnba would join nothing and deploy an
+inert change. **Producer gap in `wnba/live_lens.py` + its box-score source, not
+a join gap** — and the same `live_state` dropout above is the likely common
+cause, since a null `live_state` starves prop actuals exactly as it starves the
+game lens.
+
+### Rollback
+Redeploy `2ef1165a` on `srv-d91dpertqb8s73co8ls0`.
+
+### Pre-existing reds found on the deploy lineage, NOT mine
+`tests/test_live_gameline_join.py::TestBuildGameLensStampsSimsRun` — 4 tests
+fail on live `2ef1165a` **without** this change (verified by checking out that
+SHA clean and re-running). Another session's `simsRun` stamping is tested but
+not present in the deployed lineage. The live refresh-worker is running with
+those 4 red.
+
+### Process note against myself
+I chained `push && deploy` after a test run without gating on the result, and
+triggered a deploy while 4 tests were failing. Caught it, cancelled
+`dep-da13pcjl550s73eou4rg` before it went live, established the 4 were
+pre-existing, and only then redeployed. The deploy should have been gated on the
+test exit code in the same shell.
