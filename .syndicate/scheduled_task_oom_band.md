@@ -116,6 +116,21 @@ WHY THIS EXISTS. Two measurement tasks fire tonight (`oom-band-early-read` at 01
 
 READ-ONLY. Deploy nothing, change no config, edit no file, open or close no lane.
 
+STEP 0 — AM I ON TIME? Do this FIRST and report it FIRST. This task was scheduled for **2026-08-16T21:45:00Z**, 15 minutes before the band opens at 22:00Z. Scheduled tasks only run while the app is open; if it was closed, this fires on next launch instead — possibly hours or a day late. A late run that reports under a "pre-band" heading is WORSE than no reading, because the number looks like it answers a question it cannot answer.
+
+```bash
+py -3 -c "from datetime import datetime,timezone; n=datetime.now(timezone.utc); t=datetime(2026,8,16,21,45,tzinfo=timezone.utc); b=datetime(2026,8,17,5,0,tzinfo=timezone.utc); d=(n-t).total_seconds()/60; print(f'now {n:%Y-%m-%dT%H:%M:%SZ}  drift {d:+.1f} min  band_open={n>=t.replace(hour=22,minute=0)}  band_over={n>=b}')"
+```
+
+Classify the drift and say which case you are in, in your first line:
+
+- **drift < +10 min** — ON TIME. Proceed; the verdict means what it says.
+- **+10 min to band open (22:00Z)** — LATE BUT STILL PRE-BAND. Proceed, and state the actual lead in minutes rather than implying 15.
+- **at or after 22:00Z, band not over** — **NOT A PRE-BAND READING.** Say that first and plainly. The band has already opened, so "was the worker untouched going in" can no longer be answered — a deploy may have landed before you looked. Report what you find as an IN-BAND spot check, and say explicitly that the pre-band question is now unanswerable.
+- **after 2026-08-17T05:00:00Z** — **THE BAND IS OVER; THIS TASK IS MOOT.** Do not report a verdict. Say the run was too late to serve its purpose, and point at `oom-band-full-report`, which measures the band retrospectively and reports the SHA it actually measured. Then stop.
+
+Do not skip this because the drift "looks small". Report the number either way — a reader cannot tell an on-time run from a late one by its content alone, which is exactly why this step exists.
+
 STEP 1 — live SHA on refresh-worker. Read it, do not quote a remembered value:
 
 ```bash
@@ -147,7 +162,7 @@ STEP 4 — report in under 12 lines:
 - any `server_failed` events, classified (`oomKilled` / `evicted` / `unhealthy` / `earlyExit` — these have different causes and must not be flattened)
 - **uptime at 22:00Z**, computed from the most recent deploy's `finishedAt`
 
-VERDICT, one line, exactly one of:
+VERDICT, one line, exactly one of — **unless STEP 0 classified this run as MOOT or NOT A PRE-BAND READING, in which case do not issue one at all; a verdict from a late run is a claim the run cannot support:**
 - **BAND CLEAN** — no deploy since 15:45:50Z, fixes present, worker warm. Tonight's measurement rests on a single uninterrupted process.
 - **BAND COMPROMISED** — a deploy landed. Say when, by whom, and what uptime the band will actually open with. A short warm-up means the memory ratchet has not re-formed and the comparison against the recorded night baselines (amplitude 1,950-2,235 MB; min inactive_file 26.3/42.2 MB in windows that killed vs 164-240 MB in windows that survived) is weaker — say that plainly rather than letting the later tasks average through it.
 
