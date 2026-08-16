@@ -7553,3 +7553,77 @@ during a live MLB slate was not worth it.
 
 **A SIBLING DEFECT SURFACED IN THE SAME LOG WINDOW:** NCAAF's generator crashes
 on a missing, hard-coded 2025 input. Filed as `#445`; NCAAF opens 2026-08-29.
+
+---
+
+### ask-evidence-table — web `9d58cc09` — MEASURED
+
+- Deployed: 2026-08-16 14:19 CDT (19:19:42Z) — **web only**
+  (`srv-d88ahvrbc2fs73eodu30`), branch `deploy/ask-evidence-table-2026-08-16`
+  cut from web's own live SHA `ad77e46a`. **No collision this time — the deploy
+  claim was acquired first**, which is the whole difference from the previous
+  row, where two sessions cancelled each other twice in six minutes.
+- Change: the M1 evidence table names the same bet the headline names.
+  `_board_row_label` was the THIRD copy of the label logic and the last one
+  still wrong; it now delegates to the adapter's `_bet_label`. Also
+  `_market_label` on the Market column (was the raw key `spreads_alt`/`h2h`), a
+  new Price column, and `_board_row_chart_label` so a lay label is not
+  truncated mid-phrase.
+- **The defect this fixes was CREATED BY THE PREVIOUS FIX'S VISIBILITY.** Once
+  the headline read `"Minnesota Twins -1.5"`, the table one line below still
+  read `"home -1.5 (Philadelphia Phillies @ Minnesota Twins)"` — the same row,
+  the same response, two different names, and nothing saying which to trust.
+  A fix that improves one surface can expose a second surface it does not own.
+- **Measured on production, 19:2xZ.** 4/4 assertions pass against the served
+  `visuals.tables`:
+  - Price column present (`-104 @ kalshi`, `+426 @ kalshi`, …)
+  - no Selection names a CONVENTION (0 rows start `home `/`away `)
+  - no raw market key survives in Market (0 rows contain `_`)
+  - **every headline selection also appears in the table** — the two surfaces
+    now agree by construction, which was the point.
+  Served sample: `MLB | alt spread | Milwaukee Brewers -1.5 | +426 @ kalshi |
+  +3.72% | +8.59%`.
+- **Verified by REPLAY before deploying**, over 92 verbatim rows from the live
+  shortlist rather than only over fixtures I chose: 0 convention labels, 0
+  table-vs-headline mismatches, 0 chart labels over the 28-char budget. Game
+  totals correctly keep `over 10.0 (Texas Rangers @ Athletics)` — a total has no
+  team side, so side+line+matchup IS the bet there. Intended, not a miss.
+- **Harness: 37/52, ZERO pass/fail flips** against the post-headline run, all
+  seven classes identical. Third consecutive 37/52 today, same cases each time.
+  `reports/ask_regression/post_evidence_table_2026_08_16.json`.
+- **`warn:selection_not_on_board` is a SLATE ARTIFACT, not a signal — do not
+  read it as one.** It went 125 → 100 → 125 across the three runs and the
+  arithmetic gives it away: `125/5` and `100/4` are both exactly **25**. It is
+  `25 × (how many of the 5 HEADLINE picks are not a bare team/player name)`,
+  emitted once per each of 25 cases. The middle run scored 4 only because one
+  top pick happened to be `Milwaukee Brewers`; tonight's top 5 contains no
+  moneyline row, so it is 5 again — different picks entirely, the slate moved
+  (108 → 102 rows). **My earlier reading of the 125 → 100 drop as an improvement
+  was right about the mechanism and wrong to treat the number as a score.**
+  Every warned selection is a HEADLINE selection, which also confirms the
+  harness never reads the evidence table at all — so this deploy was invisible
+  to it by construction, exactly as predicted.
+- Landed on `main` as `79c3e247`; `main` and live carry identical blobs for all
+  three ask files. Deploy claim released.
+- **LANE: `ask_the_syndicate_data.py` was TAKEN from OPEN lane
+  `ask-sport-coverage`.** Its session (`local_eef2ef89…`) is **archived and not
+  running**, last active 2026-08-15 19:44 — a stale claim, and `send_message`
+  cannot reach an archived session, so there was no holder to ask. File was
+  clean and unchanged since `67ff20a0`. Reassigned in `lanes.md` with the reason
+  recorded; scope taken is `_board_row_label` + the `_board_candidates_evidence`
+  table ONLY, so K9/K2/K11/K3/K4 are untouched and that lane can take it back.
+- **`lane-guard.py`'s `_claims()` is STRICTLY PER-LINE, and that cost a blocked
+  edit.** A release bullet written as `- **\`path\` — REASSIGNED …` with
+  "claimed by" wrapped onto the *second* line still reads as a claim, because
+  the disclaimer marker has to sit on the same physical line as the path. Worth
+  knowing before anyone else tries to hand a file over.
+- Blast radius: web only. Safety gate returned NOT CLEAR on **an unreadable
+  instrument** — "Board build state UNKNOWN (HTTP 503)" — which is not evidence
+  of a build in flight, and a board build runs on refresh-worker regardless.
+  MLB sim `finished (exit=0)`, odds refresh `idle`. Web's loop ownership was
+  RE-checked rather than carried over from the previous deploy
+  (`MLB_ENABLE_LIVE_LENS_LOOP=false`,
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false`) and web answered
+  HTTP 200 immediately before the deploy.
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit ad77e46a
+  --allow-rollback`.

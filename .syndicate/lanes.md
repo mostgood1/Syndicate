@@ -25,6 +25,11 @@
   - `syndicate/blueprints/ask_the_syndicate_adapter.py`
   - `syndicate/static/shared/ask_bar.js`
   - `tests/test_ask_answer_substance.py` (NEW)
+  - `syndicate/blueprints/ask_the_syndicate_data.py` — **TAKEN 2026-08-16 from
+    ORPHANED lane `ask-sport-coverage`** (archived session, last active
+    2026-08-15 19:44; file clean and unchanged since `67ff20a0`). Scope is
+    `_board_row_label` + the `_board_candidates_evidence` table ONLY. Hand back
+    on request.
 - Collision check, run by reading every OPEN lane's `- Files:` block:
   `ask_the_syndicate_adapter.py` was held by `ask-headline-from-board`, which is
   **CLOSED-VERIFIED 2026-08-15** (`lanes.md:1820`); the only remaining mention
@@ -1356,7 +1361,10 @@ does not hold.** `[measured 08-14]`
   - K5/K6 — `routed_sport` in the payload; as-of from `freshness.computed_at`.
 - Files (exclusive to this lane):
   - `syndicate/blueprints/ask_the_syndicate_router.py`
-  - `syndicate/blueprints/ask_the_syndicate_data.py`
+  - NOT claimed — `syndicate/blueprints/ask_the_syndicate_data.py` is now claimed by OPEN lane `ask-answer-substance` (REASSIGNED 2026-08-16 18:5xZ).
+    Kept on ONE physical line on purpose: `_claims()` is strictly per-line, so a
+    marker wrapped onto the second line leaves the path on an unmarked first
+    line and it still reads as a claim. Cost me one blocked edit to learn.
   - `syndicate/blueprints/ask_the_syndicate.py`
   - `tests/test_ask_sport_coverage.py`
   - `.claude/hooks/lane-guard.py`
