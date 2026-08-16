@@ -6016,13 +6016,29 @@ runs were exercised.**
 05:12:2xZ on commit `755ec40a` (`date=2026-08-17`, next-day builds). Its null
 branch has not fired; every firing so far is live-odds-worker on `date=2026-08-16`.
 
-**OPEN, NOT A FINDING: every exercised run is on an OLDER commit.** The
-exercised runs carry `44bc02f3` / `755ec40a`; every run since
-05:53Z (live-odds-worker `dd53d47c`) and 06:06Z (refresh-worker `d72d670c`) has
-reported `rows=0` — 5 consecutive on each. The benign reading is that the WNBA
-slate's work was already done and later runs found nothing new; the other
-reading is that the newer commits stopped computing `win_prob` at all. **Do not
-bank either.** Discriminator: one run with `rows>0` on a current commit.
+**RETRACTED, SAME DAY — "every exercised run is on an OLDER commit" WAS FALSE.**
+This entry first claimed the newer commits might have stopped computing
+`win_prob`, with "one `rows>0` on a current commit" as the discriminator.
+**That discriminator was already satisfied in the very payload the claim was
+written from.** Re-read 16:14:55Z, ancestry checked with `merge-base
+--is-ancestor`, not assumed:
+
+    dd53d47c (descendant of 44bc02f3)  rows=24 / 9 / 15  null=0   05:53:3xZ  live-odds-worker
+
+**48 rows on the current commit.** How the error was made, because the shape
+recurs: the `latest` line for live-odds-worker reads `dd53d47c rows=0`, and that
+one line was generalised to every `dd53d47c` run — while priors 1-3 carry the
+same SHA and are exercised. The discriminating field was already printed on
+screen. `#read-the-field-you-already-have`.
+
+**What is actually true:** live-odds-worker computes rows on the current commit;
+there is no live-odds-worker rows=0 streak at all (one such run, not five). The
+5-run `rows=0` streak is **refresh-worker only**, on `d72d670c` (06:06Z-10:08Z),
+whose predecessor `755ec40a` computed 32 rows for the same `date=2026-08-17`.
+That service builds only next-day boards, so the benign reading — the board was
+already built and later runs found nothing new — is the likely one, but it is
+NOT established. **Scope any remaining doubt to refresh-worker; the fix itself
+is exercised on current code.**
 
 **READ THE `recent` ARRAY, NOT THE HEADLINE.** The route's top-level summary
 said `any_exercised: false`, `rows: 0`, `"producers reported but computed no

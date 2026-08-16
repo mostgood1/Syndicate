@@ -257,12 +257,18 @@ further runs computed 104 rows with zero nulls (fix holding on priced rows).
 compute rows; only live-odds-worker's branch has fired, because it works the
 live slate while refresh-worker builds `date=2026-08-17` where prices are
 complete.
-- **OPEN, do not bank either way:** every exercised run is on an OLDER commit
-  (`44bc02f3`/`755ec40a`). Since `dd53d47c` (live-odds-worker, 05:53Z) and
-  `d72d670c` (refresh-worker, 06:06Z), **5 consecutive runs each report
-  `rows=0`.** Benign reading: the slate's work was done. Other reading: the
-  newer commits compute no `win_prob` at all. Discriminator: one `rows>0` on a
-  current commit.
+- **CLOSED BENIGN 16:14:55Z — the fix is exercised on CURRENT code.**
+  `dd53d47c` (verified descendant of `44bc02f3`) has **3 exercised runs,
+  `rows=24/9/15`, 48 rows, 05:53:3xZ, live-odds-worker.** An earlier line here
+  claimed "every exercised run is on an OLDER commit" and set that as the
+  discriminator; **it was false when written** — those runs were in the same
+  payload, on the `prior[1..3]` lines, while only the single `latest` line read
+  `dd53d47c rows=0`. Retracted, not stacked.
+- **Still unestablished, and scoped to ONE service:** refresh-worker's
+  `d72d670c` has 5 consecutive `rows=0` runs (06:06Z–10:08Z) where its
+  predecessor `755ec40a` computed 32 rows for the same `date=2026-08-17`. It
+  builds next-day boards only, so "already built, nothing new to do" is the
+  likely reading — **likely, not measured.**
 - **Read it with `scripts/read_win_prob_null.py`**, which prints `recent`
   alongside `latest` — see below for why the route's headline cannot be trusted.
 - **DO NOT READ THE ROUTE'S HEADLINE — READ `readings[*].recent`.** The same
