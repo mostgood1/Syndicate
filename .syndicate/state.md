@@ -1290,7 +1290,7 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   difference or the complement** — including two rows where `row_side ==
   proj_side` so no complement applies and the direct figure is off by 64 and 19
   points. All `full/*_dist` bases. Owned by `layer2-board-quality`, notified.
-- **ASK ANSWER SUBSTANCE — LIVE web `d8985df8` (2026-08-16 21:59:38Z).** The
+- **ASK ANSWER SUBSTANCE — LIVE web `9bae928c` (2026-08-16 22:52:31Z).** The
   deterministic panel now: names the bet a human can place (market, line, side,
   price, book — not "Ryan Johnson"); generates its own reason sentences from
   `projection.projected` and `model_skill` (the MLB game lens is the model);
@@ -1305,16 +1305,29 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   surfaces have not been checked. Its sibling `book_age_seconds` answers a
   DIFFERENT question ("has the price moved") and the board gates on the seen
   clock deliberately — see `layer2_board._row_quote_age_seconds`.
-- **THE BOARD PUBLISHES SIDES THAT CONTRADICT ITS OWN PROJECTION, AND IT IS NOT
-  RARE.** On `/api/board/layer2-shortlist`, `projection.projected` sits on the
-  opposite side of `line` from the row's `side` on **12 of 31 over/under rows on
-  one read and 21 of 39 on another minutes earlier** — across four `basis`
-  values (`full`, `model_mean`, `rbi_1plus`, `live_resim`) and on **pregame**
-  rows as well as live. Worst seen: `over 16.5` published with
-  `projected = 7.134`. **"A live full-game projection against a remaining-game
-  line" is REFUTED as the sole cause — it cannot explain the pregame rows.**
-  Owned by `layer2-board-quality`, notified. Ask now says "does NOT support the
-  {side}" on those rows rather than inventing a causal story.
+- **WITHDRAWN 2026-08-16 22:5xZ — "the board publishes sides that contradict
+  its own projection" was MY error, not a board defect.** Chasing it to a root
+  cause showed only **2 of 10** failing rows are explained by live-join
+  staleness; the rest are a category error in the Ask reason generator.
+  `projection.projected` is a **MEAN**, and what picks a side is
+  **`P(X > line)`** — on a low-line count prop those diverge legitimately (a
+  mean of 0.214 runs implies `P(>=1) ~ 19%`, which beats a market implying
+  15%). **Do not re-open this against the board.** Ask now claims a direction
+  only on GAME totals/margins, where the mean is the right statistic; on props
+  it states the relationship as a fact. Fixed in web `9bae928c`.
+- **STANDS, AND ITS ROOT CAUSE IS CONFIRMED — `model_edge_pct` is not
+  comparable with `projection.{model_prob_over, market_fair_prob_over}` after a
+  live join.** `live_gameline_join.py:643` overwrites `edge_vs_market_pct` with
+  the LIVE edge while deliberately leaving `model_prob_over` at its PREGAME
+  value (the live probability goes to a new `live_model_prob_over` key). The
+  edge therefore refers to a different probability than the one beside it, with
+  nothing in the field name to signal it. **7/7 separation on `live_aware`**;
+  arithmetic exact — stated `-39.93` = `(0.1917 - 0.591) x 100`, where the
+  pregame pairing gives `+27.46`. Every number is correct; only the PAIRING is
+  wrong, which is why it is `full/*` only (segment bases are not live-joined
+  and agree 3/3). Owned by `layer2-board-quality`, notified with the fix
+  options. Consumers pairing those two fields must prefer `live_model_prob_over`
+  when `live_aware` is true.
 - **K1 SHIPPED AND VERIFIED** (`bef782cb`, live 20:01:18Z): 20/52 → 23/52,
   `refusal` 3/8 → 6/8, every other class byte-identical, declined-question
   latency 10.9s → 0.19s. **A refusal gate must be tested on what it must NOT

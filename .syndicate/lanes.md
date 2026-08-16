@@ -71,7 +71,7 @@ rebuild a props snapshot when its inputs are newer, not just on force".
 - Blocked by: none.
 
 
-### ask-answer-substance — OPEN — **6 DEPLOYS SHIPPED AND MEASURED (web `d8985df8`). Panel names the bet, grounds it in the sim, filters non-positive edges, and reports real quote age. ONE BOARD DEFECT FOUND AND HANDED OFF, NOT CLOSED.** — opened 2026-08-16 — session: ask-answer-substance
+### ask-answer-substance — OPEN — **7 DEPLOYS SHIPPED AND MEASURED (web `9bae928c`). Panel names the bet, grounds it in the sim, filters non-positive edges, and reports real quote age. ONE BOARD DEFECT FOUND AND HANDED OFF, NOT CLOSED.** — opened 2026-08-16 — session: ask-answer-substance
 > **ASK-ANSWER-SUBSTANCE CHECKPOINT 3 applied.**
 > **ASK-ANSWER-SUBSTANCE CHECKPOINT 2, 2026-08-16 22:0xZ.** Six deploys shipped
 > and measured today, all web-only, all cut from web's own live SHA. Live

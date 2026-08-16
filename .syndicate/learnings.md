@@ -3218,3 +3218,53 @@ The other two instruments this evening, for the pattern: `[UNKNOWN] HTTP 502`
 read as a CLEAR deploy gate, and a binary content check that shouted
 "blank board" at a deploy carrying none of my files. All three were written
 quickly, at the end of a long task, to check something I expected to be fine.
+
+## 2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 4: fixing a fix, and two bad inferences
+
+### REFUTED: "the guard I added to stop a false claim is therefore correct"
+
+The defect was false causation — *"projects 1.396 batter hits against a line of
+0.5, **which is why it lands on the under**"*. The fix I shipped replaced it with
+*"which does **NOT support** the under"*, and that is **the same category error
+pointing the other way.**
+
+`projected` is a **MEAN**. What picks a side is **`P(X > line)`**. On a low-line
+count prop those diverge routinely and legitimately: a mean of 0.214 runs still
+implies `P(>=1) ~ 19%`, which beats a market implying 15%, so `over 0.5` is a
+good bet with the mean below the line. My "correction" called that unsupported.
+
+**The general form: when you fix a claim, check that its REPLACEMENT is licensed
+by the same evidence.** Negating an unjustified assertion does not produce a
+justified one — both directions need the statistic to be the right statistic.
+The fix shipped inside four hours of the original and was live for 53 minutes.
+
+Corollary, and it is the durable half: **the comparison a template makes is part
+of the template's contract.** This generator was modelled on the MLB game lens,
+where `projection sits at 7.42 against 5.0` is sound because a game total's mean
+IS the right statistic against a nearby line. Carrying that sentence across to a
+0.5-line count prop carried the arithmetic and dropped the precondition.
+
+### REFUTED (mine, same session): "these two findings are unrelated because no row fails both"
+
+I measured `overlap = 0` between the projected-vs-side finding and the
+edge-vs-probability finding and read it as evidence against a shared cause. It
+was a **population artifact**: only **2 of the 10** projected-vs-side rows carry
+`model_edge_pct` at all, so they were barely eligible to fail the second test.
+
+**Before reading an empty intersection as independence, check that the two
+populations could have intersected.** An overlap of zero between a set of 10 and
+a set of 8 drawn from different eligibility pools says nothing. Same family as
+the standing rule that absence in a window is not absence.
+
+### CONFIRMED, and worth keeping: a guard that refuses loudly is how you find someone else's bug
+
+`_board_row_probabilities` returns `None` rather than publishing a probability it
+cannot reconcile against the row's own stated edge. That refusal is what surfaced
+the `edge_vs_market_pct` pairing defect — the harness warning
+`edge_without_market_probability` went 0 → 25, and chasing it landed on
+`live_gameline_join.py:643` with 7/7 separation and exact arithmetic.
+
+**A guard that degrades silently would have published a plausible wrong number
+and nobody would ever have looked.** When adding a reconciliation check, make its
+failure VISIBLE (a null, a counter, a warning) rather than falling back to
+whichever input looks reasonable.
