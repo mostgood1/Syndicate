@@ -6,6 +6,96 @@
 
 ## OPEN
 
+### ask-answer-substance — OPEN — opened 2026-08-16 — session: ask-answer-substance
+- Goal: the inline quick ask names a bet a human can actually place and grounds
+  it in the sim projection that is **already in the response payload**, instead
+  of a bare name and one edge number. **Single testable outcome**, on the served
+  `/api/syndicate/query` payload plus the rendered panel:
+  (a) a prop answer carries market, line and side (`Ryan Johnson over 2.5
+  earned_runs`), not `Ryan Johnson`;
+  (b) `structured_response.edge` on `bet_analysis` equals the row's
+  `model_edge_pct` (same number the briefing shows for the same pick) — today
+  the same pick reads **14.0% in the briefing and 1.4% per-pick**;
+  (c) the briefing renders as many rows as its own sentence claims (says 5,
+  renders 3);
+  (d) a game-side selection names the team, never a bare `home -1.5`;
+  (e) every answer carries at least one sim-derived term (projection vs line,
+  or `model_skill.status`) sourced from fields already fetched.
+- Files:
+  - `syndicate/blueprints/ask_the_syndicate_adapter.py`
+  - `syndicate/static/shared/ask_bar.js`
+  - `tests/test_ask_answer_substance.py` (NEW)
+- Collision check, run by reading every OPEN lane's `- Files:` block:
+  `ask_the_syndicate_adapter.py` was held by `ask-headline-from-board`, which is
+  **CLOSED-VERIFIED 2026-08-15** (`lanes.md:1820`); the only remaining mention
+  is a *disclaimer* bullet inside `ask-sport-coverage`, not a claim.
+  `ask_bar.js` is claimed by nobody — zero hits in `lanes.md`. CLEAR.
+- NOT claimed, read-only dependencies (top-level bullets on purpose, so
+  `_claims()` cannot read them as claims):
+  - `syndicate/blueprints/ask_the_syndicate_data.py`, `..._router.py`,
+    `..._the_syndicate.py` — held by OPEN `ask-sport-coverage`. This lane does
+    **not** edit them. The sim evidence it needs (`visuals.tables/charts`) is
+    already built there and already served; nothing new is required of it.
+  - `syndicate/features/shared/layer2_board.py` — held by OPEN
+    `layer2-board-quality`. Read-only. `_pick_label` there is the reviewed owner
+    of the side→team convention; this lane pins against it rather than
+    re-deriving it.
+- Hypothesis: the "answers are only edge-based" symptom is **not** missing data
+  and **not** a missing model. Every discriminating field — `line`, `side`,
+  `market`, `sim_projection`, `projection.model_skill`, `quote.bookmaker`,
+  `quote.price`, `model_edge_pct` — is already on the candidate the adapter
+  holds in `explanation.top_candidate`, and the per-pick answer already ships 7
+  sim tables and 3 sim charts in `visuals` that the inline panel never reads.
+  The loss is entirely in the adapter's field selection and the panel's render.
+- Falsification test: if a served `bet_analysis` payload for a real prop is
+  found whose `explanation.top_candidate` lacks `line`/`side`/`sim_projection`,
+  then the cause is upstream data, this lane cannot fix it in the adapter, and
+  the work belongs to `ask-sport-coverage` instead.
+- Verification: (1) `py -3 scripts/ask_syndicate_regression.py --out
+  reports/ask_regression/latest.json` re-run and diffed per class against the
+  38/52 in the `ask-sport-coverage` measurement — **no class may regress**;
+  (2) a new `tests/test_ask_answer_substance.py` asserting (a)–(e) against a
+  captured production row; (3) the panel re-read in a browser, since (c) and the
+  visuals render are client-side and no server test can see them.
+- Blocked by: none.
+
+### nfl-pbp-fetcher — OPEN — opened 2026-08-16 — session: sim-engine-track
+- Goal: `#441`. A pbp ingestion path exists, so the NFL SmartSim2 projection has
+  real ratings again instead of refusing for 2.8 days.
+- Files (exclusive to this lane): `scripts/fetch_nfl_pbp.py` (new),
+  `tests/test_fetch_nfl_pbp.py` (new). Collision check RUN: CLEAR on both.
+  `scripts/run_refresh_worker.py` (autorun wiring — claimed 2026-08-16 after a
+  fresh collision check: CLEAR, no OPEN lane holds it).
+- **Root cause is SETTLED by measurement, not assumed** (`a775e372` diagnostic,
+  17:10:45Z): the pbp is absent from all four candidate roots including the
+  mounted disk, env vars reach the subprocess, strict storage is on. There is no
+  pbp fetcher in this repo — ten scripts reference pbp, all reads.
+- **THE FILE THAT ACTUALLY MATTERS IS pbp_2025.csv, NOT 2026.** The 2026 regular
+  season has not started, so there are no current-season plays for week 1;
+  `assert_ratings_data_available` accepts current OR prior, and NFL ratings for
+  wk1 come from the prior season (`prior_season_fallback`, the mechanism
+  `verify_nfl_autorun_obligations.py` was written to check). A fetcher that only
+  pulls the current season would ship and change nothing.
+- Template: `fetch_nfl_schedule.py` (nflverse games.csv), plus the roster and
+  depth-chart fetchers. Write under `nfl_artifact_output_root()` — the `#389`
+  resolver — NOT under `default_nfl_source_root()`, which resolves to the
+  ephemeral checkout.
+- **REFUSE TO INSTALL A DEGENERATE FILE.** Same philosophy as the guard this
+  feeds: validate required columns and non-zero REG rows BEFORE replacing an
+  existing file, so a truncated or schema-changed download cannot overwrite a
+  good one. Write atomically.
+- Hypothesis: with pbp_2025.csv present on the mounted disk, the next autorun
+  writes a real artifact with non-identical rows per game.
+- Falsification: if the artifact still refuses, or writes with IDENTICAL rows for
+  every game, the ratings path is broken for a second reason and the fetcher is
+  not sufficient.
+- Verification: `SEASON_PROJECTION_LAUNCHING` stops recurring; the artifact
+  appears with a fresh mtime AND per-game variance (identical rows would mean the
+  guard was satisfied wrongly).
+- Blocked by: none. `#443` (stale PID stalls the autorun ~45 min per restart)
+  will DELAY observation and is not a blocker.
+
+
 ### export-force-refresh-escape — OPEN — **BUILT, TESTED (20, verified non-vacuous) AND ON `origin/main` (`734c163e`); ON NO SERVICE — rides along with the next worker deploy, see `deploys.md` PENDING** — opened 2026-08-16 — session: win-prob-null-readable
 - Goal: `--force-refresh` actually regenerates the three props SNAPSHOT exports
   instead of re-serving a stale per-date file. Testable: with `force_refresh=True`
@@ -38,7 +128,55 @@
   someone actually forces a refresh.
 - Blocked by: none. No deploy from this lane tonight unless asked.
 
-### layer2-board-quality — OPEN — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — OPEN — **AUDIT COMPLETE (8/8 goals measured on the SERVED payload). 6 FIXES COMMITTED TO main AND NOT DEPLOYED. 1 REGRESSION FOUND, DEPLOYED AND VERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+- **CHECKPOINT 2026-08-16 ~18:0xZ. STATUS BY GOAL:**
+
+  | goal | finding (measured, 108 served rows) | state |
+  |---|---|---|
+  | G1 rail | rail derived from ROWS, so a game with no opp cannot appear; finals sorted to the FRONT | **FIXED, committed `625b6284`, NOT deployed** |
+  | G2 score | `_SCORE_SIM_WEIGHT` is **0.0** not 0.5; sim in 0 of 65 eligible rows | **audited; disclosure shipped to main, weight unchanged (gated on S6)** |
+  | G3 books | no allowlist; **27/108 (25.0%)** best-book unbettable | **FIXED, committed `217c2bd5`, NOT deployed** |
+  | G4 movement | `return {}`; 0 movement keys on 108 rows | **NOT DONE — blocked, see below** |
+  | G5 anti-sim | 32/108 negative `model_edge_pct`, 43 no model | **LABELLED (`sim_view`), committed, NOT deployed** |
+  | G6 labels | `h2h_lay` rendered as a back bet (9 rows); **56/108** props attributed to the AWAY team | **FIXED, committed `217c2bd5`, NOT deployed** |
+  | G7 live | 6 live rows, **0** live projection sources; grid holds `live_projections` (19) unjoined | **NOT DONE — see below** |
+  | G8 betslip | collapses to the bottom of the page on desktop (layout drops to `1fr`) | **FIXED, committed `625b6284`, NOT deployed** |
+
+- **THE ONE THING THAT IS ACTUALLY LIVE:** the `min()` score guard, absent from
+  all three services because `deploy/nfl-pbp-root` was cut 1h38m before it
+  landed. Deployed as `ed54071a`, superseded by another session's `a775e372`,
+  and **verified on a post-deploy artifact** (17:13:13Z): `reliability_applied`
+  108/108, `min()` applied 4/4, scores moved. Working in `deploys.md`.
+- **NOTHING ELSE FROM THIS LANE IS DEPLOYED.** Six fixes sit on `main` only.
+  They need a deploy decision and a `/preflight`; deploying `main` outright
+  FAILED preflight on scope (520 commits / 207 files / 85,232 insertions from
+  seven sessions, including work the ledger HOLDS).
+- **G4 is BLOCKED, not skipped.** Re-enabling `_layer2_movement_columns` naively
+  re-stalls the shortlist build (`#372`: a ~20MB shard loaded inside the
+  builder, 70 minutes of no `LAYER2_SHORTLIST` and no exception). The docstring
+  states where it belongs — where the odds tracker already holds the data. It
+  also shares G2's prerequisite: the real odds sampling interval, owned by
+  `odds-cadence-off-the-mlb-peak` (1a/1b verified, **effect unmeasured**).
+- **G7 is NOT DONE and overlaps another lane.** The shortlist's
+  `attach_projections` joins only PREGAME sources; `live_projections` (19) and
+  `live_gamelines` (8) exist on the grid payload and are never read. Today's
+  slate hides it — all 6 live games were at `TOP 1`, where a full-game pregame
+  projection is still nearly right. Coordinate with `live-game-line-projection`
+  (reports both halves shipped, v2 unexercised) before building anything.
+- **UI CHANGES ARE UNRENDERED.** `deriveGameCards` is verified as LOGIC
+  (`node tests/js/game_rail_derive.test.mjs`, and the test discriminates — the
+  pre-change function fails 4 of 5). The disclosure was seen in served local
+  HTML. **The betslip collapse, the sim badge and the count-0 rail cards have
+  never been seen rendering**: the local combined-board path takes minutes to
+  hydrate 8 sports and no page load completed.
+- **Cross-lane:** `send_message` sent to `Layer 1 board coverage audit` asking
+  who should own the shared book list (it means editing `layer1_board.html`,
+  theirs). **No reply at checkpoint.** `book_shortlist.py` is the proposed
+  owner and is live in the tree; Layer 1 does not read it yet.
+- **NEXT ACTION for whoever picks this up:** decide the deploy for the six
+  committed fixes (narrow branch off the live SHA, as `ed54071a` did — NOT
+  `main`), then verify the four UI ones in a browser, which needs a page load
+  the local box has not managed.
 - Goal: the curated board scores, labels and moves correctly, and never contradicts the sim. **Testable outcome:** on the served `/api/board/layer2-shortlist` payload, (a) `sim_component` is non-zero wherever `model_edge_pct` is non-zero, (b) every `quote.bookmaker` is in the shared book shortlist, (c) no row carries a negative `model_edge_pct` without an explicit label, (d) negative-value rows are not promoted by low reliability.
 - Files:
   - `syndicate/features/shared/layer2_board.py`
@@ -47,6 +185,8 @@
   - `syndicate/templates/intelligence.html`
   - `syndicate/static/shared/bet_slip.js`
   - `syndicate/static/shared/board_cards.css`
+  - `syndicate/static/shared/board_rail_toggle.js`
+  - `syndicate/features/shared/book_shortlist.py`
   - `syndicate/blueprints/intelligence.py`
 - **CLAIM ON `layer2_board.py` TAKEN FROM `spread-line-sign-convention` 2026-08-16, RESOLVED BY CONTENT RATHER THAN BY NEGOTIATION** (the `clamp-fix-to-workers` precedent):
   - That lane's outstanding item was "artifact output still unverified". **It is now verified: `_side_line_from_cells` is PRESENT in the deployed tree** — `git show 97491161:syndicate/features/shared/layer2_board.py` returns 3 occurrences, identical to `main`. The fix is live on refresh-worker.
@@ -57,29 +197,6 @@
 - Falsification test: per goal. The standing one for the whole lane — if the served payload already satisfies (a)–(d) above, the brief's premise is wrong and the lane closes without a code change.
 - Verification: the SERVED payload from `/api/board/layer2-shortlist`, written to `deploys.md`. Not a unit test — the user has twice reported a board defect that automated checks missed.
 - Blocked by: none. Read-only on `layer1_board.py`, `templates/shared/layer1_board.html`, `blueprints/layer1_page.py` (Layer 1 session), sim-engine internals, and `pipeline/intelligence_state.py`.
-
-### branch-overlap-baseline-instrumentation — CLOSED 2026-08-16 — the baseline was sampling hours where the failure does not happen — session: `branch-overlap-baseline-watch` (scheduled-task run)
-- Goal: take one Phase 1 (`#440`) before-baseline sample; it turned into fixing
-  the instrument, because the sample was honest and the schedule was not.
-- Files: `.syndicate/scheduled_task_branch_overlap.md`,
-  `.syndicate/scheduled_task_oom_band.md`, and three task files under
-  `~/.claude/scheduled-tasks/` (outside VCS — prompts now embedded in the
-  oom_band mirror so all three are recreatable).
-- **NO LANE WAS OPEN WHILE THE WORK HAPPENED.** Opened at checkpoint, closed
-  immediately. Config + mirrors only, no app code, nothing contended — but the
-  protocol says claim first and I did not.
-- Measured: 42 `oomKilled` in 8 days, **41 of 42 in 15:00–23:59 local**; cron
-  moved `15 */4 * * *` → `45 19,22,1 * * *` (three 5h windows tiling
-  14:45–01:45). Sampling drops 6/day → 3/day with the kill band fully covered.
-- Corrected: the oom-band tasks' SHA-equality pin → containment check. See
-  `learnings.md` 2026-08-16.
-- Added: `preband-refresh-worker-sha-check`, one-time 21:45Z, returns
-  BAND CLEAN / BAND COMPROMISED. **It notifies nobody** — created from a
-  scheduled-task run session, which cannot subscribe another task.
-- Pushed: `8150ff5b`, `b37b870c`, `80581700`, `38bb30b2`. Ledger writes from this
-  checkpoint are UNCOMMITTED (shared files carry other sessions' in-flight edits).
-- Blocked by: none. Nothing here is load-bearing for another lane; the
-  `refresh-worker-oom-recurrence` owner keeps the diagnosis.
 
 ### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
 - **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
@@ -2355,6 +2472,11 @@ treat it as a controlled baseline.**
 
 
 - `win-prob-null-readable` — CLOSED-VERIFIED 2026-08-16 *(full entry in `lanes_closed.md`)*
+  — **and the question it existed to enable is now ANSWERED, 16:14:55Z:** the
+  `or 0.5` removal is exercised in production (`rows=192, null=6, 3.12%`;
+  branch fired twice, 5.36% and 9.38%) and exercised on CURRENT code
+  (`dd53d47c`, 48 rows). Read it with `scripts/read_win_prob_null.py`, never
+  from the Render logs and never from the route's `latest`-only headline.
 - `slate-size-headroom` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
 - `worker-child-processes` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
 
@@ -2536,7 +2658,7 @@ and then failed the thing it was checking, which is the point of running it.
 - Full measurement in `deploys.md`; unrelated defect found while measuring
   Phase 2's premise is filed as `#441` (NFL week-1 projection unwritten 2.36 days,
   relaunching ~107x/day).
-### nfl-pbp-root-resolution — OPEN — **HYPOTHESIS FALSIFIED IN PRODUCTION. The fix shipped (`97491161`, live 15:45:50Z) and `#441` is NOT fixed: the pbp is absent from EVERY root. The change is correct and stays; it was not the cause.** — opened 2026-08-16 — session: sim-engine-track
+### nfl-pbp-root-resolution — **CLOSED 2026-08-16 — resolution mechanism PROVEN CORRECT and the hypothesis FALSIFIED in the same reading. `#441` root cause settled as an ingestion gap; the lane goal (projection writes again) is NOT met and moves to a fetcher.** — opened 2026-08-16 — session: sim-engine-track
 - Goal: `#441`. The NFL SmartSim2 projection writes again, because the pbp READ
   path resolves to the mounted disk instead of the ephemeral repo checkout.
 - Files (exclusive to this lane): `syndicate/features/nfl/sources.py`,
@@ -2592,6 +2714,39 @@ and then failed the thing it was checking, which is the point of running it.
   recorded as fixing `#441`.
 - Handover: find what REMOVED the file and how it is meant to arrive. That is not
   a code fix and not this lane's scope; `#441` carries the next step.
+
+#### CLOSED 2026-08-16 17:10:45Z — settled by the diagnostic this lane shipped
+- **Verification ran and the result is negative-but-decisive.** The lane's own
+  falsification test fired, then the diagnostic it prompted answered the question
+  outright on the first post-restart refusal:
+
+      strict_hosted_storage_resolves_to = True
+      candidate[0] /opt/render/project/data/nfl_source/source_artifacts/... exists=False
+      candidate[1] /opt/render/project/data/nfl_source/...                  exists=False
+      candidate[2..3] /opt/render/project/src/data/...                      exists=False
+
+- **What the lane BUILT is correct and stays:** `nfl_pbp_path` searches the
+  mounted disk FIRST (candidates 0/1 prove it), replacing a resolver that picked
+  a root by probing for the unrelated `upcoming_recs_*.csv`. That was a real
+  latent defect and `#389` fixed its twin on the write path.
+- **What the lane BELIEVED was wrong twice:** v2 (root selection is the cause —
+  shipped, falsified) and v4 (env not reaching the subprocess — falsified by the
+  same reading that killed v2's successor). Root cause is v3: the file is absent
+  everywhere.
+- **Two of my own readings corrected here:**
+  1. The `DATA_ROOT`-prints-the-checkout "contradiction" was not one —
+     `_first_existing_root` returns the first root holding `upcoming_recs_*.csv`,
+     which only the checkout ships, even though mounted-disk candidates come
+     first in the list.
+  2. I claimed strict mode cannot append the checkout. There is a SECOND append
+     under `strict AND RENDER` that adds it as a lower-priority fallback.
+- **Files released:** `syndicate/features/nfl/sources.py`,
+  `scripts/generate_smartsim2_nfl_projections.py`,
+  `tests/test_smartsim2_nfl_pbp_root.py`.
+- **Handover:** `#441` needs a pbp FETCHER — no ingestion path exists in-repo.
+  Template is `fetch_nfl_schedule.py` (nflverse games.csv). `#443` (stale PID
+  silently stalling the autorun ~45 min per restart) delayed this verification
+  twice and remains open.
 
 ### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
 ### refresh-worker-oom-recurrence — OPEN — **MECHANISM SETTLED, ALLOCATOR STILL UNNAMED. `#435` did NOT regress (scope error: book_quotes READ vs container anon). The failure is a ~2GB TRANSIENT in the PARENT process (pid 39, children <54MB), decided by evictable page cache (inactive_file 26.3/42.2 at kills vs 164-240 surviving), climbing 51s with NO stage marker. THREE fixes shipped and exercised in live `d72d670c` — odds-shard duplicate `51ae7218`, ledger streaming `21f8a165`, 3-ledger-loads-to-1 `aa190d58` — and NONE has been shown to move the transient. deepcopy EXONERATED by measurement (0.54MB peak). Daytime windows are worthless as evidence; the live-slate band 22:00Z-05:00Z is scheduled via `scripts/oom_band_report.py` + two one-time tasks. OPEN pending that result** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
@@ -2782,29 +2937,6 @@ and then failed the thing it was checking, which is the point of running it.
   so its behaviour is not independent evidence. It did not come true.
 - Blocked by: none
 
-### ui-probe-tracked-statistic-revert — CLOSED 2026-08-16 — reverted to worstGroupPx; exposed and fixed two false alarms that were failing a healthy board — opened+closed 2026-08-16 — session: ui-probe-rerun-compare
-- Goal: tracked statistic back to the worst tie group, printed number == diffed
-  number == the quantity the impossibility floor uses.
-- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
-- Cross-era safety: `_cmp_value` reads `worstGroupPx` BEFORE `spreadPx`, because
-  reports from the largest-group window carry `spreadPx` meaning the other
-  quantity. Verified live: post-revert run vs a largest-group-era report reads
-  `identicalContentSpread unchanged`.
-- **False alarm 1 fixed:** mlb mobile printed "AT ITS NOISE FLOOR (164px) ... not
-  layout deviation" and failed the run on that same number (164px > 150px
-  budget). A residual at its floor is unmeetable by any model; now reported, not
-  failed.
-- **False alarm 2 fixed:** mlb desktop then failed with "LAYOUT SPREAD OVER
-  BUDGET (313px) with content not driving height" while identical-content cards
-  differed by 70px. The branch inferred "content-independent" from a flat linear
-  slope; on desktop that is false, because the grid WRAPS and a flat slope means
-  the line cannot see content, not that content is absent. The budget now applies
-  to the content-controlled figure where tied cards exist, falls back to raw
-  spread where none do, and says which it used.
-- Verification: 65 tests pass (58 + 7 new); production run after both fixes exits
-  0 / OK where the same board failed two rows before.
-- Blocked by: none
-
 ### layer1-board-coverage — OPEN — **AUDIT DELIVERED AND MEASURED; ONE FIX SHIPPED TO `main`, UNDEPLOYED. All four goals answered except the cross-sport LIVE A/B, which needs two sports live at once and is DEFERRED, not concluded.** — opened 2026-08-16 — checkpointed 2026-08-16 16:4xZ — session: layer1-board-coverage
 - Goal: for every in-season sport, a per-sport/per-market-family RATE of
   `projected / total` (alt and period families broken out), every unprojected
@@ -2863,6 +2995,52 @@ and then failed the thing it was checking, which is the point of running it.
 - Verification: met for G1/G2/G4 and for G3-props. **Unmet:** cross-sport live
   A/B (no second live sport in the window). Lane stays OPEN for that.
 - Blocked by: none.
+
+### ui-probe-tracked-statistic-revert — CLOSED 2026-08-16 — reverted to worstGroupPx; exposed and fixed two false alarms that were failing a healthy board — opened+closed 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: tracked statistic back to the worst tie group, printed number == diffed
+  number == the quantity the impossibility floor uses.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Cross-era safety: `_cmp_value` reads `worstGroupPx` BEFORE `spreadPx`, because
+  reports from the largest-group window carry `spreadPx` meaning the other
+  quantity. Verified live: post-revert run vs a largest-group-era report reads
+  `identicalContentSpread unchanged`.
+- **False alarm 1 fixed:** mlb mobile printed "AT ITS NOISE FLOOR (164px) ... not
+  layout deviation" and failed the run on that same number (164px > 150px
+  budget). A residual at its floor is unmeetable by any model; now reported, not
+  failed.
+- **False alarm 2 fixed:** mlb desktop then failed with "LAYOUT SPREAD OVER
+  BUDGET (313px) with content not driving height" while identical-content cards
+  differed by 70px. The branch inferred "content-independent" from a flat linear
+  slope; on desktop that is false, because the grid WRAPS and a flat slope means
+  the line cannot see content, not that content is absent. The budget now applies
+  to the content-controlled figure where tied cards exist, falls back to raw
+  spread where none do, and says which it used.
+- Verification: 65 tests pass (58 + 7 new); production run after both fixes exits
+  0 / OK where the same board failed two rows before.
+- Blocked by: none
+
+### branch-overlap-baseline-instrumentation — CLOSED 2026-08-16 — the baseline was sampling hours where the failure does not happen — session: `branch-overlap-baseline-watch` (scheduled-task run)
+- Goal: take one Phase 1 (`#440`) before-baseline sample; it turned into fixing
+  the instrument, because the sample was honest and the schedule was not.
+- Files: `.syndicate/scheduled_task_branch_overlap.md`,
+  `.syndicate/scheduled_task_oom_band.md`, and three task files under
+  `~/.claude/scheduled-tasks/` (outside VCS — prompts now embedded in the
+  oom_band mirror so all three are recreatable).
+- **NO LANE WAS OPEN WHILE THE WORK HAPPENED.** Opened at checkpoint, closed
+  immediately. Config + mirrors only, no app code, nothing contended — but the
+  protocol says claim first and I did not.
+- Measured: 42 `oomKilled` in 8 days, **41 of 42 in 15:00–23:59 local**; cron
+  moved `15 */4 * * *` → `45 19,22,1 * * *` (three 5h windows tiling
+  14:45–01:45). Sampling drops 6/day → 3/day with the kill band fully covered.
+- Corrected: the oom-band tasks' SHA-equality pin → containment check. See
+  `learnings.md` 2026-08-16.
+- Added: `preband-refresh-worker-sha-check`, one-time 21:45Z, returns
+  BAND CLEAN / BAND COMPROMISED. **It notifies nobody** — created from a
+  scheduled-task run session, which cannot subscribe another task.
+- Pushed: `8150ff5b`, `b37b870c`, `80581700`, `38bb30b2`. Ledger writes from this
+  checkpoint are UNCOMMITTED (shared files carry other sessions' in-flight edits).
+- Blocked by: none. Nothing here is load-bearing for another lane; the
+  `refresh-worker-oom-recurrence` owner keeps the diagnosis.
 
 ### ui-probe-baseline-nfl-ncaaf — CLOSED 2026-08-16 — armed for nfl/ncaaf only; mlb stays watch-only — opened 2026-08-16 — session: ui-probe-rerun-compare
 - Goal: `identicalContentSpread` fails on drift for nfl/ncaaf, stays watch-only

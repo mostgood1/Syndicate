@@ -6511,7 +6511,208 @@ corroborated against the live SHA read from the deploys API, and the target was
 verified a descendant of it). `opportunity_signals.py` is claimed only by
 `layer2-board-quality` (this lane).
 
-**MEASUREMENT: ____________ (pending — re-read after the next board build)**
+**MEASUREMENT — 2026-08-16 17:13:56Z. THE FIX IS LIVE AND EFFECTIVE.**
+
+Post-deploy artifact `written_at` **2026-08-16T17:13:13Z** (deploy finished
+16:59:48Z), 108 rows:
+
+    reliability_applied present     108 of 108   (was 0 of 108)
+    negative value_pct rows           4
+    min() applied on them             4 of 4     (was 0 of 4)
+
+The four scores MOVED, which is the part a key-presence check would have missed:
+
+    value_pct   score BEFORE   score AFTER
+     -0.0215      -0.0000       -0.0215
+     -0.1510      -0.0005       -0.1510
+     -0.2577      -0.0032       -0.2577
+     -0.4970*     -0.0041*      -0.4970
+
+    (* the 4th row is not the same row across the two reads -- the slate moved.
+       Its pre-fix sibling was value -0.6237 -> score -0.0041.)
+
+Bad rows now rank on their badness instead of being flattened toward zero by a
+low reliability multiplier. At the extreme: a row with reliability 0.0004 scored
+**54x better than its own value** before, and exactly its value now.
+
+**WATCHED, NOT SPOT-CHECKED.** The first read after the deploy returned
+`written_at 16:47:34Z` — a PRE-deploy artifact — with 0 of 108 carrying
+`reliability_applied` and 0 of 4 minned. Read as a result it says "the fix
+failed"; it actually says "the board has not rebuilt yet". Only a watcher
+polling until `written_at > deploy finishedAt` separates the two, and this is
+the second time in this ledger that an early read would have produced a
+confident wrong conclusion.
+
+**MY DEPLOY WAS SUPERSEDED 7 MINUTES LATER and the fix survived anyway.**
+`ed54071a` went live 16:52:40Z and was deactivated by another session's
+`a775e372` (live 16:59:48Z). Verified BY CONTENT that `a775e372` carries
+`min(value, discounted)` and `reliability_applied`, and that it is a descendant
+of `ed54071a`. **The artifact measured above was built by `a775e372`, not by my
+commit.** Recorded because "my deploy went live" and "the code I deployed
+produced this number" are different claims, and only the second is load-bearing
+— on a service where deploys are superseded within minutes, the first is not
+evidence for the second.
+
+## 2026-08-16 17:10:45Z — refresh-worker `a775e372` — **MEASURED: the diagnostic worked. `#441` root cause SETTLED on the first reading.**
+
+Deployed 16:59:48Z, rebased onto another session's `ed54071a` so neither deploy
+was cancelled. First post-restart refusal at 17:10:45Z carried the block:
+
+    env SYNDICATE_REQUIRE_HOSTED_STORAGE = 'true'
+    env SYNDICATE_NFL_SOURCE_ROOT = '/opt/render/project/data/nfl_source'
+    env SYNDICATE_DATA_ROOT = '/opt/render/project/data'
+    strict_hosted_storage_resolves_to = True
+    candidate[0] /opt/render/project/data/nfl_source/source_artifacts/.../pbp_2026.csv  exists=False
+    candidate[1] /opt/render/project/data/nfl_source/.../pbp_2026.csv                    exists=False
+    candidate[2] /opt/render/project/src/data/nfl_source/source_artifacts/.../pbp_2026.csv exists=False
+    candidate[3] /opt/render/project/src/data/nfl_source/.../pbp_2026.csv                exists=False
+
+**v4 FALSIFIED, v3 CONFIRMED.** The env vars DO reach the subprocess and strict
+storage IS on, so my "the mounted disk was never searched" hypothesis was wrong.
+Candidates 0 and 1 ARE the mounted disk, they WERE searched, and the file is not
+there. The pbp is genuinely absent from every root: **`#441` is an ingestion gap.**
+
+**IT ALSO DISSOLVED THE CONTRADICTION THAT PRODUCED v4.** `DATA_ROOT` printed the
+checkout because `_first_existing_root` returns the first root holding
+`upcoming_recs_*.csv`, and only the checkout ships those — even though
+mounted-disk candidates come FIRST in the list. Both readings were always
+consistent; I inferred a contradiction that was not there.
+
+**And it corrected my reading of `preferred_artifact_roots`.** I claimed strict
+mode cannot append the repo checkout. There is a SECOND append after the branch I
+read: under `strict AND RENDER`, the checkout mirror is added as a lower-priority
+fallback. Deliberate, and it explains candidates 2/3.
+
+**Both shipped changes hold up.** `nfl_pbp_path` demonstrably searches the mounted
+disk first (candidates 0/1 prove it), and the diagnostic turned a question that
+had produced three wrong answers into one reading. Neither is a fix for `#441`.
+
+**Process note worth keeping:** this deploy was preceded by a `deploy_claim.py`
+acquire — the first real use of that tooling — after the previous attempt
+(`a859f5f8`) was cancelled 0.4s into another session's deploy. Claim acquired,
+base re-confirmed live at trigger time, claim released after the reading.
+
+## 2026-08-16 17:20-17:28Z — ALT-LINE PROJECTIONS (`32186e28` / `c422f79a`) — **MEASURED: PASS** (watch attempt 2 of 4)
+
+The measurement owed since 2026-08-15 is taken. **All five gate conditions passed,
+including the fifth added after the void attempt 1.** Verdict: **PASS.**
+
+### Gate — all five, on the full slate
+
+| # | condition | reading | verdict |
+|---|---|---|---|
+| 1 | book-grid `rows` non-empty | `total_rows` **3325** | PASS |
+| 2 | `projections.games_in_summary` > 0 | **15** | PASS |
+| 3 | main `spreads`/`totals` with `projection.source` > 90% | **165 of 165 = 100%** (spreads 89/89, totals 76/76) | PASS |
+| 4 | shortlist >= 30 rows | **108** | PASS |
+| 5 | book-grid alt rows > 0 AND shortlist MLB alt rows > 0 | **361 alt rows**; **17 MLB alt** | PASS |
+
+**Counts are per-market fetches, not the flat read.** `/api/board/book-grid`
+hard-caps `limit` at `min(2000, ...)` regardless of what you pass, so `limit=4000`
+returned 2000 of 3325 and every count off it is a floor. The `market=` filter is
+applied BEFORE the cap (`intelligence.py:2240`), so a per-market fetch is exact.
+Attempt 1's numbers were taken off the capped read; this one is not.
+
+### Attribution — the artifact under test was built by the fix
+
+`generated_at = 2026-08-16T17:20:51Z`. refresh-worker deploy history that hour:
+`a775e372` live **16:59:48Z**, `01a4b83e` live **17:26:25Z** — so `a775e372`
+built it. Blob check, by content not ancestry:
+`a775e372:shared/prop_projections.py` = `3ec9f652` = the blob at `32186e28`.
+Byte-identical. **The fix is what produced these rows.**
+
+Noted for the next reader: `01a4b83e`, live 6 minutes AFTER this artifact, carries
+`prop_projections.py` at **`07348e83`** — 100 insertions / 5 deletions off
+`32186e28`, another lane's change. This measurement predates it and does not vouch
+for it.
+
+### Book grid — the fix's primary effect, and it is decisive
+
+| market | rows | with `projection.source` |
+|---|---|---|
+| `spreads` | 89 | 89 (100%) |
+| `totals` | 76 | 76 (100%) |
+| `spreads_alt` | 171 | **169** (99%) |
+| `totals_alt` | 190 | **190** (100%) |
+
+**Alt rows: 359 of 361 carry a projection, all `source: game_simulation`.**
+BEFORE (2026-08-15 22:41Z): **238 alt rows, 0 with a projection.** That is the
+predicate, met.
+
+### Shortlist — PASS on the stated predicate, with a real caveat
+
+`written_at = 2026-08-16T17:19:04Z`, 108 rows (baseline 88), 82 carrying a model
+projection (baseline 52).
+
+- **MLB alt rows with non-null `score.sim_component`: 12 of 17. Baseline: 0 of 9.**
+- alt rows 30 (17 `spreads_alt`, 13 `totals_alt`), split **mlb 17 / wnba 13**
+- by sport: mlb 90, wnba 18, **nfl 0** (baseline mlb 62, nfl 14, wnba 12)
+- by kind: game 69, prop 39 (baseline game 65, prop 23)
+
+**The 5 MLB alt rows still at `None` are NOT a failure of this fix.** Four are
+`live`, and live game rows carry no `model_edge_pct` at all on either side of the
+deploy — MLB main-market live rows were **0 of 21** on the baseline and are **0 of
+12** now. The live gap is slate-wide and pre-existing, not alt-specific.
+
+The valid comparison is pregame, where alt rows now behave exactly like main rows:
+
+      bucket                    n    edge!=None   sim!=None   sim!=0
+      MLB alt   pregame  NOW    13       12           12         0
+      MLB main  pregame  NOW    22       18           18         0
+      MLB main  pregame  BASE    3        3            3         0
+      MLB alt   live     NOW     4        0            0         0
+      MLB main  live     BASE   21        0            0         0
+
+**CAVEAT, and it is the load-bearing one: `sim_component` is non-null but exactly
+`0.0` — in every bucket, on main markets too.** Rows with `model_edge_pct` of
+`+14.83` and `-12.0` both score `sim_component = 0.0`. This is NOT introduced by
+this deploy: baseline MLB main pregame was already 3 non-null / **0 non-zero**.
+So the honest statement is that the fix moved alt rows from `None` to `0.0`,
+which is the same degenerate value main markets already had. **Alt rows now
+participate in the scoring path identically to main rows; that path is currently
+contributing nothing.** That residual is the open `layer2-board-quality` lane's
+stated testable outcome (a) — "`sim_component` non-zero wherever `model_edge_pct`
+is non-zero" — and it is failing, for main and alt alike. Not this deploy's bug,
+but nobody should read `12 of 17` as "alt rows are now sim-ranked".
+
+### Re-ranking — the risk being watched did NOT materialise
+
+- **MLB alt mean rank: 42.6 pctile -> 37.6 pctile.** Moved slightly UP.
+- All-alt mean rank: 38.6 pctile -> 57.3 pctile. Moved DOWN — driven entirely by
+  WNBA alt rows growing 5 -> 13 and sinking to the bottom (ranks 83-101).
+- **No crowd-out.** Top-20 composition ALT 5 -> 4; top-40 ALT 9 -> 8. Prop rows
+  GREW, 23 -> 39. Alt rows did not displace main-market or prop rows.
+
+(Baseline mean rank recomputed here as 38.6 pctile, not the 39.1 carried in the
+watch prompt — same 34.0-of-88 rank, different percentile convention. Immaterial;
+both comparisons above use one convention throughout.)
+
+WNBA alt rows remain non-discriminating as documented — every WNBA projection
+comes from the props path, `project_game_market` returns None at `if not payloads`
+regardless of this fix. Scored on MLB only.
+
+### Live props (secondary) — small move, as predicted
+
+On the 2000-of-3325 capped slice (**a floor, not a total**): 86 rows with
+`projection.source = mlb_live_lens_monte_carlo`, of which **13 sit at a market
+carrying more than one distinct line**.
+
+One thing does not match the prior: 8 of those 13 are `batter_home_runs`, which
+the watch prompt states has no captured alternates. **Do not bank this** — the
+heuristic used (same player+market, >1 distinct line across the grid) cannot
+separate a captured alternate from two books quoting different lines. It is a
+flag for someone to check, not a finding.
+
+### Verdict
+
+**PASS.** The book-grid predicate is met outright (0 -> 359 of 361). The shortlist
+predicate is met as written (0 -> 12 MLB alt rows with a non-null sim component)
+and alt rows moved up, not down, without crowding anything out. **No rollback
+indicated.** Rollback targets, unused: refresh-worker `191d098f4a8d`,
+live-odds-worker `b7ae47e6d1a0`.
+
+Measurement only — no deploy, no rollback, no source file touched. The watch task
+is discharged; attempts 3 and 4 are not needed and the task was not re-armed.
 
 ## 2026-08-16 17:20-17:28Z — ALT-LINE PROJECTIONS (`32186e28` / `c422f79a`) — **MEASURED: PASS** (watch attempt 2 of 4)
 

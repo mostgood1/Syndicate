@@ -2175,6 +2175,7 @@ index state, and it is real. This is a different mechanism:
    — their lane is committed and correct — but the ledger now has one commit
    whose message and content disagree, which is exactly the shape that makes
    `git log -S` archaeology lie later.
+
 ---
 
 ## 2026-08-16 — OVERTURNED: a pinned SHA identifies deployed CODE
@@ -2312,6 +2313,7 @@ wrong place" — the exact ambiguity that made the log version unreadable.
 
 Related: the emitter rule already in this file covers *reading* an absence; this
 one covers *building* the emitter. Both were needed. `[measured 2026-08-15/16]`
+
 ---
 
 ## 2026-08-16 — NARROWING AN INSTRUMENT TO A MEASURED DISTRIBUTION BUILDS IN A BLIND SPOT
@@ -2363,3 +2365,88 @@ could not tell a revert from a rename, the ref name could not tell a base from a
 moving target, and here a cron could not tell a quiet window from an unobserved
 one. Each is a measurement whose *scope* silently stopped matching the question
 it was still being used to answer.
+
+
+## 2026-08-16 — FORBIDDEN: never test what is deployed with `git merge-base --is-ancestor`. It answers a question about HISTORY; deployment is a question about CONTENT.
+
+Measured twice in one session, in opposite directions, on the same three services:
+
+- `edbbee9d` (spread-sign fix) is **NOT an ancestor** of live `97491161` — and
+  the fix **is running**. `git show 97491161:...layer2_board.py` returns the
+  same 3 occurrences as `main`.
+- `5a94b134` (the `min()` score guard) is **also not an ancestor**, and that one
+  genuinely **was missing**.
+
+Identical ancestry result, opposite truths. The cause: the services run
+`deploy/nfl-pbp-root`, not `main`, so ancestry against `main` is simply not the
+relation being asked about. `project_web_runs_a_deploy_branch_not_main` recorded
+this for WEB; it is true of the WORKERS too.
+
+**The rule:** `git show <live-sha>:<path> | grep -c <marker>` against the same
+command run on `main`. Do it on every service the question touches — on 08-16
+web, refresh-worker and live-odds-worker gave three different answers.
+
+**And the reason this bites:** a deploy branch cut from an older commit
+**silently un-ships every fix landed since the branch point**. `deploy/nfl-pbp-root`
+branched at `b0ab37a1` (08-15 17:26 CDT); `5a94b134` landed at 19:04 CDT — 1h38m
+later — so a measured, shipped, ledgered fix was inert on all three services for
+~22 hours with nothing anywhere reporting it. Cutting a deploy branch is a
+silent partial rollback of everything younger than its base.
+
+## 2026-08-16 — FORBIDDEN: never use a fresh `git worktree` as a test baseline for anything that reads `data/`.
+
+Used one to establish which test failures pre-dated my change. It reported 22
+failures; my tree reported 30; I attributed 8 to myself. **Three of those 8 were
+the worktree lying.** A fresh checkout has only git-tracked `data/`; this tree
+carries untracked mirror output. `read_book_quotes_latest('mlb','2026-08-09')`
+returns **0 rows** in the worktree and **36,424** here.
+
+It also exposed the real defect underneath: `test_layer2_sweep_state`'s
+`no_quotes` fixture patched `read_book_quotes` while the code calls
+`read_book_quotes_latest`, and `raising=False` swallowed the mismatch. **The
+fixture was inert and the tests were reading the real disk** — they passed or
+failed on what the machine happened to have, not on the code. A green run was
+evidence about the checkout.
+
+**The rule:** a baseline is only valid for tests whose inputs it actually
+shares. For data-touching tests, establish the baseline IN THE SAME TREE, or
+prove the test cannot reach the disk. And `raising=False` on a monkeypatch
+turns a typo into a silent no-op — pair it with an assertion that the patch
+took, or name the function the code actually calls.
+
+## 2026-08-16 — the shared-index revert fired TWICE against one session, and the second time it was armed AFTER a clean push.
+
+`project_shared_index_can_hold_a_revert` is already a rule; this adds the
+frequency and one new detail. In one session:
+
+1. Two new files (`book_shortlist.py`, a new test file) staged as **deletions**
+   while present on disk and already committed+pushed.
+2. After the UI commit was pushed and verified by blob hash, the index re-armed
+   a **complete revert of it** — `-24, -118, -33, -125, -93` = **393 deletions**
+   across all five files.
+
+Both disarmed with a path-scoped `git reset` (touches no file). **A clean push
+does not end the exposure** — the index re-armed after it, so the check belongs
+immediately before EVERY commit, not once per session. Read
+`git diff --cached --numstat HEAD` and look at the DELETION column, scoped to
+your own paths, so you disarm your revert without touching another lane's
+staged work.
+
+## 2026-08-16 — a mirrored row set makes a wrong join look like a UNIFORM defect, which is the most convincing kind.
+
+Verifying the spread-sign fix, I joined shortlist rows to book-grid rows on
+`(event, market, segment, line)` and got **3 of 3 home rows still inverted** —
+uniform, deterministic, exactly the signature of a real bug.
+
+It was the join. The grid carries **mirrored rows** for one market instance:
+`row.line=+1.5` with `home_cells=-1.5` sitting beside `row.line=-1.5` with
+`home_cells=+1.5`. Matching on `line` picks the wrong twin every time, so the
+error is uniform BY CONSTRUCTION. The discriminating field was the **price
+vector** — `{leovegas_se:123, prophetx:140, unibet_nl:125, unibet_se:125}`
+identifies exactly one source row — and against it the answer is 12 of 12
+CORRECT.
+
+**The rule:** uniformity is not evidence of a real defect; a wrong join is
+uniform too. Before believing a 100%-consistent finding, ask what the join key
+would do if two rows could both match it. Prefer a key that cannot collide
+(here: the prices, which the row already carried).

@@ -2189,6 +2189,32 @@ predicate change would move what counts as `live` board-wide. Owner needed.
   start at `pipeline/layer2_shortlist.py` /
   `syndicate/features/shared/layer2_board.py`, NOT at `collect_candidates` or
   `UniversalCandidate`. `[this cost one pointless worker restart on 08-15]`
+  - **Re-measured 2026-08-16: `layer2_is_primary=True`,
+    `legacy_candidate_count=0`, and 108 of 108 board cards carry
+    `source=layer2_shortlist`.** So the earlier ledger claim *"NO TEMPLATE
+    CONSUMES THE SHORTLIST — the board still renders `ranked_all`"* is **STALE
+    and must not be cited.** It came from a `grep` over `templates/`/`static/`
+    for "layer2" that returns zero **to this day** — the wiring is SERVER-side.
+    A template grep cannot answer "does anyone consume this"; read the served
+    payload. `[measured 08-16 16:20Z]`
+- **`_SCORE_SIM_WEIGHT` IS `0.0`, NOT `0.5`.** (`opportunity_signals.py:390`,
+  deliberately zeroed and gated on S6.) **The board ranks on market EV and price
+  shopping ALONE; the simulation contributes nothing to the ordering.** Measured
+  on the served shortlist: 65 of 108 rows carry `model_edge_pct` and
+  `sim_component` is non-zero on **0** of them. `layer2_board.py`'s own module
+  docstring said `0.5` until 08-16, and **a session brief and an audit both
+  inherited that number and built on it** — if you change the constant, change
+  every line that quotes it in the same commit. `[measured 08-16 16:20Z]`
+- **The workers and web run a DEPLOY BRANCH, so `git merge-base --is-ancestor`
+  gives WRONG answers about what is deployed.** Measured 08-16: `edbbee9d` is
+  NOT an ancestor of live `97491161` (branch `deploy/nfl-pbp-root`) and the fix
+  it carries **is running**. Test deployment by CONTENT — `git show <sha>:<path>`
+  — on EVERY service the question touches. `[measured 08-16]`
+- **Cutting a deploy branch from an older commit silently un-ships every fix
+  landed since the branch point, and nothing in the deploy path reports it.**
+  `deploy/nfl-pbp-root` branched at `b0ab37a1` (08-15 17:26 CDT); the `min()`
+  score fix landed 19:04 CDT and was therefore absent from all three services
+  for ~22h. Restored and verified 08-16 17:13Z. `[measured 08-16]`
 - `/api/intelligence/query` returns a **different-sized set on each call**
   (101, 98, 271, 216, 30 observed within one hour on the same body). **Counts
   across calls are not comparable** — compare type distributions or ratios, and
