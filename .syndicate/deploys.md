@@ -8827,3 +8827,69 @@ mean anything.**
 
 Re-armed; it will report on a slate with real line movement, or say after 3h
 that the gate remains unverified rather than going quiet.
+
+---
+
+### ask-mean-not-side — web `9bae928c` — MEASURED
+
+- Deployed 2026-08-16 17:52 CDT (22:52:31Z), **web only**, cut from web's own
+  live SHA `acdaaf7e`. Claim held. Landed on `main` as `cc80e6d0`; main and live
+  carry identical blobs. **Seventh deploy of this lane today.**
+
+- **THIS FIXES MY OWN FIX.** `d8985df8` was right about the bug and wrong about
+  the remedy:
+  - Original defect: *"projects 1.396 batter hits against a line of 0.5, which
+    is why it lands on the under"* — false causation.
+  - The remedy I shipped: *"which does NOT support the under"* — **the same
+    category error pointing the other way.**
+  `projected` is a **MEAN**; what picks a side is **`P(X > line)`**. On a
+  low-line count prop those diverge routinely and legitimately: a mean of 0.214
+  runs still implies `P(>=1) ~ 19%`, which beats a market implying 15%, so
+  `over 0.5` is a good bet with the mean BELOW the line. Rows the previous
+  wording was wrong about: `Jake Cronenworth over 0.5` (mean 0.214),
+  `Osleivis Basabe under 2.5` (mean 2.829).
+
+- The directional claim is now made only where the mean IS the right statistic:
+  - **GAME rows** (no `player_name`) — totals and margins, means in the 7-9
+    range against nearby lines. Exactly the comparison the MLB game lens makes
+    (*"the projection sits at 7.42 against 5.0"*), which is the reference this
+    generator was modelled on. Both clauses stay.
+  - **PROP rows** — the relationship is stated as a fact (*"above the 0.5
+    line"*) with no claim about why the side was taken. The probability-space
+    case is already carried by the model-vs-market clause.
+
+- **Verified on production 22:5xZ:** 10 rows inspected, **0 violations**. Game
+  rows keep the claim and it is correct in BOTH directions — `projects 5.446
+  against a line of 7.5, which does NOT support` and `projects 9.988 against a
+  line of 8, which is why it lands on`. No prop carries a directional claim.
+
+- 4 tests rewritten rather than deleted; they now pin **both** failure modes (no
+  causal claim, no unsupported claim) plus the game-row case that must keep the
+  wording. 76 in this file, 234 across all four ask suites.
+
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit acdaaf7e
+  --allow-rollback`.
+
+#### FINDING 2 IS WITHDRAWN — and the withdrawal is the point
+
+The "board publishes sides that contradict its own projection" finding sent to
+`layer2-board-quality` **is retracted.** Chasing it to a root cause showed only
+**2 of 10** failing rows are explained by live-join staleness; 4 still
+contradict using `live_projected` and 4 have no live value. The remainder are
+this category error — **mine, not the board's.**
+
+I also mis-read an earlier `overlap = 0` between findings 2 and 3 as evidence
+against a shared cause. It was a **population artifact**: only 2 of the 10
+finding-2 rows carry `model_edge_pct` at all, so they were barely eligible to
+overlap. Recorded because the reasoning error is more reusable than the result.
+
+**FINDING 3 STANDS, root cause confirmed:** `live_gameline_join.py:643`
+overwrites `edge_vs_market_pct` with the LIVE edge while deliberately leaving
+`model_prob_over` at its pregame value, so the pair is incomparable with nothing
+in the field name to signal it. **7/7 separation on `live_aware`**, and the
+arithmetic closes to the decimal: stated `-39.93` = `(live_model_prob_over
+0.1917 - market_fair_prob_over 0.591) x 100`, where the pregame pairing gives
+`+27.46`. Every number correct; only the pairing wrong. That is why it is
+`full/*` only — segment bases are not live-joined and agree 3/3. Recommended fix
+(theirs, not mine): rename to `live_edge_vs_market_pct` so the pairing cannot be
+got wrong at the call site.
