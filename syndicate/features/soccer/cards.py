@@ -129,6 +129,58 @@ def _status_label(status_state: str, kickoff: str | None) -> str:
     return _format_kickoff_display(kickoff)
 
 
+def _live_state_block(status_state: str) -> dict[str, Any]:
+    """The STRUCTURED liveness signal, which soccer knew and never published.
+
+    THE DEFECT THIS FIXES, measured on production 2026-08-16 18:03Z: the soccer
+    board reported `live: 0` while **14 matches were past kickoff and 12 carried
+    a real score**, and 45 rows served a bettable edge on a game in play or
+    already over -- including a `totals 2.5` on GRO @ ADO, which finished 4-1
+    almost eight hours earlier. `live_edge_policy` keys on `game.state`, and
+    `pregame` is its PERMISSIVE branch, so a match stuck there never has its
+    edge withheld.
+
+    WHY IT WAS STUCK. Both readers of liveness want a structured signal and
+    soccer published none:
+
+        game_board_contract._infer_live_state  -> sets `shared_is_live`
+        game_chip_scoreboard._game_flags       -> sets the chip's `state`
+
+    Both read `status`/`live_state` as DICTS. Soccer's `status` is a display
+    STRING (`"Sat, Aug 15 - 7:30 PM CT"`), and `live_state`, `gameState` and
+    `status_badge` were all absent. Dumped from the real provider on
+    2026-08-16: `_game_flags` returned `(False, False)` for all 90 soccer
+    chips while MLB returned 9 live of 15. With no structured signal both
+    readers fall back to a token search over `detail`/`summary` prose -- and
+    `_infer_live_state`'s `final_tokens` contains **"scheduled"**, so soccer's
+    own placeholder wording actively forced a not-live verdict.
+
+    `status_state` was RIGHT THERE the whole time. `_match_to_game` already
+    branches on it to decide whether to fetch live stats. It simply never put
+    it on the game dict in a shape anything downstream could read.
+
+    Deliberately sport-local: emitting this dict fixes both readers with no
+    change to any shared eight-sport predicate. Widening `_game_flags` to infer
+    liveness from kickoff+score was the alternative and is strictly more
+    dangerous -- a wrong `live` costs exactly as much as a wrong `pregame`, and
+    it would have moved MLB, WNBA, NFL and NCAAF to chase a soccer bug.
+
+    NO TEXT STATUS IS EMITTED HERE ON PURPOSE. `_game_flags` folds
+    `live_state.get("status")` into a substring haystack; putting a display
+    string in it would reintroduce exactly the prose-matching this replaces.
+    The booleans are read first by both consumers, so they are all that is
+    needed and all that is offered.
+    """
+    state = str(status_state or "pre").strip().lower()
+    return {
+        # `final` wins over `in_progress` in both readers anyway, but stating
+        # both explicitly keeps this readable as a state machine rather than as
+        # two independent flags that could contradict each other.
+        "in_progress": state == "in",
+        "final": state == "post",
+    }
+
+
 def _box_score_line(
     *,
     away_abbr: str,
@@ -195,6 +247,14 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
         # projection. This is a page-level empty state, never a bettable row.
         "is_unsimulated_placeholder": True,
         "status": _status_label(status_state, fixture.get("date")),
+        # THE PLACEHOLDER NEEDS THIS TOO, and it is the more dangerous of the
+        # two producers to leave out. Its `summary` ends "...has not been
+        # simulated yet" and its panel body says "on the real schedule for
+        # <date>" -- prose that `_infer_live_state` scans, where `final_tokens`
+        # contains "scheduled". So an unsimulated fixture that has actually
+        # kicked off was being pinned not-live by its own placeholder wording.
+        # An unsimulated match is still a real match that can start and finish.
+        "live_state": _live_state_block(status_state),
         "detail": date_str or league_display_name(league),
         "scheduled_start_utc": fixture.get("date"),
         "summary": f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet.",
@@ -510,6 +570,10 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
         },
         "card_variant": "soccer_main",
         "status": _status_label(status_state, match.get("kickoff")),
+        # Structured liveness alongside the display string above. See
+        # `_live_state_block`: `status` is prose and every downstream reader
+        # wants a dict, which is why soccer sat at 100% `pregame`.
+        "live_state": _live_state_block(status_state),
         "detail": score_text if score_text != "-" else league_display_name(league),
         # Raw ISO kickoff, distinct from "detail" above (which carries a
         # score/league string, not a timestamp) -- the shared game-chip and
