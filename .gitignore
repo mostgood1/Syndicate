@@ -198,3 +198,8 @@ data/odds_events/
 # Deploy claims are runtime state about RIGHT NOW, not history. A claim in git
 # would be a claim that outlives its truth.
 .syndicate/deploy_claims/
+
+# Per-session lane markers. The single-valued .current-lane could not represent
+# N concurrent sessions, so each session now writes its own; they are runtime
+# state about who holds what RIGHT NOW, not history.
+.syndicate/.current-lane.*

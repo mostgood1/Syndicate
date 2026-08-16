@@ -187,27 +187,44 @@ re-read it. `[measured 08-15 from data/mlb_source/tracking/book_quotes/]`
 - **`git push` from this checkout is not scoped to your own commits.** Read
   `git log origin/main..HEAD` first. `[from-git 08-13]`
 
-**DEPLOYS ARE NOT SERIALISED BY DEFAULT — THERE IS NOW A CLAIM `[08-15 22:3xZ]`.**
-Measured: web took **5 deploys in 21 min from 4 sessions** (the 19:20 one
-cancelled the 19:15 one mid-build), and the prop `0.5` fix was **silently
-reverted 8 minutes after going live** by a peer cutting from a stale live SHA.
-Messages cannot gate this — every hold sent arrived after the deploy it meant to
-stop, and three sessions ARCHIVED mid-coordination.
-
-**USE IT (`scripts/deploy_claim.py`, shipped `a5366a72`):**
+**DEPLOYS ARE NOT SERIALISED. THE CLAIM IS ADVISORY, NOT A LOCK `[08-15 23:4xZ]`**
+`scripts/deploy_claim.py` (shipped `a5366a72`, OneDrive fix `b5f33d3c`):
 
     py -3 scripts/deploy_claim.py status
     py -3 scripts/deploy_claim.py acquire --service <svc> --holder <lane>
     py -3 scripts/deploy_preflight.py --service <svc> --holder <lane>
 
-`/preflight` returns **CLAIMED (exit 3)** for a foreign holder — distinct from
-HOLD, because HOLD means "wait for a lull" and CLAIMED means "not yours". Claims
-carry a token, `--force` records whose claim was broken, and a **45-min TTL**
-stops an archived session wedging a service. **A claim only binds sessions whose
-checkout has the tool — they must `git pull` first.**
+`/preflight` returns **CLAIMED (exit 3)** for a foreign holder; 45-min TTL so an
+archived session cannot wedge a service.
 
-**STILL TRUE AND STILL THE HABIT THAT MATTERS: cut from the service's CURRENT
-live SHA, and re-verify BY CONTENT after it lands.** "live" is a lease.
+**BOTH OUTCOMES WERE MEASURED WITHIN ONE HOUR ON ONE SERVICE.** It WORKED — a
+peer held refresh-worker, my acquire was refused, I stood down, and their claim
+carried a reason ("holding through the post-deploy board build so no concurrent
+deploy invalidates the measurement"). It was IGNORED — a peer fired `129395cc`
+over my held claim at 23:09:54. **It binds only sessions that have PULLED the
+tool and RUN `/preflight --holder`.** So it makes collisions VISIBLE among
+participants and does nothing about non-participants.
+
+**THEREFORE THE HABITS STILL CARRY THE WEIGHT, claim or no claim:**
+cut from the service's **CURRENT live SHA**; **re-verify by content after
+landing**; and **never fire into an in-flight deploy even holding the claim** —
+a token is not a licence to cancel a peer's build. Evidence both ways: the
+21:39 revert happened because a peer cut from a STALE SHA, and `b7ae47e6`
+stacked harmlessly over `f0452408` because they cut from a CURRENT one.
+
+**WIN_PROB NULL COUNTER IS LIVE AND HAS SURVIVED FOUR PEER DEPLOYS**
+`[measured 08-16 00:0xZ, by content]` refresh-worker `2c14d9ae`,
+live-odds-worker `c422f79a` -- my commits are ANCESTORS of both, each tree
+carries `WIN_PROB_NULL_NO_PRICE`, and **0 reachable `... or 0.5`** remain.
+Every peer since 21:39 has STACKED rather than reverted, because each cut from
+the CURRENT live SHA -- that habit, not the claim, is what stopped the repeat.
+
+**THE `or 0.5` FIX REMAINS VERIFIED IN CODE AND UNVERIFIED IN EFFECT.** No
+`WIN_PROB_NULL_NO_PRICE` line exists yet: `scripts/render_logs.py` returns
+`nothing matched` on both services since their deploys, because the WNBA prop
+sweep has not run. **Read that as "not yet run", never as zero** -- an absent log
+line is a fact about the emitter. `wnba-win-prob-counter-read` (hourly) will
+take the reading, interpret it, overwrite this line, and disable itself.
 
 **ROUTE ONE — deploying a commit Render says does not exist. PROVEN TWICE.**
 `POST /deploys` 404s with `"service <id> does not have a commit <sha>"` for any
@@ -233,9 +250,11 @@ INTENDED state is an open question with the memory lane; merging the worker
 lineage into main conflicts in **30 hunks across 6 files** of two other lanes'
 live code.
 
-**Repo state `[measured 08-15 20:3xZ]`:** the shared tree is **13 AHEAD / 151
-BEHIND** `origin/main`. Being behind is a read-your-own-staleness problem; being
-ahead is a **lost-work** problem. `git fetch` and read `origin/main` for lineage.
+**Repo state `[measured 08-16 00:0xZ]`:** the shared tree is **0 AHEAD / 206
+BEHIND** `origin/main`. **The lost-work direction is CLOSED** -- it was 37 ahead
+earlier tonight and another session reconciled it. Being behind is only a
+read-your-own-staleness problem: `git fetch` and read `origin/main` for lineage,
+never local `git log`.
 
 **THE DIVERGENCE RECURS ON A TIMESCALE OF HOURS AND IS STRUCTURAL, NOT A LAPSE.**
 Reconciled at 17:0xZ as `6822d539` — local `main` was 33 ahead / 136 behind with
@@ -1327,26 +1346,38 @@ the place to read it, and it carries the guard on its two shortlists.
   the served rows at the same instant (`-0.2714` both ways). **PRELIMINARY —
   taken 21:5xZ, before the last first pitch (2026-08-16T01:40Z). NOT the settled
   number; the settled read was never taken (see OWED, below).**
-- **THREE JOIN DEFECTS FOUND AND TWO FIXED, in order of severity:**
-  1. **FIXED — `observed_transition` was side-blind.** `closing_price` is
-     `entity`'s price and **`entity == home_team` on 18/18** stamped markets, so
-     every away-side opening was differenced against the HOME close. A stamp is
-     now used only when the opening IS the entity's side, else it falls through
-     to the side-aware `last_pregame_quote` path. Measured: 20 refusals,
-     `observed_transition` 48 -> 22, `same_book_n` 131 -> **151** (rows that were
-     being discarded now resolve correctly).
-  2. **FIXED — the headline counted in-play prices.** `close_age_seconds` is
-     `(commence - stamp)`; negative means post-first-pitch. Now excluded and
-     reported as `by_close_timing`. **The in-play bucket flipped sign between
-     readings (-ve at 21:1xZ, `+0.7937` at 21:4xZ), so it was NOISE, not a bias**
-     — the old code would have published `-0.0124` at 21:4xZ.
-  3. **NOT FIXED — the odds-history feed transposes `home_line`/`away_line`.**
-     Event `69928d29…` FanDuel spreads carried identical prices (`-205`/`+168`)
-     under OPPOSITE labels at 06:02Z and 21:26Z. The line guard checks numeric
-     equality, so it matched the wrong bet. **Severe per row, self-cancelling in
-     aggregate** (the two extremes are a mirror pair; spreads n=42 mean `+0.515`
-     median `0.000`; h2h/totals n=128 have zero |clv|>10). Corrupts
-     per-recommendation CLV, variance, CIs and any "worst bets" list.
+- **THREE JOIN DEFECTS FOUND; ALL THREE NOW FIXED AND DEPLOYED.**
+  1. **`observed_transition` was side-blind** — `closing_price` is `entity`'s
+     price and `entity == home_team` on 18/18 stamped markets, so away-side
+     openings were differenced against the HOME close. Fixed, web `c8810f45`:
+     20 refusals, `observed_transition` 48 -> 22, `same_book_n` 131 -> 151.
+  2. **The headline counted in-play prices.** `close_age_seconds` is
+     `(commence - stamp)`; negative = post-first-pitch. Excluded and reported as
+     `by_close_timing`, web `4316c907`. The in-play bucket FLIPPED SIGN between
+     readings (`+0.7937` at 21:4xZ), so it was noise, not bias.
+  3. **A candidate's `line` was the row's, i.e. the AWAY handicap.** Measured on
+     `/api/board/book-grid`: `cell.home.line == -row["line"]` on **525 of 525**
+     book cells, every book internally consistent. Away rows were already
+     correct; HOME rows carried the wrong handicap beside the home price. Fixed
+     in `layer2_board._side_line_from_cells`.
+  4. **`closing_captured_at` was DETECTION time, not the price's observation
+     time**, so every stamped close post-dated first pitch (20:34:26Z against a
+     19:08Z start). Now `previous_snapshot_ts`; detection kept as
+     `closing_detected_at`; unknown left unset, never faked to `now`.
+- **Both worker fixes are LIVE and have SURVIVED five subsequent deploys by other
+  sessions.** Checked by content at 23:4xZ: refresh-worker `32186e28` and
+  live-odds-worker `c422f79a` both contain `_side_line_from_cells` (3) and
+  `_apply_closing_stamp` (2). Other sessions parented ON my commit rather than
+  around it, so nothing was rolled back — but `deactivated` on my own deploy
+  row is NOT evidence of a revert either way; only the content check is.
+- **THEIR OUTPUT IS STILL UNVERIFIED, and the reason is deploy churn, not a
+  defect.** refresh-worker was redeployed at 23:18, 23:25, 23:32 and again by
+  23:4x — roughly every 7 minutes — while a board build takes longer than that.
+  **Zero `LAYER2_SHORTLIST` builds completed after 23:16:39Z**; the served
+  artifact still reads `written_at=2026-08-15T23:12:20Z`, i.e. old-code output.
+  Two `WORKER_SHUTDOWN` events (23:23:34, 23:30:10) are accounted for by those
+  deploys. **No OOM events** in the Render events API (where kills actually
+  live).
 - **`clv_pct` per recommendation is NOT built** — the lane's original goal. The
   ledger's `PredictionResult.clv_pct` field exists and is never populated, which
   is why `/api/portfolio/summary` returns `avg_clv: null`.

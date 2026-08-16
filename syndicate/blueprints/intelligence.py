@@ -2648,6 +2648,33 @@ def board_layer1_api():
     return _no_cache_response(jsonify(board))
 
 
+def _clv_block(rows: Any, selected_date: str, sport: str) -> dict[str, Any]:
+    """`rows`, optionally carrying each recommendation's own CLV.
+
+    OPT-IN via `?clv=1`. Off by default so the served payload stays
+    byte-identical for every existing caller, and so the hot path never pays for
+    a join nobody asked for.
+
+    Legal on the request path: `attach_clv_to_rows` reads two published
+    artifacts and joins a few hundred rows by key — display-side transformation,
+    not the recompute the web/worker split exists to keep out.
+
+    Never raises. The joiner already degrades to un-enriched rows with an
+    `error` in `coverage`; this adds the same guarantee for an import failure,
+    because a board that renders must not stop rendering over an enrichment.
+    """
+    served = list(rows or ())
+    if str(request.args.get("clv") or "").strip().lower() not in {"1", "true", "yes"}:
+        return {"rows": served}
+    try:
+        from syndicate.features.shared.clv_join import attach_clv_to_rows
+
+        joined = attach_clv_to_rows(served, selected_date, sport)
+    except Exception as exc:  # pragma: no cover - environment dependent
+        return {"rows": served, "clv_coverage": {"error": f"{type(exc).__name__}: {exc}"}}
+    return {"rows": joined.get("rows", served), "clv_coverage": joined.get("coverage")}
+
+
 @intelligence_bp.get("/api/board/layer2-shortlist")
 def board_layer2_shortlist_api():
     """L2-A: the ranked shortlist, READ from the artifact the worker built.
@@ -2839,7 +2866,10 @@ def board_layer2_shortlist_api():
                 "opportunities_considered": shortlist.get("opportunities_considered"),
                 "returned": min(len(rows), limit),
                 "total_rows": len(rows),
-                "rows": rows[:limit],
+                # Returns {"rows": ...} alone unless ?clv=1 asked for the join,
+                # so the default payload is byte-identical to what this endpoint
+                # served before.
+                **_clv_block(rows[:limit], selected_date, sport),
                 "server_time": _server_timestamp(),
             }
         )

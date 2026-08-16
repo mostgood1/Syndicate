@@ -25,19 +25,6 @@ working blind and then discovering the divergence at merge time.
 **Push it to the default branch before anything else here matters.** Nothing in
 this protocol works while the coordination surface itself is unshared.
 
-> **STATUS 2026-08-15: ALREADY DONE — this section is historical.** `74d38daa`
-> reached `origin/main` on 2026-08-13 10:31:36 -0500 and now has 226 descendants
-> there. Verified with `git merge-base --is-ancestor 74d38daa origin/main`.
-> Implementation-order step 1 below is therefore closed; do not go looking for an
-> unpushed ops kit.
->
-> The underlying complaint is still live, just relocated: at the time of writing
-> `origin/main` held **144 commits the local checkout lacked** while the local
-> checkout held **16 unpushed**. Divergence of that size is the same failure this
-> document describes — sessions working blind and discovering it at merge time —
-> so the rule that matters is step 5 of §4: **push immediately, an unpushed claim
-> is not a claim.**
-
 ---
 
 ## 1. Lane claims — one file per lane

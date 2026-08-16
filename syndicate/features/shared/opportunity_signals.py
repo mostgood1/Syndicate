@@ -534,14 +534,45 @@ def blended_score(
     # freshness, for the same reason they are multiplicative: it is not
     # additional value, it is confidence in the value already computed.
     price_reliability = _price_reliability(price, fair_prob)
+    reliability = confidence * freshness * price_reliability
+    # A DISCOUNT MUST LOWER A SCORE. NEVER RAISE ONE.
+    #
+    # `value * reliability` is right for positive value and INVERTED for
+    # negative value: multiplying -7.08 by 0.0088 gives -0.062, so the less we
+    # trust a bad row the better it ranks. Measured on the served shortlist
+    # 2026-08-14T18:59:34Z, 256 rows: **156 carried negative value**, and across
+    # them `corr(reliability, score) = -0.8312` -- against a **+0.8560 control**
+    # on the 98 positive-value rows. Same formula, opposite sign.
+    #
+    # Concretely, the two rows that sat at opposite ends of that ranking:
+    #     soccer player_to_receive_red_card  value -7.08  1 book, stale  -> -0.062
+    #     nfl    h2h                         value -3.37  3 books, fresh -> -1.433
+    # The worse bet, quoted by one book, outranked the better one by 23x. Every
+    # reliability term this module added to demote junk was PROMOTING it over
+    # exactly the half of the board those terms were built to sort.
+    #
+    # `min` rather than a re-derived formula, because it is provably
+    # behaviour-preserving where the old rule was already correct: for
+    # value >= 0 the discounted number is the smaller one and is still chosen,
+    # so every positive row keeps its exact score and the board's ranking above
+    # zero does not move. For value < 0 the discount can only make the row look
+    # better, so it is not applied at all -- a bad row ranks on its badness.
+    #
+    # Generalises `learnings.md` 2026-08-13: "if usage going DOWN can make a
+    # guard stricter, the guard is reading the wrong quantity." Here, if TRUST
+    # goes down the RANK goes up. That inversion is a complete proof on its own.
+    discounted = value * reliability
     return {
-        "score": round(value * confidence * freshness * price_reliability, 4),
+        "score": round(min(value, discounted), 4),
         "value_pct": round(value, 4),
         "ev_component": None if value_ev is None else round(value_ev, 4),
         "sim_component": None if value_sim is None else round(_SCORE_SIM_WEIGHT * value_sim, 4),
         "book_confidence": confidence,
         "freshness_factor": freshness,
         "price_reliability": price_reliability,
+        # Whether the reliability discount was applied. False means the row's
+        # value was negative and the discount would have promoted it.
+        "reliability_applied": discounted <= value,
     }
 
 

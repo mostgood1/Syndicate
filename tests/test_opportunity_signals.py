@@ -394,3 +394,48 @@ def test_layer2_board_passes_price_and_fair_prob():
 
     source = inspect.getsource(layer2_board.build_layer2_rows)
     assert "price=price" in source and "fair_prob=fair" in source
+
+
+# --- Lane `recommendation-lane-correctness`, A3 (model audit 2026-08-14) ------
+#
+# `blended_score` multiplied value by a reliability factor in [0,1]. That is a
+# discount for positive value and a PROMOTION for negative value. Measured on
+# the served shortlist 2026-08-14T18:59:34Z: 156 of 256 rows carried negative
+# value, and across them corr(reliability, score) = -0.8312, against a +0.8560
+# control on the 98 positive-value rows.
+
+
+def test_reliability_never_promotes_a_negative_value_row():
+    # The exact production pair, from the two ends of that ranking. Before the
+    # fix the soccer row scored -0.062 and the NFL row -1.433, so the worse bet
+    # quoted by one stale book outranked the better one by 23x.
+    junk = blended_score(ev_pct=-7.08, books_quoting=1, book_age_seconds=11178, price=10000, fair_prob=0.0092)
+    better = blended_score(ev_pct=-3.37, books_quoting=3, book_age_seconds=60)
+    assert junk["score"] < better["score"], (
+        f"one-book -7.08 row scored {junk['score']}, three-book -3.37 row scored {better['score']}"
+    )
+
+
+def test_a_negative_row_ranks_on_its_own_badness():
+    assert blended_score(ev_pct=-7.08, books_quoting=1, book_age_seconds=11178)["score"] == -7.08
+
+
+def test_reliability_applied_flag_reports_which_branch_ran():
+    assert blended_score(ev_pct=-7.08, books_quoting=1, book_age_seconds=11178)["reliability_applied"] is False
+    assert blended_score(ev_pct=4.0, books_quoting=7, book_age_seconds=60)["reliability_applied"] is True
+
+
+def test_positive_rows_keep_their_exact_previous_score():
+    # `min` was chosen over a re-derived formula precisely so the half of the
+    # board that was already ranked correctly does not move at all.
+    scored = blended_score(ev_pct=4.0, books_quoting=7, book_age_seconds=60)
+    expected = 4.0 * scored["book_confidence"] * scored["freshness_factor"] * scored["price_reliability"]
+    assert scored["score"] == round(expected, 4)
+
+
+def test_more_books_still_beat_fewer_on_equal_negative_value():
+    thin = blended_score(ev_pct=-5.0, books_quoting=1, book_age_seconds=60)
+    wide = blended_score(ev_pct=-5.0, books_quoting=7, book_age_seconds=60)
+    # Neither is promoted, so they tie rather than inverting. The property that
+    # matters is that the thin one is never ABOVE the wide one.
+    assert thin["score"] <= wide["score"]

@@ -7,7 +7,7 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 143 rules `[generated]`
+## Index — 145 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
@@ -36,7 +36,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 127**
+**Rules and corrections — 129**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -165,6 +165,8 @@
 - [2026-08-15 — a cgroup number minus a per-process number is not a difference, it is a category error](#2026-08-15-a-cgroup-number-minus-a-per-process-number-is-not-a-difference-it-is-a-category-error)
 - [2026-08-15 — A DEPLOY CLAIM IS ADVISORY. It binds participants, not the fleet.](#2026-08-15-a-deploy-claim-is-advisory-it-binds-participants-not-the-fleet)
 - [2026-08-15 — NEVER PIPE A COMMAND WHOSE EXIT CODE YOU DEPEND ON](#2026-08-15-never-pipe-a-command-whose-exit-code-you-depend-on)
+- [2026-08-15 — THE DEPLOY CLAIM IS ADVISORY, AND IT LOST A RACE IT LOOKED LIKE IT WOULD WIN](#2026-08-15-the-deploy-claim-is-advisory-and-it-lost-a-race-it-looked-like-it-would-win)
+- [2026-08-16 — THE HANDOFF THAT WORKED WAS A SCHEDULED TASK, NOT A MESSAGE](#2026-08-16-the-handoff-that-worked-was-a-scheduled-task-not-a-message)
 
 <!-- LEARNINGS-INDEX:END -->
 
@@ -2993,3 +2995,31 @@ second.
   parent is now behind; re-firing it is a rollback of the session that beat you.
 - Expect the gate to CLOSE right after someone else's deploy lands on
   live-odds-worker: the restart launches a refresh run on boot.
+
+### 2026-08-16 — THE HANDOFF THAT WORKED WAS A SCHEDULED TASK, NOT A MESSAGE
+
+- What we believed: parallel sessions coordinate by messaging each other, and a
+  session ending is a handoff problem to be solved with better handoff prose.
+- What was actually true, measured across one evening: **every cross-session
+  message arrived after the event it was meant to affect.** Holds landed after
+  the deploys they meant to stop; a broadcast to eight idle sessions STALLED SIX
+  of them; three lane-owning sessions ARCHIVED mid-coordination; and at least one
+  session (`local_56dce69c`) sends messages while appearing in no roster listing,
+  archived included, so it cannot be messaged at all. Meanwhile four SCHEDULED
+  TASKS quietly did the thing messaging could not: each owns one open question,
+  fires without any session being awake, and survives the session that created
+  it. The claim file worked for the same reason -- it is state on disk, not a
+  message in a queue.
+- How we found out: listing scheduled tasks turned up two watches created by
+  OTHER sessions for questions this session had been treating as unowned (the
+  +/-4900 clamp, the settled CLV read).
+- The rule going forward: **for anything that must outlive a session -- a
+  measurement owed, a deploy window, a follow-up read -- write it to disk as a
+  scheduled task or a claim, not into another session's inbox.** Reserve
+  messages for things that are only useful if read within the minute, and expect
+  even those to be late. When you need another session's STATE, read its
+  transcript with `list_events`: it costs them nothing, cannot stall them, and
+  returns more than a reply would.
+- Cost: roughly a dozen messages sent for one unprompted reply, six stalled
+  sessions, and a production regression that stayed live 45 minutes because the
+  hold telling a peer to stop arrived after they had already deployed.
