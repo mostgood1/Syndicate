@@ -246,6 +246,27 @@ def build_layer2_shortlist(
                 "scored": int(result.get("scored") or 0),
                 "opportunities": len(sport_opportunities),
                 "by_lane": result.get("by_lane") or {},
+                # `#444`. BOTH halves of the bettable-book restriction, for the
+                # reason every other rejection counter in this pipeline is
+                # reported: a rule that trims silently cannot be told apart
+                # from a thin slate.
+                #
+                # ADDED AFTER THE FILTER SHIPPED, which is the whole lesson.
+                # `build_layer2_rows` returned these from the same commit that
+                # introduced the rule -- and they still reached nobody, because
+                # THIS dict is an explicit key list and a new key on the
+                # producer does not appear in it. Measured on the served
+                # payload 2026-08-16 18:52:57Z: the filter was demonstrably
+                # working (best-book-outside-the-list 27 -> 0) and both of its
+                # counters read `None` at every level of the payload. The
+                # filter worked and was invisible.
+                #
+                # `#397`'s discipline says add the counter in the same commit
+                # as the rule. It is not enough: the counter has to be added
+                # everywhere the payload is ASSEMBLED, and on this path that is
+                # three places, not one.
+                "no_bettable_book": int(result.get("no_bettable_book") or 0),
+                "repriced_to_bettable": int(result.get("repriced_to_bettable") or 0),
             }
         except Exception as exc:
             per_sport_stats[sport] = {"error": f"{type(exc).__name__}: {exc}"}

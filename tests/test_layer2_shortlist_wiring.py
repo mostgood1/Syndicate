@@ -104,7 +104,7 @@ def shard(monkeypatch):
     def _read(sport, date_str):
         return store.get(str(sport).lower(), [])
 
-    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes", _read)
+    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes_latest", _read)
     return store
 
 
@@ -142,12 +142,12 @@ def test_only_requested_sports_are_read(shard):
 
     import syndicate.features.shared.odds_book_quotes as obq
 
-    original = obq.read_book_quotes
-    obq.read_book_quotes = _read
+    original = obq.read_book_quotes_latest
+    obq.read_book_quotes_latest = _read
     try:
         build_layer2_shortlist("2026-08-08", ["mlb", "wnba"])
     finally:
-        obq.read_book_quotes = original
+        obq.read_book_quotes_latest = original
 
     assert seen == ["mlb", "wnba"], f"read a sport nobody asked for: {seen}"
 
@@ -182,7 +182,7 @@ def test_one_sport_failing_does_not_lose_the_others(monkeypatch):
             raise RuntimeError("corrupt shard")
         return _two_sided(sport=sport)
 
-    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes", _read)
+    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes_latest", _read)
     out = build_layer2_shortlist("2026-08-08", ["mlb", "wnba"])
 
     assert len(out["rows"]) == 2, "a failing sport took the whole shortlist down"
@@ -193,7 +193,7 @@ def test_never_raises_on_total_failure(monkeypatch):
     def _boom(*_a, **_k):
         raise RuntimeError("everything is broken")
 
-    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes", _boom)
+    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes_latest", _boom)
     out = build_layer2_shortlist("2026-08-08", ["mlb"])
     assert out["rows"] == []
 
@@ -216,7 +216,7 @@ def test_multiple_sports_are_bucketed_separately(monkeypatch):
     def _read(sport, date_str):
         return _two_sided(sport=sport, event_id=f"evt-{sport}")
 
-    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes", _read)
+    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes_latest", _read)
     out = build_layer2_shortlist("2026-08-08", ["mlb", "wnba"])
 
     assert set(out["per_sport"]) == {"mlb", "wnba"}
@@ -247,7 +247,7 @@ def test_forward_view_is_reachable(monkeypatch):
     for book, hp, ap in (("draftkings", -120, 105), ("fanduel", -115, 100)):
         rows.append({**far, "bookmaker": book, "selection": "home", "price": hp})
         rows.append({**far, "bookmaker": book, "selection": "away", "price": ap})
-    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes", lambda s, d: rows)
+    monkeypatch.setattr("syndicate.features.shared.odds_book_quotes.read_book_quotes_latest", lambda s, d: rows)
 
     scoped = build_layer2_shortlist("2026-08-08", ["mlb"])
     forward = build_layer2_shortlist("2026-08-08", ["mlb"], horizon_days=None)
