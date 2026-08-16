@@ -1,5 +1,69 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#440` — **Sim-engine track: catalogue, fixture-aware cadence, live sims for all 8 sports, engine convergence** — PLANNED, NOT STARTED — plan at `.syndicate/plan_2026-08-16_sim_scheduling.md`
+
+**This is a PIN, not a work item.** The plan is the artifact; this entry exists
+so sessions find it. Do not duplicate its content here — update the plan and
+leave this pointer alone.
+
+**Why it is a track and not a task.** It carries 10 phases on two parallel
+sub-tracks, an October capacity deadline, and it is the natural counterpart to
+the betting-engine track (see "Boundary" below).
+
+**What the plan establishes** (read from live Render env on all three services
+and from every engine package, 2026-08-16):
+
+- **The system has almost no clock.** Exactly two wall-clock gates exist in the
+  entire pipeline (MLB next-day sim ≥18 CT; settlement). Everything else is
+  elapsed-time from worker boot, so every sport's work lands uniformly across
+  24h regardless of when its games are. That is the root cause of the
+  soccer/MLB peak collision — 61% of soccer refreshes at MLB's peak fetch
+  kickoffs 2+ days away (lane `odds-cadence-off-the-mlb-peak`).
+- **7 of 8 sports have a real Monte Carlo pregame engine.** NCAAB has none.
+  **Only 2 of 8 have a live sim** (MLB, soccer); NBA/WNBA/NFL have non-sim
+  stand-ins, NHL/NCAAF/NCAAB have nothing.
+- **CORRECTION carried in the plan:** NBA/WNBA DO run a full possession-level
+  MC game sim (`simulate_smart_game` → score distributions, `p_home_win`,
+  `p_home_cover`, `p_total_over`). An earlier draft said "props only" on the
+  strength of `refresh_odds_sources.REGISTRY` prose. Read the engine.
+- **Production sim counts sit far below engine defaults** — basketball 100 vs a
+  2000 default; soccer live 80; MLB live 120. ~±5 pts of sampling noise on
+  `p_home_win` at 100 draws, comparable to the edges being priced.
+- **Two inert foundations, found by call-site trace:**
+  `calibration_profile_store.load_versioned_profile` / `save_versioned_profile`
+  have **no non-test caller** — every engine still reads its hardcoded in-source
+  constant. Most of `model_scoring` (CRPS, pinball, reliability curve,
+  bias/dispersion) likewise. `sim_run_ledger.record_sim_run` IS wired at three
+  choke points — that one landed.
+- **A silent no-sampling fallback in the basketball bridge:**
+  `basketball_props_smart_sim` falls back to `_simulate_smart_game_local` (sums
+  means, no `score` block, no probabilities) on any vendor import failure,
+  caught by a bare `except` and cached. Nothing distinguishes it in the artifact.
+
+**Boundary against the betting-engine track — the two seams that need an owner.**
+Clean split: **the sim track owns everything up to and including the projection
+artifact; the betting engine owns everything from the projection artifact to the
+graded bet.** They are not disjoint at two points, and both are in this plan:
+
+1. **`shared/intelligence_evaluation.py`** — plan Phase 7 (score projections
+   with CRPS) wants to add scoring here; it already imports
+   `binary_calibration_metrics`. Betting-engine territory.
+2. **The prediction ledger write path** — plan Phase 6 stamps `model_version`
+   (engine + profile version + code SHA) onto every prediction and carries it
+   into the ledger. Betting-engine territory.
+
+Neither can be done by the sim track unilaterally. Agree the owner before
+either phase starts, or the two tracks will rewrite the same file.
+
+**Nothing here is started.** Phase 0 is four measurements, no deploy. Four items
+are explicitly BELIEVED-NOT-VERIFIED in the plan; read that section before
+acting on any number.
+
+**Relationship to `docs/reports/syndicate_learning_loop_plan_2026_08_03.md`:**
+that plan's Stage 3 is this plan's Phases 5–9. They are the same work; the
+learning-loop plan has the fuller treatment of grading and promotion, this one
+has the engine catalogue and the current wiring state.
+
 ### `#439` — **The ±4900 fair-price clamp: web + refresh-worker FIXED (`57a437d5`, live 2026-08-16 00:23:04Z). live-odds-worker deferred. STILL UNVERIFIED IN PRODUCTION** — program Tier 3a, lanes `probability-differential-test` / `probability-clamp-removal` / `-2` / `clamp-trigger-watcher`
 
 **Filed at session close so shipped work reaches this list (the `#71` check).**
