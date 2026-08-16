@@ -21,6 +21,9 @@ the only signal that separates the two.
 
 from __future__ import annotations
 
+import os
+import time
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -141,3 +144,67 @@ def test_the_trio_is_symmetric(script_name):
         if "force_refresh" not in inspect.signature(getattr(module, name)).parameters
     ]
     assert missing == [], f"{script_name}: exporters without a force_refresh escape: {missing}"
+
+
+# --- freshness gate (2026-08-16, the stale-board fix) -------------------------
+#
+# force_refresh alone did not fix the board: nothing in the routine cycle passes
+# it, so the first build of a date won permanently and the served picks drifted
+# up to 2.0 points from the live market. These pin the gate that runs on EVERY
+# cycle: rebuild when an input is newer than the snapshot.
+
+
+def _touch(path: Path, when: float) -> None:
+    path.write_text('{"x": 1}', encoding="utf-8")
+    os.utime(path, (when, when))
+
+
+@pytest.mark.parametrize("script_name", PRODUCERS)
+@pytest.mark.parametrize(("exporter", "builder", "file_tpl"), TRIO)
+def test_rebuilds_when_the_source_csv_is_newer(script_name, exporter, builder, file_tpl, roots, monkeypatch):
+    source_root, processed_root = roots
+    module = _load(script_name)
+    snapshot = file_tpl.format(date=DATE)
+    _seed_existing(source_root, processed_root, snapshot)
+    # snapshot built an hour ago; its input CSV rewritten a minute ago
+    now = time.time()
+    for root in ((source_root / "data" / "processed"), processed_root):
+        _touch(root / snapshot, now - 3600)
+    for csv_name in (f"props_recommendations_{DATE}.csv", f"recommendations_{DATE}.csv"):
+        _touch(processed_root / csv_name, now - 60)
+    calls: list[str] = []
+    _patch_builder(monkeypatch, module, builder, calls)
+
+    getattr(module, exporter)(source_root=source_root, date_str=DATE, processed_root=processed_root)
+
+    assert calls == [DATE], f"{script_name}.{exporter} re-served a snapshot older than its own input"
+
+
+@pytest.mark.parametrize("script_name", PRODUCERS)
+@pytest.mark.parametrize(("exporter", "builder", "file_tpl"), TRIO)
+def test_reuses_when_the_snapshot_is_newer_than_its_inputs(script_name, exporter, builder, file_tpl, roots, monkeypatch):
+    # The other half: reuse must survive, or every cycle rebuilds everything.
+    source_root, processed_root = roots
+    module = _load(script_name)
+    snapshot = file_tpl.format(date=DATE)
+    _seed_existing(source_root, processed_root, snapshot)
+    now = time.time()
+    for csv_name in (f"props_recommendations_{DATE}.csv", f"recommendations_{DATE}.csv"):
+        _touch(processed_root / csv_name, now - 3600)
+    for root in ((source_root / "data" / "processed"), processed_root):
+        _touch(root / snapshot, now - 60)
+    calls: list[str] = []
+    _patch_builder(monkeypatch, module, builder, calls)
+
+    getattr(module, exporter)(source_root=source_root, date_str=DATE, processed_root=processed_root)
+
+    assert calls == [], f"{script_name}.{exporter} rebuilt though its snapshot was newer than every input"
+
+
+@pytest.mark.parametrize("script_name", PRODUCERS)
+def test_unreadable_mtime_rebuilds_rather_than_reusing(script_name):
+    # "Unknown" must not land on the permissive branch -- that is what made the
+    # staleness silent in the first place.
+    module = _load(script_name)
+    assert module._snapshot_inputs_are_newer(None, []) is True
+    assert module._snapshot_inputs_are_newer("/nonexistent/snapshot.json", []) is True

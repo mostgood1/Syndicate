@@ -5052,6 +5052,53 @@ def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, 
     return copied
 
 
+def _snapshot_inputs_are_newer(existing: str | None, sources: list[Path]) -> bool:
+    """True when a snapshot's own inputs have been rewritten since it was built.
+
+    THE BUG THIS FIXES, measured live 2026-08-16 on the served WNBA board. The
+    three props-snapshot exporters skipped their builder whenever a file for the
+    date already existed. `force_refresh` bypasses that, but nothing in the
+    routine cycle passes it -- `live_refresh_loop` only forces on a lineup or
+    injury trigger. So the FIRST build of a date won, permanently:
+
+        recommendations_slate  last built 00:53 CDT
+        cards_props_snapshot   last built 00:11 CDT
+
+    and at 14:30 CDT the board was still serving those picks beside market rows
+    that had updated all day. Measured drift on the served payload: CHI@SEA
+    spread 1.5 vs a current 2.5, POR@PHX total 176.5 vs a current 178.5. A
+    2-point stale total is not a cosmetic lag -- it is a fabricated edge, since
+    the pick is priced against a number the market has left behind.
+
+    Existence is the wrong question; FRESHNESS is the question. Rebuild when any
+    input the snapshot is derived from is newer than the snapshot itself.
+
+    In production `source_root` and `artifact_root` resolve to the same
+    directory, so `_copy_existing_processed_artifact` short-circuits without
+    copying and the existing file's mtime is its real build time -- which is
+    what makes this comparison meaningful rather than a copy artifact.
+
+    **An unreadable mtime rebuilds.** A guard that maps "unknown" onto its
+    permissive branch would restore exactly the silent staleness above; the cost
+    of being wrong in this direction is one cheap JSON build, and the cost of
+    being wrong in the other is a bad price on the board.
+    """
+    if not existing:
+        return True
+    try:
+        out_mtime = Path(existing).stat().st_mtime
+    except OSError:
+        return True
+    for source in sources:
+        try:
+            if source.exists() and source.stat().st_mtime > out_mtime:
+                return True
+        except OSError:
+            # Cannot compare this input -- treat as changed, same reasoning.
+            return True
+    return False
+
+
 def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_root: Path, force_refresh: bool = False) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
@@ -5063,8 +5110,12 @@ def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_
     # short-circuited a rebuild forever, even when the props_recommendations
     # CSV it's derived from was just refreshed with new odds/EV in this same
     # run. force_refresh bypasses the stale copy so a forced refresh actually
-    # regenerates this snapshot instead of silently re-serving old data.
-    if existing and not force_refresh:
+    # regenerates this snapshot instead of silently re-serving old data -- and
+    # the freshness check does the same for the ROUTINE cycle, which never
+    # passes force_refresh (see _snapshot_inputs_are_newer).
+    if existing and not force_refresh and not _snapshot_inputs_are_newer(
+        existing, [processed_root / f"props_recommendations_{date_str}.csv"]
+    ):
         return existing
     _, out_path = _build_local_top_by_game_snapshot(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
@@ -5085,7 +5136,11 @@ def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, 
     # this file stayed byte-for-byte identical because this reuse check found
     # "already there" and never called _build_local_recommendations_slate_artifact
     # at all. Same force_refresh bypass as cards_sim_detail/top_by_game above.
-    if existing and not force_refresh:
+    if existing and not force_refresh and not _snapshot_inputs_are_newer(
+        existing,
+        [processed_root / f"recommendations_{date_str}.csv",
+         processed_root / f"props_recommendations_{date_str}.csv"],
+    ):
         return existing
     _, out_path = _build_local_recommendations_slate_artifact(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
@@ -5110,7 +5165,9 @@ def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_
     # produced the `rows=32/null=3` reading, so its staleness is the least visible
     # of the three: the artifact that most needs rebuilding was the one that could
     # not be forced.
-    if existing and not force_refresh:
+    if existing and not force_refresh and not _snapshot_inputs_are_newer(
+        existing, [processed_root / f"props_recommendations_{date_str}.csv"]
+    ):
         return existing
     _, out_path = _build_local_cards_props_snapshot_artifact(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
