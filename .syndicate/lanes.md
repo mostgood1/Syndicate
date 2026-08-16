@@ -1262,6 +1262,35 @@ Source: the `book_grid_2026-08-15.json` artifact streamed from web
    never fired" AND with "the stamp is only applied on the carry-forward path."
    **Not disambiguated — do not record either as established.**
 
+**BOTH HALVES ARE NOW DEPLOYED — 2026-08-16 04:2xZ. `DEPLOYED NOWHERE` below is
+SUPERSEDED; the rest of that block still reads true.**
+- web `ebd5f677` live 03:38:07Z — the counters are served. Measured null -> object
+  across two artifacts.
+- refresh-worker `5c419007` live 04:24:33Z — ledger v2. **Deployed and NOT YET
+  EXERCISED:** the slate ended between the last pre-deploy build and the first
+  post-deploy one, so `considered` went 4 -> 0 and v2 has had no live row to act
+  on. Both parented on their service's LIVE SHA, never on main.
+- The `refresh-worker-oom-recurrence` hold cleared on its own evidence
+  (`9ed17262`: a ~2 GB transient, not a leak) rather than being overridden. I
+  asked that session first; it archived between the question and the answer.
+
+**CORRECTION TO THIS LANE'S OWN FINDING #2 ABOVE — read it before quoting the
+arc.** "The recorder has never recorded a row" is **FALSE**. The 04:22:51Z
+pre-deploy build read `priceable 1, candidates 1, skipped_unchanged 1`, and
+`skipped_unchanged` cannot be non-zero unless a matching record already sits on
+disk — an empty file always writes, because `_moved(None, rec)` is True. **v1
+wrote at least one row tonight**, between 02:4xZ and 04:22Z. The 03:00Z reading
+was real and I generalised it to a night. v2's premise survives (1 priceable of 4
+considered is a self-selected sample), but "it structurally could not write" was
+an overclaim.
+
+**NEXT ACTION is now purely measurement, and the plumbing question is closed.**
+`live-gameline-ledger-check`, 20:30 Central 08-16, on a full slate:
+`written > 0` on one build, then **`skipped_unchanged > 0` on a later one** —
+the second is the real test, and note it has ALREADY been observed once under
+v1, so the discriminator for v2 is `written` rising on rows that are NOT
+priceable. Read across two builds, never once.
+
 **CHECKPOINT 2026-08-16 03:4xZ.** Shipped to `origin/main`, DEPLOYED NOWHERE:
 `c87f6634` (ledger v2 + the book-grid pass-through + 2 test files),
 `bbc70d16` (the two deploy requests), `4e82d4b7` (the learnings rule).
