@@ -1,5 +1,55 @@
 # Syndicate TODO — canonical cross-session list
 
+### `#441` — **NFL SmartSim2 week-1 projection has not been written in 2.36 days, and the staleness gate relaunches it ~107x/day** — FOUND 2026-08-16, NOT STARTED, no owner
+
+**Discovered while measuring Phase 2's premise for `#440`; unrelated to that work
+and NOT caused by it.** Nothing deployed on 2026-08-15/16 goes near this generator.
+
+**THE READING, and the mechanism is one field.** `refresh-worker` logs:
+
+    SEASON_PROJECTION_LAUNCHING sport=nfl season=2026 week=1
+        reason=artifact_stale age_seconds=199911 interval_seconds=86400
+    ... 12 launches over the next 100 minutes ...
+        reason=artifact_stale age_seconds=203991 interval_seconds=86400
+
+**`age_seconds` climbs monotonically and never resets.** 199,911 -> 203,991 tracks
+wall clock exactly. So every launch re-evaluates the same staleness, launches, and
+**the artifact is never rewritten**. The gate has no memory of having just tried.
+
+**Scale, from `/api/ops/sims/ledger` (3 days):** 321 records, sport=nfl,
+kind=smartsim2_season, trigger=season_projection_autorun — **~107 launches/day
+against `interval_seconds=86400` (once daily)**. All 321 are the SAME artifact
+`nfl_2026_wk1`; some launches are **38-40 seconds apart**. 63% land in the
+18:00-01:00 CT band, on refresh-worker — the service measured at 100% of its
+4096MB cap.
+
+**THE LOAD IS THE SYMPTOM. THE ARTIFACT IS THE DEFECT.** The NFL week-1 projection
+has been absent/stale for 2.36 days; the retry storm is what staleness produces.
+Two problems, and the second is the product one.
+
+**The code predicted the launch rate and not the absence.**
+`_season_projection_should_launch`'s own docstring says *"Roughly 90 launches/day
+and ~4.5 process-hours/day against an expectation of 1."* Actual is ~107/day.
+
+**WHY THE LEDGER CANNOT ANSWER "did it do work":** all 321 records are
+`state=running`, `exit_code=None`, `duration_seconds=None`. `sim_run_ledger` is
+LAUNCH-ONLY for this path by design (MLB's own finaliser is the authority for
+MLB; nothing finalises these). So a failing generator is indistinguishable from a
+running one in the ledger. That is worth fixing on its own.
+
+**Next steps, in order — all reads before any change:**
+1. Capture one launch's stderr on refresh-worker. The launch reason is known; the
+   EXIT path is not.
+2. Check whether `smartsim2_projections_2026_wk1.csv` exists at all under
+   `nfl_artifact_output_root()`, and its mtime.
+3. Then decide: fix the producer, or gate the retry so a failing job cannot
+   relaunch 107x/day. **Do not do 3 before 1** — throttling a broken producer
+   hides the defect instead of fixing it.
+
+**Do NOT confuse with `#389`** (permissive-on-unknown guard in the same function
+family), which was about the launch DECISION. This is about the artifact never
+appearing afterwards.
+
 ### `#440` — **Sim-engine track: catalogue, fixture-aware cadence, live sims for all 8 sports, engine convergence** — PLANNED, NOT STARTED — plan at `.syndicate/plan_2026-08-16_sim_scheduling.md`
 
 **This is a PIN, not a work item.** The plan is the artifact; this entry exists

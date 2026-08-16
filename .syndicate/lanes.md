@@ -1920,7 +1920,7 @@ sessions deploying, a two-file change should ride along, not chase.
     that is this lane's stated falsification test, and it is still live.
   - Session log: `.syndicate/log/2026-08-15.md`, final section.
 
-### odds-cadence-off-the-mlb-peak — OPEN — **1a/1b SHIPPED BUT DARK (`c5daa41a`) and SOCCER EXCLUDED BY MEASUREMENT (`8640f872`). Nothing enabled on any service; NOTHING VERIFIED IN PRODUCTION. The lane's own goal is DEFERRED to 1c, which is blocked.** — opened 2026-08-16 — session: sim-engine-track
+### odds-cadence-off-the-mlb-peak — OPEN — **1a/1b VERIFIED IN PRODUCTION 2026-08-16 05:51:48Z (`dd53d47c`, live-odds-worker): gate runs, soccer exclusion HOLDS at interval_s=28800 baseline. EFFECT still unmeasured; lane goal DEFERRED to 1c (blocked).** — opened 2026-08-16 — session: sim-engine-track
 **Scoped only. No code, no deploy. Handing this over rather than starting it at
 02:00 local on a fixed crash.**
 
@@ -2341,3 +2341,25 @@ and then failed the thing it was checking, which is the point of running it.
   service and the quota re-read.
 - Gates remaining before enabling: the baseline distribution from
   `branch-overlap-baseline-watch` (accruing; one sample is not a distribution).
+
+#### 1a/1b VERIFIED 2026-08-16 05:51:48Z — the gate runs and the exclusion holds
+- Three consecutive lines carry the whole decision chain on live-odds-worker:
+  `FIXTURE_CADENCE sport=soccer interval=baseline reason=excluded_pending_per_league_scoping`
+  -> `PREGAME_CADENCE_DETAIL soccer:marker_age_s=4480/interval_s=28800`
+  -> `PREGAME_CADENCE_SKIPPED sports=soccer`.
+- **`interval_s=28800` is the load-bearing field**: soccer's 8h BASELINE, not a
+  fixture tier. Had the exclusion failed, soccer would have swept MORE often
+  (+69%, measured) — the opposite of this lane's goal.
+- Predicted the first observable tick at ~05:51:37Z from a 900s idle interval
+  against an 1800s cooldown; actual 05:51:48Z. **11 seconds.**
+- **THREE WRONG TURNS FIRST, all invisible from `status=live`:** flag on the wrong
+  service (refresh-worker never imports `_run_live_refresh_tick`); post-deploy
+  silence that was log-ingestion lag, not a boot failure; and
+  `_pregame_relaunch_blocked` sitting UPSTREAM of the cadence filter.
+- **STILL UNMEASURED: the EFFECT.** One gate decision is not a cadence outcome.
+  Needs the `branch-overlap-baseline-watch` distribution. And soccer is excluded
+  by design, so **this lane's headline goal stays DEFERRED to 1c**, blocked on
+  `soccer-model-coverage`.
+- Full measurement in `deploys.md`; unrelated defect found while measuring
+  Phase 2's premise is filed as `#441` (NFL week-1 projection unwritten 2.36 days,
+  relaunching ~107x/day).

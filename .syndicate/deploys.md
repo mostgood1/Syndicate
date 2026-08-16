@@ -5721,3 +5721,39 @@ HEAD rather than the live commit — so it carried two commits from another sess
 memory drops, it cannot be attributed to Phase 4.1 alone.** The
 `branch-overlap-baseline-watch` before/after boundary must be re-stamped from
 05:35:34Z.
+
+## 2026-08-16 05:51:48Z — live-odds-worker `dd53d47c` — **MEASURED: VERIFIED.** Phase 1 gate is live and the soccer exclusion holds
+
+Fills the PENDING row above. The gate ran, resolved, and acted — three consecutive
+lines carrying the whole decision chain:
+
+    05:51:48  FIXTURE_CADENCE sport=soccer interval=baseline
+                              reason=excluded_pending_per_league_scoping
+    05:51:50  PREGAME_CADENCE_DETAIL soccer:marker_age_s=4480/interval_s=28800
+    05:51:50  PREGAME_CADENCE_SKIPPED sports=soccer
+
+**THE LOAD-BEARING FIELD IS `interval_s=28800`** — soccer's 8h BASELINE, not a
+fixture tier. The exclusion held. Had it not, soccer would have taken a
+fixture-derived interval and swept MORE often (the measured +69% case), i.e. the
+opposite of this lane's goal. That is what this deploy needed to prove and it
+proved it.
+
+Soccer was the only sport in the candidate list on that tick, so it is the only
+line; mlb/wnba were not due. That is the cadence filter working, not a gap.
+
+**PREDICTION vs OUTCOME, recorded because it is the evidence the model is right:**
+predicted first observable tick ~05:51:37Z, from a 900s idle interval against an
+1800s cooldown stamped at 05:08:40Z. Actual: 05:51:48Z. **11 seconds.**
+
+**THREE WRONG TURNS BEFORE THIS, each caught by verification rather than assumption
+— none visible from `status=live`:**
+1. Flag set on refresh-worker, where `_run_live_refresh_tick` is never imported and
+   `SYNDICATE_ENABLE_LIVE_ODDS_REFRESH_LOOP=false`. Deploy fully inert.
+2. Post-deploy silence read as a boot failure; it was log-ingestion lag (first
+   output 05:21:36Z, 57s after live).
+3. `_pregame_relaunch_blocked` sits UPSTREAM of the cadence filter, so two ticks
+   passed without reaching the gate at all.
+
+**STILL NOT MEASURED:** the effect. One gate decision is not a cadence outcome.
+The sweeps/day change needs the `branch-overlap-baseline-watch` distribution, and
+soccer is excluded by design so this lane's headline goal remains DEFERRED to 1c.
