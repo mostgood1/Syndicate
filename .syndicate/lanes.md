@@ -1203,7 +1203,31 @@ does not hold.** `[measured 08-14]`
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
-### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+### live-game-line-projection — OPEN, UNOWNED (session `live-gameline-eval` checkpointed 2026-08-16 15:2xZ) — **BOTH HALVES SHIPPED AND v2 STILL UNEXERCISED. THE PLUMBING IS DONE TWICE OVER; THE EVALUATION HAS NOT STARTED.**
+
+**STATUS AT CHECKPOINT `[15:2xZ]`.** Nothing uncommitted; everything is on
+`origin/main` and content-verified there. web `ebd5f677` live 03:38:07Z,
+refresh-worker `5c419007` live 04:24:33Z — and `LEDGER_VERSION = 2` is
+content-verified on the CURRENTLY live `d72d670c`, which another lane deployed
+at 06:01:34Z and carried it forward. Board at 15:17Z reads `index_size 0,
+considered 0` — Sunday pregame, nothing live yet.
+
+**THE SINGLE NEXT ACTION:** read `live_gameline_ledger` off
+`/api/board/book-grid?sport=mlb&date=2026-08-16` during tonight's slate
+(scheduled `live-gameline-ledger-check`, 20:30 Central). **The discriminator
+for v2 is `written` rising on rows that are NOT priceable.**
+`skipped_unchanged > 0` is NOT it — that was already observed under v1 at
+04:22:51Z, which is what refuted this lane's own "never recorded a row".
+Read across two builds, never one.
+
+**ONE UNPAID DEBT:** an `oomKilled` fired at 04:46:44Z, 22 min after my
+deploy added work to refresh-worker. Recorded by `refresh-worker-oom-recurrence`,
+and `44ad2f9d` reports `d72d670c` as 9h clean since — **but I never measured
+the ledger's RSS and I am not claiming exoneration.** Kill switch, no deploy
+needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
+
+— original re-take header follows —
+### live-game-line-projection — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`)
 - Goal: make the ledger capable of producing a sample at all, and make its
   counters readable without streaming a 10 MB artifact. Success = one live slate
   where `live_gameline_ledger.written > 0` and the counters are reachable from

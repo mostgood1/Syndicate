@@ -1255,8 +1255,8 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
      Joined on FULL TEAM NAMES, which match exactly (`matchup.home.name` ==
      `home_team`, verified in production) — **no alias table, deliberately**,
      since the prop join's 91% miss is a market-NAME aliasing failure.
-     **refresh-worker builds this artifact and carries NEITHER Drop 1 nor Drop 2
-     (`6f512ffa`), so Drop 3 needs a refresh-worker deploy** — `#435` holds it.
+     **SHIPPED: Drop 3 is live on refresh-worker** (`f8ca54e1`, and still
+     present on the current live `d72d670c` — verified by content, not ancestry).
      **Expect `rows_live_gameline_edged: 0` at first and do not call it a
      defect:** at 120 sims the 2-sigma bar is ~9.1 pp at p=0.5, so a balanced
      slate refuses by design (recorded decision, spec §8.1).
@@ -1276,20 +1276,36 @@ Full read with per-module evidence: `.syndicate/tier5_live_modules_2026-08-14.md
     `game.state == live` on the GRID side, so the Final entries are never used.
   - **The ledger recorded nothing because its population was empty by
     construction, not because of a defect.** v1 recorded `priceable` rows only.
-    **FIXED as v2 (`c87f6634`, on `origin/main`, DEPLOYED NOWHERE)** — records
-    every PROJECTED row, keeps `priceable`/`withheld_reason` as fields.
+    **FIXED as v2 and SHIPPED** — `5c419007`, live on refresh-worker
+    **04:24:33Z**; `LEDGER_VERSION = 2` content-verified on the currently live
+    `d72d670c`, which a later deploy carried forward. Records every PROJECTED
+    row, keeps `priceable`/`withheld_reason`/`sigma` as fields.
     `LEDGER_VERSION` 1 → 2 because the POPULATION changed: **filter any reader on
     `v` before aggregating**, or the rate spans two denominators.
   - **`/api/board/book-grid` dropped `live_gamelines` and `live_gameline_ledger`**
     though the artifact carries both — second instance of that bug in that
-    function. **FIXED in the same commit, web DEPLOYED NOWHERE.** Until it ships,
-    the only reader is a ~10 MB `/api/ops/artifacts/stream` of the raw artifact.
-  - **Neither half is deployed and the worker half is deliberately held** —
-    `refresh-worker-oom-recurrence` owns deploys to that service. Requests filed:
-    `.syndicate/deploy/requests/2026-08-16T0330Z-live-game-line-projection-{web,worker}.md`.
-    **The worker one is time-boxed:** the scheduled `live-gameline-ledger-check`
-    fires 08-16 20:30 Central, and against v1 it will read `written: 0` a second
-    night and mean nothing either way.
+    function. **FIXED AND SHIPPED — web `ebd5f677`, live 03:38:07Z.** Both keys
+    read `null` before and serve objects after, measured across two different
+    artifacts (03:37:13Z and 03:39:36Z). The ~10 MB
+    `/api/ops/artifacts/stream` workaround is no longer needed.
+  - **BOTH HALVES ARE DEPLOYED, AND v2 HAS NEVER BEEN EXERCISED.** web
+    `ebd5f677` 03:38:07Z, refresh-worker `5c419007` 04:24:33Z, each parented on
+    its own service's LIVE SHA — **`main` is an ancestor of NEITHER service's
+    live tree** (13 commits live-only on refresh-worker, 33 on web at the time).
+    The slate ended between the last pre-deploy build and the first post-deploy
+    one, so v2 went live with **zero live rows to act on**; as of 15:17Z on 08-16
+    the board reads `index_size 0, considered 0` because nothing is live yet.
+    **The test is the scheduled `live-gameline-ledger-check`, 08-16 20:30
+    Central.** The discriminator for v2 is `written` rising on rows that are
+    **not** priceable — `skipped_unchanged > 0` is NOT it, having already been
+    observed under v1.
+  - **CORRECTION — "the recorder has never recorded a row" is FALSE.** The
+    04:22:51Z pre-deploy build read `priceable 1, candidates 1,
+    skipped_unchanged 1`, and `skipped_unchanged` cannot be non-zero unless a
+    matching record is already on disk (`_moved(None, rec)` is True, so an empty
+    file always writes). **v1 wrote at least one row on 08-15**, between 02:4xZ
+    and 04:22Z. The 03:00Z reading above is real; generalising it to a whole
+    night was the error.
 - **WHERE THE HUNT STANDS AFTER BOTH DROPS `[measured 08-15 21:1xZ]`. Two
   hypotheses are DEAD — do not re-run them:**
   - **"Drop 1 is bypassed; `_persist_live_lens_report` never runs on a tick" —

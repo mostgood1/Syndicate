@@ -1891,3 +1891,40 @@ match count.
   is the dangerous shape.
 - *(evidence: `#440` plan Phase 1 cost-check section; lane `odds-cadence-off-the-mlb-peak`;
   fix `8640f872`)*
+
+### 2026-08-16 — I TURNED ONE BUILD INTO A STRUCTURAL IMPOSSIBILITY, AND THE REFUTING NUMBER WAS IN THE PAYLOAD I ALREADY HAD
+
+I measured the live game-line ledger at 03:00Z — `priceable 0`, so
+`candidates 0` — and wrote, in a commit message, a lane block, `state.md` and a
+`learnings.md` rule, that the recorder **could not** produce a row. Four hours
+later a pre-deploy read at 04:22:51Z showed `priceable 1, candidates 1,
+skipped_unchanged 1`.
+
+**`skipped_unchanged` is the refutation, and I had already read that field
+three times without asking what a non-zero would mean.** It can only be non-zero
+when a record with the same key and identical numbers is already on disk —
+`_moved(None, rec)` returns True, so an empty file always writes. So v1 had
+written at least one row that night, on its own, before I changed anything.
+
+The finding survived — 1 priceable of 4 considered is a self-selected sample with
+no denominator, which is what v2 fixes. **The overclaim did not.** "It is empty
+right now" became "it is empty by construction" with no additional evidence,
+and the stronger form is the one that got written into four files.
+
+**How to apply.**
+- **"Currently zero" and "cannot be non-zero" are different claims with
+  different evidence bars.** The second needs an argument from the code path,
+  not a reading. If you find yourself writing *structurally*, *by construction*,
+  or *could never*, either produce the code argument or downgrade the sentence.
+- **A rate measured on ONE build is a sample of size one**, and a live slate is
+  the most non-stationary population in this repo — the same counter moved
+  25 → 4 → 1 across three consecutive builds earlier the same night, which I had
+  quoted in the module docstring while generalising a different one-shot reading.
+- **Before shipping a claim, ask what would refute it and check whether that
+  number is already in the payload.** Here it was, in the same six-key dict, on
+  every read.
+
+Related: [[a rate, not a count]], [[read the field you already have]],
+and the sibling entry above about a recorder gated on the publish decision — the
+volume claim that justified v1's filter was wrong the same way, by assertion
+rather than by counting.
