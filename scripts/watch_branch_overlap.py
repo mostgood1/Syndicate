@@ -220,7 +220,10 @@ def main() -> int:
         "hours": {h: dict(b) for h, b in sorted(buckets.items())},
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with args.out.open("a", encoding="utf-8") as handle:
+    # newline="" pins LF: on Windows the default translates "\n" to CRLF, which put
+    # one CRLF record into an otherwise LF-only file (2026-08-16). git's clean filter
+    # does not save us -- `git hash-object --stdin` bypasses it.
+    with args.out.open("a", encoding="utf-8", newline="") as handle:
         handle.write(json.dumps(record) + "\n")
     print(f"\nappended to {args.out}")
     return 0
