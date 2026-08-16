@@ -5074,3 +5074,45 @@ without checking the number was produced after the event.
 Rollback to `c422f79a` (landed 00:54:07) is being UNDONE — `c4116ab6` re-fired
 00:58:33Z, confirmed building by re-reading the deploys list. Net cost of the
 round trip: **three soccer runs** and two extra restarts.
+
+---
+
+## 2026-08-16 — win_prob null counter: readable channel — 2 OF 3 SERVICES, MEASUREMENT OWED
+
+**WHAT AND WHY.** The `WIN_PROB_NULL_NO_PRICE` counter deployed 2026-08-15 was
+unreadable in production: it `print()`s to stdout and
+`refresh_odds_sources._run_command` discards a successful step's stdout. Proven,
+not inferred — live-odds-worker's `ALL_PROCESS_MEMORY` census at 23:36:05Z lists
+PID 1900 running `refresh_wnba_oddsapi_props.py --date 2026-08-15`, while a
+bounded log read since the deploy returned **zero** matches on both workers. The
+counter now also writes through `write_json_file`, read at `/api/ops/win-prob-null`.
+
+**LANDED.**
+
+| service | commit | landed | content |
+|---|---|---|---|
+| refresh-worker | `b2af0fac` | 2026-08-16T01:13:32Z | producers + `win_prob_null_diag` |
+| web | `fa1871cf` | 2026-08-16T01:15:37Z | route + `win_prob_null_diag` |
+| live-odds-worker | — | **NOT DEPLOYED** | claim held by `clamp-fix-to-workers` (user-authorized), 3 jobs running |
+
+Each branch was cut on **that service's own live SHA**, not on `main` (`main` is
+not a superset of the workers), and trimmed so no other lane's code rode along —
+web took no producer changes, the workers took no `ops.py`. refresh-worker was
+**re-cut once** (`5624ef2e` → `b2af0fac`) because the service redeployed during
+verification; "live" is a lease.
+
+**MEASURED AT 01:16Z, AND IT IS NOT THE MEASUREMENT THAT MATTERS.**
+`/api/ops/win-prob-null` returns **HTTP 200**, `readings: 0`, `interpretation:
+"no producer has reported yet"`, `reports_root: /opt/render/project/data/reports`
+— which does confirm web resolves the same key root the workers write, i.e. the
+channel is wired. **It confirms nothing about the `or 0.5` fix.** A route that
+answers is not a producer that reported.
+
+**OWED, and it will not arrive by itself:** a reading with `rows>0`. The WNBA
+producer was last observed running on **live-odds-worker — the one service that
+did not get this deploy** — so the likeliest source of the first reading is
+still dark. Next deployer of live-odds-worker should carry
+`deploy/win-prob-null-live-odds-worker` (re-cut on its then-live SHA; the pushed
+`3573a0c3` is already stale). The hourly `wnba-win-prob-counter-read` scheduled
+task now reads this endpoint and will report "writer not deployed" until then —
+that is a true statement, not a null result.

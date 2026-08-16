@@ -239,7 +239,16 @@ recorded on 2026-08-01, for this same script.
   window since the deploy returned **zero matches on both workers**. So "the
   producer has not run yet" was the WRONG reading — the silence was the
   emitter's, not the code's.
-- **FIXED IN CODE, `b281bc7f`, ON NO SERVICE.** Both producers now also publish
+- **DEPLOYED 2026-08-16 TO 2 OF 3: refresh-worker `b2af0fac` (01:13:32Z), web
+  `fa1871cf` (01:15:37Z). live-odds-worker NOT DEPLOYED** — its claim was held by
+  `clamp-fix-to-workers` with 3 jobs running. `/api/ops/win-prob-null` answers
+  **200** and reports `reports_root=/opt/render/project/data/reports`, so the
+  channel is wired end to end; `readings: 0` so far. **THE WNBA PRODUCER WAS LAST
+  SEEN RUNNING ON live-odds-worker — the one service still dark — so the likeliest
+  source of the first reading is exactly the one not deployed.** Branch
+  `deploy/win-prob-null-live-odds-worker` is pushed but STALE; re-cut on the
+  then-live SHA.
+- **FIXED IN CODE, `b281bc7f`.** Both producers now also publish
   through `write_json_file` (per-service key under `reports_root()`, verified
   identical on all three services), readable at **`/api/ops/win-prob-null`**.
   Needs **both workers** (writer) **and web** (reader) to be worth anything.
