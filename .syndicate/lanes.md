@@ -2892,6 +2892,37 @@ and then failed the thing it was checking, which is the point of running it.
 
 ### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
 ### refresh-worker-oom-recurrence — OPEN — **MECHANISM SETTLED, ALLOCATOR STILL UNNAMED. `#435` did NOT regress (scope error: book_quotes READ vs container anon). The failure is a ~2GB TRANSIENT in the PARENT process (pid 39, children <54MB), decided by evictable page cache (inactive_file 26.3/42.2 at kills vs 164-240 surviving), climbing 51s with NO stage marker. THREE fixes shipped and exercised in live `d72d670c` — odds-shard duplicate `51ae7218`, ledger streaming `21f8a165`, 3-ledger-loads-to-1 `aa190d58` — and NONE has been shown to move the transient. deepcopy EXONERATED by measurement (0.54MB peak). Daytime windows are worthless as evidence; the live-slate band 22:00Z-05:00Z is scheduled via `scripts/oom_band_report.py` + two one-time tasks. OPEN pending that result** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
+- **HANDED IN 2026-08-16 ~19:55Z by `branch-overlap-baseline-watch` (scheduled
+  run). This lane's to interpret, not the reporter's — filed as observation,
+  no diagnosis, no code or config touched.**
+  - **Two NEW `oomKilled` on refresh-worker: `2026-08-16T19:17:25.767Z` and
+    `19:30:07.124Z`** (14:17:25 / 14:30:07 local), `memoryLimit=4Gi`, 12.7 min
+    apart. With the two already-known daytime kills (`16:34:32Z` / `17:19:42Z`
+    = 11:34:32 / 12:19:42 local) that is **4 `oomKilled` in one afternoon**.
+  - **Why it may bear on this lane's plan:** the heading above records
+    "Daytime windows are worthless as evidence; the live-slate band
+    22:00Z-05:00Z is scheduled". The 19:17Z/19:30Z pair falls OUTSIDE that
+    band, so `oom_band_report.py` as scheduled will not see it. Whether that
+    makes daytime evidentially interesting, or these are a different mode from
+    the live-slate transient, is this lane's call — the reporter is not making
+    it.
+  - Source: `py -3 scripts/render_events.py --service refresh-worker
+    --failures-only --since 2026-08-16T14:52:07Z`, which **COVERED
+    15:39:59.060Z .. 19:48:33.617Z** (63 events, 1 page). The events read
+    starts ~48 min AFTER the memory window opened — **nothing is claimed about
+    kills in 14:52Z-15:40Z**, and coverage ends 19:48:33Z.
+  - Memory context from the same run, cgroup `memory.current` — **INCLUDES page
+    cache; this is NOT a leak claim and NOT an imminent-OOM claim**: covered
+    14:52:07Z..19:51:47Z, 1967 samples, 0 malformed. `WORST container (any
+    sample)` **4096.0 MB = 100.0% of cap**; `WORST while BOTH branches live`
+    **4096.0 MB**; both-live share **326/1967 = 16.6%**. Local hour 14 — the
+    hour holding both new kills — n=290, worst 4096.0, worst@BOTH 4096.0. At-cap
+    has been the reading in every record since 2026-08-15 and is not itself news.
+  - Raw record appended to `reports/branch_overlap/baseline.jsonl`
+    (`run_mode=scheduled`).
+  - Delivery note: no live session holds this lane — both
+    `refresh-worker OOM: two kills in 25 min` sessions are archived and stopped
+    (last activity 15:33:05Z). This ledger entry IS the handoff.
 ### render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this is local tooling). Falsification test PASSED: 29/29 known `oomKilled` reproduced for 2026-08-14 CT, and the unpaged control returns 20/29 — i.e. a single-page reader undercounts by 31% while looking like an answer.** — opened 2026-08-16 — session: branch-overlap-baseline-watch
 - Goal: `scripts/render_events.py` exists and answers "was this service killed,
   and why" from `/v1/services/<id>/events`, so the 2026-08-15 FORBIDDEN rule
