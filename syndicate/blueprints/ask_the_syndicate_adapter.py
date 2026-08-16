@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import re
+from datetime import datetime, timezone
 from typing import Any
 
 from pipeline.intelligence_models import IntelligenceResult
@@ -313,7 +314,9 @@ def _bet_analysis_schema(result: Any, *, question: str = "", relevance_matched: 
         }
 
     top = _first_recommendation(result)
-    facts = _bet_facts(top)
+    # The snapshot's own computed_at, so the quote age advances with the
+    # artifact instead of being frozen at build time. See `_bet_facts`.
+    facts = _bet_facts(top, artifact_as_of=_result_as_of(result))
     sim = _sim_terms(top)
 
     # `selection` was `top.get("selection")`, which on a layer2-sourced
@@ -581,6 +584,79 @@ def _market_summary_rank_key(item: dict[str, Any]) -> tuple[float, float]:
 # Markets where `side` names the team you are betting AGAINST, not for.
 # Mirrors `layer2_board._LAY_MARKETS`; see `_bet_label` for why this is
 # duplicated rather than imported.
+# An artifact older than this is not a plausible offset, it is a broken clock
+# (wrong timezone, a date-only string parsed as midnight, a stale mirror). Adding
+# it would invent hours of staleness, so the offset is dropped and the stamped
+# age stands.
+_MAX_PLAUSIBLE_ARTIFACT_AGE_SECONDS = 86_400.0
+
+# When to tell a reader to re-check the price. **Raised 15min -> 45min in the
+# same change that made the age REAL, because the old number was calibrated
+# against an age that did not tick and became meaningless once it did.**
+#
+# Measured on the served board 2026-08-16 20:2xZ, real ages (stamped + the
+# artifact's own 14.3 min), 70 rows carrying a seen-clock:
+#
+#     min 27.3 | p50 27.3 | p75 54.2 | p90 61.5 | max 61.5   (minutes)
+#
+#     threshold   warned          threshold   warned
+#      15 min     70/70  100.0%    60 min     18/70   25.7%
+#      30 min     19/70   27.1%    75 min      0/70    0.0%
+#      45 min     19/70   27.1%
+#
+# **The MINIMUM real age on the board is 27 minutes**, so 15 min fired on every
+# row -- an accurate warning that carries no information. 45 min sits above the
+# normal rebuild+fetch cycle and flags the genuine tail (the slower-cadence
+# sport and the older batch) at ~27%. It is one constant: raise it if the board
+# gets faster, lower it if a sport needs tighter watching.
+_STALE_QUOTE_SECONDS = 2_700.0
+
+
+def _seconds_since(stamp: Any) -> float | None:
+    """Seconds between an ISO-8601 stamp and now, or None if it is unusable.
+
+    Naive stamps are read as UTC, which is what every artifact in this repo
+    writes. A negative delta (clock skew) and an implausibly large one are both
+    rejected rather than clamped -- see `_MAX_PLAUSIBLE_ARTIFACT_AGE_SECONDS`.
+    """
+    text = str(stamp or "").strip()
+    if not text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    delta = (datetime.now(timezone.utc) - parsed).total_seconds()
+    if delta < 0 or delta > _MAX_PLAUSIBLE_ARTIFACT_AGE_SECONDS:
+        return None
+    return delta
+
+
+def _result_as_of(result: Any) -> str | None:
+    """When the snapshot behind `result` was computed.
+
+    Key order mirrors `ask_the_syndicate.py`'s own scan, which mirrors
+    `pipeline/intelligence_state.py`'s -- three names because
+    `read_latest_intelligence_state` has four return paths whose payload shapes
+    differ, and production runs the one carrying `state_meta` with no
+    `freshness` key at all. Reading only `freshness` was inert in production
+    while passing locally; do not narrow this.
+    """
+    payload = _result_payload(result)
+    for container in (payload, result if isinstance(result, dict) else None):
+        if not isinstance(container, dict):
+            continue
+        for key in ("state_meta", "freshness", "state_freshness"):
+            source = container.get(key)
+            if isinstance(source, dict):
+                stamp = source.get("computed_at") or source.get("as_of")
+                if stamp:
+                    return str(stamp)
+    return None
+
+
 _LAY_MARKET_TOKENS = ("_lay",)
 
 # Sides that ARE the whole selection with no number attached. Mirrors what
@@ -719,7 +795,7 @@ def _bet_label(row: dict[str, Any]) -> str | None:
     return f"{label} ({matchup})" if matchup else label
 
 
-def _bet_facts(row: dict[str, Any]) -> dict[str, Any]:
+def _bet_facts(row: dict[str, Any], *, artifact_as_of: Any = None) -> dict[str, Any]:
     """Market, line, side and the price you would actually get.
 
     Every field here was already on the candidate and was being dropped. An
@@ -758,6 +834,30 @@ def _bet_facts(row: dict[str, Any]) -> dict[str, Any]:
         age = _to_float(quote.get("book_age_seconds"))
     if age is None:
         age = _to_float(row.get("book_age_seconds"))
+
+    # **THE STAMPED AGE DOES NOT TICK.** It is frozen at ARTIFACT BUILD time, so
+    # reading it raw reports how old the quote was when the board was written,
+    # not how old it is now. Measured 2026-08-16: three reads of the live
+    # shortlist 45s apart returned byte-identical ages (`mlb=[12.9, 39.8]
+    # wnba=[47.1]` at 20:18:34, 20:19:19, 20:20:04) while `written_at` sat at
+    # 20:15:41Z -- so the true WNBA age at the last read was ~51.5 min, not 47.1.
+    # Every consumer of this field understates age by the artifact's own age.
+    #
+    # Real age = stamped age + time since the artifact was written. The caller
+    # supplies that timestamp because only the caller knows WHICH artifact the
+    # row came from; `_seconds_since` rejects a skewed or implausible one rather
+    # than inventing staleness.
+    #
+    # **This yields a LOWER BOUND, not an exact age, and deliberately so.** On
+    # the board path `artifact_as_of` is the shortlist's own `written_at` and the
+    # result is exact. On the snapshot path it is the intelligence state's
+    # `computed_at`, which can POST-date the shortlist build the quote was
+    # stamped in -- so the offset is real but may be short. Under-reporting
+    # staleness by a bounded amount is the safe direction here; the alternative
+    # is guessing at an artifact chain this function cannot see.
+    elapsed = _seconds_since(artifact_as_of)
+    if age is not None and elapsed:
+        age += elapsed
     market = row.get("market") or row.get("market_key")
     return {
         "market": market,
@@ -903,7 +1003,7 @@ def _reason_sentences(
         else:
             parts.append("This game is already live.")
     age = facts.get("quote_age_seconds")
-    if age is not None and age >= 900:
+    if age is not None and age >= _STALE_QUOTE_SECONDS:
         # Says WHEN WE LOOKED, not "the price is old" -- see `_bet_facts` for
         # why those are different claims. The old wording ("The quote behind
         # this is N minutes old") was true of neither clock once the field was
@@ -1025,7 +1125,9 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> list[dict[
     for row in rows[:5]:
         model_pct, market_pct = _board_row_probabilities(row)
         score = _mapping_or_empty(row.get("score"))
-        facts = _bet_facts(row)
+        # EXACT on this path: `written_at` is the timestamp of the very artifact
+        # these rows were stamped in.
+        facts = _bet_facts(row, artifact_as_of=payload.get("written_at"))
         sim = _sim_terms(row)
         edge_pct = _to_float(row.get("model_edge_pct"))
         top.append(
@@ -1100,7 +1202,7 @@ def _market_summary_schema(
         # unavailable. Same label and same reason generator as the board path
         # above, so a degraded answer degrades in the DATA it has, not in the
         # shape a reader has to parse.
-        facts = _bet_facts(item)
+        facts = _bet_facts(item, artifact_as_of=_result_as_of(result))
         sim = _sim_terms(item)
         model_pct = _to_pct(item.get("model_probability") or item.get("confidence"))
         market_pct = _to_pct(item.get("market_probability") or item.get("implied_probability"))

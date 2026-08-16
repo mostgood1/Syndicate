@@ -625,3 +625,73 @@ def test_bet_label_matches_pick_label_on_the_draw_leg_too():
     row = {"side": "Draw", "line": None, "market": "h2h_3_way",
            "away_team": "Indiana Fever", "home_team": "Atlanta Dream"}
     assert adapter._bet_label(row).startswith(layer2_board._pick_label(row))
+
+
+# --------------------------------------------------------------------------
+# 7. The stamped quote age does not tick, so it has to be offset.
+#
+# Measured 2026-08-16: three reads of the live shortlist 45s apart returned
+# byte-identical ages (`mlb=[12.9, 39.8] wnba=[47.1]` at 20:18:34 / 20:19:19 /
+# 20:20:04) while `written_at` sat at 20:15:41Z. The field is frozen at ARTIFACT
+# BUILD time, so every consumer understates age by the artifact's own age.
+# --------------------------------------------------------------------------
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+
+def _ago(seconds: float) -> str:
+    return (datetime.now(timezone.utc) - timedelta(seconds=seconds)).isoformat().replace("+00:00", "Z")
+
+
+def test_quote_age_is_offset_by_the_artifacts_own_age():
+    """47.1 min stamped in a board written 4 min ago is ~51 min, not 47."""
+    facts = adapter._bet_facts(PROP_ROW, artifact_as_of=_ago(240))
+    assert facts["quote_age_seconds"] == pytest.approx(599.9 + 240, abs=5)
+
+
+def test_quote_age_without_a_timestamp_is_the_stamped_value():
+    """No artifact stamp -> report what we have. A floor beats a fabrication."""
+    assert adapter._bet_facts(PROP_ROW)["quote_age_seconds"] == pytest.approx(599.9)
+
+
+@pytest.mark.parametrize("stamp", [
+    None, "", "not-a-date", 12345,
+    "2020-01-01T00:00:00Z",                       # implausibly old -> broken clock
+])
+def test_an_unusable_timestamp_never_invents_staleness(stamp):
+    assert adapter._bet_facts(PROP_ROW, artifact_as_of=stamp)["quote_age_seconds"] == pytest.approx(599.9)
+
+
+def test_a_future_timestamp_is_rejected_not_clamped():
+    """Clock skew must not subtract from a real age."""
+    future = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat().replace("+00:00", "Z")
+    assert adapter._bet_facts(PROP_ROW, artifact_as_of=future)["quote_age_seconds"] == pytest.approx(599.9)
+
+
+def test_seconds_since_reads_a_naive_stamp_as_utc():
+    naive = (datetime.now(timezone.utc) - timedelta(seconds=120)).replace(tzinfo=None).isoformat()
+    assert adapter._seconds_since(naive) == pytest.approx(120, abs=5)
+
+
+def test_the_offset_can_cross_the_warning_threshold():
+    """The point of the fix: a row stamped fresh can be genuinely stale now.
+
+    Written against the CONSTANT, not the number, so raising the threshold
+    cannot silently turn this into a test of nothing.
+    """
+    limit = adapter._STALE_QUOTE_SECONDS
+    row = dict(PROP_ROW, quote=dict(PROP_ROW["quote"], quote_seen_age_seconds=limit - 300.0))
+    fresh = adapter._bet_facts(row)
+    aged = adapter._bet_facts(row, artifact_as_of=_ago(600))
+    assert fresh["quote_age_seconds"] < limit <= aged["quote_age_seconds"]
+    assert "Last checked" not in (adapter._reason_sentences(
+        row, fresh, adapter._sim_terms(row), model_pct=32.6, market_pct=27.1, edge_pct=5.5) or "")
+    assert "Last checked" in adapter._reason_sentences(
+        row, aged, adapter._sim_terms(row), model_pct=32.6, market_pct=27.1, edge_pct=5.5)
+
+
+def test_result_as_of_reads_state_meta_not_only_freshness():
+    """Production runs the path carrying `state_meta` and NO `freshness` key."""
+    assert adapter._result_as_of({"state_meta": {"computed_at": "2026-08-16T20:15:41Z"}}) == "2026-08-16T20:15:41Z"
+    assert adapter._result_as_of({"freshness": {"as_of": "2026-08-16T20:15:41Z"}}) == "2026-08-16T20:15:41Z"
+    assert adapter._result_as_of({}) is None
