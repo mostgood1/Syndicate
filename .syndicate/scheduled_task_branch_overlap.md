@@ -11,9 +11,29 @@ reconcile deliberately, do not assume this one is current.
 
 Created 2026-08-15 (local) as Phase 0 measurement 4 of
 `.syndicate/plan_2026-08-16_sim_scheduling.md` (`#440`), lane
-`sim-engine-phase0-census`. Cron `45 19,22,1 * * *` (local), notify on completion.
+`sim-engine-phase0-census`. Cron `45 14,19,22,1 * * *` (local), notify on completion.
 
-**Cron changed 2026-08-16 (local): `15 */4 * * *` → `45 19,22,1 * * *`.** The old
+**Cron changed TWICE on 2026-08-16 — read both, the second corrects the first.**
+
+**Second change (later the same day): `45 19,22,1 * * *` → `45 14,19,22,1 * * *`.**
+The evening-only schedule below was measured against a distribution that stopped
+holding within hours. refresh-worker was `oomKilled` at **11:34:32 and 12:19:42
+local on 08-16**, on an afternoon carrying four deploy cycles — and the
+evening-only schedule observes neither, while the six-a-day grid it replaced
+would have caught both. Narrowing an instrument to a measured distribution
+converts "we did not observe X" into "we cannot observe X", and downstream those
+are indistinguishable (`learnings.md`, 2026-08-16).
+
+The 14:45 slot covers **09:45–14:45 local**, so the four windows now tile
+**09:45–01:45 continuously** and catch all three of the out-of-band kills on
+record (`08-15 00:02:59`, `08-16 11:34:32`, `08-16 12:19:42`). **11:45 was
+considered and rejected** — its window ends at 11:45 and so misses the 12:19
+kill entirely; the naive "add a morning slot" answer is wrong here.
+
+**Still uncovered: 01:45–09:45 local.** Stated rather than quietly accepted, so
+no one reads a quiet baseline as an all-clear.
+
+**First change (earlier that day): `15 */4 * * *` → `45 19,22,1 * * *`.** The old
 grid fired at 00:15/04:15/08:15/12:15/16:15/20:15 and so spent three of six daily
 samples on hours where the failure does not happen. An OOM census over
 2026-08-09..08-16 (`scripts/render_events.py --failures-only`) found **42
@@ -54,7 +74,11 @@ STEP 1 — run the instrument (read-only; reads Render's logs API, touches no wo
 py -3 scripts/watch_branch_overlap.py --hours 5
 ```
 
-It appends one JSON record per run to `reports/branch_overlap/baseline.jsonl` and prints an hour table. The 5-hour window against the 19:45/22:45/01:45 local cadence overlaps heavily on purpose — a gap in the baseline is worse than a duplicated hour, and those three windows are chosen to tile 14:45–01:45 local continuously. That band is where the failure lives: 41 of 42 refresh-worker OOM kills over 2026-08-09..08-16 landed between 15:00 and 23:59 local. Do not "helpfully" widen or shift the window; the hours are the point.
+It appends one JSON record per run to `reports/branch_overlap/baseline.jsonl` and prints an hour table. The 5-hour window against the **14:45/19:45/22:45/01:45** local cadence overlaps heavily on purpose — a gap in the baseline is worse than a duplicated hour, and those four windows tile **09:45–01:45 local continuously**.
+
+Most kills are evening: 41 of 44 over 2026-08-09..08-16 fell in 15:00–23:59 local. But **not all of them**, and the schedule was briefly narrowed to the evening alone on 08-16 — which made it blind to the two daytime kills that landed that same afternoon (11:34:32 and 12:19:42 local, on a day carrying four deploy cycles). The 14:45 slot exists to close that hole; its window covers 09:45–14:45 and catches both. A slot at 11:45 would NOT — it ends before the 12:19 kill.
+
+**Uncovered: 01:45–09:45 local.** That is a real blind spot, stated so nobody reads a quiet baseline as an all-clear. Do not shift the windows to chase a single day's anomaly, and do not report "no kills" from this instrument at all — it samples memory, and kills are EVENTS (see below).
 
 STEP 2 — read the output honestly. Three outcomes are DIFFERENT and must not be reported the same way:
 - Exit code 2 with "NO LOG LINES RETURNED" → the reader failed. NOT a measurement. Say so.
