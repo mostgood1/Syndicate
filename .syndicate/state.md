@@ -1469,6 +1469,22 @@ the place to read it, and it carries the guard on its two shortlists.
 - **`lane-guard` is blind to `.claude/**` by design**, so the enforcement layer
   cannot protect the directory it lives in — and every real collision has
   happened there.
+- **`commit-guard.py` (PreToolUse) reads the index the COMMIT will use, fixed
+  `a52a2b64` 2026-08-16.** It previously evaluated both predicates against
+  `CLAUDE_PROJECT_DIR` — the MAIN worktree — while the commit runs wherever the
+  shell is, which for this repo's own contended-tree recipe is a LINKED worktree
+  with its own index and its own HEAD. **It blocked three clean commits in one
+  session**, and, the half that matters, **would have passed a stale index in the
+  worktree actually being committed from without a word.** Now resolves
+  `cd` → `-C` → payload `cwd` → project dir, then `rev-parse --show-toplevel`.
+  `git -C <dir> commit` is CHECKED (it was skipped for "has its own index";
+  having your own index is not having a fresh one). **`--git-dir` /
+  `--work-tree` remain a KNOWN GAP** — index and tree decouple, so "is it still
+  on disk" has no single correct base. 13 tests on real repos
+  (`tests/test_commit_guard_worktree_index.py`); pre-fix 7 fail, post-fix 13 pass.
+- **`commit-guard` matches the COMMAND STRING**, so bundling a file write or a
+  `git reset` into the same command as `git commit` blocks the whole thing.
+  Separate them. `[recorded by another lane 2026-08-16]`
 - **THE ARCHIVE PASS ITSELF CREATES ORPHANS, and that is a second mechanism, not
   a repeat of the one below.** Moving a CLOSED lane to `lanes_closed.md` takes
   the header and whatever body existed AT THAT MOMENT; any bullet the owning
