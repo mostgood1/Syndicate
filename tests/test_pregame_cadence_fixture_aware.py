@@ -45,15 +45,16 @@ class FixtureAwareCadenceTests(unittest.TestCase):
 
     # ---- 2. the tiers ---------------------------------------------------
 
-    def _interval_with_fixture_in(self, hours: float | None, sport: str = "soccer") -> int:
+    def _interval_with_fixture_in(self, hours: float | None, sport: str = "mlb") -> int:
         target = None if hours is None else NOW + hours * HOUR
         with patch.dict(os.environ, {"SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE": "true"}, clear=True):
             with patch.object(loop, "_next_fixture_epoch", return_value=target):
                 return loop._pregame_sweep_interval_for_tick(sport, now_epoch=NOW)
 
     def test_far_fixture_drops_to_daily_heartbeat(self):
-        # The case that motivates the whole change: a European league whose next
-        # kickoff is days away must not sweep on MLB's peak.
+        # An idle single-league sport days from its next game must not keep
+        # sweeping every 2h. (Soccer motivated the change but is EXCLUDED at
+        # sport granularity -- see SoccerIsExcludedUntilPerLeagueScoping.)
         self.assertEqual(self._interval_with_fixture_in(72), 24 * 3600)
 
     def test_mid_fixture_gets_eight_hours(self):
@@ -65,13 +66,17 @@ class FixtureAwareCadenceTests(unittest.TestCase):
     def test_imminent_fixture_defers_to_the_t_window_ramp(self):
         # Inside 3h the T-75/T-10 ramp owns cadence, so the gate must fall back
         # to the baseline rather than inventing a competing number.
-        self.assertEqual(self._interval_with_fixture_in(1), 8 * 3600)
+        self.assertEqual(self._interval_with_fixture_in(1), loop._PREGAME_SWEEP_INTERVAL_FALLBACK)
 
-    def test_mls_in_its_own_evening_is_not_slowed(self):
-        # MLS kicks off in the US evening -- 94.6% of 111 fixtures. A clock-based
-        # rule would throttle it; a fixture-relative one must not.
+    def test_mls_is_protected_by_the_soccer_exclusion(self):
+        # MLS kicks off in the US evening -- 94.6% of 111 fixtures -- and a
+        # clock-based rule would throttle it. Today it is protected by soccer
+        # being excluded outright, so its cadence is the 8h baseline whatever
+        # the fixture clock says. WHEN 1c LANDS AND THE EXCLUSION IS REMOVED,
+        # this test must be rewritten to assert MLS keeps a FAST tier near its
+        # own kickoff -- do not simply delete it.
         self.assertEqual(self._interval_with_fixture_in(2, sport="soccer"), 8 * 3600)
-        self.assertEqual(self._interval_with_fixture_in(5, sport="soccer"), 2 * 3600)
+        self.assertEqual(self._interval_with_fixture_in(5, sport="soccer"), 8 * 3600)
 
     # ---- 3. unknown must not default permissive -------------------------
 
@@ -115,11 +120,13 @@ class FixtureAwareCadenceTests(unittest.TestCase):
         """`recommendation_engine` multiplies the BASELINE by 3 for a staleness
         ceiling. If the gate leaked into it, a far-out sport's 24h heartbeat
         would silently make a 72h-old recommendation read as fresh."""
+        # Uses mlb, not soccer: soccer is excluded from the gate, so it could
+        # not show the divergence this test exists to prove.
         env = {"SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE": "true"}
         with patch.dict(os.environ, env, clear=True):
             with patch.object(loop, "_next_fixture_epoch", return_value=NOW + 72 * HOUR):
-                self.assertEqual(loop._pregame_sweep_interval_seconds("soccer"), 8 * 3600)
-                self.assertEqual(loop._pregame_sweep_interval_for_tick("soccer", now_epoch=NOW), 24 * 3600)
+                self.assertEqual(loop._pregame_sweep_interval_seconds("mlb"), 2 * 3600)
+                self.assertEqual(loop._pregame_sweep_interval_for_tick("mlb", now_epoch=NOW), 24 * 3600)
 
 
 class NextFixtureResolverTests(unittest.TestCase):
@@ -157,6 +164,37 @@ class NextFixtureResolverTests(unittest.TestCase):
     def test_absent_schedule_yields_none_not_an_exception(self):
         with patch.object(loop, "fetch_schedule_for_date", side_effect=RuntimeError("no adapter")):
             self.assertIsNone(loop._next_fixture_epoch("ncaab", now_epoch=NOW))
+
+
+class SoccerIsExcludedUntilPerLeagueScoping(unittest.TestCase):
+    """Soccer must NOT ride the fixture gate at sport granularity.
+
+    Modelled against the real 2026 fixture lists over 336 hours: soccer's
+    sport-level clock is the MINIMUM gap across ten leagues, so the 24h tier is
+    reached in 0.0% of hours and the gate yields 5.08 sweeps/day against 3.00
+    today -- a 69% INCREASE, in both call volume and the MLB-peak overlap the
+    lane exists to remove. The benefit is entirely in per-league scoping (1c).
+
+    These tests exist so the exclusion cannot be dropped silently when 1c lands:
+    removing it must break a test that says why.
+    """
+
+    def test_soccer_ignores_the_gate_even_when_enabled(self):
+        with patch.dict(os.environ, {"SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE": "true"}, clear=False):
+            with patch.object(loop, "_next_fixture_epoch", return_value=NOW + 100 * HOUR) as spy:
+                # A 100h gap would be the 24h tier for any other sport.
+                self.assertEqual(loop._pregame_sweep_interval_for_tick("soccer", now_epoch=NOW), 8 * 3600)
+                spy.assert_not_called()
+
+    def test_a_single_league_sport_still_gets_the_gate(self):
+        # The control: same conditions, different sport, gate applies. Without
+        # this, a bug that disabled the gate entirely would pass the test above.
+        with patch.dict(os.environ, {"SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE": "true"}, clear=False):
+            with patch.object(loop, "_next_fixture_epoch", return_value=NOW + 100 * HOUR):
+                self.assertEqual(loop._pregame_sweep_interval_for_tick("mlb", now_epoch=NOW), 24 * 3600)
+
+    def test_soccer_baseline_interval_is_unchanged(self):
+        self.assertEqual(loop._pregame_sweep_interval_seconds("soccer"), 8 * 3600)
 
 
 if __name__ == "__main__":
