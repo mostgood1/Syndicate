@@ -5525,3 +5525,53 @@ in-pass measurement, which needs a deploy, which needs the clean window first.
   36 of 57 markets keep the pre-fix clock and 96 of 126 headline rows are pre-fix.
   **−0.3165 is a mixed-cohort number. First clean date is 2026-08-16.**
 - Generality beyond MLB **unmeasured** — no other sport resolved a row today.
+
+---
+
+## 2026-08-16 04:24:33Z — refresh-worker `5c419007` — ledger v2 — **DEPLOYED, NOT YET EXERCISED**
+
+Lane `live-game-line-projection`. `dep-da0jk261egvs738t0d10`, fired 04:18:16Z,
+live **04:24:33.598Z** (6m17s). Parented on the live SHA `f8ca54e1`, **not on
+main** — main is not an ancestor of it and 13 commits are live on this service
+and absent from `origin/main`.
+
+**The hold was cleared by evidence, not overridden.** `refresh-worker-oom-recurrence`
+banked its attribution as `9ed17262` (a ~2 GB **transient**, not a leak; `#435`
+did not regress) and archived. I asked that session for permission first; the
+retry came back "session is archived". **Residual cost recorded:** its clean
+window was 70 min old at 03:47Z and this deploy reset it to zero, which is what
+its still-open second question (naming the allocator inside the 2 GB pass) needs.
+
+**Sim discipline:** sims were launching back to back — pid 2441
+(`props_now_available`), then pid 3275 (`fingerprint_change`) for 11 minutes.
+Polled `check_deploy_safety.py` on **exit code 0**, deliberately not on a string,
+because `NOT CLEAR` contains `CLEAR` and a substring gate would have fired on
+every busy tick. Deployed inside the 04:17:23Z gap. **No sim killed.** No new
+`oomKilled` since 02:37:06Z as of 04:26Z.
+
+**MEASUREMENT — "no data yet", and that is the honest reading:**
+
+    artifact 04:22:51Z  PRE-deploy  (v1)  considered 4  projected 1  priceable 1
+                                          candidates 1  written 0  skipped_unchanged 1
+    artifact 04:25:14Z  POST-deploy (v2)  considered 0  projected 0  priceable 0
+                                          candidates 0  written 0  skipped_unchanged 0
+
+The slate ended between the two builds. **v2 is live and has had zero live rows
+to act on.** Nothing here says it behaves as intended. The test is the scheduled
+`live-gameline-ledger-check` at 20:30 Central on a full slate.
+
+### CORRECTION, and it is against my own claim from four hours earlier
+
+**"The recorder has never recorded a row" is FALSE.** The pre-deploy build reads
+`skipped_unchanged: 1`, and that counter can only be non-zero when a record with
+the same key and identical numbers is already on disk — `_moved(None, rec)`
+returns True, so an empty file always writes. **v1 wrote at least one row
+tonight**, sometime between 02:4xZ and 04:22Z, when a market cleared the bar.
+
+The handoff's "`written: 0` with `enabled: true` proves wiring, not behaviour"
+and my own "the ledger was never asked to write anything" were **true of the
+03:00Z build and false an hour later**. v2's premise survives — 1 priceable of 4
+considered is still a self-selected sample with no denominator — but the stronger
+claim that the recorder *structurally could not write* was wrong. **It was wrong
+because I generalised a single build to a whole night**, which is the same shape
+as this repo's standing rule about reading a null as a fact about the world.
