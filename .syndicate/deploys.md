@@ -8718,3 +8718,59 @@ forward artifact-build sizing does not move.
 `tests/test_layer2_soccer_window.py`: `test_the_shortlist_reads_every_window_date`
 and `test_one_unreadable_date_does_not_lose_the_others` fail identically at width
 5 — verified by stashing the change and re-running. Flagged to the Layer 2 lane.
+
+---
+
+### ask-answer-substance — HARNESS RE-RUN AFTER ALL SIX DEPLOYS (closes the open measurement)
+
+Run 2026-08-16 22:2xZ against live web `d8985df8`, output
+`reports/ask_regression/post_all_deploys_2026_08_16.json`, diffed per case
+against the same-slate control `control_pre_answer_substance_2026_08_16.json`.
+
+- **37/52 → 37/52, ZERO pass/fail flips.** Every class identical: advice 4/5,
+  entity 9/10, explain 4/6, history 2/5, lookup 8/8, ranking 7/10, refusal 3/8.
+  Diffed per case, because equal totals can hide offsetting flips.
+- **This closes the "harness not re-run since `ad77e46a`" obligation** recorded
+  in the checkpoint above. It is a non-regression result, not a win: `_score`
+  cannot see selection shape, units, price, sim terms, quote age or the panel,
+  which is most of what the six deploys changed.
+- Confound stated rather than elided: the control is 18:0xZ and this is 22:2xZ,
+  so the SLATE differs (108 board rows → 43). Zero flips across a slate change
+  is a stronger non-regression signal than zero flips on identical data, but it
+  is not a controlled A/B and cannot be made into one — production only ever
+  serves the current code.
+
+#### The one real change, and it is NOT mine
+
+`warn:edge_without_market_probability` **0 → 25**. Attributed before being
+reported, not after:
+
+- `git diff ebd5f677 d8985df8 -- ...adapter.py` shows the board path's `"edge"`
+  (`model_edge_pct`) and `"market_probability"` (`_board_row_probabilities`) are
+  **unchanged across all six deploys**. The harness reads only
+  `structured_response.top_opportunities`, i.e. exactly that path.
+- So the input changed. Measured on the live board: **4 of 10 edge-bearing rows
+  have a `model_edge_pct` that is not derivable from
+  `projection.{model_prob_over, market_fair_prob_over}` by EITHER the direct
+  difference or the complement.**
+
+      stated     direct    complement   row_side  proj_side   basis
+       12.45      31.91       -31.91      away      home      full/run_margin_dist
+       14.10     -49.70        49.70      over      over      full/total_runs_dist
+      -11.57       7.33        -7.33      over      over      full/total_runs_dist
+       14.84     -22.44        22.44      under     over      full/total_runs_dist
+
+  **Rows 2 and 3 rule out the side-convention explanation**: `row_side ==
+  proj_side == "over"`, so the direct difference should BE the edge, and it is
+  off by 64 and 19 points. The two quantities are inconsistent, all on
+  `full/*_dist` bases.
+
+- `_board_row_probabilities` returning `None` there is CORRECT — the house rule
+  is that a published probability is computed or absent, never invented. The
+  warning is that guard reporting an upstream inconsistency, so the right
+  response is to fix the board, not to silence the warning or to pick whichever
+  number looks plausible.
+- **THIRD board finding from this lane, handed to `layer2-board-quality`**
+  alongside `sim_component == 0.0` everywhere and the `projected`-vs-`side`
+  contradiction. Findings 2 and 3 may share a root cause in how `full/*_dist`
+  projections are joined to rows — **not tested, not claimed.**

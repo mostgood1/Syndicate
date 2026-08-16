@@ -1279,6 +1279,17 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   units, price, sim terms, quote age and the rendered panel. Four deploys on
   2026-08-16 changed all of those and could not move it. **A flat score is
   therefore not evidence of no effect, and a large jump would be suspicious.**
+- **Ask baseline RE-CONFIRMED after all six deploys, 22:2xZ on live `d8985df8`:
+  37/52, ZERO pass/fail flips vs the same-slate control, every class identical.**
+  `reports/ask_regression/post_all_deploys_2026_08_16.json`. One warning moved —
+  `edge_without_market_probability` 0 → 25 — and it is BOARD DATA, not the Ask
+  code: the board path's `edge`/`market_probability` are unchanged across all six
+  deploys (`git diff ebd5f677 d8985df8`), while **4 of 10 edge-bearing rows now
+  carry a `model_edge_pct` not derivable from
+  `projection.{model_prob_over, market_fair_prob_over}` by either the direct
+  difference or the complement** — including two rows where `row_side ==
+  proj_side` so no complement applies and the direct figure is off by 64 and 19
+  points. All `full/*_dist` bases. Owned by `layer2-board-quality`, notified.
 - **ASK ANSWER SUBSTANCE — LIVE web `d8985df8` (2026-08-16 21:59:38Z).** The
   deterministic panel now: names the bet a human can place (market, line, side,
   price, book — not "Ryan Johnson"); generates its own reason sentences from
