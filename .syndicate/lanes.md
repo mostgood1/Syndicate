@@ -71,7 +71,45 @@ rebuild a props snapshot when its inputs are newer, not just on force".
 - Blocked by: none.
 
 
-### ask-answer-substance — OPEN — opened 2026-08-16 — session: ask-answer-substance
+### ask-answer-substance — OPEN — **6 DEPLOYS SHIPPED AND MEASURED (web `d8985df8`). Panel names the bet, grounds it in the sim, filters non-positive edges, and reports real quote age. ONE BOARD DEFECT FOUND AND HANDED OFF, NOT CLOSED.** — opened 2026-08-16 — session: ask-answer-substance
+> **ASK-ANSWER-SUBSTANCE CHECKPOINT 2, 2026-08-16 22:0xZ.** Six deploys shipped
+> and measured today, all web-only, all cut from web's own live SHA. Live
+> `d8985df8`; `main` carries the code (`339e510b`) and the ledger (`18bfc6f8`).
+> Nothing of this lane is uncommitted — all four source files verified
+> byte-identical to `origin/main` BY BLOB (local HEAD is 6 behind; the `M` flags
+> are that gap).
+>
+> **Shipped:** the bet is nameable (market/line/side/price/book); reason
+> sentences generated from `projection.projected` + `model_skill`; the briefing
+> renders 5 not 3; `bet_analysis.edge` no longer publishes EV under the model
+> edge's name (same pick read 14.01 and 0.0139 on two surfaces); quote age
+> offset by artifact age and its threshold re-calibrated 15 -> 45 min; only
+> positive-edge rows published, with every edge term vetoing; the sim-vs-line
+> clause no longer asserts causation it cannot support.
+>
+> **NOT CLOSED, and the reasons are deliberate:**
+> 1. **A BOARD DEFECT WAS FOUND AND HANDED OFF.** `projection.projected` sits on
+>    the wrong side of `line` on 12-21 of 31-39 over/under rows, pregame as well
+>    as live. Handed to `layer2-board-quality` with the table. **Consequence they
+>    must expect: the panel now visibly says "does NOT support the {side}" on
+>    roughly a third to a half of over/under rows until it is fixed.**
+> 2. **`8172fdef` is INERT on production data** — proven by unit test only. Do
+>    not read a clean board as evidence it fired.
+> 3. **The harness has not been re-run since `ad77e46a`.** It is blind to
+>    everything the last four deploys changed, so this is low-value, but it is
+>    unmeasured and should be said rather than assumed.
+> 4. **CSS ships INLINE in `ask_bar.js`** because `board_cards.css` is held by
+>    `layer2-board-quality`. Move the `STYLE` const into the stylesheet when that
+>    lane closes.
+> 5. **A row can still publish model-positive with EV negative's opposite** —
+>    resolved for the both-positive case, but the underlying question of which
+>    term should win when they disagree is a product call, recorded in
+>    `deploys.md` under `ask-both-edges`.
+>
+> **Process, worth carrying:** a resumed session does NOT inherit its own lane
+> marker — it lands on the shared global `.current-lane` and `lane-guard.py`
+> blocks the first edit. Fix is the per-session slot the hook names in its own
+> error text (`.syndicate/.current-lane.<session-id>`), not closing the lane.
 - Goal: the inline quick ask names a bet a human can actually place and grounds
   it in the sim projection that is **already in the response payload**, instead
   of a bare name and one edge number. **Single testable outcome**, on the served

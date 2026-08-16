@@ -1266,14 +1266,44 @@ generalise but are not current state. `#377`, `#425`, `#429`.
 
 **The LLM is off by decision. The deterministic snapshot path is the product.**
 
-- **CURRENT BASELINE: 38/52** (advice 4/5, entity 9/10, explain 4/6, history 2/5,
-  lookup 8/8, ranking 7/10, refusal 4/8), measured 16:52Z on live `0bf866c3`, in
-  `reports/ask_regression/post_ask_sport_coverage_2026_08_15.json`.
+- **CURRENT BASELINE: 37/52** (advice 4/5, entity 9/10, explain 4/6, history 2/5,
+  lookup 8/8, ranking 7/10, refusal 3/8), measured 2026-08-16 18:0xZ and again
+  post-deploy with **zero pass/fail flips**, in
+  `reports/ask_regression/{control_pre,post}_answer_substance_2026_08_16.json`.
   `answer_source: snapshot` is the EXPECTED source, not a finding.
-  **Judge every future change against 38/52, and RE-MEASURE the baseline before
-  trusting it** — the previous recorded figure (23/52) was two deploys stale by
-  the time it was used, and had it been trusted a `refusal` regression from a
-  different lane would have been inherited as the new lane's own.
+  **This REPLACES the 38/52 recorded on 2026-08-15 — that figure was a different
+  day's slate and had expired.** Re-measure a same-slate control before judging
+  any change; a handed-down baseline is not a baseline.
+  **The harness cannot see most of what the panel does.** `_score` checks
+  refusal/routing/hallucination/certainty/50-50 and is blind to selection shape,
+  units, price, sim terms, quote age and the rendered panel. Four deploys on
+  2026-08-16 changed all of those and could not move it. **A flat score is
+  therefore not evidence of no effect, and a large jump would be suspicious.**
+- **ASK ANSWER SUBSTANCE — LIVE web `d8985df8` (2026-08-16 21:59:38Z).** The
+  deterministic panel now: names the bet a human can place (market, line, side,
+  price, book — not "Ryan Johnson"); generates its own reason sentences from
+  `projection.projected` and `model_skill` (the MLB game lens is the model);
+  publishes only rows where EVERY edge term it carries is positive; and reports
+  a quote age that advances. `_bet_label` mirrors `layer2_board._pick_label` and
+  is pinned by test — the two must not drift.
+- **`quote_seen_age_seconds` IS STAMPED AT ARTIFACT BUILD TIME AND DOES NOT
+  TICK.** Three reads of the live shortlist 45s apart returned byte-identical
+  ages (`mlb=[12.9, 39.8] wnba=[47.1]`) while `written_at` sat at 20:15:41Z.
+  **Every consumer of that field understates quote age by the artifact's own
+  age** — real age is `stamped + (now - written_at)`. Ask corrects for it; other
+  surfaces have not been checked. Its sibling `book_age_seconds` answers a
+  DIFFERENT question ("has the price moved") and the board gates on the seen
+  clock deliberately — see `layer2_board._row_quote_age_seconds`.
+- **THE BOARD PUBLISHES SIDES THAT CONTRADICT ITS OWN PROJECTION, AND IT IS NOT
+  RARE.** On `/api/board/layer2-shortlist`, `projection.projected` sits on the
+  opposite side of `line` from the row's `side` on **12 of 31 over/under rows on
+  one read and 21 of 39 on another minutes earlier** — across four `basis`
+  values (`full`, `model_mean`, `rbi_1plus`, `live_resim`) and on **pregame**
+  rows as well as live. Worst seen: `over 16.5` published with
+  `projected = 7.134`. **"A live full-game projection against a remaining-game
+  line" is REFUTED as the sole cause — it cannot explain the pregame rows.**
+  Owned by `layer2-board-quality`, notified. Ask now says "does NOT support the
+  {side}" on those rows rather than inventing a causal story.
 - **K1 SHIPPED AND VERIFIED** (`bef782cb`, live 20:01:18Z): 20/52 → 23/52,
   `refusal` 3/8 → 6/8, every other class byte-identical, declined-question
   latency 10.9s → 0.19s. **A refusal gate must be tested on what it must NOT

@@ -2975,3 +2975,75 @@ it**.
 record a hash as EVIDENCE of what was true, but must never present one as an
 INSTRUCTION to be followed later without re-reading. Name the branch and the
 files; let the reader resolve the hashes at cut time.
+
+## 2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 2: five beliefs overturned
+
+### REFUTED: "sorting the pool fixed the negative-edge problem"
+
+`_market_summary_schema` carried a note from 2026-08-03 — the summary "returned
+4 negative-edge rows with the only positive one (+16.9%) ranked LAST" — and the
+fix was to SORT. It shipped again on 2026-08-16: three of five published
+"opportunities" carried `model_edge_pct` of -1.83, -4.87, -8.20.
+
+**Sorting orders a pool; it does not decline to publish one.** Necessary, never
+sufficient. **General form: a fix aimed at the ORDER of bad output does not stop
+the output, and the note it leaves behind reads like a closed case.** When a
+past note says "fixed by ranking", check whether anything filters.
+
+### REFUTED: "mirroring the ranker makes eligibility safe"
+
+`_has_positive_edge` was deliberately written to mirror `_board_rank_key` — one
+term, model edge if present else EV — and the docstring justified it as "so
+ordering and eligibility cannot disagree". **That symmetry is what let a bad row
+through**: `Pittsburgh Pirates` published at model edge **+9.18%** with EV
+**-2.18%**.
+
+**Ranking needs ONE number to sort on. Eligibility is a VETO, and a veto should
+hear every term that can object.** Two different jobs; sharing one rule was the
+defect. The careful-looking choice was the wrong one.
+
+### REFUTED: "`quote_seen_age_seconds` is how stale the quote is"
+
+It is stamped at ARTIFACT BUILD time and **does not tick**. Three reads 45s apart
+returned byte-identical values while `written_at` sat 3 minutes back.
+**Corollary that bit twice: a threshold calibrated against a frozen quantity
+becomes meaningless the moment the quantity starts moving.** Correcting the age
+made the 15-minute threshold fire on **70 of 70** rows, because the minimum real
+age on the board is 27 minutes — an accurate warning carrying no information,
+strictly worse than the inaccurate one it replaced.
+
+**When you correct a quantity, re-check every threshold calibrated against it in
+the SAME change.** Shipping the correction alone is a regression wearing a fix.
+
+### REFUTED: "a generator that reads correctly on the rows I checked is correct"
+
+`_reason_sentences` asserted "which is why it lands on the under" without ever
+comparing the two numbers in that sentence. Served: *"projects 1.396 batter hits
+against a line of 0.5, which is why it lands on the under."*
+
+**The sibling row on the same board read perfectly** (0.256 against 0.5, under).
+The template only breaks when the projection falls on the FAR side of the line,
+so **half the output vindicates it**. A generator that is right half the time by
+construction survives any eyeball review of a handful of rows — it survived mine,
+and I wrote it that morning. **Test the PREDICATE over the whole population, not
+the rendering of a few rows.**
+
+### REFUTED (my own hypothesis, same session): "the sim-vs-side mismatch is a
+### live full-game-projection-vs-remaining-line artifact"
+
+Plausible, stated as "likely", and **wrong as the sole cause**: the disagreement
+appears on **pregame** rows too (`full` 0/1, `model_mean` 0/2, `rbi_1prus` 1/2
+agree/disagree with `is_live = False`), across four `basis` values.
+
+**What it changed in practice:** I weakened my own published wording from "the
+sim and this side disagree" to "does NOT support the {side}" — the first asserts
+the two numbers are comparable, which the pregame rows say I cannot promise.
+**Claim the arithmetic you can check, not the explanation you find convincing.**
+
+### Instrument note, not a belief: the Browser pane screenshot
+
+`computer{action:screenshot}` fails with a 5s timeout whenever the Browser pane
+is not DISPLAYED on the user's screen — the page composites no frames. This is
+not transient and retrying is waste; 4 attempts across the session, 0 successes.
+`javascript_tool` + `read_page` work fine and are the fallback for proving what
+a page renders.
