@@ -1891,3 +1891,32 @@ match count.
   is the dangerous shape.
 - *(evidence: `#440` plan Phase 1 cost-check section; lane `odds-cadence-off-the-mlb-peak`;
   fix `8640f872`)*
+
+### 2026-08-16 — FORBIDDEN: bundling a file write or a `git reset` into the same command as `git commit`
+
+The `commit-guard` PreToolUse hook matches the COMMAND STRING and blocks the
+whole thing. Twice in one session I wrote:
+
+    cat > file <<EOF ... EOF        # then, same command:
+    ... git commit ...
+
+and once:
+
+    git reset -- <path> ; ... git commit ...
+
+Both were blocked, and **the non-commit half never ran**. The second case looked
+especially convincing: the guard's own refusal text says to run `git reset`, so
+I put the reset and the retry in one command — and it blocked again, identically,
+because the string still contained `git commit`. The file in the first case did
+not exist afterwards, and the next command failed with `pathspec did not match`,
+which reads like a git problem rather than a hook problem.
+
+**The rule going forward:** a command containing `git commit` may contain
+NOTHING ELSE that must survive a refusal. Writes, `git reset`, `git add` of
+unrelated paths — separate calls. A blocked command is all-or-nothing, so
+anything bundled with the commit shares its fate.
+
+Corollary already paid for elsewhere in this session: `[ cond ] || { echo ABORT; }`
+placed after an `&&` chain reports ABORT when an EARLIER link failed, so the
+abort message names the wrong cause. Check the actual failure before believing
+the guard rail that fired.
