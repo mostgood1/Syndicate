@@ -991,9 +991,40 @@ def _reason_sentences(
         # replay over the live board.
         unit = str(facts.get("market_label") or "").strip() if row.get("player_name") else ""
         unit_text = f" {unit}" if unit else ""
+        # **DOES THE PROJECTION ACTUALLY SUPPORT THIS SIDE?** "which is why it
+        # lands on the under" is a CAUSAL claim, and it was being made without
+        # ever comparing the two numbers it names. Served 21:4xZ:
+        #
+        #     "The simulation projects 1.396 batter hits against a line of 0.5,
+        #      which is why it lands on the under."
+        #
+        # 1.396 is above 0.5 -- that projection argues for the OVER. Wade
+        # Meckler, `basis=live_resim`. The sibling row (Kyle Isbel, 0.256
+        # against 0.5, under) was correct, which is exactly why this survived
+        # review: the template only breaks when the projection falls on the
+        # opposite side of the line from the bet.
+        #
+        # The disagreement is REPORTED, not suppressed, and the wording claims
+        # ONLY the arithmetic. An earlier draft said "the sim and this side
+        # disagree"; that asserts the two numbers are comparable, and measuring
+        # the board showed I cannot promise it. Disagreement spans live AND
+        # pregame rows and four different `basis` values (`full`, `model_mean`,
+        # `rbi_1plus`, `live_resim`), at 12-21 of 31-39 over/under rows across
+        # two reads minutes apart. A live full-game projection sitting against a
+        # remaining-game line would explain the live rows and does NOT explain
+        # the pregame ones.
+        #
+        # So this states what is checkable -- 1.396 is not below 0.5 -- and
+        # stops. Whether the projection or the published side is wrong is a
+        # board question, flagged to `layer2-board-quality`, whose stated goal
+        # is that the board never contradicts the sim.
+        supports = projected > line if side == "over" else projected < line
+        clause = (
+            f"which is why it lands on the {side}" if supports
+            else f"which does NOT support the {side}"
+        )
         parts.append(
-            f"The simulation projects {projected:g}{unit_text} against a line of {line:g}, "
-            f"which is why it lands on the {side}."
+            f"The simulation projects {projected:g}{unit_text} against a line of {line:g}, {clause}."
         )
     elif projected is not None and side in ("over", "under"):
         parts.append(f"The simulation projects {projected:g}, on the {side} side.")
@@ -1011,7 +1042,7 @@ def _reason_sentences(
     price, book = facts.get("price"), facts.get("bookmaker")
     if price is not None and book:
         books = facts.get("books_quoting")
-        agree = f", {books} books quoting" if books else ""
+        agree = f", {books} book{'s' if books != 1 else ''} quoting" if books else ""
         parts.append(f"Best bettable price {price:+g} at {book}{agree}.")
 
     # 4. Has this model ever been checked? See `_sim_terms`.

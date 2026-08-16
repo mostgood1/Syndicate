@@ -776,3 +776,81 @@ def test_an_empty_result_explains_itself():
 def test_singular_plural_on_one_excluded_row():
     text = adapter._board_summary_sentence([], excluded_negative=1)
     assert "1 row with a non-positive edge was left out." in text
+
+
+# --------------------------------------------------------------------------
+# 9. "which is why it lands on the under" is a CAUSAL claim.
+#
+# Served 2026-08-16 21:4xZ, verbatim:
+#   "The simulation projects 1.396 batter hits against a line of 0.5,
+#    which is why it lands on the under."
+# 1.396 is ABOVE 0.5 -- that projection argues for the OVER. The template
+# asserted causation without ever comparing the two numbers it names. The
+# sibling row (0.256 against 0.5, under) was correct, which is why it survived:
+# it only breaks when the projection falls on the far side of the line.
+# --------------------------------------------------------------------------
+
+# Verbatim production rows, 21:4xZ, `/api/board/layer2-shortlist`.
+MECKLER_ROW = {
+    "player_name": "Wade Meckler", "market": "batter_hits", "line": 0.5, "side": "under",
+    "sport": "mlb", "ev_pct": 5.2017, "model_edge_pct": None,
+    "projection": {"projected": 1.396, "side": "over", "basis": "live_resim",
+                   "model_prob_over": None, "market_fair_prob_over": 0.2757},
+    "quote": {"price": -160, "bookmaker": "betmgm", "books_quoting": 1,
+              "quote_seen_age_seconds": 120.0},
+}
+ISBEL_ROW = {
+    "player_name": "Kyle Isbel", "market": "batter_runs_scored", "line": 0.5, "side": "under",
+    "sport": "mlb", "ev_pct": 5.2046, "model_edge_pct": None,
+    "projection": {"projected": 0.256, "side": "over", "basis": "live_resim",
+                   "model_prob_over": None, "market_fair_prob_over": 0.208},
+    "quote": {"price": -210, "bookmaker": "betmgm", "books_quoting": 1,
+              "quote_seen_age_seconds": 120.0},
+}
+
+
+def _reason(row):
+    return adapter._reason_sentences(
+        row, adapter._bet_facts(row), adapter._sim_terms(row),
+        model_pct=None, market_pct=None, edge_pct=None,
+    ) or ""
+
+
+def test_a_projection_on_the_far_side_of_the_line_is_not_a_reason_for_the_bet():
+    """The exact served defect. 1.396 vs a 0.5 line cannot explain an under."""
+    text = _reason(MECKLER_ROW)
+    assert "which is why it lands on the under" not in text
+    assert "which does NOT support the under" in text
+    # the numbers are still reported -- the disagreement is surfaced, not hidden
+    assert "1.396" in text and "0.5" in text
+
+
+def test_an_agreeing_projection_still_reads_as_the_reason():
+    """The sibling row must not regress -- 0.256 below 0.5 does explain an under."""
+    text = _reason(ISBEL_ROW)
+    assert "which is why it lands on the under" in text
+    assert "does NOT support" not in text
+
+
+@pytest.mark.parametrize("side,line,projected,supports", [
+    ("over", 2.5, 3.951, True),    # above the line, betting over
+    ("over", 2.5, 1.900, False),   # below the line, betting over
+    ("under", 0.5, 0.256, True),   # below the line, betting under
+    ("under", 0.5, 1.396, False),  # the Meckler case
+])
+def test_support_is_decided_by_the_two_numbers_named(side, line, projected, supports):
+    row = dict(MECKLER_ROW, side=side, line=line,
+               projection=dict(MECKLER_ROW["projection"], projected=projected))
+    text = _reason(row)
+    assert (f"which is why it lands on the {side}" in text) is supports
+    assert ("does NOT support" in text) is not supports
+
+
+def test_one_book_is_singular():
+    assert "1 book quoting" in _reason(ISBEL_ROW)
+    assert "1 books quoting" not in _reason(ISBEL_ROW)
+
+
+def test_several_books_stay_plural():
+    row = dict(ISBEL_ROW, quote=dict(ISBEL_ROW["quote"], books_quoting=5))
+    assert "5 books quoting" in _reason(row)
