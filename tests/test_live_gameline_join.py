@@ -33,11 +33,22 @@ from syndicate.features.shared.live_gameline_join import (
 
 
 class TestProbStdErr:
-    def test_matches_the_spec_table_at_120_sims(self):
-        """The number the whole decision rests on: ±4.56 pp at p=0.5, n=120."""
-        assert prob_std_err(0.5, 120) == pytest.approx(0.04564, abs=1e-5)
-        assert prob_std_err(0.75, 120) == pytest.approx(0.03953, abs=1e-5)
-        assert prob_std_err(0.90, 120) == pytest.approx(0.02739, abs=1e-5)
+    def test_agresti_coull_near_the_spec_table_at_120_sims(self):
+        """Add-two smoothing, so these sit just inside the Wald figures the spec
+        quotes (0.04564 / 0.03953 / 0.02739). The decision's ~4.5 pp headline
+        survives; the boundary behaviour is what changed."""
+        assert prob_std_err(0.5, 120) == pytest.approx(0.0449, abs=1e-4)
+        assert prob_std_err(0.75, 120) == pytest.approx(0.0392, abs=1e-4)
+        assert prob_std_err(0.90, 120) == pytest.approx(0.02842, abs=1e-4)
+
+    @pytest.mark.parametrize("p", [0.0, 1.0])
+    def test_the_boundary_is_never_zero_width(self, p):
+        """THE DEFECT THIS FIX EXISTS FOR. Wald gives 0.0 at p in {0,1}, so the
+        2-sigma bar became 0 and EVERY edge cleared it. 0/120 and 120/120 are
+        ordinary Monte Carlo outcomes, so this fired on a live slate."""
+        se = prob_std_err(p, 120)
+        assert se is not None and se > 0.0
+        assert se == pytest.approx(0.01131, abs=1e-4)
 
     def test_scales_as_one_over_sqrt_n(self):
         assert prob_std_err(0.5, 2500) == pytest.approx(0.01, abs=1e-4)
@@ -220,8 +231,8 @@ class TestIndexAndAttach:
                           "simsRun": sims, "projection": {"total": 8.5, "homeMargin": 0.7}}],
         }]}
 
-    def _row(self, state="live", market="h2h", kind="game", market_prob=0.50):
-        return {"kind": kind, "market": market,
+    def _row(self, state="live", market="h2h", kind="game", market_prob=0.50, segment="full"):
+        return {"kind": kind, "market": market, "segment": segment,
                 "away_team": "Colorado Rockies", "home_team": "San Francisco Giants",
                 "game": {"state": state},
                 "projection": {"market_fair_prob_over": market_prob,
@@ -386,3 +397,59 @@ class TestBuildGameLensStampsSimsRun:
         assert got is not None and got["sims_run"] == 120
         v = price_moneyline(model_prob=got["home_win_prob"], market_prob=0.50, sims=got["sims_run"])
         assert v["withheld_reason"] != REASON_UNUSABLE_SIMS
+
+
+class TestSegmentFilter:
+    """A full-game projection may only be priced against a full-game market.
+
+    Measured 2026-08-16, SD @ CLE: the same h2h market appears once per segment,
+    and the live re-sim's home win probability (0.9667, full game) was priced
+    against every one of them -- including `first1` at mkt 0.5424, producing a
+    **+42.43 pp** edge that is purely the mismatched segment. The full-game row
+    for the same game and tick was +9.17 pp.
+    """
+
+    def _snapshot(self):
+        return {"games": [{
+            "gamePk": 824400, "status": {"abstract": "Live"},
+            "matchup": {"away": {"name": "San Diego Padres"},
+                        "home": {"name": "Cleveland Guardians"}},
+            "gameLens": [{"key": "live", "source": "live_mc", "modelHomeWinProb": 0.9667,
+                          "simsRun": 120, "projection": {"total": 7.5, "homeMargin": 0.7}}]}]}
+
+    def _row(self, segment, market_prob):
+        return {"kind": "game", "market": "h2h", "segment": segment,
+                "away_team": "San Diego Padres", "home_team": "Cleveland Guardians",
+                "game": {"state": "live"},
+                "projection": {"market_fair_prob_over": market_prob}}
+
+    def test_the_first_inning_row_is_refused_by_name(self):
+        grid = [self._row("first1", 0.5424)]
+        cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
+        assert cov["rows_live_gameline_edged"] == 0
+        assert cov["withheld_by_reason"] == {"segment_is_not_full_game": 1}
+        assert "live_gameline" not in grid[0]
+
+    def test_the_full_game_row_still_prices(self):
+        grid = [self._row("full", 0.8750)]
+        cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
+        assert cov["rows_live_gameline_edged"] == 1
+        assert grid[0]["live_gameline"]["edge_pp"] == pytest.approx(9.17, abs=0.01)
+
+    @pytest.mark.parametrize("segment", ["first1", "first3", "first5", "", None, "unknown"])
+    def test_every_non_full_segment_including_ABSENT_is_refused(self, segment):
+        """An absent segment refuses too: unknown must not default permissive."""
+        grid = [self._row(segment, 0.8750)]
+        cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
+        assert cov["rows_live_gameline_edged"] == 0
+        assert cov["withheld_by_reason"] == {"segment_is_not_full_game": 1}
+
+    def test_the_production_case_end_to_end(self):
+        """All four SD @ CLE rows: exactly one prices, and it is the full game."""
+        grid = [self._row("full", 0.8750), self._row("first5", 0.8856),
+                self._row("first3", 0.8993), self._row("first1", 0.5424)]
+        cov = attach_live_gamelines(grid, build_live_gameline_index(self._snapshot()))
+        assert cov["rows_live_gameline_considered"] == 4
+        assert cov["rows_live_gameline_edged"] == 1
+        assert cov["withheld_by_reason"] == {"segment_is_not_full_game": 3}
+        assert grid[3].get("live_gameline") is None   # the +42pp row is gone
