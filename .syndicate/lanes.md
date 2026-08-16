@@ -3136,3 +3136,31 @@ and then failed the thing it was checking, which is the point of running it.
   line was treated as ground truth when the tie structure is the only model-free
   evidence available.
 - Blocked by: none
+### layer1-board-coverage — UPDATE 2026-08-16 17:5xZ — **DEPLOYED AND FALSIFICATION TEST PASSED. Supersedes this lane's "UNDEPLOYED" line above.**
+- Two deploys to **refresh-worker** (`srv-d91dpertqb8s73co8ls0`), both cut on the
+  LIVE SHA rather than `main` — `main` did not contain the worker's lineage (22
+  commits incl. another session's `#441` diagnostic), so deploying it would have
+  rolled all of them back. `01a4b83e` live 17:26:25Z, `f88796a9` live 17:40:50Z.
+  Web deliberately NOT deployed: `/api/board/layer1` is a pure read and the
+  `projection` field is written at artifact-build time, so a web deploy would
+  have been inert.
+- **RUN 1 FAILED, and that is the result worth keeping.** mlb 284 → 0
+  unattributed; **3 WNBA `game|h2h|full` rows did not move.**
+  `wnba_game_projections.py:208` writes `row["projection"]` DIRECTLY and never
+  passes through `attach_projections` — a **fourth producer**, exactly the shape
+  the brief warned about for `fair_price`. My pre-deploy replay proved the
+  HELPER (I supplied its arguments) and never asked whether production calls it.
+  New learnings entry: *a replay proves the FUNCTION; only the call path proves
+  the FIX.*
+- Fixed at that producer (`f88796a9`). **RUN 2 PASS: RESIDUAL 0 across 10,692
+  rows**, all three in-season sports, on artifacts stamped after the deploy.
+  Confirmed on a SECOND independent build (17:46–17:48Z), also 0.
+- Regression check: edges still served — mlb 867 / wnba 326 / soccer 528, none
+  created or removed. **mlb's edged count fell 1,462 → 867 and that is NOT this
+  change**: `by_state` went `{live 1, pregame 14}` → `{live 8, pregame 7}` and
+  the live-edge refusal rose 65 → 697 to match. Re-read on a pregame slate.
+- Another session's deploy `b9f2b5f1` went out on top at ~17:5xZ; checked by
+  content AND ancestry — `f88796a9` is an ancestor and both fixes are present,
+  so this work survives it.
+- **Lane STAYS OPEN** for the one unmeasured goal: the cross-sport LIVE A/B needs
+  two sports live at once. Everything else in the audit is delivered.
