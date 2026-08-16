@@ -23,6 +23,7 @@ from flask import current_app
 
 from pipeline.intelligence_entrypoint import run_routed_intelligence_pipeline
 from pipeline.intelligence_pipeline import run_intelligence_pipeline
+from syndicate.features.shared.opportunity_signals import american_price
 from syndicate.features.intelligence import build_intelligence_status
 from syndicate.features.intelligence import build_intelligence_overview
 from syndicate.features.intelligence import _build_board_dictionary
@@ -1814,12 +1815,21 @@ def _backfill_layer2_board_columns(card: dict[str, Any]) -> None:
 
     fair_probability = _num(quote.get("fair_probability"))
     if fair_probability is not None and card.get("fair_price") is None:
-        prob = max(0.02, min(0.98, fair_probability))
-        card["fair_price"] = (
-            round(-100.0 * prob / max(0.001, 1.0 - prob), 0)
-            if prob >= 0.5
-            else round(100.0 * (1.0 - prob) / max(0.001, prob), 0)
-        )
+        # Delegated to the owner of this concept rather than kept inline. This
+        # was an INLINE copy of the 2%-98% clamp -- no `def`, so the board-engine
+        # audit's count of 42 probability sites never saw it, and it was the
+        # producer behind the one misprice Tier 3a confirmed in production
+        # (mlb totals under, fair_probability 0.992056, published -4900 against
+        # a correct -12488). See
+        # `.syndicate/audit_2026-08-15_probability_differential.md`.
+        #
+        # `american_price` refuses a probability outside (0, 1) instead of
+        # clamping it, so the key is left ABSENT rather than set to a wrong
+        # number -- which is what the rest of this backfill already does for
+        # everything it cannot recover honestly.
+        fair_price = american_price(fair_probability)
+        if fair_price is not None:
+            card["fair_price"] = fair_price
 
     ev_pct = _num(card.get("ev_pct"))
     if ev_pct is not None:
