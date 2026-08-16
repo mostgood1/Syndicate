@@ -6,7 +6,129 @@
 
 ## OPEN
 
-### closing-stamp-is-detection-time — OPEN — **FIXED AND DEPLOYED (`325b2822`, workers 23:1xZ); stamp is now the price's observation time, detection kept as `closing_detected_at`. OUTPUT UNVERIFIED — forward-only, today's stamps unrecoverable** — opened 2026-08-15 — session: lane-cleanup
+### sim-engine-phase0-census — OPEN — **H1/H2/H3 ALL SETTLED. Only the multi-hour memory baseline still owed** — opened 2026-08-15 — session: sim-engine-track
+- Goal: produce the four Phase 0 measurements in `.syndicate/plan_2026-08-16_sim_scheduling.md`
+  so Phase 1 has a baseline it did not inherit. Read-only; no production code, no deploy.
+- Files (exclusive to this lane): `scripts/census_kickoff_hours.py` (new),
+  `.syndicate/plan_2026-08-16_sim_scheduling.md`. Collision check RUN against all
+  7 OPEN lanes (38 claimed paths): CLEAR on both.
+- Hypotheses, written BEFORE testing (this lane is diagnostic):
+  - H1 — every sport's pregame work lands uniformly across 24h, because cadence is
+    elapsed-time not fixture-relative. Soccer's European leagues kick off 07:00-16:00 CT
+    and MLS 19:00-22:00 CT.
+  - H2 — the live-lens loop ticks on BOTH workers, duplicating mlb/wnba/soccer every 60s.
+    Read from config only; unproven.
+  - H3 — production basketball sims run the real vendor engine, not
+    `_simulate_smart_game_local` (the no-sampling stub reached by a bare `except`).
+- Falsification tests:
+  - H1 fails if kickoff hours are already uniform across the day, or if European
+    kickoffs sit in the US evening — then the peak overlap is not a cadence artifact.
+  - H2 fails if only one worker emits `[live_lens_loop] TICK_COMPLETE`.
+  - H3 fails if a live `smart_sim_*.json` carries no `score` key — the stub ran, and
+    every basketball probability in production is a means-sum with no MC behind it.
+- Verification: each hypothesis recorded in the plan with the measurement that settled
+  it, INCLUDING exoneration. A hypothesis that survives is recorded as unfalsified,
+  not as confirmed.
+- Blocked by: none. Feeds `odds-cadence-off-the-mlb-peak` (SCOPED, unstarted) — that
+  lane owns Phase 1; this one does not touch its files.
+- Governing rules read before starting: `FORBIDDEN: never run a heavyweight census ON
+  the thread that is doing the measuring` (the census is an offline script, not worker
+  work); `EXONERATED: the soccer window is not the egress cause` (pull any metric back
+  far enough to see whether the symptom predates the change).
+
+
+#### RESULTS 2026-08-15 evening CDT — two of four measurements done
+- **H3 UNFALSIFIED — the real engine runs in production.** 3/3 WNBA artifacts
+  (`smart_sim_2026-08-15_{LVA_MIN,WSH_LAS,CON_NYL}.json`, pulled via
+  `/api/ops/artifacts/stream`) carry `score`/`intervals`/`periods`/`rotation_minutes`
+  and NOT the stub's `home_team_total_pts_mean`. The §2.2 OWED item closes with the
+  reassuring answer: the bare-`except` fallback is not firing.
+  - Path gotcha for repeats: files are at `wnba_source/data/processed/`, NOT
+    `.../source_artifacts/data/processed/` (404s). Both are listed as candidate roots.
+- **H3b — n_sims=100 confirmed ON THE ARTIFACT, and the cost is visible in the
+  output.** All 9 served probabilities across the 3 games are exact multiples of
+  0.01 (0.25/0.29/0.59, 0.66/0.55/0.73, 0.14/0.25/0.46) because each is a count out
+  of 100 draws. Binomial SE at p=0.25 is ±4.3 pts — the size of the edges priced.
+- **H2 CONFIRMED BY LOG, no longer config-inferred.** `TICK_COMPLETE`
+  02:21Z-03:13Z: refresh-worker 31 ticks {mlb,wnba,soccer,nfl}, live-odds-worker
+  38 ticks {mlb,wnba,soccer}. **mlb/wnba/soccer built on BOTH** — 69 MLB builds/hr
+  where one owner needs ~35. Cycles run ~100s/~81s against a 60s interval, so the
+  tick itself costs ~20-40s. Makes Phase 4.1 a prerequisite, not a nicety.
+- **STILL OWED: H1 (kickoff-hour census) and the baseline re-take.** H1 is the one
+  that sizes Phase 1; nothing about cadence should be changed before it runs.
+- No code changed, no deploy, no production write. `scripts/census_kickoff_hours.py`
+  claimed but not yet created.
+
+#### H1 SETTLED 2026-08-15 — 0 of 200 European kickoffs are in the US evening
+- `scripts/census_kickoff_hours.py` (new, this lane) ->
+  `reports/kickoff_census/latest.json`. Window 2026-07-16..2026-08-29, CT.
+- **Falsification test did not fire.** 9 European leagues, n=200, hours 5..14 CT,
+  **0.0%** in the 18:00-01:00 band and ZERO fixtures at any hour after 14:00.
+  MLS n=111 at 94.6% (the named exception, now confirmed from fixtures rather
+  than from process cmdlines). mlb n=605 53.6%, wnba n=117 84.6%,
+  nfl_preseason n=49 71.4%.
+- **CORRECTED THIS PLAN'S OWN BAND TABLE.** It guessed European soccer at
+  01:00-09:00 CT; measured is 05:00-14:00, and US fixtures start at 11:00, so a
+  real 11:00-14:00 contested band exists that the guess denied. A hardcoded
+  "soccer in the morning" rule would have been built on the wrong hours --
+  which is the argument for fixture-relative rather than band-relative gating.
+- **TWO ERRORS OF MINE, caught and recorded rather than quietly fixed:**
+  1. I read nflverse `gametime` as US/Eastern. It is UTC. The tell was an
+     implausible 22:00 CT median; verified against the Hall of Fame Game
+     (2026-08-07 `00:00` UTC = 20:00 ET Thu) and DET@CIN (`23:00` = 18:00 CT)
+     before correcting. I had written a comment warning about this exact shift
+     and made it anyway.
+  2. The script's attributable-zero branch conflated "schema miss" with "no
+     fixtures in window", so regular-season NFL (season starts after the window)
+     reported as a parser failure. Now three distinct outcomes.
+- Still owed: the hour-by-hour both-branches-live MEMORY baseline. Needs a
+  multi-hour observation window; not doable in one pass, should run as a
+  scheduled watcher. **Phase 1 must not be judged against the lane's existing
+  2026-08-16 table without re-taking it.**
+
+### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
+- **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
+  - **`closing_detected_at` is present on 21 markets. The new code path ran.**
+    Source: the RAW shard `mlb_source/artifacts/mlb/odds_history/2026-08-15.json`
+    via `/api/ops/artifacts/stream` (46,317,328 B, `last-modified` 02:51:45Z).
+  - **DO NOT RE-RUN THIS CHECK ON `/api/ops/odds-history/inspect`. IT CANNOT SEE
+    THE FIELD.** That handler (`syndicate/blueprints/ops.py:2141`) builds each
+    market summary from a **fixed 10-key literal** — `stored_market_id`,
+    `last_line`, `last_odds`, `history_points`, `history_first`, `history_last`,
+    `is_live`, `closing_line`, `closing_price`, `closing_captured_at`. There is
+    no `closing_detected_at` key in it. The union of keys over all 3,574 returned
+    markets confirms it: the field is absent from the response **regardless of
+    what is on disk**. A `0` from `inspect` is instrument blindness. The earlier
+    `00:3xZ` "zero of 51" reading was almost certainly taken this way (the
+    handover names `inspect` as the step-1 endpoint), which — if so — means it
+    was never evidence either way, independently of the no-opportunity argument
+    already recorded. Not asserted as fact: I did not observe that run.
+  - **THE ASSERTION, on the 21 new-code stamps:** `closing_captured_at <=
+    commence_time` on **21 of 21**, none post-dating. Lead time min 1.1 min,
+    median 75.3 min, max 103.9 min.
+  - **THE CONTROL, in the same payload:** of the 36 stamped markets WITHOUT
+    `closing_detected_at` (pre-fix), **33 post-date `commence_time`** and 3 do
+    not. So the handed-down baseline "EVERY stamped close had
+    `close_age_seconds < 0`" is very nearly right but **not literally true at the
+    shard level — it is 33/36, not 36/36.** Stated because a claim of
+    universality invites a future reader to treat a single passing pre-fix stamp
+    as a fix.
+  - **ATTRIBUTED AT THE CLV-ROW LEVEL** (join `event_id|market|matched_bookmaker`,
+    confirmed by `close_captured_at` identity — note the row's `bookmaker` is the
+    OPENING book, `matched_bookmaker` is the close's book; joining on the wrong
+    one produced `NEW=0, unjoined=48` on the first pass and would have read as a
+    failed fix):
+    - rows off **NEW-code stamps: 30 — all 30 `pregame`, 0 `in_play`**
+    - rows off **OLD stamps: 31 — 26 `in_play` (84%), 5 `pregame`**
+    - 6 unjoined.
+  - **COUNTERFACTUAL:** headline without the 30 re-entered rows would read
+    **n=96, −0.3998**; with them it reads **n=126, −0.3165**. The 30 new rows
+    average **−0.0499**, i.e. genuine pregame closes are materially better than
+    the rows the old code left in.
+  - **STILL FORWARD-ONLY.** The stamp is idempotent on `closing_line`, so the 36
+    pre-fix markets are permanently wrong and 2026-08-15 is a mixed date forever.
+    Generality beyond MLB is UNMEASURED — nfl/wnba resolved 0 rows today, so no
+    other sport exercised this path.
 - **DISCRIMINATOR RUN 2026-08-15 22:0xZ on the `-186 -> +168` row. RESULT: NEITHER
   ORIGINAL BRANCH. The price is not stale and the clock is not the main problem —
   IT IS THE WRONG SIDE'S PRICE.**
@@ -409,6 +531,47 @@
   invert every spread join instead of fixing it.
 
 ### clv-without-settlement — OPEN — **GOAL RE-SCOPED 2026-08-15 23:5xZ: `clv_pct` PER RECOMMENDATION ALREADY EXISTS; THE GAP IS EXPOSURE, AND THE PREDICTION LEDGER IS THE WRONG SUBSTRATE** — opened 2026-08-14 — session: lane-cleanup
+- **SETTLED CLV READING 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read,
+  taken after the last two first pitches at 01:38Z and 01:40Z).**
+  - **mlb headline: `avg_clv_pct = −0.3165` over `same_book_n = 126`,
+    `beat_close_rate = 0.2143` (27/126).** `openings 999`, `resolved 254`,
+    `same_book_all_n 151`, `in_play_excluded_n 25`,
+    `unknown_timing_excluded_n 0`, `stamped_close_skipped
+    {stamped_close_is_home_side: 59}`, `by_close_source {last_pregame_quote 187,
+    observed_transition 67}`, `unresolved_reasons {no_market_in_history 368,
+    no_pregame_observation 246, close_precedes_open 113, line_mismatch 18}`.
+  - `by_close_timing`: pregame n=126 −0.3165 · in_play n=25 −0.3498.
+  - `by_book_scope`: same_book n=151 −0.322 · book_agnostic_close n=92 **+2.8054**
+    · different_book_close n=10 **+0.7011**. **The two positives are the known
+    upward bias (best-of-N opening vs one book's close). NOT CLV. Never quote.**
+  - **INSTRUMENT CHECK PASSED.** Recomputed the headline from `&rows=1`: mean
+    `clv_pct` over rows with `close_book_scope == same_book` AND `close_timing ==
+    pregame` = **−0.316519 → −0.3165 over n=126**, exact match on both the value
+    and the n. `beat_close` recomputed 27/126 = 0.2143, also exact. The report is
+    reporting what it says it reports.
+  - **`same_book_n` DID NOT RISE — and the prediction was not testable as
+    written.** It reads 126 against the last preliminary reading's 151. But the
+    prior readings (−0.0711 n=144, −0.668 n=167, −0.3077 n=131, −0.2714 n=151)
+    are mid-slate headline `n` only; I do not hold their payloads, and `n` moves
+    with how many games have started, how many stamps landed, and the 59
+    `stamped_close_is_home_side` skips. **A raw `n` comparison across hours is
+    confounded and I am not treating 126 < 151 as a regression OR as a
+    refutation.** The mechanism the prediction was about IS confirmed, on the
+    within-payload counterfactual: **30 rows that the old code would have
+    excluded as `in_play` are in the headline** (n=96 → n=126, −0.3998 →
+    −0.3165). See `closing-stamp-is-detection-time` for the attribution.
+  - **nfl and wnba UNCHANGED: `resolved = 0`.** `openings` 419 / 111,
+    `unresolved_reasons` **100% `no_market_in_history`** for both (419/419,
+    111/111). **This is NOT the blind-reader pattern** — the openings ledger is
+    readable (`/api/ops/artifacts/export?pattern=reports/intelligence/clv_openings/*.jsonl&names_only=1`
+    → `2026-08-15.jsonl` 1,126,475 B, mtime 02:20:33Z). Openings are recorded and
+    visible; the join fails because odds-history holds no matching market for
+    them. That is a separate, unowned gap.
+  - **CONTAMINATION, stated not glossed:** both fixes are FORWARD-ONLY and shipped
+    ~23:17Z, so this date is permanently mixed. **36 of 57 stamped markets carry
+    the pre-fix clock** (33 of them post-dating first pitch), and 96 of the 126
+    headline rows are pre-fix. **−0.3165 is a mixed-cohort number.** The first
+    clean reading is 2026-08-16.
 - **MEASURED BEFORE BUILDING, and it stopped the build:**
   - `/api/portfolio/summary`: **3 prediction records**, all sport `multi`,
     `settled: 0`, `avg_clv: null`. That is the whole ledger.
@@ -1243,6 +1406,86 @@ session's claim. **No claims held; refresh-worker and live-odds-worker are free.
 does the ledger grow only on movement, and do the surviving edges beat a sharp
 close. **That is evaluation, not plumbing.** The plumbing is done.
 
+### refresh-worker-oom-recurrence — OPEN — **ATTRIBUTED, NO DEPLOY MADE. `#435` did NOT regress (`c67f7373` is an ancestor of live `f8ca54e1`; the ledger's `2,869 -> 1,071` is the book_quotes READ, not container anon — different quantities). The kill is a ~2 GB TRANSIENT, not a leak: 22 excursions over 5 deploy-free windows, amplitude FLAT all night, every cycle reaches headroom 0.0, and the two kills are the two thinnest-page-cache cycles (inactive_file 26.3 / 42.2 MB vs 164–240 MB surviving). Measurement in `deploys.md`. ALSO THIS SESSION: adjudicated the stale shared index (3 revert-in-waiting blobs disarmed, incl. one that would have stripped the LIVE Drop 3 hook), notified the 2 reachable live sessions, and FIXED `commit-guard.py` to gate on the staged BLOB rather than name-status — 4-case falsification suite passes, 5273ms -> 659ms. OPEN because the allocator inside the 2 GB pass is still UNNAMED and needs an in-pass measurement, which needs a deploy, which needs the clean window (42.8 min at 03:19Z) to mature first** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
+- Goal: Decide, on evidence, whether the two `oomKilled` events (02:11:34Z,
+  02:37:06Z, `memoryLimit 4Gi`, refresh-worker only — live-odds-worker zero in
+  the same window) mean `#435` REGRESSED or that `#435` fixed one contributor
+  and a SECOND one is now binding. Then attack whichever is actually binding.
+  Success = a written attribution in `deploys.md` backed by a **deploy-free**
+  window, with the window stated.
+- Files: none claimed yet — this lane is diagnostic until the attribution is
+  made. Expected candidates when it turns into a change:
+  `syndicate/features/intelligence.py` (the 3000MB `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`
+  floor), `syndicate/blueprints/home.py` (MLB hydration entry),
+  `syndicate/features/shared/memory_observability.py`. Checked against every
+  OPEN lane's `- Files:` at open time: the only claims held anywhere are
+  `pipeline/intelligence_state.py` + `syndicate/features/wnba/cards.py`
+  (`clamp-fix-to-workers`). No overlap.
+- Hypothesis (to be falsified, NOT assumed): `#435`'s `read_book_quotes_latest`
+  streaming fix is still in effect on the deployed tree, and the 3,857MB anon at
+  02:37:00Z is a DIFFERENT contributor — the standing finding that the kill is
+  MLB game hydration in the main worker process (`build_cards_page_context`
+  running HYDRATED), which the 3000MB floor does not guard because that floor
+  sits in front of `build_intelligence_overview`.
+- Falsification test: if the deployed refresh-worker SHA does not contain the
+  `#435` streaming reader, or if the book_quotes read is measurably back at
+  whole-file cost on the current shard, the hypothesis is WRONG and this is a
+  regression, not a second contributor. Positive control required on every log
+  query; kills read from `/v1/services/<id>/events`, never from logs.
+- Known confound, stated before measuring: refresh-worker took **four deploys
+  between 01:31 and 02:25** (win_prob instrument work). Every deploy reboots and
+  re-runs hydration cold. Any before/after spanning that window is confounded —
+  the window used must be deploy-free and long enough to re-warm (the floor is
+  the ratchet).
+- Verification: an attribution written to `.syndicate/deploys.md` with its
+  working, naming the window and the number of kills in it. No deploy to
+  refresh-worker unless the attribution demands one — the `win_prob` counter
+  cannot produce a reading until this service gets an hour without a kill or a
+  deploy, which is a reason to keep deploys OFF, not to add one.
+- Blocked by: none.
+
+#### `clv-without-settlement` — SETTLED READING 2026-08-15 MLB, recorded by `live-game-line-projection`
+Read from `/api/ops/clv/report?sport=mlb&date=2026-08-15` at ~2026-08-16 02:5xZ,
+after the scheduled task `clv-settled-read-2026-08-15` fired 01:55:33Z. **Not my
+lane — recorded because I had the reading and the context; interpret it yourself.**
+
+**THE NUMBER (same-book, close observed BEFORE first pitch):**
+
+    avg_clv_pct      -0.4049 %
+    beat_close_rate   21.64 %   (29 of 134)
+    same_book_n      134   |  same_book_all_n 159  |  book_biased_n 107
+    openings         987   ->  resolved 266
+
+**IT GOT WORSE ON SETTLEMENT.** This lane's own preliminary figure was
+**-0.07 % at a 27.1 % beat rate**, taken pre-first-pitch. Settled it is
+**-0.4049 % at 21.64 %**. The direction of that move is the finding.
+
+**DO NOT QUOTE `book_agnostic_close`.** It reads **+2.6793 % at an 83.16 % beat
+rate on n=95** and is an ARTIFACT, not a result — the report's own `bias_note`
+says pairing a best-of-N opening against another book's close is **biased
+upward**. That is precisely what the same-book restriction exists to remove, and
+it is the most quotable wrong number in the payload.
+
+**`by_close_timing` — and this is the part that touches Tier 5:**
+
+    pregame   n=134   avg -0.4049 %   beat 21.64 %
+    in_play   n= 25   avg -0.3498 %   beat 36.00 %
+
+**IN-PLAY IS A SEPARATE, EXCLUDED BUCKET (`in_play_excluded_n: 25`) — AND
+IN-PLAY IS EXACTLY WHAT `live-game-line-projection` PRODUCES.** The live
+game-line edges cannot be scored through this path as it stands; they would land
+in the bucket this report sets aside. **This empirically confirms the caveat in
+my handoff above** ("close is ill-defined for a live market"): it is not a
+theoretical objection, the pipeline already treats those rows as un-scoreable.
+Deciding what "close" means for a market that runs continuously to settlement is
+a prerequisite for scoring the live game-line ledger, and it is this lane's call.
+
+**LIMITS, stated so nobody over-reads a single evening:** one slate; `resolved`
+is **266 of 987** openings, so roughly a quarter of published rows got a close at
+all — the 134 that carry the headline are ~14 % of what was published. Whether
+the unresolved 721 differ systematically from the resolved 266 is **unknown and
+not tested**, and if they do the -0.4049 % is not representative.
+
 > *(The blockquote and body below are this lane's HISTORY, kept for the
 > reasoning trail. The status above supersedes them — 2026-08-16 reconcile.)*
 > **STATUS LINE CORRECTED 2026-08-15 ~18:0xZ by the coordinating session.** It
@@ -1577,6 +1820,58 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
   on BOTH workers), and has no `--service` flag so it also blocks on the wrong
   service's work. And a wait loop of mine read a stderr HTTP 502 as CLEAR by
   testing for the absence of a failure string.
+- **2026-08-16 03:1xZ — THE INSTRUMENT WAS BLIND IN THE WINDOW IT WATCHES, and
+  every `no_trigger` since it was built is weaker evidence than it looked.**
+  `watch_clamp_trigger.py` gated the confirming read on
+  `/api/board/layer2-shortlist`, then judged `/api/intelligence/query`. Two
+  different populations. Measured same-instant at 03:14:08Z: **shortlist 0 rows,
+  served payload 18 priced rows** — 8,345 opportunities considered and all 8,345
+  filtered out (horizon 2,488 + stale_kickoff 2,666 + quote_age 1,256 +
+  excluded_market 689 + uninformative 1,246, summing exactly).
+  The shortlist drops `stale_kickoff_seconds = 7200` and
+  `max_quote_age_seconds = 50400` — **exactly the in-play late-game population
+  both real triggers came from** (20:45Z, and 23:10/23:15Z at p=0.009911/0.990089).
+  So the gate could read 0 while a misprice was live on a row it had filtered out.
+  Found because the user disbelieved a `rows=0` reading, not by the instrument.
+- **FIXED, not just recorded.** The trigger now derives from the served payload
+  itself — the same surface the verdict judges. The shortlist is still read, as
+  recorded context that can no longer suppress a check; both counts print.
+  Self-test 11/11. Live at 03:24:19Z: `served_rows=30 (shortlist=12)`, so the
+  old gate would still have judged on under half the population.
+  - A defect found while writing it: emitting UNPRICED probabilities (needed, or
+    `POST_FIX_OK_COLUMN_ABSENT` is unreachable and the fix working becomes
+    invisible) double-counted every quoted row — once priced at the parent, once
+    unpriced at the `quote` node. Harmless while only pairs were emitted; a
+    phantom unpriced twin on every correctly-priced row the moment they were not.
+    Caught by the new self-test, not in review.
+- **STILL NO VERDICT ON THE FIX.** 03:24:19Z read the corrected population:
+  30 rows, p=[0.057749, 0.871508], nothing outside [0.02, 0.98] → `no_trigger`.
+  Genuinely quiet, now measured on the right surface. `#439` item 1 stays OPEN.
+- **THE SHORTLIST/SERVED MISMATCH IS NOT A DEFECT — AND THAT IS WORSE FOR THE
+  OLD GATE THAN "NARROWER" WAS.** Measured 03:3xZ, same instant. They are two
+  different pipelines, not two views of one:
+  - **Different date window.** shortlist `date: 2026-08-15`, `horizon_days: 1`
+    (single date, `central_today_iso()`); served `dates_covered:
+    ['2026-08-15','2026-08-16','2026-08-17']`. Late at night the shortlist's
+    one-day horizon empties by construction while tomorrow's board is live —
+    which is exactly the 0-vs-18 reading, and it will recur every night.
+  - **Different pool.** served `source: combined_board_window` (the legacy
+    `ranked_all` pool). The shortlist is `layer2_shortlist_artifact`.
+  - **Different gates.** horizon / quote_age / stale_kickoff / excluded_market /
+    uninformative are applied at BUILD time on refresh-worker for the shortlist
+    only; `combined_board_window` does not carry them.
+  This is known in-progress L2-A migration, stated in the route's own docstring
+  (`intelligence.py:2698`): the board still renders `ranked_all`, the canonical
+  board state the shortlist lands in "is never written (both migration flags
+  default False and are off)", and pointing the board at L2-A rows "is the goal".
+  **So the old gate was not a narrow view of the product — it was an artifact
+  nothing user-facing serves.** The clamp misprices were always measured on the
+  served path (`layer2_board.py:1345`: 1346 `fair_price` values, 24 on ±4900),
+  which is the population the instrument now reads. Consistent, and the reason
+  the gate had to go rather than be widened.
+  - Sports move within minutes: 03:24Z served WNBA only; 03:3xZ served
+    mlb 168 + wnba 216 priced occurrences. Do not treat one read's sport mix
+    as the slate's shape.
 
 #### smaps-anon-breakdown — CLOSED 2026-08-15 23:5xZ
 **HYPOTHESIS CONFIRMED.** pid 39 anon is **91% mmap** (1,007.2 of 1,106.9MB)
