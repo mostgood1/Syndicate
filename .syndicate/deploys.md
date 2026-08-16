@@ -8281,6 +8281,54 @@ today) for game lines; WNBA's is unwired.
 
 ---
 
+## PENDING RIDEALONG — the compat guard **AND** the `#446` movement key fix. Producer-side. Web needs nothing.
+
+**SUPERSEDES the earlier `a21b63db`-only entry below.** `08de8c08` landed on top
+of it, so the blob hashes in that entry are STALE — shipping them would deliver
+the compat guard WITHOUT the key fix, which is the half that makes movement and
+steam actually work.
+
+**Ship these three blobs, re-read from `origin/main` at 2026-08-16T16:43:52-05:00:**
+
+    pipeline/layer2_shortlist.py                   92c278509c
+    syndicate/features/shared/layer2_board.py      ce30c1780f
+    tests/test_layer2_movement_live_segment.py     3519bcc2ec
+    tests/test_layer2_cross_file_compat.py         09fd9afd2c
+
+**RE-READ THEM AGAIN BEFORE CUTTING.** These files have moved twice in one
+evening; a blob hash written into a ledger is a snapshot, not a lease.
+
+Carries two things now:
+
+1. **The cross-file compat guard** (`a21b63db`) — signature probes so
+   `layer2_shortlist.py` can never again outrun `layer2_board.py` into a blank
+   board. Self-protecting, no ordering constraint, safe to ship alone.
+2. **`#446`, the movement join key** (`08de8c08`) — movement was keyed on
+   `line`+`bookmaker`, i.e. on the very things it measures, so only UNMOVED rows
+   could match their opening. Measured: stable key matched 20 of 20 vs full key
+   14, with line changing on 6 and book on 5. **Steam was structurally
+   suppressed by this**, not merely untested — a sharp move usually comes with a
+   line move or book switch, which erased the evidence before the detector saw
+   it.
+
+Also publishes `openings_records` / `openings_loaded` /
+`movement_eligible_rows` / `movement_rows_matched`, so the next reader can
+attribute thin movement to a sparse ledger versus a failing join instead of
+inferring it as I had to.
+
+### Falsification once it lands
+
+    git show <live-sha>:.../layer2_board.py | grep -c movement_join_key      -> >0
+    /api/board/layer2-shortlist  ->  movement_rows_matched / movement_eligible_rows
+                                     should be materially ABOVE the 31% baseline
+    cards_present > 0 and cards_compat_note ABSENT
+
+**Still not urgent** — no current defect depends on it. But it is now the
+difference between a movement column that reports moves and one that reports
+only the rows that did not move.
+
+---
+
 ## PENDING RIDEALONG — `a21b63db`, the cross-file compat guard. Producer-side. Web needs nothing.
 
 **Whoever next deploys refresh-worker: cherry-pick these three blobs onto that
