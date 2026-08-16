@@ -5926,3 +5926,53 @@ predicted first observable tick ~05:51:37Z, from a 900s idle interval against an
 **STILL NOT MEASURED:** the effect. One gate decision is not a cadence outcome.
 The sweeps/day change needs the `branch-overlap-baseline-watch` distribution, and
 soccer is excluded by design so this lane's headline goal remains DEFERRED to 1c.
+
+---
+
+## 2026-08-16 15:1xZ — DEPLOY `d72d670c` (load-once) — 9h CLEAN, AND THAT PROVES NOTHING YET
+
+Live 06:01:34Z. **Zero OOM kills in 9h 09m** (events API; last kill 04:46:44Z,
+before this deploy). Tempting, and not yet evidence.
+
+### THE DIURNAL CONTROL, WHICH IS THE WHOLE POINT
+
+Kills cluster in the LIVE-SLATE window (~22:00Z-05:00Z). The **pre-fix** code
+ran **05:02:59Z -> 22:54Z on 08-15 with zero kills — 17h 51m**. So a clean
+daytime stretch is exactly what the BROKEN worker also produced, and 9h of
+daylight is a weaker run than the defect's own best.
+
+Same clock window, one day apart, near-identical sampling density:
+
+    window 14:25-15:11Z        08-15 PRE-FIX      08-16 POST-FIX (d72d670c)
+    samples                       1,368               1,367
+    peak anon                   2,816.7 MB          2,898.5 MB   (slightly HIGHER)
+    excursions                        0                   0
+    min inactive_file               6.5 MB            183.5 MB
+
+**Zero excursions BOTH before and after.** The sawtooth simply does not run in
+the daytime lull, so this window cannot separate the two SHAs. Peak is flat
+(2,817 -> 2,899, the wrong direction if anything). Only `inactive_file` differs,
+which is one reading of a volatile quantity and is not on its own a result.
+
+**The 1,000MB "improvement" I could have claimed** — 3,907 -> 2,898 peak — is an
+artifact of comparing a DAYTIME reading against a NIGHT baseline. The correct
+comparison is same-clock, and it shows no change.
+
+### VERDICT
+
+`d72d670c` is **UNPROVEN**, exactly like `1409e96f` before it. Three fixes are
+live and exercised (odds-shard cache, ledger streaming, three-loads-to-one) and
+**not one of them has yet been shown to move the transient**, because every
+measurement so far has been either too early, too short, or in the wrong part of
+the day.
+
+**The only test that can settle it is the live-slate window, ~22:00Z tonight to
+~05:00Z.** Judge on: excursion count/hr, amplitude mean, and `min inactive_file`
+against the night baselines (amplitude 1,950-2,235 MB; inactive_file 26.3/42.2
+at the kills, 164-240 surviving). A night with excursions at the old amplitude
+means these three fixes were not the 2GB.
+
+**Method note, so the next reader does not repeat it:** `watch_rw.py` reports
+kills as "since start" with no end bound, so the control run listed three kills
+that happened AFTER its window. The window is what the header says; the kill
+line is not scoped to it.
