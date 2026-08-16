@@ -389,6 +389,111 @@ clock-blind.
 4. Re-take the hour-by-hour both-branches-live table from the lane as the
    baseline any later claim is judged against. A handed-down baseline expires.
 
+### Phase 0 — RESULTS (measured 2026-08-15 evening CDT / 08-16 UTC)
+
+Lane `sim-engine-phase0-census`. Read-only; no deploy. **H2 and H3 are settled by
+measurement. H1 and the baseline re-take are NOT yet run.**
+
+#### H3 — SETTLED, and the answer is the reassuring one. The real engine runs.
+
+The §2.2 worry — that `basketball_props_smart_sim` might be silently falling back
+to `_simulate_smart_game_local`, the no-sampling stub — **is not happening in
+production.** Three WNBA artifacts pulled off the live web disk via
+`/api/ops/artifacts/stream`, `2026-08-15`:
+
+    smart_sim_2026-08-15_LVA_MIN.json   (579.7 KB)
+    smart_sim_2026-08-15_WSH_LAS.json
+    smart_sim_2026-08-15_CON_NYL.json
+
+All three carry the real engine's signature and none carry the stub's:
+
+    score / intervals / intervals_1m / periods          present  3/3
+    rotation_minutes / minutes_summary / lineup_effects  present  3/3
+    home_team_total_pts_mean (STUB-ONLY key)             absent   3/3
+
+**So the OWED item from §2.2 closes: the vendor import is succeeding and the
+possession-level Monte Carlo is what produces production basketball numbers.**
+The bare-`except` fallback remains a latent risk worth a loud log line, but it is
+not currently firing.
+
+Path note for whoever repeats this: the artifacts are at
+`wnba_source/data/processed/`, **not** `wnba_source/source_artifacts/data/processed/`
+— the latter 404s. Both are listed as candidate roots by
+`/api/ops/wnba/artifact-counts`, and only one has the files.
+
+#### H3b — the thin-sim concern is now MEASURED, not inferred
+
+`n_sims = 100` on all three artifacts, confirming the env reading. The
+consequence is directly visible in the served probabilities — every one is an
+exact multiple of 0.01, because each is a count out of 100 draws:
+
+    LVA_MIN   p_home_win 0.25   p_home_cover 0.29   p_total_over 0.59
+    WSH_LAS   p_home_win 0.66   p_home_cover 0.55   p_total_over 0.73
+    CON_NYL   p_home_win 0.14   p_home_cover 0.25   p_total_over 0.46
+
+9 of 9 quantized to 1%. At p≈0.25 the binomial standard error on 100 draws is
+**±4.3 points** — the same order as the edges being priced. This upgrades the
+sim-count item from an env observation to a defect visible in the output, and
+it is the cheapest quality win in the system (Phase 9, or sooner).
+
+#### H2 — CONFIRMED BY LOG. Both workers tick, and three sports are built twice.
+
+Previously config-only and flagged unproven. `[live_lens_loop] TICK_COMPLETE`
+over 2026-08-16 02:21Z–03:13Z:
+
+    refresh-worker     31 ticks / 51.6 min   {mlb, wnba, soccer, nfl}  skipped [nba]
+    live-odds-worker   38 ticks / 51.4 min   {mlb, wnba, soccer}       skipped [nba, nfl]
+
+**mlb, wnba and soccer are built on BOTH services** — 69 MLB live-lens builds per
+hour across two containers where a single owner needs ~35. Each MLB build carries
+a 120-sim resim and each soccer build up to 4 Monte Carlo passes per live match.
+
+Note the cycles run slower than their 60s interval (~100s on refresh-worker, ~81s
+on live-odds-worker), so the tick itself is taking ~20–40s.
+
+**This makes Phase 4.1 a prerequisite, not a nicety** — against a 124 MB margin,
+the duplicate is real work being done twice, and it must be removed before any
+new sport joins the tick.
+
+#### H1 — CONFIRMED, and the falsification test did not fire. 0 of 200.
+
+`scripts/census_kickoff_hours.py --json reports/kickoff_census/latest.json`,
+window 2026-07-16..2026-08-29, America/Chicago. Kickoffs, not refresh runs —
+this measures the FIXTURES the cadence should be following.
+
+    series                    n    median CT   hours with fixtures   % in US evening
+    ---------------------------------------------------------------------------------
+    soccer: 9 EU leagues     200      9-14        5..14                   0.0
+    soccer: mls              111        19       15..21                  94.6
+    mlb                      605        18       11..21                  53.6
+    wnba                     117        19       11..21                  84.6
+    nfl_preseason             49        18       11..21                  71.4
+
+**The falsification test was "H1 fails if European kickoffs sit in the US
+evening." Zero of 200 do.** European soccer stops dead at 14:00 CT — the
+combined histogram runs 5,6,7,8,9,10,11,12,13,14 and is empty at every hour
+after. MLS is the named exception at 94.6%, confirming the lane's warning from
+an independent source (the lane inferred it from 111 process cmdlines; this is
+111 fixtures).
+
+**So the owner's premise is measured, not merely plausible: soccer's European
+leagues have NO fixture reason to be refreshing during the US evening peak.**
+
+**BUT IT CORRECTS THIS PLAN'S OWN BAND TABLE, which was believed and wrong.**
+Phase 2 guessed European soccer at 01:00–09:00 CT. Measured, it is **05:00–14:00
+CT** — several hours later — and US sports start at **11:00**, so there is a real
+**11:00–14:00 overlap** the guessed table denied. The separation is clean at the
+evening peak and is NOT clean at midday. Any Phase 1 tiering must be
+fixture-relative rather than band-relative for exactly this reason; a hardcoded
+"soccer in the morning" rule would have been built on the wrong hours.
+
+#### Still owed in Phase 0
+
+- **The baseline re-take** (hour-by-hour both-branches-live memory). NOT DONE and
+  not doable in one pass — it needs a multi-hour observation window, so it should
+  run as a scheduled watcher rather than a single command. Phase 1 must not be
+  judged against the lane's 2026-08-16 table without re-taking it.
+
 ### Phase 1 — fixture-aware pregame cadence
 
 This is the change that delivers the ask. Roughly 90% of the machinery exists.
@@ -437,14 +542,18 @@ as 578 MB when it was 124 MB.
 ### Phase 2 — the band, as a safety net
 
 Phase 1 should produce this shape on its own. Write it down anyway, as the thing
-to reason about and alert on when the gate misfires (America/Chicago):
+to reason about and alert on when the gate misfires (America/Chicago).
+
+**REPLACED 2026-08-15 WITH MEASURED HOURS — the guessed version had European
+soccer at 01:00–09:00 and it is actually 05:00–14:00.** See Phase 0/H1.
 
 | band | owner | what runs |
 |---|---|---|
-| 01:00–09:00 | soccer (Europe) | European pregame sims, schedule/odds/props/picks; maintenance, settlement |
-| 09:00–16:00 | soccer live + US pregame | European T-ramps and live ticks; **MLB daily sim**; **NFL/NCAAF SmartSim2** |
-| 16:00–18:00 | handoff | last US pregame sweeps; MLS pregame begins |
-| 18:00–01:00 | US live + MLS | MLB/NBA/NHL/NFL live ticks, MLS pregame + live; Europe at 24h heartbeat |
+| 01:00–05:00 | genuinely quiet | maintenance, settlement, evaluation |
+| 05:00–11:00 | soccer (Europe) only | European kickoffs begin; their pregame + live. **No US fixture starts before 11:00** |
+| 11:00–14:00 | **CONTESTED — both** | European soccer still kicking off *and* the earliest MLB/WNBA/NFL games. The one band where a fixture-relative gate has real work to do |
+| 14:00–18:00 | US pregame only | European soccer is done (0 kickoffs after 14:00). **MLB daily sim** and **NFL/NCAAF SmartSim2** belong here |
+| 18:00–01:00 | US live + MLS | MLB/WNBA/NFL live ticks, MLS pregame + live. Europe has nothing scheduled — this is the band Phase 1 clears |
 
 Two moves that belong here regardless of Phase 1:
 

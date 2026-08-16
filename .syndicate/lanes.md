@@ -6,7 +6,7 @@
 
 ## OPEN
 
-### sim-engine-phase0-census — OPEN — **H2 CONFIRMED (both workers tick; mlb/wnba/soccer built twice), H3 UNFALSIFIED (real engine runs, not the stub). H1 census + baseline STILL OWED** — opened 2026-08-15 — session: sim-engine-track
+### sim-engine-phase0-census — OPEN — **H1/H2/H3 ALL SETTLED. Only the multi-hour memory baseline still owed** — opened 2026-08-15 — session: sim-engine-track
 - Goal: produce the four Phase 0 measurements in `.syndicate/plan_2026-08-16_sim_scheduling.md`
   so Phase 1 has a baseline it did not inherit. Read-only; no production code, no deploy.
 - Files (exclusive to this lane): `scripts/census_kickoff_hours.py` (new),
@@ -58,6 +58,33 @@
   that sizes Phase 1; nothing about cadence should be changed before it runs.
 - No code changed, no deploy, no production write. `scripts/census_kickoff_hours.py`
   claimed but not yet created.
+
+#### H1 SETTLED 2026-08-15 — 0 of 200 European kickoffs are in the US evening
+- `scripts/census_kickoff_hours.py` (new, this lane) ->
+  `reports/kickoff_census/latest.json`. Window 2026-07-16..2026-08-29, CT.
+- **Falsification test did not fire.** 9 European leagues, n=200, hours 5..14 CT,
+  **0.0%** in the 18:00-01:00 band and ZERO fixtures at any hour after 14:00.
+  MLS n=111 at 94.6% (the named exception, now confirmed from fixtures rather
+  than from process cmdlines). mlb n=605 53.6%, wnba n=117 84.6%,
+  nfl_preseason n=49 71.4%.
+- **CORRECTED THIS PLAN'S OWN BAND TABLE.** It guessed European soccer at
+  01:00-09:00 CT; measured is 05:00-14:00, and US fixtures start at 11:00, so a
+  real 11:00-14:00 contested band exists that the guess denied. A hardcoded
+  "soccer in the morning" rule would have been built on the wrong hours --
+  which is the argument for fixture-relative rather than band-relative gating.
+- **TWO ERRORS OF MINE, caught and recorded rather than quietly fixed:**
+  1. I read nflverse `gametime` as US/Eastern. It is UTC. The tell was an
+     implausible 22:00 CT median; verified against the Hall of Fame Game
+     (2026-08-07 `00:00` UTC = 20:00 ET Thu) and DET@CIN (`23:00` = 18:00 CT)
+     before correcting. I had written a comment warning about this exact shift
+     and made it anyway.
+  2. The script's attributable-zero branch conflated "schema miss" with "no
+     fixtures in window", so regular-season NFL (season starts after the window)
+     reported as a parser failure. Now three distinct outcomes.
+- Still owed: the hour-by-hour both-branches-live MEMORY baseline. Needs a
+  multi-hour observation window; not doable in one pass, should run as a
+  scheduled watcher. **Phase 1 must not be judged against the lane's existing
+  2026-08-16 table without re-taking it.**
 
 ### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
 - **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
@@ -1555,6 +1582,31 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - **STILL NO VERDICT ON THE FIX.** 03:24:19Z read the corrected population:
   30 rows, p=[0.057749, 0.871508], nothing outside [0.02, 0.98] → `no_trigger`.
   Genuinely quiet, now measured on the right surface. `#439` item 1 stays OPEN.
+- **THE SHORTLIST/SERVED MISMATCH IS NOT A DEFECT — AND THAT IS WORSE FOR THE
+  OLD GATE THAN "NARROWER" WAS.** Measured 03:3xZ, same instant. They are two
+  different pipelines, not two views of one:
+  - **Different date window.** shortlist `date: 2026-08-15`, `horizon_days: 1`
+    (single date, `central_today_iso()`); served `dates_covered:
+    ['2026-08-15','2026-08-16','2026-08-17']`. Late at night the shortlist's
+    one-day horizon empties by construction while tomorrow's board is live —
+    which is exactly the 0-vs-18 reading, and it will recur every night.
+  - **Different pool.** served `source: combined_board_window` (the legacy
+    `ranked_all` pool). The shortlist is `layer2_shortlist_artifact`.
+  - **Different gates.** horizon / quote_age / stale_kickoff / excluded_market /
+    uninformative are applied at BUILD time on refresh-worker for the shortlist
+    only; `combined_board_window` does not carry them.
+  This is known in-progress L2-A migration, stated in the route's own docstring
+  (`intelligence.py:2698`): the board still renders `ranked_all`, the canonical
+  board state the shortlist lands in "is never written (both migration flags
+  default False and are off)", and pointing the board at L2-A rows "is the goal".
+  **So the old gate was not a narrow view of the product — it was an artifact
+  nothing user-facing serves.** The clamp misprices were always measured on the
+  served path (`layer2_board.py:1345`: 1346 `fair_price` values, 24 on ±4900),
+  which is the population the instrument now reads. Consistent, and the reason
+  the gate had to go rather than be widened.
+  - Sports move within minutes: 03:24Z served WNBA only; 03:3xZ served
+    mlb 168 + wnba 216 priced occurrences. Do not treat one read's sport mix
+    as the slate's shape.
 
 #### smaps-anon-breakdown — CLOSED 2026-08-15 23:5xZ
 **HYPOTHESIS CONFIRMED.** pid 39 anon is **91% mmap** (1,007.2 of 1,106.9MB)
