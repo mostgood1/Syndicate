@@ -250,6 +250,36 @@ MEASURE_JS = """
   // content this unit does not count (the live lens), so mixing states breaks
   // the linearity and the residual stops being a layout signal. Fitting inside
   // a state is what makes it one.
+  // Model-free layout signal: two cards carrying the same amount of data should
+  // be the same height. No slope, no intercept, no n>=5 -- two tied cards is
+  // enough, so it survives slates where `fitGroup` refuses to fit anything.
+  //
+  // That is not an edge case, it is the common one. Measured 2026-08-16 11:5x
+  // CDT: every MLB card carried exactly 33 pairs, so there was ONE distinct `u`
+  // and no line could be fitted at either width -- while 15 mutually tied cards
+  // sat there, which is this metric at its strongest. Gating it behind the fit
+  // would have thrown away the best reading of the day.
+  function tieFloor(pts) {
+    const byU = {};
+    pts.forEach((p) => (byU[p.u] = byU[p.u] || []).push(p.h));
+    const groups = Object.keys(byU)
+      .map((u) => ({
+        u: Number(u),
+        n: byU[u].length,
+        spread: Math.round(Math.max(...byU[u]) - Math.min(...byU[u])),
+      }))
+      .filter((g) => g.n > 1);
+    if (!groups.length) return null;
+    const worst = groups.reduce((a, b) => (b.spread > a.spread ? b : a));
+    return {
+      floorPx: worst.spread,
+      atU: worst.u,
+      n: worst.n,
+      tiedGroups: groups.length,
+      cardsTied: groups.reduce((a, g) => a + g.n, 0),
+    };
+  }
+
   function fitGroup(pts) {
     // A line costs 2 parameters, so n=3 leaves ONE degree of freedom and the
     // residual is noise. Measured on the same slate, same instant: Live n=3
@@ -319,12 +349,8 @@ MEASURE_JS = """
     // text wraps, not a layout deviation. Mobile passes because its slope is
     // ~62px/pair against desktop's ~16px, which buys 743px of explained range
     // to hide the same noise behind.
-    const byU = {};
-    pts.forEach((p) => (byU[p.u] = byU[p.u] || []).push(p.h));
-    const tied = Object.values(byU).filter((v) => v.length > 1);
-    const floorPx = tied.length
-      ? Math.round(Math.max(...tied.map((v) => Math.max(...v) - Math.min(...v))))
-      : null;
+    const tie = tieFloor(pts);
+    const floorPx = tie ? tie.floorPx : null;
     // The best ratio ANY model in `u` could reach on this slate. Above the
     // reliability bar means no fit is possible here, however the line is drawn.
     const floorRatio = floorPx !== null && explained > 0 ? floorPx / explained : null;
@@ -380,6 +406,19 @@ MEASURE_JS = """
     ? Object.assign({state: worstState}, heightModelByState[worstState])
     : null;
   const statesUnfitted = Object.keys(ptsByState).filter((k) => !heightModelByState[k]);
+  // Computed over EVERY state, independent of whether a line could be fitted.
+  const tieByState = {};
+  Object.keys(ptsByState).forEach((k) => {
+    const t = tieFloor(ptsByState[k]);
+    if (t) tieByState[k] = t;
+  });
+  const tieStates = Object.keys(tieByState);
+  const worstTieState = tieStates.length
+    ? tieStates.reduce((a, b) => (tieByState[a].floorPx >= tieByState[b].floorPx ? a : b))
+    : null;
+  const identicalContentSpread = worstTieState
+    ? Object.assign({state: worstTieState}, tieByState[worstTieState])
+    : null;
 
   // Tab/panel id agreement, per card. A tab whose target has no panel blanks
   // the card when clicked (NCAAF, measured 2026-08-14); a panel with no tab is
@@ -526,6 +565,8 @@ MEASURE_JS = """
     heightModel,
     heightModelByState,
     statesUnfitted,
+    identicalContentSpread,
+    identicalContentSpreadByState: tieByState,
     // The least-confounded figure available: the worst spread inside any one
     // game state. Still not a pure layout signal -- read it with contentUnits.
     cardHeightSpreadWithinState: Object.keys(cardHeightByState).length
@@ -970,6 +1011,17 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 unfitted = measured.get("statesUnfitted") or []
                 if unfitted:
                     issues.append("no layout fit for: " + ",".join(unfitted))
+            # Printed OUTSIDE the `if model:` block on purpose: this is the one
+            # height figure that survives a slate no line can be fitted to, and
+            # gating it on the model would hide it exactly when it is the only
+            # thing left. Reported, never failed -- see WATCH_METRICS.
+            tie = measured.get("identicalContentSpread") or {}
+            if tie.get("floorPx") is not None:
+                issues.append(
+                    f"identical-content spread {tie['floorPx']}px in {tie['state']} "
+                    f"({tie['n']} cards at {tie['atU']} pairs; "
+                    f"{tie['cardsTied']} tied across {tie['tiedGroups']} group(s))"
+                )
             conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
             if conflated:
                 issues.append("type conflated: " + ",".join(c.lstrip(".") for c in conflated))
@@ -1084,12 +1136,26 @@ STABLE_METRICS = ("overflowPx", "tabsWithoutPanel", "panelsWithoutTab", "unstyle
 # 1125 px across one evening with no code change.
 SLATE_METRICS = ("cards", "cardHeightSpread", "cardHeightSpreadWithinState", "contentUnits")
 
+# Metrics being COLLECTED, not yet judged. `identicalContentSpread` ought to be
+# code-driven -- two cards with the same data should be the same height whatever
+# the slate does -- but that is a belief, not a measurement: as of 2026-08-16 it
+# has ONE reading per width (116px desktop, 81px mobile). Until several runs say
+# otherwise it is printed as context and CANNOT fail a run, because promoting it
+# to STABLE_METRICS on one reading would be exactly the mistake this file keeps
+# recording. The decision rule was written down in advance: if it moves more than
+# ~2x across runs with no card-surface deploy, it is slate-driven and cannot be
+# baselined.
+WATCH_METRICS = ("identicalContentSpread",)
+
 
 def _cmp_value(v):
     if isinstance(v, list):
         return len(v)
     if isinstance(v, dict):
-        return v.get("spread", v.get("max"))
+        # `floorPx` first: `identicalContentSpread` carries no `spread`/`max`,
+        # and without this it compares None to None and reads "unchanged" on
+        # every run -- a watch metric that can never move is not a watch.
+        return v.get("floorPx", v.get("spread", v.get("max")))
     return v
 
 
@@ -1104,6 +1170,22 @@ def compare(baseline: dict[str, Any], current: dict[str, Any]) -> tuple[list[str
             base = base_sport.get(width) or {}
             if not base:
                 lines.append(f"{sport:8} {width:8} NEW -- not in baseline, nothing to compare")
+                continue
+            # A row that ERRORED carries no metrics at all, so every stable
+            # metric reads `None` and the diff below would announce
+            # "CODE-DRIVEN DRIFT: overflowPx 0 -> None" -- a false alarm of
+            # exactly the class this comparison exists to avoid. Seen live
+            # 2026-08-16: soccer mobile hit a 30s `page.goto` timeout and was
+            # reported as drift on four metrics at once. A failed measurement
+            # is not a measurement of a change.
+            if "error" in cur or "error" in base:
+                side = "current" if "error" in cur else "baseline"
+                detail = str((cur if "error" in cur else base)["error"])[:50]
+                lines.append(
+                    f"{sport:8} {width:8} SKIPPED -- the {side} row ERRORED "
+                    f"({detail}), which is not a comparison"
+                )
+                ok = False
                 continue
             if (cur.get("httpStatus") or 0) >= 400 or (base.get("httpStatus") or 0) >= 400:
                 lines.append(f"{sport:8} {width:8} SKIPPED -- an HTTP error on one side is not a comparison")
@@ -1126,6 +1208,15 @@ def compare(baseline: dict[str, Any], current: dict[str, Any]) -> tuple[list[str
                 lines.append(f"{sport:8} {width:8} stable metrics unchanged")
             if moved:
                 lines.append(f"{'':17} slate moved: " + "; ".join(moved))
+            # Collected, not judged. Printed even when unchanged, because the
+            # point of this line is to build a series -- a metric only shown
+            # when it moves can never be shown to be stable.
+            for key in WATCH_METRICS:
+                b, c = _cmp_value(base.get(key)), _cmp_value(cur.get(key))
+                if b is None and c is None:
+                    continue
+                verdict = "unchanged" if b == c else f"{b} -> {c}"
+                lines.append(f"{'':17} watch (stability unknown): {key} {verdict}")
     return lines, ok
 
 

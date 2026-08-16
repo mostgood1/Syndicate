@@ -565,3 +565,116 @@ def test_a_slate_with_no_tied_cards_reports_no_floor_rather_than_zero():
     assert m["floorPx"] is None
     assert m["unfittable"] is False
     assert m["atNoiseFloor"] is False
+
+
+# --- the identical-content spread: collected, not judged -------------------
+
+
+def test_the_floor_survives_a_slate_where_nothing_can_be_fitted():
+    """The 2026-08-16 11:5x CDT slate: every card carried exactly 33 pairs, so
+    there is ONE distinct `u` and no line exists -- which is precisely when 15
+    mutually tied cards make this the only height signal on the page."""
+    m = _fit([(33, 1100), (33, 1150), (33, 1180), (33, 1216), (33, 1120)])
+    assert m is None, "a single distinct u must not produce a fit"
+
+
+def test_the_floor_is_emitted_when_no_model_is():
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    pts = [(33, 1100), (33, 1150), (33, 1180), (33, 1216), (33, 1120)]
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page()
+        page.set_content(
+            "".join(
+                f"<div class='cards-game-card' style='height:{h}px'>"
+                f"<span class='cards-status-badge'>Preview</span>"
+                + "<div class='cards-data-pair'>x</div>" * u
+                + "</div>"
+                for u, h in pts
+            )
+        )
+        measured = page.evaluate(
+            probe.MEASURE_JS,
+            {"typeClasses": probe.TYPE_CLASSES, "numericClasses": probe.NUMERIC_CLASSES},
+        )
+        browser.close()
+    assert measured["heightModel"] is None
+    assert measured["statesUnfitted"] == ["Preview"]
+    tie = measured["identicalContentSpread"]
+    assert tie["floorPx"] == 116  # 1216 - 1100
+    assert tie["n"] == 5 and tie["atU"] == 33
+    assert tie["state"] == "Preview"
+
+
+def test_the_floor_is_printed_even_with_no_model():
+    text, ok = _summarize(_report(
+        heightModel=None,
+        identicalContentSpread={"state": "Live", "floorPx": 116, "atU": 33,
+                                "n": 15, "tiedGroups": 1, "cardsTied": 15},
+    ))
+    assert ok, text
+    assert "identical-content spread 116px in Live" in text
+    assert "15 cards at 33 pairs" in text
+
+
+def test_the_floor_never_fails_a_run_while_its_stability_is_unknown():
+    """One reading per width is not a baseline. Promoting it to STABLE_METRICS
+    on that basis is the mistake this harness keeps recording."""
+    assert "identicalContentSpread" in probe.WATCH_METRICS
+    assert "identicalContentSpread" not in probe.STABLE_METRICS
+    text, ok = _summarize(_report(
+        identicalContentSpread={"state": "Preview", "floorPx": 900, "atU": 33,
+                                "n": 9, "tiedGroups": 1, "cardsTied": 9}))
+    assert ok, "a watch metric must not fail a run, however large"
+
+
+def test_a_watch_metric_is_printed_even_when_it_did_not_move():
+    """A metric shown only when it moves can never be shown to be stable."""
+    tie = {"state": "Preview", "floorPx": 116, "atU": 33, "n": 5,
+           "tiedGroups": 1, "cardsTied": 5}
+    base = _report(identicalContentSpread=dict(tie))
+    cur = _report(identicalContentSpread=dict(tie))
+    text, ok = _compare(base, cur)
+    assert ok
+    assert "watch (stability unknown): identicalContentSpread unchanged" in text
+
+
+def test_a_watch_metric_reports_movement_without_failing():
+    base = _report(identicalContentSpread={"state": "Preview", "floorPx": 116,
+                                           "atU": 33, "n": 5, "tiedGroups": 1, "cardsTied": 5})
+    cur = _report(identicalContentSpread={"state": "Preview", "floorPx": 402,
+                                          "atU": 33, "n": 5, "tiedGroups": 1, "cardsTied": 5})
+    text, ok = _compare(base, cur)
+    assert ok, "movement is the DATA this lane is collecting, not a failure"
+    assert "identicalContentSpread 116 -> 402" in text
+    assert "CODE-DRIVEN DRIFT" not in text
+
+
+def test_the_comparator_can_read_the_floor_out_of_its_own_dict():
+    """Without a `floorPx` branch `_cmp_value` returns None both sides, and the
+    watch line reads 'unchanged' forever."""
+    assert probe._cmp_value({"state": "Preview", "floorPx": 116, "n": 5}) == 116
+
+
+def test_an_errored_row_is_not_reported_as_code_driven_drift():
+    """Seen live 2026-08-16: soccer mobile hit a 30s `page.goto` timeout, and
+    the comparison announced `CODE-DRIVEN DRIFT: overflowPx 0 -> None` on four
+    metrics -- a failed measurement dressed as a measured change."""
+    base = _report()
+    cur = _report()
+    cur["sports"]["mlb"]["mobile"] = {"error": "TimeoutError: Page.goto: Timeout 30000ms exceeded."}
+    text, ok = _compare(base, cur)
+    assert not ok, "an errored row still fails the run -- it is just not DRIFT"
+    assert "SKIPPED -- the current row ERRORED" in text
+    assert "CODE-DRIVEN DRIFT" not in text
+    assert "overflowPx 0 -> None" not in text
+
+
+def test_an_errored_baseline_row_is_named_as_the_errored_side():
+    base = _report()
+    base["sports"]["mlb"]["desktop"] = {"error": "TimeoutError: boom"}
+    text, ok = _compare(base, _report())
+    assert not ok
+    assert "SKIPPED -- the baseline row ERRORED" in text

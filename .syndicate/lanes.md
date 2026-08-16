@@ -2603,3 +2603,34 @@ and then failed the thing it was checking, which is the point of running it.
   heights, or per-section wrapped row counts). Both edge toward circular, so it
   was flagged for a call rather than chosen unilaterally.
 - Blocked by: none
+
+### ui-probe-tie-floor-tracking — CLOSED 2026-08-16 — floor collected on every row; 5 of 6 stable, mlb mobile fires the rule at 2.06x — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `identicalContentSpread` emitted on EVERY run at both widths, printed,
+  compared across runs, and unable to fail a run while its stability is unknown.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Decision rule, written BEFORE the readings: moves more than ~2x across runs
+  with no card-surface deploy → slate-driven, cannot be baselined → option C.
+- **RESULT — 3 consecutive production runs:** nfl desktop 14/14/14, nfl mobile
+  50/50/50, ncaaf desktop 45/45/45, ncaaf mobile 53/53/53, mlb desktop
+  125/125/125 (116 on the earlier 11:0x geometry, so 1.08x across a slate
+  change). **mlb mobile 109/109/53 = 2.06x — the rule FIRES for that row only.**
+  It fails informatively: `n` at the worst tie group moved 7 → 8, so tie-group
+  membership churns as data enriches and which group is "worst" moves with it.
+- **The row the desktop question was actually about (mlb desktop) is stable** at
+  125px across three readings while its own `contentUnits` moved 33-57 → 41-57.
+  That looks like a property of the CSS, not of the slate.
+- Verification: 51 tests pass (42 prior + 9 new), including one proving the floor
+  is emitted when `heightModel is None` and `statesUnfitted == ["Preview"]` —
+  run through the real shipped JS, not a stub. Three production runs recorded.
+- Kept as WATCH, NOT promoted to STABLE_METRICS: one row fails the bar, and the
+  metric is one day old.
+- **Deliberately not done:** a statistic that would probably pull mlb mobile under
+  the bar exists (largest tie group, or a median across groups). Choosing it
+  *after* seeing which looks stable is manufacturing the result — the same error
+  as tuning the fit threshold, which is what started this whole thread. Left for
+  a decision.
+- Bug found and fixed en route, predating this lane: `compare()` guarded
+  `httpStatus >= 400` but not an `error` row, so `soccer mobile`'s 30s
+  `page.goto` timeout was reported as `CODE-DRIVEN DRIFT` on four metrics at
+  once. Errored rows are now SKIPPED and named; they still fail the run.
+- Blocked by: none
