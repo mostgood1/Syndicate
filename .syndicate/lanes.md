@@ -3566,3 +3566,9 @@ and then failed the thing it was checking, which is the point of running it.
 - Does NOT make MLB baselineable — that number still read 81..312px across the
   day. Tomorrow's scheduled pre-game run tests that separately.
 - Blocked by: none
+
+- **CHECKPOINTED 2026-08-16 ~21:0xZ — STATUS: fix BUILT + TESTED + PUSHED TO A BRANCH, NOT DEPLOYED, NOT ON `main`.**
+  - Durable copy: **`origin/wip/grading-blocker-freeze-fix` = `8ad48ac8`**, verified on the remote by content (fix 2 occurrences, `FreezeReachesTheGradingReaderTests` present, handoff blob `9e6fc894` == local).
+  - **Four earlier commits of this lane went unreachable** (`61e2c21e`, `419cc238`, `bf643d72`, `ca80ec46`) — `main` was rewritten under the session. Everything was re-landed from the working tree. See `learnings.md` 2026-08-16 "a local commit on this worktree is not durable".
+  - Deploy runbook: `.syndicate/handoff_deploy_freeze_reader_tree.md`. **Must be executed by an ATTENDED session** — this one is a scheduled-task run and must not fire deploys.
+  - **NEXT ACTION:** merge the wip branch (or cherry-pick `8ad48ac8`), then follow the handoff — both workers in one lull, ROUTE ONE warm-up, verify by content — and re-aim `grading-freeze-payload-check` from date 08-16 to 08-17 firing 08-18, because as armed it reads a date the fix cannot affect.

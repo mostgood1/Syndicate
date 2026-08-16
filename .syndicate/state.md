@@ -2399,3 +2399,41 @@ client-side JS). Trace the served `book` field to its writer before acting.
   predicted totals, which is silently wrong rather than loudly broken.
 - **NOT DEPLOYED.** NCAAF opens 2026-08-29; rides the next worker deploy with
   `b909d008`. Whether it produces rows in production is UNVERIFIED.
+
+**MLB GRADING IS PINNED AT ONE ROW A DAY, AND THE CAUSE IS A PATH `[measured 08-16 ~18:2xZ]`.**
+The pregame freeze writer and the grading reader are on two trees one segment apart:
+writer `market_dir = source_root/data/market/oddsapi` with `source_root = REPO_ROOT/data/mlb_source`
+(`refresh_odds_sources.py:666`), git-tracking **0** files; reader `_odds_paths` ->
+`<MLB_BETTING_DATA_ROOT>/market/oddsapi` = `.../mlb_source/source_artifacts/data/market/oddsapi/`,
+git-tracking **27** `*_pregame.json`, newest **2026-07-08**. Measured consequence: `ml`
+graded rows = **exactly 1 on all 8 dates checked**, 4-14 `Missing game-line match` warnings
+each, and `season_betting_day_2026_08_15.json` retains ONE game of a ~15-game slate.
+Fix built and tested (419 passing, 3 new tests verified non-vacuous) — **NOT DEPLOYED**;
+runbook in `.syndicate/handoff_deploy_freeze_reader_tree.md`.
+
+**THE FREEZE IS NOT MONOTONIC IN PRODUCTION `[measured 08-16]`.** 14 games / 54,995 B at
+~17:52Z -> 8 games / 17,832 B at 18:12Z, 7 of the 8 still pregame. `_merge_pregame_game_lines`
+cannot shrink a seal it can READ, so the input was empty. Deploy-reset is the leading
+explanation but is **n=1 on the transition** — not proven.
+
+**`/api/ops/evaluation-settlement/status` SERVES A STORED FILE. CHECK `epoch` FIRST
+`[measured 08-16]`.** It read `2026-08-06T11:03:17Z` — ten days stale, frozen since the
+autorun was disabled. `settled 0 / pending 8276 of 8276 / graded_rows_available 1` describes
+08-06, not today. Quoting it as current is how this lane opened on a wrong premise.
+
+**`/api/board/book-grid` HARD-CAPS `limit` AT 2000 `[measured 08-16]`** (`intelligence.py:2240`,
+`min(2000, ...)`). A `limit=4000` request returns 2000 of 3325 and every count off it is a
+floor. The `market=` filter is applied BEFORE the cap, so per-market fetches are exact.
+
+**`/api/ops/artifacts/export` RUNS ON WEB AND READS WEB'S DISK `[measured 08-16]`**, and is
+filtered by `HOT_ARTIFACT_PATTERNS` (`ops.py:1342`). It showed 3466 files under
+`mlb_source/source_artifacts/data/` and **zero** containing `/market/` — which says nothing
+about refresh-worker's disk, where the grading builder actually reads. A zero from it is
+not absence.
+
+**ALT-LINE PROJECTIONS `32186e28`/`c422f79a` VERIFIED PASS `[measured 08-16 17:2xZ]`.**
+Book grid **359 of 361** alt rows carry a projection (was 238 / 0); shortlist MLB alt rows
+with non-null `sim_component` **12 of 17** (was 0 of 9), mean rank 42.6 -> 37.6 pctile, no
+crowd-out. Caveat that matters: `sim_component` is non-null but **exactly 0.0 on main
+markets too** — `_SCORE_SIM_WEIGHT` is 0.0, so the fix moved alt rows onto the same
+degenerate value main rows already had. They are not sim-ranked.

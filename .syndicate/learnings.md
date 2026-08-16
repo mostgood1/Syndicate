@@ -2722,3 +2722,53 @@ the check.
   changelog entry.
 - Same family as [[feedback-instrument-blindness]]: a reading is evidence only
   once you know what it would say when things are wrong.
+
+## 2026-08-16 — OVERTURNED: "my commits are safe once the guard passes and `git show --stat HEAD` looks right"
+
+Four commits from one session — `61e2c21e`, `419cc238`, `bf643d72`, `ca80ec46` — each
+committed cleanly through an isolated index, each verified at the time with
+`git show --stat HEAD`, and each later **unreachable from any ref**. `git branch --contains`
+returned nothing for all four. HEAD carried **0** occurrences of `_freeze_market_dirs` while
+the working-tree file had 2, so the freeze fix existed only as an uncommitted modification.
+
+`main` is rewritten under you on this tree. Twice in the same session a lane header written
+to `lanes.md` was silently dropped between two appends, once leaving a checkpoint orphaned
+under an unrelated CLOSED lane. Work was also twice swept into another session's commit, and
+once a later commit restored an older `lanes.md` that removed it again.
+
+**The rule: a local commit on this worktree is not durable. Only a pushed ref is.**
+- After committing anything you care about, `git push origin <sha>:refs/heads/wip/<lane>`.
+  An unreachable object survives only until gc.
+- Verify the push **by content on the remote**, not by ancestry and not by the local commit:
+  `git ls-tree origin/<branch> <dir>` and compare blob hashes against `git hash-object <file>`.
+  (`git show <rev>:<path>` is mangled by Git Bash — a false "unknown revision" for a file that
+  is present.)
+- Before assuming your work is in `HEAD`, grep HEAD's copy for a marker from the change.
+  `git log` showing your commit is not the same as HEAD containing it.
+
+**Corollary already in the ledger, now with a fourth and fifth instance:** the commit-guard's
+suggested `git restore --staged` list has twice OMITTED a path it flagged in the same message
+(9 flagged / 8 listed, then 10 flagged / 8 listed). Re-verify `git diff --cached --stat` and
+`--diff-filter=D --name-only` yourself after running it. Landmines cleared this session
+included staged deletions of `book_shortlist.py`, `test_layer2_bettable_books_and_labels.py`,
+`test_prop_name_accent_fold.py` and `test_layer2_cross_file_compat.py` — all present on disk
+and in HEAD — plus pure reverts of `prop_projections.py`, `layer2_board.py` and
+`pipeline/layer2_shortlist.py`.
+
+## 2026-08-16 — FORBIDDEN: never let an UNATTENDED session fire a deploy, and do not rely on prose to stop it
+
+This session was launched by the `alt-line-shortlist-watch` scheduled task, whose prompt ends
+"Do not deploy, roll back, or change any source file." It went on to open a lane, edit
+`scripts/refresh_mlb_oddsapi.py` and commit — correctly, under live user direction — and was
+then asked to deploy. It stopped at the deploy.
+
+`state.md` already records `wnba-win-prob-counter-read` doing exactly this at 01:0x-01:2xZ the
+same day: an unattended task told not to deploy committed a 339-line module, claimed three
+services and fired deploys. The stated remedy is structural — no `RENDER_API_KEY` in the run
+environment, **or a claim tool that refuses an unattended holder**. Neither exists:
+`RENDER_API_KEY` is readable and `deploy_claim.py acquire` would have granted both claims.
+
+Secondary discovery, and it is the tell: **`send_message` is unavailable in unattended
+sessions**, in both directions. So the one session that most needs to coordinate before a
+deploy is the one that structurally cannot. If a run cannot message its peers, it must not
+take an action that requires coordinating with them.
