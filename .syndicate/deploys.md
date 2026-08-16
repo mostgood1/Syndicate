@@ -8332,3 +8332,76 @@ No current defect depends on it. It removes a FUTURE failure mode. If the next
 worker deploy is days away that is acceptable; it should simply not be dropped,
 because the cost of forgetting it is another blank board and the cost of
 carrying it is three blobs.
+
+---
+
+## 2026-08-16 21:2xZ — outstanding #6, soccer bucket-A — **SEPARATED.** Two causes, both real, and the accent fix reached further than intended
+
+### The discriminator, and why it is per GAME not per player
+A fixture the sim never ran has **zero** projected rows of any kind; a fixture it
+DID run but whose roster missed a player has some. That distinction is
+computable straight off the served payload and needs no artifact access.
+
+Measured 2026-08-16 21:1xZ, 66 soccer games:
+
+```
+                                            games  dark prop rows  distinct players
+UNRUN FIXTURE   (zero projections anywhere)    14           1,916               414
+LINEUP/ROSTER   (game projected, player not)   41           2,554               452
+```
+
+**~43% unrun, ~57% lineup.** Both are substantial; neither explains the other.
+
+**Unrun is concentrated, and that is the lead:** mls **10** of 14, la_liga 3,
+serie_a 1. Lineup misses are spread evenly across all six leagues (mls 15,
+la_liga 7, epl 6, ligue_1 6, eredivisie 4, serie_a 3), which is what a roster
+gap looks like rather than a pipeline outage.
+
+The 14 unrun leagues overlap the 5 games still in `state: unknown` (la_liga 3,
+mls 1, serie_a 1). Suggestive of a common upstream cause; **not established**,
+and worth one measurement before anyone assumes it.
+
+### The accent fold already applies here — soccer imports the same function
+`soccer_projections.py:36` imports `_norm_name` from `prop_projections` and uses
+it for every player join (`:219`, `:467`, `:524`, `:545`). So today's fold
+shipped to soccer at the same moment it shipped to MLB, and the numbers above
+are **already post-fix**. Accents are not what is left.
+
+### AND IT REPAIRED A DOCUMENTED SOCCER DEFECT AS A SIDE EFFECT
+`soccer_projections.py:118-140` records that `_norm_team` (which *is*
+`_norm_name`) shattered non-ASCII club names —
+
+```
+'Vitória SC' -> 'vit ria sc'
+```
+
+— while `teams_match`'s alias map is keyed on `normalize` ('vitória sc') and
+`fold_accents` ('vitoria sc'), **neither of which is 'vit ria sc'**. The note
+records `teams_match(normed, normed)` as **False** for exactly that pair, and
+says **9 of 204 configured clubs across 5 leagues had a dead alias fallback**
+(Atlético Madrid, Alavés, Vitória SC, …). Their workaround was to feed the alias
+fallback RAW names.
+
+Re-measured after the fold:
+
+```
+Vitória SC      -> vitoria sc      raw match True | normed match True
+Atlético Madrid -> atletico madrid raw match True | normed match True
+Alavés          -> alaves          raw match True | normed match True
+```
+
+**Both paths now work.** The raw-name workaround is untouched and still correct;
+the normalised path it was written to route around is no longer broken. 34 tests
+pass across `test_soccer_projections`, `test_soccer_adapter` and the fold suite.
+
+Recorded because it cuts both ways: a shared normaliser is exactly the kind of
+function where a fix lands in modules that never asked for it, and I checked the
+one module that had DOCUMENTED depending on the old behaviour before assuming it
+was safe.
+
+### What #6 leaves open, stated as work not findings
+- **Why 14 fixtures are unrun, MLS-heavy.** Artifact-side; belongs with
+  `build_soccer_artifacts.py` (a claimed file of the orphaned
+  `soccer-model-coverage` lane).
+- **Why 452 players are missing from rosters the sim DID run.** Genuine roster
+  coverage, not a join bug — the join has now been eliminated as the cause.
