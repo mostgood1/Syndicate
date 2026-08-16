@@ -3989,6 +3989,12 @@ def _fixture_aware_cadence_enabled() -> bool:
 # unbounded look-ahead is the shape that produced the 2026-07-25 OOM elsewhere in
 # this file.
 _NEXT_FIXTURE_LOOKAHEAD_DAYS = 4
+
+# Sports the fixture gate must NOT touch yet. See the exclusion branch in
+# `_pregame_sweep_interval_for_tick` for the measurement -- soccer's sport-level
+# fixture clock is the minimum across ten leagues, which makes the gate
+# counterproductive until per-league scoping (plan step 1c) lands.
+_FIXTURE_CADENCE_EXCLUDED_SPORTS: frozenset[str] = frozenset({"soccer"})
 _NEXT_FIXTURE_CACHE: dict[str, tuple[float, float | None]] = {}
 _NEXT_FIXTURE_CACHE_TTL_SECONDS = 900.0
 
@@ -4103,6 +4109,32 @@ def _pregame_sweep_interval_for_tick(sport: str, *, now_epoch: float | None = No
 		# AN EXPLICIT ENV VALUE STILL WINS, deliberately: the per-sport override is
 		# the documented escape hatch for the incident where this gate misbehaves,
 		# so the gate must not be able to override the thing that turns it off.
+		return _pregame_sweep_interval_seconds(sport)
+	if sport in _FIXTURE_CADENCE_EXCLUDED_SPORTS:
+		# SOCCER IS EXCLUDED, AND THE MEASUREMENT SAYS SO -- this gate makes it
+		# WORSE, not better, at sport granularity.
+		#
+		# `_next_fixture_epoch` resolves ONE fixture clock per sport, but soccer's
+		# "sport" is ten leagues on ten different calendars, so the gap it returns
+		# is the MINIMUM across all of them and is therefore almost always small.
+		# Modelled over 336 hours against the real 2026 fixture lists:
+		#
+		#     sport granularity   24h tier reached in   0.0% of hours
+		#                         -> 5.08 sweeps/day against 3.00 today  (+69%)
+		#     per-league          24h tier reached in  49.3% of league-hours
+		#                         -> 3.03 sweeps/day per league  (flat, redistributed)
+		#
+		# So the benefit for soccer lives ENTIRELY in per-league scoping (plan step
+		# 1c), and applying the gate before that lands would increase both the call
+		# volume and the very MLB-peak overlap this lane exists to remove. 1c is
+		# blocked on lane `soccer-model-coverage` holding the soccer scripts.
+		#
+		# The single-league sports are unaffected by this and are why the gate is
+		# still worth shipping: mlb 12.00 -> 5.45/day, wnba 12.00 -> 5.83,
+		# nfl_preseason 12.00 -> 3.56.
+		#
+		# REMOVE THIS EXCLUSION AS PART OF 1c, not before, and re-run the model.
+		print(f"[live_refresh_loop] FIXTURE_CADENCE sport={sport} interval=baseline reason=excluded_pending_per_league_scoping", flush=True)
 		return _pregame_sweep_interval_seconds(sport)
 	if _fixture_aware_cadence_enabled():
 		resolved, reason = _fixture_aware_interval_seconds(
