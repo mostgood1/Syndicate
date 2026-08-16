@@ -1547,3 +1547,23 @@ subtract, it moves with whatever the worker has spawned.
 COST: five rebases across five live SHAs (`6f512ffa` -> `129395cc` -> `32186e28`
 -> `2c14d9ae` -> `57a437d5`) and four claim holders. On a worker with five
 sessions deploying, a two-file change should ride along, not chase.
+
+#### live-game-line-projection — 2026-08-16 ~01:1xZ — THE PREMISE IS TRUE: 25 LIVE GAME-LINE EDGES PUBLISHED
+- **Tier 5's goal is met in production.** `index_size 8 / considered 32 /
+  projected 32 / edged 25 / prob_interval_swamps_edge 7`, on an artifact
+  provably generated after the deploy. Baseline `index 3 / projected 12 /
+  sim_count_unusable 12 / edged 0`.
+- **Live:** live-odds-worker `c4116ab6` (simsRun stamp), refresh-worker
+  `1f36d718` (the join). Web needs neither.
+- **THE THREE DROPS, all shipped and measured:** D1 merge condition
+  (`0e0b0aa1`), D2 carry-forward (`4bd7dbb3`), D3 join+wiring (`758a89fa`) plus
+  the `simsRun` stamp (`49797f4b`) that made the precision gate reachable.
+- **NOT ESTABLISHED — the 25 edges are UNVALIDATED.** Clearing 2 sigma at 120
+  sims means the edge beats the ESTIMATOR'S noise, not that the model is right.
+  No CLV, no settlement, no backtest. **Next work is evaluation, not more
+  plumbing** — game lines carry 100% Pinnacle coverage, the strongest position
+  on the platform.
+- **OPEN:** why `index_size` was 3 earlier and 8 now is unexplained; Drop 2's
+  carry-forward has still never been observed firing; the tally is MLB-only.
+- **I no longer hold the live-odds-worker claim** — `clamp-fix-to-workers` took
+  it ~00:34 and my last two fires went over it. Not force-released; theirs.
