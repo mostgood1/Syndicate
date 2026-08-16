@@ -5321,3 +5321,39 @@ not crossed and no in-flight sim was killed.
 
 **Rollback:** `POST /v1/services/srv-d88ahvrbc2fs73eodu30/deploys` with
 `{"commitId": "fa1871cf..."}` — the exact SHA that was live at 03:31Z.
+
+### MEASURED 2026-08-16 03:38–03:40Z — web `ebd5f677` — **PASS**
+
+Deploy `dep-da0itvpt0dsc739pj3n0` reported `live` at **03:38:07.648Z** (6m56s
+from 03:31:11Z). Gated on the affirmative token `live`, not on the absence of a
+failure string.
+
+    read (server_time)   artifact generated_at   live_gamelines   live_gameline_ledger
+    03:38:28.543Z        03:37:13.853Z           object           object
+    03:38:57.335Z        03:37:13.853Z           object           object
+    03:39:43.233Z        03:39:36.922Z           object           object
+
+    live_gamelines       considered 8  projected 2  priceable 0  edged 0
+                         withheld 8 = {segment_is_not_full_game: 6,
+                                       prob_interval_swamps_edge: 2}
+                         index_size 10
+    live_gameline_ledger candidates 0  written 0  enabled true
+
+**Pre-state was `null` for BOTH keys** (03:0xZ, recorded in the pending row
+above before the deploy). **Two different artifacts** — 03:37:13 and 03:39:36 —
+both served them, so this is two builds, not two reads of one.
+
+**Why one read would in fact have been enough here, stated so the rule is not
+cargo-culted:** the artifact already carried both keys, proven at 03:00Z by
+streaming the raw file. The only producer between the code and the number was
+the route. The "two lags in series" rule binds when a snapshot sits upstream of
+the artifact; it does not here, and saying which applies is the point.
+
+**`written: 0` is expected and is NOT this deploy's business.** refresh-worker
+still runs the v1 recorder, whose `candidates` is 0 because 0 of 8 rows are
+priceable. **The measurement this unblocks has not been taken** — it needs the
+worker half, which `refresh-worker-oom-recurrence` still holds.
+
+**Cost:** fired 22:31 Central with 2 MLB games live; the board 502'd during a
+~7-minute stop-then-start swap. No worker restarted; no sim killed; the OOM
+lane's hold was not crossed. `render.yaml` untouched, so no `blueprint_sync`.

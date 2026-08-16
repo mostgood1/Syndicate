@@ -44,3 +44,40 @@ verify: `/api/board/book-grid?sport=mlb&date=<today>&limit=1` returns
 rollback: previous deployed sha — read it at deploy time from
         `/v1/services/srv-d88ahvrbc2fs73eodu30/deploys`. **Do not assume it is
         an ancestor of main**: web runs a deploy branch.
+
+---
+
+## RESULT — SHIPPED AND MEASURED 2026-08-16 03:38Z
+
+**Deployed `ebd5f677`, NOT `639ecce0`.** This request named a sha on `main`; the
+preflight failed it. `main` is not an ancestor of what web runs — the live SHA
+was `fa1871cf` and **33 commits were live on the service and absent from
+`origin/main`**, including the opt-in per-recommendation `clv_pct` block
+(`484221bd`) and `4316c907` ("a close stamped after first pitch is an in-play
+price"). Deploying `main` would have reverted all 33. Re-parented on the live
+SHA. The request's own "check what else rides along" paragraph is what caught it.
+
+`dep-da0itvpt0dsc739pj3n0`, fired 03:31:11Z, `live` **03:38:07.648Z** (6m56s).
+
+**MEASURED — the pre-registered predicate, met:**
+
+    before (03:0xZ)   live_gamelines: null        live_gameline_ledger: null
+    after  (03:38Z)   live_gamelines: {...}       live_gameline_ledger: {...}
+
+    03:38:28Z  artifact 03:37:13.853Z  considered 8  index_size 10  written 0
+    03:38:57Z  artifact 03:37:13.853Z  considered 8  index_size 10  written 0
+    03:39:43Z  artifact 03:39:36.922Z  considered 8  index_size 10  written 0
+
+**Two DIFFERENT artifacts, both serving the keys** — not two reads of one build,
+which is the distinction the "two lags in series" rule exists for. The
+discriminator is unambiguous here: the artifact already carried both keys
+(proven at 03:00Z off the raw stream), so nothing but the route could have
+turned `null` into an object.
+
+**`written: 0` is EXPECTED and is not this deploy's business.** The recorder
+still runs v1 on refresh-worker, where `candidates: 0` because 0 of 8 rows are
+priceable. That is the worker request, still held.
+
+**Cost recorded, not netted out:** fired 22:31 Central with 2 MLB games live, so
+the board 502'd for part of a ~7-minute swap. No worker restarted; the OOM lane's
+hold was not crossed and no in-flight sim was killed.
