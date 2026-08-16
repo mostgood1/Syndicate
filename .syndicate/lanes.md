@@ -1450,7 +1450,7 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
-### clamp-fix-to-workers — OPEN — **refresh-worker SHIPPED `57a437d5` (live 00:23:04Z, 0 clamp sites by content). live-odds-worker DEFERRED to a quiet window by user decision — `079cc42b` ready. VERIFICATION STILL OPEN: post-deploy read was `no_trigger` on a 12-row slate** — opened 2026-08-15 — session: clamp-fix-verification-watch
+### clamp-fix-to-workers — OPEN — **CHECKPOINTED 2026-08-16 01:4xZ. refresh-worker SHIPPED `57a437d5` (live 00:23:04Z, 0 clamp sites by content). live-odds-worker DEFERRED by user decision — `079cc42b` ready, re-cut before shipping. THE ONLY OPEN WORK IS VERIFICATION: 2 post-deploy reads (00:24Z, 01:30Z) both `no_trigger`, which proves nothing** — opened 2026-08-15 — session: clamp-fix-verification-watch
 - Goal: the ±4900 clamp stops being published. **Testable outcome:**
   `py -3 scripts/watch_clamp_trigger.py --once` returns `POST_FIX_OK` on a slate
   that carries an out-of-clamp probability.
@@ -1590,3 +1590,81 @@ sessions deploying, a two-file change should ride along, not chase.
   carry-forward has still never been observed firing; the tally is MLB-only.
 - **I no longer hold the live-odds-worker claim** — `clamp-fix-to-workers` took
   it ~00:34 and my last two fires went over it. Not force-released; theirs.
+
+- **CHECKPOINT 2026-08-16 01:4xZ — state of the lane for whoever picks it up.**
+  - All deploy claims RELEASED. Nothing held by this session.
+  - Committed: `86ee112f` (falsification), `0f70969b` (lane), `25e34c63`
+    (deploy record + 2 learnings), `1b76c232` (defer + `#439`), `1bd520c2`
+    (state.md + the claim-target learning).
+  - **NEXT ACTION: run `py -3 scripts/watch_clamp_trigger.py --once` when
+    games are IN PLAY.** Both real triggers (23:10Z, 23:15Z) came from live
+    in-play markets; the two `no_trigger` reads were a pregame board with
+    extremes 0.0687/0.8904. A one-off task fires 2026-08-15 21:31 CDT and the
+    recurring `clamp-fix-verification-watch` runs every 2h.
+  - **`POST_FIX_OK` closes `#439` item 1.** `PRE_FIX_MISPRICE` now that
+    refresh-worker is clean would falsify the intelligence-state attribution —
+    that is this lane's stated falsification test, and it is still live.
+  - Session log: `.syndicate/log/2026-08-15.md`, final section.
+
+### slate-size-headroom — CLOSED 2026-08-16 — UNKNOWN FROM HISTORY (slate range is 1 game wide; naive fit gives an absurd +703MB/game). Solid: max peak 3,518MB = 85.9%, 578MB headroom — opened 2026-08-16 — session: memory-cutover-ship
+- Goal: answer "at what slate size does the worker cross 4GiB", with a number and
+  an honest error bar. Post-`#435` peak is **3,527.8MB (86.1%)** on a 15-game MLB
+  slate — 568MB of headroom. Whether that survives a 16-18 game night is
+  currently a guess, and the wrong way to find out is on a Sunday.
+- Files: none claimed — READ-ONLY. Measurement from production history first.
+- **METHOD, and the order matters:** model from EXISTING data before running any
+  experiment. Every board build already emits `game_count` alongside
+  `CONTAINER_MEMORY`, so the relationship between slate size and peak anon is
+  already recorded across days. An experiment that forces a large slate on the
+  live worker risks repeated OOM kills to learn something the logs may already
+  contain.
+- **Hypothesis:** peak anon scales roughly linearly with MLB game count, and the
+  crossing point is within reach of a real slate (16-18 games).
+- **Falsification test:** if peak anon shows no usable relationship to game count
+  — because the quote-shard ramp and time-of-day dominate it — then the model is
+  unavailable from history and the honest answer is "unknown, and a stress test
+  is the only way", stated as such rather than fitted anyway.
+- **KNOWN CONFOUND, declared up front:** slate size and shard size are
+  correlated (more games -> more quotes -> bigger shard) AND the shard grows
+  through the day independently. A naive fit will attribute shard growth to game
+  count. Any number produced must say which of the two it actually measured.
+- Verification: a table of (game_count, peak anon) with the sample count per
+  bucket, and an explicit statement of what the confound leaves unresolved.
+- Blocked by: none.
+
+#### slate-size-headroom — CLOSED 2026-08-16 01:3xZ — FALSIFICATION FIRED, NO NUMBER PRODUCED
+249 complete board builds, 20,000 samples, 20:42Z-01:31Z:
+
+    games  builds  median peak   max peak  % of 4096   hours seen
+       14      14        835.4     1672.2      40.8%   00,01,21,22,23
+       15     235       1538.1     3518.0      85.9%   00,01,20,21,22,23
+
+**THE OBSERVED SLATE RANGE IS ONE GAME WIDE.** Every MLB slate in the post-fix
+window was 14 or 15 games, so there is no variation to model against.
+
+**AND THE NAIVE FIT IS SELF-EVIDENTLY WRONG: +702.7 MB PER GAME.** No single
+baseball game costs 700MB. Two buckets one game apart differing by 703MB means
+they are different KINDS of build, not different sizes — the 14-game bucket has
+18 builds against 235 and sits at a different point in the quote-shard ramp. Its
+extrapolation ("~19 games to 4096MB") is an artifact and **must not be quoted.**
+
+**SO THE ANSWER IS: UNKNOWN FROM HISTORY**, exactly as this lane's falsification
+test specified. Fitting it anyway would have produced a confident number with no
+support, which is the failure mode this whole investigation kept hitting.
+
+WHAT IS SOLID FROM THE SAME DATA:
+- max peak **3,518.0MB = 85.9%** of the 4,096MB ceiling, over 249 builds.
+- **578MB of headroom** at that peak.
+- Zero OOM kills in 7h15m post-fix, across a full evening ramp.
+
+**WHY I AM NOT RUNNING THE EXPERIMENT WITHOUT A DECISION.** Answering this
+empirically means forcing an oversized slate on the live worker to find the
+crossing point — i.e. deliberately OOM-killing production, repeatedly, to learn
+a number. A local run cannot substitute: `learnings.md` records local
+underestimating production by ~40x on this exact code path.
+
+**THE CHEAPER DECISION IS CAPACITY, NOT DIAGNOSIS.** 578MB of headroom on a
+worker that legitimately holds ~1.6GB and spawns 8-10 children is thin. Raising
+the plan removes the question; measuring it costs production outages to answer
+something the answer to which is "add memory" either way. That is an owner call,
+and `render.yaml` is a `blueprint_sync` change — it applies to production on push.

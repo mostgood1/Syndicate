@@ -1466,3 +1466,25 @@ and 3× on another the same night. Sibling rules:
 inert) and [[project_web_runs_a_deploy_branch_not_main]] (ancestry proves
 nothing here). This is the same shape one level up: I checked the artifact of an
 *intention* instead of the artifact of an *action*.
+
+### 2026-08-16 — a one-game-wide range cannot answer "how does it scale", and the fit will look plausible anyway
+
+- **What we believed:** production history could answer "at what slate size does
+  the worker cross 4GiB", because every board build records `game_count`
+  alongside peak anon. 249 builds looked like plenty.
+- **What was actually true:** all 249 builds were 14 or 15 games. The observed
+  range was ONE GAME WIDE, so there was nothing to model. The naive fit came out
+  at **+702.7 MB per game** — no baseball game costs 700MB — and would have
+  extrapolated to "~19 games", a number with no support that reads as precise.
+- **How we found out:** the absurdity of the per-unit figure, not the sample
+  count. 249 builds and 20,000 samples all pass an "is this enough data" check;
+  the range check is the one that fails. The two buckets differed in KIND (18
+  builds vs 235, different points in the quote-shard ramp), not in size.
+- **The rule going forward:** before fitting anything against a variable, print
+  its RANGE and the count per bucket. n is not the constraint — spread is. And
+  sanity-check the per-unit coefficient against physical plausibility before
+  quoting any extrapolation: if one unit of X appears to cost 700MB, the model is
+  measuring something other than X.
+- **Cost:** none. The lane's falsification test was written before measuring and
+  it fired exactly as specified, which is the only reason a confident wrong
+  number was not produced and acted on.
