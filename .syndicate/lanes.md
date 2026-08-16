@@ -3759,3 +3759,35 @@ and then failed the thing it was checking, which is the point of running it.
   - **Four earlier commits of this lane went unreachable** (`61e2c21e`, `419cc238`, `bf643d72`, `ca80ec46`) — `main` was rewritten under the session. Everything was re-landed from the working tree. See `learnings.md` 2026-08-16 "a local commit on this worktree is not durable".
   - Deploy runbook: `.syndicate/handoff_deploy_freeze_reader_tree.md`. **Must be executed by an ATTENDED session** — this one is a scheduled-task run and must not fire deploys.
   - **NEXT ACTION:** merge the wip branch (or cherry-pick `8ad48ac8`), then follow the handoff — both workers in one lull, ROUTE ONE warm-up, verify by content — and re-aim `grading-freeze-payload-check` from date 08-16 to 08-17 firing 08-18, because as armed it reads a date the fix cannot affect.
+
+### sim-scheduling — **DEPLOYED AND MEASURED 2026-08-16 21:2xZ.** `#441` verified live; `#445` shipped but unverifiable today; layer2 (both halves) shipped and measured — session: sim-scheduling
+
+- **Two deploys, each cut on that service's OWN live SHA, never on `main`:**
+  - refresh-worker `c324447d` (20:33:23Z) — `#445`, `#441` position-2 + skip
+    logging, layer2 producer. Later superseded by another lane's `a9e5d3d6`
+    (20:50:14Z), which DESCENDS from it and preserves both fixes (checked).
+  - web `73e59f51` (21:21:05Z) — the three `syndicate/features/shared/` modules
+    (`layer2_board`, `opportunity_signals`, `book_shortlist` NEW). Layer 2's UI
+    files were ALREADY live; verified per file by blob rather than assumed.
+- **VERIFIED:** `#441` at dispatch position 2 in the running process; layer2
+  `no_bettable_book` / `repriced_to_bettable` non-zero on 3 sports on the served
+  payload. Numbers in `state.md` and `deploys.md`.
+- **DEFECT I SHIPPED AND ITS CLOSURE:** `c324447d` landed a caller without its
+  callee; ~17 min of zero layer2 rows, hidden by a per-sport `except`. Closed by
+  `a9e5d3d6`. Full rule in `learnings.md` (check BOTH directions across a cut
+  call boundary; ship callee-first).
+- **NOT DONE / handed on:**
+  - `#445` — cannot be closed until an ncaaf projection dispatches or the season
+    opens (~08-29). Two readings still unseparated; see `todo.md`.
+  - `#447` (NEW) — 6 `test_layer2_shortlist_wiring` tests are RED on live AND on
+    `main`. `main` is a strict subset of live (6 vs 7), which was enough to clear
+    the deploy as "not a regression" and is NOT a clean bill of health. Unowned.
+  - `#443` — stale-PID silent stall. Still open, still unowned.
+  - Layer 1 board lane needed NOTHING from me: its fix was already live and its
+    falsification test had passed.
+- **Files touched (all committed, worktree clean):** `scripts/fetch_nfl_pbp.py`,
+  `scripts/run_refresh_worker.py`, `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `syndicate/features/shared/live_refresh_loop.py`, `syndicate/features/nfl/sources.py`,
+  `scripts/census_kickoff_hours.py`, `scripts/watch_branch_overlap.py`, plus tests.
+- **Plan artifact:** `.syndicate/plan_2026-08-16_sim_scheduling.md` (`#440`) —
+  phases 0/1 landed, phases 2-9 untouched.

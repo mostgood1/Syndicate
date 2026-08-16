@@ -2437,3 +2437,42 @@ with non-null `sim_component` **12 of 17** (was 0 of 9), mean rank 42.6 -> 37.6 
 crowd-out. Caveat that matters: `sim_component` is non-null but **exactly 0.0 on main
 markets too** — `_SCORE_SIM_WEIGHT` is 0.0, so the fix moved alt rows onto the same
 degenerate value main rows already had. They are not sim-ranked.
+
+## 2026-08-16 21:2xZ — VERIFIED (sim-scheduling lane)
+
+Deployed SHAs at this instant (they go stale in minutes — re-read before using):
+
+| service | live SHA | finished |
+|---|---|---|
+| web | `73e59f51` | 21:20:12Z |
+| refresh-worker | `a9e5d3d6` | 20:50:14Z |
+| live-odds-worker | `46b5ec66` | 19:47:16Z |
+
+**`#441` — VERIFIED IN THE RUNNING PROCESS.** The NFL pbp autorun sits at
+dispatch position 2 and every decline path states a reason. Proof is the ORDER
+inside one covered tick, 63 ms apart:
+`RECONCILIATION_AUTORUN_GATED` -> `NFL_PBP_FETCH_SKIPPED reason=rate_limited
+marker_age_s=8162/interval_s=86400`. `rate_limited` is the CORRECT outcome (the
+fetch succeeded ~18:31Z; interval is 24h).
+
+**Production had SILENTLY REVERTED `#441` to position 6** before this. Found by
+diffing the DEPLOYED tree by content; ancestry would not have shown it. Assume
+any fix can be reverted by another lane's deploy and re-check by content.
+
+**Layer 2 counters — VERIFIED ON THE SERVED PAYLOAD**
+(`/api/board/layer2-shortlist`, HTTP 200, `rows: 51`):
+
+| sport | grid_rows | no_bettable_book | repriced_to_bettable |
+|---|---|---|---|
+| mlb | 3296 | 87 | 1667 |
+| nfl | 1425 | 76 | 586 |
+| soccer | 8591 | 881 | 1586 |
+| ncaaf | **0** | — | — |
+
+No sport carries an `error` key, which disproves the caller/callee `TypeError`
+described in `learnings.md` for this date.
+
+**`#445` — SHIPPED, NOT VERIFIED, AND NOT VERIFIABLE TODAY.** NCAAF has no slate
+on 2026-08-16 (season opens ~08-29); `layer1?sport=ncaaf` returns `games=0
+empty_reason=no_precomputed_grid_artifact`. Do not close on the absence of the
+old crash line. See `todo.md` `#445` UPDATE for the two unseparated readings.
