@@ -25,7 +25,7 @@ from syndicate.features.shared.live_gameline_ledger import (
 
 
 def _row(*, priceable=True, model=0.6, market=0.4069, edge=19.31, segment="full",
-         books=("pinnacle", "fanduel"), game_pk=824966):
+         books=("pinnacle", "fanduel"), game_pk=824966, reason=None):
     return {
         "kind": "game", "market": "h2h", "segment": segment,
         "event_id": "1145a9db", "home_team": "Athletics", "away_team": "Texas Rangers",
@@ -35,6 +35,7 @@ def _row(*, priceable=True, model=0.6, market=0.4069, edge=19.31, segment="full"
             "game_pk": game_pk, "priceable": priceable, "model_prob": model,
             "market_prob": market, "edge_pp": edge, "prob_std_err": 0.04405,
             "sims_run": 120, "as_of": None, "carried_forward": False,
+            "withheld_reason": reason, "sigma": 2.0,
         },
     }
 
@@ -51,10 +52,29 @@ class TestBuildRecords:
         assert rec["sims_run"] == 120 and rec["prob_std_err"] == 0.04405
         assert rec["quote_age_seconds"] == 42.5
 
-    def test_a_withheld_row_is_not_recorded(self):
-        """Refusals already state their reason in the artifact counters;
-        recording thousands per build would bury the few scoreable rows."""
-        assert build_records([_row(priceable=False)], sport="mlb", date_str="2026-08-15") == []
+    def test_a_WITHHELD_row_IS_recorded_in_v2_carrying_its_reason(self):
+        """v1 skipped these and therefore recorded nothing at all.
+
+        Measured 2026-08-16 03:00Z on a live slate: considered 8, projected 2,
+        **priceable 0**. v1's population was empty on a real slate, so the file
+        could never answer anything. `priceable` survives as a field, which is
+        what keeps v1's question askable over a v2 file.
+        """
+        rec = build_records([_row(priceable=False, reason="prob_interval_swamps_edge")],
+                            sport="mlb", date_str="2026-08-15")[0]
+        assert rec["priceable"] is False
+        assert rec["withheld_reason"] == "prob_interval_swamps_edge"
+        assert rec["model_home_win_prob"] == 0.6
+
+    def test_a_row_the_join_never_projected_is_still_not_recorded(self):
+        """Wrong segment / no live projection never get a `live_gameline` block.
+
+        The gate is the block's PRESENCE, so those rows stay out without a second
+        rule here re-deciding what the join already decided.
+        """
+        row = _row()
+        row.pop("live_gameline")
+        assert build_records([row], sport="mlb", date_str="d") == []
 
     def test_sharp_books_and_pinnacle_are_flagged_separately(self):
         """`state.md`'s 100% sharp coverage is the sharp SET; Pinnacle
@@ -87,6 +107,19 @@ class TestDeduplication:
         assert out["written"] == 1
         lines = p.read_text(encoding="utf-8").strip().splitlines()
         assert [json.loads(x)["market_fair_prob"] for x in lines] == [0.4069, 0.4500]
+
+    def test_crossing_the_noise_bar_is_MOVEMENT_even_with_identical_numbers(self, tmp_path):
+        """`priceable` depends on `sims_run` through the standard error, and
+        `sims_run` is not one of the compared numbers. Without `priceable` in the
+        comparison, the moment a row becomes publishable would be dropped as
+        'unchanged' — which is the single event this file exists to timestamp."""
+        p = tmp_path / "led.jsonl"
+        append_records(p, build_records([_row(priceable=False, reason="prob_interval_swamps_edge")],
+                                        sport="mlb", date_str="d"))
+        out = append_records(p, build_records([_row(priceable=True)], sport="mlb", date_str="d"))
+        assert out["written"] == 1 and out["skipped_unchanged"] == 0
+        lines = p.read_text(encoding="utf-8").strip().splitlines()
+        assert [json.loads(x)["priceable"] for x in lines] == [False, True]
 
     def test_the_same_game_on_a_different_segment_is_a_different_record(self, tmp_path):
         p = tmp_path / "led.jsonl"

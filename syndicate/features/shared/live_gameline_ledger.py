@@ -45,7 +45,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-LEDGER_VERSION = 1
+# v1 recorded PRICEABLE rows only. v2 records every PROJECTED row and carries
+# `priceable` / `withheld_reason` per record. **The version is load-bearing for
+# any reader**: a rate computed across both populations is a rate over two
+# different denominators. Filter on `v` before aggregating, never on date.
+LEDGER_VERSION = 2
 
 # A live slate tops out around 15 games x a handful of priceable markets. 500
 # is far above that and still bounds a pathological build.
@@ -107,7 +111,12 @@ def _moved(previous: Mapping[str, Any] | None, current: Mapping[str, Any]) -> bo
     """
     if previous is None:
         return True
-    for field in ("model_home_win_prob", "market_fair_prob", "edge_pp"):
+    # `priceable` is compared even though it is derived: it depends on `sims_run`
+    # through the standard error, and `sims_run` is NOT one of the compared
+    # numbers. A row can therefore cross the noise bar with identical model and
+    # market probabilities, and that crossing is exactly the event this file
+    # exists to timestamp.
+    for field in ("model_home_win_prob", "market_fair_prob", "edge_pp", "priceable"):
         if previous.get(field) != current.get(field):
             return True
     return False
@@ -120,11 +129,28 @@ def build_records(
     date_str: str,
     generated_at: str | None = None,
 ) -> list[dict[str, Any]]:
-    """One record per PRICEABLE live game-line row on this grid.
+    """One record per PROJECTED live game-line row on this grid.
 
-    Priceable only, deliberately. A withheld row already states its reason in
-    the artifact's counters, and recording thousands of refusals per build would
-    bury the handful of rows CLV can actually score.
+    **CHANGED IN v2, ON A MEASUREMENT THAT REFUTED v1's PREMISE.** v1 recorded
+    priceable rows only, justified by "recording thousands of refusals per build
+    would bury the handful of rows CLV can actually score." Measured 2026-08-16
+    03:00Z on a live slate: the ENTIRE live game-line population is **8 rows per
+    build, 2 of them projected, 0 priceable** — so `candidates` was 0 and the
+    ledger was never asked to write anything. There are no thousands. The
+    projected population costs ~2 records per build against a 20,000-record cap.
+
+    **Why this is not a widening for its own sake.** Priceable is a decision
+    about the ESTIMATOR'S noise at 120 sims, not about the model. Recording only
+    the rows that clear it means the file can only ever answer "did the tail that
+    cleared a 2σ bar beat the close" — a self-selected sample, with an n small
+    enough that the answer is unfalsifiable. Recording every projected row keeps
+    `priceable` as a FIELD, so that question is still askable, and adds the
+    denominator that makes it a rate.
+
+    The gate is presence of the join's own `live_gameline` block, which
+    `attach_live_gamelines` attaches on exactly the `projected=True` path — rows
+    refused earlier (wrong segment, no live projection) never get one, so they
+    stay out without a second rule here deciding it.
     """
     out: list[dict[str, Any]] = []
     if not isinstance(grid, (list, tuple)):
@@ -134,7 +160,7 @@ def build_records(
         if not isinstance(row, Mapping):
             continue
         lg = row.get("live_gameline")
-        if not isinstance(lg, Mapping) or not lg.get("priceable"):
+        if not isinstance(lg, Mapping):
             continue
         books = sorted({str(b).strip().lower() for b in (row.get("books") or []) if str(b).strip()})
         game = row.get("game") if isinstance(row.get("game"), Mapping) else {}
@@ -156,6 +182,14 @@ def build_records(
                 "model_home_win_prob": lg.get("model_prob"),
                 "market_fair_prob": lg.get("market_prob"),
                 "edge_pp": lg.get("edge_pp"),
+                # WHETHER THE BOARD WOULD HAVE SHOWN THIS EDGE, kept as a field
+                # rather than as a filter. A CLV pass restricted to
+                # `priceable: true` reproduces v1's population exactly; one that
+                # ignores it measures the model instead of the publish gate.
+                # Absent must never read as false, so both are written always.
+                "priceable": bool(lg.get("priceable")),
+                "withheld_reason": lg.get("withheld_reason"),
+                "sigma": lg.get("sigma"),
                 # --- what makes the number interpretable later ---
                 "prob_std_err": lg.get("prob_std_err"),
                 "sims_run": lg.get("sims_run"),
