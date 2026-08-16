@@ -583,6 +583,10 @@ def _market_summary_rank_key(item: dict[str, Any]) -> tuple[float, float]:
 # duplicated rather than imported.
 _LAY_MARKET_TOKENS = ("_lay",)
 
+# Sides that ARE the whole selection with no number attached. Mirrors what
+# `layer2_board._pick_label` reaches via `side.title()` when no team matches.
+_SELF_CONTAINED_SIDES = frozenset({"draw", "tie"})
+
 # Only the keys whose raw form reads badly mid-sentence. Everything else falls
 # through to underscores-to-spaces, which is already readable
 # ("batter_total_bases" -> "batter total bases").
@@ -688,12 +692,29 @@ def _bet_label(row: dict[str, Any]) -> str | None:
     # "Milwaukee Brewers ML" into "(Milwaukee Brewers vs Pittsburgh Pirates)" --
     # strictly worse than the string it replaced. This function improves a
     # label or leaves it alone; it never degrades one.
+    matchup = _matchup_text(row)
+
+    # A SIDE THAT IS A COMPLETE BET WITHOUT A NUMBER. "draw" on a three-way
+    # market names the whole selection; "over" does not. Whitelisted rather than
+    # inferred, because the failure directions differ: emitting "Over (A @ B)"
+    # names no bet, while dropping the draw leg loses a real one.
+    #
+    # Found 2026-08-16 by the NaN fix, which turned the served
+    # "draw nan (Indiana Fever @ Atlanta Dream)" into a `selection` of literally
+    # None -- less wrong, still not a bet. `layer2_board._pick_label` renders
+    # this row "Draw" (via `side.title()`), so returning None here was also a
+    # DRIFT between the two labellers that
+    # `test_bet_label_matches_layer2_pick_label_on_team_naming` did not catch:
+    # it only exercised home/away rows.
+    if side in _SELF_CONTAINED_SIDES:
+        label = side.title()
+        return f"{label} ({matchup})" if matchup else label
+
     if not side or not line_text:
         return None
 
     # over/under on a game total: the direction and number ARE the bet, and the
     # matchup is the only thing identifying which game.
-    matchup = _matchup_text(row)
     label = f"{side} {line_text}"
     return f"{label} ({matchup})" if matchup else label
 

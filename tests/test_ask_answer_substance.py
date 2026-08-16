@@ -593,3 +593,35 @@ def test_a_valid_line_keeps_its_own_formatting():
     row = {"side": "over", "line": 10.0, "market": "totals",
            "away_team": "Texas Rangers", "home_team": "Athletics"}
     assert adapter._bet_label(row) == "over 10.0 (Texas Rangers @ Athletics)"
+
+
+def test_draw_leg_names_a_bet_not_None():
+    """`draw nan (...)` -> None was less wrong, still not a bet.
+
+    Real served WNBA `h2h_3_way` row: `side: "Draw"`, `line: null`. The board
+    renders it "Draw"; this returned None, so the panel published a null
+    selection.
+    """
+    row = {"side": "Draw", "line": None, "market": "h2h_3_way",
+           "away_team": "Indiana Fever", "home_team": "Atlanta Dream"}
+    assert adapter._bet_label(row) == "Draw (Indiana Fever @ Atlanta Dream)"
+
+
+def test_a_bare_direction_still_names_no_bet():
+    """The whitelist must stay narrow: "over" without a number is not a bet."""
+    row = {"side": "over", "line": None, "market": "totals",
+           "away_team": "Indiana Fever", "home_team": "Atlanta Dream"}
+    assert adapter._bet_label(row) is None
+
+
+def test_bet_label_matches_pick_label_on_the_draw_leg_too():
+    """The anti-drift pin, extended to the row shape that slipped past it.
+
+    The original only exercised home/away rows, which is exactly why a draw leg
+    could return None here while the board rendered "Draw".
+    """
+    from syndicate.features.shared import layer2_board
+
+    row = {"side": "Draw", "line": None, "market": "h2h_3_way",
+           "away_team": "Indiana Fever", "home_team": "Atlanta Dream"}
+    assert adapter._bet_label(row).startswith(layer2_board._pick_label(row))
