@@ -2228,3 +2228,55 @@ Second-order, and the more useful half: the sampling schedule was aimed at the
 wrong hours. Two of three baseline records covered morning. A baseline that
 never covers the failure window measures the wrong distribution no matter how
 many samples it has. Cron moved `15 */4 * * *` → `45 19,22,1 * * *`.
+
+---
+
+## 2026-08-16 — NEAR-MISS: verifying against a ref NAME is not verifying
+
+**What almost shipped.** A three-file ledger commit that also silently reverted
+another session's in-flight feature: `book_shortlist.py` −129,
+`layer2_board.py` −172, `test_layer2_bettable_books_and_labels.py` −224, plus
+`deploys.md` −43 and `lanes.md` −75. It would have been a valid commit, pushed
+cleanly, with a message about ledger writes.
+
+**The mechanism.** I built a private index with `git read-tree origin/main`,
+then verified with `git diff --cached origin/main`. Between those two commands
+another session pushed. **Each command resolved the name independently**, so the
+index was built on one commit and checked against a different one. Everything
+present in the newer remote and absent from my older index read as a deletion —
+which is exactly what it would have become on push.
+
+**Why it nearly passed review.** The two checks disagreed and the RIGHT-LOOKING
+one was the misleading one:
+
+    git diff --cached --numstat <ref>   ->  +176 / -4     (looks perfect)
+    git diff --cached <ref> | grep -c   ->  569 removed   (looks like a bug)
+
+`+176/−4` was a true statement about a base that no longer existed. My first
+instinct was that my own `grep '^-[^-]'` was matching markdown bullets — i.e. to
+explain away the alarming number and keep the reassuring one. The discrepancy
+was the signal. **When two views of the same diff disagree, the assumption they
+share — here, that `<ref>` means one fixed thing — is the thing to doubt.**
+
+**The rule.** Resolve the base to a SHA **once**, and use that SHA for all three
+of build, verify, and commit parent:
+
+```bash
+BASE=$(git rev-parse origin/main)     # once
+git read-tree $BASE ; ... ; git diff --cached $BASE
+git commit-tree $TREE -p $BASE ...
+git push origin $COMMIT:refs/heads/main
+```
+
+With the SHA as the parent, a mid-flight push makes the **push** fail loudly as
+non-fast-forward. With a moving name, it makes the push SUCCEED and the revert
+invisible. Prefer the failure.
+
+**Where this sits.** Same shape as the SHA-pin bug fixed hours earlier in the
+oom-band tasks, approached from the opposite side: there a name was too rigid
+(a pinned SHA could not survive a rebase and read live fixes as reverted); here
+a name was too fluid (a branch ref could not survive a push and read live work
+as deleted). One rule covers both — **bind the identity you are reasoning about
+for as long as you reason about it, and check containment rather than equality
+at the edges.** On a tree with seven concurrent sessions, "current" is not a
+value. It is a race.
