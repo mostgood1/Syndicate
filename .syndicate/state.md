@@ -2415,6 +2415,11 @@ Read from every engine package and from live production, not from registry prose
   margin. **That older figure is STALE — do not judge Phase 1 against it.** Whether 4096.0
   indicates a leak is NOT established: `memory.current` includes page cache and anon vs
   inactive_file was never split.
+  **Provenance, verified 08-16 19:52Z:** records now carry `run_mode`. Of the 4
+  records on `main`, exactly **ONE** (`2026-08-16T19:52:23+00:00`, `samples=1967`)
+  is `run_mode="scheduled"`; the other three carry NO field and are UNKNOWN, not
+  scheduled. **Count only `scheduled` records toward the Phase 1 distribution** —
+  the 10:09Z and 10:37Z pair also double-counts ~4.5 of its 5 hours.
 
 ## LAYER 1 / LAYER 2 BOARDS — session briefs exist; three facts worth not re-deriving `[code read 08-16 11:2x CDT, NOT a production measurement]`
 
