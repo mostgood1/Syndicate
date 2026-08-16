@@ -2480,3 +2480,35 @@ and then failed the thing it was checking, which is the point of running it.
 - Files touched: `scripts/render_events.py` (new), `tests/test_render_events.py`
   (new, not in the opening claim — added when the verification step needed it).
   No service code, no config, no deploy.
+
+### ui-probe-settle-plateau — CLOSED 2026-08-16 — the settle now needs 2400ms of stillness, and a verdict resting on absence says so — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: `_settle()` can no longer return `settled: true` on a render that never
+  started. A verdict that rests on absence of change is labelled as such in the
+  JSON and in the printed row, so no reader can mistake it for a proven settle.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis: the 800ms artifact in `reports/ui_layout/rerun_2026-08-16.json`
+  (mlb desktop, `contentUnits min==max==33`, `renderSettled: true`) is the two-
+  equal-poll rule firing inside a pre-enrichment plateau, not a finished render.
+- Falsification test: if the growth curve on mlb desktop shows the fingerprint
+  genuinely constant from `load` through enrichment, the plateau theory is wrong
+  and the uniform 33 is a real slate.
+- **CONFIRMED, not falsified.** Replaying the old rule over a plateau-then-growth
+  tape returns `settledMs: 800, settled: true, finalFingerprint: 100` while the
+  render goes on to 400 — it stops inside the plateau and reports the
+  pre-enrichment DOM as final. On the live re-run with the new rule, mlb desktop
+  settled at **6800ms with `sawChange: true`** and desktop/mobile agree at
+  **41–53 pairs/card**; under the old rule the same two widths read 33–33 and
+  33–49. The contradiction is gone because the reading is no longer premature.
+- Verification: `tests/test_ui_layout_probe.py` 35 passed (27 pre-existing + 8
+  new); the plateau test asserts `settledMs > 800`, which the old rule fails by
+  construction. Live production run 2026-08-16 ~11:0x CDT, all 8 rows OK, no
+  false alarm, footer names exactly the six server-side rows.
+- What is NOT claimed: the quiet window is a longer window, not a proof. A
+  render that stays still for 2400ms and only then starts would still fool it.
+  What changed is that such a reading is now *labelled* (`sawChange: false`) and
+  fails as soon as a second reading contradicts it.
+- Blocked by: none
+- Governed by `learnings.md` 2026-08-16 "a wait loop must gate on an AFFIRMATIVE
+  success token, never on the absence of a failure string" — `_settle` was that
+  rule recurring in a render poll. Absence of DOM change cannot distinguish
+  "render finished" from "render has not started".

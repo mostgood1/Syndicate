@@ -509,6 +509,10 @@ MEASURE_JS = """
 
 SETTLE_POLL_MS = 400
 SETTLE_MAX_MS = 12000
+# How long the card DOM must hold STILL before the render is called finished.
+# Two consecutive equal polls -- 800ms, the floor the old loop could return --
+# was not enough: it fit inside a pre-enrichment plateau. See `_settle`.
+SETTLE_QUIET_MS = 2400
 
 _FINGERPRINT_JS = """() => document.querySelectorAll('.cards-game-card').length * 100000
   + document.querySelectorAll('.cards-data-pair').length * 100
@@ -526,22 +530,71 @@ def _settle(page) -> dict[str, Any]:
 
     The old fixed 600ms settle measured MLB at **74% of its final content**, so
     every MLB height, spread and content figure this probe produced was taken
-    mid-render -- including the ones used to argue about the height model. Two
-    consecutive equal fingerprints is the signal; a timeout is REPORTED, never
-    silently treated as settled.
+    mid-render -- including the ones used to argue about the height model. A
+    timeout is REPORTED, never silently treated as settled.
+
+    **Two consecutive equal fingerprints was itself too weak, and it shipped a
+    bad row.** `reports/ui_layout/rerun_2026-08-16.json`, mlb desktop: 15 cards
+    at `contentUnits {min: 33, max: 33, spread: 0}` -- every game carrying
+    identical data -- with `renderSettled: true` at `settledMs` **800**, which
+    is the floor the old loop could return (two equal 400ms polls). In the same
+    run, at the same slate, mobile read **33-49**, and 33 is exactly mobile's
+    minimum. A recheck eight minutes later read desktop 33-49 at 1600ms; the
+    08-15 baseline settled MLB at 6000/3600ms. The plateau, not the slate, was
+    uniform: the poll landed before enrichment started and never saw it.
+
+    Two changes follow from that.
+
+    **1. The quiet window is wall-clock, not a poll count.** `SETTLE_QUIET_MS`
+    of continuous stillness, so the floor is 2400ms rather than 800ms. The
+    growth curve above moves at every 400ms step through 3000ms, so no 2400ms
+    window inside it is quiet.
+
+    **2. A verdict that rests on absence says so.** Absence of DOM change
+    cannot distinguish "the render finished" from "the render has not started"
+    -- these are the same observation. Only *change, then stillness* is
+    affirmative evidence that the renderer ran to completion, so `sawChange`
+    is reported and travels onto the row. This is the ledger's rule about wait
+    loops gating on an affirmative success token rather than on the absence of
+    a failure, recurring in a render poll.
+
+    `sawChange: False` is NOT failed here: seven of the eight sports render
+    server-side and are complete at `load`, so a still DOM is their normal and
+    correct state. It is labelled, and `summarize` fails it only when a second
+    reading contradicts it.
     """
-    last = None
-    stable = 0
+    first = page.evaluate(_FINGERPRINT_JS)
+    last = first
+    saw_change = False
+    quiet_ms = 0
     waited = 0
     while waited < SETTLE_MAX_MS:
-        fp = page.evaluate(_FINGERPRINT_JS)
-        stable = stable + 1 if fp == last else 0
-        last = fp
-        if stable >= 2:
-            return {"settledMs": waited, "settled": True}
         page.wait_for_timeout(SETTLE_POLL_MS)
         waited += SETTLE_POLL_MS
-    return {"settledMs": waited, "settled": False}
+        fp = page.evaluate(_FINGERPRINT_JS)
+        if fp == last:
+            quiet_ms += SETTLE_POLL_MS
+        else:
+            saw_change = True
+            quiet_ms = 0
+            last = fp
+        if quiet_ms >= SETTLE_QUIET_MS:
+            return {
+                "settledMs": waited,
+                "settled": True,
+                "sawChange": saw_change,
+                "quietMs": quiet_ms,
+                "firstFingerprint": first,
+                "finalFingerprint": last,
+            }
+    return {
+        "settledMs": waited,
+        "settled": False,
+        "sawChange": saw_change,
+        "quietMs": quiet_ms,
+        "firstFingerprint": first,
+        "finalFingerprint": last,
+    }
 
 
 def _tab_click_through(page, sport: str) -> list[dict[str, Any]]:
@@ -636,6 +689,10 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
                         measured["cardWaitTimedOut"] = card_wait_timed_out
                         measured["settledMs"] = settle.get("settledMs")
                         measured["renderSettled"] = settle.get("settled")
+                        # Whether the settle verdict has affirmative evidence
+                        # behind it (the DOM changed, then went still) or rests
+                        # only on the absence of change. See `_settle`.
+                        measured["settleSawChange"] = settle.get("sawChange")
                         measured["touchTargetFailures"] = [
                             box
                             for box in measured.pop("tabBoxes", [])
@@ -654,9 +711,41 @@ def probe(base_url: str, sports: Sequence[str], timeout_ms: int) -> dict[str, An
     return report
 
 
+def _contradicted_width(sport_report: dict[str, Any]) -> str | None:
+    """The width whose content reading the other width contradicts.
+
+    `.cards-data-pair` count is a DOM fact, and no card renderer keys it on
+    viewport width -- checked against `syndicate/static/mlb/cards_source.js`,
+    which has no `matchMedia`/`innerWidth` branch. So the two widths must agree
+    on how much content the slate carries. When they disagree, one of the two
+    was measured before the slate finished arriving.
+
+    Returns the label that read LESS content **and** whose settle rested on the
+    absence of change -- the reading that has both a contradiction against it
+    and no affirmative evidence for it. That conjunction is what makes this
+    safe to fail on: a bare disagreement is not proof of an unfinished render,
+    because the widths are separate navigations and the slate can genuinely
+    grow between them. Returns None when the widths agree, when the short side
+    watched the DOM change, or when either side is missing the field (an older
+    report predates it, and must not be failed on it).
+    """
+    readings = {}
+    for label in VIEWPORTS:
+        measured = sport_report.get(label) or {}
+        units = measured.get("contentUnits") or {}
+        if units.get("max") is None:
+            return None
+        readings[label] = (units, measured.get("settleSawChange"))
+    if len({(u["min"], u["max"]) for u, _ in readings.values()}) == 1:
+        return None
+    short = min(readings, key=lambda lbl: readings[lbl][0]["max"])
+    return short if readings[short][1] is False else None
+
+
 def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
     lines: list[str] = []
     ok = True
+    rests_on_absence: list[str] = []
     out_of_season = set(report.get("outOfSeason") or ())
     # `spread` is the worst spread WITHIN a game state, not across the slate --
     # see the note in MEASURE_JS. The across-slate figure is still in the JSON
@@ -666,6 +755,7 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
     lines.append(header)
     lines.append("-" * len(header))
     for sport, sport_report in report["sports"].items():
+        contradicted = _contradicted_width(sport_report)
         for label in VIEWPORTS:
             measured = sport_report.get(label) or {}
             if "error" in measured:
@@ -846,6 +936,24 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                     "every figure on this row was taken mid-render"
                 )
                 ok = False
+            # A settle can be wrong in the other direction too: still, because
+            # the render had not started. That reading is indistinguishable
+            # from a finished one ON ITS OWN -- so it fails only when the other
+            # width contradicts it, which is the case the old rule shipped.
+            if contradicted == label:
+                other = next(lbl for lbl in VIEWPORTS if lbl != label)
+                units = measured.get("contentUnits") or {}
+                other_units = ((sport_report.get(other) or {}).get("contentUnits")) or {}
+                issues.append(
+                    f"CONTENT CONTRADICTED by {other} "
+                    f"({units.get('min')}-{units.get('max')} vs "
+                    f"{other_units.get('min')}-{other_units.get('max')} pairs/card) "
+                    "and this row's settle never saw the DOM change -- measured "
+                    "before the slate finished arriving, NOT a uniform slate"
+                )
+                ok = False
+            elif measured.get("renderSettled") and measured.get("settleSawChange") is False:
+                rests_on_absence.append(f"{sport} {label}")
             if measured.get("cardWaitTimedOut"):
                 issues.append(
                     f"NO CARD ATTACHED in {CARD_WAIT_MS // 1000}s -- render did not "
@@ -860,6 +968,17 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 f"{sport:8} {label:8} {cards:>5} {str(overflow) + 'px':>9} {str(spread) + 'px':>7}  "
                 + ("; ".join(issues) if issues else "ok")
             )
+    # Stated once, as a footer, rather than as a note on every row. For the
+    # seven sports that render server-side and are complete at `load`, a still
+    # DOM is the correct state and flagging it per row would train readers to
+    # skip the flag. What the footer preserves is that the settle on these rows
+    # is an assumption, not a measurement -- so a surprising content or height
+    # figure here has a known candidate cause.
+    if rests_on_absence:
+        lines.append(
+            f"settle rests on absence (DOM never changed while watched, "
+            f"so 'finished' and 'not started' look alike): {', '.join(rests_on_absence)}"
+        )
     return lines, ok
 
 

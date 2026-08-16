@@ -332,3 +332,123 @@ def test_a_sport_absent_from_the_baseline_is_named_not_silently_passed():
 def test_card_wait_constant_is_generous_enough_for_a_js_render():
     """Guards the regression directly: MLB needed >600ms and got 400."""
     assert probe.CARD_WAIT_MS >= 10000
+
+
+class _ScriptedPage:
+    """Replays one fingerprint per poll. `wait_for_timeout` advances the tape."""
+
+    def __init__(self, fingerprints):
+        self._tape = list(fingerprints)
+        self._poll = 0
+
+    def evaluate(self, _js):
+        return self._tape[min(self._poll, len(self._tape) - 1)]
+
+    def wait_for_timeout(self, _ms):
+        self._poll += 1
+
+
+def test_settle_does_not_call_a_plateau_finished():
+    """The exact shape that shipped a bad row on 2026-08-16.
+
+    mlb desktop sat still for two polls before enrichment started, and the old
+    two-equal-polls rule returned `settled: true` at 800ms -- reporting 15 cards
+    at a uniform 33 pairs when mobile read 33-49 on the same slate.
+    """
+    plateau_then_growth = [100, 100, 100, 200, 300, 400] + [400] * 10
+    settle = probe._settle(_ScriptedPage(plateau_then_growth))
+    assert settle["settled"] is True
+    assert settle["sawChange"] is True
+    # The old rule stopped at 800ms, inside the plateau, before any of the
+    # growth existed. Anything that returns there is the bug.
+    assert settle["settledMs"] > 800
+    assert settle["finalFingerprint"] == 400
+
+
+def test_a_still_dom_settles_but_says_the_verdict_rests_on_absence():
+    """Seven of eight sports render server-side; a still DOM is their normal.
+
+    So this must still settle -- but `sawChange` has to carry that the verdict
+    is the absence of change, which "finished" and "never started" share.
+    """
+    settle = probe._settle(_ScriptedPage([700] * 20))
+    assert settle["settled"] is True
+    assert settle["sawChange"] is False
+    assert settle["settledMs"] == probe.SETTLE_QUIET_MS
+
+
+def test_a_dom_still_growing_at_the_deadline_is_a_timeout_not_a_settle():
+    settle = probe._settle(_ScriptedPage(range(1, 200)))
+    assert settle["settled"] is False
+    assert settle["sawChange"] is True
+    assert settle["settledMs"] == probe.SETTLE_MAX_MS
+
+
+def test_the_quiet_window_outlasts_the_measured_growth_step():
+    """The 2026-08-15 curve moved at every 400ms step through 3000ms, so no
+    quiet window inside it can be mistaken for the end of the render."""
+    assert probe.SETTLE_QUIET_MS >= 3 * probe.SETTLE_POLL_MS
+
+
+def _widths(desktop, mobile, sport="mlb"):
+    report = _report(sport=sport)
+    report["sports"][sport]["desktop"].update(desktop)
+    report["sports"][sport]["mobile"].update(mobile)
+    return report
+
+
+def test_content_contradicted_across_widths_fails_the_short_row():
+    """`rerun_2026-08-16.json` mlb desktop, reproduced.
+
+    No card renderer keys `.cards-data-pair` on viewport width, so a width
+    reading LESS content while its own settle never saw the DOM change was
+    measured before the slate finished arriving.
+    """
+    text, ok = _summarize(_widths(
+        desktop={"contentUnits": {"min": 33, "max": 33, "spread": 0},
+                 "renderSettled": True, "settleSawChange": False},
+        mobile={"contentUnits": {"min": 33, "max": 49, "spread": 16},
+                "renderSettled": True, "settleSawChange": True},
+    ))
+    assert not ok
+    assert "CONTENT CONTRADICTED by mobile" in text
+    assert "33-33 vs 33-49" in text
+    assert "NOT a uniform slate" in text
+
+
+def test_a_width_disagreement_alone_does_not_fail():
+    """The widths are separate navigations, so the slate can genuinely grow
+    between them. Disagreement is only damning against a settle with no
+    affirmative evidence behind it."""
+    text, ok = _summarize(_widths(
+        desktop={"contentUnits": {"min": 33, "max": 40, "spread": 7},
+                 "renderSettled": True, "settleSawChange": True},
+        mobile={"contentUnits": {"min": 33, "max": 49, "spread": 16},
+                "renderSettled": True, "settleSawChange": True},
+    ))
+    assert ok
+    assert "CONTENT CONTRADICTED" not in text
+
+
+def test_a_still_dom_is_footnoted_not_failed_when_the_widths_agree():
+    units = {"min": 3, "max": 3, "spread": 0}
+    text, ok = _summarize(_widths(
+        desktop={"contentUnits": dict(units), "renderSettled": True, "settleSawChange": False},
+        mobile={"contentUnits": dict(units), "renderSettled": True, "settleSawChange": False},
+        sport="nfl",
+    ))
+    assert ok
+    assert "CONTENT CONTRADICTED" not in text
+    assert "settle rests on absence" in text
+    assert "nfl desktop, nfl mobile" in text
+
+
+def test_a_report_predating_the_field_is_not_failed_on_it():
+    """Older JSONs carry no `settleSawChange`; absent must not read as False."""
+    text, ok = _summarize(_widths(
+        desktop={"contentUnits": {"min": 33, "max": 33, "spread": 0}, "renderSettled": True},
+        mobile={"contentUnits": {"min": 33, "max": 49, "spread": 16}, "renderSettled": True},
+    ))
+    assert ok
+    assert "CONTENT CONTRADICTED" not in text
+    assert "settle rests on absence" not in text
