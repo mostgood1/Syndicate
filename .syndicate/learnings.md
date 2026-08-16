@@ -3365,3 +3365,30 @@ asks for — no `RENDER_API_KEY` in an unattended run environment, or a
 `deploy_claim.py` that refuses an unattended holder — is still not built, and until
 it is, "the session judged it was fine" is the only thing standing between an
 unattended run and three restarted services.
+
+## 2026-08-16 — CORRECTION: the shared index CHURNS, it does not accumulate — and staged content is not the alarm
+
+I recorded the shared index earlier the same day as a landmine "growing" on a
+timer: 725 staged ledger deletions, then 1127 half an hour later, with the
+inference that its blast radius increases the longer it sits.
+
+Measured a third time minutes after that: **207 deletions across four DIFFERENT
+files.** `deploys.md` and `lanes.md` had left the staged set entirely, and local
+`HEAD` had moved twice in between. The staged set is simply whatever the
+currently-active sessions are holding at that instant. The 725 -> 1127 reading
+was two samples of a churning quantity, and I turned it into a trend.
+
+**How to apply.**
+- **Two samples of a quantity other writers control is not a trend.** Same error
+  as [[feedback-rate-not-count]] wearing different clothes: I had no denominator
+  and no idea of the sampling process, and still described a direction.
+- **A `git reset HEAD -- <paths>` on a shared index is point-in-time, not a
+  fix.** The state can return within minutes. The durable fix is other sessions
+  committing through isolated indexes — see
+  [[project-shared-tree-commit-recipes]] — not repeated disarms.
+- **Staged content in a shared index is normal; staged DELETIONS are the
+  signal.** Immediately after the disarm the index held another session's
+  `game_shape.py` (+356) and `test_game_shape.py` (+332), purely additive — a
+  shared index in correct use. An alarm that fires on "something is staged"
+  would fire constantly and be ignored. Gate on `git diff --cached --numstat |
+  awk '$2>0'`, which is empty in the healthy case.
