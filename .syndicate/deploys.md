@@ -8019,73 +8019,71 @@ stopped racing and waited for their hotfix to go live before deploying once on
 top of it. Their deploy branches were also cut from a base that lacked the HR
 ladder already on `origin/main` — a reminder that "on main" and "on the live
 worker" are independent facts here.
-## 2026-08-16 21:0xZ — outstanding #3, WNBA distribution — **DIAGNOSED, NOT BUILT.** The raw material exists; what is published cannot price a line
 
-**No code change. This is the diagnosis, and it contains a trap worth more than
-the fix.**
+---
 
-### The board symptom
-`game|totals_alt|full` **0/243** and `game|spreads_alt|full` **0/176** projected
-— 419 rows, 48% of the WNBA board — plus `player_double_double` 0/30 and
-`player_triple_double` 0/8. The BASE spread and total of the same games are
-projected (9/9, 8/8) off means, via `edge_vs_line` in stat units.
+## 2026-08-16 21:02Z — G4 MOVEMENT/STEAM + G7 LIVE COLUMN + INTERVAL LABELS — MEASURED ON `a9e5d3d6`
 
-### It is NOT a modelling gap. The sim runs 2,000 sims and keeps the arrays
-`smart_sim.SmartSimConfig.n_sims = 2000`, and `_summarize_period` computes, per
-game, from `home_scores`/`away_scores` arrays of that length:
+Artifact `written_at` **2026-08-16T21:01:19Z**, after the deploy's `finishedAt`
+20:50:14Z. 63 rows / 61 cards. Content on the live SHA verified first:
+`movement=4 live_cols=2 segment=2 openings_param=3 sig_movement=2 caller=2` —
+all three files travelled together.
 
-```
-margin      = h - a          (full 2000-element array)
-margin_mean, total_mean
-margin_q, total_q            <- _period_quantiles(...)
-p_home_win  = mean(margin > 0)
-p_raw       = mean((margin + spread_line) > 0)     <- a real COVER probability
-```
+**SAFETY FIRST:** `cards_present=63`, `cards_error=None`, `cards_compat_note=None`.
+The board is intact; the blank-board incident is closed.
 
-It even computes a cover probability against a spread line already.
+### WORKS — with coverage stated, not implied
 
-### THE TRAP: MLB's key names on a shape MLB cannot read
-`vendor/wnba_betting_repo/app.py:7477-7478` builds an MLB-shaped prediction row:
+    INTERVAL LABELS      17 cards labelled
+                         1st 5 innings 14 · 1st 3 innings 2 · 4th quarter 1
+    LIVE COLUMN          37 live cards, 18 carrying live_projection   (was 0)
+                         live_aware 20
+                         projection.source on live rows:
+                           mlb_live_lens_monte_carlo 12  <- THE LIVE MC SIM
+                           game_simulation           26  (pregame, unmatched)
+                           hitter_threshold           1
+    COUNTERS (the gap)   mlb no_bettable_book=114  repriced_to_bettable=1789
+    NO REGRESSION        unbettable best-book 0 (must stay 0) — held
 
-```python
-"total_runs_dist": score.get("total_q"),
-"run_margin_dist": score.get("margin_q"),
-```
+The live column is the one the user asked for by name: it now carries the LIVE
+Monte-Carlo re-sim, not the pregame distribution. **Coverage is 18 of 37 (49%)
+and that is the honest number** — the other 19 live rows carry
+`game_simulation`, a pregame source, because the live-lens snapshot has no row
+for that market/player. They render a dash rather than a pregame number
+dressed as a live one, which is the intended degrade.
 
-Those are **exactly** the keys `prop_projections.project_game_market` consumes
-for MLB totals and spreads. But `_quantiles` (`smart_sim.py:3449`) returns
+### MOVEMENT WORKS BUT IS THIN, AND STEAM IS UNVERIFIED — NOT VERIFIED-ZERO
 
-```python
-{"p10": -8.0, "p50": 1.5, "p90": 11.0}
-```
+    movement_state   not_tracked 45 · no_opening_for_row 11 · tracked 4 · flat 1
+    with a delta     4      all same_book basis, all direction "toward"
+    STEAM flagged    0
 
-— a THREE-POINT SUMMARY, while MLB's `_dist_prob_over` iterates the dict
-treating each KEY as an outcome value and each VALUE as a count:
-`float("p10")` raises, the entry is skipped, `total` stays 0, and the function
-returns `None`.
+- `not_tracked 45` is CORRECT: only `h2h`/`totals`/`spreads` carry history, and
+  the board is mostly props. 16 rows were tracked-eligible.
+- **Of those 16, only 5 had an opening (4 tracked + 1 flat). 11 did not.**
+  Opening coverage is **31%**, because `record_openings` writes a row the first
+  time it is PUBLISHED and today's board has churned through several builds —
+  a row appearing for the first time this build has no prior opening by
+  definition. Expected to improve over a day, and that is a PREDICTION, not a
+  measurement.
+- **STEAM AT 0 IS NOT EVIDENCE THE DETECTOR WORKS.** With 4 rows carrying a
+  delta and a ±15-point threshold inside a 3-hour window, steam had no
+  opportunity to fire. This is the "absence in a window isn't absence" rule:
+  the correct statement is **untested in production**, and it stays that way
+  until a row actually crosses the threshold. Do not record it as verified.
+- **`direction: toward` on 4 of 4** is a small sample and should not be read as
+  a market-wide signal.
 
-**So wiring these together on the strength of the matching name yields silence,
-not an error.** A future reader who greps `run_margin_dist`, sees WNBA already
-emits it, and points the consumer at it will get a board that stays exactly as
-blank as it is now, with nothing saying why. Recorded here so that hour is not
-spent twice.
+### OWED — a THIRD instance of the same instrumentation gap
 
-### What the fix actually needs (not done)
-Publish something a line can be priced against, from arrays that already exist:
-- **Empirical histogram** `{margin_value: sim_count}` — matches MLB's contract
-  exactly and needs no distributional assumption. ~40 int keys per game.
-- **Or mean + sigma**, which is cheaper but imposes normality on a
-  basketball margin — defensible, and it must be labelled as an assumption
-  rather than presented as the sim's own distribution.
+`openings_loaded` is **not published anywhere** in the payload — not top level,
+not `per_sport_ingest`. So "movement is thin" cannot currently be attributed
+between *the ledger is sparse* and *the key does not join*. I inferred 31% from
+`movement_state` counts rather than reading it.
 
-Then the WNBA consumer (`wnba_game_projections.py`, currently reading
-`pred_margin`/`pred_total` means out of `game_cards_<date>.csv`) prices
-`spreads`/`totals` and their `_alt` families the same way
-`live_gameline_join.price_distribution_market` now does for MLB — including the
-away-frame sign convention, which is already written down in two places.
-
-**Verification will require a WNBA sim re-run**, like the HR ladder: the
-counters/arrays only change what a NEW sim writes.
-
-`player_double_double` / `player_triple_double` fall out of the same gap — both
-are joint conditions on the per-player stat arrays the sim also already has.
+This is the same defect I fixed for `no_bettable_book` two hours ago, in the
+same file, and I reintroduced it while writing the movement code. `#397`'s rule
+— add the counter in the same commit as the rule — is necessary and NOT
+sufficient: the counter has to reach every place the payload is ASSEMBLED, and
+on this path that is three. **Fix: publish `openings_loaded` and
+`movement_rows_matched` beside the existing counters.**

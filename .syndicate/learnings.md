@@ -2723,6 +2723,40 @@ the check.
 - Same family as [[feedback-instrument-blindness]]: a reading is evidence only
   once you know what it would say when things are wrong.
 
+
+## 2026-08-16 - FORBIDDEN: a deploy-content check must return THREE verdicts, not pass/fail. "Nothing shipped" is not "shipped wrong".
+
+Armed a watcher for a combined worker deploy and gave it a bare `all(v > 0)`
+check across five markers. At 20:25:21Z it fired against `2efe76b1` -- another
+lane's props-snapshot fix -- with:
+
+    *** THE THREE FILES DID NOT TRAVEL TOGETHER. Expect cards_error / blank board. ***
+
+**All five markers were 0, which means that deploy carried NONE of my work.**
+The board was healthy throughout (`cards_present 70`, `cards_error None`). The
+alarm was false, and it was aimed at an innocent lane's deploy.
+
+The real risk is narrow and asymmetric: `pipeline/layer2_shortlist.py` (the
+CALLER) shipping WITHOUT `layer2_board.py` (the CALLEE), because the caller
+passes `openings=` to a signature that lacks it. Every other combination is
+safe -- nothing shipped is self-consistent old code, and callee-without-caller
+is inert.
+
+**The rule:** when a check spans files with a dependency DIRECTION, encode the
+direction. Verdicts here are ABSENT / PARTIAL_INERT / PARTIAL_DANGEROUS /
+COMPLETE, and only one of the four is an alarm. A binary check over a
+directional dependency maps three states onto "broken" and cries wolf on two of
+them.
+
+**And the meta-rule, second instance in one session:** this is the same shape as
+the gate watcher that read `[UNKNOWN] HTTP 502` as CLEAR -- an instrument
+mapping an unknown or benign state onto the wrong branch. Both were MY
+instruments, written quickly at the end of a long task, and both would have
+produced a confident wrong statement. **Falsify a new watcher against a known
+input before trusting it**: the corrected version was run against three real
+SHAs and returns ABSENT / ABSENT / COMPLETE, which is what proves it
+discriminates.
+
 ## 2026-08-16 — OVERTURNED: "my commits are safe once the guard passes and `git show --stat HEAD` looks right"
 
 Four commits from one session — `61e2c21e`, `419cc238`, `bf643d72`, `ca80ec46` — each
@@ -2772,3 +2806,65 @@ Secondary discovery, and it is the tell: **`send_message` is unavailable in unat
 sessions**, in both directions. So the one session that most needs to coordinate before a
 deploy is the one that structurally cannot. If a run cannot message its peers, it must not
 take an action that requires coordinating with them.
+
+
+## 2026-08-16 - FORBIDDEN: never split one change across separately-deployed files and rely on TELLING the deployer. A message is not a guard.
+
+Cost a production incident at 20:34Z. `pipeline/layer2_shortlist.py`,
+`layer2_board.py` and `opportunity_signals.py` deploy as separate blobs onto a
+long-lived worker, so **there is no instant at which they are guaranteed to be
+the same vintage.** Deploy `c324447d` carried the caller alone:
+
+    layer2_rows_to_board_cards(rows, openings=...)  ->  TypeError
+    -> caught by try/except -> cards = []
+    -> layer2_is_primary=True, legacy_candidate_count=0  ->  BLANK BOARD
+
+announced only by a `cards_error` string nobody reads. I had warned the
+deploying session TWICE, in prose, with the exact file list. It still happened,
+and it was **my design that made it possible**, not their process.
+
+**The rule:** if a caller gains a parameter its callee may not have yet, the
+CALLER probes — `inspect.signature`, not `except TypeError` (a bare retry cannot
+tell "no such parameter" from a real TypeError raised inside the function, and
+silently drops data on a genuine bug). Degrade to the reduced feature and SAY SO
+in the payload. Never to nothing.
+
+Two things this exposed that were worse than the headline:
+- The `blended_score` coupling one level down was **worse than the cards one** —
+  an unguarded TypeError there escapes `build_layer2_rows` and loses rows AND
+  cards, where the cards path at least had a `try/except`.
+- The live-join imports **shared one `try` with game state, projections and the
+  margin model**, so a rollback of `board_enrichment.py` would have taken all
+  four down. A missing live tier must cost the live tier.
+
+## 2026-08-16 - FORBIDDEN: never record a detector's zero as a pass when the data gave it no chance to fire.
+
+Shipped steam detection and measured **0 flagged**. That is NOT evidence it
+works: only **4 rows** carried a price delta at all, against a +/-15-point
+threshold inside a 3-hour window. The honest status is **UNTESTED IN
+PRODUCTION**, and it stays that way until a row actually crosses.
+
+Same shape as the standing rule "absence in a window isn't absence", but the
+failure here is subtler: a zero from a working detector and a zero from a
+detector that never ran are **identical readings**, and the deploy would have
+been written up as "steam is back" on the strength of it.
+
+**The rule:** before recording a detector's null result, state its DENOMINATOR
+and its threshold. "0 steam from 4 eligible rows at +/-15 points" is a
+measurement; "0 steam" is a guess wearing a number.
+
+## 2026-08-16 - the third instance of the same instrumentation gap, in the file where I fixed the second.
+
+`no_bettable_book` was computed and never published because `per_sport_stats` is
+an explicit key list; I fixed it at 19:0xZ. Two hours later I shipped movement
+and `openings_loaded` is **unpublished in exactly the same way, in the same
+file** -- so "movement is thin" cannot be attributed between a sparse ledger and
+a key that does not join. I inferred 31% from `movement_state` counts instead of
+reading it.
+
+`#397`'s rule (add the counter in the same commit as the rule) is necessary and
+**not sufficient**. The counter must reach every place the payload is
+ASSEMBLED, which on this path is three: the producer's return, the per-sport
+stats dict, and the endpoint's key list. **Knowing the rule did not stop me
+reproducing the defect within two hours.** Check the assembly sites, not the
+commit.

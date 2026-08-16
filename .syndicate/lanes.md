@@ -42,6 +42,7 @@ rebuild a props snapshot when its inputs are newer, not just on force".
 - **Cross-session messaging was UNAVAILABLE** — this lane's session is unattended
   (a scheduled-task run), and `send_message` refuses to send from those. The
   ledger is the channel; that is why this is here and not a DM.
+
 ### ncaaf-schedule-fallback — **CLOSED-VERIFIED 2026-08-16 — `#445` fixed in `483bb9dd`, on `origin/main`. NOT DEPLOYED (NCAAF opens 08-29)** — opened 2026-08-16 (retroactively, see below) — session: sim-engine-track
 - **PROTOCOL GAP, RECORDED NOT HIDDEN:** the collision check was run before any
   edit (both files CLEAR), but the lane entry itself was never written until
@@ -224,7 +225,39 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   someone actually forces a refresh.
 - Blocked by: none. No deploy from this lane tonight unless asked.
 
-### layer2-board-quality — OPEN — **SHIPPED AND MEASURED. 5 of 6 outcomes PASS on the post-deploy artifact; 1 instrumentation gap OWED. G4 and G7 not started.** — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — OPEN — **G1/G2/G3/G5/G6/G8 SHIPPED+MEASURED. G4 movement SHIPPED, thin (4 rows) and STEAM UNVERIFIED. G7 live column SHIPPED at 49% coverage. One blank-board incident, caused by my design, guarded in code.** — opened 2026-08-16 — session: layer2-board-quality
+- **G4 / G7 / INTERVALS MEASURED 2026-08-16 21:02Z** on `a9e5d3d6` (live
+  20:50:14Z), artifact 21:01:19Z, 63 rows / 61 cards. Safety first:
+  `cards_present 63`, no `cards_error`, no `cards_compat_note`.
+
+      intervals   17 labelled: 1st 5 innings 14 · 1st 3 innings 2 · 4th quarter 1
+      live column 18 of 37 live cards carry live_projection   (was 0)
+                  source mlb_live_lens_monte_carlo on 12 -- the LIVE MC sim
+      counters    mlb no_bettable_book=114  repriced_to_bettable=1789
+      regression  unbettable best-book 0 -- held
+      movement    tracked 4 · flat 1 · no_opening_for_row 11 · not_tracked 45
+      steam       0 flagged
+
+- **STEAM IS UNVERIFIED, NOT VERIFIED-ZERO.** 4 rows carried a delta against a
+  ±15-point / 3-hour threshold, so it had no opportunity to fire. Recording 0 as
+  a pass would be the "absence in a window isn't absence" error. **It stays
+  untested until a row crosses the threshold.**
+- **Movement coverage is 31% of tracked-eligible rows** (5 of 16 had an
+  opening). `record_openings` writes on first publish and the board churned
+  through several builds today, so a first-appearance row has no opening by
+  definition. Expected to improve over a day — a PREDICTION, not a measurement.
+- **Live coverage is 49% (18/37)** and the other 19 render a dash rather than a
+  pregame number dressed as live, which is the intended degrade.
+- **OWED — third instance of the same gap:** `openings_loaded` is unpublished,
+  so thin movement cannot be attributed between a sparse ledger and a failing
+  key join. Fix: publish `openings_loaded` + `movement_rows_matched` beside the
+  existing counters, in `pipeline/layer2_shortlist.py`.
+- **BLANK-BOARD INCIDENT 20:34Z, caused by this lane's design.** `c324447d`
+  shipped the caller without the callees; caught before any build landed; closed
+  by roll-forward `77dbbd06`. Guarded in code as `a21b63db` (signature probes +
+  optional import + 6 tests). The three files are no longer coupled — any
+  combination is now safe.
+
 - **DEPLOYED 2026-08-16 AND MEASURED.** refresh-worker `7b544eb4` (live
   18:20:40Z), web `ad77e46a` (live 18:27:30Z). Both cut on their service's LIVE
   SHA, never on `main` (`/preflight` failed `main` on scope: 520 commits).
@@ -237,6 +270,59 @@ rebuild a props snapshot when its inputs are newer, not just on force".
       rail cards (live chips + rows)   108        -> 18       PASS
       no_bettable_book / repriced       absent    -> absent    FAIL
 
+- **BLOCKER FOUND IN THE COMBINED DEPLOY, 2026-08-16 ~20:1xZ — THE THREE WORKER
+  FILES MUST TRAVEL TOGETHER OR THE BOARD GOES BLANK.**
+  `sim-engine-track` queued a branch carrying `pipeline/layer2_shortlist.py`
+  alone. Measured against live refresh-worker `415e23cb`:
+
+      main  layer2_shortlist.py:391  layer2_rows_to_board_cards(rows, openings=openings_index)
+      live  layer2_board.py          def layer2_rows_to_board_cards(rows)   ("openings": 0 occurrences)
+
+  **It does not crash, which is worse.** The call is inside `try/except
+  Exception` that sets `shortlist["cards"] = []`; with `layer2_is_primary=True`
+  and `legacy_candidate_count=0` that is a **BLANK BOARD** carrying a
+  `cards_error` string nobody watches. Second instance one level down: main's
+  `layer2_board.py:1070` calls `blended_score(movement_price_delta=...)` and
+  live `opportunity_signals.py` has 0 occurrences of that parameter.
+  - **MINIMUM COHERENT SET:** `pipeline/layer2_shortlist.py` +
+    `syndicate/features/shared/layer2_board.py` +
+    `syndicate/features/shared/opportunity_signals.py`. `book_shortlist.py` and
+    both `attach_live_*_for_sport` are ALREADY on `415e23cb` — verified, not
+    assumed.
+  - **Post-deploy check, because the failure is SILENT:** `cards_present > 0`
+    AND no `cards_error` on `/api/board/layer2-shortlist`. Either fails -> the
+    files did not travel together -> roll back.
+- **WEB IS DONE AND NEEDS NO FURTHER DEPLOY.** Verified BY CONTENT on live web
+  `a01b30eb` (20:04:16Z): `claimedChips` 3, `chipCentralDate` 2,
+  `board-disclosure` 2, `const isFinal` 1, `sim-disagrees` 1, `segment_label` 1;
+  `bet_slip.js` / `board_cards.css` / `board_rail_toggle.js` /
+  `blueprints/intelligence.py` all empty-diff against `main`. `boardSports` is
+  absent ON PURPOSE (removed when soccer was restored to the rail) — do not read
+  its absence as a regression.
+- **The Layer 1 lane independently found the same live-tier gap** (`model_edge_pct:
+  None` on 7 live spreads + 10 live totals) and routed it here rather than
+  editing across the lane. Same item as `1d03855e`; both confirmed to them.
+- **DEPLOY HANDED TO `sim-engine-track` 2026-08-16 ~19:5xZ, BY USER DECISION.**
+  My worker payload is NOT mine to fire; it rides their next refresh-worker
+  deploy. Everything below is on `origin/main` and on NO service:
+  - `1d03855e` — `#372` movement/steam re-enabled from the CLV opening ledger,
+    live projection joins wired into the shortlist build, movement folded into
+    the score (capped). `layer2_board.py`, `opportunity_signals.py`,
+    `pipeline/layer2_shortlist.py`.
+  - `7576b1d5` — publishes `no_bettable_book` / `repriced_to_bettable`.
+  - Tests: 15 new pytest + 10 node rail assertions. Suite 315 -> 330 passes,
+    **21 failed before and after** (all pre-existing).
+  - **Two items flagged to them explicitly rather than smuggled in:**
+    `blended_score` gained a `movement_price_delta` parameter (defaults None, so
+    every existing caller is unaffected), and the shortlist build now runs two
+    extra enrichment steps that read the published live-lens snapshot — MLB-only
+    real work, the rest return `supported: False`. Offered to gate the second
+    behind a flag if their scheduling work objects.
+- **NO UNDEPLOYED LAYER 1 BOARD CHANGES EXIST — checked, not assumed.**
+  `layer1_board.py`, `layer1_board.html` and `layer1_page.py` all diff EMPTY
+  against `main` on BOTH live SHAs (worker `98a9cad8`, web `1468780b`). The
+  Layer 1 lane's soccer live-state and finished-match-edge fixes shipped at
+  18:37:38Z and 18:54:37Z and are live.
 - **OWED -> FIXED IN CODE, NOT DEPLOYED (`7576b1d5`).**
   `no_bettable_book` / `repriced_to_bettable` now reach `per_sport_ingest`.
   The gap was that `#397`'s "add the counter in the same commit as the rule" is
@@ -3414,38 +3500,6 @@ and then failed the thing it was checking, which is the point of running it.
 - **This overlaps `odds-cadence-off-the-mlb-peak`** (1a/1b verified, effect unmeasured). If that lane moved sampling off the MLB pregame window, it is the same fact seen from the other end. Coordinate before changing cadence.
 - **NEXT TEST, cheap and decisive:** today's 08-16 freeze already holds 14 games. If tomorrow's `season_betting_day_2026_08_16.json` grades ~15 `ml` rows instead of 1, the mechanism is confirmed and the fix is scheduling, not logic. If it still grades 1 with a 14-game freeze present, the reader is not reaching the freeze in production and the next suspect is `_odds_data_roots()` ordering on the mounted disk.
 - **NOT DONE / NOT CHANGED:** no source file touched, no deploy, no env change. `_SCORE_SIM_WEIGHT` untouched. The settlement autorun remains off by user decision.
-- **ROOT CAUSE FOUND 2026-08-16 ~18:2xZ — the freeze WRITER and the grading READER are on two different trees, separated by one path segment (`source_artifacts/`).**
-
-      WRITER  `_freeze_oddsapi_pregame_markets`, market_dir = source_root/data/market/oddsapi
-              source_root = REPO_ROOT/data/mlb_source   (`refresh_odds_sources.py:666`, passed as --source-root)
-              => <checkout>/data/mlb_source/data/market/oddsapi/
-              git-tracked files there: **0**
-
-      READER  `_odds_paths` -> <root>/market/oddsapi, root[0] = MLB_BETTING_DATA_ROOT
-              = /opt/render/project/data/mlb_source/source_artifacts/data   (all three services)
-              => .../mlb_source/source_artifacts/data/market/oddsapi/
-              git-tracked `*_pregame.json` there: **27, newest 2026-07-08**
-
-- **That single fact explains both halves of this lane.** (1) `frozen_doc` is read back from the WRITER's tree, which git tracks as EMPTY — so every deploy recreates the checkout without it, `frozen_doc` comes back `{}`, and the merge (monotonic by construction) reseeds the freeze from live-only-pregame. (2) The grading builder reads the OTHER tree, whose newest sealed game-lines file is from **July 8** — so ~14 of 15 games warn `Missing game-line match` and exactly one grades, on every date.
-- **The merge code is NOT at fault and should not be edited.** `_merge_pregame_game_lines` seeds `frozen_games` from `frozen_doc` and only ever adds or updates. Given a readable `frozen_doc` it cannot shrink. The observed shrink is proof the input was empty, not that the merge is wrong.
-- **EVIDENCE for the deploy-reset half, stated at its real strength (n=1 on the transition):** refresh-worker deployed 6x between 16:46Z and 18:07Z. Freeze read **14 games at ~17:52Z** -> **8 games at 18:12Z** (7 of the 8 still pregame), with `cf467794` going live **18:07:36Z** between the two reads. Re-read at 18:18Z with no new deploy: still 8/7, i.e. steady between deploys. That is consistent, not conclusive; `7b544eb4` was still building and its landing is the next free test.
-- **INSTRUMENT NOTE — I corrected myself mid-check.** I nearly concluded `market/` is absent in production because `/api/ops/artifacts/export` shows 3466 files under `mlb_source/source_artifacts/data/` and **zero** containing `/market/`. That endpoint runs on WEB and reads WEB's disk; the grading builder runs on refresh-worker and reads ITS disk. Separate disks (three-service architecture). The zero is real for web and says nothing about the worker. Not usable as evidence for the reader's tree.
-- **`market/*.json` IS allowlisted** (`artifact_publisher.py:78`, `*_source/source_artifacts/data/market/*.json`, and fnmatch's `*` crosses `/`), so the absence on web is a publish/transfer question, not an allowlist one. Unresolved and NOT needed for the diagnosis above.
-- **STILL OPEN, and it is the fix decision:** which of the two trees is meant to be canonical. Either the writer should target `source_root/source_artifacts/data/market/oddsapi` (write where the reader looks), or the reader's root should include the checkout tree. Do not guess — `--artifact-root` already exists on this script (`_local_source_artifact_root("mlb")`) and a publish step may be the intended bridge. Whichever way, the freeze must live somewhere a deploy does not wipe.
-- **The scheduled check `grading-freeze-payload-check` (2026-08-17 07:00 CT) was rewritten** to predict the collapse rather than the full slate, and now carries the `_odds_data_roots()` exoneration so it is not re-opened.
-
-- **FIX BUILT AND TESTED 2026-08-16 ~18:5xZ — NOT DEPLOYED, and it is INERT until it is.** `scripts/refresh_mlb_oddsapi.py`:
-  - New `_freeze_market_dirs(source_root)` returns every `market/oddsapi` the freeze must live in: the writer's own tree (unchanged, and first — it is where the live doc it merges from is fetched to), **`<MLB_BETTING_DATA_ROOT>/market/oddsapi`**, and `source_root/source_artifacts/data/market/oddsapi` for env-less callers.
-  - **Derived from the SAME env var the reader uses, deliberately not hardcoded to `source_artifacts`.** `_odds_data_roots` resolves odds from `MLB_BETTING_DATA_ROOT`; a hardcoded second layout would silently diverge again the next time that var is repointed, which IS this bug.
-  - **Seed from every copy, not just this tree's** — `frozen_doc` is now the union of all existing seals (merged at `now_epoch=0.0` so started games carry across rather than being dropped by a pregame test that should only apply to the LIVE doc). Without this, writing to the right place still loses the slate on the next deploy.
-  - `_ensure_dir` on every destination parent. Only `snapshot_dir` was ensured; the reader's tree on a fresh disk would have raised and taken the whole freeze down with it.
-  - `_merge_pregame_game_lines` UNTOUCHED. It was never at fault.
-  - Contract change: `copied` is keyed by FULL PATH, not basename — the copies share one filename, so a name-keyed dict reported one and hid the rest. It surfaces as `frozenPregame` in the run payload, which is where this fix gets verified in production.
-- **TESTED: 419 passing.** 59 (freeze + odds-paths + odds-sources orchestrator) and 360 + 13 subtests (mlb market board, mlb refresh runner, live refresh loop). 3 new tests added in `tests/test_oddsapi_pregame_freeze.py::FreezeReachesTheGradingReaderTests`.
-- **NON-VACUITY VERIFIED, and it mattered.** The 3 new tests were re-run against a simulated pre-fix `_freeze_market_dirs` (single directory): **all 3 fail**. Without that check `test_freeze_lands_in_the_source_artifacts_tree` could have passed for the wrong reason.
-- **A test-result correction worth keeping:** the first adjacent run exited 0 with no FAILED/ERROR lines, but 464KB of worker debug output had swallowed the pytest summary. Exit code alone does not separate "all passed" from "collected oddly" — re-ran in batches to get real counts rather than bank the zero.
-- **TWO LIMITS, STATED:** (1) `autoDeploy` is off, so this ships nothing until someone deploys — the 2026-08-17 07:00 CT check will measure the OLD behaviour unless a deploy lands first, and a deploy kills any in-flight sim. (2) **Forward-only.** It seals future slates; it does not repair the already-collapsed freezes for 08-09..08-16. `scripts/backfill_pregame_game_lines.py` is the tool for that and is untouched.
-
 
 ### layer1-board-coverage — **CLOSE REFUSED 2026-08-16 18:0xZ.** Verification is not met, and a NEW production defect was found in this lane's own scope while attempting to close
 - The `/lane close` gate says: confirm the verification ran and state the result;
@@ -3521,6 +3575,82 @@ and then failed the thing it was checking, which is the point of running it.
   `tests/test_soccer_cards_live_state.py`, `tests/test_live_edge_enforcement.py`,
   `tests/test_projection_degeneracy.py` (one exact-dict assertion widened).
 
+- **ROOT CAUSE FOUND 2026-08-16 ~18:2xZ — the freeze WRITER and the grading READER are on two different trees, separated by one path segment (`source_artifacts/`).**
+
+      WRITER  `_freeze_oddsapi_pregame_markets`, market_dir = source_root/data/market/oddsapi
+              source_root = REPO_ROOT/data/mlb_source   (`refresh_odds_sources.py:666`, passed as --source-root)
+              => <checkout>/data/mlb_source/data/market/oddsapi/
+              git-tracked files there: **0**
+
+      READER  `_odds_paths` -> <root>/market/oddsapi, root[0] = MLB_BETTING_DATA_ROOT
+              = /opt/render/project/data/mlb_source/source_artifacts/data   (all three services)
+              => .../mlb_source/source_artifacts/data/market/oddsapi/
+              git-tracked `*_pregame.json` there: **27, newest 2026-07-08**
+
+- **That single fact explains both halves of this lane.** (1) `frozen_doc` is read back from the WRITER's tree, which git tracks as EMPTY — so every deploy recreates the checkout without it, `frozen_doc` comes back `{}`, and the merge (monotonic by construction) reseeds the freeze from live-only-pregame. (2) The grading builder reads the OTHER tree, whose newest sealed game-lines file is from **July 8** — so ~14 of 15 games warn `Missing game-line match` and exactly one grades, on every date.
+- **The merge code is NOT at fault and should not be edited.** `_merge_pregame_game_lines` seeds `frozen_games` from `frozen_doc` and only ever adds or updates. Given a readable `frozen_doc` it cannot shrink. The observed shrink is proof the input was empty, not that the merge is wrong.
+- **EVIDENCE for the deploy-reset half, stated at its real strength (n=1 on the transition):** refresh-worker deployed 6x between 16:46Z and 18:07Z. Freeze read **14 games at ~17:52Z** -> **8 games at 18:12Z** (7 of the 8 still pregame), with `cf467794` going live **18:07:36Z** between the two reads. Re-read at 18:18Z with no new deploy: still 8/7, i.e. steady between deploys. That is consistent, not conclusive; `7b544eb4` was still building and its landing is the next free test.
+- **INSTRUMENT NOTE — I corrected myself mid-check.** I nearly concluded `market/` is absent in production because `/api/ops/artifacts/export` shows 3466 files under `mlb_source/source_artifacts/data/` and **zero** containing `/market/`. That endpoint runs on WEB and reads WEB's disk; the grading builder runs on refresh-worker and reads ITS disk. Separate disks (three-service architecture). The zero is real for web and says nothing about the worker. Not usable as evidence for the reader's tree.
+- **`market/*.json` IS allowlisted** (`artifact_publisher.py:78`, `*_source/source_artifacts/data/market/*.json`, and fnmatch's `*` crosses `/`), so the absence on web is a publish/transfer question, not an allowlist one. Unresolved and NOT needed for the diagnosis above.
+- **STILL OPEN, and it is the fix decision:** which of the two trees is meant to be canonical. Either the writer should target `source_root/source_artifacts/data/market/oddsapi` (write where the reader looks), or the reader's root should include the checkout tree. Do not guess — `--artifact-root` already exists on this script (`_local_source_artifact_root("mlb")`) and a publish step may be the intended bridge. Whichever way, the freeze must live somewhere a deploy does not wipe.
+- **The scheduled check `grading-freeze-payload-check` (2026-08-17 07:00 CT) was rewritten** to predict the collapse rather than the full slate, and now carries the `_odds_data_roots()` exoneration so it is not re-opened.
+
+- **FIX BUILT AND TESTED 2026-08-16 ~18:5xZ — NOT DEPLOYED, and it is INERT until it is.** `scripts/refresh_mlb_oddsapi.py`:
+  - New `_freeze_market_dirs(source_root)` returns every `market/oddsapi` the freeze must live in: the writer's own tree (unchanged, and first — it is where the live doc it merges from is fetched to), **`<MLB_BETTING_DATA_ROOT>/market/oddsapi`**, and `source_root/source_artifacts/data/market/oddsapi` for env-less callers.
+  - **Derived from the SAME env var the reader uses, deliberately not hardcoded to `source_artifacts`.** `_odds_data_roots` resolves odds from `MLB_BETTING_DATA_ROOT`; a hardcoded second layout would silently diverge again the next time that var is repointed, which IS this bug.
+  - **Seed from every copy, not just this tree's** — `frozen_doc` is now the union of all existing seals (merged at `now_epoch=0.0` so started games carry across rather than being dropped by a pregame test that should only apply to the LIVE doc). Without this, writing to the right place still loses the slate on the next deploy.
+  - `_ensure_dir` on every destination parent. Only `snapshot_dir` was ensured; the reader's tree on a fresh disk would have raised and taken the whole freeze down with it.
+  - `_merge_pregame_game_lines` UNTOUCHED. It was never at fault.
+  - Contract change: `copied` is keyed by FULL PATH, not basename — the copies share one filename, so a name-keyed dict reported one and hid the rest. It surfaces as `frozenPregame` in the run payload, which is where this fix gets verified in production.
+- **TESTED: 419 passing.** 59 (freeze + odds-paths + odds-sources orchestrator) and 360 + 13 subtests (mlb market board, mlb refresh runner, live refresh loop). 3 new tests added in `tests/test_oddsapi_pregame_freeze.py::FreezeReachesTheGradingReaderTests`.
+- **NON-VACUITY VERIFIED, and it mattered.** The 3 new tests were re-run against a simulated pre-fix `_freeze_market_dirs` (single directory): **all 3 fail**. Without that check `test_freeze_lands_in_the_source_artifacts_tree` could have passed for the wrong reason.
+- **A test-result correction worth keeping:** the first adjacent run exited 0 with no FAILED/ERROR lines, but 464KB of worker debug output had swallowed the pytest summary. Exit code alone does not separate "all passed" from "collected oddly" — re-ran in batches to get real counts rather than bank the zero.
+- **TWO LIMITS, STATED:** (1) `autoDeploy` is off, so this ships nothing until someone deploys — the 2026-08-17 07:00 CT check will measure the OLD behaviour unless a deploy lands first, and a deploy kills any in-flight sim. (2) **Forward-only.** It seals future slates; it does not repair the already-collapsed freezes for 08-09..08-16. `scripts/backfill_pregame_game_lines.py` is the tool for that and is untouched.
+
+### mlb-live-gameline-distributions — OPEN — opened 2026-08-16 — session: layer1-board-coverage
+- Goal: a LIVE MLB game carries a live projection and a priced edge on its
+  TOTALS and SPREADS, not just its moneyline, sourced from the same 120-sim
+  re-sim and gated on the same interval. **Testable outcome:** on the served
+  `/api/board/layer1?sport=mlb&view=live`, `totals|full` and `spreads|full` go
+  from **0 live_aware / 0 edge** to non-zero, and every released edge carries a
+  `prob_std_err` that cleared `PRICEABLE_SIGMA`.
+- Files (all checked unclaimed at open):
+  - `vendor/mlb_bettingv2/sim_engine/live_mc.py` (add a margin histogram)
+  - `vendor/mlb_bettingv2/tools/web/flask_frontend.py` (carry the histograms)
+  - `syndicate/features/shared/live_gameline_join.py` (consume + price)
+  - `tests/test_live_gameline_join.py`, `tests/test_mlb_live_game_line_lens.py`
+- **NOT taken:** `syndicate/features/mlb/live_lens.py` — claimed by
+  `refresh-worker-oom-recurrence` and `odds-cadence-off-the-mlb-peak`. Avoid; if
+  the merge side turns out to need a change, stop and coordinate.
+- **The finding, measured 2026-08-16 19:13Z on 8 live MLB games:**
+  `h2h|full` 8 rows / 7 joined / 2 priceable / 2 edges — the moneyline works.
+  Every other game family is **0 live_gameline, 0 live_aware, 0 edge** across
+  **470+ rows**: `totals_alt|first5` 98, `spreads_alt|first5` 79, `totals|full`
+  41, `spreads|full` 36, and the rest. They render a PREGAME projection on a
+  live game.
+- **Root cause, and it is a discard, not a gap.** `live_mc.LiveMcResult` already
+  carries `total_runs_dist: Dict[int, int]` — a full histogram over the 120
+  sims. `flask_frontend`'s live-MC return (`:16683`) keeps `batterStatDist` and
+  `pitcherStatDist` — added, in that same dict, with the comment *"Carried so
+  the live PROP rows can price off the same 120 sims that produced the numbers
+  above, instead of falling back to the pregame distribution"* — and drops
+  `total_runs_dist` on the floor. So the props got a real live probability and
+  the game total, from the identical sims, kept only `avg_total_runs`.
+  `live_gameline_join` then has nothing but a mean, which is exactly what
+  `REASON_TOTALS_MEAN = "totals_mean_not_distribution"` reports.
+- `sigma: 2.0` in the served payload is `PRICEABLE_SIGMA`, the threshold — NOT a
+  distribution width. I misread it as interval data on the first pass; it is not.
+- No margin histogram exists yet. The MC's loop already computes `home_final -
+  away_final` per sim, so it is a two-line addition in the same loop, not a new
+  model.
+- Falsification test: if `totals|full` still reports 0 `live_aware` after the
+  dists are published and consumed, the diagnosis is wrong and the lens is not
+  the carrier. Check `projections`/`live_gameline` coverage counters first.
+- Verification: (a) unit tests price a known histogram at a known line;
+  (b) production `view=live` shows non-zero live_aware + edge on totals/spreads;
+  (c) Layer 2 inherits it with no Layer 2 change, since it reads the same grid.
+- Blocked by: none.
+
 ### ui-probe-tab-click-race — CLOSED 2026-08-16 — cause UNPROVEN and not reproduced; the blindness that made it undiagnosable is fixed — opened 2026-08-16 — session: ui-probe-rerun-compare
 - Goal: stop the intermittent, or name a real defect.
 - Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
@@ -3545,6 +3675,33 @@ and then failed the thing it was checking, which is the point of running it.
   never committed, so its detail is unrecoverable. Keep a failing artifact under
   a separate name before re-running.
 - Blocked by: none
+
+### layer1-board-coverage — SCOPE ADDED 2026-08-16 20:0xZ — the HR threshold ladder
+- Additional file claimed: `vendor/mlb_bettingv2/tools/daily_update.py` (the HR
+  threshold counters and `_hr_row`). Checked against every OPEN lane: unclaimed.
+  `prop_projections.py` is already this lane's.
+- Goal: `batter_home_runs` at lines 1.5 and 2.5 stops being 0% projected.
+  **504 dark rows**, the single largest coverage gap on the MLB board.
+- **The cause, read from the emitter's own key table** (`daily_update.py:4452`):
+  five stats go through the ladder helper and HR does not.
+      _inc_ge_thresholds("hits", pid, h, 3)
+      if hr >= 1: _inc_ge("hr_1plus", pid)          <- HR, single threshold
+      _inc_ge_thresholds("hits_runs_rbis", pid, hrr, 5)
+      _inc_ge_thresholds("runs", pid, rr, 3)
+      _inc_ge_thresholds("rbi", pid, rbi, 4)
+      _inc_ge_thresholds("total_bases", pid, tb, 5)
+  `hr_2plus`/`hr_3plus` are never counted, `_hr_row` emits only `p_hr_1plus`,
+  and the consumer refuses anything but line 0.5 outright
+  (`prop_projections.py:366`). Three layers agreeing on a limit none of them
+  needs — the model simulates HR per plate appearance and P(HR>=2) falls out of
+  the same counter.
+- Falsification test: if `hr_2plus` is counted and published and the board still
+  shows 0 projections at line 1.5, the consumer is not the only remaining
+  blocker and the artifact join needs looking at instead.
+- **Verification requires a SIM RUN, not just a deploy** — the counters only
+  change what a new sim writes, so an existing artifact will not gain the field.
+  Stated up front so a green deploy is not mistaken for a working fix.
+- Blocked by: nothing to build; verification blocked on the next MLB sim cycle.
 
 ### ui-probe-peer-min-group — CLOSED 2026-08-16 — verdicts need n>=3; thin groups reported, never dropped — opened 2026-08-16 — session: ui-probe-rerun-compare
 - Goal: a PEER DEVIATION failure requires n>=3; thinner groups still reported.
