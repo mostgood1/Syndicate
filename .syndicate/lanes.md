@@ -874,7 +874,135 @@ does not hold.** `[measured 08-14]`
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
-### live-game-line-projection — OPEN — DROP 1 DEPLOYED **TO THE WRONG SERVICE** (web, where it is INERT); DROP 2 BUILT (`4bd7dbb3`) AND ON NO SERVICE; DROP 3 UNBUILT — opened 2026-08-15 — session: live-game-line-projection
+### live-game-line-projection — OPEN, UNOWNED (session archived 2026-08-16 ~02:4xZ) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+**Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
+
+**SHIPPED AND LIVE (content-verified per service, not by ancestry):**
+- live-odds-worker `c4116ab6` — the live MC stamps `simsRun`.
+- refresh-worker `f8ca54e1` — the game-line join, the segment filter, the
+  Agresti-Coull boundary, and the CLV recorder.
+- web carries D1+D2; it needs neither the vendor stamp nor the join.
+
+**THE ARC, in measured numbers:**
+
+    baseline   index 3   projected 12  edged 0   (sim_count_unusable 12)
+    +simsRun   index 8   projected 32  edged 25  <- FIRST EVER, and WRONG
+    +segment   index 10  projected  5  edged 4   <- first credible ones
+    tail       index 10  projected  2  edged 0   (slate over; ledger written 0)
+
+**THE 25 WERE FAKE AND I RETRACTED THEM MYSELF**, caught while packaging them
+for handoff: Wald `sqrt(p(1-p)/n)` is **0.0 at p in {0,1}**, so the 2-sigma bar
+was ZERO and everything cleared it; and the full-game projection was priced
+against every SEGMENT (SD @ CLE `first1` gave **+42.43 pp**). Both fixed.
+
+**WHAT IS NOT ESTABLISHED — do not let the arc imply otherwise:**
+- **No CLV, no settlement, no backtest.** Surviving means an edge exceeds the
+  ESTIMATOR'S OWN NOISE at 120 sims. It says nothing about the model.
+- **The recorder has never recorded a row** — it went live on a finished slate.
+  `written: 0` with `enabled: true` proves wiring, not behaviour.
+- **`index_size` 3 -> 8 -> 10 across the night is unexplained.**
+- **Drop 2's carry-forward has never been observed firing.**
+- The tally is MLB-only; soccer/wnba report `liveMcSources: null`.
+
+**HANDOFFS, all verified present in HEAD:**
+- `clv-without-settlement` — the rows are TRANSIENT (edged 25→4→1 on one slate);
+  the recorder is the prerequisite, and `clv_join.py` was deliberately untouched.
+  Carries two corrections: **Pinnacle is 15/30 in production** (the sharp SET is
+  30/30), and "close" is ill-defined for a live market.
+- `memory-watchdog-435` — a **2,092 MB** in-process excursion, pid 39, 34 s,
+  children proven flat. ~3x `#327`'s largest.
+- `soccer-model-coverage` — `SOCCER_PREGAME_AUTORUN_FAILED` lock contention.
+
+**COSTS I IMPOSED, recorded rather than netted out:** three soccer runs killed,
+one wrong rollback of a working fix, and two deploys fired over another
+session's claim. **No claims held; refresh-worker and live-odds-worker are free.**
+
+**NEXT SESSION STARTS HERE:** tomorrow's live slate is the first real test —
+does the ledger grow only on movement, and do the surviving edges beat a sharp
+close. **That is evaluation, not plumbing.** The plumbing is done.
+
+### refresh-worker-oom-recurrence — OPEN — opened 2026-08-16 — session: refresh-worker-oom-recurrence
+- Goal: Decide, on evidence, whether the two `oomKilled` events (02:11:34Z,
+  02:37:06Z, `memoryLimit 4Gi`, refresh-worker only — live-odds-worker zero in
+  the same window) mean `#435` REGRESSED or that `#435` fixed one contributor
+  and a SECOND one is now binding. Then attack whichever is actually binding.
+  Success = a written attribution in `deploys.md` backed by a **deploy-free**
+  window, with the window stated.
+- Files: none claimed yet — this lane is diagnostic until the attribution is
+  made. Expected candidates when it turns into a change:
+  `syndicate/features/intelligence.py` (the 3000MB `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`
+  floor), `syndicate/blueprints/home.py` (MLB hydration entry),
+  `syndicate/features/shared/memory_observability.py`. Checked against every
+  OPEN lane's `- Files:` at open time: the only claims held anywhere are
+  `pipeline/intelligence_state.py` + `syndicate/features/wnba/cards.py`
+  (`clamp-fix-to-workers`). No overlap.
+- Hypothesis (to be falsified, NOT assumed): `#435`'s `read_book_quotes_latest`
+  streaming fix is still in effect on the deployed tree, and the 3,857MB anon at
+  02:37:00Z is a DIFFERENT contributor — the standing finding that the kill is
+  MLB game hydration in the main worker process (`build_cards_page_context`
+  running HYDRATED), which the 3000MB floor does not guard because that floor
+  sits in front of `build_intelligence_overview`.
+- Falsification test: if the deployed refresh-worker SHA does not contain the
+  `#435` streaming reader, or if the book_quotes read is measurably back at
+  whole-file cost on the current shard, the hypothesis is WRONG and this is a
+  regression, not a second contributor. Positive control required on every log
+  query; kills read from `/v1/services/<id>/events`, never from logs.
+- Known confound, stated before measuring: refresh-worker took **four deploys
+  between 01:31 and 02:25** (win_prob instrument work). Every deploy reboots and
+  re-runs hydration cold. Any before/after spanning that window is confounded —
+  the window used must be deploy-free and long enough to re-warm (the floor is
+  the ratchet).
+- Verification: an attribution written to `.syndicate/deploys.md` with its
+  working, naming the window and the number of kills in it. No deploy to
+  refresh-worker unless the attribution demands one — the `win_prob` counter
+  cannot produce a reading until this service gets an hour without a kill or a
+  deploy, which is a reason to keep deploys OFF, not to add one.
+- Blocked by: none.
+
+#### `clv-without-settlement` — SETTLED READING 2026-08-15 MLB, recorded by `live-game-line-projection`
+Read from `/api/ops/clv/report?sport=mlb&date=2026-08-15` at ~2026-08-16 02:5xZ,
+after the scheduled task `clv-settled-read-2026-08-15` fired 01:55:33Z. **Not my
+lane — recorded because I had the reading and the context; interpret it yourself.**
+
+**THE NUMBER (same-book, close observed BEFORE first pitch):**
+
+    avg_clv_pct      -0.4049 %
+    beat_close_rate   21.64 %   (29 of 134)
+    same_book_n      134   |  same_book_all_n 159  |  book_biased_n 107
+    openings         987   ->  resolved 266
+
+**IT GOT WORSE ON SETTLEMENT.** This lane's own preliminary figure was
+**-0.07 % at a 27.1 % beat rate**, taken pre-first-pitch. Settled it is
+**-0.4049 % at 21.64 %**. The direction of that move is the finding.
+
+**DO NOT QUOTE `book_agnostic_close`.** It reads **+2.6793 % at an 83.16 % beat
+rate on n=95** and is an ARTIFACT, not a result — the report's own `bias_note`
+says pairing a best-of-N opening against another book's close is **biased
+upward**. That is precisely what the same-book restriction exists to remove, and
+it is the most quotable wrong number in the payload.
+
+**`by_close_timing` — and this is the part that touches Tier 5:**
+
+    pregame   n=134   avg -0.4049 %   beat 21.64 %
+    in_play   n= 25   avg -0.3498 %   beat 36.00 %
+
+**IN-PLAY IS A SEPARATE, EXCLUDED BUCKET (`in_play_excluded_n: 25`) — AND
+IN-PLAY IS EXACTLY WHAT `live-game-line-projection` PRODUCES.** The live
+game-line edges cannot be scored through this path as it stands; they would land
+in the bucket this report sets aside. **This empirically confirms the caveat in
+my handoff above** ("close is ill-defined for a live market"): it is not a
+theoretical objection, the pipeline already treats those rows as un-scoreable.
+Deciding what "close" means for a market that runs continuously to settlement is
+a prerequisite for scoring the live game-line ledger, and it is this lane's call.
+
+**LIMITS, stated so nobody over-reads a single evening:** one slate; `resolved`
+is **266 of 987** openings, so roughly a quarter of published rows got a close at
+all — the 134 that carry the headline are ~14 % of what was published. Whether
+the unresolved 721 differ systematically from the resolved 266 is **unknown and
+not tested**, and if they do the -0.4049 % is not representative.
+
+> *(The blockquote and body below are this lane's HISTORY, kept for the
+> reasoning trail. The status above supersedes them — 2026-08-16 reconcile.)*
 > **STATUS LINE CORRECTED 2026-08-15 ~18:0xZ by the coordinating session.** It
 > read "NOT DEPLOYED" and that is no longer true: `0e0b0aa1` rode the web train
 > and is in the deployed tree (`dep-da0a5rlg1s2s73cm43kg`, live 17:40:30Z).
@@ -1533,129 +1661,26 @@ treat it as a controlled baseline.**
 - `win-prob-null-readable` — CLOSED-VERIFIED 2026-08-16 *(full entry in `lanes_closed.md`)*
 - `slate-size-headroom` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
 - `worker-child-processes` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
-### live-game-line-projection — SESSION ARCHIVED 2026-08-16 ~02:4xZ. TIER 5'S PREMISE IS TRUE IN PRODUCTION.
-**Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
 
-**SHIPPED AND LIVE (content-verified per service, not by ancestry):**
-- live-odds-worker `c4116ab6` — the live MC stamps `simsRun`.
-- refresh-worker `f8ca54e1` — the game-line join, the segment filter, the
-  Agresti-Coull boundary, and the CLV recorder.
-- web carries D1+D2; it needs neither the vendor stamp nor the join.
+#### live-game-line-projection — ARCHIVE ADDENDUM 2026-08-16 ~03:0xZ (supersedes the "next session" line in the archive above)
+Recorded after the archive block, and it **changes the next step**.
 
-**THE ARC, in measured numbers:**
+The settled MLB CLV read for 2026-08-15 (`ceecf863`) shows
+**`in_play_excluded_n: 25` — in-play is a SEPARATE, EXCLUDED bucket**, and
+in-play is exactly the population this lane produces. **So the live game-line
+edges cannot be scored through the existing CLV path at all**, however many rows
+the ledger accumulates.
 
-    baseline   index 3   projected 12  edged 0   (sim_count_unusable 12)
-    +simsRun   index 8   projected 32  edged 25  <- FIRST EVER, and WRONG
-    +segment   index 10  projected  5  edged 4   <- first credible ones
-    tail       index 10  projected  2  edged 0   (slate over; ledger written 0)
+**The blocker is therefore a DECISION, not more data:** what does "close" mean
+for a market that runs continuously to settlement? That is
+`clv-without-settlement`'s call, and it gates everything this lane ships.
 
-**THE 25 WERE FAKE AND I RETRACTED THEM MYSELF**, caught while packaging them
-for handoff: Wald `sqrt(p(1-p)/n)` is **0.0 at p in {0,1}**, so the 2-sigma bar
-was ZERO and everything cleared it; and the full-game projection was priced
-against every SEGMENT (SD @ CLE `first1` gave **+42.43 pp**). Both fixed.
+**Revised order for whoever picks this up:**
+1. **Settle the in-play close definition** with `clv-without-settlement`. Until
+   then the ledger accrues rows nobody can score.
+2. Then read the **8/16 20:30 CDT** scheduled check — dedup working, rows
+   accumulating. That proves the RECORDER, which is still worth knowing.
+3. Only then ask whether the edges are any good.
 
-**WHAT IS NOT ESTABLISHED — do not let the arc imply otherwise:**
-- **No CLV, no settlement, no backtest.** Surviving means an edge exceeds the
-  ESTIMATOR'S OWN NOISE at 120 sims. It says nothing about the model.
-- **The recorder has never recorded a row** — it went live on a finished slate.
-  `written: 0` with `enabled: true` proves wiring, not behaviour.
-- **`index_size` 3 -> 8 -> 10 across the night is unexplained.**
-- **Drop 2's carry-forward has never been observed firing.**
-- The tally is MLB-only; soccer/wnba report `liveMcSources: null`.
-
-**HANDOFFS, all verified present in HEAD:**
-- `clv-without-settlement` — the rows are TRANSIENT (edged 25→4→1 on one slate);
-  the recorder is the prerequisite, and `clv_join.py` was deliberately untouched.
-  Carries two corrections: **Pinnacle is 15/30 in production** (the sharp SET is
-  30/30), and "close" is ill-defined for a live market.
-- `memory-watchdog-435` — a **2,092 MB** in-process excursion, pid 39, 34 s,
-  children proven flat. ~3x `#327`'s largest.
-- `soccer-model-coverage` — `SOCCER_PREGAME_AUTORUN_FAILED` lock contention.
-
-**COSTS I IMPOSED, recorded rather than netted out:** three soccer runs killed,
-one wrong rollback of a working fix, and two deploys fired over another
-session's claim. **No claims held; refresh-worker and live-odds-worker are free.**
-
-**NEXT SESSION STARTS HERE:** tomorrow's live slate is the first real test —
-does the ledger grow only on movement, and do the surviving edges beat a sharp
-close. **That is evaluation, not plumbing.** The plumbing is done.
-
-### refresh-worker-oom-recurrence — OPEN — opened 2026-08-16 — session: refresh-worker-oom-recurrence
-- Goal: Decide, on evidence, whether the two `oomKilled` events (02:11:34Z,
-  02:37:06Z, `memoryLimit 4Gi`, refresh-worker only — live-odds-worker zero in
-  the same window) mean `#435` REGRESSED or that `#435` fixed one contributor
-  and a SECOND one is now binding. Then attack whichever is actually binding.
-  Success = a written attribution in `deploys.md` backed by a **deploy-free**
-  window, with the window stated.
-- Files: none claimed yet — this lane is diagnostic until the attribution is
-  made. Expected candidates when it turns into a change:
-  `syndicate/features/intelligence.py` (the 3000MB `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`
-  floor), `syndicate/blueprints/home.py` (MLB hydration entry),
-  `syndicate/features/shared/memory_observability.py`. Checked against every
-  OPEN lane's `- Files:` at open time: the only claims held anywhere are
-  `pipeline/intelligence_state.py` + `syndicate/features/wnba/cards.py`
-  (`clamp-fix-to-workers`). No overlap.
-- Hypothesis (to be falsified, NOT assumed): `#435`'s `read_book_quotes_latest`
-  streaming fix is still in effect on the deployed tree, and the 3,857MB anon at
-  02:37:00Z is a DIFFERENT contributor — the standing finding that the kill is
-  MLB game hydration in the main worker process (`build_cards_page_context`
-  running HYDRATED), which the 3000MB floor does not guard because that floor
-  sits in front of `build_intelligence_overview`.
-- Falsification test: if the deployed refresh-worker SHA does not contain the
-  `#435` streaming reader, or if the book_quotes read is measurably back at
-  whole-file cost on the current shard, the hypothesis is WRONG and this is a
-  regression, not a second contributor. Positive control required on every log
-  query; kills read from `/v1/services/<id>/events`, never from logs.
-- Known confound, stated before measuring: refresh-worker took **four deploys
-  between 01:31 and 02:25** (win_prob instrument work). Every deploy reboots and
-  re-runs hydration cold. Any before/after spanning that window is confounded —
-  the window used must be deploy-free and long enough to re-warm (the floor is
-  the ratchet).
-- Verification: an attribution written to `.syndicate/deploys.md` with its
-  working, naming the window and the number of kills in it. No deploy to
-  refresh-worker unless the attribution demands one — the `win_prob` counter
-  cannot produce a reading until this service gets an hour without a kill or a
-  deploy, which is a reason to keep deploys OFF, not to add one.
-- Blocked by: none.
-
-#### `clv-without-settlement` — SETTLED READING 2026-08-15 MLB, recorded by `live-game-line-projection`
-Read from `/api/ops/clv/report?sport=mlb&date=2026-08-15` at ~2026-08-16 02:5xZ,
-after the scheduled task `clv-settled-read-2026-08-15` fired 01:55:33Z. **Not my
-lane — recorded because I had the reading and the context; interpret it yourself.**
-
-**THE NUMBER (same-book, close observed BEFORE first pitch):**
-
-    avg_clv_pct      -0.4049 %
-    beat_close_rate   21.64 %   (29 of 134)
-    same_book_n      134   |  same_book_all_n 159  |  book_biased_n 107
-    openings         987   ->  resolved 266
-
-**IT GOT WORSE ON SETTLEMENT.** This lane's own preliminary figure was
-**-0.07 % at a 27.1 % beat rate**, taken pre-first-pitch. Settled it is
-**-0.4049 % at 21.64 %**. The direction of that move is the finding.
-
-**DO NOT QUOTE `book_agnostic_close`.** It reads **+2.6793 % at an 83.16 % beat
-rate on n=95** and is an ARTIFACT, not a result — the report's own `bias_note`
-says pairing a best-of-N opening against another book's close is **biased
-upward**. That is precisely what the same-book restriction exists to remove, and
-it is the most quotable wrong number in the payload.
-
-**`by_close_timing` — and this is the part that touches Tier 5:**
-
-    pregame   n=134   avg -0.4049 %   beat 21.64 %
-    in_play   n= 25   avg -0.3498 %   beat 36.00 %
-
-**IN-PLAY IS A SEPARATE, EXCLUDED BUCKET (`in_play_excluded_n: 25`) — AND
-IN-PLAY IS EXACTLY WHAT `live-game-line-projection` PRODUCES.** The live
-game-line edges cannot be scored through this path as it stands; they would land
-in the bucket this report sets aside. **This empirically confirms the caveat in
-my handoff above** ("close is ill-defined for a live market"): it is not a
-theoretical objection, the pipeline already treats those rows as un-scoreable.
-Deciding what "close" means for a market that runs continuously to settlement is
-a prerequisite for scoring the live game-line ledger, and it is this lane's call.
-
-**LIMITS, stated so nobody over-reads a single evening:** one slate; `resolved`
-is **266 of 987** openings, so roughly a quarter of published rows got a close at
-all — the 134 that carry the headline are ~14 % of what was published. Whether
-the unresolved 721 differ systematically from the resolved 266 is **unknown and
-not tested**, and if they do the -0.4049 % is not representative.
+**Unchanged:** no claims held; live-odds-worker `c4116ab6`, refresh-worker
+`f8ca54e1`, both content-verified. The plumbing is done.
