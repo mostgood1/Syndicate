@@ -33024,3 +33024,38 @@ argue from a null (a REQUESTED 3-min window returned 0.23s of logs).
 **DO NOT close this on the absence of the old crash line.** Absence here is
 consistent with "never ran", and the instrument that would show the crash drops
 most lines anyway.
+
+#### `#445` UPDATE 2 — 2026-08-16 22:0xZ — **WHY IT IS UNTESTED IS NOW KNOWN, AND SO IS WHEN IT WILL BE TESTED**
+
+Measured on refresh-worker `a9e5d3d6`, full untruncated log line:
+
+    22:02:49Z [refresh_worker] SEASON_PROJECTION_ARTIFACT_MISSING sport=ncaaf
+      artifact_missing_after_launch since_launch_seconds=12588 interval_seconds=86400
+      path=/opt/render/project/data/ncaaf_source/data/smartsim2_projections_2026_wk1.csv
+
+**Both earlier hypotheses are now settled, and BOTH were wrong:**
+- NOT `#341` starvation. `season_projections` reaches ncaaf on essentially every
+  tick — this line repeats every few minutes.
+- NOT "fixed, ran, and quietly satisfied". The artifact is still MISSING.
+
+**What is actually happening:** the last ncaaf launch was
+`22:02:49Z − 12588s ≈ 18:33Z`, which is the SAME timestamp as the pre-fix crash
+recorded in this ticket. The fix went live at 20:33:23Z — **two hours after that
+launch**. The relaunch gate is `interval_seconds=86400`, so the next launch, and
+the first one to run the fixed code, is due at **~2026-08-17 18:33Z**.
+
+Note this contradicts this ticket's original "relaunched it indefinitely": the
+gate is a 24h interval, not every-tick. The relaunch loop was a burst, not a
+permanent state.
+
+**SO: `#445` cannot be confirmed or refuted before ~18:33Z on 2026-08-17.** At
+that moment expect `SEASON_PROJECTION_LAUNCHING sport=ncaaf` followed by
+`ENGINE_SCHEDULE_ABSENT` and NO `FileNotFoundError`. If the artifact is still
+missing after that launch, the fix reached the CFBD fallback and the fallback
+returned nothing — a DIFFERENT defect from the one this ticket describes, and the
+one nobody has ever observed running.
+
+Instrument note for whoever checks: read these lines with
+`--width 200000`. I truncated one at 125 chars and read `interval_s=8640`
+instead of `86400` — a 10x error that would have predicted the relaunch 18 hours
+early.
