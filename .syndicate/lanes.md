@@ -5,6 +5,33 @@
 > Managed by `/lane`. Do not hand-edit while a session is running.
 
 ## OPEN
+### ncaaf-schedule-fallback — **CLOSED-VERIFIED 2026-08-16 — `#445` fixed in `483bb9dd`, on `origin/main`. NOT DEPLOYED (NCAAF opens 08-29)** — opened 2026-08-16 (retroactively, see below) — session: sim-engine-track
+- **PROTOCOL GAP, RECORDED NOT HIDDEN:** the collision check was run before any
+  edit (both files CLEAR), but the lane entry itself was never written until
+  checkpoint. The claim was made and not published, so for ~40 minutes another
+  session could have taken `generate_smartsim2_ncaaf_projections.py` without
+  seeing a conflict. No collision occurred; the exposure was real anyway.
+- Files: `scripts/generate_smartsim2_ncaaf_projections.py`,
+  `tests/test_ncaaf_schedule_fallback.py` (new).
+- **Goal met:** an absent engine schedule reaches the CFBD fallback instead of
+  raising. `load_engine_schedule` returns `[]` and logs `ENGINE_SCHEDULE_ABSENT`.
+- **The fallback was already written, already correct and already called** — its
+  own docstring names this case. It was unreachable because the read raised.
+  Four lines.
+- **The fix this lane did NOT make, deliberately:** re-pointing the hard-coded
+  2025 filename at 2026. No 2026 file exists, nothing writes one, all 278 in the
+  checkout are 2025 — it would rate 2026 from 2025 predicted totals, silently
+  wrong rather than loudly broken. My own `#445` ticket proposed exactly that;
+  see `learnings.md` on reasoning by analogy from a just-solved defect.
+- **Verification:** 5 new tests, two guarding the FALLBACK rather than the change
+  (FBS-vs-FBS only; rows missing a team), because a widened slate would alter
+  which games get projected rather than merely keeping the run alive.
+  295 passed / 0 failed across `-k ncaaf`.
+- **UNVERIFIED and handed over:** that CFBD `/games` returns rows for
+  `season=2026 week=1` in production. Not called against the live API, and not
+  deployed. Check when this ships.
+- Blocked by: none.
+
 
 ### ask-answer-substance — OPEN — opened 2026-08-16 — session: ask-answer-substance
 - Goal: the inline quick ask names a bet a human can actually place and grounds

@@ -2664,3 +2664,27 @@ bar, and it works on slates where nothing can be fitted at all.
 - Same family as [[feedback-instrument-blindness]] and
   [[feedback-gate-on-the-output-not-the-input]]: a healthy reading is evidence
   only once you know what makes it read unhealthy.
+
+### 2026-08-16 — OVERTURNED: reasoning by analogy from a just-solved defect. `#441` needed a fetcher; its look-alike `#445` needed four lines and would have been made WORSE by one
+- **What we believed:** `#445` looked identical to `#441` — a projection generator
+  dying on an absent input — so the ticket I wrote proposed the `#441` shape:
+  fetch it, or fix the path resolution. It also called the hard-coded 2025
+  filename the deeper defect.
+- **What was actually true:** the generator already had a CFBD fallback for
+  exactly this case, already called by `main()`, with a docstring naming the
+  situation. It was unreachable only because the read RAISED instead of returning
+  empty. The fix was four lines and needed no new data source.
+- **And the ticket's "deeper defect" was a trap.** Re-pointing the filename at a
+  2026 path would have rated the 2026 season from 2025 predicted totals: a
+  silently wrong artifact, strictly worse than the crash, which is at least
+  visible. All 278 such files in the checkout are 2025; nothing writes a 2026 one.
+- **The rule going forward: a defect that RESEMBLES the last one earns a code
+  read, not a transplanted fix.** The resemblance is in the symptom (generator +
+  absent input + relaunch loop); the remedy lives in the cause, and the causes
+  differed completely — `#441` had no writer anywhere, `#445` had a working
+  substitute that an exception hid. Read the failing function's siblings before
+  proposing a remedy; the previous ticket is evidence about the previous bug only.
+- **Corollary on my own tickets:** a next-steps list written while a defect is
+  fresh encodes the shape of the LAST investigation. Treat it as a hypothesis to
+  test, not a plan to execute — this one would have shipped a wrong fix.
+- *(evidence: `483bb9dd`; `games_from_cfbd_when_engine_schedule_empty` docstring)*

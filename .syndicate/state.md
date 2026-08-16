@@ -2382,3 +2382,20 @@ client-side JS). Trace the served `book` field to its writer before acting.
   starts; week-1 ratings come from `prior_season_fallback`.
 - **`#443` and `#445` remain OPEN and unowned** — the stale-PID silent stall, and
   NCAAF's generator crashing on a hard-coded 2025 input 13 days before its season opens.
+
+## NCAAF SEASON PROJECTIONS — verified 2026-08-16 (`#445`, FIXED, NOT DEPLOYED)
+
+- **The generator crashed on every launch** with `FileNotFoundError` on
+  `ncaaf_source/data/college_football_schedule_2025_predicted_totals_enhanced.csv`,
+  and the staleness gate relaunched it indefinitely
+  (`SEASON_PROJECTION_ARTIFACT_MISSING sport=ncaaf ... since_launch_seconds=2866`).
+- **The CFBD fallback for this case already existed** and was already called by
+  `main()`; it was unreachable because the read raised instead of returning empty.
+  Fixed in `483bb9dd` (4 lines + an `ENGINE_SCHEDULE_ABSENT` log line).
+- **The predicted-totals CSV family is season-2025-only** — 278 files in the
+  checkout, all 2025, none for 2026, and nothing in the repo writes one. CFBD is
+  the correct source for any season the legacy engine never covered. **Do not
+  re-point the hard-coded filename at a 2026 path**: it would rate 2026 from 2025
+  predicted totals, which is silently wrong rather than loudly broken.
+- **NOT DEPLOYED.** NCAAF opens 2026-08-29; rides the next worker deploy with
+  `b909d008`. Whether it produces rows in production is UNVERIFIED.
