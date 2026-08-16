@@ -329,11 +329,21 @@ guard this pass** — `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES` is consumed only by
 cannot say — `seconds_since_stage` is 14-34 s and `apply_game_board_contract`
 only does `setdefault`s after `games_normalized`, so the cost is BETWEEN markers.
 Working in `deploys.md` (2026-08-16 ~02:5xZ).
-**CLEAN WINDOW OPEN: no kill and no deploy since 02:37:06Z — 42.8 min as of
-03:19:53Z** (events API). This is the precondition the `win_prob` counter has
-been waiting on: both its channels only write when a run COMPLETES, so it
-cannot produce a reading until refresh-worker gets an uninterrupted hour.
-**Every deploy to this service resets that clock to zero.**
+**THE CLEAN HOUR HAPPENED AND IT PROVED THE PREMISE WRONG.** `[measured 08-16
+04:3xZ]` refresh-worker ran **1h 41m** with no kill and no deploy —
+02:37:06Z -> 04:18:17Z (events API), ended by deploy `5c419007` (live 04:24:33Z).
+The `win_prob` counter emitted **nothing**, and that is CORRECT, not a failure.
+**`WIN_PROB_NULL_NO_PRICE` cannot ever come from refresh-worker: the producer
+`refresh_wnba_oddsapi_props.py` runs ONLY on live-odds-worker** — exact-name log
+search, 26 matches there, **zero on refresh-worker all day**, positive control
+2,346 `MEMORY_WATCHDOG` lines over the identical window. `refresh_nba_oddsapi_props.py`
+never ran at all (NBA out of season, as predicted).
+**So holding deploys on refresh-worker could never have produced this reading.**
+The real gate: the WNBA producer last ran **01:31:25Z**; `PREGAME_CADENCE_SKIPPED
+sports=wnba` starts **02:11:58Z** and repeats 115x through 04:30; the counter code
+went live on live-odds-worker at **02:24:12Z** (`44bc02f3`) — i.e. AFTER the last
+producer run. **The counter has had ZERO opportunity to fire.** It will read on
+the next WNBA slate, not on any refresh-worker window.
 
 ### Prior `#435` record, unchanged and still true `[measured 08-16 01:07Z]`
 

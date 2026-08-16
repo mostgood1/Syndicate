@@ -1835,3 +1835,36 @@ directly with `ls-files --others --exclude-standard` INTERSECT
 `ls-tree -r --name-only origin/main`. And **`git stash create` does not capture
 untracked files**, so a snapshot taken that way is not the safety net you think
 it is for exactly the files that block a merge.
+
+### 2026-08-16 — the clean hour arrived, and the thing it was supposed to unblock does not run on that service
+
+`state.md` and a session handoff both carried: *"the `win_prob` counter cannot
+produce a reading while this continues — the producer keeps being killed or
+restarted mid-run … that is a reason to keep deploys off refresh-worker."*
+Deploys were held on refresh-worker on that basis.
+
+**refresh-worker then ran 1h 41m clean (02:37:06Z -> 04:18:17Z, events API) and
+the counter emitted nothing — because the producer never runs there.**
+`refresh_wnba_oddsapi_props.py`: 26 log matches on **live-odds-worker**, **zero
+on refresh-worker** all day. Positive control on the null: 2,346
+`MEMORY_WATCHDOG` lines over the identical window, so the probe and the window
+were both good.
+
+The belief was never tested against **which service executes the code**. This
+repo already has a rule for that (`project_which_service_runs_the_code`) and a
+lane that shipped Drop 1 to the wrong service, where it sat inert. It recurred
+because the claim was inherited in prose and re-stated, not re-derived.
+
+**The rule going forward:** before accepting "X is blocked until service S is
+healthy", grep the logs of S for the emitter of X. If the token has never
+appeared on S, the dependency is imaginary and the mitigation being paid for —
+here, a deploy freeze on a busy service — is being paid for nothing.
+
+**Near-miss inside the same investigation, worth its own line:** I first searched
+the substring `oddsapi_props` and found 38 matches on live-odds-worker, and was
+one step from publishing "the producers run there". They were
+`fetch_soccer_oddsapi_props_local.py` — the SOCCER fetcher, a substring
+collision. **Search for the exact emitter or the exact script name; a substring
+that contains your quarry's name is not your quarry.** The correct conclusion
+survived only because I extracted the process cmdline instead of trusting the
+match count.
