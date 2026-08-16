@@ -47,6 +47,7 @@ from syndicate.features.nfl.injury_adjustment import adjust_team_rating_for_inju
 from syndicate.features.nfl.smartsim2_projection import SmartSimNflProjection
 from syndicate.features.nfl.smartsim2_projection import write_projection_artifact
 from syndicate.features.nfl.sources import default_nfl_source_root
+from syndicate.features.nfl.sources import nfl_pbp_path
 from syndicate.features.nfl.sources import nfl_artifact_output_root
 # Reused rather than reimplemented: the reader already decides what counts as
 # degenerate (`98950c6d`), and a second copy of that predicate here would let
@@ -188,7 +189,21 @@ def assert_projections_carry_information(
 
 
 def _pbp_path(season: int) -> Path:
-    return DATA_ROOT / "tracking" / "nflverse" / "pbp" / f"pbp_{season}.csv"
+    """`#441`. Resolves across candidate roots, NOT under `DATA_ROOT`.
+
+    `DATA_ROOT` is `default_nfl_source_root()`, which picks a root by probing for
+    `upcoming_recs_*.csv`. On refresh-worker that selects the ephemeral repo
+    CHECKOUT, because the checkout ships those 5 tracked files while
+    `data/nfl_source/tracking/` is gitignored and the pbp exists only on the
+    mounted disk. Measured in production 2026-08-16: zero plays loaded, the
+    degenerate-run guard refused (correctly), and the artifact went 2.36 days
+    stale while relaunching ~107x/day.
+
+    Deliberately NOT fixed by changing `default_nfl_source_root()`: that function
+    is load-bearing for every other NFL reader, and `#389` set the precedent of
+    giving each path its own resolver rather than re-pointing the shared one.
+    """
+    return nfl_pbp_path(season)
 
 
 def load_pbp_plays(season: int) -> list[tuple[int, str, str, str, float]]:
