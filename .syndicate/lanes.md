@@ -3351,7 +3351,12 @@ and then failed the thing it was checking, which is the point of running it.
 - Live consequence: the probe fails every run while MLB has a live slate.
 - Blocked by: none
 
-### branch-overlap-manual-run-marker — OPEN — opened 2026-08-16 — session: `branch-overlap-baseline-watch`
+### branch-overlap-manual-run-marker — CLOSED — opened 2026-08-16 — session: `branch-overlap-baseline-watch` — verified in production 2026-08-16T19:52:23+00:00
+- **PROVEN IN PRODUCTION.** The 14:45 local slot landed a record at
+  `recorded_at=2026-08-16T19:52:23+00:00` carrying **`run_mode="scheduled"`** — the
+  first record ever written with the field set, so `--scheduled` does reach the
+  live task. Covered 2026-08-16T14:52:07Z—19:51:47Z (09:52—14:51 local),
+  `samples=1967`. The three prior records carry NO field and stay UNKNOWN.
 - Goal: a record in `reports/branch_overlap/baseline.jsonl` states whether it came
   from the scheduled run or from a human, so a manual probe can never be counted
   as evidence in the Phase 1 (`#440`) before-distribution.
