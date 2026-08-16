@@ -2666,3 +2666,26 @@ and then failed the thing it was checking, which is the point of running it.
 - Provenance caveat: this statistic was chosen AFTER seeing which looked stable,
   so its behaviour is not independent evidence. It did not come true.
 - Blocked by: none
+
+### ui-probe-tracked-statistic-revert — CLOSED 2026-08-16 — reverted to worstGroupPx; exposed and fixed two false alarms that were failing a healthy board — opened+closed 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: tracked statistic back to the worst tie group, printed number == diffed
+  number == the quantity the impossibility floor uses.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Cross-era safety: `_cmp_value` reads `worstGroupPx` BEFORE `spreadPx`, because
+  reports from the largest-group window carry `spreadPx` meaning the other
+  quantity. Verified live: post-revert run vs a largest-group-era report reads
+  `identicalContentSpread unchanged`.
+- **False alarm 1 fixed:** mlb mobile printed "AT ITS NOISE FLOOR (164px) ... not
+  layout deviation" and failed the run on that same number (164px > 150px
+  budget). A residual at its floor is unmeetable by any model; now reported, not
+  failed.
+- **False alarm 2 fixed:** mlb desktop then failed with "LAYOUT SPREAD OVER
+  BUDGET (313px) with content not driving height" while identical-content cards
+  differed by 70px. The branch inferred "content-independent" from a flat linear
+  slope; on desktop that is false, because the grid WRAPS and a flat slope means
+  the line cannot see content, not that content is absent. The budget now applies
+  to the content-controlled figure where tied cards exist, falls back to raw
+  spread where none do, and says which it used.
+- Verification: 65 tests pass (58 + 7 new); production run after both fixes exits
+  0 / OK where the same board failed two rows before.
+- Blocked by: none

@@ -245,7 +245,10 @@ def test_content_independent_over_budget_fails():
         residualSpread=11, fitRatio=2.0, reliable=False, contentIndependent=True)))
     assert not ok
     assert "LAYOUT SPREAD OVER BUDGET" in text
-    assert "content not driving height" in text
+    # Wording changed 2026-08-16: the budget is applied to the content-
+    # CONTROLLED figure where tied cards exist. This report has none, so the
+    # raw spread is still the signal and still fails.
+    assert "NO tied cards, so this raw spread is the best available signal" in text
 
 
 def test_an_unreliable_fit_is_neither_an_alarm_nor_a_pass():
@@ -634,14 +637,15 @@ def test_the_floor_is_printed_even_with_no_model():
     text, ok = _summarize(_report(
         heightModel=None,
         identicalContentSpread={"state": "Live", "spreadPx": 116, "atU": 33,
-                                "n": 15, "worstGroupPx": 116, "worstAtU": 33,
-                                "worstN": 15, "tiedGroups": 1, "cardsTied": 15},
+                                "n": 15, "worstGroupPx": 116, "largestGroupPx": 116,
+                                "largestAtU": 33, "largestN": 15,
+                                "tiedGroups": 1, "cardsTied": 15},
     ))
     assert ok, text
     assert "identical-content spread 116px in Live" in text
-    assert "largest group: 15 cards at 33 pairs" in text
-    # One group, so the two statistics agree and the worst-group clause is noise.
-    assert "worst group" not in text
+    assert "worst group: 15 cards at 33 pairs" in text
+    # One group, so the two statistics agree and the second clause is noise.
+    assert "largest group " not in text
 
 
 def test_the_floor_never_fails_a_run_while_its_stability_is_unknown():
@@ -712,14 +716,16 @@ def test_an_errored_baseline_row_is_named_as_the_errored_side():
 # later be cited as having been predicted to be stable.
 
 
-def test_the_tracked_statistic_is_the_largest_group_not_the_worst():
-    """A 2-card group straddling the extremes must not own the metric."""
+def test_the_tracked_statistic_is_the_worst_group():
+    """Reverted 2026-08-16 after the largest-group variant measured WORSE on
+    both mlb rows (2.45x vs 1.66x). The tracked number and the fit floor are
+    one quantity again, so a row cannot print one and diff the other."""
     pts = [(41, 1000), (41, 1400)]                      # n=2, spread 400
     pts += [(45, 1100), (45, 1130), (45, 1120), (45, 1150)]  # n=4, spread 50
     m = _fit_tie(pts)
-    assert m["n"] == 4 and m["atU"] == 45
-    assert m["spreadPx"] == 50
-    assert m["worstGroupPx"] == 400 and m["worstAtU"] == 41
+    assert m["spreadPx"] == 400 and m["atU"] == 41 and m["n"] == 2
+    assert m["worstGroupPx"] == 400
+    assert m["largestGroupPx"] == 50 and m["largestAtU"] == 45 and m["largestN"] == 4
 
 
 def test_the_worst_group_still_drives_fit_impossibility():
@@ -744,21 +750,41 @@ def test_equal_sized_groups_break_toward_the_larger_spread():
 
 
 def test_both_statistics_are_printed_when_they_disagree():
+    """Them disagreeing is itself informative -- it says a small group is
+    straddling the extremes."""
     text, ok = _summarize(_report(identicalContentSpread={
-        "state": "Preview", "spreadPx": 50, "atU": 45, "n": 4,
-        "worstGroupPx": 400, "worstAtU": 41, "worstN": 2,
-        "tiedGroups": 2, "cardsTied": 6}))
+        "state": "Preview", "spreadPx": 400, "atU": 41, "n": 2,
+        "worstGroupPx": 400, "largestGroupPx": 50, "largestAtU": 45,
+        "largestN": 4, "tiedGroups": 2, "cardsTied": 6}))
     assert ok, text
-    assert "identical-content spread 50px in Preview" in text
-    assert "worst group 400px at 41 pairs, n=2" in text
+    assert "identical-content spread 400px in Preview" in text
+    assert "worst group: 2 cards at 41 pairs" in text
+    assert "largest group 50px at 45 pairs, n=4" in text
 
 
-def test_the_comparison_diffs_the_tracked_statistic_not_the_worst():
+def test_the_comparison_diffs_the_worst_group():
     base = _report(identicalContentSpread={
-        "state": "Preview", "spreadPx": 50, "worstGroupPx": 400, "atU": 45, "n": 4})
+        "state": "Preview", "spreadPx": 400, "worstGroupPx": 400,
+        "largestGroupPx": 50, "atU": 41, "n": 2})
     cur = _report(identicalContentSpread={
-        "state": "Preview", "spreadPx": 50, "worstGroupPx": 900, "atU": 45, "n": 4})
+        "state": "Preview", "spreadPx": 400, "worstGroupPx": 400,
+        "largestGroupPx": 900, "atU": 41, "n": 2})
     text, ok = _compare(base, cur)
+    assert ok
+    assert "identicalContentSpread unchanged" in text
+
+
+def test_a_report_from_the_largest_group_window_compares_on_the_same_quantity():
+    """Reports written 2026-08-16 between the switch and the revert carry
+    `spreadPx` meaning the LARGEST group. Diffing that against a current report
+    would compare two different quantities and call the difference movement --
+    `worstGroupPx` is present in both eras and means one thing in both."""
+    old_era = {"state": "Preview", "spreadPx": 67, "worstGroupPx": 99}
+    new_era = {"state": "Preview", "spreadPx": 99, "worstGroupPx": 99,
+               "largestGroupPx": 67}
+    assert probe._cmp_value(old_era) == probe._cmp_value(new_era) == 99
+    text, ok = _compare(_report(identicalContentSpread=old_era),
+                        _report(identicalContentSpread=new_era))
     assert ok
     assert "identicalContentSpread unchanged" in text
 
@@ -767,3 +793,85 @@ def test_an_older_report_using_floorPx_still_compares():
     """Reports written before the statistic changed carry `floorPx` only."""
     assert probe._cmp_value({"state": "Preview", "floorPx": 116}) == 116
     assert probe._cmp_value({"state": "Preview", "spreadPx": 50, "floorPx": 400}) == 50
+
+
+def test_a_residual_at_its_noise_floor_is_not_failed_for_being_over_budget():
+    """Seen live 2026-08-16, mlb mobile: residual 164px == floor 164px against a
+    150px budget. The row said "text wrap, not layout deviation" and failed the
+    run on that same number. No model beats its own floor, so this would make
+    the harness permanently red on a healthy board."""
+    text, ok = _summarize(_report(heightModel=_model(
+        residualSpread=164, floorPx=164, atNoiseFloor=True)))
+    assert ok, text
+    assert "EQUALS its noise floor" in text
+    assert "cannot be met by any model" in text
+    assert "LAYOUT RESIDUAL OVER BUDGET" not in text
+
+
+def test_a_residual_clear_of_its_floor_still_fails_over_budget():
+    """The budget must still bite where a model COULD have done better."""
+    text, ok = _summarize(_report(heightModel=_model(
+        residualSpread=164, floorPx=20, atNoiseFloor=False)))
+    assert not ok
+    assert "LAYOUT RESIDUAL OVER BUDGET" in text
+
+
+def test_the_over_budget_suppression_needs_the_floor_to_be_known():
+    """No tied cards means no floor. An unmeasured floor must not buy an
+    exemption -- absent must not read as `atNoiseFloor`."""
+    text, ok = _summarize(_report(heightModel=_model(
+        residualSpread=164, floorPx=None, atNoiseFloor=False)))
+    assert not ok
+    assert "LAYOUT RESIDUAL OVER BUDGET" in text
+
+
+def test_content_independent_applies_the_budget_to_the_controlled_figure():
+    """Seen live 2026-08-16, mlb desktop: raw group spread 313px against an
+    identical-content spread of 70px, failed as "a layout difference". 243px of
+    that was the 33-57 pair range. A flat linear slope on desktop means the LINE
+    cannot see wrap, not that content is absent."""
+    text, ok = _summarize(_report(
+        heightModel=_model(contentIndependent=True, reliable=False,
+                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
+        identicalContentSpreadByState={"Preview": {"spreadPx": 70}},
+    ))
+    assert ok, text
+    assert "identical-content spread 70px in Preview" in text
+    assert "raw spread 313px is mostly content" in text
+    assert "LAYOUT SPREAD OVER BUDGET" not in text
+
+
+def test_content_independent_still_fails_when_the_controlled_figure_is_over():
+    """Controlling for content must not disarm the check -- only aim it."""
+    text, ok = _summarize(_report(
+        heightModel=_model(contentIndependent=True, reliable=False,
+                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
+        identicalContentSpreadByState={"Preview": {"spreadPx": 260}},
+    ))
+    assert not ok
+    assert "LAYOUT SPREAD OVER BUDGET (260px > 150px)" in text
+    assert "content controlled for" in text
+
+
+def test_content_independent_falls_back_to_raw_spread_when_nothing_ties():
+    """No tied cards means no controlled figure; the raw spread is then the
+    best available signal and must still be able to fail."""
+    text, ok = _summarize(_report(
+        heightModel=_model(contentIndependent=True, reliable=False,
+                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
+        identicalContentSpreadByState={},
+    ))
+    assert not ok
+    assert "NO tied cards, so this raw spread is the best available signal" in text
+    assert "LAYOUT SPREAD OVER BUDGET" in text
+
+
+def test_the_controlled_figure_is_taken_from_the_models_own_state():
+    """A tie floor from a DIFFERENT state is not a control for this one."""
+    text, ok = _summarize(_report(
+        heightModel=_model(state="Preview", contentIndependent=True, reliable=False,
+                           groupHeightSpread=313, explainedPx=24, pxPerUnit=1.5),
+        identicalContentSpreadByState={"Live": {"spreadPx": 70}},
+    ))
+    assert not ok, "a Live tie floor must not exempt a Preview spread"
+    assert "NO tied cards" in text

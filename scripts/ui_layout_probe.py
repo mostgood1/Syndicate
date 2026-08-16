@@ -278,22 +278,31 @@ MEASURE_JS = """
     // bounds its residual from below. Using anything smaller here would let
     // something read as fittable when it is not.
     //
-    // `spreadPx` is the spread within the LARGEST tie group, and it is the
-    // number tracked across runs (user decision, 2026-08-16, after mlb mobile
-    // read 109/109/53 on the max statistic). Biggest group = most evidence, and
-    // it does not hand the metric to a two-card group that happens to straddle
-    // the extremes. Ties on group size break toward the LARGER spread, so the
-    // choice can never hide a difference.
+    // `spreadPx` is the TRACKED number, and it is the worst group as well.
+    // It was briefly the largest group instead (2026-08-16, to try to steady
+    // mlb mobile) and that was MEASURED WORSE on both mlb rows -- tracked
+    // 67/132/164 = 2.45x against the worst group's 99/132/164 = 1.66x, because
+    // the largest group's own SIZE churns (n = 7/14/7 across three runs). The
+    // instability was never the statistic: nfl and ncaaf read 1.00x under both,
+    // on static slates, while MLB enriches continuously during a live slate.
+    // Reverted, so the tracked number and the fit floor are one quantity.
+    //
+    // `largestGroupPx` is kept and printed when it differs, because the two
+    // statistics disagreeing is itself informative -- it says a small group is
+    // straddling the extremes.
     const worst = groups.reduce((a, b) => (b.spread > a.spread ? b : a));
     const largest = groups.reduce((a, b) =>
       b.n > a.n || (b.n === a.n && b.spread > a.spread) ? b : a);
     return {
-      spreadPx: largest.spread,
-      atU: largest.u,
-      n: largest.n,
+      spreadPx: worst.spread,
+      atU: worst.u,
+      n: worst.n,
+      // Same value as `spreadPx`, kept under its own name so a report written
+      // on either side of the revert compares on the SAME quantity.
       worstGroupPx: worst.spread,
-      worstAtU: worst.u,
-      worstN: worst.n,
+      largestGroupPx: largest.spread,
+      largestAtU: largest.u,
+      largestN: largest.n,
       tiedGroups: groups.length,
       cardsTied: groups.reduce((a, g) => a + g.n, 0),
     };
@@ -973,19 +982,47 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 # Three states, not two. Treating the middle one as "no signal"
                 # was this metric's own bug -- see the note in fitGroup.
                 if model.get("contentIndependent"):
-                    # Content is not driving height here, so the RAW spread is
-                    # already the layout signal and the budget applies to it.
-                    signal = model["groupHeightSpread"]
-                    issues.append(
-                        f"layout spread {signal}px in {model['state']} "
-                        f"(content-independent: {model['explainedPx']}px explained "
-                        f"at {model['pxPerUnit']}px/pair)"
-                    )
+                    # "Content is not driving height" is what a FLAT LINEAR
+                    # SLOPE means, and on desktop that inference is false. The
+                    # pair grid wraps, so content drives height non-linearly and
+                    # a near-zero slope says the line cannot see it, not that it
+                    # is absent.
+                    #
+                    # Measured 2026-08-16, mlb desktop: raw group spread 313px
+                    # against an identical-content spread of 70px. Calling 313px
+                    # "a layout difference" is wrong -- 243px of it tracks the
+                    # 33-57 pair range. That failed a run on a healthy board.
+                    #
+                    # So the budget is applied to the CONTENT-CONTROLLED figure
+                    # when one exists: cards carrying the same data, how far
+                    # apart are they. The raw spread is only the signal when
+                    # nothing ties and there is nothing better.
+                    tie_state = (measured.get("identicalContentSpreadByState") or {}).get(
+                        model.get("state")
+                    ) or {}
+                    controlled = tie_state.get("spreadPx")
+                    if controlled is not None:
+                        signal = controlled
+                        basis = (
+                            f"identical-content spread {signal}px in {model['state']} "
+                            f"(raw spread {model['groupHeightSpread']}px is mostly content: "
+                            f"a flat {model['pxPerUnit']}px/pair slope means the LINE cannot "
+                            "see wrap, not that content is absent)"
+                        )
+                    else:
+                        signal = model["groupHeightSpread"]
+                        basis = (
+                            f"layout spread {signal}px in {model['state']} "
+                            f"(content-independent: {model['explainedPx']}px explained "
+                            f"at {model['pxPerUnit']}px/pair; NO tied cards, so this raw "
+                            "spread is the best available signal)"
+                        )
+                    issues.append(basis)
                     if signal > LAYOUT_RESIDUAL_BUDGET_PX:
                         issues.append(
                             f"LAYOUT SPREAD OVER BUDGET ({signal}px > "
-                            f"{LAYOUT_RESIDUAL_BUDGET_PX}px) with content not "
-                            "driving height -- this is a layout difference"
+                            f"{LAYOUT_RESIDUAL_BUDGET_PX}px) with content controlled for "
+                            "-- this is a layout difference"
                         )
                         ok = False
                 elif model.get("unfittable"):
@@ -1022,13 +1059,30 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                         + floor_note
                     )
                     if model["residualSpread"] > LAYOUT_RESIDUAL_BUDGET_PX:
-                        issues.append(
-                            f"LAYOUT RESIDUAL OVER BUDGET ({model['residualSpread']}px > "
-                            f"{LAYOUT_RESIDUAL_BUDGET_PX}px): a card is off the height "
-                            f"model -- worst {model['worstCard']['residual']:+}px at "
-                            f"{model['worstCard']['u']} pairs"
-                        )
-                        ok = False
+                        if model.get("atNoiseFloor"):
+                            # The row would otherwise say "this is text wrap,
+                            # not layout deviation" and fail the run on that
+                            # same number in the next breath. Seen live
+                            # 2026-08-16: mlb mobile, residual 164px == floor
+                            # 164px, over a 150px budget. No model can do
+                            # better than its floor by construction, so failing
+                            # here makes the harness permanently red on a
+                            # healthy board -- the exact outcome fitGroup's own
+                            # comments argue against.
+                            issues.append(
+                                f"residual {model['residualSpread']}px is over the "
+                                f"{LAYOUT_RESIDUAL_BUDGET_PX}px budget but EQUALS its "
+                                "noise floor, so the budget cannot be met by any model "
+                                "-- not failed; the floor is the thing to watch"
+                            )
+                        else:
+                            issues.append(
+                                f"LAYOUT RESIDUAL OVER BUDGET ({model['residualSpread']}px > "
+                                f"{LAYOUT_RESIDUAL_BUDGET_PX}px): a card is off the height "
+                                f"model -- worst {model['worstCard']['residual']:+}px at "
+                                f"{model['worstCard']['u']} pairs"
+                            )
+                            ok = False
                 # Absence of a fit is absence of a signal, never a pass.
                 unfitted = measured.get("statesUnfitted") or []
                 if unfitted:
@@ -1043,15 +1097,15 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 # printing the worst next to it is what stops the choice of
                 # statistic from quietly hiding a bigger difference elsewhere on
                 # the page.
-                worst = ""
-                if tie.get("worstGroupPx") != tie.get("spreadPx"):
-                    worst = (f"; worst group {tie['worstGroupPx']}px "
-                             f"at {tie['worstAtU']} pairs, n={tie['worstN']}")
+                other = ""
+                if tie.get("largestGroupPx") != tie.get("spreadPx"):
+                    other = (f"; largest group {tie['largestGroupPx']}px "
+                             f"at {tie['largestAtU']} pairs, n={tie['largestN']}")
                 issues.append(
                     f"identical-content spread {tie['spreadPx']}px in {tie['state']} "
-                    f"(largest group: {tie['n']} cards at {tie['atU']} pairs; "
+                    f"(worst group: {tie['n']} cards at {tie['atU']} pairs; "
                     f"{tie['cardsTied']} tied across {tie['tiedGroups']} group(s)"
-                    f"{worst})"
+                    f"{other})"
                 )
             conflated = [k for k, v in (measured.get("typeScale") or {}).items() if isinstance(v, dict) and v.get("conflated")]
             if conflated:
@@ -1183,12 +1237,20 @@ def _cmp_value(v):
     if isinstance(v, list):
         return len(v)
     if isinstance(v, dict):
-        # `spreadPx` first: `identicalContentSpread` carries no `spread`/`max`,
-        # and without this it compares None to None and reads "unchanged" on
-        # every run -- a watch metric that can never move is not a watch. It is
-        # the LARGEST-group statistic that is tracked, so that is what the
-        # comparison must read; `worstGroupPx` is reported but not diffed.
-        return v.get("spreadPx", v.get("floorPx", v.get("spread", v.get("max"))))
+        # `worstGroupPx` FIRST, ahead of `spreadPx`: reports written during the
+        # brief largest-group window carry `spreadPx` meaning something else,
+        # and diffing those against a current report would compare two
+        # different quantities and call the difference movement. Both eras
+        # carry `worstGroupPx`, and in both it means the same thing.
+        #
+        # The rest of the chain: `identicalContentSpread` has no `spread`/`max`,
+        # and without a branch that matches it the comparison reads None vs None
+        # and prints "unchanged" forever -- a watch metric that can never move is
+        # not a watch.
+        return v.get(
+            "worstGroupPx",
+            v.get("spreadPx", v.get("floorPx", v.get("spread", v.get("max")))),
+        )
     return v
 
 
