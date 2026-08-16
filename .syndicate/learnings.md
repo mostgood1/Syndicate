@@ -2280,3 +2280,35 @@ as deleted). One rule covers both — **bind the identity you are reasoning abou
 for as long as you reason about it, and check containment rather than equality
 at the edges.** On a tree with seven concurrent sessions, "current" is not a
 value. It is a race.
+
+### 2026-08-16 — FORBIDDEN: never add an instrument without first checking who captures the channel it writes to
+
+A `win_prob` null counter was added to both prop producers and deployed to two
+workers. It printed to stdout from `__main__`'s `finally`. It could never be
+read: `refresh_odds_sources._run_command` runs every producer under
+`subprocess.run(capture_output=True)` and **discards a successful step's stdout**
+— only a bounded stderr tail survives, and only for a FAILED step.
+
+**The repo already knew.** `ops.py:2263` records the identical trap, found live
+2026-08-01, for the SAME script, and says a keyvalue state file is "the only way
+to observe" that step. The counter was added into it anyway.
+
+**What made it expensive is the shape of the failure, not the bug.** The counter
+existed to answer "has the `or 0.5` branch been exercised?", and its silence was
+indistinguishable from "the branch never fired". A scheduled task was then built
+ON that silence and would have reported "not yet run" forever. The producer HAD
+run — PID 1900 in the worker's own process census at 23:36:05Z, started
+23:36:04Z — while the log carried zero occurrences.
+
+**The rule:** before adding a counter/log/metric, establish that the channel
+reaches a reader — name the process that captures it and where that capture
+lands. `print()` is not a channel; it is a hope about one. Prefer the mechanism
+the codebase already proved crosses the boundary (`write_json_file` + a route).
+
+Corollary, learned the same night: **an instrument must also report what it
+LOOKED FOR, not only what it found.** `/api/ops/win-prob-null` returns `probed`
+beside `readings`, so "nothing recorded" cannot be confused with "looked in the
+wrong place" — the exact ambiguity that made the log version unreadable.
+
+Related: the emitter rule already in this file covers *reading* an absence; this
+one covers *building* the emitter. Both were needed. `[measured 2026-08-15/16]`

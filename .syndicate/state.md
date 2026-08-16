@@ -289,11 +289,13 @@ complete.
     snapshots already exist; exposure to the `or 0.5` branch is concentrated in
     first-build runs. Do not treat "11 of 18 runs exercised" as a health metric
     that should stay high — it will fall as a date settles, with nothing wrong.
-  - **ASYMMETRY WORTH FIXING (not fixed): `_export_cards_props_snapshot` has NO
-    `force_refresh` escape** while both siblings do, and the sibling comment names
-    that exact shape "the same reuse-forever bug". So `--force-refresh` cannot
-    regenerate `cards_props_snapshot_<date>.json` — and that is the builder that
-    produced the `rows=32/null=3` reading.
+  - **ASYMMETRY NOW FIXED — `704bdc1a`, on `origin/main` as `734c163e`, ON NO
+    SERVICE.** `_export_cards_props_snapshot` takes the `force_refresh` escape its
+    two siblings had; NBA's whole trio got it plus the `_materialize_artifact_bundle`
+    parameter it lacked. 20 tests, verified non-vacuous against HEAD. Rides along
+    with the next worker deploy (`deploys.md` PENDING). **Not inert on WNBA:**
+    `live_refresh_loop` passes `--force-refresh` on every lineup/injury trigger, so
+    that snapshot starts rebuilding on those triggers — expected, not a regression.
 - **CLOSED BENIGN 16:14:55Z — the fix is exercised on CURRENT code.**
   `dd53d47c` (verified descendant of `44bc02f3`) has **3 exercised runs,
   `rows=24/9/15`, 48 rows, 05:53:3xZ, live-odds-worker.** An earlier line here
