@@ -7649,3 +7649,124 @@ producer runs at all and no record can appear no matter what the code does.
 - The hourly `wnba-win-prob-counter-read` task now walks three causes IN ORDER —
   WNBA absent from the cycle → no forced run → genuine negative — and pings only
   on a real landing.
+
+---
+
+## 2026-08-16 19:33Z / 19:37Z — **MLB LIVE GAME LINES NOW PRICED FROM THE RE-SIM'S OWN HISTOGRAMS.** The user called this a big miss; it was
+
+**Two services, because the producer and the consumer are different ones** —
+live-odds-worker runs the live-lens loop (`run_live_odds_refresh_worker.py:405`
+→ `start_live_lens_background_loop`); refresh-worker consumes the published
+snapshot inside `build_book_grid_artifact`.
+
+| service | deploy | commit | parent | live |
+|---|---|---|---|---|
+| live-odds-worker (producer) | `dep-da10ub9t0dsc73ap5ugg` | `0315f548` | `e28594a7` | 19:33:42Z |
+| refresh-worker (consumer) | `dep-da10vtlg1s2s73cl4l40` | `98a9cad8` | `a72b4bf4` | 19:37:32Z |
+
+### The finding: a discard, not a gap
+
+`LiveMcResult.total_runs_dist` — a full histogram over the 120 sims — has
+existed all along. `flask_frontend`'s live-MC return keeps `batterStatDist` and
+`pitcherStatDist`, added in that same dict with the comment *"Carried so the
+live PROP rows can price off the same 120 sims"*, and dropped the game histogram
+on the floor. So props got a real live probability and the game total, from the
+identical sims, kept only `avg_total_runs`. `REASON_TOTALS_MEAN` was an honest
+refusal standing in for data computed and thrown away three functions upstream.
+
+No margin histogram existed at all; `live_mc` now emits one from the finals its
+loop already computes.
+
+**Correction to my earlier reading:** `sigma: 2.0` in the served payload is
+`PRICEABLE_SIGMA`, the threshold — not a distribution width. I called it
+interval data on the first pass and it was not.
+
+### BEFORE → AFTER, same endpoint, live MLB games
+
+```
+                      before (19:13Z)        after (19:38Z)
+h2h|full              7 aware / 2 edge       8 aware /  3 edge
+totals|full           0 aware / 0 edge      56 aware / 38 edge
+spreads|full          0 aware / 0 edge      55 aware / 44 edge
+--------------------------------------------------------------
+live-aware game rows        7                    119
+live game-line edges        2                     85
+```
+
+Sample: AZ @ ATL, `totals 8.5`, live P(over) **0.2583**, edge **−13.26 pp**,
+`prob_std_err` 0.0397 at 120 sims → 2σ bar 7.9 pp, released. The arithmetic is
+checkable from the served row.
+
+### What is still refused, and correctly
+- **All segment markets** (`first1/3/5`): 387 rows stating *"game is live: a
+  pregame projection cannot be priced against a live market"*. The histograms
+  describe the FULL remaining game; pricing them against a first-inning line is
+  the +42.43 pp artifact `REASON_SEGMENT_NOT_FULL_GAME` exists for. **Every
+  `*_alt` row on a live MLB game is a segment row**, which is why the alt
+  families read 0 — that is the guard working, not a gap.
+- **34 rows** withheld by `prob_interval_swamps_edge` — the precision gate.
+
+### Sign convention imported, not re-derived
+`_dist_prob_over/_below` come from `prop_projections`, so live and pregame
+cannot drift. With `L` the away-frame line, home covers when `margin > L`; the
+negated form returns 0.75 where the truth is 0.25 on the test histogram — three
+times the value, in the bettor's favour.
+
+---
+
+## 2026-08-16 19:4xZ — soccer `unknown` game state: the fan-out asked the wall clock
+
+`dep-da11526gekts73815e50` (`415e23cb` on live `98a9cad8`), refresh-worker.
+
+**17 soccer games in `state: "unknown"` holding 1,628 rows.** Measured cause,
+not reasoned: `build_game_chips` returned the **identical 90 chips** for
+2026-08-16, 08-17, 08-20 and 08-22, while `default_week` maps 08-16 → week 1 and
+08-22 → week 2 for epl/la_liga/ligue_1. 15 of the 17 had no matching chip at any
+date; for epl and ligue_1 the clubs were **absent from the chip set entirely**
+(1 epl chip against 6 epl fixtures on the board).
+
+`resolve_context(requested_date=...)` always resolved the PRIMARY league
+correctly. `_SoccerDataProvider.games()` then opened `today =
+central_today_iso()` and threw it away, re-resolving all ten leagues against the
+wall clock.
+
+**Measured after the fix, locally:** chips for 08-22 go **90 → 113**, epl
+**1 → 10**, ligue_1 **1 → 9**, la_liga **9 → 13** — exactly the leagues that
+were unknown. Against the pooled 7-day window, **14 of the 17 unknown games now
+match a chip**. The remaining 3 (mls, la_liga, serie_a) are separate
+schedule/alias gaps and are **NOT** claimed as fixed.
+
+Production verification pending the deploy + a board rebuild.
+
+### soccer `unknown`: FIX DEPLOYED, PRODUCTION UNCHANGED — a SECOND cause exists
+
+`415e23cb` live on refresh-worker 19:48:33Z. Board artifact rebuilt 19:51:08Z —
+**post-deploy** — and `by_state` still reads
+`{final 13, live 2, pregame 34, unknown 17}`, same 17 games, same leagues
+(la_liga 5, epl 5, ligue_1 5, mls 1, serie_a 1), same dates (14 on 08-22).
+
+**So the date-blindness was real and is not the whole story.** What is
+established:
+
+- The defect is genuine and the fix is correct: locally, chips for 08-22 go
+  90 → 113, epl 1 → 10, ligue_1 1 → 9, and 14 of the 17 unknown games match.
+- The deployed SHA contains the fix (checked by content, not ancestry).
+- The date cap is NOT binding: the grid spans 8 dates (2,123 rows on 08-15 plus
+  the 7-day window), `_MAX_GAME_STATE_DATES = 7`, so all 8 dates are queried.
+
+**The remaining hypothesis, UNVERIFIED:** production's worker disk does not hold
+the week-2 soccer schedule/cards for epl and ligue_1, so
+`build_cards_page_context(league, 2, 2026)` returns nothing there even with the
+correct week resolved. My local mirror has MORE soccer schedule data than
+production — the "Render is the source of truth, the local mirror is lossy" rule
+biting in the unexpected direction.
+
+I could not confirm it: `/soccer/<league>/api/cards` builds cards on the REQUEST
+path and 502s, which is itself worth noting — that endpoint is doing exactly the
+heavy work the web/worker split exists to keep off the web service.
+
+**Not claimed as fixed.** The change is correct and stays; it removes one of two
+causes. The next step is to check the worker's soccer schedule artifacts for
+weeks beyond the current one — artifact territory, i.e. the orphaned
+`soccer-model-coverage` lane's domain, and `build_soccer_artifacts.py` is one of
+its claimed files.
