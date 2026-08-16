@@ -795,6 +795,14 @@ def _settle(page) -> dict[str, Any]:
     }
 
 
+# How long to wait for a clicked tab's panel to actually become active, and how
+# often to look. `activateTab` in `game_board.js` is a synchronous classList
+# swap, so one poll normally suffices -- this window exists because the board
+# replaces its own innerHTML on a 30s timer and can detach the node mid-check.
+TAB_ACTIVATE_WAIT_MS = 2000
+TAB_POLL_MS = 100
+
+
 def _tab_click_through(page, sport: str) -> list[dict[str, Any]]:
     """Trusted click on every tab of the first card. See the method caveat."""
     card = page.locator(".cards-game-card").first
@@ -802,26 +810,55 @@ def _tab_click_through(page, sport: str) -> list[dict[str, Any]]:
         return []
     tabs = card.locator(".cards-tab[data-tab-target]")
     results: list[dict[str, Any]] = []
+    read_state = """(node) => ({
+        active: [...node.querySelectorAll('.cards-panel.is-active')].map((p) => p.getAttribute('data-panel-id')),
+        height: Math.round(node.getBoundingClientRect().height),
+    })"""
     for index in range(tabs.count()):
         tab = tabs.nth(index)
         target = tab.get_attribute("data-tab-target")
-        try:
-            tab.scroll_into_view_if_needed(timeout=5000)
-            tab.click(timeout=5000)
-        except Exception as exc:  # pragma: no cover - reported, not raised.
-            results.append({"tab": target, "error": type(exc).__name__})
+        # THE BOARD REPLACES ITSELF UNDERNEATH THIS CHECK. `game_board.js` polls
+        # every 30s and does `cardsGrid.innerHTML = fresh.innerHTML`, which
+        # detaches every node this loop is holding. The check had NO defence
+        # against that and read the panel state exactly once, immediately after
+        # `click()` returned -- a single sample of a DOM that another timer can
+        # rewrite between the click and the read.
+        #
+        # So: retry once when the element goes stale, and wait for the OUTCOME
+        # rather than sampling it. `activateTab` is synchronous, so the first
+        # poll normally succeeds; the loop exists for the swap, not for a slow
+        # handler. A timeout is REPORTED, never treated as success.
+        state, error, attempts = None, None, 0
+        for attempt in (1, 2):
+            attempts = attempt
+            try:
+                tab.scroll_into_view_if_needed(timeout=5000)
+                tab.click(timeout=5000)
+                waited = 0
+                while True:
+                    state = card.evaluate(read_state)
+                    if state["active"] == [target]:
+                        break
+                    if waited >= TAB_ACTIVATE_WAIT_MS:
+                        break
+                    page.wait_for_timeout(TAB_POLL_MS)
+                    waited += TAB_POLL_MS
+                error = None
+                break
+            except Exception as exc:  # pragma: no cover - reported, not raised.
+                error = f"{type(exc).__name__}: {str(exc).splitlines()[0][:80]}"
+                state = None
+        if state is None:
+            # No measurement at all. Carries `ok: False` explicitly rather than
+            # relying on a missing key to read as failure downstream.
+            results.append({"tab": target, "error": error, "attempts": attempts, "ok": False})
             continue
-        state = card.evaluate(
-            """(node) => ({
-                active: [...node.querySelectorAll('.cards-panel.is-active')].map((p) => p.getAttribute('data-panel-id')),
-                height: Math.round(node.getBoundingClientRect().height),
-            })"""
-        )
         results.append(
             {
                 "tab": target,
                 "activePanels": state["active"],
                 "cardHeight": state["height"],
+                "attempts": attempts,
                 # One panel active, and a card taller than a bare header strip.
                 # The NCAAF failure rendered 0 panels and a 187px card.
                 "ok": len(state["active"]) == 1 and state["active"][0] == target and state["height"] > 250,
@@ -977,7 +1014,17 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                 ok = False
             failed_clicks = [r for r in measured.get("tabClickThrough", []) if not r.get("ok")]
             if failed_clicks:
-                issues.append("tab click " + ",".join(str(r.get("tab")) for r in failed_clicks))
+                # Print WHY, not just which tab. `tab click identity` was the
+                # whole of what the 2026-08-16 intermittent left behind, and it
+                # is not enough to diagnose from -- the reason has to survive
+                # into the row and the JSON or the next occurrence costs another
+                # investigation.
+                def _why(r):
+                    if r.get("error"):
+                        return f"{r.get('tab')} [{r['error']}]"
+                    return (f"{r.get('tab')} [active={r.get('activePanels')} "
+                            f"h={r.get('cardHeight')}px]")
+                issues.append("tab click " + ",".join(_why(r) for r in failed_clicks))
                 ok = False
             if label == "mobile" and measured.get("touchTargetFailures"):
                 issues.append(f"{len(measured['touchTargetFailures'])} tabs < 44px")

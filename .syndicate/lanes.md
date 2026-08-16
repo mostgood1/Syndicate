@@ -3420,3 +3420,28 @@ and then failed the thing it was checking, which is the point of running it.
   `syndicate/features/shared/board_enrichment.py`,
   `tests/test_soccer_cards_live_state.py`, `tests/test_live_edge_enforcement.py`,
   `tests/test_projection_degeneracy.py` (one exact-dict assertion widened).
+
+### ui-probe-tab-click-race — CLOSED 2026-08-16 — cause UNPROVEN and not reproduced; the blindness that made it undiagnosable is fixed — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: stop the intermittent, or name a real defect.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- **Three hypotheses written before testing, ALL FALSIFIED:** (1) deferred tab
+  handler — `activateTab` is a synchronous `classList.toggle`; (2) selection lost
+  because cards lack ids — all 16 ncaaf cards have ids; (3) the probe's click
+  triggers `refreshOnFocus` — 0 refresh fetches after the click in 10/10 runs,
+  10/10 passed.
+- **NOT REPRODUCED** in 10 scripted attempts or any probe run since. The cause of
+  the single instance stays UNKNOWN and is recorded as such.
+- Real mechanism found, previously unguarded: `game_board.js` polls every 30s and
+  does `cardsGrid.innerHTML = fresh.innerHTML`, detaching every node the check
+  holds, while the check sampled panel state exactly ONCE after `click()`.
+- Fixed: the failure now prints WHY (error type, or `active=[…] h=…px`) — the
+  primary fix, since `tab click identity` cost this whole investigation; the
+  check waits on the outcome (2000ms/100ms poll) and retries once on staleness;
+  a no-measurement result carries `ok: False` explicitly.
+- Verification: 85 tests pass (80 + 5). Live run exit 0/OK with ncaaf 4 / nfl 4 /
+  mlb 3 tabs all ok at attempts=[1,1,1,1] — the retry never fires, correct for a
+  synchronous handler.
+- Process note: the failing artifact was OVERWRITTEN by the clean re-run and
+  never committed, so its detail is unrecoverable. Keep a failing artifact under
+  a separate name before re-running.
+- Blocked by: none

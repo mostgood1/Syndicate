@@ -1047,3 +1047,51 @@ def test_a_tie_group_with_no_measurable_height_is_named_not_skipped():
     assert ok, text
     assert "peer deviation in Preview NOT JUDGED" in text
     assert "no measurable card height" in text
+
+
+# --- tab click-through: the board rewrites itself underneath this check -----
+#
+# `game_board.js` polls every 30s and does `cardsGrid.innerHTML = fresh.innerHTML`,
+# detaching every node the check holds. On 2026-08-16 `ncaaf desktop` reported
+# `tab click identity` once and was clean on re-run and on 10 scripted repeats.
+# The cause of that single instance is UNPROVEN -- the row printed only the tab
+# name and the artifact was overwritten. These tests pin the two things that
+# were actually wrong: the check sampled once with no defence against the swap,
+# and the failure carried no reason.
+
+
+def test_a_failed_tab_click_reports_WHY_not_just_which_tab():
+    text, ok = _summarize(_report(tabClickThrough=[
+        {"tab": "identity", "error": "TimeoutError: element is not attached", "ok": False}]))
+    assert not ok
+    assert "tab click identity [TimeoutError: element is not attached]" in text
+
+
+def test_a_wrong_panel_failure_reports_the_state_it_saw():
+    text, ok = _summarize(_report(tabClickThrough=[
+        {"tab": "identity", "activePanels": [], "cardHeight": 187, "ok": False}]))
+    assert not ok
+    assert "tab click identity [active=[] h=187px]" in text
+
+
+def test_a_passing_tab_click_says_nothing():
+    text, ok = _summarize(_report(tabClickThrough=[
+        {"tab": "identity", "activePanels": ["identity"], "cardHeight": 900, "ok": True}]))
+    assert ok, text
+    assert "tab click" not in text
+
+
+def test_a_result_with_no_measurement_carries_ok_false_explicitly():
+    """It must not depend on a MISSING key reading as failure downstream --
+    that is the same absent-vs-false conflation this harness keeps hitting."""
+    text, ok = _summarize(_report(tabClickThrough=[
+        {"tab": "identity", "error": "TimeoutError: boom", "attempts": 2, "ok": False}]))
+    assert not ok
+    assert "TimeoutError" in text
+
+
+def test_the_activation_wait_is_bounded_and_short():
+    """`activateTab` is a synchronous classList swap, so this window is for the
+    innerHTML swap, not for a slow handler. It must not become a sleep."""
+    assert probe.TAB_ACTIVATE_WAIT_MS <= 3000
+    assert probe.TAB_POLL_MS <= 250

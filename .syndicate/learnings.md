@@ -2688,3 +2688,37 @@ bar, and it works on slates where nothing can be fitted at all.
   fresh encodes the shape of the LAST investigation. Treat it as a hypothesis to
   test, not a plan to execute — this one would have shipped a wrong fix.
 - *(evidence: `483bb9dd`; `games_from_cfbd_when_engine_schedule_empty` docstring)*
+
+## 2026-08-16 — FORBIDDEN: shipping a check whose FAILURE MESSAGE does not carry the evidence for the failure
+
+`scripts/ui_layout_probe.py` failed one run with exactly this, and nothing else:
+
+    tab click identity
+
+That is a tab name. Not the error, not the panel state, not the card height —
+the check computed all three and the summary line threw them away. Diagnosing it
+later cost three falsified hypotheses (a deferred handler, missing card ids, a
+focus-triggered refresh), a 10-run scripted reproduction that came back 10/10
+clean, and it is STILL unexplained. The artifact that held the detail was
+overwritten by the re-run that went green.
+
+An intermittent whose message carries no evidence has a predictable outcome: the
+next person re-runs until it passes, because that is the only move available to
+them. The check then trains people to ignore it, which is worse than not having
+the check.
+
+**How to apply.**
+- A failure message must contain what the check MEASURED, not just which subject
+  failed. If the code computed `activePanels` and `cardHeight` to make the
+  decision, both belong in the message — the decision is not reproducible from
+  the subject's name alone.
+- **Before re-running a failing job, preserve its artifact under a different
+  name.** A green re-run that overwrites the red one destroys the only copy of
+  the evidence. Cost this exact investigation.
+- When an intermittent cannot be reproduced, say so and fix the OBSERVABILITY
+  rather than shipping a speculative fix and calling it closed. "Three
+  hypotheses falsified, cause unknown, evidence now captured" is an honest
+  result; "hardened against a race" without a reproduction is a guess wearing a
+  changelog entry.
+- Same family as [[feedback-instrument-blindness]]: a reading is evidence only
+  once you know what it would say when things are wrong.
