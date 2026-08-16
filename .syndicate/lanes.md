@@ -3414,6 +3414,38 @@ and then failed the thing it was checking, which is the point of running it.
 - **This overlaps `odds-cadence-off-the-mlb-peak`** (1a/1b verified, effect unmeasured). If that lane moved sampling off the MLB pregame window, it is the same fact seen from the other end. Coordinate before changing cadence.
 - **NEXT TEST, cheap and decisive:** today's 08-16 freeze already holds 14 games. If tomorrow's `season_betting_day_2026_08_16.json` grades ~15 `ml` rows instead of 1, the mechanism is confirmed and the fix is scheduling, not logic. If it still grades 1 with a 14-game freeze present, the reader is not reaching the freeze in production and the next suspect is `_odds_data_roots()` ordering on the mounted disk.
 - **NOT DONE / NOT CHANGED:** no source file touched, no deploy, no env change. `_SCORE_SIM_WEIGHT` untouched. The settlement autorun remains off by user decision.
+- **ROOT CAUSE FOUND 2026-08-16 ~18:2xZ — the freeze WRITER and the grading READER are on two different trees, separated by one path segment (`source_artifacts/`).**
+
+      WRITER  `_freeze_oddsapi_pregame_markets`, market_dir = source_root/data/market/oddsapi
+              source_root = REPO_ROOT/data/mlb_source   (`refresh_odds_sources.py:666`, passed as --source-root)
+              => <checkout>/data/mlb_source/data/market/oddsapi/
+              git-tracked files there: **0**
+
+      READER  `_odds_paths` -> <root>/market/oddsapi, root[0] = MLB_BETTING_DATA_ROOT
+              = /opt/render/project/data/mlb_source/source_artifacts/data   (all three services)
+              => .../mlb_source/source_artifacts/data/market/oddsapi/
+              git-tracked `*_pregame.json` there: **27, newest 2026-07-08**
+
+- **That single fact explains both halves of this lane.** (1) `frozen_doc` is read back from the WRITER's tree, which git tracks as EMPTY — so every deploy recreates the checkout without it, `frozen_doc` comes back `{}`, and the merge (monotonic by construction) reseeds the freeze from live-only-pregame. (2) The grading builder reads the OTHER tree, whose newest sealed game-lines file is from **July 8** — so ~14 of 15 games warn `Missing game-line match` and exactly one grades, on every date.
+- **The merge code is NOT at fault and should not be edited.** `_merge_pregame_game_lines` seeds `frozen_games` from `frozen_doc` and only ever adds or updates. Given a readable `frozen_doc` it cannot shrink. The observed shrink is proof the input was empty, not that the merge is wrong.
+- **EVIDENCE for the deploy-reset half, stated at its real strength (n=1 on the transition):** refresh-worker deployed 6x between 16:46Z and 18:07Z. Freeze read **14 games at ~17:52Z** -> **8 games at 18:12Z** (7 of the 8 still pregame), with `cf467794` going live **18:07:36Z** between the two reads. Re-read at 18:18Z with no new deploy: still 8/7, i.e. steady between deploys. That is consistent, not conclusive; `7b544eb4` was still building and its landing is the next free test.
+- **INSTRUMENT NOTE — I corrected myself mid-check.** I nearly concluded `market/` is absent in production because `/api/ops/artifacts/export` shows 3466 files under `mlb_source/source_artifacts/data/` and **zero** containing `/market/`. That endpoint runs on WEB and reads WEB's disk; the grading builder runs on refresh-worker and reads ITS disk. Separate disks (three-service architecture). The zero is real for web and says nothing about the worker. Not usable as evidence for the reader's tree.
+- **`market/*.json` IS allowlisted** (`artifact_publisher.py:78`, `*_source/source_artifacts/data/market/*.json`, and fnmatch's `*` crosses `/`), so the absence on web is a publish/transfer question, not an allowlist one. Unresolved and NOT needed for the diagnosis above.
+- **STILL OPEN, and it is the fix decision:** which of the two trees is meant to be canonical. Either the writer should target `source_root/source_artifacts/data/market/oddsapi` (write where the reader looks), or the reader's root should include the checkout tree. Do not guess — `--artifact-root` already exists on this script (`_local_source_artifact_root("mlb")`) and a publish step may be the intended bridge. Whichever way, the freeze must live somewhere a deploy does not wipe.
+- **The scheduled check `grading-freeze-payload-check` (2026-08-17 07:00 CT) was rewritten** to predict the collapse rather than the full slate, and now carries the `_odds_data_roots()` exoneration so it is not re-opened.
+
+- **FIX BUILT AND TESTED 2026-08-16 ~18:5xZ — NOT DEPLOYED, and it is INERT until it is.** `scripts/refresh_mlb_oddsapi.py`:
+  - New `_freeze_market_dirs(source_root)` returns every `market/oddsapi` the freeze must live in: the writer's own tree (unchanged, and first — it is where the live doc it merges from is fetched to), **`<MLB_BETTING_DATA_ROOT>/market/oddsapi`**, and `source_root/source_artifacts/data/market/oddsapi` for env-less callers.
+  - **Derived from the SAME env var the reader uses, deliberately not hardcoded to `source_artifacts`.** `_odds_data_roots` resolves odds from `MLB_BETTING_DATA_ROOT`; a hardcoded second layout would silently diverge again the next time that var is repointed, which IS this bug.
+  - **Seed from every copy, not just this tree's** — `frozen_doc` is now the union of all existing seals (merged at `now_epoch=0.0` so started games carry across rather than being dropped by a pregame test that should only apply to the LIVE doc). Without this, writing to the right place still loses the slate on the next deploy.
+  - `_ensure_dir` on every destination parent. Only `snapshot_dir` was ensured; the reader's tree on a fresh disk would have raised and taken the whole freeze down with it.
+  - `_merge_pregame_game_lines` UNTOUCHED. It was never at fault.
+  - Contract change: `copied` is keyed by FULL PATH, not basename — the copies share one filename, so a name-keyed dict reported one and hid the rest. It surfaces as `frozenPregame` in the run payload, which is where this fix gets verified in production.
+- **TESTED: 419 passing.** 59 (freeze + odds-paths + odds-sources orchestrator) and 360 + 13 subtests (mlb market board, mlb refresh runner, live refresh loop). 3 new tests added in `tests/test_oddsapi_pregame_freeze.py::FreezeReachesTheGradingReaderTests`.
+- **NON-VACUITY VERIFIED, and it mattered.** The 3 new tests were re-run against a simulated pre-fix `_freeze_market_dirs` (single directory): **all 3 fail**. Without that check `test_freeze_lands_in_the_source_artifacts_tree` could have passed for the wrong reason.
+- **A test-result correction worth keeping:** the first adjacent run exited 0 with no FAILED/ERROR lines, but 464KB of worker debug output had swallowed the pytest summary. Exit code alone does not separate "all passed" from "collected oddly" — re-ran in batches to get real counts rather than bank the zero.
+- **TWO LIMITS, STATED:** (1) `autoDeploy` is off, so this ships nothing until someone deploys — the 2026-08-17 07:00 CT check will measure the OLD behaviour unless a deploy lands first, and a deploy kills any in-flight sim. (2) **Forward-only.** It seals future slates; it does not repair the already-collapsed freezes for 08-09..08-16. `scripts/backfill_pregame_game_lines.py` is the tool for that and is untouched.
+
 
 ### layer1-board-coverage — **CLOSE REFUSED 2026-08-16 18:0xZ.** Verification is not met, and a NEW production defect was found in this lane's own scope while attempting to close
 - The `/lane close` gate says: confirm the verification ran and state the result;

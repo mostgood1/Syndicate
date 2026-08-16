@@ -631,6 +631,52 @@ def _merge_pregame_game_lines(frozen_doc: dict, live_doc: dict, *, now_epoch: fl
     return merged, updated
 
 
+def _freeze_market_dirs(source_root: Path) -> list[Path]:
+    """Every `market/oddsapi` the freeze must live in, best first.
+
+    THE FREEZE USED TO BE WRITTEN WHERE NOTHING READ IT. This writer's
+    `market_dir` is `source_root/data/market/oddsapi`, but the grading
+    builder resolves odds against `MLB_BETTING_DATA_ROOT`
+    (`build_season_betting_cards_manifest._odds_data_roots`), which on all
+    three services is `.../mlb_source/source_artifacts/data` -- a DIFFERENT
+    tree, one path segment apart. Measured 2026-08-16: git tracks 0 files
+    under `data/mlb_source/data/market/oddsapi/` and 27 `*_pregame.json`
+    under `data/mlb_source/source_artifacts/data/market/oddsapi/`, the
+    newest from 2026-07-08. So the builder graded against a July seal (or
+    none) and warned `Missing game-line match` for ~14 of 15 games every
+    day -- `ml` graded EXACTLY 1 row on all 8 dates checked.
+
+    Derived from the SAME env var the reader uses rather than by hardcoding
+    a second layout, so the two cannot drift apart again. The writer's own
+    `market_dir` stays first because that is where the live file it merges
+    from is fetched to.
+    """
+    candidates: list[Path] = [source_root / "data" / "market" / "oddsapi"]
+    env_root = str(
+        os.environ.get("MLB_BETTING_DATA_ROOT")
+        or os.environ.get("MLB_BETTING_DATA_ROOT_DIR")
+        or ""
+    ).strip()
+    if env_root:
+        try:
+            candidates.append(Path(env_root).expanduser().resolve() / "market" / "oddsapi")
+        except Exception:
+            pass
+    # Env-less callers (local runs, tests) still get the source_artifacts
+    # tree, which is the layout the reader falls back to.
+    candidates.append(source_root / "source_artifacts" / "data" / "market" / "oddsapi")
+
+    ordered: list[Path] = []
+    seen: set[str] = set()
+    for path in candidates:
+        key = str(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(path)
+    return ordered
+
+
 def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict[str, str]:
     """Seal the day's pregame odds before a live refresh overwrites them.
 
@@ -660,23 +706,47 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
     it survive the nightly collapse.
     """
     snapshot_dir = _daily_snapshot_dir(source_root=source_root, date_str=date_str)
-    market_dir = source_root / "data" / "market" / "oddsapi"
+    market_dirs = _freeze_market_dirs(source_root)
+    market_dir = market_dirs[0]
     slug = _date_slug(date_str)
     _ensure_dir(snapshot_dir)
     now_epoch = datetime.now(timezone.utc).timestamp()
     copied: dict[str, str] = {}
 
+    lines_frozen_name = f"oddsapi_game_lines_{slug}_pregame.json"
     lines_path = market_dir / f"oddsapi_game_lines_{slug}.json"
-    frozen_lines_path = market_dir / f"oddsapi_game_lines_{slug}_pregame.json"
     live_lines = _read_json_doc(lines_path)
-    merged_lines, updated = _merge_pregame_game_lines(
-        _read_json_doc(frozen_lines_path), live_lines, now_epoch=now_epoch
-    )
+
+    # SEED FROM EVERY COPY, not just this tree's. The seal is only durable if
+    # losing one tree cannot lose the accumulated slate: whichever copy is on
+    # an ephemeral filesystem, a deploy recreates it empty, and re-seeding from
+    # an empty doc silently rebuilds the freeze from the live file -- which by
+    # then holds only the games still pregame. That is exactly how a 14-game
+    # freeze became 8 games in 20 minutes on 2026-08-16 while `_merge_pregame_game_lines`,
+    # which cannot shrink a seal it can read, was working perfectly.
+    #
+    # `now_epoch=0.0` is deliberate: it makes the merge a pure UNION of the
+    # existing seals (nothing is "already under way" relative to epoch 0), so
+    # started games are carried across instead of being dropped by the
+    # pregame test that only the LIVE doc should be subject to.
+    seed: dict = {}
+    for directory in market_dirs:
+        existing = _read_json_doc(directory / lines_frozen_name)
+        if existing.get("games"):
+            seed, _ = _merge_pregame_game_lines(seed, existing, now_epoch=0.0)
+
+    merged_lines, updated = _merge_pregame_game_lines(seed, live_lines, now_epoch=now_epoch)
     if merged_lines.get("games"):
         payload = json.dumps(merged_lines, indent=2)
-        for destination in (frozen_lines_path, snapshot_dir / frozen_lines_path.name):
+        destinations = [directory / lines_frozen_name for directory in market_dirs]
+        destinations.append(snapshot_dir / lines_frozen_name)
+        for destination in destinations:
+            # `market_dir` was never ensured -- only `snapshot_dir` was. A tree
+            # that does not exist yet (the reader's, on a fresh disk) would
+            # raise here and take the whole freeze down with it.
+            _ensure_dir(destination.parent)
             destination.write_text(payload, encoding="utf-8")
-            copied[destination.name] = str(destination)
+            copied[str(destination)] = str(destination)
 
     # The props docs carry no per-event clock, so they use the slate clock
     # taken from the MERGED freeze -- which never shrinks, and so cannot be
@@ -694,11 +764,18 @@ def _freeze_oddsapi_pregame_markets(*, source_root: Path, date_str: str) -> dict
         frozen_name = f"{prefix}_{slug}_pregame.json"
         # Sealed once the slate starts. With no clock at all we cannot prove
         # we are pregame, so write the first freeze and never clobber it.
-        if slate_started or (slate_start is None and (market_dir / frozen_name).exists()):
+        # "Already frozen" is asked of EVERY tree, not just this one: a seal
+        # that exists only in the tree the reader uses must still count, or
+        # each pass would re-copy a now-live doc over a good seal.
+        already_frozen = any((directory / frozen_name).exists() for directory in market_dirs)
+        if slate_started or (slate_start is None and already_frozen):
             continue
-        for destination in (market_dir / frozen_name, snapshot_dir / frozen_name):
+        destinations = [directory / frozen_name for directory in market_dirs]
+        destinations.append(snapshot_dir / frozen_name)
+        for destination in destinations:
+            _ensure_dir(destination.parent)
             shutil.copy2(source_path, destination)
-            copied[destination.name] = str(destination)
+            copied[str(destination)] = str(destination)
     return copied
 
 
