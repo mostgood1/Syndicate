@@ -309,6 +309,31 @@ unsaved anywhere.
 
 ---
 
+## MEMORY — refresh-worker: THE 2GB IS A TRANSIENT, AND ITS ALLOCATOR IS STILL UNNAMED `[measured 08-16 15:1xZ]`
+
+**Three fixes are live in `d72d670c` and exercised; NONE has been shown to move
+the transient.** `51ae7218` (odds-shard duplicate parse), `21f8a165` (ledger
+streaming + `LEDGER_CHUNKS_ACCEPTED`), `aa190d58` (rank_recommendations: 3 full
+ledger loads per call -> 1). Verified by counting the branch, not the outcome.
+
+**What IS established:** the failure is a ~2GB TRANSIENT, not a leak (22
+excursions, 5 deploy-free windows, trough returns every cycle); it is IN-PROCESS
+in the parent, pid 39 at 3,138 -> 3,545.8 MB while every child stayed under
+54 MB; the kill is decided by evictable page cache (`inactive_file` 26.3/42.2 MB
+at the two kills vs 164-240 MB surviving); the climb runs **51s with no stage
+marker**, so `last_stage` structurally cannot name it; and **833,550,415 bytes**
+of ledger chunks are ACCEPTED per load against a **per-FILE** 256MB ceiling that
+never bounded the sum.
+
+**EXONERATED by measurement — do not re-open:** `copy.deepcopy` of the cards page
+context (context 0.81MB, copy peak 0.54MB, three orders short, and load-bearing
+because `home.py:5381` mutates the returned games).
+
+**THE DAYTIME LULL IS WORTHLESS AS EVIDENCE.** Same clock window one day apart:
+peak anon 2,816.7 MB pre-fix vs 2,898.5 MB post-fix, **zero excursions on both**.
+The pre-fix code once ran **17h51m clean** in daylight. Judge only on the
+live-slate band ~22:00Z-05:00Z; `scripts/oom_band_report.py` measures it.
+
 ## MEMORY — refresh-worker `#435` — FIX HOLDS; KILLS RECURRED 08-16 02:11Z/02:37Z FROM A SECOND CONDITION `[re-measured 08-16 02:5xZ]`
 
 **THE KILL IS A ~2 GB TRANSIENT, NOT A LEAK, AND NOT A `#435` REGRESSION.**

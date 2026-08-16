@@ -613,9 +613,37 @@ def _ledger_max_chunk_bytes() -> int:
 
 
 def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
+    """Materialising wrapper. Prefer `_stream_chunked_ledger_records`.
+
+    Kept because two windowed readers and `recommendation_engine` genuinely want
+    a list. Every caller that immediately reduces should stream instead -- see
+    the note on `_stream_chunked_ledger_records`.
+    """
+    return list(_stream_chunked_ledger_records(path))
+
+
+def _stream_chunked_ledger_records(path: Path) -> "Iterator[dict[str, Any]]":
+    """Yield ledger records one at a time. NEVER build the full list.
+
+    #435 ONE LEVEL UP. `#254` correctly removed the 256MB `read_text()` string
+    and the `splitlines()` list here, but left `rows.append(...)` accumulating
+    every record of every ACCEPTED chunk into a single list declared outside the
+    chunk loop. **The ceiling is per FILE; nothing bounded the SUM.**
+
+    Measured 2026-08-16: the parent worker (pid 39) climbed 1,666 -> 3,990 MB
+    over 51 seconds with no stage marker, and the only thing logging in that
+    window was this pass. Skipped chunks were 305/367/480MB against a 256MB
+    ceiling, so accepted chunks sit in the same order of magnitude, and this
+    repo measured this JSON family at ~6.3x file bytes resident (`#435`).
+
+    Six of the eight callers immediately wrap this in
+    `_latest_by_recommendation_id`, which is a single-pass reduction -- exactly
+    the shape `read_book_quotes_latest` used to turn 478,782 rows into 36,424
+    keys. Streaming lets the peak be the REDUCED set instead of the raw one.
+    """
     chunk_root = _ledger_chunk_root(path)
     if not chunk_root.exists():
-        return []
+        return
     manifest_path = _ledger_manifest_path(path)
     chunk_paths: list[Path] = []
     if manifest_path.exists():
@@ -633,7 +661,14 @@ def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
     if not chunk_paths:
         chunk_paths = sorted(item for item in chunk_root.glob("*.jsonl") if item.is_file())
     max_chunk_bytes = _ledger_max_chunk_bytes()
-    rows: list[dict[str, Any]] = []
+    # Counters only -- these must never grow with the data. The guard has always
+    # announced what it REFUSED (SKIP_OVERSIZED_LEDGER_CHUNK) and never what it
+    # ACCEPTED, which is the wrong half: the refused chunks are free, and the
+    # accepted ones are what cost memory. That blind spot is why sizing this
+    # took a full night.
+    accepted_chunks = 0
+    accepted_bytes = 0
+    yielded = 0
     for chunk_path in chunk_paths:
         # Historical chunks reached 2.0-2.7GB per day (records used to embed
         # full sport manifests -- see _artifact_manifest_summary); reading one
@@ -661,6 +696,12 @@ def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
         # 256,000,000 -- so real chunks sit in the same order of magnitude as
         # the ceiling, and "under the limit" is not the same as "small".
         try:
+            chunk_bytes = chunk_path.stat().st_size
+        except OSError:
+            chunk_bytes = -1
+        accepted_chunks += 1
+        accepted_bytes += max(0, chunk_bytes)
+        try:
             with chunk_path.open("r", encoding="utf-8") as handle:
                 for line in handle:
                     line = line.strip()
@@ -671,10 +712,20 @@ def _load_chunked_ledger_records(path: Path) -> list[dict[str, Any]]:
                     except Exception:
                         continue
                     if isinstance(payload, dict):
-                        rows.append(payload)
+                        yielded += 1
+                        yield payload
         except Exception:
             continue
-    return rows
+    if accepted_chunks:
+        # The number that was missing all night: what the ceiling let THROUGH.
+        # print(..., flush=True) -- #37, logger.info never reaches Render's
+        # collector.
+        print(
+            f"[intelligence_evaluation] LEDGER_CHUNKS_ACCEPTED count={accepted_chunks} "
+            f"bytes={accepted_bytes} ceiling={max_chunk_bytes} records={yielded} "
+            f"streamed=1",
+            flush=True,
+        )
 
 
 def _ledger_index(path: Path) -> dict[str, dict[str, Any]]:
@@ -683,7 +734,7 @@ def _ledger_index(path: Path) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}
     index: dict[str, dict[str, Any]] = {}
-    for record in _iter_record_payloads(ledger_path=path):
+    for record in _stream_record_payloads(ledger_path=path):
         record_id = str(
             record.get("portfolio_event_id")
             or record.get("recommendation_id")
@@ -1245,14 +1296,32 @@ def settle_result(*, record: Mapping[str, Any], result: Any, pnl: Any, closing_l
 
 
 def _iter_record_payloads(records: Iterable[Mapping[str, Any]] | None = None, *, ledger_path: Path | str | None = None) -> list[dict[str, Any]]:
+    """Materialising wrapper, kept for the callers that genuinely want a list.
+
+    If the next thing you do is reduce (`_latest_by_recommendation_id`, or a
+    dict keyed by record id), call `_stream_record_payloads` instead -- this
+    one holds every record of every accepted chunk at once.
+    """
+    return list(_stream_record_payloads(records, ledger_path=ledger_path))
+
+
+def _stream_record_payloads(
+    records: Iterable[Mapping[str, Any]] | None = None,
+    *,
+    ledger_path: Path | str | None = None,
+) -> "Iterator[dict[str, Any]]":
+    """Yield ledger records one at a time, materialising nothing."""
     if records is not None:
-        return [dict(item) for item in records if isinstance(item, Mapping)]
+        for item in records:
+            if isinstance(item, Mapping):
+                yield dict(item)
+        return
     path = Path(ledger_path) if ledger_path is not None else DEFAULT_LEDGER_PATH
     if _is_chunked_ledger_path(path):
-        return _load_chunked_ledger_records(path)
+        yield from _stream_chunked_ledger_records(path)
+        return
     if not path.exists():
-        return []
-    rows: list[dict[str, Any]] = []
+        return
     # #254: streamed -- the unchunked-ledger fallback, which has no ceiling
     # either. See _count_jsonl_records for the full note.
     for line in _iter_jsonl_lines(path):
@@ -1264,8 +1333,7 @@ def _iter_record_payloads(records: Iterable[Mapping[str, Any]] | None = None, *,
         except Exception:
             continue
         if isinstance(payload, dict):
-            rows.append(payload)
-    return rows
+            yield payload
 
 
 def _record_sport(record: Mapping[str, Any]) -> str | None:
@@ -1302,7 +1370,9 @@ def _record_market_family(record: Mapping[str, Any]) -> str | None:
     return market
 
 
-def _latest_by_recommendation_id(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _latest_by_recommendation_id(records: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    # Single pass, iterate-only -- so it consumes a GENERATOR without
+    # materialising it. That is what lets the peak be the reduced set.
     latest: dict[str, dict[str, Any]] = {}
     fallback: dict[str, dict[str, Any]] = {}
     ordered_fallback: list[str] = []
@@ -1422,7 +1492,7 @@ def _calibration(records: list[dict[str, Any]]) -> dict[str, Any]:
 
 def compute_metrics(*, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None, sport: str | None = None) -> dict[str, Any]:
     warn_if_compute_in_request_path("compute_metrics")
-    record_rows = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    record_rows = _latest_by_recommendation_id(_stream_record_payloads(records, ledger_path=ledger_path))
     sport_slug = str(sport or "").strip().lower() or None
     if sport_slug:
         record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None} or _record_sport(record) == sport_slug]
@@ -1480,7 +1550,7 @@ def build_reliability_profile(*, records: Iterable[Mapping[str, Any]] | None = N
 
 
 def build_evaluation_history_summary(*, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None, sport: str | None = None, market_family: str | None = None) -> dict[str, Any]:
-    record_rows = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    record_rows = _latest_by_recommendation_id(_stream_record_payloads(records, ledger_path=ledger_path))
     sport_slug = str(sport or "").strip().lower() or None
     market_family_slug = str(market_family or "").strip().lower() or None
     if sport_slug:
@@ -1912,7 +1982,7 @@ def _aggregate_performance_rows(rows: list[dict[str, Any]], *, bucket_key: str, 
 
 
 def build_recommendation_performance_analytics(*, records: Iterable[Mapping[str, Any]] | None = None, ledger_path: Path | str | None = None) -> dict[str, Any]:
-    raw_records = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    raw_records = _latest_by_recommendation_id(_stream_record_payloads(records, ledger_path=ledger_path))
     normalized_records = [_normalized_performance_record(record) for record in raw_records]
     settled_records = [record for record in normalized_records if str(record.get("result") or "").strip().lower() in {"win", "loss", "push", "void"}]
     total_stake = sum(float(record.get("stake") or 1.0) for record in settled_records)
@@ -2265,7 +2335,7 @@ def build_segmented_reliability_profile(
     once real segment-level sample sizes exist.
     """
     sport_slug = str(sport or "").strip().lower() or None
-    record_rows = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    record_rows = _latest_by_recommendation_id(_stream_record_payloads(records, ledger_path=ledger_path))
     if sport_slug:
         record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None}]
 
@@ -2322,7 +2392,7 @@ def build_accuracy_summary(
     from syndicate.features.shared.drift_detection import detect_metric_drift
 
     sport_slug = str(sport or "").strip().lower() or None
-    record_rows = _latest_by_recommendation_id(_iter_record_payloads(records, ledger_path=ledger_path))
+    record_rows = _latest_by_recommendation_id(_stream_record_payloads(records, ledger_path=ledger_path))
     if sport_slug:
         record_rows = [record for record in record_rows if _record_sport(record) in {sport_slug, None}]
 

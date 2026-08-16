@@ -32647,3 +32647,36 @@ across five stages" into a list of allocation sites, which is the last unknown.
 
 Cost note: tracemalloc keeps a traceback per live allocation and the process is
 already at its ceiling — arm it to fire ONCE per boot, on the excursion only.
+### `#442` — **SHIPPED TO THE TREE 2026-08-16 (local tooling, no deploy). `scripts/render_events.py`: the 2026-08-15 FORBIDDEN rule about OOM finally has a tool behind it** — lane `render-events-reader`, CLOSED-VERIFIED
+**The gap this closes.** `learnings.md` 2026-08-15 says a negative result about
+process death MUST come from the events API, and names `render_logs.py` as unable
+to answer it. It then left **nothing in its place**, so every session needing a
+kill census since has hand-rolled a reader — including the one that wrote this.
+    py -3 scripts/render_events.py --failures-only --since 2026-08-14T00:00:00Z
+**Why it is not a wrapper around one HTTP call.** Three failure modes, each
+already paid for elsewhere in this repo:
+1. **The unpaged undercount.** Against 2026-08-14 CT the tool returns **29
+   `oomKilled`**; with paging disabled the same window returns **20**. A 31%
+   undercount that reads as an answer — `#434`'s failure exactly. It always
+   prints the window it ACTUALLY covered, never the one requested.
+2. **Quiet vs. broken.** An empty window triggers a positive control (unfiltered
+   `limit=1`). Events exist but none in the window → genuinely quiet, exit 0.
+   Nothing at all → **reader failure, exit 2, "do not conclude anything"**. These
+   are different readings and must never print the same.
+3. **`server_failed` is not one thing.** `oomKilled` / `evicted` / `unhealthy` /
+   `earlyExit` are classified, and an unrecognised reason becomes
+   `failed:unknown` rather than falling into a familiar bucket.
+**Verified, all three criteria run:** 29/29 census reproduced · `--json`
+round-trips · `py -3 -m pytest tests/test_render_events.py -q` → **15 passed**.
+**The reading it produced, recorded because it is load-bearing for `#440` and for
+lane `refresh-worker-oom-recurrence` — theirs to interpret, not this entry's:**
+refresh-worker `server_failed` since 2026-08-09 is **42 events, all 42
+`oomKilled`, none evicted** — 08-08:5, 08-13:4, **08-14:29**, 08-15:4, 08-16:0 so
+far (CT), clustering **15:00–00:00 CT**. Meanwhile live-odds-worker's 19 failures
+over the same week are **zero OOM, all `earlyExit`**, still recurring ~1–3/day
+through 08-16 05:54 CT — a distinct, ongoing, **unowned** failure mode that a
+"19 failures" summary would have buried. Not diagnosed here.
+**Caveat that survives this entry:** `container_memory_mb` is `memory.current`
+and includes page cache. The branch-overlap baseline read **4096.0 MB = 100% of
+cap** on 2026-08-16 05:09–10:09 CT with **zero kill events in that window** — the
+ceiling was touched and nothing died. A cap-touch is not a kill.

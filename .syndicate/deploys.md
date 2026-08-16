@@ -5829,3 +5829,167 @@ predicted first observable tick ~05:51:37Z, from a 900s idle interval against an
 **STILL NOT MEASURED:** the effect. One gate decision is not a cadence outcome.
 The sweeps/day change needs the `branch-overlap-baseline-watch` distribution, and
 soccer is excluded by design so this lane's headline goal remains DEFERRED to 1c.
+## 2026-08-16 04:58:57Z — refresh-worker `755ec40a` — fixture-aware pregame cadence ENABLED (`#440` Phase 1)
+**MEASUREMENT: PENDING.** Nothing here is a claim yet. Reminder to read: within
+2h of the deploy going live, and again from the 4-hourly
+`branch-overlap-baseline-watch`.
+**What shipped.** Deploy branch `deploy/fixture-cadence-on-live` @ `755ec40a`,
+cut from the **LIVE SHA `5c419007`**, not from `main`. Diff vs live is exactly
+two files:
+    syndicate/features/shared/live_refresh_loop.py   +183 / -1
+    tests/test_pregame_cadence_fixture_aware.py      +201 / -0
+Preflight FAILED on the first shape and this is the fix: the service runs a
+deploy branch diverged from `main` by 14 live-only / 472 origin-only commits, so
+deploying `origin/main` would have changed **196 files, 92 of them `.py`**, while
+diagnosing. `render.yaml` untouched — no `blueprint_sync`.
+**Config, set by the user in the dashboard and READ BACK before deploying:**
+`SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=true` on refresh-worker (105 keys, up
+from 104); **absent on live-odds-worker and web** — verified, not assumed.
+**Deploy safety CLEAR at 04:53Z and re-checked immediately before triggering:**
+no MLB sim in flight, odds refresh idle, no live games, board build idle.
+**Expected effect, as a number and a window.** Within 2h: `FIXTURE_CADENCE` lines
+on refresh-worker carrying `interval` in {7200, 28800, 86400} for mlb/wnba/nfl,
+and `reason=excluded_pending_per_league_scoping` for soccer. Pregame sweep
+ceiling mlb 12.00 -> 5.45/day, wnba -> 5.83, nfl_preseason -> 3.56. **Soccer
+unchanged at 3.00 BY DESIGN** — it is excluded, because at sport granularity the
+gate measured +69% (see `learnings.md` 2026-08-15).
+**What would falsify it:** no `FIXTURE_CADENCE` line at all (the branch did not
+run, or the flag is not being read); or a soccer line with a numeric interval
+instead of the exclusion reason.
+**Baseline caveat, stated because it limits what can be concluded:** the before
+side is **ONE** `branch-overlap-baseline-watch` sample (worst container 4096.0 MB
+= 100.0% of cap in 3 hours), not a distribution. The older 3,972 MB / 97.0% /
+124 MB figure is STALE and must not be used as the comparison.
+**Rollback:** delete the env key (default is False, so absence restores baseline)
+and `py -3 scripts/render_deploy.py --service refresh-worker --commit 5c419007`.
+## 2026-08-16 ~05:2xZ — THE REMAINING ~1,900 MB IS NAMED: cumulative ledger accumulation
+**No deploy.** Measurement only, from production telemetry + code.
+### THE CHAIN, each step measured
+1. **The 2GB is IN THE PARENT PROCESS.** `ALL_PROCESS_MEMORY` across the
+   04:46:44Z kill: **pid 39 (`run_refresh_worker.py`) 3,138 -> 3,545.8 MB**,
+   every child under **54 MB** (12 processes). Not a sim job, not a subprocess.
+   (pid 39 at 85.9 MB from 04:46:33 is the post-kill reboot.)
+2. **The fatal climb runs 51s with NO stage marker.** `last_stage` sat at
+   `board_contract_games_normalized` with `seconds_since_stage` 0.7 -> **51.5**
+   while anon went **1,666 -> 3,990 MB**. Sport-carrying board emissions stop at
+   **soccer 04:45:16**; everything after is unmarked.
+3. **What IS logging in that gap:** `[intelligence_evaluation]
+   SKIP_OVERSIZED_LEDGER_CHUNK` at 04:45:29, 04:45:33 (x3) and 04:46:01.
+   **Read those correctly — they are the guard WORKING**, skipping 305/367/480MB
+   chunks. They are not the allocation. What they prove is that **the chunked
+   prediction-ledger pass is executing inside the fatal window.**
+### THE DEFECT — `intelligence_evaluation.py:615-677`
+    def _load_chunked_ledger_records(path) -> list[dict]:
+        max_chunk_bytes = _ledger_max_chunk_bytes()   # 256,000,000
+        rows: list[dict[str, Any]] = []               # <-- 636, OUTSIDE the loop
+        for chunk_path in chunk_paths:                # <-- 637
+            if chunk_path.stat().st_size > max_chunk_bytes:  # per-FILE ceiling
+                ...continue
+            with chunk_path.open(...) as handle:      # #254 streams, correctly
+                for line in handle:
+                    rows.append(json.loads(line))     # <-- 674, ACCUMULATES
+        return rows
+**`#254` fixed the wrong half.** It removed the 256MB string and the
+`splitlines()` list — real defects — but left `rows`, which **materialises every
+record of every ACCEPTED chunk into one list that outlives the loop.** The
+ceiling is **per chunk**; nothing bounds the SUM. Three accepted chunks near the
+ceiling is ~750MB of file bytes, and this repo measured this JSON family at
+**~6.3x file bytes resident** (`#435`) — i.e. **multiple GB in `rows`**.
+This is `#435`'s defect one level up. `read_book_quotes_latest` was fixed by
+**reducing AS IT STREAMS** (478,782 rows -> 36,424 keys, 92.4% superseded).
+Here the streaming was fixed and the reduction was never added.
+The file's own comment already contains the principle and stops one step short:
+*"the ceiling above bounds which files are SKIPPED, never what reading an
+accepted one costs"* — true of the string it was written about, and equally true
+of the list it did not consider.
+### WHAT IS AND IS NOT PROVEN
+**Proven:** location (parent process), timing (inside the unmarked 51s),
+mechanism (unbounded cumulative accumulation past a per-file ceiling), and that
+the pass runs there.
+**NOT proven:** that this totals ~1,900 MB. The accepted-chunk count and their
+sizes have not been measured — only the SKIPPED ones are logged, which is
+exactly the wrong half to log. **Do not record this as the cause until that
+number exists.**
+**Cheapest next step, no deploy needed:** log accepted chunks too
+(`path`, `bytes`, running `len(rows)`), then read one pass. The guard currently
+announces only what it refused, never what it accepted — the same blind spot
+that made this take all night.
+## 2026-08-16 05:35:34Z — DEPLOY `1409e96f` refresh-worker — MEASURED, AND THE TRANSIENT DID NOT MOVE
+Deployed from live `755ec40a` (re-cut; the live SHA moved 3x in 40 min). Window
+taken at a job boundary by explicit user decision: 3 jobs in flight, all odds /
+soccer refresh, **0 MLB sim jobs**, re-verified immediately before the POST.
+Claim acquired and released. Diff vs live: exactly 2 files.
+### BOTH FIXES ARE LIVE AND EXERCISED (not assumed — seen)
+    05:40:08  [mlb_cards] ODDS_HISTORY_BUILD_CACHE entries=1 date=2026-08-16
+    05:43:49  [intelligence_evaluation] LEDGER_CHUNKS_ACCEPTED count=8
+              bytes=833550415 ceiling=256000000 records=22188 streamed=1
+**THE NUMBER THAT WAS MISSING ALL NIGHT: 833,550,415 bytes accepted across 8
+chunks**, every one under the 256MB per-file ceiling. The mechanism is now
+proven with a measurement: the ceiling bounded each FILE while the SUM went
+unbounded, and all 833MB used to land in one list.
+### THE RESULT — HONEST NULL
+    metric                 f8ca54e1 baseline   5c419007      1409e96f (this)
+    amplitude mean            1,950 MB          2,220 MB        2,235 MB
+    peak anon                 3,907 MB          3,426 MB        3,646 MB
+    min inactive_file      26.3 / 42.2 MB        12.3 MB           0.6 MB
+    kills                   2 in 26 min        1 @22.2 min    0 in 9 min (early)
+**The excursion is UNCHANGED.** 833MB is no longer materialised on the paths I
+changed, and the transient did not shrink by a measurable amount. So the ledger
+accumulation, as reached through `intelligence_evaluation`, is **not** the ~2GB.
+### WHY — A CONSUMER I LEFT MATERIALISING, AND IT DOUBLE-COPIES
+`recommendation_engine.py:1239` and `:1528`:
+    history_rows = [dict(record) for record in
+                    (evaluation_records or _load_records_from_ledger(ledger_path))
+                    if isinstance(record, Mapping)]
+`_load_records_from_ledger` (`:456`) calls the MATERIALISING
+`_iter_record_payloads` — the full 833MB-of-chunks list — and the comprehension
+then builds a **second full copy**, one `dict(record)` per record. Two complete
+copies of the whole ledger, in the recommendation path that runs during board
+builds. I fixed the six `intelligence_evaluation` call sites and left this one,
+because it wants a list; that is exactly why the number did not move.
+**This is the same defect one call frame further out, and the fix pattern is
+already proven here.** Next: stream `_load_records_from_ledger`, and drop the
+`dict(record)` re-copy unless a downstream mutation actually needs it — check
+before removing, `history_rows` may be iterated more than once.
+**Standing correction:** the excursions remain tagged `board_contract_games_normalized`
+with `seconds_since_stage` 14-51s, so the cost is still in the unmarked region
+after that marker. The named candidates so far — deepcopy (EXONERATED, 0.54MB),
+odds-shard duplicate (~125MB, FIXED), ledger accumulation (833MB, FIXED on 6 of
+8 paths) — do not yet add to 2GB. The remaining double-copy is the best
+outstanding candidate and is UNMEASURED.
+## 2026-08-16 15:1xZ — DEPLOY `d72d670c` (load-once) — 9h CLEAN, AND THAT PROVES NOTHING YET
+Live 06:01:34Z. **Zero OOM kills in 9h 09m** (events API; last kill 04:46:44Z,
+before this deploy). Tempting, and not yet evidence.
+### THE DIURNAL CONTROL, WHICH IS THE WHOLE POINT
+Kills cluster in the LIVE-SLATE window (~22:00Z-05:00Z). The **pre-fix** code
+ran **05:02:59Z -> 22:54Z on 08-15 with zero kills — 17h 51m**. So a clean
+daytime stretch is exactly what the BROKEN worker also produced, and 9h of
+daylight is a weaker run than the defect's own best.
+Same clock window, one day apart, near-identical sampling density:
+    window 14:25-15:11Z        08-15 PRE-FIX      08-16 POST-FIX (d72d670c)
+    samples                       1,368               1,367
+    peak anon                   2,816.7 MB          2,898.5 MB   (slightly HIGHER)
+    excursions                        0                   0
+    min inactive_file               6.5 MB            183.5 MB
+**Zero excursions BOTH before and after.** The sawtooth simply does not run in
+the daytime lull, so this window cannot separate the two SHAs. Peak is flat
+(2,817 -> 2,899, the wrong direction if anything). Only `inactive_file` differs,
+which is one reading of a volatile quantity and is not on its own a result.
+**The 1,000MB "improvement" I could have claimed** — 3,907 -> 2,898 peak — is an
+artifact of comparing a DAYTIME reading against a NIGHT baseline. The correct
+comparison is same-clock, and it shows no change.
+### VERDICT
+`d72d670c` is **UNPROVEN**, exactly like `1409e96f` before it. Three fixes are
+live and exercised (odds-shard cache, ledger streaming, three-loads-to-one) and
+**not one of them has yet been shown to move the transient**, because every
+measurement so far has been either too early, too short, or in the wrong part of
+the day.
+**The only test that can settle it is the live-slate window, ~22:00Z tonight to
+~05:00Z.** Judge on: excursion count/hr, amplitude mean, and `min inactive_file`
+against the night baselines (amplitude 1,950-2,235 MB; inactive_file 26.3/42.2
+at the kills, 164-240 surviving). A night with excursions at the old amplitude
+means these three fixes were not the 2GB.
+**Method note, so the next reader does not repeat it:** `watch_rw.py` reports
+kills as "since start" with no end bound, so the control run listed three kills
+that happened AFTER its window. The window is what the header says; the kill
+line is not scoped to it.
