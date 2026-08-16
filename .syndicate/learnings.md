@@ -2621,3 +2621,46 @@ than the marker.
   the orphaned object still held them — `git show <orphan>:<path>` recovered both.
   An orphaned bad commit is a backup of the work it appeared to destroy.
 - *(evidence: `c1ff7b21` orphaned; recovery in `af7e864d`)*
+
+## 2026-08-16 — FORBIDDEN: letting a FITTED MODEL judge, when a model-free measurement of the same thing is available
+
+Three false alarms in one day on `scripts/ui_layout_probe.py`, all on a healthy
+board, all the same mistake wearing different clothes:
+
+- **raw group spread** failed mlb desktop at 313px while cards carrying identical
+  content differed by 70px — 243px of it was the 33-57 pair range;
+- **a residual AT its own noise floor** (164px == floor) failed the budget while
+  the same row printed "this is text wrap, not layout deviation" one clause
+  earlier;
+- **a CURVED fit** passed `reliable` at `fitRatio` 0.20 and then failed on a
+  structured residual, accusing the only card at its pair count — a card with no
+  peer, so the accusation could not be checked even in principle.
+
+The common root: **the fitted line was treated as ground truth.** Every one of
+those verdicts was a statement about the MODEL's failure to describe the page,
+reported as a statement about the PAGE.
+
+The fix that dissolved all three at once was to notice that a model-free
+measurement of the same quantity was already being computed: two cards carrying
+the same data should be the same height. No slope, no intercept, no reliability
+bar, and it works on slates where nothing can be fitted at all.
+
+**How to apply.**
+- When a model and a model-free measurement of the same thing disagree, the
+  model-free one is the evidence and the model is the hypothesis. Do not ship a
+  verdict that only the model supports.
+- **A goodness-of-fit statistic cannot detect misspecification.** `fitRatio` is
+  residual/explained, so a wide explained range certifies a bent line — measured:
+  a fit whose per-pair cost ran 41.3 -> 61.8 -> 76.6 scored 0.20 and `reliable`.
+  If a number is used to certify a model, ask what it reads when the model is the
+  WRONG SHAPE, not merely noisy.
+- **An accusation needs a peer.** "This card is +79px off" means nothing when
+  that card is the only one of its kind on the page; the comparison had no
+  control. Prefer checks that compare like with like, and say so when no
+  comparison was possible rather than passing silently.
+- Corollary, learned the same day: a residual sitting AT its own noise floor has
+  measured nothing. Report the floor next to any residual, or the number reads as
+  signal when it is the instrument's own resolution.
+- Same family as [[feedback-instrument-blindness]] and
+  [[feedback-gate-on-the-output-not-the-input]]: a healthy reading is evidence
+  only once you know what makes it read unhealthy.

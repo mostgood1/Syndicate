@@ -2027,24 +2027,60 @@ uniform and their spreads ARE layout signals. MLB's is not. `[measured]`
 across it (0/15 games). `[measured]`
 
 
-## UI probe - the height model and the settle rule `[measured 08-15 23:xxZ]`
+## UI probe - the settle rule and what JUDGES a card's height `[measured 08-16, supersedes the 08-15 entry]`
 
-**`scripts/ui_layout_probe.py` now reports a LAYOUT signal for MLB**, not a
-content one: it fits `height = chrome + k * content_units` per game state and
-reports the residual. Baseline, settled: mlb mobile Live 6px / Preview 54px,
-mlb desktop Live 18px. Budget `LAYOUT_RESIDUAL_BUDGET_PX = 150` (~3x worst
-clean reading). Desktop Preview is declared UNRELIABLE — its grid wraps into
-columns, so height is linear in ROWS not pairs. `[measured]`
+**The height model no longer judges anything. Deviation from same-content PEERS
+does.** A card is anomalous when it differs from cards carrying the SAME
+`.cards-data-pair` count — model-free, per state, and it runs on slates where no
+line can be fitted. Budget is **`PEER_DEVIATION_BUDGET_PCT = 15.0`**, a share of
+the tied group's own median card height, calibrated on 16 healthy readings whose
+worst was 9.9%. `LAYOUT_RESIDUAL_BUDGET_PX = 150` survives only for the
+content-independent branch's legacy path; the residual is now CONTEXT. `[measured]`
 
-**MLB RENDERS PROGRESSIVELY FOR ~4 SECONDS AND `wait_for_selector` DOES NOT
-COVER IT.** Total `.cards-data-pair` across 15 cards at 390px: 482 at +0ms,
-530 at +600ms, 590 at +1200, 683 at +2000, **719 at +3000 and stable**. Any
-probe of `/mlb/cards` must wait for the DOM to stop changing, not for the first
-card to attach. The probe does this now (`_settle`), records `settledMs`, and
-FAILS if the render never settles. MLB 3.6-4.0s; every other sport 0.8s.
-**Every MLB figure produced before this was taken at ~74% of final content.**
-`[measured]`
+**Three false alarms on 2026-08-16 shared one root cause: the fitted line was
+treated as ground truth.** Raw group spread failed mlb desktop at 313px while
+peers differed by 70px; a residual AT its own noise floor (164px) failed while
+the same row called it text wrap; and a CURVED fit passed `reliable` at ratio
+0.20 then failed on a structured residual. All three are gone. `[measured]`
 
+**`fitRatio` cannot see misspecification** — it is residual/explained, so a wide
+explained range certifies a bent line. `fitGroup` now tests SHAPE: slopes between
+consecutive pair-count group means, monotone-drift over >=3 steps, drift > 0.5.
+Measured: mlb mobile Live 0.88 (curved) vs Preview 0.008 (straight). A curved fit
+reports MISSPECIFIED and is not `reliable`. `[measured]`
+
+**MLB desktop is UNFITTABLE, and the mechanism is TEXT WRAP.** Cards with
+identical pair counts differ 97-116px because the pair grid is a wrapping
+row-max flow — 10 visible columns at 1440, 2 at 390. Agreeing on both visible
+pair count AND visible row count still leaves 74px. Preview is linear
+(62.4/62.1 px/pair); Live is convex (41.3/61.8/76.6), all of it inside
+`section.cards-panel.is-active > div.cards-overview-grid`. `[measured]`
+
+**The settle rule: 2400ms of CONTINUOUS stillness, and a verdict resting on
+absence says so.** Two equal polls (800ms) was the floor and fit inside a
+pre-enrichment plateau — it shipped a bad row (`rerun_2026-08-16.json`, mlb
+desktop, 15 cards at a uniform 33 pairs, `renderSettled: true`, while mobile read
+33-49 on the same slate). `_settle` now returns `sawChange`; MLB settles
+4.4-10.0s, the seven server-side sports at the 2400ms floor with
+`sawChange: false`, named in a footer. The 08-15 growth curve still stands and
+is why a short window is not enough — total `.cards-data-pair` across 15 cards at
+390px: **482 at +0ms, 530 at +600, 590 at +1200, 683 at +2000, 719 at +3000 and
+stable**; every MLB figure produced before `_settle` existed was taken at ~74% of
+final content. `[measured 08-15]`
+
+**`identicalContentSpread` is baselined for nfl and ncaaf ONLY**
+(`TIE_SPREAD_BASELINED`), where it read bit-identical 14/50/45/53 across 7+ runs.
+MLB read 81/109/123/164/193px the same day — **the cause is the SLATE, not the
+metric**: nfl/ncaaf slates were static, MLB enriches while games are live.
+Baseline file `reports/ui_layout/baseline_2026-08-16.json` (`ok: true`). Drift
+FAILS; a state change reports NOT COMPARABLE, which is what stops first pitch
+reading as a regression. `[measured]`
+
+**Proportional does NOT tighten the spread** — raw px max/median 3.3, percentages
+3.0. It was kept because it fixes the WIDTH bias (150px is 2.8% of a 4800px mlb
+mobile card and 27% of a 541px ncaaf desktop one), not for the reason it was
+proposed. Drift-against-baseline is the sharper check and caught nothing false
+all day. `[measured]`
 
 ## UI probe height model - MLB DESKTOP HAS NO LAYOUT SIGNAL, and grid-rows will not give it one `[measured 08-15]`
 
