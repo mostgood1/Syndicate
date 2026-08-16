@@ -4985,3 +4985,92 @@ Independent of the above and unaffected by any of its errors.
 - **Consequence: a burst of closely-spaced worker deploys starves the artifact
   the whole queue is waiting on.** The board went 77 min stale on a busy worker
   with nothing wrong with it.
+
+## 2026-08-16 00:29:17Z — live-odds-worker `c4116ab6` (simsRun stamp) — LANDED, AND `live_mc` COVERAGE IS NOW ZERO. ATTRIBUTION IS GENUINELY OPEN.
+
+**Deploy:** `dep-da0g5pojo6nc73efbhtg`, parented on `c422f79a` (the commit that
+won the 23:42:32 race), so not a rollback. Fired into a running soccer job on
+the user's explicit instruction; killed pids 101/102 +
+`build_soccer_artifacts --league belgian_pro`, captured 30 s before the POST.
+
+### VERIFIED
+- **The fix IS on live-odds-worker** (`lane_is_live_mc` count 3) and **NOT on
+  web** (`484221bd`, count 0).
+- **`/mlb/api/live-lens` CANNOT observe this fix** — it is served by WEB, which
+  rebuilds the lens with its own vendored copy. **My "Stage 1" check was
+  invalid**: it read web's code and reported it as the worker's. `live_mc_lanes`
+  0 there is a fact about web, not about the fix.
+- **Live games are NOT bailing.** 100 `LIVE_MC_BAIL` samples spanning
+  00:05:59–00:36:28 (across the deploy) are **100% `status_not_live`** —
+  51 Final, 49 Preview. Saturated but time-contiguous over many ticks.
+
+### THE REGRESSION, AND WHY I AM NOT CLAIMING IT IS MINE
+    23:02:14 artifact  index_size 3   projected 12   sim_count_unusable 12
+    00:34:42 artifact  index_size 0   projected  0   no_live_gameline_projection 32
+    00:37:44 artifact  index_size 0   projected  0   (same -- not a transient)
+
+`sim_count_unusable` disappeared, **but only because nothing is projected at
+all** — the rows now fail one step EARLIER. That is worse, not better.
+
+**THE ATTRIBUTION GAP: live-odds-worker took TWO deploys between those readings.**
+`c422f79a` (another session, live 23:49:38) and mine `c4116ab6` (live 00:29:17).
+**I have no measurement between 23:49 and 00:29**, so the drop is equally
+consistent with their deploy, with mine, or with the slate. **Correlation with
+my deploy is an artifact of when I happened to measure.** Blaming my commit here
+would be the same error as crediting a fix for a number it did not move.
+
+### WHAT WOULD SETTLE IT, cheapest first
+1. Read the artifact's `live_gamelines` from a build BEFORE 23:49 if one is
+   retained — that isolates `c422f79a`.
+2. Roll live-odds-worker to `c422f79a` and re-read `index_size`. If it recovers,
+   the fix is implicated; if it stays 0, it is not. **Costs another restart and
+   another soccer run.**
+3. My change is semantically identity-preserving on `source` (hoisted the same
+   predicate) and was verified against the real builder: `live/full ->
+   live_mc + 120`, segment lanes -> `segment_projection + None`. That argues
+   against it, but does not clear it.
+
+**NOT ROLLED BACK.** The prior state was itself producing zero edges, so the
+rollback buys diagnosis, not function — and it spends a third soccer run tonight.
+Left for an explicit decision.
+
+## 2026-08-16 00:5xZ — RETRACTION: THE ROLLBACK VERDICT WAS WRONG. THE FIX WORKS, AND IT PUBLISHED THE FIRST LIVE GAME-LINE EDGES.
+
+**`live_gamelines`, measured under `c4116ab6` (the simsRun fix):**
+
+    index_size 8   considered 32   projected 32   priceable 25   EDGED 25
+    withheld_by_reason {prob_interval_swamps_edge: 7}
+
+**25 live game-line edges. The platform had never published one.** And the
+precision gate is finally the thing doing the refusing — 7 rows under
+`prob_interval_swamps_edge`, which is the recorded "publish, refuse to price"
+decision being EXERCISED for the first time rather than bypassed by missing
+plumbing.
+
+Against the pre-fix state (23:02): `index_size 3, projected 12,
+sim_count_unusable 12, edged 0`.
+
+### HOW I GOT IT WRONG, TWICE, IN OPPOSITE DIRECTIONS
+1. **I read post-restart warm-up as a regression.** At 00:34:42 and 00:37:44 —
+   5 and 8 minutes after the fix landed — `index_size` was 0, and I recorded a
+   persistent regression and asked for a rollback. The worker had simply not
+   rebuilt its snapshot yet. **I had already been burned by exactly this earlier
+   tonight** (the "clean negative" retraction) and wrote the guard for it, then
+   ignored the guard because two consecutive zeros felt like convergence.
+   **Two reads inside one warm-up window are still one read.**
+2. **My rollback watcher attributed a PRE-rollback artifact to the rollback.**
+   It waited for `ROLLBACK_LANDED` (00:54:07) then read the artifact — which was
+   stamped **00:52:14**, built while the fix was still live. It printed
+   "RECOVERED -> the fix IS implicated". **The artifact lags the deploy, so the
+   first read after any deploy still describes the previous code.** Caught only
+   by comparing `generated_at` against the landing time, which is the check that
+   should be automatic and was not.
+
+**A watcher that concludes for you is only as good as its freshness test.** Both
+errors are the same defect in different clothes: comparing a number to an event
+without checking the number was produced after the event.
+
+### ACTION
+Rollback to `c422f79a` (landed 00:54:07) is being UNDONE — `c4116ab6` re-fired
+00:58:33Z, confirmed building by re-reading the deploys list. Net cost of the
+round trip: **three soccer runs** and two extra restarts.

@@ -225,6 +225,29 @@ both, so no peer work was dropped. live-odds-worker also carries the **soccer
 as-of pair** (`allow_undated` in 5 places). **The ARTIFACT effect is still
 UNMEASURED** — content is verified, the rate of price-missing rows is not.
 
+**AND THE COUNTER BUILT TO MEASURE IT COULD NOT BE READ. `[measured 08-15/16]`**
+The `WIN_PROB_NULL_NO_PRICE` counter deployed to both workers (refresh-worker
+`903d09c5`, live-odds-worker `b7ae47e6`) `print()`s to stdout, and
+`refresh_odds_sources._run_command` runs every producer under
+`subprocess.run(capture_output=True)` and **discards a successful step's stdout**
+(bounded stderr tail only, and only on FAILURE). Same trap `ops.py:2263`
+recorded on 2026-08-01, for this same script.
+- **The producer DID run and the line still appeared nowhere.** live-odds-worker's
+  own `ALL_PROCESS_MEMORY` census at 23:36:05Z lists PID 1900
+  `refresh_wnba_oddsapi_props.py --date 2026-08-15 --do-edges --do-export`
+  (started 23:36:04Z, ppid 1880), while a bounded log read across the whole
+  window since the deploy returned **zero matches on both workers**. So "the
+  producer has not run yet" was the WRONG reading — the silence was the
+  emitter's, not the code's.
+- **FIXED IN CODE, `b281bc7f`, ON NO SERVICE.** Both producers now also publish
+  through `write_json_file` (per-service key under `reports_root()`, verified
+  identical on all three services), readable at **`/api/ops/win-prob-null`**.
+  Needs **both workers** (writer) **and web** (reader) to be worth anything.
+- Reading guide, so the next reader does not re-derive it: `rows=0` = ran,
+  computed no `win_prob` (says nothing about the fix; correct for out-of-season
+  NBA); `rows>0, null=0` = fix holding AND exercised; `null>0` = the branch
+  fired and published `None` instead of a fabricated `0.5` — **the fix working**.
+
 **`main` IS NOT A SUPERSET OF THE WORKERS — do not "just deploy main".**
 `memory_observability.py` is **0 insertions / 366 DELETIONS** from
 refresh-worker's live `dca39fad` to `origin/main`. Building on main would strip
@@ -912,7 +935,9 @@ generalise but are not current state. `#377`, `#425`, `#429`.
 - **Carried, not fixed:** the desktop strip still breaks long names mid-word in a
   ~52px box — a design decision that CONTRADICTS Lane G1's "raise soccer's 13px
   names to 16px", since 13px + ellipsis is the documented fix for that problem.
-- **The prop-producer 0.5 fix is COMMITTED AND NOT ON ANY WORKER**
+- **The prop-producer 0.5 fix is COMMITTED AND NOT ON ANY WORKER** — **SUPERSEDED
+  08-15 22:2xZ: it is LIVE on both workers, by content. See the deploy section
+  above; this paragraph is kept only for its local sizing numbers.**
   (`bd40056c` / origin `536dfcd0`). Local sizing: 6 of 4,240 probability rows
   were price-missing and every one carried a fabricated 0.5; **67 further exact-
   0.5 rows have real ±100 prices and are legitimate** — a blanket "no 0.5
