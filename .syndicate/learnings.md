@@ -2497,3 +2497,104 @@ forwards from the function I had chosen.
    have passed both times. **The pre-registered residual is the only reason this
    was caught rather than shipped as done** — keep writing acceptance criteria
    as "count of things still wrong, expected 0".
+
+### 2026-08-16 — a slug-level check on a shared ledger is blind to the loss it is meant to catch
+- **What nearly shipped:** the working copy of `lanes.md` was stale by **64
+  lines** against HEAD. `git diff --cached --stat` looked normal (0 file
+  deletions), and a heading-slug comparison reported only one absent lane.
+  Committing it would have silently reverted an OPEN lane
+  (`branch-overlap-manual-run-marker`) and a DEPLOYED-and-verified update block
+  (`layer1-board-coverage`) belonging to two other sessions.
+- **Why the cheap checks passed.** Three of the four differing headings were
+  *legitimate supersessions* — the disk copy was NEWER (a lane closed, a deploy
+  at 17:53Z). So the slug diff was mostly noise, and the one real loss sat inside
+  it looking identical. "0 deletions" is about FILES; a ledger loses content by
+  being rewritten from a stale in-memory copy, which shows up as an
+  insertion-heavy diff.
+- **The rule going forward:** before committing any `.syndicate/**` ledger,
+  compare **lines**, not slugs: every non-empty line in `HEAD:<file>` must be
+  present in the staged blob, and each survivor of that check must be
+  individually confirmed as a supersession — by reading BOTH texts and deciding
+  which is newer — not assumed to be one.
+
+    py -3 -c "import subprocess; g=lambda r: subprocess.run(['git','show',r],capture_output=True,text=True,encoding='utf-8',errors='replace').stdout.splitlines(); h=g('HEAD:.syndicate/lanes.md'); s=set(g(':.syndicate/lanes.md')); print([l for l in h if l.strip() and l not in s])"
+
+- **Generalises beyond git.** This is the same shape as
+  `shared-index-can-hold-a-revert` and `presence-is-not-reachability`: the check
+  ran, returned green, and was measuring a coarser quantity than the failure.
+- *(this session also shipped a tool whose OWN OUTPUT exposed a defect in it —
+  `_deploy_trigger` labelling `server_failed` events with the `blueprint_sync`
+  signature because they carry no `trigger`. Absence of a field is a fact about
+  an event's SHAPE, not evidence about its cause. Same family as
+  `unknown-must-not-default-permissive`.)*
+
+
+## 2026-08-16 - FORBIDDEN: never let a branch sit behind a deploy gate without re-cutting it. Waiting is itself a source of staleness.
+
+A worker branch (`b8939778`) was cut on live `f88796a9`, then held 14 minutes for
+an MLB sim to finish. In that window another session shipped TWICE - `b9f2b5f1`
+(17:53:08Z) and `cf467794` (18:07:36Z). **Deploying the branch at the end of the
+wait would have reverted both.** It was correct when cut and a revert when fired.
+
+Re-cut on `cf467794` and the props ridealong was dropped entirely, because
+`cf467794` already carried it. `git diff --name-only cf467794 -- scripts/` on the
+new branch is EMPTY, which is the check that proves the other lane's work is
+untouched.
+
+**The rule:** re-read the live SHA immediately before firing (already a rule) AND
+re-cut if it moved. The longer a branch is gated, the more likely it has silently
+become a revert. On a tree with five sessions deploying, "live" has a lifetime of
+minutes.
+
+## 2026-08-16 - FORBIDDEN: a deploy does not race another deploy on this platform. It CANCELS it.
+
+Fired a web deploy at ~18:18 and it **cancelled `a92f76e9`**, another session's
+983-insertion Ask change that had been cut on the same live SHA a minute earlier.
+Their code was safe in git; their DEPLOY was silently dropped, and a cancelled
+deploy is invisible from the session that owns it.
+
+Re-shipped as `ad77e46a`, a union of both branches, after verifying the file sets
+were disjoint (`git diff --name-only` intersection empty). Deployed the union
+immediately so it superseded my OWN in-flight deploy rather than costing a third
+restart.
+
+**Re-reading the live SHA protects you from shipping a revert. It does NOT
+protect the other session's in-flight deploy.** These are different failures with
+different fixes. After every deploy, read the deploys list for a `canceled` entry
+inside your window, and own the re-ship if one appears.
+
+## 2026-08-16 - a verification script needs the same predicate discipline as the code it verifies, and a disagreeing verifier is suspect BEFORE the fix is.
+
+Measuring the board deploy, two checks reported partial failure of fixes that had
+fully landed:
+
+- `h2h_lay` counted with `'lay' in market` - which matches **player**
+  (p-**lay**-er). Reported "7 remaining, was 9", a completely plausible partial
+  failure. The shipped `_is_lay_market` guards this exact case with `'_lay'`;
+  the checker did not. True answer: **0**.
+- `sim_view` looked for on shortlist ROWS. It is stamped by
+  `_layer2_board_columns`, which feeds CARDS. Rows: 0. Cards: **108/108**.
+
+Both would have been written up as "the fix did not work". **When a measurement
+disagrees with a well-founded expectation, check the measurement first** - it is
+newer, less reviewed, and was usually written in a hurry at the end.
+
+## 2026-08-16 - `check_deploy_safety.py` can report a blocker that does not exist, and a BLIND read of it is not a CLEAR one.
+
+Two distinct failures of the gate in one evening:
+
+1. **Phantom blocker.** It reported a board build "IN FLIGHT since 17:57:07Z"
+   across another session's 18:07:36Z deploy, which restarts the worker and
+   therefore kills any running build. Falsified against the OUTPUT, not the
+   marker: the shortlist artifact was still stamped 17:35:43Z, 36 minutes stale,
+   so that build produced nothing. Same shape as `#443`.
+2. **Blind read.** While web restarted it returned `[UNKNOWN] HTTP 502` - it
+   reads live-refresh state off the WEB service. That string contains neither
+   `NOT CLEAR` nor `CLEAR:`, so a watcher testing `'NOT CLEAR' not in out`
+   declares the gate clear **precisely while it cannot see**. I wrote that
+   watcher and caught it before it reported.
+
+**The rule:** gate on an explicit positive (`CLEAR:` present) AND the absence of
+`[UNKNOWN]` - never on the absence of a negative. Cross-check any "build in
+flight" claim against the artifact's `written_at`, which is the output rather
+than the marker.

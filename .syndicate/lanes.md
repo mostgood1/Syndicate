@@ -128,7 +128,41 @@
   someone actually forces a refresh.
 - Blocked by: none. No deploy from this lane tonight unless asked.
 
-### layer2-board-quality — OPEN — **AUDIT COMPLETE (8/8 goals measured on the SERVED payload). 6 FIXES COMMITTED TO main AND NOT DEPLOYED. 1 REGRESSION FOUND, DEPLOYED AND VERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — OPEN — **SHIPPED AND MEASURED. 5 of 6 outcomes PASS on the post-deploy artifact; 1 instrumentation gap OWED. G4 and G7 not started.** — opened 2026-08-16 — session: layer2-board-quality
+- **DEPLOYED 2026-08-16 AND MEASURED.** refresh-worker `7b544eb4` (live
+  18:20:40Z), web `ad77e46a` (live 18:27:30Z). Both cut on their service's LIVE
+  SHA, never on `main` (`/preflight` failed `main` on scope: 520 commits).
+  Post-deploy artifact `written_at` 18:31:26Z:
+
+      best book outside DEFAULT_BOOKS   27 of 108 -> 0        PASS
+      h2h_lay rows served                9        -> 0        PASS
+      prop cards attributed to a team   56 of 108 -> 0        PASS
+      cards carrying sim_view            0        -> 108/108  PASS
+      rail cards (live chips + rows)   108        -> 18       PASS
+      no_bettable_book / repriced       absent    -> absent    FAIL
+
+- **OWED, and it is the only functional debt from this lane:**
+  `no_bettable_book` and `repriced_to_bettable` are returned by
+  `build_layer2_rows` and never published — `pipeline/layer2_shortlist.py`
+  assembles `per_sport_stats` from an explicit key list that omits them.
+  The filter works and is invisible. `#397`'s trap. **One-line fix, in a file
+  this lane already claims.**
+- **STILL NOT DONE — G4 (movement/steam) and G7 (live-lens projection).**
+  G4 is blocked on the odds sampling interval (`odds-cadence-off-the-mlb-peak`,
+  effect unmeasured) and on `#372`'s stall cause. G7 overlaps
+  `live-game-line-projection`; the shortlist joins only PREGAME projection
+  sources while the grid carries `live_projections` (19) unread.
+- **NO UI ELEMENT HAS BEEN SEEN RENDERING.** Web is verified as SERVED BYTES
+  (`boardSports` 2, `chipCentralDate` 2, `board-disclosure` 2 on the live page)
+  and as LOGIC (`node tests/js/game_rail_derive.test.mjs`, 9 assertions, and it
+  discriminates). The betslip 36px strip, the count-0 rail card, the disclosure
+  and the sim badge have never been looked at in a browser with data.
+- **The count-0 rail card is unexercised in production** — all 18 games today
+  carry an opportunity, so only the synthetic harness covers that branch.
+- `ad77e46a` also carries another session's Ask work (`a92f76e9`), which my
+  earlier web deploy CANCELLED. Union verified disjoint; that session notified
+  and asked to verify their half by content.
+
 - **CHECKPOINT 2026-08-16 ~18:0xZ. STATUS BY GOAL:**
 
   | goal | finding (measured, 108 served rows) | state |
@@ -197,7 +231,6 @@
 - Falsification test: per goal. The standing one for the whole lane — if the served payload already satisfies (a)–(d) above, the brief's premise is wrong and the lane closes without a code change.
 - Verification: the SERVED payload from `/api/board/layer2-shortlist`, written to `deploys.md`. Not a unit test — the user has twice reported a board defect that automated checks missed.
 - Blocked by: none. Read-only on `layer1_board.py`, `templates/shared/layer1_board.html`, `blueprints/layer1_page.py` (Layer 1 session), sim-engine internals, and `pipeline/intelligence_state.py`.
-
 ### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
 - **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
   - **`closing_detected_at` is present on 21 markets. The new code path ran.**

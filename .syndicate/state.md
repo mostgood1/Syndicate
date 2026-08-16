@@ -393,6 +393,31 @@ unsaved anywhere.
 
 ---
 
+## KILLS ARE EVENTS — there is now a tool, and a census `[measured 08-16 17:5xZ]`
+
+`scripts/render_events.py` (`#442`, shipped `f4627832`/`d72a3f66`, local tooling,
+nothing deployed). Reads `/v1/services/<id>/events`. The 2026-08-15 FORBIDDEN
+rule said a negative result about process death must come from the events API and
+named `render_logs.py` as unable to give one; this is that tool.
+
+    py -3 scripts/render_events.py --service <svc> --failures-only --since <ISO>
+
+- **Paging is not optional.** 2026-08-14 CT returns **29 `oomKilled`** paged and
+  **20** unpaged — a 31% undercount that reads as an answer. It prints the window
+  it ACTUALLY covered, and an empty window triggers a positive control so
+  "quiet" (exit 0) and "reader broken" (exit 2) cannot be confused.
+- **refresh-worker `server_failed` 08-09..08-16 = 42 events, ALL 42 `oomKilled`**,
+  zero evicted. 08-08:5, 08-13:4, **08-14:29**, 08-15:4, 08-16:0. Clusters
+  **15:00–00:00 CT**.
+- **live-odds-worker is a DIFFERENT failure: 20 `earlyExit`, ZERO OOM**, ~2.6/day,
+  steady across 8 days, latest 08-16 11:38:05 CT. Cause and impact both
+  **unmeasured** — `#444`, unowned. Do not merge with the refresh-worker work;
+  they share only the word "failure".
+- **A cap-touch is not a kill.** 08-16 05:09–10:09 CT read `container_memory_mb`
+  **4096.0 MB = 100.0% of the 4 GiB cap** with **zero events** in the window
+  (newest refresh-worker event was 01:01:34 CT). `memory.current` includes page
+  cache; the ceiling was reached and nothing died.
+
 ## MEMORY — refresh-worker: THE 2GB IS A TRANSIENT, AND ITS ALLOCATOR IS STILL UNNAMED `[measured 08-16 15:1xZ]`
 
 **Three fixes are live and exercised; NONE has been shown to move the
@@ -2199,6 +2224,28 @@ predicate change would move what counts as `live` board-wide. Owner needed.
     for "layer2" that returns zero **to this day** — the wiring is SERVER-side.
     A template grep cannot answer "does anyone consume this"; read the served
     payload. `[measured 08-16 16:20Z]`
+- **THE LAYER 2 BOARD FIXES ARE LIVE AND MEASURED** `[2026-08-16 18:31Z]`.
+  refresh-worker `7b544eb4` (live 18:20:40Z), web `ad77e46a` (live 18:27:30Z).
+  On the post-deploy artifact (`written_at` 18:31:26Z, 108 rows/cards):
+  best book outside the operator's 11 **27 -> 0**; `h2h_lay` served **9 -> 0**;
+  prop cards attributed to a team **56 -> 0** (renders the board's `—`);
+  cards carrying `sim_view` **0 -> 108/108**; rail cards **108 -> 18**
+  (MLB 15, WNBA 3). `book_shortlist.py` is the ONE owner of the bettable-book
+  list; Layer 1 does NOT read it yet.
+- **`no_bettable_book` / `repriced_to_bettable` ARE COMPUTED AND NEVER
+  PUBLISHED** `[2026-08-16]`. `pipeline/layer2_shortlist.py` builds
+  `per_sport_stats` from an EXPLICIT KEY LIST that omits them, so the book
+  filter works and is invisible — a future slate that shrinks because rows had
+  no bettable book is indistinguishable from a thin slate. `#397`'s trap, in
+  the module that warns about it. OWED by `layer2-board-quality`.
+- **`/api/board/game-chips` IS NOT A "TODAY" FEED, BY DESIGN.**
+  `game_chip_scoreboard.py:227` says a chip strip "can span several days at
+  once" and disambiguates with a date prefix on the status token rather than by
+  filtering. Measured 2026-08-16: a single-date request returned **90 soccer
+  chips across 10 Central dates (08-15..08-28), only 21 of them today**, while
+  MLB (15/15) and WNBA (3/3) were clean — so the multi-day case is invisible
+  until a week-keyed sport reaches the consumer. Any consumer must filter by
+  CENTRAL date itself. `[measured 08-16]`
 - **`_SCORE_SIM_WEIGHT` IS `0.0`, NOT `0.5`.** (`opportunity_signals.py:390`,
   deliberately zeroed and gated on S6.) **The board ranks on market EV and price
   shopping ALONE; the simulation contributes nothing to the ordering.** Measured

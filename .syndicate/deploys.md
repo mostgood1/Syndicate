@@ -7259,4 +7259,56 @@ measurement on `written_at > 18:1xZ`.
 
     py -3 scripts/render_deploy.py --service refresh-worker --commit cf467794 --allow-rollback
 
-**MEASUREMENT: ____________ (pending — needs an artifact with `written_at` after the deploy)**
+**MEASUREMENT — 2026-08-16 18:31-18:4xZ. FIVE OF SIX OUTCOMES LANDED; ONE INSTRUMENTATION GAP.**
+
+Artifact `written_at` **2026-08-16T18:31:26Z**, genuinely after the deploy's
+`finishedAt` 18:20:40Z. 108 rows / 108 cards.
+
+    best book outside DEFAULT_BOOKS      27 of 108  ->  0        PASS
+    cards on an unbettable book                     ->  0        PASS
+    h2h_lay rows served                   9         ->  0        PASS
+    lay cards on the board                          ->  0        PASS
+    prop cards attributed to a team      56 of 108  ->  0        PASS
+    cards carrying sim_view               0         ->  108/108  PASS
+      (none 75 / agrees 17 / disagrees 16)
+    no_bettable_book, repriced_to_bettable          ->  ABSENT   FAIL
+
+**The prop-team fix reads as `—`, not as a missing key.** All 51 prop cards
+carry `"team": "—"` — the board's own null placeholder. `_row_team` returns
+None and the card normaliser renders that as an em dash, which is the intended
+outcome: a blank cell rather than a real player on a real opposing team. Verified
+`team == away_team` on **0 of 51** (was 56 of 108).
+
+### THE ONE MISS: the filter's own counters are computed and never published
+
+`no_bettable_book` and `repriced_to_bettable` are returned by
+`build_layer2_rows` and do not appear anywhere in the served payload — not at
+top level, not in `per_sport_ingest` for any of the five sports.
+`pipeline/layer2_shortlist.py` assembles `per_sport_stats` from an EXPLICIT KEY
+LIST and my two keys are not in it.
+
+**This is `#397`'s trap, which the codebase already warns about in this exact
+module**: *"a rule that trims silently is a rule nobody can tell apart from a
+thin slate"*, and `select_shortlist`'s own comment says a new counter "ALSO has
+to be added to `/api/board/layer2-shortlist`'s explicit key list". I added the
+counters in the same commit as the rule — which was the point — and still missed
+the third place that has to know about them.
+
+Consequence, stated plainly: **the book filter is working and invisible.** Today
+it is verifiable indirectly (27 -> 0 offenders), but on a future slate a board
+that shrank because 40 rows had no bettable book would be indistinguishable from
+a thin slate. OWED, tracked in the lane.
+
+### The measurement script was wrong twice before it was right
+
+- It counted `h2h_lay` with `'lay' in market`, which matches **player**
+  (p-**lay**-er). It reported "7 remaining, was 9" — a plausible partial failure
+  that was actually `player_points` / `player_assists` / `player_rebounds`. The
+  correct predicate `'_lay' in market` gives **0**. `_is_lay_market` in the
+  shipped code guards against exactly this and my checker did not.
+- It looked for `sim_view` on the shortlist ROWS. `sim_view` is stamped by
+  `_layer2_board_columns`, which feeds the CARDS. Rows: 0. Cards: 108/108.
+
+Both would have been read as failures of a working fix. **A measurement script
+needs the same predicate discipline as the code it measures** — and when a
+verification disagrees with an expectation, check the verifier before the fix.
