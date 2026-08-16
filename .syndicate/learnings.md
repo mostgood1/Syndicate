@@ -3147,3 +3147,34 @@ tests were the residue of the wrong belief.
 encodes an assumption the fix is correcting before you touch either. Rewrite the
 test and say WHY in its docstring, so the next reader sees the fixture changed
 because reality did -- not because it was inconvenient.
+
+## 2026-08-16 — SCOPE NOTE on "blob-staging needs `--path`": true in general, WRONG for this repo
+
+`dea23cc8` records that `git hash-object -w <file>` skips the clean filter unless
+given `--path`, so blob-staging can commit un-normalised content. Correct as a
+git fact. Applied to this repo it would cause the damage it warns about.
+
+Measured 2026-08-16 against `origin/main`: **this repo stores CRLF throughout** —
+`app.py`, `scripts/migration_gate.py`, `tests/test_archives.py`, and
+`scripts/ui_layout_probe.py` at `f55b8e7c` before anyone touched it (1011/1011
+CRLF). `.gitattributes` scopes `eol=lf` to `.claude/hooks/*` **only**, and says in
+its own comment: *"this repo has no line-ending policy and setting one repo-wide
+would rewrite far more than this change warrants."*
+
+A day of blob-staged commits without `--path` therefore produced blobs
+**consistent with every other file in the tree**, and `git status` reports them
+clean. Adding `--path` would have normalised those files to LF — leaving them the
+only LF files in a CRLF repo, and turning every subsequent diff into a whole-file
+rewrite.
+
+**How to apply.**
+- Use `--path` where a repo HAS a normalisation policy. Check `.gitattributes`
+  and the stored line endings of a file you did not touch before deciding —
+  `git show origin/main:<some-other-file> | grep -c $'\r'` answers it in one line.
+- The general rule and the local convention can disagree. A learning that says
+  "always X" needs its scope measured before it is applied to a tree it was not
+  derived from — this is [[feedback-rederive-load-bearing-cross-lane-numbers]]
+  applied to a RULE rather than a number.
+- Do not "fix" the existing files to LF on the strength of the general rule. That
+  is a repo-wide rewrite nobody asked for, and `.gitattributes` already records
+  the deliberate decision not to have a policy.
