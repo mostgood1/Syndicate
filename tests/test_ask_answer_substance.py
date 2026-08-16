@@ -365,14 +365,21 @@ def test_unmeasured_model_is_stated_not_hidden():
 def test_reason_states_projection_against_the_line_for_over_under():
     """The MLB game lens shape: "the projection sits at X against Y". Ask had
     every analogue and generated nothing -- `recommendation` was `null` on 5 of
-    5 briefing rows."""
+    5 briefing rows.
+
+    On a PROP the relationship is stated as a fact rather than as the reason for
+    the side: `projected` is a mean and the side is picked by P(X > line), and
+    on low-line count props those diverge legitimately. The probability-space
+    case is carried by the model-vs-market clause, which is asserted here too so
+    this test still covers "the answer explains itself"."""
     reason = adapter._reason_sentences(
         PROP_ROW, adapter._bet_facts(PROP_ROW), adapter._sim_terms(PROP_ROW),
         model_pct=32.58, market_pct=27.06, edge_pct=5.52,
     )
     assert "0.564" in reason
-    assert "against a line of 0.5" in reason
-    assert "over" in reason
+    assert "above the 0.5 line" in reason
+    assert "32.6% against the market's 27.1%" in reason
+    assert "5.5 point edge" in reason
     assert "+265 at betrivers" in reason
 
 
@@ -816,34 +823,52 @@ def _reason(row):
     ) or ""
 
 
-def test_a_projection_on_the_far_side_of_the_line_is_not_a_reason_for_the_bet():
-    """The exact served defect. 1.396 vs a 0.5 line cannot explain an under."""
+def test_a_prop_projection_states_the_relationship_without_claiming_the_side():
+    """The served defect, and the OVER-CORRECTION that replaced it.
+
+    Original: "projects 1.396 batter hits against a line of 0.5, which is why it
+    lands on the under" -- false causation. First fix: "which does NOT support
+    the under" -- the same category error pointing the other way, because
+    `projected` is a MEAN and what picks a side is P(X > line). On a low-line
+    count prop those diverge legitimately.
+    """
     text = _reason(MECKLER_ROW)
-    assert "which is why it lands on the under" not in text
-    assert "which does NOT support the under" in text
-    # the numbers are still reported -- the disagreement is surfaced, not hidden
-    assert "1.396" in text and "0.5" in text
+    assert "which is why it lands on the under" not in text   # the original bug
+    assert "does NOT support" not in text                     # the over-correction
+    assert "above the 0.5 line" in text                       # the fact, plainly
+    assert "1.396" in text
 
 
-def test_an_agreeing_projection_still_reads_as_the_reason():
-    """The sibling row must not regress -- 0.256 below 0.5 does explain an under."""
-    text = _reason(ISBEL_ROW)
-    assert "which is why it lands on the under" in text
-    assert "does NOT support" not in text
-
-
-@pytest.mark.parametrize("side,line,projected,supports", [
-    ("over", 2.5, 3.951, True),    # above the line, betting over
-    ("over", 2.5, 1.900, False),   # below the line, betting over
-    ("under", 0.5, 0.256, True),   # below the line, betting under
-    ("under", 0.5, 1.396, False),  # the Meckler case
-])
-def test_support_is_decided_by_the_two_numbers_named(side, line, projected, supports):
-    row = dict(MECKLER_ROW, side=side, line=line,
-               projection=dict(MECKLER_ROW["projection"], projected=projected))
+def test_a_low_mean_prop_is_not_called_unsupported():
+    """mean 0.214 vs a 0.5 line still implies P(>=1) ~ 19%, which can beat the
+    market. Calling that "unsupported" is wrong."""
+    row = dict(MECKLER_ROW, side="over",
+               projection=dict(MECKLER_ROW["projection"], projected=0.214))
     text = _reason(row)
-    assert (f"which is why it lands on the {side}" in text) is supports
-    assert ("does NOT support" in text) is not supports
+    assert "does NOT support" not in text
+    assert "below the 0.5 line" in text
+
+
+def test_an_agreeing_prop_also_drops_the_causal_claim():
+    """Consistency: the mean does not explain the side in EITHER direction."""
+    text = _reason(ISBEL_ROW)
+    assert "which is why it lands on the under" not in text
+    assert "below the 0.5 line" in text
+
+
+def test_a_game_row_keeps_the_directional_claim():
+    """On totals/margins the mean IS the right statistic -- the comparison the
+    MLB game lens makes, and the reference this generator was modelled on."""
+    game = {
+        "player_name": None, "market": "totals", "line": 5.0, "side": "over",
+        "sport": "mlb", "ev_pct": 2.4, "model_edge_pct": None,
+        "projection": {"projected": 7.42, "side": "over", "basis": "full/total_runs_dist",
+                       "model_prob_over": None, "market_fair_prob_over": None},
+        "quote": {"price": -104, "bookmaker": "novig", "books_quoting": 5,
+                  "quote_seen_age_seconds": 60.0},
+    }
+    assert "which is why it lands on the over" in _reason(game)
+    assert "which does NOT support the under" in _reason(dict(game, side="under"))
 
 
 def test_one_book_is_singular():

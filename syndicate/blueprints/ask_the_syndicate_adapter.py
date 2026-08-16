@@ -1004,28 +1004,49 @@ def _reason_sentences(
         # review: the template only breaks when the projection falls on the
         # opposite side of the line from the bet.
         #
-        # The disagreement is REPORTED, not suppressed, and the wording claims
-        # ONLY the arithmetic. An earlier draft said "the sim and this side
-        # disagree"; that asserts the two numbers are comparable, and measuring
-        # the board showed I cannot promise it. Disagreement spans live AND
-        # pregame rows and four different `basis` values (`full`, `model_mean`,
-        # `rbi_1plus`, `live_resim`), at 12-21 of 31-39 over/under rows across
-        # two reads minutes apart. A live full-game projection sitting against a
-        # remaining-game line would explain the live rows and does NOT explain
-        # the pregame ones.
+        # **A MEAN DOES NOT DETERMINE A SIDE ON A COUNT PROP, AND THE FIRST
+        # VERSION OF THIS GUARD DID NOT KNOW THAT.** Fixing the causal claim, I
+        # replaced it with "which does NOT support the {side}" — which is the
+        # same category error pointing the other way. `projected` is a MEAN;
+        # what picks a side is `P(X > line)`. For a low-line count prop those
+        # diverge routinely and legitimately: a mean of 0.214 runs still implies
+        # `P(>=1) ~ 19%`, which beats a market implying 15%, so `over 0.5` is a
+        # perfectly good bet with the mean BELOW the line. Served examples that
+        # the previous wording called unsupported and which are probably fine:
+        # `Jake Cronenworth over 0.5` (mean 0.214), `Osleivis Basabe under 2.5`
+        # (mean 2.829).
         #
-        # So this states what is checkable -- 1.396 is not below 0.5 -- and
-        # stops. Whether the projection or the published side is wrong is a
-        # board question, flagged to `layer2-board-quality`, whose stated goal
-        # is that the board never contradicts the sim.
-        supports = projected > line if side == "over" else projected < line
-        clause = (
-            f"which is why it lands on the {side}" if supports
-            else f"which does NOT support the {side}"
-        )
-        parts.append(
-            f"The simulation projects {projected:g}{unit_text} against a line of {line:g}, {clause}."
-        )
+        # So the directional CLAIM is now made only where the mean is the right
+        # statistic:
+        #
+        #   * GAME rows (no `player_name`) — totals and margins, means in the
+        #     7-9 range against nearby lines. This is exactly the comparison the
+        #     MLB game lens makes ("the projection sits at 7.42 against 5.0"),
+        #     and it is the reference this generator was modelled on.
+        #   * PROP rows — the relationship is reported as a FACT ("above the 0.5
+        #     line") and nothing is claimed about why the side was taken. The
+        #     model-vs-market clause below already states the probability-space
+        #     case when the row carries one, which is the number that actually
+        #     picks the side.
+        #
+        # The original defect stays fixed: `1.396 batter hits` no longer reads
+        # as the REASON for an under. It now reads as "above the 0.5 line",
+        # which is true, useful, and not a claim about the bet.
+        above = projected > line
+        if row.get("player_name"):
+            parts.append(
+                f"The simulation projects {projected:g}{unit_text}, "
+                f"{'above' if above else 'below'} the {line:g} line."
+            )
+        else:
+            supports = above if side == "over" else not above
+            clause = (
+                f"which is why it lands on the {side}" if supports
+                else f"which does NOT support the {side}"
+            )
+            parts.append(
+                f"The simulation projects {projected:g}{unit_text} against a line of {line:g}, {clause}."
+            )
     elif projected is not None and side in ("over", "under"):
         parts.append(f"The simulation projects {projected:g}, on the {side} side.")
 
