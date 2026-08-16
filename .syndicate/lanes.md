@@ -72,6 +72,7 @@ rebuild a props snapshot when its inputs are newer, not just on force".
 
 
 ### ask-answer-substance — OPEN — **6 DEPLOYS SHIPPED AND MEASURED (web `d8985df8`). Panel names the bet, grounds it in the sim, filters non-positive edges, and reports real quote age. ONE BOARD DEFECT FOUND AND HANDED OFF, NOT CLOSED.** — opened 2026-08-16 — session: ask-answer-substance
+> **ASK-ANSWER-SUBSTANCE CHECKPOINT 3 applied.**
 > **ASK-ANSWER-SUBSTANCE CHECKPOINT 2, 2026-08-16 22:0xZ.** Six deploys shipped
 > and measured today, all web-only, all cut from web's own live SHA. Live
 > `d8985df8`; `main` carries the code (`339e510b`) and the ledger (`18bfc6f8`).
@@ -95,9 +96,12 @@ rebuild a props snapshot when its inputs are newer, not just on force".
 >    roughly a third to a half of over/under rows until it is fixed.**
 > 2. **`8172fdef` is INERT on production data** — proven by unit test only. Do
 >    not read a clean board as evidence it fired.
-> 3. **The harness has not been re-run since `ad77e46a`.** It is blind to
->    everything the last four deploys changed, so this is low-value, but it is
->    unmeasured and should be said rather than assumed.
+> 3. **HARNESS RE-RUN, OBLIGATION CLOSED (22:2xZ, live `d8985df8`): 37/52 with
+>    ZERO pass/fail flips** vs the same-slate control, every class identical.
+>    Non-regression, not a win — the harness is blind to nearly everything the
+>    six deploys changed. Its one moved warning
+>    (`edge_without_market_probability` 0 → 25) was checked against the diff and
+>    is BOARD DATA, not this lane's code.
 > 4. **CSS ships INLINE in `ask_bar.js`** because `board_cards.css` is held by
 >    `layer2-board-quality`. Move the `STYLE` const into the stylesheet when that
 >    lane closes.

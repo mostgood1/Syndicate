@@ -3056,3 +3056,50 @@ is not DISPLAYED on the user's screen — the page composites no frames. This is
 not transient and retrying is waste; 4 attempts across the session, 0 successes.
 `javascript_tool` + `read_page` work fine and are the fallback for proving what
 a page renders.
+
+## 2026-08-16 — ASK-ANSWER-SUBSTANCE CHECKPOINT 3: two more
+
+### REFUTED: "a metric that moved right after my deploys is my regression"
+
+`warn:edge_without_market_probability` went **0 → 25** between a control taken
+before this lane's deploys and a run taken after six of them. The obvious read —
+"I broke something" — was wrong.
+
+`git diff <control-era-SHA> <live-SHA>` on the file showed the code path the
+harness actually reads (`structured_response.top_opportunities` ← the board
+path's `edge` and `market_probability`) was **untouched by all six deploys**.
+The input had changed: 4 of 10 edge-bearing board rows now carry a
+`model_edge_pct` that cannot be derived from their own projection probabilities
+by either the direct difference or the complement.
+
+**The rule: when a metric moves across your change, diff the code path the
+metric actually reads before attributing it — to yourself OR to anyone else.**
+Both directions of misattribution are expensive. Claiming a regression you did
+not cause sends the next session hunting in the wrong file; claiming innocence
+you have not checked is worse. The check is one `git diff` scoped to the path,
+and it takes a minute.
+
+Corollary that made this diagnosable at all: `_board_row_probabilities` returns
+`None` rather than publishing a probability it cannot reconcile against the
+row's own stated edge. **The warning was a guard reporting upstream data, not a
+defect.** A guard that refuses loudly turns someone else's bad data into your
+visible signal — which is the behaviour you want, and it means "my warning count
+went up" is not the same claim as "my code got worse".
+
+### FOUND: a cited artifact that is not in git is not evidence
+
+`state.md` and `deploys.md` rows in this lane named
+`reports/ask_regression/*.json` as the evidence for their measurements. **Those
+files were UNTRACKED** — 15 of them under `??` in `git status`, including both
+files my own rows cite, and including one cited by a `state.md` line written by
+a different session on 2026-08-15.
+
+The ledger's whole premise is that a claim is checkable later by someone who was
+not here. A path that resolves only on one dev box fails that, silently, and it
+fails at exactly the moment it matters: when the box is gone or the file has
+been overwritten by the next run of the same script.
+
+**Rule: if a ledger row names an artifact path as its evidence, commit the
+artifact in the same push as the row — or write the numbers inline and say the
+file is local-only.** Do not name a path you have not made durable. Fixed for
+the two rows I wrote; the other 13 are pre-existing and flagged in the log.
