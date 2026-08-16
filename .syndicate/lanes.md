@@ -1827,3 +1827,118 @@ treat it as a controlled baseline.**
 - `win-prob-null-readable` — CLOSED-VERIFIED 2026-08-16 *(full entry in `lanes_closed.md`)*
 - `slate-size-headroom` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
 - `worker-child-processes` — CLOSED 2026-08-16 *(full entry in `lanes_closed.md`)*
+
+#### `clv-without-settlement` — SETTLED READING 2026-08-15 MLB, recorded by `live-game-line-projection`
+Read from `/api/ops/clv/report?sport=mlb&date=2026-08-15` at ~2026-08-16 02:5xZ,
+after the scheduled task `clv-settled-read-2026-08-15` fired 01:55:33Z. **Not my
+lane — recorded because I had the reading and the context; interpret it yourself.**
+
+**THE NUMBER (same-book, close observed BEFORE first pitch):**
+
+    avg_clv_pct      -0.4049 %
+    beat_close_rate   21.64 %   (29 of 134)
+    same_book_n      134   |  same_book_all_n 159  |  book_biased_n 107
+    openings         987   ->  resolved 266
+
+**IT GOT WORSE ON SETTLEMENT.** This lane's own preliminary figure was
+**-0.07 % at a 27.1 % beat rate**, taken pre-first-pitch. Settled it is
+**-0.4049 % at 21.64 %**. The direction of that move is the finding.
+
+**DO NOT QUOTE `book_agnostic_close`.** It reads **+2.6793 % at an 83.16 % beat
+rate on n=95** and is an ARTIFACT, not a result — the report's own `bias_note`
+says pairing a best-of-N opening against another book's close is **biased
+upward**. That is precisely what the same-book restriction exists to remove, and
+it is the most quotable wrong number in the payload.
+
+**`by_close_timing` — and this is the part that touches Tier 5:**
+
+    pregame   n=134   avg -0.4049 %   beat 21.64 %
+    in_play   n= 25   avg -0.3498 %   beat 36.00 %
+
+**IN-PLAY IS A SEPARATE, EXCLUDED BUCKET (`in_play_excluded_n: 25`) — AND
+IN-PLAY IS EXACTLY WHAT `live-game-line-projection` PRODUCES.** The live
+game-line edges cannot be scored through this path as it stands; they would land
+in the bucket this report sets aside. **This empirically confirms the caveat in
+my handoff above** ("close is ill-defined for a live market"): it is not a
+theoretical objection, the pipeline already treats those rows as un-scoreable.
+Deciding what "close" means for a market that runs continuously to settlement is
+a prerequisite for scoring the live game-line ledger, and it is this lane's call.
+
+**LIMITS, stated so nobody over-reads a single evening:** one slate; `resolved`
+is **266 of 987** openings, so roughly a quarter of published rows got a close at
+all — the 134 that carry the headline are ~14 % of what was published. Whether
+the unresolved 721 differ systematically from the resolved 266 is **unknown and
+not tested**, and if they do the -0.4049 % is not representative.
+
+> *(The blockquote and body below are this lane's HISTORY, kept for the
+> reasoning trail. The status above supersedes them — 2026-08-16 reconcile.)*
+> **STATUS LINE CORRECTED 2026-08-15 ~18:0xZ by the coordinating session.** It
+> read "NOT DEPLOYED" and that is no longer true: `0e0b0aa1` rode the web train
+> and is in the deployed tree (`dep-da0a5rlg1s2s73cm43kg`, live 17:40:30Z).
+> **This does NOT discharge the lane's measurement obligation.** By this lane's
+> own commit message the change publishes nothing on its own — the visible
+> effect needs Drop 2 — so "deployed" here means *present*, not *proven*. No
+> production predicate was declared for it and none was measured. Do not read
+> the deploy as evidence the lens now serves a live win probability.
+- Goal: MLB game lines carry a projection computed from the CURRENT game state
+  rather than the pregame sim. **Testable outcome:** on a live MLB slate, a
+  published artifact carries a live win probability per live game whose value
+  MOVES between two consecutive builds while the pregame `predictions.full`
+  for the same game does not — and `rows_live_edged` on the book-grid counters
+  is > 0 for game-line markets.
+- **THE PREMISE IS FALSE AND THAT IS THIS LANE'S CENTRAL FINDING.** "No live
+  game-line projection exists" is a statement about PUBLICATION, not about
+  computation. `estimate_live(LiveSituation(...))` runs in production today,
+  120 sims per live game, on every live-lens tick, and returns `homeWinProb`,
+  `awayWinProb`, projected `total` and `homeMargin` from the live inning /
+  outs / bases / score / batter / pitcher state. Evidence in
+  `.syndicate/spec_live_game_line_projection.md` §1.
+- Files (exclusive to this lane):
+  - `.syndicate/spec_live_game_line_projection.md` (new — the deliverable of
+    this phase)
+  - `syndicate/features/mlb/live_lens.py` — the merge site at 1090-1100 that
+    discards the live-MC game lens for exactly the live games.
+- Hypothesis (H1): the live MC's `gameLens` is dropped by
+  `_enhance_card_row_with_live_projection`'s `should_use_projection_lens`
+  because the card's own pregame-derived lens already satisfies
+  `_lens_rows_have_projection_signal`, so the branch is False on precisely the
+  live games it was written to serve.
+- Hypothesis (H2): a second, independent drop — the report that is PUBLISHED
+  is the slim HTTP-fetched shape from `scripts/refresh_mlb_oddsapi.py`, which
+  carries no `gameLens` at all. Fixing H1 alone therefore changes nothing that
+  crosses to web.
+- Falsification test: for H1 — a live game whose card row carries NO gameLens
+  still shows no `source: live_mc` row after the merge, which would mean the
+  MC payload never reached the merge. For H2 — a published report that already
+  carries `gameLens` rows, which would mean the slim path is not the binding
+  drop.
+- Verification: (1) the spec is reviewed and its scope agreed BEFORE any engine
+  work — this phase produces no source edit; (2) any later code change is
+  measured on the published artifact, never through web's `/mlb/api/live-lens`,
+  which recomputes a cards fallback locally and is structurally blind to the MC
+  (`cardsFallback: True`, `simContextAvailable: False` on 14/14 games, measured).
+- Blocked by: none. **NO DEPLOY FROM THIS LANE.** refresh-worker is under
+  `#435` and had a deploy in flight (`eea7554a`) at lane-open.
+
+#### live-game-line-projection — ARCHIVE ADDENDUM 2026-08-16 ~03:0xZ (supersedes the "next session" line in the archive above)
+Recorded after the archive block, and it **changes the next step**.
+
+The settled MLB CLV read for 2026-08-15 (`ceecf863`) shows
+**`in_play_excluded_n: 25` — in-play is a SEPARATE, EXCLUDED bucket**, and
+in-play is exactly the population this lane produces. **So the live game-line
+edges cannot be scored through the existing CLV path at all**, however many rows
+the ledger accumulates.
+
+**The blocker is therefore a DECISION, not more data:** what does "close" mean
+for a market that runs continuously to settlement? That is
+`clv-without-settlement`'s call, and it gates everything this lane ships.
+
+**Revised order for whoever picks this up:**
+1. **Settle the in-play close definition** with `clv-without-settlement`. Until
+   then the ledger accrues rows nobody can score.
+2. Then read the **8/16 20:30 CDT** scheduled check — dedup working, rows
+   accumulating. That proves the RECORDER, which is still worth knowing.
+3. Only then ask whether the edges are any good.
+
+**Unchanged:** no claims held; live-odds-worker `c4116ab6`, refresh-worker
+`f8ca54e1`, both content-verified. The plumbing is done.
