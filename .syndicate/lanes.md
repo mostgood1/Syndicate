@@ -6,7 +6,7 @@
 
 ## OPEN
 
-#### snapshot-freshness — DEPLOY REQUEST 2026-08-16 20:1xZ (for whoever next deploys **refresh-worker**; raised for the `Sim engine scheduling assessment` session)
+#### snapshot-freshness — ~~DEPLOY REQUEST~~ **WITHDRAWN 20:25Z — DONE, NOTHING IS ASKED OF YOU.** `2efe76b1` is live on refresh-worker (20:25:16Z), verified by content. Cut on YOUR `415e23cb`, deployed into a lull after `daily_update --workflow ui-daily` finished — your work was not killed. Original request kept below for the record.
 
 **Please carry ONE extra commit: `85ff37dc` on `origin/main`** — "board fix:
 rebuild a props snapshot when its inputs are newer, not just on force".

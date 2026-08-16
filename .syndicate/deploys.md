@@ -7861,3 +7861,23 @@ instrument read unhealthy.**
   **exactly 119.8 minutes, identical to the decimal** — one fetch timestamp, not
   18 independent ages, against MLB's 3.0m across 83 rows. Stalled lane or
   deliberate off-peak cadence is the odds worker's call. Flagged, not diagnosed.
+
+## 2026-08-16 20:25Z — refresh-worker — snapshot freshness gate — DEPLOYED, EFFECT UNMEASURED
+
+`2efe76b1`, live 20:25:16Z, cut on the service's own live SHA `415e23cb`.
+Verified BY CONTENT on the live SHA: `wnba_gated=3`, `nba_gated=3`. **Both
+workers now carry the freshness gate** (live-odds-worker `46b5ec66`, 19:47:16Z).
+
+- **Deployed into a real lull, deliberately.** refresh-worker was running
+  `daily_update.py --workflow ui-daily` at **3.4GB RSS on a 4GB service**;
+  deploying then would have killed a heavy job for no urgency, since this service
+  builds `date+1` and today's board was already fixed via live-odds-worker.
+  Waited; the lull came at 20:18:11Z and the deploy fired 27s later.
+- **This is the deploy that was cancelled at 19:42:01Z** by another session's
+  `415e23cb`. Not re-fired at the time on purpose — cancelling theirs back would
+  have cost the same work twice. Re-cut on their result instead.
+- **EFFECT UNMEASURED on this service.** refresh-worker builds `date=2026-08-17`;
+  the proof is a `:recommendations_slate` / `:cards_props_snapshot` builder record
+  on `/api/ops/win-prob-null` for a date whose snapshot already existed, produced
+  WITHOUT `--force-refresh`. Today's board proof is tracked separately against
+  live-odds-worker.
