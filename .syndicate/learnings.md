@@ -2055,3 +2055,123 @@ succeeded, because a blob with conflict markers is a perfectly valid blob.
   verify it; confirm the deployed content instead.
 - *(evidence: `#441`; deploy `97491161` row in `deploys.md`; lane
   `nfl-pbp-root-resolution`)*
+
+## 2026-08-16 — RULE: fix a bad commit MESSAGE by rebuilding the commit from its own tree, not by `--amend` and not by living with it
+
+- **What we believed:** the shared-tree recipe offered two options for a wrong
+  commit message — `git commit --amend -- <paths>` (dangerous: without a
+  pathspec it commits the whole shared index, and it once swallowed another
+  session's 22 staged files) or *"accept the message and move on."* Written as a
+  binary, so a message defect looked like something you either risk a disaster
+  over or simply eat.
+- **What is actually true:** there is a third form, and it is strictly safer than
+  both. The tree object from the first commit is already written and immutable.
+  Rebuild with the SAME tree and the SAME parent, only the message differing:
+
+      NEW=$(git commit-tree <tree> -p <parent> -F - <<'MSG' ... MSG)
+      git update-ref refs/heads/<branch> "$NEW" "$OLD"      # compare-and-swap
+
+  It reads no file, touches neither the shared index nor the working tree, and
+  cannot pick up another session's staged work **because it never consults an
+  index at all**. The two-argument `update-ref` is a compare-and-swap: if another
+  session committed in between, it fails loudly instead of discarding them.
+- **How we found out:** used PowerShell here-string syntax (`@'...'@`) inside the
+  Bash tool, where `@'x'@` is concatenation, not a here-string — it pasted a
+  stray `@` at both ends of the message (`ceccb672`). Rebuilt as above to
+  `01c53f56`; blob hashes byte-identical, `git show --stat` exactly the 2 intended
+  files, CAS passed.
+- **The general form:** *a commit is (tree, parents, message). Only the message
+  was wrong, so only the message should be rebuilt.* `--amend` is dangerous here
+  precisely because it re-derives the tree from the index — it does far more than
+  the intent required. Prefer the plumbing verb that touches only the broken
+  field over the porcelain one that recomputes everything.
+- **Corollary, and it is the reason this is worth writing down:** the same
+  reasoning covers any commit whose CONTENT is right and whose metadata is wrong.
+  It does not extend to fixing content — that needs a new tree, and then the
+  ordinary contention rules apply.
+- **Harness note:** the Bash tool is Git Bash. PowerShell here-strings
+  (`@'...'@`) are silently valid Bash that means something else. Use a quoted
+  heredoc (`<<'MSG'`) or `-F -`. It fails quietly, not loudly — the commit
+  succeeded and only `--oneline` showed the damage.
+- *(evidence: commits `ceccb672` -> `01c53f56`, session `layer12-board-briefs`;
+  refines the amend-trap entry in the shared-tree commit recipe)*
+
+## 2026-08-16 — a per-row field read off ONE row and generalised to all of them
+
+**Overturned:** my own same-day claim that "every exercised `win_prob` run is on
+an OLDER commit", which I wrote into `deploys.md` and `state.md` and pushed,
+along with a discriminator ("one `rows>0` on a current commit") for resolving it.
+
+**The discriminator was already satisfied in the payload the claim was written
+from.** `wnba/live-odds-worker`'s `latest` line read `dd53d47c rows=0`. Priors
+1–3 carry the SAME SHA and are exercised — `rows=24/9/15`, 48 rows — three lines
+below it in output already on my screen. I read the commit off the summary row
+and generalised it to every row sharing that commit. The same error made "5
+consecutive `rows=0` runs on each service" wrong for live-odds-worker, which has
+exactly one.
+
+**Rule:** when a field appears on every row, a value read off ONE row is a fact
+about that row only. Before writing "every X is Y", scan the column. This is the
+`read-the-field-you-already-have` failure in its most expensive form: no new data
+was needed, no tool call would have helped, and the wrong version reached
+`origin/main` and a scheduled task that would have sent every future run hunting
+for a result already in hand.
+
+**Corollary, learned the same hour:** `git diff --stat origin/main..HEAD` is a
+TREE comparison, not a push manifest. When you are behind, incoming upstream
+changes render INVERTED — it showed "42 deletions from `learnings.md`" for a push
+that deleted nothing. Read `git log origin/main..HEAD` for what you would push.
+
+*(evidence: retraction commit `14269339`; the reading itself in `deploys.md`
+2026-08-16; session `wnba-win-prob-counter-read`)*
+
+### 2026-08-16 — MY DELETION GUARD PASSED WHILE ANOTHER SESSION'S CONTENT WAS SUBSTITUTED UNDER MY COMMIT MESSAGE. `git add <path>` stages the WORKTREE, and a clobbered worktree file is insertion-only
+
+**What happened.** I appended a 44-line lane to `.syndicate/lanes.md`, then
+committed it through an isolated `GIT_INDEX_FILE` with the documented guards.
+`git diff --cached --numstat` read `44  0  .syndicate/lanes.md` — 44 insertions,
+**zero deletions** — so the deletion guard passed, the file-count guard passed,
+and `e543e8dd` was created.
+
+`e543e8dd` does not contain my lane. It contains **44 lines of a parallel
+session's lane** (`layer2-board-quality`). Between my append and my commit, that
+session did a read-modify-write of `lanes.md` from a copy taken before my append.
+Their write dropped my 44 lines and added their own 44. `git add` then staged the
+worktree faithfully. I discovered it ~20 minutes later, only because a later edit
+asserted `s.count(heading) == 1` and got `0`.
+
+**Why every existing guard was blind to it.** The known rule is that an
+isolated-index commit leaves the SHARED INDEX staging a revert — that is about
+index state, and it is real. This is a different mechanism:
+
+- The clobber happened in the **worktree**, not the index.
+- The substitution was **insertion-only** relative to `HEAD`, so a deletion
+  count of 0 is exactly what a clean append looks like. **The deletion column
+  cannot see a swap.** It is a guard against removal, and this was replacement.
+- The line count matched by coincidence (44 for 44), but nothing depended on
+  that — any count would have passed.
+- `git diff --cached --stat` read by a human would also have passed: it says
+  "lanes.md +44", which is what I expected to see.
+
+**The rule going forward.**
+
+1. **A guard on the SHAPE of a diff cannot confirm its CONTENT.** If you are
+   committing a file you wrote a specific string into, assert **the string**, in
+   the same shell, against the staged blob — not against the worktree:
+   `git show :<path> | grep -qF "<your unique marker>" || exit 1`.
+   `git diff --cached --numstat` answers "how much changed", never "is my change
+   the thing that changed".
+2. **For shared append-only ledgers, prefer `cat >> file` over any
+   read-modify-write.** An `O_APPEND` write cannot drop another session's lines;
+   a Python/Edit read-modify-write silently can, and will, because five sessions
+   share this worktree. I used `>>` for the first append and it was still lost —
+   because the *other* session used read-modify-write. So this rule only helps
+   if everyone follows it, which is the argument for putting it here.
+3. **Re-read your own marker after writing to a contended file**, before moving
+   on. The whole loss window here was ~20 minutes of work continuing on the
+   belief that the lane existed.
+4. **Committing a shared ledger file commits whatever is in it.** My commit
+   message described my lane and the commit delivered theirs. Nobody was harmed
+   — their lane is committed and correct — but the ledger now has one commit
+   whose message and content disagree, which is exactly the shape that makes
+   `git log -S` archaeology lie later.

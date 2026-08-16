@@ -204,7 +204,47 @@
   to a stamp that persists in shard files needs its backfill story decided
   before it ships, not after.
 
-### spread-line-sign-convention — OPEN — **DIAGNOSED AND FIXED; DEPLOYED TO WORKERS 23:1xZ, ARTIFACT OUTPUT STILL UNVERIFIED** — the row's `line` is the AWAY handicap and home candidates inherited it (525/525 cells) — opened 2026-08-15 — session: lane-cleanup
+### spread-line-sign-convention — CLOSED-VERIFIED 2026-08-16 — **ARTIFACT OUTPUT NOW MEASURED: 12 of 12 MLB spreads rows correct on the served shortlist (9 away + 3 home, the previously broken case).** File claim released to `layer2-board-quality`; holding session `lane-cleanup` archived 01:14Z — opened 2026-08-15 — session: lane-cleanup → verified by layer2-board-quality
+- **VERIFICATION (2026-08-16 ~16:3xZ, by `layer2-board-quality`).** The one open
+  item — "artifact output still unverified" — is now closed against the SERVED
+  payload (`/api/board/layer2-shortlist`, `written_at` 2026-08-16T16:20:21Z)
+  cross-checked cell-by-cell against `/api/board/book-grid?sport=mlb`:
+
+      away rows agree      9/9      (already correct pre-fix)
+      home rows agree      3/3      (the case this lane fixed)
+      total               12/12
+
+  `_side_line_from_cells` confirmed present in the DEPLOYED tree —
+  `git show 97491161:syndicate/features/shared/layer2_board.py` returns 3
+  occurrences, identical to `main`.
+- **THIS LANE'S OWN DEPLOY CLAIM WAS UNPROVABLE BY ANCESTRY, AND ANCESTRY SAYS
+  THE OPPOSITE OF THE TRUTH.** `git merge-base --is-ancestor edbbee9d 97491161`
+  returns **NO**. refresh-worker runs branch `deploy/nfl-pbp-root`, not `main`,
+  so the fix rode in by content while failing every ancestry test.
+  `project_web_runs_a_deploy_branch_not_main` generalises to the WORKERS.
+- **A FALSE 3-of-3 DEFECT CAME OUT OF THIS DATA FIRST; recorded so nobody
+  re-derives it.** The grid carries MIRRORED rows for one (event, market,
+  segment): `row.line=+1.5 / home_cells=-1.5` beside `row.line=-1.5 /
+  home_cells=+1.5`. Joining the shortlist to the grid ON `line` picks the wrong
+  twin and produces a uniform-looking "home side still inverted, 3/3". The
+  discriminating field is the **price vector** — the disputed row's
+  `{leovegas_se:123, prophetx:140, unibet_nl:125, unibet_se:125}` matches
+  `row.line=1.0` (home cells -1.0) exactly, so its `-1.0` is CORRECT.
+  **The lane's original 525-cell result is NOT affected** — it compared cells
+  WITHIN a row, never across mirrored rows.
+- **THIS LANE'S "NO TEMPLATE CONSUMES THE SHORTLIST" IS NOW STALE AND WAS THE
+  BASIS FOR ITS SEVERITY CALL.** Measured 2026-08-16: `layer2_is_primary=True`,
+  `legacy_candidate_count=0`, and **108 of 108** board cards carry
+  `source=layer2_shortlist`. The `grep` over `templates/`/`static/` still returns
+  zero because the wiring is SERVER-SIDE. The blast radius was never limited to
+  the Ask headline; the shortlist is the board.
+- **CLAIM WAS NEVER ENFORCED.** `lane-guard.py`'s `_claims()` yields **zero**
+  claims on `layer2_board.py` from this lane: `FILES_RE` matched the Files header
+  on the colon inside `23:0xZ` (harvesting no paths), and the continuation lines
+  holding the real paths start with a backtick rather than `-`. This lane's note
+  "Collision check RUN … CLEAR both times, so no other lane was blocked by the
+  gap" read CLEAR **because its own claim was invisible**, not because the file
+  was free.
 - **TEMPLATE QUESTION ANSWERED 2026-08-15 23:2xZ. THE CONVENTION IS
   `row["line"] == THE AWAY HANDICAP`, AND ONLY THE HOME SIDE IS BROKEN.**
   - From the 525-cell result: `cell.home.line == -row.line` and (per-book
@@ -2689,3 +2729,62 @@ and then failed the thing it was checking, which is the point of running it.
 - Verification: 65 tests pass (58 + 7 new); production run after both fixes exits
   0 / OK where the same board failed two rows before.
 - Blocked by: none
+
+### layer1-board-coverage — OPEN — **AUDIT DELIVERED AND MEASURED; ONE FIX SHIPPED TO `main`, UNDEPLOYED. All four goals answered except the cross-sport LIVE A/B, which needs two sports live at once and is DEFERRED, not concluded.** — opened 2026-08-16 — checkpointed 2026-08-16 16:4xZ — session: layer1-board-coverage
+- Goal: for every in-season sport, a per-sport/per-market-family RATE of
+  `projected / total` (alt and period families broken out), every unprojected
+  prop classified as EITHER stale-fingerprint OR sim-does-not-emit-this-stat,
+  and the `Edge` column's missing term named AT ITS PRODUCER.
+- Files (claimed): `syndicate/features/shared/layer1_board.py`,
+  `syndicate/templates/shared/layer1_board.html`,
+  `syndicate/blueprints/layer1_page.py`,
+  `syndicate/blueprints/intelligence.py` (the `/api/board/layer1` handler only).
+  Edited in the end: `syndicate/features/shared/prop_projections.py` +
+  `tests/test_prop_projections_edge_attribution.py` — checked against every OPEN
+  lane's `- Files:` at edit time and claimed by none. Read-only throughout on
+  `layer2_board.py`, `intelligence.html`, `bet_slip.js`, `board_cards.css`,
+  `soccer_projections.py`, `pipeline/intelligence_state.py`, sim internals.
+- **THIS ENTRY WAS WRITTEN TWICE.** The first append was silently overwritten in
+  the worktree by a parallel session's read-modify-write of `lanes.md`, and my
+  own commit then staged THEIR 44 lines under my message without either of us
+  noticing. See the learnings entry of the same date. Re-appended, not rewritten.
+- **RESULT** (full audit `.syndicate/audit_2026-08-16_layer1_board.md`;
+  measurement + falsification test in `deploys.md`, 2026-08-16 16:19–16:40Z):
+  - **Both briefed premises were wrong, and re-checking them first was the whole
+    value of the first ten minutes.** Layer 1 is NOT dark (**5 of 5** consecutive
+    builds non-zero). Alt lines are NOT unprojected on MLB (`totals_alt` 86/86,
+    `spreads_alt` 76/77) — they are unprojected on **WNBA** (419/419 dark). The
+    `Edge` column is not blank everywhere: MLB serves **1,462** edges, and most
+    rows lacking one already state why on the row.
+  - The prior baseline in `docs/ai_context/betting_contract_lifecycle.md` §3a
+    (MLB 19.7% projected / **0** edges / game state 1,220 of 3,604) is **EXPIRED**
+    — today 68.3% / 1,462 / 2,843 of 2,843. Quoting it would book another lane's
+    fix as this lane's regression.
+  - **G1** rates measured per sport × family. mlb 1,941/2,843 (68.3%), soccer
+    1,704/6,453 (26.4%), wnba 305/872 (35.0%). The MLB gap is **LINE-shaped, not
+    market-shaped**: `batter_home_runs` 0.5 → 82.8%, 1.5 → **0.4%**, 2.5 → **0%**.
+  - **G2** every unprojected prop classified. mlb 504 no-such-rung / 337
+    player-dark (63 players) / 42 residual; soccer 1,293 / 3,128 (836) / 268;
+    wnba 39 / 41 / 0. Mapping named: the sim publishes a `<stat>_<N>plus` ladder
+    and `hr_2plus`, `hr_3plus`, `hits_runs_rbis_1plus` are the missing rungs.
+  - **G3** MLB live lens MEASURED working for props (27 of 201 `live_projected`
+    moved, 3 `actual_so_far` advanced over 4 min, right direction) and NOT
+    working for game lines (0 live projections on every `game|*` family).
+  - **G4** missing term named at the producer: `prop_projections.py` set
+    `edge_vs_market_pct = None` and no reason — key **ABSENT** on 284/284 —
+    while its soccer sibling has always attributed the same refusal. Fixed in
+    `e543e8dd`; replay over real served payloads gives **287/287 attributed, 0
+    silent**. The refusal itself is correct (`#238`) and unchanged.
+- **NOT DONE, owned elsewhere, routed by `send_message`:** missing sim rungs, the
+  63 dark MLB players, WNBA needs a distribution → sim-engine session. The 1,416
+  rows carrying BOTH EV terms → Layer 2 session and a **user decision**,
+  deliberately not taken here because `modelled_fair` is a book-margin ESTIMATE,
+  not a de-vig. The WNBA `wnba_game_cards` +31.7pp finding could NOT be delivered
+  (that session is unattended) — it lives in audit §4b and `e543e8dd`'s message.
+- Falsification test for the undeployed fix: re-sweep and count rows with a
+  projection, no edge of either contract, and no reason. **Expected 0.** Do NOT
+  verify by "the reason string appears" — it already appears on 287 rows in
+  replay; the residual is the discriminator.
+- Verification: met for G1/G2/G4 and for G3-props. **Unmet:** cross-sport live
+  A/B (no second live sport in the window). Lane stays OPEN for that.
+- Blocked by: none.
