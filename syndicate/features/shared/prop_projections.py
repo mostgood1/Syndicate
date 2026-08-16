@@ -386,15 +386,42 @@ class PropProjectionIndex:
             }
 
         if market_key == _HR_MARKET:
+            # THE LINE PICKS THE RUNG, like every other counting stat.
+            #
+            # This used to read `if not row or abs(line_value - 0.5) > 0.01:
+            # return None` -- an outright refusal of every line but 0.5, which
+            # matched a sim that counted only `hr_1plus`. Measured on production
+            # 2026-08-16: `batter_home_runs` 240/290 projected at 0.5, **1/260
+            # at 1.5 and 0/244 at 2.5** -- 504 rows, the largest single coverage
+            # gap on the board, and three layers each enforcing a limit none of
+            # them needed.
+            #
+            # The sim now walks the same ladder for HR that it always walked for
+            # hits/runs/RBIs/total bases, so the bucket is derived here the same
+            # way too rather than hard-coded.
+            #
+            # ONE INDEX KEY, MANY RUNGS: HR rows come from the separate
+            # `hitter_hr_likelihood_all` payload as ONE row per player carrying
+            # every `p_hr_Nplus`, so the row is still found under `hr_1plus`
+            # while the FIELD varies. Indexing per rung would have implied a row
+            # per rung, which the payload does not have.
             row = self._hitters.get((name, "hr_1plus"))
-            if not row or abs(line_value - 0.5) > 0.01:
+            if not row:
                 return None
-            prob = row.get("p_hr_1plus_cal", row.get("p_hr_1plus"))
+            bucket = _bucket_for_line("hr", line_value)
+            if bucket is None:
+                return None
+            prob = row.get(f"p_{bucket}_cal", row.get(f"p_{bucket}"))
+            if prob is None:
+                # An artifact written before the sim counted this rung. Absent,
+                # not zero -- a 0.0 here would be indistinguishable from "the
+                # model says it will not happen" and would price against it.
+                return None
             return {
                 "projected": row.get("hr_mean"),
-                "model_prob_over": round(float(prob), 4) if prob is not None else None,
+                "model_prob_over": round(float(prob), 4),
                 "source": "hitter_threshold",
-                "basis": "hr_1plus",
+                "basis": bucket,
             }
 
         if market_key in _HITTER_BUCKETS:
