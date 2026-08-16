@@ -250,15 +250,17 @@ recorded on 2026-08-01, for this same script.
   window since the deploy returned **zero matches on both workers**. So "the
   producer has not run yet" was the WRONG reading — the silence was the
   emitter's, not the code's.
-- **DEPLOYED 2026-08-16 TO 2 OF 3: refresh-worker `b2af0fac` (01:13:32Z), web
-  `fa1871cf` (01:15:37Z). live-odds-worker NOT DEPLOYED** — its claim was held by
-  `clamp-fix-to-workers` with 3 jobs running. `/api/ops/win-prob-null` answers
-  **200** and reports `reports_root=/opt/render/project/data/reports`, so the
-  channel is wired end to end; `readings: 0` so far. **THE WNBA PRODUCER WAS LAST
-  SEEN RUNNING ON live-odds-worker — the one service still dark — so the likeliest
-  source of the first reading is exactly the one not deployed.** Branch
-  `deploy/win-prob-null-live-odds-worker` is pushed but STALE; re-cut on the
-  then-live SHA.
+- **DEPLOYED 2026-08-16 TO ALL THREE:** refresh-worker `b2af0fac` (01:13:32Z,
+  since carried forward by another session's `3e1994a2` — verified BY CONTENT),
+  web `fa1871cf` (01:15:37Z), live-odds-worker `3573a0c3` (01:59:59Z).
+  `/api/ops/win-prob-null` answers **200** and reports
+  `reports_root=/opt/render/project/data/reports`, so the channel is wired end to
+  end. **`readings: 0` as of 02:0xZ — NOTHING ABOUT THE `or 0.5` FIX IS CONFIRMED
+  YET.** A live-odds-worker WNBA producer run was observed at 01:31:36Z, before
+  that service had the writer; the next one after its 01:59:59Z reboot is what
+  produces the first reading. live-odds-worker has NO idle window during live
+  hours (10 of 10 samples across 25 min had jobs running), so this deploy killed
+  ~3 in-flight jobs by design, not by accident.
 - **FIXED IN CODE, `b281bc7f`.** Both producers now also publish
   through `write_json_file` (per-service key under `reports_root()`, verified
   identical on all three services), readable at **`/api/ops/win-prob-null`**.

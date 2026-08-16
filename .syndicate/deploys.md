@@ -5124,7 +5124,25 @@ counter now also writes through `write_json_file`, read at `/api/ops/win-prob-nu
 |---|---|---|---|
 | refresh-worker | `b2af0fac` | 2026-08-16T01:13:32Z | producers + `win_prob_null_diag` |
 | web | `fa1871cf` | 2026-08-16T01:15:37Z | route + `win_prob_null_diag` |
-| live-odds-worker | — | **NOT DEPLOYED** | claim held by `clamp-fix-to-workers` (user-authorized), 3 jobs running |
+| live-odds-worker | `3573a0c3` | 2026-08-16T01:59:59Z | producers + `win_prob_null_diag` |
+
+**live-odds-worker landed on the SECOND attempt, and the wait was the finding.**
+Its claim freed at 01:26:48Z; a 25-minute watcher then found **no lull at all** —
+`refresh_odds_sources` + a rolling `build_soccer_artifacts` (belgian_pro,
+la_liga, mls, eredivisie, primeira, champio…) were running at every one of 10
+samples. There is no idle moment on this service during live hours, so "wait for
+a lull" is not a plan, it is a deferral. Deployed at 01:54:04Z into 3 running
+jobs, deliberately: those jobs re-run on the next cycle (this ledger already
+prices that at ~three soccer runs), whereas waiting risked the WNBA slate ending
+before the writer landed.
+- **The watcher also caught the thing that justified the whole deploy:** at
+  01:31:36Z `refresh_wnba_oddsapi_props.py` ran **on live-odds-worker** — the one
+  service still undeployed at that moment. That run wrote nothing. It is the
+  direct confirmation that this service, not refresh-worker, is where the first
+  reading has to come from.
+- **refresh-worker was redeployed over by another session mid-flight** (`b2af0fac`
+  → `3e1994a2`, 01:31:03Z). Checked BY CONTENT, not ancestry: `3e1994a2` still
+  carries `win_prob_null_diag.py` and the recorder call sites. Not stripped.
 
 Each branch was cut on **that service's own live SHA**, not on `main` (`main` is
 not a superset of the workers), and trimmed so no other lane's code rode along —
@@ -5139,14 +5157,13 @@ verification; "live" is a lease.
 channel is wired. **It confirms nothing about the `or 0.5` fix.** A route that
 answers is not a producer that reported.
 
-**OWED, and it will not arrive by itself:** a reading with `rows>0`. The WNBA
-producer was last observed running on **live-odds-worker — the one service that
-did not get this deploy** — so the likeliest source of the first reading is
-still dark. Next deployer of live-odds-worker should carry
-`deploy/win-prob-null-live-odds-worker` (re-cut on its then-live SHA; the pushed
-`3573a0c3` is already stale). The hourly `wnba-win-prob-counter-read` scheduled
-task now reads this endpoint and will report "writer not deployed" until then —
-that is a true statement, not a null result.
+**STILL OWED: a reading with `rows>0`.** All three services now carry it, and at
+02:0xZ the endpoint still returns `readings: 0` — live-odds-worker rebooted at
+01:59:59Z and its next producer run has not completed. **Nothing about the
+`or 0.5` fix is confirmed yet.** The hourly `wnba-win-prob-counter-read`
+scheduled task reads this endpoint and will report the first reading; a
+`rows>0, null=0` there is the first genuine confirmation, `null>0` is the branch
+firing correctly. Neither has happened.
 
 ## 2026-08-16 01:2xZ — RETRACTION: THE "25 LIVE GAME-LINE EDGES" ARE NOT CREDIBLE. TWO DEFECTS IN MY OWN GATE.
 
