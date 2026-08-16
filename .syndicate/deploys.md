@@ -8986,3 +8986,45 @@ triggered a deploy while 4 tests were failing. Caught it, cancelled
 `dep-da13pcjl550s73eou4rg` before it went live, established the 4 were
 pre-existing, and only then redeployed. The deploy should have been gated on the
 test exit code in the same shell.
+
+
+---
+
+## 2026-08-16 23:0xZ — LINE GATE **VERIFIED IN PRODUCTION**. Supersedes the retracted PASS.
+
+Artifact **2026-08-16T23:01:01Z**, worker `2ef1165a`, 22 cards. This time the
+population could actually test it:
+
+    tracked 11   MOVED-LINE 9   same-line 2
+    leaked price delta across a moved line : 0    (pre-fix 19 of 23)
+    coverage 100% (15/15)                          (baseline 31%)
+
+**Independently re-counted, not taken from my own harness** — which produced a
+false PASS on an empty set two hours earlier and is not yet trustworthy on its
+own word. Every one of the 9 moved-line rows:
+
+    Under totals      line 21.0  open  8.0   delta=None  basis=line_moved  line_delta +13.0
+    Rockies spreads   line -3.5  open  1.0   delta=None  basis=line_moved  line_delta  -4.5
+    SF Giants spreads line  5.5  open -1.5   delta=None  basis=line_moved  line_delta  +7.0
+    ... 6 more, all delta=None
+
+**And it does not over-suppress**, which is the other half of correct: the 2
+same-line rows still carry deltas — `+23.0` and `-1120.0`, both `same_book`.
+A gate that silenced everything would have looked identical on the leak check
+alone.
+
+The `Under totals 8.0 -> 21.0` row is the case in miniature: comparing prices
+across a 13-point total move is meaningless, and pre-fix it would have produced
+a large fabricated "movement".
+
+### STEAM IS STILL NOT VERIFIED, AND THE PASS DOES NOT COVER IT
+
+Only **2 rows** were eligible to fire steam (it needs a price delta, so
+same-line only), and both openings were outside the 3-hour window. `steam 0` here
+is correct behaviour, not evidence the detector works — a pregame opening five
+hours old moving to a live price is not steam, and the window rightly excludes
+it.
+
+**Status: line gate VERIFIED. Steam UNVERIFIED**, needing a same-line row that
+moves >=15 points within 3 hours of its opening. Scheduled re-run 2026-08-17
+09:00 CDT (`scripts/verify_movement_line_gate.py`).

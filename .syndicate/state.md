@@ -2353,10 +2353,11 @@ predicate change would move what counts as `live` board-wide. Owner needed.
   showed a FALSE STEAM flag (`Rockies spreads -1.5` vs an opening of `+1.0`).
   Price delta is now emitted only when the line is unchanged; when it moved, the
   line move IS the movement. Fix `3662d552`; worker `2ef1165a` LIVE 22:34:09Z and web `acdaaf7e`
-  LIVE 22:35:42Z. **THE GATE ITSELF IS UNVERIFIED IN PRODUCTION** — never
-  exercised against a moved-line row (a harness reported PASS on ZERO such
-  rows and was retracted, `12bba949`). Covered by 24 unit tests including the
-  exact false-steam case. Re-verify on a slate with live line movement.
+  LIVE 22:35:42Z. **THE GATE IS VERIFIED IN PRODUCTION** `[2026-08-16 23:01:01Z]` —
+  **9 moved-line rows, 0 leaked a price delta** (pre-fix 19 of 23), and the 2
+  same-line rows still priced, so it does not over-suppress. Independently
+  re-counted. **STEAM is still UNVERIFIED** — only 2 rows could fire it and both
+  openings were outside the 3h window.
 - **`_SCORE_SIM_WEIGHT` IS `0.0`, NOT `0.5`.** (`opportunity_signals.py:390`,
   deliberately zeroed and gated on S6.) **The board ranks on market EV and price
   shopping ALONE; the simulation contributes nothing to the ordering.** Measured

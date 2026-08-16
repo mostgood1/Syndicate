@@ -267,7 +267,7 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   someone actually forces a refresh.
 - Blocked by: none. No deploy from this lane tonight unless asked.
 
-### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction VERIFIED FIXED in production 23:01Z. Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
 - **`#446` SHIPPED AND MEASURED.** worker `bdb3dc58` live 22:09:54Z; artifact
   22:20:31Z: **coverage 31% -> 96%**, tracked rows 4 -> 23, first-ever steam
   flag. The diagnosis and the fix were both right.
@@ -520,6 +520,19 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   not the gate. Harness rebuilt with a minimum-denominator guard and falsified
   across INCONCLUSIVE / PASS / FAIL. **Re-verify on a slate with live line
   movement — realistically tomorrow.**
+- **LINE GATE VERIFIED IN PRODUCTION 2026-08-16 23:01:01Z** — supersedes both the
+  retracted empty-set PASS and the "UNVERIFIED" line above. **9 moved-line rows,
+  0 leaked a price delta** (pre-fix: 19 of 23 leaked). Coverage 100% (15/15).
+  Independently re-counted rather than taken from my own harness, which had
+  produced a false PASS two hours earlier.
+  - **It does not over-suppress**: the 2 same-line rows still carry deltas
+    (+23.0, -1120.0, both `same_book`). A gate that silenced everything would
+    look identical on the leak check alone.
+- **STEAM REMAINS UNVERIFIED and the gate PASS does not cover it.** Only 2 rows
+  were eligible (steam needs a price delta, so same-line only) and both openings
+  were outside the 3h window. `steam 0` is correct behaviour, not evidence.
+  Needs a same-line row moving >=15 pts within 3h of its opening.
+  Scheduled re-run 2026-08-17 09:00 CDT.
 ### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
 - **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
   - **`closing_detected_at` is present on 21 markets. The new code path ran.**
