@@ -174,6 +174,41 @@ def attach_wnba_game_projections(
                     "projected": entry.get("pred_margin"),
                     "basis": "margin_win_prob",
                     "source": "wnba_game_cards",
+                    # THE ONLY BRANCH HERE THAT SET NEITHER AN EDGE NOR A REASON.
+                    # `spreads` and `totals` below both state
+                    # `probability_unavailable_reason` and both get an
+                    # `edge_vs_line` from the block at the end of this loop --
+                    # which `market != "h2h"` deliberately excludes h2h from,
+                    # because a moneyline has no line to subtract. So h2h alone
+                    # served a projection with no edge of either contract and
+                    # nothing saying why.
+                    #
+                    # Caught by the 2026-08-16 falsification sweep AFTER the
+                    # matching fix shipped to `prop_projections`: MLB went
+                    # 284 -> 0 unattributed and these 3 rows did not move,
+                    # because THIS function writes `row["projection"]` directly
+                    # and never passes through `attach_projections`. A fourth
+                    # producer, exactly the shape `#329`'s notes warn about for
+                    # `fair_price` — a count of definitions is not a count of
+                    # producers, and the residual is what found it.
+                    "edge_vs_market_pct": None,
+                    # NOT priced, deliberately. Unlike spreads/totals the term
+                    # is not missing: these rows have a `model_prob_over` AND a
+                    # computable two-sided no-vig fair, so an edge is
+                    # arithmetically available. Measured 2026-08-16, Portland
+                    # Fire @ Phoenix Mercury: model 0.9673 against a market fair
+                    # of 0.6502 = +31.7 pp, on a projection whose own
+                    # `model_skill` reads `sample_games: 0, "model never
+                    # backtested"`. Publishing a 31-point moneyline edge off an
+                    # unvalidated margin model is the clamp failure mode --
+                    # a confident number from an input nobody has checked.
+                    # Turning this on is a modelling decision, not a plumbing
+                    # one, and it belongs with whoever validates the margin
+                    # model.
+                    "edge_unavailable_reason": (
+                        "this projection's producer does not compute a "
+                        "probability-space edge, so none was priced"
+                    ),
                 }
         elif market == "spreads":
             margin = entry.get("pred_margin")

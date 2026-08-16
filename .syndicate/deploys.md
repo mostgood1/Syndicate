@@ -6870,3 +6870,89 @@ rather than a merge. **"Live" is a lease; re-read it immediately before firing.*
 deploy that record could only appear on a first build. Absence of it proves
 nothing on its own — `--force-refresh` only fires on a lineup/injury trigger, so
 check that a forced run happened at all before reading a null as a failure.
+---
+
+## 2026-08-16 17:26Z + 17:40Z — lane `layer1-board-coverage` — TWO DEPLOYS, refresh-worker — FALSIFICATION TEST **PASS** ON THE SECOND
+
+**Service: `refresh-worker` (`srv-d91dpertqb8s73co8ls0`) only.** Web was NOT
+deployed and deploying it would have been INERT: `/api/board/layer1` is a pure
+read, and the `projection` field is written at artifact-build time by
+`run_refresh_worker.py:3140 -> build_book_grid_artifact -> attach_projections`.
+
+**NEITHER DEPLOY WAS CUT ON `main`, and that was load-bearing.** refresh-worker
+was live on `a775e372`, a deploy branch carrying **22 commits absent from
+`origin/main`** — another live session's `#441` diagnostic, `ed54071a`'s min()
+score guard restore, the clamp sites, Drop 3, the cadence work. Deploying `main`
+would have rolled every one of them back. Both deploys were cut on the LIVE SHA
+and the owning session was notified before the first.
+
+| deploy | commit | parent | live at |
+|---|---|---|---|
+| `dep-da0v2mflk1mc738rp8eg` | `01a4b83e` | `a775e372` (live SHA) | 17:26:25.559Z |
+| `dep-da0v9715efls73aiicpg` | `f88796a9` | `01a4b83e` (live SHA) | 17:40:50.831Z |
+
+Pre-deploy safety: all 15 MLB slate sims for 2026-08-16 already written, so no
+in-flight sim was killed. The `#441` diagnostic is print-on-run and carries no
+accumulated state, so the restart cost it only its next print.
+
+### THE TEST GATE — an artifact built BY the new code, not just a live deploy
+
+Both runs waited for `generated_at` to exceed the deploy's `finishedAt` on every
+sport before sweeping. First run: artifact 17:27:07Z > deploy 17:26:25Z. Second:
+mlb 17:41:35Z / wnba 17:41:43Z / soccer 17:41:57Z, all > 17:40:50Z. **Reading the
+pre-deploy artifact would have scored the old code and called it a result.**
+
+### RUN 1 — FAIL, and the failure is the useful part
+
+```
+mlb     RESIDUAL 0     (was 284)   attributed 1245
+wnba    RESIDUAL 3                 attributed 0      <-- FAIL
+soccer  RESIDUAL 0                 attributed 1176
+VERDICT: FAIL — 3 rows still serve a blank Edge with no reason
+```
+
+**MY PRE-DEPLOY VERIFICATION PROVED THE HELPER AND NOT THE CALL PATH.** The
+replay ran `_edge_unavailable_reason` directly over the 3 real WNBA rows and it
+returned the right string — so I recorded "287 of 287 attributed" and believed
+the population was covered. It was not: `wnba_game_projections.py:208` writes
+`row["projection"]` **directly** and never passes through
+`prop_projections.attach_projections`, so the shipped code could not reach those
+rows at all. A **fourth producer**, which is the shape the Layer 1 brief warned
+about for `fair_price` — *a count of definitions is not a count of producers* —
+and the residual is what found it, exactly as the test was written to.
+
+### RUN 2 — PASS
+
+```
+mlb     rows 3303  generated 17:41:35Z  RESIDUAL 0  attributed 1418
+wnba    rows  936  generated 17:41:43Z  RESIDUAL 0  attributed    3
+soccer  rows 6453  generated 17:41:57Z  RESIDUAL 0  attributed 1176
+--------------------------------------------------------------------
+rows swept 10,692   RESIDUAL 0 (expected 0)   attributed 2,597
+VERDICT: PASS — no silent blank Edge remains on any in-season sport
+```
+
+### REGRESSION CHECK — no edge was created or removed
+
+```
+mlb     projected 2285   with edge 867   37.9%
+wnba    projected  329   with edge 326   99.1%
+soccer  projected 1704   with edge 528   31.0%
+```
+
+**MLB's edged count fell 1,462 (16:19Z) -> 867 and that is NOT this change.**
+`by_state` went `{live 1, pregame 14}` -> `{live 8, pregame 7}` over the same
+window; the live-edge policy withholds pregame-derived edges on live games, and
+`"game is live: a pregame projection cannot be priced against a live market"`
+rose 65 -> 697 to match. Stated because the raw number looks like a regression
+and is not — re-read it against a pregame slate before drawing any conclusion.
+
+### Rollback, if ever needed
+Redeploy `a775e372` on `srv-d91dpertqb8s73co8ls0` (reverts both).
+Branch `deploy/layer1-edge-attribution` on origin holds both commits.
+
+### Still true, and unchanged by this
+No edge was added. The 1,416 rows carrying BOTH a `model_prob_over` and a
+`modelled_fair.*.fair_probability` still serve no edge — that remains a user
+decision, not a defect. The 3 WNBA rows now say why rather than being blank; one
+of them would read +31.7 pp against a model with `sample_games: 0`.

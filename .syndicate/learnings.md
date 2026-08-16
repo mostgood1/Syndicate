@@ -2450,3 +2450,50 @@ CORRECT.
 uniform too. Before believing a 100%-consistent finding, ask what the join key
 would do if two rows could both match it. Prefer a key that cannot collide
 (here: the prices, which the row already carried).
+
+### 2026-08-16 — I REPLAYED THE HELPER OVER REAL PRODUCTION ROWS, CALLED IT VERIFIED, AND SHIPPED A FIX THAT COULD NOT REACH 3 OF THEM. A replay proves the FUNCTION; only the call path proves the FIX
+
+**What happened.** To verify an edge-attribution fix before deploying, I fetched
+the real served payloads, filtered to the exact rows that were serving a blank
+`Edge` with no reason, and ran the changed helper over them. Result: **287 of
+287 attributed, 0 unattributed.** I wrote that into `deploys.md` as the
+verification and deployed.
+
+The post-deploy falsification sweep returned **FAIL: 3 rows unattributed** — the
+same 3 my replay had "proved" were covered. `wnba_game_projections.py:208`
+writes `row["projection"]` directly and never calls the function I fixed. The
+helper handled those rows correctly and was never invoked on them.
+
+**Why the replay was structurally incapable of catching it.** I supplied the
+inputs myself. `_edge_unavailable_reason(row, model_prob=..., fair=...)` called
+with hand-passed arguments answers "given these inputs, what does this function
+return" — a question about the function. The question that mattered was "does
+production ever call this function with this row", which the replay never asked
+and could not. **Feeding real data to a function is not the same as
+demonstrating that the real path feeds it.** The realism of the *inputs* made
+the test feel like an integration test while it stayed a unit test.
+
+This is the standing `presence is not reachability` rule, and I had it in front
+of me — I even wrote "trace the user-visible field backwards to its writers" in
+this lane's own notes about `fair_price` having four producers. I then verified
+forwards from the function I had chosen.
+
+**The rule going forward.**
+
+1. **Before verifying a fix, enumerate the WRITERS of the user-visible field,
+   not the callers of your function.** Grep the field name (`row["projection"]
+   =`, `projection[...] =`), not the module. A producer that assigns the field
+   directly never imports your code and cannot be found from your side.
+2. **A replay that you supply the arguments to is a unit test with production
+   fixtures.** To make it an integration check, it must enter through the same
+   entrypoint production uses — or it must assert on the SERVED payload after
+   the code runs, which is what the falsification sweep did and why it worked.
+3. **Count the population BEFORE and AFTER at the same place.** My "287 of 287"
+   and the sweep's "3 remaining" are not contradictory — they measured different
+   things. Only the second was measured where the user reads it.
+4. **This is why the falsification test was written as a RESIDUAL and not as
+   "the reason string appears".** The string appeared on 287 rows in replay and
+   on 1,245 rows in production while 3 were still silent. A presence check would
+   have passed both times. **The pre-registered residual is the only reason this
+   was caught rather than shipped as done** — keep writing acceptance criteria
+   as "count of things still wrong, expected 0".
