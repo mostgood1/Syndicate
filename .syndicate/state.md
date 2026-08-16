@@ -233,22 +233,9 @@ INTENDED state is an open question with the memory lane; merging the worker
 lineage into main conflicts in **30 hunks across 6 files** of two other lanes'
 live code.
 
-**Repo state `[measured 08-16 01:0xZ]`:** the shared tree is **4 ahead / 212
-behind** `origin/main`, and **all four are already upstream by patch-id** -- so
-0 genuinely unpushed. **6 non-data files genuinely differ**; the other ~69 that
-`git status` reports are CRLF-only and byte-identical. **Do not quote the raw
-`git status` count** -- it overstated the real exposure by more than half all
-evening and was written into this ledger twice before anyone diffed content.
-
-**LEDGER HYGIENE `[08-16]`:** `lanes.md` 310KB -> **109KB, now under budget**
-(19 closed lanes archived to `lanes_closed.md`, moved by STATUS with an
-`OPEN|BLOCKED` exclusion so "DEPLOYED, MEASUREMENT OPEN" stays live; 35 slugs
-before, 0 lost). `state.md` collapsed twice in one session -- 40KB -> 113KB in
-five hours -> 98KB -- because the first pass fixed the size and not the habit.
-`learnings.md` 215KB -> 163KB, **145 rules intact**, 41 compacted to their rule
-bullet with evidence in `learnings_evidence.md`. **28 prose-form entries were
-left INTACT deliberately**: their rule sits mid-paragraph, and an extractor that
-guessed would keep the evidence and drop the rule.
+**Repo state `[measured 08-15 20:3xZ]`:** the shared tree is **13 AHEAD / 151
+BEHIND** `origin/main`. Being behind is a read-your-own-staleness problem; being
+ahead is a **lost-work** problem. `git fetch` and read `origin/main` for lineage.
 
 **THE DIVERGENCE RECURS ON A TIMESCALE OF HOURS AND IS STRUCTURAL, NOT A LAPSE.**
 Reconciled at 17:0xZ as `6822d539` — local `main` was 33 ahead / 136 behind with
