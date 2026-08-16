@@ -218,6 +218,27 @@ people learn to route around. Run the gate, read it, then deploy.
 
 ### PENDING
 
+- [ ] **RIDEALONG, NOT A DEPLOY OF ITS OWN — `734c163e` on `origin/main`: the
+      props-snapshot `force_refresh` escape.** Whoever next deploys **either
+      worker**, cherry-pick it onto that service's live SHA and it comes along.
+      **Web needs nothing** — these exporters are producer-side only.
+      - Live when written: refresh-worker `a775e372` (16:59:48Z),
+        live-odds-worker `dd53d47c` (05:20:39Z), web `ebd5f677`.
+      - **NOT INERT ON WNBA, AND THAT IS THE POINT.** `live_refresh_loop` passes
+        `--force-refresh` on every lineup/injury trigger, so after this lands
+        `cards_props_snapshot_<date>.json` REBUILDS on those triggers instead of
+        re-serving the first file written for that date. Cost is one more artifact
+        build of the same class its two siblings already do under force — expect
+        it, do not read it as a regression. NBA is out of season, so its half is
+        inert until the sport returns.
+      - Falsification if someone doubts it landed: on the deployed service,
+        `_export_cards_props_snapshot` must show `force_refresh` in its signature.
+        Check BY CONTENT — ancestry lies here, the workers run deploy branches.
+      - Why it matters: that exporter's builder is the one that produced the
+        `rows=32/null=3` win_prob reading, so it is the artifact whose staleness
+        was least visible, and it was the only one of the trio that could not be
+        forced.
+
 - [ ] Internal-hostname cutover — expected effect, window, and rollback
       to be written by `/preflight` **before** it goes out.
       NOTE 2026-08-13: `state.md` and `lanes.md` both record this as CLOSED
