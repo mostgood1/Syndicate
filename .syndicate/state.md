@@ -2329,6 +2329,18 @@ predicate change would move what counts as `live` board-wide. Owner needed.
   MLB (15/15) and WNBA (3/3) were clean — so the multi-day case is invisible
   until a week-keyed sport reaches the consumer. Any consumer must filter by
   CENTRAL date itself. `[measured 08-16]`
+- **MOVEMENT/STEAM COVERAGE IS 96%, UP FROM 31%, AND THE KEY IS WHY** `[measured
+  2026-08-16 22:20:31Z]`. `clv_opening_ledger._opening_key` includes `line` and
+  `bookmaker`; joining movement on it meant only UNMOVED rows could match their
+  own opening. Movement now uses `layer2_board.movement_join_key` (event ·
+  market · player · segment · side). `_opening_key` is UNCHANGED and still
+  correct for settlement.
+- **A LOOSE JOIN KEY MADE ROWS VISIBLE, NOT COMPARABLE** `[measured 22:20:31Z]`.
+  19 of 23 tracked rows had a different opening line, and the board briefly
+  showed a FALSE STEAM flag (`Rockies spreads -1.5` vs an opening of `+1.0`).
+  Price delta is now emitted only when the line is unchanged; when it moved, the
+  line move IS the movement. Fix `3662d552`, worker `2ef1165a` — **live state
+  UNVERIFIED at checkpoint time.**
 - **`_SCORE_SIM_WEIGHT` IS `0.0`, NOT `0.5`.** (`opportunity_signals.py:390`,
   deliberately zeroed and gated on S6.) **The board ranks on market EV and price
   shopping ALONE; the simulation contributes nothing to the ordering.** Measured

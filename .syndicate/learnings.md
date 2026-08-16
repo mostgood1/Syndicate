@@ -3103,3 +3103,47 @@ been overwritten by the next run of the same script.
 artifact in the same push as the row — or write the numbers inline and say the
 file is local-only.** Do not name a path you have not made durable. Fixed for
 the two rows I wrote; the other 13 are pre-existing and flagged in the log.
+
+## 2026-08-16 - FORBIDDEN: a loose join key makes a row VISIBLE. It does not make the row's values COMPARABLE. Those are two decisions and I made only one.
+
+`#446` correctly dropped `line` and `bookmaker` from the movement join key,
+because keying a change metric on the changing fields means only unmoved rows can
+match. Coverage went **31% -> 96%** and the diagnosis was right.
+
+But I then differenced PRICES across the rows the loose key had newly matched.
+Measured on the first post-deploy artifact (22:20:31Z): **19 of 23 tracked rows
+had a different opening line**, so their "movement" was the gap between two
+different bets --
+
+    Under totals    line  7.0   opening 11.0   "+242"
+    Rockies spreads line -1.5   opening  +1.0  "+226"  -> FIRED STEAM
+
+**The first steam this board ever produced was a false positive, and it was live
+for ~15 minutes.** `_opening_key`'s docstring had already said "home -1.5 and
+home -2.5 are different markets"; I read it as an argument about settlement and
+did not notice it constrained me.
+
+**The rule:** widening a join to see more rows and comparing values on those rows
+are separate decisions. After loosening a key, ask of every derived quantity:
+*is this still comparing like with like?* Here the answer was yes for the LINE
+delta and no for the PRICE delta.
+
+**And the fix's shape matters:** when the line moved, no `movement_price_delta`
+is emitted **at all** rather than a value with a caveat in a neighbouring key.
+The score and the steam detector both read that field; a caveat stops neither.
+
+## 2026-08-16 - a test I wrote can encode the belief that production later disproves, and then it defends the bug.
+
+Two tests written at 21:4xZ asserted a -27 point price delta across a line that
+moved -1.5 -> -2.5, and a steam flag on the strength of it. Both passed. Both
+were **wrong in exactly the way production proved an hour later** -- that delta
+compares different bets.
+
+When the gate landed, those two tests failed. The instinct a failing test creates
+is "the change broke something"; here the change had **fixed** something and the
+tests were the residue of the wrong belief.
+
+**The rule:** when a fix makes your own tests fail, check whether the test
+encodes an assumption the fix is correcting before you touch either. Rewrite the
+test and say WHY in its docstring, so the next reader sees the fixture changed
+because reality did -- not because it was inconvenient.

@@ -267,7 +267,30 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   someone actually forces a refresh.
 - Blocked by: none. No deploy from this lane tonight unless asked.
 
-### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` FOUND AND FIXED: movement was keyed on the thing it measures, which ALSO structurally suppressed steam. Key fix + compat guard are on main and on NO service — handed to `sim-engine-track` as a ridealong.** — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+- **`#446` SHIPPED AND MEASURED.** worker `bdb3dc58` live 22:09:54Z; artifact
+  22:20:31Z: **coverage 31% -> 96%**, tracked rows 4 -> 23, first-ever steam
+  flag. The diagnosis and the fix were both right.
+- **THEN THE OVER-CORRECTION, found by not believing two numbers.** 19 of 23
+  tracked rows compared prices at DIFFERENT lines (`Under totals 7.0` vs an
+  opening of 11.0 -> "+242"), and **the one steam flag was FALSE** (`Rockies
+  spreads -1.5` vs opening `+1.0`). A loose key makes a row VISIBLE; it does not
+  make its price COMPARABLE. `_opening_key`'s docstring had said so and I read
+  it as being about settlement.
+  - The 1636-pt delta in that same reading was **NOT** a bug: a pregame +109
+    underdog live at ~-1527. Checked before assuming.
+- **RE-GATED `3662d552`** — price delta only when the line is unchanged; nothing
+  emitted otherwise, because score and steam both read that field. Deployed
+  worker `2ef1165a` + web `acdaaf7e` (endpoint counters, 4th instance of that
+  gap).
+- **UNVERIFIED AT CHECKPOINT: the gate itself.** Both deploys were
+  `update_in_progress`. Verification harness armed (`brey4hlgd`) and **proven to
+  discriminate** — against the pre-fix board it fires on both signatures (17
+  leaked deltas, 1 false steam). PASS requires both at 0 and coverage READ from
+  the counters rather than derived.
+- **NEXT ACTION:** read that harness's verdict. If it says FAIL, roll worker back
+  to `bdb3dc58` (coverage win without the gate) rather than to `a9e5d3d6`.
+
 - **`#446` — MOVEMENT WAS KEYED ON THE THING IT MEASURES.** Found by chasing a
   number that went the WRONG WAY against my own prediction (opening coverage
   31% -> 29% when I said it would rise). `_opening_key` includes `line` and
