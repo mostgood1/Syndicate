@@ -1599,3 +1599,48 @@ nothing here). This is the same shape one level up: I checked the artifact of an
 - How we found out: counted headers per slug and re-ran the hook's own grep
   after resolving, instead of trusting that no conflict markers meant no defect.
 - Cost: caught pre-push; the second-order bug was live for about a minute.
+
+### 2026-08-16 — A RECORDER GATED ON THE PUBLISH DECISION CANNOT EVALUATE THE PUBLISHER
+
+The live game-line ledger was built to make CLV computable on live edges. It
+recorded only rows the board judged `priceable` — i.e. rows whose edge cleared
+the estimator's own 2σ noise bar at 120 sims. Measured on the first live slate it
+ever saw (2026-08-16 03:00Z, 2 games live):
+
+    considered 8   projected 2   priceable 0   ->   ledger candidates 0
+
+**The file could not have a row in it.** Not because of a bug — every component
+did exactly what it was written to do — but because the recorder's population was
+defined by the decision the recording exists to audit. A ledger that only keeps
+what the publisher published can answer "did the published tail beat the close"
+and can never answer "should we have published it", which is the question.
+
+**The second half is worse than the first: the filter's justification was a
+guess, and the guess was wrong by three orders of magnitude.** The docstring
+refused non-priceable rows because "recording thousands of refusals per build
+would bury the handful of rows CLV can actually score." The entire live
+game-line population is **8 rows per build**. There were never thousands. A
+volume argument was used to make a selection decision, and nobody had counted.
+
+**How to apply.**
+- **When you gate what gets recorded, the gate must not be the thing under
+  evaluation.** Keep the decision as a FIELD (`priceable`, `withheld_reason`) so
+  the restricted question stays askable, and record the population. A field costs
+  bytes; a filter costs the denominator, and the denominator is the measurement.
+- **Count before you filter for volume.** "That would be too many rows" is a
+  measurable claim about a population that already exists in production. Reading
+  one artifact settles it. This one was wrong by 1000x and it silently emptied
+  the file for a full slate.
+- **A recorder that has never recorded is not "wired and waiting."** `written: 0`
+  with `enabled: true` was recorded as proving the wiring. It equally described a
+  recorder that structurally could not fire, and the two were never separated
+  until someone read `candidates`. **Before a scheduled check, ask what a zero
+  from it would mean — if it means the same thing whether the system works or
+  not, the check is not a test.**
+- Version the record shape when the POPULATION changes, not just the fields
+  (`LEDGER_VERSION` 1 → 2 here). A rate computed across both populations is a
+  rate over two different denominators, and nothing in the file's own data says
+  where one ends.
+
+Related: [[a rate, not a count]] — same family, one step earlier: this is a
+counter with no denominator *by construction* rather than by omission.
