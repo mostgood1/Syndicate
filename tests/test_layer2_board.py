@@ -33,7 +33,15 @@ def _row(**overrides):
         "books_quoting": 11,
         "game": {"state": "pregame", "status_token": "7:15P CT"},
         "best": {
-            "over": {"price": -110, "bookmaker": "betopenly", "age_seconds": 52.0, "books_quoting": 9},
+            # REAL book slugs, because the board now restricts its recommended
+            # price to books the operator can actually bet
+            # (`book_shortlist.DEFAULT_BOOKS`). This fixture used "betopenly"
+            # and "dk"; the first is a real book that is NOT on the list and the
+            # second is not a slug at all, so both sides were dropped and seven
+            # tests failed for a reason that had nothing to do with what they
+            # assert. Two DIFFERENT bettable books, which is what the fixture
+            # was always trying to express.
+            "over": {"price": -110, "bookmaker": "draftkings", "age_seconds": 52.0, "books_quoting": 9},
             "under": {"price": -105, "bookmaker": "betmgm", "age_seconds": 60.0, "books_quoting": 9},
         },
     }
@@ -64,7 +72,7 @@ def test_dead_market_is_never_ranked():
 
 
 def test_unpriced_side_is_skipped_not_zero_filled():
-    row = _row(best={"over": {"price": -110, "bookmaker": "b", "age_seconds": 10.0}, "under": {}})
+    row = _row(best={"over": {"price": -110, "bookmaker": "betmgm", "age_seconds": 10.0}, "under": {}})
     result = build_layer2_rows([row])
     assert result["sides_priced"] == 1
 
@@ -72,7 +80,7 @@ def test_unpriced_side_is_skipped_not_zero_filled():
 def test_one_sided_row_falls_back_to_the_margin_model_and_says_so():
     row = _row(
         sides=["over"],
-        best={"over": {"price": 450, "bookmaker": "dk", "age_seconds": 20.0, "books_quoting": 11}},
+        best={"over": {"price": 450, "bookmaker": "draftkings", "age_seconds": 20.0, "books_quoting": 11}},
         modelled_fair={"over": {"fair_probability": 0.2}},
     )
     result = build_layer2_rows([row])
@@ -111,7 +119,7 @@ def test_rows_without_a_value_term_are_excluded_not_zeroed():
     row would rank it above genuinely negative ones."""
     row = _row(
         sides=["over"],
-        best={"over": {"price": 120, "bookmaker": "dk", "age_seconds": 15.0}},
+        best={"over": {"price": 120, "bookmaker": "draftkings", "age_seconds": 15.0}},
     )
     result = build_layer2_rows([row])
     assert result["opportunities"] == []
@@ -138,15 +146,15 @@ def test_ranked_best_first():
     strong = _row(
         event_id="strong",
         best={
-            "over": {"price": -105, "bookmaker": "dk", "age_seconds": 15.0, "books_quoting": 9},
-            "under": {"price": -105, "bookmaker": "dk", "age_seconds": 15.0, "books_quoting": 9},
+            "over": {"price": -105, "bookmaker": "draftkings", "age_seconds": 15.0, "books_quoting": 9},
+            "under": {"price": -105, "bookmaker": "draftkings", "age_seconds": 15.0, "books_quoting": 9},
         },
     )
     weak = _row(
         event_id="weak",
         best={
-            "over": {"price": -130, "bookmaker": "dk", "age_seconds": 15.0, "books_quoting": 9},
-            "under": {"price": -130, "bookmaker": "dk", "age_seconds": 15.0, "books_quoting": 9},
+            "over": {"price": -130, "bookmaker": "draftkings", "age_seconds": 15.0, "books_quoting": 9},
+            "under": {"price": -130, "bookmaker": "draftkings", "age_seconds": 15.0, "books_quoting": 9},
         },
     )
     result = build_layer2_rows([weak, strong])

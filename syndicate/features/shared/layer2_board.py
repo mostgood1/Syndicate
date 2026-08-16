@@ -27,9 +27,17 @@ one side at a time, because that is the thing you can actually place. So each
 grid row fans out to at most one candidate per side.
 
 WHAT IS NOT SOLVED HERE, stated so nobody reads a ranked board as a validated
-one: `_SCORE_SIM_WEIGHT = 0.5` is a stated prior nobody has measured, and
-`settled: 0` means it has never been checked against outcomes. This makes the
-board *flow* and be *correct*; S6 is what would make it *proven*.
+one: **`_SCORE_SIM_WEIGHT` is 0.0**, so this board ranks on market EV and price
+shopping ALONE and the simulation contributes nothing to the ordering. It was
+deliberately zeroed (see the comment block at `opportunity_signals.py:352-390`)
+because the sim term dominated while `settled: 0` meant nobody had ever checked
+it against outcomes. Raising it is gated on S6, not on taste.
+
+**This line said `0.5` until 2026-08-16 and the constant had been 0.0 for some
+time.** A session brief and an audit both inherited `0.5` from here and built on
+it. Measured on the served shortlist 2026-08-16T16:20:21Z: 65 of 108 rows carry
+`model_edge_pct`, and `sim_component` is non-zero on **0** of them. If you change
+that constant, change this line in the same commit.
 
 INTEGRATION (not yet wired — deliberately):
     `_build_candidate_pool` in `pipeline/intelligence_state.py` is where these
@@ -47,7 +55,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping
 
-from syndicate.features.shared import opportunity_gate
+from syndicate.features.shared import book_shortlist, opportunity_gate
 from syndicate.features.shared.book_margin_model import market_family as _market_family
 from syndicate.features.shared.opportunity_signals import (
     american_price,
@@ -820,6 +828,14 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
     rows_in = 0
     sides_priced = 0
     scored = 0
+    # `#444`. BOTH halves of the book restriction, because either alone is
+    # ambiguous: `no_bettable_book` is what the filter REMOVED, and
+    # `repriced_to_bettable` is what it MOVED to a worse price. Reporting only
+    # the first makes a repriced board look untouched; reporting only the second
+    # makes a shrinking board look like a thin slate. Same contract every other
+    # selection rule in this module already follows.
+    no_bettable_book = 0
+    repriced_to_bettable = 0
 
     for row in grid:
         rows_in += 1
@@ -837,9 +853,73 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
                 continue
             sides_priced += 1
             fair = fair_by_side.get(side)
+
+            # `#444`: RECOMMEND ONLY A PRICE THE OPERATOR CAN ACTUALLY TAKE.
+            #
+            # The grid's `best` is the best of ~36 books. Measured on the served
+            # shortlist 2026-08-16T16:20:21Z, that put **27 of 108** rows on a
+            # book outside the operator's list (betopenly 16, betfair_ex_eu 9,
+            # betsson 2) -- a recommendation nobody can place.
+            #
+            # Re-selected HERE, before `quote` and before `ev`, because EV is
+            # computed against this price and settlement grades against it. A
+            # filter applied after scoring would rank on a price it then did not
+            # recommend -- the same class of defect as `#364`'s unit mismatch:
+            # two numbers that have to be the same number.
+            #
+            # A row with no bettable book is DROPPED, not repriced. 9 of those
+            # 27 were `h2h_lay` quoted only by `betfair_ex_eu` + `matchbook`;
+            # there is no fallback price for them, and inventing one from an
+            # unbettable book is exactly what this removes.
+            side_prices = {
+                str(book): cell[side]["price"]
+                for book, cell in (row.get("cells") or {}).items()
+                if isinstance(cell, Mapping)
+                and isinstance(cell.get(side), Mapping)
+                and cell[side].get("price") is not None
+            }
+            # FALL BACK TO THE BEST QUOTE'S OWN BOOK WHEN THERE ARE NO CELLS.
+            #
+            # `cells` is always populated by `build_book_grid`, but this function
+            # is also called on hand-built rows, and reading the restriction
+            # ONLY from cells meant a row with no cells lost its price entirely
+            # -- the filter deleted rows it had no evidence against. Caught by
+            # 8 existing tests whose fixtures carry `best` but no `cells`, which
+            # is exactly the shape that would have been silently dropped in any
+            # caller that builds rows the same way.
+            #
+            # The rule stated once: judge the books WE CAN SEE. Cells when we
+            # have them, otherwise the single book on `best`.
+            if not side_prices:
+                fallback_book = side_best.get("bookmaker")
+                if fallback_book is not None:
+                    side_prices = {str(fallback_book): price}
+            bettable = book_shortlist.best_bettable(side_prices)
+            if bettable is None:
+                # No book we can see is bettable. `side_prices` empty means we
+                # could see NO book at all -- absent evidence, not evidence of
+                # absence -- so the row is kept at its original price rather
+                # than dropped on a fact we never established.
+                if side_prices:
+                    no_bettable_book += 1
+                    continue
+                bettable_book = str(side_best.get("bookmaker") or "") or None
+            else:
+                bettable_book, bettable_price = bettable
+                if bettable_price != price or str(side_best.get("bookmaker") or "") != bettable_book:
+                    repriced_to_bettable += 1
+                price = bettable_price
+
             quote = {
                 "price": price,
-                "bookmaker": side_best.get("bookmaker"),
+                "bookmaker": bettable_book,
+                # The unrestricted best, kept so the COST of the restriction is
+                # readable rather than inferred. A filter that silently changes
+                # the headline price is a filter nobody can audit.
+                "best_any_book": {
+                    "bookmaker": side_best.get("bookmaker"),
+                    "price": side_best.get("price"),
+                },
                 "book_age_seconds": side_best.get("age_seconds"),
                 # Time since we last LOOKED, as opposed to `book_age_seconds`'
                 # time since the price last MOVED. None when the date's quote
@@ -996,6 +1076,9 @@ def build_layer2_rows(grid: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "scored": scored,
         "opportunities": opportunities,
         "by_lane": lanes,
+        "no_bettable_book": no_bettable_book,
+        "repriced_to_bettable": repriced_to_bettable,
+        "bettable_books": list(book_shortlist.DEFAULT_BOOKS),
     }
 
 
@@ -1026,6 +1109,19 @@ def _score_of(row: Mapping[str, Any]) -> float:
 SHORTLIST_HORIZON_DAYS = 1
 
 
+# Markets where `side` names the team you are betting AGAINST, not for.
+#
+# `h2h_lay` is the exchange lay price (Betfair, Matchbook): laying the home side
+# wins if the home side does NOT win. `side` still reads "home", so every
+# team-name lookup in this module resolves it to the home team's name.
+_LAY_MARKETS = ("_lay",)
+
+
+def _is_lay_market(market: Any) -> bool:
+    text = str(market or "").strip().lower()
+    return any(token in text for token in _LAY_MARKETS)
+
+
 def _pick_label(row: Mapping[str, Any]) -> str:
     """What the bettor is actually taking, as one readable string.
 
@@ -1034,16 +1130,47 @@ def _pick_label(row: Mapping[str, Any]) -> str:
     selection -> pick -> name -> player_name and defaults to the literal string
     "candidate", so a game row with no player name would render as "candidate"
     on every line without this.
+
+    **A LAY MARKET IS A BET AGAINST THE NAMED TEAM AND MUST SAY SO.** Measured
+    on the served board 2026-08-16: 9 `h2h_lay` rows rendered as a bare team
+    name -- "Los Angeles Dodgers" for a bet that WINS WHEN THE DODGERS LOSE,
+    typeset identically to a back bet on them. That is the single most dangerous
+    string this function can emit, because it is not vague, it is inverted: a
+    reader who acts on it takes the opposite of the intended position. `side`
+    carries no hint (it still reads "home"), so the market key is the only
+    signal, and it is checked here rather than at one call site because
+    `display_name` and the `team` column read the same answer.
     """
     player = str(row.get("player_name") or "").strip()
     if player:
         return player
     side = str(row.get("side") or "").strip().lower()
+    team = ""
     if side == "home":
-        return str(row.get("home_team") or "Home").strip()
+        team = str(row.get("home_team") or "Home").strip()
+    elif side == "away":
+        team = str(row.get("away_team") or "Away").strip()
+    if not team:
+        return side.title() or "—"
+    if _is_lay_market(row.get("market")):
+        return f"LAY {team} (wins if {team} does not)"
+    return team
+
+
+def _row_team(row: Mapping[str, Any], home: str, away: str) -> str | None:
+    """The team this row is ABOUT, or None when the row does not name one.
+
+    Only `home`/`away` sides identify a team. `over`/`under` (props, totals) do
+    not: the side names a direction, and for a prop the relevant team is the
+    PLAYER's, which this row does not carry. None rather than a guess -- see the
+    call site for what guessing cost.
+    """
+    side = str(row.get("side") or "").strip().lower()
+    if side == "home":
+        return home or None
     if side == "away":
-        return str(row.get("away_team") or "Away").strip()
-    return side.title() or "—"
+        return away or None
+    return None
 
 
 def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -1120,7 +1247,20 @@ def layer2_rows_to_board_cards(rows: Iterable[Mapping[str, Any]]) -> list[dict[s
                 # shortlist's own floors (`min_value_pct`) are expressed against
                 # it. Only the alias that feeds the card is converted.
                 "edge": (_as_float(row.get("ev_pct")) / 100.0) if _as_float(row.get("ev_pct")) is not None else None,
-                "team": home if str(row.get("side") or "").lower() == "home" else away,
+                # WHOSE ROW THIS IS. `home if side == "home" else away` was
+                # wrong for every prop on the board: a prop's side is
+                # `over`/`under`, never `home`, so the expression fell to `away`
+                # unconditionally -- **56 of 108 served cards** on 2026-08-16,
+                # correct only by coincidence when the player happened to be on
+                # the away team. Andy Pages (Los Angeles Dodgers, the HOME team)
+                # was served as `"team": "Milwaukee Brewers"`, and
+                # `intelligence.html:525` reads this field first.
+                #
+                # A player's team is not derivable from `side`, and it is not
+                # carried on the row. So: resolve it for the sides that DO name
+                # a team, and leave it absent otherwise. An absent team renders
+                # blank; a wrong one puts a real player on a real opposing team.
+                "team": _row_team(row, home, away),
                 "home_team": home,
                 "away_team": away,
                 "matchup": f"{away} @ {home}" if home and away else "",
@@ -1416,6 +1556,29 @@ def _layer2_board_columns(
     confidence = _as_float(score.get("book_confidence"))
     if confidence is not None:
         columns["confidence"] = confidence
+
+    # `#445`: SAY WHEN OUR OWN SIM DISAGREES WITH THE BET WE ARE SHOWING.
+    #
+    # Measured on the served board 2026-08-16: **32 of 108** rows carried a
+    # NEGATIVE `model_edge_pct` -- the projection says this side is worse than
+    # the market price implies -- and nothing on the card said so. A further 43
+    # carried no model at all, which is a DIFFERENT state and must not render
+    # the same way: "the sim dissents" and "the sim has no view" need different
+    # fixes and different words.
+    #
+    # LABELLED, NOT SUPPRESSED, by decision 2026-08-16. Suppressing would let a
+    # model with `settled: 0` veto rows on EV grounds it has not earned --
+    # `_SCORE_SIM_WEIGHT` is 0.0 for exactly that reason, and a filter would be
+    # a weight of -infinity smuggled in as a rule. The EV is real even where the
+    # sim dissents; the reader is told and decides.
+    model_edge = _as_float(row.get("model_edge_pct"))
+    if model_edge is None:
+        columns["sim_view"] = "none"
+    elif model_edge < 0:
+        columns["sim_view"] = "disagrees"
+        columns["sim_disagreement_pct"] = round(model_edge, 4)
+    else:
+        columns["sim_view"] = "agrees"
 
     composite = _as_float(score.get("score"))
     if composite is not None:
