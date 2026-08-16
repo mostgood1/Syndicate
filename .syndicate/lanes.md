@@ -2421,7 +2421,7 @@ and then failed the thing it was checking, which is the point of running it.
 - Full measurement in `deploys.md`; unrelated defect found while measuring
   Phase 2's premise is filed as `#441` (NFL week-1 projection unwritten 2.36 days,
   relaunching ~107x/day).
-### nfl-pbp-root-resolution — OPEN — opened 2026-08-16 — session: sim-engine-track
+### nfl-pbp-root-resolution — OPEN — **HYPOTHESIS FALSIFIED IN PRODUCTION. The fix shipped (`97491161`, live 15:45:50Z) and `#441` is NOT fixed: the pbp is absent from EVERY root. The change is correct and stays; it was not the cause.** — opened 2026-08-16 — session: sim-engine-track
 - Goal: `#441`. The NFL SmartSim2 projection writes again, because the pbp READ
   path resolves to the mounted disk instead of the ephemeral repo checkout.
 - Files (exclusive to this lane): `syndicate/features/nfl/sources.py`,
@@ -2458,6 +2458,26 @@ and then failed the thing it was checking, which is the point of running it.
   `smartsim2_projections_2026_wk1.csv` appears with a fresh mtime and
   NON-IDENTICAL rows per game (identical rows would mean the guard was bypassed
   rather than satisfied).
+#### FALSIFIED 2026-08-16 15:53:28Z — the lane's own falsification test fired
+- This lane wrote the test before shipping: *"if the pbp is ALSO absent from the
+  mounted disk, root selection is a red herring."* It is, and it was.
+- `DegenerateProjectionRun` raised again 8 minutes after go-live, with the same
+  `looked for` path as before the fix.
+- **THE LOG WAS AMBIGUOUS BY CONSTRUCTION** — the resolver's not-found fallback is
+  `default_nfl_source_root()`, i.e. the same checkout path the old code printed.
+  "Not deployed" and "ran and found nothing" are indistinguishable in the log.
+  Settled by CONTENT: `97491161` carries `nfl_pbp_path` (1) and the generator's
+  delegation (1), and refresh-worker is live on it.
+- **v3 root cause:** the pbp is gone from every root; ten scripts reference it,
+  all reads, zero writes; no nflverse fetcher exists for play-by-play. It was
+  present 2026-08-13 (`verify_nfl_autorun_obligations.py:25`, real ratings on
+  16/16 games), which matches the 2.79-day staleness.
+- **Lane goal NOT met.** The change is kept — it removes a real latent
+  misresolution and is inert when the file is absent — but it must not be
+  recorded as fixing `#441`.
+- Handover: find what REMOVED the file and how it is meant to arrive. That is not
+  a code fix and not this lane's scope; `#441` carries the next step.
+
 ### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
 ### refresh-worker-oom-recurrence — OPEN — **MECHANISM SETTLED, ALLOCATOR STILL UNNAMED. `#435` did NOT regress (scope error: book_quotes READ vs container anon). The failure is a ~2GB TRANSIENT in the PARENT process (pid 39, children <54MB), decided by evictable page cache (inactive_file 26.3/42.2 at kills vs 164-240 surviving), climbing 51s with NO stage marker. THREE fixes shipped and exercised in live `d72d670c` — odds-shard duplicate `51ae7218`, ledger streaming `21f8a165`, 3-ledger-loads-to-1 `aa190d58` — and NONE has been shown to move the transient. deepcopy EXONERATED by measurement (0.54MB peak). Daytime windows are worthless as evidence; the live-slate band 22:00Z-05:00Z is scheduled via `scripts/oom_band_report.py` + two one-time tasks. OPEN pending that result** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
 ### render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this is local tooling). Falsification test PASSED: 29/29 known `oomKilled` reproduced for 2026-08-14 CT, and the unpaged control returns 20/29 — i.e. a single-page reader undercounts by 31% while looking like an answer.** — opened 2026-08-16 — session: branch-overlap-baseline-watch

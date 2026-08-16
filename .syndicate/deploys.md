@@ -6102,3 +6102,48 @@ served `margin 0.96 / total 44.38 / home_win 0.5267` on all 16 preseason games o
 2026-08-13). Verify row VARIANCE, not just file presence.
 
 **Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit d72d670c`.
+
+## 2026-08-16 15:53:28Z — refresh-worker `97491161` — **MEASURED: THE FIX DID NOT FIX `#441`. Hypothesis falsified.**
+
+Fills the PENDING row above with the answer it asked for. **The falsifier written
+into that row is exactly what fired**, ~8 minutes after the deploy went live.
+
+    15:53:28Z  SEASON_PROJECTION_LAUNCHING sport=nfl ... age_seconds=240710
+    15:53:28Z  DegenerateProjectionRun: NO PLAY-BY-PLAY DATA
+    15:53:28Z  looked for : /opt/render/project/src/data/nfl_source/tracking/nflverse/pbp/pbp_2026.csv
+
+**THE LOG ALONE COULD NOT SETTLE IT, and that nearly cost a wrong conclusion.**
+My resolver returns a NAMED fallback when no candidate has the file, and that
+fallback is `default_nfl_source_root()` — the same checkout path the OLD code
+printed. So "fix not deployed" and "fix ran, found nothing anywhere" emit an
+IDENTICAL line. Settled by reading the deployed commit's content instead:
+
+    refresh-worker live on 97491161 since 15:45:50Z
+    nfl_pbp_path present in 97491161          : 1
+    generator delegates to it in 97491161     : 1
+
+So the resolver RAN, searched every candidate root, and found the pbp on NONE of
+them. **Root selection was a red herring.**
+
+**WHAT I GOT WRONG, and why.** The generator's own NOTE asserts: *"the pbp lives
+on the mounted disk and is absent from the repo checkout. If DATA_ROOT points at
+the checkout, that is the bug, not a missing download."* DATA_ROOT did point at
+the checkout, so the NOTE read as a confirmed diagnosis. **It was a hypothesis
+written in the imperative, and I inherited it as a measurement.** The half I
+never verified — that the file is on the mounted disk — is the half that was
+false.
+
+**WHAT THE CHANGE IS STILL WORTH.** It removes a real latent defect: a root
+chosen by probing for an unrelated artifact (`upcoming_recs_*.csv`) could
+misresolve the pbp whenever both roots exist. That bug was real and is now fixed,
+and `#389` fixed its twin on the write path. **It is not a fix for `#441` and must
+not be recorded as one.** No rollback: the change is correct, inert when the file
+is absent everywhere, and improves the diagnostic.
+
+**ROOT CAUSE NOW (v3):** the pbp is ABSENT FROM EVERY ROOT, and nothing in this
+repo writes it — traced: ten scripts reference `pbp`, all reads, zero writes.
+There are nflverse fetchers for schedule/rosters/depth-charts/games and **none
+for play-by-play**. It was present as recently as **2026-08-13** —
+`verify_nfl_autorun_obligations.py:25` records the 21:02:06Z run writing a real
+rating on 16/16 games — which matches the 2.79-day staleness exactly. So: present,
+then gone, with no code path able to restore it.

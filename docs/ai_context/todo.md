@@ -1,6 +1,45 @@
 # Syndicate TODO — canonical cross-session list
 
-### `#441` — **NFL SmartSim2 week-1 projection has not been written in 2.36 days, and the staleness gate relaunches it ~107x/day** — FOUND 2026-08-16, NOT STARTED, no owner
+### `#441` — **ROOT CAUSE CORRECTED 2026-08-16 (v3): the nflverse play-by-play is ABSENT FROM EVERY ROOT and nothing in this repo writes it. Two earlier diagnoses were wrong, the second was shipped and falsified in production** — NOT FIXED, no owner
+
+> **AMENDED 2026-08-16 after a deployed fix failed. Read this block before the
+> original text below, which records diagnosis v2 and is now WRONG about the cause.**
+>
+> **v1** "the generator is broken" — WRONG. `assert_ratings_data_available` is a
+> correct precondition guard and must not be relaxed; it refuses to write a
+> projection where every team rates `neutral_no_data`.
+>
+> **v2** "root selection picks the ephemeral checkout" — WRONG, and this one was
+> BUILT, TESTED AND DEPLOYED (`97491161`, live 15:45:50Z). `DATA_ROOT` really did
+> resolve to `/opt/render/project/src/data/nfl_source`, and `_first_existing_root`
+> really does pick a root by probing for the unrelated `upcoming_recs_*.csv` — so
+> the hypothesis was well-evidenced. **It was still not the cause.** The deployed
+> resolver searched every candidate root and found the pbp on none of them;
+> `DegenerateProjectionRun` raised again at 15:53:28Z, 8 minutes after go-live.
+>
+> **v3, current: the file is simply GONE, and no code path can restore it.**
+>   * Traced 2026-08-16: **ten scripts reference `pbp`, every one a READ, zero
+>     writes.** nflverse fetchers exist for schedule, rosters, depth charts and
+>     games — **none for play-by-play**.
+>   * It WAS present on 2026-08-13: `verify_nfl_autorun_obligations.py:25` records
+>     the 21:02:06Z run writing a real rating on 16/16 games. Staleness is now
+>     2.79 days, which matches that date exactly.
+>   * So the shape is **present -> absent**, not never-ingested, and nothing in
+>     this repo will bring it back.
+>
+> **NEXT STEP IS NOT A CODE FIX.** Find what removed it (a sweep/prune touching
+> `tracking/`, a disk event, or a mirror refresh that no longer runs), and
+> establish how the file is meant to arrive at all — there is no ingestion path
+> in-repo, so it has been arriving by some means outside this codebase.
+>
+> **WHY THE LOG COULD NOT SETTLE v2, worth knowing before the next attempt:** the
+> resolver returns a NAMED fallback when nothing is found, and that fallback is
+> the same checkout path the old code printed. "Not deployed" and "ran, found
+> nothing" emit an IDENTICAL line. Verify the deployed commit's CONTENT.
+>
+> **The `97491161` change stays.** It fixes a real latent misresolution and is
+> inert when the file is absent everywhere. It is NOT a fix for `#441`.
+
 
 **Discovered while measuring Phase 2's premise for `#440`; unrelated to that work
 and NOT caused by it.** Nothing deployed on 2026-08-15/16 goes near this generator.

@@ -2028,3 +2028,30 @@ succeeded, because a blob with conflict markers is a perfectly valid blob.
 - This is [[feedback_instrument_blindness]] in a new place — a green push is
   evidence only once you know what a bad push would have printed. It printed
   exactly that, one line above.
+
+### 2026-08-16 — OVERTURNED: a NOTE in the code that names a cause is a HYPOTHESIS, not a measurement — even when it is right about everything else
+- **What we believed:** `generate_smartsim2_nfl_projections.py`'s degenerate-run
+  guard prints *"the pbp lives on the mounted disk and is absent from the repo
+  checkout. If DATA_ROOT points at the checkout, that is the bug, not a missing
+  download."* Production showed `DATA_ROOT` = the checkout, so the NOTE read as a
+  confirmed diagnosis and I built, tested and deployed a fix for it.
+- **What was actually true:** the pbp is absent from EVERY root, the mounted disk
+  included. The NOTE's first clause ("the pbp lives on the mounted disk") was the
+  unverified half, and it was false. Traced afterwards: ten scripts reference
+  `pbp`, all reads, **zero writes** — nothing in the repo can produce that file,
+  though it demonstrably existed on 2026-08-13.
+- **How we found out:** the falsifier written into the deploy row before shipping
+  — *"if `DegenerateProjectionRun` still raises, root selection was a red
+  herring"* — fired 8 minutes after the deploy.
+- **THE SECOND TRAP, which nearly hid it:** the fix returns a NAMED fallback path
+  when nothing is found, and that fallback equals the path the OLD code printed.
+  **"Fix not deployed" and "fix ran and found nothing" emitted an identical log
+  line.** Only reading the deployed commit's CONTENT distinguished them.
+- **The rule going forward: a comment that asserts a cause carries the author's
+  confidence, not their evidence.** Treat the clause you did not measure as the
+  one most likely to be wrong — here, everything about the checkout was correct
+  and verifiable, and the single unverifiable clause was the false one. And when
+  a fix's failure mode prints the same string as its absence, the log cannot
+  verify it; confirm the deployed content instead.
+- *(evidence: `#441`; deploy `97491161` row in `deploys.md`; lane
+  `nfl-pbp-root-resolution`)*
