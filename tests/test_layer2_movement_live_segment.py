@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from syndicate.features.shared.clv_opening_ledger import _opening_key
+from syndicate.features.shared.layer2_board import movement_join_key
 from syndicate.features.shared.layer2_board import (
     _live_projection_columns,
     _movement_from_opening,
@@ -41,7 +42,12 @@ def _row(**over):
 
 
 def _openings(row, *, price=-105, line=8.5, minutes=20, books=None):
-    key = _opening_key(row)
+    # `movement_join_key`, not `_opening_key` (`#446`). The production index is
+    # built with the stable key -- one that excludes `line` and `bookmaker` --
+    # because keying movement on those means only UNMOVED rows can match their
+    # own opening. A fixture keyed the old way tests a join production no
+    # longer performs.
+    key = movement_join_key(row)
     return {
         key: {
             "key": key,
@@ -227,3 +233,117 @@ def test_an_unknown_segment_is_shown_not_swallowed():
     """A segment this map has not seen is exactly where the reader most needs
     telling the line is not full-game."""
     assert _segment_label("first7_alt") == "first7 alt"
+
+
+# ---------------------------------------------------------------------------
+# `#446`: movement was keyed on the thing it measures.
+#
+# Found by asking why opening coverage FELL (31% -> 29%) instead of rising as
+# the ledger accumulated. It was not thin data -- `clv_opening_ledger._opening_key`
+# includes `line` and `bookmaker`, so a row could only match its own opening if
+# it had NOT moved. Measured across two artifacts 20 min apart: stable key
+# matched 20, full key matched 14, and of the 20 the line changed on 6 and the
+# book on 5. The dropped third were exactly the rows with something to report.
+# ---------------------------------------------------------------------------
+
+
+def _mv_opening(**over):
+    base = {
+        "event_id": "e1", "market": "spreads", "player_name": None, "segment": "full",
+        "side": "home", "line": -1.5, "price": -110, "bookmaker": "draftkings",
+        "captured_at": "2026-08-16T19:00:00Z",
+        "book_prices": {"draftkings": -110, "fanduel": -108},
+    }
+    base.update(over)
+    return base
+
+
+def _mv_row(**over):
+    base = {
+        "event_id": "e1", "market": "spreads", "player_name": None, "segment": "full",
+        "side": "home", "line": -1.5,
+        "quote": {"price": -110, "bookmaker": "draftkings",
+                  "book_prices": {"draftkings": -110, "fanduel": -108}},
+    }
+    base.update(over)
+    return base
+
+
+def test_the_join_key_survives_a_line_move():
+    """The whole defect in one assertion."""
+    from syndicate.features.shared.layer2_board import movement_join_key
+
+    assert movement_join_key(_mv_opening()) == movement_join_key(_mv_row(line=-2.5))
+
+
+def test_the_join_key_survives_a_best_book_switch():
+    from syndicate.features.shared.layer2_board import movement_join_key
+
+    moved = _mv_row(quote={"price": -135, "bookmaker": "fanduel", "book_prices": {"fanduel": -135}})
+    assert movement_join_key(_mv_opening()) == movement_join_key(moved)
+
+
+def test_a_row_that_moved_line_AND_book_is_still_measured():
+    """The production case. Under the old key this row was invisible."""
+    from syndicate.features.shared.layer2_board import _movement_from_opening, movement_join_key
+
+    opening = _mv_opening()
+    moved = _mv_row(
+        line=-2.5,
+        quote={"price": -135, "bookmaker": "fanduel",
+               "book_prices": {"draftkings": -140, "fanduel": -135}},
+    )
+    out = _movement_from_opening(moved, {movement_join_key(opening): opening})
+
+    assert out["movement_state"] == "tracked"
+    assert out["movement_line_delta"] == -1.0
+    # Same-book via `book_prices`, NOT best-of-N across a book switch.
+    assert out["movement_basis"] == "same_book"
+    assert out["movement_book"] == "fanduel"
+    assert out["movement_price_delta"] == -27.0
+
+
+def test_that_same_row_now_reaches_the_steam_threshold():
+    """Steam was structurally suppressed, not merely untested.
+
+    A sharp move usually comes WITH a line move or a book switch -- the exact
+    conditions that broke the old key. So the moves large enough to be steam
+    were the ones most reliably erased before the detector saw them.
+    """
+    from syndicate.features.shared.layer2_board import (
+        _STEAM_PRICE_POINTS,
+        _movement_from_opening,
+        movement_join_key,
+    )
+
+    opening = _mv_opening(captured_at=_recent_iso())
+    moved = _mv_row(
+        line=-2.5,
+        quote={"price": -135, "bookmaker": "fanduel",
+               "book_prices": {"draftkings": -140, "fanduel": -135}},
+    )
+    out = _movement_from_opening(moved, {movement_join_key(opening): opening})
+    assert abs(out["movement_price_delta"]) >= _STEAM_PRICE_POINTS
+    assert out.get("steam") is True
+    assert "fanduel" in (out.get("steam_reason") or "")
+
+
+def test_the_old_full_key_would_have_missed_all_of_the_above():
+    """Guards the fix by proving the OLD behaviour was broken.
+
+    Without this, a future change could silently reinstate the full key and
+    every test above would still pass on unmoved rows.
+    """
+    from syndicate.features.shared.clv_opening_ledger import _opening_key
+
+    old_open = _opening_key({**_mv_opening(), "quote": {"bookmaker": "draftkings"}})
+    old_now = _opening_key(
+        _mv_row(line=-2.5, quote={"price": -135, "bookmaker": "fanduel"})
+    )
+    assert old_open != old_now, "if these ever match, this test is measuring nothing"
+
+
+def _recent_iso():
+    from datetime import datetime, timedelta, timezone
+
+    return (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat().replace("+00:00", "Z")

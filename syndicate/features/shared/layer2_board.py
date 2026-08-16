@@ -1430,6 +1430,53 @@ _STEAM_PRICE_POINTS = 15.0    # American-odds move that counts as sharp
 _STEAM_WINDOW_SECONDS = 3 * 3600
 
 
+def movement_join_key(row: Mapping[str, Any]) -> str | None:
+    """Identity of a BET across price and line movement.
+
+    Deliberately EXCLUDES `line` and `bookmaker`, which is the opposite choice
+    from `clv_opening_ledger._opening_key` -- and both are right, because they
+    answer different questions.
+
+    `_opening_key` must not collapse home -1.5 with home -2.5, nor two books'
+    prices, because settlement grades a specific bet at a specific book. But
+    **movement IS the detection of line and book change.** Keying on them means
+    a row can only match its own opening if it did not move, so the metric is
+    conditioned on the absence of the thing it measures.
+
+    MEASURED, two artifacts 20 minutes apart (2026-08-16 21:01 -> 21:21):
+
+        stable key (this one)          matched  20
+        full key (+ line + bookmaker)  matched  14
+           of the 20: line changed 6, book changed 5, either 7
+
+    A third of matchable rows dropped, and they were exactly the rows with
+    something to report. It is also why steam never fired: a sharp move usually
+    comes with a line move or a best-book switch, which broke the key and
+    erased the evidence.
+
+    Nothing is lost by keying loosely -- the opening RECORD still carries
+    `line`, `price`, `bookmaker` and `book_prices`, and it is `book_prices`
+    that keeps the price comparison same-book even when the best book changed.
+
+    `segment` and `player_name` stay IN: a first-five total and a full-game
+    total are different bets, and four batters sharing one prop line collapse
+    onto one key without the name (measured on 2026-08-14, 17 rows -> 7 keys).
+    """
+    event_id = str(row.get("event_id") or "").strip()
+    market = str(row.get("market") or "").strip().lower()
+    if not event_id or not market:
+        return None
+    return "|".join(
+        (
+            f"event_id={event_id}",
+            f"market={market}",
+            f"player={str(row.get('player_name') or '').strip().lower()}",
+            f"segment={str(row.get('segment') or '').strip().lower()}",
+            f"side={str(row.get('side') or '').strip().lower()}",
+        )
+    )
+
+
 @lru_cache(maxsize=8)
 def _blended_score_accepts(parameter: str) -> bool:
     """Does the DEPLOYED `blended_score` take this keyword?
@@ -1495,11 +1542,7 @@ def _movement_from_opening(
         return {"movement_not_tracked": True, "movement_state": "not_tracked"}
     if not openings:
         return {"movement_state": "no_openings"}
-    try:
-        from syndicate.features.shared.clv_opening_ledger import _opening_key
-        key = _opening_key(row)
-    except Exception:
-        key = None
+    key = movement_join_key(row)
     if not key:
         return {"movement_state": "unkeyable"}
     opened = openings.get(key)

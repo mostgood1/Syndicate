@@ -57,17 +57,50 @@ def build_layer2_shortlist(
     # Read BEFORE `record_openings` appends today's rows, deliberately: movement
     # must compare against the FIRST time we published a row, not against the
     # copy being written this instant.
+    # KEYED WITHOUT `line` AND `bookmaker`, AND THAT IS THE WHOLE POINT.
+    #
+    # `_opening_key` puts BOTH in the key, correctly, because CLV must not
+    # collapse home -1.5 and home -2.5, nor two books' prices. But **movement
+    # IS the detection of line and book change**, so joining on that key can
+    # only ever match rows that did NOT move -- the metric becomes conditioned
+    # on the absence of the thing it measures.
+    #
+    # MEASURED across two artifacts 20 minutes apart, 2026-08-16 21:01 -> 21:21:
+    #
+    #     stable key (event·market·player·segment·side) matched   20
+    #     full key   (+ line + bookmaker)               matched   14
+    #        of the 20: line changed 6, book changed 5, either 7
+    #
+    # So ~a third of matchable rows were dropped, and they were precisely the
+    # rows with something to report. It also explains why steam never fired: a
+    # sharp move is usually accompanied by a line move or a best-book switch,
+    # which breaks the key and erases the evidence of the move.
+    #
+    # The opening RECORD already carries `line`, `price`, `bookmaker` and
+    # `book_prices`, so nothing is lost by keying loosely and reading the
+    # detail off the record -- `book_prices` is what still makes the price
+    # comparison same-book even when the best book has changed.
+    #
+    # `_opening_key` itself is NOT changed: it is right for the settlement join
+    # it was built for, and this is a different question asked of the same data.
     openings_index: dict[str, Any] = {}
     openings_error: str | None = None
+    openings_records = 0
     try:
         from syndicate.features.shared.clv_opening_ledger import load_openings
+        from syndicate.features.shared.layer2_board import movement_join_key
 
         for record in load_openings(selected_date) or []:
-            key = record.get("key") if isinstance(record, Mapping) else None
-            # FIRST WRITE WINS -- the ledger is append-only, so a key can recur
-            # and the earliest occurrence is the opening by definition.
+            if not isinstance(record, Mapping):
+                continue
+            openings_records += 1
+            key = movement_join_key(record)
+            # FIRST WRITE WINS -- the ledger is append-only, so a key recurs and
+            # the earliest occurrence is the opening by definition. Doubly so
+            # now: under the loose key, later records for the same bet are
+            # exactly the moved versions we are measuring against.
             if key and key not in openings_index:
-                openings_index[str(key)] = record
+                openings_index[key] = record
     except Exception as exc:
         openings_error = f"{type(exc).__name__}: {exc}"
 
@@ -471,7 +504,37 @@ def build_layer2_shortlist(
 
     # Both numbers, so "no movement on the board" is attributable: 0 openings
     # loaded is a different fact from openings loaded and nothing having moved.
+    # BOTH numbers, because either alone is unattributable -- the third time
+    # this lesson has been paid for in this file. `openings_records` is what the
+    # ledger HELD; `openings_loaded` is how many distinct bets that collapsed
+    # to. Thin movement is then separable into "the ledger is sparse" (records
+    # low) versus "the key does not join" (records high, matched low), which is
+    # exactly the distinction I had to infer by hand at 21:02Z because neither
+    # number was published.
+    shortlist["openings_records"] = openings_records
     shortlist["openings_loaded"] = len(openings_index)
+    # The join's own hit rate, computed over the rows actually published. A
+    # coverage number that lives only in my head is how "movement is thin" went
+    # three hours without a cause.
+    try:
+        # Imported HERE, not reused from the loader block above: those names are
+        # bound inside a `try` that can fail, and a NameError raised while
+        # computing an instrument would take the build down for the sake of a
+        # counter.
+        from syndicate.features.shared.layer2_board import (
+            _movement_is_tracked,
+            movement_join_key as _movement_key,
+        )
+
+        published = shortlist.get("rows") or []
+        eligible = [r for r in published if _movement_is_tracked(r.get("market"))]
+        matched = sum(1 for r in eligible if _movement_key(r) in openings_index)
+        shortlist["movement_eligible_rows"] = len(eligible)
+        shortlist["movement_rows_matched"] = matched
+    except Exception:
+        # An instrument that can break the build is worse than no instrument.
+        shortlist["movement_eligible_rows"] = -1
+        shortlist["movement_rows_matched"] = -1
     if openings_error:
         shortlist["openings_error"] = openings_error
 
