@@ -299,16 +299,87 @@ def _bet_analysis_schema(result: Any, *, question: str = "", relevance_matched: 
         }
 
     top = _first_recommendation(result)
-    selection = top.get("selection") or top.get("pick") or top.get("name") or top.get("label")
+    facts = _bet_facts(top)
+    sim = _sim_terms(top)
+
+    # `selection` was `top.get("selection")`, which on a layer2-sourced
+    # candidate is the bare player name. Reported live 2026-08-16: a question
+    # about a specific prop was answered "Ryan Johnson" while the same dict
+    # carried market="earned_runs", line=2.5, side="over". See `_bet_label`.
+    selection = _bet_label(top) or top.get("selection") or top.get("pick") or top.get("name") or top.get("label")
+
+    # **EDGE IS THE MODEL EDGE, IN PERCENT, ON BOTH SCHEMAS.**
+    #
+    # This read `adjusted_edge or edge or price_edge_pct`. On a layer2
+    # candidate, `edge` is the **EV fraction**, not the model edge -- and
+    # `_board_top_opportunities` publishes `model_edge_pct` under the same
+    # field name. Measured on one pick at one instant, 2026-08-16:
+    #
+    #     briefing (market_summary)  edge 14.01   <- model_edge_pct, PERCENT
+    #     per-pick (bet_analysis)    edge  0.0139 <- ev_pct/100, FRACTION
+    #
+    # Ask contradicted itself by a factor of ten on the same bet, and the two
+    # schemas disagreed on the UNITS of a field with one name. `edge_pct` is
+    # emitted alongside for readers that should not have to infer a scale from
+    # a magnitude -- the same reason `_board_summary_sentence` needs it.
+    edge_pct = _to_float(top.get("model_edge_pct"))
+    if edge_pct is None:
+        fraction = _to_float(top.get("adjusted_edge") or top.get("edge") or top.get("price_edge_pct"))
+        edge_pct = fraction * 100.0 if fraction is not None else None
+
+    # `market_probability` came back null on every measured answer while
+    # `quote.fair_probability` sat on the same object; `EV` came back null
+    # while `ev_pct` did. Neither was missing data -- both were the wrong key.
+    # The harness has been reporting the first as a WARNING
+    # (`edge_without_market_probability`) into a list nobody reads.
+    #
+    # **THE SOURCE ORDER IS LOAD-BEARING, AND READING `quote.fair_probability`
+    # FIRST RE-CREATES THE BUG THIS LANE EXISTS TO FIX.** Caught in the first
+    # replay over the live board: the briefing showed `Market 49.0%` and the
+    # per-pick answer `Market 51.0%` for the same pick at the same instant.
+    # They are two different quantities -- `_board_row_probabilities` derives
+    # market from `projection.market_fair_prob_over` and RECONCILES it against
+    # `model_edge_pct`, while `quote.fair_probability` is the no-vig price of
+    # one specific quote. Only the first satisfies `model - market == edge`,
+    # which is the identity the board itself publishes.
+    #
+    # So: derive from the identity when both terms are present. That is exact
+    # arithmetic on two published numbers, not an estimate, and it guarantees
+    # the three numbers in an answer cannot contradict each other. The quote's
+    # fair price is the last resort, for rows carrying no model edge at all.
+    # `confidence` used to fall back to `top["confidence"]`, which on a layer2
+    # candidate is **book_confidence** -- a price-reliability term -- published
+    # under a name every reader takes as model confidence. Model probability or
+    # nothing.
+    model_probability = _to_pct(top.get("model_probability"))
+
+    quote = _mapping_or_empty(top.get("quote"))
+    market_probability = _to_pct(top.get("market_probability") or top.get("implied_probability"))
+    if market_probability is None and model_probability is not None and edge_pct is not None:
+        market_probability = round(model_probability - edge_pct, 2)
+    if market_probability is None:
+        market_probability = _to_pct(quote.get("fair_probability"))
+    ev = _to_float(top.get("expected_value") or top.get("ev_current") or top.get("ev_pct") or top.get("ev"))
+
     return {
         "schema_type": "bet_analysis",
         "selection": selection,
-        "model_probability": _to_pct(top.get("model_probability") or top.get("confidence")),
-        "market_probability": _to_pct(top.get("market_probability") or top.get("implied_probability")),
-        "edge": _to_float(top.get("adjusted_edge") or top.get("edge") or top.get("price_edge_pct")),
-        "EV": _to_float(top.get("expected_value") or top.get("ev_current") or top.get("ev")),
-        "confidence": _to_pct(top.get("confidence") or top.get("model_probability")),
-        "recommendation": _candidate_prose(top) or explanation.get("summary"),
+        **facts,
+        **sim,
+        "model_probability": model_probability,
+        "market_probability": market_probability,
+        "edge": edge_pct,
+        "edge_pct": edge_pct,
+        "EV": ev,
+        "confidence": model_probability,
+        "recommendation": (
+            _candidate_prose(top)
+            or _reason_sentences(
+                top, facts, sim,
+                model_pct=model_probability, market_pct=market_probability, edge_pct=edge_pct,
+            )
+            or explanation.get("summary")
+        ),
         "relevance_matched": relevance_matched,
         "explanation": {
             "summary": _candidate_prose(top) or explanation.get("summary"),
@@ -493,26 +564,288 @@ def _market_summary_rank_key(item: dict[str, Any]) -> tuple[float, float]:
     return (score if score is not None else float("-inf"), edge if edge is not None else float("-inf"))
 
 
-def _board_row_selection(row: dict[str, Any]) -> str:
-    """Same label shape `_board_row_label` produces for the M1 evidence table.
+# Markets where `side` names the team you are betting AGAINST, not for.
+# Mirrors `layer2_board._LAY_MARKETS`; see `_bet_label` for why this is
+# duplicated rather than imported.
+_LAY_MARKET_TOKENS = ("_lay",)
 
-    Deliberately duplicated rather than imported: `ask_the_syndicate_data`
-    imports heavy per-sport fetchers, and the adapter is on the render path for
-    every answer. If the two ever need to agree on more than a string, promote
-    this to a shared module -- do not make the adapter import the data layer.
+# Only the keys whose raw form reads badly mid-sentence. Everything else falls
+# through to underscores-to-spaces, which is already readable
+# ("batter_total_bases" -> "batter total bases").
+_MARKET_LABELS = {
+    "h2h": "moneyline",
+    "h2h_lay": "moneyline (lay)",
+    "spreads": "spread",
+    "spreads_alt": "alt spread",
+    "totals": "total",
+    "totals_alt": "alt total",
+}
+
+
+def _is_lay_market(market: Any) -> bool:
+    text = str(market or "").strip().lower()
+    return any(token in text for token in _LAY_MARKET_TOKENS)
+
+
+def _market_label(market: Any) -> str:
+    key = str(market or "").strip().lower()
+    if not key:
+        return ""
+    return _MARKET_LABELS.get(key) or key.replace("_", " ")
+
+
+def _format_handicap(line: Any) -> str:
+    """A team handicap always carries its sign; `+1.5` and `-1.5` are two bets."""
+    value = _to_float(line)
+    if value is None:
+        return ""
+    if value == 0:
+        return "PK"
+    return f"{value:+g}"
+
+
+def _matchup_text(row: dict[str, Any]) -> str:
+    explicit = str(row.get("matchup") or "").strip()
+    if explicit:
+        return explicit
+    away, home = str(row.get("away_team") or "").strip(), str(row.get("home_team") or "").strip()
+    return f"{away} @ {home}".strip(" @")
+
+
+def _bet_label(row: dict[str, Any]) -> str | None:
+    """The bet, as a string someone could carry to a betting slip.
+
+    **A LABEL IS NOT A BET UNTIL IT NAMES THE SIDE YOU CAN PLACE.** The
+    FORBIDDEN rule of 2026-08-15 (never treat equality of a LABEL as identity of
+    a BET) and the CLOSED `spread-line-sign-convention` lane are both about this
+    exact string. Three rules, in order:
+
+    1. **A prop is the player, the direction AND the number** -- "Ryan Johnson
+       over 2.5". This used to emit the bare `player_name`, which names no bet
+       at all: reported live 2026-08-16, where the answer to a question about a
+       specific prop read "Ryan Johnson" with no market, no line and no side,
+       while the object it was reading carried all three.
+    2. **A game side is the TEAM, never the word "home".** Served the same day:
+       `"home -1.5 (Philadelphia Phillies @ Minnesota Twins)"` -- a reader has
+       to already know the convention that home is the second name before they
+       can place it. `line` is the row's OWN side's handicap (pinned by
+       `spread-line-sign-convention`: 12 of 12 MLB spreads rows correct on the
+       served shortlist, including the 3 home rows that were the broken case),
+       so it pairs with that side's team directly.
+    3. **A LAY market is a bet AGAINST the named team and must say so.**
+       `side` still reads "home" on an `h2h_lay` row, so the market key is the
+       only signal. Emitting a bare team name there is not vague, it is
+       inverted -- a reader who acts on it takes the opposite position.
+
+    Deliberately duplicated from `layer2_board._pick_label` rather than
+    imported: that module's own header says it is a worker-side builder that
+    must not be called from a request path, and this adapter renders every
+    answer. `tests/test_ask_answer_substance.py` pins the two together so they
+    cannot drift.
     """
-    player = str(row.get("player_name") or "").strip()
-    side = str(row.get("side") or "").strip()
+    player = str(row.get("player_name") or row.get("player") or "").strip()
+    side = str(row.get("side") or "").strip().lower()
     line = row.get("line")
+    line_text = "" if line is None else str(line)
+
     if player:
-        parts = [player, side] if side else [player]
-        if line is not None:
-            parts.append(str(line))
-        return " ".join(p for p in parts if p)
-    away, home = str(row.get("away_team") or ""), str(row.get("home_team") or "")
-    matchup = f"{away} @ {home}".strip(" @")
-    label = f"{side} {line}".strip() if line is not None else side
-    return f"{label} ({matchup})".strip() if matchup else label
+        return " ".join(part for part in (player, side, line_text) if part)
+
+    team = ""
+    if side == "home":
+        team = str(row.get("home_team") or "").strip()
+    elif side == "away":
+        team = str(row.get("away_team") or "").strip()
+
+    if team:
+        label = f"{team} {_format_handicap(line)}".strip()
+        if _is_lay_market(row.get("market") or row.get("market_key")):
+            return f"LAY {label} (wins if {team} does not)"
+        return label
+
+    # **Everything below needs BOTH a side and a number.** Without them there is
+    # no bet here to describe, and this must return None so the caller keeps
+    # whatever `selection` it already had. Caught by
+    # `test_adapter_promotes_question_relevant_recommendation`: a snapshot
+    # candidate carrying only `name` and `matchup` turned
+    # "Milwaukee Brewers ML" into "(Milwaukee Brewers vs Pittsburgh Pirates)" --
+    # strictly worse than the string it replaced. This function improves a
+    # label or leaves it alone; it never degrades one.
+    if not side or not line_text:
+        return None
+
+    # over/under on a game total: the direction and number ARE the bet, and the
+    # matchup is the only thing identifying which game.
+    matchup = _matchup_text(row)
+    label = f"{side} {line_text}"
+    return f"{label} ({matchup})" if matchup else label
+
+
+def _bet_facts(row: dict[str, Any]) -> dict[str, Any]:
+    """Market, line, side and the price you would actually get.
+
+    Every field here was already on the candidate and was being dropped. An
+    answer that names an edge without naming the price and book behind it is
+    not actionable -- and `ev` is computed against that price, so the two
+    belong together.
+    """
+    quote = _mapping_or_empty(row.get("quote"))
+    price = _to_float(quote.get("price"))
+    if price is None:
+        price = _to_float(row.get("odds"))
+    books = quote.get("books_quoting")
+    age = _to_float(quote.get("book_age_seconds"))
+    if age is None:
+        age = _to_float(row.get("book_age_seconds"))
+    market = row.get("market") or row.get("market_key")
+    return {
+        "market": market,
+        "market_label": _market_label(market) or None,
+        "line": _to_float(row.get("line")),
+        "side": str(row.get("side") or "").strip().lower() or None,
+        "price": int(price) if price is not None and float(price).is_integer() else price,
+        "bookmaker": str(quote.get("bookmaker") or "").strip() or None,
+        "books_quoting": int(books) if isinstance(books, int) and not isinstance(books, bool) else None,
+        "quote_age_seconds": round(age, 1) if age is not None else None,
+        "matchup": _matchup_text(row) or None,
+    }
+
+
+def _sim_terms(row: dict[str, Any]) -> dict[str, Any]:
+    """The simulation's own output, and whether it has ever been checked.
+
+    **`score.sim_component` is deliberately NOT read here.** It is 0.0 on 108
+    of 108 served rows (`_SCORE_SIM_WEIGHT` is zeroed pending settlement), so
+    publishing it would report "the sim contributed nothing" as if it were a
+    measurement of this bet. `projection.projected` is the sim term that is
+    actually populated -- 86 of 108 rows.
+
+    `model_skill` is carried because a user asked to trust a number is entitled
+    to know that 88 of 108 rows say of themselves "model never backtested --
+    projection is unvalidated". Under the standing decision that the LLM stays
+    off, the system prompt's rules about surfacing uncertainty will never
+    execute, so this is the only place they can live.
+    """
+    projection = _mapping_or_empty(row.get("projection"))
+    projected = _to_float(projection.get("projected"))
+    if projected is None:
+        projected = _to_float(row.get("sim_projection"))
+    if projected is None:
+        projected = _to_float(row.get("projected"))
+
+    # **A TEAM SIDE'S PROJECTION IS NOT PUBLISHED, AND THIS IS THE WHOLE
+    # REASON.** On a spreads row the projection is a run margin
+    # (`basis: "full/run_margin_dist"`) whose sign convention against the
+    # handicap is not pinned anywhere in this payload. Caught in the first
+    # replay of this change over the live board: a `Minnesota Twins -1.5` row
+    # rendered "Sim 1.369" directly beside "Edge 14.8%", which invites the
+    # reader to compare 1.369 against -1.5 -- a comparison nothing here
+    # justifies. `_reason_sentences` already declines to write that clause for
+    # the same reason; publishing the raw number in the numbers row would have
+    # smuggled it back in. Over/under sides are safe: there the line and the
+    # projection are the same quantity by construction.
+    if str(row.get("side") or "").strip().lower() not in ("over", "under"):
+        projected = None
+
+    skill = _mapping_or_empty(projection.get("model_skill")) or _mapping_or_empty(row.get("model_skill"))
+    sample = skill.get("sample_games")
+    return {
+        "projected": round(projected, 3) if projected is not None else None,
+        "projection_basis": str(projection.get("basis") or "").strip() or None,
+        "projection_source": str(projection.get("source") or "").strip() or None,
+        "model_skill_status": str(skill.get("status") or "").strip() or None,
+        "model_skill_verdict": str(skill.get("verdict") or "").strip() or None,
+        "model_skill_sample_games": int(sample) if isinstance(sample, int) and not isinstance(sample, bool) else None,
+    }
+
+
+def _reason_sentences(
+    row: dict[str, Any],
+    facts: dict[str, Any],
+    sim: dict[str, Any],
+    *,
+    model_pct: float | None,
+    market_pct: float | None,
+    edge_pct: float | None,
+) -> str | None:
+    """A deterministic reason built from fields the row already carries.
+
+    **The MLB game lens is the shape this copies.** Its narrative
+    (`vendor/mlb_bettingv2/tools/web/flask_frontend.py:15232-15244`) is plain
+    string assembly -- "The live total still leans over because the projection
+    sits at 7.42 against 5.0. There are 34 outs left..." -- with no model in the
+    loop. Ask had every analogue on its own rows and generated nothing:
+    `_candidate_prose` looks for a `detail`/`writeup` field, and layer2 rows do
+    not have one, so `recommendation` came back `null` on 5 of 5 briefing rows
+    and on every per-pick answer. The gap was a missing GENERATOR, not a
+    missing source.
+
+    Every clause is guarded independently. Absent renders as absent -- a row
+    with no projection gets the price and freshness clauses and no invented
+    sim term.
+    """
+    parts: list[str] = []
+    side = facts.get("side")
+    line = facts.get("line")
+    projected = sim.get("projected")
+
+    # 1. Sim vs line. **Over/under only.** For a team side the projection is a
+    # run margin whose sign convention against the handicap is not pinned in
+    # this payload, and the rule is that a published number is computed or
+    # absent, never inferred. The model-vs-market clause below still covers
+    # team sides, because `_board_row_probabilities` reconciles those against
+    # the row's own stated edge and returns None when it cannot.
+    if projected is not None and line is not None and side in ("over", "under"):
+        # The market label is a UNIT only for a prop ("3.951 earned runs").
+        # On a game total it is the word "total", and "9.494 total against a
+        # line of 7.5" reads as a typo -- worse on `totals_alt`, which gave
+        # "7.057 alt total against a line of 6.5". Both seen in the first
+        # replay over the live board.
+        unit = str(facts.get("market_label") or "").strip() if row.get("player_name") else ""
+        unit_text = f" {unit}" if unit else ""
+        parts.append(
+            f"The simulation projects {projected:g}{unit_text} against a line of {line:g}, "
+            f"which is why it lands on the {side}."
+        )
+    elif projected is not None and side in ("over", "under"):
+        parts.append(f"The simulation projects {projected:g}, on the {side} side.")
+
+    # 2. Model vs market.
+    if model_pct is not None and market_pct is not None:
+        edge_text = f" — a {edge_pct:.1f} point edge." if edge_pct is not None else "."
+        parts.append(
+            f"That prices at {model_pct:.1f}% against the market's {market_pct:.1f}%{edge_text}"
+        )
+    elif edge_pct is not None:
+        parts.append(f"Model edge {edge_pct:.1f}% against the market's fair price.")
+
+    # 3. The price you would actually get, and how many books agree.
+    price, book = facts.get("price"), facts.get("bookmaker")
+    if price is not None and book:
+        books = facts.get("books_quoting")
+        agree = f", {books} books quoting" if books else ""
+        parts.append(f"Best bettable price {price:+g} at {book}{agree}.")
+
+    # 4. Has this model ever been checked? See `_sim_terms`.
+    status = sim.get("model_skill_status")
+    if status == "unmeasured":
+        parts.append("This model has never been backtested, so treat the projection as unvalidated.")
+    elif status and sim.get("model_skill_verdict"):
+        parts.append(f"Model skill {status}: {sim['model_skill_verdict']}.")
+
+    # 5. Game situation and quote staleness -- the game lens's other half.
+    game = _mapping_or_empty(row.get("game"))
+    if row.get("is_live") or str(row.get("game_state") or "").strip().lower() == "live":
+        away_score, home_score = game.get("away_score"), game.get("home_score")
+        if away_score is not None and home_score is not None:
+            parts.append(f"Live now at {away_score}-{home_score}.")
+        else:
+            parts.append("This game is already live.")
+    age = facts.get("quote_age_seconds")
+    if age is not None and age >= 900:
+        parts.append(f"The quote behind this is {int(age // 60)} minutes old.")
+
+    return " ".join(parts) or None
 
 
 def _board_row_probabilities(row: dict[str, Any]) -> tuple[float | None, float | None]:
@@ -624,25 +957,37 @@ def _board_top_opportunities(context: dict[str, Any], result: Any) -> list[dict[
     for row in rows[:5]:
         model_pct, market_pct = _board_row_probabilities(row)
         score = _mapping_or_empty(row.get("score"))
+        facts = _bet_facts(row)
+        sim = _sim_terms(row)
+        edge_pct = _to_float(row.get("model_edge_pct"))
         top.append(
             {
-                "selection": _board_row_selection(row),
-                "market": row.get("market"),
+                "selection": _bet_label(row) or row.get("selection"),
+                **facts,
+                **sim,
                 "sport": row.get("sport"),
                 "model_probability": model_pct,
                 "market_probability": market_pct,
                 # The field the board's own max is taken over. Same units
                 # (already a percent), so chat and the board are comparing the
                 # same number rather than two scalings of it.
-                "edge": _to_float(row.get("model_edge_pct")),
+                "edge": edge_pct,
                 # Explicit units, so no downstream reader has to infer the
                 # scale from the magnitude. See `_board_summary_sentence`.
-                "edge_pct": _to_float(row.get("model_edge_pct")),
+                "edge_pct": edge_pct,
                 "EV": _to_float(row.get("ev_pct")),
                 "confidence": model_pct,
                 "adjusted_score": _to_float(score.get("score")),
                 "source": "layer2_shortlist",
-                "recommendation": None,
+                # Was hardcoded `None`, so every briefing row arrived with an
+                # empty prose slot and the panel rendered a bare name over a
+                # raw market key. Layer2 rows have no `detail` field for
+                # `_candidate_prose` to find, so the sentence has to be
+                # generated -- see `_reason_sentences`.
+                "recommendation": _reason_sentences(
+                    row, facts, sim,
+                    model_pct=model_pct, market_pct=market_pct, edge_pct=edge_pct,
+                ),
             }
         )
     return top or None
@@ -683,19 +1028,36 @@ def _market_summary_schema(
         top_opportunities = board_opportunities
         ranked = []
     for item in ranked[:5]:
+        # The snapshot fallback, reached only when the board artifact is
+        # unavailable. Same label and same reason generator as the board path
+        # above, so a degraded answer degrades in the DATA it has, not in the
+        # shape a reader has to parse.
+        facts = _bet_facts(item)
+        sim = _sim_terms(item)
+        model_pct = _to_pct(item.get("model_probability") or item.get("confidence"))
+        market_pct = _to_pct(item.get("market_probability") or item.get("implied_probability"))
+        edge_pct = _to_float(item.get("model_edge_pct"))
+        if edge_pct is None:
+            fraction = _to_float(item.get("adjusted_edge") or item.get("edge") or item.get("price_edge_pct"))
+            edge_pct = fraction * 100.0 if fraction is not None else None
         top_opportunities.append(
             {
-                "selection": item.get("selection") or item.get("pick") or item.get("name") or item.get("label"),
-                "market": item.get("market") or item.get("market_label") or item.get("market_key"),
-                "model_probability": _to_pct(item.get("model_probability") or item.get("confidence")),
-                "market_probability": _to_pct(item.get("market_probability") or item.get("implied_probability")),
-                "edge": _to_float(item.get("adjusted_edge") or item.get("edge") or item.get("price_edge_pct")),
-                "EV": _to_float(item.get("expected_value") or item.get("ev_current") or item.get("ev")),
+                "selection": _bet_label(item) or item.get("selection") or item.get("pick") or item.get("name") or item.get("label"),
+                **facts,
+                "model_probability": model_pct,
+                "market_probability": market_pct,
+                "edge": edge_pct,
+                "edge_pct": edge_pct,
+                "EV": _to_float(item.get("expected_value") or item.get("ev_current") or item.get("ev_pct") or item.get("ev")),
                 "confidence": _to_pct(item.get("confidence") or item.get("model_probability")),
                 # Surfaced so the ordering is inspectable rather than
                 # something a reader has to take on trust.
                 "adjusted_score": _to_float(item.get("adjusted_score")),
-                "recommendation": _candidate_prose(item),
+                **sim,
+                "recommendation": _candidate_prose(item) or _reason_sentences(
+                    item, facts, sim,
+                    model_pct=model_pct, market_pct=market_pct, edge_pct=edge_pct,
+                ),
             }
         )
 

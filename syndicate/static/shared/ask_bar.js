@@ -173,10 +173,140 @@ window.SyndicateAskBar = (function () {
     });
   }
 
+  function finiteNumber(value) {
+    return typeof value === "number" && isFinite(value) ? value : null;
+  }
+
+  function formatOdds(price) {
+    const n = finiteNumber(price);
+    if (n === null) return "";
+    return n > 0 ? `+${n}` : String(n);
+  }
+
+  // What you are betting and at what price. `selection` now carries the side
+  // and the number (server-side `_bet_label`), so this line is the market, the
+  // price and the book -- the part that makes a row placeable rather than
+  // merely nameable. Reported 2026-08-16: a prop answer named neither the prop
+  // nor the side, and no answer has ever shown a price or a book.
+  function renderPickFacts(row) {
+    const bits = [];
+    const market = safeText(row.market_label || row.market, "");
+    if (market) bits.push(market);
+    const odds = formatOdds(row.price);
+    const book = safeText(row.bookmaker, "");
+    if (odds && book) bits.push(`${odds} at ${book}`);
+    else if (odds) bits.push(odds);
+    const books = finiteNumber(row.books_quoting);
+    if (books) bits.push(`${books} bks`);
+    const matchup = safeText(row.matchup, "");
+    if (matchup && !safeText(row.selection, "").includes(matchup)) bits.push(matchup);
+    return bits.join(" · ");
+  }
+
+  // `edge` is a PERCENT on both schemas from 2026-08-16. It used to be a
+  // FRACTION on bet_analysis and a PERCENT on market_summary, and this line
+  // multiplied by 100 unconditionally -- which was right for one schema and
+  // silently wrong for the other. Prefer the explicitly-united `edge_pct`.
+  function renderPickNumbers(row) {
+    const bits = [];
+    const projected = finiteNumber(row.projected);
+    const model = finiteNumber(row.model_probability);
+    const market = finiteNumber(row.market_probability);
+    const edge = finiteNumber(row.edge_pct === undefined || row.edge_pct === null ? row.edge : row.edge_pct);
+    if (projected !== null) bits.push(`Sim ${projected}`);
+    if (model !== null) bits.push(`Model ${model.toFixed(1)}%`);
+    if (market !== null) bits.push(`Market ${market.toFixed(1)}%`);
+    if (edge !== null) bits.push(`Edge ${edge.toFixed(1)}%`);
+    return bits.join(" · ");
+  }
+
+  // INLINE STYLES, DELIBERATELY, AND THEY SHOULD NOT STAY THAT WAY.
+  // These belong next to `.ask-bar__answer-pick-*` in
+  // `syndicate/static/shared/board_cards.css`, which is claimed by the OPEN
+  // lane `layer2-board-quality`. Editing across lanes is forbidden, and the
+  // evidence table genuinely needs `overflow-x` or a 7-column starter
+  // projection breaks the sidebar layout -- so shipping unstyled was not an
+  // option either. The class names are already correct; move the declarations
+  // into the stylesheet and delete this block when that lane closes.
+  const STYLE = {
+    numbers: "font-size:11px;font-variant-numeric:tabular-nums;",
+    flag: "align-self:flex-start;margin-top:3px;padding:1px 6px;border-radius:999px;"
+      + "border:1px solid rgba(255,196,120,0.45);background:rgba(255,176,80,0.12);"
+      + "color:#ffd9a8;font-size:10px;letter-spacing:0.02em;text-transform:uppercase;",
+    evidence: "margin-top:8px;display:flex;flex-direction:column;gap:6px;",
+    table: "overflow-x:auto;",
+    tableEl: "border-collapse:collapse;font-size:10.5px;white-space:nowrap;",
+    tableTitle: "font-size:10.5px;text-transform:uppercase;letter-spacing:0.04em;opacity:0.65;margin-bottom:2px;",
+    th: "padding:2px 6px 2px 0;text-align:left;font-weight:600;opacity:0.7;",
+    td: "padding:2px 6px 2px 0;text-align:left;font-variant-numeric:tabular-nums;opacity:0.85;",
+  };
+
+  function renderPickRow(row) {
+    const name = safeText(row.selection || row.name, "Opportunity");
+    const facts = renderPickFacts(row);
+    const numbers = renderPickNumbers(row);
+    const why = safeText(row.recommendation || row.why, "");
+    // The single most useful thing an answer can say about a number it is
+    // asking you to trust: 88 of 108 board rows say of themselves "model never
+    // backtested -- projection is unvalidated". Suppressed when the generated
+    // reason already says it, so it does not appear twice.
+    const unvalidated = safeText(row.model_skill_status, "") === "unmeasured"
+      && !why.toLowerCase().includes("backtested");
+    return `
+      <div class="ask-bar__answer-pick">
+        <span class="ask-bar__answer-pick-name">${escapeHtml(name)}</span>
+        ${facts ? `<span class="ask-bar__answer-pick-why">${escapeHtml(facts)}</span>` : ""}
+        ${numbers ? `<span class="ask-bar__answer-pick-numbers" style="${STYLE.numbers}">${escapeHtml(numbers)}</span>` : ""}
+        ${why ? `<div class="ask-bar__answer-pick-detail">${escapeHtml(why)}</div>` : ""}
+        ${unvalidated ? `<span class="ask-bar__answer-pick-flag" style="${STYLE.flag}">model unvalidated</span>` : ""}
+      </div>`;
+  }
+
+  function renderEvidenceTable(table) {
+    const cols = Array.isArray(table.columns) ? table.columns : [];
+    const rows = Array.isArray(table.rows) ? table.rows : [];
+    if (!rows.length) return "";
+    const cell = (value) => `<td style="${STYLE.td}">${escapeHtml(String(value == null ? "—" : value))}</td>`;
+    return `
+      <div class="ask-bar__answer-table" style="${STYLE.table}">
+        <div class="ask-bar__answer-table-title" style="${STYLE.tableTitle}">${escapeHtml(safeText(table.title, "Evidence"))}</div>
+        <table style="${STYLE.tableEl}">
+          ${cols.length ? `<thead><tr>${cols.map((c) => `<th style="${STYLE.th}">${escapeHtml(String(c))}</th>`).join("")}</tr></thead>` : ""}
+          <tbody>
+            ${rows.slice(0, 6).map((r) => `<tr>${(Array.isArray(r) ? r : [r]).map(cell).join("")}</tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // The sim and advanced evidence has been in every response all along:
+  // `collect_focused_evidence` builds it server-side and the standalone
+  // /syndicate page renders it. This panel never read `response.visuals` at
+  // all -- a deliberate scoping decision when it was a sidebar afterthought,
+  // and wrong now that it is the surface people use. Measured 2026-08-16: an
+  // MLB prop question returned 7 tables and 3 charts of real simulation output
+  // (starter sim projections, last 5 starts, opposing-lineup Statcast, a full
+  // simulated-strikeout distribution) and the panel showed a name and one
+  // number. Two tables inline, everything else named, so a sidebar stays one.
+  function renderEvidence(response) {
+    const visuals = response && typeof response.visuals === "object" ? response.visuals : null;
+    if (!visuals) return "";
+    const tables = (Array.isArray(visuals.tables) ? visuals.tables : [])
+      .filter((t) => t && Array.isArray(t.rows) && t.rows.length);
+    const charts = Array.isArray(visuals.charts) ? visuals.charts : [];
+    if (!tables.length && !charts.length) return "";
+    const more = tables.slice(2).map((t) => safeText(t.title, ""))
+      .concat(charts.map((c) => safeText(c && c.title, "")))
+      .filter(Boolean);
+    return `
+      <div class="ask-bar__answer-evidence" style="${STYLE.evidence}">
+        ${tables.slice(0, 2).map(renderEvidenceTable).join("")}
+        ${more.length ? `<div class="ask-bar__answer-pick-why">Also computed: ${escapeHtml(more.join(" · "))}</div>` : ""}
+      </div>`;
+  }
+
   // Compact rendering of the same `briefing` block syndicate.html's
-  // renderBriefing() draws in full -- narrative + top picks only, since
-  // this is a sidebar widget answering quick questions, not a replacement
-  // for the standalone page's deep-dive view (tables/charts/drivers/risks).
+  // renderBriefing() draws in full.
   function renderBriefingCompact(response) {
     const briefing = response && typeof response.briefing === "object" ? response.briefing : null;
     if (briefing) {
@@ -188,7 +318,7 @@ window.SyndicateAskBar = (function () {
         ${narrative ? `<div class="ask-bar__answer-narrative">${escapeHtml(narrative).replace(/\n+/g, "<br><br>")}</div>` : ""}
         ${picks.length ? `
           <div class="ask-bar__answer-picks">
-            ${picks.slice(0, 3).map((pick) => `
+            ${picks.map((pick) => `
               <div class="ask-bar__answer-pick">
                 <span class="ask-bar__answer-pick-name">${escapeHtml(safeText(pick.selection, "Pick"))}</span>
                 ${pick.why ? `<span class="ask-bar__answer-pick-why">${escapeHtml(pick.why)}</span>` : ""}
@@ -229,57 +359,48 @@ window.SyndicateAskBar = (function () {
     const opportunities = structured && Array.isArray(structured.top_opportunities) ? structured.top_opportunities
       // matchup_analysis's own list, same shape/purpose as top_opportunities.
       : (structured && Array.isArray(structured.key_edges) ? structured.key_edges : []);
+    // bet_analysis is ONE named bet, so it renders as a pick row rather than
+    // as loose prose. Checked BEFORE the opportunities branch: `recommendation`
+    // is now populated for every layer2-sourced pick (the server generates the
+    // sentence -- `_reason_sentences`), so `fallbackText` is non-empty and this
+    // branch, when it sat last, became unreachable for exactly the answers it
+    // was written to serve.
+    if (structured && structured.schema_type === "bet_analysis" && structured.selection) {
+      return `<div class="ask-bar__answer-picks">${renderPickRow(structured)}</div>`;
+    }
     if (fallbackText || opportunities.length) {
       return `
         ${fallbackText ? `<div class="ask-bar__answer-narrative">${escapeHtml(fallbackText).replace(/\n+/g, "<br><br>")}</div>` : ""}
         ${opportunities.length ? `
           <div class="ask-bar__answer-picks">
-            ${opportunities.slice(0, 3).map((row) => {
-              const name = safeText(row && (row.selection || row.name), "Opportunity");
-              const market = safeText(row && row.market, "");
-              const why = safeText(row && row.recommendation, "");
-              return `
-              <div class="ask-bar__answer-pick">
-                <span class="ask-bar__answer-pick-name">${escapeHtml(name)}</span>
-                ${market ? `<span class="ask-bar__answer-pick-why">${escapeHtml(market)}</span>` : ""}
-                ${why ? `<div class="ask-bar__answer-pick-detail">${escapeHtml(why)}</div>` : ""}
-              </div>`;
-            }).join("")}
+            ${/* Was slice(0, 3) while the server's own sentence said "Showing
+                  the top 5" and returned 5 -- reported 2026-08-16. The count in
+                  the prose is generated from the rows the server sent, so the
+                  renderer must not second-guess it. */""}
+            ${opportunities.map((row) => renderPickRow(row || {})).join("")}
           </div>
         ` : ""}
       `;
     }
-    // bet_analysis for a real, specific pick with no prose at all on the
-    // underlying candidate (e.g. a steam-move alert, which is a market
-    // signal rather than a modeled pick and genuinely has no writeup) --
-    // still show the real numbers rather than a dead end.
-    if (structured && structured.schema_type === "bet_analysis" && structured.selection) {
-      const facts = [
-        typeof structured.model_probability === "number" ? `Model ${structured.model_probability.toFixed(1)}%` : null,
-        typeof structured.market_probability === "number" ? `Market ${structured.market_probability.toFixed(1)}%` : null,
-        typeof structured.edge === "number" ? `Edge ${(structured.edge * 100).toFixed(1)}%` : null,
-        typeof structured.EV === "number" ? `EV ${structured.EV.toFixed(2)}` : null,
-      ].filter(Boolean);
-      return `
-        <div class="ask-bar__answer-picks">
-          <div class="ask-bar__answer-pick">
-            <span class="ask-bar__answer-pick-name">${escapeHtml(safeText(structured.selection, "This pick"))}</span>
-            ${facts.length ? `<span class="ask-bar__answer-pick-why">${escapeHtml(facts.join(" · "))}</span>` : ""}
-          </div>
-        </div>
-        ${!facts.length ? `<div class="ask-bar__answer-narrative ask-bar__answer-narrative--empty">No detailed numbers available for this pick yet.</div>` : ""}
-      `;
+    // Any other schema that still named one bet (matchup_analysis with a
+    // single edge, a steam-move alert) -- show the real numbers rather than a
+    // dead end.
+    if (structured && structured.selection) {
+      return `<div class="ask-bar__answer-picks">${renderPickRow(structured)}</div>`;
     }
     return `<div class="ask-bar__answer-narrative ask-bar__answer-narrative--empty">No structured answer came back for this question -- try rephrasing it.</div>`;
   }
 
   function renderEntry(entry) {
     const contextBits = [entry.context && entry.context.selection, entry.context && entry.context.matchup].filter(Boolean);
+    const response = entry.response || {};
     return `
       <div class="ask-bar__entry">
         <div class="ask-bar__question">${escapeHtml(entry.question)}${contextBits.length ? ` <span class="ask-bar__question-context">(${escapeHtml(contextBits.join(" · "))})</span>` : ""}</div>
         <div class="ask-bar__answer">
-          ${entry.error ? `<div class="ask-bar__answer-error">${escapeHtml(entry.error)}</div>` : renderBriefingCompact(entry.response || {})}
+          ${entry.error
+            ? `<div class="ask-bar__answer-error">${escapeHtml(entry.error)}</div>`
+            : renderBriefingCompact(response) + renderEvidence(response)}
         </div>
       </div>
     `;
