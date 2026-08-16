@@ -99,13 +99,11 @@ in minutes — read it, don't quote it.
 ## Recoverability of these three tasks
 
 The live tasks live under `~/.claude/scheduled-tasks/<id>/SKILL.md`, which is
-**outside this repo and not under version control on any machine**. This file
-records the reasoning for all three but embeds the full prompt of only
-`preband-refresh-worker-sha-check` (below). **`oom-band-early-read` and
-`oom-band-full-report` are NOT recoverable from this file** — if those task
-directories are lost, their prompts are gone. Noted rather than fixed, because
-both fire tonight and auto-disable; embed them here if the pattern is ever
-reused.
+**outside this repo and not under version control on any machine**. All three
+prompts are embedded below verbatim, so the tasks can be recreated from this
+file alone if those directories are lost. The bodies were inserted by script
+rather than copied by hand — copying is how a mirror drifts from the thing it
+mirrors — and verified byte-identical against the live files.
 
 ### Full prompt — `preband-refresh-worker-sha-check` (one-time, 2026-08-16T21:45:00Z)
 
@@ -154,4 +152,100 @@ VERDICT, one line, exactly one of:
 - **BAND COMPROMISED** — a deploy landed. Say when, by whom, and what uptime the band will actually open with. A short warm-up means the memory ratchet has not re-formed and the comparison against the recorded night baselines (amplitude 1,950-2,235 MB; min inactive_file 26.3/42.2 MB in windows that killed vs 164-240 MB in windows that survived) is weaker — say that plainly rather than letting the later tasks average through it.
 
 Report local time (America/Chicago) alongside UTC. A wrong clock has produced a wrong recommendation in this repo before.
+````
+
+### Full prompt — `oom-band-early-read` (one-time, 2026-08-17T01:00:00Z)
+
+````text
+Early read on the refresh-worker OOM lane. Self-contained — you have no memory of the session that created this.
+
+WORKING DIR: C:\Users\tempadmin\OneDrive\Coding\Syndicate
+
+WHAT THIS IS. `refresh-worker` was OOM-killed repeatedly (4 Gi container). Three fixes shipped 2026-08-16 and are live and EXERCISED, but NOT ONE has been shown to move the ~2 GB transient that causes the kills:
+  - odds-shard duplicate parse (~125 MB/build) — was `51ae7218`, now `164f6e80`
+  - ledger streaming + LEDGER_CHUNKS_ACCEPTED logging (833,550,415 bytes accepted per load) — was `21f8a165`, now `1409e96f`
+  - rank_recommendations loaded the whole ledger 3x per call -> 1x — was `aa190d58`, now `d72d670c`
+The original SHAs were REBASED away and no longer exist in the live line; the renames above were verified by `git patch-id --stable` on 2026-08-16. refresh-worker is live on **`97491161`** (finished 2026-08-16T15:45:50Z), which is `d72d670c` plus one unrelated NFL play-by-play path fix (`#441`) that touches no MLB ledger or odds allocator.
+
+WHY NOW. Kills cluster in the LIVE-SLATE band, roughly 22:00Z-05:00Z. The daytime lull shows ZERO excursions on broken AND fixed code alike, so a clean afternoon proves nothing — the pre-fix code once ran 17h51m clean in daylight. This is ~3 hours into tonight's band.
+
+RUN EXACTLY THIS:
+    py -3 scripts/oom_band_report.py --start 2026-08-16T22:00:00Z
+
+Then report, in under 15 lines:
+1. Kills in the band (the tool reads these from the EVENTS API — never from logs; a killed process emits no log line, and this repo has a retracted "0 kills" claim that came from a log grep).
+2. Excursion count/hr and mean amplitude per deploy-free segment. Night baseline amplitude is 1,950-2,235 MB.
+3. min inactive_file per segment. THIS IS THE DISCRIMINATOR: the two windows that ended in a kill bottomed at 26.3 and 42.2 MB; surviving windows kept 164-240 MB.
+4. A verdict in one sentence: are excursions back at the old amplitude (=> the three fixes were NOT the 2 GB), or genuinely reduced?
+
+IMPORTANT HONESTY RULES, which this lane has already been burned by:
+- Check CONTAINMENT, not SHA equality. The question is never "is live still `<pinned sha>`" — this branch gets rebased, which renames every SHA while changing nothing, and on 2026-08-16 that made three live fixes look reverted. Ask instead whether the fixes are still IN what is running:
+      git merge-base --is-ancestor d72d670c <live-sha> && echo "fixes present" || echo "INVESTIGATE"
+  `d72d670c` is the newest of the three (they are linear: `164f6e80` -> `1409e96f` -> `d72d670c`), so that one check covers all three. If it fails, do NOT conclude a revert — re-check by content before saying anything:
+      git show <fix-sha> | git patch-id --stable      # compare against the same over `git log <live-sha>`
+  Only if the patch-ids are genuinely absent has something been reverted. SAY SO FIRST if so.
+- Report which SHA you actually measured, and whether it differs from `97491161`. A deploy mid-band splits the segments and the tool already knows that; an UNREPORTED one silently mixes two different builds into one average.
+- Do NOT read a quiet window as success. State the window length. A short or deploy-fragmented band is not evidence.
+- Do NOT claim a fix works. The only claim available tonight is whether the transient moved.
+
+Append a short dated entry to `.syndicate/deploys.md` under a `## 2026-08-16 ~01:00Z — OOM band, early read` heading with the numbers and the verdict. Commit it through an ISOLATED index, because the shared git index in this worktree is stale continuously:
+    IDX=/c/tmp/idx-oomband-early
+    BASE=$(git rev-parse HEAD)
+    GIT_INDEX_FILE=$IDX git read-tree $BASE
+    GIT_INDEX_FILE=$IDX git add -- .syndicate/deploys.md
+    GIT_INDEX_FILE=$IDX git diff --cached --numstat    # must show ONLY that file
+    [ "$(git rev-parse HEAD)" = "$BASE" ] || echo "HEAD MOVED — re-read before committing"
+    GIT_INDEX_FILE=$IDX git commit -F -
+Use a FIXED index path as above, never `$$` or `mktemp` — each shell invocation is new, and an absent index file is an EMPTY one, not an error. If a `commit-guard` hook blocks the commit, that is a real finding: run `git reset -- <named path>` in a SEPARATE command (the hook blocks any command containing `git commit`, including one that also does the reset), then commit.
+
+DO NOT DEPLOY ANYTHING. Measurement only.
+````
+
+### Full prompt — `oom-band-full-report` (one-time, 2026-08-17T05:15:00Z)
+
+````text
+Full retrospective measurement of the refresh-worker OOM band. Self-contained — you have no memory of the session that created this.
+
+WORKING DIR: C:\Users\tempadmin\OneDrive\Coding\Syndicate
+
+WHAT THIS IS. `refresh-worker` (4 Gi) is killed by a ~2 GB TRANSIENT, not a leak: anon climbs ~2 GB in 15-25 s, collapses ~2 GB in ~2 s, and every cycle reaches headroom ~0. Whether a cycle kills is decided by how much evictable page cache remains. Three fixes shipped 2026-08-16, all live and EXERCISED, and NOT ONE has yet been shown to move the transient:
+  - odds-shard duplicate parse (~125 MB/build) — was `51ae7218`, now `164f6e80`
+  - ledger streaming + LEDGER_CHUNKS_ACCEPTED (833,550,415 bytes accepted per load) — was `21f8a165`, now `1409e96f`
+  - rank_recommendations loaded the whole ledger 3x per call -> 1x — was `aa190d58`, now `d72d670c`
+The originals were REBASED away; the renames above were verified by `git patch-id --stable` on 2026-08-16. refresh-worker is live on **`97491161`** (finished 2026-08-16T15:45:50Z) = `d72d670c` plus one unrelated NFL play-by-play path fix (`#441`).
+
+THIS RUN IS THE TEST. Kills cluster in the live-slate band ~22:00Z-05:00Z. Daytime is worthless as evidence — measured 2026-08-16, the same clock window one day apart showed peak anon 2,816.7 MB (pre-fix) vs 2,898.5 MB (post-fix) and ZERO excursions on both. The band is the only window that can separate them.
+
+RUN EXACTLY THIS:
+    py -3 scripts/oom_band_report.py --start 2026-08-16T22:00:00Z --end 2026-08-17T05:00:00Z
+
+REPORT, comparing against these recorded NIGHT baselines (from `.syndicate/deploys.md`, 2026-08-16):
+    amplitude mean          1,950 - 2,235 MB
+    min inactive_file       26.3 / 42.2 MB in the two windows that ENDED IN A KILL
+                            164 - 240 MB in windows that SURVIVED
+    kills                   2 in 26 min (f8ca54e1); 1 at 22.2 min after boot (5c419007)
+Give per-segment numbers (the tool splits on deploys, because a deploy reboots the worker and re-runs hydration cold), then a one-paragraph verdict answering exactly one question: DID THE TRANSIENT MOVE?
+  - Excursions at 1,950-2,235 MB amplitude => the three fixes were NOT the ~2 GB. Say so plainly; that is a useful result, not a failure.
+  - Materially lower amplitude or excursion rate => the first real reduction; still state the window length and deploy count.
+
+HONESTY RULES this lane has already been burned by, twice:
+- Check CONTAINMENT, not SHA equality. "Is live still `<pinned sha>`" is the wrong question — this branch gets rebased, which renames every SHA while changing nothing, and on 2026-08-16 that made three live fixes look reverted. Ask whether the fixes are still IN what runs:
+      git merge-base --is-ancestor d72d670c <live-sha> && echo "fixes present" || echo "INVESTIGATE"
+  The three are linear (`164f6e80` -> `1409e96f` -> `d72d670c`), so that single check covers all three. On failure do NOT report a revert — re-check by content (`git show <sha> | git patch-id --stable`, compared across `git log <live-sha>`) and only call it reverted if the patch-ids are genuinely absent. If they are, SAY SO FIRST.
+- Report the SHA you actually measured and whether it moved from `97491161` during the band. The tool splits on deploys; an unreported redeploy still mixes two builds into one verdict.
+- Count the deploys in the band. If the band is fragmented into short segments, the ratchet never re-warms and the result is weak — say that rather than averaging it away.
+- A quiet band is NOT proof. State window length. The pre-fix code once ran 17h51m clean in daylight.
+- Kills come from the EVENTS API only, which the tool already does. Never conclude "no kills" from a log search.
+
+Then append a dated entry to `.syndicate/deploys.md` under `## 2026-08-17 ~05:1xZ — OOM BAND, FULL RESULT` containing the per-segment table, the verdict, and — if the transient did NOT move — the explicit note that the remaining allocator is still unnamed and the next candidate must be found by measurement, not by guessing. Commit through an ISOLATED index (the shared index here is stale continuously):
+    IDX=/c/tmp/idx-oomband-full
+    BASE=$(git rev-parse HEAD)
+    GIT_INDEX_FILE=$IDX git read-tree $BASE
+    GIT_INDEX_FILE=$IDX git add -- .syndicate/deploys.md
+    GIT_INDEX_FILE=$IDX git diff --cached --numstat     # ONLY that file
+    [ "$(git rev-parse HEAD)" = "$BASE" ] || echo "HEAD MOVED — re-read"
+    GIT_INDEX_FILE=$IDX git commit -F -
+FIXED index path, never `$$` or `mktemp`: each shell call is new, and an absent index file is an EMPTY one, not an error. If the `commit-guard` hook blocks you, that is a genuine stale-index finding — run `git reset -- <named path>` as its OWN command (the hook blocks any command containing `git commit`), then commit.
+
+DO NOT DEPLOY ANYTHING. Measurement only. If the result is bad, the correct output is an accurate report, not a fix.
 ````
