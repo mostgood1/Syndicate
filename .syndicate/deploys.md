@@ -5157,7 +5157,6 @@ verification; "live" is a lease.
 channel is wired. **It confirms nothing about the `or 0.5` fix.** A route that
 answers is not a producer that reported.
 
-<<<<<<< HEAD
 **FIRST CROSS-SERVICE READING, 2026-08-16T02:02:33Z — THE CHANNEL IS PROVEN.**
 
     wnba / live-odds-worker   rows=0  null_no_price=0  date=2026-08-15
@@ -5269,5 +5268,3 @@ still dark. Next deployer of live-odds-worker should carry
 `3573a0c3` is already stale). The hourly `wnba-win-prob-counter-read` scheduled
 task now reads this endpoint and will report "writer not deployed" until then —
 that is a true statement, not a null result.
-=======
->>>>>>> origin/main
