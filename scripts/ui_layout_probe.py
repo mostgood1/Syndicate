@@ -295,6 +295,39 @@ MEASURE_JS = """
     // whole observed range is not driving height. Desktop groups measured
     // 10-38px explained; mobile Preview measured 745px.
     const contentIndependent = explained < 50;
+    // THE FLOOR NO MODEL IN `u` CAN BEAT: cards carrying IDENTICAL content
+    // still differ in height, because a pair's text WRAPS. The summary grid is
+    // a wrapping flow -- 10 columns at 1440, 2 at 390 -- so a long team name or
+    // a 5-character price pushes a row that a short one does not, and the pair
+    // COUNT does not see it. Measured on production MLB, 2026-08-16, one slate,
+    // one instant, all 15 cards Preview:
+    //
+    //     desktop u=45 (n=7) 1092..1208 = 116px    mobile u=45 (n=7) = 81px
+    //     desktop u=49 (n=5) 1106..1203 =  97px    mobile u=49 (n=5) = 40px
+    //
+    // A second variable does not rescue it: cards agreeing on BOTH visible pair
+    // count and visible row count still spread **74px** on desktop.
+    //
+    // This is what makes desktop UNFITTABLE rather than mis-tuned. `reliable`
+    // wants residual <= 0.25 * explained, so a 116px floor needs 464px of
+    // explained range; desktop's content spans 197px. No slope and no intercept
+    // reach that, and moving the threshold to make it pass would be
+    // manufacturing a fit rather than finding one.
+    //
+    // It also reframes a PASSING model. Mobile's residual is 81px and its floor
+    // is 81px -- the fit sits exactly on the noise floor, so it is reporting how
+    // text wraps, not a layout deviation. Mobile passes because its slope is
+    // ~62px/pair against desktop's ~16px, which buys 743px of explained range
+    // to hide the same noise behind.
+    const byU = {};
+    pts.forEach((p) => (byU[p.u] = byU[p.u] || []).push(p.h));
+    const tied = Object.values(byU).filter((v) => v.length > 1);
+    const floorPx = tied.length
+      ? Math.round(Math.max(...tied.map((v) => Math.max(...v) - Math.min(...v))))
+      : null;
+    // The best ratio ANY model in `u` could reach on this slate. Above the
+    // reliability bar means no fit is possible here, however the line is drawn.
+    const floorRatio = floorPx !== null && explained > 0 ? floorPx / explained : null;
     return {
       n,
       pxPerUnit: Math.round(slope * 10) / 10,
@@ -306,6 +339,12 @@ MEASURE_JS = """
       fitRatio: fitRatio === null ? null : Math.round(fitRatio * 100) / 100,
       contentIndependent,
       reliable: fitRatio !== null && fitRatio <= 0.25,
+      // Model-free, no free parameters, and the same number at both widths:
+      // two cards with the same amount of data should be the same height.
+      floorPx,
+      floorRatio: floorRatio === null ? null : Math.round(floorRatio * 100) / 100,
+      unfittable: floorRatio !== null && floorRatio > 0.25,
+      atNoiseFloor: floorPx !== null && residualSpread <= floorPx,
       worstCard: worst,
     };
   }
@@ -886,6 +925,17 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                             "driving height -- this is a layout difference"
                         )
                         ok = False
+                elif model.get("unfittable"):
+                    # Not "mis-tuned" and not "no signal" -- IMPOSSIBLE. State
+                    # the floor and the range so the number can be checked
+                    # rather than believed, and so nobody tries to rescue this
+                    # by moving LAYOUT_RESIDUAL_BUDGET_PX or the fit ratio.
+                    issues.append(
+                        f"layout model UNFITTABLE in {model['state']}: "
+                        f"identical-content cards differ by {model['floorPx']}px while "
+                        f"content explains only {model['explainedPx']}px -- no model in "
+                        "pair count fits here at ANY threshold (text wrap drives height)"
+                    )
                 elif not model.get("reliable"):
                     issues.append(
                         f"layout model UNRELIABLE in {model['state']} "
@@ -893,9 +943,20 @@ def summarize(report: dict[str, Any]) -> tuple[list[str], bool]:
                         "explained) -- no layout signal here"
                     )
                 else:
+                    # A fit sitting ON its floor has not measured a deviation.
+                    # Saying so is the difference between "82px of layout
+                    # residual" and "82px of text wrapping".
+                    floor_note = ""
+                    if model.get("atNoiseFloor"):
+                        floor_note = (
+                            f" -- AT ITS NOISE FLOOR ({model['floorPx']}px between "
+                            "identical-content cards), so this is text wrap, not "
+                            "layout deviation"
+                        )
                     issues.append(
                         f"layout residual {model['residualSpread']}px in {model['state']} "
                         f"({model['chromePx']}px chrome + {model['pxPerUnit']}px/pair)"
+                        + floor_note
                     )
                     if model["residualSpread"] > LAYOUT_RESIDUAL_BUDGET_PX:
                         issues.append(

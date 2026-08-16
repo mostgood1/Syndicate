@@ -452,3 +452,119 @@ def test_a_report_predating_the_field_is_not_failed_on_it():
     assert ok
     assert "CONTENT CONTRADICTED" not in text
     assert "settle rests on absence" not in text
+<<<<<<< Updated upstream
+=======
+
+
+# --- the desktop height model: unfittable, not mis-tuned -------------------
+#
+# Measured on production MLB, 2026-08-16, one slate, one instant, 15 Preview
+# cards. Cards with IDENTICAL pair counts still differ in height because the
+# summary grid is a wrapping flow (10 columns at 1440, 2 at 390) and text width
+# decides where it wraps:
+#
+#     desktop u=45 (n=7) 1092..1208 = 116px      mobile u=45 (n=7) = 81px
+#     desktop u=49 (n=5) 1106..1203 =  97px      mobile u=49 (n=5) = 40px
+#
+# Agreeing on visible pair count AND visible row count still leaves 74px on
+# desktop, so this is not a missing variable either.
+
+
+def _fit(pts):
+    """Run the real `fitGroup` over points, via the JS the probe ships."""
+    pytest.importorskip("playwright.sync_api")
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch()
+        page = browser.new_page()
+        page.set_content(
+            "<div id='s'>"
+            + "".join(
+                f"<div class='cards-game-card' style='height:{h}px'>"
+                f"<span class='cards-status-badge'>Preview</span>"
+                + "<div class='cards-data-pair'>x</div>" * u
+                + "</div>"
+                for u, h in pts
+            )
+            + "</div>"
+        )
+        model = page.evaluate(
+            probe.MEASURE_JS,
+            {"typeClasses": probe.TYPE_CLASSES, "numericClasses": probe.NUMERIC_CLASSES},
+        )
+        browser.close()
+    return (model.get("heightModelByState") or {}).get("Preview")
+
+
+DESKTOP_PTS = [(49, 1157), (49, 1197), (45, 1134), (49, 1120), (45, 1111),
+               (53, 1129), (45, 1092), (49, 1106), (45, 1157), (45, 1208),
+               (41, 914), (45, 1180), (45, 1180), (41, 914), (49, 1203)]
+MOBILE_PTS = [(49, 4162), (49, 4174), (45, 3867), (49, 4145), (45, 3930),
+              (53, 4358), (45, 3849), (49, 4134), (45, 3907), (45, 3907),
+              (41, 3627), (45, 3907), (45, 3907), (41, 3657), (49, 4162)]
+
+
+def test_the_desktop_slate_is_unfittable_not_merely_unreliable():
+    m = _fit(DESKTOP_PTS)
+    assert m["floorPx"] == 116, m
+    assert m["unfittable"] is True
+    # 116px of floor needs 464px of explained range to clear the 0.25 bar.
+    # Desktop's content spans 197px, so no threshold rescues it.
+    assert m["explainedPx"] < 4 * m["floorPx"]
+    assert m["reliable"] is False
+
+
+def test_the_mobile_fit_sits_exactly_on_its_own_noise_floor():
+    """It passes -- but its residual IS the identical-content spread, so it is
+    reporting text wrap rather than a layout deviation."""
+    m = _fit(MOBILE_PTS)
+    assert m["reliable"] is True
+    assert m["floorPx"] == 81
+    assert m["residualSpread"] == 81
+    assert m["atNoiseFloor"] is True
+    assert m["unfittable"] is False
+
+
+def test_mobile_passes_only_because_its_slope_buys_range():
+    """Same noise, four times the slope. That is the whole difference."""
+    desktop, mobile = _fit(DESKTOP_PTS), _fit(MOBILE_PTS)
+    assert desktop["floorPx"] >= mobile["floorPx"]
+    assert mobile["explainedPx"] > 3 * desktop["explainedPx"]
+
+
+def test_unfittable_is_reported_as_impossible_not_as_no_signal():
+    text, ok = _summarize(_report(heightModel=_model(
+        reliable=False, unfittable=True, floorPx=116, explainedPx=197, fitRatio=1.16)))
+    assert ok, text
+    assert "UNFITTABLE" in text
+    assert "identical-content cards differ by 116px" in text
+    assert "at ANY threshold" in text
+    # The old wording invited a threshold tweak; it must not be what prints.
+    assert "no layout signal here" not in text
+
+
+def test_a_fit_on_its_noise_floor_says_so_rather_than_claiming_a_residual():
+    text, ok = _summarize(_report(heightModel=_model(
+        residualSpread=81, floorPx=81, atNoiseFloor=True)))
+    assert ok, text
+    assert "AT ITS NOISE FLOOR (81px between identical-content cards)" in text
+    assert "text wrap, not layout deviation" in text
+
+
+def test_a_fit_clear_of_its_floor_still_reads_as_a_real_residual():
+    text, ok = _summarize(_report(heightModel=_model(
+        residualSpread=54, floorPx=20, atNoiseFloor=False)))
+    assert ok, text
+    assert "layout residual 54px in Preview" in text
+    assert "NOISE FLOOR" not in text
+
+
+def test_a_slate_with_no_tied_cards_reports_no_floor_rather_than_zero():
+    """No two cards share a pair count, so the floor is unmeasured -- and an
+    unmeasured floor must not read as a floor of 0px (a perfect instrument)."""
+    m = _fit([(41, 900), (45, 1000), (49, 1100), (53, 1200), (57, 1300)])
+    assert m["floorPx"] is None
+    assert m["unfittable"] is False
+    assert m["atNoiseFloor"] is False
+>>>>>>> Stashed changes

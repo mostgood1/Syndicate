@@ -2546,3 +2546,40 @@ and then failed the thing it was checking, which is the point of running it.
   success token, never on the absence of a failure string" — `_settle` was that
   rule recurring in a render poll. Absence of DOM change cannot distinguish
   "render finished" from "render has not started".
+
+### ui-probe-desktop-height-model — CLOSED 2026-08-16 — desktop is UNFITTABLE, not mis-tuned; measured the floor instead of tuning the threshold — opened 2026-08-16 — session: ui-probe-rerun-compare
+- Goal: desktop reports a height figure that is a real layout signal — either a
+  model that fits because it matches how the desktop grid actually sets height,
+  or a stated finding that no per-card model can fit and why.
+- Files: `scripts/ui_layout_probe.py`, `tests/test_ui_layout_probe.py`
+- Hypothesis (written BEFORE testing): (a) grid row-stretching, or (b) pairs
+  wrapping into columns so height goes as `ceil(u/cols)`.
+- **BOTH HYPOTHESES FALSIFIED.** (a) dead: every card sits at `left=4`, one per
+  row — there is no row to equalise against. (b) dead as stated: the pair grid is
+  10 visible columns at 1440 and 2 at 390, not 2, and `visRows` fits WORSE than
+  `u` (ratio 1.69 vs 1.16).
+- **What is true instead:** the grid is a wrapping flow and text WIDTH decides
+  where it wraps, so height is not a function of pair count at all. Cards with
+  identical `u` differ by **116px** (u=45, n=7) and **97px** (u=49, n=5) on
+  desktop; by 81px and 40px on mobile. Agreeing on BOTH `uVis` and `visRows`
+  still leaves **74px**. That is a floor no model in these variables can beat.
+- **Why no threshold rescues it:** `reliable` needs `residual <= 0.25*explained`,
+  so a 116px floor requires 464px of explained range; desktop's content spans
+  197px. Tuning the bar would manufacture a fit.
+- **Bonus correction:** mobile's residual (81px) EQUALS its floor (81px) — the
+  passing model sits on the noise floor and reports text wrap, not layout
+  deviation. It passes only because its slope is ~62px/pair vs desktop's ~16,
+  buying 743px of range to hide identical noise behind. This revises the
+  "residual band ~80–105px" recorded earlier in `log/2026-08-16.md`.
+- Verification: 42 tests pass (35 prior + 7 new); the new ones drive the REAL
+  shipped `fitGroup` JS in a headless browser over captured production points and
+  independently reproduce `floorPx == 116` and mobile `residual == floor == 81`.
+- **Verification LIMIT, not claimed as done:** not observed on a live run. The
+  11:5x CDT slate collapsed to a uniform 33 pairs at both widths with games Live,
+  so nothing fits anywhere (`statesUnfitted: [Live, Preview]`). Verified by
+  replay through the shipped code path only.
+- Follow-up left open by decision, not oversight: making desktop actually fit
+  needs a variable capturing rendered text extent (summed visible section
+  heights, or per-section wrapped row counts). Both edge toward circular, so it
+  was flagged for a call rather than chosen unilaterally.
+- Blocked by: none
