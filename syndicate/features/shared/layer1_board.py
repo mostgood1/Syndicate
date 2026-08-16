@@ -105,8 +105,36 @@ _SLATE_WINDOW_DAYS = {
     "nba": 1,
     "wnba": 1,
     "nhl": 1,
-    # Thu through Mon. Measured: NFL's grid fixture dates cluster Thu/Sun/Mon.
-    "nfl": 5,
+    # SEVEN, not five, and the number is measured rather than reasoned.
+    #
+    # Five was "Thu through Mon", taken from where the REGULAR season's fixture
+    # dates cluster (Thu/Sun/Mon). It is correct for that and silently wrong for
+    # the preseason, whose week runs Fri/Sat/Sun/Mon and which is reached from a
+    # Sunday anchor at +5 days -- exactly one day past the edge of a 5-day
+    # forward window.
+    #
+    # Measured against the real schedules on 2026-08-16 (a Sunday), counting
+    # games actually inside the window:
+    #
+    #     width  preseason games   regular season from Thu 2026-09-10
+    #       5          1           09-10, 09-13, 09-14
+    #       7         15           09-10, 09-13, 09-14      <- unchanged
+    #       9         17           ...plus 09-17, the NEXT Thursday
+    #
+    # So 7 is the only width that gains the preseason slate WITHOUT pulling a
+    # second regular-season week onto a "today" board. Nine would: the NFL week
+    # is 7 days, so any window wider than 7 anchored on a Thursday reaches the
+    # following Thursday's games. Over-inclusion is not free here -- `#329`'s
+    # notes record 1,244 NFL rows starting 34-156 days out reaching a today
+    # board once already.
+    #
+    # This does NOT fix NFL's empty board on its own. As of this change the
+    # 08-16..08-22 window is quoted for zero of those 15 games; whether that is
+    # a capture gap or a vendor that has not posted week-3 lines is the open
+    # question the `[nfl_preseason] events_fetched` instrument now answers. The
+    # width was a SECOND, independent reason those games could not appear, and
+    # it is the half that needed no vendor answer.
+    "nfl": 7,
     # Thu through Sat.
     "ncaaf": 3,
     "ncaab": 1,

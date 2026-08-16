@@ -277,8 +277,15 @@ def test_slate_window_is_forward_only_and_per_sport():
     # put yesterday's settled games on a pregame board for any sport whose slate
     # spans days.
     assert resolve_window_dates("mlb", "2026-08-10", window="slate") == ["2026-08-10"]
+    # SEVEN since 2026-08-16, not five. Measured, not preferred: from a Sunday
+    # anchor the NFL PRESEASON week (Fri/Sat/Sun/Mon) begins at +5 days, one day
+    # past a 5-day forward window, so the board reached 1 preseason game where 7
+    # reaches 15. Seven is also the widest width that does NOT pull a second
+    # regular-season week in -- the NFL week is 7 days, so 9 anchored on a
+    # Thursday would reach the following Thursday's games.
     assert resolve_window_dates("nfl", "2026-08-10", window="slate") == [
         "2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13", "2026-08-14",
+        "2026-08-15", "2026-08-16",
     ]
     assert resolve_window_dates("ncaaf", "2026-08-10", window="slate") == [
         "2026-08-10", "2026-08-11", "2026-08-12",
@@ -287,7 +294,7 @@ def test_slate_window_is_forward_only_and_per_sport():
     # Explicit day counts override, and an unknown sport gets the safe single day.
     assert resolve_window_dates("nfl", "2026-08-10", window=2) == ["2026-08-10", "2026-08-11"]
     assert resolve_window_dates("kabaddi", "2026-08-10", window="slate") == ["2026-08-10"]
-    assert slate_window_days("nfl") == 5
+    assert slate_window_days("nfl") == 7
 
 
 def test_a_window_keeps_fixtures_across_its_whole_span():

@@ -64,9 +64,15 @@ def test_single_day_sports_are_unchanged():
 
 
 def test_multi_day_sports_match_their_layer1_windows():
-    # nfl 5 dates -> delta 4; ncaaf 3 -> delta 2.
-    assert _within_horizon(_row("nfl", days_out=4), NOW, 1)
-    assert not _within_horizon(_row("nfl", days_out=5), NOW, 1)
+    # nfl 7 dates -> delta 6; ncaaf 3 -> delta 2.
+    #
+    # NFL widened 5 -> 7 on 2026-08-16 so the preseason week (Fri/Sat/Sun/Mon,
+    # which starts at +5 from a Sunday anchor) is reachable at all. THIS TEST
+    # TRACKING IT IS THE POINT: its name says these horizons match Layer 1's
+    # windows, and the shared `slate_window_days` table is what makes that true
+    # by construction rather than by two constants agreeing today.
+    assert _within_horizon(_row("nfl", days_out=6), NOW, 1)
+    assert not _within_horizon(_row("nfl", days_out=7), NOW, 1)
     assert _within_horizon(_row("ncaaf", days_out=2), NOW, 1)
     assert not _within_horizon(_row("ncaaf", days_out=3), NOW, 1)
 

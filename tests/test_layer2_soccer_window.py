@@ -52,7 +52,13 @@ def test_single_date_sports_are_unaffected():
 def test_multi_day_sports_match_their_layer1_windows():
     # NFL and NCAAF fixtures also span days; they get the same treatment for the
     # same reason, and their windows must not diverge from Layer 1's.
-    assert len(resolve_window_dates("nfl", "2026-08-12", window="slate")) == 5
+    #
+    # NFL is SEVEN since 2026-08-16 (was five). This is the THIRD file asserting
+    # that width -- the others are `test_layer1_board` and
+    # `test_layer2_sport_horizon` -- and all three read it from the same
+    # `slate_window_days` table, which is the thing that keeps the two boards
+    # from diverging. Three literal 5s were the cost of that guarantee.
+    assert len(resolve_window_dates("nfl", "2026-08-12", window="slate")) == 7
     assert len(resolve_window_dates("ncaaf", "2026-08-12", window="slate")) == 3
 
 
