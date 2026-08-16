@@ -3268,3 +3268,100 @@ the `edge_vs_market_pct` pairing defect — the harness warning
 and nobody would ever have looked.** When adding a reconciliation check, make its
 failure VISIBLE (a null, a counter, a warning) rather than falling back to
 whichever input looks reasonable.
+### 2026-08-16 — AN ISOLATED-INDEX COMMIT IS PROTECTED FROM THE SHARED INDEX AND NOT FROM A HEAD MOVE. Mine was orphaned within minutes, and so was another lane's
+
+**The documented recipe protects your commit's CONTENT from other sessions'
+staged junk. It does nothing to protect its REACHABILITY.** I committed
+`87ffffd2` through `GIT_INDEX_FILE` with every guard this file prescribes —
+2 files, 0 deletions, asserted in the same shell, shared index repaired
+afterwards. Minutes later `git merge-base --is-ancestor 87ffffd2 HEAD` returned
+FALSE: another session had moved local `main` to `1508c463`, which does not
+descend from it (reflog `HEAD@{0}`, empty message — a reset or checkout, not a
+commit). No ref reached it, `git branch -a --contains` was empty, and it was not
+on `origin/main`. **`05f7d8fb`, another lane's wnba commit, was orphaned by the
+same move** — so this is a worktree-wide event, not one session's mistake.
+
+- **The rule going forward:**
+  1. **A commit is not durable until it is REACHABLE. Assert it:**
+     `git merge-base --is-ancestor <sha> HEAD`. Presence in `git log` right
+     after committing proves nothing five minutes later, and presence in the
+     REFLOG is not reachability at all — a dangling commit still reflogs.
+  2. **Re-assert at checkpoint**, not only at commit time. This session's commit
+     was made and orphaned inside one turn boundary.
+  3. **Recovery is cheap IF the blobs are checked first.** `git rev-parse
+     <sha>:<path>` vs `git hash-object <worktree path>` — confirm byte-identity,
+     then re-commit onto the new HEAD. Re-committing without that check would
+     silently ship whatever another session had left in the worktree.
+  4. **Do not rescue another lane's orphan.** Record it and notify; their
+     content may have been deliberately superseded (`origin/main` here carried a
+     DIFFERENT wnba commit, `e9fdcf98`).
+  5. **`git status` says nothing about this.** It reported a clean tree for
+     files that had just fallen out of history.
+
+### 2026-08-16 — A COLLISION CHECK IS A READING WITH A TIMESTAMP, NOT A FACT. A lane was re-opened between my check and my edit
+
+At `/lane open` the header for `mlb-live-gameline-distributions` read
+`CLOSED-VERIFIED 2026-08-16 22:2xZ`, so I recorded its claim on
+`vendor/.../flask_frontend.py` as released and wrote that into my lane block.
+Between that read and the edit, the holding session **re-opened it** (`12bba949`
+— *"the line-gate PASS was a pass on an empty population; a verifier that cannot
+fail cannot pass"*). `lane-guard` blocked the edit and **the guard was right**.
+
+- **The rule going forward:** re-run the collision check **immediately before
+  the edit**, not only at lane open. A CLOSED lane can re-open — closure is
+  itself a claim that can be withdrawn, and withdrawal is exactly what a failed
+  verification produces. Corollary: when a guard contradicts your own recorded
+  check, **the guard is reading now and you read earlier** — believe it and
+  re-read before arguing.
+- Same session, same mechanism: my first `lanes.md` lane block was **overwritten
+  wholesale** by a parallel session's write and had to be re-appended.
+
+### 2026-08-16 — `commit-guard`'s suggested fix list was INCOMPLETE on all THREE occurrences in one session
+
+Already recorded as a hazard; this is the evidence that it is the norm, not the
+exception. Omitted: `.syndicate/scheduled_task_ncaaf_445.md` (0/-58) on the
+first block, and `.syndicate/deploys.md` (0/-66) on the second.
+
+- **The rule going forward:** after running the guard's `git restore --staged`
+  line, **re-print the WHOLE index and audit every remaining path yourself** —
+  for each, is it on disk, and is it in HEAD? `absent on disk + in HEAD` is a
+  legitimate deletion (leave it — `scheduled_task_ncaaf_445.md` was one);
+  `present on disk + in HEAD + staged as deleting lines` is a stale-index revert
+  (disarm it). Do not treat the guard's list as the fix.
+
+- **ADDENDUM 2026-08-16, same session:** it happened a SECOND time — the
+  re-commit `af3017e6` was orphaned by a hard reset of local `main` to
+  `origin/main` minutes later. **Re-committing onto `main` is therefore not the
+  fix.** The fix is a REF: `git branch lane/<slug> <sha>` makes the commit
+  reachable, immune to any `main` move, and safe from gc, at zero cost to any
+  other session. **In this worktree, do that immediately after every commit,
+  before doing anything else** — and treat a commit as durable only once it is
+  on `origin/main`.
+
+## 2026-08-16 — OVERRIDE, LOGGED: an unattended session was authorised by the user to fire this deploy
+
+The FORBIDDEN entry above ("never let an UNATTENDED session fire a deploy") was
+raised to the user twice with its reasoning — the same-day `wnba-win-prob-counter-read`
+incident, the absent structural control, and the tell that `send_message` is
+unavailable in unattended runs so the session that most needs to coordinate cannot.
+The user chose it deliberately, in these words: **"fire it"**, after being offered
+the alternative of running `.syndicate/handoff_deploy_freeze_reader_tree.md` from
+their own attended window.
+
+**Scope of the override:** deploy `_freeze_market_dirs` (blob `426bbd70`, on
+`origin/main`) to refresh-worker and live-odds-worker. Nothing else.
+
+**What the override does NOT suspend**, and these were kept:
+- the in-flight job gate — both workers read HOLD (5 and 3 jobs, including
+  `run_mlb_daily_sim_job.py`) at 22:15Z and the deploy waited rather than killing them;
+- ROUTE ONE (warm-up deploy before target), one service at a time, `finishedAt`
+  observed between calls;
+- verification by CONTENT, by blob, never by ancestry;
+- rollback SHAs captured before firing.
+
+**The rule is unchanged and still stands for the next run.** This entry records a
+human decision on one deploy, not a precedent. The structural fix the earlier entry
+asks for — no `RENDER_API_KEY` in an unattended run environment, or a
+`deploy_claim.py` that refuses an unattended holder — is still not built, and until
+it is, "the session judged it was fine" is the only thing standing between an
+unattended run and three restarted services.

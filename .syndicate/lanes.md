@@ -3876,3 +3876,88 @@ and then failed the thing it was checking, which is the point of running it.
   `scripts/census_kickoff_hours.py`, `scripts/watch_branch_overlap.py`, plus tests.
 - **Plan artifact:** `.syndicate/plan_2026-08-16_sim_scheduling.md` (`#440`) —
   phases 0/1 landed, phases 2-9 untouched.
+
+### game-shape-capture — UPDATE 2026-08-16 ~23:0xZ (checkpoint) — **PRIMITIVE COMMITTED `af3017e6`; EMIT STILL BLOCKED; HANDOFF SENT**
+
+- **Committed:** `af3017e6` — `game_shape.py` (356 ln) + `test_game_shape.py`
+  (332 ln), 2 files / 688 insertions / **0 deletions**, through an isolated
+  `GIT_INDEX_FILE` with the file-count and deletion guards asserted in the same
+  shell. Reachability asserted after the fact (`merge-base --is-ancestor`) —
+  see below for why that step is not optional.
+- **THE FIRST COMMIT (`87ffffd2`) WAS ORPHANED WITHIN MINUTES.** Another session
+  moved local `main` to a commit not descending from it. Blobs were verified
+  byte-identical (`rev-parse <sha>:<path>` vs `hash-object`) and re-committed as
+  `af3017e6`. **`05f7d8fb`, another lane's wnba commit, was orphaned by the same
+  move and is NOT recovered here** — it belongs to that lane and `origin/main`
+  carries a different wnba commit (`e9fdcf98`). Rule filed in `learnings.md`.
+- **`commit-guard` blocked twice**, both times on stale shared-index reverts that
+  were not mine (5 ledger files, then 5 more incl. 182 dropped lines of
+  `live_refresh_loop.py`). Disarmed path-scoped, index-only. **Its fix list was
+  incomplete BOTH times** (`scheduled_task_ncaaf_445.md`, then `deploys.md`);
+  every remaining staged path was audited by hand for on-disk/in-HEAD status.
+  Other sessions' legitimate staged work was left untouched throughout.
+- **HANDOFF SENT** to session `Layer 1 board coverage audit (fork 2)`
+  (`local_c83b3d44-…`), which holds both `mlb-live-gameline-distributions` and
+  `wnba-live-tier`: the two-line change (bind `situation` INSIDE the existing
+  `try` so the bare-except semantics are unchanged; one `"gameShape"` key on the
+  return) plus the guarded helper. **No reply yet.** They may decline; the
+  primitive stands either way.
+- **STILL BLOCKED, and the lane's verification has NOT run.** No production data
+  has passed through this code. Every bucket count is **n=0**. Do not read
+  "committed and tested" as "working in production".
+- **Local `main` is ahead 1 / behind 2 of `origin/main` — `af3017e6` is NOT
+  PUSHED.** That is the single largest risk to this work surviving.
+- Blocked by: `mlb-live-gameline-distributions` (emit half only).
+
+#### game-shape-capture — ORPHANED A SECOND TIME, THEN ANCHORED `[2026-08-16 ~23:1xZ]`
+
+`af3017e6` was orphaned **again** while this checkpoint was being written —
+local `main` was hard-reset to `origin/main` (`git status -sb` went from
+`ahead 1, behind 2` to level). Twice in one session, two different sessions'
+commits, so **re-committing onto `main` is not a fix; the next reset takes it
+too.**
+
+**The work is now anchored on a real ref: branch `lane/game-shape-capture` ->
+`af3017e6`.** A ref makes the commit reachable, immune to any `main` move, and
+safe from gc — and it costs nothing and touches no other session. Blobs
+re-verified against disk (`95035c9a…`, `907b4d4e…`). **`game_shape.py` is NOT
+in `main`/`HEAD` and NOT on `origin/main`.**
+
+**NEXT ACTION for whoever picks this up:** get `lane/game-shape-capture` onto
+`origin/main` (cherry-pick or merge, then push) — until then this work exists
+only in this worktree.
+- **CHECKPOINT 2 — 2026-08-16 ~22:3xZ. DEPLOY AUTHORISED, ARMED, NOT FIRED.**
+  - Fix is on `origin/main` (blob `426bbd70`, `_freeze_market_dirs` = 2) and **not live** on either worker (both `f471b0d2`, = 0). Verified by blob, not ancestry.
+  - User authorised this unattended session to fire it ("fire it"), logged as an OVERRIDE in `learnings.md` with scope bounded to this one deploy. **The override does not suspend the job gate.**
+  - Not fired because both workers read HOLD at every check — refresh-worker 5 jobs incl. `run_mlb_daily_sim_job.py`, live-odds-worker 3 jobs.
+  - **User constraint: do not fire if it slips past 08-17 first pitch.** Watch `bs8qocgqt` has two exits, `DEPLOYABLE` and `DEADLINE`; a resolver error counts as expired so an instrument failure cannot authorise a deploy. Deadline is measured from the production 08-17 snapshot, on a conservative 16:00:00Z floor until that feed populates (it currently holds 0 games).
+  - `grading-freeze-payload-check` re-aimed to **date 08-17, firing 08-18 07:00 CT**, and gained Gate A: prove by content that the fix was RUNNING for the whole slate, else VOID rather than FAIL.
+  - **NEXT ACTION:** if the window opens before first pitch, deploy both workers per the handoff doc (ROUTE ONE warm-up, one service at a time, verify by blob). If it does not, do not fire — let Tuesday's check return VOID and deploy for a later date.
+
+#### game-shape-capture — **PUSHED AND VERIFIED ON `origin/main` `597f4a80`** `[2026-08-16 ~23:2xZ]`
+
+Supersedes the two orphaning entries above: the work is now durable off this
+worktree.
+
+- **`dff358bb..597f4a80` on `origin/main`.** Built with plumbing directly on
+  `origin/main`'s tip (`read-tree` into an isolated index -> `write-tree` ->
+  `commit-tree -p origin/main` -> `push <sha>:main`), so it touched **no**
+  working-tree file, **not** local `main`, and **not** the shared index — the
+  three things that had already destroyed this commit twice.
+- **Guards asserted before the push, in the same shell:** diff vs `origin/main`
+  is exactly 2 files / **688 insertions / 0 deletions**, and the new commit's
+  parent IS `origin/main` (checked by `rev-parse`, not assumed).
+- **Verified AFTER the push, by re-fetch:** both paths present on `origin/main`;
+  blobs byte-identical to disk (`95035c9a…`, `907b4d4e…`); **0 carriage returns**
+  in the pushed blob — relevant because `origin/main`'s previous tip
+  (`dff358bb`) was itself a warning that the commit recipe is the CRLF vector.
+  That vector is `git hash-object --stdin` WITHOUT `--path`, which this recipe
+  does not use.
+- **`lane/game-shape-capture` re-anchored to `597f4a80`.**
+- **A useful side effect:** the resets that orphaned this work twice were to
+  `origin/main`. Now that the commit IS on `origin/main`, the next such reset
+  DELIVERS these files instead of destroying them.
+- **UNCHANGED BY THE PUSH — do not read this as progress:** nothing emits
+  `gameShape`, the lane's verification has not run, and **every bucket count is
+  still n=0**. The handoff to `Layer 1 board coverage audit (fork 2)` is
+  unanswered.
