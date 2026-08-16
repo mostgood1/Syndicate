@@ -5357,3 +5357,171 @@ worker half, which `refresh-worker-oom-recurrence` still holds.
 **Cost:** fired 22:31 Central with 2 MLB games live; the board 502'd during a
 ~7-minute stop-then-start swap. No worker restarted; no sim killed; the OOM
 lane's hold was not crossed. `render.yaml` untouched, so no `blueprint_sync`.
+
+---
+
+## 2026-08-16 ~02:5xZ — MEASUREMENT, NO DEPLOY — `refresh-worker-oom-recurrence`
+
+**No deploy was made. Nothing was changed on any service.** This is the
+attribution the lane was opened to produce, and the reason not to deploy.
+
+### THE QUESTION: did `#435` regress, or is this a second contributor?
+
+**`#435` did NOT regress. This is a second, independent condition — and it is
+NOT a leak, it is a ~2 GB TRANSIENT.**
+
+Two things resolve the apparent contradiction with the ledger's
+`#435 deployed: peak anon 2,869 → 1,071 MB`:
+
+1. **Ancestry.** `c67f7373` (the `#435` streaming reader) IS an ancestor of
+   refresh-worker's live SHA `f8ca54e1`. `read_book_quotes_latest` is present in
+   the deployed tree at `odds_book_quotes.py:928`, called from
+   `layer2_shortlist.py:100`. The fix is in production by content.
+2. **The two numbers are DIFFERENT QUANTITIES.** `2,869 → 1,071 MB` is the cost
+   of the book_quotes READ. `3,857 MB` is CONTAINER anon. Comparing them is the
+   same scope error that produced the retracted "673MB outside pymalloc".
+   **"anon is back at 3,857" was never in contradiction with `#435`.**
+
+### METHOD, AND THE WINDOWS ACTUALLY USED
+
+Kills read from `/v1/services/srv-d91dpertqb8s73co8ls0/events`, never logs.
+Every window below is **DEPLOY-FREE** — bounded by a `deploy_ended` on one side
+and a `deploy_started` or a kill on the other. Positive control run on the log
+probe before trusting any of it (1,266 matches over a stated 11.6 min window).
+Coverage gaps after each boot are the watchdog's own emission gate
+(`pct >= 60%` OR a 200 MB move), not pager truncation.
+
+### THE KILL LIST, FROM EVENTS
+
+    08-14 22:17Z .. 08-15 05:02Z   21 oomKills   3.11 /hour   (pre-#435)
+    08-15 05:02Z .. 08-16 02:11Z    0 oomKills   over 21h 08m
+    08-16 02:11:34Z, 02:37:06Z      2 oomKills   memoryLimit 4Gi
+
+live-odds-worker in the same window: **0**. Its kills are ~6 h apart and the
+most recent is 2026-08-15T20:03:41Z — a different, slower condition. Control holds.
+
+### WHAT IS ACTUALLY HAPPENING — 22 EXCURSIONS, 5 DEPLOY-FREE WINDOWS
+
+The worker runs a **repeating sawtooth**, roughly two passes ~18 s apart then a
+~2 min gap. Each pass allocates ~2 GB in 15–25 s at 100–330 MB/s and frees
+essentially all of it in ~2 s (collapse rate −700 to −919 MB/s):
+
+    window (deploy-free)      n   mean amp    peak anon   min inactive_file   outcome
+    W1 00:27–00:51           6    1658.5 MB    3612.5         239.8 MB        survived
+    W3 01:36–01:50           2    2004.9 MB    3611.2         164.0 MB        survived
+    W4 02:03–02:11           2    2006.2 MB    3907.1          26.3 MB        KILLED
+    W5 02:31–02:37           1    2621.9 MB    3894.9          42.2 MB        KILLED
+    W6 02:43–02:59          11    1952.9 MB    3415.4         186.1 MB        alive at read
+
+**The amplitude and the peak are FLAT across the whole night — before and after
+tonight's deploys alike.** ~2 GB transient launched from a ~1.0–1.9 GB baseline
+lands at 3.0–3.8 GB against a 4,096 MB ceiling. **Every single cycle reaches
+`memory_headroom_mb` 0.0–0.2.** The kernel services each burst by evicting page
+cache: `inactive_file` is driven 1,500 → 186 MB on a survivable cycle.
+
+**The two kills are the two thinnest-page-cache cycles.** W4/W5 left the kernel
+26.3 and 42.2 MB of evictable file cache; the surviving windows kept 164–240 MB.
+W5's single captured excursion is the largest of the night — amplitude 2,621.9 MB,
+peak 3,804.1 MB at 02:36:13 — and the process was dead **53 seconds later**.
+
+So the kill is not a ratchet crossing a line. **It is a coin flip on every cycle,
+decided by how much page cache the kernel still has to evict when the ~2 GB
+transient lands.**
+
+### RULED OUT TONIGHT — do not re-derive
+
+- **Drop 3's `live_gameline_ledger` is NOT the cause.** It landed in `f8ca54e1`
+  at **02:25Z**; the first kill was **02:11:34Z**, before it existed on the
+  service. Separately, `read_last_by_key` streams line-by-line into a dict
+  bounded by distinct market keys, with a 20k-record/12 MB file cap — it already
+  has `#435`'s lesson built in. Kilobytes, not hundreds of MB. Not a candidate.
+- **Not a leak.** Trough anon returns to 971–1,900 MB after every excursion,
+  including the last one before each kill. Nothing is accumulating.
+
+### WHAT THIS CONFIRMS, AND THE INSTRUMENT'S BLIND SPOT
+
+The standing finding holds and is now quantified: `last_stage` during the climbs
+is `cards_context_page_cache_hit` / `_summary_loaded` / `_sim_games_loaded` /
+`_end` and `board_contract_games_normalized`, with `seconds_since_stage` of
+**14–34 s**. After `games_normalized`, `apply_game_board_contract` only does
+`setdefault`s and returns (`simulation_contract` is default OFF since `#75/#43`).
+**The 2 GB is allocated BETWEEN stage markers, in the caller** — which is exactly
+why `board_contract_games_normalized` can be EXONERATED at "0.0 MB median" and
+still be the last thing named before a 2 GB climb. Both statements are true.
+
+**The 3000 MB floor does not guard this.** `_OVERVIEW_MIN_SAFE_HEADROOM_BYTES`
+(`intelligence.py:2583`) is consumed by `_overview_headroom_exhausted(next_sport=…)`
+— a per-sport gate INSIDE `build_intelligence_overview`'s sport loop. The
+excursions above are not gated by it. Its own comment already says so: *"This is
+a circuit breaker around MLB's cost, NOT a fix for it. The real work is making
+`build_cards_page_context` cheaper or not running it hydrated on the worker at
+all."* That sentence is now backed by a number: **the pass is ~2 GB and it runs
+~2× every ~2 minutes.**
+
+### WHY NO DEPLOY
+
+The `win_prob` counter still cannot produce a reading — both its channels only
+write on run completion, and the producer keeps being killed or restarted. That
+needs an hour clean. refresh-worker took **12 deploys between 22:54Z and 02:25Z**;
+the two kills are the first in 21 hours. **Adding a deploy here would destroy the
+only clean window that could settle it.** No deploy claim was acquired and none
+is owed.
+
+### NEXT LEVER — named, not taken
+
+Reduce the **amplitude** of the single pass, or put a headroom gate in front of
+the pass that actually costs 2 GB rather than in front of the overview sport
+loop. Raising the ceiling is excluded by the standing user decision
+(2026-08-16: keep `pro`, reduce instead). **Unresolved and required before any
+change: which allocation inside the pass is the 2 GB.** `last_stage` cannot say —
+it is a boundary marker and the cost is between boundaries. That needs a bounded
+in-pass measurement, which needs a deploy, which needs the clean window first.
+
+---
+
+### #440 — MEASUREMENT ONLY, NO DEPLOY — closing-stamp clock fix (`325b2822`) verified in output, and the settled CLV reading
+- Deployed: nothing. This row settles an existing open obligation; it does not open one.
+- Measured: **2026-08-15 22:06 CDT / 2026-08-16 03:06Z** (scheduled read
+  `clv-settled-read-2026-08-15`, timed after the day's last two first pitches at
+  01:38Z and 01:40Z).
+- Subject: `325b2822` on live-odds-worker (~23:17Z 2026-08-15) — `closing_captured_at`
+  now carries the previous tick's observation time; detection time moved to the new
+  field `closing_detected_at`.
+
+**RESULT 1 — THE STAMP FIX IS VERIFIED.**
+- `closing_detected_at` present on **21** markets → the new code path ran.
+- **21 of 21** satisfy `closing_captured_at <= commence_time`. Zero post-date it.
+  Lead time min 1.1 / median 75.3 / max 103.9 minutes.
+- Control in the SAME payload: of the 36 stamped markets without the new field,
+  **33 post-date `commence_time`**. Before/after with no cross-time confound.
+- At CLV-row level: NEW-code stamps → 30 rows, **all pregame, 0 in_play**;
+  OLD stamps → 31 rows, **26 in_play (84%)**.
+- Correction to the handed-down baseline: "EVERY pre-fix stamped close had
+  `close_age_seconds < 0`" is **33/36 at the shard level, not 36/36.**
+
+**RESULT 2 — THE SETTLED CLV READING (mlb, 2026-08-15).**
+- **`avg_clv_pct = −0.3165`, `same_book_n = 126`, `beat_close_rate = 0.2143`.**
+- `openings 999` · `resolved 254` · `same_book_all_n 151` · `in_play_excluded_n 25`
+  · `unknown_timing_excluded_n 0` · `stamped_close_skipped {stamped_close_is_home_side: 59}`.
+- **Recompute check PASSED**: mean `clv_pct` over `same_book` ∧ `pregame` rows from
+  `&rows=1` = −0.316519 → **−0.3165 over n=126**, exact on value and n;
+  `beat_close` 27/126 = 0.2143, exact. Headline is not to be doubted on this date.
+- `book_agnostic_close +2.8054` and `different_book_close +0.7011` are the known
+  upward bias. **Not CLV.**
+- nfl `resolved 0` (419 openings, 100% `no_market_in_history`), wnba `resolved 0`
+  (111 openings, same). Unchanged. Openings ledger confirmed readable, so this is a
+  real join gap, not a blind reader.
+
+**WHAT IS STILL WRONG / OWED**
+- **`/api/ops/odds-history/inspect` STRUCTURALLY CANNOT SEE `closing_detected_at`.**
+  Its summary is a fixed 10-key literal (`ops.py:2141`). Any future check of this
+  field must go through `/api/ops/artifacts/stream?path=<sport>_source/artifacts/<sport>/odds_history/<date>.json`.
+  The 00:3xZ "zero of 51" reading was taken through this blind instrument.
+- **`same_book_n` did not rise (126 vs a prior 151) and the prediction was not
+  testable as written** — prior readings survive only as a headline `n`, which moves
+  with slate progress. Not scored either way. The mechanism is confirmed by the
+  within-payload counterfactual instead: n=96/−0.3998 without the fix → n=126/−0.3165 with it.
+- **2026-08-15 IS PERMANENTLY MIXED.** Stamps are idempotent on `closing_line`, so
+  36 of 57 markets keep the pre-fix clock and 96 of 126 headline rows are pre-fix.
+  **−0.3165 is a mixed-cohort number. First clean date is 2026-08-16.**
+- Generality beyond MLB **unmeasured** — no other sport resolved a row today.
