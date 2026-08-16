@@ -7881,3 +7881,71 @@ workers now carry the freshness gate** (live-odds-worker `46b5ec66`, 19:47:16Z).
   on `/api/ops/win-prob-null` for a date whose snapshot already existed, produced
   WITHOUT `--force-refresh`. Today's board proof is tracked separately against
   live-odds-worker.
+
+---
+
+### ask-quote-tick — web `d6ae3e8c` — MEASURED
+
+- Deployed 2026-08-16 15:40 CDT (20:40:59Z), **web only**, cut from web's own
+  live SHA `8676da1f`. Deploy claim held; nothing in flight, nothing cancelled.
+  Landed on `main` as `05fe6aea`; main and live carry identical blobs.
+
+- **THE FIELD WAS FROZEN, NOT SLOW.** `quote_seen_age_seconds` is stamped at
+  ARTIFACT BUILD time and never advances. Three reads of the live shortlist 45s
+  apart returned byte-identical ages — `mlb=[12.9, 39.8] wnba=[47.1]` at
+  20:18:34, 20:19:19 and 20:20:04 — while `written_at` sat at 20:15:41Z. True
+  WNBA age at the last read was ~51.5 min, not 47.1. **Every consumer of that
+  field understates age by the artifact's own age.**
+
+- Fix: real age = stamped + time since the artifact was written, with the
+  caller supplying the timestamp because only the caller knows which artifact
+  the row came from. Board path uses the shortlist's own `written_at` (EXACT);
+  snapshot paths use the intelligence state's `computed_at` via `_result_as_of`,
+  whose three-key scan mirrors the route's — production runs the path carrying
+  `state_meta` and **no** `freshness` key, and reading only `freshness` was
+  inert in production once before. The snapshot offset can be short, so the
+  published age is a **lower bound** and the docstring says so.
+  `_seconds_since` REJECTS rather than clamps: future stamps (clock skew),
+  unparseable strings and anything over 24h fall back to the stamped value, so a
+  broken clock cannot invent hours of staleness.
+
+- **THE THRESHOLD HAD TO MOVE IN THE SAME CHANGE, 15min → 45min.** It had been
+  calibrated against an age that did not tick and became meaningless the moment
+  it did. Real ages on the served board (stamped + a 14.3 min artifact age),
+  70 rows:
+
+      min 27.3 | p50 27.3 | p75 54.2 | p90 61.5 | max 61.5   (minutes)
+
+      15 min -> 70/70 (100%)      45 min -> 19/70 (27%)
+      30 min -> 19/70 ( 27%)      75 min ->  0/70 ( 0%)
+
+  **The MINIMUM real age on the board is 27 minutes**, so the old threshold
+  fired on every row — an accurate warning carrying no information, which is
+  strictly worse than the inaccurate one it replaced. **Correcting a number
+  without re-checking the threshold calibrated against it would have shipped a
+  regression disguised as a fix.**
+
+- **Measured on production after the deploy:**
+  - **It ticks.** Same five WNBA rows sampled 75s apart: 72 → 74 minutes, all
+    five advanced, none frozen. That is the fix, verified as a rate rather than
+    as a single reading.
+  - **It discriminates.** MLB 1/5, WNBA 5/5 through the served answer; against
+    the full board, mlb 1/52 (1.9%) and wnba 18/18 (100%). It now points at
+    exactly the sport with the slow cadence instead of at everything.
+
+- 8 tests (63 in this file, 221 across all four ask suites). The threshold test
+  is written against the CONSTANT, not the number, so raising it cannot silently
+  turn it into a test of nothing.
+
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit 8676da1f
+  --allow-rollback`.
+
+- **NOT FIXED, and not Ask's to fix:** the field is frozen because it is written
+  into a static artifact. Making it tick at the SOURCE means the board
+  publishing a per-batch build timestamp rather than a precomputed age — then
+  every consumer gets a real age without each one re-deriving the offset.
+  Flagged to the odds-cadence session (`sim-engine-track`, fork 4) with the
+  three-sample measurement, along with the correction that "all 18 identical to
+  the decimal" is batch stamping, **not** evidence of a stall — WNBA does
+  refresh (119.8 → ~18 → 47.1 across the evening), it is simply on a much longer
+  interval than MLB.
