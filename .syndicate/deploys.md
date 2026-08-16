@@ -8774,3 +8774,56 @@ reported, not after:
   alongside `sim_component == 0.0` everywhere and the `projected`-vs-`side`
   contradiction. Findings 2 and 3 may share a root cause in how `full/*_dist`
   projections are joined to rows — **not tested, not claimed.**
+
+
+---
+
+## 2026-08-16 22:4xZ — CORRECTION: the line-gate "PASS" was a PASS ON AN EMPTY POPULATION. Status is INCONCLUSIVE.
+
+Worker `2ef1165a` (live 22:34:09Z) + web `acdaaf7e` (live 22:35:42Z) carry the
+line gate and the endpoint counters. A verification harness reported:
+
+    tracked 2 · moved-line 0
+    PRICE DELTA LEAKED ACROSS A MOVED LINE : 0   (was 19)
+    STEAM 0, false 0                             (was 1)
+    COVERAGE 100% (2/2)
+    VERDICT: PASS
+
+**DO NOT READ THAT AS A PASS.** There were **zero moved-line rows**, so the leak
+check and the false-steam check had nothing to test. The board had shrunk
+63 -> 31 -> 12 on end-of-night attrition. `PASS if not leaked and not bad_steam`
+is trivially true on an empty population.
+
+**Corrected status: the line gate is UNVERIFIED IN PRODUCTION.** It has never
+been exercised there against a moved-line row. It IS covered by 24 unit tests
+including the exact false-steam case (`Rockies spreads -1.5` vs an opening of
+`+1.0`).
+
+### The shrink is SLATE, not the gate — checked rather than assumed
+
+    mlb   442 opportunities / 15 games      wnba  513 / 3 games
+    rows_beyond_quote_age  1014   <- books pulling prices late
+    rows_beyond_game_cap    689
+    rows_beyond_horizon    2420   <- NFL, days out
+
+Nothing points at the gate.
+
+### What IS verified
+
+- **`#446` join fix: coverage 31% -> 96%** on a real population (23 tracked
+  rows), artifact 22:20:31Z.
+- **Endpoint counters shipped** (4th instance of that gap, closed):
+  `openings_records` 1247, `openings_loaded` 680 — read from the payload, not
+  derived.
+
+### Harness rebuilt with a MINIMUM-DENOMINATOR GUARD
+
+Every assertion now declares the population it needs (>=3 moved-line rows for
+the leak check, >=8 tracked for coverage). Below that it returns INCONCLUSIVE
+and names what it waits for. Falsified across all three verdicts before being
+trusted: tonight's real board -> INCONCLUSIVE, synthetic clean -> PASS, same
+with one leaked delta -> FAIL. **The FAIL case is what makes the other two
+mean anything.**
+
+Re-armed; it will report on a slate with real line movement, or say after 3h
+that the gate remains unverified rather than going quiet.

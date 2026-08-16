@@ -3178,3 +3178,43 @@ rewrite.
 - Do not "fix" the existing files to LF on the strength of the general rule. That
   is a repo-wide rewrite nobody asked for, and `.gitattributes` already records
   the deliberate decision not to have a policy.
+
+
+## 2026-08-16 - FORBIDDEN: a verifier that cannot FAIL cannot PASS. State the denominator every assertion needs, or it will report an empty population as success.
+
+Third instrument of mine in one evening to map a benign state onto the wrong
+branch, and this one is the worst because it produced a confident PASS on a
+question that had not been asked.
+
+Verifying the line gate, the harness printed:
+
+    tracked 2 · moved-line 0
+    PRICE DELTA LEAKED ACROSS A MOVED LINE : 0   (was 19 -- must be 0)
+    VERDICT: PASS
+
+**There were ZERO moved-line rows.** `PASS if not leaked and not bad_steam` is
+trivially true on an empty population. The board had shrunk 63 -> 31 -> 12 on
+end-of-night slate attrition, so the check ran against nothing and reported that
+the gate worked. It meant the gate was never exercised.
+
+I had written the governing rule into this same file FOUR HOURS EARLIER --
+"never record a detector's zero as a pass when the data gave it no chance to
+fire" -- and then wrote a verifier that did exactly that. **Knowing the rule did
+not stop me; the harness had no structural reason to obey it.**
+
+**The rule, structurally:** every assertion in a verifier declares the minimum
+denominator it needs. Below that the verdict is INCONCLUSIVE and names what it
+is waiting for. Pick the threshold from the population the DEFECT was observed
+in (here 19 moved-line rows of 23 tracked -> require 3), so a pass cannot rest
+on one lucky row.
+
+**And falsify all three verdicts before trusting it**, not just the one you
+want. The corrected harness was run against tonight's real board
+(-> INCONCLUSIVE), a synthetic clean population (-> PASS) and the same
+population with one leaked delta (-> FAIL). The FAIL case is the one that
+proves the other two mean anything.
+
+The other two instruments this evening, for the pattern: `[UNKNOWN] HTTP 502`
+read as a CLEAR deploy gate, and a binary content check that shouted
+"blank board" at a deploy carrying none of my files. All three were written
+quickly, at the end of a long task, to check something I expected to be fine.

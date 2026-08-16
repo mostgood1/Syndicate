@@ -513,6 +513,13 @@ rebuild a props snapshot when its inputs are newer, not just on force".
 - Falsification test: per goal. The standing one for the whole lane — if the served payload already satisfies (a)–(d) above, the brief's premise is wrong and the lane closes without a code change.
 - Verification: the SERVED payload from `/api/board/layer2-shortlist`, written to `deploys.md`. Not a unit test — the user has twice reported a board defect that automated checks missed.
 - Blocked by: none. Read-only on `layer1_board.py`, `templates/shared/layer1_board.html`, `blueprints/layer1_page.py` (Layer 1 session), sim-engine internals, and `pipeline/intelligence_state.py`.
+- **CORRECTION 22:4xZ — the line gate is UNVERIFIED, not passing.** The harness
+  said PASS on **0 moved-line rows** (board down to 12 cards on end-of-night
+  attrition), so the leak and false-steam checks tested nothing. Shrink
+  confirmed as SLATE (`rows_beyond_quote_age` 1014, `rows_beyond_game_cap` 689),
+  not the gate. Harness rebuilt with a minimum-denominator guard and falsified
+  across INCONCLUSIVE / PASS / FAIL. **Re-verify on a slate with live line
+  movement — realistically tomorrow.**
 ### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
 - **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
   - **`closing_detected_at` is present on 21 markets. The new code path ran.**
