@@ -6,6 +6,46 @@
 
 ## OPEN
 
+### nfl-pbp-root-resolution — OPEN — opened 2026-08-16 — session: sim-engine-track
+- Goal: `#441`. The NFL SmartSim2 projection writes again, because the pbp READ
+  path resolves to the mounted disk instead of the ephemeral repo checkout.
+- Files (exclusive to this lane): `syndicate/features/nfl/sources.py`,
+  `scripts/generate_smartsim2_nfl_projections.py`,
+  `tests/test_smartsim2_nfl_pbp_root.py` (new). Collision check RUN against all
+  OPEN lanes: CLEAR on all three.
+- **DIAGNOSIS COMPLETE BEFORE ANY EDIT — measured in production, not inferred:**
+  - `DATA_ROOT : /opt/render/project/src/data/nfl_source` (the CHECKOUT)
+  - `looked for : .../src/data/nfl_source/tracking/nflverse/pbp/pbp_2026.csv`
+  - `.gitignore:96` excludes `data/nfl_source/tracking/`, so the pbp exists ONLY
+    on the mounted disk. Zero plays loaded -> `assert_ratings_data_available`
+    refuses -> artifact never written -> `age_seconds` climbs forever ->
+    ~107 relaunches/day.
+- **THE GUARD IS NOT THE BUG. It is working exactly as designed** — it refuses to
+  write a degenerate artifact where every team rates `neutral_no_data` and all
+  games get the same league-average projection (production served exactly that on
+  2026-08-13: `margin 0.96 / total 44.38 / home_win 0.5267` on all 16 preseason
+  games across four dates). Do NOT relax it.
+- **ROOT CAUSE, and `#389` already found it for the OTHER path:**
+  `_first_existing_root` picks a root by probing for `upcoming_recs_*.csv` — a
+  DIFFERENT artifact family. The checkout ships those (5 tracked files); the pbp
+  subtree is gitignored. So an unrelated artifact's presence decides where the
+  pbp is read from. `#389` fixed the WRITE path by adding
+  `nfl_artifact_output_root()` and left the READ path on the same selector.
+- Hypothesis: adding a pbp-specific resolver that probes candidates for the pbp
+  FILE (not for `upcoming_recs_*.csv`) makes the generator find it on the mounted
+  disk and write the artifact.
+- Falsification test: if the pbp is ALSO absent from the mounted disk, root
+  selection is a red herring and the real gap is ingestion. The production
+  message says otherwise ("that is the bug, not a missing download") but that is
+  the code's assertion, not a directory listing — treat as unconfirmed until the
+  artifact actually writes.
+- Verification: `SEASON_PROJECTION_LAUNCHING` stops recurring every ~40s, and
+  `smartsim2_projections_2026_wk1.csv` appears with a fresh mtime and
+  NON-IDENTICAL rows per game (identical rows would mean the guard was bypassed
+  rather than satisfied).
+- Blocked by: none.
+
+
 ### closing-stamp-is-detection-time — CLOSED-VERIFIED — **OUTPUT MEASURED 2026-08-15 22:06 CDT / 2026-08-16 03:06Z. 21/21 new-code stamps precede first pitch; 33/36 pre-fix stamps post-date it. Same payload, both populations — a control group, not a before/after across time.** — opened 2026-08-15 — closed 2026-08-15 — session: lane-cleanup → clv-settled-read-2026-08-15
 - **VERIFICATION 2026-08-15 22:06 CDT / 2026-08-16 03:06Z (scheduled read).**
   - **`closing_detected_at` is present on 21 markets. The new code path ran.**
@@ -1355,7 +1395,7 @@ session's claim. **No claims held; refresh-worker and live-odds-worker are free.
 does the ledger grow only on movement, and do the surviving edges beat a sharp
 close. **That is evaluation, not plumbing.** The plumbing is done.
 
-### refresh-worker-oom-recurrence — OPEN — **ATTRIBUTED, NO DEPLOY MADE. `#435` did NOT regress (`c67f7373` is an ancestor of live `f8ca54e1`; the ledger's `2,869 -> 1,071` is the book_quotes READ, not container anon — different quantities). The kill is a ~2 GB TRANSIENT, not a leak: 22 excursions over 5 deploy-free windows, amplitude FLAT all night, every cycle reaches headroom 0.0, and the two kills are the two thinnest-page-cache cycles (inactive_file 26.3 / 42.2 MB vs 164–240 MB surviving). Measurement in `deploys.md`. ALSO THIS SESSION: adjudicated the stale shared index (3 revert-in-waiting blobs disarmed, incl. one that would have stripped the LIVE Drop 3 hook), notified the 2 reachable live sessions, and FIXED `commit-guard.py` to gate on the staged BLOB rather than name-status — 4-case falsification suite passes, 5273ms -> 659ms. OPEN because the allocator inside the 2 GB pass is still UNNAMED and needs an in-pass measurement, which needs a deploy, which needs the clean window (42.8 min at 03:19Z) to mature first** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
+### refresh-worker-oom-recurrence — OPEN — **MECHANISM SETTLED, ALLOCATOR STILL UNNAMED. `#435` did NOT regress (scope error: book_quotes READ vs container anon). The failure is a ~2GB TRANSIENT in the PARENT process (pid 39, children <54MB), decided by evictable page cache (inactive_file 26.3/42.2 at kills vs 164-240 surviving), climbing 51s with NO stage marker. THREE fixes shipped and exercised in live `d72d670c` — odds-shard duplicate `51ae7218`, ledger streaming `21f8a165`, 3-ledger-loads-to-1 `aa190d58` — and NONE has been shown to move the transient. deepcopy EXONERATED by measurement (0.54MB peak). Daytime windows are worthless as evidence; the live-slate band 22:00Z-05:00Z is scheduled via `scripts/oom_band_report.py` + two one-time tasks. OPEN pending that result** — opened 2026-08-16 — session: refresh-worker-oom-recurrence
 - Goal: Decide, on evidence, whether the two `oomKilled` events (02:11:34Z,
   02:37:06Z, `memoryLimit 4Gi`, refresh-worker only — live-odds-worker zero in
   the same window) mean `#435` REGRESSED or that `#435` fixed one contributor
@@ -2363,3 +2403,60 @@ and then failed the thing it was checking, which is the point of running it.
 - Full measurement in `deploys.md`; unrelated defect found while measuring
   Phase 2's premise is filed as `#441` (NFL week-1 projection unwritten 2.36 days,
   relaunching ~107x/day).
+
+### render-events-reader — CLOSED-VERIFIED 2026-08-16 — **`scripts/render_events.py` + `tests/test_render_events.py` SHIPPED TO THE TREE (no deploy — this is local tooling). Falsification test PASSED: 29/29 known `oomKilled` reproduced for 2026-08-14 CT, and the unpaged control returns 20/29 — i.e. a single-page reader undercounts by 31% while looking like an answer.** — opened 2026-08-16 — session: branch-overlap-baseline-watch
+- Goal: `scripts/render_events.py` exists and answers "was this service killed,
+  and why" from `/v1/services/<id>/events`, so the 2026-08-15 FORBIDDEN rule
+  ("never conclude no-OOM from a LOG search") has a tool behind it. That rule
+  names `render_logs.py` as unable to answer the question and leaves nothing in
+  its place; every session that has needed a kill census since has hand-rolled
+  one. Success = the script reports the window it ACTUALLY covered, pages the
+  cursor to exhaustion, and distinguishes `oomKilled` / `evicted` / `unhealthy` /
+  `earlyExit` rather than lumping them as "failed".
+- Files: `scripts/render_events.py` (NEW). Checked against every OPEN lane's
+  `- Files:` at open time: the only claims held anywhere are
+  `pipeline/intelligence_state.py` + `syndicate/features/wnba/cards.py`
+  (`clamp-fix-to-workers`) and the four `live_gameline` paths
+  (`live-game-line-projection`). No lane claims anything under `scripts/`.
+  `refresh-worker-oom-recurrence` is the adjacent lane — it OWNS diagnosing
+  refresh-worker memory and this lane must not touch that. Read-only tooling
+  only; no service code, no config, no deploy.
+- Hypothesis: n/a (tooling, not diagnostic).
+- Falsification test: the tool is worthless if it can silently under-cover, which
+  is exactly how `render_logs.py`'s predecessor lied (`#434`: 99 samples spanning
+  1.2s of a 51s window). So: run it against a window whose contents are already
+  known independently — the 29 `oomKilled` on refresh-worker 2026-08-14 CT — and
+  require it to return all 29. If a single-page run and a paged run disagree on
+  the count, the pager is wrong and the tool must not ship.
+- Verification: (a) the 2026-08-14 census reproduces 29/29 `oomKilled`;
+  (b) `--json` output round-trips through `json.loads`; (c) `py -3 -m pytest
+  tests/test_render_events.py` passes. Recorded here, not in `deploys.md` —
+  nothing deploys.
+- Blocked by: none.
+- **Outcome, all three verification criteria run:**
+  (a) `--failures-only --since 2026-08-14T05:00:00Z --end 2026-08-15T05:00:00Z`
+      returns **29 `oomKilled`**, matching the independently-derived census.
+      With `max_pages=1` the same window returns **20** — the pager is the
+      difference between a measurement and a plausible undercount.
+  (b) `--json` round-trips through `json.loads` (checked on live-odds-worker:
+      5 `earlyExit`, 0 OOM since 2026-08-15).
+  (c) `py -3 -m pytest tests/test_render_events.py -q` → **15 passed**.
+- **Positive control works:** the branch-overlap window 10:09:51Z..15:09:30Z
+  today returns zero events AND names the newest event overall
+  (`2026-08-16T06:01:34Z deploy_ended`), so "quiet" and "reader broken" print
+  differently and exit differently (0 vs 2). This is the whole reason the tool
+  exists — the 2026-08-15 FORBIDDEN rule said a negative result about process
+  death must come from the events API, and named `render_logs.py` as unable to
+  provide one, leaving no tool in its place.
+- **Reading it produced, recorded because it is load-bearing for
+  `refresh-worker-oom-recurrence` (that lane's, not this one's, to interpret):**
+  refresh-worker `server_failed` since 2026-08-09 is **42 events, all 42
+  `oomKilled`, none evicted** — 08-08:5, 08-13:4, **08-14:29**, 08-15:4,
+  08-16:0-so-far (CT). Kills cluster 15:00–00:00 CT. Separately,
+  live-odds-worker's 19 failures over the same week are **zero OOM, all
+  `earlyExit`**, still recurring ~1–3/day through 08-16 05:54 CT — a different
+  failure mode that a "19 failures" summary would have buried. Not diagnosed
+  here; filed as an observation only.
+- Files touched: `scripts/render_events.py` (new), `tests/test_render_events.py`
+  (new, not in the opening claim — added when the verification step needed it).
+  No service code, no config, no deploy.
