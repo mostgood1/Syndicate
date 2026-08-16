@@ -53,6 +53,55 @@ class DispatchOrder(unittest.TestCase):
         )
 
 
+class NotStarvedByTheElifChain(unittest.TestCase):
+    def test_pbp_fetch_sits_high_in_the_chain(self):
+        """`#341`: a late entry in this elif chain is starved during a slate.
+
+        Measured 2026-08-16: at position 6 of 8 this emitted NOTHING for the 10
+        minutes after its first deploy, while `mlb_refresh` won every tick. The
+        same comment records reconciliation being mute FOR WEEKS from the same
+        cause. Position is behaviour here, so it is pinned.
+        """
+        source = open(worker.__file__, encoding="utf-8").read()
+        order = [
+            line.strip().removeprefix("elif ").removeprefix("if ").split("(")[0]
+            for line in source.splitlines()
+            if line.strip().startswith(("elif _launch_autorun", "if _launch_autorun"))
+        ]
+        self.assertIn("_launch_autorun_nfl_pbp_fetch", order)
+        index = order.index("_launch_autorun_nfl_pbp_fetch")
+        self.assertLessEqual(
+            index, 1,
+            f"pbp fetch must stay near the front of the chain; found at {index} in {order}",
+        )
+
+    def test_every_decline_path_logs_a_reason(self):
+        """`#443` in my own code: the first version had three silent returns.
+
+        With all three mute, a fetch that never fired was indistinguishable
+        between disabled / out-of-season / rate-limited / never-reached.
+        """
+        import inspect
+
+        src = inspect.getsource(worker._launch_autorun_nfl_pbp_fetch)
+        for reason in ("disabled", "not_in_season", "rate_limited"):
+            self.assertIn(reason, src)
+
+        # The invariant is "no decline is SILENT", not "no `return False`
+        # exists" -- the remaining ones each print immediately before
+        # returning. Banning the statement outright was my first version of
+        # this test and it failed on correct code.
+        lines = src.splitlines()
+        silent: list[str] = []
+        for i, line in enumerate(lines):
+            if line.strip() != "return False":
+                continue
+            window = "\n".join(lines[max(0, i - 5):i])
+            if "print(" not in window and "_skip(" not in window:
+                silent.append(f"line {i}: {line.strip()}")
+        self.assertEqual(silent, [], f"silent decline path(s) reintroduced: {silent}")
+
+
 class NoStalePidGuard(unittest.TestCase):
     def test_autorun_does_not_consult_a_persisted_pid(self):
         """`#443`: a pid-existence guard stalls silently after a restart.

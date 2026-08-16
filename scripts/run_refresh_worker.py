@@ -2420,6 +2420,13 @@ def _season_projection_launch_state_path(sport: str) -> Path:
 # installs atomically, so two overlapping runs cannot corrupt the file.
 # ---------------------------------------------------------------------------
 
+# In-process, deliberately (same rule as `_ODDS_SWEEP_REPORTED`): a reboot
+# re-stating why it is skipping is useful, and persisting diagnostic bookkeeping
+# to the keyvalue store buys nothing.
+_NFL_PBP_SKIP_LOG_AT: dict[str, float] = {}
+_NFL_PBP_SKIP_LOG_INTERVAL_SECONDS = 60.0
+
+
 def _nfl_pbp_fetch_enabled() -> bool:
     # Absent means OFF -- see the block comment above for why the first version
     # of this returned True and which three tests caught it.
@@ -2456,12 +2463,29 @@ def _launch_autorun_nfl_pbp_fetch(
     Runs BEFORE `_launch_autorun_season_projections` in the dispatch chain so the
     input exists before its only consumer asks for it.
     """
-    if not _nfl_pbp_fetch_enabled():
+    # EVERY DECLINE SAYS WHY. `#443` is the ticket I filed against exactly this
+    # shape -- a guard that returns False with no log line -- and the first
+    # version of THIS function had three of them. When the fetch then failed to
+    # fire after its first deploy, the silence was indistinguishable between
+    # "flag off", "out of season", "rate limited" and "never reached", and the
+    # real cause (elif starvation, `#341`) had to be found by reading the
+    # dispatch chain instead of the logs. Throttled to once a minute per reason
+    # so a 30s poll loop cannot turn this into the log storm `#378` records.
+    now = time.time()
+
+    def _skip(reason: str, detail: str = "") -> bool:
+        last = _NFL_PBP_SKIP_LOG_AT.get(reason, 0.0)
+        if now - last >= _NFL_PBP_SKIP_LOG_INTERVAL_SECONDS:
+            _NFL_PBP_SKIP_LOG_AT[reason] = now
+            print(f"[refresh_worker] NFL_PBP_FETCH_SKIPPED reason={reason} {detail}".rstrip(), flush=True)
         return False
+
+    if not _nfl_pbp_fetch_enabled():
+        return _skip("disabled", "NFL_PBP_FETCH_ENABLE_REFRESH_WORKER_AUTORUN is not true")
     selected_date = central_today_iso()
     active = {item.strip().lower() for item in _active_sports_for_date(selected_date).split(",") if item.strip()}
     if "nfl" not in active:
-        return False
+        return _skip("not_in_season", f"date={selected_date} active={','.join(sorted(active))}")
 
     interval = _nfl_pbp_fetch_interval_seconds()
     state = _refresh_state_store()["read_json_file"](_nfl_pbp_fetch_state_path())
@@ -2473,7 +2497,7 @@ def _launch_autorun_nfl_pbp_fetch(
             last_attempt = 0.0
     age = time.time() - last_attempt
     if last_attempt > 0.0 and age < interval:
-        return False
+        return _skip("rate_limited", f"marker_age_s={int(age)}/interval_s={interval}")
 
     season = date.today().year
     # Marker BEFORE the launch: a run that dies costs one interval rather than
@@ -2993,8 +3017,10 @@ def _diag_log_malloc_arena(stage: str) -> None:
         snapshot = malloc_arena_snapshot()
         if not snapshot:
             return  # off glibc, or unreadable -- MALLOC_INFO_INIT already said why
+        # Same reason as TRACEMALLOC_SITES below: without a pid, a supervisor
+        # reading and a 35MB child reading look identical.
         print(
-            f"[refresh_worker] MALLOC_ARENA stage={stage} "
+            f"[refresh_worker] MALLOC_ARENA stage={stage} pid={os.getpid()} "
             + json.dumps(snapshot, sort_keys=True),
             flush=True,
         )
@@ -3031,8 +3057,14 @@ def _diag_log_allocation_sites(stage: str) -> None:
         snapshot = allocation_snapshot()
         if not snapshot:
             return  # not tracing -- TRACEMALLOC_INIT already said why
+        # `#423`. THE PID IS NOT DECORATION. 5 of the first 6 readings came
+        # from short-lived CHILD processes (anon ~70MB, top site pure import
+        # machinery) and only one caught pid 39, the process that actually
+        # accumulates -- indistinguishable in the log because the payload
+        # carried no pid. That is the same defect that wasted time on
+        # LIVE_ODDS_WORKER_MEMORY earlier the same night.
         print(
-            f"[refresh_worker] TRACEMALLOC_SITES stage={stage} "
+            f"[refresh_worker] TRACEMALLOC_SITES stage={stage} pid={os.getpid()} "
             + json.dumps(snapshot, sort_keys=True),
             flush=True,
         )
@@ -3714,6 +3746,33 @@ def main() -> int:
         ):
             if args.run_once:
                 return 0
+        elif _launch_autorun_nfl_pbp_fetch(
+            # SECOND, DIRECTLY BEHIND RECONCILIATION, and `#341` is why.
+            #
+            # It sat 6th of 8 and emitted NOTHING for the 10 minutes after its
+            # first deploy. Not broken -- starved. `#341`'s comment above
+            # already records the mechanism: every branch here is `elif`, so a
+            # late entry only runs on a tick where every earlier one declines,
+            # and during a slate `mlb_refresh` keeps winning. That comment was
+            # written after reconciliation was mute FOR WEEKS while enabled and
+            # correctly configured. `season_projections` (7th) went from 16
+            # turns/hour to zero over the same window, which is the same
+            # starvation, not a second bug.
+            #
+            # Safe this high for the same reasons `#341` gives: it is DAILY
+            # gated, so it wins at most one tick per 24h. It launches a ~5s
+            # subprocess rather than running inline, so unlike a sim it does not
+            # hold a job slot the refresh branches are waiting on.
+            #
+            # It must also stay AHEAD of `_launch_autorun_season_projections`:
+            # this fetches the only input those projections rate teams from
+            # (`#441`). Producer before consumer -- pinned by a test.
+            latest_manifest_path=latest_manifest_path,
+            worker_status_path=worker_status_path,
+            refresh_cycle=refresh_cycle,
+        ):
+            if args.run_once:
+                return 0
         elif _launch_autorun_mlb_refresh(
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
@@ -3736,17 +3795,6 @@ def main() -> int:
             if args.run_once:
                 return 0
         elif _launch_autorun_evaluation_settlement(
-            latest_manifest_path=latest_manifest_path,
-            worker_status_path=worker_status_path,
-            refresh_cycle=refresh_cycle,
-        ):
-            if args.run_once:
-                return 0
-        elif _launch_autorun_nfl_pbp_fetch(
-            # BEFORE season projections on purpose (`#441`): this fetches the
-            # ONLY input those projections rate teams from, and without it the
-            # generator's guard correctly refuses and the staleness gate
-            # relaunches it ~107x/day. Producer before consumer.
             latest_manifest_path=latest_manifest_path,
             worker_status_path=worker_status_path,
             refresh_cycle=refresh_cycle,
