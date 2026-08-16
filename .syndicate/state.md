@@ -72,6 +72,17 @@ moved past it. `[measured 08-15, **4 occurrences in one session**; the third re-
 
 ## USER DECISIONS `[2026-08-14 ~21:5x CDT]`
 
+- **2026-08-16 — DO NOT BUMP THE refresh-worker PLAN. Reduce instead.** Asked
+  directly, with the numbers: peak 3,518MB = 85.9% of the 4,096MB `pro` ceiling,
+  578MB headroom, zero OOM kills in 7h15m post-`#435`. Options put were Pro Plus
+  (8GB), Pro Max (16GB), or keep 4GB and reduce. **Chosen: keep `pro` and work
+  the two remaining levers** — child processes (0.4-504MB, bursty,
+  uncharacterised) and pymalloc's 350MB arena retention.
+  Consequence to hold onto: the crash is FIXED, so this is optimisation, not
+  repair — it does not carry outage urgency and must not be used to justify one.
+  No `render.yaml` change was made and none is owed; the file still says
+  `plan: pro` at line 272 and that is CORRECT.
+
 Product decisions, not engineering ones. Do not re-take them.
 
 1. **The LLM is NOT meant to be on.** `ANTHROPIC_API_KEY` stays absent. The
