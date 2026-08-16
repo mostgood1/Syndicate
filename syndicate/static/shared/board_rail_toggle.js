@@ -24,8 +24,37 @@
   // .board-rail) naturally puts the now-slim rail handle below the full-
   // width board instead of beside it.
   var MOBILE_QUERY = "(max-width: 1080px)";
+  // Two collapsed labels, because the collapsed rail is a different
+  // shape at each breakpoint: a full-width docked bar on mobile, and
+  // (since 2026-08-16) a 36px vertical strip BESIDE the board on
+  // desktop, matching Layer 1's `.l1-rail`. "Bet slip, watchlist & more
+  // ▴" is fine across a phone and far too long rotated into a 36px
+  // column, where it simply clips.
   var COLLAPSED_LABEL = "Bet slip, watchlist & more ▴";
+  var COLLAPSED_LABEL_DESKTOP = "◂ Bet slip";
   var EXPANDED_LABEL = "Hide bet slip & more ▾";
+
+  function collapsedLabel() {
+    return window.matchMedia(MOBILE_QUERY).matches ? COLLAPSED_LABEL : COLLAPSED_LABEL_DESKTOP;
+  }
+
+  // Seed the badge from whatever the slip has already staged.
+  //
+  // bet_slip.js writes this on every render, but the two scripts race:
+  // if the slip renders before this handle exists the count is written
+  // to nothing, and the badge stays blank until the user next touches
+  // the slip -- i.e. exactly while they are looking at a collapsed rail
+  // wondering whether it still holds their picks. Reading the count out
+  // of the rendered panel closes that window from this side, so neither
+  // script depends on winning the race.
+  function seedSlipCount(handle) {
+    try {
+      var count = document.querySelector("#bet-slip-panel .bet-slip__count");
+      handle.setAttribute("data-slip-count", count ? (count.textContent || "0").trim() : "0");
+    } catch (e) {
+      /* decoration only */
+    }
+  }
 
   function defaultState() {
     return window.matchMedia(MOBILE_QUERY).matches ? "collapsed" : "expanded";
@@ -54,11 +83,13 @@
       var nextExpanded = !expanded;
       setState(rail, layout, nextExpanded ? "expanded" : "collapsed");
       handle.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
-      handle.textContent = nextExpanded ? EXPANDED_LABEL : COLLAPSED_LABEL;
+      handle.textContent = nextExpanded ? EXPANDED_LABEL : collapsedLabel();
+      if (!nextExpanded) seedSlipCount(handle);
     });
     var initiallyExpanded = rail.getAttribute("data-rail-state") === "expanded";
     handle.setAttribute("aria-expanded", initiallyExpanded ? "true" : "false");
-    handle.textContent = initiallyExpanded ? EXPANDED_LABEL : COLLAPSED_LABEL;
+    handle.textContent = initiallyExpanded ? EXPANDED_LABEL : collapsedLabel();
+    seedSlipCount(handle);
     rail.insertBefore(handle, rail.firstChild);
   }
 

@@ -279,12 +279,36 @@ window.SyndicateBetSlip = (function () {
     return panel;
   }
 
+  // Mirror the staged-pick count onto the rail's collapse handle.
+  //
+  // When the rail is collapsed to its 36px strip the whole slip is
+  // hidden, so without this a slip holding six picks and an empty one
+  // look identical -- which is the reason the old collapse was reported
+  // as losing the slip rather than hiding it. Written to the HANDLE
+  // (not the rail) because board_cards.css renders the badge with
+  // `content: attr(data-slip-count)`, and attr() reads only the
+  // pseudo-element's own host.
+  //
+  // Fails silently and independently of the slip render: the handle is
+  // created by board_rail_toggle.js, which may not have run yet (or at
+  // all, on a page with no rail). A missing badge must never take the
+  // slip down with it.
+  function syncRailSlipCount(count) {
+    try {
+      const handle = document.querySelector(".board-rail .board-rail-handle");
+      if (handle) handle.setAttribute("data-slip-count", String(count));
+    } catch (e) {
+      /* the badge is decoration; the slip is not */
+    }
+  }
+
   function renderBetSlip() {
     const panel = ensureBetSlipPanel();
     if (!panel) return;
     const legs = betSlip;
     panel.setAttribute("data-empty", legs.length ? "false" : "true");
     panel.setAttribute("data-collapsed", betSlipCollapsed ? "true" : "false");
+    syncRailSlipCount(legs.length);
     if (!legs.length) {
       panel.innerHTML = `
         <div class="bet-slip__header">

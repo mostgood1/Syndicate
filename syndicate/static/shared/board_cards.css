@@ -175,6 +175,52 @@ body.syndicate-body .cards-shell {
   background: rgba(78, 205, 196, 0.1);
 }
 
+/* A game on the slate with nothing to bet. The rail is seeded from the
+   scoreboard (not from board rows) so every game appears, which makes
+   "no opportunity" a normal state rather than an impossible one --
+   dimmed so it reads as present-but-empty, and still clickable, because
+   the scoreline is worth seeing. Kept above the aria-pressed rule's
+   specificity deliberately: selecting an empty game must still show the
+   selection ring. */
+.game-mini-card--empty {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.game-mini-card--empty[aria-pressed="true"] {
+  opacity: 1;
+}
+
+/* The ranking disclosure. Quiet by design -- it is a standing statement
+   about how the score is built, not an alert, and an alarm-coloured
+   banner on every page load is one people stop reading. */
+.board-disclosure {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--cards-line);
+  border-left: 3px solid var(--cards-accent, #4ecdc4);
+  border-radius: 10px;
+  background: rgba(10, 21, 34, 0.6);
+  color: var(--cards-text-soft, #9fb0c4);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.board-disclosure strong {
+  color: var(--cards-text, #e8eef7);
+}
+
+.board-disclosure__chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(231, 76, 60, 0.22);
+  color: #ffd9d3;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .game-mini-card__head {
   display: flex;
   justify-content: space-between;
@@ -476,6 +522,15 @@ body.syndicate-body .cards-shell {
 .board-badge--alert { background: rgba(231, 76, 60, 0.16); color: #ffd4d4; border-color: rgba(231, 76, 60, 0.38); }
 .board-badge--steam { background: rgba(255, 149, 0, 0.18); color: #ffe0b3; border-color: rgba(255, 149, 0, 0.45); }
 
+/* Our own simulation rates this side WORSE than its price implies
+   (`sim_view === "disagrees"`, 32 of 108 served rows on 2026-08-16).
+   Distinct from --model-favored above, which says which side the sim
+   points AT; this one says the sim points away from the row we are
+   showing. Red-tinted because it is a caution on a row we are still
+   recommending on EV grounds -- not a hard warning, because the sim
+   carries no weight in the score and has never been graded. */
+.board-badge--sim-disagrees { background: rgba(231, 76, 60, 0.2); color: #ffd9d3; border-color: rgba(231, 76, 60, 0.45); }
+
 /* Which side (Over/Under, home/away) the sim's own probability actually
    favors for a two-sided market (row.model_side === row.side) -- distinct
    from the join_status badges above, which only say whether a model read
@@ -740,13 +795,70 @@ table.board-blotter tbody tr:last-child td {
   /* Requested live 2026-08-04: collapsing the rail hid its content but
      the two-column grid stayed put, so .board-main never gained any
      width back -- the board stayed squeezed into the same column next
-     to an empty one. Dropping to a single column when collapsed
-     (board_rail_toggle.js mirrors data-rail-state onto .board-layout
-     for this) reclaims the full width for the board; DOM order
-     (.board-main before .board-rail) puts the now-slim rail handle
-     below it, not beside it. */
+     to an empty one.
+
+     THAT FIX WENT ONE STEP TOO FAR, reported live 2026-08-16: dropping
+     to `1fr` removes the rail's column entirely, and DOM order
+     (.board-main before .board-rail) then pushes the handle BELOW the
+     whole board -- hundreds of rows down. The slip did not collapse
+     beside the board, it collapsed to the bottom of the page, which is
+     the mobile behaviour leaking onto desktop.
+
+     Layer 1 already solved this and is the reference: `.l1-rail` keeps
+     its column and shrinks to a 34px strip
+     (`layer1_board.html:143`), so the toggle stays where the eye left
+     it. Same shape here -- a narrow second column rather than none --
+     which still returns almost the full width to the board. */
   .board-layout[data-rail-state="collapsed"] {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) 36px;
+  }
+
+  /* The collapsed strip: a vertical arrow beside the board, with the
+     staged-pick count still legible. A collapse that hides the fact
+     that the slip HAS picks in it is why the old one was reported --
+     the user could not tell an empty slip from a full hidden one. */
+  .board-rail[data-rail-state="collapsed"] {
+    position: sticky;
+    top: 10px;
+  }
+
+  .board-rail[data-rail-state="collapsed"] .board-rail-handle {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 36px;
+    padding: 10px 0;
+    margin: 0;
+    /* The label is rotated rather than truncated: 36px of horizontal
+       space cannot hold a word, and an icon alone does not say what the
+       strip opens. */
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  /* Staged-pick count, mirrored onto the HANDLE by bet_slip.js.
+     Deliberately on the handle and not on `.board-rail`: `attr()` reads
+     only the pseudo-element's own host, so keying the selector off the
+     rail while reading `attr()` on the handle renders an empty badge --
+     the selector matches and the content resolves to nothing. Hidden at
+     zero, because a "0" chip reads as a broken counter rather than an
+     empty slip. */
+  .board-rail[data-rail-state="collapsed"]
+    .board-rail-handle[data-slip-count]:not([data-slip-count="0"])::after {
+    content: attr(data-slip-count);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    padding: 3px 0;
+    border-radius: 999px;
+    background: rgba(46, 204, 113, 0.28);
+    color: #d6ffe4;
+    font-size: 11px;
+    font-weight: 800;
+    writing-mode: horizontal-tb;
   }
 }
 

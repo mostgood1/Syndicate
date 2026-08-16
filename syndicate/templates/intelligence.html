@@ -56,6 +56,36 @@
 
   <div id="board-summary-strip" class="board-summary-strip" hidden></div>
 
+  {#
+    SAY WHAT THIS BOARD ACTUALLY IS.
+
+    `opportunity_signals.py:386` states the condition in the code itself:
+    "THE SURFACE MUST SAY WHAT IT IS: with this at 0, L2-A is a low-hold /
+    line-shopping board and must NOT be presented as 'our model found these'.
+    If the page cannot say that, keep it off the main board rather than raising
+    this number to make it look like a model board."
+
+    `_SCORE_SIM_WEIGHT` has been 0.0 since it was gated on S6, and the board
+    said nothing -- while rendering a PROJECTED column, which is exactly the
+    thing that reads as "our model found these". Measured 2026-08-16 on the
+    served shortlist: 65 of 108 rows carried a `model_edge_pct` and the sim
+    contributed to the ranking of NONE of them (`sim_component` non-zero on 0).
+
+    Static text, not a computed banner: it describes how the ranking is built,
+    which is a property of the code, and a banner that could silently stop
+    rendering would put us back where we started. If the weight is ever raised,
+    this block changes in the same commit.
+  #}
+  <p class="board-disclosure">
+    <strong>How this board ranks.</strong> Rows are ordered by expected value
+    against the no-vig market price and by how much of that value survives
+    price shopping — <em>not</em> by our simulation, which currently carries no
+    weight in the score. Projections are shown where we have them, and the
+    <span class="board-disclosure__chip">sim disagrees</span> tag marks rows our
+    own model rates worse than the price implies. Neither has been graded
+    against outcomes yet.
+  </p>
+
   <section>
     <div id="board-game-cards"></div>
   </section>
@@ -1412,6 +1442,54 @@
         }
       }
     }
+    // EVERY GAME ON THE SLATE, NOT ONLY THE ONES WITH AN OPPORTUNITY.
+    //
+    // `groups` is derived from BOARD ROWS, so a game the shortlist did not
+    // seat contributes nothing and simply is not on the rail -- the rail
+    // could only ever show games we happen to have a bet for, which is the
+    // opposite of "the compact rail listing all of today's games".
+    //
+    // Invisible on 2026-08-16 (MLB 15 scheduled / 15 on the rail, WNBA 3/3,
+    // because SHORTLIST_ROWS_PER_GAME=6 seated every game) and structural
+    // regardless: any game filtered out by the value floor, the quote-age
+    // ceiling or the per-game cap disappears from the schedule strip too.
+    //
+    // /api/board/game-chips already carries the full slate, so the rail is
+    // seeded from CHIPS and left-joined to rows. A chip with no rows becomes
+    // a count-0 card: the game is on the board, it just has no bet.
+    //
+    // Deliberately NOT widening the shortlist. `layer2_board.py:1012-1026`
+    // exists because the board once served 1,244 NFL rows starting 34-156
+    // days out -- "quoted today" is not "playing today". This widens what the
+    // RAIL SHOWS and touches no selection rule.
+    const claimedChips = new Set();
+    for (const group of groups.values()) {
+      const chip = chipForGame(group);
+      if (chip) claimedChips.add(chip);
+    }
+    for (const chip of new Set(gameChipsById.values())) {
+      if (claimedChips.has(chip)) continue;
+      const sport = String(chip.sport || "").toLowerCase();
+      if (state.sport !== "all" && sport !== state.sport) continue;
+      const away = String((chip.away || {}).abbr || (chip.away || {}).name || "").trim();
+      const home = String((chip.home || {}).abbr || (chip.home || {}).name || "").trim();
+      if (!away || !home) continue;
+      const key = `chip|${sport}|${String(chip.game_key || `${away}@${home}`)}`;
+      if (groups.has(key)) continue;
+      groups.set(key, {
+        key,
+        sport: sport.toUpperCase(),
+        matchup: `${away} @ ${home}`,
+        count: 0,
+        hasLive: chip.state === "live",
+        // A game with no rows has no row to be non-final, so the
+        // row-derived `allFinal` would read TRUE for every pregame chip
+        // card. The chip's own state is the only honest answer here.
+        allFinal: chip.state === "final",
+        fallbackDate: null,
+      });
+    }
+
     const gamesList = Array.from(groups.values());
     // Attach each group's live-scoreboard chip up front (chipForGame is a
     // cheap map lookup) so the sort below can order by the game's real
@@ -1440,7 +1518,33 @@
       }
       return null;
     };
+    // A FINISHED GAME STAYS ON THE RAIL AND SORTS TO THE END OF IT.
+    //
+    // `allFinal` was computed (twice -- here and in the merge above) and
+    // read only by the LABEL at the bottom of renderGameCards. It appeared
+    // nowhere in this comparator, so a final game kept its early start time
+    // and sorted to the FRONT: the earliest games finish first, so the head
+    // of the rail filled up with games there is nothing left to bet, pushing
+    // the live and upcoming ones off the right edge.
+    //
+    // Prefers the CHIP's state over the row-derived flag. `allFinal` is an
+    // AND over the group's rows (`itemState !== "final"` clears it), so a
+    // game whose rows went stale before the game ended can read final while
+    // the scoreboard says otherwise -- and a chip-seeded card has no rows at
+    // all. The scoreboard is the authority on whether a game is over.
+    const isFinal = (group) => {
+      const chip = chipForGame(group);
+      if (chip && chip.state) return chip.state === "final";
+      return Boolean(group.allFinal);
+    };
     return gamesList.sort((a, b) => {
+      const aFinal = isFinal(a);
+      const bFinal = isFinal(b);
+      // Ahead of the live test on purpose: these are disjoint (a game cannot
+      // be live and final), so ordering them costs nothing, and putting the
+      // final test first makes "finals last" true regardless of what any
+      // other term does.
+      if (aFinal !== bFinal) return aFinal ? 1 : -1;
       if (a.hasLive !== b.hasLive) return a.hasLive ? -1 : 1;
       const aTime = sortTimeKey(a);
       const bTime = sortTimeKey(b);
@@ -1485,8 +1589,12 @@
             const headLeft = chip.status_token && chip.state !== "final"
               ? `${escapeHtml(game.sport)} · ${escapeHtml(chip.status_token)}`
               : escapeHtml(game.sport);
+            // `game-mini-card--empty` marks a game that is ON the slate with
+            // nothing to bet, which is now a real and common state rather
+            // than an impossible one. Without it a count-0 card is
+            // indistinguishable from one whose opportunities failed to load.
             return `
-              <button type="button" class="game-mini-card" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}" title="${game.count} opportunit${game.count === 1 ? "y" : "ies"}">
+              <button type="button" class="game-mini-card${game.count ? "" : " game-mini-card--empty"}" data-game-key="${escapeHtml(game.key)}" aria-pressed="${isSelected}" title="${game.count} opportunit${game.count === 1 ? "y" : "ies"}">
                 <div class="game-mini-card__head"><span>${headLeft}</span><span>${stateLabel}</span></div>
                 ${chipTeamRow("away", chip)}
                 ${chipTeamRow("home", chip)}
@@ -1858,9 +1966,24 @@
               const rowAttrs = `data-syndicate-name="${escapeHtml(title)}" data-syndicate-sport="${escapeHtml(sport)}" data-syndicate-market="${escapeHtml(item.market || item.market_label || "")}" data-syndicate-selection="${escapeHtml(item.selection || item.pick || "")}" data-syndicate-prediction-id="${escapeHtml(item.prediction_id || "")}" data-syndicate-recommendation-id="${escapeHtml(item.recommendation_id || "")}" data-syndicate-odds="${escapeHtml(oddsText)}" data-syndicate-prop-line="${escapeHtml(propText)}" data-syndicate-event-id="${escapeHtml(String(item.event_id || item.game_id || ""))}" data-syndicate-game-date="${escapeHtml(item.context_label || "")}"`;
               const headshot = playerHeadshot(item);
               const steamBadge = isSteamCandidate(item) ? '<span class="board-badge board-badge--steam" title="Steam move: a sharp, fast line/price move detected by the odds tracker">⚡ Steam</span>' : "";
+              // OUR OWN SIM RATES THIS ROW WORSE THAN ITS PRICE IMPLIES.
+              //
+              // 32 of 108 served rows carried a negative `model_edge_pct` on
+              // 2026-08-16 with nothing on the card saying so. Labelled rather
+              // than suppressed by decision: the sim carries zero weight in the
+              // score and has never been graded (`settled: 0`), so it has not
+              // earned a veto -- but a reader is entitled to know it dissents.
+              //
+              // Only "disagrees" gets a badge. "agrees" and "no view" are the
+              // unremarkable cases and a chip on 100% of rows is a chip nobody
+              // reads -- and "no model at all" must never be typeset as though
+              // the model had approved the row.
+              const simBadge = item.sim_view === "disagrees"
+                ? `<span class="board-badge board-badge--sim-disagrees" title="Our simulation rates this side ${Math.abs(Number(item.sim_disagreement_pct || 0)).toFixed(1)}% worse than the market price implies. It carries no weight in the score and has not been graded against outcomes.">sim disagrees</span>`
+                : "";
               return `
                 <tr ${rowAttrs}>
-                  <td data-label="State"><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}</td>
+                  <td data-label="State"><span class="board-badge board-badge--${itemState === "live" ? "live" : "pregame"}">${itemState === "live" ? "Live" : "Pre"}</span>${steamBadge}${simBadge}</td>
                   <td data-label="Score">${renderBlotterScore(item)}</td>
                   <td data-label="Pick" class="board-blotter__cell--primary">
                     <div class="board-blotter__primary">${headshot}${escapeHtml(title)}</div>
