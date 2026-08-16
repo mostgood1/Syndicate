@@ -543,3 +543,53 @@ def test_chart_label_respects_its_budget():
     row = dict(GAME_ROW, player_name="A Player With A Very Long Name Indeed",
                side="over", line=1.5)
     assert len(data._board_row_chart_label(row)) <= 28
+
+
+# --------------------------------------------------------------------------
+# 6. NaN is not a number, and it reached production as text.
+#
+# Served 2026-08-16 19:5xZ on a real WNBA three-way row:
+#     "draw nan (Indiana Fever @ Atlanta Dream)"
+# The layer2 row carries `line: null`; the NaN is introduced downstream, and
+# `float("nan")` then survives every `is None` check and renders as "nan".
+# Fixed in `_to_float` -- the choke point every caller shares -- rather than at
+# the label, because a NaN edge renders "nan%" and a NaN probability passes the
+# `> 0` guards meant to suppress it.
+# --------------------------------------------------------------------------
+
+NAN = float("nan")
+
+
+@pytest.mark.parametrize("value", [NAN, float("inf"), float("-inf")])
+def test_to_float_rejects_non_finite(value):
+    assert adapter._to_float(value) is None
+
+
+def test_to_float_still_accepts_real_numbers():
+    assert adapter._to_float(0) == 0.0
+    assert adapter._to_float("2.5") == 2.5
+    assert adapter._to_float(-1.5) == -1.5
+    assert adapter._to_float(None) is None
+    assert adapter._to_float(True) is None
+
+
+def test_a_nan_line_never_reaches_a_label():
+    """The exact served string this test exists for."""
+    row = {"side": "draw", "line": NAN, "market": "h2h_3_way",
+           "away_team": "Indiana Fever", "home_team": "Atlanta Dream"}
+    label = adapter._bet_label(row)
+    assert label is None or "nan" not in label.lower()
+
+
+def test_a_nan_line_does_not_become_a_handicap():
+    assert adapter._format_handicap(NAN) == ""
+    row = {"side": "home", "line": NAN, "market": "spreads",
+           "away_team": "Indiana Fever", "home_team": "Atlanta Dream"}
+    assert adapter._bet_label(row) == "Atlanta Dream"
+
+
+def test_a_valid_line_keeps_its_own_formatting():
+    """The NaN guard must not reformat good lines -- 10.0 stays 10.0."""
+    row = {"side": "over", "line": 10.0, "market": "totals",
+           "away_team": "Texas Rangers", "home_team": "Athletics"}
+    assert adapter._bet_label(row) == "over 10.0 (Texas Rangers @ Athletics)"

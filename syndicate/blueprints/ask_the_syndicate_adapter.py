@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from typing import Any
 
@@ -57,12 +58,25 @@ def _evidence_to_dict(value: Any) -> dict[str, Any]:
 
 
 def _to_float(value: Any) -> float | None:
+    """Numeric, or None. **NaN and infinity are None, not numbers.**
+
+    `float("nan")` survives every `is None` check, compares False against every
+    threshold, and renders as the literal string "nan". Served on production
+    2026-08-16 as `"draw nan (Indiana Fever @ Atlanta Dream)"` — a WNBA
+    three-way row whose line was absent upstream and arrived here as NaN.
+
+    Fixed at this choke point rather than at the label, because every caller
+    inherits the same defect: a NaN edge renders "nan%", a NaN probability
+    passes the `> 0` guards that are supposed to suppress it, and a NaN price
+    formats as "+nan". One guard covers all of them.
+    """
     try:
         if value is None or isinstance(value, bool):
             return None
-        return float(value)
+        numeric = float(value)
     except Exception:
         return None
+    return numeric if math.isfinite(numeric) else None
 
 
 def _to_pct(value: Any) -> float | None:
@@ -646,7 +660,10 @@ def _bet_label(row: dict[str, Any]) -> str | None:
     player = str(row.get("player_name") or row.get("player") or "").strip()
     side = str(row.get("side") or "").strip().lower()
     line = row.get("line")
-    line_text = "" if line is None else str(line)
+    # Validate through `_to_float` (which now rejects NaN) but RENDER from the
+    # original, so a valid line keeps its own formatting -- `10.0` stays "10.0"
+    # rather than becoming "10" via a %g round-trip.
+    line_text = "" if _to_float(line) is None else str(line)
 
     if player:
         return " ".join(part for part in (player, side, line_text) if part)
