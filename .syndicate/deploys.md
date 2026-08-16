@@ -7312,3 +7312,85 @@ a thin slate. OWED, tracked in the lane.
 Both would have been read as failures of a working fix. **A measurement script
 needs the same predicate discipline as the code it measures** — and when a
 verification disagrees with an expectation, check the verifier before the fix.
+
+---
+
+### ask-answer-substance — web `ad77e46a` — MEASURED
+
+- Deployed: 2026-08-16 13:27 CDT (18:27:30Z) — **web only** (`srv-d88ahvrbc2fs73eodu30`)
+- Change: the inline quick ask names the exact bet (market, line, side, price,
+  book) and grounds it in the sim projection already in the payload. Four user
+  reports, all reproduced against production payloads captured the same hour.
+  `bet_analysis.edge` was `ev_pct/100` while the briefing's was `model_edge_pct`
+  — the same pick read **14.01 in the briefing and 0.0139 per-pick**.
+
+- **SHIPPED AND LIVE, BUT NOT IN THE DEPLOY I FIRED.** My
+  `dep-da0vrufqj5pc73bd6h7g` (`a92f76e9`, cut from web's own live SHA) was
+  **CANCELED mid-build at 18:18:08Z** when a peer started a web deploy; theirs
+  (`82a3cded`) was cancelled the same way at 18:20:44Z. The peer resolved it by
+  folding both changes into **`ad77e46a`** — "the rail scoping AND the Ask
+  substance work, because my deploy canceled theirs" — live 18:27:30Z. **My
+  three blobs are byte-identical in it, checked by hash, not assumed.** Two
+  earlier attempts were also blocked and both blocks were correct: the first
+  refused by `render_deploy.py` because web had moved `ebd5f677` → `4ab9d12a`
+  under me and my branch would have reverted 826 lines of another session's work.
+
+- **The new code IS running** — asserted on the branch, not the outcome. 8/8
+  fields that exist ONLY in the new adapter came back on production:
+  `market_label`, `edge_pct`, `price`/`bookmaker`, `model_skill_status`, and a
+  generated `recommendation` on rows whose `_candidate_prose` source is empty.
+  - **The ten-fold contradiction is closed.** Same pick, same instant: briefing
+    `edge 14.01`, per-pick `edge 14.01`. `model − market − edge` = **0.000**.
+  - Served: `"Ryan Johnson over 2.5" · earned runs · -101 at draftkings · 2 bks ·
+    Sim 3.951 · Model 63.0% · Market 49.0% · Edge 14.0%` plus the generated
+    reason and a stale-quote clause. **Was: `"Ryan Johnson"`.**
+  - A moneyline row now reads `"Milwaukee Brewers"`, a spread `"Minnesota Twins
+    -1.5"`. Was `"home -1.5 (Philadelphia Phillies @ Minnesota Twins)"`.
+
+- **Harness: 37/52 → 37/52, ZERO pass/fail flips**, all seven classes identical
+  (advice 4/5, entity 9/10, explain 4/6, history 2/5, lookup 8/8, ranking 7/10,
+  refusal 3/8). Diffed **per case**, because 37 == 37 is not the same claim as
+  "the same 37". Control
+  `reports/ask_regression/control_pre_answer_substance_2026_08_16.json` (18:0xZ,
+  pre-deploy, same slate — the handed-down 38/52 was another day's slate and had
+  expired); post `.../post_answer_substance_2026_08_16.json`.
+  **This is the result predicted in writing before the run**: `_score` checks
+  refusal/routing/hallucination/certainty/50-50 and cannot see selection shape,
+  units, price, sim terms, or the panel. A large gain would have been suspicious.
+
+- **ONE PREDICTION WAS WRONG, IN DIRECTION, AND THE CAUSE IS NAMED.** I wrote
+  that `warn:selection_not_on_board` would RISE (selections are longer now). It
+  **FELL, 125 → 100**. Cause: h2h rows now render as an exact team name
+  (`"Milwaukee Brewers"`, which matches the harness's team list) where they
+  previously read `"away (milwaukee brewers @ los angeles do…)"`. I reasoned only
+  about props and forgot moneyline rows, which went the other way and dominated.
+  Spreads rows still warn — `"minnesota twins -1.5"` is not a bare team name.
+
+- **Landed on `main` as `3f16ee2e`.** Checked first and it was NOT there:
+  `ad77e46a` is not an ancestor of `main`, so without this a later deploy cut
+  from `main` would have silently reverted a live change. `main` and the live SHA
+  now carry identical blobs for all three files. 168 tests green on the `main`
+  base before pushing.
+
+- **Blast radius, and why `check_deploy_safety.py` was overridden deliberately.**
+  It returned NOT CLEAR with three items — MLB sim `pid=111`, odds refresh
+  `pid=553` on live-odds-worker, board build on refresh-worker. **All three are
+  on WORKERS; this deployed WEB only, so none was killed.** Its fourth line ("a
+  restart interrupts live-lens ticks and live prop hydration") was checked
+  against web's live env rather than assumed: `MLB_ENABLE_LIVE_LENS_LOOP=false`,
+  `MLB_ENABLE_LIVE_LENS_BACKGROUND_REPORTS=false`,
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` — **web owns no
+  loop.** Real cost was ~1–2 min of 502s during a live slate.
+  `deploy_preflight.py` returned UNKNOWN for web because its
+  `ALL_PROCESS_MEMORY` sample is **47h stale**; recorded as an instrument being
+  blind, not counted as a clean read.
+
+- Rollback (unused): `py -3 scripts/render_deploy.py --service web --commit
+  4ab9d12a --allow-rollback` — note this would also drop the peer's rail scoping,
+  since the two shipped in one commit.
+
+- **This row was written twice.** The first copy was appended at 18:1xZ and was
+  **clobbered within minutes** by a peer's whole-file write to `deploys.md` —
+  gone from the worktree, from `HEAD` and from `origin/main`, with no conflict
+  and no error. A `cat >>` append is not safe on a contended ledger file. This
+  copy is committed in the same action that writes it.

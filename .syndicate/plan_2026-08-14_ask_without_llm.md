@@ -1,5 +1,15 @@
 # Ask the Syndicate without the LLM — what is capturable
 
+> **AMENDED 2026-08-16 — see `.syndicate/plan_2026-08-16_ask_answer_substance.md`.**
+> The headline table below scores each sport on **evidence produced**. Measured
+> 2026-08-16, MLB scores 4/4 on that metric and the panel the user actually
+> reads shows a bare player name and one number: `ask_bar.js` never reads
+> `response.visuals`, so 7 tables and 3 charts of real sim output are discarded
+> at render. **The table is not wrong; it is not the whole instrument.** Items
+> 1–11 below all stand. What changes is the conclusion that MLB "proves the
+> deterministic path can be genuinely good" — it proves the *evidence* is good,
+> not the answer.
+
 > **Standing decision, 2026-08-14, from the user: the LLM is not meant to be on.**
 > `ANTHROPIC_API_KEY` stays absent. The deterministic snapshot path is the
 > product, not a degrade.

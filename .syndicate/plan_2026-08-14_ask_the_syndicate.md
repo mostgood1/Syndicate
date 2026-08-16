@@ -1,5 +1,23 @@
 # Ask the Syndicate audit → lane plan — 2026-08-14
 
+> **AMENDED 2026-08-16 — see `.syndicate/plan_2026-08-16_ask_answer_substance.md`.**
+> This plan is entirely about **routing** (which sport, which fetcher) and
+> **aggregation** (M1). It contains no item about the *content of a single-pick
+> answer*, which is where four measured user-visible defects live: a prop answer
+> names neither the prop nor the side; the briefing says "top 5" and renders 3
+> (client-side, invisible to the regression harness); a game side reads
+> `home -1.5` with no team, price or book; and `bet_analysis.edge` publishes
+> **EV** while `market_summary.edge` publishes **model edge**, so the same pick
+> reads 14.0% in the briefing and 1.4% per-pick.
+>
+> Consequences: **M1 is half-credited** (fixed the pool, not the substance).
+> **K8 is absorbed and made concrete** — `projection.model_skill` is the
+> mechanism it was written to need. **L2 re-opens on `bet_analysis`**, as a
+> units divergence rather than a pool divergence. **The exit rule "anything that
+> does not move a class score is not done" is retired as the sole gate**: the
+> harness scores the JSON and cannot see the panel, so it scores all four
+> reports as nonexistent. Lanes K9/K2/K11/K3/K4/K5/K6 are unaffected.
+
 Derived from `.syndicate/audit_2026-08-14_ask_the_syndicate.md`. Measured against
 production web `f9aa2399`. Lane letters continue from `plan_2026-08-14_models.md`
 (A–D) and `plan_2026-08-14_ui.md` (E–I).
