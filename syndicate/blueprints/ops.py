@@ -414,6 +414,53 @@ def api_ops_live_lens_status() -> Any:
     return jsonify(payload)
 
 
+@ops_bp.get("/api/ops/win-prob-null")
+def api_ops_win_prob_null() -> Any:
+    # Protected endpoint: requires admin token (enforced by before_request)
+    #
+    # Reads the `win_prob` null-counter the two prop producers write at the end
+    # of every run. The counter exists to answer one question: has the removal
+    # of the `... or 0.5` coin-flip substitution actually been EXERCISED on a
+    # real slate, or has the branch simply never been reached?
+    #
+    # WHY A ROUTE AND NOT A LOG READ. The counter's `print()` is unobservable in
+    # production, and that was measured rather than assumed on 2026-08-15/16:
+    # the WNBA producer ran (PID 1900 in live-odds-worker's own
+    # ALL_PROCESS_MEMORY census at 23:36:05Z, started 23:36:04Z) while a bounded
+    # log read over the entire window since the deploy returned ZERO matches for
+    # `WIN_PROB_NULL_NO_PRICE` on both workers. `refresh_odds_sources._run_command`
+    # runs every producer under `subprocess.run(capture_output=True)` and
+    # discards a successful step's stdout -- the same trap already documented
+    # for this script at the `wnba/live-lines-export-diag` route below, found
+    # 2026-08-01.
+    #
+    # WHY NOT AN ARTIFACT-ALLOWLIST ENTRY. Same reason `live-lens/status` is a
+    # route: `_KEYVALUE_EXCLUDED_PATH_MARKERS` is only `("migration_runs/",)`,
+    # so these paths are keyvalue-backed on every service and never touch disk.
+    # `/api/ops/artifacts/stream` gates on `target.is_file()` and would 404
+    # forever. `read_all` goes through the keyvalue-aware reader, so this
+    # returns the WORKERS' readings from web.
+    #
+    # HOW TO READ THE RESULT -- `summary.interpretation` states it, but plainly:
+    #   no readings     -> no producer has reported since the writer deployed.
+    #                      A fact about the emitter; NOT "the fix never fired".
+    #   rows=0          -> the producer ran and computed no win_prob at all.
+    #                      Says nothing about the fix. Correct and expected for
+    #                      NBA while it is out of season.
+    #   rows>0, null=0  -> the fix is holding AND has been exercised.
+    #   null>0          -> the branch fired: that many rows had no price and
+    #                      published None instead of a fabricated 0.5. That is
+    #                      the fix WORKING, not a defect.
+    # `probed` lists every key looked at, so an empty result is distinguishable
+    # from having looked in the wrong place.
+    from syndicate.features.shared.win_prob_null_diag import read_all as win_prob_null_readings
+
+    try:
+        return jsonify(win_prob_null_readings())
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"{type(exc).__name__}: {exc}"}), 500
+
+
 def _stale_after_days_param() -> int:
     raw = str(request.args.get("stale_after_days") or "").strip()
     try:
