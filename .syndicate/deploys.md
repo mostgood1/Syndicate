@@ -8659,3 +8659,62 @@ quoted**. Independent of the capture question, and it is this lane's own file.
   "does NOT support the over" on roughly a third to a half of over/under rows
   until it is resolved.** That is honest output, not a new defect, but it makes
   the contradiction user-visible.
+
+---
+
+## 2026-08-16 22:08Z — NFL slate window 5 -> 7, **web `432b9e9b`, VERIFIED**
+
+Cut on the live web SHA `d8985df8` after waiting for another session's web
+deploy to land rather than cancelling it.
+
+### Why 7, measured rather than chosen
+Games actually inside the window, against the real schedules on 2026-08-16:
+
+```
+width  preseason games   regular season from Thu 2026-09-10
+  5          1           09-10, 09-13, 09-14
+  7         15           09-10, 09-13, 09-14      <- unchanged
+  9         17           ...plus 09-17, the NEXT Thursday
+```
+
+The old width was "Thu through Mon", correct for where the REGULAR season's
+fixtures cluster and silently wrong for the preseason, whose week runs
+Fri/Sat/Sun/Mon and is reached from a Sunday anchor at **+5 days — exactly one
+day past a 5-day forward window**. Seven is the only width that gains the
+preseason slate without pulling a second regular-season week onto a today board;
+the NFL week is 7 days, so anything wider anchored on a Thursday reaches the
+following Thursday. `#329` records 1,244 NFL rows starting 34-156 days out
+reaching a today board once already, so over-inclusion is not free.
+
+### Verified in production
+```
+window dates : 2026-08-16 .. 2026-08-22
+window_days  : 7   (was 5)
+rows in window: 0    games: 0
+rows in grid  : 1425   other_dates {08-15: 179, 09-13: 78, 09-20: 64, ...}
+empty_reason : grid_rows_all_for_other_dates
+```
+
+**The board is still empty and that is the expected result, not a failed fix.**
+The width was a SECOND, independent reason those games could not appear. The
+grid holds nothing between 08-15 and 09-13, so there is nothing for the wider
+window to admit. Whether that is a capture gap or a vendor with no week-3 lines
+is what `[nfl_preseason] events_fetched` answers on the next daily run.
+
+Stated plainly because a green deploy against an unchanged board is exactly the
+shape that gets read as "the fix did not work".
+
+### Blast radius, deliberate and notified
+`_within_horizon` derives from the same `slate_window_days` table, so **Layer 2's
+NFL horizon widens +4 -> +6 days** by construction. That coupling is the point —
+the test asserting it is named `test_multi_day_sports_match_their_layer1_windows`
+— and **three** files pinned the literal 5. All updated. The Layer 2 session was
+notified before they could find it.
+
+`max_slate_window_days()` unchanged at 7 (soccer already), so the worker's
+forward artifact-build sizing does not move.
+
+### Pre-existing reds found in passing, NOT mine
+`tests/test_layer2_soccer_window.py`: `test_the_shortlist_reads_every_window_date`
+and `test_one_unreadable_date_does_not_lose_the_others` fail identically at width
+5 — verified by stashing the change and re-running. Flagged to the Layer 2 lane.
