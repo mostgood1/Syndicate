@@ -3676,7 +3676,113 @@ _local_live_state_payload.cache_clear = _local_live_state_payload_cached.cache_c
 _local_live_state_payload.cache_info = _local_live_state_payload_cached.cache_info  # type: ignore[attr-defined]
 
 
+# LAST GOOD ESPN SCOREBOARD, PER DATE, SO ONE BLIP DOES NOT NULL A LIVE SLATE.
+# `(monotonic_at, wall_iso, payload)`. Monotonic bounds the age; the wall clock
+# is only for the reason string a human reads.
+_PUBLIC_SCOREBOARD_LAST_GOOD: dict[str, tuple[float, str, dict[str, Any]]] = {}
+
+# 180s, deliberately TIGHTER than MLB's 300s equivalent
+# (`_LIVE_STATE_CARRY_FORWARD_MAX_AGE_DEFAULT_SECONDS`): a basketball clock moves
+# faster than a half-inning, so a three-minute-old WNBA score is already a worse
+# claim than a three-minute-old baseball one.
+_PUBLIC_SCOREBOARD_CARRY_MAX_AGE_DEFAULT_SECONDS = 180
+
+
+def _public_scoreboard_carry_max_age_seconds() -> int:
+    """0 disables carry-forward outright -- the kill switch.
+
+    A NEGATIVE value is a typo, not an intent, and must not read as "disabled".
+    Same rule and same reasoning as MLB's carry-forward gate.
+    """
+    try:
+        value = int(str(os.environ.get("WNBA_LIVE_STATE_CARRY_FORWARD_MAX_AGE_SECONDS") or "").strip())
+    except Exception:
+        return _PUBLIC_SCOREBOARD_CARRY_MAX_AGE_DEFAULT_SECONDS
+    return value if value >= 0 else _PUBLIC_SCOREBOARD_CARRY_MAX_AGE_DEFAULT_SECONDS
+
+
+def _clear_public_scoreboard_last_good() -> None:
+    _PUBLIC_SCOREBOARD_LAST_GOOD.clear()
+
+
+def _carried_forward_scoreboard(iso_date: str, *, reason: str) -> dict[str, Any] | None:
+    """The last good scoreboard for this date, if it is still young enough.
+
+    Returns None -- an honest absence -- when there is nothing stored, when
+    carry-forward is switched off, or when the stored copy has aged out. Never
+    returns an unmarked payload: a carried board that looked fresh would be a
+    worse defect than the nulls this replaces.
+    """
+    max_age = _public_scoreboard_carry_max_age_seconds()
+    if max_age <= 0:
+        return None
+    stored = _PUBLIC_SCOREBOARD_LAST_GOOD.get(str(iso_date))
+    if stored is None:
+        return None
+    stored_at, stored_wall, payload = stored
+    age = time.monotonic() - stored_at
+    if age > float(max_age):
+        # Aged out. Drop it so a later failure cannot resurrect an even older
+        # board, and so the store cannot grow a tail of dead dates.
+        _PUBLIC_SCOREBOARD_LAST_GOOD.pop(str(iso_date), None)
+        print(
+            f"[wnba_cards] SCOREBOARD_CARRY_EXPIRED date={iso_date} "
+            f"age_s={age:.0f} max_s={max_age} reason={reason}",
+            flush=True,
+        )
+        return None
+    carried = dict(payload)
+    carried["carried_forward"] = True
+    carried["carried_forward_age_seconds"] = round(age, 1)
+    carried["carried_forward_from"] = stored_wall
+    carried["carried_forward_reason"] = reason
+    print(
+        f"[wnba_cards] SCOREBOARD_CARRIED_FORWARD date={iso_date} "
+        f"age_s={age:.0f} max_s={max_age} reason={reason} "
+        f"games={len(payload.get('games') or [])}",
+        flush=True,
+    )
+    return carried
+
+
 def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] | None:
+    """ESPN's scoreboard for this date, or the last good one inside the age bound.
+
+    WHY THE FALLBACK EXISTS. This was `except Exception: return None`, silently.
+    Every caller then saw zero public games, no live merge happened, and the
+    published lens carried `in_progress: False, clock: None, pts: None-None` for
+    games genuinely in progress -- at which point this module's own source rule
+    (`live_projection` only when `is_live` AND `live_margin` AND `elapsed_min`)
+    downgraded every game to `pregame` and the board lost its whole live tier.
+
+    OBSERVED IN PRODUCTION 2026-08-16, end to end. At 22:50:31Z the WNBA board
+    served **149 live-aware game rows** off this payload. At 22:57:22Z the same
+    board served 309 game rows and **zero**, while CHI @ SEA and IND @ ATL were
+    still live at 78-74 and 78-77 -- and the lens at 22:57:43Z read
+    `sources=['pregame']`, `in_progress=False`, `clock=None`, `pts=None-None`
+    for all three games. By 23:19Z it had recovered on its own.
+    **A transient outbound failure, published as fact.**
+
+    The failure modes are real and recurring: a 6s timeout to an external host,
+    and ESPN's documented 403 against Render's egress IP for certain
+    User-Agents (the header note below cost a full day of live status once).
+
+    THE RULES ARE MLB's, because it solved this first
+    (`mlb/live_lens._carry_forward_live_state_lens`):
+      - AGE-BOUNDED. Past the bound, return None. An honest absence beats a
+        stale score presented as current.
+      - AN UNKNOWN AGE MUST NOT TAKE THE PERMISSIVE BRANCH. Monotonic time is
+        used precisely so the age is always knowable; there is no path that
+        carries without one.
+      - MARKED, NEVER SILENT. The payload carries `carried_forward: True` and
+        its age, and the failure prints. A carried payload that looked fresh
+        would be a worse defect than the one being fixed.
+      - KILL SWITCH. `WNBA_LIVE_STATE_CARRY_FORWARD_MAX_AGE_SECONDS=0` restores
+        the previous behaviour exactly.
+
+    NOT A CACHE. A successful fetch always wins and always refreshes the store;
+    this is a failure path only.
+    """
     warn_if_compute_in_request_path("wnba_public_scoreboard_live_state_fetch")
     iso_date = str(selected_date or "").strip()
     parsed = parse_iso_date(iso_date)
@@ -3700,11 +3806,24 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
     try:
         with urllib_request.urlopen(request_obj, timeout=6) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except Exception:
-        return None
+    except Exception as error:
+        # PRINTED, not swallowed. This was a bare `return None` and the outage
+        # was therefore invisible: nothing in any log distinguished "ESPN timed
+        # out" from "no WNBA games today". `print(..., flush=True)` because
+        # `logger.info` does not reach Render's collector.
+        print(
+            f"[wnba_cards] SCOREBOARD_FETCH_FAILED date={iso_date} "
+            f"{type(error).__name__}: {error}",
+            flush=True,
+        )
+        return _carried_forward_scoreboard(iso_date, reason=type(error).__name__)
 
     events = payload.get("events") if isinstance(payload, dict) else None
     if not isinstance(events, list) or not events:
+        # A 200 with no events is NOT the same failure and is NOT carried.
+        # Out of season, or a date with no slate, legitimately has none -- and
+        # carrying a previous day's board over that would invent a slate. Only
+        # a FAILED fetch is smoothed.
         return None
 
     games: list[dict[str, Any]] = []
@@ -3833,13 +3952,23 @@ def _public_scoreboard_live_state_payload(selected_date: str) -> dict[str, Any] 
 
     if not games:
         return None
-    return {
+    fresh = {
         "date": iso_date or parsed.isoformat(),
         "ttl": 12,
         "source": "espn_scoreboard_fallback",
         "games": games,
         "generated_at": _wnba_generated_at(),
     }
+    # STORE ONLY A SUCCESSFUL, NON-EMPTY FETCH. A success always wins and always
+    # refreshes, so the carry-forward can never shadow a working feed -- it is
+    # reachable solely from the `except` branch above. Keyed by date so a
+    # rollover cannot serve yesterday's board.
+    _PUBLIC_SCOREBOARD_LAST_GOOD[str(iso_date)] = (
+        time.monotonic(),
+        str(fresh.get("generated_at") or ""),
+        fresh,
+    )
+    return fresh
 
 
 @lru_cache(maxsize=256)
