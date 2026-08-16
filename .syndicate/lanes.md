@@ -2270,3 +2270,45 @@ for a market that runs continuously to settlement? That is
 
 **Unchanged:** no claims held; live-odds-worker `c4116ab6`, refresh-worker
 `f8ca54e1`, both content-verified. The plumbing is done.
+
+#### CALL-VOLUME CHECK RUN 2026-08-15 — budget clear, and it found a defect in 1a/1b
+The gate this lane required before enabling anything. It cleared the cost question
+and then failed the thing it was checking, which is the point of running it.
+
+- **BUDGET IS NOT A CONSTRAINT.** `/api/ops/oddsapi/quota`: `projected_30d_credits`
+  **3,134,318** against the 5M cap = **62.7%**, 4,353 credits/hr. By sport since
+  2026-07-28: mlb 1,627,718 (**93.0%**), soccer 71,912 (**4.1%**), nfl 37,639,
+  wnba 13,475. **Soccer cadence is not a cost lever.** (Headers claim ~13.3M
+  remaining; `CLAUDE.md` records that as untrue — 5M used here.)
+- **THE DEFECT — 1a/1b IS WRONG FOR SOCCER, THE ONE SPORT THIS LANE IS ABOUT.**
+  Tiers modelled against the real 2026 fixture lists, 336 hours:
+
+        mlb            12.00 -> 5.45 sweeps/day   -55%
+        wnba           12.00 -> 5.83              -51%
+        nfl_preseason  12.00 -> 3.56              -70%
+        soccer          3.00 -> 5.08              +69%   WRONG DIRECTION
+
+  `_next_fixture_epoch` resolves ONE clock per sport, but soccer's "sport" is ten
+  leagues on ten calendars, so the gap is the MINIMUM across all of them and is
+  almost never large: **the 24h tier is reached in 0.0% of hours.** The gate would
+  have made soccer sweep MORE often — increasing the exact overlap this lane
+  exists to remove. Per-league: 24h tier in **49.3%** of league-hours, volume flat
+  (3.03/day) but redistributed OFF the peak.
+- **I shipped 1a/1b naming soccer as the motivating case. The measurement says
+  soccer is the one sport it hurts.** Recorded rather than quietly patched.
+- **FIX (`8640f872`):** `_FIXTURE_CADENCE_EXCLUDED_SPORTS = {"soccer"}`, numbers in
+  the code, 3 tests pinning it — including a control that fails if the gate is
+  disabled outright rather than only for soccer, and a note that the MLS test must
+  be REWRITTEN when 1c lands, not deleted. 52 tests green.
+- **CONSEQUENCE FOR THIS LANE'S GOAL: 1c is a PREREQUISITE, not an optimisation.**
+  Phase 1's headline benefit — soccer off the MLB peak — is DEFERRED until 1c,
+  which is blocked on `soccer-model-coverage`. What ships today is a -51% to -70%
+  cut in the pregame sweep ceiling for the single-league sports, which is real but
+  is NOT what this lane set out to get. State it that way in any status.
+- **WHAT THE MODEL IS NOT:** `sweeps/day` is a ceiling on the PREGAME cadence, not
+  measured call volume — launches are further gated by the 1800s relaunch cooldown
+  and the off-hours gates, and the 60s live tick is not governed by this cadence at
+  all. **The credit delta stays UNMEASURED** until the flag is enabled on one
+  service and the quota re-read.
+- Gates remaining before enabling: the baseline distribution from
+  `branch-overlap-baseline-watch` (accruing; one sample is not a distribution).
