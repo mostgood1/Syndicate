@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import unicodedata
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -68,11 +69,33 @@ _HRR_COMPONENT_MEANS: tuple[str, ...] = ("h_mean", "r_mean", "rbi_mean")
 def _norm_name(value: Any) -> str:
     """Normalised player name for joining sim output to quote rows.
 
-    Accents and punctuation differ between feeds -- the same fold `#218`'s team
-    matching needed. Kept deliberately simple: lowercase, strip non-letters, and
-    collapse whitespace.
+    ACCENTS ARE FOLDED TO ASCII, NOT DELETED, and that one word is the whole
+    fix. The docstring here already claimed accents were handled -- "the same
+    fold `#218`'s team matching needed" -- and the code did the opposite: with
+    no decomposition step, `re.sub(r"[^a-z ]", " ", text)` REPLACED every
+    accented letter WITH A SPACE, splitting the name in half.
+
+        "Eugenio Suarez"  -> "eugenio suarez"
+        "Eugenio Suárez"  -> "eugenio su rez"     <- never joins
+
+    So any player one feed spells with an accent and the other spells plain was
+    invisible to the projection join. Measured on production 2026-08-16: 63 MLB
+    players carried NO projection on ANY stat, holding 337 rows, and the list is
+    led by Eugenio Suárez, Francisco Álvarez and Andrés Giménez. I first
+    recorded that population as a stale lineup/injury fingerprint; for the
+    accented names it was never a fingerprint problem at all.
+
+    NOT ALL 63 ARE ACCENTED -- Christian Yelich is on the same list -- so this
+    fixes one cause of that population and not the whole of it. The remainder
+    is a genuine lineup question and stays open.
+
+    `unicodedata.normalize("NFD", ...)` splits a precomposed character into its
+    base letter plus a combining mark; dropping category `Mn` (nonspacing mark)
+    leaves the base letter. `ñ` -> `n` and `ü` -> `u` follow the same path,
+    which is what the quote feeds actually do when they strip accents.
     """
-    text = str(value or "").strip().lower()
+    text = unicodedata.normalize("NFD", str(value or "").strip().lower())
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
     text = text.replace(".", " ").replace("'", "").replace("-", " ")
     text = re.sub(r"[^a-z ]", " ", text)
     return " ".join(text.split())
