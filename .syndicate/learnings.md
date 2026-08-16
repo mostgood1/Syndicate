@@ -1385,3 +1385,53 @@ the evidence file are the source of truth.
 - **Cost:** none — caught before firing. It took five rebases across five live
   SHAs to land a two-file commit, which is the real signal: on a worker with five
   sessions deploying, a small change should ride along rather than chase.
+
+### 2026-08-16 — A DEPLOY HAS TWO LAGS IN SERIES. I GUARDED ONE AND MISREAD THE SYSTEM THREE TIMES
+
+`deploy -> snapshot -> artifact`. live-odds-worker's tick rewrites the snapshot;
+refresh-worker's build turns it into the artifact you read. **A fresh artifact
+can carry a stale snapshot**, so "generated_at is after the deploy" is NOT
+sufficient to conclude the number reflects the new code.
+
+Three failures tonight, all one shape — comparing a number to an event without
+establishing the number was PRODUCED AFTER the event:
+
+1. **Warm-up read as regression.** 5 and 8 minutes after the fix landed,
+   `index_size` was 0 twice. I called it a persistent regression and **asked for
+   a rollback of a working fix.** Two reads inside one warm-up window are one
+   read — a rule I had written earlier the same night and did not apply.
+2. **Pre-rollback artifact credited to the rollback.** The watcher waited for
+   `ROLLBACK_LANDED` (00:54:07) then read an artifact stamped **00:52:14** and
+   printed "RECOVERED -> the fix IS implicated". It had just measured the fix's
+   own success and blamed the rollback for it.
+3. **Artifact-vs-deploy check still insufficient.** I then added exactly the
+   check that would have caught (2) — and 01:09:04 STILL read
+   `sim_count_unusable 32`, because the artifact was fresh while the snapshot it
+   consumed was written by the rolled-back code. The truth arrived at 01:11:16.
+
+**Cost: three soccer runs killed, two extra restarts, one wrong rollback of a
+change that was working.**
+
+**How to apply.** Identify EVERY producer between the code and the number, and
+wait for the slowest. For this pipeline that means a signal that the SNAPSHOT
+was rewritten — not just the artifact. Best: poll until the number CHANGES and
+then stabilises across two builds, rather than reading once at a computed
+"should be ready" moment. A single post-deploy read is a coin flip on the
+warm-up.
+
+### 2026-08-16 — I HELD A CLAIM ONCE AND THEN DEPLOYED OVER SOMEONE ELSE'S, TWICE
+
+At 23:42 another session's deploy cancelled mine one second apart, and I wrote
+up the deploy claim as advisory. Then `clamp-fix-to-workers` acquired
+live-odds-worker at ~00:34 — and **my 00:47 rollback and 00:58 re-deploy both
+fired on that service without re-checking the claim.** I did to them exactly
+what had just been done to me, while holding the ledger entry about it.
+
+**Acquiring a claim is not honouring one.** The claim I took at 23:39 gave me a
+sense of ownership that outlived the claim itself; I never re-read it, and it
+had moved. **Check the claim IMMEDIATELY BEFORE EVERY FIRE, not once at the
+start of the work** — `deploy_preflight --json` returns `deploy_claim.holder`
+for free on the same call that gates the jobs, so there is no excuse of cost.
+
+Corollary: **you cannot release a claim you no longer hold**, and `--force`
+against a live claim breaks another session's lock. Mine was gone; I left it.
