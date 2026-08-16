@@ -250,6 +250,21 @@ def build_book_grid_artifact(
     # ~9.1 points at p=0.5, so most rows are refused BY NAME rather than
     # published as noise (recorded decision, spec 8.1: publish, refuse to price).
     live_gameline_coverage = attach_live_gamelines_for_sport(grid, sport=sport, selected_date=date_str)
+    # PERSIST the edges this build just computed, before anything downstream can
+    # overwrite them. `live_gamelines` is recomputed from scratch every build:
+    # measured 2026-08-16 on ONE slate, `rows_live_gameline_edged` read
+    # 25 -> 4 -> 1 across three consecutive builds. CLV needs (edge at time T)
+    # paired with (price at settlement) and the first half was never written
+    # down, so by the time a game settled the row carrying its edge was long
+    # gone. This records the OPEN half and computes no CLV.
+    #
+    # Deduplicated against the last record per market, so the file is a movement
+    # history rather than a copy of the board per build, and it NEVER raises --
+    # the board is the product, this is instrumentation for a measurement that
+    # does not exist yet.
+    from syndicate.features.shared.live_gameline_ledger import record_live_gamelines
+
+    live_gameline_ledger = record_live_gamelines(grid, sport=sport, date_str=date_str)
     margin_coverage = attach_margin_model(grid)
 
     # Market taxonomy, served rather than re-derived on the client -- the serve
@@ -296,6 +311,8 @@ def build_book_grid_artifact(
         # joins with different inputs and different failure modes, and folding
         # them together would make one family's zero look like the other's.
         "live_gamelines": live_gameline_coverage,
+        # Counters only -- the records themselves are JSONL on the worker's disk.
+        "live_gameline_ledger": live_gameline_ledger,
         "margin_model": margin_coverage,
         "market_kinds": market_kinds,
         "rows": bounded,
