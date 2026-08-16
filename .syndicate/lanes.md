@@ -1668,3 +1668,73 @@ worker that legitimately holds ~1.6GB and spawns 8-10 children is thin. Raising
 the plan removes the question; measuring it costs production outages to answer
 something the answer to which is "add memory" either way. That is an owner call,
 and `render.yaml` is a `blueprint_sync` change — it applies to production on push.
+
+### worker-child-processes — CLOSED 2026-08-16 — CONFIRMED: worst combined 3,972MB = 97.0% of ceiling; 3 concurrent daily_update variants + `--workers 2` spawns are the lever — opened 2026-08-16 — session: memory-cutover-ship
+- Goal: characterise the refresh-worker's CHILD processes over a window — how
+  many, which, how big, how long-lived, and whether their peak coincides with
+  pid 39's. Measured twice and got 0.4MB and ~504MB, which is not a
+  characterisation, it is two anecdotes.
+- Files: none claimed — READ-ONLY, from `ALL_PROCESS_MEMORY` already in
+  production. No deploy.
+- **Hypothesis:** the children are dominated by MLB `daily_update.py` and its
+  `multiprocessing` spawns (`--workers 2` is on its command line), so the count
+  is CONFIGURABLE and the reduction is a flag rather than a rewrite.
+- **Falsification test:** if the largest child is NOT `daily_update`/its spawns —
+  e.g. the soccer or odds refresh jobs — the flag does nothing and the lever is
+  elsewhere.
+- **The measurement that matters is CONCURRENCY WITH THE PARENT'S PEAK**, not the
+  children's own size. 504MB of children while pid 39 sits at 1.1GB is
+  affordable; the same 504MB during pid 39's 3.5GB peak is what kills. A
+  characterisation that reports only the children's totals answers the wrong
+  question.
+- Verification: per-cmdline table (count, median/max rss, lifetime) plus the
+  joint distribution against parent rss at the same instant.
+- Blocked by: none.
+
+#### worker-child-processes — CLOSED 2026-08-16 01:4xZ — HYPOTHESIS CONFIRMED, LEVER NAMED
+6,199 `ALL_PROCESS_MEMORY` samples, 18:11Z-01:4xZ.
+
+**THE CHILDREN ARE CONCURRENT WITH THE PARENT'S PEAK, which is the finding —
+their own size was never the question:**
+
+    parent rss      samples   median kids   max kids   worst sum
+    0-1000 MB           742           3.3      677.0      1650.3
+    1000-2000 MB      1,391         300.2      771.8      2668.9
+    2000-3000 MB      2,013         450.2      778.1      3665.1
+    3000+ MB             53         206.4      672.1    **3972.0**
+
+**WORST COMBINED 3,972.0MB = 97.0% OF THE 4,096MB CEILING** — parent 3,302.4 +
+children 669.6 across 11 kids, at 22:00:31Z. **124MB from the ceiling.** The
+`#435` fix did not leave 578MB of headroom; it left 124MB at the worst observed
+moment, because the earlier figure counted the parent alone.
+
+**THE WORST MOMENT, named:**
+
+    3302.4  pid 39   run_refresh_worker.py
+     180.6  pid 341  daily_update.py --workers 2
+      95.5  pid 382  refresh_odds_sources.py
+      86.7  pid 415  build_soccer_artifacts.py
+      76.8  pid 370  daily_update.py --workers 2      <- a SECOND one
+      53.7  pid 493  multiprocessing spawn
+      53.7  pid 490  multiprocessing spawn
+      47.9  pid 369  daily_update_multi_profile.py --workers 2
+      39.2  pid 340  run_mlb_daily_sim_job.py --workers 2
+
+**HYPOTHESIS CONFIRMED:** the largest children are `daily_update.py` and its
+`multiprocessing` spawns, and **`--workers 2` is on every one of their command
+lines** — so the count is CONFIGURABLE. Falsification would have been the biggest
+child being a soccer/odds job; the soccer jobs are there (95.5 + 86.7) but they
+are second-tier.
+
+**THE LEVER, in order of size:**
+1. **THREE `daily_update` variants ran CONCURRENTLY** (`ui-daily`, `core`,
+   `multi_profile`) = 305.3MB before their spawns. Serialising them is the
+   single biggest win and costs no memory work at all.
+2. **`--workers 2` on four jobs** produced 2 live spawns at 53.7MB each. Dropping
+   to 1 saves ~107MB at the worst moment.
+3. Soccer (`refresh_odds_sources` + `build_soccer_artifacts`) = 182.2MB
+   concurrent with the MLB peak. Scheduling, not code.
+
+Together these are ~400-500MB against a 124MB margin — i.e. the children are a
+BIGGER lever than pymalloc's 350MB retention, and cheaper to pull.
+Read-only lane. No files touched, no deploy.

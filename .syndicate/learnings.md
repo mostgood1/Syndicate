@@ -1488,3 +1488,25 @@ nothing here). This is the same shape one level up: I checked the artifact of an
 - **Cost:** none. The lane's falsification test was written before measuring and
   it fired exactly as specified, which is the only reason a confident wrong
   number was not produced and acted on.
+
+### 2026-08-16 — a headroom figure that counts one process is not headroom on a container
+
+- **What we believed:** after `#435` the worker had **578MB of headroom** — peak
+  anon 3,518MB against a 4,096MB ceiling. That number was reported to the owner
+  and used to argue a plan bump was not urgent.
+- **What was actually true:** the ceiling is a CONTAINER limit and the worker runs
+  8-12 processes. At the worst observed moment the parent held 3,302.4MB and its
+  children held 669.6MB **at the same instant** — 3,972.0MB total, **97.0% of the
+  ceiling and 124MB from a kill**. The real margin was a fifth of the reported one.
+- **How we found out:** by bucketing children's total rss BY WHAT THE PARENT HELD
+  at the same sample, rather than reporting either in isolation. Children median
+  450.2MB while the parent sat at 2-3GB — they peak WITH the parent, not between
+  its peaks, which is the assumption that makes separate figures feel safe.
+- **The rule going forward:** when the limit is per-container, headroom must be
+  computed from the SUM of every process at one instant. A per-process peak and a
+  per-process children total are both true and neither is headroom. This is the
+  same scope error as the retracted "673MB outside pymalloc", reached from the
+  opposite direction — there I subtracted across scopes, here I omitted a scope.
+- **Cost:** none yet, but it understated risk by 454MB in a decision about whether
+  to spend money on memory. The decision may still be right; it was made on a
+  number that was wrong.
