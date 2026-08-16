@@ -346,6 +346,27 @@ instrument.
 
 ---
 
+**THE REAL MARGIN IS 124MB, NOT 578MB — the ceiling is a CONTAINER limit and the
+worker runs 8-12 processes.** `[measured 08-16 01:4xZ, 6,199 samples]` Worst
+combined **3,972.0MB = 97.0%** of 4,096MB: parent 3,302.4 + children 669.6 across
+11 kids, at 22:00:31Z. Children peak WITH the parent, not between its peaks —
+median 450.2MB while pid 39 held 2-3GB. Any headroom figure that counts one
+process is not headroom.
+
+**CHILD TREE IS NESTED, NOT CONCURRENT** (`ppid` chain, same sample):
+`run_mlb_daily_sim_job` -> `daily_update`(ui-daily, 180.6) ->
+`daily_update_multi_profile`(47.9) -> `daily_update`(76.8) -> 2 spawns(107.4).
+~305MB of that is parents IDLING with memory held while children work.
+Separately, off its own child of pid 39: `run_refresh_odds_job` ->
+`refresh_odds_sources` -> `build_soccer_artifacts` = **202.6MB genuinely
+concurrent** with the MLB chain.
+
+**SOCCER'S OVERLAP IS CADENCE, NOT FIXTURES** `[measured 08-16 02:1xZ]`. 43 of 71
+soccer refreshes during 18-22Z (**61%**) fetch kickoffs 2+ DAYS away; 19Z, the
+worst overlap hour, was 100% future-dated. **Exception: MLS** (20 of 111
+invocations) genuinely kicks off in the US evening — a league-blind or clock-blind
+rule would break it. The gate must be TIME-TO-KICKOFF.
+
 ## BOARD FRESHNESS AND STALENESS
 
 **THE BOARD HAS TWO INDEPENDENT CAUSES, and fixing one is not enough.**
