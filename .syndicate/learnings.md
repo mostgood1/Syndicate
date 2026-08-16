@@ -24,14 +24,14 @@
 
 <!-- LEARNINGS-INDEX:START -->
 
-## Index — 147 rules `[generated]`
+## Index — 104 rules `[generated]`
 
 > Regenerate with `py -3 scripts/build_learnings_index.py` after appending.
 > This block is the ONLY part of this file that is rewritten; rule bodies
 > are append-only and are never touched. **FORBIDDEN** = never do this
 > again. **EXONERATED** = ruled out, stop re-investigating.
 
-**FORBIDDEN — 13**
+**FORBIDDEN — 6**
 
 - [2026-08-15 — FORBIDDEN: never conclude "no OOM" from a LOG search. Kills are EVENTS, and I had this rule already](#2026-08-15-forbidden-never-conclude-no-oom-from-a-log-search-kills-are-events-and-i-had-this-rule-already)
 - [2026-08-15 — FORBIDDEN: never run a heavyweight census ON the thread that is doing the measuring](#2026-08-15-forbidden-never-run-a-heavyweight-census-on-the-thread-that-is-doing-the-measuring)
@@ -39,13 +39,6 @@
 - [2026-08-12 — FORBIDDEN: never point a worker publish URL at a public hostname](#2026-08-12-forbidden-never-point-a-worker-publish-url-at-a-public-hostname)
 - [2026-08-13 — FORBIDDEN: never `cat` a ledger file into hook stdout — a hook delivers the obligation, not the content](#2026-08-13-forbidden-never-cat-a-ledger-file-into-hook-stdout-a-hook-delivers-the-obligation-not-the-content)
 - [2026-08-13 — FORBIDDEN: never edit a file from a read taken earlier in the session](#2026-08-13-forbidden-never-edit-a-file-from-a-read-taken-earlier-in-the-session)
-- [2026-08-15 — FORBIDDEN: never trust a CLEAR from `lane-guard.py`'s `_claims()` alone. It UNDER-reports, and that is the dangerous direction](#2026-08-15-forbidden-never-trust-a-clear-from-lane-guardpys-_claims-alone-it-under-reports-and-that-is-the-dangerous-direction)
-- [2026-08-15 — FORBIDDEN: never read a background-task wrapper's `exit code 0` as "the tests passed"](#2026-08-15-forbidden-never-read-a-background-task-wrappers-exit-code-0-as-the-tests-passed)
-- [2026-08-15 — FORBIDDEN: never judge a pinned deploy by ANCESTRY alone. Patch-id is the test.](#2026-08-15-forbidden-never-judge-a-pinned-deploy-by-ancestry-alone-patch-id-is-the-test)
-- [2026-08-15 — FORBIDDEN: never wake many idle sessions at once. It stalls them.](#2026-08-15-forbidden-never-wake-many-idle-sessions-at-once-it-stalls-them)
-- [2026-08-15 — FORBIDDEN: never gate a DEPLOY with a cross-session message. It always arrives late.](#2026-08-15-forbidden-never-gate-a-deploy-with-a-cross-session-message-it-always-arrives-late)
-- [2026-08-15 — FORBIDDEN: never deploy a fix without first reading WHICH SERVICE runs the code it changes. The env decides, not the repo.](#2026-08-15-forbidden-never-deploy-a-fix-without-first-reading-which-service-runs-the-code-it-changes-the-env-decides-not-the-repo)
-- [2026-08-15 — FORBIDDEN: a scratch index seeded with `git read-tree HEAD` snapshots the WHOLE TREE, and `git diff --cached --numstat` cannot see it go stale](#2026-08-15-forbidden-a-scratch-index-seeded-with-git-read-tree-head-snapshots-the-whole-tree-and-git-diff---cached---numstat-cannot-see-it-go-stale)
 
 **EXONERATED — 3**
 
@@ -53,7 +46,7 @@
 - [2026-08-15 — EXONERATED: "eight hydrated sports at once cannot fit in 4GiB"](#2026-08-15-exonerated-eight-hydrated-sports-at-once-cannot-fit-in-4gib)
 - [2026-08-13 — EXONERATED: `shell: "bash"` in a Windows hooks block works](#2026-08-13-exonerated-shell-bash-in-a-windows-hooks-block-works)
 
-**Rules and corrections — 131**
+**Rules and corrections — 95**
 
 - [2026-08-12 — Do not batch changes during a diagnosis](#2026-08-12-do-not-batch-changes-during-a-diagnosis)
 - [2026-08-12 — A rate ceiling is not a fix](#2026-08-12-a-rate-ceiling-is-not-a-fix)
@@ -141,42 +134,6 @@
 - [2026-08-14 — the Render logs API returns the NEWEST N in a window; paging forward silently reports a peak over a sliver](#2026-08-14-the-render-logs-api-returns-the-newest-n-in-a-window-paging-forward-silently-reports-a-peak-over-a-sliver)
 - [2026-08-14 — a before/after is void if the change moved work INSIDE the measured span](#2026-08-14-a-beforeafter-is-void-if-the-change-moved-work-inside-the-measured-span)
 - [2026-08-14 — "it cannot fit" from one sample, when the same shape runs fine twice](#2026-08-14-it-cannot-fit-from-one-sample-when-the-same-shape-runs-fine-twice)
-- [2026-08-15 — A BASELINE IS A MEASUREMENT, NOT A CONSTANT. Re-measure it before you judge anything against it](#2026-08-15-a-baseline-is-a-measurement-not-a-constant-re-measure-it-before-you-judge-anything-against-it)
-- [2026-08-15 — A JOB THAT ONLY FLUSHES ON COMPLETION CANNOT SURVIVE A SESSION BOUNDARY, AND I LAUNCHED TWO](#2026-08-15-a-job-that-only-flushes-on-completion-cannot-survive-a-session-boundary-and-i-launched-two)
-- [2026-08-15 — A COMMITTED LEDGER FACT IS NOT A DURABLE ONE. Re-read it at archive time, or the file will quietly go back to the claim you refuted](#2026-08-15-a-committed-ledger-fact-is-not-a-durable-one-re-read-it-at-archive-time-or-the-file-will-quietly-go-back-to-the-claim-you-refuted)
-- [2026-08-15 — I CONFIRMED A VALUE MY CHANGE DID NOT PRODUCE. A field with two sources verifies nothing until you know which one filled it](#2026-08-15-i-confirmed-a-value-my-change-did-not-produce-a-field-with-two-sources-verifies-nothing-until-you-know-which-one-filled-it)
-- [2026-08-15 — OVERTURNED: two locks with one symptom. `JOB_CAP_THROTTLED` is not the refresh run-lock, and the difference picks the remedy](#2026-08-15-overturned-two-locks-with-one-symptom-job_cap_throttled-is-not-the-refresh-run-lock-and-the-difference-picks-the-remedy)
-- [2026-08-15 — A BASELINE QUOTED IN PROSE MAY CORRESPOND TO NO RUN ON DISK](#2026-08-15-a-baseline-quoted-in-prose-may-correspond-to-no-run-on-disk)
-- [2026-08-15 — A CLASS NAME IS NOT A SURFACE, and `querySelector` turned that into two wrong plan items](#2026-08-15-a-class-name-is-not-a-surface-and-queryselector-turned-that-into-two-wrong-plan-items)
-- [2026-08-15 — THE INSTRUMENT THAT DROPPED A MISSING KEY, AND THE CORRECTION IT HANDED ME MID-FIX](#2026-08-15-the-instrument-that-dropped-a-missing-key-and-the-correction-it-handed-me-mid-fix)
-- [2026-08-15 — ON A CONTENDED LEDGER, NEITHER COPY IS AUTHORITATIVE, AND A WHOLE-FILE COMMIT PICKS A WINNER SILENTLY](#2026-08-15-on-a-contended-ledger-neither-copy-is-authoritative-and-a-whole-file-commit-picks-a-winner-silently)
-- [2026-08-15 — A FIELD MOVED INTO AN UNCONDITIONAL LOOP LOSES THE CONDITION ITS NEIGHBOURS WERE GIVEN](#2026-08-15-a-field-moved-into-an-unconditional-loop-loses-the-condition-its-neighbours-were-given)
-- [2026-08-15 — MY SUCCESS CRITERION CONTAINED A TERM THE BASELINE ALREADY SATISFIED, AND MY INSTRUMENT RULE INVERTED BECAUSE OF MY OWN FIX](#2026-08-15-my-success-criterion-contained-a-term-the-baseline-already-satisfied-and-my-instrument-rule-inverted-because-of-my-own-fix)
-- [2026-08-15 - A PINNED DEPLOY IS NOT ON main's LINEAGE, SO ANCESTRY ANSWERS THE WRONG QUESTION](#2026-08-15---a-pinned-deploy-is-not-on-mains-lineage-so-ancestry-answers-the-wrong-question)
-- [2026-08-15 - A FIXED `GIT_INDEX_FILE` NAME COLLIDES ACROSS SESSIONS, AND A FAILED read-tree LEAVES AN EMPTY INDEX THAT STAGES THE WHOLE REPO AS DELETIONS](#2026-08-15---a-fixed-git_index_file-name-collides-across-sessions-and-a-failed-read-tree-leaves-an-empty-index-that-stages-the-whole-repo-as-deletions)
-- [2026-08-15 — OVERTURNED: two throttles with the same symptom, and I named the wrong one as the mechanism](#2026-08-15-overturned-two-throttles-with-the-same-symptom-and-i-named-the-wrong-one-as-the-mechanism)
-- [2026-08-15 — RULE: deploy to where the artifact is BUILT, not where it is served](#2026-08-15-rule-deploy-to-where-the-artifact-is-built-not-where-it-is-served)
-- [2026-08-15 — OVERTURNED: p50 is the wrong statistic to set an alarm floor from, and my own test caught it](#2026-08-15-overturned-p50-is-the-wrong-statistic-to-set-an-alarm-floor-from-and-my-own-test-caught-it)
-- [2026-08-15 — A FALLBACK ARGUMENT IS A REQUEST, NOT A GUARANTEE. `_safe_text(x, None)` RETURNS `""`, 43 TIMES OVER](#2026-08-15-a-fallback-argument-is-a-request-not-a-guarantee-_safe_textx-none-returns-43-times-over)
-- [2026-08-15 — THE SHARED-INDEX REPAIR MUST RUN IN A SHELL WITH NO `GIT_INDEX_FILE`, OR IT REPAIRS THE WRONG INDEX](#2026-08-15-the-shared-index-repair-must-run-in-a-shell-with-no-git_index_file-or-it-repairs-the-wrong-index)
-- [2026-08-15 - A LABEL-MATCHED LOOKUP IS NOT A SUBSTITUTE FOR THE FIELD, AND ITS FAILURE IS SILENT](#2026-08-15---a-label-matched-lookup-is-not-a-substitute-for-the-field-and-its-failure-is-silent)
-- [2026-08-15 - ENUMERATE EVERY SPORT THAT REACHES A CHANGED BRANCH *BEFORE* DEPLOYING](#2026-08-15---enumerate-every-sport-that-reaches-a-changed-branch-before-deploying)
-- [2026-08-15 — I PROPOSED ALLOWLISTING A READ PATH WITHOUT CHECKING THE WRITE PATH. It would have 404'd forever](#2026-08-15-i-proposed-allowlisting-a-read-path-without-checking-the-write-path-it-would-have-404d-forever)
-- [2026-08-15 — A HOOK THAT BLOCKS A `Bash` CALL DISCARDS EVERY SIDE EFFECT IN IT, INCLUDING THE HEREDOCS](#2026-08-15-a-hook-that-blocks-a-bash-call-discards-every-side-effect-in-it-including-the-heredocs)
-- [2026-08-15 - I APPLIED "ONE SAMPLE OF A MOVING QUANTITY" TO PRODUCTION AND NOT TO MY OWN MEASUREMENT](#2026-08-15---i-applied-one-sample-of-a-moving-quantity-to-production-and-not-to-my-own-measurement)
-- [2026-08-15 — a mid-ramp reading is not a window reading; I called a 446MB difference "noise"](#2026-08-15-a-mid-ramp-reading-is-not-a-window-reading-i-called-a-446mb-difference-noise)
-- [2026-08-15 — verify a deployed fix by CONTENT across every SHA that carried it](#2026-08-15-verify-a-deployed-fix-by-content-across-every-sha-that-carried-it)
-- [2026-08-15 — AN OCCURRENCE COUNT IS NOT A ROW COUNT, and I published three numbers that could be read as either](#2026-08-15-an-occurrence-count-is-not-a-row-count-and-i-published-three-numbers-that-could-be-read-as-either)
-- [2026-08-15 — A PINNED-DEPLOY SERVICE SILENTLY REVERTS PEERS. VERIFY YOUR COMMIT AFTER IT GOES LIVE.](#2026-08-15-a-pinned-deploy-service-silently-reverts-peers-verify-your-commit-after-it-goes-live)
-- [2026-08-15 — Render's git mirror is PER SERVICE and only refreshes at build time](#2026-08-15-renders-git-mirror-is-per-service-and-only-refreshes-at-build-time)
-- [2026-08-15 - `wait_for_selector` PROVES ATTACHMENT, NOT COMPLETION, AND I HAD ALREADY "FIXED" THIS ONCE](#2026-08-15---wait_for_selector-proves-attachment-not-completion-and-i-had-already-fixed-this-once)
-- [2026-08-15 — TWO READS INSIDE ONE WARM-UP WINDOW ARE ONE READ. I declared a working fix dead](#2026-08-15-two-reads-inside-one-warm-up-window-are-one-read-i-declared-a-working-fix-dead)
-- [2026-08-15 - A UNIT CHANGE CANNOT FIX A FIT WHEN THE UNITS ARE PROPORTIONAL, AND I ALMOST BUILT IT ANYWAY](#2026-08-15---a-unit-change-cannot-fix-a-fit-when-the-units-are-proportional-and-i-almost-built-it-anyway)
-- [2026-08-15 — A TIMESTAMP WHERE A SIGNAL STOPS IS NOT WHERE THE FAULT IS](#2026-08-15-a-timestamp-where-a-signal-stops-is-not-where-the-fault-is)
-- [2026-08-15 — A HARDCODED ABSOLUTE `startTime` IS A FUTURE TIMESTAMP FOR PART OF A WATCHER'S LIFE](#2026-08-15-a-hardcoded-absolute-starttime-is-a-future-timestamp-for-part-of-a-watchers-life)
-- [2026-08-15 — check whether the instrument is already firing BEFORE building a way to make it fire](#2026-08-15-check-whether-the-instrument-is-already-firing-before-building-a-way-to-make-it-fire)
-- [2026-08-15 — MY OWN WATCHERS FAILED THREE TIMES IN ONE EVENING. Hand-run the gate before trusting a poller.](#2026-08-15-my-own-watchers-failed-three-times-in-one-evening-hand-run-the-gate-before-trusting-a-poller)
-- [2026-08-15 — THE CONFIDENCE INTERVAL BELONGS TO THE ESTIMATE, NOT TO THE THRESHOLD. My own test asserted otherwise and failed](#2026-08-15-the-confidence-interval-belongs-to-the-estimate-not-to-the-threshold-my-own-test-asserted-otherwise-and-failed)
 - [2026-08-15 — ACQUIRING THE DEPLOY CLAIM BLINDS THE DEPLOY GATE. The safety mechanism disabled the safety check](#2026-08-15-acquiring-the-deploy-claim-blinds-the-deploy-gate-the-safety-mechanism-disabled-the-safety-check)
 - [2026-08-15 — ANCESTRY CANNOT TELL YOU YOUR WORK IS PUBLISHED, AND A BROKEN GREP LOOKS EXACTLY LIKE A DELETION](#2026-08-15-ancestry-cannot-tell-you-your-work-is-published-and-a-broken-grep-looks-exactly-like-a-deletion)
 - [2026-08-15 — a cgroup number minus a per-process number is not a difference, it is a category error](#2026-08-15-a-cgroup-number-minus-a-per-process-number-is-not-a-difference-it-is-a-category-error)
