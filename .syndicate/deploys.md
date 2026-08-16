@@ -9028,3 +9028,63 @@ it.
 **Status: line gate VERIFIED. Steam UNVERIFIED**, needing a same-line row that
 moves >=15 points within 3 hours of its opening. Scheduled re-run 2026-08-17
 09:00 CDT (`scripts/verify_movement_line_gate.py`).
+
+---
+
+### ask-sim-margin — web `9f617f34` — MEASURED
+
+- Deployed 2026-08-16 18:30 CDT (23:30:17Z), **web only**, cut from web's own
+  live SHA `9bae928c`. Claim held. Landed on `main` as `cc04240c`; main and live
+  carry identical blobs. **Eighth deploy of this lane.**
+
+- **THIRD AND FINAL CORRECTION to the same clause.** The prop/game split shipped
+  in `9bae928c` was still wrong — it moved the error to a sport that was not on
+  the board. `player_name` is a proxy for "low count"; it fits MLB and **fails on
+  soccer**, because a soccer TOTAL is a low-count **GAME** row, so the old rule
+  routed it straight into the directional claim.
+
+- **Grounded in the system's own model, not an outside assumption.** Soccer's
+  engine models counts as Poisson
+  (`soccer/sim_engine/soccersim/player_props.py`), and a Poisson median sits
+  ~1/3 BELOW its mean, so "mean above the line" stops implying
+  "P(over) > 50%" in a narrow one-sided band:
+
+      market         mean  line  P(over)   mean says  prob says
+      soccer total   2.60   2.5    48.2%     over       UNDER   <-- wrong
+      soccer total   2.55   2.5    46.9%     over       UNDER   <-- wrong
+      soccer total   2.40   2.5    43.0%     under      under
+      soccer total   3.10   2.5    59.9%     over       over
+      MLB total      8.00   7.5    54.7%     over       over
+      MLB total      9.99   8.0    66.6%     over       over    (served)
+      MLB total      5.45   7.5    18.4%     under      under   (served)
+
+  **A 2.5 goal line against a 2.6 mean is the most common shape in soccer and
+  sits exactly in the band** — the rule was most wrong about the sport it had
+  never been tested on.
+
+- Fix is the actual precondition and carries no sport in it: claim a direction
+  only when `abs(projected - line) >= _SIM_DIRECTION_MIN_MARGIN` (**0.5**),
+  enough that the median cannot be on the other side. Below it the sentence says
+  "too close to call the side from the projection alone".
+  **This SUBSUMES the prop/game split and is strictly better**: a prop with a
+  real gap gets its claim back (verified live — `Bryan Woo over 17.5`, projected
+  16.509, gap 0.99, "does NOT support the over"), while a prop without one
+  (0.214 vs 0.5) still stays quiet.
+
+- **Verified on production 23:3xZ:** 3 directional claims, every gap >= 0.5,
+  every direction correct, **0 rule violations**. Pre-deploy replay over the
+  live board: 7 over/under rows, 6 claims, 1 quiet, 0 violations.
+
+- 13 tests including a 7-case parametrised margin table, both soccer shapes,
+  both served MLB rows, and the level-with-the-line case. 85 in this file, 243
+  across all four ask suites.
+
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit 9bae928c
+  --allow-rollback`.
+
+- **NOT MEASURED ON SERVED SOCCER ROWS, and the commit says so.** Soccer had 0
+  board rows all session (`active_sports: ['mlb','wnba']`), no retained date
+  carries any, and the local mirror yielded no total lines — the documented
+  lossy-mirror trap. The table is arithmetic on the engine's own Poisson
+  assumption, **not an observation of served rows.** Re-check when soccer
+  returns to the board; that is the single open item on this clause.

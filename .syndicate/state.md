@@ -1290,7 +1290,7 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   difference or the complement** — including two rows where `row_side ==
   proj_side` so no complement applies and the direct figure is off by 64 and 19
   points. All `full/*_dist` bases. Owned by `layer2-board-quality`, notified.
-- **ASK ANSWER SUBSTANCE — LIVE web `9bae928c` (2026-08-16 22:52:31Z).** The
+- **ASK ANSWER SUBSTANCE — LIVE web `9f617f34` (2026-08-16 23:30:17Z).** The
   deterministic panel now: names the bet a human can place (market, line, side,
   price, book — not "Ryan Johnson"); generates its own reason sentences from
   `projection.projected` and `model_skill` (the MLB game lens is the model);
@@ -1305,6 +1305,15 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   surfaces have not been checked. Its sibling `book_age_seconds` answers a
   DIFFERENT question ("has the price moved") and the board gates on the seen
   clock deliberately — see `layer2_board._row_quote_age_seconds`.
+- **The Ask sim-vs-line clause claims a direction ONLY when the mean clears
+  the line by 0.5 (`_SIM_DIRECTION_MIN_MARGIN`).** The precondition is that
+  the distribution's MEDIAN is on the same side as the mean; for Poisson
+  counts the median sits ~1/3 below, so `mean > line` stops implying
+  `P(over) > 50%` in a band just above the line. **A 2.6 mean against a 2.5
+  goal line reads 48.2% — the most common shape in soccer.** An earlier
+  `player_name` prop/game split was wrong for exactly that case (a soccer
+  total is a low-count GAME row). NOT verified on served soccer rows —
+  soccer had 0 board rows all session; re-check when it returns.
 - **WITHDRAWN 2026-08-16 22:5xZ — "the board publishes sides that contradict
   its own projection" was MY error, not a board defect.** Chasing it to a root
   cause showed only **2 of 10** failing rows are explained by live-join
