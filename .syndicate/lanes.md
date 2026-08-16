@@ -1775,3 +1775,54 @@ it is the one I should have named.
    spawning, or to hand off rather than nest. Real work, not a flag.
 3. **`--workers 2` -> 1 — ~54MB** (2 spawns at 53.7MB; only one is saved since
    one worker remains).
+
+### odds-cadence-off-the-mlb-peak — SCOPED, NOT STARTED — opened 2026-08-16 — session: memory-cutover-ship
+**Scoped only. No code, no deploy. Handing this over rather than starting it at
+02:00 local on a fixed crash.**
+
+- **Goal:** stop the soccer/odds refresh branch running concurrently with MLB's
+  memory peak. Target: remove ~202.6MB from the worst combined moment, against a
+  margin measured at **124MB** (worst combined 3,972.0MB = 97.0% of 4,096MB).
+- **THE OWNER'S DOMAIN POINT IS THE PREMISE, and it is confirmed by the data:**
+  soccer and the US sports run on opposite schedules, so soccer has no fixture
+  reason to be refreshing during MLB's evening peak. Measured 18:11Z-01:5xZ,
+  samples with BOTH branches live, against pid 39's peak that hour:
+
+        hr   soccer   mlb   BOTH   pid39 peak
+        18      113   383    101       3,230
+        19      355   689    317       2,369
+        20      241   501    223       3,300
+        21      206   215    101       3,328
+        22       91   353     82       3,302
+        00      206    84     33       3,628
+
+  **Soccer runs in EVERY hour MLB peaks.** The collision is cadence, not fixtures.
+- **The concurrency is real** (unlike the `daily_update` chain, which is nested —
+  see the correction above). The odds branch hangs off its own child of pid 39:
+  `run_refresh_odds_job` -> `refresh_odds_sources` -> `build_soccer_artifacts`
+  = 20.4 + 95.5 + 86.7 = **202.6MB** alongside the MLB chain.
+
+**DO NOT START FROM SCRATCH — TWO PIECES ALREADY EXIST:**
+1. **`9ec20a06` is written, tested and HELD** — "odds: the pregame relaunch
+   cooldown is per-sport, not one clock for all eight"
+   (`live_refresh_loop.py` +115, `tests/test_pregame_cooldown_per_sport.py`
+   +132). NOT on `origin/main`. It was held because it changes odds cadence and
+   would confound `soccer-odds-coverage`'s per-league measurement — that is the
+   SAME mechanism this lane needs, so check whether it already does the job
+   before writing anything.
+2. The `soccer-odds-coverage` lane owns per-league cadence. **Coordinate; do not
+   take its files.**
+
+- **Hypothesis:** a per-sport cadence that ties soccer's refresh to its own
+  fixture window removes most of the 202.6MB overlap without reducing soccer's
+  data quality, because the refreshes during MLB's peak are polling leagues with
+  no imminent kickoff.
+- **Falsification test:** if soccer's refreshes during 18-22Z are in fact serving
+  imminent kickoffs (check `commence_time` on what those runs write), then the
+  overlap is REQUIRED and the lever is memory, not scheduling.
+- **Verification:** re-run the hour table above; `BOTH` should fall in MLB's peak
+  hours, and worst-combined should drop from 3,972MB. Must be a WORST-COMBINED
+  measurement across all processes — a per-process figure is what made the margin
+  look like 578MB when it was 124MB.
+- **Cost note:** OddsAPI spend. Changing cadence changes call volume against a 5M
+  cap; `9ec20a06` was held partly for that call.
