@@ -1949,3 +1949,40 @@ Corollary already paid for elsewhere in this session: `[ cond ] || { echo ABORT;
 placed after an `&&` chain reports ABORT when an EARLIER link failed, so the
 abort message names the wrong cause. Check the actual failure before believing
 the guard rail that fired.
+
+
+### 2026-08-16 — A GUARD SCOPED TO THE WRONG OBJECT CRIES WOLF AND GOES BLIND AT THE SAME TIME
+
+`commit-guard.py` evaluated its two predicates against `CLAUDE_PROJECT_DIR`.
+Commits run wherever the shell is, and the repo's own recipe for a contended
+tree is to commit from a linked worktree — which has its own index and its own
+HEAD. So the guard read one object and protected another.
+
+It blocked **three clean commits in one session**, each time naming a real
+revert staged in a tree the commit was not touching. That half is loud and
+merely annoying. **The other half is silent: a stale index in the worktree
+actually being committed from was never examined at all.** Same defect, same
+line of code, and only one of the two symptoms is visible.
+
+The old code made this worse by *reasoning* its way past the case: it skipped
+`git -C <dir> commit` because those "have their own index and are the documented
+safe recipe". **Having your own index is not having a fresh one** — that exact
+conflation is what the guard exists to catch, so it cannot also be the excuse
+for not looking.
+
+**How to apply.**
+- **Name the object a check protects, and prove the check reads THAT object.**
+  Not the repo — *this* index. Not the service — *this* deployment. A guard is
+  a claim about a specific thing; scope drift makes it a claim about a different
+  thing that happens to still return a verdict.
+- **When a guard fires on something you know is fine, do not just override it.**
+  Three false positives were three signals that it was reading the wrong tree,
+  and the fix took twenty minutes once the question was asked.
+- **A guard's false positives are self-reporting; its false negatives are not.**
+  Whenever you find one, look immediately for the mirrored silence — they are
+  usually the same bug, and only the loud half will ever come to you.
+- Test it against REAL state, not mocks: the bug was *which directory a
+  subprocess ran in*, and a mocked `git` reproduces that perfectly and wrongly.
+
+Related: [[instrument blindness]], [[gate on the output, not the input]],
+[[unknown must not default permissive]].

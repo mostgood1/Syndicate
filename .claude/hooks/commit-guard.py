@@ -58,6 +58,37 @@ guard was structurally blind to:
   The strongest case is called out by name when it holds: staged blob ==
   `git ls-tree HEAD^ -- <path>`, a pure revert-in-waiting.
 
+WHICH INDEX IT READS, fixed 2026-08-16 after THREE FALSE POSITIVES IN ONE
+SESSION -- and the same bug is a FALSE NEGATIVE in the other direction:
+
+  Both predicates were evaluated against `CLAUDE_PROJECT_DIR`, the MAIN
+  worktree. But the commit runs wherever the shell is, and this repo's own
+  documented recipe for a contended tree is `git worktree add` + commit from
+  there. A linked worktree has its OWN index and its OWN HEAD.
+
+  So the guard was answering a question nobody asked. Measured 2026-08-16: a
+  session committing from `/c/tmp/lgl-ck` was blocked three times over reverts
+  staged in the MAIN index, while its own index held exactly its four intended
+  appends. Each block named real danger -- in the wrong tree.
+
+  **The false negative is the half that matters.** A stale index in the worktree
+  being committed from was never examined at all, so the guard would pass it
+  silently. "It has its own index" was the reason the old code skipped scoped
+  calls; having your own index is not the same as having a FRESH one, and that
+  conflation is precisely what this guard exists to catch.
+
+  Resolution order for the directory git will actually run in:
+    1. any `cd` in the command that precedes the `git ... commit`
+    2. `-C <dir>` on the commit invocation itself
+    3. the payload's `cwd` (the Bash tool's persistent working directory)
+    4. `CLAUDE_PROJECT_DIR`, then `os.getcwd()`
+  then `git rev-parse --show-toplevel` from there, so on-disk path joins are
+  relative to the right worktree.
+
+  Still skipped, deliberately and now named as a GAP rather than as safety:
+  `--git-dir` / `--work-tree`, where the index and the tree can be decoupled and
+  the on-disk half of predicate 1 has no single correct base.
+
 Overrides:
     SYNDICATE_ALLOW_STAGED_DELETES=1 git commit ...   # disables BOTH predicates
     SYNDICATE_ALLOW_STAGED_REVERTS=1 git commit ...   # disables predicate 2 only
@@ -75,15 +106,80 @@ REVERT_ALLOW_ENV = "SYNDICATE_ALLOW_STAGED_REVERTS"
 # a normal staged set is a handful of text files.
 _MAX_PATHS = 120
 _MAX_BLOB_BYTES = 4 * 1024 * 1024
-# `git commit` but not `git commit-tree`, and not a commit inside another
-# worktree via -C / --git-dir (those have their own index and are the
-# documented safe recipe, so leave them alone).
-COMMIT_RE = re.compile(r"(?:^|[;&|]|\s)git\s+(?:-c\s+\S+\s+)*commit(?![\w-])")
-SCOPED_RE = re.compile(r"(?:^|\s)git\s+(?:-C\s+\S+|--git-dir(?:=|\s)\S+)")
+# `git commit` but not `git commit-tree`. The whole invocation prefix is
+# captured so `-C <dir>` can be read off it: the commit's own index is the one
+# to check, wherever it lives.
+_GIT_OPT = r"(?:-c|-C)(?:\s+|=)\S+\s+"
+COMMIT_RE = re.compile(
+    r"(?:^|[;&|]|\s)(git\s+(?:" + _GIT_OPT + r")*commit(?![\w-]))")
+# Index and working tree can be decoupled here, so predicate 1's "does it still
+# exist on disk" question has no single correct base. Skipped, and named as a
+# gap in the docstring rather than passed off as safe.
+DECOUPLED_RE = re.compile(r"(?:^|\s)git\s[^;&|]*?--(?:git-dir|work-tree)(?:=|\s)")
+_DASH_C_RE = re.compile(r"(?:^|\s)-C(?:\s+|=)(\"[^\"]*\"|'[^']*'|\S+)")
+# `cd DIR`, with the shell quoting forms that actually appear in this repo's
+# commands. Options (`cd -P`) are stepped over; a bare `cd` (to $HOME) is not
+# matched, which is correct -- it is never followed by a repo-relative commit.
+_CD_RE = re.compile(
+    r"(?:^|[;&|]|\s)cd\s+(?:-[A-Za-z]+\s+)*(\"[^\"]*\"|'[^']*'|[^\s;&|]+)")
 
 
-def repo_root():
-    return os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd()
+def _unquote(token):
+    token = token.strip()
+    if len(token) >= 2 and token[0] == token[-1] and token[0] in "\"'":
+        return token[1:-1]
+    return token
+
+
+def command_cwd(cmd, commit_pos, payload):
+    """The directory `git commit` will actually run in.
+
+    A guard that reads a different tree than the command touches is not a
+    weaker guard, it is a guard answering a different question -- it both cries
+    wolf about someone else's index and stays silent about the one at risk.
+    """
+    base = None
+    for candidate in ((payload.get("cwd") or "").strip(),
+                      os.environ.get("CLAUDE_PROJECT_DIR") or "",
+                      os.getcwd()):
+        if candidate and os.path.isdir(candidate):
+            base = candidate
+            break
+    if base is None:
+        return None
+
+    # Apply every `cd` that precedes the commit, in order: `cd a && cd b && git
+    # commit` lands in b, and a relative second hop resolves against the first.
+    for m in _CD_RE.finditer(cmd):
+        if m.start() >= commit_pos:
+            break
+        target = _unquote(m.group(1))
+        if not target or target.startswith("-"):
+            continue
+        base = target if os.path.isabs(target) else os.path.join(base, target)
+
+    # `-C` on the commit invocation itself wins: git applies it last.
+    prefix = cmd[commit_pos:]
+    m = _DASH_C_RE.search(prefix.split("commit", 1)[0])
+    if m:
+        target = _unquote(m.group(1))
+        if target:
+            base = target if os.path.isabs(target) else os.path.join(base, target)
+
+    return base if os.path.isdir(base) else None
+
+
+def worktree_root(cwd):
+    """The top level of the worktree containing `cwd`.
+
+    Predicate 1 joins repo-relative paths onto this to ask "is it still on
+    disk", so it must be the tree the commit belongs to, not the main one.
+    """
+    out = _git(cwd, "rev-parse", "--show-toplevel")
+    if not out:
+        return None
+    root = out.decode("utf-8", "replace").strip()
+    return root if root and os.path.isdir(root) else None
 
 
 def _git(root, *args):
@@ -247,11 +343,10 @@ def main():
     if payload.get("tool_name") != "Bash":
         return 0
     cmd = (payload.get("tool_input") or {}).get("command") or ""
-    if not COMMIT_RE.search(cmd):
+    m = COMMIT_RE.search(cmd)
+    if not m:
         return 0
-    # An explicitly scoped git call uses another repo/index -- not our problem,
-    # and it is the recipe the ledger tells sessions to use.
-    if SCOPED_RE.search(cmd):
+    if DECOUPLED_RE.search(cmd):
         return 0
     if os.environ.get(ALLOW_ENV):
         return 0
@@ -259,7 +354,15 @@ def main():
         # Isolated index: this is the safe recipe, by construction.
         return 0
 
-    root = repo_root()
+    # THE INDEX THE COMMIT WILL USE, not the main worktree's. Reading the wrong
+    # one blocked three clean commits in one session while leaving the index
+    # actually at risk unexamined.
+    cwd = command_cwd(cmd, m.start(1), payload)
+    root = worktree_root(cwd) if cwd else None
+    if root is None:
+        # Cannot tell which tree this commit belongs to. A guard that cannot
+        # read must not block work -- the same rule the read below follows.
+        return 0
     try:
         out = subprocess.run(
             ["git", "diff", "--cached", "--name-status", "--no-renames"],

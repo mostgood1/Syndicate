@@ -1203,6 +1203,40 @@ does not hold.** `[measured 08-14]`
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
+### commit-guard-reads-wrong-index — CLOSED 2026-08-16 — the guard read the MAIN worktree's index while the commit used another one — session: `live-gameline-eval`
+- Goal: `commit-guard.py` evaluates the index the COMMIT will use. **DONE.**
+- Files: `.claude/hooks/commit-guard.py`, `tests/test_commit_guard_worktree_index.py`.
+  Neither claimed by any OPEN lane at the time of the edit.
+- **The bug.** Both predicates ran with `cwd=CLAUDE_PROJECT_DIR`. The commit runs
+  wherever the shell is — and this repo's own documented recipe for a contended
+  tree is `git worktree add` and commit from there. A linked worktree has its own
+  index and its own HEAD.
+- **Two opposite failures, and the SECOND is the one that mattered:**
+  - *False positive*, observed **3× in one session**: a session committing from
+    `/c/tmp/lgl-ck` was blocked over reverts staged in the MAIN index while its
+    own index held exactly its four intended appends.
+  - *False negative*, **never observed and strictly worse**: a stale index in the
+    worktree being committed from was never examined, so the guard would pass it
+    in silence. That is the entire hazard it was written to catch.
+- **`-C` is now checked instead of skipped.** The old code waved
+  `git -C <dir> commit` through because it "has its own index". **Having your own
+  index is not having a fresh one** — that conflation is what this guard exists
+  to catch, so it cannot be the reason to skip. `--git-dir` / `--work-tree` stay
+  skipped and are now named as a KNOWN GAP: index and tree decouple there, so
+  predicate 1's "is it still on disk" has no single correct base.
+- **Verification — falsified, not just asserted.** 13 tests on REAL git repos in
+  `tmp_path` (a mocked git reproduces nothing; the bug was which directory git
+  ran in). Against the pre-fix hook: **7 fail, 6 pass**, and the load-bearing
+  `test_a_stale_index_in_the_LINKED_worktree_is_caught` fails as `assert 0 == 2`
+  — the false negative, reproduced. Against the fix: **13 pass.**
+- **Honest limit on the end-to-end check.** The real hook binary was run on the
+  real payload shape and returned 0, but the shared index happened to be CLEAN at
+  that moment, so **that reading is not a positive control** — it cannot
+  distinguish the fix from the bug. The positive control is the pytest pair on
+  real repos. Deliberately staging a revert in the live shared index to produce
+  one would have created the exact landmine the guard exists to prevent.
+- Blocked by: none.
+
 ### live-game-line-projection — OPEN, UNOWNED (session `live-gameline-eval` checkpointed 2026-08-16 15:2xZ) — **BOTH HALVES SHIPPED AND v2 STILL UNEXERCISED. THE PLUMBING IS DONE TWICE OVER; THE EVALUATION HAS NOT STARTED.**
 
 **STATUS AT CHECKPOINT `[15:2xZ]`.** Nothing uncommitted; everything is on
