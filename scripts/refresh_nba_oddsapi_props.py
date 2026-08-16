@@ -3652,25 +3652,31 @@ def _build_optional_player_recon_artifacts(*, source_root: Path, date_str: str, 
     return copied
 
 
-def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+# PARITY WITH WNBA, 2026-08-16. All three props-snapshot exporters below took a
+# prior `<name>_<date>.json` as permission to skip the rebuild FOREVER, with no
+# way to override it -- WNBA fixed two of its three long ago and the third on the
+# same day as this. NBA is out of season, so this cannot be verified in
+# production now; the `False` default keeps every path byte-identical until
+# someone actually passes --force-refresh.
+def _export_top_by_game_snapshot(*, source_root: Path, date_str: str, processed_root: Path, force_refresh: bool = False) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
         processed_root=processed_root,
         file_name=f"props_recommendations_top_by_game_{date_str}.json",
     )
-    if existing:
+    if existing and not force_refresh:
         return existing
     _, out_path = _build_local_top_by_game_snapshot(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
 
 
-def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+def _export_recommendations_slate_snapshot(*, source_root: Path, date_str: str, processed_root: Path, force_refresh: bool = False) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
         processed_root=processed_root,
         file_name=f"recommendations_slate_{date_str}.json",
     )
-    if existing:
+    if existing and not force_refresh:
         return existing
     _, out_path = _build_local_recommendations_slate_artifact(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
@@ -3806,13 +3812,13 @@ def _export_season_betting_card_artifacts(*, source_root: Path, date_str: str, p
     return copied
 
 
-def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_root: Path) -> str | None:
+def _export_cards_props_snapshot(*, source_root: Path, date_str: str, processed_root: Path, force_refresh: bool = False) -> str | None:
     existing = _copy_existing_processed_artifact(
         source_root=source_root,
         processed_root=processed_root,
         file_name=f"cards_props_snapshot_{date_str}.json",
     )
-    if existing:
+    if existing and not force_refresh:
         return existing
     _, out_path = _build_local_cards_props_snapshot_artifact(processed_root=processed_root, date_str=date_str)
     return str(out_path) if out_path is not None else None
@@ -4303,7 +4309,7 @@ def _export_live_snapshot_artifacts(*, source_root: Path, date_str: str, process
     return copied
 
 
-def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path, source_root: Path) -> dict[str, object]:
+def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Path, source_root: Path, force_refresh: bool = False) -> dict[str, object]:
     processed_root = artifact_root / "data" / "processed"
     raw_root = artifact_root / "data" / "raw"
     live_lens_root = artifact_root / "data" / "live_lens"
@@ -4354,16 +4360,16 @@ def _materialize_artifact_bundle(*, state: dict[str, object], artifact_root: Pat
             recon_props_path = _export_recon_props_artifact(source_root=source_root, date_str=date_text, processed_root=processed_root)
             if recon_props_path:
                 copied["recon_props_path"] = recon_props_path
-            recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            recommendations_slate_path = _export_recommendations_slate_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
             if recommendations_slate_path:
                 copied["recommendations_slate_path"] = recommendations_slate_path
-            cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            cards_props_snapshot_path = _export_cards_props_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
             if cards_props_snapshot_path:
                 copied["cards_props_snapshot_path"] = cards_props_snapshot_path
             cards_sim_detail_path = _export_cards_sim_detail_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
             if cards_sim_detail_path:
                 copied["cards_sim_detail_path"] = cards_sim_detail_path
-            top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root)
+            top_by_game_path = _export_top_by_game_snapshot(source_root=source_root, date_str=date_text, processed_root=processed_root, force_refresh=bool(force_refresh))
             if top_by_game_path:
                 copied["top_by_game_path"] = top_by_game_path
             copied.update(_export_season_betting_card_artifacts(source_root=source_root, date_str=date_text, processed_root=processed_root))
@@ -4625,6 +4631,7 @@ def main() -> int:
                 state=state,
                 artifact_root=artifact_root_path,
                 source_root=source_root,
+                force_refresh=bool(args.force_refresh),
             )
             if copied:
                 state["artifact_bundle_root"] = str(artifact_root_path)
