@@ -2330,7 +2330,15 @@ def _enrich_games_with_tracked_market_lines(games: list[dict[str, Any]], selecte
     return enriched_games
 
 
-def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
+def source_cards_api_payload(
+    context: dict[str, Any],
+    *,
+    history_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None,
+) -> dict[str, Any]:
+    """`history_cache` is BUILD-SCOPED and optional. See build_mlb_market_board.
+
+    Default None preserves every existing caller exactly.
+    """
     games = context.get("games") if isinstance(context.get("games"), list) else []
     hr_targets = context.get("hr_targets_shelf") if isinstance(context.get("hr_targets_shelf"), dict) else None
     hr_rows = hr_targets.get("rows") if hr_targets and isinstance(hr_targets.get("rows"), list) else []
@@ -2365,7 +2373,9 @@ def source_cards_api_payload(context: dict[str, Any]) -> dict[str, Any]:
     # the slate runs, and the freeze holds the games it has dropped.
     game_lines_doc = load_oddsapi_game_lines_doc(selected_date) if selected_date else None
     shared_game_lines_doc = (
-        load_odds_history_payload_for_sport("mlb", resolve_current_shard_key("mlb", selected_date))
+        load_odds_history_payload_for_sport(
+            "mlb", resolve_current_shard_key("mlb", selected_date), cache=history_cache
+        )
         if selected_date == today_iso and not render_web_dyno
         else None
     )
@@ -6383,9 +6393,17 @@ _MLB_MARKET_BOARD_TO_ODDS_HISTORY_MARKET = {
 }
 
 
-def _mlb_odds_history_payload(selected_date: str) -> dict[str, Any]:
+def _mlb_odds_history_payload(
+    selected_date: str,
+    *,
+    history_cache: dict[tuple[str, str], dict[str, Any] | None] | None = None,
+) -> dict[str, Any]:
+    """`history_cache` is BUILD-SCOPED and optional. See build_mlb_market_board.
+
+    Default None preserves every existing caller exactly.
+    """
     shard_key = resolve_current_shard_key("mlb", selected_date)
-    payload = load_odds_history_payload_for_sport("mlb", shard_key)
+    payload = load_odds_history_payload_for_sport("mlb", shard_key, cache=history_cache)
     return payload if isinstance(payload, dict) else {}
 
 
@@ -6628,12 +6646,40 @@ def build_mlb_market_board(selected_date: str) -> dict[str, Any]:
         if cached_board is not None:
             return cached_board
     context = build_cards_page_context(selected_date)
-    payload = source_cards_api_payload(dict(context))
+    # BUILD-SCOPED cache for the odds_history shard, shared by the two readers
+    # below. Measured 2026-08-16: `source_cards_api_payload` and
+    # `_mlb_odds_history_payload` each called
+    # `load_odds_history_payload_for_sport` for the SAME (sport, shard_key)
+    # five lines apart, and neither passed the `cache=` parameter that has
+    # existed on that function all along -- so the shard was read off disk and
+    # json-parsed TWICE per board build. The MLB shard is 19,798,176 bytes /
+    # 3,436 markets (that function's own docstring), and `#435` measured this
+    # JSON family at ~6.3x file bytes resident, so the duplicate is worth
+    # ~125MB of transient per build on a worker whose excursions already reach
+    # headroom 0.0.
+    #
+    # DELIBERATELY BUILD-SCOPED, not module-level. A module-level cache would
+    # hold ~125MB resident between builds, and on this worker the floor IS the
+    # ratchet -- trading a transient for a permanent floor rise is not a win
+    # when peak = floor + transient. This dict dies with the function, so the
+    # change can reduce the transient and CANNOT raise resident memory.
+    #
+    # It also cannot go stale within a build: one build, one read.
+    history_cache: dict[tuple[str, str], dict[str, Any] | None] = {}
+    payload = source_cards_api_payload(dict(context), history_cache=history_cache)
     games = payload.get("games") if isinstance(payload.get("games"), list) else []
     raw_pitcher_market_lines = _pitcher_snapshot_market_lines(selected_date)
     raw_hitter_market_lines = _hitter_snapshot_market_lines(selected_date)
     live_lens_report = _mlb_live_lens_report(selected_date)
-    odds_history = _mlb_odds_history_payload(selected_date)
+    odds_history = _mlb_odds_history_payload(selected_date, history_cache=history_cache)
+    # Says whether the fix was exercised, so it cannot be inert-but-believed:
+    # entries=1 means both readers shared one parse. print(), not logger.info --
+    # #37, logger.info never reaches Render's collector.
+    print(
+        f"[mlb_cards] ODDS_HISTORY_BUILD_CACHE entries={len(history_cache)} "
+        f"date={selected_date}",
+        flush=True,
+    )
 
     board_games: list[dict[str, Any]] = []
     for game in games:
