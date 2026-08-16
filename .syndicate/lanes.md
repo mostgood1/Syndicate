@@ -874,7 +874,64 @@ does not hold.** `[measured 08-14]`
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
-### live-game-line-projection — OPEN, UNOWNED (session archived 2026-08-16 ~02:4xZ) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+- Goal: make the ledger capable of producing a sample at all, and make its
+  counters readable without streaming a 10 MB artifact. Success = one live slate
+  where `live_gameline_ledger.written > 0` and the counters are reachable from
+  an API.
+- Files: `syndicate/features/shared/live_gameline_ledger.py`,
+  `syndicate/features/shared/live_gameline_join.py`,
+  `syndicate/blueprints/intelligence.py`, `tests/test_live_gameline_ledger.py`.
+  Checked against every OPEN lane's `- Files:` at re-take: no lane claims any of
+  them. `refresh-worker-oom-recurrence` names `syndicate/features/intelligence.py`
+  as an expected candidate — a DIFFERENT file from `syndicate/blueprints/intelligence.py`.
+- Deploy intent: **PREPARE ONLY.** The recorder runs on refresh-worker, and
+  `refresh-worker-oom-recurrence` has an explicit hold on deploys to that service
+  until its attribution is written. Request file, not a deploy.
+- Verification: written to `deploys.md` with the window stated.
+- Blocked by: refresh-worker deploy hold (`refresh-worker-oom-recurrence`) for
+  the recorder half only. The web half is unblocked.
+- **Took `.syndicate/.current-lane` from `refresh-worker-oom-recurrence`** — one
+  single-valued marker, N sessions, the known root cause. That lane claims no
+  files, so the cost is bounded.
+
+**MEASURED 2026-08-16 03:00–03:1xZ on a LIVE slate (2 games live, 13 final).**
+Source: the `book_grid_2026-08-15.json` artifact streamed from web
+(`/api/ops/artifacts/stream`, 9,953,474 bytes, `generated_at 03:00:00.538Z`) and
+`/mlb/api/live-lens` at 03:00Z. Both read at the same instant, both post-date
+`f8ca54e1`.
+
+    live_gamelines       considered 8  projected 2  priceable 0  edged 0
+                         withheld 8 = {segment_is_not_full_game: 6,
+                                       prob_interval_swamps_edge: 2}
+                         index_size 10
+    live_gameline_ledger candidates 0  written 0  enabled true
+
+1. **`index_size` IS EXPLAINED. It is not a live-game count and nothing is
+   wrong.** It counts snapshot games carrying a `live_mc` lens. Census at 03:0xZ:
+   **10 of 15 games carry one — 8 FINAL and 2 LIVE.** A Final keeps its last
+   `live_mc` lens, so the number is monotone through a slate: 3 → 8 → 10 is just
+   how many games had gone live-or-through-live by each read. **The join loop
+   filters on `game.state == live` on the GRID side, so the Final entries are
+   never used** — the counter is misleading, not the join. Retire the "unexplained"
+   framing; the defect, if any, is that this is the one counter in the block with
+   no denominator, which is exactly what invited the wrong reading.
+2. **THE RECORDER CANNOT PRODUCE A SAMPLE, AND THIS IS THE REAL BLOCKER.**
+   `build_records` skips any row that is not `priceable`; `priceable` requires the
+   edge to clear a 2σ bar at 120 sims. Tonight that is **0 of 8**, so
+   `candidates: 0` — the ledger was never asked to write anything. **The
+   scheduled `live-gameline-ledger-check` will very likely read `written: 0`
+   again tomorrow, and that will mean neither "broken" nor "working."**
+3. **The filter's stated justification is wrong by three orders of magnitude.**
+   The docstring refuses non-priceable rows because "recording thousands of
+   refusals per build would bury the handful CLV can score." The measured
+   population is **8 rows per build, 2 of them projected.** There are no
+   thousands. Recording every PROJECTED row costs ~2 records/build against a
+   20,000-record file cap, and it is the difference between a sample and none.
+4. **`liveStateAsOf` and `liveStateCarriedForward` are `None` on all 10 lensed
+   games, including the 2 live ones.** Consistent with "Drop 2's carry-forward has
+   never fired" AND with "the stamp is only applied on the carry-forward path."
+   **Not disambiguated — do not record either as established.**
 **Lane stays OPEN** — the projection ships, but nothing yet says the edges are good.
 
 **SHIPPED AND LIVE (content-verified per service, not by ancestry):**

@@ -2317,6 +2317,26 @@ def board_book_grid_api():
                     # predates the join" signal the gate exists to give.
                     "live_projections": precomputed.get("live_projections"),
                     "live_game_state": precomputed.get("live_game_state"),
+                    # THE GAME-LINE TIER, added 2026-08-16 for the same reason
+                    # and by the same argument as the two lines above -- which is
+                    # the point: the writer gained `live_gamelines` (Drop 3) and
+                    # `live_gameline_ledger`, this response dropped both, and the
+                    # only way to read either was to stream a 9.95 MB artifact
+                    # off `/api/ops/artifacts/stream`. That is how the last
+                    # session spent its instrument budget.
+                    #
+                    # Kept as SEPARATE keys from `live_projections`, matching the
+                    # writer: props and game lines are different joins with
+                    # different failure modes, and folding them would make one
+                    # family's zero look like the other's.
+                    #
+                    # NB for whoever reads `index_size` inside `live_gamelines`:
+                    # it counts snapshot games carrying a `live_mc` lens, NOT
+                    # live games. Measured 03:0xZ, 10 = 8 Final + 2 Live -- a
+                    # Final keeps its last lens, so the number is monotone across
+                    # a slate. It is the one counter here without a denominator.
+                    "live_gamelines": precomputed.get("live_gamelines"),
+                    "live_gameline_ledger": precomputed.get("live_gameline_ledger"),
                     # rows_total/rows_truncated come from the artifact so a bounded
                     # grid is attributable rather than reading as "that is all there is".
                     "total_rows": precomputed.get("rows_total"),
