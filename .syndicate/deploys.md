@@ -8474,3 +8474,66 @@ was 00:24Z, so the read is available after the next one. Grep
 `_SLATE_WINDOW_DAYS["nfl"] = 5` with a forward-only window means a board anchored
 on 08-16 spans 08-16..08-20 and **cannot show week 3 (08-21) even once it is
 quoted**. Independent of the capture question, and it is this lane's own file.
+
+---
+
+### ask-both-edges — web `8172fdef` — MEASURED (AND THE MEASUREMENT IS "INERT TODAY")
+
+- Deployed 2026-08-16 16:37 CDT (21:37:45Z), **web only**, cut from web's own
+  live SHA `73e59f51`. Claim held, nothing in flight, nothing cancelled. Landed
+  on `main` as `4705124e`; main and live carry identical blobs.
+
+- **THE RULE CHANGE.** Eligibility now requires EVERY edge term a row carries to
+  be positive, not just the one it is ranked on. Closes the item left open in
+  the `ask-positive-edge` row above.
+
+- **WHY THE FIRST CUT WAS NOT ENOUGH, and it is a general lesson.**
+  `_has_positive_edge` mirrored `_board_rank_key` — model edge when present, EV
+  otherwise — so a row was judged on the single term it is ordered by. That
+  published `Pittsburgh Pirates` at **model edge +9.18% with EV -2.18%**: the
+  model liked the side while the offered price was worse than consensus fair.
+  **Ranking needs ONE number to sort on; eligibility is a VETO, and a veto
+  should hear every term that can object.** Two different jobs, and sharing one
+  rule between them was the mistake. Mirroring the ranker had felt like the
+  careful choice — it was written up as "so ordering and eligibility cannot
+  disagree" — and that symmetry is exactly what let a bad row through.
+
+- Ordering is untouched. `test_ranking_is_unchanged_by_the_stricter_eligibility`
+  pins that model-bearing rows still sort above EV-only rows by descending edge.
+
+- **WORDING FIXED IN THE SAME CHANGE, because the rule made it false.** The
+  summary said "N rows priced against the model and were left out". Already
+  loose — it covered rows dropped for a non-positive `ev_pct`, where the model
+  has no opinion at all — and plainly wrong once EV could veto, since a row can
+  now be dropped with the model FOR it and only the price against it.
+  `_has_positive_edge` does not report which term objected, so the sentence must
+  not claim to know. Now: "N rows with a non-positive edge were left out."
+
+- **MEASURED, AND THE HONEST RESULT IS THAT THE RULE IS CURRENTLY INERT.**
+  Replayed over the live board (51 rows) before deploying: old rule keeps 42,
+  new rule keeps 42, **0 newly excluded** — no row on that slate had the
+  conflicting shape. The predicate is proven by unit test against the exact
+  Pittsburgh values, NOT by a production diff.
+  **So this ships as a guard against a shape that occurs occasionally, and a
+  clean board read after it is NOT evidence that it fired.** Recorded that way
+  deliberately; the next reader would otherwise bank a success against the wrong
+  cause.
+
+- **New code confirmed running by the one thing that IS observable** — the
+  wording, which exists only in this build. Production 21:3xZ: "Showing the top
+  5 opportunities on today's board in MLB. Best edge 8.9%. **7 rows with a
+  non-positive edge were left out.**" Old wording absent, 0 non-positive rows
+  published, 0 model-positive/EV-negative rows published.
+
+- 11 assertions on the rule, the ranking-invariance pin, and 3 wording
+  assertions. 70 in this file, 228 across all four ask suites.
+
+- Rollback: `py -3 scripts/render_deploy.py --service web --commit 73e59f51
+  --allow-rollback`.
+
+- **Process note for this lane:** the first edit of this change was BLOCKED by
+  `lane-guard.py` because the resumed session was on the shared global
+  `.current-lane` marker while another session held it. Fix is the per-session
+  slot the hook names in its own error text
+  (`.syndicate/.current-lane.<session-id>`), not closing or forcing the lane.
+  Worth knowing: a resumed session does not inherit its own marker.
