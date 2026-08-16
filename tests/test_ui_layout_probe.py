@@ -452,8 +452,6 @@ def test_a_report_predating_the_field_is_not_failed_on_it():
     assert ok
     assert "CONTENT CONTRADICTED" not in text
     assert "settle rests on absence" not in text
-<<<<<<< Updated upstream
-=======
 
 
 # --- the desktop height model: unfittable, not mis-tuned -------------------
@@ -567,4 +565,3 @@ def test_a_slate_with_no_tied_cards_reports_no_floor_rather_than_zero():
     assert m["floorPx"] is None
     assert m["unfittable"] is False
     assert m["atNoiseFloor"] is False
->>>>>>> Stashed changes
