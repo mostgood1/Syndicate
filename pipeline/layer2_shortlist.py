@@ -81,11 +81,30 @@ def build_layer2_shortlist(
         try:
             from syndicate.features.shared.board_enrichment import (
                 attach_game_state,
-                attach_live_gamelines_for_sport,
-                attach_live_projections_for_sport,
                 attach_margin_model,
                 attach_projections,
             )
+
+            # THE LIVE JOINS ARE IMPORTED SEPARATELY AND OPTIONALLY.
+            #
+            # Same cross-file hazard as the card builder below: if
+            # `board_enrichment.py` on this worker predates them, naming them in
+            # the import block above turns an ImportError into the loss of THIS
+            # SPORT'S ENTIRE ENRICHMENT -- game state, projections and margin
+            # model all die with it, because they share the try. A missing live
+            # tier should cost the live tier and nothing else.
+            #
+            # They are on every service today (verified 2026-08-16), so this
+            # guards a future rollback rather than a present gap. It is here
+            # because `c324447d` proved these files do not move together.
+            try:
+                from syndicate.features.shared.board_enrichment import (
+                    attach_live_gamelines_for_sport,
+                    attach_live_projections_for_sport,
+                )
+            except ImportError:
+                attach_live_gamelines_for_sport = None  # type: ignore[assignment]
+                attach_live_projections_for_sport = None  # type: ignore[assignment]
             from syndicate.features.shared.book_grid import build_book_grid
             from syndicate.features.shared.odds_book_quotes import read_book_quotes_latest, read_quote_last_seen
 
@@ -226,13 +245,27 @@ def build_layer2_shortlist(
                 # live-odds-worker's tick, so this stays a read.
                 (
                     "live_projections",
-                    lambda: attach_live_projections_for_sport(grid, sport=sport, selected_date=selected_date),
+                    (
+                        (lambda: attach_live_projections_for_sport(grid, sport=sport, selected_date=selected_date))
+                        if attach_live_projections_for_sport is not None
+                        else None
+                    ),
                 ),
                 (
                     "live_gamelines",
-                    lambda: attach_live_gamelines_for_sport(grid, sport=sport, selected_date=selected_date),
+                    (
+                        (lambda: attach_live_gamelines_for_sport(grid, sport=sport, selected_date=selected_date))
+                        if attach_live_gamelines_for_sport is not None
+                        else None
+                    ),
                 ),
             ):
+                if fn is None:
+                    # ABSENT, and say which absence it is. "not on this deploy"
+                    # and "ran and matched nothing" need different fixes, and
+                    # `#296`'s whole point is that they must not look alike.
+                    enrichment[step] = {"supported": False, "reason": "not present on this deploy"}
+                    continue
                 try:
                     enrichment[step] = fn()
                 except Exception as exc:  # never let enrichment break the build
@@ -385,15 +418,56 @@ def build_layer2_shortlist(
     # Read BEFORE `record_openings` runs, deliberately: that call appends
     # today's rows, and movement must compare against the FIRST time we
     # published a row, not against the copy we are writing this instant.
+    # THE CALLER MUST TOLERATE AN OLDER CALLEE, AND THIS COST A PRODUCTION
+    # INCIDENT TO LEARN (2026-08-16 20:34Z).
+    #
+    # These two files deploy as separate blobs onto a long-lived worker, so
+    # there is no instant at which they are guaranteed to be the same vintage.
+    # Deploy `c324447d` shipped THIS file carrying `openings=` while
+    # `layer2_board.py` on the worker still had the one-argument signature:
+    # `TypeError: unexpected keyword argument 'openings'` -> caught by the
+    # `except` below -> `cards = []` -> and because `layer2_is_primary` is True
+    # with `legacy_candidate_count` 0, **a blank board**, announced only by a
+    # `cards_error` string nobody reads.
+    #
+    # The guard for that was a message to the deploying session. A message is
+    # not a guard. So: ASK THE CALLEE WHAT IT ACCEPTS, then call it that way.
+    # `inspect.signature` rather than `except TypeError`, because a bare
+    # TypeError retry cannot tell "that parameter does not exist" from a real
+    # TypeError raised INSIDE the function, and would silently drop movement on
+    # a genuine bug.
+    #
+    # Degrading to a board WITHOUT movement is the correct failure: movement is
+    # an enrichment, the rows are already correct, and a board that ranks
+    # without a movement term is the board that shipped for months.
+    cards_compat_note = None
     try:
+        import inspect
+
         from syndicate.features.shared.layer2_board import layer2_rows_to_board_cards
 
-        shortlist["cards"] = layer2_rows_to_board_cards(
-            shortlist.get("rows") or [], openings=openings_index
-        )
+        rows_for_cards = shortlist.get("rows") or []
+        try:
+            accepts = "openings" in inspect.signature(layer2_rows_to_board_cards).parameters
+        except (TypeError, ValueError):
+            accepts = False
+        if accepts:
+            shortlist["cards"] = layer2_rows_to_board_cards(rows_for_cards, openings=openings_index)
+        else:
+            # Older `layer2_board.py` on this worker. Build the board it CAN
+            # build rather than no board at all, and say so -- an unexplained
+            # empty movement column is `#368`'s defect over again.
+            shortlist["cards"] = layer2_rows_to_board_cards(rows_for_cards)
+            cards_compat_note = (
+                "layer2_board.layer2_rows_to_board_cards has no `openings` parameter on this "
+                "deploy; cards built WITHOUT movement/steam. Ship layer2_board.py alongside "
+                "pipeline/layer2_shortlist.py to restore it."
+            )
     except Exception as exc:
         shortlist["cards"] = []
         shortlist["cards_error"] = f"{type(exc).__name__}: {exc}"
+    if cards_compat_note:
+        shortlist["cards_compat_note"] = cards_compat_note
 
     # Both numbers, so "no movement on the board" is attributable: 0 openings
     # loaded is a different fact from openings loaded and nothing having moved.

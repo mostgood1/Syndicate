@@ -53,6 +53,7 @@ from __future__ import annotations
 import json
 import os
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import Any, Iterable, Mapping
 
 from syndicate.features.shared import book_shortlist, opportunity_gate
@@ -1064,10 +1065,24 @@ def build_layer2_rows(
             # two numbers that have to be the same number.
             movement = _movement_from_opening(candidate, openings)
             candidate["movement"] = movement
+            # SAME CROSS-FILE HAZARD AS THE CARD BUILDER, one level down.
+            # `opportunity_signals.py` is a separate blob and can be a deploy
+            # behind this file, in which case `blended_score` has no
+            # `movement_price_delta` parameter. Unguarded, that TypeError
+            # propagates out of `build_layer2_rows` and takes the whole
+            # shortlist with it -- strictly worse than the blank-cards case,
+            # because there would be no rows either.
+            #
+            # Probed ONCE per process, not per row: `_blended_score_accepts`
+            # is module-level and this loop runs thousands of times.
             score = blended_score(
                 ev_pct=ev,
                 model_edge=model_edge,
-                movement_price_delta=movement.get("movement_price_delta"),
+                **(
+                    {"movement_price_delta": movement.get("movement_price_delta")}
+                    if _blended_score_accepts("movement_price_delta")
+                    else {}
+                ),
                 books_quoting=side_best.get("books_quoting") or row.get("books_quoting"),
                 book_age_seconds=side_best.get("age_seconds"),
                 quote_seen_age_seconds=side_best.get("seen_age_seconds"),
@@ -1413,6 +1428,28 @@ def layer2_rows_to_board_cards(
 
 _STEAM_PRICE_POINTS = 15.0    # American-odds move that counts as sharp
 _STEAM_WINDOW_SECONDS = 3 * 3600
+
+
+@lru_cache(maxsize=8)
+def _blended_score_accepts(parameter: str) -> bool:
+    """Does the DEPLOYED `blended_score` take this keyword?
+
+    `opportunity_signals.py` deploys as its own blob onto a long-lived worker,
+    so it can be a deploy behind this file. Passing it a keyword it does not
+    have raises `TypeError` out of `build_layer2_rows` and loses the entire
+    shortlist -- rows and cards both.
+
+    Cached because the caller is a per-side loop over thousands of rows and the
+    answer cannot change inside a process. `False` on any introspection failure:
+    the fallback drops one scoring term, which is a board that ranks the way it
+    did for months, while the alternative is no board.
+    """
+    try:
+        import inspect
+
+        return parameter in inspect.signature(blended_score).parameters
+    except (TypeError, ValueError):
+        return False
 
 
 def _movement_from_opening(
