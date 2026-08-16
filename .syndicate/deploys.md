@@ -5993,3 +5993,70 @@ means these three fixes were not the 2GB.
 kills as "since start" with no end bound, so the control run listed three kills
 that happened AFTER its window. The window is what the header says; the kill
 line is not scoped to it.
+
+---
+
+## 2026-08-16 — `or 0.5` REMOVAL: **EXERCISED, AND THE NULL BRANCH FIRED**. Measurement closed.
+
+**THE READING.** `/api/ops/win-prob-null` at **2026-08-16T15:37:21Z**, HTTP 200,
+`reports_root=/opt/render/project/data/reports`, 2 of 8 probed keys present, 0
+read failures. Both keys retain 9 runs. **Across all 18 retained runs:
+`rows=192, null_no_price=6, pct=3.12%`.** The two runs that fired:
+
+    wnba/live-odds-worker  rows=56  null=3  pct=5.36   05:11:01Z  commit 44bc02f3
+    wnba/live-odds-worker  rows=32  null=3  pct=9.38   05:10:59Z  commit 44bc02f3
+
+**That is the confirmation that was owed.** 6 price-missing rows published
+`None` instead of a fabricated `0.5`; per the reading guide this is **the fix
+WORKING**, not a defect. Nine further runs computed 104 rows with zero nulls —
+the fix holding on priced rows. `rows>0` is no longer owed; **11 of 18 retained
+runs were exercised.**
+
+**BOTH workers have computed rows** — `wnba/refresh-worker` `rows=16/3/8/5` at
+05:12:2xZ on commit `755ec40a` (`date=2026-08-17`, next-day builds). Its null
+branch has not fired; every firing so far is live-odds-worker on `date=2026-08-16`.
+
+**OPEN, NOT A FINDING: every exercised run is on an OLDER commit.** The
+exercised runs carry `44bc02f3` / `755ec40a`; every run since
+05:53Z (live-odds-worker `dd53d47c`) and 06:06Z (refresh-worker `d72d670c`) has
+reported `rows=0` — 5 consecutive on each. The benign reading is that the WNBA
+slate's work was already done and later runs found nothing new; the other
+reading is that the newer commits stopped computing `win_prob` at all. **Do not
+bank either.** Discriminator: one run with `rows>0` on a current commit.
+
+**READ THE `recent` ARRAY, NOT THE HEADLINE.** The route's top-level summary
+said `any_exercised: false`, `rows: 0`, `"producers reported but computed no
+win_prob"` — **while the exercised runs sat in the same payload.**
+`win_prob_null_diag._summarize` iterates `readings[*].latest` only, so a run
+that computed rows is erased from the headline the moment ANY later run reports
+`rows=0`. Both services' `latest` happened to be an empty run (live-odds-worker
+09:24:45Z; refresh-worker 10:08:33Z on `date=2026-08-17`, a next-day build that
+legitimately computes nothing). A reader who trusted `interpretation` would have
+filed "still unexercised" on top of the proof. The instrument built to end
+instrument-blindness has a latest-only headline that reintroduces it.
+
+**The null branch has only ever fired on live-odds-worker.** refresh-worker
+computes rows (4 runs, 32 rows) but on `date=2026-08-17` next-day builds, where
+prices are complete; live-odds-worker works the live `date=2026-08-16` slate,
+which is where price-missing rows exist at all. If you want to watch the branch,
+watch live-odds-worker.
+
+**THE LOG CHANNEL IS CONFIRMED DEAD, AGAIN, AND A SCHEDULED TASK WAS WATCHING IT.**
+`WIN_PROB_NULL_NO_PRICE` since 2026-08-15T23:31Z (refresh-worker) and
+23:17Z (live-odds-worker): **nothing matched on either**, ~16 hours, while the
+counter recorded 18 runs across the two services. Positive control run first —
+`live-odds-worker`, empty text, 15:15–15:22Z, **940 lines / 11 pages** — so the
+probe was not broken. This is the `capture_output=True` trap already documented
+in `win_prob_null_diag`'s module docstring; the scheduled task
+`wnba-win-prob-counter-read` greps that dead line and would have reported
+"not yet run" forever. **It must be repointed at the route or deleted.**
+
+**PRODUCER LIVENESS, since silence invites the wrong reading.** Not alive at
+15:31:34Z: refresh-worker's `ALL_PROCESS_MEMORY` lists `process_count 12` and
+**12 processes enumerated** (message 5,565 chars, JSON closes clean — not
+truncated), none of them `refresh_wnba_oddsapi_props`; the container was busy
+with the MLB sim + rolling soccer artifacts at 95.3% of 4096MB. It ran and
+exited twice earlier: visible in census sweeps at 07:07:51–07:08:07Z and a
+single sweep at 09:08:29Z. Census cadence is ~9 lines/min, so those are runs of
+seconds, not a hung job. No `oomKilled` on refresh-worker since the 06:01:34Z
+`deploy_ended` — the short life is an early exit, not a kill.

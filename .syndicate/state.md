@@ -244,8 +244,39 @@ lull. **Fire the two steps BY HAND** — see `learnings.md` on watchers.
 refresh-worker `6f512ffa`, live-odds-worker `25774aaf`; reachable `... or 0.5`
 **0 and 0** in both prop scripts (was 7 and 8). Predecessors are ancestors of
 both, so no peer work was dropped. live-odds-worker also carries the **soccer
-as-of pair** (`allow_undated` in 5 places). **The ARTIFACT effect is still
-UNMEASURED** — content is verified, the rate of price-missing rows is not.
+as-of pair** (`allow_undated` in 5 places).
+
+**THE ARTIFACT EFFECT IS NOW MEASURED — THE NULL BRANCH FIRED. `[measured
+2026-08-16T15:37:21Z via /api/ops/win-prob-null]`** Across the 18 retained runs
+on both worker keys: **`rows=192, null_no_price=6, pct=3.12%`**, with the branch
+firing twice — `rows=56/null=3` (5.36%) and `rows=32/null=3` (9.38%), both
+`wnba/live-odds-worker` at 05:10–05:11Z on commit `44bc02f3`. Those 6 rows
+published `None` instead of a fabricated `0.5` = **the fix WORKING**. Nine
+further runs computed 104 rows with zero nulls (fix holding on priced rows).
+**`rows>0` is no longer owed — 11 of 18 runs were exercised.** Both workers
+compute rows; only live-odds-worker's branch has fired, because it works the
+live slate while refresh-worker builds `date=2026-08-17` where prices are
+complete.
+- **OPEN, do not bank either way:** every exercised run is on an OLDER commit
+  (`44bc02f3`/`755ec40a`). Since `dd53d47c` (live-odds-worker, 05:53Z) and
+  `d72d670c` (refresh-worker, 06:06Z), **5 consecutive runs each report
+  `rows=0`.** Benign reading: the slate's work was done. Other reading: the
+  newer commits compute no `win_prob` at all. Discriminator: one `rows>0` on a
+  current commit.
+- **Read it with `scripts/read_win_prob_null.py`**, which prints `recent`
+  alongside `latest` — see below for why the route's headline cannot be trusted.
+- **DO NOT READ THE ROUTE'S HEADLINE — READ `readings[*].recent`.** The same
+  payload said `any_exercised: false`, `rows: 0`, `"producers reported but
+  computed no win_prob"`, because `win_prob_null_diag._summarize` iterates
+  `latest` only and both services' latest run was an empty one. The summary
+  erases an exercised run as soon as any later run reports `rows=0`.
+- **The log line is dead and a scheduled task is watching it.**
+  `WIN_PROB_NULL_NO_PRICE`: zero matches on both workers over ~16h (since
+  23:31Z / 23:17Z) while the counter recorded 18 runs. Probe proven live first
+  (positive control: 940 lines / 11 pages, 15:15–15:22Z). Scheduled task
+  `wnba-win-prob-counter-read` used to grep that line and would have reported
+  "not yet run" forever — **REPOINTED 2026-08-16 at `scripts/read_win_prob_null.py`**
+  (every 4h, reports only on change). Nothing should read that log line again.
 
 **AND THE COUNTER BUILT TO MEASURE IT COULD NOT BE READ. `[measured 08-15/16]`**
 The `WIN_PROB_NULL_NO_PRICE` counter deployed to both workers (refresh-worker
@@ -270,7 +301,8 @@ recorded on 2026-08-01, for this same script.
   `generated_at` 02:01:19Z (80s after the deploy), `commit 3573a0c3` — worker
   wrote, web read. **NOTHING ABOUT THE `or 0.5` FIX IS CONFIRMED: `rows=0` means
   that run computed no `win_prob` at all, so `null=0` is arithmetic on an empty
-  denominator, not evidence.** A `rows>0` reading is still owed.** A live-odds-worker WNBA producer run was observed at 01:31:36Z, before
+  denominator, not evidence.** (**That `rows>0` reading has since ARRIVED — see
+  the measured block above; do not re-open this as outstanding.**) A live-odds-worker WNBA producer run was observed at 01:31:36Z, before
   that service had the writer; the next one after its 01:59:59Z reboot is what
   produces the first reading. live-odds-worker has NO idle window during live
   hours (10 of 10 samples across 25 min had jobs running), so this deploy killed
