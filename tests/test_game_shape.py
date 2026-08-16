@@ -536,3 +536,158 @@ def test_basketball_bucket_space_stays_coarse():
             labels.add(shape["bucket"])
     assert len(labels) <= 17, f"bucket space grew to {len(labels)}: {sorted(labels)}"
     assert "unknown" not in labels
+
+
+# ==========================================================================
+# FOOTBALL (NFL / NCAAF)
+# ==========================================================================
+
+from syndicate.features.shared.game_shape import (  # noqa: E402
+    football_game_shape,
+    football_margin_band,
+    football_phase,
+)
+
+
+def _fb_state(**kw: Any) -> dict:
+    """Mirrors `nfl/live_game_state.py:_state_from_event`'s output fields."""
+    base = {
+        "period": 3,
+        "clock": "8:05",
+        "home_pts": 17.0,
+        "away_pts": 14.0,
+        "in_progress": True,
+        "final": False,
+    }
+    base.update(kw)
+    return base
+
+
+def test_football_quarters_are_fifteen_minutes():
+    """Guards against inheriting basketball's 10 or 12."""
+    shape = football_game_shape(_fb_state(period=2, clock="0:00"))
+    assert shape["elapsed_minutes"] == 30.0
+    assert shape["game_pct_complete"] == 0.5
+    assert shape["minutes_remaining_regulation"] == 30.0
+
+
+def test_the_measured_nfl_state_parses_end_to_end():
+    shape = football_game_shape(_fb_state())
+    assert shape["valid"] is True
+    assert shape["sport"] == "nfl"
+    assert shape["period"] == 3
+    assert shape["elapsed_minutes"] == round(30.0 + (15.0 - (8 + 5 / 60)), 4)
+    assert shape["home_margin"] == 3.0
+    assert shape["bucket"] == "third_quarter|one_score"
+
+
+def test_ncaaf_overtime_is_untimed_so_elapsed_is_none_not_extrapolated():
+    """College OT is alternating possessions with no clock.
+
+    Guards against reusing NFL's timed-OT branch, which would invent a
+    15-minute period that does not exist and report a confident elapsed time.
+    """
+    ncaaf = football_game_shape(_fb_state(period=5, clock=""), sport="ncaaf")
+    assert ncaaf["valid"] is True            # the record survives
+    assert ncaaf["overtime"] is True
+    assert ncaaf["overtime_is_timed"] is False
+    assert ncaaf["elapsed_minutes"] is None  # and refuses to guess
+    assert ncaaf["points_per_minute"] is None
+    assert ncaaf["bucket"] == "overtime|one_score"
+
+    nfl = football_game_shape(_fb_state(period=5, clock="10:00"), sport="nfl")
+    assert nfl["overtime_is_timed"] is True
+    assert nfl["elapsed_minutes"] == 60.0     # NFL OT is timed, 10 minutes
+
+
+def test_nfl_overtime_is_ten_minutes_not_fifteen():
+    shape = football_game_shape(_fb_state(period=5, clock="0:00"), sport="nfl")
+    assert shape["elapsed_minutes"] == 70.0
+
+
+def test_margin_bands_are_in_scores_not_points():
+    """An 8-point football game is ONE score; basketball would call it moderate."""
+    def band(h, a):
+        return football_margin_band(football_game_shape(_fb_state(home_pts=h, away_pts=a)))
+
+    assert band(21.0, 13.0) == "one_score"      # 8 -- still one possession
+    assert band(21.0, 12.0) == "two_score"      # 9
+    assert band(24.0, 8.0) == "two_score"       # 16
+    assert band(24.0, 7.0) == "three_score"     # 17
+    assert band(35.0, 7.0) == "blowout"         # 28
+    # The same 8-point gap is NOT `one_score` on the basketball scale.
+    assert basketball_margin_band(wnba_game_shape(_live_state(home_pts=88.0, away_pts=80.0))) == "moderate"
+
+
+def test_margin_in_scores_counts_possessions_behind():
+    assert football_game_shape(_fb_state(home_pts=17.0, away_pts=17.0))["margin_in_scores"] == 0
+    assert football_game_shape(_fb_state(home_pts=17.0, away_pts=14.0))["margin_in_scores"] == 1
+    assert football_game_shape(_fb_state(home_pts=24.0, away_pts=14.0))["margin_in_scores"] == 2
+    assert football_game_shape(_fb_state(home_pts=31.0, away_pts=14.0))["margin_in_scores"] == 3
+
+
+def test_situation_block_flows_through_when_supplied():
+    """ESPN's situation is fetched and discarded upstream; accept it now.
+
+    Guards against the field set changing when the upstream capture is fixed.
+    """
+    shape = football_game_shape(
+        _fb_state(),
+        situation={"down": 3, "distance": 7, "yardLine": 12, "possession": "KC"},
+    )
+    assert shape["situation_available"] is True
+    assert shape["down"] == 3
+    assert shape["distance"] == 7
+    assert shape["yard_line"] == 12
+    assert shape["possession_team"] == "KC"
+    assert shape["red_zone"] is True
+
+
+def test_absent_situation_says_so_rather_than_reading_as_no_red_zone():
+    """Unknown must not default onto the permissive branch."""
+    shape = football_game_shape(_fb_state())
+    assert shape["situation_available"] is False
+    assert shape.get("red_zone") is None
+    assert shape.get("down") is None
+
+
+def test_out_of_range_situation_fields_are_dropped_not_stored():
+    shape = football_game_shape(
+        _fb_state(), situation={"down": 7, "distance": -3, "yardLine": 250}
+    )
+    assert shape["situation_available"] is True
+    assert shape["down"] is None
+    assert shape["distance"] is None
+    assert shape["yard_line"] is None
+    assert shape["red_zone"] is None
+
+
+def test_football_phase_boundaries():
+    def phase_at(period: int) -> str:
+        return football_phase(football_game_shape(_fb_state(period=period)))
+
+    assert phase_at(1) == "first_half"
+    assert phase_at(2) == "first_half"
+    assert phase_at(3) == "third_quarter"
+    assert phase_at(4) == "fourth_quarter"
+    assert phase_at(5) == "overtime"
+
+
+def test_football_refuses_unsupported_sport_and_hostile_input():
+    assert football_game_shape(_fb_state(), sport="xfl")["reason"] == "sport_not_supported"
+    for bad in (None, {}, "", 0, [], object(), {"period": "banana"}):
+        shape = football_game_shape(bad)
+        assert shape["valid"] is False
+        assert shape["bucket"] == "unknown"
+
+
+def test_football_bucket_space_stays_coarse():
+    labels = set()
+    for period in range(1, 7):
+        for margin in range(-35, 36, 3):
+            shape = football_game_shape(
+                _fb_state(period=period, home_pts=20.0 + margin, away_pts=20.0)
+            )
+            labels.add(shape["bucket"])
+    assert len(labels) <= 17, f"bucket space grew to {len(labels)}: {sorted(labels)}"
+    assert "unknown" not in labels

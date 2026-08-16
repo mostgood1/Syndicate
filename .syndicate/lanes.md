@@ -3309,3 +3309,60 @@ session (`Layer 1 board coverage audit (fork 2)`) that holds
 `mlb-live-gameline-distributions`. **One session gates both sports' emits.**
 - **UNVERIFIED, and it is the whole point:** no production data has passed
   through this code. Every bucket count is **n=0** for WNBA too.
+
+#### game-shape-capture — NFL/NCAAF ADDED, **AND THE NFL EMIT ACTUALLY LANDED** `[2026-08-17 ~00:0xZ]`
+
+First sport whose producer was NOT held by another lane. Claim re-checked
+immediately before the edit (the rule this lane learned the hard way at 23:0xZ),
+`live_game_state` unclaimed in `lanes.md`.
+
+**A THIRD DISTINCT SITUATION — the plan's field list was wrong again (3 for 3).**
+It promised down/distance/field position/timeouts/`pace_secs_play` from a grep.
+Measured:
+- NFL's `_state_from_event` captures `period`, `clock`, `away_pts`, `home_pts`
+  **and nothing else** — no down, distance, field position or possession.
+- **BUT `_fetch_scoreboard` returns the WHOLE ESPN event JSON**, whose
+  competitions carry a `situation` block that **nothing in `nfl/`, `ncaaf/` or
+  `football/` reads** — the only `down` references in the tree are the sim
+  engine's internal `play_state` and the historical loaders, neither on the live
+  path. **Discarded, not absent** — the MLB pattern, and free to fix.
+- **`pace_features.py` IS NOT LIVE.** It reads `game["pace_features"]`, a
+  season-level secs/play feature for the pregame drive priors. Joining it to a
+  live record as in-game tempo is a silent category error.
+- **NCAAF HAS NO LIVE-STATE PRODUCER AT ALL** (no `live_game_state` analog).
+
+**TWO SPORT RULES THAT WOULD HAVE BEEN SILENTLY WRONG:**
+1. **NCAAF overtime is UNTIMED** — alternating possessions from the 25, no
+   clock. Reusing NFL's timed-OT branch would invent a 15-minute period that
+   does not exist and report a confident elapsed time. NCAAF OT returns
+   `elapsed_minutes: None` and the record stays valid. Mutation F2 fires on it.
+2. **NFL regular-season OT is 10 minutes, not 15.** Mutation F3 fires.
+
+**MARGIN BANDS ARE IN SCORES, NOT POINTS** (<=8 / <=16 / <=24 / 25+). An
+8-point football game is ONE possession; the basketball scale calls it
+`moderate` and baseball's calls it a blowout. Three sports, three units — a
+test asserts the same 8-point gap buckets differently in football vs basketball.
+
+**THE EMIT (`nfl/live_game_state.py`):**
+- `_state_from_event` now keeps `situation`, **on live games only** — a
+  `situation` on a finished game is a feed artefact and would render "3rd and 7"
+  hours after the whistle, the same class of defect as the 0-0 placeholder score
+  that file already guards against. Mutation E1 fires on it.
+- `attach_nfl_live_game_state` attaches `live_state["game_shape"]` behind a
+  function-local import and a bare except, so a failure costs the shape block
+  and nothing else. The cards board is the product.
+- Tests call the REAL `attach_nfl_live_game_state`, not a stub — that file's own
+  docstring warns that asserting a field is SET only proves presence.
+
+**66 tests green** (46 shape + 20 NFL, up from 15). **10 of 10 mutations caught**
+— 7 on the primitive (football quarters inheriting basketball's 10, NCAAF OT
+treated as timed, NFL OT at 15, point bands reused, absent situation reading as
+"not in the red zone", out-of-range situation values stored, `margin_in_scores`
+flooring instead of ceiling) and **3 on the emit** (stale situation on a finished
+game, shape built without the situation so the capture does nothing, shape never
+attached).
+
+**UNVERIFIED, and this is the part not to misread.** NFL is the first sport with
+a live emit PATH; no production slate has run through it. **n is still 0.**
+NCAAF has the contract and **no producer**, season opens 08-29, so nothing there
+is verifiable today — a ready rules entry is not coverage. No deploy requested.

@@ -54,13 +54,24 @@ caller's problem, deliberately: the natural store
 fired yet, and changing a record shape underneath a running measurement is how
 a result gets silently confounded.
 
-SPORTS COVERED, and they are NOT the same job. **MLB is serialisation** — its
-state vector (`LiveSituation`) already exists in full at tick time and is merely
-discarded. **Basketball is derivation** — no state vector exists, so period,
-clock, score and the per-quarter array are assembled into one, and the pace
-statistic available is scoring pace rather than possessions (see the basketball
-section header, which explains why that distinction is load-bearing rather than
-pedantic).
+SPORTS COVERED, and no two of them are the same job — which is the single most
+useful thing to know before reading further:
+
+  * **MLB is SERIALISATION.** Its state vector (`LiveSituation`) already exists
+    in full at tick time and is merely discarded.
+  * **Basketball is DERIVATION.** No state vector exists, so period, clock,
+    score and the per-quarter array are assembled into one. Possession pace is
+    not available at all.
+  * **Football is PARTIAL CAPTURE.** Period/clock/score are captured; down,
+    distance, field position and possession sit in the fetched ESPN payload and
+    are never read. `situation=` accepts them so that upstream fix needs no
+    change here.
+
+Each sport's margin bands are in ITS OWN unit — baseball runs, basketball
+points, football scores. An 8-point football game and an 8-point basketball
+game are entirely different states, so a shared band table would mis-bucket
+almost everything. Every sport is capped at 17 bucket labels for the same
+reason (see the MLB header on the precision floor).
 
 NEVER RAISES. An unparseable situation returns `valid: False` with a `reason`,
 mirroring `model_scoring`'s philosophy that a bad record should cost one
@@ -71,6 +82,7 @@ permissive branch turns a failed parse into a confident wrong segment.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from typing import Any
 
@@ -632,6 +644,245 @@ def basketball_shape_bucket(shape: Any) -> str:
     if phase == _UNKNOWN_BUCKET:
         return _UNKNOWN_BUCKET
     band = basketball_margin_band(shape)
+    if band == _UNKNOWN_BUCKET:
+        return _UNKNOWN_BUCKET
+    return f"{phase}|{band}"
+
+
+# ---------------------------------------------------------------------------
+# FOOTBALL (NFL / NCAAF)
+# ---------------------------------------------------------------------------
+#
+# WHAT IS CAPTURED TODAY, MEASURED -- and it is a THIRD situation, different
+# again from MLB's and basketball's.
+#
+# `nfl/live_game_state.py:_state_from_event` builds `period`, `clock`
+# (ESPN's `displayClock`, "8:05"), `away_pts`, `home_pts`, `in_progress`,
+# `final` -- and writes `period`/`clock` onto the same `live_state` block the
+# WNBA path uses. So the input contract is shared. `[from-code]`
+#
+# **DOWN, DISTANCE, FIELD POSITION AND POSSESSION ARE IN THE FETCHED PAYLOAD AND
+# ARE NEVER READ.** `_fetch_scoreboard` returns the whole ESPN scoreboard JSON,
+# whose events carry a `situation` block; nothing in `nfl/`, `ncaaf/` or
+# `football/` reads it -- the only `down` references in the tree are the sim
+# engine's internal `play_state` and the historical loaders. This is the same
+# shape as MLB: **discarded, not absent.** `situation=` below accepts it so the
+# capture change upstream is a one-liner that needs no edit here, and every
+# record states `situation_available` either way.
+#
+# **`pace_features.py` IS NOT A LIVE PACE SOURCE.** It reads
+# `game["pace_features"]` -- a season-level secs/play feature from the rbsdm
+# ingestion, used by the pregame drive priors. Joining it to a live record as
+# though it were in-game tempo would be a silent category error. As with
+# basketball, the live statistic here is SCORING pace.
+#
+# **NCAAF OVERTIME IS NOT TIMED.** College OT is alternating possessions from
+# the 25 with no game clock, so elapsed minutes is UNDEFINED there rather than
+# computable. This module returns `None` for it and keeps the record valid,
+# rather than extrapolating a 15-minute period that does not exist. NFL regular
+# season OT is 10 minutes.
+#
+# **NCAAF HAS NO LIVE-STATE PRODUCER AT ALL** (no `live_game_state` analog in
+# `syndicate/features/ncaaf/`), and its season opens 2026-08-29, so nothing here
+# can be verified against a live college game today. The rules entry exists so
+# the contract is ready; that is not the same as coverage.
+
+_FOOTBALL_RULES: dict[str, dict[str, Any]] = {
+    "nfl": {
+        "quarter_minutes": 15.0,
+        "ot_minutes": 10.0,      # regular season; playoff OT is 15 and is not modelled
+        "regulation_periods": 4,
+        "ot_timed": True,
+    },
+    "ncaaf": {
+        "quarter_minutes": 15.0,
+        "ot_minutes": None,      # untimed alternating possessions -- see above
+        "regulation_periods": 4,
+        "ot_timed": False,
+    },
+}
+
+# The scoring unit football margins are actually read in: a touchdown plus a
+# two-point conversion. "Two scores down" is the sport's own coarse state
+# description, so the bands below are built from it rather than from a
+# points grid borrowed off another sport.
+_FOOTBALL_MAX_SCORE = 8
+
+
+def _football_situation(situation: Any) -> dict[str, Any]:
+    """Normalise ESPN's `situation` block if a caller supplies one."""
+    if not isinstance(situation, Mapping):
+        return {"situation_available": False}
+    down = _as_int(situation.get("down"))
+    distance = _as_int(situation.get("distance"))
+    yardline = _as_int(situation.get("yardLine") if situation.get("yardLine") is not None else situation.get("yard_line"))
+    possession = situation.get("possession") if situation.get("possession") is not None else situation.get("possession_team")
+    out: dict[str, Any] = {
+        "situation_available": True,
+        "down": down if (down is not None and 1 <= down <= 4) else None,
+        "distance": distance if (distance is not None and distance >= 0) else None,
+        "yard_line": yardline if (yardline is not None and 0 <= yardline <= 100) else None,
+        "possession_team": str(possession).strip() if possession is not None and str(possession).strip() else None,
+    }
+    # ESPN's `yardLine` is distance-to-opponent-goal on this feed, so <=20 is
+    # the red zone. Emitted only when the yard line parsed -- an absent yard
+    # line must not read as "not in the red zone".
+    out["red_zone"] = (out["yard_line"] is not None and out["yard_line"] <= 20) or None
+    if out["yard_line"] is None:
+        out["red_zone"] = None
+    return out
+
+
+def football_game_shape(
+    live_state: Any,
+    *,
+    sport: str = "nfl",
+    status: Any = None,
+    situation: Any = None,
+) -> dict[str, Any]:
+    """Flat, JSON-safe game shape for one live football game. Never raises."""
+    slug = str(sport or "").strip().lower()
+    rules = _FOOTBALL_RULES.get(slug)
+    if rules is None:
+        return {
+            "shape_version": SHAPE_VERSION,
+            "sport": slug or "unknown",
+            "valid": False,
+            "reason": "sport_not_supported",
+            "bucket": _UNKNOWN_BUCKET,
+        }
+
+    def invalid(reason: str) -> dict[str, Any]:
+        return {
+            "shape_version": SHAPE_VERSION,
+            "sport": slug,
+            "valid": False,
+            "reason": reason,
+            "bucket": _UNKNOWN_BUCKET,
+        }
+
+    if live_state is None and status is None:
+        return invalid("live_state_absent")
+
+    period = _get(live_state, "period")
+    if period is None:
+        period = _get(status, "period")
+    clock = _get(live_state, "clock")
+    if clock is None:
+        clock = _get(status, "clock")
+
+    period_int = _as_int(period)
+    if period_int is None or period_int < 1:
+        return invalid("period_absent_or_invalid")
+
+    home_pts = _as_float(_get(live_state, "home_pts"))
+    away_pts = _as_float(_get(live_state, "away_pts"))
+    if home_pts is None or away_pts is None:
+        return invalid("score_absent")
+
+    reg_periods = int(rules["regulation_periods"])
+    quarter_minutes = float(rules["quarter_minutes"])
+    regulation_minutes = quarter_minutes * reg_periods
+    overtime = period_int > reg_periods
+
+    # NCAAF OT has no clock, so there is nothing to compute and nothing is
+    # invented. NFL OT is timed and uses its own period length.
+    if overtime and not rules["ot_timed"]:
+        elapsed = None
+    else:
+        elapsed = basketball_elapsed_minutes(
+            period_int,
+            clock,
+            quarter_minutes=quarter_minutes,
+            ot_minutes=float(rules["ot_minutes"] or quarter_minutes),
+            regulation_periods=reg_periods,
+        )
+
+    total_points = home_pts + away_pts
+    home_margin = home_pts - away_pts
+    points_per_minute = None
+    if elapsed is not None and elapsed > 0:
+        points_per_minute = round(total_points / elapsed, 3)
+
+    shape: dict[str, Any] = {
+        "shape_version": SHAPE_VERSION,
+        "sport": slug,
+        "valid": True,
+        "period": period_int,
+        "clock": str(clock or "").strip() or None,
+        "clock_parsed": elapsed is not None,
+        "overtime": overtime,
+        "overtime_is_timed": bool(rules["ot_timed"]),
+        "elapsed_minutes": round(elapsed, 4) if elapsed is not None else None,
+        "minutes_remaining_regulation": (
+            round(max(0.0, regulation_minutes - elapsed), 4) if elapsed is not None else None
+        ),
+        "game_pct_complete": (
+            round(min(1.0, elapsed / regulation_minutes), 4) if elapsed is not None else None
+        ),
+        "home_pts": home_pts,
+        "away_pts": away_pts,
+        "home_margin": home_margin,
+        "total_points": total_points,
+        # Football's own coarse reading of a margin: how many scores behind.
+        "margin_in_scores": int(math.ceil(abs(home_margin) / _FOOTBALL_MAX_SCORE)) if home_margin else 0,
+        # SCORING pace. Football's other "pace" (secs/play) is a SEASON feature
+        # in `pace_features.py`, not an in-game measurement -- see header.
+        "points_per_minute": points_per_minute,
+        "possession_pace_available": False,
+        "in_progress": bool(_get(live_state, "in_progress") or _get(status, "in_progress")),
+        "final": bool(_get(live_state, "final") or _get(status, "final")),
+    }
+    shape.update(_football_situation(situation))
+    shape["bucket"] = football_shape_bucket(shape)
+    return shape
+
+
+def football_phase(shape: Any) -> str:
+    if not isinstance(shape, Mapping) or not shape.get("valid"):
+        return _UNKNOWN_BUCKET
+    period = _as_int(shape.get("period"))
+    if period is None or period < 1:
+        return _UNKNOWN_BUCKET
+    if shape.get("overtime"):
+        return "overtime"
+    if period <= 2:
+        return "first_half"
+    if period == 3:
+        return "third_quarter"
+    return "fourth_quarter"
+
+
+def football_margin_band(shape: Any) -> str:
+    """Bands in football's own unit: how many scores separate the teams.
+
+    **A third distinct scale, and deliberately so.** Baseball bands are runs,
+    basketball's are points, football's are SCORES -- an 8-point football game
+    and an 8-point basketball game are completely different states (one
+    possession vs. three). Reusing either of the other two here would mis-bucket
+    almost every game.
+    """
+    if not isinstance(shape, Mapping) or not shape.get("valid"):
+        return _UNKNOWN_BUCKET
+    margin = _as_float(shape.get("home_margin"))
+    if margin is None:
+        return _UNKNOWN_BUCKET
+    gap = abs(margin)
+    if gap <= _FOOTBALL_MAX_SCORE:
+        return "one_score"
+    if gap <= 2 * _FOOTBALL_MAX_SCORE:
+        return "two_score"
+    if gap <= 3 * _FOOTBALL_MAX_SCORE:
+        return "three_score"
+    return "blowout"
+
+
+def football_shape_bucket(shape: Any) -> str:
+    """At most 17 labels (4 phases x 4 margin bands, plus `unknown`)."""
+    phase = football_phase(shape)
+    if phase == _UNKNOWN_BUCKET:
+        return _UNKNOWN_BUCKET
+    band = football_margin_band(shape)
     if band == _UNKNOWN_BUCKET:
         return _UNKNOWN_BUCKET
     return f"{phase}|{band}"
