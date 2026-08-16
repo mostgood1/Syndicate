@@ -6,7 +6,7 @@
 
 ## OPEN
 
-### win-prob-null-readable — OPEN — **DEPLOYED TO ALL THREE (refresh-worker `b2af0fac`, web `fa1871cf`, live-odds-worker `3573a0c3` @ 01:59:59Z). Route answers 200 — but `readings: 0`, so THE READING ITSELF IS STILL OWED and this lane does not close on it** — opened 2026-08-15 — session: win-prob-null-readable
+### win-prob-null-readable — CLOSED-VERIFIED 2026-08-16 — **the counter is readable in production: `wnba/live-odds-worker rows=0 null=0`, generated_at 02:01:19Z (80s after the deploy), commit `3573a0c3` — worker wrote, web read. THE `or 0.5` MEASUREMENT IS NOT THIS LANE'S AND REMAINS OWED (`rows=0` = empty denominator)** — opened 2026-08-15 — session: win-prob-null-readable — opened 2026-08-15 — session: win-prob-null-readable
 - Goal: the `WIN_PROB_NULL_NO_PRICE` counter is READABLE from the web service
   (one HTTP read, no log archaeology), for both prop producers, on every run.
 - **THE DEFECT, measured not suspected.** The counter deployed 2026-08-15
@@ -1860,3 +1860,38 @@ freshness; soccer stops polling leagues with no imminent kickoff during MLB's pe
 **NEXT MEASUREMENT IS THE FALSIFICATION TEST ALREADY IN THIS LANE:** read
 `commence_time` on what the 18-22Z soccer runs write. Imminent kickoffs -> the
 overlap is required and the lever is memory, not scheduling.
+
+#### odds-cadence-off-the-mlb-peak — FALSIFICATION TEST RUN 2026-08-16 02:1xZ: IT DOES NOT FIRE
+The test was: "if the 18-22Z soccer refreshes are serving IMMINENT kickoffs, the
+overlap is REQUIRED and the lever is memory, not scheduling." They are not.
+
+111 distinct soccer invocations parsed from `ALL_PROCESS_MEMORY` cmdlines
+(`--soccer-leagues` + `--soccer-date`), 18:00Z onward. Kickoff DATE being fetched,
+by hour:
+
+    18Z   08-15 x4, 08-16 x4, 08-17 x2, 08-21 x6
+    19Z   08-19 x2, 08-22 x10          <- 100% FUTURE, 4-7 days out
+    20Z   08-15 x2, 08-16 x2, 08-17 x2, 08-20 x2, 08-22 x8
+    21Z   08-15 x6, 08-16 x6, 08-17 x3
+    22Z   08-15 x2, 08-16 x2, 08-17 x2, 08-21 x6
+
+**43 of 71 invocations during 18-22Z (61%) are for kickoffs 2+ DAYS AWAY.** And
+19Z — the hour with the MOST overlap (317 both-branch samples) — was ENTIRELY
+future-dated. Nothing it fetched kicked off for four days.
+
+**SO THE OWNER'S DOMAIN POINT IS CONFIRMED AND QUANTIFIED.** Those refreshes can
+be deferred out of MLB's peak at no freshness cost, because their fixtures are
+days away.
+
+**ONE EXCEPTION THAT MUST NOT BE BROKEN: MLS.** It is the single most-refreshed
+league (20 of 111) and its kickoffs genuinely ARE in the US evening. The European
+leagues — la_liga 17, championship 16, primeira_liga 14, belgian_pro_league 12,
+eredivisie 12, epl 8, ligue_1 8, serie_a 4 (91 of 111) — kick off in the European
+day. A blanket "no soccer during the MLB peak" rule would break MLS; the rule has
+to be fixture-relative, not league-blind or clock-blind.
+
+**IMPLEMENTATION SHAPE THIS IMPLIES:** gate a league's pregame refresh on
+time-to-kickoff rather than on a global clock. Leagues whose next fixture is >N
+hours out get a slow cadence; MLS in its own evening stays fast. That serves
+`9ec20a06`'s freshness goal AND this lane's memory goal, which is why the two are
+only in tension while the cadence is fixture-blind.
