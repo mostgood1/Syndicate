@@ -2868,3 +2868,110 @@ ASSEMBLED, which on this path is three: the producer's return, the per-sport
 stats dict, and the endpoint's key list. **Knowing the rule did not stop me
 reproducing the defect within two hours.** Check the assembly sites, not the
 commit.
+
+## 2026-08-16 — FORBIDDEN: curating a deploy branch BY FILE without checking the call boundary you just cut
+
+I cut `c324447d` by picking individual files from `main` onto the live SHA — the
+right technique, applied without the check it requires. It took main's
+`pipeline/layer2_shortlist.py` (the CALLER) and kept live's
+`syndicate/features/shared/layer2_board.py` (the CALLEE):
+
+    layer2_shortlist.py:241  build_layer2_rows(grid, openings=openings_index)
+    layer2_board.py:824      def build_layer2_rows(grid)          <- no openings
+
+**A file-level diff cannot see this.** I verified content by blob, ancestry
+(`merge-base --is-ancestor`), absence of `render.yaml`, and that the delta was
+exactly my intended files. Every one of those passed. The defect lives in the
+SIGNATURE ACROSS THE BOUNDARY, which is invisible to all of them.
+
+**What made it dangerous was the error handling, not the error.** The per-sport
+`except Exception` at `layer2_shortlist.py:320` catches the `TypeError` and
+records it as `{"error": ...}` in `per_sport_stats`. So the worker did not crash,
+did not restart, and emitted no traceback — it just produced ZERO layer2 rows for
+EVERY sport. A caught exception is not a safe failure when the catch is what
+hides it. Exposure ~17 min (20:33:23Z -> 20:50:14Z), closed by another session's
+`a9e5d3d6`, not by me.
+
+**THE RULE.** When a curated branch splits a directory that other modules import
+— `syndicate/features/shared/` above all — check BOTH directions before pushing:
+- FORWARD: every module the new files import exists on the target.
+- REVERSE: no public name present on the target is removed/renamed in the new
+  files, and every call site's kwargs are accepted by the callee you are landing.
+I ran both on the web deploy afterwards and it was clean. Two greps. That is the
+whole cost.
+
+**Corollary, from the same incident:** a new signature with a DEFAULT
+(`openings: ... | None = None`) is backward-compatible, so the CALLEE is the safe
+half to ship first. `a21b63db` ("the caller must survive a callee one deploy
+behind") is the same lesson from the other side. Ship callee-first, caller-second.
+
+## 2026-08-16 — FORBIDDEN: computing a RATE or a COUNT from `scripts/render_logs.py`
+
+I nearly filed a false regression against my own `#441` fix. One `NFL_PBP` line
+appeared in 14 minutes against a 60s throttle, which reads as "evaluated once,
+still starved". It was the instrument. Measured coverage for REQUESTED windows:
+
+| requested | actually covered | matches |
+|---|---|---|
+| 3 min | **0.23 s** | 8 |
+| 3 min | 2m12s | 6 |
+| 3 min | **nothing** | 0 |
+
+It caps at ~2 pages and returns an arbitrary slice, so there is no denominator.
+**Presence is evidence; absence and frequency are not.** What actually proved the
+fix was the ORDER of two lines inside ONE covered tick — `RECONCILIATION_AUTORUN_GATED`
+then `NFL_PBP_FETCH_SKIPPED`, 63 ms apart. Read ordering within a covered window,
+never counts across one.
+
+
+## 2026-08-16 - FORBIDDEN: never join a CHANGE metric on a key that contains the changing fields. The metric becomes conditioned on the absence of what it measures.
+
+Shipped movement detection joined on `clv_opening_ledger._opening_key`, which
+includes `line` and `bookmaker`. That key is CORRECT for settlement -- it must
+not collapse home -1.5 with home -2.5, nor two books' prices. It is fatal for
+movement, because **movement IS the detection of line and book change**: a row
+could only match its own opening if it had not moved.
+
+MEASURED, two served artifacts 20 minutes apart:
+
+    stable key (event·market·player·segment·side) matched   20
+    full key   (+ line + bookmaker)               matched   14
+       of those 20: line changed 6, book changed 5, either 7
+
+A third of matchable rows dropped, and they were precisely the rows with
+something to report.
+
+**The second-order damage was worse than the coverage loss.** Steam read 0 and I
+recorded it as "unverified, the data gave it no chance to fire". True, but the
+REASON was structural: a sharp move usually arrives WITH a line move or a
+best-book switch -- the exact conditions that broke the key -- so the moves large
+enough to be steam were the ones most reliably erased. **A detector can be
+silenced by the join that feeds it, and the silence looks identical to a quiet
+market.**
+
+**The rule:** when building a delta/change/movement metric, ask what the join
+key does when the measured quantity changes. If the key moves with it, the
+metric reports only the population that did not change. Key on the STABLE
+identity of the thing, and read the changing fields off the record.
+
+**How it was found, which generalises:** a number went the WRONG WAY against a
+stated prediction (coverage 31% -> 29% when I had predicted a rise), and I
+chased it instead of explaining it away as noise. The prediction being wrong was
+the entire finding.
+
+## 2026-08-16 - a blob hash written into a ledger is a SNAPSHOT, not a lease.
+
+Recorded a pending ridealong naming exact blob hashes so the next deployer could
+not get it wrong. Within the hour `08de8c08` moved two of those blobs, and the
+ledger entry -- written precisely to be unambiguous -- would have shipped the
+compat guard WITHOUT the movement fix that makes it worth having.
+
+Superseded the entry rather than editing it, so the stale one stays readable and
+nobody wonders which was current, and the new one instructs the reader to
+**re-read the blobs before cutting rather than trusting the numbers printed in
+it**.
+
+**The rule:** in a repo where files move several times an evening, a ledger may
+record a hash as EVIDENCE of what was true, but must never present one as an
+INSTRUCTION to be followed later without re-reading. Name the branch and the
+files; let the reader resolve the hashes at cut time.

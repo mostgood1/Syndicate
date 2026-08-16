@@ -225,7 +225,32 @@ rebuild a props snapshot when its inputs are newer, not just on force".
   someone actually forces a refresh.
 - Blocked by: none. No deploy from this lane tonight unless asked.
 
-### layer2-board-quality — OPEN — **G1/G2/G3/G5/G6/G8 SHIPPED+MEASURED. G4 movement SHIPPED, thin (4 rows) and STEAM UNVERIFIED. G7 live column SHIPPED at 49% coverage. One blank-board incident, caused by my design, guarded in code.** — opened 2026-08-16 — session: layer2-board-quality
+### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` FOUND AND FIXED: movement was keyed on the thing it measures, which ALSO structurally suppressed steam. Key fix + compat guard are on main and on NO service — handed to `sim-engine-track` as a ridealong.** — opened 2026-08-16 — session: layer2-board-quality
+- **`#446` — MOVEMENT WAS KEYED ON THE THING IT MEASURES.** Found by chasing a
+  number that went the WRONG WAY against my own prediction (opening coverage
+  31% -> 29% when I said it would rise). `_opening_key` includes `line` and
+  `bookmaker`, so a row matched its opening only if it had NOT moved.
+  Measured over two artifacts 20 min apart: stable key matched 20, full key 14,
+  line changed on 6 and book on 5.
+  - **It also explains steam.** A sharp move usually comes WITH a line move or
+    book switch, so the biggest moves were the most reliably erased. **Steam was
+    structurally suppressed, not merely unverified** — the earlier "0 flagged,
+    untested" entry understated it.
+  - Fixed `08de8c08`: `movement_join_key` (stable). `_opening_key` UNCHANGED —
+    right for settlement, wrong for this question. Regression test pins the
+    production case (-1.5 -> -2.5, draftkings -> fanduel: invisible before, now
+    **-27 pts same-book**, crosses the 15-pt threshold).
+  - Counter gap closed (3rd instance in this file): `openings_records`,
+    `openings_loaded`, `movement_eligible_rows`, `movement_rows_matched`.
+- **NOT LIVE.** Live worker `a9e5d3d6` has `movement_join_key` 0 and
+  `_blended_score_accepts` 0. **Production movement still reports only rows that
+  did not move.** Handed to `sim-engine-track`; recorded in `deploys.md` under
+  the superseding PENDING RIDEALONG entry.
+- **Whether coverage rises after the fix is PREDICTED, NOT MEASURED** — and the
+  last prediction I made about this number was wrong. A content-gated watcher
+  (fires only on a SHA carrying `movement_join_key`, falsified against 3 real
+  SHAs) will measure it.
+
 - **G4 / G7 / INTERVALS MEASURED 2026-08-16 21:02Z** on `a9e5d3d6` (live
   20:50:14Z), artifact 21:01:19Z, 63 rows / 61 cards. Safety first:
   `cards_present 63`, no `cards_error`, no `cards_compat_note`.
