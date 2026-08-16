@@ -257,6 +257,21 @@ further runs computed 104 rows with zero nulls (fix holding on priced rows).
 compute rows; only live-odds-worker's branch has fired, because it works the
 live slate while refresh-worker builds `date=2026-08-17` where prices are
 complete.
+- **WHY 7 OF 18 RUNS READ `rows=0`, PROVEN FOR ONE AND OPEN FOR ANOTHER — a
+  `rows=0` latest does NOT mean the producer is broken.** Joined on time from two
+  instruments: `/api/ops/wnba/refresh-decision?date=2026-08-15` recorded
+  `decision=reused_artifact_bundle` at `21:01:16-05:00`, and the counter for that
+  run landed at `21:01:19-05:00` — **3 seconds later, same run**. Every
+  `_clamp_probability` call site (the counting chokepoint) sits inside the three
+  LOCAL ARTIFACT BUILDERS (`_build_local_recommendations_slate_artifact`,
+  `_build_local_top_by_game_snapshot`, `_build_local_cards_props_snapshot_artifact`),
+  and the reuse gate returns the cached bundle BEFORE any of them run. No builder
+  → no `win_prob` computed → `rows=0`. **Structurally correct output of a
+  reuse-skipped run, not a fault.**
+  - **NOT GENERALISED: a second `rows=0` at `04:24:45-05:00` is unexplained.**
+    That date's decision was `will_fetch` (recorded `04:24:18`, 27s earlier), so
+    reuse does not cover it. The memory census had NO sample in that window, so
+    that process's flags are unknown — do not assume it was also reuse.
 - **CLOSED BENIGN 16:14:55Z — the fix is exercised on CURRENT code.**
   `dd53d47c` (verified descendant of `44bc02f3`) has **3 exercised runs,
   `rows=24/9/15`, 48 rows, 05:53:3xZ, live-odds-worker.** An earlier line here
