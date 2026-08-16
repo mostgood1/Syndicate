@@ -1564,7 +1564,31 @@ def _movement_from_opening(
         "movement_open_bookmaker": opened.get("bookmaker"),
     }
 
-    # PRICE DELTA IS ONLY MEANINGFUL SAME-BOOK. The board publishes the best of
+    # PRICE DELTA IS ONLY MEANINGFUL AT THE SAME LINE. Measured in production
+    # 2026-08-16 22:20Z, immediately after the loose join key shipped: **19 of
+    # 23 tracked rows had a different opening line**, and their "movement" was
+    # the price gap between two different bets --
+    #
+    #     Under totals   line 7.0   opening line 11.0   "delta" +242
+    #     Rockies spreads line -1.5 opening line  +1.0  "delta" +226  -> STEAM
+    #
+    # That last one FIRED STEAM on a false positive. A +1.0 spread and a -1.5
+    # spread are different bets; the price difference between them is not a
+    # move, and `_opening_key`'s own docstring says so ("home -1.5 and home
+    # -2.5 are different markets").
+    #
+    # So the JOIN stays loose -- that is what `#446` fixed, and it is why the
+    # row is visible at all -- but the PRICE comparison is gated on the line
+    # being unchanged. When the line moved, the LINE MOVE IS THE MOVEMENT and
+    # is reported as such; a price at a different handicap is not a price move.
+    # This keeps the coverage win (31% -> 96%) without buying it with nonsense.
+    lines_comparable = (open_line is None and now_line is None) or (
+        open_line is not None and now_line is not None and abs(open_line - now_line) < 1e-9
+    )
+    if not lines_comparable:
+        out["movement_price_not_comparable"] = "line_moved"
+
+    # SAME-BOOK, for the same class of reason. The board publishes the best of
     # N books, and the best book can change between builds -- differencing
     # across a book switch measures the switch, not the market. `book_prices`
     # on the opening record exists precisely so this can be same-book; fall
@@ -1574,7 +1598,13 @@ def _movement_from_opening(
     book = str(quote.get("bookmaker") or "").strip().lower()
     same_book_open = _as_float((open_books or {}).get(book))
     same_book_now = _as_float((now_books or {}).get(book)) if now_books else now_price
-    if same_book_open is not None and same_book_now is not None:
+    if not lines_comparable:
+        # Deliberately no `movement_price_delta` at all, rather than a value
+        # with a caveat attached. A number in that field feeds the score and
+        # the steam detector, and a caveat in a neighbouring key does not stop
+        # either of them reading it.
+        out["movement_basis"] = "line_moved"
+    elif same_book_open is not None and same_book_now is not None:
         out["movement_price_delta"] = round(same_book_now - same_book_open, 2)
         out["movement_basis"] = "same_book"
         out["movement_book"] = book

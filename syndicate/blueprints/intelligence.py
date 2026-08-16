@@ -2884,6 +2884,26 @@ def board_layer2_shortlist_api():
                 "stale_kickoff_seconds": shortlist.get("stale_kickoff_seconds"),
                 "rows_stale_kickoff": shortlist.get("rows_stale_kickoff"),
                 "opportunities_considered": shortlist.get("opportunities_considered"),
+                # MOVEMENT ACCOUNTING -- the FOURTH place this same gap has been
+                # paid for, and the second time I have paid it myself.
+                #
+                # `#397`'s rule is "add the counter in the same commit as the
+                # rule". I did, twice, and both times the number still reached
+                # nobody: the producer returns it, `per_sport_stats` is an
+                # explicit key list, and THIS dict is a third explicit key list.
+                # Measured 2026-08-16 22:20Z: `openings_records` and
+                # `openings_loaded` read `None` in the served payload while the
+                # producer was computing both, so the measurement had to derive
+                # coverage from `movement_state` counts instead of reading it.
+                #
+                # The rule that actually holds: a counter is not shipped until
+                # it is READ FROM THE SERVED PAYLOAD. Trace it to the endpoint,
+                # do not trust the commit.
+                "openings_records": shortlist.get("openings_records"),
+                "openings_loaded": shortlist.get("openings_loaded"),
+                "openings_error": shortlist.get("openings_error"),
+                "movement_eligible_rows": shortlist.get("movement_eligible_rows"),
+                "movement_rows_matched": shortlist.get("movement_rows_matched"),
                 "returned": min(len(rows), limit),
                 "total_rows": len(rows),
                 # Returns {"rows": ...} alone unless ?clv=1 asked for the join,

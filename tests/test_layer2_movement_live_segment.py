@@ -283,8 +283,16 @@ def test_the_join_key_survives_a_best_book_switch():
     assert movement_join_key(_mv_opening()) == movement_join_key(moved)
 
 
-def test_a_row_that_moved_line_AND_book_is_still_measured():
-    """The production case. Under the old key this row was invisible."""
+def test_a_row_that_moved_line_AND_book_is_still_VISIBLE():
+    """The production case. Under the old key this row did not exist at all.
+
+    **REWRITTEN 22:3xZ, and the rewrite is the point.** This originally asserted
+    a `movement_price_delta` of -27.0 across a line that moved -1.5 -> -2.5. That
+    encoded a belief production then disproved: 19 of 23 tracked rows were
+    comparing prices at DIFFERENT handicaps, and one of them fired steam. The
+    loose key's job is to make the row VISIBLE; comparing its price across a line
+    move was never part of that and is now refused.
+    """
     from syndicate.features.shared.layer2_board import _movement_from_opening, movement_join_key
 
     opening = _mv_opening()
@@ -295,20 +303,20 @@ def test_a_row_that_moved_line_AND_book_is_still_measured():
     )
     out = _movement_from_opening(moved, {movement_join_key(opening): opening})
 
+    # Visible -- this is the `#446` win and it survives.
     assert out["movement_state"] == "tracked"
     assert out["movement_line_delta"] == -1.0
-    # Same-book via `book_prices`, NOT best-of-N across a book switch.
-    assert out["movement_basis"] == "same_book"
-    assert out["movement_book"] == "fanduel"
-    assert out["movement_price_delta"] == -27.0
+    # But NOT priced across the line move.
+    assert out.get("movement_price_delta") is None
+    assert out["movement_basis"] == "line_moved"
 
 
-def test_that_same_row_now_reaches_the_steam_threshold():
-    """Steam was structurally suppressed, not merely untested.
+def test_steam_needs_a_real_price_move_at_an_unchanged_line():
+    """**REWRITTEN.** This asserted that the -1.5 -> -2.5 row reached the steam
+    threshold on a -27 point "move". It did, in production, and it was a FALSE
+    POSITIVE -- the -27 was the gap between two different bets.
 
-    A sharp move usually comes WITH a line move or a book switch -- the exact
-    conditions that broke the old key. So the moves large enough to be steam
-    were the ones most reliably erased before the detector saw them.
+    The honest version: steam fires on a real price move at an UNCHANGED line.
     """
     from syndicate.features.shared.layer2_board import (
         _STEAM_PRICE_POINTS,
@@ -316,16 +324,15 @@ def test_that_same_row_now_reaches_the_steam_threshold():
         movement_join_key,
     )
 
-    opening = _mv_opening(captured_at=_recent_iso())
-    moved = _mv_row(
-        line=-2.5,
-        quote={"price": -135, "bookmaker": "fanduel",
-               "book_prices": {"draftkings": -140, "fanduel": -135}},
+    opening = _mv_opening(captured_at=_recent_iso())          # line -1.5
+    moved = _mv_row(                                          # line -1.5, price moved
+        quote={"price": -140, "bookmaker": "draftkings",
+               "book_prices": {"draftkings": -140}},
     )
     out = _movement_from_opening(moved, {movement_join_key(opening): opening})
+    assert out["movement_price_delta"] == -30.0
     assert abs(out["movement_price_delta"]) >= _STEAM_PRICE_POINTS
     assert out.get("steam") is True
-    assert "fanduel" in (out.get("steam_reason") or "")
 
 
 def test_the_old_full_key_would_have_missed_all_of_the_above():
@@ -347,3 +354,76 @@ def _recent_iso():
     from datetime import datetime, timedelta, timezone
 
     return (datetime.now(timezone.utc) - timedelta(minutes=20)).isoformat().replace("+00:00", "Z")
+
+
+# ---------------------------------------------------------------------------
+# `#446` FOLLOW-UP: the loose join key bought coverage with nonsense.
+#
+# Measured in production 22:20Z, right after the loose key shipped: coverage
+# 31% -> 96%, but **19 of 23 tracked rows had a different opening line**, so
+# their "price movement" was the gap between two different bets:
+#
+#     Under totals    line 7.0   opening 11.0   "delta" +242
+#     Rockies spreads line -1.5  opening  +1.0  "delta" +226  -> FIRED STEAM
+#
+# The join must stay loose (that is what makes the row visible); the PRICE
+# comparison must be gated on the line being unchanged.
+# ---------------------------------------------------------------------------
+
+
+def test_a_moved_line_yields_no_price_delta():
+    """The false-positive steam case, pinned."""
+    from syndicate.features.shared.layer2_board import _movement_from_opening, movement_join_key
+
+    opening = _mv_opening(line=1.0, price=-104, book_prices={"kalshi": -104})
+    moved = _mv_row(line=-1.5, quote={"price": 122, "bookmaker": "kalshi",
+                                      "book_prices": {"kalshi": 122}})
+    out = _movement_from_opening(moved, {movement_join_key(opening): opening})
+
+    assert out["movement_state"] == "tracked", "the row must still be VISIBLE"
+    assert out.get("movement_price_delta") is None, (
+        "a price at a different handicap is not a price move"
+    )
+    assert out["movement_basis"] == "line_moved"
+    assert out["movement_price_not_comparable"] == "line_moved"
+    # The line move IS the movement, and is still reported.
+    assert out["movement_line_delta"] == -2.5
+
+
+def test_a_moved_line_cannot_fire_steam():
+    """Steam reads `movement_price_delta`; withholding it is what stops the
+    false positive. A caveat in a neighbouring key would not."""
+    from syndicate.features.shared.layer2_board import _movement_from_opening, movement_join_key
+
+    opening = _mv_opening(line=1.0, price=-104, book_prices={"kalshi": -104},
+                          captured_at=_recent_iso())
+    moved = _mv_row(line=-1.5, quote={"price": 122, "bookmaker": "kalshi",
+                                      "book_prices": {"kalshi": 122}})
+    out = _movement_from_opening(moved, {movement_join_key(opening): opening})
+    assert out.get("steam") is not True
+
+
+def test_an_unmoved_line_still_measures_price_normally():
+    """The gate must not suppress the case it was built to preserve."""
+    from syndicate.features.shared.layer2_board import _movement_from_opening, movement_join_key
+
+    opening = _mv_opening(line=-1.5, price=-110, book_prices={"draftkings": -110})
+    moved = _mv_row(line=-1.5, quote={"price": -135, "bookmaker": "draftkings",
+                                      "book_prices": {"draftkings": -135}})
+    out = _movement_from_opening(moved, {movement_join_key(opening): opening})
+    assert out["movement_price_delta"] == -25.0
+    assert out["movement_basis"] == "same_book"
+    assert "movement_price_not_comparable" not in out
+
+
+def test_h2h_has_no_line_and_is_therefore_always_comparable():
+    """Both lines None must count as comparable, not as a mismatch."""
+    from syndicate.features.shared.layer2_board import _movement_from_opening, movement_join_key
+
+    opening = _mv_opening(market="h2h", line=None, price=109,
+                          book_prices={"draftkings": 109})
+    moved = _mv_row(market="h2h", line=None,
+                    quote={"price": 140, "bookmaker": "draftkings",
+                           "book_prices": {"draftkings": 140}})
+    out = _movement_from_opening(moved, {movement_join_key(opening): opening})
+    assert out["movement_price_delta"] == 31.0
