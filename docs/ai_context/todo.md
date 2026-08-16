@@ -32647,6 +32647,61 @@ across five stages" into a list of allocation sites, which is the last unknown.
 
 Cost note: tracemalloc keeps a traceback per live allocation and the process is
 already at its ceiling — arm it to fire ONCE per boot, on the excursion only.
+### `#443` — **A stale PID silently blocks a sport's season projections for up to 45 min after EVERY restart** — FOUND 2026-08-16, NOT STARTED, no owner
+
+**Found while verifying `#441`, and it is why that verification stalled.** Separate
+defect, separate fix. NOT caused by the `#441` deploy.
+
+**THE SILENT BRANCH.** `run_refresh_worker._launch_autorun_season_projections`:
+
+    if _season_projection_process_still_running(sport):
+        continue          # <-- NO LOG LINE. The only fully silent path here.
+
+`_season_projection_process_still_running` reads a **persisted** launch-state file
+(pid + `started_at_epoch`) and returns True when `_process_exists(pid)`. That is an
+EXISTENCE check with **no identity check**. A container restart kills the real
+generator but leaves the state file on the mounted disk, and in a fresh container
+PIDs restart low — so a recorded pid can match an unrelated live process and the
+guard blocks on it.
+
+**MEASURED 2026-08-16.** refresh-worker went live at 15:45:50Z; last recorded NFL
+launch was 15:44:27Z (they had been ~30-40s apart, 321 records in 3 days). After
+the restart: **zero `SEASON_PROJECTION` lines of ANY kind** — no launch, no skip,
+no refusal — for 6+ minutes, while the autorun loop was demonstrably running
+(soccer's autorun fired twice in the same window). Neither branch that logs was
+reached, so a silent `continue` is the only path left.
+
+**WHY IT IS NOT COSMETIC.** The only release is the time backstop,
+`_SEASON_PROJECTION_MAX_RUNTIME_SECONDS = 45 min`, which then prints
+`SEASON_PROJECTION_TIMEOUT`. So after every deploy a sport's projections can stall
+for up to 45 minutes with **no signal at all**, and refresh-worker redeploys
+several times a day. It also destroys attribution: a stalled autorun is
+indistinguishable from a healthy one that has nothing to do — which is exactly how
+it consumed `#441`'s verification window.
+
+**DO NOT REMOVE THE GUARD.** It is correct and necessary. Its `#389`-era comment
+records what it prevents: with no guard, **18 -> 56+ concurrent
+`generate_smartsim2_nfl_projections.py` processes** piled up over ~2 hours, drove
+container memory 31.6% -> 53.8% of the 4GB cap, and starved a live MLB
+Sunday-slate sim on the same container. The guard is right; its liveness test is
+wrong.
+
+**THE FIX ALREADY EXISTS IN A SIBLING MODULE.**
+`live_refresh_loop._process_matches_lock(pid, expected_command)` solves precisely
+this for MLB's daily sim — it compares the process CMDLINE, not just existence.
+Three parts, in order:
+1. Match identity, not existence — reuse `_process_matches_lock` rather than
+   writing a third variant.
+2. **Log the blocking branch.** A guard that stalls a sport silently is the defect
+   this repo keeps re-shipping; `PREGAME_CADENCE_DETAIL` and
+   `SEASON_PROJECTION_TIMEOUT` are the house pattern.
+3. Consider clearing the launch-state file at worker boot — a PID recorded by a
+   previous container can never be valid in a new one.
+
+**Applies to every sport this autorun covers** (`_SEASON_PROJECTION_SPORTS` =
+nfl, ncaaf) plus the separate preseason autorun, which keeps its own
+`nfl_preseason` launch-state file and has the identical guard.
+
 ### `#442` — **SHIPPED TO THE TREE 2026-08-16 (local tooling, no deploy). `scripts/render_events.py`: the 2026-08-15 FORBIDDEN rule about OOM finally has a tool behind it** — lane `render-events-reader`, CLOSED-VERIFIED
 **The gap this closes.** `learnings.md` 2026-08-15 says a negative result about
 process death MUST come from the events API, and names `render_logs.py` as unable

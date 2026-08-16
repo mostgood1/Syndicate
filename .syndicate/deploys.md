@@ -6060,3 +6060,45 @@ exited twice earlier: visible in census sweeps at 07:07:51–07:08:07Z and a
 single sweep at 09:08:29Z. Census cadence is ~9 lines/min, so those are runs of
 seconds, not a hung job. No `oomKilled` on refresh-worker since the 06:01:34Z
 `deploy_ended` — the short life is an early exit, not a kill.
+
+## 2026-08-16 15:39:58Z — refresh-worker `97491161` — `#441` pbp root fix. **MEASUREMENT: PENDING**
+
+**What shipped.** Branch `deploy/nfl-pbp-root`, cut from refresh-worker's LIVE SHA
+`d72d670c` (re-confirmed unmoved immediately before triggering, not assumed).
+Diff vs live is three files:
+
+    syndicate/features/nfl/sources.py                +43 / -0   (nfl_pbp_path)
+    scripts/generate_smartsim2_nfl_projections.py    +16 / -1   (delegate)
+    tests/test_smartsim2_nfl_pbp_root.py            +132 / -0   (6 tests)
+
+`render.yaml` untouched — no `blueprint_sync`. The degenerate-run guard is NOT
+relaxed (both `raise DegenerateProjectionRun` sites intact, asserted on the
+branch).
+
+**Deploy cost, accepted deliberately.** `check_deploy_safety` read NOT CLEAR:
+MLB sim pid 37345, age **1 minute** (`props_now_available`), plus live games.
+Chosen anyway because it is the cheapest window observed — the previous sim
+(36515) had been running 10 minutes — and `fingerprint_change` relaunches it with
+~80 minutes to MLB first pitch (~12:00 CT). After `#440` Phase 4.1 refresh-worker
+ticks only NFL live-lens, so the "live games" warning largely applies to
+live-odds-worker, which this deploy does not touch.
+
+**EXPECTED EFFECT, as a falsifiable statement.** Within ~15 min of going live:
+`SEASON_PROJECTION_LAUNCHING sport=nfl` stops recurring every ~40s, and
+`smartsim2_projections_2026_wk1.csv` appears with a fresh mtime.
+
+**WHAT WOULD FALSIFY IT, and it is the honest half:** if `DegenerateProjectionRun`
+still raises, the pbp is ALSO absent from the mounted disk and root selection was
+a red herring — the fix changes nothing and the guard keeps refusing, correctly.
+**This was never directly verified**: web cannot see refresh-worker's disk and
+workers serve no HTTP, so what is proven is only that `DATA_ROOT` pointed at the
+ephemeral checkout (`/opt/render/project/src/data/nfl_source`) — i.e. the mounted
+disk was never consulted. **The deploy is the test.**
+
+**A SECOND FAILURE MODE TO CHECK, not just "did it write":** if the artifact
+appears with IDENTICAL rows for every game, the guard was bypassed rather than
+satisfied — that is the exact degenerate output it exists to prevent (production
+served `margin 0.96 / total 44.38 / home_win 0.5267` on all 16 preseason games on
+2026-08-13). Verify row VARIANCE, not just file presence.
+
+**Rollback:** `py -3 scripts/render_deploy.py --service refresh-worker --commit d72d670c`.
