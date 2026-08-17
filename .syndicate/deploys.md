@@ -11927,3 +11927,81 @@ live-odds-worker peaks at 1855/2048 MB (90.6%, 257–415 MB headroom) and
 refresh-worker is OOM-looping under `#449`. A CPU-only cost is a different
 decision from a linear memory cost, and guessing which one it is on an
 OOM-looping service is exactly the mistake `#241` already cost this project.
+
+## 2026-08-17 — DOES THE REQUIRED SIM COUNT DIFFER BY SPORT? **Yes — and the driver is `sigma / CRPS_climatology`, not the sport**
+
+Lane `convergence-phase7-crps`. `scripts/sim_count_requirement.py`. Read-only.
+
+Phase 9 measured MLB's knee at ~300 on ONE quantity. Whether that transfers to a
+soccer 3-way or a basketball prop needed answering without re-simulating every
+sport for days.
+
+### It has a closed form, and it was VALIDATED before use
+
+An n-draw empirical forecast inflates CRPS by `MD / 2n`, where `MD = E|X-X'|`
+(= `2*sigma/sqrt(pi)` for a Normal). So the penalty scales with the FORECAST'S
+OWN SPREAD, and what matters for a skill score is that penalty relative to the
+climatology CRPS it is divided by.
+
+| n | measured (MLB, leash 5) | predicted | error | penalty understated |
+|---|---|---|---|---|
+| 100 | 2.5110 | 2.4668 | **−0.0442** | **3.34x** |
+| 300 | 2.4516 | 2.4542 | +0.0026 | 0.59x |
+| 1000 | 2.4498 | 2.4498 | +0.0000 | 1.00x |
+
+**The model is exact at n>=300 and UNDER-STATES the penalty at n=100 by 3.3x** —
+`outs` is discrete, bounded and skewed (26.78% of simulated mass on one value),
+and a Normal's MD under-counts a lumpy distribution's spread.
+
+**My first pass passed this validation on a |error| <= 0.05 CRPS threshold.**
+That threshold was loose enough to wave through a 3.3x error in exactly the
+direction that causes UNDER-provisioning. The check now scores the PENALTY, not
+the absolute CRPS. **Same class as the 08-17 baseline-form error: a test that
+agrees for the wrong reason.**
+
+**Consequence: the formula gives the SCALING, not the LEVEL.** The level is
+anchored on MLB's *measured* knee.
+
+### Required sims, anchored (`sigma/CRPS_clim` = 1.528 -> 300 measured)
+
+| sport | market | sigma | CRPS clim | ratio | ANCHORED n | current | verdict |
+|---|---|---|---|---|---|---|---|
+| nfl | margin | 16.473 | 7.9713 | 2.067 | **406** | 300 | **TOO THIN** |
+| nfl | total | 14.200 | 7.7692 | 1.828 | **359** | 300 | **TOO THIN** |
+| ncaaf | margin | 13.695 | 11.4848 | 1.192 | 234 | 300 | OK |
+| ncaaf | total | 12.819 | 9.2085 | 1.392 | 273 | 300 | OK |
+| mlb | outs | 3.351 | 2.1927 | 1.528 | 300 | 1000 | OK (3x over) |
+
+**THE ANSWER TO "does it differ by sport": yes, by ~1.7x across measured sports
+alone — but the sport is not the variable.** `sigma / CRPS_climatology` is. NFL
+and NCAAF are the same engine, same markets, and differ by 1.7x because college
+outcomes are themselves more spread out, which raises the denominator.
+
+**So a single global sim count is wrong in both directions at once**: 300 is
+thin for NFL and generous for NCAAF, and MLB pregame's 1000 is 3x more than its
+own quantity needs.
+
+### What this does NOT license
+
+- **NHL's 20,000 -> 300 is NOT supported.** No climatology has been measured for
+  NHL (n=10, below the floor), so its ratio is unknown. Cutting 66x on an
+  unmeasured ratio is exactly the extrapolation this method cannot carry.
+- **Basketball and soccer are unmeasured too** — no climatology CRPS exists for
+  either, so neither an anchored n nor a verdict can be given. Their current
+  counts (100 / 80) remain unjustified rather than proven wrong.
+- The anchor rests on ONE measured knee. A second measured curve on a different
+  sport would convert this from "anchored extrapolation" to "fitted".
+
+### Memory, measured `[scripts/scope_sim_memory.py]`
+
+    accumulate   0.07 MB at 25, 50 AND 100 sims -- FLAT, O(1) in n_sims
+    retain       ~11.4 MB per 1000 sims per game -- linear
+
+**If the caller accumulates, raising sim counts costs CPU and NOT memory.** Even
+the retain worst case at 300 sims is ~3.4 MB per concurrent game, against
+257–415 MB of headroom on live-odds-worker. **Memory is not the blocker; which
+call-site regime applies is still unconfirmed.**
+
+Note: the script prints "psutil available: NO". That is a bug in its own check
+(it calls `rss_mb()` twice and compares, and RSS legitimately moves between
+calls). psutil works and the RSS column is real.
