@@ -10246,3 +10246,46 @@ workers, effect NOT measured. Next natural chance ~20:01Z, but **2026-08-17 is a
 ONE-fixture slate and cannot prove coverage** - a 1-row file is correct there.
 The proof needs 2026-08-18 (4 fixtures: LAS@CON, IND@TOR, NYL@CHI, ATL@LVA),
 expecting `scheduled=4 covered=4`.
+
+## 2026-08-17 — PREFLIGHT: cadence flip on live-odds-worker — **FAIL (not fired)**
+
+Lane `convergence-phase7-crps`. Candidate: set
+`SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=true` on **live-odds-worker only**, via
+the single-key env endpoint, then deploy that service at **its own current live
+SHA** (NOT `main` — `state.md`: the three services run separate lineages and
+"Do not deploy main's tree to these services").
+
+**VERDICT: FAIL, on measurement. NOT ON SAFETY.** The change is narrow, correctly
+scoped, and reversible in one call. It fails because **no reader is assigned to
+the 24h effect**, and this gate treats that as a FAIL rather than a shrug. The
+session opened with *"14 deploys with no measurement. Not evidence of a fix."*
+Firing this would have made it 15.
+
+| item | answer |
+|---|---|
+| scope | ONE change: the env var. No code ships — my own seal fix `bafb4fb2` stays undeployed, deliberately. |
+| expected effect | `FIXTURE_CADENCE sport=mlb` in logs within ~1 tick; on the next slate, props `retrieved_at` **before first pitch** and **>=8 pitchers with an outs line** (baseline: 5 of 29 dates cleared that) |
+| measurement | log line = me, minutes. **24h effect = UNASSIGNED — this is the failing item.** |
+| blast radius | live-odds-worker only; persistent disk, stop-then-start, real downtime, no instance overlap; mlb/wnba/soccer live tick pauses |
+| rollback | same endpoint, `=false`, redeploy same SHA |
+| ledger | no rule forbids it. Live concerns: headroom **257–415 MB** (peak 1855/2048 = 90.6%) and *"worker periodic work is never free"* (`#241` = restart loop). Flag's own precondition, a baseline BEFORE, stands at **n=4 scheduled records** — thin. |
+
+**SHORTEST PATH TO PASS: assign a reader for 2026-08-18.** Nothing else is missing.
+
+### RUNBOOK, ready to execute
+
+1. Job gate: confirm no in-flight sim on live-odds-worker.
+2. Single-key env endpoint (**NOT `render.yaml`** — avoids `blueprint_sync`,
+   which would rewrite the whole env block and 502 every route ~2 min).
+3. Deploy live-odds-worker at **its own live SHA**.
+4. Minutes: Render logs for `FIXTURE_CADENCE sport=mlb`.
+5. 2026-08-18: `py -3 scripts/grade_production_outs_betting.py`. PASS =
+   pre-first-pitch `retrieved_at` and >=8 pitchers carrying an outs line.
+
+### CARRIED, and it matters for whoever fires this
+
+**The two halves only pay off together.** `bafb4fb2` (monotone props seal) is on
+`main` and **UNDEPLOYED**, so it is inert until refresh-worker next ships.
+Cadence makes the pregame capture happen; the seal makes it stick. Flipping
+cadence alone improves capture but still lets a later thin fetch overwrite a good
+seal on any date whose slate clock is unreadable.
