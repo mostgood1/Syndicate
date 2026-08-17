@@ -3392,3 +3392,42 @@ market by **+0.038 Brier** on 3,638 records and is **worst on `priceable_only`
   the lens's `live_state.final` for the same game. If the chips say `live` while
   the lens says `Final`, it is (a) and the carry-forward is exonerated by
   measurement rather than by argument.
+
+### wnba-live-tier — CHIP COMPARISON RUN 2026-08-17 02:4xZ — **the chips are CORRECT. Two candidates eliminated, one named.**
+- **RAN the comparison the previous note asked for.** `build_game_chips(
+  '2026-08-16', ['wnba'])`:
+  ```
+  CHI @ SEA   state=final  token='FINAL'  82-80
+  IND @ ATL   state=final  token='FINAL'  95-91
+  POR @ PHX   state=final  token='FINAL'  88-85
+  ```
+  `_game_flags` returns `(is_live=False, is_final=True)` for all three.
+  **The chip/state-mapping code is EXONERATED — it flips WNBA to final
+  correctly.**
+- Worth keeping: IND @ ATL had `live_state.final=False, in_progress=True` and
+  STILL resolved final, because `_game_flags` found "final" in the `status`
+  dict's text and `is_final` forces `is_live=False`. The fallback did its job.
+- **THE 180s SCOREBOARD CARRY-FORWARD (`16a898ef`) IS EXONERATED BY
+  MEASUREMENT, not by argument.** Its bound is 180 seconds against a
+  three-hour discrepancy, and on failure it returns the stored payload without
+  re-storing it, so it cannot ratchet. It was named as a suspect because it is
+  new code on this surface; it is now cleared.
+- **THE 30s CHIP CACHE IS EXONERATED.** `_CACHE_TTL_SECONDS = 30.0` — three
+  orders of magnitude too short to hold a three-hour staleness.
+- **WHAT THAT LEAVES, and it is a candidate, NOT a conclusion.** The chips are
+  right and the served grid is wrong, so the stale `live` is introduced
+  *between* them. The leading suspect is
+  **`attach_live_game_state_from_lens`** (`book_grid_artifact.py:221`), which
+  runs AFTER `attach_game_state` (`:215`) and can overwrite a correct `final`
+  with a stale `live` from the published lens snapshot. **Not verified** — I ran
+  out of budget before measuring it.
+- **NOTE THE ENVIRONMENT DIFFERENCE before trusting the local run.** Locally
+  `build_live_state_payload` took `build_live_state_payload_fallback_return` (a
+  stored snapshot); on the worker `_render_web_dyno()` is False and it takes the
+  live ESPN path. So the local run proves the MAPPING is correct, not that
+  production's inputs are the same.
+- **Next action, one measurement:** on a served wnba `book_grid` row whose game
+  is finished, compare `game.state` against the chip for the same game and
+  against `live/wnba_live_lens.json`'s `live_state.final`. If the chip says
+  final and the row says live, `attach_live_game_state_from_lens` is the writer
+  and the lens is the stale input.
