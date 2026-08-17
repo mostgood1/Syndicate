@@ -3067,3 +3067,24 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
 - Tick-over-tick movement UNPROVEN — second tick had no live rows.
 - **Next action:** re-read on the next live WNBA slate (~21:00Z) for both the
   movement diff and the carry-forward trigger.
+
+#### game-shape-capture — MLB RUN EXPECTANCY BUILT FROM `feed_live` (`#454` first step) `[2026-08-16 ~21:0x CDT]`
+
+`scripts/mlb_run_expectancy.py` + `tests/test_mlb_run_expectancy.py`. Both new, `scripts/` unclaimed.
+
+**THE TABLE EXISTS.** 723 files -> 714 games -> **47 distinct dates** (2026-05-28 .. 2026-07-14) -> 12,423 half-innings (62 incomplete excluded) -> **53,049 plate appearances**. All 24 base-out cells populated; 23 clear an n>=100 floor (`1-3|0` is thin at n=90 and is reported, not compared).
+
+**THE JOIN IS TRUSTWORTHY ON THE CHECKS THAT DO NOT DEPEND ON A REFERENCE:**
+- **0 score cross-check mismatches** across 12,361 complete half-innings — runs counted from `movement.end == "score"` agree with the `result` score delta everywhere.
+- **Monotonic in outs in all 8 base states.**
+- 21 of 23 comparable cells sit within 3 SE of a single global scale factor.
+
+**A REAL BUG, CAUGHT BY A TEST RATHER THAN BY REVIEW.** A runner advancing twice on one play gets two entries, and `start` advances between them while `originBase` does not. My first version deduplicated to the LAST entry and read its `start` — which vacates a base the runner never occupied when the play began and leaves a **phantom runner** on the original base for the rest of the half-inning, inflating exactly the occupied-base cells. Fixing it moved real counts: **`--3|0` n 107 -> 229, `1-3|0` 217 -> 90.** Not cosmetic.
+
+**A MODELLING ERROR OF MINE, worth keeping.** The first comparison fitted an **additive** offset and reported a post-offset scatter of 0.53 runs, which reads as a broken join. The residuals gave it away — strongly negative on low-RE cells, positive on high-RE ones: the signature of a scale factor, not a shift. Under the correct multiplicative fit the same data lands 21/23 inside 3 SE. **A residual that correlates with the fitted value means the model is wrong, not the data.**
+
+**RESULT: k = 1.1459 (+14.6% run environment vs the published era).** Two cells disagree by >3 SE (`-2-|0` +3.4, `--3|0` +3.6) — both among the rarest states.
+
+**ATTRIBUTION OF THOSE TWO IS OPEN, AND THE VERDICT SAYS SO.** The reference table is **RECALLED FROM MEMORY, NOT SOURCED**. A per-cell disagreement is at least as likely to be an error in my reference as in the data, and the outliers are precisely the cells where a recalled number is least reliable and the sample thinnest. **Source the reference before calling either one a data defect.**
+
+**16 tests.** What this unblocks: `game_shape.py`'s leverage-index refusal needs a win-expectancy table; this is its run-expectancy half. The other half needs score differential and inning and is not built.
