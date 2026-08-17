@@ -2587,3 +2587,64 @@ A scheduled-task run cannot reach its peers and cannot be reached. So the sessio
 most needs to coordinate before a deploy is structurally the one that cannot — which is
 the practical argument for the control `learnings.md` already asks for (a
 `deploy_claim.py` that refuses an unattended holder).
+
+## GAME SHAPE — CONTRACT FOR FOUR SPORTS, TWO LIVE EMITS, **n = 0** `[measured 2026-08-16, lane game-shape-capture]`
+
+Supersedes the "GAME SHAPE IS NOT PERSISTED FOR ANY SPORT" section above for the
+capture half; that section's MEASUREMENTS stand, its status line does not.
+
+`syndicate/features/shared/game_shape.py` (`origin/main` `8a01fa3d`) is the
+extraction contract. **90 tests, 31 of 31 mutations caught.**
+
+| sport | primitive | live emit | why |
+|---|---|---|---|
+| MLB | yes | **blocked** | producer is `vendor/.../flask_frontend.py:16647`, held by `mlb-live-gameline-distributions` |
+| WNBA/NBA | yes | **blocked** | producer is `wnba/cards.py:3679`, held by `wnba-live-tier` |
+| NFL | yes | **LANDED** | `nfl/live_game_state.py` was unclaimed |
+| soccer | yes | **LANDED** | `soccer/ingestion/espn_live_state.py` was unclaimed |
+| NCAAF | contract only | **no producer exists** | no `live_game_state` analog in `ncaaf/`; season opens 08-29 |
+
+**THE NUMBER THAT MATTERS: every bucket is n = 0.** Nothing has run in
+production. Both emits are PREPARED, NOT DEPLOYED, and no deploy was requested.
+Do not read "contract for four sports" as coverage.
+
+**Per-sport facts worth not re-deriving:**
+- **MLB** — `LiveSituation` (`vendor/mlb_bettingv2/sim_engine/live_mc.py:20`) is
+  built in full every live tick and discarded at the return. Capture is
+  serialisation, not derivation.
+- **WNBA/NBA** — **possession pace is UNDERIVABLE**: no FGA/TOV/OREB/FTA in any
+  live artifact. The field is `points_per_minute` and records carry
+  `possession_pace_available: False`. `wnba/cards.py:891 _wnba_elapsed_minutes`
+  is the canonical clock math (10-min quarters, NOT NBA's 12); the shared copy
+  is pinned to it by a 143-cell drift test.
+- **NFL** — `situation` (down/distance/yardline) was in the fetched ESPN payload
+  and never read; now captured, **live games only**. `pace_features.py` is
+  SEASON-level and is not a live pace source.
+- **NCAAF** — overtime is **UNTIMED** (alternating possessions), so elapsed
+  minutes is undefined there and is returned as `None`, never extrapolated.
+- **soccer** — `clock_remaining` is remaining **in that half**
+  (`_HALF_SECONDS = 2700`): half 2 / 1800s is the **60th minute**. Its
+  `live_state` **embeds the model's own `projection`**, which is excluded from
+  the shape (circular conditioning). Second-half stoppage is invisible — the
+  producer clamps at 0, so 90' and 95' both read 90; flagged `clock_saturated`.
+- Margin bands are in **each sport's own unit** — runs / points / scores /
+  goals. Buckets cap at 17 (13 for soccer).
+
+## PLAY-BY-PLAY COVERAGE IS 5 SPORTS OF 8 `[measured 2026-08-16, `#454`]`
+
+| have it | form |
+|---|---|
+| NFL | nflverse CSV, **372 cols incl. `epa`, `wp`, `wpa`** — 2025 = 46,452 REG plays |
+| MLB | statsapi `feed_live` — 618 + 105 files |
+| NCAAF | CFBD `plays_<season>_wk##.json.gz` — 51 files, 2023+ |
+| WNBA / NBA | `live_pbp_stats_<date>.jsonl` — 53 / 11 |
+
+**soccer, NHL and NCAAB have NONE** — the same three modules that are weakest
+elsewhere. `vendor/wnba_betting_repo/models/pbp/` is **models trained from pbp**
+(`.joblib`/`.onnx`), not pbp; a census by path would miscount it.
+
+**pbp is the OFFLINE substrate; `game_shape` is the prediction-time conditioning
+variable. Do not merge them** — that is how leakage gets in. pbp unblocks two
+refusals already written into `game_shape.py` by name: the MLB leverage index
+(needs a fitted win-expectancy table — `feed_live` is where it comes from) and
+football down/distance value (NFL pbp already ships `epa`/`wp`/`wpa`).

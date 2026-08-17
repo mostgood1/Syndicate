@@ -2598,3 +2598,25 @@ shape built from a synthetic dict rather than the real state).
 by `Layer 1 board coverage audit (fork 2)`; **NFL and soccer emits LANDED**;
 NCAAF has a contract and **no producer at all**. **n = 0 everywhere — not one
 production slate has run through any of it.**
+
+#### game-shape-capture — CHECKPOINT 2026-08-16 ~19:0x CDT — **ALL WORK ON `origin/main`; LANE STAYS OPEN ON VERIFICATION**
+
+`origin/main` `8a01fa3d`; ref `lane/game-shape-capture` -> same. Five commits,
+all verified reachable: `597f4a80` `862aac3a` `2dd384b0` `5cb588f2` `8a01fa3d`.
+**90 tests, 31 of 31 mutations caught.** `#454` filed.
+
+**WHY THIS LANE IS NOT CLOSED, stated so nobody closes it on the commit count:**
+its verification is *one live slate with a non-zero bucket distribution read
+across two builds*, and **that has not run. n = 0 for every sport.** Two emits
+exist (NFL, soccer); neither is deployed and neither has seen a production game.
+
+**NEXT ACTIONS, in order:**
+1. Read `game_shape` off a live NFL preseason or soccer fixture — the only step
+   that turns any of this from prepared into measured.
+2. MLB + WNBA emits: two handoffs to `Layer 1 board coverage audit (fork 2)`
+   are **unanswered**. If declined, wait for the lanes to close; do not edit
+   across them.
+3. NCAAF needs a live-state PRODUCER built (no `live_game_state` analog exists).
+   Season opens **08-29** — this is the only dated item in the lane.
+4. Owed consolidation: `wnba/cards.py:891` should delegate to
+   `basketball_elapsed_minutes`; blocked on that file's holder.

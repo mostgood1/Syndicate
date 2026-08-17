@@ -3392,3 +3392,72 @@ was two samples of a churning quantity, and I turned it into a trend.
   shared index in correct use. An alarm that fires on "something is staged"
   would fire constantly and be ignored. Gate on `git diff --cached --numstat |
   awk '$2>0'`, which is empty in the healthy case.
+
+### 2026-08-16 — A PLAN'S FIELD LIST WRITTEN FROM GREPS WAS WRONG FOR ALL FOUR SPORTS. Greps find NAMES; only the payload has the data
+
+`plan_2026-08-16_state_conditional_learning.md` promised, per sport, a concrete
+field list. Measured against real artifacts, **it was wrong every single time,
+and wrong in a DIFFERENT direction each time** — which is why "check the plan
+against reality" cannot be a one-off:
+
+| sport | the plan said | measured |
+|---|---|---|
+| MLB | build a state vector | it **already existed** in full (`LiveSituation`) and was discarded — serialisation, not derivation |
+| WNBA | "needs a possession count" | possessions are **underivable** — no FGA/TOV/OREB/FTA anywhere |
+| NFL | down/distance/field position/`pace_secs_play` | **none captured**; `situation` sits in the fetched payload unread, and `pace_features.py` is SEASON-level, not live |
+| soccer | minute/score/red cards | far richer (shots, SOT, corners) **and it embeds the model's own projection** |
+
+- **The rule going forward:** before designing an extractor, **open a populated
+  artifact and read it.** The grep that produced each of those lists found a
+  field NAME in a file somewhere in the tree — in a sim engine's internal state,
+  a historical loader, a season-level feature builder — none of which is the
+  live payload. A name in the repo is not a field on the record.
+- Corollary that paid off four times: the measurement changes the DESIGN, not
+  just the field list. MLB became a one-line serialisation, WNBA became an
+  honest refusal, NFL became a capture fix, soccer became an exclusion problem.
+
+### 2026-08-16 — STATE THAT EMBEDS THE MODEL'S OWN OUTPUT MAKES CONDITIONING CIRCULAR. Soccer is the only sport here that does it
+
+`soccer/ingestion/espn_live_state.py`'s record carries a `projection` block
+(`home_win_probability`, `projected_final_total`) and `goal_windows` inline,
+alongside the real state. Folding those into a game-shape record would mean
+scoring the model's error against a variable that CONTAINS the model.
+
+- **The rule going forward:** a conditioning variable must be derivable from
+  observable state ALONE. When a payload mixes state and prediction, split them
+  explicitly and say so on the record. **The test for this is cheap and
+  worth writing:** assert the model's field names are absent from the shape.
+- No other sport's live_state carries its projection, so nothing else in the
+  module guards it — a trap that exists in exactly one place is the kind that
+  survives review.
+
+### 2026-08-16 — A RESERVATION IS A READING WITH A TIMESTAMP. Three different kinds went stale in ONE session
+
+Already recorded for lane claims. It happened in **three distinct systems**
+within a few hours, which makes it a general property of this worktree, not a
+lane-file quirk:
+
+1. **Lane claim** — `mlb-live-gameline-distributions` read `CLOSED-VERIFIED` at
+   lane open and was re-opened before my edit. `lane-guard` was right.
+2. **Shared git index** — held revert-shaped entries against a HEAD that had
+   moved; `commit-guard` blocked twice and its fix list was incomplete BOTH
+   times.
+3. **Todo IDs** — this session's plan reserved `#447`/`#448`; other sessions
+   filed unrelated items under both before it was filed.
+
+- **The rule going forward:** re-read the authority immediately before the
+  action that depends on it — the claim before the edit, the index before the
+  commit, the ID before filing. Never carry a reading across a turn boundary.
+
+### 2026-08-16 — A DIRECTORY NAMED `pbp` CAN CONTAIN MODELS, NOT PLAY-BY-PLAY
+
+`vendor/wnba_betting_repo/models/pbp/` holds `.joblib`/`.onnx` files
+(`early_threes_gbr`, `first_basket_lr`, `tip_winner_lr`) — artefacts TRAINED
+from pbp. A coverage census by path would have counted WNBA twice and, worse,
+would have reported coverage for a sport on the strength of a filename.
+
+- **The rule going forward:** a coverage census must open a file and check its
+  SHAPE, not match its path. The same pass corrected "we have pbp for every
+  sport" to **5 of 8** (`#454`) — and the three without it (soccer, NHL, NCAAB)
+  are the same three modules that are weakest everywhere else, which is a
+  finding in itself rather than a coincidence.
