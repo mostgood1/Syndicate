@@ -3211,3 +3211,37 @@ a missing `coordinator.id` were each tested to return 0. Deleting
 **Grants** (`.syndicate/deploy/grants/<session_id>.json`, `expires_epoch`) are
 tested in all three states: valid allows, expired does NOT, malformed does NOT.
 A grant that cannot be parsed is not a grant.
+
+### ADDENDUM 4 2026-08-17 14:0x CDT — local `main` is 135 BEHIND origin, and 17 commits had never left this machine
+
+Measured while pushing. **This is the divergence `coordination-protocol.md`
+predicted** ("origin/main held 144 commits the local checkout lacked while the
+local checkout held 16 unpushed... sessions working blind and discovering it at
+merge time"). The numbers today: **135 behind, 29 ahead, of which 17 are
+genuinely unpushed** and 12 already reached `origin` by patch-id through another
+route.
+
+**Pushed to `ledger/coordinator-2026-08-17` (`e8b86d60`)** — a side branch, so
+the work is durable and shareable without touching `origin/main` or the
+worktree. Nothing can be lost now.
+
+**`origin/main` is NOT updated, and that is a deliberate hold, not an oversight:**
+
+- `git merge-tree` (no worktree, no index) reports **15 conflicted paths**,
+  including `deploys.md`, `lanes.md`, `lanes_closed.md`, `learnings.md`,
+  `state.md` — every append-only ledger file, conflicting on both sides' appends.
+- the worktree has **52 uncommitted modified files** belonging to live sessions.
+
+Integrating means resolving 15 conflicts and rewriting files under three or more
+running sessions. That needs a quiet window and a decision, not a convenient
+moment. **Do it as its own lane**, with no other lane open against the ledger.
+
+**One false alarm worth recording, because I raised it myself.** The pre-push
+blueprint check reported `render.yaml` in the diff. It was not: the pattern
+`render.yaml` is a REGEX, `.` matched `_`, and it hit my own new test file
+`test_deploy_guard_render_yaml.py`. The real blueprint is byte-identical between
+`origin/main` and `HEAD`, confirmed by `git diff origin/main HEAD -- render.yaml`
+returning empty and `git log origin/main..HEAD -- render.yaml` returning nothing.
+Second unanchored-pattern error of the day (the first was `[—-]` as a bracket
+range, which reported 12 open lanes as 1). **A `grep -c` answers "how many"
+when the question was "which one" — ask for the name.**
