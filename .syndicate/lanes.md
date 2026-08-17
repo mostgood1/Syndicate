@@ -3355,3 +3355,40 @@ market by **+0.038 Brier** on 3,638 records and is **worst on `priceable_only`
    its parts is wrong.
 
 **Do not act on +0.038 yet. It is one slate.**
+
+### wnba-live-tier — GAP DIAGNOSED 2026-08-17 02:3xZ — **the WNBA grid NEVER reports `final`. Its games are stuck on `live` hours after they end.**
+- **The scorer is exonerated.** It correctly took the
+  `no_final_games_on_this_grid` branch because that grid genuinely has none.
+- **Measured, wnba `book_grid` artifact 02:37:22Z, 300 rows served:**
+  ```
+  game.state = live            93
+  game.state = NO_GAME_BLOCK  207     <- 69% of rows never joined a game at all
+  game.state = final            0     <- at 02:37Z, hours after the slate ended
+  ```
+  CHI @ SEA was observed **Final 82-80 at ~23:19Z** on the WNBA lens. Three
+  hours later the board's grid still calls its rows `live`.
+- **This is the MIRROR IMAGE of the soccer defect fixed earlier tonight.**
+  Soccer was stuck on `pregame` and never became live; WNBA becomes live and
+  never becomes final. Both are `game.state` never reaching a terminal value,
+  and both make a whole class of row un-scoreable — soccer by serving edges on
+  finished games, WNBA by hiding the outcomes from the scorer.
+- **It also costs more than scoring.** `live_edge_policy` keys on `game.state`:
+  a finished WNBA game still reading `live` is treated as LIVE, so its rows keep
+  a live tier they should have lost. That is the same family as the soccer harm,
+  just pointed the other way.
+- **NOT yet diagnosed to a line, and I am not guessing.** Two candidates,
+  neither checked: (a) the chip/game-state join (`build_game_chips` ->
+  `attach_game_state`) reads a source that never flips WNBA to final, while the
+  LENS clearly knows (it reported `status: "Final"`, `in_progress: False`);
+  (b) the 180s scoreboard carry-forward I shipped tonight (`16a898ef`) holding a
+  stale payload — **unlikely, its bound is 180 seconds and this is hours**, but
+  it is new code near this surface and must be ruled out rather than assumed
+  innocent.
+- **The 207 unjoined rows are a SECOND finding**, not part of the same one: 69%
+  of WNBA grid rows carry no `game` block at all, so they have no state to be
+  wrong about. That is a join-coverage gap and needs its own measurement.
+- **First action for whoever picks this up:** read the wnba chips directly
+  (`build_game_chips(date, ["wnba"])`) and compare each chip's `state` against
+  the lens's `live_state.final` for the same game. If the chips say `live` while
+  the lens says `Final`, it is (a) and the carry-forward is exonerated by
+  measurement rather than by argument.
