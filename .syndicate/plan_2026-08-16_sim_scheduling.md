@@ -605,6 +605,83 @@ Two moves that belong here regardless of Phase 1:
 - **Pin NFL/NCAAF season projections to the same band.** 45-minute jobs on a
   staleness gate with no clock; no reason for them to land at 20:00 on a Sunday.
 
+### Phase 2b — redefine the re-sim rule set
+
+Added 2026-08-17. **This is a redesign, not a tuning pass**, and it should be
+written down before it is built: `_mlb_daily_sim_decision()` in
+`live_refresh_loop.py` is 230 lines evaluated every tick, and every branch in it
+carries a comment naming the incident that created it. That is accretion, and it
+has a structural defect underneath it.
+
+**THE EVIDENCE THAT IT IS ACCRETION** (all from the function's own comments):
+
+- `tip_off_window` was once-per-tick until a staggered slate produced **10
+  launches / 49 game-sims in a 3-hour window**; it is now once-per-game with a
+  deliberate fall-through.
+- `board_missing_game_pks` exists because the guard `if not changed_game_pks and
+  ...` reasoned "no point paying that when we're launching anyway" — and that was
+  wrong.
+- `props_now_available` exists for the same reason, and records the cost: a
+  scoped `fingerprint_change` launch **resims only the changed games and never
+  reaches the top-props stage**, so `daily_top_props_2026-08-04.json` held zero
+  rows for **11+ hours** while the board served MLB moneylines only.
+- A **second** memory check had to be added inside the `join_mismatch` path,
+  because the central one is passed before that work is computed.
+- Both the main trigger (`SYNDICATE_ENABLE_MLB_DAILY_SIM_TRIGGER`) and the
+  evening one (`SYNDICATE_MLB_EVENING_NEXT_DAY_SIM_ENABLED`) are **default-off
+  dark launches** that were never turned on.
+
+**THE STRUCTURAL DEFECT: trigger and scope are fused.** `fingerprint_change`
+means both *"these games changed"* AND *"therefore run a scoped sim"*. That single
+coupling is why the sim can fire every 12 minutes and still leave props empty —
+the trigger that fires most often is the one that regenerates least.
+
+**MEASURED 2026-08-16/17, and it is what prompted this phase:**
+
+    MLB_DAILY_SIM_TRIGGERED  23:03:50, 23:17:31, 23:32:20, 23:44:11, 23:56:58
+                             all reason=fingerprint_change  (~12-14 min apart)
+
+The 600s `SYNDICATE_MLB_SIM_CHECK_INTERVAL_SECONDS` is a **floor, not a
+schedule**: past it, any input hash diff relaunches. On a live slate with
+lineups, injuries and odds moving, that is a continuous relaunch loop with
+nothing anchored to a clock.
+
+**AND THE GUARD MEANT TO STOP IT NEVER FIRES.** Parsing `MLB_SIM_TICK` decisions
+(12 ticks, 23:00Z on): `insufficient_memory_headroom` appears **zero** times and
+no decision carries a `memory` payload — on a service being OOM-killed every ~12
+minutes (`#449`). The dominant suppressor is `intelligence_pipeline_busy`, a
+deferral checked ABOVE the memory gate, so on most ticks the gate is never
+reached. Prior art for the other reading is already in `learnings.md`: *a 900MB
+floor guarding an 1873MB stage.*
+
+**THE REDESIGN — five properties, in priority order:**
+
+1. **Decouple trigger from scope.** A trigger states WHAT CHANGED. A separate
+   scope policy states WHAT WORK THAT IMPLIES (scoped resim / full slate /
+   top-props regen). The `props_now_available` and `board_missing` branches
+   disappear as branches — they become scope outcomes.
+2. **Clock-anchored baseline** (Phase 2's band), with event-driven re-sims as
+   EXCEPTIONS rather than the normal path.
+3. **One prioritised queue, not an early-returning precedence chain.** The chain
+   is why `intelligence_pipeline_busy` masks whether the memory gate would even
+   have fired — you cannot observe a guard that sits below an early return.
+4. **Every suppression emits WHAT IT MEASURED**, not just a reason string. A
+   memory gate reporting `sufficient` invisibly on an OOM-looping service is the
+   current cost.
+5. **No default-off triggers left dark.** Decide or delete: a dark launch that
+   outlives the investigation that justified it is a branch nobody has tested.
+
+**SEQUENCING AND OWNERSHIP.** `live_refresh_loop.py` is claimed by OPEN lane
+`refresh-worker-oom-recurrence`, which owns `#449` and whose status reads
+"MECHANISM SETTLED". **Do not build this into their file while that is open** —
+their remedy may already change these rules, and Phase 2's banding may be
+superseded by it. Write the design, agree it with that lane, then build.
+
+**Falsification for the redesign itself:** if, after decoupling, the re-sim rate
+on a live slate is unchanged AND top-props still goes stale, then the trigger set
+is not the problem and the cost is in the sim itself — stop and re-measure rather
+than adding a ninth branch.
+
 ### Phase 3 — live sims for every sport
 
 Ordered so the work lands before the season does. Every addition inherits the
