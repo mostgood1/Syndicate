@@ -13037,3 +13037,65 @@ today, and the first where I was the one who created the inert thing.
 3. The fitted hazards in `reports/phase7/mlb_removal_hazards.json` remain valid
    as the empirical basis — inning hazard peaking 0.0509 at the 8th, slot
    multiplier 0.71→1.55, team spread 2.0x. They just have no consumer yet.
+
+## 2026-08-17 — P2 STEP 2: **the consumer is written, reachable, and closes 34.3% of the opportunity gap**
+
+Lane `convergence-phase7-crps`. `vendor/mlb_bettingv2/sim_engine/simulate.py` +
+`models.py`, `tests/test_mlb_position_substitutions.py` (9 passing),
+`scripts/measure_substitution_effect.py`. **Dark-launched OFF. No deploy.**
+
+This is the code path whose ABSENCE — not the missing data file — was the real
+blocker, per the correction above.
+
+### Measured on REAL roster artifacts (30 games x 40 sims, 21.6k starter-games)
+
+    substitutions OFF: starter AB 3.985   bias +0.490  (+14.0%)
+    substitutions ON : starter AB 3.817   bias +0.322   (+9.2%)
+    -> 34.3% of the opportunity gap closed
+    bench AB when ON: mean 1.365 over 2,802 appearances
+
+Against the measured actual of **3.495**. This is the engine actually removing
+batters, not a rescaling of its output.
+
+### Design, and the two constraints that shaped it
+
+**Per-GAME state, never roster mutation.** `TeamRoster` objects are reused across
+every simulation of a slate and cache `_batter_by_id` on themselves, so mutating
+`lineup.batters` would leak substitutions from run N into run N+1 and silently
+corrupt the distribution. Substitutions live in a `(team_id, slot) -> profile`
+map on the game state. **Two tests guard this** — identical repeated runs, and an
+explicit assert that the lineup is unmutated after 15 games.
+
+**The margin term is deliberately OMITTED.** Exposure by score band is not
+observable (a starter's band is known only at exit), so the fitted value is a
+normalised share rather than a hazard, and its direction disagreed with an
+independent event count. Shipping an unresolved term into a live model is
+guessing with extra steps.
+
+### A THIRD INERT-FEATURE BUG, caught by the reachability test
+
+The first version set `position_substitutions` with `setattr` on a `GameConfig`
+instance. **`dataclasses.replace()` rebuilds from DECLARED FIELDS ONLY**, and the
+sim calls `replace(cfg, rng_seed=...)` on every run — so the attribute was
+discarded before the first pitch and the feature read as permanently disabled.
+All three reachability tests failed; it is now a declared field.
+
+**Third time today a feature was wired and unreachable** (the props seal's
+predicate, the misplaced tendencies artifact, this). The reachability test is the
+only reason any of them were caught.
+
+### WHAT IS NOT ESTABLISHED
+
+- **The remaining +9.2% bias is unexplained.** The model closes a third; two
+  thirds remain. Candidates not yet separated: multiple removals per slot (only
+  the FIRST is modelled, matching the fit), games ending before the home 9th, and
+  a mixed comparison population in the 3.495 target (which includes players who
+  entered as substitutes).
+- **NO accuracy claim.** This measures OPPORTUNITY only. Whether it improves the
+  market scoreboard is a different question, and **it cannot be answered by
+  re-running `mlb_opportunity_haircut.py` as-is** — that script scores
+  PRODUCTION'S PUBLISHED projections, which are unaffected by an undeployed
+  engine change. Answering it needs a re-projection with the flag on.
+- **Bench selection is a known simplification**: next-available, not by position
+  or platoon. It models the opportunity loss, not the identity of the
+  replacement.
