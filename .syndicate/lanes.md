@@ -3088,3 +3088,29 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
 **ATTRIBUTION OF THOSE TWO IS OPEN, AND THE VERDICT SAYS SO.** The reference table is **RECALLED FROM MEMORY, NOT SOURCED**. A per-cell disagreement is at least as likely to be an error in my reference as in the data, and the outliers are precisely the cells where a recalled number is least reliable and the sample thinnest. **Source the reference before calling either one a data defect.**
 
 **16 tests.** What this unblocks: `game_shape.py`'s leverage-index refusal needs a win-expectancy table; this is its run-expectancy half. The other half needs score differential and inning and is not built.
+
+#### game-shape-capture — MLB WIN EXPECTANCY BUILT BY COMPOSITION (`#454` second half) `[2026-08-16 ~21:2x CDT]`
+
+`scripts/mlb_win_expectancy.py` + `tests/test_mlb_win_expectancy.py`.
+
+**THE EMPIRICAL TABLE IS IMPOSSIBLE FROM THIS SAMPLE, AND THAT IS MEASURED.** Counting win rates per (inning, half, base-out, score band) over the 47 dates gives **4,039 occupied cells, median 4 observations per cell, 68.7% below 10, and ZERO cells at 1,000+**. Publishing that would be `#377` committed by the script written to enable measurement.
+
+**SO IT COMPOSES.** The estimable quantity is P(k runs in the rest of the half-inning) per base-out state — **~2,200 observations per state instead of 4**. WE is assembled from those by convolution rather than counted:
+`P(win) = P(home remaining > away remaining) + P(tie) x P(home wins in extras)`.
+
+**SANITY CHECKS LAND ON PUBLISHED VALUES:**
+
+| state | this table | published |
+|---|---|---|
+| tied, bottom 9, bases empty | **0.641** | ~0.63-0.65 |
+| home up 3, top 9, 2 out | **0.993** | ~0.99 |
+| home down 3, bottom 9, 2 out | **0.009** | ~0.01 |
+| home down 1, bottom 9, runner on 3rd, 1 out | **0.446** | ~0.45-0.50 |
+
+**A THRESHOLD I SET TOO LOOSE, AND FIXED.** The extra-innings constant was estimated from **43 games** (18 home wins = 0.419, SE 0.076) on a floor of 30. That is within ~1.3 SE of the truth but it moved every tied state by several points — bottom-9-tied read 0.583 instead of 0.641. Floor raised to 200; it now defaults to 0.500 and REPORTS the measured value with its SE rather than using it.
+
+**THE HOME-FIELD GAP IS PRINTED, NOT FUDGED.** Start-of-game reads exactly **0.500** where published tables show ~0.540. That difference IS the home-field advantage this model omits — assumption 2 gives both sides one league-average run distribution, so the only asymmetry left is batting last. The script says so in its output and a test pins 0.500, so any undeclared asymmetry creeping in will fail.
+
+**14 tests, 5 of 5 mutations caught** (extra-innings constant ignored, a tie counted as a home win, thin states estimated instead of omitted, the inning term dropped, convolution dropping the carry). Reuses `mlb_run_expectancy`'s replay rather than writing a second base-state reconstruction — the one over there is the one whose phantom-runner bug was already found and fixed.
+
+**`game_shape.py`'s leverage refusal now has BOTH halves.** Leverage is the swing in WE across outcomes from a state; RE and WE are the inputs. **Wiring it in is a separate change and is NOT done** — and the honest caveat travels with it: this WE is a league-average composition under i.i.d. innings, not an empirical win probability.
