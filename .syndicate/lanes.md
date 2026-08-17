@@ -6861,3 +6861,34 @@ about the state of the working tree - uncommitted work, missing files, a broken
 service - re-measure it.** The cost here was small (a wrong action item, since
 retracted). The cost of the reverse - deleting or "rescuing" files on a stale
 claim - would not have been.
+
+### soccer-model-coverage - **FIX #3 NOW VERIFIED PRESENT. Upgrades the UNVERIFIED recorded in `79805a8f`. BOTH fixes are on main; the lane's at-risk warning is entirely stale, not partially.**
+- **Fix #3 is `fold_accents`** (`syndicate/features/shared/team_aliases.py:42`).
+  Its docstring names the exact problem this lane describes: *"ESPN spells clubs
+  with their real diacritics ... OddsAPI routinely does not. A join that only
+  casefolds treats those as different clubs."*
+- **COMMITTED:** `git status --porcelain` for that file is EMPTY.
+- **FUNCTIONAL**, run against the docstring's own examples plus five more:
+```
+Vitoria de Guimaraes  -> vitoria de guimaraes      OK
+Alaves                -> alaves                    OK
+CF Montreal           -> cf montreal               OK
+Union St.-Gilloise    -> union st gilloise         OK
+Atletico Madrid       -> atletico madrid           OK
+Borussia Monchengladbach -> borussia monchengladbach  OK
+```
+  (the console died printing a Turkish s-cedilla under cp1252 - an OUTPUT
+  encoding failure, not a logic one; every case that printed folded correctly.)
+- **REACHABLE, which is the check that matters** - four inert "fixes" were found
+  this session by exactly this test. `soccer_projections.py:126` keys its index
+  on BOTH `normalize` and `fold_accents`, and `team_aliases.py:238/244` uses it
+  in the ESPN -> canonical mapping. It is wired in, not orphaned code.
+- **NOT verified, and deliberately not claimed:** the lane's specific
+  *"9 clubs / 5 leagues"* figure. That needs the served board payload and is a
+  different, weaker question than whether the fix exists. **Do not quote the 9/5
+  as confirmed.**
+- **NET: fixes #1 AND #3 are both on main. There is nothing to rescue, and the
+  "commit the soccer fixes first" gate on taking
+  `scripts/run_live_odds_refresh_worker.py` for Phase 2 DOES NOT EXIST.**
+  Releasing this lane loses nothing. I still did not release it - #2 (3-way
+  de-vig) is separately marked DELIBERATELY HELD and is not mine to judge.
