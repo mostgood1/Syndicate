@@ -2337,6 +2337,19 @@ def board_book_grid_api():
                     # a slate. It is the one counter here without a denominator.
                     "live_gamelines": precomputed.get("live_gamelines"),
                     "live_gameline_ledger": precomputed.get("live_gameline_ledger"),
+                    # The SCORE of those records against realised outcomes.
+                    #
+                    # THIS LINE IS THE WHOLE POINT OF THE SCORER. The ledger is
+                    # JSONL on the worker's disk and matches zero
+                    # HOT_ARTIFACT_PATTERNS, so this response is the ONLY way the
+                    # measurement leaves the worker. Deploying the scorer without
+                    # it produced exactly that: the artifact carried a correct
+                    # score and the API served `null` -- producer wired, reader
+                    # not, which is the presence-is-not-reachability trap, caught
+                    # only by reading the served payload instead of trusting the
+                    # deploy. Forwarding is an explicit allowlist here, so a new
+                    # artifact key is invisible until it is named.
+                    "live_gameline_score": precomputed.get("live_gameline_score"),
                     # rows_total/rows_truncated come from the artifact so a bounded
                     # grid is attributable rather than reading as "that is all there is".
                     "total_rows": precomputed.get("rows_total"),
