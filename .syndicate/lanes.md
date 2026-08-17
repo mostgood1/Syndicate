@@ -3220,3 +3220,47 @@ game_cards_2026-08-16.csv    1 row     game_id='1', POR@PHX
   from source alone: read `export_game_cards_cmd` (`cli.py:9581`) to its end and
   identify what it iterates when `go` is empty and `gid_map` is empty. Every
   external fact needed is now in hand; further export calls will not help.
+
+### wnba-live-tier - **DEFECT 1 ANSWERED 2026-08-17 16:0xZ. The row source is the PBP-market files, reached through a FALLBACK, and on this worker the fallback IS the normal path.**
+- **`cli.py:9859`, the `else` branch of `export_game_cards_cmd`:**
+```python
+else:
+    # Fallback: derive from tip/first basket files (game_id only)
+    gid_set = set()
+    for df in (tip, thr, fb):
+        if df is not None and not df.empty and "game_id" in df.columns:
+            gid_set.update(str(x) for x in df["game_id"].dropna().unique().tolist())
+    for gid in sorted(gid_set):
+        rows.append(_build_row(gid, None, None, None))
+```
+  `tip` / `thr` / `fb` are `tip_winner_probs_<date>.csv`,
+  `early_threes_<date>.csv`, `first_basket_probs_<date>.csv`.
+- **THE DENOMINATOR IS PBP-MARKET COVERAGE.** Not odds, not the schedule, not the
+  sims. One row per `game_id` appearing in those three files.
+- **IT EXPLAINS EVERY OBSERVATION AT ONCE:**
+  - **1 of 3 rows** - only POR@PHX had a `game_id` in the PBP files.
+  - **`game_id='1'`** - the fallback calls `_build_row(gid, None, None, None)`, so
+    home/away/commence_time are `None` BY CONSTRUCTION. `gid_map` being empty
+    (boxscores absent) was a red herring I chased; the fallback never consults it.
+  - **Why the three `smart_sim_*` files did not help** - the fallback never looks
+    at them, even though all three exist for that date.
+- **AND THE FALLBACK IS NOT AN EDGE CASE HERE.** `game_odds_*` returns count=0 for
+  ANY date on this worker, so the primary branch can NEVER run. **The path
+  labelled "Fallback" in the source is the only path this deployment uses.**
+- **MY EARLIER READINGS, CORRECTED FOR THE RECORD:** "walks the props pool" was
+  directionally right and specifically wrong; "walks the odds file" was right
+  about the TOP of the function and wrong about what executes. Both were read
+  from partial views of a long function. The answer needed the `else`.
+- **THIS SHARPENS THE FIX RATHER THAN CHANGING IT.** Walking
+  `vendor/wnba_betting_repo/data/processed/schedule_2026.csv` and LEFT-JOINING is
+  still correct, and the reason is now stronger: **BOTH** the primary path (odds)
+  and the fallback (PBP markets) are MARKET-COVERAGE-derived, so a fixture with
+  neither does not exist in the output at all. A schedule-driven loop emits one
+  row per real fixture and leaves market columns blank - "absent renders as
+  absent" - instead of the fixture vanishing.
+- **STILL TRUE AND UNCHANGED:** same function emits `pred_margin`/`pred_total` as
+  MEANS (outstanding #3), so one change closes both defects. Verification needs a
+  WNBA sim re-run AND a multi-game slate.
+- **DEFECT 1 IS NOW FULLY ATTRIBUTED.** Chip builder, `is_active_today`, provider
+  code, `gid_map`/boxscores and the odds branch are all eliminated by
+  measurement or by reading. The remaining work is the fix, not the diagnosis.
