@@ -4241,3 +4241,58 @@ lines. **Do not round-trip these ledger files through PowerShell strings.**
 **Standing consequence:** `git diff --numstat <base> <commit>` before any ledger
 push, and the push gated on deletions == 0 in the same process. Insertions-only
 is the invariant for every append to `lanes.md`, `deploys.md`, `learnings.md`.
+
+## 2026-08-17 — FORBIDDEN: comparing a MAX (or any summary over a set) across two runs without checking the set is the same
+
+`scripts/ui_layout_probe.py` compared `identicalContentSpread` through
+`worstGroupPx` — the largest spread over all tie groups. Both sides were single
+numbers, they matched, and the check printed `unchanged (baselined)` at exit 0.
+
+**It was comparing two different groups.** Measured on production 2026-08-17
+12:37 CDT, one game live against an all-Preview baseline:
+
+    mobile   baseline 43px came from the 45-pair group
+             current  43px came from the 53-pair group
+             meanwhile 53: 30->43, 49: 32->15, 45: 43->36 -- ALL of them moved
+
+    desktop  86px "unchanged" from u=49 n=3 vs u=49 n=2,
+             hiding the 45-pair group moving 28->41
+
+A max is a function of a SET. When the set's membership moves — here a game
+going live leaves the Preview pool — the max can land on a different member and
+read identical. The number was stable; the thing it stood for was not.
+
+**Why this is the bad direction.** A false alarm gets investigated and dies. A
+false pass is silent and can persist indefinitely, and this one would have
+reported a healthy board through a real regression in any group that was not
+currently the max.
+
+**The state guard did not help, and I claimed it would.** The morning's entry
+said the per-state comparison stops first pitch reading as a layout regression.
+That was true of the state LABEL and false of everything underneath it: both
+sides still said `Preview` while the pool changed under them. The run written to
+confirm that claim is what disproved it — which is the argument for writing the
+confirming run at all.
+
+**How to apply.**
+
+1. Before diffing a summary statistic across runs, establish that its INPUT SET
+   is the same on both sides. If you cannot, the comparison is not a measurement.
+2. Prefer comparing the elements to comparing the summary. Per-group is now the
+   check here; the scalar is kept only for files that predate it.
+3. Match on IDENTITY, not on count. "Three cards at 45 pairs" on one side need
+   not be the same three games — `n` is a proxy that fails exactly when the slate
+   reshuffles, which is when you are looking.
+4. When identity is unavailable, say so IN THE OUTPUT and do not fail on the
+   weaker match — but do not call it unchanged either. Both overclaims are
+   available and both are wrong.
+5. Nothing comparable must never render as a pass.
+
+**And a second one, from the same hour: a green suite after a behaviour change
+is a question, not an answer.** `93 passed` immediately after this fix, because
+the test helper builds a per-state block with no `groups`, so every test was
+still exercising the legacy scalar path while production reports took the new
+one. Assert the new branch RAN — same family as the standing rule to confirm the
+code ran rather than banking the outcome. A `_grouped` helper already defined
+further down the same file then silently shadowed the new one, and eight tests
+ran against the wrong builder while looking authored and correct.
