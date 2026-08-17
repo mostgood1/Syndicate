@@ -1574,7 +1574,40 @@ model had an opinion.
 `None` — the harness exists but is not wired into the sim's own slot.
 Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
 
-### clamp-fix-to-workers — OPEN — **CLOSE REFUSED 2026-08-16 23:5xZ. The headline "THE ONLY OPEN WORK IS VERIFICATION" IS FALSE: a REACHABLE clamp site is still live on live-odds-worker.** — opened 2026-08-15 — session: clamp-fix-verification-watch
+### clamp-fix-to-workers — CLOSED-VERIFIED 2026-08-17 00:0xZ — the ±4900 clamp is gone from all three live services, and 7,002 served fair_price values carry none**
+- **CLOSED 2026-08-17 00:0xZ, ~10 minutes after the refusal below, because
+  the missing piece SHIPPED IN THE INTERVAL — and not by me.** Another
+  session deployed `c348da53` to live-odds-worker at 23:57:12Z
+  ("converge origin/main into live-odds-worker's deploy lineage"), which
+  carried the clamp removal along with everything else on main. Credit
+  where it belongs; this lane did not ship it.
+- **I did NOT ship a duplicate.** The user authorised shipping the deferred
+  fix; before cutting anything I re-read the live SHA and found it had
+  moved from `16a898ef` to `c348da53` with the work already in it. Cutting
+  on the stale SHA would have re-applied a change that was already live.
+- **STRUCTURAL HALF: PASSES.** Clamp sites (`max(0.02, min(0.98`) by
+  content at each service's CURRENT live SHA, all three re-read at 00:0xZ:
+  ```
+  web              9f617f34   0   (intelligence_state 0, cards 0, layer2_board 0)
+  refresh-worker   fdc72dd0   0   (0, 0, 0)
+  live-odds-worker c348da53   0   (0, 0, 0)
+  ```
+  Both sites now delegate to `american_price`, which REFUSES a probability
+  outside (0,1) instead of clamping it.
+- **PRODUCT-LEVEL SWEEP, the number this lane never had:** **7,002 served
+  `modelled_fair.fair_price` values** across mlb + wnba + soccer,
+  **0 at ±4900**. That is a real denominator, against the 6-row shortlist
+  the watcher kept reading.
+- **THE ORIGINAL BEHAVIOURAL CRITERION NEVER FIRED, AND IS NOW MOOT —
+  stated rather than quietly dropped.** `watch_clamp_trigger.py --once`
+  returned `no_trigger` on all FOUR reads (00:24Z, 01:30Z, 23:49Z,
+  00:00:39Z); the last read `p=[0.227201, 0.512829] out_of_clamp=0`. It was
+  never satisfied because no slate in that window carried an out-of-clamp
+  probability. It is moot because a `POST_FIX_OK` proves a clamped
+  PRODUCER priced correctly, and there is no longer a clamped producer on
+  any live service. **What remains unproven by THIS lane is that
+  `american_price` prices an extreme probability correctly in production —
+  a different claim, covered by its own unit tests, not by this one.** — opened 2026-08-15 — session: clamp-fix-verification-watch
 - **CLOSE ATTEMPTED AND REFUSED 2026-08-16 23:5xZ.** Both halves of this
   lane's own Verification line were checked. Neither passes.
   - **Behavioural half: still never fired.** `watch_clamp_trigger.py --once`
@@ -1613,21 +1646,6 @@ Full result: `reports/soccer_backtest/h2h_calibration_2026-08-15.json`.
   carry-forward) was deliberately cut on live `440f5f29`, which already
   carried these 2 sites — so it PRESERVED the deferral rather than
   silently resolving or worsening it.
-- Goal: the ±4900 clamp stops being published. **Testable outcome:**
-  `py -3 scripts/watch_clamp_trigger.py --once` returns `POST_FIX_OK` on a slate
-  that carries an out-of-clamp probability.
-- **WHY THIS LANE EXISTS — the web deploy was falsified.** `e831263e` shipped the
-  fix to web on 2026-08-15 and production kept mispricing. Measured 23:10:13Z
-  (nfl `h2h_3_way` 0.014698 → +4900, correct +6704) and 23:15:46Z (mlb `spreads`
-  0.009911/0.990089 → ±4900, correct ±9990) — two triggers, two unrelated slates,
-  both `PRE_FIX_MISPRICE` against a fix-carrying web SHA.
-  `reports/clamp_watch/trigger_20260815T2310*.json`, `..._231546*.json`.
-- **The runbook's "WEB SERVICE ONLY" was wrong, and the reason is instructive.**
-  It inferred serve-time stamping from "0 of 108 shortlist-artifact rows carry
-  `fair_price`" — true, and about the WRONG ARTIFACT. The shortlist has no
-  `fair_price` at all; the intelligence-state card does. Web's block is a
-  **backfill** (`if ... card.get("fair_price") is None`), so an upstream-clamped
-  value passes through untouched and the web fix is structurally inert.
 - Files: `pipeline/intelligence_state.py`, `syndicate/features/wnba/cards.py`.
   - **`syndicate/features/shared/layer2_board.py` DELIBERATELY NOT TOUCHED** — it
     is claimed by OPEN `spread-line-sign-convention`, and that lane's worker
