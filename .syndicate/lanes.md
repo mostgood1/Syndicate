@@ -6267,3 +6267,63 @@ emits `null` where `sim.win_probability` has a value. Compare the two blocks for
 `source_artifacts/data/processed/`). The widening is drafted but **NOT applied** -
 `lane-guard` blocks the file, and widening cannot be READ from anyway until the
 new pattern is DEPLOYED to web. It was never completable in one session.
+
+### soccer-projection-collapse - **ROOT CAUSE CONFIRMED AND THE PATCH IS WRITTEN. NOT APPLIED - `lanes.md` contention, not a code problem.**
+
+**THE DEFECT: the `#379` widening shipped INERT.**
+`load_soccer_projections` grew a `window_dates` parameter so the projection read
+could span the same slate window the QUOTE read already spans. It defaults to
+`[selected_date]` *"so every existing caller behaves exactly as before"* - and
+**the ONLY production caller never passes one**:
+
+```python
+# syndicate/features/shared/board_enrichment.py:678
+index = load_soccer_projections(roots, selected_date)      # <- no window_dates
+```
+
+So the merge logic, its cost analysis and its documentation all shipped, and
+production went on reading exactly ONE date. Soccer shards by KICKOFF date and
+almost nothing kicks off "today". Measured 2026-08-17: window 08-17..08-23,
+**8,759 grid rows, `rows_with_projection: 4`, `matches_in_source: 3`,
+`unmatched_match_rows: 8,755`** - and the three that DID load were today's and
+IN PLAY, so their pregame projections were correctly withheld. **Today was never
+the problem; the other six dates were never read at all.**
+
+**THE PATCH** (one call site, `board_enrichment.py:678`):
+```python
+from syndicate.features.shared.layer1_board import resolve_window_dates
+try:
+    soccer_window = resolve_window_dates("soccer", selected_date)
+except Exception:
+    soccer_window = [selected_date]     # degrade to today, never break the join
+index = load_soccer_projections(roots, selected_date, window_dates=soccer_window)
+```
+`resolve_window_dates` (`layer1_board.py:165`) is the resolver Layer 2's quote
+read already uses and the one the docstring names for this call. **Using the
+same one is the point** - two independent notions of "which dates is this
+sport's board" would drift, and that drift IS this defect.
+
+**WHY IT IS NOT APPLIED. `lanes.md` IS BEING CONCURRENTLY REWRITTEN AND SILENTLY
+DISCARDS LANE RELEASES.** Four blocked attempts tonight, two files. Each time:
+release the claim -> the guard's OWN parser (`lane-guard._claims`) confirms
+**NONE** -> the `Edit` hook still reports the claim -> and re-reading `lanes.md`
+shows **my release text is GONE**, the file rewritten by another session in
+between. **This is not the guard being wrong; it is read-modify-write loss on a
+323KB file that five sessions share.** It also explains the earlier
+`artifact_publisher.py` failures.
+
+**I did NOT route around it.** Writing the file through Bash would dodge the
+PreToolUse hook, which is the same class of move as reaching for PowerShell
+after the permission classifier refused - declined for the same reason.
+
+**SUPERSEDES MY OWN EARLIER CLAIM IN THIS LANE.** I reported the cause as
+`predictions.probabilities` being null on 4 of 5 fixtures. That observation is
+real but is NOT the cause - it is the correct withholding of in-play fixtures,
+exactly as the `#379` docstring already recorded. I also said the sim's cards
+and its recommendations "disagree"; **they do not** - cards read per-date across
+the window, the projection index read one date. Same files, different breadth.
+
+**SINGLE NEXT ACTION:** apply the five-line patch above when `board_enrichment.py`
+is free. Verify on the served payload: `rows_with_projection` should rise from
+4 toward the thousands, and `unmatched_match_rows` fall from 8,755. **Both, or
+it did not work.**
