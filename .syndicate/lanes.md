@@ -6750,3 +6750,20 @@ Supersedes the 19:0xZ checkpoint's "next action" only; its findings stand.
   Do not promote any leash value — the model still loses to a constant baseline
   at every grid point.
 
+
+### wnba-fixture-identity - CHECKPOINT 2026-08-17 ~14:30 CDT - **all work COMMITTED AND PUSHED, nothing uncommitted. One deliverable shipped-but-unmeasured, one awaiting the coordinator.**
+- **Identity + coverage fix: deployed to both workers, verified BY CONTENT,
+  EFFECT UNMEASURED.** It cannot be measured until something calls the builder.
+- **Sweep ownership gate: committed `20025cc4`, 245 tests, NOT DEPLOYED.**
+  Request at `.syndicate/deploy/requests/2026-08-17T2000Z-wnba-fixture-identity.md`;
+  coordinator messaged (roster `local_1d6f136e-...`).
+  **Verify needs BOTH halves** - refresh-worker stopping is also what a broken
+  gate looks like; the proof is a sweep line appearing on live-odds-worker.
+  **Branches MUST be cut from each LIVE SHA** - neither is an ancestor of `main`,
+  and main copy of the builder lacks a readable-channel block live on both.
+- **Scheduled reader:** `wnba-game-cards-coverage-check`, 2026-08-18 13:00 CDT.
+  Will likely report STILL UNMEASURED; that is the correct outcome, not a failure.
+- **NEXT ACTION - a DESIGN DECISION with an owner, not a patch:** re-home the
+  WNBA full refresh (finish Phase 2), re-arm the cron, or accept that
+  `game_cards` is sweep-derived - **under which the coverage fix is dead code.**
+  It gates whether the open deploy row can ever close.

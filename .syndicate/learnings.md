@@ -4639,3 +4639,41 @@ real blocker was never missing code; it was an undeployed fix that everyone,
 including me, assumed was live because it was merged. *Merged is not deployed*
 already has a rule here; this is its fourth instance.
 
+
+## 2026-08-17 - A NULL LOOKUP IS A FACT ABOUT THE INSTRUMENT UNTIL PROVEN OTHERWISE
+
+Three times in one session I read a **failed lookup** as a **defect**, and was
+wrong every time:
+
+| I concluded | Reality |
+|---|---|
+| `pid=890` is a stuck refresh lock | Transient; self-healed 20 min before I looked. `ops_refresh.py:645` rewrites a dead-pid manifest to `failed` on the next read, so a stale lock CANNOT persist - derivable from the code before I called it a blocker |
+| `#378`: WNBA never launches | It launches AND writes: `ODDS_SWEEP_OUTCOME sport=wnba wrote=True` |
+| `.syndicate/coordinator.id` is stale | **`coordinator.md:139` documents a two-id design.** "Fixing" it would have stopped the hook matching and **opened the deploy gate for every session** |
+
+**THE RULE:** before calling a non-resolving identifier, an absent log line, or
+an empty query a DEFECT, ask **what would make this lookup fail for a HEALTHY
+subject.** Instrument, scope, window, namespace, retention - and *a second
+identifier* - all produce the same null as a real fault.
+
+**WHY THIS IS A RULE AND NOT A NOTE: in the `coordinator.id` case I was holding
+the disproof.** This session has two ids - `7c041356-...` in the hook payload I
+fed `lane-guard`, and `bd97b64e-...` in my scratchpad path. **I used both,
+repeatedly, and still read a two-id system as a broken one-id system.**
+Generalising the rule I already had (*absence in a window is not absence*):
+**an identifier that does not resolve is not thereby dead.**
+
+**COROLLARY, measured the same session:** `SYNDICATE_ACTIVE_SPORTS` is **not
+evidence of what a service does.** refresh-worker sweeps mlb/nfl/soccer/wnba
+with `ACTIVE_SPORTS=nfl`; live-odds-worker sweeps nothing with
+`mlb,wnba,soccer`. **Both services behave as the exact inverse of their env.**
+I nearly shipped an inert single-worker deploy on that assumption.
+
+## 2026-08-17 - AN UNATTENDED SESSION LANE CANNOT BE RELEASED BY ANYONE BUT THE USER
+
+`export-force-refresh-escape` was held by a **scheduled-task run**:
+`send_message` REFUSES delivery to it, it was ~20h idle, and it cannot close its
+own lane. **It blocked a real fix indefinitely.** A lane opened by an unattended
+session is a lane no session can clear. Scheduled tasks should be told **not to
+open lanes** - the `wnba-game-cards-coverage-check` task carries that
+instruction for exactly this reason.

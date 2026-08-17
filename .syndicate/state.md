@@ -3891,3 +3891,27 @@ on the swept side. Appended verbatim, nothing edited, nothing reordered.
   live-odds-worker. Half one proves the non-owner stopped, not that the owner
   started.
 
+
+## WNBA fixture identity + the sweep ownership gap - VERIFIED 2026-08-17
+
+- **The stable WNBA fixture identity is the ESPN event id, already present in
+  `schedule_2026.csv`** - verified same-instant against ESPN scoreboard; all
+  three 2026-08-16 ids match. Pregame artifacts and the live lens share one key.
+  `syndicate/features/shared/wnba_fixture_identity.py`, 40 tests.
+- **`game_cards` coverage was 82/113 fixtures = 72.6%** over 41 dates. Fixed and
+  proven on the real production artifact (1 row -> 3). **EFFECT IN PRODUCTION
+  UNMEASURED** - deployed to both workers by CONTENT only.
+- **Nothing on a cadence calls `refresh_wnba_oddsapi_props.main()`.**
+  `MAIN_ENTRY` 0 hits over 8h. The GHA cron reads `RUN_FULL_PIPELINE` from
+  `github.event.inputs`, which is empty on the `schedule` trigger, so full
+  regeneration is manual-dispatch only; and `render.yaml:611` Phase-1 migration
+  covered only NFL/NCAAF/NCAAB. **The WNBA full refresh was never re-homed.**
+- **Both workers share ONE unnamespaced cadence marker** (identical
+  `SYNDICATE_REFRESH_STATE_URL`, `KEY_PREFIX` absent on both). refresh-worker
+  stamps it and sweeps four sports; **live-odds-worker swept ZERO across 30h**
+  despite being the designated owner per `#129`. Fix committed (`20025cc4`),
+  **NOT deployed**.
+- **`SYNDICATE_ACTIVE_SPORTS` does not describe what a service does.** Both
+  workers behave as the inverse of their env.
+- **`.syndicate/coordinator.id` is CORRECT, not stale** - two-id design, see
+  `coordinator.md:139`. **Do not edit or delete it.**
