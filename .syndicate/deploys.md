@@ -10367,3 +10367,58 @@ Single-key endpoint `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=false` on
 headroom was **257–415 MB** (peak 1855/2048 = 90.6%) and this changes sweep
 frequency near first pitch — `#241` is the precedent for periodic work causing a
 restart loop.
+
+### ROOT CAUSE 2026-08-17 ~13:45 CDT - the game_cards builder runs rarely because NOTHING ON A CADENCE CALLS ITS ENTRYPOINT. The odds sweep is a different path.
+
+**THE CHAIN, each link measured:**
+```
+pregame cadence (7200s) -> ODDS SWEEP  -> writes an odds snapshot   [WORKS]
+     ODDS_SWEEP_OUTCOME sport=wnba wrote=True since_launch_s=6532   17:49:33Z
+
+refresh_wnba_oddsapi_props.main()  ->  _run_refresh_via_cli
+     ->  _build_local_game_cards_artifact  ->  GAME_CARDS_CENSUS    [NEVER RUNS]
+     MAIN_ENTRY hits in 8h, BOTH services: 0
+     GAME_CARDS_CENSUS hits in ~2 days, BOTH services: 0
+```
+**`MAIN_ENTRY` is printed by that script's `main()`, and it is the ONLY route to
+the builder.** Zero `MAIN_ENTRY` over 8h means `main()` was not invoked at all.
+The 2h cadence launches an ODDS SWEEP, which captures odds by a different,
+lighter path and never reaches the builder. **So the census was never going to
+appear on the cadence I was watching, and my fix - correct as it is - sits
+behind an entrypoint nothing calls.**
+
+**`#378` IS NOW WRONG AND SHOULD BE CORRECTED.** Its claim, quoted in
+`live_refresh_loop.py:4630`, is *"WNBA never launches -- it produces no
+ODDS_SWEEP_OUTCOME line at all"*. **Measured today: WNBA DOES launch and DOES
+write** (`wrote=True`, refresh-worker, 17:49:33Z). The permanent-stall theory in
+that comment (marker stamped before launch, launch dies every time, marker
+advances forever) **does not fit the current readings** - the sweep completes.
+It may have been true when written; it is not true now. **The stall is one level
+up: the sweep succeeds, the FULL REFRESH is never started.**
+
+**EXONERATED along the way, so nobody re-checks them:**
+- `WNBA_ISOLATE_AFTER_SNAPSHOT` - ABSENT on both services, so the early
+  `return state` above the first build call never fires.
+- A stale/wedged refresh lock - see the correction above; transient, self-healed.
+- The logs API - control queries returned live lines from both services in the
+  same windows. Every null here was checked for instrument blindness first.
+
+**SPLIT BY SERVICE, and this matters for where a fix goes:**
+- **refresh-worker** produces ODDS_SWEEP_OUTCOME for wnba, mlb, soccer - despite
+  `SYNDICATE_ACTIVE_SPORTS=nfl`.
+- **live-odds-worker** produces **ZERO ODDS_SWEEP_OUTCOME for any sport** -
+  despite `SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer`. **The two services' env
+  says the opposite of what their logs say.** Not chased today; flagged.
+
+**WHAT THIS MEANS FOR THE OPEN DEPLOY ROW.** The scheduled 08-18 check will most
+likely report STILL UNMEASURED rather than a coverage number, because the
+builder will not have run. **That is the correct outcome to record** - the task
+is already told that a skipped cadence is not a failure. The coverage fix cannot
+be measured until something invokes the WNBA full refresh.
+
+**NEXT, and NOT started:** find what is supposed to call
+`refresh_wnba_oddsapi_props.main()` on a schedule (a daily-update wrapper, a
+Render cron, or `run_refresh_odds_job.py`) and establish whether it is
+misconfigured, disabled, or was never wired for WNBA. **Do not "fix" this by
+adding a new caller until that is known** - a second invoker of a job that
+already has an owner is how you get two concurrent refreshes.
