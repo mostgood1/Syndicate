@@ -3116,7 +3116,7 @@ touch that.
   from the worker and count rows. One row confirms the whole chain; three would
   mean the loss happens inside this function and the read above is incomplete.
 
-### mlb-tie-spread-baseline — OPEN — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
+### mlb-tie-spread-baseline — CLOSED 2026-08-17 — **MLB ARMED on both widths. Pre-game slate read 86px desktop / 43px mobile BIT-IDENTICAL across 5 production runs; the 2026-08-16 instability was the slate, not the metric. Shipped `2882ad11`.** — opened 2026-08-17 — session: mlb-tie-baseline-pregame (scheduled task)
 - **Goal:** answer the question `2026-08-16` left open — is MLB's
   `identicalContentSpread` stable on a **pre-game** slate? If yes, add `"mlb"` to
   `TIE_SPREAD_BASELINED` in `scripts/ui_layout_probe.py` so a change in that
