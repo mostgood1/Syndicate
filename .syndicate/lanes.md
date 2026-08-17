@@ -2385,7 +2385,77 @@ and then failed the thing it was checking, which is the point of running it.
     `refresh-worker OOM: two kills in 25 min` sessions are archived and stopped
     (last activity 15:33:05Z). This ledger entry IS the handoff.
 
-### layer1-board-coverage — OPEN — **AUDIT DELIVERED AND MEASURED; ONE FIX SHIPPED TO `main`, UNDEPLOYED. All four goals answered except the cross-sport LIVE A/B, which needs two sports live at once and is DEFERRED, not concluded.** — opened 2026-08-16 — checkpointed 2026-08-16 16:4xZ — session: layer1-board-coverage
+### layer1-board-coverage — CLOSED-VERIFIED 2026-08-17 — all four goals answered, and the last unmet criterion was EXECUTED (it returned a defect, which was then fixed and verified)
+- **THE ONE OPEN CRITERION IS NOW MET.** This lane closed-refused twice for
+  the same gap: the cross-sport LIVE A/B needed two sports live at once.
+  **It was run 2026-08-16 22:2xZ** on a real live WNBA slate against a live
+  MLB slate. Result: WNBA had **0 of 521 rows** carrying any live field —
+  i.e. no live tier at all. That answer was the deliverable; it was then
+  fixed (`wnba-live-tier`) and verified at **218 of 321 game rows
+  live_aware**.
+- G1 rates, G2 bucket classification, G3 (MLB live lens measured moving),
+  G4 (missing term named at the producer, fixed in `e543e8dd`, 287/287
+  attributed) all delivered and recorded in `deploys.md`.
+- Scope added mid-lane and also delivered: the HR threshold ladder
+  (`hr_2plus`/`hr_3plus`), the NFL window 5->7, and the soccer game-state
+  defect that was serving edges on finished matches.
+- Goal: for every in-season sport, a per-sport/per-market-family RATE of
+  `projected / total` (alt and period families broken out), every unprojected
+  prop classified as EITHER stale-fingerprint OR sim-does-not-emit-this-stat,
+  and the `Edge` column's missing term named AT ITS PRODUCER.
+- Files (claimed): `syndicate/features/shared/layer1_board.py`,
+  `syndicate/templates/shared/layer1_board.html`,
+  `syndicate/blueprints/layer1_page.py`,
+  `syndicate/blueprints/intelligence.py` (the `/api/board/layer1` handler only).
+  Edited in the end: `syndicate/features/shared/prop_projections.py` +
+  `tests/test_prop_projections_edge_attribution.py` — checked against every OPEN
+  lane's `- Files:` at edit time and claimed by none. Read-only throughout on
+  `layer2_board.py`, `intelligence.html`, `bet_slip.js`, `board_cards.css`,
+  `soccer_projections.py`, `pipeline/intelligence_state.py`, sim internals.
+- **THIS ENTRY WAS WRITTEN TWICE.** The first append was silently overwritten in
+  the worktree by a parallel session's read-modify-write of `lanes.md`, and my
+  own commit then staged THEIR 44 lines under my message without either of us
+  noticing. See the learnings entry of the same date. Re-appended, not rewritten.
+- **RESULT** (full audit `.syndicate/audit_2026-08-16_layer1_board.md`;
+  measurement + falsification test in `deploys.md`, 2026-08-16 16:19–16:40Z):
+  - **Both briefed premises were wrong, and re-checking them first was the whole
+    value of the first ten minutes.** Layer 1 is NOT dark (**5 of 5** consecutive
+    builds non-zero). Alt lines are NOT unprojected on MLB (`totals_alt` 86/86,
+    `spreads_alt` 76/77) — they are unprojected on **WNBA** (419/419 dark). The
+    `Edge` column is not blank everywhere: MLB serves **1,462** edges, and most
+    rows lacking one already state why on the row.
+  - The prior baseline in `docs/ai_context/betting_contract_lifecycle.md` §3a
+    (MLB 19.7% projected / **0** edges / game state 1,220 of 3,604) is **EXPIRED**
+    — today 68.3% / 1,462 / 2,843 of 2,843. Quoting it would book another lane's
+    fix as this lane's regression.
+  - **G1** rates measured per sport × family. mlb 1,941/2,843 (68.3%), soccer
+    1,704/6,453 (26.4%), wnba 305/872 (35.0%). The MLB gap is **LINE-shaped, not
+    market-shaped**: `batter_home_runs` 0.5 → 82.8%, 1.5 → **0.4%**, 2.5 → **0%**.
+  - **G2** every unprojected prop classified. mlb 504 no-such-rung / 337
+    player-dark (63 players) / 42 residual; soccer 1,293 / 3,128 (836) / 268;
+    wnba 39 / 41 / 0. Mapping named: the sim publishes a `<stat>_<N>plus` ladder
+    and `hr_2plus`, `hr_3plus`, `hits_runs_rbis_1plus` are the missing rungs.
+  - **G3** MLB live lens MEASURED working for props (27 of 201 `live_projected`
+    moved, 3 `actual_so_far` advanced over 4 min, right direction) and NOT
+    working for game lines (0 live projections on every `game|*` family).
+  - **G4** missing term named at the producer: `prop_projections.py` set
+    `edge_vs_market_pct = None` and no reason — key **ABSENT** on 284/284 —
+    while its soccer sibling has always attributed the same refusal. Fixed in
+    `e543e8dd`; replay over real served payloads gives **287/287 attributed, 0
+    silent**. The refusal itself is correct (`#238`) and unchanged.
+- **NOT DONE, owned elsewhere, routed by `send_message`:** missing sim rungs, the
+  63 dark MLB players, WNBA needs a distribution → sim-engine session. The 1,416
+  rows carrying BOTH EV terms → Layer 2 session and a **user decision**,
+  deliberately not taken here because `modelled_fair` is a book-margin ESTIMATE,
+  not a de-vig. The WNBA `wnba_game_cards` +31.7pp finding could NOT be delivered
+  (that session is unattended) — it lives in audit §4b and `e543e8dd`'s message.
+- Falsification test for the undeployed fix: re-sweep and count rows with a
+  projection, no edge of either contract, and no reason. **Expected 0.** Do NOT
+  verify by "the reason string appears" — it already appears on 287 rows in
+  replay; the residual is the discriminator.
+- Verification: met for G1/G2/G4 and for G3-props. **Unmet:** cross-sport live
+  A/B (no second live sport in the window). Lane stays OPEN for that.
+- Blocked by: none.
 - Goal: for every in-season sport, a per-sport/per-market-family RATE of
   `projected / total` (alt and period families broken out), every unprojected
   prop classified as EITHER stale-fingerprint OR sim-does-not-emit-this-stat,
@@ -2474,7 +2544,55 @@ and then failed the thing it was checking, which is the point of running it.
 - **NEXT TEST, cheap and decisive:** today's 08-16 freeze already holds 14 games. If tomorrow's `season_betting_day_2026_08_16.json` grades ~15 `ml` rows instead of 1, the mechanism is confirmed and the fix is scheduling, not logic. If it still grades 1 with a 14-game freeze present, the reader is not reaching the freeze in production and the next suspect is `_odds_data_roots()` ordering on the mounted disk.
 - **NOT DONE / NOT CHANGED:** no source file touched, no deploy, no env change. `_SCORE_SIM_WEIGHT` untouched. The settlement autorun remains off by user decision.
 
-### mlb-live-gameline-distributions — OPEN — opened 2026-08-16 — session: layer1-board-coverage
+### mlb-live-gameline-distributions — CLOSED-VERIFIED 2026-08-17 — live MLB totals and spreads carry a live projection AND a priced edge — opened 2026-08-16 — session: layer1-board-coverage
+- **VERIFICATION RAN AND PASSED**, production, live slate 2026-08-16 22:23Z
+  (6 live MLB games): `game|spreads` **65 rows / 36 live_aware / 28 edged**,
+  `game|totals` **65 / 37 / 30**, `game|h2h` 24 / 6 / 3. Before this lane the
+  same families read **0 live_aware and 0 edged on every live game**.
+- Re-closing: an earlier close of this lane was clobbered back to OPEN by a
+  parallel rewrite of `lanes.md`. The measurement above is unchanged.
+- Goal: a LIVE MLB game carries a live projection and a priced edge on its
+  TOTALS and SPREADS, not just its moneyline, sourced from the same 120-sim
+  re-sim and gated on the same interval. **Testable outcome:** on the served
+  `/api/board/layer1?sport=mlb&view=live`, `totals|full` and `spreads|full` go
+  from **0 live_aware / 0 edge** to non-zero, and every released edge carries a
+  `prob_std_err` that cleared `PRICEABLE_SIGMA`.
+- Files (all checked unclaimed at open):
+  - `vendor/mlb_bettingv2/sim_engine/live_mc.py` (add a margin histogram)
+  - `vendor/mlb_bettingv2/tools/web/flask_frontend.py` (carry the histograms)
+  - `syndicate/features/shared/live_gameline_join.py` (consume + price)
+  - `tests/test_live_gameline_join.py`, `tests/test_mlb_live_game_line_lens.py`
+- **NOT taken:** `syndicate/features/mlb/live_lens.py` — claimed by
+  `refresh-worker-oom-recurrence` and `odds-cadence-off-the-mlb-peak`. Avoid; if
+  the merge side turns out to need a change, stop and coordinate.
+- **The finding, measured 2026-08-16 19:13Z on 8 live MLB games:**
+  `h2h|full` 8 rows / 7 joined / 2 priceable / 2 edges — the moneyline works.
+  Every other game family is **0 live_gameline, 0 live_aware, 0 edge** across
+  **470+ rows**: `totals_alt|first5` 98, `spreads_alt|first5` 79, `totals|full`
+  41, `spreads|full` 36, and the rest. They render a PREGAME projection on a
+  live game.
+- **Root cause, and it is a discard, not a gap.** `live_mc.LiveMcResult` already
+  carries `total_runs_dist: Dict[int, int]` — a full histogram over the 120
+  sims. `flask_frontend`'s live-MC return (`:16683`) keeps `batterStatDist` and
+  `pitcherStatDist` — added, in that same dict, with the comment *"Carried so
+  the live PROP rows can price off the same 120 sims that produced the numbers
+  above, instead of falling back to the pregame distribution"* — and drops
+  `total_runs_dist` on the floor. So the props got a real live probability and
+  the game total, from the identical sims, kept only `avg_total_runs`.
+  `live_gameline_join` then has nothing but a mean, which is exactly what
+  `REASON_TOTALS_MEAN = "totals_mean_not_distribution"` reports.
+- `sigma: 2.0` in the served payload is `PRICEABLE_SIGMA`, the threshold — NOT a
+  distribution width. I misread it as interval data on the first pass; it is not.
+- No margin histogram exists yet. The MC's loop already computes `home_final -
+  away_final` per sim, so it is a two-line addition in the same loop, not a new
+  model.
+- Falsification test: if `totals|full` still reports 0 `live_aware` after the
+  dists are published and consumed, the diagnosis is wrong and the lens is not
+  the carrier. Check `projections`/`live_gameline` coverage counters first.
+- Verification: (a) unit tests price a known histogram at a known line;
+  (b) production `view=live` shows non-zero live_aware + edge on totals/spreads;
+  (c) Layer 2 inherits it with no Layer 2 change, since it reads the same grid.
+- Blocked by: none.
 - Goal: a LIVE MLB game carries a live projection and a priced edge on its
   TOTALS and SPREADS, not just its moneyline, sourced from the same 120-sim
   re-sim and gated on the same interval. **Testable outcome:** on the served
@@ -2741,3 +2859,35 @@ a refusal smuggling a mean out with it, duplicates not collapsed).
 False` is correct for the card payload that function reads; the comment now says
 so precisely and points at the `live_pbp_stats` family where possessions DO
 live, with the coverage caveat and the tricode-vs-home/away trap attached.
+
+### wnba-live-tier — OPEN — **GAME LINES SHIPPED AND VERIFIED (218/321 rows live_aware). PROPS NOT WIRED — the source emits nothing. Tick-over-tick movement UNPROVEN.** — opened 2026-08-16 — session: layer1-board-coverage
+- Goal: WNBA live games carry a live tier on the Layer 1 board, GAME LINES and
+  PROPS. Baseline was **0 of 521 rows** across 2 live games.
+- Files: `syndicate/features/shared/live_gameline_join.py`,
+  `syndicate/features/shared/board_enrichment.py`,
+  `syndicate/features/wnba/cards.py`, `tests/test_wnba_live_tier.py`,
+  `tests/test_wnba_scoreboard_carry_forward.py`.
+- **DONE — game lines.** `attach_live_gamelines_for_sport` was gated
+  `if sport != "mlb"` on a docstring claim that WNBA "has no live tier at all",
+  which had gone stale: the live-lens loop already ran for wnba on a 60s tick,
+  writing the exact path the join reads. Shipped `fdc72dd0` (refresh-worker) via
+  a per-sport `LIVE_LENS_SOURCES_BY_SPORT` (wnba stamps `live_projection`, not
+  `live_mc`) plus a top-level team-name fallback (wnba has no `matchup`
+  wrapper). **Verified twice on production live slates: 149 rows, then 218 of
+  321.** No `simsRun` is published by wnba, so the edge is withheld by
+  `REASON_UNUSABLE_SIMS` — an n was NOT invented to open the gate.
+- **DONE — the live_state dropout.** `_public_scoreboard_live_state_payload` was
+  `except Exception: return None`, publishing a 6s ESPN timeout as "no games in
+  progress". Age-bounded MARKED carry-forward shipped `16a898ef`
+  (live-odds-worker). **Its trigger has NOT fired in production yet** — unit
+  verified only.
+- **NOT DONE — props.** Across the entire wnba snapshot, `actual` /
+  `live_projection` / `live_total` / `live_total_line` appear 24 times each and
+  are **NULL in all 24**. Wiring the prop join would be inert. Producer gap in
+  `wnba/live_lens.py` and its box-score source.
+- **NOT DONE — tick-over-tick movement.** The stated verification wanted a diff
+  proving the numbers MOVE. The second tick had no live rows to compare, so it
+  is **unproven, not passed**. Needs another live WNBA slate.
+- Verification: game-line half MET (two independent live slates). Props half and
+  movement UNMET. Lane stays OPEN for those.
+- Blocked by: none.
