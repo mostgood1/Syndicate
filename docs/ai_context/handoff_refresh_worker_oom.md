@@ -1,5 +1,20 @@
 # Handoff — refresh-worker OOM (RESOLVED 2026-07-26 19:06 UTC)
 
+> **SUPERSEDED IN PART — 2026-08-16.** This document's headline
+> ("RESOLVED", "LOCATED: the OOM is inside `apply_game_board_contract`") is
+> **falsified for the excursions occurring since 2026-08-15**. Measured
+> 2026-08-17 in production: a full `apply_game_board_contract` triplet
+> (`sport=nfl games=16`) ran mid-excursion for **anon 2935 -> 2937 MB (+2 MB)**.
+> The board contract builder is cheap and is not the allocator.
+>
+> The 2026-07-26 fix in this document may still be correct for the excursion it
+> addressed; what is wrong is reading this file as a current diagnosis. The
+> refresh-worker was still `oomKilled` at 02:27:07, 02:51:09, 02:57:53 and
+> 03:10:46 on 2026-08-17.
+>
+> Current state: `.syndicate/state.md` (refresh-worker OOM sections) and
+> `docs/ai_context/worker_thread_and_entrypoint_map.md`.
+
 ## Resolution
 
 **Root cause: `_load_jsonl_rows` read the entire odds-events file into memory
