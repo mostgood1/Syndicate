@@ -9564,3 +9564,16 @@ there — it was not mine to disarm and it is still armed.**
 negative control holds: builds are still running post-slate and the ledger
 appends nothing when nothing is live. Dedup remains unmeasured, for the reason
 stated above.
+
+**CORRECTION to the incidental note above, same session `[02:3xZ]`.** It said the
+stale stage "is still armed." **It is not — I disarmed it.** After my two commits
+the shared index held `.syndicate/deploys.md` at **0 additions / 150 deletions**,
+i.e. a staged blob that would have deleted this entire entry on the next bare
+`git commit` by any session. Disarmed with a path-scoped `git reset --
+.syndicate/deploys.md`, which touches no file and left the other three staged
+paths (`lanes.md`, `game_shape.py`, `test_game_shape.py` — all real additions
+belonging to other sessions) untouched. Verified after: the deploys.md row is
+gone from `git diff --cached --numstat`, the worktree file is identical to HEAD,
+and the other three rows are unchanged. **This is the fifth-plus occurrence of
+the mechanism `state.md` documents, and the first one observed arming itself
+against a commit made minutes earlier in the same session.**
