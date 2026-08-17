@@ -10476,3 +10476,46 @@ is a design decision with an owner, not a patch:
    belongs in the sweep path instead.
 **My coverage fix is correct under 1 and 2 and IRRELEVANT under 3**, so this
 decision gates whether the open deploy row can ever be closed.
+
+### CROSS-SPORT CHECK 2026-08-17 ~14:20 CDT - **MY OWN PROBE WAS WRONG, AND THE "CLASS PROBLEM" WAS OVERSTATED. Two live findings survive.**
+
+**CORRECTION 1 - the test I recommended does not exist.** I told the user
+*"`MAIN_ENTRY` per sport is a cheap and direct test"*. **`MAIN_ENTRY` is emitted
+by exactly ONE script** - `refresh_wnba_oddsapi_props.py:6040`, the only
+occurrence in `scripts/*.py`. The other sport scripts have no equivalent entry
+banner. **The cross-sport probe I proposed could never have run.** Checked
+before relying on it, not after.
+
+**CORRECTION 2 - "assume the same gap for MLB, NBA, NHL and soccer" was too
+broad. NBA and NHL are OUT OF SEASON in August** (both start October), so they
+have no slate to refresh and their absence is CORRECT, not a defect. **The class
+question reduces to MLB and soccer**, not four sports. I asserted a five-sport
+blast radius from a calendar I did not check.
+
+**WHAT THE SWEEP LAYER ACTUALLY DOES - `ODDS_SWEEP_OUTCOME`, 30h, refresh-worker:**
+```
+mlb      lines=35   wrote=True:16
+nfl      lines=14   wrote=True:14
+soccer   lines=29   wrote=True:19
+wnba     lines=22   wrote=True: 9
+```
+**All four in-season sports sweep AND write.** The sweep layer is healthy across
+the board - WNBA is not special there.
+**CAVEAT: the API caps at 100 lines and returned exactly 100, so these are
+FLOORS and the split across sports is truncation-biased.** Do not quote the
+ratios as rates.
+
+**FINDING THAT SURVIVES - live-odds-worker does NO sweeping at all.**
+**ZERO `ODDS_SWEEP_OUTCOME` for ANY sport over 30h**, while its
+`SYNDICATE_ACTIVE_SPORTS=mlb,wnba,soccer` says it should own three. Meanwhile
+refresh-worker sweeps all four **while its own `ACTIVE_SPORTS=nfl`**. **Both
+services' env says the opposite of their behaviour.** Unexplained, and it means
+a per-service env reading is NOT evidence of what a service actually does -
+which is how I nearly deployed to one worker only.
+
+**STILL OPEN AND NOT ANSWERED:** whether MLB and soccer have a scheduled owner
+for their FULL refresh (sims, artifacts, cards) as distinct from the odds sweep.
+**The sweep census above does NOT answer that** - it measures a different layer.
+Answering it needs a per-sport full-refresh marker that does not currently
+exist. **The WNBA gap is confirmed; the MLB/soccer equivalents are UNTESTED, and
+should not be reported either way.**
