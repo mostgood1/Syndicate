@@ -76,6 +76,41 @@ rebuild a props snapshot when its inputs are newer, not just on force".
 - Blocked by: none. No deploy from this lane tonight unless asked.
 
 ### layer2-board-quality — OPEN — **ALL 8 GOALS SHIPPED. `#446` fixed and MEASURED (coverage 31% -> 96%). Its over-correction VERIFIED FIXED in production 23:01Z. Its over-correction (price compared across moved lines, one FALSE STEAM live ~15 min) found and re-gated; that gate is DEPLOYING, UNVERIFIED.** — opened 2026-08-16 — session: layer2-board-quality
+> **`live_gameline_join.py` IS NOW CLAIMED — added 2026-08-16 ~00:1xZ by the
+> `ask-answer-substance` session, which holds no claim on this lane.** Board
+> finding 3, which I reported to you earlier, has its root cause in
+> `syndicate/features/shared/live_gameline_join.py:643` — and **that file is now
+> guarded**, so an edit there will be BLOCKED by `lane-guard.py`.
+>
+> Nothing was taken from you. `live-game-line-projection` had declared those
+> files all along, but its `- Files:` block sat under a heading with no `OPEN` in
+> it, so `_claims()` yielded NOTHING for that lane and the file was silently
+> unprotected. Merging its stray stub heading (the lane's only `OPEN` marker)
+> onto the entry that owns the block started enforcing four files:
+> `live_gameline_ledger.py`, `live_gameline_join.py`, `blueprints/intelligence.py`,
+> `tests/test_live_gameline_ledger.py`.
+>
+> **So: coordinate with `live-game-line-projection` before touching it.** That
+> lane reads `OPEN, UNOWNED` (its session checkpointed 15:2xZ), so it may be
+> takeable rather than blocked.
+>
+> **Restating the finding so it does not die with my session.**
+> `live_gameline_join.py:643` overwrites `projection["edge_vs_market_pct"]` with
+> the LIVE edge while deliberately leaving `model_prob_over` at its PREGAME value
+> (the live probability goes to a NEW `live_model_prob_over` key). The edge then
+> refers to a different probability than the one printed beside it, with nothing
+> in the field name to say so. **7/7 separation on `live_aware`**; arithmetic
+> exact — stated `-39.93` = `(live_model_prob_over 0.1917 − market_fair_prob_over
+> 0.591) × 100`, where the pregame pairing gives `+27.46`. Every number is
+> correct; only the PAIRING is wrong, which is why it is `full/*` only (segment
+> bases are not live-joined and agree 3/3). Suggested fix: rename to
+> `live_edge_vs_market_pct` so the pairing cannot be got wrong at the call site.
+>
+> **Also withdrawn, so you do not chase it:** my earlier "board publishes sides
+> that contradict its own projection" report was MY error — a mean-vs-`P(X>line)`
+> category mistake in the Ask reason generator, fixed on my side. Only finding 3
+> stands. Full record in `deploys.md` under `ask-sim-margin` and `ask-both-edges`.
+
 - **`#446` SHIPPED AND MEASURED.** worker `bdb3dc58` live 22:09:54Z; artifact
   22:20:31Z: **coverage 31% -> 96%**, tracked rows 4 -> 23, first-ever steam
   flag. The diagnosis and the fix were both right.
