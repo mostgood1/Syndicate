@@ -2253,7 +2253,50 @@ def adjust_confidence(base_confidence: float, *, records: Iterable[Mapping[str, 
     return round(adjusted, 2), profile
 
 
-def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: bool = True, ledger_path: Path | str | None = None) -> dict[str, Any]:
+def build_intelligence_evaluation_bundle(
+    *,
+    query: Any,
+    response: Any,
+    persist: bool = True,
+    ledger_path: Path | str | None = None,
+    include_history_analytics: bool = True,
+) -> dict[str, Any]:
+    """`include_history_analytics=False` skips the ledger entirely.
+
+    WHY THIS EXISTS. The stack dump of 2026-08-17 03:48Z named this function as
+    the allocator, in two frames: `_latest_by_recommendation_id` over the chunk
+    stream, and `_aggregate_performance_rows`. Both serve `history` and
+    `performance_analytics` -- and **the caller that runs every board cycle does
+    not read either of them.**
+
+    `maybe_record_board_state_to_evaluation_ledger`
+    (`pipeline/intelligence_state.py:2054`) calls this with
+    `query_type="board_state"` and `persist=True`, for the SIDE EFFECT of
+    recording board state. It then checks `if not recommendations` and returns.
+    It never touches `bundle["performance_analytics"]` or `bundle["history"]`.
+
+    So on every cycle the worker was loading 830,832,574 bytes / 22,078 records,
+    reducing, normalising and running SIX aggregations over them, to produce
+    `sample_size=0` and `reliability_multiplier=1.0` in 49.7 seconds -- for a
+    caller that discards the result. Bounding that load (the previous change)
+    made it cheaper. Not doing it is free.
+
+    SAFE BECAUSE `persist` DOES NOT COVER THE ANALYTICS. `persist` flows only to
+    `record_prediction` and the two recommendation/portfolio-event writers below;
+    `history` and `performance_analytics` are computed for the RETURN VALUE
+    alone. Skipping them cannot change what reaches the ledger, which is the
+    board_state caller's entire purpose.
+
+    DEFAULT IS TRUE, deliberately: the two API callers
+    (`blueprints/intelligence.py:1950` and `features/intelligence.py:11097`) DO
+    read `bundle["performance_analytics"]` and `bundle["history"]`, and they are
+    request-scoped rather than on the board loop. An opt-out keeps them
+    untouched; an opt-in would have silently emptied them.
+
+    The skipped fields are returned as empty dicts rather than omitted, so a
+    consumer that reads them without checking gets the same SHAPE it always got
+    rather than a KeyError.
+    """
     evaluation_started_at = time.perf_counter()
     query_payload = _copy_mapping(query)
     response_payload = _copy_mapping(response)
@@ -2388,20 +2431,38 @@ def build_intelligence_evaluation_bundle(*, query: Any, response: Any, persist: 
     #
     # `sample_size` was ALREADY 0 before this change (verified in pre-fix windows
     # 23:52, 01:54, 02:34), so the history summary loses nothing it was using.
-    shared_ledger_records = _latest_by_recommendation_id(
-        load_recent_evaluation_records(
-            days=_bundle_ledger_window_days(), ledger_path=ledger_path
+    if not include_history_analytics:
+        # THE CHEAPEST LEDGER READ IS THE ONE THAT DOES NOT HAPPEN. The
+        # board_state caller discards both of these; see the docstring. Emitted
+        # so the skip is visible in production rather than inferred from an
+        # absent LEDGER_CHUNKS_ACCEPTED -- an absent line is exactly how the
+        # peak-SMAPS and PAYLOAD_LOAD readings were nearly misread tonight.
+        # Plain str(), not a helper: `_safe_text` lives in `intelligence.py`,
+        # not this module. Assuming it was here cost one test run -- cheap
+        # because the tests exist, which is the argument for writing them first.
+        _qt = str((query_payload or {}).get("query_type") or "unknown").strip() or "unknown"
+        print(
+            f"[intelligence_evaluation] BUNDLE_ANALYTICS_SKIPPED query_type={_qt} "
+            "reason=caller_does_not_read_them",
+            flush=True,
         )
-    )
-    history_summary = build_evaluation_history_summary(
-        records=shared_ledger_records,
-        ledger_path=ledger_path,
-        sport=artifact_metadata.get("sport"),
-        market_family=_record_market_family(recommendation_records[0]) if recommendation_records else None,
-    )
-    performance_analytics = build_recommendation_performance_analytics(
-        records=shared_ledger_records, ledger_path=ledger_path
-    )
+        history_summary: dict[str, Any] = {}
+        performance_analytics: dict[str, Any] = {}
+    else:
+        shared_ledger_records = _latest_by_recommendation_id(
+            load_recent_evaluation_records(
+                days=_bundle_ledger_window_days(), ledger_path=ledger_path
+            )
+        )
+        history_summary = build_evaluation_history_summary(
+            records=shared_ledger_records,
+            ledger_path=ledger_path,
+            sport=artifact_metadata.get("sport"),
+            market_family=_record_market_family(recommendation_records[0]) if recommendation_records else None,
+        )
+        performance_analytics = build_recommendation_performance_analytics(
+            records=shared_ledger_records, ledger_path=ledger_path
+        )
     _intel_trace(
         "evaluation_bundle",
         recommendation_count=len(recommendation_rows),
