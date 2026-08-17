@@ -1144,7 +1144,42 @@ does not hold.** `[measured 08-14]`
   `syndicate/features/shared/opportunity_signals.py`,
   `pipeline/intelligence_state.py`, soccer card templates and `board_cards` CSS.
 
-### live-game-line-projection — OPEN, UNOWNED (session `live-gameline-eval` checkpointed 2026-08-16 15:2xZ) — **BOTH HALVES SHIPPED AND v2 STILL UNEXERCISED. THE PLUMBING IS DONE TWICE OVER; THE EVALUATION HAS NOT STARTED.**
+### live-game-line-projection — CLOSED-VERIFIED 2026-08-17 00:4xZ — v2 EXERCISED on a live slate: `written=13` across two builds, 2 of them NON-priceable — opened 2026-08-15 — session: live-gameline-eval (closed by `layer1-board-coverage`)
+- **The lane's own SINGLE NEXT ACTION was run, verbatim:** read
+  `live_gameline_ledger` off `/api/board/book-grid?sport=mlb&date=2026-08-16`
+  during a live slate, **across two builds, never one.**
+- **Its stated success criterion — quoted — is MET:** *"one live slate where
+  `live_gameline_ledger.written > 0` and the counters are reachable from an
+  API."*
+  ```
+  BUILD 1  00:37:48.762827Z   written=13 candidates=13 skipped_unchanged=0
+                              projected=13 priceable=11  -> 2 NON-priceable
+  BUILD 2  00:39:58.257836Z   written=13 candidates=13 skipped_unchanged=0
+                              projected=13 priceable=11  -> 2 NON-priceable
+  ```
+  Counters served on the API, no 10 MB artifact stream needed — the second
+  half of the goal.
+- **The v2 discriminator held, and it is the part that could have been
+  faked.** The lane warned that `skipped_unchanged > 0` is NOT the signal
+  (seen under v1 at 04:22:51Z, which refuted this lane's own earlier claim).
+  Here `skipped_unchanged` is **0** and `written 13` exceeds `priceable 11`,
+  so **2 rows that v1 could never have written were recorded** — on both
+  builds. Withheld: `segment_is_not_full_game` 49,
+  `prob_interval_swamps_edge` 2, of 62 considered.
+- Measurement in `deploys.md` with the window stated, which was this lane's
+  literal Verification line.
+- **TWO THINGS THIS DOES NOT ESTABLISH, carried forward so they do not
+  disappear with the lane:**
+  1. **The edges are still UNSCORED.** The old heading's "THE EDGES ARE
+     UNEVALUATED" is a broader ambition than the Goal this lane actually
+     stated. The ledger can now produce a sample; nobody has measured
+     whether those 11 edged rows were RIGHT. **Needs its own lane.**
+  2. **The ledger's RSS was never measured.** This lane records an
+     `oomKilled` at 04:46:44Z, 22 min after its deploy added work to
+     refresh-worker, and says plainly it is *not* claiming exoneration.
+     **That debt is NOT discharged here** — it stays with
+     `refresh-worker-oom-recurrence` (OPEN). Kill switch, no deploy:
+     `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
 
 **STATUS AT CHECKPOINT `[15:2xZ]`.** Nothing uncommitted; everything is on
 `origin/main` and content-verified there. web `ebd5f677` live 03:38:07Z,
@@ -1168,7 +1203,7 @@ the ledger's RSS and I am not claiming exoneration.** Kill switch, no deploy
 needed: `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
 
 — original re-take header follows —
-### live-game-line-projection — OPEN — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
+### live-game-line-projection — SUPERSEDED (see CLOSED-VERIFIED 2026-08-17 00:4xZ above) — RE-TAKEN 2026-08-16 03:0xZ (session `live-gameline-eval`) — TIER 5'S PREMISE IS TRUE IN PRODUCTION; THE EDGES ARE UNEVALUATED
 - Goal: make the ledger capable of producing a sample at all, and make its
   counters readable without streaming a 10 MB artifact. Success = one live slate
   where `live_gameline_ledger.written > 0` and the counters are reachable from

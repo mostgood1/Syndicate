@@ -9267,3 +9267,63 @@ after.**
 - Remaining bulk in `lanes.md` is long OPEN lane bodies, not closed ones —
   archiving cannot get it under the 117KB budget; that needs open lanes trimmed
   or closed.
+
+---
+
+## 2026-08-17 00:37–00:40Z — `live-game-line-projection` — **VERIFICATION RUN. Its stated success criterion is MET.**
+
+Not a deploy. This is the read that lane had been waiting on since 15:2xZ, and
+its own "SINGLE NEXT ACTION" verbatim: read `live_gameline_ledger` off
+`/api/board/book-grid?sport=mlb&date=2026-08-16` during a live slate, **across
+two builds, never one.**
+
+### The lane's success criterion, quoted
+> Success = one live slate where `live_gameline_ledger.written > 0` and the
+> counters are reachable from an API.
+
+### Measured — two consecutive builds, MLB, live slate
+
+```
+BUILD 1  2026-08-17T00:37:48.762827Z
+   ledger  written=13  candidates=13  skipped_unchanged=0
+   rows    projected=13  priceable=11   -> NON-priceable written = 2
+
+BUILD 2  2026-08-17T00:39:58.257836Z
+   ledger  written=13  candidates=13  skipped_unchanged=0
+   rows    projected=13  priceable=11   -> NON-priceable written = 2
+```
+
+Withheld breakdown on both: `segment_is_not_full_game` 49,
+`prob_interval_swamps_edge` 2, of 62 considered.
+
+### Both halves of the criterion
+- **`written > 0` on a live slate: YES**, 13 on each of two builds.
+- **Counters reachable from an API: YES** — the `live_gameline_ledger` block is
+  served on `/api/board/book-grid`, no 10 MB artifact stream required. That was
+  the second half of the goal and it is why this read took seconds.
+
+### THE v2 DISCRIMINATOR, which is the part that could have been faked
+The lane warned explicitly that `skipped_unchanged > 0` is **NOT** the signal —
+that was already seen under v1 at 04:22:51Z and is what refuted this lane's own
+earlier "never recorded a row". The real discriminator is **`written` rising on
+rows that are NOT priceable.**
+
+`written 13` against `priceable 11` = **2 non-priceable rows recorded**, on both
+builds. Under v1 those two (`prob_interval_swamps_edge`) would never have been
+written. And `skipped_unchanged` is **0** here, so the result cannot be the
+false signal the lane named.
+
+### What this does NOT establish, carried forward rather than closed over
+1. **The edges are still UNSCORED.** The heading's "THE EDGES ARE UNEVALUATED"
+   is a broader ambition than the Goal this lane actually states. The ledger can
+   now produce a sample; nobody has measured whether those 11 edged rows were
+   RIGHT. That is downstream evaluation work and needs its own lane.
+2. **The ledger's RSS was never measured.** The lane records an `oomKilled` at
+   04:46:44Z, 22 minutes after its deploy added work to refresh-worker, and says
+   plainly: *"I never measured the ledger's RSS and I am not claiming
+   exoneration."* **That debt is NOT discharged by this read.** It stays with
+   `refresh-worker-oom-recurrence` (OPEN). Kill switch if needed, no deploy:
+   `MLB_LIVE_GAMELINE_LEDGER_ENABLED=0` (currently ABSENT = enabled).
+
+Closed on the criterion the lane wrote for itself, with both unmet ambitions
+named above so neither disappears with the lane.
