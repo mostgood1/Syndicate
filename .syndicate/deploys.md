@@ -10646,3 +10646,36 @@ coordinator-owned.**
 live-odds-worker resumes WNBA odds work - which is where a WNBA full-refresh
 owner most naturally belongs, making option 1 (finish the migration onto the
 odds owner) the coherent choice rather than option 2.
+
+### COORDINATION 2026-08-17 ~14:15 CDT - request handed to the coordinator, and `.syndicate/coordinator.id` IS STALE
+
+**`.syndicate/coordinator.id` holds `9ed7fd89-6696-4d42-9681-39c1a5b78a46`,
+which matches NO SESSION in the roster** - checked with archived included.
+Routed by TITLE instead, to `Deploy and Document Coordinator`
+(`local_1d6f136e-...`, running, active 19:12Z). **`coordinator.md` says the
+off-switch is DELETING that file, so a stale id is ambiguous between
+"coordinator is gone" and "coordinator moved" - it reads as an ACTIVE
+coordinator that cannot be reached.** Same failure shape as the unattended lane
+that blocked this work earlier today: a marker outliving the thing it points at.
+
+**HANDED OVER** (deploy request `2026-08-17T2000Z-wnba-fixture-identity.md`,
+commit `20025cc4`, 245 tests): both services must ship together; branches must be
+cut from each LIVE SHA because neither is an ancestor of `main` and main's copy
+of `refresh_wnba_oddsapi_props.py` lacks a readable-channel block that is live on
+both workers; and the verify needs BOTH halves, because "refresh-worker stopped
+sweeping" is also what a broken gate looks like.
+
+**DISCLOSED, unprompted, so the ledger is not reconstructed later:**
+1. **I deployed twice today** (17:52Z, 18:00Z) **before the coordinator rule
+   reached my digest.** Both rows sit in `deploys.md` with EMPTY measurement.
+2. **I closed another session's lane by override** (`export-force-refresh-escape`,
+   user-authorized) - **its effect measurement is still OWED, not discharged.**
+3. **Three ledger entries are falsified by today's measurements** - `#378`
+   (WNBA does launch and write), `#382` (the marker advances because ANOTHER
+   SERVICE advances it, not because a launch dies), `#129` (regressed by a new
+   mechanism). These are the coordinator's to correct; I did not edit them.
+
+**PROPOSED FOR `learnings.md`, from a near-miss of my own:** *a service's
+`SYNDICATE_ACTIVE_SPORTS` is NOT evidence of what that service does.* Measured
+today, both workers' behaviour is the exact inverse of their env. I nearly
+deployed to one worker on that assumption and would have shipped an inert fix.
