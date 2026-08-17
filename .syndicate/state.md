@@ -1714,7 +1714,10 @@ the place to read it, and it carries the guard on its two shortlists.
   and that case is unmeasured. Unrecognised options fall through to "keep
   guarding" — false positive, never false negative. Verified by running 19 cases
   through the pre-fix and post-fix guards together: 10 flip 2→0, 8 hold at 2.
-  69 tests pass; exemption path 81 ms, short-circuiting before any git call.
+  **62 tests in `tests/test_commit_guard_worktree_index.py`** (69 for the
+  two-file run that also covers `test_checkpoint_guard_hook.py` — cite the 62 if
+  you mean this guard); exemption path 81 ms, short-circuiting before any git
+  call.
 - **A PATHSPEC COMMIT NEEDS NO REPAIR STEP; THE ISOLATED-INDEX RECIPE DOES.**
   Measured on `5fb52342`: the partial commit UPDATED the shared index for the
   three paths it committed (`git diff --cached` for them empty afterwards) and
@@ -3349,3 +3352,66 @@ when the question was "which one" — ask for the name.**
   naming `mlb` in `dropped`, **and** an MLB pregame sweep appearing on
   live-odds-worker. Half one proves the non-owner stopped, not that the owner
   started.
+
+### MERGE LANDED 2026-08-17 ~15:2x CDT — the coordinator branch is on `origin/main` (`5962900e`)
+
+20 unpushed commits merged with 149 of other sessions'. **Done in a SEPARATE
+worktree**, because the live tree had 178 uncommitted files across three running
+sessions and a merge there would have rewritten files under them mid-task. The
+live worktree was never touched — verified after: still dirty, HEAD unmoved by me.
+
+**Resolution: block-level union on the six append-only ledger files, NOT a line
+merge.** A textual union would have resurrected every block this morning's sweep
+moved out of `lanes.md`, since those lines are absent on one side and present on
+the other. For the lanes pair, "already present" spans `lanes.md` +
+`lanes_closed.md` together.
+
+**Verified at LINE level across all six ledger files as one corpus** (content
+moves between them, so per-file checks are not enough): origin/main 31,283 /
+branch 30,582 / result 33,524 substantive lines, **zero lost from either side**.
+
+**A block-level check was tried first and cried loss on all six files** —
+appending anywhere shifts the previous block's hash. Same brittleness that bit
+the sweep this morning. Once corrected to line level it found a REAL hole the
+union had left: one block missed per merge round, both times a block EDITED
+rather than appended upstream. Closed generically with a backstop that works
+from the line-loss set and maps lost lines back to whole blocks.
+
+### THREE PENDING DEPLOY REQUESTS WERE NEARLY DESTROYED, and the mechanism is subtle
+
+This branch moved ONE delivered request from `requests/` to `done/`. Git read
+that as a **directory rename** and relocated every new request `origin/main` had
+added into `done/` — silently reclassifying undelivered work as delivered.
+
+- two were surfaced by the conflict list;
+- **the third only by diffing deletions against `origin/main`** — it never
+  appeared as a conflict at all;
+- a fourth arrived mid-merge and was caught by the same check.
+
+All are in `requests/`. **The lesson generalises: after any merge touching a
+queue directory, diff DELETIONS against the remote, not just the conflict list.**
+Restoring one by rewriting it in PowerShell added a BOM and changed its blob;
+`git checkout <rev> -- <path>` is the only safe restore.
+
+### Live-race note
+
+`origin/main` moved three times during the merge (`20025cc4` → `52d45b10` →
+`adf2aefa` → `6cf3f60b`); the first two pushes were correctly rejected. Manual
+rounds took longer than the interval between other sessions' pushes. Closed by
+making the cycle atomic and CONDITIONAL: merge, union, backstop, verify, push —
+pushing only if no deletions, no lost request, zero line loss both sides, and
+`render.yaml` identical. Script kept at `scratchpad/merge_cycle.py`.
+
+### Two things this surfaced that are now coordinator work, not done here
+
+1. **`origin/main` and local `main` diverged again within minutes** — local is
+   already 154 behind / 2 ahead (`013c7cd5`, `acad136f`, from a session working
+   in the live tree). The divergence is structural, not a one-off; sessions
+   commit locally and rarely push. **Not forced**: fast-forwarding the live tree
+   would rewrite files under three running sessions.
+2. **101 registered git worktrees.** `git worktree remove` and `prune` both fail
+   with Permission denied (locked, likely OneDrive). This is §5 of
+   `coordination-protocol.md` ("stale worktrees are how the count grows until
+   scans time out") and it is measurably true — repo-wide greps have timed out
+   twice today at 120s, which is why searches here must be scoped to `scripts/`
+   or use the indexed tool.

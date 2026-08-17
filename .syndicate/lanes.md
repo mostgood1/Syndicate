@@ -3825,7 +3825,7 @@ Taken on explicit user instruction ("now take the cadence lever too").
   serialises deploys, holds the guardrails, takes the measurement, and keeps the
   ledger true. Correctness of a fix stays with the lane that wrote it.
 
-### commit-guard-blind-to-own-recipe — CLOSED 2026-08-17 — **both goals shipped, measured, and DELIVERED to `origin/main` in `5fb52342`: the guard now honours its own printed recipe (in-command env assignment) and exempts pathspec-limited commits, with `-i`/`-a`/pathspec-less unchanged. Verification ran: 19 cases through the pre-fix AND post-fix guards (10 flip 2→0, 8 hold at 2), 69 tests, every printed remedy replayed through the real hook at rc=0.** — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+### commit-guard-blind-to-own-recipe — CLOSED 2026-08-17 — **both goals shipped, measured, and DELIVERED to `origin/main` in `5fb52342`: the guard now honours its own printed recipe (in-command env assignment) and exempts pathspec-limited commits, with `-i`/`-a`/pathspec-less unchanged. Verification ran: 19 cases through the pre-fix AND post-fix guards (10 flip 2→0, 8 hold at 2), 62 tests in the guard's own suite (69 with the sibling checkpoint-guard suite), every printed remedy replayed through the real hook at rc=0.** — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
 - **CLOSING NOTE.** The wrong belief this lane produced (`coordinator.id` is
   stale) already has its durable rule in `learnings.md` 2026-08-17 —
   *"matches no session in the roster" is not "points at nobody"* — written with
