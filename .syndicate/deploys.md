@@ -12211,3 +12211,149 @@ Only the *outs-specific* justification evaporated. **Do not read this entry as
 "props capture was a mistake" — read it as "the urgency I attached to it was
 resting on a model that turned out to be uninformative."**
 
+## 2026-08-17 — THE FALSIFICATION TEST: **MLB hitter props LOSE to the market in every clean family**
+
+Lane `convergence-phase7-crps`. `scripts/grade_mlb_hitter_props_vs_market.py`.
+Production projections (`/api/ops/artifacts/stream`) x archived odds x
+`mlb_batter_game_log.csv`. 12 dates, 5,437 scored rows. Read-only, no deploy.
+
+**This is the measurement that decides whether the MLB improvement programme is
+worth starting.** Everything else this session scored against CLIMATOLOGY, which
+answers "does the engine know anything" and cannot answer "does it know
+something the PRICE does not".
+
+| family | n | base rate | model Brier | market Brier | gap |
+|---|---|---|---|---|---|
+| hits | 1529 | 0.574 | 0.24318 | **0.23315** | +0.0100 |
+| runs | 1442 | 0.372 | 0.23230 | **0.23081** | +0.0015 |
+| total_bases | 1161 | 0.427 | 0.24854 | **0.24188** | +0.0067 |
+
+**0 of 3 clean families beat the market.** Lower Brier is better; the market is
+better everywhere.
+
+**BUT THE GAPS ARE SMALL** — 0.0015 to 0.010 Brier. This is not a model with no
+information losing badly; it is a model with real information (r = 0.13–0.16)
+landing just behind the price. That distinction matters for what to do next.
+
+### TWO BUGS IN MY OWN SCRIPT, BOTH CAUGHT, ONE NEARLY SHIPPED AS A RESULT
+
+**1. THE FIRST RUN SAID "MODEL BEATS MARKET IN 3 OF 4 FAMILIES". IT WAS FALSE.**
+`FAMILIES` mapped StatsAPI spellings (`hits`, `totalBases`, `runs`) onto a CSV
+whose headers are `h`, `tb`, `r`. Every lookup missed, and the reader did
+`float(row.get(key) or 0)` — so **every outcome silently became 0.0**. With
+all-zero outcomes Brier reduces to `p^2`, so "beating the market" meant only
+"predicts smaller numbers". The tell was a **base rate of 0.000** on three
+families; `rbi` matched by coincidence, which is the only reason one family
+looked different and the bug was visible at all.
+
+**Fixed twice over:** `stat_value` now returns **None for an absent column,
+never 0.0**, and the reporter **REFUSES any family whose base rate is <=0.001 or
+>=0.999** as a broken join rather than scoring it.
+
+**2. `hits_runs_rbis` IS STILL BROKEN AND IS EXCLUDED, NOT REPORTED.** Its Brier
+(0.46207) equals its base rate (0.46207) to five decimals — the signature of
+predicting p≈0 on every row. The extractor matches probability fields by
+THRESHOLD (`_2plus`) without checking the FAMILY, so on an hrr bucket it can
+pick up `p_h_2plus` (hits) instead of the hrr field. The three clean families do
+not share this because their prefixes do not collide. **Do not quote the hrr
+row.**
+
+### WHAT THIS MEANS FOR THE PROGRAMME
+
+**The premise I was going to build the MLB plan on — "hitter props are where a
+beatable market and a working model overlap" — is HALF TRUE AND HALF FALSE.**
+
+- TRUE: props are soft-priced (0% sharp coverage vs 100% on game lines), and the
+  engine has real conditional signal there.
+- FALSE: that signal does not currently beat the price. Not in any clean family.
+
+**So the programme is not "scale an existing edge". It is "close a measured gap
+of 0.0015–0.010 Brier".** That is a different, more honest, and much more
+tractable framing — and the largest known error (`pa_mean` +18.4%, opportunity
+explaining 55% of count bias) is exactly the size of thing that could close it.
+
+**Nothing should be promoted or shipped on the strength of an edge, because
+none has been demonstrated.**
+
+### CAVEATS
+
+- 12 dates, June 2026, one park-season. Not a verdict on the engine for all time.
+- `model_raw` and `model_cal` are IDENTICAL in every family — production's
+  calibration layer is either identity on these rows or is not being read. Worth
+  a separate look; it means the `_cal` column proved nothing here.
+- Brier gaps of ~1e-3 on n~1,400 are a SCREEN, not proof. A paired test is owed
+  before anyone acts on the *magnitude*. The DIRECTION is consistent across
+  three independent families, which is what makes it usable.
+- 17,867 rows had no market and 18,664 were line mismatches — expected, since
+  buckets exist at many thresholds and books quote one line.
+
+
+## TRIAGE 2026-08-17 ~21:2xZ — the two requests filed during the deploy window
+
+### `2026-08-17T205500Z-soccer-live-lens-as-of` (`6bdc50de`) — **ACCEPTED, BOTH WORKERS, waiting on a window**
+
+- **SHA state corrected:** the request says "local `main`, **not pushed**". It is
+  pushed now — `6bdc50de` reached `origin/main` at 21:1xZ in the coordinator's
+  push. Nothing is blocked on git any more.
+- **The request asks "confirm the owner before deploying" — ANSWERED, and the
+  answer is BOTH.** Read live from the API:
+
+      refresh-worker     SYNDICATE_ENABLE_LIVE_LENS_LOOP = 'true'
+      live-odds-worker   SYNDICATE_ENABLE_LIVE_LENS_LOOP = 'true'
+
+  So the requester's own conditional applies: *"if both genuinely run it, both
+  need this or the fix is half-applied."* **This is a two-service deploy.**
+  (`MLB_ENABLE_LIVE_LENS_LOOP` differs — `false` / `true` — but that gates the
+  MLB lens, not the soccer poll, and does not change the answer.)
+- Severity is higher than its LOW label suggests: a `TypeError` behind
+  `if live_events:` means it is **silent on a quiet slate and total on a busy
+  one** — the three leagues that vanished were exactly the three with matches in
+  play. But the requester is right that it has been broken for as long as the
+  as-of change has been in, so hours do not matter.
+- **Held only for a window, per the requester's own instruction not to stack a
+  deploy on top of the 20:29-20:37Z one.**
+
+### `2026-08-17T2115Z-wnba-phase2-migration` (`e65a5531` + `c7494c6c`) — **HELD. Its staging is impossible as written.**
+
+Both SHAs verified on `main`. The code is fine. **The request cannot be executed
+the way it is designed, and executing it anyway would be the dangerous reading.**
+
+**1. THE FLAG IS ALREADY ON.** The request's whole safety design is *"Step 1 —
+deploy the code with the flag still OFF... Step 2 — only then set the flag,
+ideally in a window you can watch."* Read live:
+
+    live-odds-worker  SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN = 'true'
+
+So step 1 does not exist. **Deploying IS enabling**, immediately, unwatched, with
+no inert observation period. Whoever set the key in advance removed the staging
+without the request's author knowing.
+
+**2. THE INTERVAL IS HALF WHAT THE REQUEST ASSUMES.** It says "Interval defaults
+to 14400s (4h), matching soccer." Live:
+
+    SYNDICATE_WNBA_PREGAME_REFRESH_INTERVAL_SECONDS = '7200'   (2h)
+
+Twice the frequency the risk paragraph was written against — and the verify step
+says "allow up to one full interval (4h)", which is now the wrong window to wait.
+
+**3. THE MEMORY DOES NOT FIT, on the request's own numbers.** It states the WNBA
+refresh leg measures **~1.3–1.5 GB RSS**. Measured on live-odds-worker 21:15:29Z:
+
+    container_memory_mb 867.7 / 2048.0  (42.4%)   headroom 1,186.3 MB
+
+**1,186 MB of headroom against a 1,300–1,500 MB leg.** That is a predicted OOM,
+not a risk to monitor, on the 2 GB service whose history includes `#241`'s
+production restart loop. `phase="pregame"` excluding the sim leg is what the
+request offers as the safety margin, and it is not enough on this arithmetic.
+
+**Decision: not deployed. Returned to the lane with these three readings.** The
+paths forward, none of which the coordinator should choose alone:
+  a. set the flag to `false` first, then deploy inert exactly as the request
+     intends, and enable later in a watched window;
+  b. re-measure the leg — if 1.3–1.5 GB is stale or a peak rather than a
+     steady-state, the arithmetic changes;
+  c. re-home the autorun to refresh-worker (4 GB) instead.
+
+**Not touched:** the env keys. Changing another lane's flags to make a deploy fit
+is exactly the silent config drift this ledger keeps warning about, and
+`render.yaml` already differs from live env here.
