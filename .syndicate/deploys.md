@@ -13276,3 +13276,67 @@ exactly the shape of a result that looks like a finding.
 applied at build time. Either rebuild rosters, or apply the builder's function to
 loaded profiles as this harness does. Anyone expecting a cache fill alone to
 change production output will see nothing.
+
+## 2026-08-17 — **THE PITCH-SPLITS CACHE CANNOT REACH RENDER. Three independent blockers, all structural.**
+
+Lane `convergence-phase7-crps`. Raised by the user: *"don't we need this to be an
+artifact available on Render?"* **Correct, and it currently cannot be.** I had
+been filling a LOCAL cache and had not checked that it could ever ship.
+
+### Blocker 1 — THE PATH IS THE EPHEMERAL CHECKOUT
+
+`default_statcast_cache()` (`statcast_pitch_splits.py:51`) resolves to
+`Path(__file__).parents[2] / "data" / "cache" / "statcast"` =
+**`vendor/mlb_bettingv2/data/cache/statcast`**.
+
+On Render that is inside the **repo checkout**, which CLAUDE.md records as
+*"ephemeral, replaced on every deploy"* — the exact `#389` failure, where the
+SmartSim2 generators wrote to `src/data` while the reader used the mounted disk
+and every artifact was invisible and discarded.
+
+**It takes a `cache_dir` parameter — and `daily_update.py:5862` calls it WITHOUT
+one, and there is NO env override.** So the ephemeral path is not a default that
+production overrides; it is the only path production can use.
+
+### Blocker 2 — IT CANNOT SHIP VIA GIT
+
+    .gitignore:111   vendor/*/data/
+    tracked cache files: 0
+
+The whole tree is gitignored. Filling it locally and committing is not available.
+
+### Blocker 3 — NOTHING ON THE WORKER POPULATES IT
+
+The populator is `tools/statcast/fetch_pitcher_pitch_splits_x64.py`, a **manual
+x64-only tool** requiring `pybaseball`. It is not called by `daily_update.py` or
+any worker entrypoint. `fetch_pitcher_pitch_splits` is **cache-only** and returns
+None on a miss, so a worker with an empty cache silently produces 1.0
+multipliers — which is precisely today's production state.
+
+### And a fourth, if the first three were fixed
+
+**It is not in `HOT_ARTIFACT_PATTERNS`** (`artifact_publisher.py:35`), so even
+written to the mounted disk it would not be exported or mirrored.
+
+### THE FIX HAS A CLEAN SHAPE — and it is NOT "commit the cache"
+
+1. **Emit ONE artifact, not 314 hashed cache files.** A hash-keyed `DiskCache` is
+   the wrong shape to publish. Write
+   `data/mlb_source/.../pitch_splits_<season>.json`, keyed by pitcher id.
+2. **Resolve it through `data_root()`** (`refresh_state_store.py:419`,
+   `SYNDICATE_DATA_ROOT`) so it lands on the mounted disk, not the checkout.
+3. **Add it to `HOT_ARTIFACT_PATTERNS`** so it mirrors and exports like every
+   other artifact.
+4. **Populate it on a schedule, not by hand.** Pitch mix drifts through a season;
+   a one-off fill goes stale. Weekly is likely enough.
+
+**Do NOT simply point `cache_dir` at the disk and call it done** — that leaves a
+hash-keyed cache as a production artifact, un-mirrorable and un-inspectable, and
+still with no populator on the worker.
+
+### Status
+
+**Everything measured so far is LOCAL-ONLY and cannot affect production.** The
+73 starter splits now cached prove the DATA exists and is rich (whiff 1.55 vs
+0.65 across pitch types). They do not prove anything about Render, and the effect
+measurement now running is an offline experiment, not a production preview.
