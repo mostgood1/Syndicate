@@ -3825,7 +3825,20 @@ Taken on explicit user instruction ("now take the cadence lever too").
   serialises deploys, holds the guardrails, takes the measurement, and keeps the
   ledger true. Correctness of a fix stays with the lane that wrote it.
 
-### commit-guard-blind-to-own-recipe — OPEN — **BOTH GOALS SHIPPED AND MEASURED in `5fb52342`. NOT ON `origin/main` — it rides `origin/ledger/coordinator-2026-08-17`, and the push is with the coordinator. OPEN only for that.** — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+### commit-guard-blind-to-own-recipe — CLOSED 2026-08-17 — **both goals shipped, measured, and DELIVERED to `origin/main` in `5fb52342`: the guard now honours its own printed recipe (in-command env assignment) and exempts pathspec-limited commits, with `-i`/`-a`/pathspec-less unchanged. Verification ran: 19 cases through the pre-fix AND post-fix guards (10 flip 2→0, 8 hold at 2), 69 tests, every printed remedy replayed through the real hook at rc=0.** — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+- **CLOSING NOTE.** The wrong belief this lane produced (`coordinator.id` is
+  stale) already has its durable rule in `learnings.md` 2026-08-17 —
+  *"matches no session in the roster" is not "points at nobody"* — written with
+  the `deploy-guard.py:130-140` evidence this session. Not re-run as a separate
+  `/postmortem`, because the rule exists and a second copy would just be a
+  second thing to keep true.
+- **Left with others, deliberately, NOT blockers on this lane:**
+  (1) the falsified `deploys.md` entry on `origin/main` asserting
+  `coordinator.id IS STALE`, duplicated at lines 11441 and 11546 — reported to
+  the coordinator with the correction and the exact locations; `deploys.md` is
+  theirs. (2) A second session's brief to CLOSE the in-command `GIT_INDEX_FILE`
+  escape this lane opened; the coordinator ruled the escape stays open and
+  retargeted them. If that ruling is revisited, `5fb52342` is the commit.
 - **STATUS 2026-08-17 ~14:30 CDT.** Verification ran and both goals hold.
   (a) in-command assignment of any of the three vars is honoured; (b) pathspec
   commits exempt, `-i`/`-a`/pathspec-less unchanged. Evidence: 19 cases through
