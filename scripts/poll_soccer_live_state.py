@@ -72,7 +72,37 @@ def poll_league(league: str, iso_date: str, *, source_root: Path, out_root: Path
 
     games: dict[str, Any] = {}
     if live_events:
-        ratings = _load_team_ratings(league, source_root)
+        # `as_of` is REQUIRED and this call was missing it, which is the whole
+        # live-lens outage. `_load_team_ratings(league, source_root, as_of)`
+        # (build_soccer_artifacts.py:54) gained the third parameter with the
+        # audit §7 #6 as-of work; that change updated its own module's caller
+        # (:238) and missed this one.
+        #
+        # `iso_date`, matching :238's `iso_date`, because `as_of` is documented
+        # there as "the date being built for" and live polling builds for the
+        # in-progress fixture's own date.
+        #
+        # MEASURED ON PRODUCTION 2026-08-17 20:1x-20:3xZ (live-odds-worker):
+        # this raised `TypeError: _load_team_ratings() missing 1 required
+        # positional argument: 'as_of'` for la_liga, primeira_liga and
+        # championship -- EXACTLY and only the three leagues with matches in
+        # play -- while the other seven wrote `(0 live games)` and looked fine.
+        # All three live-lens boards read "Live matches: 0 / Source: No data"
+        # with three matches actually being played and scoring.
+        #
+        # THREE COVERS KEPT THIS HIDDEN, worth naming because only the first is
+        # fixed here. (1) The call sits behind `if live_events:`, so it can only
+        # fire for a league with a live match -- silent on a quiet slate, total
+        # on a busy one. (2) `poll_active_leagues_for_tick`'s handler catches it
+        # into an `errors` dict with no log line, and that dict reaches only
+        # `data/live/soccer_live_lens.json`, which is not in the publisher
+        # allowlist. (3) `tests/test_soccer_team_ratings_as_of.py:117` asserts
+        # the literal call-site TEXT in `build_soccer_artifacts` alone, so it
+        # stayed green while three other call sites were broken. A signature
+        # change needs a caller census, not a spot-check of the caller you just
+        # edited -- `validate_soccer_vs_market.py:316` and `:449` are still
+        # wrong on the same footing and are NOT fixed here.
+        ratings = _load_team_ratings(league, source_root, iso_date)
         team_names = [event["home_team"] for event in live_events] + [event["away_team"] for event in live_events]
         _fill_promoted(ratings, team_names)
         player_rows = _load_player_rows(league, source_root)
