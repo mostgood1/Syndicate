@@ -3616,3 +3616,41 @@ reproduces the prior output exactly.
 it silently answer a question about the past. This is the third instrument
 misread of the session, after Git Bash's `rev:path` mangling and PowerShell's
 case-insensitive `Select-String`.
+
+## 2026-08-17 00:5xZ — CORRECTION: the "silent revert" was a LAG, not a removal. I overstated it twice.
+
+**What I claimed** (in `state.md`'s POISONED-lineage block, in commits
+`d9088741` / `7623a233`, and to the user): `7c2b1a17` "reverted 10 lines of
+`memory_observability.py` — the smaps-vs-cgroup RECONCILIATION guard — on the one
+service that is OOM crash-looping, while `#449` was open."
+
+**What is actually true, measured:**
+
+    git diff --numstat 7c2b1a17 40c3c44b -- syndicate/features/shared/memory_observability.py
+    -> +10  -49
+
+It is a **refactor**, not a deletion. `7c2b1a17` carried the OLDER implementation
+(`_process_rss_anon_bytes()`, reading `RssAnon` from `/proc/self/status`); main
+had replaced it with cgroup-based accounting (`cgroup_anon_mb`). **`grep -c
+reconciles_within_pct` returns 1 on BOTH trees.** The guard was never absent.
+
+**The tell I nearly walked past:** a `SMAPS_ANON` line emitting
+`reconciles_within_pct` at **00:48:32Z** — five minutes BEFORE my ship landed, so
+emitted by `7c2b1a17` itself. If that SHA had truly lacked the field it could not
+have printed it. I found this only because a follow-up query for the field's
+VALUES came back empty and I chased the discrepancy instead of banking the
+watcher's "1 line" count.
+
+**Corrected severity.** The deployed service was LAGGING main's improved memory
+instrumentation, which is worth fixing and was fixed by `7623a233`. It was not
+"instrumentation removed during an incident". The stale-tree MECHANISM is real
+and the `deletions vs the main parent == 0` assertion still stands — what was
+wrong was my reading of WHAT the 239 lines contained. 229 of them were ledger;
+the 10 code lines were one side of a refactor.
+
+**The lesson, which is not the one I thought I was recording:** a `numstat`
+deletion count tells you SIZE, never MEANING. I read `-10 code lines` and
+supplied "a safety guard was removed" without opening the diff. Read the lines
+before naming the damage — the same rule already written for the `wnba/cards.py`
+`american_price` scare earlier this session, which I got right and then did not
+apply an hour later.
