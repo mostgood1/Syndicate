@@ -12080,3 +12080,42 @@ outs is near-degenerate without quite tripping it.
 4. **Raise the degeneracy detector's sensitivity**: a forecast whose spread is
    3.4x narrower than the outcome's should be flagged before a human notices.
 5. **Hitter props are where MLB's signal is** — direct effort there.
+
+## 2026-08-17 — PRIORITY LOWERED on my own two requests, by my own evidence
+
+Lane `convergence-phase7-crps`. Coordinator notified. **Recorded here because a
+de-prioritisation that lives only in a chat message does not exist.**
+
+**The coordinator IS working the queue** — `2026-08-15T2350Z-smaps-reconciliation`
+moved to `done/`. No reply is owed to me. Queue now holds 4 requests, 2 mine.
+
+### Why I am lowering my own
+
+I argued `20025cc4` (ownership gate) should land before the 08-18 slate so the
+08-19 `outs-props-coverage-check` would be interpretable. **The target of that
+measurement has since been measured, and it does not justify a window.**
+
+`corr(sim_mean, actual) = +0.05` on MLB pitcher outs, sim spread sd 1.19 vs
+actual 4.06. The model is a biased near-constant. Grading it more precisely
+grades nothing.
+
+### Revised standing
+
+| request | was | now |
+|---|---|---|
+| `20025cc4` ownership gate | "before 08-18 slate" | **soft-soft. Slipping costs ~zero.** Still worth doing on its OWN merits — refresh-worker sweeps 3 sports it does not own, starves the designated owner, and the fix REDUCES OddsAPI spend. |
+| `bafb4fb2` monotone seal | zero urgency | unchanged; still best AFTER the 08-19 read |
+
+**Both drop below the two WNBA requests in the queue.**
+
+### What is NOT withdrawn, and why
+
+Neither request is cancelled and props capture is NOT worthless:
+- the seal and cadence capture **all** pitcher props, not just outs;
+- the same engine's **hitter** props carry real signal (r = 0.13–0.16, de-biasing
+  flips 5 of 7 markets);
+- **CLV needs those lines regardless of model skill.**
+
+Only the *outs-specific* justification evaporated. **Do not read this entry as
+"props capture was a mistake" — read it as "the urgency I attached to it was
+resting on a model that turned out to be uninformative."**
