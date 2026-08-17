@@ -2581,3 +2581,592 @@ A scheduled-task run cannot reach its peers and cannot be reached. So the sessio
 most needs to coordinate before a deploy is structurally the one that cannot — which is
 the practical argument for the control `learnings.md` already asks for (a
 `deploy_claim.py` that refuses an unattended holder).
+
+## GAME SHAPE — CONTRACT FOR FOUR SPORTS, TWO LIVE EMITS, **n = 0** `[measured 2026-08-16, lane game-shape-capture]`
+
+Supersedes the "GAME SHAPE IS NOT PERSISTED FOR ANY SPORT" section above for the
+capture half; that section's MEASUREMENTS stand, its status line does not.
+
+`syndicate/features/shared/game_shape.py` (`origin/main` `8a01fa3d`) is the
+extraction contract. **90 tests, 31 of 31 mutations caught.**
+
+| sport | primitive | live emit | why |
+|---|---|---|---|
+| MLB | yes | **blocked** | producer is `vendor/.../flask_frontend.py:16647`, held by `mlb-live-gameline-distributions` |
+| WNBA/NBA | yes | **blocked** | producer is `wnba/cards.py:3679`, held by `wnba-live-tier` |
+| NFL | yes | **LANDED** | `nfl/live_game_state.py` was unclaimed |
+| soccer | yes | **LANDED** | `soccer/ingestion/espn_live_state.py` was unclaimed |
+| NCAAF | contract only | **no producer exists** | no `live_game_state` analog in `ncaaf/`; season opens 08-29 |
+
+**THE NUMBER THAT MATTERS: every bucket is n = 0.** Nothing has run in
+production. Both emits are PREPARED, NOT DEPLOYED, and no deploy was requested.
+Do not read "contract for four sports" as coverage.
+
+**Per-sport facts worth not re-deriving:**
+- **MLB** — `LiveSituation` (`vendor/mlb_bettingv2/sim_engine/live_mc.py:20`) is
+  built in full every live tick and discarded at the return. Capture is
+  serialisation, not derivation.
+- **WNBA/NBA** — **possession pace is UNDERIVABLE**: no FGA/TOV/OREB/FTA in any
+  live artifact. The field is `points_per_minute` and records carry
+  `possession_pace_available: False`. `wnba/cards.py:891 _wnba_elapsed_minutes`
+  is the canonical clock math (10-min quarters, NOT NBA's 12); the shared copy
+  is pinned to it by a 143-cell drift test.
+- **NFL** — `situation` (down/distance/yardline) was in the fetched ESPN payload
+  and never read; now captured, **live games only**. `pace_features.py` is
+  SEASON-level and is not a live pace source.
+- **NCAAF** — overtime is **UNTIMED** (alternating possessions), so elapsed
+  minutes is undefined there and is returned as `None`, never extrapolated.
+- **soccer** — `clock_remaining` is remaining **in that half**
+  (`_HALF_SECONDS = 2700`): half 2 / 1800s is the **60th minute**. Its
+  `live_state` **embeds the model's own `projection`**, which is excluded from
+  the shape (circular conditioning). Second-half stoppage is invisible — the
+  producer clamps at 0, so 90' and 95' both read 90; flagged `clock_saturated`.
+- Margin bands are in **each sport's own unit** — runs / points / scores /
+  goals. Buckets cap at 17 (13 for soccer).
+
+## PLAY-BY-PLAY COVERAGE IS 5 SPORTS OF 8 `[measured 2026-08-16, `#454`]`
+
+| have it | form |
+|---|---|
+| NFL | nflverse CSV, **372 cols incl. `epa`, `wp`, `wpa`** — 2025 = 46,452 REG plays |
+| MLB | statsapi `feed_live` — 618 + 105 files |
+| NCAAF | CFBD `plays_<season>_wk##.json.gz` — 51 files, 2023+ |
+| WNBA / NBA | `live_pbp_stats_<date>.jsonl` — 53 / 11 |
+
+**soccer, NHL and NCAAB have NONE** — the same three modules that are weakest
+elsewhere. `vendor/wnba_betting_repo/models/pbp/` is **models trained from pbp**
+(`.joblib`/`.onnx`), not pbp; a census by path would miscount it.
+
+**pbp is the OFFLINE substrate; `game_shape` is the prediction-time conditioning
+variable. Do not merge them** — that is how leakage gets in. pbp unblocks two
+refusals already written into `game_shape.py` by name: the MLB leverage index
+(needs a fitted win-expectancy table — `feed_live` is where it comes from) and
+football down/distance value (NFL pbp already ships `epa`/`wp`/`wpa`).
+
+## 2026-08-17 00:29Z — VERIFIED (sim-scheduling)
+
+**ALL THREE SERVICES ARE CONVERGED WITH `main`.** Each is a merge commit with two
+parents, cut on that service's own live SHA:
+
+| service | commit | landed |
+|---|---|---|
+| web | `763a2f66` | 00:13:41Z |
+| refresh-worker | `7c2b1a17` | 00:24:01Z |
+| live-odds-worker | `c348da53` | 23:57:12Z |
+
+**Do not deploy `main`'s tree to these services.** Each lineage held commits main
+never received (21 / 52 / 40). See `learnings.md` 2026-08-17 for the per-file
+`main-only == 0` test that finds them.
+
+**`#440` Phase 1c VERIFIED IN PRODUCTION 00:11:36Z on live-odds-worker.** Soccer
+pregame cadence now resolves PER LEAGUE: `mls due:imminent_handoff_to_t_window:1107s`
+while `championship`, `la_liga` and `primeira_liga` all skip at 18-19h out
+(`scope=league due=mls of=4`). Corroborated by a live process carrying
+`--soccer-leagues mls`. Flag `SYNDICATE_PREGAME_LEAGUE_SCOPED_CADENCE` is set on
+**live-odds-worker only** — the code is present but INERT on the other two, and
+`FIXTURE_CADENCE sport=soccer` appears in live-odds-worker's logs and nowhere else.
+
+**`refresh-worker` IS OOM CRASH-LOOPING — `#449`.** 23 `oomKilled` (4Gi) events
+since 12:00Z, first 16:34:32Z, cadence tightened to ~11-15 min. It is a SPIKE not
+a leak: post-restart memory is ~510MB of 4096. Each kill takes the running job
+with it, so **any job longer than ~12 minutes may never complete on this service**
+— check this before diagnosing unrelated "job never finished" symptoms.
+NOT caused by tonight's deploys; the loop predates them by 96 minutes.
+
+**Tooling:** `scripts/pending_deploys.py` re-derives pending work per service from
+each service's CURRENT live SHA. Use it instead of `rev-list --count live..main`,
+which reports 600-700 and means nothing because services run curated branches.
+
+
+## LIVE TIER AND EDGE ATTRIBUTION — VERIFIED 2026-08-16/17 (lane `layer1-board-coverage`)
+
+- **The ±4900 clamp is GONE platform-wide.** 0 clamp sites by content at all
+  three live SHAs (web `9f617f34`, refresh-worker `fdc72dd0`, live-odds-worker
+  `c348da53`), and **7,002 served `fair_price` values across mlb+wnba+soccer
+  carry 0 at ±4900**. `[measured 00:0xZ]` The last piece shipped via another
+  session's converge deploy, not by the clamp lane.
+- **Soccer was serving bettable edges on FINISHED matches, and no longer is.**
+  27 rows on `state: final` plus 9 live-from-pregame → **0**, confirmed by the
+  enforcement counter `live_edge_enforced_rows: 36` matching the pre-fix count
+  exactly. Two causes, both fixed: soccer published no structured liveness
+  (every game read `pregame`), and the producer's own refusal was unreachable
+  behind an early return. `[measured 18:38–18:56Z]`
+- **`live_edge_policy` is now enforced at `attach_projections`**, over the
+  finished grid, where no producer's control flow can route around it. Producers
+  that already refuse correctly hit 0 rows (MLB reads 0).
+- **WNBA has a live GAME-LINE tier**: 218 of 321 game rows `live_aware` on a live
+  slate, edges withheld by `sim_count_unusable` because wnba publishes no
+  `simsRun` — an `n` was NOT invented. **WNBA PROPS DO NOT**: `actual` /
+  `live_projection` / `live_total` are NULL in all 24 rows at the source.
+  `[measured 22:2x–23:3xZ]`
+- **A finished game retains NO model probability on any served surface**
+  (`{final: 14, live: 1}` → model_prob rows `{live: 12}`). Live projections
+  exist only in `live_gameline_ledger`, which is on the worker's disk and
+  matches **zero** `HOT_ARTIFACT_PATTERNS`. **Scoring live edges is blocked on
+  transport, not on method.** `[measured 01:02Z]`
+- **NFL slate window is 7 days**, not 5: the preseason week starts at +5 from a
+  Sunday anchor, one day past the old edge. Measured — width 7 reaches 15
+  preseason games vs 1, and is the widest that does not pull a second
+  regular-season week onto a today board. Widens Layer 2's NFL horizon by
+  construction (shared `slate_window_days`).
+
+## refresh-worker OOM — verified 2026-08-16 evening CDT (session `refresh-worker-oom-trace`)
+
+> Supersedes nothing above by contradiction; these SHARPEN the existing
+> "STILL UNNAMED: which allocation inside the pass is the 2 GB" line. The
+> allocator is still unnamed.
+
+- **WHY `last_stage` cannot name the allocator — now specific, not just
+  observed.** `_WATCHDOG_STATE` (`memory_observability.py:774`) is a
+  module-level dict with **no thread-locals**, and this worker runs concurrent
+  daemon threads (`live_lens_loop.py:914` and `:814`,
+  `run_refresh_worker.py:3498`). `last_stage` therefore names whichever thread
+  most recently emitted a marker, NOT the allocating thread. The existing
+  "climbs with no stage marker" line is true; this is the mechanism. **Any
+  attribution built on `last_stage` is invalid by construction.**
+- **Excursion shape, n=7 distinct excursions (events API + watchdog samples):**
+  effective headroom (`max - unreclaimable`) at excursion START **2231–2953MB**;
+  magnitude **+2078 to +2860MB**; routine operating headroom **2913–3186MB**.
+  Fatal-start and routine ranges **OVERLAP at 2913–2953MB**, so no static
+  threshold at the check point separates "about to die" from "working".
+- **`OVERVIEW_STOPPED_FOR_MEMORY` is silent because it is PASSING A CHECK IT
+  SHOULD PASS**, not because it is broken. Measured at a real check point:
+  headroom **3341.6MB**, unreclaimable 754MB — clears both floors.
+  `OVERVIEW_MEMORY_CHECK_FAILED` fired 0 times; the permissive-default branch is
+  NOT being taken. The seven non-MLB sports take the relaxed **1500MB** floor
+  (`intelligence.py:2622`), and all 7 excursion-start headrooms clear 1500 while
+  falling below 3000.
+- **~87% OF ANON IS INVISIBLE TO THE PYTHON OBJECT CENSUS.**
+  `UNTRACKED_BYTES_CENSUS explained_pct_of_anon = 13.7%`; `SMAPS_ANON`:
+  `anon_mmap 1848.2MB`, **1293MB in mmap regions >64MB**, largest single region
+  **515.0MB**. pymalloc takes 1MB arenas, so these are large contiguous buffers
+  (NumPy / bytes / compression scratch), not object churn. **`HEAP_CENSUS`'s
+  682k dicts are a red herring — every tracked holder totals 253.8MB of 2146MB.**
+  **CAVEAT: these censuses fire at anon 1610–1700MB (elevated BASELINE), not at
+  the 3700–4000MB peak. They describe what the process HOLDS, not what the
+  excursion ALLOCATES.**
+- **`apply_game_board_contract` is CHEAP and exonerated by measurement:** a
+  `sport=nfl games=16` triplet ran mid-excursion for anon **2935→2937MB (+2MB)**.
+- **Stage-marker density inside an excursion is ZERO** (4 consecutive
+  sub-windows, each under the logs-API cap). Only the watchdog's own 2s clock
+  samples in there. Any design that polls at existing stage markers cannot work.
+- **The artifact-pull path is EXONERATED for the excursion** — presence in
+  excursion vs matched control windows is the same rate (`pulled_hot_artifacts`
+  1/7 vs 1/6). Stop re-investigating it without new evidence.
+
+### Instruments now live on refresh-worker
+- **`board_contract_end`** — emitted by `apply_game_board_contract` for all 8
+  sports (the only per-sport hydration signal the seven non-MLB sports have).
+  Live since `7c2b1a17`; present in `4ec66498`.
+- **Peak SMAPS** — `SMAPS_ANON` at anon ≥2600MB
+  (`SYNDICATE_MEMORY_WATCHDOG_PEAK_SMAPS_MB`), up to 3×, off-thread. Deployed
+  `4ec66498` at 01:23:37Z. **HAD NOT FIRED at checkpoint time** — it needs an
+  excursion, and the post-deploy worker was at anon 328MB.
+
+- **refresh-worker RUNS OFF-MAIN DEPLOY BRANCHES.** Observed this evening:
+  `deploy/wnba-live-tier` (`fdc72dd0`) → `deploy/rw-ship` (`7623a233`) →
+  `deploy/rw-peak-smaps` (`4ec66498`). `origin/main` was 639 commits ahead at one
+  point and 11 at another. **Always parent a deploy branch on the LIVE SHA and
+  read that SHA before every deploy** — this is the `web_runs_a_deploy_branch`
+  rule holding for refresh-worker too.
+
+## `#454` COMPLETE — RE, WE AND LEVERAGE EXIST AND ARE ON MAIN `[measured 2026-08-16]`
+
+Built from `data/mlb_source/**/feed_live`: 723 files, 714 games, **47 dates**
+(2026-05-28..07-14), **53,049 plate appearances**.
+
+- **`scripts/mlb_run_expectancy.py`** — RE24. Reproduces published values under a
+  single **+14.6%** run-environment factor, 21 of 23 comparable cells within
+  3 SE. **0 score cross-check mismatches over 12,361 half-innings**, monotonic in
+  outs in all 8 base states.
+- **`scripts/mlb_win_expectancy.py`** — WE by COMPOSITION. The empirical table was
+  refused on measurement: 4,039 cells, **median 4 observations**, zero at 1,000+.
+  Composed from P(k runs | base-out) at ~2,200 obs/state.
+- **`scripts/mlb_leverage_index.py`** + **`shared/mlb_leverage_table.py`**
+  (GENERATED, 5,382 cells) — LI matching published values (start 0.93,
+  bottom-9-tied 2.36, bases-loaded-tied-2-out 10.61, 6-run 9th 0.00).
+- **`game_shape.py` emits `leverage_index` + `leverage_source`.** Its leverage
+  REFUSAL is lifted; the module stays pure (generated literals, function-local
+  import).
+
+**THE CAVEATS ARE LOAD-BEARING AND RIDE ON THE RECORDS THEMSELVES:**
+league-average only — i.i.d. innings, one shared run distribution for both sides,
+no team or park term, extras as a constant, and a start-of-game WE of **0.500**
+against a published ~0.540 (that gap IS the omitted home-field advantage).
+**Wrong for a specific matchup.** The RE reference table is **RECALLED, NOT
+SOURCED**; two cells disagree by >3 SE and the attribution is deliberately OPEN.
+
+## `#455` / `#456` — BOTH FIXED, NEITHER DEPLOYED `[measured 2026-08-16]`
+
+- **`#455` WNBA:** `build_live_pbp_stats_payload` never computes pbp — it replays
+  a stored snapshot and otherwise emits an all-null skeleton, and a skeleton has a
+  NON-EMPTY `games` list, so once persisted it was served over real data all day.
+  Reproduced on a slate that was two games FINAL and one LIVE, `generated_at`
+  **frozen 3 hours**. Fixed in `ea9a2be8` under a logged claim override on
+  `wnba/cards.py`, taken on explicit user instruction.
+- **`#456` NBA:** a DIFFERENT defect — one undated snapshot path served for every
+  requested date (`?date=2025-12-25` -> payload date `2026-06-13`). NBA never
+  persists, so it does NOT share `#455`. Fixed in `0fcdefa4`.
+- **Both change what a live endpoint serves and NEITHER IS DEPLOYED.** `#455` is
+  verifiable only during a live slate: check that `generated_at` advances.
+
+## WNBA pbp IS NOT A CORPUS `[measured 2026-08-16]`
+
+`live_pbp_stats_*.jsonl` are **cached API responses** (`payload`/`ttl`/`ok` is an
+HTTP envelope), not a data store. 53 files -> 120 game records -> 17 with
+possessions -> minus 8 placeholder ids and 5 partial snapshots -> **4 usable
+games**. The endpoint serves LIVE ONLY (past dates return 0 games), so there is
+nothing to accumulate historically. **The mirror refresh cannot help — it copies
+local-to-local and never contacts production.** `HOT_ARTIFACT_PATTERNS` excludes
+the family, but that is NOT the binding constraint: there is nothing to export.
+
+
+## LIVE GAME-LINE MODEL — SCORED 2026-08-17 (lane `score-live-gameline-edges`)
+
+- **The live game-line model LOSES TO THE MARKET on every population.** Measured
+  on the served `book_grid` artifact at **02:28:13Z, the COMPLETE 15-game MLB
+  slate** (`by_state {final: 15, live: 0}`):
+
+  | population | model Brier | market Brier | model − market | n |
+  |---|---|---|---|---|
+  | `all_records` | 0.27725 | **0.23883** | **+0.03842** | 3,638 |
+  | `last_per_game` | 0.25925 | **0.20147** | **+0.05778** | 15 |
+  | `priceable_only` | 0.29694 | **0.24070** | **+0.05624** | 2,409 |
+
+  Positive = the market is better calibrated. **It is worst on
+  `priceable_only` — the rows the board actually shows.**
+- **SUPERSEDES the 14-game figures written at 02:1xZ** (`all_records` +0.02656).
+  Those were taken while one game was still live; the gap WIDENED to +0.03842
+  once the slate completed. Do not quote the earlier numbers.
+- **ONE SLATE. `last_per_game` is n=15.** The direction is consistent across
+  three populations and 3,638 records, but the magnitude rests on a single
+  night. **Do not act on it without a second slate.**
+- **`no_final_outcome_for_game` resolved to ZERO and was never a defect.** It
+  read 416 at 02:12Z because one game was still in progress, and cleared itself
+  when that game went final — the counter correctly refusing to score a result
+  that did not exist yet. The only remaining unscored bucket is
+  `record_carries_no_model_probability: 110`, which is the live re-sim
+  publishing no probability (the same refusal surfacing as
+  `prob_interval_swamps_edge` on the board).
+- **The score is readable from the API**: `live_gameline_score` on
+  `/api/board/book-grid?sport=<sport>&date=<date>`. The ledger itself stays
+  unpublished (zero `HOT_ARTIFACT_PATTERNS`), so this block is the ONLY way the
+  measurement leaves the worker.
+- Live: refresh-worker `9bff3cc1`, web `685ab3e9`; `origin/main` matches both by
+  content.
+
+
+## refresh-worker OOM — part 2, verified 2026-08-16 late evening CDT (`refresh-worker-oom-trace`)
+
+- **PEAK SMAPS ANSWERED ITS QUESTION.** 01:46:04–09Z, three samples, kill
+  01:46:59Z: **one anon VMA 1096.5 → 1306.2 → 1586.4MB (+489.9MB in 5.5s) while
+  regions #2/#3/#4 were IDENTICAL across all three samples**
+  (268.7/201.8/194.0). Total `anon_mmap` +489.8MB — all growth in that one
+  region. Baseline largest region was 515.0MB at anon 1610–1700MB.
+- **BUT THE SECOND EXCURSION HAS A DIFFERENT SHAPE, and this is load-bearing.**
+  02:26:43–02:27:01Z (kill 02:27:07Z): top5 `[751.1, 648.6, …]` →
+  `[759.9, 622.1, …]` → `[774.6, 759.9, …]` — **two comparable regions trading
+  places**, individual regions moving both up and down, total +136MB. **Do NOT
+  treat "one giant growing region" as the established signature.** The most
+  likely reconciliation is that VMA identity is an artifact of where the kernel
+  merged adjacent mappings at sample time (`_SMAPS_MAX_PER_PROCESS`'s own comment
+  says coalescing makes region counts meaningless), so region topology locates
+  bytes but does not identify an allocator.
+- **THE PER-FILE LEDGER CEILING IS CORRECT AND IS NOT THE BUG.** Applied BEFORE
+  the read (`intelligence_evaluation.py:679`, `stat().st_size` → `continue`), and
+  accepted chunks stream line-by-line. **The unbounded quantities are the SUM
+  (8 chunks, 830,832,574 bytes accepted per load) and the MATERIALISATION by
+  callers** — `_iter_record_payloads`'s own docstring: "holds every record of
+  every accepted chunk at once".
+- **`recommendation_engine.py`'s duplicate-load defects are ALREADY FIXED**
+  (`:1253-1256`, `:1545-1548`, single load threaded via `_owned_records`). Its
+  comments describe the pre-fix state — read the code, not the comment.
+- **SETTLEMENT AUTORUN IS OFF**, verified three ways: code default for absent is
+  False; `EVALUATION_SETTLEMENT_ENABLE_REFRESH_WORKER_AUTORUN='false'`;
+  `EVALUATION_SETTLEMENT_REFRESH_INTERVAL_SECONDS` ABSENT. **105 env keys across
+  2 pages — page 1 returns exactly 100, the cap; a single-page read is
+  truncated.** Statically, the autorun is the ONLY production path to
+  `evaluation_settlement._read_chunk_records`; no blueprint reaches it.
+- **LANE CLAIMS MUST BE READ WITH THE GUARD'S OWN PARSER, not by eye.** Reading
+  `lanes.md` by eye said `recommendation_engine.py` was claimed; running
+  `_claims()` from `.claude/hooks/lane-guard.py` says it is NOT (a blank line
+  ends the Files block before the path). 51 claimed paths across OPEN lanes.
+  `evaluation_settlement.py` IS claimed (`grading-blocker-settled-zero`).
+  Recipe: exec the hook source with `sys.exit(main())` neutralised — importing it
+  runs and exits.
+
+### Instruments live on refresh-worker (all deployed, none is a fix)
+- `board_contract_end` — all 8 sports. Live since `7c2b1a17`.
+- **Peak SMAPS** — `SMAPS_ANON` at anon ≥2600MB, ≤3×, off-thread. `4ec66498`.
+  **FIRED TWICE, both readings above.**
+- **`PAYLOAD_LOAD`** — on `_iter_record_payloads` (the choke point all three
+  ledger entry points share), reporting `records` + `elapsed` + anon delta +
+  caller. Live `7d8f960d` since 02:39:10Z. **HAD NOT FIRED at checkpoint
+  (02:43Z).**
+- **Kill cadence intact: 01:46:59Z, 02:27:07Z.** Earlier quiet was
+  boot-confounded by four deploys; it was NOT improvement.
+
+## WEB IS `60cdf8eb` — `#455` + `#456` DEPLOYED, ONE MEASURED `[2026-08-16 21:58 CDT / 02:58:34Z]`
+
+**Supersedes any earlier web SHA in this file.** Deploy
+`dep-da17ekm7bikc738hcisg`, scoped to two files and parented on the previous
+live SHA `685ab3e9`, NOT on `main` (which carried 14 pending commits from six
+lanes). Branch `origin/deploy/web-455-456` holds the commit.
+
+- **`#456` MEASURED PASS:** `/nba/api/live_pbp_stats?date=<past>` returns
+  `empty_reason=snapshot_date_mismatch` with the stale `snapshot_date` named;
+  a request for the MATCHING date is still served unrefused (the control).
+  Before: all dates returned payload date `2026-06-13`.
+- **`#455` NOT MEASURED.** `generated_at` being current post-deploy is NOT
+  evidence — the restart alone produces it. Needs a live WNBA slate:
+  `generated_at` must ADVANCE between `ttl=1` fetches and no all-null record may
+  persist. Instrument: `scripts/capture_wnba_pbp.py --date <d> --probe`
+  (exits 2 when every record is a skeleton). **Unowned.**
+- **Rollback:** redeploy `685ab3e9`.
+
+**A FACT ABOUT THIS PLATFORM worth not re-deriving:** web's configured Render
+branch is `main`, and its live SHA was nonetheless NOT an ancestor of `main`.
+Previously-deployed commits fall out of `main`'s history when sessions rewrite
+it. **Never infer the deploy base from the branch setting — read the live SHA
+from the service.**
+
+- **The evaluation bundle scanned the chunked ledger TWICE per pass; it now scans
+  ONCE.** `build_intelligence_evaluation_bundle` passed `records=None` to both
+  `build_evaluation_history_summary` and
+  `build_recommendation_performance_analytics` — the branch that re-reads all 8
+  chunks (830,832,574 bytes / 22,078 records each). Fixed by reducing once and
+  threading the REDUCED set (raw would raise the peak above the double scan).
+  **VERIFIED in production 03:10:25–03:10:26Z: exactly one
+  `LEDGER_CHUNKS_ACCEPTED` before the bundle completion, against two pre-fix.**
+  Live `a3340e32`.
+- **THAT CHANGE DID NOT STOP THE OOM.** Kill at 03:10:46Z, 20s after the bundle.
+  Series: 02:27:07, 02:51:09, 02:57:53, 03:10:46. **A THIRD ledger pass exists**
+  (`SKIP 08-05/06/07`, different date set, therefore a different caller) which
+  died mid-flight in the original excursion and is NOT covered by the
+  bundle-level sharing.
+- **The 830MB chunked loads do NOT go through the materialising wrapper.**
+  `PAYLOAD_LOAD` (on `_iter_record_payloads`) fired twice with `records=0` in a
+  window where `LEDGER_CHUNKS_ACCEPTED` fired three times — so the heavy loads
+  take the six `_latest_by_recommendation_id(_stream_record_payloads(...))`
+  reduce routes. **The materialisation hypothesis is DISCONFIRMED**; the cost is
+  the transient of streaming/parsing 830MB repeatedly, not a retained list.
+
+- **CORRECTION to the line above: there was no third ledger pass. There were
+  exactly TWO scans per bundle, now ONE.** `_stream_chunked_ledger_records`
+  (`:644-662`) has NO date scoping — manifest list or a full `*.jsonl` glob — so
+  every call sees the same chunks and emits skips in SORTED order.
+  `08-05/06/07` is a scan's START, `08-14/08-16` its END. Verified from two
+  UNCAPPED windows: scan A ran 02:26:21->02:26:45, scan B 02:26:46->02:27:02.
+- **Consequence, and it is the important one: the single-scan fix removes HALF
+  the bundle's entire ledger cost, and the OOM continued regardless** (kill
+  03:10:46Z, 20s after the post-fix bundle). **Repeated ledger scanning is not
+  the cause of the excursion, or not the dominant part of it.** The remaining
+  ~2GB is unexplained by anything measured this session.
+
+## THE ALLOCATOR IS NAMED — 2026-08-17 03:48Z, by stack dump
+
+**Supersedes the earlier line in this file saying "repeated ledger scanning is
+not the cause of the excursion". That was WRONG and the error is worth keeping:
+peak is PER-PASS, not cumulative — halving 2 scans to 1 cut DURATION
+(81s/195s -> 46-49s) and could never have moved the peak, so "kills continued"
+was evidence of the wrong lever, not of the wrong suspect.**
+
+- **`build_intelligence_evaluation_bundle`, on the INTELLIGENCE-STATE BACKGROUND
+  LOOP**, entered via `maybe_record_board_state_to_evaluation_ledger`
+  (`pipeline/intelligence_state.py:2054`, loop at `:5411`). Captured in two
+  frames of the same chain, in one excursion, while anon climbed 100+ MB/s:
+  - `_latest_by_recommendation_id` (`intelligence_evaluation.py:1464`) consuming
+    `_stream_chunked_ledger_records` (`:706`) — the reduce over the 830MB stream.
+  - `_aggregate_performance_rows` (`:1992`) via
+    `build_recommendation_performance_analytics` (`:2095`).
+- Region #1 grew **764.7 -> 1041.3 -> 1260.4 MB** across three samples 5s apart
+  while region #2 stayed frozen at 631.0MB and all others were static.
+- **The pass is near-useless as well as expensive:**
+  `performance_publish_count=22078`, `recommendation_count=60`,
+  **`sample_size=0`**, `reliability_multiplier=1.0`, `duration_ms=49706`.
+  22,078 ledger records reduced and aggregated to serve 60 recommendations,
+  deriving zero samples and returning the neutral multiplier. `sample_size=0` is
+  PRE-EXISTING (verified in pre-fix windows 23:52, 01:54, 02:34), not caused by
+  the single-scan change.
+- **A fix must address BOTH sites** — the reduce and the aggregation are separate
+  allocations inside the same pass.
+- Method note, because it is the transferable part: five instruments and six
+  retractions preceded this, and every log-correlation attempt was refuted by its
+  own control. The answer came from `faulthandler.dump_traceback(all_threads=True)`
+  — the only instrument that does not require the allocating code to volunteer a
+  log line.
+
+## VERIFIED FIX — the refresh-worker OOM, 2026-08-17
+
+- **The allocator was `build_intelligence_evaluation_bundle`'s ledger load**, on
+  the intelligence-state background loop, entered via
+  `maybe_record_board_state_to_evaluation_ledger` (`intelligence_state.py:2054`).
+  Named by stack dump 03:48Z, confirmed by fix.
+- **Fix: bound the load** to `load_recent_evaluation_records` (14-day window +
+  64MB per-chunk ceiling). Live `59c07221` from 04:03:35Z.
+- **Result: 154 minutes with no kill** (last kill 03:55:17Z, pre-deploy) against
+  a ~6-7 min baseline, sustained at `procs=9, sim=6, 83.9%` — a busier machine
+  than the excursions it replaced. Mechanism: 830,832,574 bytes -> 0 accepted;
+  22,078 -> 755 records; 49.7s -> 24.2s.
+- **NOT "stable": memory still ratchets slowly, 84% -> 86% over ~25 min.** The
+  fast +2.1-2.9GB excursion is gone; a slow climb remains and is UNMEASURED
+  beyond ~2.5 hours. Do not record this worker as fixed-and-stable on the
+  strength of the kill interval alone.
+- **Every ledger chunk exceeds the hot-path ceiling** — 08-06 480MB, 08-05
+  367MB, 08-16 327MB, 08-14 305MB, down to 08-15 95MB (1.5x over 64MB). The
+  daily chunks have grown large enough that ANY unbounded hot-path read of them
+  is hundreds of MB.
+
+- **The board-state path no longer reads the evaluation ledger at all.**
+  `maybe_record_board_state_to_evaluation_ledger` passes
+  `include_history_analytics=False`; the bundle emits
+  `BUNDLE_ANALYTICS_SKIPPED query_type=board_state` and returns
+  `history_status=null` / `performance_publish_count=null` (**null, not 0** — the
+  code never ran). Live `8e3d2f95` from 14:39:32Z, measured 14:47:01Z.
+  **49,707ms -> 5,608ms across the session's two fixes (89%).** Persistence is
+  unaffected: `BOARD_STATE_LEDGER_RECORDED recommendation_count=95`.
+
+
+## LEDGER SWEEP 2026-08-17 — ownership was decoupled from reality `[measured 11:5x–12:3x CDT, lane `ledger-sweep-2026-08-17`]`
+
+**The headline fact: of 15 lanes reading OPEN in `lanes.md`, 9 had no live
+owner.** Not archived — GONE. `get_session` returns *not found* for every one
+of them. This was measured, not inferred: roster census via `list_sessions`
+with `include_archived: true`, then a per-id `get_session` on each session named
+by a lane or by a `.current-lane.<id>` marker.
+
+Nothing in this sweep changed code, config, or any production surface.
+
+### Owner census `[2026-08-17 12:0x CDT]`
+
+| lane | owner | verdict |
+|---|---|---|
+| `convergence-phase7-crps` | `model-sim-track` | RUNNING |
+| `wnba-live-tier` | `layer1-board-coverage` fork 6 | RUNNING (last claim file belongs to an archived fork) |
+| `live-edge-basis` | `ask-answer-substance` fork | EXISTS, idle — the only orphan recoverable by resuming a session |
+| `layer2-board-quality` | — | GONE |
+| `clv-without-settlement` | `lane-cleanup` | GONE |
+| `ask-sport-coverage` | — | GONE |
+| `soccer-model-coverage` | `soccer-model` | archived, claims explicitly released |
+| `live-game-line-projection` | `live-gameline-eval` | GONE |
+| `refresh-worker-oom-recurrence` | — | GONE (but the OOM itself was FIXED 2026-08-17 by other sessions) |
+| `odds-cadence-off-the-mlb-peak` | `sim-engine-track` | archived |
+| `grading-blocker-settled-zero` | `alt-line-shortlist-watch` | GONE |
+| `game-shape-capture` | — | GONE |
+
+Each of the above now carries a `[SWEEP 2026-08-17]` block under its header
+naming its owner state and its SINGLE NEXT ACTION. **File claims were left
+ENFORCED** — every header still reads `OPEN`, so `lane-guard` behaves exactly as
+before. Releasing them is a separate decision and is reversible either way.
+
+`export-force-refresh-escape` was CLOSED by the `wnba-fixture-identity` session
+at ~12:1x, mid-sweep. That is why the count reads 15 in one place and 14 in
+another; both are correct at their stated time.
+
+### The obligation counter was a high-water mark, not a count
+
+`deploys.md` is append-only by its own convention, so a `Measured:` pending
+marker is NEVER cleared — the MEASUREMENT row closing it is appended BELOW it.
+**The session-start hook counted the markers, so its number could only ever go
+up.** It read **14 owed**. The true number was **0**: 12 were already
+discharged (seven by rows literally headed "closes the ... row" a few hundred
+lines further down), and the remaining two are the same `#395` row counted
+twice, which is a blast-radius cap nobody owes a measurement on.
+
+Fixed at both ends: an `OBLIGATION RECONCILIATION` section in `deploys.md`
+adjudicates all 14 with one `- RECONCILED:` line each, and the hook now
+subtracts them and prints `$RECONCILED of $PENDING`. It reads
+"none owed (14 of 14 markers reconciled)".
+
+**Do not read that as a healthy service.** The refresh-worker's bounded-ledger
+fix is VERIFIED against the kill it addressed; the slow ratchet (84% -> 86% over
+~25 min) is real and unmeasured beyond ~10.5h.
+
+### Two enforcement gaps found while counting
+
+1. **`game-shape-capture` has no `— OPEN` header anywhere in `lanes.md`.**
+   `lane-guard` only enforces claims on a lane whose status field matches
+   `\bOPEN\b`, so **every file that lane claims has been unguarded the whole
+   time**, while its 16 update blocks read as active work.
+2. **One `layer1-board-coverage` block has a single em-dash**, so it has no
+   parseable status field and the hook reports it as unguarded. It is a
+   byte-identical duplicate of a block already in `lanes_closed.md` and
+   disappears when the duplicates are removed.
+
+### Stale claim markers retired
+
+18 `.current-lane.<session-id>` markers pointed at sessions that no longer
+exist. **Moved, not deleted**, to `.syndicate/lane_claims_retired/`. Five held
+claims on lanes that are still open (`layer2-board-quality`,
+`clv-without-settlement`, `ask-sport-coverage`, `grading-blocker-settled-zero`,
+`refresh-worker-oom-recurrence`); the rest were empty or named closed lanes.
+Markers belonging to ARCHIVED-but-existing sessions were deliberately left
+alone — an archived session can be resumed.
+
+### NOT DONE, and it needs a quiet window
+
+**~1,000 lines of `lanes.md` are duplicates** — 13 blocks byte-identical to
+copies already in `lanes_closed.md`, one exact 92-line intra-file duplicate
+(`clv-without-settlement — SETTLED READING`, appearing twice), and one stray
+1-line header. Six closed lanes (`ask-answer-substance`, `layer1-board-coverage`,
+`mlb-live-gameline-distributions`, `score-live-gameline-edges`,
+`mlb-tie-spread-baseline`, `render-events-reader`) still sit in the OPEN file.
+
+It was not done because **the file moved under the transform, twice, inside ten
+minutes** — three sessions append to it continuously, and the first attempt's
+hash guard aborted correctly rather than clobbering a live append. Deleting a
+thousand lines from a file being appended to is a different risk class from
+annotating it. The transform script exists and is idempotent:
+`scratchpad/sweep_lanes.py` (re-baseline `EXPECT_SHA` before running).
+
+**`lanes.md` states its own cap: "Max concurrent OPEN lanes: 3". It is at 14.**
+
+### ADDENDUM 2026-08-17 12:3x CDT — a LIVE lane is unguarded, and the cause is one character
+
+Found while verifying the sweep, not while looking for it. `wnba-fixture-identity`
+(opened minutes earlier by the running `layer1-board-coverage` fork 6) is written
+with **ASCII hyphens instead of em-dashes** in its header:
+
+    ### wnba-fixture-identity - OPEN - **stable fixture identity SHIPPED...
+
+`lane-guard.py`'s `LANE_RE` is `^###\s+(\S+)\s+—\s*([^—]*)` and requires U+2014.
+A hyphen header does not parse **at all**, so:
+
+- its three claimed files are **NOT GUARDED**, including
+  `scripts/refresh_wnba_oddsapi_props.py` — the same file the just-closed
+  `export-force-refresh-escape` lane was editing;
+- the session-start digest does not list the lane under OPEN LANES, so a session
+  starting now sees no claim on those paths;
+- the hook already prints `(1 lane header(s) have no parseable status and are NOT
+  guarded)`, which is how it surfaced.
+
+**Not fixed here — it is another session's live lane and cross-lane edits are
+forbidden.** Notified via `send_message` to `layer1-board-coverage` fork 6.
+
+**The general rule:** in this ledger the em-dash is not punctuation, it is
+SYNTAX. Two hooks parse on it (`lane-guard` for enforcement, `session-start` for
+the digest), and both fail silently and permissively — a malformed header does
+not warn the lane's owner, it just stops protecting them. That is the third
+distinct instance recorded of a guard whose unparseable input maps onto its
+permissive branch.
+
+### ADDENDUM 2 2026-08-17 12:4x CDT — a revert-in-waiting was sitting in the shared index, and it was 1,110 lines wide
+
+Found by the mandatory `git diff --cached --numstat` check at the end of the
+sweep, not by looking for it. The shared index held a staged `.syndicate/lanes.md`
+that was **3,512 lines against a 4,622-line worktree** and contained **zero** of
+the sweep annotations. A bare `git commit` by ANY session would have recorded a
+`lanes.md` missing today's ledger work — the sweep, the `wnba-fixture-identity`
+lane, and the sub-block restructure — **with the worktree clean and nothing
+visibly wrong.**
+
+**Disarmed path-scoped and index-only** (`git reset -- .syndicate/lanes.md`),
+which changes no file; verified after: worktree still 4,622 lines with all 13
+annotations. The two staged `game-shape-capture` blobs
+(`syndicate/features/shared/game_shape.py`, `tests/test_game_shape.py`, 906/693
+insertions, **0 deletions**) were LEFT ALONE — they are adds, not a revert, and
+they belong to a lane's commit.
+
+This is the **fifth** recorded occurrence of the stale-shared-index mechanism.
+The count is the finding: it is not rare, and a single disarm is not a fix.
+Re-check immediately before every commit.

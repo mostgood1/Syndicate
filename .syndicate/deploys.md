@@ -9589,3 +9589,789 @@ lines of somebody's real work.** The note is safe in the worktree copy too, so a
 worktree commit by that session preserves it; only a bare commit of the stale
 stage would drop it from HEAD. Whoever owns those 542 lines should commit from
 the worktree, not from the index.
+
+### single ledger scan per evaluation bundle — **FIRST BEHAVIOUR CHANGE OF THIS LANE** (refresh-worker)
+- Deployed: 2026-08-17 02:57:44Z — `dep-da17ha67bikc738hhtq0`, commit `a3340e32`,
+  branch `deploy/rw-single-scan`, parented on the LIVE SHA `7d8f960d`. Live's
+  `intelligence_evaluation.py` blob was byte-identical to the change's base, so
+  the carry was exact. **Scope: 1 commit, 2 files, 189 insertions, 0
+  file-deletions**; `shared_ledger_records` x3 and the prior `PAYLOAD_LOAD`
+  instrument x2 both verified present in the REMOTE blob.
+- **PREFLIGHT PASSED CLEAN — the first time tonight with NO override.** Sim gate
+  was genuinely CLEAR (0 procs at 02:56:37Z), no deploy in progress. The four
+  earlier deploys all overrode a running sim.
+- Change: `build_intelligence_evaluation_bundle` reduces the ledger ONCE and
+  threads that set through `build_evaluation_history_summary` and
+  `build_recommendation_performance_analytics`, which were each being passed
+  `records=None` — the branch that re-reads all eight chunks.
+- **Evidence it was two scans**, one bundle, 81s (`duration_ms=80934.56`), kill
+  02:27:07Z:
+
+      02:26:45.341  LEDGER_CHUNKS_ACCEPTED count=8 bytes=830,832,574 records=22,078
+      02:26:46.720  evaluation_reliability_profile      <- scan 1 done
+      02:26:46.739  SKIP 08-05 / 08-06 / 08-07          <- scan 2 begins
+      02:27:02.574  LEDGER_CHUNKS_ACCEPTED count=8 bytes=830,832,574 records=22,078
+
+- **REDUCED set threaded, NOT raw, and that distinction is the change.** Sharing
+  22,078 raw records would be held at bundle scope AND copied per consumer
+  (`_stream_record_payloads` yields `dict(item)` when `records` is not None),
+  raising the peak ABOVE the double scan it replaces. The streaming rewrite of
+  `_stream_chunked_ledger_records` exists so the peak is the REDUCED set.
+- Expected: **`LEDGER_CHUNKS_ACCEPTED` per bundle drops 2 -> 1.** That is the
+  falsifiable prediction and it is cheap to read. Effect on the OOM is NOT
+  predicted — see below.
+- Measured: `<pending>`
+- Rollback: redeploy `7d8f960d`.
+- **NOT A CLAIMED OOM FIX.** It removes one of AT LEAST THREE scans: a third
+  pass (`SKIP 08-05/06/07` at 02:26:46.739) was still in flight when the process
+  died and never printed its accepted line. Unknown share of the +2.4GB.
+- **Equivalence asserted, not assumed** (this is a refactor, so that is the
+  load-bearing test): `threaded == fresh` for both consumers across three
+  sport-filter values; reduce is idempotent; `portfolio_event` rows skipped
+  identically; a spy proves a threaded consumer never re-opens the ledger; a
+  call-site guard fails if anyone restores `records=None`. 225 passed across 21
+  suites locally, 30 on the deploy branch's own codebase.
+- Verdict: `<pending>`
+
+## 2026-08-16 21:58 CDT (02:58:34Z) — web `60cdf8eb` — `#455` + `#456`, SCOPED — one MEASURED, one NOT
+
+**Deploy** `dep-da17ekm7bikc738hcisg`, service `syndicate` (web,
+`srv-d88ahvrbc2fs73eodu30`). Triggered 21:52 CDT, live **21:58:44 CDT /
+02:58:34Z**. Live commit verified `60cdf8eb…` against the version endpoint.
+
+**SCOPED ON PURPOSE, and this is the part worth reusing.** `origin/main` carried
+**14 pending code commits from six lanes** — a versioned-profile seam across all
+three sim engines, four live-gameline-score changes, an intelligence-evaluation
+trace, and others, several of which their own lanes describe as unverified.
+Deploying main would have shipped all of them on their first ever deployment and
+made attribution impossible.
+
+So the deploy was parented on the **LIVE** web SHA `685ab3e9` — which is NOT an
+ancestor of `main` (web's configured branch IS `main`; previously-deployed SHAs
+fall out of its history when sessions rewrite it, the same orphaning that hit two
+of my own commits earlier today). Built with plumbing into an isolated index,
+carrying exactly two files, each blob-identical to `origin/main`'s version:
+
+    53   1  syndicate/features/nba/live_lens.py
+    111  3  syndicate/features/wnba/cards.py
+
+Verified before pushing: **no commit other than `ea9a2be8` and `0fcdefa4`
+touches either file** between the live SHA and main. Pushed to
+`origin/deploy/web-455-456` so it cannot be orphaned.
+
+### `#456` — **MEASURED, PASS** `[02:59Z, immediately after live]`
+
+| request | payload `date` | `empty_reason` | `snapshot_date` |
+|---|---|---|---|
+| `?date=2025-12-25` | `2025-12-25` | `snapshot_date_mismatch` | `2026-06-13` |
+| `?date=2026-03-01` | `2026-03-01` | `snapshot_date_mismatch` | `2026-06-13` |
+| **`?date=2026-06-13`** | `2026-06-13` | **`None`** | **`None`** |
+
+Before the fix all three returned payload date `2026-06-13` regardless of what
+was asked for. **The third row is the control and it is what makes this a pass
+rather than "it returns empty now"** — the MATCHING date is still served with no
+refusal, so the fix discriminates instead of just emptying the endpoint.
+
+### `#455` — **NOT MEASURED. Do not read this deploy as evidence for it.**
+
+`generated_at` now reads `2026-08-16T21:59:32-05:00` — current, where it had been
+frozen at `16:14:21` for three hours. **That is NOT attribution.** The deploy
+restarted the service, and a restart alone clears the replayed snapshot and would
+produce exactly this reading. `#455`'s claim is about STICKINESS, and stickiness
+cannot be observed in the first minute after a restart.
+
+**What would actually measure it, and nobody owns it:** on a LIVE WNBA slate,
+`generated_at` must ADVANCE between successive `ttl=1` fetches rather than
+freezing, and no all-null record may be persisted. WNBA games were over before
+this deploy landed, so the earliest read is the next slate.
+`scripts/capture_wnba_pbp.py --date <d> --probe` is the instrument; it exits 2
+when every record is a skeleton.
+
+**Health after deploy:** `/healthz` OK; WNBA and NBA pbp endpoints both return
+`ok: true` with no 5xx. (`/api/ops/version` returning 401 without the admin token
+is correct, not a defect.)
+
+**Rollback:** redeploy `685ab3e9`.
+
+### MEASUREMENT — closes the single-scan row (`dep-da17ha67bikc738hhtq0`, `a3340e32`)
+- Measured 2026-08-17 03:10:25–03:10:46Z, first completed bundle after the fix
+  booted at 03:04:14Z. Appended, not edited into the row above.
+- **PREDICTION HELD: scans per bundle 2 -> 1.**
+
+      03:10:25.289  LEDGER_CHUNKS_ACCEPTED count=8 bytes=830,832,574 records=22,078
+      03:10:26.777  evaluation_bundle duration_ms=46114.633
+      03:10:46      oomKilled
+
+  Exactly ONE `LEDGER_CHUNKS_ACCEPTED` preceded the bundle completion, against
+  TWO on every pre-fix bundle observed (02:26:45 + 02:27:02; 02:49:34 +
+  02:50:42). Read as an ordered sequence of timestamps, not as a count from the
+  logs API.
+- **n=1 IS ADEQUATE FOR THIS PARTICULAR CLAIM AND NOT FOR THE OTHER.** The scan
+  count is deterministic given the code path — the bundle either threads the
+  shared set or it does not — so one bundle settles it. The duration figure
+  (195s/81s -> 46s) is ONE sample against ONE sample, on different instances
+  under different slate loads. **The duration improvement is suggestive and NOT
+  measured; do not cite it as an effect of this change.**
+- **THE OOM IS NOT FIXED. A kill landed at 03:10:46Z, 20 seconds after the
+  bundle completed.** Kill series intact: 02:27:07, 02:51:09, 02:57:53,
+  03:10:46. This row records a mechanism change that worked exactly as scoped
+  and did not resolve the symptom — the deploy row above said "not a claimed OOM
+  fix" before the result was known, and that framing stands rather than being
+  retro-fitted now.
+- **THE THIRD SCAN IS STILL UNACCOUNTED FOR.** The original excursion showed a
+  third pass (`SKIP 08-05 / 08-06 / 08-07` at 02:26:46.739) that never printed
+  an accepted line because the process died first. This change halved two of at
+  least three; the remaining one has a different date set, so it is a different
+  caller and not covered by the bundle-level sharing.
+- Verdict: **mechanism VERIFIED (2 -> 1 scans per bundle); symptom UNCHANGED.**
+  Whatever holds the remaining ~2GB is still unnamed.
+
+### RETRACTION — there was no "third ledger pass". There were exactly TWO scans.
+- Applies to the measurement entry above and to the matching notes in `state.md`
+  and `lanes.md`, which named a third pass as **the next thread**. That
+  instruction was wrong; do not follow it.
+- **What I claimed:** a third pass existed, scanning a DIFFERENT date set
+  (`08-05/06/07` vs the bundle's `08-14/08-16`), therefore a different caller,
+  not covered by the bundle-level sharing.
+- **Why it was wrong:** `_stream_chunked_ledger_records` has **NO date scoping**
+  (`:644-662` — it takes the manifest's chunk list, or globs every `*.jsonl`).
+  Every call considers the SAME chunk set and emits its skips in SORTED order.
+  So `08-05/06/07` is the START of a scan and `08-14/08-16` is its END — one
+  scan, not two callers.
+- **The full sequence, from two COMPLETE (uncapped) windows:**
+
+      02:26:21  SKIP 08-05, 08-06, 08-07     <- scan A begins
+      02:26:44  SKIP 08-14
+      02:26:45  SKIP 08-16 -> ACCEPTED       <- scan A ends   (~24s)
+      02:26:46  SKIP 08-05, 08-06, 08-07     <- scan B begins
+      02:26:59  SKIP 08-14
+      02:27:02  SKIP 08-16 -> ACCEPTED       <- scan B ends   (~16s)
+
+- **How the error was made:** my first read of this window started at
+  **02:26:40**, AFTER scan A's opening skips. I saw A's tail, then B's head, and
+  read the head as a separate pass. The fix was to widen the window until it
+  came back UNDER the row cap — `02:26:20-02:26:35` returned 10 rows COMPLETE and
+  showed A's opening immediately. **A window that begins mid-event will invent
+  an event.**
+- **What this CHANGES about the fix's meaning — it makes the result stronger,
+  and worse.** The bundle did exactly TWO ledger scans and now does ONE, so the
+  change removes **half of the bundle's entire ledger cost**, not "one of at
+  least three". And the OOM continued anyway (kill 03:10:46Z, 20s after the
+  post-fix bundle). **Repeated ledger scanning is therefore not the cause of the
+  excursion**, or not the dominant part of it.
+- Each scan took ~24s and ~16s of an 81s bundle, so the two accounted for roughly
+  half the bundle's wall-clock — which is consistent with the post-fix bundle
+  landing at 46s, though that remains n=1 and confounded.
+
+### stack dump at the excursion — fifth instrument (refresh-worker)
+- Deployed 2026-08-17 ~03:36Z — `dep-da1833e7bikc738imn50`, commit `e54ea856`,
+  branch `deploy/rw-stack-dump`, parented on LIVE `a3340e32` (blob-identical
+  base, exact carry). Scope: 1 commit, 2 files, 310 insertions, 0 file-deletions.
+  Prior instruments verified preserved in the REMOTE blob (peak_smaps=2).
+- **Preflight PASSED CLEAN, second time tonight — sim CLEAR, no deploy in
+  flight, no override.**
+- Change: `faulthandler.dump_traceback(all_threads=True)` at anon >= 2600MB, up
+  to 3x, on the sampler thread, with a pure-Python `sys._current_frames()`
+  fallback.
+- **WHY THIS AND NOT MORE LOG CORRELATION.** Across seven excursions nothing in
+  the logs separates an excursion from a quiet window: zero stage markers in a
+  16s excursion; pull activity 1/7 vs 1/6 across arms; thread activity IDENTICAL
+  between excursion 00:31 (artifact=12, live-lens=7) and control 00:36
+  (artifact=12, live-lens=7); and two excursions produced 8 and 6 log rows, ALL
+  of them the watchdog's own samples, while anon climbed 25-160 MB/s. Three
+  attributions were built on log correlation and each was refuted by its own
+  control.
+- Expected: `WATCHDOG_STACK_DUMP_BEGIN` + frames within one excursion. **A
+  STABLE stack across the 3 samples is the signal; three unrelated stacks is a
+  real (negative) answer, not a failure.**
+- Measured: `<pending>`
+- Rollback: redeploy `a3340e32`.
+- **KILL CADENCE HAS TIGHTENED AND I AM NOT ATTRIBUTING IT.** Since the
+  single-scan fix went live 03:04:14: `03:10:46`, `03:18:11`, `03:24:07`,
+  `03:31:24` — four kills in 27 minutes, ~6-7 min apart. Pre-fix intervals were
+  mixed (02:27:07 -> 02:51:09 is 24 min; 02:51:09 -> 02:57:53 is 7 min), so
+  ~7 min was ALREADY in the pre-fix range and this is not established as a
+  regression. **What IS established: the single-scan fix did not help.**
+  Recorded now so a later reader does not discover the acceleration and assume
+  it went unnoticed.
+- Verdict: `<pending — instrumentation only, fifth of the session, no fix>`
+
+### MEASUREMENT — THE STACK DUMP NAMED THE ALLOCATOR (`dep-da1833e7bikc738imn50`, `e54ea856`)
+- Measured 2026-08-17 03:48:28–03:48:33Z, three dumps inside one excursion,
+  instance restarted 03:48:38Z. `wrote=True` on all three.
+- **THE ALLOCATOR, captured in two different frames of ONE call chain, on the
+  INTELLIGENCE-STATE BACKGROUND LOOP thread (`0x738e0dfff6c0`):**
+
+      n=2  anon 3168MB  climb 101.6 MB/s
+        intelligence_evaluation.py:706   _stream_chunked_ledger_records
+        intelligence_evaluation.py:1406  _stream_record_payloads
+        intelligence_evaluation.py:1464  _latest_by_recommendation_id
+        intelligence_evaluation.py:2323  build_intelligence_evaluation_bundle
+        pipeline/intelligence_state.py:2054  maybe_record_board_state_to_evaluation_ledger
+        pipeline/intelligence_state.py:5411  _background_loop
+
+      n=3  anon 3399MB  climb 109.4 MB/s
+        intelligence_evaluation.py:1992  _aggregate_performance_rows
+        intelligence_evaluation.py:2095  build_recommendation_performance_analytics
+        intelligence_evaluation.py:2332  build_intelligence_evaluation_bundle
+        (same caller chain)
+
+  Region #1 grew **764.7 -> 1041.3 -> 1260.4 MB** across the three samples while
+  region #2 stayed frozen at 631.0 and every other region was static.
+- **CORRECTION, AND IT IS THE IMPORTANT ONE. My earlier conclusion "repeated
+  ledger scanning is not the cause of the excursion" is WRONG.** It rested on
+  halving the scans (2 -> 1) and seeing no change in the kills. The reasoning
+  error: **peak is PER-PASS, not cumulative.** Two sequential scans that free
+  between them have the same peak as one, so halving them cut DURATION
+  (81s/195s -> 46-49s) and could never have moved the peak. I read "no change in
+  kills" as exoneration when it was evidence I had pulled the wrong lever.
+  **The ledger IS the allocator.** `state.md` and `lanes.md` corrected.
+- **What the pass costs, from the same window:**
+  `performance_publish_count=22078`, `recommendation_count=60`,
+  `sample_size=0`, `duration_ms=49706`. **22,078 ledger records reduced and
+  aggregated to serve 60 recommendations, deriving ZERO samples and returning
+  `reliability_multiplier: 1.0`** — the neutral value. A 49-second, ~1.3GB pass
+  whose output is indistinguishable from not running it.
+- **Two distinct allocation sites inside the one pass**, so a fix must address
+  both: the reduce (`_latest_by_recommendation_id` consuming the 830MB stream,
+  line 2323 — the shared load introduced by THIS session) and the aggregation
+  (`_aggregate_performance_rows`, line 1992).
+- **Owner: the intelligence-state background loop**
+  (`SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP='true'` on
+  refresh-worker only), entered via `maybe_record_board_state_to_evaluation_ledger`.
+- Verdict: **instrument SUCCEEDED. The allocator is named for the first time in
+  this lane's history.** Five instruments, six retractions, and the answer came
+  from the one that did not require the code to volunteer a log line.
+
+### bound the evaluation bundle's ledger load — THE FIX FOR THE NAMED ALLOCATOR (refresh-worker)
+- Deployed 2026-08-17 ~03:57Z — `dep-da18d63l550s73f325sg`, commit `59c07221`,
+  branch `deploy/rw-bounded-ledger`, parented on LIVE `e54ea856` (blob-identical
+  base, exact carry). Scope: 1 commit, 2 files, 153 insertions, 0 file-deletions.
+  Bounded reader present x2 in the REMOTE blob; the `PAYLOAD_LOAD` instrument
+  verified preserved.
+- **Preflight PASSED CLEAN — third time tonight, sim CLEAR, no override.**
+- Change: `build_intelligence_evaluation_bundle` loads via
+  `load_recent_evaluation_records` (14-day window AND a 64MB per-chunk ceiling)
+  instead of an unbounded `_stream_record_payloads`. Window env-tunable
+  (`SYNDICATE_BUNDLE_LEDGER_WINDOW_DAYS`), guarded >=1.
+- **BASELINE TO BEAT, measured immediately before deploying:** kills at
+  `03:24:07, 03:31:24, 03:37:49, 03:48:37, 03:55:17` — **five in 31 minutes,
+  every ~6-7 min.** Unbounded load was `count=8 bytes=830,832,574 records=22,078`
+  in `duration_ms=49706`.
+- **Expected, and both halves are falsifiable:**
+  1. `LEDGER_CHUNKS_ACCEPTED` bytes/records fall well below 830,832,574 / 22,078
+     (mechanism — deterministic, one bundle settles it).
+  2. Kill interval lengthens materially beyond ~7 min, or kills stop.
+  **If (1) holds and (2) does not, the bundle is not the whole allocator** and
+  that is a real result, not a failed deploy.
+- Measured: `<pending>`
+- Rollback: redeploy `e54ea856`.
+- **KNOWN INCOMPLETE:** the stack dump named TWO sites. This bounds the INPUT to
+  both, but `_aggregate_performance_rows` still runs six aggregations and the
+  bundle still returns the full normalized `records` list in its payload.
+- **Also corrects an earlier conclusion in this file** ("repeated ledger scanning
+  is not the allocator"): peak is PER-PASS, not cumulative, so halving scans cut
+  duration only. Wrong lever, not wrong suspect.
+- Verdict: `<pending — first fix aimed at a NAMED allocator this session>`
+
+### MEASUREMENT — closes the bounded-ledger row (`dep-da18d63l550s73f325sg`, `59c07221`)
+- Measured 2026-08-17 04:03:35Z (boot) -> 04:28:39Z. **Banked BEFORE deploying
+  the next change, because a deploy resets the clock and would have destroyed
+  this observation.**
+- **MECHANISM: ENGAGED, completely.**
+
+      LEDGER_CHUNKS_ACCEPTED   8 chunks / 830,832,574 bytes  ->  0 accepted
+      performance_publish_count        22,078  ->  755   (3.4% of baseline)
+      evaluation_bundle duration_ms    49,707  ->  24,157 (halved)
+
+  Zero accepted because EVERY chunk in the 14-day window is over the 64MB
+  hot-path ceiling: 08-06 480MB (7.5x), 08-05 367MB (5.7x), 08-16 327MB (5.1x),
+  08-14 305MB (4.8x), down to 08-15 95MB (1.5x). **Note the absent
+  `LEDGER_CHUNKS_ACCEPTED` line IS the reading** — it prints only
+  `if accepted_chunks:`, so total refusal looks identical to "no bundle ran".
+  The discriminator was `SKIP_OVERSIZED_LEDGER_CHUNK`=10 and
+  `evaluation_bundle`=2 in the same window.
+- **SYMPTOM: 25 MINUTES WITH NO KILL**, against a baseline of ~6-7 min
+  (`03:24:07, 03:31:24, 03:37:49, 03:48:37, 03:55:17`). That is 3-4 missed
+  intervals and well past the boot-confounding window. **First genuine
+  improvement of the session.**
+- **CONFOUND, NAMED AND NOT DISMISSED:** `process_count` was **2-3** in this
+  window. Every excursion measured earlier tonight had **12-13 processes**
+  including MLB sim forks. Part of this quiet is a quieter machine, not this
+  change. The clean run has NOT yet been observed with a sim running, and that
+  is the test this result still owes. Visible only because the raw log lines
+  were read rather than grepped.
+- Verdict: **mechanism VERIFIED; symptom STRONGLY IMPROVED with a named
+  confound outstanding.** This also retro-confirms the stack dump's
+  attribution — bounding the ledger load is what moved the kill interval, and
+  the ledger is where the dump pointed.
+
+### ADDENDUM to the bounded-ledger measurement — THE CONFOUND IS RESOLVING ITSELF
+- 2026-08-17 04:30:13Z, still on `59c07221`, **27 minutes with no kill**:
+  `process_count=7` with **4 MLB sim processes RUNNING**, container **2951MB
+  (72.0%)**.
+- **This is the exact test the measurement was recorded as owing.** The prior
+  note said "part of this quiet is a quieter machine (process_count 2-3 vs the
+  12-13 during earlier excursions), and the clean run has NOT been observed with
+  a sim running." It now has been. The machine is no longer quiet, memory is at
+  72%, and it is still not dying — against a ~6-7 min baseline
+  (`03:24:07, 03:31:24, 03:37:49, 03:48:37, 03:55:17`).
+- The bounded-ledger result is therefore **stronger than when it was banked**,
+  and the named confound is materially weakened rather than merely noted.
+
+### VERDICT — bounded ledger load: **VERIFIED FIX** (`59c07221`), with one caveat
+- 2026-08-17 04:03:35Z boot -> 06:38Z. **154 MINUTES WITH NO KILL.** Last
+  `oomKilled` on this service was **03:55:17Z, before the deploy**.
+- Baseline it replaced: `03:24:07, 03:31:24, 03:37:49, 03:48:37, 03:55:17` —
+  ~6-7 min apart. **154 min is ~22 missed intervals.**
+- **The confound this measurement owed is FULLY discharged.** It was banked
+  noting the clean run had only been seen at `process_count` 2-3 against the
+  12-13 of earlier excursions. Across the run it was observed at **procs=9,
+  sim=6, 83.9%** and sustained — a BUSIER machine than most excursions, at a
+  memory level that was previously inside the kill zone.
+- Mechanism (restated, deterministic): `LEDGER_CHUNKS_ACCEPTED` 8 chunks /
+  830,832,574 bytes -> **0 accepted**; `performance_publish_count` 22,078 ->
+  **755**; bundle `duration_ms` 49,707 -> **24,157**.
+- **THE CHAIN IS NOW COMPLETE AND EACH LINK MEASURED:** stack dump named
+  `build_intelligence_evaluation_bundle` on the intelligence-state loop ->
+  bounding its ledger load changed the mechanism -> the kill interval moved from
+  ~7 min to 154+ min under load. The ledger load WAS the allocator.
+- **CAVEAT, AND IT IS NOT COSMETIC: MEMORY IS STILL SLOWLY RATCHETING.**
+  Across the last ~25 min of the run it drifted **84% -> 86%** (3482 -> 3504MB
+  over seconds at the end). The FAST excursion (+2.1-2.9GB in 16-51s) is gone;
+  a slow climb is not. At this rate the ceiling is hours away rather than
+  minutes, but **"no kill in 154 min" is NOT "the worker is stable"** and must
+  not be recorded as such. Whether the ratchet plateaus or eventually kills is
+  UNMEASURED — it needs a multi-hour observation this session did not run.
+- **Still available and NOT deployed:** `deploy/rw-skip-analytics` (`8e3d2f95`,
+  on `main` as `618d97ae`) removes the remaining 24s / 755 records from this
+  path entirely, since the board-state caller never reads the result. Held
+  deliberately so this measurement could mature.
+
+### UPDATE to the bounded-ledger verdict — the clean run reached **10.5 HOURS**, and the ratchet is real
+- 2026-08-17 14:33Z, still `59c07221`: **629 MINUTES (10.5 h) with no kill.**
+  Last `oomKilled` remains **03:55:17Z, pre-deploy**. Against a ~6-7 min
+  baseline that is roughly **90 missed intervals**. The bounded-ledger fix is
+  confirmed well beyond any reasonable doubt.
+- **AND THE CAVEAT HELD, which is why it was written down:** memory continued to
+  ratchet across the run — **85% (04:30) -> 86% (06:38) -> 90.9% (14:33)**. The
+  fast +2.1-2.9GB excursion is gone; a slow climb of roughly +5 points over ~10
+  hours is not. **"No kill in 10.5 hours" was still not "stable"**, and at 90.9%
+  the worker was heading toward the ceiling on a timescale of hours.
+- This is the second time tonight the recorded caveat turned out to be the load-
+  bearing part of the entry rather than hedging.
+
+### skip the analytics the board-state caller never reads (refresh-worker)
+- Deployed 2026-08-17 ~14:33Z — `dep-da1hng6417fc73ahe9eg`, commit `8e3d2f95`,
+  branch `deploy/rw-skip-analytics`, parented on LIVE `59c07221` (exact carry,
+  both touched blobs identical to base). Scope: 1 commit, 3 files, 0
+  file-deletions. Opt-out present x1, default `True` preserved x1 — both
+  verified in the REMOTE blob.
+- **Preflight PASSED CLEAN — sim CLEAR, no deploy in flight, branch still
+  parented on the live SHA.** Fourth clean preflight of the session.
+- Change: `build_intelligence_evaluation_bundle(include_history_analytics=False)`
+  from `maybe_record_board_state_to_evaluation_ledger`. That caller invokes the
+  bundle for the `persist=True` SIDE EFFECT and never reads `history` or
+  `performance_analytics`. Removes the remaining **24.2s / 755 records** from
+  every board cycle.
+- Expected: `BUNDLE_ANALYTICS_SKIPPED` appears; `evaluation_bundle duration_ms`
+  falls well below 24,157 on the board-state path; `/api/intelligence` analytics
+  UNCHANGED (default stays `True`).
+- **Also resets the 90.9% ratchet to a fresh boot** — an incidental benefit of
+  the restart, NOT an effect of the change. Do not read post-deploy memory as
+  evidence for this commit.
+- Measured: `<pending>`
+- Rollback: redeploy `59c07221`.
+- Verdict: `<pending>`
+
+### MEASUREMENT — closes the skip-analytics row (`dep-da1hng6417fc73ahe9eg`, `8e3d2f95`)
+- Measured 2026-08-17 14:47:01Z, first board cycle after the 14:39:32Z boot.
+  Appended, not edited into the row above.
+- **CONFIRMED, with the caller named in the line itself:**
+
+      14:47:01.742  BUNDLE_ANALYTICS_SKIPPED query_type=board_state reason=caller_does_not_read_them
+      14:47:01.743  evaluation_bundle duration_ms=5607.556
+                    history_status=null  performance_publish_count=null
+      14:47:01.753  BOARD_STATE_LEDGER_RECORDED recommendation_count=95 chunk_lines_on_disk=98
+
+- **The cumulative effect of the two fixes on the board-state path:**
+
+      unbounded (pre-session)   49,707 ms   830,832,574 bytes   22,078 records
+      bounded  (59c07221)       24,157 ms   0 accepted             755 records
+      skipped  (8e3d2f95)        5,608 ms   no ledger read        null
+
+  **49.7s -> 5.6s, an 89% cut**, and the ledger is no longer touched on this path.
+- **THE SAFETY PROPERTY HELD, and it is the one that mattered:**
+  `BOARD_STATE_LEDGER_RECORDED recommendation_count=95 chunk_lines_on_disk=98`.
+  Persistence still happens — that caller invokes the bundle for exactly that
+  side effect. The skip removed the analytics without touching `persist`, as the
+  pre-deploy test asserted (`record_prediction` runs BEFORE the guard).
+- **`null` vs `0` is the discriminator, and it is the right one.**
+  `history_status=null` / `performance_publish_count=null` means the code never
+  ran. A `0` would have meant it ran and found nothing — the ambiguity that made
+  `sample_size=0` unreadable for hours earlier in this session.
+- **ONE FALSE ALARM, CHECKED NOT ASSUMED:** `SKIP_OVERSIZED_LEDGER_CHUNK=11`
+  since boot suggested the path was still scanning. Reading the FULL unfiltered
+  window shows the board-state bundle at 14:47:01 performs no chunk scan; those
+  11 come from elsewhere in the boot sequence. A `text=` filtered count would
+  have left that as a live suspicion.
+- Verdict: **VERIFIED.** Mechanism confirmed, safety property confirmed, caller
+  named in the emitted line. No memory claim is made here — the deploy rebooted
+  the worker, and post-boot memory is boot-confounded by construction.
+
+## 2026-08-17 — PHASE 7 MEASUREMENT (`#440` Part 4) — lane `convergence-phase7-crps`
+
+**NO DEPLOY. Local tooling only**, same class as `#442` — new module + script +
+tests on the tree. Nothing in a request path or a worker loop changed.
+
+**The instrument exists and has produced a number.** 7,242 scored observations
+across 7 markets and **46 dates (2026-05-28 .. 2026-07-12)**, with **zero**
+settled bets required. For scale: production settlement has produced 0 records
+since it was built. The plan's "10–100× more observations" is now measured for
+MLB rather than asserted.
+
+**SOURCE CAVEAT, load-bearing: read from the LOCAL MIRROR** (`data/mlb_source/**`),
+which is lossy and is NOT what production computed. 46 dates is a LOWER BOUND.
+**Re-run against production before citing any of this externally.**
+
+`py -3 scripts/score_projections.py`
+
+| market | n | CRPS(emp) | CRPS(norm) | gap | bias | MAE | baseline | beats? | disp |
+|---|---|---|---|---|---|---|---|---|---|
+| game_total_runs | 546 | 2.528 | 2.516 | −0.011 | +0.797 | 3.485 | 3.555 | **YES** | 0.75 |
+| pitcher_earned_runs | 1116 | 1.167 | 1.227 | 0.059 | −0.486 | 1.790 | 1.681 | no | 0.72 |
+| pitcher_hits_allowed | 1116 | 1.654 | 1.707 | 0.053 | −1.901 | 2.461 | 1.780 | no | 0.87 |
+| pitcher_outs | 1116 | 3.982 | 4.008 | 0.026 | **−5.139** | 5.377 | 3.158 | no | **1.54** |
+| pitcher_pitches | 1116 | 9.164 | 9.089 | −0.075 | −6.828 | 11.657 | 11.710 | YES | 1.23 |
+| pitcher_strikeouts | 1116 | 1.443 | 1.459 | 0.016 | −0.593 | 2.061 | 1.993 | no | 1.02 |
+| pitcher_walks_allowed | 1116 | 0.712 | 0.740 | 0.028 | −0.148 | 1.040 | 1.053 | YES | 0.78 |
+
+Sign convention is `model_scoring`'s: `bias = actual − mean`, so **negative =
+THE SIM RUNS HIGH**.
+
+### THREE FINDINGS
+
+**1. EVERY pitcher market is biased HIGH, and `outs` is the opportunity term.**
+All six are negative. `outs` is −5.139 — **the sim projects ~1.7 innings more
+per start than the pitcher actually records.** Every other pitcher market is
+downstream of workload (more outs → more pitches, more strikeouts, more hits),
+and their biases line up with that ordering.
+
+**This independently corroborates `#428` on a family that had NO backtest.**
+The 08-14 audit measured MLB *hitter* props as "biased, not blind — sitting
+high", with **55% of it attributable to OPPORTUNITY** (`pa_mean` +18.4%,
+`ab_mean` +17.2%). `outs` is the pitcher-side opportunity variable and it shows
+the same sign and a comparable relative magnitude. Two independent families,
+same defect: **the sim over-estimates playing time.** Fix opportunity first,
+then re-measure — exactly the order `#428` already prescribes.
+
+**2. Four of seven markets LOSE to a constant baseline** (earned_runs,
+hits_allowed, outs, strikeouts). The baseline is the pool's own mean and is
+therefore **in-sample, i.e. flattered** — the honest reading is "these markets
+do not clear a one-parameter competitor", not "these markets are worthless".
+An out-of-sample split is `#440` D4 and was NOT done here.
+
+**3. `outs` is BOTH centred wrong AND overconfident** — dispersion 1.54 against
+a calibrated 0.798, so σ is roughly half what it should be. `pitches` (1.23)
+and `strikeouts` (1.02) are also too narrow. **This is the distinction the
+whole phase exists to make**: bias needs an additive shift, dispersion needs a
+σ scale, and a single MAE cannot tell them apart. Phase 8 now has a target and
+a direction per market instead of one error number.
+
+### A RESULT THAT MAKES PHASE 8 EASIER, AND IS WORTH STATING
+
+**The empirical-vs-Normal gap is tiny everywhere** (|gap| ≤ 0.075 on CRPS of
+0.7–9.2, i.e. under 1%). The `crps_empirical` primitive was built because
+`learnings.md` 2026-08-16 forbids letting a fitted model judge when a
+model-free measurement exists — and having built it, **the measurement says the
+Normal summary is adequate for these markets.** That is a licence for a
+Gaussian calibration term in Phase 8, and it is a licence we now have EVIDENCE
+for rather than an assumption we never tested. Do not read it as general: it
+was measured on these 7 markets only.
+
+### WHAT WAS REFUSED RATHER THAN GUESSED
+
+- **`run_margin_dist` is NOT scored.** The PMF is there, but the artifact does
+  not state the sign convention (home−away vs away−home) and guessing it would
+  have produced a confident wrong number instead of an error.
+- **`batters_faced` is reported UNJOINABLE**, not silently dropped — there is
+  no such column in `mlb_pitcher_game_log.csv`.
+- **48 of 617 games dropped on a source disagreement.** Total runs is derived
+  (every run is charged to a pitcher), so it is cross-checked against the
+  batter log and any game where the two disagree is dropped and counted. That
+  check FIRED, so it is not vacuous.
+- **708 pitcher projections (9.6%) had no outcome row** — projected starters
+  who did not pitch. Excluded and counted, per `backtest_mlb_props`'s DNP rule.
+
+### VERIFICATION OF THE INSTRUMENT ITSELF
+
+- 66 tests pass, including the pre-existing `model_scoring` consumer
+  (`test_segmented_reliability_profile`, `test_build_accuracy_summary`).
+- `crps_empirical` verified **three independent ways** — closed-form point-mass
+  case, an independent sample-based estimator (`E|X−y| − ½E|X−X'|`), and
+  agreement with `crps_normal` on a finely discretised Normal.
+- **4 of 4 mutants caught** (strict-vs-non-strict indicator, dropped interval
+  width, missing outcome breakpoint, absolute instead of squared error). A
+  passing suite that no mutant fails is decoration.
+
+## 2026-08-17 — PHASE 7 ON PRODUCTION — **THE MIRROR RESULT IS PARTLY WITHDRAWN**
+
+Lane `convergence-phase7-crps`. `py -3 scripts/score_projections.py --source both`.
+Code on `origin/main` `91be99e6` + the `--source` addition. **Still no deploy.**
+
+### FIRST, A CORRECTION TO THE ENTRY ABOVE
+
+That entry said **"EVERY pitcher market is biased high"** and read it as
+corroborating `#428`. **On production that claim does not hold.** It was true of
+the mirror window and I generalised it. Three of seven markets change sign
+between windows.
+
+### AND A FACT ABOUT THE TWO SOURCES THAT INVERTS THE USUAL WARNING
+
+The standing rule is "production has far more history than the checkout". **For
+the MLB game logs it is the opposite, and the windows barely overlap:**
+
+| source | dates | span |
+|---|---|---|
+| production | 29 | 2026-07-19 .. 2026-08-16 |
+| local mirror | 46 | 2026-05-28 .. 2026-07-12 |
+
+The logs are a **rolling window production trims**, and the mirror is holding
+history production has already dropped. Neither is a superset. That makes them
+**two nearly independent samples**, which is why the scorer now reports a
+reproducibility table instead of one number — and it is a better instrument for
+the accident.
+
+### REPRODUCIBILITY (bias = actual − mean; negative = THE SIM RUNS HIGH)
+
+| market | bias local | bias prod | same sign | disp local | disp prod |
+|---|---|---|---|---|---|
+| **pitcher_outs** | −5.139 | −2.031 | **YES** | 1.537 | 1.105 |
+| **pitcher_hits_allowed** | −1.901 | −1.592 | **YES** | 0.874 | 0.794 |
+| **pitcher_earned_runs** | −0.486 | −0.694 | **YES** | 0.721 | 0.661 |
+| pitcher_strikeouts | −0.593 | −0.005 | yes, but collapses to ZERO | 1.022 | 1.016 |
+| pitcher_pitches | −6.828 | **+4.313** | **NO** | 1.231 | 1.575 |
+| pitcher_walks_allowed | −0.148 | +0.137 | **NO** (both ~0, so noise) | 0.783 | 0.772 |
+| game_total_runs | +0.797 | **−1.230** | **NO** | 0.752 | 0.726 |
+
+Production n = 4,695 observations / 29 dates / 370 games.
+
+### WHAT SURVIVES BOTH WINDOWS — this is the real finding
+
+1. **The sim over-projects how deep a starter goes, in both windows.** `outs`
+   is negative in both (−5.14, −2.03) and is the largest bias in both. **The
+   `#428` OPPORTUNITY thesis is corroborated** — `outs` IS the pitcher-side
+   opportunity variable, and the hitter side showed the same sign via
+   `pa_mean`/`ab_mean`. What is NOT corroborated is a blanket "all markets high".
+2. **`outs` is overconfident in both** (1.54, 1.10 against a calibrated 0.798),
+   so it needs an additive shift AND a σ scale. `strikeouts` dispersion is
+   1.02 in BOTH windows — the most stable number in the table.
+3. **Runs allowed is over-projected in both** (`hits_allowed`, `earned_runs`),
+   consistent with over-projecting workload.
+4. **On production, 5 of 7 markets lose to the constant baseline** — only
+   `strikeouts` and `walks_allowed` beat it. Worse than the mirror window.
+5. **The empirical-vs-Normal gap stays under 1% in BOTH windows** (≤0.085). A
+   Gaussian calibration term in Phase 8 is defensible, now on two samples.
+
+### WHAT MUST NOT BE READ INTO THIS
+
+- **The `outs` bias HALVED between windows** (−5.14 → −2.03). That could be a
+  real improvement, a seasonal effect, or sampling. **Not attributed.** Nobody
+  should claim a fix caused it without finding the fix.
+- **`pitches` is unstable** — sign flipped and dispersion worsened (1.23 →
+  1.58). Do not calibrate it on either window alone.
+- The baseline is **in-sample** in both runs (`#440` D4 not done).
+- Two windows is not a time series. Three of seven signs flipping on ~4.7k
+  observations says the per-market numbers are noisier than their n suggests,
+  because observations within a start are not independent.
+
+
+## OBLIGATION RECONCILIATION — 2026-08-17 12:2x CDT — all 14 pending markers
+
+**Nothing above this line was edited.** This file is append-only by its own
+stated convention ("Appended, not edited into the row above"), so a
+`Measured:` pending marker is never cleared even when the MEASUREMENT row that
+closes it is appended below. The session-start digest counts the literal string,
+so **its obligation count can only ever go up** — it read 14 today, and 12 of
+the 14 were already discharged. That is why this row exists.
+
+**This section deliberately never writes the literal marker string** — doing so
+inflates the count it exists to reconcile. (Measured: the first draft of this
+section pushed the digest from 14 to 17.)
+
+**Convention introduced here, so the count can fall honestly:** when you append
+a MEASUREMENT row that closes an earlier pending marker, also append one
+`- RECONCILED:` line naming the marker it discharges. The digest subtracts
+those. One line per marker, never per deploy.
+
+### Discharged — the measurement is already in this file
+
+- RECONCILED: `#395` rate ceiling (row `### #395 — rate ceiling`) — **NOT measured, and none is owed.** It is a blast-radius cap, not a repair; its own Verdict says so. The egress incident it belonged to is closed. Do not read a flat graph under this cap as evidence the underlying issue was solved.
+- RECONCILED: `#395` rate-ceiling checklist repeat (the `- [ ]` line under `### PENDING`) — same row, counted twice by the grep. See above.
+- RECONCILED: `#414` quote-join index, inside `### 2026-08-13 22:55-22:59Z — all three services to `d4bb29b5``. **Measured, but recorded in the wrong file** — `lanes.md` carries the production result ("the index works, 21.5x measured", 2026-08-14 00:18Z, lane `quote-join-enrich-cost`, since closed). The obligation is discharged; only the pointer was missing.
+- RECONCILED: `#433` soccer capture-before-simulate — closed in-block by **CLEAN-WINDOW MEASUREMENT 2026-08-14 16:16:56-18:00:49Z (103.9 min, no intervening deploy)**.
+- RECONCILED: `#433` soccer pregame run reports its own outcome — closed in-block by **FINAL MEASUREMENT — 3h CLEAN WINDOW, 16:16:56-19:24Z = 187.3 min**, live commit verified by SHA.
+- RECONCILED: `board_contract_end` instrument — closed by `### MEASUREMENT — closes the `board_contract_end` row above (`dep-da14vu3l550s73ermc0g`)`, then a SECOND MEASUREMENT reproducing it on different code, then `### RETRACTION — the `board_contract_end` verdict does NOT localize the allocator`. Discharged as a measured NEGATIVE, which is a result.
+- RECONCILED: peak SMAPS census — closed by `### MEASUREMENT — closes the peak-SMAPS row (`dep-da161hc9v7es73alq6ig`)`. THE ALLOCATOR IS ONE ANONYMOUS MMAP REGION.
+- RECONCILED: ledger load trace (`_load_records_from_ledger` anon delta) — closed in-block: 16 kills in 4h20m, 5 excursions across the deploy-free segments, **"Verdict: the transient did NOT move."**
+- RECONCILED: single ledger scan per evaluation bundle, `Measured:` marker — closed by `### MEASUREMENT — closes the single-scan row (`dep-da17ha67bikc738hhtq0`, `a3340e32`)`, plus `### RETRACTION — there was no "third ledger pass". There were exactly TWO scans.`
+- RECONCILED: single ledger scan per evaluation bundle, `Verdict:` marker — same row as above; the verdict is **the single-scan fix did not help**, stated in the stack-dump row.
+- RECONCILED: stack dump at the excursion — closed by `### MEASUREMENT — THE STACK DUMP NAMED THE ALLOCATOR (`dep-da1833e7bikc738imn50`, `e54ea856`)`.
+- RECONCILED: bound the evaluation bundle's ledger load — closed by `### MEASUREMENT — closes the bounded-ledger row (`dep-da18d63l550s73f325sg`, `59c07221`)`, its ADDENDUM, `### VERDICT — bounded ledger load: **VERIFIED FIX**`, and the UPDATE recording a **10.5-hour** clean run.
+- RECONCILED: skip the analytics the board-state caller never reads, `Measured:` marker — closed by `### MEASUREMENT — closes the skip-analytics row (`dep-da1hng6417fc73ahe9eg`, `8e3d2f95`)`, measured 14:47:01Z: **49,707ms -> 5,608ms across the session's two fixes (89%)**.
+- RECONCILED: skip the analytics, `Verdict:` marker — same row; verdict is CONFIRMED with the caller named in the emitted line.
+
+### Net
+
+**0 measurements owed.** Two markers (`#395`, twice) are permanently unmeasured
+by decision and are labelled as such rather than struck. The other 12 were
+already discharged by rows appended below them.
+
+**What this does NOT say:** the refresh-worker is not declared stable. The
+bounded-ledger fix is VERIFIED against the kill it addressed; the **slow ratchet
+(84% -> 86% over ~25 min) remains real and unmeasured beyond ~10.5h**. A
+discharged deploy obligation is not a healthy service.
+
+Swept by the `ledger-sweep-2026-08-17` lane. Line numbers are deliberately not
+quoted — this file is appended to constantly. Match on the quoted header text.
+
+## 2026-08-17 — F5 LEASH EXPOSED AS A TUNABLE AND SWEPT (`#440` Phase 7)
+
+Lane `convergence-phase7-crps`. **NO DEPLOY. No production config changed.**
+`py -3 scripts/sweep_starter_leash.py --sims 100 --workers 10`
+
+**Sample:** 267 distinct starts, 13 dates (2026-06-15..06-27), 175 games
+replayed from their archived roster artifacts, 87,500 game-sims, 100 sims/game.
+**Local mirror only** — 13 dates is what has roster artifacts here, not 46.
+
+Grid run on top of production's four promoted overrides, not code defaults.
+
+| leash | n | bias | MAE | CRPS | dispersion | sim P(outs<15) | vs actual |
+|---|---|---|---|---|---|---|---|
+| 0 | 267 | **−1.470** | **3.185** | **2.389** | **0.791** | **0.2394** | −0.0266 |
+| 3 | 267 | −1.580 | 3.208 | 2.411 | 0.810 | 0.2394 | −0.0266 |
+| 4 | 267 | −1.769 | 3.250 | 2.436 | 0.879 | 0.2215 | −0.0444 |
+| **5 (current)** | 267 | −2.197 | 3.352 | 2.511 | 1.002 | 0.0881 | −0.1778 |
+| 6 | 267 | −2.993 | 3.795 | 2.858 | 1.254 | 0.0728 | −0.1931 |
+
+Actual P(outs<15) = 0.2659. Target dispersion 0.7979. bias = actual − mean, so
+negative = the sim runs high.
+
+**EVERY METRIC IMPROVES MONOTONICALLY AS THE LEASH SHORTENS.** Bias, MAE, CRPS,
+dispersion and short-start rate all move the same way across all five points.
+There is no trade-off to arbitrate — which is itself unusual and worth a second
+look before trusting it.
+
+**THE DISPERSION RESULT IS THE STRIKING ONE.** At leash 0 dispersion is
+**0.791 against a calibrated 0.7979** — essentially exact. The overconfidence
+measured in production (1.10–1.54) is very largely THE LEASH: truncating the
+left tail is what made σ too narrow. Going 5 → 0 also closes
+**most of the short-start deficit** (gap −0.1778 → −0.0266).
+
+**BUT: NO GRID POINT BEATS THE CONSTANT BASELINE.** Baseline MAE is **3.0912**
+at every point (it does not depend on the leash); the best model MAE is
+**3.1852** at leash 0. So even fully unleashed, the outs projection still loses
+to "always predict this pool's average". Shortening the leash narrows the gap
+from 0.261 to 0.094 MAE and does not close it. **Do not report this sweep as
+"fixed".**
+
+**AND A RESIDUAL REMAINS THAT THE LEASH CANNOT EXPLAIN.** At leash 0 the bias
+is still **−1.470** (~half an inning) and P(outs<15) still sits 0.027 low. The
+leash is the largest single term, not the only one — the pitch-count hook is
+generous too. Anyone who sets the leash to 0 and expects zero bias will be
+wrong.
+
+**Leash 0 and 3 are nearly the same** (identical P(outs<15) to 4 dp, bias
+−1.470 vs −1.580). Physically sensible: starters are almost never pulled before
+the 3rd, so a 3-inning leash is close to no leash. Treat that as a sanity check
+that passed, not as a tie to break.
+
+**Empirical-vs-Normal gap ≤ 0.022 at every grid point**, consistent with the
+production reading. The Normal summary remains adequate for this market.
+
+### WHAT THIS IS NOT
+
+- **NOT A PROMOTION.** Betting hit rate against market lines is **not graded**
+  by this script. The overrides file's own record: `starter_tto_quality_scaling`
+  was promoted on a clean statistical win and reverted the same session for
+  making strikeout betting accuracy WORSE (55.78% → 54.65%). This sweep is
+  exactly the kind of evidence that has already proven insufficient once.
+- **NOT THE FITTED HARNESS.** The four promoted knobs were fitted on a
+  35-tune/11-holdout split. This is 13 contiguous dates with **no holdout** and
+  **no tier split** — and the team's tier data shows elite starters are
+  *under*-projected, so a global change could hurt them. A per-tier read is owed.
+- **100 sims/game, not production's 1000.** Fair across grid points, thinner
+  per start.
+
+### OWED BEFORE ANY VALUE IS PROMOTED
+
+1. Grade the grid on betting hit rate (`betting_accuracy.py`), not just bias.
+2. Split tune/holdout, and split by market-line tier.
+3. Re-run against production artifacts — 13 local dates is not the 46 the other
+   knobs were fitted on.
+
+## 2026-08-17 — BETTING GRADE ON THE LEASH GRID — **INCONCLUSIVE, AND THE GRADE ITSELF IS CONFOUNDED**
+
+Lane `convergence-phase7-crps`. `py -3 scripts/grade_leash_betting.py`.
+**NO DEPLOY. No value promoted. No production config changed.**
+
+148 graded starts / 13 dates, pick = the side the model thinks is mispriced,
+push excluded, ROI at the quoted odds. Multiplicative and power devig agree
+throughout, so the devig choice is not driving anything.
+
+| leash | bets | hit rate | ROI/unit | over picks | under picks |
+|---|---|---|---|---|---|
+| 0 (statistical optimum) | 148 | **53.38%** | **+1.93%** | 106 | 42 |
+| 3 | 148 | 53.38–54.05% | +1.56–2.83% | 110 | 37 |
+| 4 | 148 | **59.46%** | **+12.40%** | 113 | 35 |
+| **5 (current)** | 148 | 59.46% | +11.84% | 123 | 25 |
+| 6 | 148 | 58.78% | +7.88% | 146 | 2 |
+
+**AT FACE VALUE THIS REVERSES THE SWEEP.** Leash 0 — which halved the bias and
+put dispersion at 0.791 against a 0.7979 target — is the WORST betting outcome,
+and the current 5 is near the best. That is the
+`starter_tto_quality_scaling` pattern exactly.
+
+### BUT THE GRADE DOES NOT SUPPORT THAT READING, AND I CHECKED BEFORE REPORTING IT
+
+**1. A side-blind strategy beats almost the whole grid.** On these identical
+148 starts:
+
+    OUTCOMES over the line   87 / 148 = 58.78%
+    ALWAYS OVER              hit 58.78%   ROI  +8.16%     <- no model at all
+    ALWAYS UNDER             hit 41.22%   ROI -20.37%
+
+The best grid point (59.46% / +12.40%) is barely distinguishable from betting
+every over blind. **Leash 6 scores EXACTLY 58.78% because it picks over 146 of
+148 times — it IS always-over.**
+
+**2. The grid varies the OVER-RATE almost monotonically** (106 → 110 → 113 →
+123 → 146 over-picks out of 148). A longer leash projects more outs, so it bets
+over more often. In a window where overs won 58.78%, that alone orders the
+table. **The grade is measuring over-propensity, not model skill.**
+
+**3. It is not significant anyway.** SE of a hit rate at p≈0.55, n=148 is
+**4.09pp**; the observed 53.38% → 59.46% spread is 6.08pp = **1.49 SE**.
+
+### THE CONSEQUENCE, STATED PLAINLY
+
+**The betting gate could not be run on this sample, and I am not going to
+pretend it was.** It cannot promote leash 4/5 and it cannot block leash 0. Worse,
+taken naively it would have *endorsed the defect*: the sim over-projects outs,
+which makes it bet over, and overs won here — so the bug looks profitable.
+
+**This is a negative result about the INSTRUMENT, not about the leash.** The
+statistical sweep stands as measured; it simply has not been confirmed or
+refuted by money.
+
+### WHAT A VALID GRADE NEEDS
+
+1. **Far more than 148 bets.** At 4.09pp SE nothing under ~5pp is readable.
+   Production has 29 dates the mirror does not.
+2. **Control the over-rate.** Compare grid points at a matched number of
+   over-picks, or grade over and under separately, or report ROI against the
+   always-over baseline rather than against zero.
+3. **Report the side-blind baseline every time.** A grade without it read as a
+   +12.40% model edge when +8.16% of it was available with no model.
+4. `betting_accuracy.py` is ABSENT from this checkout, so none of this is
+   comparable to the overrides file's 55.78%/54.65%.

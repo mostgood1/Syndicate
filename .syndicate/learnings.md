@@ -3626,3 +3626,323 @@ rather than with a force-push, so the bad commit remains in history as a record.
 the *wrong* baseline and read the pass as safety. A verification is only as good
 as the thing it is compared against, and a baseline captured in an earlier tool
 call is not a constant in a repo other people are pushing to.
+
+### 2026-08-16 — A KEY NAME THAT MATCHES ANOTHER SPORT'S CONTRACT IS NOT A CONTRACT. WNBA publishes `run_margin_dist` and `total_runs_dist` — the exact keys MLB prices from — carrying a three-point quantile summary MLB's reader cannot parse, and the failure is SILENT
+- **The rule going forward:** before wiring a producer to a consumer on the
+  strength of a matching key name, **read the VALUE's shape, not the key**.
+  `vendor/wnba_betting_repo/app.py:7477-7478` emits `score.total_q` /
+  `score.margin_q` under MLB's key names. `_quantiles` returns
+  `{"p10": -8.0, "p50": 1.5, "p90": 11.0}`. MLB's `_dist_prob_over` iterates the
+  dict treating each KEY as an outcome value and each VALUE as a count, so
+  `float("p10")` raises, the entry is skipped, `total` stays 0, and it returns
+  `None`. **A board that stays exactly as blank as before, with nothing saying
+  why.** The matching name is worse than a mismatched one: it invites the wiring
+  and then swallows the result.
+- *(evidence: `.syndicate/deploys.md`, "outstanding #3, WNBA distribution")*
+
+### 2026-08-16 — "THE ONLY OPEN WORK IS VERIFICATION" WAS FALSE, AND A CONTENT CENSUS ACROSS ALL THREE SERVICES IS WHAT CAUGHT IT
+- **The rule going forward:** when a lane claims its code work is done and only
+  verification remains, **count the defect by content at EVERY live service SHA
+  before believing it.** `clamp-fix-to-workers` read that way for a day; the
+  census found web 0, refresh-worker 0, **live-odds-worker 2** — one of them
+  reachable (`_american_from_prob` → `home_ml`/`away_ml` on the WNBA cards that
+  service publishes). A per-service census is three commands and it converts
+  "should be fine" into a number.
+- **And the second half:** the site that was dormant was dormant only because
+  `SYNDICATE_ENABLE_INTELLIGENCE_STATE_BACKGROUND_LOOP=false` on that service.
+  **Dormant is not fixed** — loop ownership is an env flag that moves with no
+  diff, so a clamp behind a flag is a latent re-arm, not an absence.
+- *(evidence: `.syndicate/deploys.md`, clamp census 2026-08-16 23:5xZ / 00:0xZ)*
+
+### 2026-08-16 — RE-READ THE LIVE SHA IMMEDIATELY BEFORE CUTTING, NOT WHEN YOU DECIDED TO
+- **The rule going forward:** the gap between "I measured the live SHA" and "I
+  cut a branch on it" is where another session deploys. Authorised to ship the
+  deferred clamp fix to live-odds-worker, I re-read the SHA first and found it
+  had moved `16a898ef` → `c348da53` five minutes earlier, with the work already
+  in it. **Cutting on the stale SHA would have re-applied a change that was
+  already live.** Same session, the reverse case also bit: a `git commit` was
+  refused because HEAD moved mid-sequence.
+- *(evidence: `.syndicate/deploys.md`, clamp closure)*
+
+## 2026-08-16 — FORBIDDEN: attributing an excursion with a field that is not THREAD-scoped. A process-global "last stage" names the last thread to speak, not the one allocating.
+
+I spent an hour localizing a 2.4GB excursion to `_build_sport_overview` on the
+strength of `MEMORY_WATCHDOG`'s `last_stage=board_contract_end`, wrote it into
+`deploys.md` as a VERDICT twice, and designed a mitigation around it.
+
+`_WATCHDOG_STATE` (`memory_observability.py:774`) is a module-level dict with no
+thread-locals. refresh-worker runs several concurrent daemon threads
+(`live_lens_loop.py:914` and `:814`, `run_refresh_worker.py:3498`). So
+`last_stage` records **whichever thread most recently emitted a marker**, which
+need not be — and here was not — the thread allocating.
+
+The refutation took one covered window: inside the excursion there was **no
+`OVERVIEW_SPORT_BEGIN` or `OVERVIEW_SPORT_END` at all**. The loop I had blamed
+was not running.
+
+**Two rules.**
+
+1. **Before attributing anything to an instrument's field, ask what its SCOPE
+   is** — per-thread, per-process, per-request. A global read as if it were
+   local is not a weak signal, it is a *wrong* one, and it is wrong in a way
+   that looks precise. `feedback_read_the_field_you_already_have` says read the
+   field; this says **know what the field is scoped to.**
+
+2. **`state.md` ALREADY SAID THIS.** Line 462 records that the climb has "no
+   stage marker, so `last_stage` structurally cannot name it", and line 502 says
+   the allocation is "STILL UNNAMED". I never read that section — I entered from
+   a user's log paste, re-took the lane, and started measuring. The session
+   protocol's "read `state.md` first" is not ceremony; it is the step that would
+   have made an hour of work unnecessary and stopped a false verdict being
+   written into the deploy ledger. **When you re-take an OPEN lane, read what
+   that lane already concluded before you measure anything.**
+
+**Also worth keeping: the control arm is what actually killed the follow-up
+hypothesis.** After the retraction I suspected the artifact-pull path, on a
++537MB jump right after `pulled_hot_artifacts count=17`. Presence in 7 excursion
+windows looked convincing until I ran 6 matched control windows: same rate in
+both arms (1/7 vs 1/6). **A correlation study without a control arm is a
+coincidence generator.**
+
+### 2026-08-16 — A "NEVER DEFAULTS" TEST THAT ONLY EXERCISES GUARD CLAUSES IS VACUOUS. Three times in one session
+
+Each time the pattern was identical: assert that a lookup does not fall back to a
+permissive value, using inputs rejected BEFORE the fallback is reached. The test
+passes against the broken implementation.
+
+1. `wnba_pbp_possessions.team_possessions` — removing `home`/`away` from the key
+   filter changed nothing, because the `poss_est <= 0` check already dropped them
+   on real data.
+2. `wnba/cards.py:_has_pbp_signal` — the same vacuity, reintroduced hours after
+   fixing the first.
+3. `game_shape.mlb_leverage_index` — `.get(key, 1.0)` passed, because every input
+   in the test was rejected by a guard clause before the dict was touched.
+
+- **The rule going forward:** a test for "does not default" must use an input
+  that **reaches the defaulting line** — valid in every other respect and missing
+  only the thing under test. For a lookup that means a key passing all validation
+  and genuinely absent from the table (here: `1-3` with 0 outs, the one base-out
+  combination below the n>=100 floor). If no such input can be named, the
+  fallback may be unreachable — also worth knowing.
+- **Mutation testing caught all three**, including the third AFTER I had written
+  the rule for the first. Run it against the guard you care most about, not only
+  the code you are least sure of.
+
+### 2026-08-16 — A RESIDUAL THAT CORRELATES WITH THE FITTED VALUE MEANS THE MODEL IS WRONG, NOT THE DATA
+
+Comparing a freshly built RE24 table to published values under an ADDITIVE offset
+gave 0.53 runs of post-offset scatter and a "does not reproduce" verdict — i.e. a
+broken join. The residuals were strongly negative on low-RE cells and positive on
+high-RE ones. That is a scale factor, not a shift: an environment 14.6% livelier
+lifts a 2.3-run cell by 0.34 and a 0.10-run cell by 0.015, and no constant fits
+both. Under a multiplicative fit the same data landed 21 of 23 cells inside 3 SE.
+
+- **The rule going forward:** before concluding the DATA is wrong, scan the
+  residual against the fitted value. Structure there indicts the model.
+- Same session, same shape: a leverage normalisation weighted by state frequency
+  alone made start-of-game read 1.14 when an average plate appearance is 1.00
+  **by definition**. That definition was the check that caught it. **Prefer a
+  quantity whose correct value is known a priori as the sanity check.**
+
+### 2026-08-16 — SAMPLE SIZE CHOOSES THE METHOD. An empirical win-expectancy table was refused at 4 observations per cell
+
+Counting win rates per (inning, half, base-out, score band) over 47 dates gives
+4,039 occupied cells, **median 4 observations**, 68.7% below 10, zero at 1,000+.
+The composition route — estimating P(k runs | base-out state) at ~2,200
+observations per state and convolving — answers the same question from the same
+corpus.
+
+- **The rule going forward:** when a table is too thin, the answer is usually a
+  different ESTIMATOR over the same data, not more data and not a published
+  number copied in. Compute the per-cell n BEFORE choosing the method.
+
+### 2026-08-16 — AN ARCHIVED SESSION IS NOT AN ABANDONED LANE. The lineage forks forward
+
+`wnba-live-tier`'s holder (`Layer 1 board coverage audit (fork 2)`) was archived,
+and I was about to declare the lane orphaned and take a claim override — there is
+precedent in this file for exactly that. The roster showed fork 2 -> fork 3 (also
+archived) -> **fork 4, running**. The lane was actively held.
+
+- **The rule going forward:** before calling a lane orphaned, list sessions with
+  `include_archived: true` and look for a SUCCESSOR BY TITLE, not only for the
+  session named in the lane. Archived means that session ended, not that the work
+  stopped.
+
+### 2026-08-17 — A DEPLOY BRANCH THAT NEVER GOES BACK TO `main` IS A REGRESSION WAITING FOR THE NEXT DEPLOY. Three commits ran in production for an hour while `main` did not have them
+- **The rule going forward:** cutting a deploy branch on the LIVE SHA is correct
+  and this session did it six times. **The other half is pushing the same commit
+  to `main`, and it is easy to skip because production already works.** Measured
+  at checkpoint: `live_gameline_score.py`'s two join fixes and the
+  `blueprints/intelligence.py` reader line were live on refresh-worker and web
+  and **absent from `origin/main`** — the next deploy cut from main would have
+  silently reverted all three, and the symptom would have been the scorer
+  reporting zero again with no code change to blame.
+- **How to check, in one command per file:** `git show origin/main:<file> | grep
+  -c <marker>` against the deployed SHA's count. Ancestry is the wrong test —
+  these were cherry-picks, so their SHAs never appear on main at all.
+- *(evidence: `.syndicate/log/2026-08-16.md`, this session's closing block)*
+
+### 2026-08-17 — `a or b` IS NOT A FALLBACK WHEN `a` IS RELIABLY PRESENT AND RELIABLY WRONG
+- **The rule going forward:** to try several keys against an index, **try each
+  against the index** — `next(k for k in candidates if k in index)` — never
+  `a or b`, which picks the first TRUTHY value and then fails the lookup.
+  Measured: ledger records are written while a game is LIVE so they always carry
+  `game_pk`; a row that has since gone FINAL carries no `live_gameline` and is
+  indexed under `event_id` only. `game_pk or event_id` therefore chose the one
+  key the index never held, on all 3,727 records, while the key that WAS there
+  was never tried. **The first fix widened the INDEX and the bug survived,
+  because the defect was in the LOOKUP.**
+- *(evidence: `.syndicate/log/2026-08-16.md`)*
+
+## 2026-08-16 — FORBIDDEN: instrumenting a WRAPPER when the hot path has siblings that reach the same work directly. Twice in one night.
+
+Both instruments I placed on a caller measured my route instead of the work.
+
+1. `board_contract_end` went on the shared builder only after `last_stage` —
+   a PROCESS-GLOBAL field — was read as if it were thread-scoped.
+2. `LEDGER_LOAD` went on `recommendation_engine._load_records_from_ledger`.
+   Production returned `records=0 anon_delta_mb=0.2
+   path=evaluation_ledger.jsonl`: that wrapper defaults to
+   `DEFAULT_EVALUATION_LEDGER`, a FLAT path that does not exist, while the 830MB
+   chunked load reaches `_iter_record_payloads` through
+   `_load_chunk_records_for_window` (:2042) and `load_recent_evaluation_records`
+   (:2088), which default to a DIFFERENT constant and call it DIRECTLY. One of
+   three entry points instrumented, and the one wired to a missing file.
+
+**The rule: before instrumenting a function, grep for other callers of what it
+calls.** If the callee has siblings reaching it by another route, instrument the
+CALLEE. The choke point every caller must pass is the only placement that cannot
+be routed around. Both fixes tonight were the same move.
+
+**The tell is available in advance and costs one grep.** In both cases the
+function I first chose had "wrapper" or "materialising wrapper" in its own
+docstring.
+
+### And the second-order error, which was worse
+
+My watcher auto-scored that `records=0` reading as **"VERDICT: KILLED — this load
+is not the allocator"**. A 0.2MB delta on a load that returned ZERO records is a
+NULL measurement. That is `learnings.md`'s own "never record a detector's zero as
+a pass when the data gave it no chance to fire" — committed by the instrument I
+built to avoid exactly that class of error, and I nearly reported it.
+
+**Rule: any automated verdict must carry the denominator that makes it
+readable.** The fix was to make `records` travel WITH the delta in the log line,
+and to make the watcher refuse to score any load with `records < 1000`, printing
+"NO VERDICT YET" instead. A threshold on the measured quantity alone will always
+eventually fire on an empty sample.
+
+### 2026-08-16 — SCOPING A DEPLOY WHEN `main` CARRIES OTHER LANES' WORK: parent on the LIVE SHA, not on `main`
+
+`origin/main` had **14 pending code commits from six lanes** — a versioned-profile
+seam across all three sim engines, four live-gameline-score changes, an
+intelligence-evaluation trace. Deploying main would have shipped every one of
+them on its FIRST ever deployment, alongside two unrelated fixes, into a
+stop-then-start on a disk-backed service. If anything broke, attribution would
+have been impossible.
+
+- **The rule going forward — the recipe, because it worked and is reusable:**
+  1. Read the **LIVE** SHA from the service, not from `state.md` (it had moved
+     twice in the hours before this deploy).
+  2. Confirm the live SHA is **not** assumed to be on `main`. Web's configured
+     branch IS `main`, yet the live SHA was not an ancestor of it —
+     previously-deployed commits fall out of `main`'s history when sessions
+     rewrite it. **Do not infer the deploy base from the branch setting.**
+  3. `git log LIVE..origin/main -- <your files>` and confirm **only your
+     commits** touch them. That is what makes the next step safe.
+  4. Build with plumbing into an isolated index: `read-tree LIVE`,
+     `update-index` your files to `origin/main`'s blobs, `commit-tree -p LIVE`.
+     Never touches the working tree or the shared index.
+  5. Assert the result is exactly N files and each blob is **identical to
+     `origin/main`'s** — that proves you shipped your fix and not a hand-merge.
+  6. Push it to a branch so it cannot be orphaned, then deploy that SHA.
+- Cost: about ten minutes. It bought unambiguous attribution and left five other
+  lanes their own deploy decisions.
+
+### 2026-08-16 — A RESTART CONFOUNDS ANY FIX WHOSE CLAIM IS ABOUT STATE PERSISTING
+
+`#455`'s claim is that a stale all-null snapshot was STICKY — served in
+preference to real data all day once persisted. After the deploy, `generated_at`
+read current where it had been frozen three hours, and that looks exactly like
+the fix working.
+
+**It is not evidence.** The deploy restarts the service, which clears the
+replayed snapshot on its own. The convenient reading and the null hypothesis
+predict the identical observation.
+
+- **The rule going forward:** when a fix's claim is about state PERSISTING —
+  stickiness, caching, leaks, accumulation — the first minutes after a restart
+  can only ever look healthy, so a reading taken there is worthless. The
+  measurement must span the condition that produced the bug: for `#455`, a live
+  slate where `generated_at` must ADVANCE across ticks rather than freeze.
+- Same family as the existing rule that a healthy reading is evidence only once
+  you know what makes it read unhealthy — but sharper: **here the restart
+  GUARANTEES the healthy reading**, so the observation carries no information at
+  all.
+
+
+## 2026-08-17 — RULE: the em-dash in a lane header is SYNTAX, not punctuation. A hyphen header is an UNGUARDED lane
+
+**Evidence.** `wnba-fixture-identity` was opened by a live session with ASCII
+hyphens: `### wnba-fixture-identity - OPEN - **...`. `lane-guard.py` parses
+`^###\s+(\S+)\s+—\s*([^—]*)` and requires U+2014, so the header did not parse at
+all. Consequences, all silent: the lane's three claimed files were unguarded
+(one of them contended with a lane closed minutes earlier), and the
+session-start digest did not list the lane as OPEN, so an arriving session saw
+no claim on those paths. Found 2026-08-17 12:3x CDT by the `ledger-sweep`
+lane while verifying something else; the hook had been printing
+`(1 lane header(s) have no parseable status and are NOT guarded)` and nobody
+had read it as naming a specific live lane.
+
+**Why it keeps happening.** Both hooks fail OPEN by design — a broken guard that
+blocks all edits is worse than no guard. That is the right default and it is
+also why a malformed header is invisible: it does not warn its owner, it just
+stops protecting them. **Unparseable input lands on the permissive branch.**
+
+**How to apply.**
+- Copy an existing header when opening a lane; do not retype the separators.
+- After `/lane open`, run `bash .claude/hooks/session-start.sh | grep -i guarded`
+  and confirm your lane appears under OPEN LANES. Presence in `lanes.md` is not
+  evidence of enforcement — *parseability* is.
+- When a guard reports a count of unparseable/skipped items, resolve WHICH ones.
+  A count is not a finding until it is a name.
+
+**Related:** the same shape is already recorded twice — a guard that maps absent
+onto its permissive branch turns a failed join into a relaxed rule with no
+reason emitted, and `_is_disclaimer` had to be added to this same file after a
+regex read "NOT claimed, deliberately" as a claim.
+
+## 2026-08-17 — FORBIDDEN: diagnosing from FILTERED log projections. Six wrong attributions, one question, and the answer was in the lines I was truncating.
+
+I spent a night attributing a memory excursion, wrong six times. Every
+investigation used `text=` greps for markers I ALREADY SUSPECTED, windows with
+`MEMORY_WATCHDOG`/`CONTAINER_MEMORY` stripped as "instrument noise", owner-
+classified COUNTS instead of content, and messages cut at 78-130 characters.
+
+The user asked: **"have you read the actual render logs line by line?"** I had
+not. One unfiltered window immediately produced fields I had never seen —
+`region_count` (366 -> 367, a NEW mapping appearing), `reconciles: true` (the
+SMAPS data self-reconciles, which I had been hedging about),
+`performance_publish_count=22078` against `recommendation_count=60`, and
+`sample_size=0`. I had been quoting that last line TRUNCATED AT `"samp` for
+hours.
+
+**Each filter encoded the hypothesis I was trying to test.** A `text=` query
+returns only what I already believed mattered; stripping the memory lines
+removed the only rows carrying `seconds_since_stage` and `climb_mb_per_s`;
+truncation hid the discriminating field. The phantom "third ledger pass" was a
+filtered window that began mid-scan and invented a caller that never existed.
+
+**The rule: on an unexplained symptom, read one FULL window — no `text=` filter,
+no dropped line types, no truncation — BEFORE forming the hypothesis.** Filter
+afterwards to confirm, never to discover. If the window comes back at the row
+cap, narrow the time range until it is under the cap; do not narrow by content.
+
+**Corollary that actually solved it:** when the logs cannot distinguish an
+excursion from a quiet window — measured: zero stage markers in 16s, pull
+activity 1/7 vs 1/6 across arms, thread activity IDENTICAL between excursion and
+control, two excursions producing 6-8 rows that were ALL the watchdog's own —
+then log correlation is EXHAUSTED and no further study of it will help. Reach
+for something that does not require the code to volunteer a line:
+`faulthandler.dump_traceback(all_threads=True)` named the allocator in one
+excursion after six failed attributions.

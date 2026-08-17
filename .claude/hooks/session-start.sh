@@ -115,9 +115,30 @@ if [ -f .syndicate/learnings.md ]; then
 fi
 
 # --- Open obligations: a count, not the rows ---
+#
+# 2026-08-17: the raw marker count COULD ONLY EVER GO UP. deploys.md is
+# append-only by its own convention ("Appended, not edited into the row above"),
+# so a `Measured:` pending marker is never cleared -- the MEASUREMENT row that
+# closes it is appended BELOW it. Measured that day: the hook reported 14 while
+# 12 were already discharged, including seven closed by rows carrying the words
+# "closes the ... row" a few hundred lines further down. A number that cannot
+# fall is not an obligation count, it is a high-water mark, and it was being
+# read at every session start as if a fix were owed.
+#
+# Each discharged marker is now declared by exactly one `- RECONCILED:` line
+# (see "OBLIGATION RECONCILIATION" in deploys.md), so subtract those. The
+# reconciliation section deliberately never writes the literal marker string --
+# describing the markers used to inflate the count of them.
 if [ -f .syndicate/deploys.md ]; then
-  PENDING=$(grep -c '<pending>' .syndicate/deploys.md 2>/dev/null || echo 0)
-  [ "$PENDING" -gt 0 ] && add "OPEN OBLIGATIONS: $PENDING deploy(s) with no measurement. Not evidence of a fix."
+  PENDING=$(grep -c '<pending>' .syndicate/deploys.md 2>/dev/null); PENDING=${PENDING:-0}
+  RECONCILED=$(grep -c '^- RECONCILED:' .syndicate/deploys.md 2>/dev/null); RECONCILED=${RECONCILED:-0}
+  OWED=$(( PENDING - RECONCILED ))
+  [ "$OWED" -lt 0 ] && OWED=0
+  if [ "$OWED" -gt 0 ]; then
+    add "OPEN OBLIGATIONS: $OWED deploy(s) with no measurement ($RECONCILED of $PENDING markers reconciled). Not evidence of a fix."
+  elif [ "$PENDING" -gt 0 ]; then
+    add "OPEN OBLIGATIONS: none owed ($RECONCILED of $PENDING markers reconciled). A discharged obligation is not a healthy service."
+  fi
 fi
 
 # --- Ledger health ---
