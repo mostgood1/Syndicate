@@ -3196,3 +3196,61 @@ live, with the coverage caveat and the tricode-vs-home/away trap attached.
   `refresh-worker-oom-recurrence`.
 - **Interleaving constraint from the plan:** do not run Phase 8 inside Phase 1's
   measurement window. Phase 5 changes no output, so it is unaffected.
+
+### score-live-gameline-edges — UPDATE 2026-08-17 01:3xZ — **ROUTE 2 BUILT, TESTED AND DEPLOYED. The score is COMPUTED in production and NOT YET READABLE — one line, in a file another lane holds.**
+- **SHIPPED** `e63bee63` to refresh-worker (live 01:35:06Z), cut on live
+  `4ec66498`, deploy gated on the test exit code in the same shell.
+  - `syndicate/features/shared/live_gameline_score.py` (new) — model vs market
+    Brier/MAE on **identical rows**, over three populations (`all_records`,
+    `last_per_game` chosen by `recorded_at` not file order, `priceable_only`).
+  - `live_gameline_ledger.read_records()` (new) — every forecast, distinct from
+    `read_last_by_key` which collapses to one per market for DEDUP.
+  - `book_grid_artifact.py` — computes the score at build time and puts
+    `live_gameline_score` on the artifact. Never raises; the board is the
+    product.
+  - 14 tests pass.
+- **VERIFIED THE PRODUCER RAN:** artifact `01:36:25Z` (post-deploy) carries
+  `live_gameline_ledger {candidates: 11, written: 11}`.
+- **BLOCKED ON ONE LINE, AND IT IS THE READER.** `/api/board/book-grid` forwards
+  an EXPLICIT key allowlist (`blueprints/intelligence.py:2339`), so
+  `live_gameline_score` served **`null`** — the artifact has it, the endpoint
+  does not forward it. Producer wired, reader not: the
+  presence-is-not-reachability trap, caught by reading the served payload rather
+  than trusting the deploy.
+- **THE FIX IS ONE LINE**, beside the existing `live_gameline_ledger` entry:
+  ```python
+  "live_gameline_score": precomputed.get("live_gameline_score"),
+  ```
+  Then a **web** deploy (that endpoint is web-served).
+- **NOT TAKEN.** `syndicate/blueprints/intelligence.py` is claimed by OPEN
+  `layer2-board-quality`, which was actively worked tonight — a live lane, not
+  an orphan. Handing it over rather than overriding.
+- **Next action:** ask `layer2-board-quality` to add that line (or release the
+  file), deploy web, then read `live_gameline_score` off
+  `/api/board/book-grid?sport=mlb&date=<date>`. The score itself needs a slate
+  with FINAL games in the same artifact as ledger records — mid-slate it
+  correctly reports `no_final_games_on_this_grid`.
+
+#### game-shape-capture — FINAL CHECKPOINT 2026-08-16 ~20:3x CDT — **`#454` COMPLETE; LANE STAYS OPEN ON n = 0**
+
+13 commits, all verified reachable from `origin/main` (`28cc8814` latest).
+**95 tests** across game_shape / run-expectancy / win-expectancy.
+
+Shipped this session: game-shape contracts for MLB, WNBA/NBA, NFL/NCAAF and
+soccer; live emits for NFL and soccer; WNBA pbp coverage tooling; `#454` (RE, WE,
+leverage) complete; `#455` and `#456` found, filed and FIXED.
+
+**WHY IT IS STILL OPEN — unchanged from every previous checkpoint:** the
+verification is one live slate with a non-zero bucket distribution, read across
+two builds. **That has never run. n = 0 for every sport.** Do not close this on
+the commit count, the test count, or the fact that leverage now has a number.
+
+**NEXT ACTIONS, in order:**
+1. Deploy decisions for `#455`, `#456` and the NFL/soccer emits. All four change
+   live behaviour; none is deployed and none has been requested.
+2. Read `game_shape` off a live NFL or soccer fixture — the only step that turns
+   any of this from prepared into measured.
+3. NCAAF needs a live-state PRODUCER built. Season opens **2026-08-29** — still
+   the only dated item in the lane.
+4. Source the RE reference table, then re-adjudicate the two >3 SE cells.
+5. Owed: `wnba/cards.py:891` should delegate to `basketball_elapsed_minutes`.
