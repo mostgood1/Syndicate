@@ -4052,3 +4052,42 @@ named `render_logs.py` as unable to give one; this is that tool.
   Empirical/PMF forecasts (MLB outs) need hundreds; parametric mean+sigma
   summaries (NFL, NCAAF) need tens — NFL's measured knee is **<=100**, so
   **NFL/NCAAF at 300 are fine** and the earlier "TOO THIN" verdicts were wrong.
+
+## MLB SIM — PITCH-TYPE EFFECTIVENESS IS BUILT AND UNFED `[measured 2026-08-17]`
+
+- **`pitcher.pitch_type_whiff_mult`, `pitch_type_hr_mult` and
+  `batter.vs_pitch_type` are 0% populated** across 450 batters / 449 pitchers,
+  while `pitcher.arsenal` is **100%**. The sim consumes them as
+  `.get(pitch_type, 1.0)` (`simulate.py:1067/1068/1097/1099`, `:2779-2796`), so
+  **a slider and a fastball are interchangeable** and pitch selection is
+  decorative.
+- **Cause:** `fetch_pitcher_pitch_splits` is CACHE-ONLY and the
+  `pitcher_pitch_splits` namespace had **never been written** (the cache held
+  only `bvp`). Its populator is a **manual x64 tool outside the daily pipeline**.
+- **The cache CANNOT reach Render:** its path is inside the **ephemeral repo
+  checkout**, and `vendor/*/data/` is **gitignored** (0 tracked files). This is
+  the `#389` shape.
+- **NOW WIRED (not deployed):** a disk-backed artifact
+  `data/mlb_source/source_artifacts/data/pitch_splits/pitch_splits_<season>.json`
+  resolved via `SYNDICATE_DATA_ROOT`, and an **artifact-first loader**. 5 tests
+  including the empty-cache worker case. **73 pitchers published.**
+- **STILL BLOCKING PRODUCTION:** (a) `HOT_ARTIFACT_PATTERNS` needs one pattern —
+  `artifact_publisher.py` is owned by `clv-without-settlement`, request filed in
+  its lane; (b) **nothing on the worker populates the splits.**
+- **Effect at 12.7% pitcher-slot coverage: FLAT** (2 markets better, 2 worse, all
+  <=0.003). **INCONCLUSIVE** — starters only; 236 bullpen arms were fetching at
+  checkpoint time.
+- **PRODUCTION POPULATION IS UNVERIFIED:** `/api/ops/artifacts/stream` **403s on
+  `roster_objs/`** paths. Confirm on the worker disk before funding further work.
+
+## MLB SIM — MODELLING ABSENT ENTIRELY `[measured 2026-08-17, zero grep matches]`
+
+- **No defensive quality anywhere** (no OAA/DRS/UZR, no team or player fielding).
+  **BABIP has nothing fielding behind it.**
+- **No batted-ball type model** — no GB/FB/LD, no launch angle, no exit velocity.
+  `inplay_hit_rate` is one scalar, so **park factors cannot interact with a
+  hitter's profile** and defence could not be applied even if it existed.
+- **No catcher framing.** The **umpire IS** modelled (called-strike multiplier).
+- **BVP is fetched daily and `simulate.py` never references it** — evaluation
+  tooling only, 1,282 cached files.
+- Full write-up: `.syndicate/research_2026-08-17_mlb_sim_gaps.md`.

@@ -4892,3 +4892,39 @@ the first `replace()`, which in a simulator is before the first event.
 
 Related: the standing "presence is not reachability" rule — this is its
 test-shaped form, and today produced four fresh instances.
+
+## 2026-08-17 — RULE: a feature can be unfed at the DATA layer, and it looks nothing like a bug
+
+**Standing rules here cover code that is present-but-unreachable.** This is the
+same failure one level down: code that IS reached, with inputs that are empty.
+
+**Measured:** the MLB sim consumes pitch-type multipliers at four call sites as
+`.get(pitch_type, 1.0)`. `pitcher.arsenal` is **100% populated** — so the sim
+samples a real pitch on every pitch — while `pitch_type_whiff_mult`,
+`pitch_type_hr_mult` and `vs_pitch_type` are **0% populated on 449/449
+pitchers**. Every multiplier resolves to 1.0. **Pitch selection is decorative.**
+
+**Nothing about this presents as broken.** No error, no warning, no null. The
+arsenal being populated makes it look MORE alive, not less. The tests pass. The
+sim runs. The feature simply has no effect, and has had none for as long as the
+cache has been empty.
+
+**RULE: for any model input that flows through a `.get(key, NEUTRAL)` default,
+measure the POPULATION RATE, not the presence of the code.** A neutral default
+(1.0 for a multiplier, 0.0 for an additive term) is indistinguishable from a
+working feature at every level except the data.
+
+**The specific shape to hunt for:** a *pair* of fields where one is populated and
+the other is not — an arsenal with no effectiveness, a lineup with no platoon
+splits, a schedule with no clock. The populated half makes the empty half
+invisible.
+
+**Why it persisted:** the loader was CACHE-ONLY (returns None on a miss, never
+fetches), its cache namespace had never been written, and its populator was a
+manual out-of-band tool. Three separate silences, none of which logged anything.
+
+**Corollary that cost the most:** the cache lived under `vendor/*/data/`, which
+is **gitignored and inside Render's ephemeral checkout**. So even a correct local
+fill could never reach production — *"I populated the cache"* and *"production
+has the data"* are unrelated statements. Check the SHIPPING PATH before
+celebrating a data fix.
