@@ -2232,6 +2232,21 @@ _GAME_CARDS_HEADER_ORDER = [
     "away_spread_price",
     "total_over_price",
     "total_under_price",
+    # Added 2026-08-17. THE STABLE IDENTITY -- the ESPN event id, taken from
+    # `schedule_2026.csv` and shared with the live feed (verified same-instant
+    # against ESPN's scoreboard: all three 2026-08-16 ids match exactly).
+    #
+    # `game_id` above has carried THREE mutually incompatible schemes -- 1395
+    # sequential indices, 39 hex hashes, 16 long numerics across 62 files -- and
+    # two CONSECUTIVE production dates disagreed, so nothing could join on it.
+    #
+    # Appended at the END and populated ALONGSIDE `game_id` rather than
+    # replacing it: existing rows keep whatever they had, readers use
+    # DictReader + .get() (same precedent as the 2026-08-02 block above), and
+    # consumers migrate to `fixture_id` on their own schedule. Blank means the
+    # row did not resolve against the schedule -- a REPORTABLE upstream problem,
+    # never something to paper over with an invented id.
+    "fixture_id",
 ]
 
 
@@ -2293,7 +2308,14 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         except NameError:
             return "unset"
 
-    def _census(source: str, *, written: int, matchups: object = None, note: str = "") -> None:
+    def _census(
+        source: str,
+        *,
+        written: int,
+        matchups: object = None,
+        note: str = "",
+        coverage: object = None,
+    ) -> None:
         """What this build read and what it produced, on EVERY exit (`#375`).
 
         Measured 2026-08-11: `game_cards_2026-08-11.csv` held 2 games for a
@@ -2315,13 +2337,57 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
             count = len(matchups) if matchups is not None else -1
         except TypeError:
             count = -1
+        # `expected_matchups` is derived from `predictions_<date>.csv`, and that
+        # file is ABSENT on production (measured 2026-08-17) -- so it reads 0 and
+        # every `issubset` gate built on it passes trivially. `scheduled` below
+        # comes from `schedule_2026.csv` instead and is the honest denominator;
+        # both are printed so the difference between them stays visible rather
+        # than being quietly reconciled.
+        cov = coverage if isinstance(coverage, dict) else {}
+        cov_text = ""
+        if cov:
+            cov_text = (
+                f" scheduled={cov.get('scheduled')} covered={cov.get('covered')}"
+                f" backfilled={cov.get('backfilled')} unresolved={cov.get('unresolved')}"
+                f" backfill_enabled={cov.get('backfill_enabled')}"
+            )
         print(
             f"[wnba_cards] GAME_CARDS_CENSUS date={date_str} source={source} "
             f"written_rows={written} input_matchups={count} "
             f"expected_matchups={_expected_count()}"
+            + cov_text
             + (f" note={note}" if note else ""),
             flush=True,
         )
+
+    def _finalize_and_write(source: str, rows_out: list[dict[str, object]]) -> tuple[int, Path | None]:
+        """Stamp the stable fixture id, backfill the schedule, census, write.
+
+        Every write path routes through here so the identity and the coverage
+        ratio cannot be added to one branch and forgotten on another -- which is
+        how `game_cards` ended up with three id schemes in the first place.
+
+        The stamping/backfill logic lives in
+        `syndicate/features/shared/wnba_fixture_identity.py` and is tested there
+        without running a build. Import failure is swallowed: this is an artifact
+        BUILD path, and the `#375` lesson is that an addition must never be able
+        to break the thing it is measuring.
+        """
+        coverage: dict[str, object] = {}
+        try:
+            from syndicate.features.shared.wnba_fixture_identity import (
+                stamp_and_backfill_game_cards_rows,
+            )
+
+            rows_out, coverage = stamp_and_backfill_game_cards_rows(date_str, rows_out)
+        except Exception as exc:  # pragma: no cover - defensive, see docstring
+            print(
+                f"[wnba_cards] FIXTURE_IDENTITY_SKIPPED date={date_str} source={source} error={exc!r}",
+                flush=True,
+            )
+        _census(source, written=len(rows_out), matchups=_matchups_of(rows_out), coverage=coverage)
+        _write_game_cards_csv_rows(out_path, rows_out)
+        return len(rows_out), out_path
 
     def _log(message: str) -> None:
         if log_file is not None:
@@ -2339,6 +2405,50 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         # "nothing real for today" signal as an input full of stale rows,
         # and must clear the same stale output.
         _log(reason)
+        # THE EMPTY-FILE MODE, and it is a distinct failure from partial
+        # coverage rather than a degree of it. Measured across 41 dates:
+        # `game_cards_2026-06-28.csv` held 0 rows against 4 scheduled fixtures
+        # and `2026-07-09` held 0 against 3. Every market input can be missing
+        # while the SLATE is perfectly well known.
+        #
+        # So when the schedule knows the fixtures, publish them carrying
+        # identity and tip time and NO market data, instead of publishing
+        # nothing. "Absent renders as absent" is the contract the board already
+        # uses everywhere else, and a game visible with no price beats a game
+        # that silently vanished.
+        #
+        # This changes the return from (0, None) to (n, out_path), which flips
+        # `rc_game_cards` at the :4428 call site from failure to success. That is
+        # correct -- the slate WAS produced -- and all three call sites read only
+        # the count and the path. Guarded below on rows actually existing, so a
+        # genuinely empty schedule still falls through to the delete.
+        schedule_only: list[dict[str, object]] = []
+        schedule_coverage: dict[str, object] = {}
+        try:
+            from syndicate.features.shared.wnba_fixture_identity import (
+                stamp_and_backfill_game_cards_rows,
+            )
+
+            schedule_only, schedule_coverage = stamp_and_backfill_game_cards_rows(date_str, [])
+        except Exception as exc:  # pragma: no cover - never break the build path
+            print(
+                f"[wnba_cards] FIXTURE_IDENTITY_SKIPPED date={date_str} source=schedule_only error={exc!r}",
+                flush=True,
+            )
+        if schedule_only:
+            _census(
+                "schedule_only",
+                written=len(schedule_only),
+                matchups=_matchups_of(schedule_only),
+                note=reason.replace(" ", "_")[:120],
+                coverage=schedule_coverage,
+            )
+            _write_game_cards_csv_rows(out_path, schedule_only)
+            _log(
+                f"No market input for {date_str}; published {len(schedule_only)} "
+                f"schedule-only game_cards rows (no prices): {out_path}"
+            )
+            return len(schedule_only), out_path
         # Every no-data branch routes through here, so one call covers all of
         # them and carries the reason that distinguishes them.
         _census("none", written=0, note=reason.replace(" ", "_")[:120])
@@ -2487,10 +2597,9 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
                         )
 
                     if rows_out and (not expected_matchups or expected_matchups.issubset(snapshot_matchups)):
-                        _census("raw_player_props_snapshot", written=len(rows_out), matchups=_matchups_of(rows_out))
-                        _write_game_cards_csv_rows(out_path, rows_out)
-                        _log(f"Built local game_cards from raw player props snapshot fallback: {out_path} (rows={len(rows_out)})")
-                        return len(rows_out), out_path
+                        written, written_path = _finalize_and_write("raw_player_props_snapshot", rows_out)
+                        _log(f"Built local game_cards from raw player props snapshot fallback: {out_path} (rows={written})")
+                        return written, written_path
 
                     if rows_out and expected_matchups and not expected_matchups.issubset(snapshot_matchups):
                         missing_matchups = sorted(expected_matchups.difference(snapshot_matchups))
@@ -2628,10 +2737,9 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
         if not rows_out:
             return _no_data(f"Local game_cards build skipped for {date_str}: processed game_odds had no usable rows")
 
-        _census("processed_game_odds", written=len(rows_out), matchups=_matchups_of(rows_out))
-        _write_game_cards_csv_rows(out_path, rows_out)
-        _append_log(log_file, f"Built local game_cards from game_odds fallback: {out_path} (rows={len(rows_out)})")
-        return len(rows_out), out_path
+        written, written_path = _finalize_and_write("processed_game_odds", rows_out)
+        _append_log(log_file, f"Built local game_cards from game_odds fallback: {out_path} (rows={written})")
+        return written, written_path
 
     try:
         import pandas as pd
@@ -2698,9 +2806,7 @@ def _build_local_game_cards_artifact(*, source_root: Path, processed_root: Path,
     if not rows_out:
         return _no_data(f"Local game_cards build skipped for {date_str}: no groupable rows in raw team odds snapshot")
 
-    _census("raw_team_odds_snapshot", written=len(rows_out), matchups=_matchups_of(rows_out))
-    _write_game_cards_csv_rows(out_path, rows_out)
-    return len(rows_out), out_path
+    return _finalize_and_write("raw_team_odds_snapshot", rows_out)
 
 
 def _smart_sim_projection_index(*, processed_root: Path, date_str: str) -> dict[tuple[str, str], dict[str, float]]:
