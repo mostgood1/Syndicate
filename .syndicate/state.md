@@ -1305,6 +1305,16 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   surfaces have not been checked. Its sibling `book_age_seconds` answers a
   DIFFERENT question ("has the price moved") and the board gates on the seen
   clock deliberately — see `layer2_board._row_quote_age_seconds`.
+- **`syndicate/features/shared/live_gameline_join.py` IS CLAIMED BY TWO OPEN
+  LANES** — `live-game-line-projection` and `mlb-live-gameline-distributions`.
+  Verified on `origin/main` 2026-08-17 00:2xZ; the second claim predates
+  2026-08-16's ledger work (checked at `2dd384b0`), the first began being
+  enforced when that lane's stray `OPEN` stub heading was merged onto the
+  entry owning its `- Files:` block. **Neither lane has a live session.**
+  This is the file board finding 3 root-causes to (`:643` overwrites
+  `edge_vs_market_pct` with the LIVE edge while `model_prob_over` stays
+  PREGAME), so whoever fixes that must reconcile the two lanes first rather
+  than just satisfy `lane-guard`.
 - **The Ask sim-vs-line clause claims a direction ONLY when the mean clears
   the line by 0.5 (`_SIM_DIRECTION_MIN_MARGIN`).** The precondition is that
   the distribution's MEDIAN is on the same side as the mean; for Poisson

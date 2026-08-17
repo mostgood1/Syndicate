@@ -3461,3 +3461,58 @@ would have reported coverage for a sport on the strength of a filename.
   sport" to **5 of 8** (`#454`) — and the three without it (soccer, NHL, NCAAB)
   are the same three modules that are weakest everywhere else, which is a
   finding in itself rather than a coincidence.
+
+## 2026-08-16 — CHECKPOINT 6: the ledger's own tooling, and three instrument misreads
+
+### FORBIDDEN: never `import` a hook module to reuse its parser
+
+`lane-guard.py` runs `main()` at import. With stdin at EOF it calls `sys.exit()`,
+which propagates out of `exec_module` and **kills the importing script with exit
+code 0 and no output at all**. Two scripts died that way tonight and both looked
+like "the parser returned nothing" — a silent wrong answer, not a crash.
+
+**Copy the regexes, or shell out with `stdin=DEVNULL`.** More generally: a file
+under `.claude/hooks/` is an executable with side effects, not a library.
+
+### REFUTED: "my open-lane test is equivalent to the guard's"
+
+I archived lanes using `— OPEN\b` (OPEN immediately after the first em-dash). The
+guard uses `LANE_RE = ^###\s+(\S+)\s+—\s*([^—]*)` plus `OPEN_RE = \bOPEN\b` —
+i.e. **OPEN anywhere in the first em-dash segment**. Mine is strictly narrower,
+so a heading like `— RE-TAKEN … OPEN …` reads closed to me and open to the guard.
+
+Archiving such a lane moves its body to `lanes_closed.md`, which the guard never
+reads — **silently dropping that lane's file protection**. I checked the batch
+afterwards and all six agreed, but that was luck, not design.
+**When a hook decides something, reproduce ITS predicate exactly.**
+
+### THE RULE THAT CAUGHT MY OWN BAD CLAIM: diff against the before-state, not against your intent
+
+I told another lane a file "was silently unprotected". It was not — it was
+already claimed by a different lane. What made the error visible was printing the
+claimants **from a commit before any of my work** and comparing, rather than
+reasoning about what my change touched. Reasoning said "I added the only claim";
+measurement said there were two.
+
+**For any claim of the form "X was broken and I fixed it", compute X's state at a
+commit that predates you.** Cheap, and it is the difference between a fix and a
+misattribution sent to another session.
+
+### Instrument misreads, three in one session, all producing CONFIDENT WRONG ANSWERS
+
+Same family as the standing rule that a null result is about the instrument until
+proven otherwise:
+
+1. **Git Bash mangles `rev:path`** — `git show origin/main:.syndicate/deploys.md`
+   became `origin\main;...` and returned a false "row absent: 0".
+2. **PowerShell `Select-String` is CASE-INSENSITIVE by default** — it matched the
+   lowercase quotation of a heading inside my own withdrawal text and reported a
+   deleted block as still present.
+3. **Bash executes backticks inside double-quoted strings** — an inline Python
+   check containing `` `Files:` `` had the backticks run as a command, and the
+   containment test returned `False` for a string that was present.
+
+**All three answered a question I did not ask, and all three looked plausible.**
+Verify a surprising ledger result with a SECOND tool before acting on it; in this
+session every one of the three was caught that way and none by re-reading the
+output.
