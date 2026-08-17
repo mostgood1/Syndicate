@@ -13158,3 +13158,68 @@ session's other corrections were about.
    modelling the substitution.
 2. Re-run this script. It is now a one-command scoreboard for any engine change.
 3. Only then consider a deploy request, with the total-bases row non-negative.
+
+## 2026-08-17 — RESEARCH: what the MLB sim is missing. **The biggest gap is a built dimension that is fed nothing.**
+
+Lane `convergence-phase7-crps`. Full write-up:
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md`. Read-only.
+
+**ACCESS CAVEAT FIRST:** `/api/ops/artifacts/stream` **403s on `roster_objs/`
+paths** (it serves `daily_summary` fine with the same token), so production
+roster profiles could NOT be read directly. Findings rest on mirrored artifacts
+that production WROTE plus the code path. **Production population is
+UNVERIFIED** and is a five-minute check for anyone with worker disk access.
+
+### THE HEADLINE
+
+**Pitch-type effectiveness is fully built, actively sampled, and 100% inert.**
+
+    pitcher.arsenal                  100.0%  (449/449)
+    batter.platoon_mult_vs_*          98.7%
+    batter.venue_mult_*               98.4%
+    batter.vs_pitch_type               0.0%  (0/450)
+    pitcher.pitch_type_whiff_mult      0.0%  (0/449)
+    pitcher.pitch_type_hr_mult         0.0%  (0/449)
+    pitcher.statcast_splits_n_pitches  0.0%  (0/449)
+
+The sim consumes all four (`simulate.py:1067/1068/1097/1099`, `:2779-2796`) as
+`.get(pitch_type, 1.0)`. **Empty map -> 1.0 -> a slider and a fastball are
+interchangeable.** The pitch is chosen from a real arsenal and then cannot affect
+anything.
+
+**Chain, evidenced end to end:** `_apply_cached_statcast_pitch_splits` calls
+`fetch_pitcher_pitch_splits`, which is **CACHE-ONLY** — reads
+`cache.get("pitcher_pitch_splits", …)`, returns None on miss, **never fetches**.
+The statcast cache holds **1,282 files in exactly one namespace, `bvp`**; the
+`pitcher_pitch_splits` namespace **has never been written**. Its populator is a
+manual x64 tool outside the daily pipeline.
+
+**Also collected daily and never used:** BVP (batter-vs-pitcher) — 1,282 cached
+files, `statcast_bvp.py` exists, and `simulate.py` contains **no reference to
+bvp at all**. Evaluation tooling only.
+
+### GENUINELY ABSENT MODELLING, ranked
+
+1. **No defensive quality anywhere** — no OAA/DRS/UZR, no team or player fielding
+   term. **BABIP is modelled with no defence behind it.** Largest true hole.
+2. **No batted-ball type model** — no GB/FB/LD, no launch angle, no exit
+   velocity. `inplay_hit_rate` is one scalar, so **park factors cannot interact
+   with a hitter's profile** and defence could not be applied even if it existed.
+3. **No catcher framing** — the umpire IS modelled (called-strike multiplier);
+   the catcher, a larger and more persistent effect on K/BB, is not.
+4. **No batter fatigue/availability** (`availability_mult` is pitcher-only).
+5. **No visible recency weighting** — rates read as season aggregates.
+
+### WHERE A MARKET BEAT IS MOST LIKELY
+
+1. **Pitch-type matchup** — model, consumption, loader, cache and fetch tool ALL
+   exist. This is pipeline wiring, not modelling, and soft prop books price K
+   props off season rates rather than arsenal-vs-weakness.
+2. **Catcher framing** — cheap, sits beside the umpire term already there, moves
+   K/BB props directly.
+3. **Batted-ball types, then defence** — the pair unlocks park interaction and
+   total-bases accuracy, the exact market where P2's substitution work REGRESSED.
+4. **BVP** — already collected daily; currently evaluation-only.
+
+**Aim all of it at PROPS.** Game lines carry a sharp reference on 102/102
+markets; props carry 0%.
