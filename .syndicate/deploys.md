@@ -13573,3 +13573,63 @@ but it is not free the way the other two are — cost it before promising it.
 
 **Nothing here is built. This measures whether the dimensions DISCRIMINATE, which
 is the prior question to modelling them — and all three do.**
+
+## 2026-08-17 — PITCH-TYPE SPLITS AT 98.4% COVERAGE: **the effect is negligible. I am retiring my own research prediction.**
+
+Lane `convergence-phase7-crps`. 45 games x 120 sims per arm, 2,415 scored rows,
+**793/806 pitcher-slots (98.4%)** carrying real splits. Artifact rebuilt with
+**305 pitchers**.
+
+| market | n | splits OFF | splits ON | market | effect |
+|---|---|---|---|---|---|
+| batter_hits | 659 | 0.24404 | 0.24472 | 0.23077 | **−0.00069 worse** |
+| batter_rbis | 663 | 0.22211 | 0.21940 | 0.20959 | +0.00270 better |
+| batter_runs_scored | 651 | 0.23974 | 0.23844 | 0.23377 | +0.00130 better |
+| batter_total_bases | 442 | 0.26177 | 0.26104 | 0.24510 | +0.00073 better |
+
+3 of 4 better, 1 worse, **every effect <= 0.0027**, market still wins all four by
+0.010–0.016.
+
+### THE DECISIVE COMPARISON — coverage went up 7.7x and the answer did not move
+
+    coverage 12.7%   hits -0.00058  rbi +0.00312  runs -0.00084  tb +0.00084
+    coverage 98.4%   hits -0.00069  rbi +0.00270  runs +0.00130  tb +0.00073
+
+**The earlier result was not thin — it was correct.** Going from 102 to 793
+pitcher-slots changed nothing material. That rules out the coverage explanation I
+had been holding open, and makes this a real negative result rather than an
+inconclusive one.
+
+### RETIRING THE PREDICTION
+
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md` §4 ranked pitch-type matchup as
+**"where a market beat is most likely"**, on the reasoning that everything was
+built and only needed wiring. **Wiring it produced ~+0.001 mean Brier and no
+market beat. That prediction is WRONG and is retired.**
+
+**I spent the expensive fetch (314 calls, ~2h) on the dimension whose payoff was
+least established, while the spread probe later showed batted-ball and defence
+are ONE CALL EACH with far larger between-player spread.** The ordering error was
+mine: I ranked by "how complete is the machinery" instead of by "how much does
+the dimension discriminate", and machinery-completeness turned out to predict
+nothing.
+
+### WHAT WAS ACTUALLY TESTED — half the feature, and this bounds the claim
+
+The artifact populates the **PITCHER side** (`pitch_type_whiff_mult`,
+`pitch_type_hr_mult`, `inplay_mult`). **`batter.vs_pitch_type` is STILL 0%
+populated** — there is no batter-by-pitch-type source in this work at all.
+
+So what is measured is **a pitcher's average effectiveness per pitch type**, NOT
+the matchup interaction (this batter against this pitch). **The interaction is
+untested.** That does not rescue the prediction — the pitcher half is the larger
+and more available half — but a future claim about "pitch-type matchup" must not
+cite this result as having tested it.
+
+### Standing value of the work
+
+The wiring is **not wasted**: the artifact, the disk-backed path, the
+artifact-first loader and 5 tests are the mechanism any future pitch-level
+feature needs, and the 305-pitcher artifact is real data. **But it should not be
+deployed on these numbers** — a ~0.001 Brier move does not justify a scheduled
+populator and a new mirrored artifact family.

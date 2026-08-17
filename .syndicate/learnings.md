@@ -5080,3 +5080,38 @@ verified 92->93->94 keys) but **false of the restart**. The service redeploys.
 `render.yaml` push, but "I only set one variable, nothing will happen" is wrong,
 and on a service with an in-flight job it would have killed it.
 
+## 2026-08-17 — RULE: rank modelling gaps by how much the dimension DISCRIMINATES, not by how complete its machinery is
+
+**What I did.** Researching what the MLB sim was missing, I found pitch-type
+effectiveness fully built — model fields, four consumption sites, a loader, a
+cache, a fetch tool — and **0% populated**. I ranked it "where a market beat is
+most likely" *because everything existed and only needed wiring*, and spent
+**314 network calls and ~2 hours** filling it.
+
+**Result at 98.4% coverage: ~+0.001 mean Brier, 3 of 4 markets, no market beat.**
+The prediction was wrong and is retired.
+
+**What I should have measured first, and later did — in twelve calls:**
+
+    batted ball   barrel rate  p10  3.10%  ->  p90 13.85%     (4.5x spread)
+    defence OAA   outs         p10 -6.0    ->  p90 +7.4       (13.4 outs)
+    pitch splits  -- no spread probe was ever run --
+
+**Both of the dimensions I ranked BELOW pitch-type are ONE CALL EACH** (season
+leaderboards, not per-player) and have large, measured between-player spread. I
+ranked by machinery-completeness; machinery-completeness predicted nothing.
+
+**RULE: before investing in a modelling gap, measure the SPREAD of the input
+across the population it would distinguish.** A dimension where p10 and p90 are
+close cannot move a forecast however elegantly it is wired. A cheap spread probe
+is minutes; the wiring was hours.
+
+**The seductive part, and why this needs to be a rule rather than an
+observation:** "everything is built, it just needs data" feels like the highest
+expected value in the room. It is an argument about COST, and I let it stand in
+for an argument about VALUE. Cheap and worthless is still worthless.
+
+**Corollary:** state what fraction of a feature you actually tested. I populated
+the PITCHER side and `batter.vs_pitch_type` remains 0%, so the matchup
+INTERACTION was never tested — only per-pitcher average effectiveness. The
+negative result stands for what was measured and must not be cited as broader.
