@@ -26,6 +26,17 @@ HEADER_RE = re.compile(r"^###\s")
 # accepts "DEPLOYED, MEASUREMENT OPEN", rejects "OPENED"/"REOPENED"/"CLOSED".
 LANE_RE = re.compile(r"^###\s+(\S+)\s+—\s*([^—]*)")
 OPEN_RE = re.compile(r"\bOPEN\b")
+# THE SAME HEADER WRITTEN WITH ASCII HYPHENS. LANE_RE requires U+2014, so a
+# header written `### slug - OPEN - ...` did not parse AT ALL -- and an unparsed
+# header is an UNGUARDED lane, silently. Measured 2026-08-17: one live lane sat
+# in that state with three claimed files unprotected, one of them contended with
+# a lane closed minutes earlier; by day's end the digest reported FIVE of them.
+#
+# The fix is deliberately two-sided, because rejecting alone leaves the gap open:
+# these headers are PARSED, so their claims are enforced like any other lane, AND
+# reported loudly, and the owning session is blocked from editing until it fixes
+# the separator. Protection first, pressure second.
+ASCII_LANE_RE = re.compile(r"^###\s+(\S+)\s+-\s*([^-]*)")
 FILES_RE = re.compile(r"^\s*-\s*Files\b[^:]*:(.*)$")
 FIELD_RE = re.compile(r"^-\s*\w")
 PATHISH_RE = re.compile(r"^[\w.\-]+\.\w{1,5}$")
@@ -96,6 +107,9 @@ def _claims(text):
         # state, attributing its Files block to the wrong slug.
         if HEADER_RE.match(line):
             m = LANE_RE.match(line)
+            if not m:
+                # Malformed separator: still a lane, still claims its files.
+                m = ASCII_LANE_RE.match(line)
             if m:
                 slug = m.group(1)
                 open_lane = bool(OPEN_RE.search(m.group(2)))
@@ -122,6 +136,25 @@ def _claims(text):
             if open_lane and stripped.startswith("-") and not _is_disclaimer(stripped):
                 for f in _paths_in(stripped.lstrip("- ")):
                     yield slug, f
+
+
+def _malformed_headers(text):
+    """Lane headers needing U+2014 that were written with ASCII hyphens.
+
+    Returns [(slug, header_line)]. These DO parse for claim purposes (see
+    `_claims`) so no lane goes unguarded -- but every other reader keyed on the
+    em-dash, including the session-start digest, still disagrees about them.
+    """
+    out = []
+    for line in text.splitlines():
+        if not HEADER_RE.match(line):
+            continue
+        if LANE_RE.match(line):
+            continue
+        m = ASCII_LANE_RE.match(line)
+        if m and OPEN_RE.search(m.group(2)):
+            out.append((m.group(1), line.strip()))
+    return out
 
 
 def main():
@@ -195,6 +228,45 @@ def main():
             text = fh.read()
     except Exception:
         return 0
+
+    # MALFORMED HEADERS: report always, block the owner.
+    #
+    # Reporting alone was the old behaviour by accident -- the session-start
+    # digest counted them and nobody acted, so the count grew 1 -> 5 in one day.
+    # A count is not a finding until it names something and stops someone.
+    try:
+        malformed = _malformed_headers(text)
+    except Exception:
+        malformed = []
+
+    if malformed:
+        sys.stderr.write(
+            "LANE HEADER(S) USE ASCII HYPHENS. They need the em-dash U+2014 that "
+            "lane-guard and the session-start digest both parse on:\n")
+        for _slug, _line in malformed:
+            sys.stderr.write("    " + _line[:120] + "\n")
+        sys.stderr.write(
+            "Their claims ARE enforced here, so nothing is unguarded -- but the "
+            "digest will not list them as OPEN, so an arriving session sees no "
+            "claim on those paths. Fix the separators.\n")
+
+    if current and any(_slug == current for _slug, _ in malformed):
+        # Deliberately NOT printing a literal em-dash: this hook's stderr is
+        # re-encoded by the console, and an instruction to use U+2014 that
+        # arrives as a mangled byte is worse than no instruction at all.
+        sys.stderr.write(
+            "\nBLOCKED: your own lane header for '" + current + "' uses ASCII "
+            "hyphens, so the digest does not list your lane as OPEN and an "
+            "arriving session sees no claim on your files.\n"
+            "Replace both separators with U+2014 (the em-dash character) so the\n"
+            "header reads:   ### " + current + " <U+2014> OPEN <U+2014> <status>\n"
+            "Copy the separator from any other OPEN lane header rather than "
+            "typing it -- that is the reliable way to get the right codepoint.\n"
+            "Then re-run your edit. Verify with:\n"
+            "    bash .claude/hooks/session-start.sh | grep -i guarded\n"
+            "Blocked rather than warned because the warning was already being "
+            "printed and ignored while the count grew to five.\n")
+        return 2
 
     conflict = None
     try:
