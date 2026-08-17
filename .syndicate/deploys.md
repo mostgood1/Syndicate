@@ -10375,3 +10375,557 @@ refuted by money.
    +12.40% model edge when +8.16% of it was available with no model.
 4. `betting_accuracy.py` is ABSENT from this checkout, so none of this is
    comparable to the overrides file's 55.78%/54.65%.
+
+## 2026-08-17 — PRODUCTION RE-RUN ATTEMPTED — **THE GRID CANNOT BE SWEPT ON PRODUCTION, AND THE BETTING EVIDENCE FLIPS SIGN BETWEEN WINDOWS**
+
+Lane `convergence-phase7-crps`. **NO DEPLOY. Nothing promoted.**
+
+### THE REQUESTED RE-RUN IS BLOCKED, and the reason is data availability
+
+Re-simulating the leash grid needs the **schema-v4 `roster_obj_*.json`**
+(a serialized `TeamRoster`). **Production does not have it.** Verified by
+direct fetch, not by absence from a listing — the listing is filtered, so I
+tested the stream endpoint at every plausible root:
+
+    roster_obj_0_CWS_at_TOR_pk822786_g1.json   404 at mlb_source/data/...
+                                               404 at mlb_source/source_artifacts/data/...
+
+Only the RAW INPUT BUNDLE (`roster_0_*.json`, `schema_version=None`, carrying
+`pitch_model`/`statcast`/`umpire_factors`/`probable_pitcher`) is exposed, and
+the sim's own loader rejects it: `ValueError: Unsupported game roster artifact
+schema_version=None`. Rebuilding a `TeamRoster` from it would no longer be a
+frozen record of what production simulated, which is the property that made the
+June sweep trustworthy in the first place.
+
+**Path quirk worth not rediscovering — the two families sit under DIFFERENT
+stream roots:**
+
+    odds     mlb_source/data/daily/snapshots/<date>/...                     OK
+    rosters  mlb_source/source_artifacts/data/daily/snapshots/<date>/...    OK
+
+### WHAT WAS RUN INSTEAD, AND IT ANSWERS THE ACTUAL BLOCKER
+
+`scripts/grade_production_outs_betting.py` — grade **production's shipped**
+outs model on **its own window** (2026-07-19..08-16), using its published
+`outs_dist`. This does not sweep the leash; it tests whether the *confound*
+that invalidated the June grade is systemic.
+
+    dates 29   dates with usable odds 15   starts 342   no_line 246   graded 95
+
+| | hit rate | ROI/unit |
+|---|---|---|
+| outcomes over the line | 56.84% | — |
+| **ALWAYS OVER** (no model) | 56.84% | **+0.79%** |
+| ALWAYS UNDER (no model) | 43.16% | −18.44% |
+| **shipped model** (60% over-picks) | **48.42%** | **−10.15%** |
+
+Multiplicative and power devig agree exactly.
+
+### THREE FINDINGS
+
+**1. THE OVER-CONFOUND IS SYSTEMIC, NOT A JUNE ANOMALY.** Overs won 58.78% in
+the June window and **56.84%** in this independent one. Any future grid grade
+MUST control for over-rate; a configuration that bets over more will keep
+looking good for reasons unrelated to skill.
+
+**2. THE BETTING EVIDENCE FLIPS SIGN BETWEEN WINDOWS.** June grid best:
+59.46% / **+12.40%**. Production window, shipped model: 48.42% / **−10.15%**.
+Two windows, opposite conclusions, n=148 and n=95. **Betting grades at this
+scale are not decision-grade for this question in EITHER direction** — which
+retroactively strengthens the refusal to promote a leash value on the June run.
+
+**3. On this window the shipped model LOSES to a side-blind baseline** by 8.4pp
+of hit rate and ~11 points of ROI. **n=95, SE 5.13pp, so that is 1.6 SE — NOT
+significant.** Stated as a direction to investigate, not a verdict.
+
+### WHY THE SAMPLE IS SO SMALL, MEASURED
+
+Only **15 of 29** dates carry a usable pitcher-props artifact — most in-window
+live files are 441–548 B stubs — and only **95 of 342** starts have a matching
+line. The binding constraint on grading outs props is **archived line coverage**,
+not simulation cost. Fixing that is upstream of any further betting grade.
+
+### STANDING RULE THIS CONFIRMS
+
+Report the side-blind baseline with every prop betting grade. Here it converted
+"the model returns −10.15%" into the far more useful "the model returns −10.15%
+where betting every over blind returned +0.79%".
+
+## 2026-08-17 — ARCHIVED LINE COVERAGE DIAGNOSED — **THE FETCH IS RUNNING AFTER THE SLATE, AND THE FREEZE SEALS THE RESULT**
+
+Lane `convergence-phase7-crps`. **READ-ONLY. No code changed** — every file
+that could fix this is claimed by another OPEN lane (see hand-off below).
+
+The blocker on grading outs props is archived line coverage: only 15 of 29
+dates carry a usable pitcher-props artifact, and only **5 dates carry >= 8
+pitchers with an outs line**.
+
+### THE CAUSE IS THE RETRIEVAL CLOCK, and it is visible in the artifact itself
+
+`retrieved_at` inside each doc, against pitcher count:
+
+| date | variant | retrieved_at (UTC) | pitchers | with outs |
+|---|---|---|---|---|
+| 07-24 | live | **2026-07-24T19:13** *(same day, pregame)* | **30** | **26** |
+| 08-11 | pregame | **2026-08-11T22:41** *(same day)* | **30** | **30** |
+| 08-15 | pregame | **2026-08-15T23:33** *(same day)* | 19 | 17 |
+| 08-10 | pregame | 2026-08-11T01:34 | 12 | 12 |
+| 07-19 | live | 2026-07-**20**T04:31 *(next day)* | **0** | **0** |
+| 07-25 | live | 2026-07-**26**T04:59 *(next day)* | **0** | **0** |
+| 08-08 | pregame | 2026-08-**09**T02:42 *(next day)* | 1 | 1 |
+
+**The rule is exact: docs retrieved same-day afternoon/evening carry 26–30
+pitchers; docs retrieved after ~02:00Z the following day carry ZERO.** Books
+pull pitcher-props markets once games finish, so a post-slate fetch retrieves an
+empty market and there is nothing to archive. 12 of 29 dates have literally
+`pitchers: 0`.
+
+**`mode` is `live` on EVERY file, including the `_pregame` ones** — the freeze
+copies the live doc, so it can only ever seal what the fetch happened to hold.
+
+### TWO DISTINCT DEFECTS, and only the first is the big one
+
+**1. THE PITCHER-PROPS FETCH RUNS AFTER THE SLATE ON MOST DATES.** This is
+primary and upstream of everything else. No freeze can seal data that was never
+fetched while the market existed. This is the same root cause class as `#440`'s
+headline finding — *the system has almost no clock*, so work lands uniformly
+across 24h regardless of when the market is open.
+
+**2. THE FREEZE CANNOT PROVE IT IS PREGAME WHEN THE SLATE CLOCK IS MISSING.**
+`_freeze_oddsapi_pregame_markets` (`scripts/refresh_mlb_oddsapi.py:680`) gates
+on `if slate_started or (slate_start is None and already_frozen): continue`.
+When `slate_start` is None it is **first-write-wins**, so the first pass of the
+day seals whatever exists — including a post-slate empty doc, which is what
+08-08 (1 pitcher) and 08-09 (2 pitchers) look like. The seal then never
+improves, by design.
+
+### THE HISTORICAL HALF IS NOT RECOVERABLE FROM THE ARCHIVE
+
+The freeze was **unreachable before 2026-08-08** — its own docstring records
+production holding **zero** `*_pregame.json` on that date, and usable coverage
+in my sample begins exactly there. Before it, the live file was rewritten in
+place all night, so 07-19..08-07 is gone. **The only route to that history is
+OddsAPI's historical endpoints, which the ledger records as CHEAP** — that is a
+real backfill option, not a dead end, and it would roughly triple the gradeable
+sample.
+
+### HAND-OFF — I AM NOT TAKING THESE FILES
+
+Every lever is owned elsewhere and I have not edited any of them:
+
+- `scripts/refresh_mlb_oddsapi.py` — claimed (read-only) by OPEN
+  `grading-blocker-settled-zero`. Owns defect 2, and note this is the SAME file
+  whose freeze fix that lane already shipped.
+- `live_refresh_loop.py` / pregame cadence — OPEN `odds-cadence-off-the-mlb-peak`
+  and `refresh-worker-oom-recurrence`. Owns defect 1, and that lane's Phase 1
+  fixture-aware cadence is precisely the mechanism that would fix it: a props
+  fetch keyed to time-to-first-pitch instead of an elapsed-time counter.
+
+**Recommended, in order:** (a) make the props fetch fixture-relative so it lands
+pregame — defect 1 is most of the loss; (b) require positive proof of pregame
+before sealing, and allow a strictly-richer re-seal while pregame; (c) backfill
+07-19..08-07 from the historical endpoint.
+
+**Cost note before anyone acts:** OddsAPI is at ~62.7% of a 5M cap and MLB is
+93.0% of spend. Moving the props fetch earlier changes call timing, not
+necessarily volume, but the backfill does add calls — cost it first.
+
+## 2026-08-17 — PREFLIGHT: cadence flip on live-odds-worker — **FAIL (not fired)**
+
+Lane `convergence-phase7-crps`. Candidate: set
+`SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=true` on **live-odds-worker only**, via
+the single-key env endpoint, then deploy that service at **its own current live
+SHA** (NOT `main` — `state.md`: the three services run separate lineages and
+"Do not deploy main's tree to these services").
+
+**VERDICT: FAIL, on measurement. NOT ON SAFETY.** The change is narrow, correctly
+scoped, and reversible in one call. It fails because **no reader is assigned to
+the 24h effect**, and this gate treats that as a FAIL rather than a shrug. The
+session opened with *"14 deploys with no measurement. Not evidence of a fix."*
+Firing this would have made it 15.
+
+| item | answer |
+|---|---|
+| scope | ONE change: the env var. No code ships — my own seal fix `bafb4fb2` stays undeployed, deliberately. |
+| expected effect | `FIXTURE_CADENCE sport=mlb` in logs within ~1 tick; on the next slate, props `retrieved_at` **before first pitch** and **>=8 pitchers with an outs line** (baseline: 5 of 29 dates cleared that) |
+| measurement | log line = me, minutes. **24h effect = UNASSIGNED — this is the failing item.** |
+| blast radius | live-odds-worker only; persistent disk, stop-then-start, real downtime, no instance overlap; mlb/wnba/soccer live tick pauses |
+| rollback | same endpoint, `=false`, redeploy same SHA |
+| ledger | no rule forbids it. Live concerns: headroom **257–415 MB** (peak 1855/2048 = 90.6%) and *"worker periodic work is never free"* (`#241` = restart loop). Flag's own precondition, a baseline BEFORE, stands at **n=4 scheduled records** — thin. |
+
+**SHORTEST PATH TO PASS: assign a reader for 2026-08-18.** Nothing else is missing.
+
+### RUNBOOK, ready to execute
+
+1. Job gate: confirm no in-flight sim on live-odds-worker.
+2. Single-key env endpoint (**NOT `render.yaml`** — avoids `blueprint_sync`,
+   which would rewrite the whole env block and 502 every route ~2 min).
+3. Deploy live-odds-worker at **its own live SHA**.
+4. Minutes: Render logs for `FIXTURE_CADENCE sport=mlb`.
+5. 2026-08-18: `py -3 scripts/grade_production_outs_betting.py`. PASS =
+   pre-first-pitch `retrieved_at` and >=8 pitchers carrying an outs line.
+
+### CARRIED, and it matters for whoever fires this
+
+**The two halves only pay off together.** `bafb4fb2` (monotone props seal) is on
+`main` and **UNDEPLOYED**, so it is inert until refresh-worker next ships.
+Cadence makes the pregame capture happen; the seal makes it stick. Flipping
+cadence alone improves capture but still lets a later thin fetch overwrite a good
+seal on any date whose slate clock is unreadable.
+
+## 2026-08-17 ~18:3xZ — CADENCE FLIP FIRED ON live-odds-worker — **GATE VERIFIED RUNNING; EFFECT NOT YET MEASURED**
+
+Lane `convergence-phase7-crps`. Fired on explicit user instruction after the
+preflight above returned FAIL on the measurement item. **That FAIL is not
+retracted** — the 08-18 read is still unassigned, and this entry records the
+deploy as UNMEASURED rather than as a fix.
+
+- **Service:** live-odds-worker `srv-d91dpertqb8s73co8lt0`.
+- **Change:** `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=true`, set through the
+  **single-key env endpoint**. `render.yaml` untouched, so **no `blueprint_sync`,
+  no whole-env rewrite, no 502 window.**
+- **Code shipped: NONE.** Redeployed the service's OWN live SHA `abc9987515`, not
+  `main`, per `state.md`'s "Do not deploy main's tree to these services". The env
+  var is the only change. **`bafb4fb2` (monotone props seal) did NOT ship and
+  remains inert.**
+- **Deploy `dep-…` reached `live` after ~410s** (build ~300s, update ~110s).
+- **Env confirmed by RE-READ after the PUT**, not by the PUT's status code.
+
+### VERIFICATION — reachability, not presence `[Render logs API, 18:36–18:37Z]`
+
+    FIXTURE_CADENCE sport=wnba   interval=7200 reason=near:7h_out
+    FIXTURE_CADENCE sport=soccer league=championship due:imminent_handoff_to_t_window:1338s
+    FIXTURE_CADENCE sport=soccer league=epl        skip:far:96h_out:age=48461s<86400s
+
+The tier table is being **applied**: `near`, `far`, and the
+`imminent_handoff_to_t_window` hand-off all fire. Per-league scoping (1c) is
+live too. The env var alone would have proved only configuration.
+
+### WHAT IS **NOT** VERIFIED, STATED PLAINLY
+
+- **No `FIXTURE_CADENCE sport=mlb` line is in this sample**, and MLB is the sport
+  this whole lane cares about. The likely reason is benign and is the branch I
+  traced: `_filter_sports_for_pregame_sweep` keeps a **live** sport
+  unconditionally, so the interval gate is never reached during a slate. **That
+  is an inference, not a measurement.** Confirm it off-slate before claiming MLB
+  is gated.
+- **THE EFFECT IS UNMEASURED.** The deploy changes *when* sweeps happen; whether
+  that yields a pre-first-pitch props capture is a 2026-08-18 question.
+- **OWED, UNASSIGNED:** on 2026-08-18 run
+  `py -3 scripts/grade_production_outs_betting.py`. PASS = props `retrieved_at`
+  before first pitch and **>=8 pitchers carrying an outs line** (baseline: 5 of
+  29 dates cleared that). Until then this is a deploy with no measurement.
+
+### ROLLBACK (one call, no code)
+
+Single-key endpoint `SYNDICATE_PREGAME_FIXTURE_AWARE_CADENCE=false` on
+`srv-d91dpertqb8s73co8lt0`, redeploy the same SHA. Watch item: live-odds-worker
+headroom was **257–415 MB** (peak 1855/2048 = 90.6%) and this changes sweep
+frequency near first pitch — `#241` is the precedent for periodic work causing a
+restart loop.
+
+## 2026-08-17 — READER ASSIGNED for the cadence flip — the preflight's failing item is now discharged
+
+The 2026-08-17 ~18:3xZ cadence flip was fired with its 24h read **UNASSIGNED**,
+which is the single item that made its preflight FAIL. That is now closed.
+
+- **`outs-props-coverage-check`**, one-time, **fires 2026-08-19 07:00 CT**,
+  reads date **2026-08-18**. Doc: `.syndicate/scheduled_task_outs_coverage.md`.
+- Runs `scripts/grade_production_outs_betting.py`. **PASS** = props
+  `retrieved_at` before first pitch AND >=8 pitchers carrying an `outs` line
+  (baseline: 5 of 29 dates). **FAIL** → recommends rollback, deploys nothing.
+  **VOID** if Gate A cannot prove the flag was live all day.
+- Carries the lane's standing rules: rate-with-denominator, side-blind baseline
+  beside any hit rate, "one slate is not a verdict", and the explicit note that
+  the monotone seal `bafb4fb2` is UNDEPLOYED so a FAIL may be the missing seal
+  rather than the cadence.
+
+**This does not make the deploy measured.** It makes it *scheduled to be
+measured*. The obligation closes when the reader reports.
+
+## 2026-08-17 19:4xZ — COORDINATION STATE for the two `convergence-phase7-crps` requests
+
+Written so the next session does not re-derive it. **Nothing has been deployed.**
+
+**Re-measured 19:4xZ, by CONTENT against each live SHA:**
+
+    refresh-worker    live=8c0bd8e6 (17:48:53Z)   ownership_gate=False  monotone_seal=False
+    live-odds-worker  live=abc9987515 (18:40:57Z)  ownership_gate=False  monotone_seal=False
+
+**Queue is backed up:** 4 requests pending, oldest `2026-08-15T2350Z-smaps-reconciliation`
+is **two days old**; `done/` has nothing since 08-16. Do not read "my request is
+pending" as "the coordinator is ignoring it".
+
+### PRIORITY CALL COMMUNICATED TO THE COORDINATOR — honour it if you pick this up
+
+- **`20025cc4` ownership gate — the one that matters.** Both workers. Soft
+  deadline before the 08-18 slate.
+- **`bafb4fb2` monotone seal — URGENCY FORMALLY DROPPED TO ZERO by its own
+  requester (me).** It should not land before the 08-19 cadence result anyway,
+  because its reading is uninterpretable until cadence is known good. Leaving it
+  queued past 08-19 regresses nothing.
+- **If neither fits a safe window, take neither.** The deadline is soft: the
+  scheduled reader's Gate B returns INCONCLUSIVE rather than FAIL, so a starved
+  mechanism cannot be wrongly rolled back. Missing it costs one day of
+  measurement, not correctness. **An in-flight MLB sim on refresh-worker outranks
+  this deadline.**
+
+### If both land in one window
+
+**Record that fact in this file.** Two changes in one window means neither
+result is attributable, and the 08-19 read must not be credited to the wrong
+change. This lane has already been burned twice by confounded measurements
+(the leash sweep vs the betting grade; the cadence flip vs the undeployed seal).
+
+**Requester is out of context and cannot answer follow-ups.** Everything needed
+is in the two request files, this section, and `state.md` under "ODDS-SWEEP
+OWNERSHIP GATE — ON `main`, RUNNING ON NEITHER WORKER".
+
+## 2026-08-17 — CORRECTION TO MY OWN PHASE 7 VERDICT: the skill test was the wrong instrument, and the real answer is WORSE
+
+Lane `convergence-phase7-crps`. Read-only re-scoring of data already on disk; no
+re-simulation, no deploy.
+
+### What I got wrong
+
+`sweep_starter_leash.py` decided "beats base" by comparing the model's **mean
+absolute error** to a **constant point prediction**, and on that basis `state.md`
+was told the MLB pitcher-outs model "loses to a constant baseline at every grid
+point". **That is a POINT-forecast test applied to a DISTRIBUTIONAL model**, and
+it is the wrong instrument twice:
+
+1. **A constant has no distribution.** It cannot price `P(outs > 17.5)` at all,
+   so it was never a competitor — the thing being sold is the distribution.
+2. **MAE cannot see the result the sweep actually found.** Dispersion moved
+   **1.002 → 0.791** against a 0.7979 target: the DISTRIBUTION improved
+   dramatically while MAE barely moved. The verdict rested on the one metric
+   blind to the finding.
+
+`model_scoring.crps_empirical` — the exact integrator for this — was already
+present and I did not use it for the baseline. Phase 7 built the instrument and
+then the verdict was taken with a different one.
+
+### The correct test: CRPS skill vs CLIMATOLOGY `[measured, 267 starts]`
+
+    skill = 1 - CRPS_model / CRPS_climatology
+    CRPS(climatology) = 2.1927   (marginal empirical distribution of outs, 22 support points)
+
+| leash | CRPS model | skill vs climatology |
+|---|---|---|
+| 0 | 2.3894 | **−8.97%** |
+| 3 | 2.4114 | −9.98% |
+| 4 | 2.4355 | −11.08% |
+| **5 (current)** | 2.5110 | **−14.52%** |
+| 6 | 2.8585 | −30.37% |
+
+**THE MODEL HAS NEGATIVE SKILL AT EVERY LEASH VALUE.** You would price these
+starts better using the league-wide marginal distribution of outs than using the
+sim. Shortening the leash reduces the damage (−14.52% → −8.97%) and **does not
+make it positive.**
+
+So the corrected reading is not softer than the original, it is **harder and
+better-founded**: the leash is a real defect worth fixing, and fixing it does not
+make this model useful for outs.
+
+### The baseline is deliberately HARD, stated rather than buried
+
+Climatology is computed **in-sample**, from the very actuals being scored, so it
+is fitted to the test set while the model is not. Beating it would have been a
+conservative result; losing to it is therefore not automatically damning.
+
+### THE ONE CONFOUND THAT COULD STILL MOVE THIS, and it is being measured
+
+**The replay ran at 100 sims/game; production MLB pregame uses 1000.** A 100-draw
+empirical PMF is a NOISY estimate of the model's own predictive distribution, and
+CRPS penalises that noise — so the model's true CRPS is better than 2.389 by an
+unmeasured amount. A 9-point deficit is unlikely to flip on this alone, but the
+size is unknown and **quoting the number without this caveat would overstate the
+case.**
+
+This is exactly `#440` **Phase 9** ("re-score the same slate at several sim
+counts and read where CRPS stops improving"), which Phase 7 exists to make
+measurable. Running now at leash {0, 5} x sims {100, 300, 1000}, 490,000
+game-sims. **Treat the table above as provisional until that lands.**
+
+## 2026-08-17 — CRPS SKILL CENSUS vs CLIMATOLOGY — **the first cross-sport distributional skill measurement, and NFL margin PASSES**
+
+Lane `convergence-phase7-crps`. `py -3 scripts/skill_census_crps.py`. Read-only
+over the local mirror. **No deploy.**
+
+The 2026-08-14 audit: 69 sport x market pairs ship a prediction, **2 have a
+backtest**. This asks the cheapest useful question of as many as the mirror can
+answer — does the forecast beat CLIMATOLOGY *as a distribution*?
+
+    skill = 1 - CRPS_model / CRPS_climatology
+
+| sport | market | segment | n | CRPS model | CRPS clim | skill | 95% CI | verdict |
+|---|---|---|---|---|---|---|---|---|
+| **nfl** | **margin** | regular | 273 | 7.7160 | 7.9713 | **+3.20%** | **[+1.10%, +5.31%]** | **BEATS climatology** |
+| nfl | total | regular | 273 | 7.7958 | 7.7692 | −0.34% | [−3.47%, +2.79%] | **INDISTINGUISHABLE** |
+| nhl | team_goals | full_game | 10 | — | — | — | — | unmeasured (n<30) |
+| mlb | pitcher outs | — | 267 | 2.3894 | 2.1927 | **−8.97%** | (see separate entry) | loses |
+
+### THE RESULT THAT MATTERS
+
+**NFL game margin is the FIRST forecast in this platform measured to have real
+distributional skill.** +3.20% with a **paired** 95% CI of [+1.10%, +5.31%] —
+excludes zero. The interval is paired (every game scored by both forecasts), so
+game-to-game variance is differenced out rather than swamping a few-percent
+effect.
+
+**And it is a conservative number:** climatology is computed **in-sample** and
+**within segment**, so the baseline is fitted to the test set while the model is
+not. Beating it is harder than beating an honest out-of-sample climatology.
+
+### THE THREE-WAY VERDICT IS DELIBERATE
+
+`INDISTINGUISHABLE` is not a rounding of "loses". NFL total's CI spans zero: the
+sample cannot tell, which is a different finding from "measured to be worse" and
+must not be reported as either skill or failure.
+
+**Read across the platform:** of everything measurable today, **one cell has
+proven skill, one is a coin flip, one is clearly negative (MLB outs), and the
+rest cannot be measured from the mirror at all.**
+
+### UNMEASURED, WITH REASONS — none of these is a silent zero
+
+- **NCAAF — truth is in a different FORMAT.** 30 projection files / 1,522 rows
+  present, but `_nflverse_finals` looks for `play_by_play_<season>.csv.gz` while
+  NCAAF truth is CFBD `plays_<season>_wk##.json.gz`. **0 game_id matches.**
+  Fixable: a CFBD reader. The projections are there and unscored.
+- **NHL — joins, but n=10.** 5 of 11 boxscore dates intersect the 9 sim dates.
+  The floor refused it. Not a defect; a coverage limit.
+- **NFL PRESEASON could not be scored at all** — and it is one of only two pairs
+  with a published backtest. nflverse `play_by_play_*.csv.gz` carries regular
+  season, so 725 projection rows joined 273 REGULAR games and **zero preseason**.
+  The existing `nfl_preseason_calibration.MEASURED_SKILL` therefore rests on a
+  truth source this census cannot reach — worth reconciling.
+
+### WHAT THE FILE ACTUALLY CONTAINED, vs what its name said
+
+`nhl_source/.../props_boxscores_sim_samples_*.csv` is **NOT player props**. All
+8,000 rows on 2026-06-02 carry `player_id=0` (TEAM) and the only market is
+GOALS. The scoreable quantity is **team goals with 2,000 draws per team-game** —
+the ideal shape for `crps_empirical`, just not the one the filename advertises.
+A census that trusted the filename would have reported a player-prop skill
+number computed from team aggregates.
+
+### CAVEATS
+
+- **Local mirror only**, which CLAUDE.md warns is lossy and whose per-family date
+  windows do not align. Coverage is printed before every score for that reason.
+- NFL n=273 games across 2023–2025 regular seasons.
+- Climatology is a WITHIN-SEGMENT marginal; pooling preseason with regular would
+  have credited the model for knowing the schedule, which is not skill.
+
+## 2026-08-17 — CFBD READER ADDED — NCAAF now joins (761 games) and is **LEAKY, NOT CITABLE**
+
+Lane `convergence-phase7-crps`. `scripts/skill_census_crps.py`. Read-only, no deploy.
+
+**The reader works.** NCAAF truth is CFBD `games_<season>.json.gz`, not nflverse
+pbp — game-level, so `homePoints`/`awayPoints` are the finals directly and `id`
+is the same ESPN-style key the projections carry. `completed` games only, so a
+scheduled game cannot enter as a 0-0 outcome.
+
+    ncaaf  truth_source=cfbd_games  projection_rows=1522  truth_games=888  joined_games=761
+
+That is **2.8x the NFL sample**. And it cannot be used.
+
+### THE LEAK, detected automatically and carried on every record
+
+    rating_source = cfbd_ppa_season_2025   ->  season-2025 games
+    generated_at  = 2026-07-16
+
+**Full-season 2025 PPA ratings, computed after the 2025 season ended, used to
+predict 2025 games.** A week-11 game is forecast using ratings that include that
+game and every game after it. Same shape as the soccer backtest leak the
+2026-08-14 audit found ("a season-to-date aggregate recomputed from a current
+table"), which `plan_2026-08-14_models.md` D1 marked NOT CITABLE. 761 of 761
+rows affected.
+
+| sport | market | n | skill | 95% CI | verdict |
+|---|---|---|---|---|---|
+| ncaaf | margin | 761 | +1.72% | [+0.20%, +3.24%] | **LEAKY — NOT CITABLE** |
+| ncaaf | total | 761 | −3.65% | [−6.94%, −0.36%] | **LEAKY — NOT CITABLE** |
+
+### THE POINT THAT MATTERS MOST — a leaked number is an UPPER BOUND
+
+A backtest that lets the model see its own outcomes should FLATTER it. NCAAF
+margin manages only **+1.72% even with the leak**, and total is **−3.65% even
+with the leak**. So the honest out-of-sample numbers are **at best** these, and
+realistically worse:
+
+- **NCAAF margin: true skill <= +1.72%** — i.e. plausibly zero or negative.
+- **NCAAF total: true skill <= −3.65%** — bad, and the leak is hiding how bad.
+
+This is more informative than "unmeasurable". A leaky cell still bounds the
+answer, and this one bounds it low.
+
+### THE CLEAN MEASUREMENT IS 12 DAYS AWAY, and the 2026 files already do it right
+
+The 2026 projections carry `rating_source=cfbd_ppa_season_2025_fallback_for_2026`
+— **prior-season ratings, which is point-in-time correct.** NCAAF opens
+**2026-08-29**. So from week 1 the census can score NCAAF honestly with no code
+change: 761 projections are already written and waiting for outcomes.
+
+**Do not "fix" the 2025 leak by regenerating those projections** — the fix is to
+score the 2026 season forward, not to re-derive history with a better rating
+source, which would just move the leak.
+
+### Census state after this change
+
+    cells scored 2   BEAT 1   lose 0   indistinguishable 1   LEAKY 2   unmeasured 1
+
+Still exactly **one** forecast in this platform with proven distributional skill:
+NFL margin, +3.20% [+1.10%, +5.31%].
+
+
+## PREFLIGHT — odds-sweep ownership gate `20025cc4` (BOTH workers) — **HELD, NOT DEPLOYED** `[2026-08-17 ~15:0x CDT / 20:0xZ]`
+
+Run by the coordinator against two deploy requests that turned out to be **the
+same fix filed twice**: `2026-08-17T192500Z-convergence-phase7-crps-ownership-gate`
+and `2026-08-17T2000Z-wnba-fixture-identity`. One deploy closes both.
+
+**Six of seven gates PASS. The seventh is blast radius, and it is the reason
+nothing shipped.**
+
+| gate | result |
+|---|---|
+| scope | ONE substantive change — `live_refresh_loop.py` +79, a 205-line new test, and the request `.md`. No `render.yaml`, so no `blueprint_sync`. |
+| cherry-pick | **CLEAN onto both live SHAs**, simulated with `merge-tree` (no worktree, no index) |
+| still needed? | **YES — re-verified BY CONTENT, not ancestry:** `_sweep_ownership_exclusion` absent from `8c0bd8e6` AND `abc99875`. The defect is live. |
+| expected effect | refresh-worker emits `SWEEP_OWNERSHIP_EXCLUDED … kept=nfl dropped=mlb/soccer/wnba`; live-odds-worker begins an MLB pregame sweep it currently never runs. Two-sided. |
+| measurement | coordinator, from Render logs, written here |
+| rollback | `render_deploy.py --service refresh-worker --commit 8c0bd8e6 --allow-rollback`; live-odds-worker → `abc99875` |
+| **blast radius** | **HOLD — 13 jobs in flight** |
+
+**The blocker, measured 19:5xZ:** refresh-worker had **10 jobs** running
+(`run_mlb_daily_sim_job.py`, `daily_update --workflow ui-daily`, a soccer
+artifact build, plus spawned children); live-odds-worker had **3**
+(`refresh_odds_sources.py`, `poll_soccer_live_state.py`). A deploy is
+stop-then-start with no instance overlap, so it kills all of them.
+
+**Why waiting is the right call rather than caution for its own sake:** the
+request is `urgency: ELEVATED but not an incident`, and its own deadline is the
+2026-08-18 slate. Spending an in-flight MLB sim to save an hour against a
+next-day deadline is a bad trade, and `state.md` already records that deploying
+kills in-flight sims.
+
+**Live SHAs at gate time** (they go stale in minutes — re-read before deploying):
+`web 60cdf8eb` · `refresh-worker 8c0bd8e6` · `live-odds-worker abc99875`.
+
+**A lane collision exists and is NOT a blocker:** `odds-cadence-off-the-mlb-peak`
+claims `live_refresh_loop.py` exclusively, but it is one of the nine lanes marked
+ORPHANED this morning — no live owner — and `20025cc4` is already on `main`.
+Recorded so the next reader does not rediscover it as new.
+
+**NOT bundled with the other open request.** `2026-08-17T185950Z-convergence-phase7-crps`
+(the monotone pregame props seal, `urgency: NONE`) also targets refresh-worker.
+Bundling would halve the restarts and destroy the attribution of a two-sided
+verification. It waits its turn.
+
+**Watcher armed** on both services; it exits when both are idle and explicitly
+distinguishes *idle* from *unreadable* — a blind poll exits non-zero rather than
+reporting a false window. **It does not deploy.** The sim check gets re-read at
+the moment of deploy, because a poll reading is up to three minutes stale and a
+new job can start at any time.
