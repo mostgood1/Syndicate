@@ -82,13 +82,25 @@ rebuild a props snapshot when its inputs are newer, not just on force".
 > `syndicate/features/shared/live_gameline_join.py:643` — and **that file is now
 > guarded**, so an edit there will be BLOCKED by `lane-guard.py`.
 >
-> Nothing was taken from you. `live-game-line-projection` had declared those
-> files all along, but its `- Files:` block sat under a heading with no `OPEN` in
-> it, so `_claims()` yielded NOTHING for that lane and the file was silently
-> unprotected. Merging its stray stub heading (the lane's only `OPEN` marker)
-> onto the entry that owns the block started enforcing four files:
+> **CORRECTION, same night, measured — I overstated this in the first version of
+> this note.** I wrote that the file "was silently unprotected". It was not:
+> against `2dd384b0` (before any of tonight's `lanes.md` work) it was **already
+> claimed by `mlb-live-gameline-distributions`**. What my change actually did was
+> add a SECOND claimant.
+>
+> `live-game-line-projection` had declared these files all along, but its
+> `- Files:` block sat under a heading with no `OPEN` in it, so `_claims()`
+> yielded nothing FOR THAT LANE. Merging its stray stub heading (that lane's only
+> `OPEN` marker) onto the entry owning the block started enforcing four files:
 > `live_gameline_ledger.py`, `live_gameline_join.py`, `blueprints/intelligence.py`,
 > `tests/test_live_gameline_ledger.py`.
+>
+> **So the real state is a CROSS-LANE CONFLICT, not a gap I closed:**
+> `live_gameline_join.py` is now claimed by **`live-game-line-projection` AND
+> `mlb-live-gameline-distributions`** — two OPEN lanes on one file, which is the
+> thing the lane protocol exists to prevent. Both are `OPEN` and neither has a
+> live session. Whoever picks this up should reconcile the two before editing,
+> not just satisfy the guard.
 >
 > **So: coordinate with `live-game-line-projection` before touching it.** That
 > lane reads `OPEN, UNOWNED` (its session checkpointed 15:2xZ), so it may be
