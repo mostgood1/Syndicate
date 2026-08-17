@@ -2924,3 +2924,40 @@ games**. The endpoint serves LIVE ONLY (past dates return 0 games), so there is
 nothing to accumulate historically. **The mirror refresh cannot help — it copies
 local-to-local and never contacts production.** `HOT_ARTIFACT_PATTERNS` excludes
 the family, but that is NOT the binding constraint: there is nothing to export.
+
+## 2026-08-17 02:1xZ — VERIFIED (sim-scheduling): the primary goal has ONE blocker
+
+**`#440`'s goal is "live sims for every sport". Every route to it ends at
+refresh-worker/live-odds-worker CAPACITY, which is `#449`.** Not at engine work,
+and not at wiring. Stated because three separate attempts tonight each arrived
+here from a different direction.
+
+**SOCCER'S LIVE SIM ALREADY EXISTS AND PUBLISHES.**
+`soccer/features/live_lens.py` (`build_resume_state`, `apply_red_card_penalty`,
+shipped `df96c3fb`) resumes a match from score/clock/red-cards every 60s and
+writes home/away/draw win probabilities, over 2.5, BTTS, projected goals and
+corners into `data/live/soccer_live_lens.json`. The board never reads it: three
+named gates exclude soccer —
+`attach_live_projections_for_sport` (`sport != "mlb"`),
+`_LIVE_GAMELINE_SPORTS` (`{"mlb","wnba"}`),
+`LIVE_LENS_SOURCES_BY_SPORT` (no soccer key).
+
+**WHY WIRING IT TODAY WOULD NOT HELP.** The join releases an edge only above
+`PRICEABLE_SIGMA=2.0` standard errors of `sqrt(p(1-p)/n)`:
+
+    80 sims (soccer live tick)  -> 10.91 pp at p=.50, ~10.3 pp for its 3-WAY market
+    120 (MLB live)              ->  8.98 pp
+    300                         ->  5.74 pp
+
+**AND 300 DOES NOT FIT.** live-odds-worker measured **1855.2 MB of 2048 (90.6%),
+headroom 257-415 MB across 127 samples — at 80 sims**. Soccer runs FOUR Monte
+Carlo passes per live match, 60s cadence, up to ~18 concurrent fixtures. Same
+service where WNBA's builder once took **+1,062 MB in one step** and crash-looped
+the container. **Do not set `SYNDICATE_SOCCER_LIVE_LENS_TICK_SIMULATIONS=300`.**
+
+**Part 4 Phase 5 is SHIPPED** (`964c89a4`): `load_versioned_profile` is reached
+from football, soccer and hockey. Calibration is now a file swap and rollback a
+file revert. No-op until an artifact exists.
+
+**`#449` is ONGOING** — kills at 01:07:16, 01:21:07, 01:46:59Z, cadence unbroken
+by two full container replacements. Owned by `Worker memory watchdog logs`.

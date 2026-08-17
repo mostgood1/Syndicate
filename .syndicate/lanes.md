@@ -3267,3 +3267,18 @@ the commit count, the test count, or the fact that leverage now has a number.
   of two seams the plan says are shared with the betting-engine track: *"Agree an
   owner before either phase starts."* Same for Phase 7 and
   `shared/intelligence_evaluation.py`. Raise ownership before writing code.
+
+#### sim-scheduling — SESSION CLOSE 2026-08-17 02:1xZ
+- `odds-cadence-off-the-mlb-peak`: **Phase 1 COMPLETE** (1a/1b/1c all verified in
+  production). Phase 2/2b deliberately NOT started — both edit files held by
+  `refresh-worker-oom-recurrence`; surfaced, default position theirs.
+- `convergence-phase5-profile-seam`: **Phase 5 SHIPPED** (`964c89a4`), both
+  verification halves met, falsification test did not fire. Undeployed by design
+  (no-op until an artifact exists).
+- **Phase 3e reduces to Phase 4.** Soccer needs neither engine work nor a new
+  sim — it needs capacity. Measurement in `state.md`.
+- **Handed to other lanes, with measurements, not opinions:** `#449` (OOM) to
+  `Worker memory watchdog logs`; soccer board-join wiring belongs to
+  `wnba-live-tier` / `live-edge-basis` who hold those files.
+- Open and unowned: `#447` (6 red layer2 wiring tests), `#448` (unattended tasks
+  wedging deploy claims), the soccer `unknown`-state fixture.
