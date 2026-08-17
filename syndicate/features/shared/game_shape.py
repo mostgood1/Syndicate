@@ -888,6 +888,209 @@ def football_shape_bucket(shape: Any) -> str:
     return f"{phase}|{band}"
 
 
+# ---------------------------------------------------------------------------
+# SOCCER
+# ---------------------------------------------------------------------------
+#
+# **SOCCER HAS THE RICHEST LIVE STATE OF ANY SPORT HERE, AND IT IS THE ONLY ONE
+# THAT CARRIES REAL IN-GAME EVENTS.** Measured on a populated record
+# (`data/soccer_source/mls/api/live_state/live_state_2026-07-22.json`, CF
+# Montréal v Toronto FC): `half`, `clock_remaining`, `score_home`/`score_away`,
+# `home_red_cards`/`away_red_cards`, `home_shots_so_far`,
+# `home_shots_on_target_so_far`, `home_corners_so_far` and their away twins.
+#
+# So soccer is the one sport where a genuine TEMPO statistic is derivable --
+# shots per minute is an event rate, not a scoring proxy. Basketball and
+# football could only offer points per minute because their event counts are
+# not captured. `shot_dominance` is the other thing only soccer can say: which
+# side is actually on top, which routinely disagrees with the scoreline and is
+# exactly the "game shape" a 0-0 hides.
+#
+# **THE REFUSAL THAT MATTERS MOST IN THIS MODULE, AND IT IS UNIQUE TO SOCCER.**
+# The same `live_state` record embeds a `projection` block (`home_win_probability`,
+# `projected_final_total`, ...) and a `goal_windows` block. **Those are MODEL
+# OUTPUT and they are deliberately excluded from the shape.** Game shape is the
+# conditioning variable a model's error is scored AGAINST; folding the model's
+# own prediction into it makes the analysis circular -- you would be asking "is
+# the model wrong when the model says X", which cannot separate a bad model from
+# a bad state. No other sport's live_state carries its projection inline, so
+# this trap exists here and nowhere else. If a caller wants the projection, it
+# is still on the record they passed in; it just is not shape.
+#
+# **KNOWN BLIND SPOT, STATED RATHER THAN PAPERED OVER.**
+# `_current_half_and_clock_remaining` clamps `clock_remaining` at 0.0 and never
+# returns a half above 2, so second-half stoppage time is invisible: 90' and
+# 95' both read as `match_minute == 90.0`. `clock_saturated` flags exactly that
+# case so a reader can exclude it rather than mistake a stoppage-time state for
+# a regulation one. Fixing it needs the ingestion contract to carry the raw
+# match clock, which is upstream of this module.
+#
+# NOT AVAILABLE and NOT invented: possession share and xG. Neither appears in
+# the payload. Shots on target is captured and is not a substitute for either.
+
+_SOCCER_HALF_SECONDS = 2700.0
+_SOCCER_REGULATION_SECONDS = 2 * _SOCCER_HALF_SECONDS
+# Final 15 minutes of the second half -- the window where game state starts
+# driving behaviour (chasing, closing out) rather than merely describing it.
+_SOCCER_CLOSING_SECONDS = 900.0
+
+
+def soccer_game_shape(live_state: Any) -> dict[str, Any]:
+    """Flat, JSON-safe game shape for one live soccer match. Never raises."""
+
+    def invalid(reason: str) -> dict[str, Any]:
+        return {
+            "shape_version": SHAPE_VERSION,
+            "sport": "soccer",
+            "valid": False,
+            "reason": reason,
+            "bucket": _UNKNOWN_BUCKET,
+        }
+
+    if live_state is None:
+        return invalid("live_state_absent")
+
+    half = _as_int(_get(live_state, "half"))
+    if half is None or half < 1:
+        return invalid("half_absent_or_invalid")
+    # The producer only ever emits 1 or 2; anything else means the contract
+    # changed and this module should be re-read rather than guess at it.
+    if half > 2:
+        return invalid("half_out_of_contract")
+
+    clock_remaining = _as_float(_get(live_state, "clock_remaining"))
+    if clock_remaining is None or clock_remaining < 0:
+        return invalid("clock_remaining_absent_or_invalid")
+
+    score_home = _as_float(_get(live_state, "score_home"))
+    score_away = _as_float(_get(live_state, "score_away"))
+    if score_home is None or score_away is None:
+        return invalid("score_absent")
+
+    elapsed_seconds = half * _SOCCER_HALF_SECONDS - clock_remaining
+    elapsed_seconds = max(0.0, min(_SOCCER_REGULATION_SECONDS, elapsed_seconds))
+    match_minute = round(elapsed_seconds / 60.0, 3)
+    # See the header: 90' and 95' are indistinguishable once the clock clamps.
+    clock_saturated = half == 2 and clock_remaining <= 0.0
+
+    def side(name: str) -> float:
+        return _as_float(_get(live_state, name)) or 0.0
+
+    home_shots = side("home_shots_so_far")
+    away_shots = side("away_shots_so_far")
+    home_sot = side("home_shots_on_target_so_far")
+    away_sot = side("away_shots_on_target_so_far")
+    home_corners = side("home_corners_so_far")
+    away_corners = side("away_corners_so_far")
+    home_reds = side("home_red_cards")
+    away_reds = side("away_red_cards")
+
+    total_shots = home_shots + away_shots
+    total_sot = home_sot + away_sot
+
+    # Shares are None on a zero denominator rather than 0.5 -- "nobody has shot
+    # yet" and "both sides have shot equally" are different states, and
+    # collapsing them would file every goalless opening into the balanced cell.
+    shot_dominance = round(home_shots / total_shots, 4) if total_shots > 0 else None
+    sot_dominance = round(home_sot / total_sot, 4) if total_sot > 0 else None
+
+    # A real EVENT RATE, which only soccer can offer here.
+    shots_per_minute = round(total_shots / match_minute, 4) if match_minute > 0 else None
+
+    shape: dict[str, Any] = {
+        "shape_version": SHAPE_VERSION,
+        "sport": "soccer",
+        "valid": True,
+        # --- clock ---
+        "half": half,
+        "clock_remaining_seconds": clock_remaining,
+        "match_minute": match_minute,
+        "minutes_remaining_regulation": round(
+            max(0.0, (_SOCCER_REGULATION_SECONDS - elapsed_seconds) / 60.0), 3
+        ),
+        "game_pct_complete": round(elapsed_seconds / _SOCCER_REGULATION_SECONDS, 4),
+        "clock_saturated": clock_saturated,
+        # --- score, oriented home-positive ---
+        "score_home": score_home,
+        "score_away": score_away,
+        "home_margin": score_home - score_away,
+        "total_goals": score_home + score_away,
+        # --- EVENTS: the half no other sport in this module has ---
+        "home_red_cards": home_reds,
+        "away_red_cards": away_reds,
+        "red_card_diff": home_reds - away_reds,
+        "home_shots": home_shots,
+        "away_shots": away_shots,
+        "home_shots_on_target": home_sot,
+        "away_shots_on_target": away_sot,
+        "home_corners": home_corners,
+        "away_corners": away_corners,
+        "total_shots": total_shots,
+        "total_shots_on_target": total_sot,
+        # --- shape: who is actually on top, and how fast ---
+        "shot_dominance": shot_dominance,
+        "sot_dominance": sot_dominance,
+        "shots_per_minute": shots_per_minute,
+        # Stated so a consumer never has to infer it from absence.
+        "possession_available": False,
+        "xg_available": False,
+    }
+    shape["bucket"] = soccer_shape_bucket(shape)
+    return shape
+
+
+def soccer_phase(shape: Any) -> str:
+    if not isinstance(shape, Mapping) or not shape.get("valid"):
+        return _UNKNOWN_BUCKET
+    half = _as_int(shape.get("half"))
+    if half is None:
+        return _UNKNOWN_BUCKET
+    if half == 1:
+        return "first_half"
+    remaining = _as_float(shape.get("clock_remaining_seconds"))
+    if remaining is not None and remaining <= _SOCCER_CLOSING_SECONDS:
+        return "closing"
+    return "second_half"
+
+
+def soccer_margin_band(shape: Any) -> str:
+    """Bands in GOALS -- a fourth distinct scale.
+
+    A two-goal soccer lead is closer to a three-score football lead than to a
+    two-point basketball one. Goals are scarce enough that the bands have to be
+    this tight or every match lands in one cell.
+    """
+    if not isinstance(shape, Mapping) or not shape.get("valid"):
+        return _UNKNOWN_BUCKET
+    margin = _as_float(shape.get("home_margin"))
+    if margin is None:
+        return _UNKNOWN_BUCKET
+    gap = abs(margin)
+    if gap == 0:
+        return "level"
+    if gap == 1:
+        return "one_goal"
+    if gap == 2:
+        return "two_goal"
+    return "comfortable"
+
+
+def soccer_shape_bucket(shape: Any) -> str:
+    """At most 13 labels (3 phases x 4 margin bands, plus `unknown`).
+
+    `red_card_diff` is deliberately NOT in the bucket even though it is one of
+    the strongest state variables in the sport -- it would double the space.
+    It stays on the record as the obvious first re-cut once a sample exists.
+    """
+    phase = soccer_phase(shape)
+    if phase == _UNKNOWN_BUCKET:
+        return _UNKNOWN_BUCKET
+    band = soccer_margin_band(shape)
+    if band == _UNKNOWN_BUCKET:
+        return _UNKNOWN_BUCKET
+    return f"{phase}|{band}"
+
+
 def bucket_distribution(shapes: Any) -> dict[str, int]:
     """Count shapes per bucket. The denominator half of any rate built on these.
 

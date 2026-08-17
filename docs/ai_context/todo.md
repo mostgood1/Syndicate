@@ -33115,3 +33115,79 @@ that the holder has exited.
 **Prior art:** `live-odds-worker EXPIRED (does not block) by snapshot-freshness
 69.4 min` was observed earlier the same evening — the same shape, already
 self-healed, and nobody wrote it down.
+
+### `#454` — **PLAY-BY-PLAY IS THE OFFLINE MODELING SUBSTRATE WE ALREADY HAVE AND DO NOT USE — AND IT IS 5 SPORTS, NOT 8** — FOUND 2026-08-17, NOT STARTED, no owner
+
+**The premise that prompted this was "we have pbp files for every sport". We do
+not.** Census run 2026-08-17 against the checkout:
+
+| sport | pbp | form | files |
+|---|---|---|---|
+| NFL | YES | nflverse CSV — **372 columns, already carrying `epa`, `wp`, `wpa`** | 4 season files (2025 = 46,452 REG plays, 97 MB) |
+| MLB | YES | statsapi `feed_live` JSON | 618 + 105 |
+| NCAAF | YES | CFBD `plays_<season>_wk##.json.gz` | 51, seasons 2023+ |
+| WNBA | YES | `live_pbp_stats_<date>.jsonl` | 53 |
+| NBA | YES | same | 11 |
+| **soccer** | **NO** | — | 0 |
+| **NHL** | **NO** | — | 0 |
+| **NCAAB** | **NO** | — | 0 |
+
+**A directory-name trap worth recording:** `vendor/wnba_betting_repo/models/pbp/`
+holds `.joblib`/`.onnx` files (`early_threes_gbr`, `first_basket_lr`,
+`tip_winner_lr`) — **models trained FROM pbp, not pbp data.** A scan by path
+would count it as coverage.
+
+**Note which three are missing: NHL, NCAAB and soccer** — the same three modules
+that are weakest elsewhere (NCAAB has no sim engine at all; soccer's model loses
+to the market). Any pbp-powered design is 5 of 8 and must degrade honestly
+rather than silently cover a subset.
+
+### Why this matters, stated as a job separation rather than a wish
+
+**pbp is NOT a substitute for `game_shape` and must not be merged into it.**
+- `game_shape` (`shared/game_shape.py`, lane `game-shape-capture`) is the
+  conditioning variable available **at prediction time** — thin, live, in-game.
+- **pbp is the OFFLINE substrate**: what you fit tables and priors from.
+Conflating them is how leakage gets in. Keep the seam.
+
+**It unblocks two refusals that are ALREADY IN THE CODE, by name:**
+1. **MLB leverage index.** `game_shape.py` refuses to emit one because a real
+   leverage index needs a fitted win-expectancy table this repo does not have.
+   `feed_live` is exactly where that table comes from — run expectancy by
+   base-out state is a direct aggregation over those 618 files.
+2. **Football down/distance value.** NFL pbp **already ships `epa`, `wp` and
+   `wpa` as columns.** Nothing needs fitting; nflverse computed them.
+
+**It also closes the basketball possession gap.** `game_shape` refuses to
+publish possession pace because the live CARD artifact carries no box stats —
+but `live_pbp_stats` has the events to derive possessions
+(FGA − OREB + TOV + 0.44·FTA). That would be a NEW field, never a redefinition
+of `points_per_minute`.
+
+**And it attacks the sample-starvation problem directly.** The learning loop's
+binding constraint is thin samples (settlement autorun off; every `game_shape`
+bucket is currently n=0). pbp yields thousands of state transitions per game, so
+a live win-probability path can be scored at **every play** rather than once per
+game.
+
+### Two constraints that must be designed in, not discovered
+
+- **POINT-IN-TIME SAFETY.** This repo has already shipped a leaking backtest —
+  soccer ratings computed from the full season and applied to matches inside it.
+  Any pbp-derived feature needs an explicit as-of filter, and the backtest must
+  state the number of dates it actually rests on.
+- **OFFLINE ONLY.** NFL pbp alone is 97 MB/season at 372 columns and MLB is 618
+  JSON files, against a 4 GB worker with an active OOM lane
+  (`refresh-worker-oom-recurrence`). This is a batch job. It must never run in a
+  request path or inside a worker tick — `#241` caused a production restart loop
+  for far less.
+
+**First step for whoever takes it, and it is cheap:** build the MLB base-out run
+expectancy table from `feed_live` offline and compare it to the published
+reference values. If it reproduces them, the pipeline is trustworthy and the
+leverage index becomes available; if it does not, the join is wrong and that is
+worth knowing before anything is built on it.
+
+**Related:** lane `game-shape-capture`;
+`.syndicate/plan_2026-08-16_state_conditional_learning.md` (Phase 3b);
+`#441` (which is why NFL pbp exists at all).

@@ -691,3 +691,170 @@ def test_football_bucket_space_stays_coarse():
             labels.add(shape["bucket"])
     assert len(labels) <= 17, f"bucket space grew to {len(labels)}: {sorted(labels)}"
     assert "unknown" not in labels
+
+
+# ==========================================================================
+# SOCCER
+# ==========================================================================
+
+from syndicate.features.shared.game_shape import (  # noqa: E402
+    soccer_game_shape,
+    soccer_margin_band,
+    soccer_phase,
+)
+
+
+def _sc_state(**kw: Any) -> dict:
+    """The measured MLS record, 2026-07-22 CF Montreal v Toronto FC."""
+    base = {
+        "event_id": "761659",
+        "half": 2,
+        "clock_remaining": 1800.0,
+        "score_home": 0,
+        "score_away": 0,
+        "home_red_cards": 0,
+        "away_red_cards": 0,
+        "home_shots_so_far": 9,
+        "away_shots_so_far": 5,
+        "home_shots_on_target_so_far": 1,
+        "away_shots_on_target_so_far": 0,
+        "home_corners_so_far": 4,
+        "away_corners_so_far": 2,
+        # Model output. Present on the real record; must NOT reach the shape.
+        "projection": {"home_win_probability": 0.36, "projected_final_total": 0.82},
+        "goal_windows": {"next_10_min": 0.22},
+    }
+    base.update(kw)
+    return base
+
+
+def test_the_measured_mls_record_parses_end_to_end():
+    """half=2, clock_remaining=1800 is the 60th minute, not the 30th.
+
+    `clock_remaining` is remaining in THAT HALF (producer:
+    `_current_half_and_clock_remaining`), so half 2 with 1800s left is
+    45 + (45-30) = 60. Reading it as remaining-in-match would put this at 60'
+    remaining and invert the whole progress axis.
+    """
+    shape = soccer_game_shape(_sc_state())
+    assert shape["valid"] is True
+    assert shape["match_minute"] == 60.0
+    assert shape["minutes_remaining_regulation"] == 30.0
+    assert shape["game_pct_complete"] == round(3600.0 / 5400.0, 4)
+    assert shape["home_margin"] == 0.0
+    assert shape["bucket"] == "second_half|level"
+
+
+def test_first_half_clock_is_not_offset_by_a_half():
+    """Guards against `(half-1)` vs `half` in the elapsed formula."""
+    shape = soccer_game_shape(_sc_state(half=1, clock_remaining=2700.0))
+    assert shape["match_minute"] == 0.0
+    shape = soccer_game_shape(_sc_state(half=1, clock_remaining=900.0))
+    assert shape["match_minute"] == 30.0
+
+
+def test_model_output_is_excluded_from_the_shape():
+    """THE soccer-specific trap: `live_state` embeds the projection inline.
+
+    Folding the model's own prediction into the conditioning variable makes the
+    error analysis circular -- you cannot separate a bad model from a bad state
+    if the state contains the model. No other sport's live_state carries this,
+    so nothing else in this module guards it.
+    """
+    shape = soccer_game_shape(_sc_state())
+    for leaked in ("projection", "goal_windows", "home_win_probability",
+                   "projected_final_total", "next_10_min"):
+        assert leaked not in shape, f"model output {leaked!r} leaked into game shape"
+
+
+def test_events_are_captured_because_only_soccer_has_them():
+    shape = soccer_game_shape(_sc_state())
+    assert shape["home_shots"] == 9
+    assert shape["away_shots"] == 5
+    assert shape["total_shots"] == 14
+    assert shape["home_corners"] == 4
+    assert shape["red_card_diff"] == 0
+
+
+def test_shot_dominance_shows_the_game_a_goalless_scoreline_hides():
+    """0-0 with 9 shots to 5 is not a balanced match, and the shape says so."""
+    shape = soccer_game_shape(_sc_state())
+    assert shape["home_margin"] == 0.0                 # scoreline says level
+    assert shape["shot_dominance"] == round(9 / 14, 4)  # shape says otherwise
+    assert shape["shots_per_minute"] == round(14 / 60.0, 4)
+
+
+def test_zero_shots_gives_none_dominance_not_a_balanced_half():
+    """'Nobody has shot yet' and 'both sides equally' are different states.
+
+    Guards against a 0.5 default, which would file every goalless opening into
+    the balanced cell.
+    """
+    shape = soccer_game_shape(
+        _sc_state(half=1, clock_remaining=2640.0, home_shots_so_far=0,
+                  away_shots_so_far=0, home_shots_on_target_so_far=0,
+                  away_shots_on_target_so_far=0)
+    )
+    assert shape["shot_dominance"] is None
+    assert shape["sot_dominance"] is None
+    assert shape["shots_per_minute"] == 0.0
+
+
+def test_second_half_stoppage_is_flagged_not_silently_folded_in():
+    """The producer clamps clock_remaining at 0, so 90' and 95' are identical.
+
+    A reader must be able to exclude that case rather than mistake a
+    stoppage-time state for a regulation one.
+    """
+    shape = soccer_game_shape(_sc_state(half=2, clock_remaining=0.0))
+    assert shape["match_minute"] == 90.0
+    assert shape["clock_saturated"] is True
+    normal = soccer_game_shape(_sc_state())
+    assert normal["clock_saturated"] is False
+
+
+def test_closing_phase_is_the_last_fifteen_minutes():
+    def phase_at(half, remaining):
+        return soccer_phase(soccer_game_shape(_sc_state(half=half, clock_remaining=remaining)))
+
+    assert phase_at(1, 2700.0) == "first_half"
+    assert phase_at(1, 60.0) == "first_half"      # first-half stoppage is not `closing`
+    assert phase_at(2, 1800.0) == "second_half"
+    assert phase_at(2, 901.0) == "second_half"
+    assert phase_at(2, 900.0) == "closing"
+    assert phase_at(2, 0.0) == "closing"
+
+
+def test_margin_bands_are_in_goals():
+    def band(h, a):
+        return soccer_margin_band(soccer_game_shape(_sc_state(score_home=h, score_away=a)))
+
+    assert band(0, 0) == "level"
+    assert band(1, 0) == "one_goal"
+    assert band(0, 2) == "two_goal"
+    assert band(3, 0) == "comfortable"
+    assert band(5, 1) == "comfortable"
+
+
+def test_soccer_refuses_bad_input_rather_than_guessing():
+    assert soccer_game_shape(None)["reason"] == "live_state_absent"
+    assert soccer_game_shape({})["reason"] == "half_absent_or_invalid"
+    assert soccer_game_shape(_sc_state(half=3))["reason"] == "half_out_of_contract"
+    assert soccer_game_shape(_sc_state(clock_remaining=None))["reason"] == "clock_remaining_absent_or_invalid"
+    assert soccer_game_shape(_sc_state(score_home=None))["reason"] == "score_absent"
+    for bad in ("", 0, [], object()):
+        assert soccer_game_shape(bad)["valid"] is False
+
+
+def test_soccer_bucket_space_stays_coarse():
+    labels = set()
+    for half in (1, 2):
+        for remaining in (2700.0, 1800.0, 900.0, 300.0, 0.0):
+            for margin in range(-4, 5):
+                shape = soccer_game_shape(
+                    _sc_state(half=half, clock_remaining=remaining,
+                              score_home=max(0, margin), score_away=max(0, -margin))
+                )
+                labels.add(shape["bucket"])
+    assert len(labels) <= 13, f"bucket space grew to {len(labels)}: {sorted(labels)}"
+    assert "unknown" not in labels

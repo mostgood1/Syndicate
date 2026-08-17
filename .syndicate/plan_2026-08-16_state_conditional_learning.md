@@ -267,17 +267,28 @@ regression.
 
 ---
 
-## 7. Proposed todo IDs (next free is `#447`; `#446` is the highest in use)
+## 7. Todo IDs — **CORRECTED 2026-08-17. `#447`/`#448` WERE TAKEN BY OTHER SESSIONS.**
 
-| id | item |
-|---|---|
-| `#447` | Deploy the freeze-reader-tree fix; re-take the settlement-autorun decision on post-fix numbers (Phase 0) |
-| `#448` | `shared/game_shape.py` + MLB extractor from the existing `LiveSituation`; persist into `live_gameline_ledger` (Phase 1) |
-| `#449` | WNBA/NBA game-shape extractor incl. a possession count (pace) — the one genuinely new derivation |
-| `#450` | NFL/NCAAF + soccer game-shape capture, **capture only**, before the 08-29 opener |
-| `#451` | `state_conditioned_scoring` over `model_scoring.py` with EB shrinkage and an `unmeasured` floor (Phase 2) |
-| `#452` | Per-bucket calibration profiles through `calibration_profile_store`, shadow-then-promote (Phase 3a) |
-| `#453` | Skills S1–S4 |
+This plan originally reserved `#447` and `#448`. Between authoring and filing,
+other sessions filed **`#447`** (6 red Layer-2 shortlist wiring tests) and
+**`#448`** (an unattended scheduled task can take the deploy claim on every
+service and then end). IDs are stable and never reused, so those numbers are
+theirs and the table below is renumbered. **This is the same class of staleness
+as the lane-collision rule: a reservation is a reading with a timestamp.**
+
+| id | item | status |
+|---|---|---|
+| `#449` | `shared/game_shape.py` — MLB, WNBA/NBA, NFL/NCAAF and soccer extractors (Phase 1) | **SHIPPED** — `597f4a80`, `2dd384b0`, `5cb588f2`, + soccer |
+| `#450` | Emits: NFL and soccer **landed**; MLB and WNBA **blocked** by `Layer 1 board coverage audit (fork 2)`; NCAAF has **no producer at all** | PARTIAL |
+| `#451` | `state_conditioned_scoring` over `model_scoring.py` with EB shrinkage and an `unmeasured` floor (Phase 2) | not started |
+| `#452` | Per-bucket calibration profiles through `calibration_profile_store`, shadow-then-promote (Phase 3a) | not started |
+| `#453` | Skills S1–S4 | not started |
+| `#454` | **Play-by-play as the offline modeling substrate** — filed in `todo.md`. 5 sports of 8, not 8. Unblocks the MLB leverage index and football EPA that this module currently refuses to fabricate | not started |
+| `#455` | Deploy the freeze-reader-tree fix; re-take the settlement-autorun decision on post-fix numbers (Phase 0) — **was `#447`** | not started |
+
+**Phase 3b (new, from `#454`):** pbp is the offline substrate, `game_shape` is
+the prediction-time conditioning variable. Keep the seam — merging them is how
+leakage gets in.
 
 **Lane names reserved by this plan and deliberately NOT opened** (no session holds
 them): `game-shape-capture`, `state-conditional-scoring`, `calibration-promotion`.

@@ -2520,3 +2520,61 @@ and then failed the thing it was checking, which is the point of running it.
 - `soccer-card-end-to-end` — soccer-card-end-to-end — CLOSED-VERIFIED 2026-08-15 — deployed as web `7e334509`, every criterion measured in production — opened 2026-08-15 — session → `lanes_closed.md`.
 - `model-audit-devig-and-hygiene` — model-audit-devig-and-hygiene — CLOSED-VERIFIED 2026-08-15 — #5 falsified then collapsed for real + D5 done (`2ac3c6bc`, committed, NOT deployed, cons → `lanes_closed.md`.
 
+
+#### game-shape-capture — SOCCER ADDED, EMIT LANDED; ALL FIVE SPORTS NOW HAVE A CONTRACT `[2026-08-17 ~00:3xZ]`
+
+**Soccer has the RICHEST live state of any sport here and is the ONLY one
+carrying real in-game EVENTS.** Measured on a populated record
+(`data/soccer_source/mls/api/live_state/live_state_2026-07-22.json`, CF Montréal
+v Toronto FC): shots, shots on target, corners and red cards per side, plus
+`half` / `clock_remaining` / scores. **Only 3 of 14 live_state files on disk are
+populated at all** — the rest are `count: 0`.
+
+- **Only sport where a true EVENT RATE is derivable.** `shots_per_minute` is a
+  real tempo statistic, not the scoring-rate proxy basketball and football had
+  to settle for. `shot_dominance` says who is actually on top — 0-0 with shots
+  9-5 is not a balanced match, and the scoreline cannot say so.
+- **`clock_remaining` IS REMAINING-IN-THAT-HALF, NOT IN THE MATCH**
+  (`_current_half_and_clock_remaining`, `_HALF_SECONDS = 2700`). half 2 /
+  1800s is the **60th minute**. Reading it as remaining-in-match inverts the
+  entire progress axis; mutation S1 fires on exactly that.
+- **THE REFUSAL THAT MATTERS MOST, AND IT IS UNIQUE TO SOCCER: the same
+  `live_state` embeds the MODEL'S OWN `projection` and `goal_windows` blocks.**
+  They are excluded from the shape. Game shape is what a model's error is scored
+  AGAINST; folding the model's prediction into it makes the analysis circular —
+  "is the model wrong when the model says X" cannot separate a bad model from a
+  bad state. No other sport's live_state carries its projection inline, so
+  nothing else in the module guards this. Mutation S2 fires on the leak.
+- **KNOWN BLIND SPOT, FLAGGED NOT PAPERED OVER:** the producer clamps
+  `clock_remaining` at 0 and never returns a half above 2, so second-half
+  stoppage is invisible — 90' and 95' both read `match_minute == 90.0`.
+  `clock_saturated` marks that case so it can be excluded. Fixing it needs the
+  ingestion contract to carry the raw match clock.
+- **Zero-shot dominance is `None`, not 0.5** — "nobody has shot yet" and "both
+  sides equally" are different states, and collapsing them files every goalless
+  opening into the balanced cell.
+- **Possession and xG are NOT captured and are NOT invented.** Shots on target
+  is not a substitute for either.
+
+**Margin bands are in GOALS** (level / 1 / 2 / 3+) — a fourth distinct scale.
+Buckets cap at **13** (3 phases x 4 bands): `first_half`, `second_half`,
+`closing` (final 15 min). `red_card_diff` is deliberately NOT in the bucket
+despite being one of the strongest state variables in the sport — it would
+double the space, and it stays on the record as the obvious first re-cut.
+
+**EMIT LANDED.** `soccer/ingestion/espn_live_state.py` was UNCLAIMED (checked
+immediately before the edit). `build_live_state` now binds its dict and attaches
+`state["game_shape"]` **before** any projection is merged in by the caller —
+the ordering is pinned by a test.
+
+**90 tests green** across `test_game_shape` (57), `test_nfl_live_game_state`
+(20), `test_soccer_espn_live_state` (10), `test_poll_soccer_live_state` (3).
+**8 of 8 soccer mutations caught** — 6 on the primitive (remaining-in-match
+clock, model-output leak, 0.5 dominance default, unflagged saturation, widened
+closing window, `half > 2` accepted) and 2 on the emit (shape never attached,
+shape built from a synthetic dict rather than the real state).
+
+**STATUS ACROSS THE LANE:** MLB and WNBA primitives on main with emits BLOCKED
+by `Layer 1 board coverage audit (fork 2)`; **NFL and soccer emits LANDED**;
+NCAAF has a contract and **no producer at all**. **n = 0 everywhere — not one
+production slate has run through any of it.**
