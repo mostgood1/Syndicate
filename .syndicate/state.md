@@ -3415,3 +3415,84 @@ pushing only if no deletions, no lost request, zero line loss both sides, and
    scans time out") and it is measurably true — repo-wide greps have timed out
    twice today at 120s, which is why searches here must be scoped to `scripts/`
    or use the indexed tool.
+
+## MLB PITCHER OUTS — ROOT CAUSE FOUND `[measured 2026-08-17, n=267, 1000 sims]`
+
+Supersedes the "loses to climatology" line above with the REASON.
+
+- **`corr(sim_mean, actual) = +0.05`.** The engine's per-start expectation varies
+  by **sd 1.19 outs** while actual outcomes vary by **sd 4.06** — 3.4x wider —
+  and that variation is uncorrelated with the outcome.
+- **MLB's outs forecast is a BIASED NEAR-CONSTANT** (sim mean 17.21 vs actual
+  15.90). Climatology is an unbiased constant with the right spread, which is the
+  entire −6.74% deficit.
+- **A calibration layer CANNOT fix this.** Hold-out test: at production's leash a
+  scalar shift recovers +3.08 skill points; at the best leash it makes it WORSE
+  (−0.48), because the residual bias is date-to-date noise. **Do not ship a
+  calibration profile for MLB outs.**
+- **The aggregate dispersion check (0.791 vs 0.798) is BLIND to this.** It scores
+  `sd(actual−mean)/mean(sigma)`; per-start sigma is ~right, the per-start MEAN is
+  what does not move. A calibrated width around an uninformative centre passes.
+- **Removing the F5 leash raises differentiation 21%** (sd 0.98 → 1.19). Real,
+  and far short of the 4.06 needed to matter.
+- **DO NOT GENERALISE TO "MLB HAS NO SIGNAL".** The same engine's HITTER PROPS
+  are measured at r = 0.13–0.16 with de-biasing flipping 5 of 7 markets. Outs is
+  dominated by MANAGER HOOK BEHAVIOUR — a human decision the plate-appearance
+  simulator has no information about.
+- **Consequence:** MLB outs should be served `unmeasured` or withheld, not
+  calibrated. Effort belongs on hitter props.
+
+
+## COORDINATOR CORRECTIONS — clearing what a lane handed me and I left sitting `[2026-08-17 ~22:0xZ]`
+
+A lane disclosed five things unprompted under *"COORDINATION 2026-08-17 ~14:15
+CDT"* and wrote **"These are the coordinator's to correct; I did not edit them."**
+It was right not to edit them, and I left them for hours. Discharged here.
+
+### 1. THREE STANDING LEDGER CLAIMS ARE FALSIFIED — corrected, with attribution
+
+These corrections rest on **that lane's measurements, not mine**; I am recording
+the correction, which is the coordinator's job, not re-deriving the result. Any
+reader who needs the working should read that lane's block.
+
+- **`#378` — FALSIFIED. WNBA DOES launch and write.** The standing entry says the
+  WNBA capture launches and writes nothing. Measured today: it launches and it
+  writes. Any reasoning that treats a missing WNBA artifact as proof of a dead
+  launch is invalid from here on.
+- **`#382` — FALSIFIED, and the replacement mechanism matters more than the
+  correction.** The entry attributes the cadence marker advancing to a launch
+  dying. Measured: **the marker advances because ANOTHER SERVICE advances it.**
+  The marker is shared and unnamespaced, so "the marker moved" says nothing about
+  the service you are looking at. That is a cross-service confound, and it
+  invalidates single-service reasoning about the marker generally.
+- **`#129` — REGRESSED BY A NEW MECHANISM.** `#129` established live-odds-worker
+  as the sole MLB odds-refresh owner. That ownership is not being honoured by the
+  sweep path; the fix for it (`20025cc4`) shipped today and **measured INERT**, so
+  `#129` should be read as OPEN, not as settled history.
+
+### 2. TWO DEPLOYS WITH EMPTY MEASUREMENT ROWS — obligation accepted, not discharged
+
+That lane deployed twice (its note: 17:52Z / 18:00Z; Render events for
+live-odds-worker show `deploy_started` 17:49:32Z and 18:33:49Z) **before the
+coordinator rule reached its digest.** No fault: the rule landed mid-flight.
+
+**The measurement is OWED and I now own chasing it.** I am deliberately NOT
+inventing a reading for someone else's deploy — the lane knows what it shipped
+and what would prove it. Asked for the intended verify; recorded here so the
+obligation cannot quietly lapse.
+
+### 3. `export-force-refresh-escape` — EFFECT MEASUREMENT STILL OWED
+
+Closed by override (user-authorized) during the morning sweep. Its close recorded
+the deploy as verified BY CONTENT, and its **effect** was never measured — it
+needs a `:cards_props_snapshot` staged record from a forced run over an existing
+snapshot. The lane that closed it flagged this itself. **A lane closed by
+override is not a lane discharged.**
+
+### Why this sat unattended, stated plainly
+
+The lane used the only channel it has. I did not read it, because reading the
+ledger for inbound was not a step in my turn — it was something I did when I
+happened to think of it. `coordinator.md` §0 and `scripts/coordinator_inbox.py`
+now make it the first step. This block is the backlog that had accumulated in the
+meantime.
