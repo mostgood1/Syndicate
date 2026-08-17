@@ -216,6 +216,40 @@
     { value: "tomorrow", label: "Tomorrow", date: TOMORROW_ISO },
   ];
 
+  // The day filter's URL home is `?day=`, NOT `?date=`, and the two are
+  // different things on purpose.
+  //
+  // `?date=` means "an explicit override -- go fetch this day from the server"
+  // and sets explicitDateOverride, which bypasses the combined-board default
+  // (read_combined_intelligence_response's "not explicit_date" gate). That is
+  // right for a deep link to a day outside the warm window and wrong for the
+  // day TAB, which #93 designed as a pure client-side refinement over the one
+  // combined fetch.
+  //
+  // Before the default moved to Today this distinction cost nothing, because
+  // the default state.date was "" and syncUrlState wrote no `date` at all. With
+  // a defaulted date it would write `?date=<today>` into the URL on the first
+  // filter interaction, and the next reload would read that back as an explicit
+  // deep link -- every session silently off the combined board, without anyone
+  // choosing a date. Same failure as #113, reached from the other end.
+  //
+  // So the tab persists as `?day=today|tomorrow|all` and never touches `date`.
+  // Omitted when it is the default, to keep a clean URL.
+  function _dayFilterDate(dayValue) {
+    const tab = DAY_TABS.find((candidate) => candidate.value === dayValue);
+    return tab ? (tab.date || "") : null;
+  }
+  function _initialDayFilterDate() {
+    const resolved = _dayFilterDate(String(urlParams.get("day") || "").trim().toLowerCase());
+    return resolved === null ? TODAY_ISO : resolved;
+  }
+  function _currentDayTabValue() {
+    if (!state.date) return "all";
+    if (state.date === TODAY_ISO) return "today";
+    if (state.date === TOMORROW_ISO) return "tomorrow";
+    return null;
+  }
+
   let lastVersion = null;
   let lastResponseTimestamp = null;
   let lastResponseHash = null;
@@ -241,7 +275,33 @@
     // explicit URL param (an intentional deep link) should seed state.date
     // now; the input's own value is synced FROM state.date just below,
     // not the other way around.
-    date: urlParams.get("date") || "",
+    // THE DEFAULT DAY IS TODAY, NOT "ALL" [2026-08-17, user decision].
+    //
+    // This read `urlParams.get("date") || ""` since #93, and the empty string
+    // did not merely mean "no date chosen" -- it turned OFF every date filter
+    // on the board, because both are guarded on state.date being truthy:
+    // matchesClientFilters' date clause (`if (!state.date) return true`) and
+    // the Games rail's own chip filter (`const railDate = String(state.date ||
+    // "").slice(0,10) || null`, then `if (railDate && ...)`). So the one view
+    // every user loads was the one view with no date filter at all.
+    //
+    // MEASURED ON PRODUCTION 2026-08-17 19:4xZ on the default "All" tab: the
+    // Games rail carried 51 soccer cards across EIGHT distinct non-today
+    // Central dates, Sat Aug 15 through Fri Aug 28 -- including a two-days-PAST
+    // match rendered PREGAME. Clicking "Today" in the same page collapsed it to
+    // 3 soccer cards and 0 non-today dates. Both filters were already correct;
+    // neither was reachable. Soccer is what made it visible (its schedule is
+    // week-keyed, so its chips legitimately span ~14 days) but nothing here is
+    // soccer-specific: NFL seated 82 rows for Aug 20-22 on the same board.
+    //
+    // "All" is still one click away and still means what it meant. What changed
+    // is which day the board opens on.
+    //
+    // NOT an explicit override -- see explicitDateOverride directly below. A
+    // DEFAULTED date must stay a client-side filter over the single combined
+    // fetch; forwarding it to the server would bypass the combined-board
+    // default for every session, which is #113's failure with a new cause.
+    date: urlParams.get("date") || _initialDayFilterDate(),
     // Tracks whether state.date is a deliberate server-side override (an
     // explicit ?date= deep link, or the free-text #board-date input +
     // Refresh) versus the Today/Tomorrow day tabs, which per #93's design
@@ -289,8 +349,13 @@
     sortDirection: "desc",
   };
   {
+    // ONLY an explicit override fills this input. It is the "go fetch this
+    // specific day from the server" control, and its value is what the toolbar
+    // submit below turns back into explicitDateOverride -- so seeding it with a
+    // merely DEFAULTED date would make the very next Refresh click an explicit
+    // server-side date request that the user never asked for.
     const dateInput = document.getElementById("board-date");
-    if (dateInput) dateInput.value = state.date;
+    if (dateInput) dateInput.value = state.explicitDateOverride ? state.date : "";
   }
 
   const initialResponseScript = document.getElementById("initial-intelligence-response");
@@ -333,7 +398,10 @@
 
   function syncUrlState() {
     const url = new URL(window.location.href);
-    if (state.date) url.searchParams.set("date", state.date); else url.searchParams.delete("date");
+    // `date` = explicit override only; `day` = the tab. See _initialDayFilterDate.
+    if (state.date && state.explicitDateOverride) url.searchParams.set("date", state.date); else url.searchParams.delete("date");
+    const dayValue = _currentDayTabValue();
+    if (!state.explicitDateOverride && dayValue && dayValue !== "today") url.searchParams.set("day", dayValue); else url.searchParams.delete("day");
     if (state.sport && state.sport !== "all") url.searchParams.set("sport", state.sport); else url.searchParams.delete("sport");
     if (state.gameState && state.gameState !== "all") url.searchParams.set("game_state", state.gameState); else url.searchParams.delete("game_state");
     if (state.marketFamily && state.marketFamily !== "all") url.searchParams.set("market_family", state.marketFamily); else url.searchParams.delete("market_family");
@@ -379,16 +447,21 @@
     // (below, in the DOM) is the one remaining path that still does a real
     // server fetch -- it's the explicit override for a date outside the
     // warm window, which genuinely isn't in lastRenderItems yet.
-    const activeDayValue = !state.date ? "all" : (state.date === TODAY_ISO ? "today" : (state.date === TOMORROW_ISO ? "tomorrow" : null));
+    const activeDayValue = _currentDayTabValue();
     renderTabs("board-day-tabs", DAY_TABS, activeDayValue, (value) => {
       const tab = DAY_TABS.find((candidate) => candidate.value === value);
       if (!tab) return;
       const nextDate = tab.date || "";
-      if (nextDate === (state.date || "")) return;
+      if (nextDate === (state.date || "") && !state.explicitDateOverride) return;
       state.date = nextDate;
       state.explicitDateOverride = false;
+      // The day tab deliberately CLEARS the #board-date input rather than
+      // filling it. That input means "explicit server-side override" and the
+      // toolbar submit reads its value back as exactly that; writing a tab's
+      // date into it made the next Refresh click silently escalate a
+      // client-side tab into a server fetch that leaves the combined board.
       const dateInput = document.getElementById("board-date");
-      if (dateInput) dateInput.value = nextDate;
+      if (dateInput) dateInput.value = "";
       syncUrlState();
       renderFilterTabs();
       renderBoardBody();
@@ -2441,8 +2514,17 @@
 
   document.getElementById("board-toolbar").addEventListener("submit", (event) => {
     event.preventDefault();
-    state.date = document.getElementById("board-date").value || state.date;
-    state.explicitDateOverride = true;
+    // An EMPTY input is not an override. It used to fall back to `state.date`
+    // and then stamp explicitDateOverride = true regardless -- harmless while
+    // the default state.date was "" (nothing to forward), but once the default
+    // became today, a plain Refresh with an empty box would have forwarded
+    // today's date to the server and dropped the session off the combined
+    // board for the rest of its life. The override now follows the INPUT.
+    const dateInputValue = String(document.getElementById("board-date").value || "").trim();
+    // Empty input keeps whatever day tab is active -- a Refresh must not
+    // silently move the board off "All" or "Tomorrow".
+    state.explicitDateOverride = Boolean(dateInputValue);
+    if (dateInputValue) state.date = dateInputValue;
     syncUrlState();
     void loadGameChips();
     void loadIntelligence({ forceRefresh: true });

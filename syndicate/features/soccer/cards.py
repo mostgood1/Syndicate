@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from datetime import timezone
 from typing import Any
 
 from syndicate.features.shared.timezone import CENTRAL_TIMEZONE
@@ -120,8 +121,78 @@ def _format_kickoff_display(kickoff: str | None) -> str:
         return "Scheduled"
 
 
-def _status_label(status_state: str, kickoff: str | None) -> str:
+# A match cannot have started before its own kickoff. Tolerance is generous on
+# purpose: the cost of the two errors is NOT symmetric. Suppressing a genuinely
+# live match for a few minutes costs a stale badge; trusting a bogus `post`
+# costs a settled-looking card and a withheld edge on a game nobody has played.
+# 30 minutes covers listed-kickoff drift and clock skew and is still three
+# orders of magnitude short of the five-day error this was built for.
+_KICKOFF_GRACE_SECONDS = 1800.0
+
+
+def _effective_status_state(status_state: str, kickoff: Any) -> str:
+    """`status_state`, refused where the kickoff cannot support it.
+
+    THE DEFECT, measured on production 2026-08-17 19:3xZ: the chip for
+    `eredivisie EXC @ NEC` read `state: "final"`, token `FINAL`, score 0-0 --
+    on a fixture kicking off `2026-08-22T18:00:00Z`, FIVE DAYS LATER. Traced
+    end to end: `/soccer/eredivisie/api/cards` served that game with
+    `live_state: {"final": true}` while all seven sibling fixtures in the same
+    league and week read `false`, so this is one corrupt `status_state: "post"`
+    in the schedule artifact, not a rendering bug. The git mirror of the same
+    event (`401875636`, generated 2026-07-20) still reads `"pre"`.
+
+    NOTHING ANYWHERE CHECKED THIS. `_live_state_block` and `_status_label` both
+    trusted `status_state` outright, and every downstream reader trusts them:
+    `_game_flags` sets the chip's state from `live_state`, and `live_edge_policy`
+    keys on it to decide whether to withhold an edge. A `post` that arrives five
+    days early therefore presents an unplayed match as settled.
+
+    Deliberately a REFUSAL, never an inference. This only ever downgrades a
+    started/finished claim to `pre`; it cannot promote anything, so it cannot
+    reintroduce the "stuck at pregame" failure `_live_state_block` was built to
+    fix. An unparseable or absent kickoff leaves the source's own state alone --
+    with no clock to check against there is no contradiction to act on, and
+    inventing one would be the permissive-on-unknown mistake in reverse.
+    """
     state = str(status_state or "pre").strip().lower()
+    if state not in {"in", "post"}:
+        return state
+    kickoff_dt = _parse_kickoff(kickoff)
+    if kickoff_dt is None:
+        return state
+    now = datetime.now(timezone.utc)
+    if (kickoff_dt - now).total_seconds() <= _KICKOFF_GRACE_SECONDS:
+        return state
+    # Counted where it happens, in the same commit as the rule: a filter that
+    # trims silently is indistinguishable from a source that got it right.
+    print(
+        f"[soccer_cards] IMPOSSIBLE_STATUS_STATE_REFUSED state={state} "
+        f"kickoff={kickoff_dt.isoformat()} now={now.isoformat()}",
+        flush=True,
+    )
+    return "pre"
+
+
+def _parse_kickoff(value: Any) -> datetime | None:
+    # Naive stamps are read as CENTRAL, matching _format_kickoff_display above.
+    # Not a detail: if the guard and the badge disagreed about what a naive
+    # kickoff means, a card could read "Final" beside a time that says it has
+    # not started, which is the exact contradiction this is here to remove.
+    text = str(value or "").strip()
+    if not text or "T" not in text:
+        return None
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=CENTRAL_TIMEZONE)
+    return parsed.astimezone(timezone.utc)
+
+
+def _status_label(status_state: str, kickoff: str | None) -> str:
+    state = _effective_status_state(status_state, kickoff)
     if state == "post":
         return "Final"
     if state == "in":
@@ -129,7 +200,7 @@ def _status_label(status_state: str, kickoff: str | None) -> str:
     return _format_kickoff_display(kickoff)
 
 
-def _live_state_block(status_state: str) -> dict[str, Any]:
+def _live_state_block(status_state: str, kickoff: Any = None) -> dict[str, Any]:
     """The STRUCTURED liveness signal, which soccer knew and never published.
 
     THE DEFECT THIS FIXES, measured on production 2026-08-16 18:03Z: the soccer
@@ -170,8 +241,14 @@ def _live_state_block(status_state: str) -> dict[str, Any]:
     string in it would reintroduce exactly the prose-matching this replaces.
     The booleans are read first by both consumers, so they are all that is
     needed and all that is offered.
+
+    `kickoff` is optional so the one caller that has no timestamp to offer keeps
+    working unchanged; see `_effective_status_state` for what it buys when
+    present. It defaults to None rather than being required because a missing
+    kickoff and a future one are different facts and only the second is a
+    contradiction.
     """
-    state = str(status_state or "pre").strip().lower()
+    state = _effective_status_state(status_state, kickoff)
     return {
         # `final` wins over `in_progress` in both readers anyway, but stating
         # both explicitly keeps this readable as a state machine rather than as
@@ -212,7 +289,7 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
     home_team = str(fixture.get("home_team") or "Home").strip() or "Home"
     away_team = str(fixture.get("away_team") or "Away").strip() or "Away"
     event_id = str(fixture.get("event_id") or "").strip()
-    status_state = str(fixture.get("status_state") or "pre")
+    status_state = _effective_status_state(fixture.get("status_state") or "pre", fixture.get("date"))
     date_str = str(fixture.get("date") or "")[:10]
     return {
         "gamePk": event_id or f"{league}_{date_str}_{home_team}_{away_team}".replace(" ", "_"),
@@ -254,7 +331,7 @@ def _unsimulated_game(fixture: dict[str, Any], *, league: str, week: int, season
         # contains "scheduled". So an unsimulated fixture that has actually
         # kicked off was being pinned not-live by its own placeholder wording.
         # An unsimulated match is still a real match that can start and finish.
-        "live_state": _live_state_block(status_state),
+        "live_state": _live_state_block(status_state, fixture.get("date")),
         "detail": date_str or league_display_name(league),
         "scheduled_start_utc": fixture.get("date"),
         "summary": f"{away_team} at {home_team} is on the schedule for Week {week} but has not been simulated yet.",
@@ -532,11 +609,16 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
     top_props = match.get("top_props") if isinstance(match.get("top_props"), list) else []
     event_id = str(match.get("event_id") or match.get("match_id") or "").strip()
     status_state = str(match.get("status_state") or "pre")
-    live_state = _live_match_state(league, str(match.get("date") or "")[:10], event_id) if status_state == "in" else None
+    # Resolved ONCE and used for every state-dependent branch below. The live
+    # fetch, the score line and the badge previously each re-read the raw
+    # `status_state`, so a guard applied to one of them would have left the
+    # others still presenting a match its own kickoff says has not started.
+    effective_state = _effective_status_state(status_state, match.get("kickoff"))
+    live_state = _live_match_state(league, str(match.get("date") or "")[:10], event_id) if effective_state == "in" else None
 
     home_score = match.get("live_home_score")
     away_score = match.get("live_away_score")
-    score_text = f"{away_score}-{home_score}" if status_state in {"in", "post"} and home_score is not None else "-"
+    score_text = f"{away_score}-{home_score}" if effective_state in {"in", "post"} and home_score is not None else "-"
 
     summary = (
         f"Projected {away_team} {_fmt_num(team_projection.get('away_mean'), 1)} @ {home_team} "
@@ -569,11 +651,14 @@ def _match_to_game(match: dict[str, Any], *, league: str, week: int, season: int
             "secondary_color": _team_secondary_color(home_team, league),
         },
         "card_variant": "soccer_main",
-        "status": _status_label(status_state, match.get("kickoff")),
+        # `effective_state`, not `status_state`: already guarded above, so these
+        # two re-derive nothing and the refusal is logged once per match rather
+        # than once per reader.
+        "status": _status_label(effective_state, match.get("kickoff")),
         # Structured liveness alongside the display string above. See
         # `_live_state_block`: `status` is prose and every downstream reader
         # wants a dict, which is why soccer sat at 100% `pregame`.
-        "live_state": _live_state_block(status_state),
+        "live_state": _live_state_block(effective_state, match.get("kickoff")),
         "detail": score_text if score_text != "-" else league_display_name(league),
         # Raw ISO kickoff, distinct from "detail" above (which carries a
         # score/league string, not a timestamp) -- the shared game-chip and
