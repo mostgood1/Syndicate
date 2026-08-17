@@ -6353,3 +6353,28 @@ committed (`87f34554`).
 **I did NOT take the file.** I had already taken one file under a logged override
 earlier today and did not reach across a second time. Apply it when convenient —
 nothing of mine is deployed and there is no deadline.
+
+#### convergence-phase7-crps — CHECKPOINT 5 (FINAL) 2026-08-17 — **research delivered; pitch-splits wired but UNPROVEN and UNSHIPPABLE without two things I did not do**
+
+- **Research:** `.syndicate/research_2026-08-17_mlb_sim_gaps.md`. Headline —
+  pitch-type effectiveness is **built, sampled, and 0% populated** (449/449
+  pitchers) while `arsenal` is 100%, so a slider and a fastball are
+  interchangeable. Also: **no defence model, no catcher framing, no batted-ball
+  types** anywhere; **BVP fetched daily and never referenced by the sim**.
+- **Wired (not deployed):** disk-backed artifact via `SYNDICATE_DATA_ROOT` +
+  artifact-first loader, 73 pitchers, **5 tests incl. the empty-cache WORKER
+  case**. Commit `87f34554`.
+- **TWO THINGS BLOCK PRODUCTION AND NEITHER IS MINE TO FINISH:**
+  1. one `HOT_ARTIFACT_PATTERNS` line — `artifact_publisher.py` is owned by
+     `clv-without-settlement`; **request filed in that lane, file NOT taken**;
+  2. **no populator on the worker** — the x64 tool is manual and out-of-pipeline.
+- **Effect is INCONCLUSIVE, not negative:** flat at **12.7% pitcher-slot
+  coverage** (starters only). 236 bullpen arms were mid-fetch at checkpoint;
+  **the re-run at near-full coverage is the owed measurement.**
+- **UNVERIFIED:** production population of these fields —
+  `/api/ops/artifacts/stream` **403s on `roster_objs/`**.
+- **NEXT ACTION:** when the bullpen fetch finishes, rebuild the artifact
+  (`build_mlb_pitch_splits_artifact.py --season 2026`) and re-run
+  `measure_pitch_splits_effect.py --games 45 --sims 120`. If it is still flat at
+  high coverage, **retire the research prediction that pitch-type matchup is the
+  most likely market beat** before anyone builds a scheduled populator.
