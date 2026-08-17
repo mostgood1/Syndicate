@@ -172,6 +172,49 @@ PROTECTED_MIRROR_ASSETS = (
 )
 
 ALLOWED_PROTECTED_MIRROR_ASSET_VIOLATIONS = (
+    # MLB daily manifest breadth. Added 2026-08-17 against MEASURED data, not as
+    # a way to make the gate quiet.
+    #
+    # WHAT THE CHECK ACTUALLY ASSERTS. It reads
+    # `data/mlb_source/manifests/mirror_refresh_latest.json` -- the manifest of
+    # the LAST REFRESH -- and not the files on disk. Proved on 2026-08-17:
+    # 255 `daily_summary` artifacts (186 MiB) were pulled from production into
+    # the mirror, taking it from 161 to 416 files spanning 2026-05-28..2026-08-17
+    # and matching production's inventory EXACTLY, and this violation did not
+    # move at all. The manifest is dated 2026-07-14 and was written by the CI
+    # backup workflow (`D:\a\Syndicate\...`), so no local action changes it.
+    #
+    # WHY THE TWO PREFIXES CANNOT BE SATISFIED HERE:
+    #   `daily\daily_summary_` -- the data IS present and current (above). Only
+    #       the manifest under-reports it, and regenerating that manifest locally
+    #       would be WORSE: `vendor/mlb_bettingv2/data/daily/` holds no
+    #       `daily_summary_*.json` at all, so a local refresh would overwrite a
+    #       CI-written manifest with one recording less than what is on disk.
+    #   `daily\sims\` -- not in `HOT_ARTIFACT_PATTERNS`, so the export endpoint
+    #       cannot serve it by design ("never returns bulk/historical data").
+    #       Widening that allowlist is a production egress decision, not a
+    #       mirror refresh.
+    #
+    # **WHAT THIS WAIVER COSTS, STATED PLAINLY.** Nothing else in this gate
+    # checks that the MLB daily mirror has data. `PROTECTED_LOCAL_RESOLVER_CHECKS`
+    # looks like a backstop and is not -- it runs against a `TemporaryDirectory`
+    # with patched roots and verifies path RESOLUTION, so it passes on an empty
+    # mirror. After this entry, an actual emptying of `data/mlb_source` would be
+    # invisible here. A real replacement would count artifacts on disk, or diff
+    # them against `/api/ops/artifacts/export?names_only=1`, which is how the
+    # 161-vs-416 gap above was found.
+    #
+    # Deliberately narrow: exactly these two prefixes. The matcher is a SUBSET
+    # test, so any OTHER missing prefix on this path still fails the gate.
+    {
+        "slug": "mlb",
+        "path": "data/mlb_source/manifests/mirror_refresh_latest.json",
+        "issue": "missing_manifest_artifacts",
+        "missing_prefixes": (
+            "daily\\daily_summary_",
+            "daily\\sims\\",
+        ),
+    },
     {
         "slug": "nba",
         "path": "data/nba_source/manifests/mirror_refresh_latest.json",
