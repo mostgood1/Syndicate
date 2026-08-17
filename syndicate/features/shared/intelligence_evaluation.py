@@ -1295,14 +1295,99 @@ def settle_result(*, record: Mapping[str, Any], result: Any, pnl: Any, closing_l
     return settled_record
 
 
+_PAYLOAD_TRACE_MAX = 12
+_PAYLOAD_TRACE: dict[str, int] = {"count": 0}
+
+
 def _iter_record_payloads(records: Iterable[Mapping[str, Any]] | None = None, *, ledger_path: Path | str | None = None) -> list[dict[str, Any]]:
     """Materialising wrapper, kept for the callers that genuinely want a list.
 
     If the next thing you do is reduce (`_latest_by_recommendation_id`, or a
     dict keyed by record id), call `_stream_record_payloads` instead -- this
     one holds every record of every accepted chunk at once.
+
+    INSTRUMENTED HERE, AT THE CHOKE POINT, AND NOT AT A CALLER. 2026-08-17: the
+    same trace was first put on `recommendation_engine._load_records_from_ledger`
+    and produced `records=0 anon_delta_mb=0.2 path=evaluation_ledger.jsonl` --
+    that wrapper defaults to `DEFAULT_EVALUATION_LEDGER`, a FLAT path which does
+    not exist, while the 830MB chunked load arrives through
+    `_load_chunk_records_for_window` (:2042) and `load_recent_evaluation_records`
+    (:2088), which default to `DEFAULT_LEDGER_PATH` and call this function
+    DIRECTLY. One of three entry points instrumented, and the one wired to a
+    missing file. This function is the choke point all three share -- the same
+    lesson as `board_contract_end`: instrument the shared function, not the
+    caller you happen to be looking at.
+
+    WHAT IT IS FOR. Peak SMAPS caught the excursion 2026-08-17 01:46:04-09Z: one
+    anonymous VMA grew 1096.5 -> 1586.4MB in 5.5s while regions #2/#3/#4 sat
+    unchanged, oomKilled 50s later. It named a mapping, not an allocator. This
+    docstring's own first paragraph names the suspect -- "holds every record of
+    every accepted chunk at once" -- against production's
+    `LEDGER_CHUNKS_ACCEPTED count=8 bytes=830,832,574 records=22,078`.
+
+    THE DELTA IS THE FALSIFIABLE PART, and `records` is what makes it readable:
+    a small delta on a zero-record load proves nothing (that is exactly how the
+    first attempt produced a false "hypothesis killed"), while a small delta on
+    a 22,078-record load kills the hypothesis outright. Both numbers or neither.
     """
-    return list(_stream_record_payloads(records, ledger_path=ledger_path))
+    _n = _PAYLOAD_TRACE["count"] + 1
+    _PAYLOAD_TRACE["count"] = _n
+    _traced = _n <= _PAYLOAD_TRACE_MAX
+    _before = _t0 = None
+    _callers = ""
+    if _traced:
+        try:
+            import sys as _sys
+            import time as _time
+
+            from syndicate.features.shared.memory_observability import container_memory_payload
+
+            _frames = []
+            for _d in (1, 2, 3):
+                try:
+                    _f = _sys._getframe(_d)
+                except ValueError:
+                    break
+                _frames.append(f"{Path(_f.f_code.co_filename).name}:{_f.f_code.co_name}")
+            _callers = "<-".join(_frames)
+            _t0 = _time.monotonic()
+            _p = container_memory_payload("payload_load_before")
+            _before = _p.get("memory_unreclaimable_mb") or _p.get("memory_anon_mb")
+        except Exception:
+            _before = None
+    out = list(_stream_record_payloads(records, ledger_path=ledger_path))
+    if _traced:
+        try:
+            import time as _time
+
+            from syndicate.features.shared.memory_observability import container_memory_payload
+
+            _p = container_memory_payload("payload_load_after")
+            _after = _p.get("memory_unreclaimable_mb") or _p.get("memory_anon_mb")
+            _delta = (
+                round(float(_after) - float(_before), 1)
+                if isinstance(_after, (int, float)) and isinstance(_before, (int, float))
+                else None
+            )
+            print(
+                f"[intelligence_evaluation] PAYLOAD_LOAD n={_n} records={len(out)} "
+                f"elapsed_s={round(_time.monotonic() - _t0, 2) if _t0 else None} "
+                f"anon_before_mb={_before} anon_after_mb={_after} anon_delta_mb={_delta} "
+                f"inline_records={records is not None} callers={_callers}",
+                flush=True,
+            )
+        except Exception:  # pragma: no cover - an instrument must never break the load
+            pass
+    elif _n == _PAYLOAD_TRACE_MAX + 1:
+        try:
+            print(
+                f"[intelligence_evaluation] PAYLOAD_LOAD_TRACE_CAPPED max={_PAYLOAD_TRACE_MAX} "
+                "-- further loads run untraced",
+                flush=True,
+            )
+        except Exception:  # pragma: no cover
+            pass
+    return out
 
 
 def _stream_record_payloads(
