@@ -4296,3 +4296,38 @@ one. Assert the new branch RAN — same family as the standing rule to confirm t
 code ran rather than banking the outcome. A `_grouped` helper already defined
 further down the same file then silently shadowed the new one, and eight tests
 ran against the wrong builder while looking authored and correct.
+
+## 2026-08-17 — OVERTURNED: "a statistical win on a sim parameter can be graded by betting hit rate on the same sample"
+
+**Belief going in:** the overrides file records `starter_tto_quality_scaling`
+being reverted because it won statistically and lost money, so the correct gate
+on any sim-parameter change is a betting hit rate. I built that gate.
+
+**What actually happened:** the gate could not discriminate, and it pointed the
+wrong way. On 148 graded starts the leash grid read 53.38% → 59.46% hit rate and
++1.93% → +12.40% ROI, apparently reversing a clean statistical sweep. Three
+checks killed it:
+
+- **ALWAYS OVER returned 58.78% / +8.16% on the identical rows, with no model.**
+  The best grid point was barely above a side-blind strategy, and the longest
+  leash scored EXACTLY 58.78% because it picked over on 146 of 148 — it *was*
+  always-over.
+- The grid varied the **over-rate** monotonically (106 → 146 over-picks), so the
+  ordering followed from over-propensity in a window where overs won 58.78%.
+- The whole spread was **1.49 SE** (SE 4.09pp at n=148).
+
+**The trap, and it is the general form:** the parameter under test *shifts the
+mean of the projection*, which *shifts which side gets bet*. Any outcome window
+with a directional base rate then scores the parameter by its directional bias
+rather than its accuracy. Here that meant the grade would have **ENDORSED THE
+DEFECT** — the sim over-projects outs, so it bets over, and overs won.
+
+**RULE: never report a prop betting hit rate without the side-blind baseline
+(ALWAYS OVER / ALWAYS UNDER) computed on the same rows.** Without it a +12.40%
+"model edge" read as skill when +8.16% of it needed no model at all. A grade whose
+picks are not side-balanced is measuring direction, not skill.
+
+**Corollary, learned the same day:** a betting gate is not automatically stronger
+evidence than a statistical one just because it is denominated in money. It has
+its own confounds, and n is usually far smaller — 148 bets against 3,226 scored
+projections.

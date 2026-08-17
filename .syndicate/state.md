@@ -3069,3 +3069,33 @@ from the service.**
   (live-odds-worker, 14:43:08Z): `_normalized_game_status` had no precedence
   between its live and terminal text checks, and `"Final/OT"` trips both.
   **Deployed, verified by content, behavioural test PENDING a finished OT game.**
+
+## MLB PITCHER-OUTS MODEL AND ITS INPUTS — verified 2026-08-17 (lane `convergence-phase7-crps`)
+
+- **The `outs` over-projection is the F5 STARTER LEASH.** 267 starts / 13 dates /
+  87,500 game-sims replayed from archived roster artifacts. Every metric improves
+  monotonically as the leash shortens; dispersion **1.002 → 0.791 against a
+  calibrated 0.7979**, short-start gap **−0.1778 → −0.0266**. Replay at the
+  current leash reproduces production (P(outs<15) 0.0965 vs 0.104 on 726 starts).
+- **`starter_min_innings` is now a `manager_pitching_overrides` key** (v2 hook).
+  Absent = the manager profile's value = byte-for-byte no-op. `0` disables the
+  leash; the old `max(1, …)` silently promoted 0 to 1.
+- **NO LEASH VALUE IS PROMOTED.** The model loses to a CONSTANT baseline at every
+  grid point (baseline MAE 3.0912 vs best 3.1852), and residual bias at leash 0
+  is still −1.470 — the leash is the largest term, not the only one.
+- **THE BETTING GRADE IS CONFOUNDED. Do not re-run it without the side-blind
+  baseline.** On 148 starts ALWAYS OVER returned **58.78% / +8.16% with no
+  model**; the grid varied only how often it bet the over (106→146 of 148); the
+  whole spread was **1.49 SE**. Taken naively it endorses the over-projection
+  defect. **Standing rule: print ALWAYS OVER / ALWAYS UNDER beside any prop hit
+  rate.**
+- **ARCHIVED LINE COVERAGE: only 5 of 29 dates carry >=8 pitchers with an `outs`
+  line; 12 of 29 carry ZERO.** The discriminator is `retrieved_at` INSIDE the
+  artifact: same-day-afternoon fetches carry 26–30 pitchers, fetches after
+  ~02:00Z the next day carry 0, because books pull player-prop markets once games
+  end. `mode` is `live` on every file including the `_pregame` ones.
+- **`betting_accuracy.py` is ABSENT from this checkout** — the overrides file's
+  55.78%/54.65% came from an instrument that is not here. Do not compare to it.
+- **Re-simulating the leash grid on PRODUCTION data is impossible** — it needs
+  schema-v4 `roster_obj_*.json`; production 404s at every root and the sim's
+  loader rejects the raw bundle (`schema_version=None`).

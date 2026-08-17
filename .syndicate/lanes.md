@@ -4002,3 +4002,31 @@ Taken on explicit user instruction ("now take the cadence lever too").
   less frequent when fixtures are far out. Net OddsAPI call volume is not
   obviously higher, but it is not obviously lower either, against a cap at ~62.7%
   with MLB at 93.0% of spend. Measure before and after.
+
+#### convergence-phase7-crps — CHECKPOINT 2026-08-17 ~19:0xZ — **instrument built, defect traced and quantified, both halves of the fix in flight, NEITHER MEASURED**
+
+- **Shipped and on `origin/main`:** Phase 7 CRPS/bias-dispersion instrument;
+  `starter_min_innings` exposed + swept; two betting graders; monotone props seal
+  (`bafb4fb2`).
+- **Verified:** the `outs` over-projection IS the F5 leash (dispersion
+  1.002→0.791 vs a 0.7979 target; short-start gap −0.1778→−0.0266 over 267
+  starts / 87,500 sims), the replay reproduces production, and the seal is on
+  `origin/main` by content.
+- **Verified negative, and it matters more than the positive:** the model still
+  loses to a constant baseline at EVERY leash value (3.0912 vs best 3.1852), and
+  the betting grade is CONFOUNDED — ALWAYS OVER returns 58.78%/+8.16% on the same
+  148 starts, the grid varies only over-propensity, spread is 1.49 SE. **Nothing
+  is promoted. No leash value is recommended.**
+- **In flight, both unmeasured:**
+  1. cadence flag LIVE on live-odds-worker (gate verified running; effect read
+     by `outs-props-coverage-check`, fires 2026-08-19 07:00 CT for date 08-18);
+  2. seal QUEUED as a deploy request for refresh-worker, cut on `8c0bd8e6`.
+- **TOP RISK TO THE 08-19 READING, found in another session's commit
+  `7c4439f4` AFTER my flip went live:** refresh-worker sweeps mlb/wnba/soccer/nfl
+  while owning only nfl, is gated by neither the ownership flags nor
+  ACTIVE_SPORTS, **wins the shared unnamespaced cadence marker and starves the
+  designated owner**. My flag is set on live-odds-worker ONLY. So a FAIL on 08-19
+  may be MARKER CONTENTION, not the cadence mechanism — and the scheduled reader
+  does not know this. Whoever reads it must rule that out before concluding.
+- **Next action:** read `outs-props-coverage-check` on 08-19, ruling out marker
+  contention first; then let the coordinator ship the seal.
