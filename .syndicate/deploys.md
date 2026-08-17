@@ -10679,3 +10679,40 @@ sweeping" is also what a broken gate looks like.
 `SYNDICATE_ACTIVE_SPORTS` is NOT evidence of what that service does.* Measured
 today, both workers' behaviour is the exact inverse of their env. I nearly
 deployed to one worker on that assumption and would have shipped an inert fix.
+
+### RETRACTION 2026-08-17 ~14:25 CDT - **`coordinator.id` IS NOT STALE. I was wrong, `coordinator.md` documents this exact mistake, and editing the file would have BROKEN THE DEPLOY HOOK. NOTHING WAS CHANGED.**
+
+I reported the register as stale because `9ed7fd89-...` matched no roster entry.
+**`coordinator.md:139-168` already answers this**, under the heading *"The
+register holds ONE of this session's TWO ids - do not read it as stale"*:
+```
+hook payload / scratchpad path / coordinator.id   9ed7fd89-6696-4d42-9681-39c1a5b78a46
+list_sessions roster id                           local_1d6f136e-be80-4799-adff-b9f7071871f7
+roster title                                      "Deploy and Document Coordinator"
+```
+> *"This is not a bug to fix by editing the file. The hook must match the payload
+> id or it stops working; the roster cannot see that id at all... Never conclude
+> the role is unheld from a roster lookup alone, and never delete
+> `coordinator.id` to 'clean up' - that is the off switch, not a tidy."*
+
+**Asked to fix it, I read the contract first and did not touch it.** No edit, no
+delete. Had I "fixed" it, the hook would have stopped matching and **the deploy
+gate would have silently opened for every session** - the failure mode the file
+exists to prevent, caused by tidying it.
+
+**THE EVIDENCE WAS IN MY OWN HANDS ALL SESSION.** This session ALSO has two ids:
+`7c041356-...` in the hook payload I fed `lane-guard`, and `bd97b64e-...` in my
+scratchpad path. **I used both, in the same session, and still read a two-id
+system as a broken one-id system.**
+
+**THE PATTERN, third instance today, and it is worth naming:** I diagnosed a
+DEFECT from a null lookup three times - the `pid=890` "stuck lock" (transient,
+already self-healed), `#378`'s "WNBA never launches" (it launches), and now
+this. **Each time the null was a property of the INSTRUMENT, not the subject.**
+The rule I already hold - *absence in a window is not absence* - generalises:
+**an identifier that does not resolve is not thereby dead.** Ask what would make
+the lookup fail for a HEALTHY subject before calling it broken.
+
+**Nothing else changes.** The deploy request, the two deploy disclosures, and the
+`#378`/`#382`/`#129` corrections all stand; the retraction is scoped to this one
+claim and was sent to the coordinator as its own message.
