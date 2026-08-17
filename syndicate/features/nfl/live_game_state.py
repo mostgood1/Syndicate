@@ -173,6 +173,19 @@ def _state_from_event(event: Mapping[str, Any]) -> dict[str, Any] | None:
         "start_time": _text(event.get("date")),
         "away_pts": away_pts,
         "home_pts": home_pts,
+        # DOWN / DISTANCE / FIELD POSITION WERE ALREADY IN THIS PAYLOAD AND WERE
+        # BEING THROWN AWAY. `_fetch_scoreboard` returns the whole scoreboard
+        # JSON, whose competitions carry a `situation` block; nothing in `nfl/`,
+        # `ncaaf/` or `football/` read it -- the only `down` references in the
+        # tree are the sim engine's internal `play_state` and the historical
+        # loaders, neither of which is on the live path. So this costs no extra
+        # fetch and no extra credit: it stops discarding what we already have.
+        #
+        # Kept RAW and only on a live game. A `situation` on a finished or
+        # unstarted game is a stale or placeholder artefact of the feed, and
+        # storing it would make "3rd and 7" render on a game that ended hours
+        # ago -- the same class of bug as the 0-0 placeholder score above.
+        "situation": (competition.get("situation") if in_progress and isinstance(competition.get("situation"), Mapping) else None),
     }
 
 
@@ -268,6 +281,26 @@ def attach_nfl_live_game_state(
             live_state["away_pts"] = state["away_pts"]
         if state.get("home_pts") is not None:
             live_state["home_pts"] = state["home_pts"]
+        # GAME SHAPE -- the state this game is in, kept instead of discarded.
+        # Lane `game-shape-capture`; contract in `shared/game_shape.py`.
+        # Nothing downstream can currently ask WHEN a football projection is
+        # wrong (early vs late, one score vs three, backed up vs red zone),
+        # only whether it is wrong on average, because the conditioning
+        # variable is never written down.
+        #
+        # Function-local import and a bare except on purpose: this is
+        # instrumentation for a measurement that does not exist yet, and the
+        # cards board is the product. A failure here must cost the shape block
+        # and nothing else. Same rule `live_gameline_ledger` states for its own
+        # append path.
+        try:
+            from syndicate.features.shared.game_shape import football_game_shape
+
+            live_state["game_shape"] = football_game_shape(
+                live_state, sport="nfl", situation=state.get("situation")
+            )
+        except Exception:
+            live_state["game_shape"] = None
         game["live_state"] = live_state
 
         # `_scheduled_status_token` and `_resolve_scheduled_start_utc` both

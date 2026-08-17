@@ -638,6 +638,20 @@ _MAX_PLAUSIBLE_ARTIFACT_AGE_SECONDS = 86_400.0
 # gets faster, lower it if a sport needs tighter watching.
 _STALE_QUOTE_SECONDS = 2_700.0
 
+# How far the sim's MEAN must clear the LINE before it may be quoted as the
+# reason for a side. See `_reason_sentences` for the measurement and the two
+# wrong rules this replaced.
+#
+# The precondition is that the distribution's MEDIAN is on the same side of the
+# line as the mean. For Poisson counts — which is what soccer's own engine uses
+# and what run/goal totals are — the median sits about 1/3 below the mean, so
+# the claim fails in a band of roughly `line < mean < line + 1/3`. 0.5 covers
+# that with room, is a natural unit (half a run, half a goal), and keeps every
+# MLB case measured on the served board, including both real rows (9.988 vs 8.0
+# and 5.446 vs 7.5). It costs the marginal ones — an F5 total at 4.3 against 4.5
+# now says nothing about the side — and staying quiet there is the right trade.
+_SIM_DIRECTION_MIN_MARGIN = 0.5
+
 
 def _seconds_since(stamp: Any) -> float | None:
     """Seconds between an ISO-8601 stamp and now, or None if it is unusable.
@@ -1004,42 +1018,49 @@ def _reason_sentences(
         # review: the template only breaks when the projection falls on the
         # opposite side of the line from the bet.
         #
-        # **A MEAN DOES NOT DETERMINE A SIDE ON A COUNT PROP, AND THE FIRST
-        # VERSION OF THIS GUARD DID NOT KNOW THAT.** Fixing the causal claim, I
-        # replaced it with "which does NOT support the {side}" — which is the
-        # same category error pointing the other way. `projected` is a MEAN;
-        # what picks a side is `P(X > line)`. For a low-line count prop those
-        # diverge routinely and legitimately: a mean of 0.214 runs still implies
-        # `P(>=1) ~ 19%`, which beats a market implying 15%, so `over 0.5` is a
-        # perfectly good bet with the mean BELOW the line. Served examples that
-        # the previous wording called unsupported and which are probably fine:
-        # `Jake Cronenworth over 0.5` (mean 0.214), `Osleivis Basabe under 2.5`
-        # (mean 2.829).
+        # **A MEAN DOES NOT DETERMINE A SIDE, AND `player_name` WAS THE WRONG
+        # TEST FOR WHEN IT DOES.** Two wrong versions preceded this one:
         #
-        # So the directional CLAIM is now made only where the mean is the right
-        # statistic:
+        #   1. the causal claim, made without comparing the two numbers at all;
+        #   2. "which does NOT support the {side}" — the same category error
+        #      pointing the other way;
+        #   3. a prop/game split on `player_name`, which is a proxy for "low
+        #      count" that happens to fit MLB and FAILS ON SOCCER.
         #
-        #   * GAME rows (no `player_name`) — totals and margins, means in the
-        #     7-9 range against nearby lines. This is exactly the comparison the
-        #     MLB game lens makes ("the projection sits at 7.42 against 5.0"),
-        #     and it is the reference this generator was modelled on.
-        #   * PROP rows — the relationship is reported as a FACT ("above the 0.5
-        #     line") and nothing is claimed about why the side was taken. The
-        #     model-vs-market clause below already states the probability-space
-        #     case when the row carries one, which is the number that actually
-        #     picks the side.
+        # `projected` is a MEAN; what picks a side is `P(X > line)`. Those agree
+        # only when the distribution's median falls on the same side of the line
+        # as the mean. Soccer's own engine models counts as Poisson
+        # (`soccer/sim_engine/soccersim/player_props.py`), whose median sits
+        # about a third BELOW the mean — so the claim fails in a narrow,
+        # one-sided band just above the line:
         #
-        # The original defect stays fixed: `1.396 batter hits` no longer reads
-        # as the REASON for an under. It now reads as "above the 0.5 line",
-        # which is true, useful, and not a claim about the bet.
-        above = projected > line
-        if row.get("player_name"):
-            parts.append(
-                f"The simulation projects {projected:g}{unit_text}, "
-                f"{'above' if above else 'below'} the {line:g} line."
-            )
-        else:
-            supports = above if side == "over" else not above
+        #     market         mean  line  P(over)   mean says  prob says
+        #     soccer total   2.60   2.5    48.2%     over       UNDER   <-- wrong
+        #     soccer total   2.55   2.5    46.9%     over       UNDER   <-- wrong
+        #     soccer total   2.40   2.5    43.0%     under      under
+        #     soccer total   3.10   2.5    59.9%     over       over
+        #     MLB total      8.00   7.5    54.7%     over       over
+        #     MLB total      9.99   8.0    66.6%     over       over    (served)
+        #     MLB total      5.45   7.5    18.4%     under      under   (served)
+        #
+        # A 2.5 goal line against a 2.6 mean is the single most common shape in
+        # soccer, and it sits exactly in the band — so the `player_name` split
+        # routed the sport it is most wrong about into the directional claim.
+        #
+        # The MARGIN is the real precondition, and it is sport-agnostic: claim a
+        # direction only when the mean clears the line by enough that the median
+        # cannot be on the other side. Below that, state the relationship and
+        # claim nothing. This also subsumes the prop/game split — a prop with a
+        # genuine gap (1.396 against 0.5, `P(>=1) ~ 75%`) gets its claim back,
+        # and a prop without one (0.214 against 0.5) still does not.
+        #
+        # NOT MEASURED ON SERVED SOCCER ROWS: soccer had 0 board rows all
+        # session and no retained date carries any, so the table above is
+        # arithmetic on the engine's own Poisson assumption, not an observation.
+        # Re-check when soccer returns to the board.
+        margin = abs(projected - line)
+        if margin >= _SIM_DIRECTION_MIN_MARGIN:
+            supports = (projected > line) if side == "over" else (projected < line)
             clause = (
                 f"which is why it lands on the {side}" if supports
                 else f"which does NOT support the {side}"
@@ -1047,9 +1068,14 @@ def _reason_sentences(
             parts.append(
                 f"The simulation projects {projected:g}{unit_text} against a line of {line:g}, {clause}."
             )
-    elif projected is not None and side in ("over", "under"):
-        parts.append(f"The simulation projects {projected:g}, on the {side} side.")
-
+        else:
+            # Too close to call from the mean alone. `where` still carries real
+            # information; it just is not a reason for the bet.
+            where = "level with" if projected == line else ("above" if projected > line else "below")
+            parts.append(
+                f"The simulation projects {projected:g}{unit_text}, {where} the {line:g} line "
+                f"— too close to call the side from the projection alone."
+            )
     # 2. Model vs market.
     if model_pct is not None and market_pct is not None:
         edge_text = f" — a {edge_pct:.1f} point edge." if edge_pct is not None else "."
