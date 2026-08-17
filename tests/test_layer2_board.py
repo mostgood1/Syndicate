@@ -14,6 +14,8 @@ looks.
 
 from __future__ import annotations
 
+import itertools
+
 from syndicate.features.shared.layer2_board import build_layer2_rows
 
 
@@ -33,16 +35,27 @@ def _row(**overrides):
         "books_quoting": 11,
         "game": {"state": "pregame", "status_token": "7:15P CT"},
         "best": {
-            # REAL book slugs, because the board now restricts its recommended
-            # price to books the operator can actually bet
-            # (`book_shortlist.DEFAULT_BOOKS`). This fixture used "betopenly"
-            # and "dk"; the first is a real book that is NOT on the list and the
-            # second is not a slug at all, so both sides were dropped and seven
-            # tests failed for a reason that had nothing to do with what they
-            # assert. Two DIFFERENT bettable books, which is what the fixture
-            # was always trying to express.
+            # REAL book slugs, because the board restricts its recommended price
+            # to books the operator can actually bet (`book_shortlist.DEFAULT_BOOKS`).
+            # This fixture once used "betopenly" and "dk" -- the first a real book
+            # NOT on the list, the second not a slug at all -- and both sides were
+            # dropped.
+            #
+            # ONE BOOK ON BOTH SIDES, and that is load-bearing. The repair for the
+            # shortlist gate used two DIFFERENT bettable books, which satisfied
+            # that gate and broke the next one: with no `cells`, `_fair_by_side`
+            # falls through the consensus path to a SAME-BOOK de-vig that requires
+            # `len(books_used) == 1`. Two books meant no `fair`, so `ev` was None,
+            # `blended_score` returned None, and every candidate was dropped as
+            # unscored -- `sides_priced == 2` while `opportunities == []`. Nine
+            # tests failed for a reason none of them asserts.
+            #
+            # A two-sided de-vig is only legitimate within one book; the CROSS-book
+            # case is what launders a fake edge, which is why the code refuses it.
+            # The other fixtures in this file (the strong/weak pair below) already
+            # use one book on both sides and have always passed.
             "over": {"price": -110, "bookmaker": "draftkings", "age_seconds": 52.0, "books_quoting": 9},
-            "under": {"price": -105, "bookmaker": "betmgm", "age_seconds": 60.0, "books_quoting": 9},
+            "under": {"price": -105, "bookmaker": "draftkings", "age_seconds": 60.0, "books_quoting": 9},
         },
     }
     row.update(overrides)
@@ -57,9 +70,24 @@ def test_each_side_becomes_its_own_candidate():
 
 
 def test_two_sided_fair_is_devigged_and_drives_ev():
+    """**This test was passing while asserting nothing.**
+
+    It loops over `opportunities`, and `opportunities` was EMPTY -- the fixture's
+    two sides came from different books, so no `fair` was derived and every
+    candidate was dropped unscored. An empty collection makes a `for` body
+    vacuous, so the suite stayed green on this one while nine of its neighbours
+    failed. The `assert result["opportunities"]` below is what stops that
+    recurring.
+
+    The method is `two_sided_same_book`, not `two_sided`: the code distinguishes
+    a de-vig within ONE book from the cross-book case, because only the first is
+    legitimate -- cross-book de-vigging launders a arb surplus into a "fair"
+    value. The name records which one was used, and the test says so.
+    """
     result = build_layer2_rows([_row()])
+    assert result["opportunities"], "fixture produced no scored candidates -- see _row()"
     for candidate in result["opportunities"]:
-        assert candidate["quote"]["fair_method"] == "two_sided"
+        assert candidate["quote"]["fair_method"] == "two_sided_same_book"
         assert candidate["quote"]["fair_probability"] is not None
         assert candidate["ev_pct"] is not None
 
@@ -189,8 +217,28 @@ from syndicate.features.shared.layer2_board import (  # noqa: E402
 from datetime import datetime, timezone  # noqa: E402
 
 
-def _cand(sport, kind, score, market="totals"):
-    return {"sport": sport, "kind": kind, "market": market, "score": {"score": score}}
+_CAND_SEQ = itertools.count()
+
+
+def _cand(sport, kind, score, market="totals", event_id=None):
+    """One shortlist candidate, on its OWN game unless told otherwise.
+
+    **The unique `event_id` is load-bearing.** `select_shortlist` caps how many
+    rows any ONE game may contribute (`SHORTLIST_ROWS_PER_GAME = 6`). This helper
+    used to emit no `event_id` at all, so 400 candidates counted as a single game
+    and every per-sport budget test saw 6 where it asserted 100 -- five failures
+    that were about the per-GAME cap while claiming to be about the per-SPORT
+    allowance.
+
+    Tests that mean to exercise the per-game cap pass an explicit `event_id`.
+    """
+    return {
+        "sport": sport,
+        "kind": kind,
+        "market": market,
+        "event_id": event_id if event_id is not None else f"evt{next(_CAND_SEQ)}",
+        "score": {"score": score},
+    }
 
 
 def test_caps_at_the_per_sport_limit():
