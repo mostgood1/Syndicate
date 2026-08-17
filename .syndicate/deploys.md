@@ -12711,3 +12711,71 @@ exhausted** — remaining gaps are 0.0110 (hits) and 0.0167 (total_bases).
 substitution that removes a batter at a specific INNING — a haircut scales
 opportunity and structurally cannot know when the removal happened. That is P2,
 and per-manager tendencies (managers differ 1.68x) are its input.
+
+## 2026-08-17 — P2 STEP 1: **`manager_tendencies.json` NOW EXISTS**, fitted from 618 games
+
+Lane `convergence-phase7-crps`. `scripts/build_mlb_manager_tendencies.py`.
+Writes `data/manager/manager_tendencies.json` — **the file whose absence is the
+root cause.** `ManagerProfile`'s loader has always read it and always silently
+received `{}`, so all 30 teams ran one hardcoded profile.
+
+618 games / 1,192 team-games / 47 dates. Overall hazard **0.01820 per
+starter-inning**.
+
+### INNING HAZARD — P(removed this inning | still in)
+
+    1: 0.00028    4: 0.00234    7: 0.04183
+    2: 0.00093    5: 0.00525    8: 0.05089   <- peak
+    3: 0.00233    6: 0.01989    9: 0.04632
+
+**This is the shape a haircut structurally cannot represent.** Removals are
+concentrated in innings 6-9 and are essentially absent before the 5th; a scalar
+spreads that uniformly across all nine. It is the direct explanation for the
+haircut's collapsing returns (+0.0057 → +0.0028 → +0.0016).
+
+### SLOT MULTIPLIER — cleanly monotonic, unlike the fitted haircut
+
+    1:0.71  2:0.73  3:0.70  4:0.82  5:0.92  6:0.97  7:1.21  8:1.40  9:1.55
+
+Bottom-order starters are removed **~2.2x** as often as the top of the order.
+**This is the clean curve the slot-haircut fit FAILED to reproduce** (that fit
+was non-monotonic, slot 4 needing the least correction). The hazard is measured
+on 10,728 starter-innings; the haircut was fitted on ~130 rows per slot. The
+event data was right and the regression was noise.
+
+### TEAM MULTIPLIER — a 2.0x spread
+
+    Houston Astros x1.33 (1.90/game) ... Boston Red Sox x0.66 (0.95/game)
+
+30 teams fitted at >=15 team-games. **One hardcoded profile for all 30 is
+measurably wrong.**
+
+### THE MARGIN TERM IS THE WEAK ONE, AND ITS DIRECTION IS NOW IN DOUBT
+
+    leading 0.74   even 1.15   trailing 1.11
+
+**This CONTRADICTS the earlier event-count reading** (defensive substitutions
+231 leading vs 94 trailing), which I used to explain the haircut's band result.
+Two differences make them non-comparable: this counts a STARTER'S FIRST REMOVAL
+while the earlier count was all substitution EVENTS, and the bands differ (±2
+here vs ±1/±5 there). **Exposure by band is not observable** — a starter's band
+is only known at exit — so this term is a normalised removal SHARE, not a
+hazard, and the artifact says so in its own note.
+
+**Treat the margin term as UNRESOLVED.** The inning and slot terms are true
+hazards on real exposure; the margin term is not, and the two readings disagree.
+
+### A SECOND SILENT ZERO, CAUGHT
+
+The first run reported **10,728 starter-innings at risk and ZERO removals** and
+still wrote an all-1.0 artifact. Cause: I identified starters from
+`boxscore.battingOrder`, which is the **END-OF-GAME** lineup — a replaced starter
+is absent from it (measured: 0 of 4 replaced ids present, vs 4 of 4 among players
+whose own `battingOrder` field ends in `"00"`). Fixed, and the builder now
+**REFUSES to write** when the numerator is zero against a large denominator.
+
+### Next: wire it into the sim
+
+The artifact is inert until `simulate.py` consumes it. That is P2 step 2 and it
+is real engine surgery — a removal roll per starter per half-inning, with the
+substitute inheriting the slot.
