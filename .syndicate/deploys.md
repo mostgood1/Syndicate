@@ -10592,3 +10592,57 @@ It is a perfectly good cross-service mutex preventing two workers from
 double-sweeping the same sport. Namespacing it would let BOTH sweep - which may
 be the bug, not the fix. **That is a design question with an owner, and doubling
 the sweep rate against a 5M OddsAPI cap is not something to discover by trying.**
+
+### ANSWERED 2026-08-17 ~14:50 CDT - **YES. live-odds-worker IS supposed to sweep. The config is CORRECT and the behaviour is a REGRESSION against it. This also RETRACTS my "maybe the shared marker is a good mutex" caution.**
+
+**THE INTENT IS EXPLICIT**, `render.yaml` on live-odds-worker's
+`SYNDICATE_MLB_REFRESH_TICK_OWNER: "true"`:
+> `#129`: reverted back to "true" -- refresh-worker's competing
+> `MLB_ENABLE_REFRESH_WORKER_AUTORUN` path (set "false" there now) is fully
+> disabled, **so this worker is the sole MLB odds-refresh owner again, not just
+> nominally excluded from a race with another owner.**
+
+The architecture split (2026-07-20): **MLB SIM moved to refresh-worker; ODDS
+REFRESH stayed here.** live-odds-worker is the odds owner by design.
+
+**THE CONFIG IS SET CORRECTLY. I checked for a misconfiguration and there is none:**
+```
+                                    refresh-worker   live-odds-worker
+SYNDICATE_MLB_REFRESH_TICK_OWNER    false            true
+MLB_ENABLE_REFRESH_WORKER_AUTORUN   false            <ABSENT>
+WEEKLY_SPORTS_REFRESH_TICK_OWNER    true             false
+```
+Exactly the ownership split `#129` describes. **Nobody fat-fingered a flag.**
+
+**THE DEFECT, now sharp: refresh-worker sweeps `mlb`, `wnba`, `soccer` AND `nfl`
+- and it explicitly does NOT own three of them.** Its `ACTIVE_SPORTS=nfl` and its
+`MLB_REFRESH_TICK_OWNER=false`. **So the odds-sweep path is gated by NEITHER the
+ownership flags NOR `SYNDICATE_ACTIVE_SPORTS`.** It sweeps regardless, wins the
+shared unnamespaced cadence marker, and starves the designated owner.
+
+**RETRACTION - my previous caution was wrong.** I wrote that namespacing the
+marker "would let BOTH sweep" and warned about doubling the OddsAPI burn against
+the 5M cap. **That reasoning assumed the marker was the cross-service mutex. It
+is not** - the OWNERSHIP FLAGS are, and they are already set correctly. With the
+sweep path properly gated, only one service would sweep each sport regardless of
+the marker. **The burn risk I raised was against a design that does not exist.**
+The real risk runs the other way: the intended owner is doing nothing while a
+service that was deliberately taken OFF these sports does all of it.
+
+**WHY THIS MATTERS BEYOND TIDINESS.** `#129`'s own words are that the previous
+fix left this worker *"nominally excluded from a race"* - i.e. someone fought
+exactly this race, believed they had won it, and wrote it down. **It is back, by
+a different mechanism** (the marker, not the autorun flag), which is why the
+flag-level fix did not hold.
+
+**THE FIX IS IN THE SWEEP'S GATE, NOT IN THE MARKER.** Make the odds sweep honour
+the same ownership flags the tick already does, so refresh-worker declines
+`mlb`/`wnba`/`soccer`. **Do NOT namespace the marker as the fix** - that treats
+the symptom and leaves an ungated sweep running on the wrong service.
+**Not started; it is a code change plus a production deploy, and deploys are
+coordinator-owned.**
+
+**AND IT UNBLOCKS THE WNBA QUESTION.** If the sweep is re-gated to its owner,
+live-odds-worker resumes WNBA odds work - which is where a WNBA full-refresh
+owner most naturally belongs, making option 1 (finish the migration onto the
+odds owner) the coherent choice rather than option 2.
