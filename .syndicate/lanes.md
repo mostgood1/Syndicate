@@ -3140,3 +3140,47 @@ touch that.
   per width inside the rule; if armed, a fresh baseline that **exits 0**, the
   probe suite green, and a re-run reporting mlb `unchanged (baselined)`.
 - **Blocked by:** none
+
+### wnba-live-tier - **CORRECTION 2026-08-17 15:4xZ. THREAD 1 BROKE MY ATTRIBUTION. `game_odds_*` DOES NOT EXIST, and the sim ran for ALL THREE games.**
+- **Ran the export call the brief ordered first, precisely because it could
+  invalidate everything else. It did.**
+```
+wnba_source/data/processed/*2026-08-16*   count=11, truncated=False
+    cards_props_snapshot_2026-08-16.json
+    cards_sim_detail_2026-08-16.json
+    game_cards_2026-08-16.csv                 <- 1 row
+    oddsapi_player_props_2026-08-16.csv
+    props_recommendations_2026-08-16.csv
+    props_recommendations_top_by_game_2026-08-16.json
+    recommendations_2026-08-16.csv
+    recommendations_slate_2026-08-16.json
+    smart_sim_2026-08-16_ATL_IND.json         <- ALL THREE
+    smart_sim_2026-08-16_PHX_POR.json         <-   fixtures
+    smart_sim_2026-08-16_SEA_CHI.json         <-     simulated
+
+wnba_source/data/processed/game_odds_*        count=0
+```
+- **`game_odds_*` DOES NOT EXIST FOR ANY DATE.** So `export_game_cards_cmd`'s
+  `if odds_path.exists()` ALWAYS takes the empty-frame fallback. **That branch
+  cannot discriminate between the three games**, so my claim that "every
+  `game_cards` row derives from a game that had odds captured" is **FALSE and is
+  hereby retracted.** It was a plausible read of the first 45 lines of a long
+  function, and the very limit I wrote down next to it.
+- **THE SIM RAN FOR ALL THREE.** `smart_sim_2026-08-16_{ATL_IND,PHX_POR,SEA_CHI}`
+  are all present. The sim output is COMPLETE; only `game_cards` is short. So the
+  loss happens **INSIDE the writer, downstream of the sims** - which is exactly
+  the "3 rows means my read is incomplete" outcome the brief predicted, reached
+  by a different route.
+- **WHAT IS STILL TRUE:** `game_cards_2026-08-16.csv` holds 1 row (`game_id='1'`,
+  POR@PHX); the chip builder, `is_active_today` and provider code remain
+  exonerated by measurement; and `export_game_cards_cmd` is still the writer.
+  **Only the MECHANISM inside it is now unknown again.**
+- **Note the coincidence worth checking, not assuming:** the surviving fixture is
+  PHX/POR and the surviving sim file is `PHX_POR` - but ATL_IND and SEA_CHI have
+  sim files too, so file presence is not the discriminator either.
+- **NEXT ACTION, replacing the brief's thread 1:** read the REST of
+  `export_game_cards_cmd` (`cli.py:9581`, it is long) and find what it iterates
+  once `go` is an empty frame. With no odds rows the loop must be driven by
+  something else - `gid_map` from `boxscores_<date>.csv`, or the sim files. Then
+  check whether `boxscores_2026-08-16.csv` exists on the worker; if it holds one
+  game, that is the discriminator.

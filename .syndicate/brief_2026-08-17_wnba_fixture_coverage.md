@@ -34,7 +34,12 @@ once ran in production for an hour while `main` lacked them.
   `/api/ops/artifacts/export`: `game_cards_2026-08-16.csv` = 1 row
   (`game_id='1'`, POR@PHX). Chip builder, `is_active_today` and provider code all
   EXONERATED by measurement.
-- **The writer is `export_game_cards_cmd`,
+- **RETRACTED 2026-08-17 15:4xZ - see lanes.md.** `game_odds_*` does not exist
+  for ANY date, so the odds branch cannot discriminate between fixtures, and the
+  sim ran for ALL THREE games. The writer is still `export_game_cards_cmd`, but
+  the MECHANISM is unknown again. Thread 1 in §5 is superseded: read the rest of
+  that function and check `boxscores_2026-08-16.csv`.
+- ~~The writer is `export_game_cards_cmd`,
   `vendor/wnba_betting_repo/src/wnba_betting/cli.py:9581`, and it walks
   `game_odds_<date>.csv`** - odds, not schedule - with an EMPTY frame fallback.
   A fixture with no odds row does not exist.
