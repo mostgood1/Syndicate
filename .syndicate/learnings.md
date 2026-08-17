@@ -4237,3 +4237,293 @@ count you inspected.** If they differ, something arrived while you worked.
 Related: the same session had already written that a queue "only ever
 accumulates because closing it was nobody's job" — the failure mode inverts the
 moment closing becomes someone's job and they close too eagerly.
+
+## 2026-08-17 — RULE: an aggregate dispersion check cannot see an UNINFORMATIVE CENTRE
+
+**What happened.** Phase 7's bias/dispersion decomposition reported MLB pitcher
+outs at **dispersion 0.791 against a 0.798 target** — as close to perfect as that
+metric gets. I read it as "the shape is right, only the location is off" and went
+looking for a calibration fix.
+
+**The shape was NOT right in the way that matters.** Dispersion scores
+`sd(actual − mean) / mean(sigma)`. It asks whether the stated UNCERTAINTY matches
+the realised error. It says nothing about whether the per-item MEAN carries
+information. Measured directly:
+
+    corr(sim_mean, actual) = +0.05
+    sim_mean spread sd     =  1.19
+    actual spread   sd     =  4.06
+
+The engine predicts nearly the same value for every start. Its per-start sigma
+(~5) is genuinely well-calibrated **around a centre that does not move**, and
+that combination passes a dispersion check cleanly.
+
+**RULE: alongside bias and dispersion, always report the CORRELATION between the
+forecast and the outcome, and the RATIO of forecast spread to outcome spread.**
+A model can be perfectly calibrated and completely uninformative; those two
+numbers separate the cases and neither bias nor dispersion will.
+
+**The tell to watch for:** `sd(forecast) << sd(actual)`. Here it was 3.4x
+narrower. That is near-degeneracy, and `#425`'s degeneracy detector only fires on
+FULL collapse to a single value, so it did not trip.
+
+**Why this matters beyond one market:** the remedy differs completely.
+Miscalibration is fixed by a profile; an uninformative centre is not fixable at
+all at the calibration layer, and shipping a profile for it burns a promotion
+cycle to change nothing. I nearly recommended exactly that.
+
+Related: `learnings.md` 2026-08-17 on matching the baseline's FORM, and the
+`#428` rule about decomposing bias before publishing a skill verdict — which I
+had ALSO skipped on this same model before catching it here.
+
+## 2026-08-17 — RULE: a signature change needs a CALLER CENSUS, not a spot-check of the caller you just edited
+
+**Evidence.** `_load_team_ratings` gained a required third parameter (`as_of`,
+audit §7 #6). The author updated the caller inside the same module and wrote a test
+for it:
+
+```python
+assert "_load_team_ratings(league, source_root, iso_date)" in inspect.getsource(mod)
+```
+
+That test asserted the ONE call site somebody remembered. **Four others were not
+updated and the test stayed green through a total production outage** — soccer's
+live lens was dead for as long as the change had been in, and `poll_soccer_live_state.py`
+raised `TypeError: missing 1 required positional argument: 'as_of'` on exactly the
+leagues that had a live match.
+
+**Why asserting call-site TEXT is the trap.** It can only ever prove the site you
+thought of. It reads like coverage and is a spot-check. The green result was not
+weak evidence of correctness — it was NO evidence, about four of five sites.
+
+**The replacement** (`tests/test_soccer_team_ratings_as_of.py::test_every_caller_passes_as_of`):
+AST-walk the repo, resolve every call the way Python does (module-local `def` wins,
+else the `from ... import` binding), assert arity. It found the two remaining broken
+sites in `validate_soccer_vs_market.py` **by being written** — no run required.
+
+**TWO functions, SAME name, DIFFERENT arities**, which is why a naive census would
+also have been wrong: `build_soccer_artifacts._load_team_ratings(league, source_root,
+as_of)` takes 3, `validate_soccer_vs_market._load_team_ratings(league, as_of)` takes 2.
+Three of five sites bind to the 2-arg one. A census that assumes a single arity is
+worse than none — it reports confident wrong answers.
+
+**Also:** exclude `.claude/worktrees/` from any repo-wide AST sweep. It holds stale
+copies of the same scripts from other sessions, still on the pre-change signature.
+
+**HOW TO APPLY.** When you change a signature: census the callers before you finish,
+and if you write a test for it, assert over ALL resolved call sites, never over the
+text of one. Then verify the test FAILS with the bug reintroduced — I reverted the
+fixed call site, confirmed the census named `poll_soccer_live_state.py:105 passes 2
+arg(s), needs 3`, and restored. The old test was green against that exact state.
+
+Related: [[feedback_confirm_the_code_ran]] (assert the branch, not the outcome) and
+the standing "gate on the output, not the input" rule — a guard that encodes an
+assumption about WHICH caller breaks is silent in the real failure mode.
+
+## 2026-08-17 — RULE: a falsified prediction LOCALISES a bug; treat it as a measurement, not a miss
+
+**Three predictions were falsified today and each was worth more than the
+confirmation would have been.**
+
+1. **"Totals will run HIGH"** (from a measured +15% plate-appearance inflation).
+   They run **LOW, −0.481**. That single sign flip proved the opportunity bug is
+   in the PROP PROJECTION path and not the game simulation — a localisation no
+   amount of prop-side work had produced.
+2. **"The home team skips the bottom of the 9th"** (a textbook cause of exactly
+   the +0.5 AB signature). HOME +0.478 vs AWAY +0.535 — **flat**, so it is not
+   side-specific, which pointed at substitution instead.
+3. **"NFL's knee will be ~406"** (from the sigma/CRPS_clim scaling law). It is
+   **below 50**, because NFL summarises draws into a Normal while MLB scores the
+   empirical PMF — so the law applies to the FORECAST REPRESENTATION, not the
+   sport.
+
+**The rule:** state the prediction and its expected MAGNITUDE before running the
+check, so a wrong answer carries information. "Totals should be +1.0 high" fails
+informatively; "let us see if totals are biased" does not. All three of these
+narrowed the search; none of them cost anything beyond the run.
+
+**The discipline that makes it work:** say in advance what a negative result
+would mean. I wrote "if the NFL knee is below 300 the honest reading is that the
+scaling law is wrong, not that NFL is special" BEFORE seeing it — which made
+accepting the answer automatic rather than a negotiation with myself.
+
+## 2026-08-17 â€” A SIGNATURE CHANGE NEEDS A CALLER CENSUS, AND THE CALLER YOU CANNOT REACH IS THE ONE THAT BREAKS
+
+`_load_team_ratings` gained a required third parameter (`as_of`). The change
+updated the caller inside its own module and missed **three others**. One of them,
+`poll_soccer_live_state.py:75`, is the soccer live lens. It was dead for every
+league with a match in play, for as long as that change has been in.
+
+**Why it survived â€” three independent covers, and each is a general shape:**
+
+1. **The broken call sat behind `if live_events:`.** Only a league WITH a live
+   match could execute it. Silent on a quiet slate, total on a busy one. A defect
+   gated behind "there is something to do" is invisible in exactly the conditions
+   nobody tests.
+2. **The handler swallowed it with no log line.**
+   `poll_active_leagues_for_tick` caught each league's exception into an `errors`
+   dict that reaches only `data/live/soccer_live_lens.json` â€” not in the publisher
+   allowlist, so unreadable from web. **A throwing league was indistinguishable
+   from a league that was never active.**
+3. **The test asserted the call-site TEXT of the ONE caller that was fixed.**
+   `test_soccer_team_ratings_as_of.py:117` asserted
+   `"_load_team_ratings(league, source_root, iso_date)" in getsource(mod)` for
+   `build_soccer_artifacts` alone. It was green throughout. **A test that pins the
+   caller you just edited proves you edited it â€” nothing more.**
+
+**THE RULE.** When a function gains a required parameter, the test must enumerate
+**every** call site by AST across the repo and assert arity against the signature â€”
+not string-match one file. `18c5ecb9` does this. It found the live one plus two in
+`validate_soccer_vs_market.py` that string-matching could never have seen.
+
+**AND: `ok: true` was not evidence.** Three instruments read healthy while the
+feature was entirely dead â€” the tick reported `ok: true` (because
+`validate_live_lens_snapshot` accepts an EMPTY games list), seven leagues wrote
+their files successfully, and no error appeared anywhere. The tell was a **ratio
+nobody was printing**: 7 leagues written against 10 active. The discriminator was
+in the data all along, as a count that was never compared to its denominator.
+
+**Cross-reference:** this is the same family as the standing rules on absent
+signals and on gating for the wrong failure mode. New here is the *test* being the
+third cover â€” the other two are about instruments, this one is about the thing
+that was supposed to catch it.
+
+## 2026-08-17 â€” TEST DEPLOYMENT BY CONTENT, NEVER BY ANCESTRY OR BY A SHARED SYMBOL
+
+Two near-misses in one session, opposite directions.
+
+**False negative.** live-odds-worker deployed `7470939b`.
+`git merge-base --is-ancestor 6bdc50de 7470939b` -> **NO**. By ancestry the fix was
+absent. `git show 7470939b:scripts/poll_soccer_live_state.py` -> the 3-arg call is
+**there**. Deploy-branch delivery, exactly as the existing "web runs a deploy
+branch" rule describes â€” recorded again because I nearly reported a shipped fix as
+missing.
+
+**False positive.** Checking whether the web fix had shipped, grepping the served
+page for `railDate` returns **present** â€” because `railDate` is the OLD,
+insufficient filter that the fix REPLACES. The honest check derives markers from
+the actual diff: **1 of 79** substantive lines present, i.e. not deployed.
+
+**THE RULE.** To answer "is this change live", diff the deployed artifact against
+the commit, or probe a string the commit UNIQUELY introduces. A symbol that exists
+on both sides of the change answers a different question than the one asked.
+
+
+## 2026-08-17 — RULE: the FIRST test for any flagged feature is "does enabling it change anything"
+
+**I built three inert things today.** Not three bugs — three pieces of work that
+existed, looked complete, passed their obvious tests, and did nothing:
+
+1. **A `manager_tendencies.json` at the wrong path, wrong key, and wrong
+   schema.** I announced it as fixing the root cause.
+2. **`GameConfig.position_substitutions` set with `setattr`.**
+   `dataclasses.replace()` rebuilds from DECLARED FIELDS ONLY, and the sim calls
+   `replace(cfg, rng_seed=...)` on every run — so the attribute was discarded
+   before the first pitch and the feature was permanently off.
+3. Earlier, a **leash test reading `stats["outs"]` where the key is `"OUTS"`** —
+   which made three no-op tests pass on `0.0 == 0.0`.
+
+**Every one was caught by the same thing: a test that asserts ENABLING IT CHANGES
+THE OUTPUT.** No amount of "the code is present", "the file exists" or "the
+no-op case passes" would have found any of them. Two would have shipped as
+completed work.
+
+**RULE: for any feature behind a flag, artifact, or config key, write the
+reachability assertion FIRST —**
+
+    assert run(enabled=False) != run(enabled=True)
+
+**— and only then write the correctness tests.** If that assertion cannot be
+written, the feature has no observable effect and there is nothing to test.
+
+**The corollary that bit hardest:** a no-op test and a reachability test look
+like a pair, but they FAIL INDEPENDENTLY and the no-op half passes vacuously
+when the feature is dead. Three green no-op tests are evidence of nothing on
+their own.
+
+**Specific trap worth naming: `dataclasses.replace()` silently drops
+monkey-patched attributes.** Any config that is `replace()`d in a loop must
+carry its flags as DECLARED FIELDS. An instance attribute survives exactly until
+the first `replace()`, which in a simulator is before the first event.
+
+Related: the standing "presence is not reachability" rule — this is its
+test-shaped form, and today produced four fresh instances.
+
+
+## 2026-08-17 — RULE: a watcher that reports a PEAK of ZERO has not measured a peak. Zero samples is NO DATA, never "clean"
+
+**I wrote a memory watcher whose entire purpose was to catch an OOM I had
+predicted, and it reported `Window clean. Peak live-odds-worker memory 0.0% of
+2048MB` while the service was at 85.3% and climbing.** Had I trusted it, the
+rollback would not have happened. It was caught only because the user asked me
+to check the number by hand.
+
+**The mechanism, and it is three ordinary mistakes stacked:**
+
+1. `scripts/render_logs.py` TRUNCATES each log line (`--max-field`), so the
+   embedded JSON arrives incomplete — the samples visibly end mid-key at
+   `"date`. The text search was fine: `CONTAINER_MEMORY` matched 367 times.
+2. `json.loads` therefore threw on every single line.
+3. The parse sat inside `try: ... except: pass`, so every failure was silent,
+   `pcts` stayed empty, and the danger check `if pcts:` never ran.
+
+Then the fatal line: the summary printed `Window clean. Peak {worst:.1f}%`
+unconditionally, where `worst` was still its initial `0.0`. **A peak of 0.0% on a
+running service is physically impossible and the code presented it as the
+healthy case.**
+
+**How to apply, to any watcher:**
+- **Assert the sample count, not just the value.** `if not samples: fail("NO
+  DATA")`. A threshold check over an empty set passes vacuously, and a vacuous
+  pass looks exactly like a healthy service.
+- **An impossible reading is a bug report, not a measurement.** 0.0% memory,
+  0 rows, 0 games, `n=0` — treat as instrument failure and say so loudly.
+- **Never `except: pass` around parsing in a guard.** Count the failures and
+  surface them; a guard that cannot parse its input is blind, and blind must
+  never render as clean.
+- **Parse defensively when the source truncates.** Prefer a regex for the one
+  number you need (`container_memory_pct_of_max":\s*([\d.]+)`) over `json.loads`
+  of a field the reader may cut.
+
+**Why this one stings:** the same file's docstring says *"Terminal states, all of
+them printed -- silence must never look like success."* I wrote that rule into
+the header and then violated it in the summary line, because I guarded the
+*absence of an event* and forgot to guard the *absence of a measurement*. This is
+the fourth-plus instance of instrument blindness in this repo and the first that
+was self-inflicted inside a tool built to prevent it.
+
+## 2026-08-17 — RULE: a feature can be unfed at the DATA layer, and it looks nothing like a bug
+
+**Standing rules here cover code that is present-but-unreachable.** This is the
+same failure one level down: code that IS reached, with inputs that are empty.
+
+**Measured:** the MLB sim consumes pitch-type multipliers at four call sites as
+`.get(pitch_type, 1.0)`. `pitcher.arsenal` is **100% populated** — so the sim
+samples a real pitch on every pitch — while `pitch_type_whiff_mult`,
+`pitch_type_hr_mult` and `vs_pitch_type` are **0% populated on 449/449
+pitchers**. Every multiplier resolves to 1.0. **Pitch selection is decorative.**
+
+**Nothing about this presents as broken.** No error, no warning, no null. The
+arsenal being populated makes it look MORE alive, not less. The tests pass. The
+sim runs. The feature simply has no effect, and has had none for as long as the
+cache has been empty.
+
+**RULE: for any model input that flows through a `.get(key, NEUTRAL)` default,
+measure the POPULATION RATE, not the presence of the code.** A neutral default
+(1.0 for a multiplier, 0.0 for an additive term) is indistinguishable from a
+working feature at every level except the data.
+
+**The specific shape to hunt for:** a *pair* of fields where one is populated and
+the other is not — an arsenal with no effectiveness, a lineup with no platoon
+splits, a schedule with no clock. The populated half makes the empty half
+invisible.
+
+**Why it persisted:** the loader was CACHE-ONLY (returns None on a miss, never
+fetches), its cache namespace had never been written, and its populator was a
+manual out-of-band tool. Three separate silences, none of which logged anything.
+
+**Corollary that cost the most:** the cache lived under `vendor/*/data/`, which
+is **gitignored and inside Render's ephemeral checkout**. So even a correct local
+fill could never reach production — *"I populated the cache"* and *"production
+has the data"* are unrelated statements. Check the SHIPPING PATH before
+celebrating a data fix.

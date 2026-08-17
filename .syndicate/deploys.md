@@ -11939,3 +11939,593 @@ deployed against it.
 convenience.** Bundling two deploys to save a restart is a coordinator
 optimisation; "do not land this before 08-19" is the requester's measurement
 design. The second wins.
+
+## 2026-08-17 — P2 STEP 1: **`manager_tendencies.json` NOW EXISTS**, fitted from 618 games
+
+Lane `convergence-phase7-crps`. `scripts/build_mlb_manager_tendencies.py`.
+Writes `data/manager/manager_tendencies.json` — **the file whose absence is the
+root cause.** `ManagerProfile`'s loader has always read it and always silently
+received `{}`, so all 30 teams ran one hardcoded profile.
+
+618 games / 1,192 team-games / 47 dates. Overall hazard **0.01820 per
+starter-inning**.
+
+### INNING HAZARD — P(removed this inning | still in)
+
+    1: 0.00028    4: 0.00234    7: 0.04183
+    2: 0.00093    5: 0.00525    8: 0.05089   <- peak
+    3: 0.00233    6: 0.01989    9: 0.04632
+
+**This is the shape a haircut structurally cannot represent.** Removals are
+concentrated in innings 6-9 and are essentially absent before the 5th; a scalar
+spreads that uniformly across all nine. It is the direct explanation for the
+haircut's collapsing returns (+0.0057 → +0.0028 → +0.0016).
+
+### SLOT MULTIPLIER — cleanly monotonic, unlike the fitted haircut
+
+    1:0.71  2:0.73  3:0.70  4:0.82  5:0.92  6:0.97  7:1.21  8:1.40  9:1.55
+
+Bottom-order starters are removed **~2.2x** as often as the top of the order.
+**This is the clean curve the slot-haircut fit FAILED to reproduce** (that fit
+was non-monotonic, slot 4 needing the least correction). The hazard is measured
+on 10,728 starter-innings; the haircut was fitted on ~130 rows per slot. The
+event data was right and the regression was noise.
+
+### TEAM MULTIPLIER — a 2.0x spread
+
+    Houston Astros x1.33 (1.90/game) ... Boston Red Sox x0.66 (0.95/game)
+
+30 teams fitted at >=15 team-games. **One hardcoded profile for all 30 is
+measurably wrong.**
+
+### THE MARGIN TERM IS THE WEAK ONE, AND ITS DIRECTION IS NOW IN DOUBT
+
+    leading 0.74   even 1.15   trailing 1.11
+
+**This CONTRADICTS the earlier event-count reading** (defensive substitutions
+231 leading vs 94 trailing), which I used to explain the haircut's band result.
+Two differences make them non-comparable: this counts a STARTER'S FIRST REMOVAL
+while the earlier count was all substitution EVENTS, and the bands differ (±2
+here vs ±1/±5 there). **Exposure by band is not observable** — a starter's band
+is only known at exit — so this term is a normalised removal SHARE, not a
+hazard, and the artifact says so in its own note.
+
+**Treat the margin term as UNRESOLVED.** The inning and slot terms are true
+hazards on real exposure; the margin term is not, and the two readings disagree.
+
+### A SECOND SILENT ZERO, CAUGHT
+
+The first run reported **10,728 starter-innings at risk and ZERO removals** and
+still wrote an all-1.0 artifact. Cause: I identified starters from
+`boxscore.battingOrder`, which is the **END-OF-GAME** lineup — a replaced starter
+is absent from it (measured: 0 of 4 replaced ids present, vs 4 of 4 among players
+whose own `battingOrder` field ends in `"00"`). Fixed, and the builder now
+**REFUSES to write** when the numerator is zero against a large denominator.
+
+### Next: wire it into the sim
+
+The artifact is inert until `simulate.py` consumes it. That is P2 step 2 and it
+is real engine surgery — a removal roll per starter per half-inning, with the
+substitute inheriting the slot.
+
+## 2026-08-17 — NFL SIM-COUNT CURVE COMPLETE: **knee is <=100, not 406. My scaling law was wrong, and I said in advance this is how I would read it.**
+
+Lane `convergence-phase7-crps`. `scripts/sweep_nfl_sim_count.py`, 72 generator
+runs over 2025 regular season, scored on 272 games. Production artifacts never
+touched (writes redirected per seed level; verified by md5).
+
+    margin    50 +3.10%   100 +3.70%   300 +3.22%   1000 +3.32%
+    total     50 -0.95%   100 -0.27%   300 -0.27%   1000 -0.37%
+
+**FLAT AFTER 100, and non-monotonic** — 100 is the best point for margin and
+300/1000 are slightly worse. The ±0.5pp wobble across 100/300/1000 is run-to-run
+noise, not a curve. **The knee is <=100, plausibly <=50.**
+
+### THIS CORRECTS A TABLE I ALREADY PUBLISHED
+
+`sim_count_requirement.py` anchored every sport off MLB's measured knee (300) via
+`sigma / CRPS_climatology` and produced **"nfl margin: required 406, current 300
+-> TOO THIN"**. That verdict is **WRONG** and so is the one for NFL total.
+**NFL and NCAAF at 300 are comfortable, not thin. No change is needed there.**
+
+### WHY THE LAW FAILED — it is the FORECAST REPRESENTATION, not the sport
+
+The `MD / 2n` penalty applies to a forecast scored as an **empirical CDF**. MLB's
+outs PMF *is* the draws, so it pays that penalty in full and needs hundreds.
+
+**NFL does not do that.** It summarises its draws into `margin_mean` +
+`margin_stdev` and is scored with `crps_normal`. The seed count only affects the
+ESTIMATES of two parameters, each converging at 1/sqrt(n) and then smoothed
+through a parametric form. That is a large variance reduction and it makes CRPS
+nearly insensitive to n.
+
+**So required sim count is set by HOW THE OUTPUT IS REPRESENTED, a pipeline
+property, not by the sport:**
+
+- **empirical / PMF forecasts** (MLB outs, NHL sim samples) -> hundreds of draws
+- **parametric summaries** (NFL, NCAAF: mean + sigma) -> tens
+
+### I PRE-COMMITTED TO THIS READING
+
+Before the sweep completed I wrote: *"the NFL knee may come back well below 300,
+contradicting the anchored prediction of ~406. If it does, the honest reading is
+that the sigma/CRPS_clim scaling is wrong or incomplete — not that NFL is a
+special case."* It did, and it is. Recording that the pre-commitment is what made
+accepting this automatic rather than a negotiation.
+
+**The second anchor did NOT fit the law — it broke it, which is more useful.**
+One measured knee plus one falsification beats two knees that happened to agree.
+
+## 2026-08-17 — **CORRECTION: my P2 step-1 artifact was INERT THREE WAYS, and the real blocker is not the missing file**
+
+Lane `convergence-phase7-crps`. **This retracts the operative claim of the "P2
+STEP 1" entry above.** The fitted numbers there are sound; what I said they would
+DO is wrong.
+
+### What I got wrong
+
+I wrote `data/manager/manager_tendencies.json` at the **repo root** and announced
+"the file whose absence is the root cause NOW EXISTS". It is inert three ways:
+
+1. **WRONG PATH.** `_load_manager_tendencies_anykey`
+   (`sim_engine/data/build_roster.py:523`) resolves
+   `Path(build_roster.py).parents[2] / "data" / "manager" / …` =
+   **`vendor/mlb_bettingv2/data/manager/`**. Nothing reads the repo root.
+2. **WRONG KEY.** The loader does
+   `m.get(str(team.team_id)) or m.get(str(team.abbreviation))`. My artifact is
+   keyed by **full team name** ("Boston Red Sox") and would never match.
+3. **WRONG SCHEMA.** The loader applies exactly six fields —
+   `pull_starter_pitch_count`, `starter_min_innings`, `starter_blowup_run_diff`,
+   `closer_leverage_max_run_diff`, `use_closer_in_9th_only`,
+   `pinch_hit_aggressiveness`. My `inning_hazard` / `slot_multiplier` /
+   `margin_multiplier` are in **none** of them. Worse, the loader iterates
+   `raw.items()` treating every top-level key as a team, so my
+   `schema_version` / `source` / `league` / `teams` would be read as four teams.
+
+**I also duplicated existing work:**
+`vendor/mlb_bettingv2/tools/datasets/build_manager_tendencies_from_feed_live.py`
+already generates this artifact in the correct schema and location.
+
+**Remediation:** the file has been MOVED to
+`reports/phase7/mlb_removal_hazards.json`. Leaving it at
+`data/manager/manager_tendencies.json` was the dangerous option — it looks
+exactly like the production artifact.
+
+### THE FINDING THAT MATTERS MORE, and it reframes P2
+
+**`pinch_hit_aggressiveness` is defined on `ManagerProfile` (default 0.15),
+loaded from the artifact, set on the profile — and READ BY NOTHING in the sim
+engine.** Verified: the only hit in `sim_engine/*.py` is its definition.
+
+So even a **correct** artifact, at the **correct** path, in the **correct**
+schema, keyed **correctly**, would produce **zero** substitution behaviour.
+
+**P2's blocker was never the missing data file. It is that the simulation has no
+code path that consumes a substitution knob.** The file's absence is a symptom;
+the absent CONSUMER is the cause. My framing — repeated several times in this
+ledger — had it backwards.
+
+This is the fourth "presence is not reachability" instance I have hit personally
+today, and the first where I was the one who created the inert thing.
+
+### P2, restated correctly
+
+1. **Write the sim logic first** — a removal roll per starter per half-inning in
+   `simulate.py`, with per-game state (NOT roster mutation: the roster is shared
+   across sims and caches `_batter_by_id`, so mutating it leaks between runs).
+2. **Then feed it**, via the EXISTING generator and schema, at the vendor path,
+   keyed by `team_id`/`abbreviation`.
+3. The fitted hazards in `reports/phase7/mlb_removal_hazards.json` remain valid
+   as the empirical basis — inning hazard peaking 0.0509 at the 8th, slot
+   multiplier 0.71→1.55, team spread 2.0x. They just have no consumer yet.
+
+## 2026-08-17 — P2 STEP 2: **the consumer is written, reachable, and closes 34.3% of the opportunity gap**
+
+Lane `convergence-phase7-crps`. `vendor/mlb_bettingv2/sim_engine/simulate.py` +
+`models.py`, `tests/test_mlb_position_substitutions.py` (9 passing),
+`scripts/measure_substitution_effect.py`. **Dark-launched OFF. No deploy.**
+
+This is the code path whose ABSENCE — not the missing data file — was the real
+blocker, per the correction above.
+
+### Measured on REAL roster artifacts (30 games x 40 sims, 21.6k starter-games)
+
+    substitutions OFF: starter AB 3.985   bias +0.490  (+14.0%)
+    substitutions ON : starter AB 3.817   bias +0.322   (+9.2%)
+    -> 34.3% of the opportunity gap closed
+    bench AB when ON: mean 1.365 over 2,802 appearances
+
+Against the measured actual of **3.495**. This is the engine actually removing
+batters, not a rescaling of its output.
+
+### Design, and the two constraints that shaped it
+
+**Per-GAME state, never roster mutation.** `TeamRoster` objects are reused across
+every simulation of a slate and cache `_batter_by_id` on themselves, so mutating
+`lineup.batters` would leak substitutions from run N into run N+1 and silently
+corrupt the distribution. Substitutions live in a `(team_id, slot) -> profile`
+map on the game state. **Two tests guard this** — identical repeated runs, and an
+explicit assert that the lineup is unmutated after 15 games.
+
+**The margin term is deliberately OMITTED.** Exposure by score band is not
+observable (a starter's band is known only at exit), so the fitted value is a
+normalised share rather than a hazard, and its direction disagreed with an
+independent event count. Shipping an unresolved term into a live model is
+guessing with extra steps.
+
+### A THIRD INERT-FEATURE BUG, caught by the reachability test
+
+The first version set `position_substitutions` with `setattr` on a `GameConfig`
+instance. **`dataclasses.replace()` rebuilds from DECLARED FIELDS ONLY**, and the
+sim calls `replace(cfg, rng_seed=...)` on every run — so the attribute was
+discarded before the first pitch and the feature read as permanently disabled.
+All three reachability tests failed; it is now a declared field.
+
+**Third time today a feature was wired and unreachable** (the props seal's
+predicate, the misplaced tendencies artifact, this). The reachability test is the
+only reason any of them were caught.
+
+### WHAT IS NOT ESTABLISHED
+
+- **The remaining +9.2% bias is unexplained.** The model closes a third; two
+  thirds remain. Candidates not yet separated: multiple removals per slot (only
+  the FIRST is modelled, matching the fit), games ending before the home 9th, and
+  a mixed comparison population in the 3.495 target (which includes players who
+  entered as substitutes).
+- **NO accuracy claim.** This measures OPPORTUNITY only. Whether it improves the
+  market scoreboard is a different question, and **it cannot be answered by
+  re-running `mlb_opportunity_haircut.py` as-is** — that script scores
+  PRODUCTION'S PUBLISHED projections, which are unaffected by an undeployed
+  engine change. Answering it needs a re-projection with the flag on.
+- **Bench selection is a known simplification**: next-available, not by position
+  or platoon. It models the opportunity loss, not the identity of the
+  replacement.
+
+## 2026-08-17 — P2 RE-PROJECTION SCORED AGAINST THE MARKET: **3 of 4 markets improve, 1 REGRESSES, and the market still wins all four**
+
+Lane `convergence-phase7-crps`. `scripts/reproject_mlb_props_with_subs.py`.
+45 games x 120 sims **per arm**, 2,415 scored rows. Read-only, no deploy.
+
+**This is the measurement P2 existed to produce.** Both arms are the SIM'S OWN
+empirical distribution over identical seeds and rosters, differing in exactly one
+input (`position_substitutions`). No binomial assumption, no rescaling of
+production's published numbers — the earlier haircut work could not answer this
+because it scored production's projections, which an undeployed engine change
+does not touch.
+
+| market | n | base | subs OFF | subs ON | market | effect |
+|---|---|---|---|---|---|---|
+| batter_hits | 659 | 0.592 | 0.24404 | 0.24195 | **0.23077** | +0.00209 better |
+| batter_rbis | 663 | 0.312 | 0.22211 | 0.21638 | **0.20959** | +0.00573 better |
+| batter_runs_scored | 651 | 0.410 | 0.23974 | 0.23828 | **0.23377** | +0.00146 better |
+| batter_total_bases | 442 | 0.423 | 0.26177 | 0.26331 | **0.24510** | **−0.00154 WORSE** |
+
+### The honest reading
+
+**Substitution helps 3 of 4 and hurts 1.** The gains are small (+0.0015 to
++0.0057) and **no arm beats the market in any market.** P2 improved the engine;
+it did not produce an edge.
+
+**TOTAL BASES REGRESSED, and the likely cause is a known simplification I
+shipped.** Bench selection is **next-available** — not by position, not by
+platoon. Total bases is power-weighted, so replacing a starter with an arbitrary
+bench bat distorts the upper tail more than the lost opportunity corrects. Hits
+and runs are less sensitive to WHO the replacement is; total bases is the market
+where the identity of the substitute matters most. **That is a falsifiable
+explanation and it is the obvious next thing to fix.**
+
+### THE SMOKE RUN OVERSTATED THE EFFECT BY ~3x — do not quote it
+
+A 12-game / 60-sim smoke showed hits **+0.00700** and runs **+0.00744**. The full
+45-game / 120-sim run shows **+0.00209** and **+0.00146**. Same code, same
+method, 3x smaller effect. **The smoke numbers were small-sample noise** and
+would have been a materially misleading result to report. Recording this because
+the temptation to publish the first encouraging number is exactly what the
+session's other corrections were about.
+
+### Where P2 stands
+
+- **Opportunity defect: 34.3% closed**, measured on the engine `[earlier entry]`.
+- **Accuracy: improved on 3 of 4 prop markets, regressed on 1.**
+- **Edge: none.** The market wins all four, by 0.0045 to 0.0182 Brier.
+- **Flag remains OFF.** Nothing is deployed and nothing should be until the
+  total-bases regression is understood — shipping a change that is known to make
+  one live market worse is not defensible on a 3-of-4 record.
+
+### Next, in order
+
+1. **Platoon/position-aware bench selection.** Directly targets the one
+   regression, and is the difference between modelling the opportunity loss and
+   modelling the substitution.
+2. Re-run this script. It is now a one-command scoreboard for any engine change.
+3. Only then consider a deploy request, with the total-bases row non-negative.
+
+## 2026-08-17 — RESEARCH: what the MLB sim is missing. **The biggest gap is a built dimension that is fed nothing.**
+
+Lane `convergence-phase7-crps`. Full write-up:
+`.syndicate/research_2026-08-17_mlb_sim_gaps.md`. Read-only.
+
+**ACCESS CAVEAT FIRST:** `/api/ops/artifacts/stream` **403s on `roster_objs/`
+paths** (it serves `daily_summary` fine with the same token), so production
+roster profiles could NOT be read directly. Findings rest on mirrored artifacts
+that production WROTE plus the code path. **Production population is
+UNVERIFIED** and is a five-minute check for anyone with worker disk access.
+
+### THE HEADLINE
+
+**Pitch-type effectiveness is fully built, actively sampled, and 100% inert.**
+
+    pitcher.arsenal                  100.0%  (449/449)
+    batter.platoon_mult_vs_*          98.7%
+    batter.venue_mult_*               98.4%
+    batter.vs_pitch_type               0.0%  (0/450)
+    pitcher.pitch_type_whiff_mult      0.0%  (0/449)
+    pitcher.pitch_type_hr_mult         0.0%  (0/449)
+    pitcher.statcast_splits_n_pitches  0.0%  (0/449)
+
+The sim consumes all four (`simulate.py:1067/1068/1097/1099`, `:2779-2796`) as
+`.get(pitch_type, 1.0)`. **Empty map -> 1.0 -> a slider and a fastball are
+interchangeable.** The pitch is chosen from a real arsenal and then cannot affect
+anything.
+
+**Chain, evidenced end to end:** `_apply_cached_statcast_pitch_splits` calls
+`fetch_pitcher_pitch_splits`, which is **CACHE-ONLY** — reads
+`cache.get("pitcher_pitch_splits", …)`, returns None on miss, **never fetches**.
+The statcast cache holds **1,282 files in exactly one namespace, `bvp`**; the
+`pitcher_pitch_splits` namespace **has never been written**. Its populator is a
+manual x64 tool outside the daily pipeline.
+
+**Also collected daily and never used:** BVP (batter-vs-pitcher) — 1,282 cached
+files, `statcast_bvp.py` exists, and `simulate.py` contains **no reference to
+bvp at all**. Evaluation tooling only.
+
+### GENUINELY ABSENT MODELLING, ranked
+
+1. **No defensive quality anywhere** — no OAA/DRS/UZR, no team or player fielding
+   term. **BABIP is modelled with no defence behind it.** Largest true hole.
+2. **No batted-ball type model** — no GB/FB/LD, no launch angle, no exit
+   velocity. `inplay_hit_rate` is one scalar, so **park factors cannot interact
+   with a hitter's profile** and defence could not be applied even if it existed.
+3. **No catcher framing** — the umpire IS modelled (called-strike multiplier);
+   the catcher, a larger and more persistent effect on K/BB, is not.
+4. **No batter fatigue/availability** (`availability_mult` is pitcher-only).
+5. **No visible recency weighting** — rates read as season aggregates.
+
+### WHERE A MARKET BEAT IS MOST LIKELY
+
+1. **Pitch-type matchup** — model, consumption, loader, cache and fetch tool ALL
+   exist. This is pipeline wiring, not modelling, and soft prop books price K
+   props off season rates rather than arsenal-vs-weakness.
+2. **Catcher framing** — cheap, sits beside the umpire term already there, moves
+   K/BB props directly.
+3. **Batted-ball types, then defence** — the pair unlocks park interaction and
+   total-bases accuracy, the exact market where P2's substitution work REGRESSED.
+4. **BVP** — already collected daily; currently evaluation-only.
+
+**Aim all of it at PROPS.** Game lines carry a sharp reference on 102/102
+markets; props carry 0%.
+
+## 2026-08-17 — WIRING THE PITCH-TYPE SPLITS: **the cache namespace now exists and the data is real. The MEASUREMENT is not done.**
+
+Lane `convergence-phase7-crps`. `scripts/measure_pitch_splits_effect.py`.
+Local cache only, **no deploy, no production change.**
+
+### What is established
+
+**The populator works and the missing data is now obtainable.** Ran
+`tools/statcast/fetch_pitcher_pitch_splits_x64.py` under the vendored x64 venv
+(pybaseball 2.2.7). The `pitcher_pitch_splits` cache namespace — **which had
+never been written** — now exists and is filling.
+
+**The cached content is exactly the signal that was missing.** For pitcher
+518876, over **2,122 pitches**:
+
+    whiff_mult   CH 1.55   SL 1.55   |   FF 0.65   FC 0.65   SI 0.65
+    pitch_mix    7 pitch types, real usage shares
+    inplay_mult  CH 1.03  CU 0.71  FF 0.88  FC 1.22
+
+**Today every one of those collapses to 1.0.** A changeup that misses bats at
+1.55x and a fastball at 0.65x are currently interchangeable in the sim.
+
+### The measurement harness, and why its first output MUST BE IGNORED
+
+`measure_pitch_splits_effect.py` compares two arms differing in exactly one
+thing: whether pitchers carry pitch-type multipliers. Arm B calls **the
+builder's own `_apply_cached_statcast_pitch_splits`** — not a reimplementation —
+because splits are applied at ROSTER BUILD time and the archived artifacts were
+built against an empty cache, so re-reading them picks up nothing.
+
+**A 6-game smoke returned 2 markets better / 2 worse. That result is
+MEANINGLESS and is recorded here so nobody quotes it:** splits were applied to
+**3 of 109 pitcher-slots (2.8%)**. At that application rate the two arms are
+nearly identical and the differences are noise. **The script prints the
+application rate and REFUSES outright at 0%** — the guard exists because this is
+exactly the shape of a result that looks like a finding.
+
+### WHAT IS STILL OWED — this is a bigger data job than one pass
+
+- **73 starters fetched (~23 cached at the time of writing, ~3/min).**
+- **241 distinct BULLPEN arms have NOT been fetched at all.** Relievers face a
+  third of plate appearances; a starters-only application understates the effect
+  and biases it toward early innings.
+- **314 pitcher fetches total, ~60-90 minutes of network time.**
+- The real comparison needs a HIGH application rate. Do not score until it is.
+
+### Also worth recording
+
+**The archived roster artifacts cannot be re-read to pick this up.** Splits are
+applied at build time. Either rebuild rosters, or apply the builder's function to
+loaded profiles as this harness does. Anyone expecting a cache fill alone to
+change production output will see nothing.
+
+## 2026-08-17 — **THE PITCH-SPLITS CACHE CANNOT REACH RENDER. Three independent blockers, all structural.**
+
+Lane `convergence-phase7-crps`. Raised by the user: *"don't we need this to be an
+artifact available on Render?"* **Correct, and it currently cannot be.** I had
+been filling a LOCAL cache and had not checked that it could ever ship.
+
+### Blocker 1 — THE PATH IS THE EPHEMERAL CHECKOUT
+
+`default_statcast_cache()` (`statcast_pitch_splits.py:51`) resolves to
+`Path(__file__).parents[2] / "data" / "cache" / "statcast"` =
+**`vendor/mlb_bettingv2/data/cache/statcast`**.
+
+On Render that is inside the **repo checkout**, which CLAUDE.md records as
+*"ephemeral, replaced on every deploy"* — the exact `#389` failure, where the
+SmartSim2 generators wrote to `src/data` while the reader used the mounted disk
+and every artifact was invisible and discarded.
+
+**It takes a `cache_dir` parameter — and `daily_update.py:5862` calls it WITHOUT
+one, and there is NO env override.** So the ephemeral path is not a default that
+production overrides; it is the only path production can use.
+
+### Blocker 2 — IT CANNOT SHIP VIA GIT
+
+    .gitignore:111   vendor/*/data/
+    tracked cache files: 0
+
+The whole tree is gitignored. Filling it locally and committing is not available.
+
+### Blocker 3 — NOTHING ON THE WORKER POPULATES IT
+
+The populator is `tools/statcast/fetch_pitcher_pitch_splits_x64.py`, a **manual
+x64-only tool** requiring `pybaseball`. It is not called by `daily_update.py` or
+any worker entrypoint. `fetch_pitcher_pitch_splits` is **cache-only** and returns
+None on a miss, so a worker with an empty cache silently produces 1.0
+multipliers — which is precisely today's production state.
+
+### And a fourth, if the first three were fixed
+
+**It is not in `HOT_ARTIFACT_PATTERNS`** (`artifact_publisher.py:35`), so even
+written to the mounted disk it would not be exported or mirrored.
+
+### THE FIX HAS A CLEAN SHAPE — and it is NOT "commit the cache"
+
+1. **Emit ONE artifact, not 314 hashed cache files.** A hash-keyed `DiskCache` is
+   the wrong shape to publish. Write
+   `data/mlb_source/.../pitch_splits_<season>.json`, keyed by pitcher id.
+2. **Resolve it through `data_root()`** (`refresh_state_store.py:419`,
+   `SYNDICATE_DATA_ROOT`) so it lands on the mounted disk, not the checkout.
+3. **Add it to `HOT_ARTIFACT_PATTERNS`** so it mirrors and exports like every
+   other artifact.
+4. **Populate it on a schedule, not by hand.** Pitch mix drifts through a season;
+   a one-off fill goes stale. Weekly is likely enough.
+
+**Do NOT simply point `cache_dir` at the disk and call it done** — that leaves a
+hash-keyed cache as a production artifact, un-mirrorable and un-inspectable, and
+still with no populator on the worker.
+
+### Status
+
+**Everything measured so far is LOCAL-ONLY and cannot affect production.** The
+73 starter splits now cached prove the DATA exists and is rich (whiff 1.55 vs
+0.65 across pitch types). They do not prove anything about Render, and the effect
+measurement now running is an offline experiment, not a production preview.
+
+## 2026-08-17 — PITCH-TYPE SPLITS **WIRED FOR PRODUCTION** (artifact + loader, tested). Effect measurement is **INCONCLUSIVE at 12.7% coverage.**
+
+Lane `convergence-phase7-crps`. Local only, **no deploy**.
+
+### What is now built — this closes 2 of the 3 Render blockers
+
+**1. A publishable ARTIFACT replaces the un-shippable cache.**
+`scripts/build_mlb_pitch_splits_artifact.py` reads the hash-keyed `DiskCache`
+and writes ONE document keyed by pitcher id to
+`data/mlb_source/source_artifacts/data/pitch_splits/pitch_splits_2026.json`,
+resolved through **`SYNDICATE_DATA_ROOT`** — the mounted disk on Render, not the
+ephemeral checkout. **73 pitchers published**, all clearing a 200-pitch floor;
+the builder REFUSES to write an empty artifact.
+
+**2. The loader now reads the ARTIFACT FIRST**, falling back to the cache.
+`statcast_pitch_splits.fetch_pitcher_pitch_splits` was **cache-only**, and the
+cache is gitignored AND inside the ephemeral checkout — so on a worker it always
+missed and every multiplier silently resolved to 1.0.
+
+**5 tests pass, and the one that matters is the WORKER case:** an **empty
+DiskCache** still yields real splits when the artifact is present. A test passing
+only with a warm local cache would have proved nothing about production. Also
+asserted: multipliers actually DIFFER by pitch type and none is the inert 1.0.
+
+### STILL OPEN — one line, blocked by lane ownership
+
+`HOT_ARTIFACT_PATTERNS` needs
+`"*_source/source_artifacts/data/pitch_splits/pitch_splits_*.json"`, but
+`syndicate/features/shared/artifact_publisher.py` is claimed by **OPEN lane
+`clv-without-settlement`**. I had already taken one file under override today and
+**did not reach across a second time.** Without it the artifact will not mirror
+or export — it is a one-line change for that lane's owner.
+
+**Blocker 3 also remains:** nothing on the worker POPULATES the splits. The x64
+populator is manual and outside the daily pipeline, and pitch mix drifts through
+a season, so this needs a scheduled job.
+
+### THE EFFECT — flat, and INCONCLUSIVE, and I am not reading it as "no effect"
+
+45 games x 120 sims per arm, 2,415 scored rows:
+
+| market | n | splits OFF | splits ON | market | effect |
+|---|---|---|---|---|---|
+| batter_hits | 659 | 0.24404 | 0.24461 | 0.23077 | −0.00058 worse |
+| batter_rbis | 663 | 0.22211 | 0.21899 | 0.20959 | +0.00312 better |
+| batter_runs_scored | 651 | 0.23974 | 0.24058 | 0.23377 | −0.00084 worse |
+| batter_total_bases | 442 | 0.26177 | 0.26093 | 0.24510 | +0.00084 better |
+
+2 better, 2 worse, every effect <= 0.003, market still wins all four.
+
+**COVERAGE WAS 102 of 806 pitcher-slots = 12.7%.** I fetched the **73 starters
+only**; the 241 distinct bullpen arms were never fetched. **By the same standard
+that made me discard the 2.8% smoke, this is inconclusive.**
+
+**One nuance in its favour, stated as reasoning not measurement:** a starter is
+one slot per team but faces the majority of plate appearances, so PA-weighted
+coverage is far above 12.7% — plausibly ~60%. That makes the flat result
+*suggestive* that starter splits alone do not carry a large prop effect. It does
+NOT settle it, because relievers own the late innings where prop outcomes are
+decided.
+
+### Honest status of the research prediction
+
+The 2026-08-17 research ranked pitch-type matchup as the **most likely route to a
+market beat**. **That prediction is not yet supported by measurement.** The
+wiring is real and tested; the payoff is unproven and needs bullpen coverage
+before anyone concludes either way.
+
+## MEASUREMENT — WNBA phase 2 autorun: ROLLED BACK PRE-EMPTIVELY, the predicted OOM was real `[2026-08-17 22:2x-22:4xZ]`
+
+Closes the `396cac89` deploy row. **Verdict: the hold was correct and the
+override was costly.** No OOM kill ever fired — this was caught climbing.
+
+- RECONCILED: WNBA phase 2 autorun — measured 2026-08-17, rolled back at 85.3%.
+
+**The climb, on live-odds-worker (2048MB ceiling):**
+
+    22:17:18   1,365.6 MB   66.7%   headroom 682 MB
+    22:28:50   1,705.3 MB   83.3%   headroom 343 MB
+    22:30:03   1,746.3 MB   85.3%   headroom 302 MB   <- rollback fired
+    22:36:00   1,583.4 MB   77.3%   post-rollback
+
+**+380 MB in 13 minutes, monotonic.** The requesting lane sized its refresh leg
+at 1.3-1.5 GB and triage measured 1,186 MB of headroom against it; that
+arithmetic predicted an OOM and the climb matched it. Rolled back to `7470939b`
+(confirmed live 22:4xZ), which retains the soccer live-lens fix.
+
+**THE TRAP THAT REMAINS LIVE:** `SYNDICATE_ENABLE_WNBA_PREGAME_REFRESH_AUTORUN`
+is still `'true'` on live-odds-worker. The env was deliberately NOT touched —
+flipping another lane's flag to make a deploy fit stays refused — so **any
+redeploy of this service re-arms the autorun by accident.** Whoever deploys
+live-odds-worker next must either clear that flag first or expect the leg.
+
+### THE WATCHER GUARDING THIS REPORTED "CLEAN" WHILE IT WAS BLIND
+
+The memory watcher built specifically to catch this printed
+`Window clean. Peak live-odds-worker memory 0.0% of 2048MB` while the service sat
+at 85.3%. `render_logs.py` truncates the embedded JSON, `json.loads` threw on
+every sample, the failures sat inside `except: pass`, and an empty sample set
+printed as the healthy case. **A peak of 0.0% on a running service is impossible
+and the code presented it as success.**
+
+The rollback happened because the number was checked BY HAND, not because the
+guard fired. Rule filed in `learnings.md`: zero samples is NO DATA, never clean;
+an impossible reading is a bug report; never `except: pass` around a guard's
+parse. The replacement watcher exits non-zero on zero samples and was used to
+confirm this rollback.
