@@ -1319,6 +1319,17 @@ generalise but are not current state. `#377`, `#425`, `#429`.
   **QUEUED in `.syndicate/deploy_manifest_refresh_worker.md`** rather than
   shipped: an MLB sim was 11 min in and would have died for a key nothing
   reads yet. **`edge_basis` has never been observed on a served row.**
+- **STANDING DECISION, 2026-08-17, FROM THE OWNER: KEEP THE GATE WAIVERS.**
+  The three tolerated findings were put to the owner explicitly, together with
+  the fact that the gate went FAIL -> PASS by waiving and not fixing, and the
+  offer to revert `cda5ffdb` + `411977fd` if a failing gate was preferred.
+  **The answer was keep them.** So a future session finding a green gate over
+  three waived artifact-coverage findings is looking at a DECISION, not an
+  oversight — do not revert either commit without a fresh owner override,
+  logged here. What remains correct to do is DELETE the entries when the
+  underlying artifacts are generated, and to rebuild the two checks the
+  waivers removed (MLB daily mirror data presence; NFL/NCAAF advanced
+  surfaces) rather than widening the allowances.
 - **THE MIGRATION GATE PASSES, AND IT PASSES BECAUSE IT ASKS LESS.** FAIL ->
   PASS on 2026-08-17 via THREE WAIVERS AND ZERO FIXES: MLB daily manifest
   breadth (`cda5ffdb`), NFL/NCAAF advanced inputs (`411977fd`), plus the
