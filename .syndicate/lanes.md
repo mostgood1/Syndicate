@@ -3824,3 +3824,84 @@ Taken on explicit user instruction ("now take the cadence lever too").
 - **NOT CLAIMED:** that this role reviews or approves engineering decisions. It
   serialises deploys, holds the guardrails, takes the measurement, and keeps the
   ledger true. Correctness of a fix stays with the lane that wrote it.
+
+### commit-guard-blind-to-own-recipe — OPEN — opened 2026-08-17 — session: commit-guard-blind-to-own-recipe (`2028fec0-86fa-4442-a8db-a7ff8949aec8`)
+- Goal: a session that follows the guard's OWN printed instructions is not blocked
+  by it. Two testable outcomes: (a) a command that assigns `GIT_INDEX_FILE=` (or
+  either `SYNDICATE_ALLOW_STAGED_*`) inside the command string is exempt, exactly
+  as the same variable in the hook's env already is; (b) a PATHSPEC-limited
+  commit (`git commit -- <paths>`, `git commit <paths>`, `--pathspec-from-file`)
+  is exempt, while `-i`/`--include` and a pathspec-less commit keep today's
+  behaviour.
+- Files: `.claude/hooks/commit-guard.py`,
+  `tests/test_commit_guard_worktree_index.py`. Checked against every OPEN lane's
+  `- Files:` at open time — no lane claims either path.
+- Hypothesis: n/a for (a) — it is a read of the code: the hook reads
+  `os.environ`, and the `export` in the recipe it prints runs in the Bash call
+  the hook is gating, i.e. AFTER it. For (b) the hypothesis was "a pathspec
+  commit cannot carry a stale index entry", and it is now MEASURED, not assumed.
+- Falsification test: build a repo whose index holds a revert of `A.txt` and a
+  deletion of `C.txt` (still on disk), then `git commit -m x -- C.txt`. If the
+  resulting tree drops `A.txt`'s line or `C.txt`, the pathspec form is NOT
+  immune and (b) must be scoped-filtering rather than exemption.
+  RESULT 2026-08-17: tree kept `A.txt` at HEAD content and `C.txt` on disk;
+  `--stat` = 1 file. Immune. Same probe run for `-i` (revert LANDED — stays
+  guarded), `--amend -- <paths>` (immune), `--pathspec-from-file` (immune),
+  and `-a` (immune to predicate 2, but it COMMITTED the deletion under
+  predicate 1 — stays guarded).
+- Verification: the four probes above re-expressed as tests in
+  `tests/test_commit_guard_worktree_index.py` against real git repos, plus the
+  observed false positive replayed (a two-path pathspec commit while an
+  unrelated `.syndicate/lanes.md` revert is staged) — pass, and the existing
+  suite still passes.
+- Blocked by: none.
+- **COLLISION NOTICE, filed 2026-08-17 by `branch-overlap-baseline-watch`.** A
+  second session is editing `.claude/hooks/commit-guard.py` right now:
+  `local_7c140749-7876-4a25-86ea-a20756dbc18f`, "Fix commit-guard's undetectable
+  GIT_INDEX_FILE escape", user-started and running. **I caused this** — I spawned
+  it from the same two defects before reading this lane, so it duplicates work
+  this lane has already MEASURED (the four probes above). Its brief covers (a)
+  and (b) and nothing this lane does not already have.
+  I could not warn either session: `send_message` is unavailable in
+  scheduled-task runs (contract §4a, measured again here), so this block is the
+  only channel I have. **Recommend that session be stopped rather than merged** —
+  two sessions writing one hook is the exact shape this lane exists to prevent,
+  and this lane is further along.
+
+### render-events-read-label — CLOSED 2026-08-17 — `render_events.py` now reports the window READ separately from the span of events FOUND; shipped in `f03928db`, 20/20 tests pass — opened 2026-08-17 — session: branch-overlap-baseline-watch (`65591da9-7697-4a25-a6fd-d4702c2941d1`)
+- **Opened RETROACTIVELY, after the edit and the commit. That is a protocol
+  violation and is recorded rather than tidied away** — `/lane open` is supposed
+  to precede editing. Nothing collided (no OPEN lane claimed these paths;
+  `render-events-reader` was archived earlier the same day), so the cost was zero
+  this time, which is luck and not a defence.
+- Goal: a reader of this tool cannot mistake "few events found" for "little of
+  the window read".
+- Files: `scripts/render_events.py`, `tests/test_render_events.py`,
+  `reports/branch_overlap/baseline.jsonl`.
+- Hypothesis: n/a — it is a read of the code. `main()` set its `COVERED` line
+  from `events[0]`/`events[-1]` timestamps, i.e. the span of what was FOUND,
+  while the label claimed coverage.
+- **What it cost, which is why this is worth a lane at all.** A scheduled 5-hour
+  events read that returned one 4-event deploy cycle printed
+  `COVERED 14:33 .. 14:39`. I read that as "the API only gave me 6 minutes" and
+  downgraded a correct, fully-paged all-clear to "~4h54m unverified". The window
+  had read whole. **An understated coverage figure is not a safe error** — it
+  argues against another lane's urgency exactly the way `learnings.md`
+  2026-08-16 ("absence in a window isn't absence") already records.
+- Falsification test: a stub returning 4 events for a requested 5-hour window
+  must yield `truncated == ""`; a stalled cursor on a FULL page must NOT. Both in
+  `tests/test_render_events.py`. RESULT: pass, 20/20.
+- Verification: ran against the live Render API on all three paths — fully-paged
+  window (prints `READ … fully paged`), empty window (prints `READ no events` +
+  positive control), and JSON (`read {fully_paged, truncated_reason}` +
+  `event_span`). Confirmed the previously-misread window is `CLEAN` across its
+  whole 5 hours.
+- Consequence for the ledger, stated because it is cheap to state and expensive
+  to rediscover: **any ledger entry citing a `COVERED` range from this tool was
+  quoting the EVENT SPAN, not the coverage.** The error direction is always
+  understatement, so conclusions drawn from it are conservative, not wrong.
+- `fetch_events` now returns `(events, pages, truncated)`. Callers outside this
+  script: none. A malformed API response no longer shares the empty-page branch,
+  where an unrecognised shape reported as a window that had ended — the
+  "unknown must not default permissive" rule.
+- Blocked by: none.

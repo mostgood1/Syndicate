@@ -66,6 +66,24 @@ def _repo(path: Path) -> Path:
     return path
 
 
+def _stage_a_deletion_of_a_file_still_on_disk(repo: Path) -> Path:
+    """Predicate 1's shape: `D` in the index, present in the worktree."""
+    doomed = repo / "ondisk.txt"
+    doomed.write_text("keep-me\n", encoding="utf-8")
+    _run(repo, "add", "ondisk.txt")
+    _run(repo, "commit", "-qm", "third")
+    _run(repo, "rm", "--cached", "-q", "ondisk.txt")
+    assert doomed.exists()
+    return doomed
+
+
+def _an_unrelated_edit(repo: Path) -> str:
+    """A path with a real worktree change, so a pathspec commit has something to
+    do. Returns its repo-relative name."""
+    (repo / "mine.txt").write_text("my work\n", encoding="utf-8")
+    return "mine.txt"
+
+
 def _stage_a_revert(repo: Path):
     """Stage HEAD^'s blob while the worktree keeps HEAD's content.
 
@@ -220,3 +238,242 @@ class TestUnchangedContracts:
         rc = _verdict(monkeypatch, capsys, f"cd {linked} && git commit -m x",
                       cwd=main, project_dir=main)
         assert rc == 2
+
+
+class TestTheCommandSetsTheEnvironment:
+    """The guard read `os.environ` for all three of its exemptions, but a
+    PreToolUse hook runs BEFORE the shell. Every override this guard documents
+    is written as a shell assignment, so none of them could ever reach it.
+
+    Observed 2026-08-17: a session followed the isolated-index recipe printed in
+    the guard's own refusal message and was refused again by the same guard.
+    """
+
+    def test_the_printed_recipe_is_honoured(self, trees, monkeypatch, capsys):
+        """THE LOAD-BEARING ONE. Verbatim the command the refusal message tells
+        you to run. Pre-fix this returned 2: the `export` had not run yet."""
+        main, _ = trees
+        _stage_a_revert(main)
+        cmd = ("export GIT_INDEX_FILE=C:/tmp/idx-lane && "
+               "git read-tree HEAD && git add -- mine.txt && git commit -m x")
+        assert _verdict(monkeypatch, capsys, cmd, cwd=main, project_dir=main) == 0
+
+    def test_the_inline_prefix_form_is_honoured(self, trees, monkeypatch, capsys):
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys,
+                        "GIT_INDEX_FILE=/tmp/idx git commit -m x",
+                        cwd=main, project_dir=main) == 0
+
+    @pytest.mark.parametrize("var", ["SYNDICATE_ALLOW_STAGED_DELETES",
+                                     "SYNDICATE_ALLOW_STAGED_REVERTS"])
+    def test_both_documented_overrides_work_from_the_command(
+            self, trees, monkeypatch, capsys, var):
+        """These are printed as `VAR=1 git commit ...`, which is a shell prefix.
+        Neither was reachable before this fix."""
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys, f"{var}=1 git commit -m x",
+                        cwd=main, project_dir=main) == 0
+
+    def test_an_assignment_AFTER_the_commit_does_not_exempt_it(
+            self, trees, monkeypatch, capsys):
+        """Order matters: the commit runs first and sees the shared index."""
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys,
+                        "git commit -m x && export GIT_INDEX_FILE=/tmp/idx",
+                        cwd=main, project_dir=main) == 2
+
+    def test_an_intervening_unset_wins(self, trees, monkeypatch, capsys):
+        """Last write before the commit decides, so `unset` re-arms the guard."""
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys,
+                        "export GIT_INDEX_FILE=/tmp/idx; unset GIT_INDEX_FILE; "
+                        "git commit -m x",
+                        cwd=main, project_dir=main) == 2
+
+    def test_an_empty_assignment_is_not_set(self, trees, monkeypatch, capsys):
+        """Matches `os.environ.get()` being falsy for "" -- the behaviour the
+        env-only check always had."""
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys, 'GIT_INDEX_FILE="" git commit -m x',
+                        cwd=main, project_dir=main) == 2
+
+    def test_a_similarly_named_variable_does_not_exempt(
+            self, trees, monkeypatch, capsys):
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys,
+                        "MY_GIT_INDEX_FILE_BACKUP=/tmp/x git commit -m x",
+                        cwd=main, project_dir=main) == 2
+
+
+class TestPathspecLimitedCommits:
+    """A partial commit builds its tree from HEAD plus the WORKING TREE content
+    of the named paths and never consults the index.
+
+    Measured 2026-08-17 against a repo whose index held a revert of one file and
+    a `D` of another that was still on disk: `git commit -m x -- <third path>`
+    produced a tree that kept both, `--stat` = 1 file. So flagging unrelated
+    staged paths on such a commit is a false positive by construction -- which is
+    what blocked a `scripts/render_events.py` commit over another session's
+    staged `.syndicate/lanes.md`.
+
+    `test_include_is_still_guarded` is the boundary: `-i` is the option that
+    re-admits the index, and under it the revert really did land.
+    """
+
+    def test_the_observed_false_positive_is_gone(self, trees, monkeypatch, capsys):
+        main, _ = trees
+        _stage_a_revert(main)
+        mine = _an_unrelated_edit(main)
+        rc = _verdict(monkeypatch, capsys, f'git commit -m "msg" -- {mine}',
+                      cwd=main, project_dir=main)
+        assert rc == 0
+
+    def test_a_bare_pathspec_without_the_separator(self, trees, monkeypatch, capsys):
+        """`git commit <paths>` is the same partial commit."""
+        main, _ = trees
+        _stage_a_revert(main)
+        mine = _an_unrelated_edit(main)
+        assert _verdict(monkeypatch, capsys, f"git commit -m msg {mine}",
+                        cwd=main, project_dir=main) == 0
+
+    def test_a_pathspec_naming_the_STALE_path_is_still_exempt(
+            self, trees, monkeypatch, capsys):
+        """The index is not consulted even for the named paths, so the staged
+        blob cannot ride in on its own path either."""
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys, "git commit -m msg -- tracked.txt",
+                        cwd=main, project_dir=main) == 0
+
+    def test_predicate_1_is_also_exempt_under_a_pathspec(
+            self, trees, monkeypatch, capsys):
+        """Both predicates, not just the content one."""
+        main, _ = trees
+        _stage_a_deletion_of_a_file_still_on_disk(main)
+        mine = _an_unrelated_edit(main)
+        assert _verdict(monkeypatch, capsys, f"git commit -m msg -- {mine}",
+                        cwd=main, project_dir=main) == 0
+
+    def test_pathspec_from_file_is_exempt(self, trees, monkeypatch, capsys):
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys,
+                        "git commit --pathspec-from-file=LIST -m msg",
+                        cwd=main, project_dir=main) == 0
+
+    def test_amend_with_a_pathspec_is_exempt(self, trees, monkeypatch, capsys):
+        main, _ = trees
+        _stage_a_revert(main)
+        mine = _an_unrelated_edit(main)
+        assert _verdict(monkeypatch, capsys, f"git commit --amend -m msg -- {mine}",
+                        cwd=main, project_dir=main) == 0
+
+    @pytest.mark.parametrize("opt", ["-i", "--include"])
+    def test_include_is_still_guarded(self, trees, monkeypatch, capsys, opt):
+        """MEASURED: under `-i` the staged revert LANDED in the commit. This is
+        the one pathspec form that re-admits the index."""
+        main, _ = trees
+        _stage_a_revert(main)
+        mine = _an_unrelated_edit(main)
+        assert _verdict(monkeypatch, capsys, f"git commit {opt} -m msg -- {mine}",
+                        cwd=main, project_dir=main) == 2
+
+    def test_dash_a_is_still_guarded(self, trees, monkeypatch, capsys):
+        """`-a` re-stages tracked worktree content, so predicate 2 cannot bite --
+        but a `git rm --cached` path is no longer tracked, and MEASURED, `-a`
+        committed the deletion. Predicate 1 is live under `-a`."""
+        main, _ = trees
+        _stage_a_deletion_of_a_file_still_on_disk(main)
+        assert _verdict(monkeypatch, capsys, "git commit -a -m msg",
+                        cwd=main, project_dir=main) == 2
+
+    def test_a_pathspec_less_commit_is_unchanged(self, trees, monkeypatch, capsys):
+        """The whole original contract. Every option here takes a value, and
+        none of those values is a pathspec."""
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys,
+                        'git commit -m "a message with -- in it" --author="A <a@a>"',
+                        cwd=main, project_dir=main) == 2
+
+    def test_a_bare_dash_dash_with_no_paths_is_not_pathspec_limited(
+            self, trees, monkeypatch, capsys):
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys, "git commit -m msg --",
+                        cwd=main, project_dir=main) == 2
+
+    def test_an_unknown_option_keeps_guarding(self, trees, monkeypatch, capsys):
+        """The parser's failure direction must be a false positive, never a
+        false negative: an option it cannot classify might be eating the word
+        that looks like a pathspec."""
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys,
+                        "git commit --some-future-option value",
+                        cwd=main, project_dir=main) == 2
+
+    def test_a_later_command_in_the_chain_is_not_read_as_a_pathspec(
+            self, trees, monkeypatch, capsys):
+        """`shell_words` must stop at the separator, or `git push` becomes a
+        pathspec and silences the guard."""
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys, "git commit -m msg && git push",
+                        cwd=main, project_dir=main) == 2
+
+    def test_unbalanced_quoting_keeps_guarding(self, trees, monkeypatch, capsys):
+        main, _ = trees
+        _stage_a_revert(main)
+        assert _verdict(monkeypatch, capsys, 'git commit -m "unclosed msg',
+                        cwd=main, project_dir=main) == 2
+
+
+class TestPathspecParsing:
+    """Direct unit coverage of the word/option split, where the false-negative
+    risk lives: a mis-parsed `-m` value read as a pathspec silences the guard."""
+
+    @pytest.mark.parametrize("cmd,expected", [
+        ("-m msg -- a.py", True),
+        ("-m msg a.py", True),
+        ("a.py -m msg", True),                  # git permutes
+        ("-am msg", False),                     # cluster: 'm' eats the next word
+        ("-m msg", False),
+        ("-mmsg", False),                       # attached value, no pathspec
+        ("--message=msg", False),
+        ("--message msg", False),
+        ("-F msg.txt", False),                  # -F's value is not a pathspec
+        ("--file msg.txt", False),
+        ("-S a.py", True),                      # -S's key is ATTACHED only
+        ("-Skeyid", False),
+        ("--amend --no-edit", False),
+        ("--amend --no-edit -- a.py", True),
+        ("-i -m msg -- a.py", False),
+        ("--include -- a.py", False),
+        ("--pathspec-from-file=LIST", True),
+        ("-a", False),
+        ("--", False),
+        ("--unknown-opt a.py", False),          # conservative
+        ("-m msg -- 'a file.py'", True),
+    ])
+    def test_pathspec_detection(self, cmd, expected):
+        assert guard.pathspec_limited(guard.shell_words(cmd)) is expected
+
+    @pytest.mark.parametrize("text,expected", [
+        ("-m msg && git push", ["-m", "msg"]),
+        ("-m msg; echo hi", ["-m", "msg"]),
+        ("-m 'two words'", ["-m", "two words"]),
+        ('-m "$(date)" -- a.py', ["-m", "$(date)", "--", "a.py"]),
+        ("-m a\\ b", ["-m", "a b"]),
+    ])
+    def test_words_stop_at_the_separator(self, text, expected):
+        assert guard.shell_words(text) == expected
+
+    def test_unbalanced_quotes_are_unparseable(self):
+        assert guard.shell_words('-m "unclosed') is None
